@@ -5,7 +5,7 @@ App Android React Native (Expo) : photo → SAM 3.1 sur Modal (segmentation) →
 ## Répertoires (racine = ~/Bureau/sam3-vision-app)
 
 - `backend/` — app Modal (Python)
-- `app/` — app Expo React Native (TypeScript)
+- `legacy-expo-app/` — app Expo React Native (TypeScript)
 - `scripts/` — tests, déploiement, build APK
 - `docs/` — spec et notes
 
@@ -55,11 +55,11 @@ Erreurs : HTTP 400 `{"detail": "..."}` pour image illisible, HTTP 500 sinon.
 - Aucune clé API dans l'app : tout passe par le backend.
 - Overlays de masques : images PNG base64 superposées, opacité ~0.45, couleurs tournantes ; toggle « masques on/off ».
 - États UI : chargement, erreur réseau explicite (timeout 60 s), bouton réessayer.
-- Fichiers < 500 lignes, composants découpés, pas de duplication (client API unique dans `app/src/api.ts`).
+- Fichiers < 500 lignes, composants découpés, pas de duplication (client API unique dans `legacy-expo-app/src/api.ts`).
 
 ## Vérifications attendues
 
 - `python3 -m py_compile` sur le backend, import du module sans token Modal.
 - `npx tsc --noEmit` sans erreur côté app.
-- Test E2E `scripts/test_api.py` : `/health`, `/segment`, `/analyze`, `/ask` sur une image d'exemple (`app/assets/sample.jpg` ou l'image de test des docs SAM3).
-- APK debug/release produit dans `app/android/app/build/outputs/apk/**`, taille et chemin affichés.
+- Test E2E `scripts/test_api.py` : `/health`, `/segment`, `/analyze`, `/ask` sur une image d'exemple (`legacy-expo-app/assets/sample.jpg` ou l'image de test des docs SAM3).
+- APK debug/release produit dans `legacy-expo-app/android/app/build/outputs/apk/**`, taille et chemin affichés.
