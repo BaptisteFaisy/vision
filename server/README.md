@@ -51,14 +51,23 @@ export LLM_MODEL="<modèle vision>"
 ```
 
 Le script est idempotent : il vérifie le venv Modal, crée/actualise le secret `sam3-llm`
-(`modal secret create --force --from-json`, valeurs lues dans l'environnement et jamais affichées),
+(`modal secret create --force --from-json`, valeurs lues dans l'environnement dans un fichier
+`chmod 600` et jamais affichées — la clé ne passe **jamais** en argument de commande),
 déploie `backend/modal_app.py`, affiche l'URL `https://…modal.run` et lance le test `/health`.
-Options : `--skip-smoke`, et `MODAL_PROFILE` / `MODAL_BIN` / `SECRET_NAME` / `APP_NAME` surchargeables.
+
+Options : `--skip-smoke`, `--help`, et `MODAL_PROFILE` / `MODAL_BIN` / `SECRET_NAME` /
+`APP_NAME` surchargeables. `DRY_RUN=1 ./scripts/deploy_backend.sh` valide l'environnement et
+les fichiers **sans appeler Modal** ; sans `LLM_API_KEY` le script refuse de tourner.
+Pour changer seulement la clé : `./scripts/rotate_llm_secret.sh /chemin/cle.txt`
+(rotation depuis un fichier, puis redéploiement).
 
 ## Test
 
 ```bash
-# suite complète (health, segment ± prompts, analyze, ask, erreur 400)
+# tests unitaires backend, sans GPU ni token Modal (stdlib + PIL + numpy + fastapi)
+python3 scripts/test_units.py
+
+# suite E2E complète (health, segment ± prompts, analyze, ask, erreur 400)
 python3 scripts/test_api.py https://xxxx.modal.run
 
 # ou via l'environnement
@@ -66,10 +75,21 @@ API_URL=https://xxxx.modal.run python3 scripts/test_api.py --timeout 90
 
 # image imposée et test isolé
 python3 scripts/test_api.py --url … --image photo.jpg --only health
+
+# contrat des corps invalides : 7 cas → 400, sans réémission du payload
+python3 scripts/test_api.py --url … --only contract-errors
+
+# plusieurs groupes d'un coup
+python3 scripts/test_api.py --url … --only segment,segment-prompts,bad-image
+
+# tests du client Expo (parsing, api.ts contre un serveur local, masques) — sans npm
+node app/tools/test-client.mjs
 ```
 
-Sans `--image`, le script télécharge un échantillon public ; à défaut il génère une scène
-synthétique. Code de sortie ≠ 0 dès qu'un test échoue (utilisable en CI).
+Sans `--image`, `test_api.py` télécharge un échantillon public ; à défaut il génère une scène
+synthétique. Code de sortie ≠ 0 dès qu'un test échoue (utilisable en CI). `--only analyze,ask`
+nécessite une vraie clé LLM dans le secret `sam3-llm` (tant que la clé est un placeholder, ces
+deux routes renvoient 500).
 
 ## Dev Expo Go
 
@@ -98,17 +118,19 @@ APK produite : `app/android/app/build/outputs/apk/{debug,release}/`.
 | Poste | Ordre de grandeur |
 |---|---|
 | A10G sur Modal | ~1,10 $/h de calcul facturé à la seconde |
-| Cold start (chargement SAM 3.1) | 60–120 s, une seule fois par conteneur |
-| Requête `/segment` ou `/analyze` | 2–8 s selon le nombre d'objets → quelques centimes |
+| Cold start (chargement SAM 3.1) | **~36 s mesurés une seule fois** (35,8 s pour `/health`, puis 5,7 s pour le `/segment` suivant) ; le second essai après 567 s d'inactivité n'a donné aucun cold start — non reproductible, chiffres détaillés dans [`docs/PERF.md`](docs/PERF.md) |
+| Requête `/segment` | ~1,6–2,0 s à chaud (médians mesurés sur 3 passes) → quelques centimes |
+| Requête `/analyze` | segmentation + appel LLM : non mesuré tant que la clé LLM est absente (500 attendu) |
 | LLM vision `/analyze`, `/ask` | ~0,001–0,01 $ par appel selon le modèle |
-| App au repos | 0 $ si `container_idle_timeout` est court (sinon le GPU reste facturé) |
+| App au repos | 0 $ si `scaledown_window` est court (300 s dans `modal_app.py`) ; si le conteneur ne descend pas, le GPU reste facturé |
 
 À retenir : le coût dominant est le **temps de GPU allumé**, pas le nombre de requêtes.
 Un `keep_warm` évite les cold starts mais facture en continu.
 
 ## Limites connues
 
-- **Cold start** de 1 à 2 min après inactivité (chargement des poids sur le GPU).
+- **Cold start** : ~36 s mesurés une seule fois après 450 s d'inactivité (`scaledown_window=300`) ; le second essai après 567 s n'en a produit aucun — non reproductible, à surveiller en console Modal (détail : `docs/PERF.md`).
+- **Liste d'objets coupée à 24** : `MAX_OBJECTS = 24` dans `backend/segmentation.py` trie par score décroissant puis ne garde que les 24 premiers, **sans champ d'avertissement** dans la réponse (voir `docs/SPEC.md`).
 - **Prompts libres** : la qualité dépend des concepts demandés ; sans prompt, le serveur choisit une liste générique et peut manquer de petits objets.
 - **Masques PNG base64** : réponse lourde (quelques centaines de Ko à plusieurs Mo) → Wi-Fi conseillé, timeout client 60 s.
 - **Sans état** : l'historique du chat est renvoyé par le client à chaque `/ask`, rien n'est stocké côté serveur.

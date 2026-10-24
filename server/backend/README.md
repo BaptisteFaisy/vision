@@ -15,23 +15,40 @@ Contrat HTTP exact : `../docs/SPEC.md`.
 
 ## Secret Modal
 
+**Jamais de clé en argument de commande** — la forme `modal secret create … LLM_API_KEY=…`,
+même en copiant un exemple, laisse la clé dans l'historique shell et dans la table des
+processus (`ps`). Elle n'est plus documentée ici.
+
+Le dépôt passe par `--from-json` avec un fichier temporaire `chmod 600` — implémentation
+unique dans `scripts/lib-env.sh` (`sync_secret_from_env`), appelée par :
+
 ```bash
-/home/baptiste/.venv-modal/bin/modal secret create sam3-llm \
-  LLM_BASE_URL=https://openrouter.ai/api/v1 \
-  LLM_API_KEY=<clé> \
-  LLM_MODEL=google/gemini-2.5-flash
+# rotation depuis un fichier de clé (recommandé) : pousse le secret puis redéploie
+./scripts/rotate_llm_secret.sh /chemin/cle.txt
+
+# ou à l'occasion d'un déploiement : le script pousse le secret depuis l'environnement
+export LLM_BASE_URL="https://openrouter.ai/api/v1" LLM_API_KEY="<clé>" LLM_MODEL="<modèle vision>"
+./scripts/deploy_backend.sh
+
+# vérifier le processus sans rien pousser sur Modal
+DRY_RUN=1 ./scripts/deploy_backend.sh
 ```
 
-`LLM_BASE_URL` et `LLM_MODEL` sont optionnels (défauts OpenRouter + `google/gemini-2.5-flash`) ;
-`LLM_API_KEY` est obligatoire. Aucune clé n'est écrite dans le dépôt.
+Les trois clés du secret sont `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`. Côté backend,
+`llm.py` retombe sur OpenRouter (`DEFAULT_BASE_URL`) et `google/gemini-2.5-flash`
+(`DEFAULT_MODEL`) si les deux premières manquent ; `rotate_llm_secret.sh` applique le même défaut
+d'URL (`BASE_URL_DEFAULT` dans `scripts/lib-env.sh`). La clé, elle, est obligatoire : les scripts
+**refusent de tourner** sans `LLM_API_KEY` plutôt que de créer un secret vide. Aucune clé n'est
+écrite dans le dépôt.
 
 ## Déploiement
 
 ```bash
 cd /home/baptiste/Bureau/sam3-vision-app
-/home/baptiste/.venv-modal/bin/modal deploy backend/modal_app.py
+./scripts/deploy_backend.sh            # secret + deploy + smoke /health (idempotent)
 ```
 
+Équivalent manuel (sans la partie secret) : `/home/baptiste/.venv-modal/bin/modal deploy backend/modal_app.py`.
 L'URL se termine par `...modal.run` ; elle sert de `expo.extra.apiUrl` côté app.
 
 ## Smoke test
@@ -53,5 +70,6 @@ celui tapé par l'utilisateur**.
 ## Limites connues
 
 - 1 requête à la fois par conteneur (Modal 1.6.2 n'accepte que `max_inputs=1` pour `@app.cls`).
-- `scaledown_window=300` : le premier appel après 5 min de veille recharge les poids (~30-60 s).
+- `scaledown_window=300` : le premier appel après 5 min de veille recharge les poids — **~36 s
+  mesurés une seule fois** (35,8 s pour `/health`), non reproductible depuis : voir `docs/PERF.md`.
 - Les masques sont calculés sur une copie ≤ 1024 px puis remontés en nearest à la taille d'origine.

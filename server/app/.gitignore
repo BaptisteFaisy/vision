@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# build des tests client (app/tools/test-client.mjs)
+.test-build/
