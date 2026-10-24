@@ -28,6 +28,11 @@ from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detai
 #   LIVE_APP_NAME=sam3-live-h200 LIVE_GPU=H200 modal deploy backend/live_app.py
 APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-live")
 GPU_TYPE = os.environ.get("LIVE_GPU", "A100")
+REGION = os.environ.get("LIVE_REGION") or None
+# Sans routing_region, Modal fait passer TOUT le trafic web par Virginia (us-east),
+# même si le conteneur est en Europe : pour la latence téléphone, c'est la moitié
+# du trajet. Fixable uniquement au premier déploiement (documenté par Modal).
+ROUTING = os.environ.get("LIVE_ROUTING_REGION") or None
 MODEL_LABEL = "sam3.1"
 BACKEND_DIR = Path(__file__).resolve().parent
 
@@ -87,9 +92,16 @@ def gpu_name() -> str:
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
+    region=REGION,
+    routing_region=ROUTING,
     timeout=300,
     startup_timeout=900,
-    scaledown_window=30,
+    # UN SEUL GPU, JAMAIS DEUX : max_containers=1 empêche Modal de lancer un second
+    # conteneur (donc une seconde carte) même si plusieurs frames arrivent en parallèle.
+    # min_containers=0 + scaledown court : la carte s'éteint dès la fin du direct.
+    max_containers=1,
+    min_containers=0,
+    scaledown_window=int(os.environ.get("LIVE_SCALEDOWN", "20")),
 )
 class Sam3Live:
     """Conteneur chaud A100 : modèle chargé une fois, inférence sérialisée sur un verrou."""
@@ -157,7 +169,9 @@ class Sam3Live:
         @api.get("/health")
         async def health():
             return {"ok": True, "model": MODEL_LABEL, "device": device_label(),
-                    "gpu": getattr(self, "gpu_name", "unknown")}
+                    "gpu": getattr(self, "gpu_name", "unknown"),
+                    "region": os.environ.get("MODAL_REGION", "unknown"),
+                    "cloud": os.environ.get("MODAL_CLOUD_PROVIDER", "unknown")}
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
