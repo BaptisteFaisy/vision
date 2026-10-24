@@ -82,3 +82,15 @@ Protocole identique aux mesures ci-dessus, **8 concepts** (`person,chair,table,l
 - Pour franchir un vrai cap (>10 ips, suivi d'objets persistant), ce n'est pas une question de carte :
   c'est le **tracker vidéo** `sam3.1_multiplex.pt` (mesuré précédemment : 21,6 ips en A100, 35,8 en H100,
   40,0 en H200) qu'il faut brancher à la place de la boucle image-par-image.
+
+### Mesure sur le téléphone (Xiaomi 2312DRA50G, Android 15, Wi‑Fi 192 Mbps), même build
+
+| Carte | régime établi | cadence affichée | latence affichée |
+|---|---|---|---|
+| A100-40GB | ~40 s après réveil | 1,4–1,7 ips | 599–710 ms |
+| H200 | ~40 s après réveil | 1,3 ips (après 1,1–1,6 en montée) | 754–775 ms |
+
+**Verdict terrain : aucun gain visible.** Le goulot du direct sur le téléphone est le **lien montant**
+(base64 de la frame + masques redescendus) et la cadence d'une frame à la fois, pas le GPU. Le gain
+serveur de H200 (406 → 245 ms) est avalé par le réseau. L'app reste donc sur **A100** (2,10 $/h au lieu
+de 4,54 $/h). H200 ne redevient utile qu'avec le tracker vidéo (40 ips) ou plusieurs flux simultanés.
