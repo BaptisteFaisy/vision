@@ -3,7 +3,8 @@
 # Usage : ./scripts/dev_qr.sh [--no-install] [-- <args expo>]
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-env.sh"
 APP_DIR="${APP_DIR:-$PROJECT_ROOT/app}"
 NO_INSTALL=0
 EXPO_ARGS=()
@@ -15,11 +16,6 @@ while [[ $# -gt 0 ]]; do
     *) EXPO_ARGS+=("$1"); shift ;;
   esac
 done
-
-log()  { printf '\033[36m==>\033[0m %s\n' "$*"; }
-ok()   { printf '\033[32m  ok\033[0m %s\n' "$*"; }
-warn() { printf '\033[33m  !! %s\033[0m\n' "$*"; }
-die()  { printf '\033[31mERREUR : %s\033[0m\n' "$*" >&2; exit 1; }
 
 [[ -d "$APP_DIR" ]] || die "répertoire app introuvable : $APP_DIR"
 cd "$APP_DIR"
