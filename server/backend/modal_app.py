@@ -16,6 +16,8 @@ from pathlib import Path
 
 import modal
 
+from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
+
 APP_NAME = "sam3-vision"
 LLM_SECRET_NAME = "sam3-llm"
 GPU_TYPE = "A10G"
@@ -31,27 +33,6 @@ image = (
 )
 
 app = modal.App(APP_NAME)
-
-
-MAX_DETAIL_ITEMS = 8
-MAX_DETAIL_CHARS = 300
-
-
-def _validation_detail(errors: list) -> str:
-    """Summarise request-validation errors without echoing the submitted payload.
-
-    ``RequestValidationError.errors()`` carries the offending ``input`` value: a
-    malformed body that happens to contain the image would send ~2 MB of base64
-    back to the client (and into every log in between). Only the field path and
-    the message are kept.
-    """
-    parts = []
-    for error in errors[:MAX_DETAIL_ITEMS]:
-        location = ".".join(str(item) for item in error.get("loc", ())) or "body"
-        parts.append(f"{location}: {error.get('msg', 'invalid value')}")
-    if len(errors) > MAX_DETAIL_ITEMS:
-        parts.append(f"(+{len(errors) - MAX_DETAIL_ITEMS} plus)")
-    return ("invalid request body: " + "; ".join(parts))[:MAX_DETAIL_CHARS]
 
 
 def _labels(objects: list[dict]) -> list[str]:
