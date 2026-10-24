@@ -94,3 +94,45 @@ Protocole identique aux mesures ci-dessus, **8 concepts** (`person,chair,table,l
 (base64 de la frame + masques redescendus) et la cadence d'une frame à la fois, pas le GPU. Le gain
 serveur de H200 (406 → 245 ms) est avalé par le réseau. L'app reste donc sur **A100** (2,10 $/h au lieu
 de 4,54 $/h). H200 ne redevient utile qu'avec le tracker vidéo (40 ips) ou plusieurs flux simultanés.
+
+## A100-40GB en Europe — region + routing (2026-10-24 20:3x)
+
+Demande : « tester une A100 40 Go en Europe pour le moins de latence possible ».
+Modal permet deux réglages distincts (docs/guide/region-selection) :
+
+- `region="eu"` : le **conteneur** (donc le GPU) est placé en Europe. Multiplicateur tarifaire 1,15×
+  (large) ou 1,75× (étroit, ex. eu-west). Choisi : large `eu` → 2,415 $/h.
+- `routing_region="eu-west"` : le **trafic web** sort de Virginia (défaut Modal) et passe par Dublin.
+  Sans ça, même GPU européen = aller-retour Paris→Virginie→Europe. Fixable qu'au premier déploiement.
+
+Déploiement : `LIVE_APP_NAME=sam3-eu-a100 LIVE_GPU=A100-40GB LIVE_REGION=eu LIVE_ROUTING_REGION=eu-west
+modal deploy backend/live_app.py` → URL `https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run`.
+`/health` confirme : `gpu=NVIDIA A100-SXM4-40GB, region=eu-west, cloud=GCP` (40 Go réelles, pas d'upgrade 80 Go).
+
+### PC (France) vs mêmes protocoles us-east — street 640×258, 4 concepts, max 12
+
+| Backend | serveur méd. | A/R méd. | part réseau |
+|---|---:|---:|---:|
+| A100 us-east (table plus haut) | 339–340 ms | 1107–1115 ms | ~775 ms |
+| **A100-40GB eu-west** | **294–298 ms** | **472–503 ms** | **~200 ms** |
+
+8 concepts, frame 512×206 (scène sans objets, à titre indicatif) : serveur 481–485 ms, A/R 627–633 ms.
+Le serveur n'est pas plus lent en Europe (GCP SXM4 40 Go, même ordre que AWS us-east).
+
+### Téléphone (Xiaomi, live30 multi-frames, 6 en vol)
+
+| Backend | cadence établie | latence affichée |
+|---|---|---|
+| A100 us-east, 1 frame à la fois (ancien build) | 1,4–1,7 ips | 599–710 ms |
+| B200 us-east, 6 en vol | 20–28 ips | 517–627 ms |
+| **A100-40GB eu-west, 6 en vol** | **4,4–4,8 ips** | **~1220–1260 ms** |
+
+Lecture : la latence affichée inclut la **file d'attente** derrière le verrou GPU (1 conteneur,
+inférence sérialisée ~250–300 ms × 6 en vol). L'A100-EU triple la cadence de l'A100-US simple frame
+et descend l'A/R réseau à ~200 ms, mais ne rattrape pas le B200 (41 ms/frame côté serveur).
+Le goulot A100 n'est plus le réseau : c'est le GPU lui-même.
+
+### Coût & garde-fous
+
+max_containers=1 + scaledown 20 s : jamais deux cartes, la carte chauffe 20 s après la dernière frame.
+Session de test ≈ 9–10 min de GPU ≈ **0,36 $** (2,415 $/h). Garde : `KEEP=sam3-eu-a100 bash scripts/modal-one-gpu.sh`.
