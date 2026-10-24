@@ -11,7 +11,7 @@ du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret
 |---|---|---|
 | `test_units.py` | tests unitaires backend sans GPU ni token (imagerie, masques PNG, prompts, app FastAPI pilotée en ASGI) ; sort ≠ 0 si échec | `python3 scripts/test_units.py` |
 | `test_api.py` | test E2E du contrat contre le backend déployé (stdlib seule) ; groupes `health`, `segment`, `segment-prompts`, `analyze`, `ask`, `bad-image`, `contract-errors` ; sort ≠ 0 si échec | `python3 scripts/test_api.py --url https://…modal.run --only contract-errors` |
-| `../app/tools/test-client.mjs` | tests du client Expo hors RN : parsing des 4 réponses, `api.ts` contre un serveur HTTP local, colorisation de masque pixel à pixel | `node app/tools/test-client.mjs` |
+| `../app/tools/test-client.mjs` | tests du client Expo hors RN : parsing des 4 réponses, `api.ts` contre un serveur HTTP local, colorisation de masque pixel à pixel | `node legacy-expo-app/tools/test-client.mjs` |
 
 ## Déploiement Modal
 
@@ -30,14 +30,14 @@ Modal** : ni secret, ni déploiement). `MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAM
 | Script | Rôle | Exemple |
 |---|---|---|
 | `install-android-sdk.sh` | installe/met à jour le SDK dans `~/Android/Sdk` sans root (idempotent ; `--minimal` sans NDK) | `./scripts/install-android-sdk.sh` |
-| `build-apk.sh` | `expo prebuild` si besoin puis Gradle ; APK dans `app/android/app/build/outputs/apk/{release,debug}/` | `./scripts/build-apk.sh debug` |
+| `build-apk.sh` | `expo prebuild` si besoin puis Gradle ; APK dans `legacy-expo-app/android/app/build/outputs/apk/{release,debug}/` | `./scripts/build-apk.sh debug` |
 | `dev_qr.sh` | serveur Expo en tunnel pour tester dans Expo Go (installe `node_modules` si absent) | `./scripts/dev_qr.sh` |
 
 ```bash
 ./scripts/install-android-sdk.sh                 # une fois
 ./scripts/build-apk.sh                           # release → app-release.apk
 ./scripts/build-apk.sh debug                     # variante debug
-adb install -r app/android/app/build/outputs/apk/release/app-release.apk
+adb install -r legacy-expo-app/android/app/build/outputs/apk/release/app-release.apk
 ./scripts/dev_qr.sh                              # ou : Expo Go + QR code
 ```
 
