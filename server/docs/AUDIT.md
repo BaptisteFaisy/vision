@@ -2,7 +2,7 @@
 
 Périmètre : backend Modal SAM 3.1 + app Expo. Audit statique, tests unitaires, tests E2E contre le
 backend déployé (`…sam3service-web.us-east.modal.run`), cas d'erreur du contrat, latence.
-Aucun déploiement, aucune modification de secret, `app/app.json` et `app/android/` non touchés.
+Aucun déploiement, aucune modification de secret, `legacy-expo-app/app.json` et `legacy-expo-app/android/` non touchés.
 
 ## 1. Limites (fichiers < 500 lignes, fonctions < 50 lignes)
 
@@ -16,10 +16,10 @@ et par analyse `ast` des fonctions Python. Plus gros fichiers :
 | `backend/llm.py` | 152 | OK |
 | `backend/modal_app.py` | 157 (après correctif) | OK |
 | `scripts/test_units.py` | 260 (ajouté) | OK |
-| `app/src/api.ts` | 126 | OK |
+| `legacy-expo-app/src/api.ts` | 126 | OK |
 
 Plus longue fonction mesurée : `test_http_contract` (≈ 35 lignes), toutes les autres < 30.
-`app/tools/check-limits.py` passe (`OK`), mais **il ne couvre que `.ts/.tsx`** — les fonctions Python
+`legacy-expo-app/tools/check-limits.py` passe (`OK`), mais **il ne couvre que `.ts/.tsx`** — les fonctions Python
 n'étaient vérifiées par personne ; le contrôle Python a été fait à la main pendant l'audit (ast).
 
 ## 2. Tests exécutés
@@ -29,8 +29,8 @@ n'étaient vérifiées par personne ; le contrôle Python a été fait à la mai
 | `python3 -m py_compile backend/*.py` | OK |
 | `python3 -m py_compile scripts/*.py` | OK |
 | `bash -n scripts/*.sh` (5 scripts) | OK |
-| `npx tsc --noEmit` (dans `app/`) | OK, 0 erreur |
-| `python3 app/tools/check-limits.py` | OK |
+| `npx tsc --noEmit` (dans `legacy-expo-app/`) | OK, 0 erreur |
+| `python3 legacy-expo-app/tools/check-limits.py` | OK |
 | `python3 -c "import modal_app"` (venv-modal) | OK, sans token |
 | `python3 scripts/test_units.py` (ajouté) | **57 OK, 0 KO** |
 | `test_api.py --only health` | PASS (0,3 s) `model=sam3.1 device=cuda` |
@@ -70,26 +70,26 @@ choix délibéré du handler, cohérent avec « 400 pour requête invalide, 500 
 
 ## 4. Duplications
 
-Corrigées : aucune correction n'était nécessaire côté `app/src` (client API unique, helpers déjà
+Corrigées : aucune correction n'était nécessaire côté `legacy-expo-app/src` (client API unique, helpers déjà
 partagés : `base64`, `color`, `mask`, `url`, `errors`, `format`, `config` ; `fetch` et le timer
 n'existent que dans `api.ts`).
 
-Relevées, **non corrigées** (hors périmètre d'autorisation : `scripts/*.sh`, `app/tools`, `app/app.json`) :
+Relevées, **non corrigées** (hors périmètre d'autorisation : `scripts/*.sh`, `legacy-expo-app/tools`, `legacy-expo-app/app.json`) :
 
 1. `scripts/rotate_llm_secret.sh` recopie `scripts/deploy_backend.sh` : en-tête `MODAL_BIN` /
    `MODAL_PROFILE` / `SECRET_NAME` / `BASE_URL_DEFAULT`, les helpers `log()` et `die()`, et surtout le
    bloc « mktemp chmod 600 → heredoc python JSON → `modal secret create --from-json --force` → rm ».
    Deux implémentations d'un chemin sensible aux secrets : à remonter dans `scripts/lib-env.sh`
    (`sync_secret` + `log`/`die` + par défauts Modal), les deux scripts ne gardant que l'appel.
-2. `app/src/theme.ts` : `MASK_COLORS` réécrit les littéraux déjà dans `colors`
+2. `legacy-expo-app/src/theme.ts` : `MASK_COLORS` réécrit les littéraux déjà dans `colors`
    (`#4F8EF7` = `colors.primary`, `#F2555A` = `colors.danger`, `#3ED598` = `colors.success`).
    Sûr mais cosmétique — non fait pour ne pas toucher un fichier lu par le pair en parallèle sur l'app.
-3. La valeur `1024` apparaît trois fois avec trois sens distincts : `app/src/utils/image.ts`
+3. La valeur `1024` apparaît trois fois avec trois sens distincts : `legacy-expo-app/src/utils/image.ts`
    (`MAX_IMAGE_EDGE`, envoi client), `backend/segmentation.py` (`SEG_MAX_EDGE`, résolution de travail),
    `backend/imaging.py` (`LLM_MAX_EDGE`, JPEG du LLM). Ce n'est pas une duplication de code, mais une
    **couple contractuel implicite** : si l'envoi dépasse la borne serveur, les masques grossissent.
    À documenter plutôt qu'à factoriser (fait : ARCHITECTURE.md § bornes).
-4. `backend/schemas.py` vs `app/src/types.ts` + `parse.ts` : le même contrat écrit deux fois — inhérent
+4. `backend/schemas.py` vs `legacy-expo-app/src/types.ts` + `parse.ts` : le même contrat écrit deux fois — inhérent
    à une frontière HTTP, aucune dérive constatée (champs, types et formes vérifiés par `test_api.py`).
 5. `scripts/test_api.py` est à 464 lignes : la prochaine fonction ajoutée doit déclencher un découpage.
 
@@ -104,7 +104,7 @@ Relevées, **non corrigées** (hors périmètre d'autorisation : `scripts/*.sh`,
 - **README racine** : parle de `container_idle_timeout`, paramètre Modal aujourd'hui nommé
   `scaledown_window` (celui utilisé dans `modal_app.py`) ; annonce un cold start « 60-120 s » qui n'a
   pas pu être confirmé (§7) ; la section « Test » ne cite ni `contract-errors` ni `test_units.py`.
-- **`app/NOTES.md`** : les tests du client (parsing des réponses, `api.ts` contre un serveur local,
+- **`legacy-expo-app/NOTES.md`** : les tests du client (parsing des réponses, `api.ts` contre un serveur local,
   colorisation de masque vérifiée pixel à pixel) sont « dans `/tmp`, **non versionnés** » — exactement
   le trou que comble `scripts/test_units.py` côté backend. À versionner (Node + un runner léger) pour
   qu'un CI puisse les rejouer.
@@ -136,7 +136,7 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
    `test_api.py --only analyze,ask` ; vérifier au passage que `max_tokens` est accepté par le modèle
    choisi (`llm.py` envoie `max_tokens`, certains modèles récents n'acceptent que `max_completion_tokens`).
 3. ~~Dédupliquer les scripts shell du secret (§4.1)~~ — **fait**, voir §9.1.
-4. ~~Étendre `app/tools/check-limits.py` au Python (ast)~~ — **fait**, voir §9.6.
+4. ~~Étendre `legacy-expo-app/tools/check-limits.py` au Python (ast)~~ — **fait**, voir §9.6.
 5. ~~`MAX_OBJECTS = 24` coupe silencieusement la liste~~ — **documenté dans SPEC.md**, voir §9.7
    (aucun champ d'avertissement ajouté : choix assumé).
 6. Le `detail` des 500 répercute le message de la SDK (`llm.py` → message du fournisseur). Nécessaire
@@ -151,7 +151,7 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
   correct, mais le ressenti dépend du réglage `scaledown_window` / `keep_warm`).
 - `Sam3Model.from_pretrained` réel, forwards bf16 et empreinte mémoire sur A10G : observés uniquement
   dans le conteneur déployé (et il répond : `/segment` renvoie 200 avec 17 objets sur 2048×824).
-- APK / `app/app.json` : hors périmètre (pair en parallèle).
+- APK / `legacy-expo-app/app.json` : hors périmètre (pair en parallèle).
 - Charge concurrente : non testée — concurrence forcée à 1 par Modal, un second appel pendant un
   premier attend derrière le verrou GPU.
 
@@ -165,7 +165,7 @@ tous les prompts : c'est ce qui explique que 8 concepts et 2 concepts soient à 
 ## 9. Finitions (2026-10-24, après audit)
 
 Points §4 et §5 traités sans déploiement, sans modification de secret, sans toucher à
-`app/app.json` ni `app/android/`.
+`legacy-expo-app/app.json` ni `legacy-expo-app/android/`.
 
 1. **Dédup du chemin secret (§4.1)** : `scripts/lib-env.sh` porte désormais `log/ok/warn/die`,
    les défauts Modal (`MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAME`, `APP_NAME`, `BASE_URL_DEFAULT`),
@@ -184,12 +184,12 @@ Points §4 et §5 traités sans déploiement, sans modification de secret, sans 
 4. **`scripts/README.md`** : les 7 scripts documentés (une ligne + exemple) — `test_api.py`,
    `test_units.py`, `deploy_backend.sh`, `rotate_llm_secret.sh`, `build-apk.sh`,
    `install-android-sdk.sh`, `dev_qr.sh` — plus `lib-env.sh` et le runner client.
-5. **Tests client versionnés** : `app/tools/test-client.mjs` + `app/tools/testlib/` (29 tests,
+5. **Tests client versionnés** : `legacy-expo-app/tools/test-client.mjs` + `legacy-expo-app/tools/testlib/` (29 tests,
    sortie ≠ 0 en cas d'échec) : parsing des 4 réponses, `api.ts` contre un serveur HTTP local
    (succès, 400 avec `detail`, non-JSON, contrat invalide, réseau, timeout), colorisation de masque
    **pixel à pixel**. Plus rien « dans /tmp ». Constat au passage : `upng-js` 2.1.0 tronque le chunk
    `IEND` pour les images de 1-2 px (données IDAT intactes, sans effet sur les masques réels).
-6. **Garde de limites** : `app/tools/check-limits.py` couvre tout le dépôt — `.py` par `ast`
+6. **Garde de limites** : `legacy-expo-app/tools/check-limits.py` couvre tout le dépôt — `.py` par `ast`
    (fonctions et méthodes), `.ts/.tsx` par accolades — 43 fichiers, **0 dépassement**.
 7. **`docs/SPEC.md`** : coupe silencieuse à `MAX_OBJECTS = 24` documentée explicitement dans le
    contrat `/segment` (tri par score décroissant, ni total ni champ `truncated`).
