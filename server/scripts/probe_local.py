@@ -18,12 +18,11 @@ SIDES = (512, 1024, 2048)
 PROMPT_COUNTS = (1, 8)
 
 
-def run_once(model, processor, side: int, prompts: int) -> dict:
-    """Une image unie, prompts répétés ; renvoie pic mémoire et latence."""
+def measure(model, processor, image: "Image.Image", prompts) -> dict:
+    """Une inférence sur une image donnée ; renvoie pic mémoire et latence."""
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
-    text = ", ".join(["sofa"] * prompts) if prompts > 1 else "sofa"
-    image = Image.new("RGB", (side, side), (120, 90, 60))
+    text = ", ".join(prompts) if isinstance(prompts, (list, tuple)) else prompts
     inputs = processor(images=image, text=text, return_tensors="pt").to("cuda", DTYPE)
     start = time.time()
     with torch.inference_mode():
@@ -35,14 +34,23 @@ def run_once(model, processor, side: int, prompts: int) -> dict:
             target_sizes=inputs.get("original_sizes").tolist(),
         )[0]
     torch.cuda.synchronize()
+    masks = result["masks"]
     return {
-        "side": side,
-        "prompts": prompts,
+        "input_px": list(image.size),
+        "prompts": text,
         "alloc_peak_gb": round(torch.cuda.max_memory_allocated() / 1e9, 2),
         "reserved_peak_gb": round(torch.cuda.max_memory_reserved() / 1e9, 2),
         "inference_s": round(time.time() - start, 3),
-        "masks": list(result["masks"].shape),
+        "masks": list(masks.shape),
+        "mask_px": int(masks.shape[-1] * masks.shape[-2]) if masks.numel() else 0,
     }
+
+
+def run_once(model, processor, side: int, prompts: int) -> dict:
+    """Image unie de ``side`` px, prompt répété ``prompts`` fois."""
+    image = Image.new("RGB", (side, side), (120, 90, 60))
+    text = ["sofa"] * prompts
+    return measure(model, processor, image, text)
 
 
 def main() -> None:

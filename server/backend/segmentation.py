@@ -181,11 +181,16 @@ def _run_prompt(model, processor, device, vision, prompt: str, work_size, image_
     ]
 
 
-def segment_image(model, processor, device, dtype, image, prompts: list[str]) -> dict:
-    """Segment ``image`` for every prompt and build the SPEC-shaped payload."""
+def segment_image(model, processor, device, dtype, image, prompts: list[str],
+                  work_edge: int = SEG_MAX_EDGE, max_objects: int = MAX_OBJECTS) -> dict:
+    """Segment ``image`` for every prompt and build the SPEC-shaped payload.
+
+    ``work_edge`` caps the resolution handed to the encoder (the live route trades
+    it for latency), ``max_objects`` caps the score-sorted slice.
+    """
     torch = _torch()
     image_size = image.size
-    work = resize_max_edge(image, SEG_MAX_EDGE)
+    work = resize_max_edge(image, work_edge)
     pixel_values = processor(images=work, return_tensors="pt")["pixel_values"]
     with torch.inference_mode():
         vision = model.vision_encoder(pixel_values.to(device=device, dtype=dtype))
@@ -193,7 +198,7 @@ def segment_image(model, processor, device, dtype, image, prompts: list[str]) ->
     for prompt in prompts:
         objects.extend(_run_prompt(model, processor, device, vision, prompt, work.size, image_size))
     objects.sort(key=lambda item: item["score"], reverse=True)
-    return {"width": image_size[0], "height": image_size[1], "objects": objects[:MAX_OBJECTS]}
+    return {"width": image_size[0], "height": image_size[1], "objects": objects[:max_objects]}
 
 
 def run_segmentation(model, processor, device, dtype, image, prompts=None) -> dict:

@@ -231,6 +231,77 @@ def test_http_contract(modal_app) -> None:
     check("/analyze erreur interne → 500", status == 500 and "gpu exploded" in payload.get("detail", ""), str(status))
 
 
+def _live_service(live_app):
+    """Instance Sam3Live + app FastAPI, hors GPU (stub torch, verrou factice)."""
+    stub_module("torch", cuda=types.SimpleNamespace(
+        is_available=lambda: True, get_device_name=lambda _i: "NVIDIA A100 80GB PCIe"))
+    service = live_app.Sam3Live()
+    service._gpu_lock = __import__("threading").Lock()
+    service.gpu_name = "NVIDIA A100 80GB PCIe"
+    return service, service.web()
+
+
+def test_live_contract(live_app) -> None:
+    """/live (docs/LIVE-SPEC.md) : bornes des knobs, /health enrichi, erreurs 400 bornées."""
+    png = sample_png()
+    service, api = _live_service(live_app)
+
+    check("_clamp: absent → défaut", live_app._clamp(None, 768, 256, 1024) == 768)
+    check("_clamp: sous-borne → borne basse", live_app._clamp(10, 768, 256, 1024) == 256)
+    check("_clamp: sur-borne → borne haute", live_app._clamp(99_999, 768, 256, 1024) == 1024)
+    check("_clamp: valeur parasite → défaut", live_app._clamp("xyz", 12, 1, 24) == 12)
+
+    status, payload = asyncio.run(asgi_call(api, "GET", "/health", b""))
+    check("/health: ok + model + device + gpu",
+          status == 200 and payload.get("ok") is True and payload.get("model") == "sam3.1"
+          and payload.get("device") == "cuda" and "A100" in payload.get("gpu", ""), str(payload)[:120])
+
+    cases = (
+        ("/live image_b64 absent", "/live", b'{"prompts": null}', 400),
+        ("/live base64 invalide", "/live", json.dumps({"image_b64": "!!!pas du base64!!!"}).encode(), 400),
+        ("/live prompts non-liste", "/live", json.dumps({"image_b64": png, "prompts": "car"}).encode(), 400),
+        ("/live corps = liste", "/live", json.dumps([png]).encode(), 400),
+        ("/live GET", "/live", b"", 405),
+        ("/segment image_b64 absent", "/segment", b'{"prompts": null}', 400),
+    )
+    for name, path, body, expected in cases:
+        status, payload = asyncio.run(asgi_call(api, "GET" if name.endswith("GET") else "POST", path, body))
+        check(name, status == expected, f"{status} au lieu de {expected}")
+        check(f"{name} → detail string borné",
+              isinstance(payload.get("detail"), str) and len(payload["detail"]) <= 300, str(payload)[:120])
+
+
+def test_live_pipeline(live_app) -> None:
+    """/live : echo borné, transmission des knobs, 500 interne borné."""
+    png = sample_png()
+    service, api = _live_service(live_app)
+
+    huge = asyncio.run(asgi_call(api, "POST", "/live", json.dumps([png * 20]).encode()))
+    check("/live echo borné (< 1 Ko)", len(json.dumps(huge[1])) < 1024, f"{len(json.dumps(huge[1]))} octets")
+
+    captured = {}
+
+    def fake_live(image_b64, prompts, max_objects, work_edge):
+        captured.update(prompts=prompts, max_objects=max_objects, work_edge=work_edge)
+        return {"width": 64, "height": 40, "elapsed_ms": 12, "objects": []}
+
+    service._live_sync = fake_live
+    status, payload = asyncio.run(asgi_call(api, "POST", "/live", json.dumps(
+        {"image_b64": png, "prompts": ["person"], "max_objects": 5, "work_edge": 640}).encode()))
+    check("/live OK 200 + charge utile LIVE-SPEC",
+          status == 200 and set(payload) == {"width", "height", "elapsed_ms", "objects"}, str(payload)[:120])
+    check("/live knobs transmis au pipeline",
+          captured == {"prompts": ["person"], "max_objects": 5, "work_edge": 640}, str(captured))
+
+    def boom(*_args):
+        raise RuntimeError("gpu exploded")
+
+    service._live_sync = boom
+    status, payload = asyncio.run(asgi_call(api, "POST", "/live", json.dumps({"image_b64": png}).encode()))
+    check("/live erreur interne → 500 borné",
+          status == 500 and len(payload.get("detail", "")) <= 300, str(payload)[:120])
+
+
 RUNNERS = (
     ("imaging", "imaging", test_imaging),
     ("masques", "imaging", test_masks),
@@ -238,6 +309,8 @@ RUNNERS = (
     ("llm (logique)", "llm", test_llm_logic),
     ("modal_app (helpers)", "modal_app", test_modal_helpers),
     ("contrat HTTP (app FastAPI)", "modal_app", test_http_contract),
+    ("live_app (contrat /live)", "live_app", test_live_contract),
+    ("live_app (pipeline /live)", "live_app", test_live_pipeline),
 )
 
 
