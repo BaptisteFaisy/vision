@@ -29,6 +29,7 @@ superposés + objets + description → chat via `POST /ask`.
 | `src/hooks/*` | `usePhotoCapture`, `useAnalysis`, `useChat`, `useApiUrlSettings`, `useBackendCheck` |
 | `src/components/*` | `PhotoStage`, `ObjectList`, `DescriptionCard`, `ChatInput`, `ChatBubble`, `Feedback`, … |
 | `src/screens/*` | `Camera`, `Result`, `Settings` |
+| `tools/test-client.mjs` | tests versionnés hors RN (parsing, `api.ts`, masques) + leurs helpers dans `tools/testlib/` |
 
 ## Décisions techniques
 
@@ -46,12 +47,25 @@ superposés + objets + description → chat via `POST /ask`.
 ## Vérifications
 
 ```bash
-npx tsc --noEmit          # 0 erreur
-npx expo-doctor           # 20/20 checks passed
-python3 tools/check-limits.py   # fichiers < 500 lignes, fonctions < 50 lignes
+npx tsc --noEmit                # 0 erreur
+npx expo-doctor                 # 20/20 checks passed
+python3 tools/check-limits.py   # tout le dépôt : fichiers < 500 lignes, fonctions < 50 lignes
+node tools/test-client.mjs      # tests client versionnés, sort ≠ 0 si un test échoue
 ```
 
-Tests hors React Native (Node, dans /tmp, non versionnés) : parsing des mocks `/segment`,
-`/analyze`, `/ask`, `/health` + rejets des réponses invalides ; client `src/api.ts` contre un
-serveur HTTP local (succès, HTTP 400 avec `detail`, JSON invalide, hôte injoignable) ;
-colorisation d'un vrai PNG gris vérifiée pixel par pixel avec Pillow.
+Les tests du client sont **versionnés** dans `app/tools/test-client.mjs` (+ `app/tools/testlib/`) —
+plus de tests « dans /tmp » :
+
+- `parse.ts` : les 4 réponses du contrat, plus le rejet des formes invalides (champ manquant,
+  mauvais type, `box` de 3 valeurs, `tags` non-liste…).
+- `api.ts` contre un serveur HTTP local factice : succès des 4 routes, `POST`/`GET` et corps
+  envoyés, HTTP 400 avec `detail`, corps non-JSON, JSON invalide, contrat non respecté, hôte
+  injoignable, requête abandonnée (→ `timeout`).
+- `utils/mask.ts` : colorisation d'un vrai PNG 8 bits gris vérifiée **pixel à pixel** (couleur
+  exacte, `alpha = gris × 0,45`, opacité 1, `#rgb`, réduction à `MAX_MASK_EDGE` = 512 px).
+
+Le runner compile `parse.ts` / `api.ts` / `utils/mask.ts` avec le `tsc` local dans
+`app/.test-build/` (gitignoré), puis exécute les suites en CommonJS : rien à installer, aucun
+émulateur. Constat au passage : `upng-js` 2.1.0 tronque le chunk `IEND` pour les images de 1-2 px
+(données IDAT intactes) — sans effet réel, les masques font la taille de la photo ; le décodeur
+de test tolère l'absence d'`IEND`.
