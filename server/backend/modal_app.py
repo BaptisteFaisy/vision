@@ -33,6 +33,27 @@ image = (
 app = modal.App(APP_NAME)
 
 
+MAX_DETAIL_ITEMS = 8
+MAX_DETAIL_CHARS = 300
+
+
+def _validation_detail(errors: list) -> str:
+    """Summarise request-validation errors without echoing the submitted payload.
+
+    ``RequestValidationError.errors()`` carries the offending ``input`` value: a
+    malformed body that happens to contain the image would send ~2 MB of base64
+    back to the client (and into every log in between). Only the field path and
+    the message are kept.
+    """
+    parts = []
+    for error in errors[:MAX_DETAIL_ITEMS]:
+        location = ".".join(str(item) for item in error.get("loc", ())) or "body"
+        parts.append(f"{location}: {error.get('msg', 'invalid value')}")
+    if len(errors) > MAX_DETAIL_ITEMS:
+        parts.append(f"(+{len(errors) - MAX_DETAIL_ITEMS} plus)")
+    return ("invalid request body: " + "; ".join(parts))[:MAX_DETAIL_CHARS]
+
+
 def _labels(objects: list[dict]) -> list[str]:
     """Distinct labels, ordered by first appearance (objects are score-sorted)."""
     labels: list[str] = []
@@ -111,11 +132,11 @@ class Sam3Service:
             except (ImageDecodeError, PromptError) as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"internal error: {exc}") from exc
+                raise HTTPException(status_code=500, detail=f"internal error: {exc}"[:MAX_DETAIL_CHARS]) from exc
 
         @api.exception_handler(RequestValidationError)
         async def invalid_body(_request, exc):
-            return JSONResponse(status_code=400, content={"detail": f"invalid request body: {exc.errors()}"})
+            return JSONResponse(status_code=400, content={"detail": _validation_detail(exc.errors())})
 
         @api.get("/health")
         async def health():
