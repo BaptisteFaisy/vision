@@ -16,6 +16,19 @@ class SegmentRequest(BaseModel):
     prompts: list[str] | None = None
 
 
+class LiveRequest(BaseModel):
+    """POST /live body (docs/LIVE-SPEC.md): one video frame plus tuning knobs.
+
+    ``work_edge`` and ``max_objects`` are clamped server-side (never rejected) so a
+    client sending an out-of-range knob still gets a frame back.
+    """
+
+    image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
+    prompts: list[str] | None = None
+    max_objects: int | None = None
+    work_edge: int | None = None
+
+
 class AnalyzeRequest(BaseModel):
     """POST /analyze body: only the image is needed."""
 
