@@ -56,9 +56,9 @@ Erreurs : `400 {"detail": "..."}` (image illisible), `500` sinon. Images en base
 
 | Chemin | Rôle |
 |---|---|
-| `app/src/api.ts` | client HTTP unique (timeout 60 s, erreurs typées) |
-| `app/src/parse.ts` | validation des réponses (échec explicite si le contrat change) |
-| `app/src/utils/mask.ts` | masque PNG gris → calque RGBA colorisé (UPNG, réduit à 512 px) |
+| `legacy-expo-app/src/api.ts` | client HTTP unique (timeout 60 s, erreurs typées) |
+| `legacy-expo-app/src/parse.ts` | validation des réponses (échec explicite si le contrat change) |
+| `legacy-expo-app/src/utils/mask.ts` | masque PNG gris → calque RGBA colorisé (UPNG, réduit à 512 px) |
 | `backend/modal_app.py` | app Modal : image, routes FastAPI, mapping erreurs → codes HTTP |
 | `backend/segmentation.py` | chargement SAM 3.1, prompts, concepts FR→EN, tri/découpe des objets |
 | `backend/imaging.py` | base64 → PIL, resize, encodage masque PNG, data URL JPEG pour le LLM |

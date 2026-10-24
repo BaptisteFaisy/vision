@@ -10,7 +10,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT/app"
+APP_DIR="$ROOT/legacy-expo-app"
 HERE="$ROOT/scripts"
 # shellcheck source=lib-env.sh
 . "$HERE/lib-env.sh"
@@ -46,7 +46,7 @@ log "SDK : $SDK"
 
 # ------------------------------------------------------------- 2. deps JS
 cd "$APP_DIR"
-[ -f package.json ] || die "app/package.json introuvable"
+[ -f package.json ] || die "legacy-expo-app/package.json introuvable"
 if [ ! -d node_modules ]; then
   log "npm install"
   npm install

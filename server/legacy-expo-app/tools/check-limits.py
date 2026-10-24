@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Garde de dépôt : fichiers < 500 lignes et fonctions < 50 lignes (TS/TSX et Python).
 
-    python3 app/tools/check-limits.py          # depuis n'importe où
-    python3 tools/check-limits.py              # depuis app/
+    python3 legacy-expo-app/tools/check-limits.py  # depuis n'importe où
+    python3 tools/check-limits.py                  # depuis legacy-expo-app/
 
 Le TypeScript est mesuré par accolades (regex + comptage), le Python par `ast`
 (fonctions et méthodes, décorateurs exclus). Sortie ≠ 0 dès un dépassement.

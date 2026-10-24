@@ -5,7 +5,7 @@ set -euo pipefail
 
 # shellcheck source=lib-env.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-env.sh"
-APP_DIR="${APP_DIR:-$PROJECT_ROOT/app}"
+APP_DIR="${APP_DIR:-$PROJECT_ROOT/legacy-expo-app}"
 NO_INSTALL=0
 EXPO_ARGS=()
 
@@ -32,7 +32,7 @@ fi
 
 if [[ ! -d node_modules ]]; then
   if [[ $NO_INSTALL -eq 1 ]]; then
-    die "node_modules absent et --no-install demandé : lance 'npm install' dans app/"
+    die "node_modules absent et --no-install demandé : lance 'npm install' dans legacy-expo-app/"
   fi
   warn "node_modules absent : installation des dépendances"
   if [[ -f package-lock.json ]]; then
@@ -45,7 +45,7 @@ else
   ok "node_modules présent"
 fi
 
-[[ -d node_modules/expo ]] || die "expo absent de node_modules : 'npm install' dans app/ puis relance"
+[[ -d node_modules/expo ]] || die "expo absent de node_modules : 'npm install' dans legacy-expo-app/ puis relance"
 [[ -d node_modules/@expo/ngrok ]] \
   || warn "@expo/ngrok absent : le tunnel peut demander une installation au premier lancement"
 
