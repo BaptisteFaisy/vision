@@ -48,3 +48,22 @@ class AskRequest(BaseModel):
     image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
     question: str = Field(min_length=1)
     history: list[HistoryMessage] | None = None
+
+class TrackSessionRequest(BaseModel):
+    """POST /session body (docs/TRACK-SPEC.md): frame 0 plus the concepts to track."""
+
+    image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
+    prompts: list[str] | None = None
+
+
+class TrackFrameRequest(BaseModel):
+    """POST /frame body: one stream frame for an existing session."""
+
+    session_id: str = Field(min_length=1, max_length=64)
+    image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
+
+
+class TrackCloseRequest(BaseModel):
+    """POST /session/close body: session to release."""
+
+    session_id: str = Field(min_length=1, max_length=64)
