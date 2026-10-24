@@ -1,81 +1,80 @@
 #!/usr/bin/env bash
 # Déploiement idempotent du backend sam3-vision sur Modal.
-# Secret `sam3-llm` créé/actualisé depuis l'environnement (jamais affiché).
+# Le secret `sam3-llm` est poussé depuis l'environnement, jamais en clair (cf. lib-env.sh).
+#
+#   ./scripts/deploy_backend.sh                  # secret + deploy + smoke test
+#   ./scripts/deploy_backend.sh --skip-smoke     # sans le /health final
+#   DRY_RUN=1 ./scripts/deploy_backend.sh        # vérifie tout, n'appelle pas Modal
+#
+# Surchargeables : MODAL_BIN, MODAL_PROFILE, SECRET_NAME, APP_NAME, API_URL, DRY_RUN.
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODAL_BIN="${MODAL_BIN:-$HOME/.venv-modal/bin/modal}"
-MODAL_PROFILE="${MODAL_PROFILE:-baptiste-faisy}"
-SECRET_NAME="${SECRET_NAME:-sam3-llm}"
-APP_NAME="${APP_NAME:-sam3-vision}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib-env.sh
+. "$HERE/lib-env.sh"
+
 APP_FILE="$PROJECT_ROOT/backend/modal_app.py"
 TEST_CLIENT="$PROJECT_ROOT/scripts/test_api.py"
 SKIP_SMOKE=0
-[[ "${1:-}" == "--skip-smoke" ]] && SKIP_SMOKE=1
-
-SECRET_FILE=""
 DEPLOY_LOG=""
 
-log()  { printf '\033[36m==>\033[0m %s\n' "$*"; }
-ok()   { printf '\033[32m  ok\033[0m %s\n' "$*"; }
-warn() { printf '\033[33m  !! %s\033[0m\n' "$*"; }
-die()  { printf '\033[31mERREUR : %s\033[0m\n' "$*" >&2; exit 1; }
+usage() {
+  cat <<'TXT'
+Usage : deploy_backend.sh [--skip-smoke] [-h|--help]
+
+Déploie backend/modal_app.py sur Modal et met à jour le secret « sam3-llm ».
+  --skip-smoke   ne pas lancer le test /health après le déploiement
+  -h, --help     cette aide
+
+Variables d'environnement requises : LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+(valeurs jamais affichées ; sans LLM_API_KEY le script refuse de tourner).
+Optionnelles : MODAL_BIN, MODAL_PROFILE, SECRET_NAME, APP_NAME, API_URL,
+DRY_RUN=1 (valide l'environnement et la présence des fichiers sans appeler Modal).
+TXT
+}
 
 cleanup() {
   # Fichiers temporaires créés par ce script uniquement (secret en clair : 600).
-  [[ -n "$SECRET_FILE" && -f "$SECRET_FILE" ]] && rm -f "$SECRET_FILE"
+  cleanup_secret_tmp
   [[ -n "$DEPLOY_LOG" && -f "$DEPLOY_LOG" ]] && rm -f "$DEPLOY_LOG"
   return 0
 }
 trap cleanup EXIT INT TERM
 
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skip-smoke) SKIP_SMOKE=1 ;;
+      -h|--help) usage; exit 0 ;;
+      *) printf 'ERREUR : option inconnue : %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+}
+
 preflight() {
   log "Pré-vol"
-  [[ -x "$MODAL_BIN" ]] || die "CLI Modal absent : $MODAL_BIN (venv attendu : ~/.venv-modal)"
-  local version
-  version="$(timeout 30 "$MODAL_BIN" --version 2>/dev/null)" || die "CLI Modal inutilisable : $MODAL_BIN --version"
-  ok "modal ${version##* }"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    [[ -x "$MODAL_BIN" ]] || warn "CLI Modal absent : $MODAL_BIN (ignoré en DRY_RUN)"
+    ok "DRY_RUN=1 : aucun appel Modal ne sera fait"
+  else
+    [[ -x "$MODAL_BIN" ]] || die "CLI Modal absent : $MODAL_BIN (venv attendu : ~/.venv-modal)"
+    local version
+    version="$(timeout 30 "$MODAL_BIN" --version 2>/dev/null)" \
+      || die "CLI Modal inutilisable : $MODAL_BIN --version"
+    ok "modal ${version##* }"
+  fi
   command -v python3 >/dev/null || die "python3 introuvable"
   [[ -f "$APP_FILE" ]] || die "backend introuvable : $APP_FILE (attendu : backend/modal_app.py)"
   [[ -f "$TEST_CLIENT" ]] || die "client de test introuvable : $TEST_CLIENT"
   ok "backend : ${APP_FILE#"$PROJECT_ROOT"/}"
 }
 
-check_env() {
-  log "Variables d'environnement (valeurs jamais affichées)"
-  local missing=0 var value
-  for var in LLM_BASE_URL LLM_API_KEY LLM_MODEL; do
-    value="${!var:-}"
-    if [[ -n "$value" ]]; then
-      ok "$var défini (${#value} caractères)"
-    else
-      warn "$var manquant"
-      missing=1
-    fi
-  done
-  [[ $missing -eq 0 ]] || die "exporte LLM_BASE_URL, LLM_API_KEY et LLM_MODEL puis relance"
-}
-
-sync_secret() {
-  log "Secret Modal « $SECRET_NAME » (create --force, depuis --from-json)"
-  SECRET_FILE="$(mktemp "${TMPDIR:-/tmp}/sam3-secret.XXXXXX.json")"
-  chmod 600 "$SECRET_FILE"
-  SECRET_FILE="$SECRET_FILE" python3 <<'PY'
-import json, os
-path = os.environ["SECRET_FILE"]
-keys = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL")
-with open(path, "w", encoding="utf-8") as fh:
-    json.dump({k: os.environ[k] for k in keys}, fh)
-PY
-  if ! timeout 120 "$MODAL_BIN" secret create "$SECRET_NAME" \
-        --from-json "$SECRET_FILE" --force --profile "$MODAL_PROFILE" >/dev/null; then
-    die "création du secret impossible (profil $MODAL_PROFILE, jeton valide ?)"
-  fi
-  rm -f "$SECRET_FILE"; SECRET_FILE=""
-  ok "secret à jour"
-}
-
 deploy_app() {
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "DRY_RUN : modal deploy ${APP_FILE#"$PROJECT_ROOT"/} --profile $MODAL_PROFILE (non exécuté)"
+    return 0
+  fi
   log "Déploiement de ${APP_FILE#"$PROJECT_ROOT"/} (profil $MODAL_PROFILE)"
   DEPLOY_LOG="$(mktemp "${TMPDIR:-/tmp}/sam3-deploy.XXXXXX.log")"
   if ! timeout 900 "$MODAL_BIN" deploy "$APP_FILE" --profile "$MODAL_PROFILE" \
@@ -118,10 +117,21 @@ smoke_test() {
   printf "App Expo     : ./scripts/dev_qr.sh (puis renseigner l'URL dans Réglages)\n"
 }
 
+dry_run_report() {
+  log "DRY_RUN : environnement et fichiers validés"
+  printf '  secret « %s » : %s (contrôlé, non poussé)\n' "$SECRET_NAME" "${SECRET_KEYS[*]}"
+  printf '  déploiement  : %s --profile %s (non exécuté)\n' \
+    "${APP_FILE#"$PROJECT_ROOT"/}" "$MODAL_PROFILE"
+  ok "rien n'a été envoyé à Modal — relance sans DRY_RUN pour déployer"
+}
+
 main() {
+  parse_args "$@"
+  log "Variables d'environnement (valeurs jamais affichées)"
+  check_env_keys "${SECRET_KEYS[@]}"
   preflight
-  check_env
-  sync_secret
+  sync_secret_from_env
+  if [[ "$DRY_RUN" == "1" ]]; then dry_run_report; exit 0; fi
   deploy_app
   local url listing
   url="$(endpoint_url)"
