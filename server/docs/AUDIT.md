@@ -135,10 +135,10 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
 2. **Secret LLM** : mettre une vraie clé (`rotate_llm_secret.sh`) puis relancer
    `test_api.py --only analyze,ask` ; vérifier au passage que `max_tokens` est accepté par le modèle
    choisi (`llm.py` envoie `max_tokens`, certains modèles récents n'acceptent que `max_completion_tokens`).
-3. **Dédupliquer les scripts shell** du secret (§4.1) — owner : scripts, pas backend/app.
-4. **Étendre `app/tools/check-limits.py` au Python** (ast), ou remplacer par un unique garde de dépôt.
-5. Choix à trancher : `MAX_OBJECTS = 24` coupe silencieusement la liste — soit renvoyer un champ
-   d'avertissement, soit le documenter dans SPEC.md (fait dans ARCHITECTURE.md, pas dans SPEC.md).
+3. ~~Dédupliquer les scripts shell du secret (§4.1)~~ — **fait**, voir §9.1.
+4. ~~Étendre `app/tools/check-limits.py` au Python (ast)~~ — **fait**, voir §9.6.
+5. ~~`MAX_OBJECTS = 24` coupe silencieusement la liste~~ — **documenté dans SPEC.md**, voir §9.7
+   (aucun champ d'avertissement ajouté : choix assumé).
 6. Le `detail` des 500 répercute le message de la SDK (`llm.py` → message du fournisseur). Nécessaire
    pour le diagnostic, mais à garder à l'œil si un fournisseur fait remonter des en-têtes dans ses erreurs.
 
@@ -161,3 +161,35 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
 (17 objets, 61,9 Ko de réponse), avec 2 prompts **1,60 s** (6 objets, 10,1 Ko), `/health` **0,30 s**,
 400 de validation **0,30 s**. Le décodage d'entrée coûte ~1 s, l'encodeur vision une seule fois pour
 tous les prompts : c'est ce qui explique que 8 concepts et 2 concepts soient à ~0,3 s d'écart.
+
+## 9. Finitions (2026-10-24, après audit)
+
+Points §4 et §5 traités sans déploiement, sans modification de secret, sans toucher à
+`app/app.json` ni `app/android/`.
+
+1. **Dédup du chemin secret (§4.1)** : `scripts/lib-env.sh` porte désormais `log/ok/warn/die`,
+   les défauts Modal (`MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAME`, `APP_NAME`, `BASE_URL_DEFAULT`),
+   `DRY_RUN`, `check_env_keys`/`require_keys` et **`sync_secret_from_env`** (mktemp `chmod 600` →
+   JSON → `modal secret create --from-json --force`). `deploy_backend.sh` (149 lignes) et
+   `rotate_llm_secret.sh` (67 lignes) ne gardent que leur logique propre ; `dev_qr.sh` réutilise
+   aussi les helpers. Une seule implémentation du chemin sensible, et elle **refuse** de tourner
+   sans `LLM_API_KEY` (vérifié : `DRY_RUN=1` sans clé → code 1, aucun appel modal).
+2. **`backend/README.md`** : le bloc `modal secret create sam3-llm LLM_API_KEY=<clé>` (clé en
+   argument = historique shell + `ps`) est remplacé par un renvoi vers `scripts/rotate_llm_secret.sh`
+   et `deploy_backend.sh` (`--from-json`, `DRY_RUN=1`).
+3. **README racine** : `container_idle_timeout` → `scaledown_window` (300 s, celui de `modal_app.py`) ;
+   cold start « 60-120 s » remplacé par les chiffres de `docs/PERF.md` (~36 s mesurés une seule fois,
+   non reproductible) ; section **Test** complétée (`test_units.py`, `--only contract-errors`,
+   tests client).
+4. **`scripts/README.md`** : les 7 scripts documentés (une ligne + exemple) — `test_api.py`,
+   `test_units.py`, `deploy_backend.sh`, `rotate_llm_secret.sh`, `build-apk.sh`,
+   `install-android-sdk.sh`, `dev_qr.sh` — plus `lib-env.sh` et le runner client.
+5. **Tests client versionnés** : `app/tools/test-client.mjs` + `app/tools/testlib/` (29 tests,
+   sortie ≠ 0 en cas d'échec) : parsing des 4 réponses, `api.ts` contre un serveur HTTP local
+   (succès, 400 avec `detail`, non-JSON, contrat invalide, réseau, timeout), colorisation de masque
+   **pixel à pixel**. Plus rien « dans /tmp ». Constat au passage : `upng-js` 2.1.0 tronque le chunk
+   `IEND` pour les images de 1-2 px (données IDAT intactes, sans effet sur les masques réels).
+6. **Garde de limites** : `app/tools/check-limits.py` couvre tout le dépôt — `.py` par `ast`
+   (fonctions et méthodes), `.ts/.tsx` par accolades — 43 fichiers, **0 dépassement**.
+7. **`docs/SPEC.md`** : coupe silencieuse à `MAX_OBJECTS = 24` documentée explicitement dans le
+   contrat `/segment` (tri par score décroissant, ni total ni champ `truncated`).
