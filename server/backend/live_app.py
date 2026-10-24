@@ -14,6 +14,7 @@ reste importable sans stack GPU (``py_compile``, ``scripts/test_units.py``).
 # des modèles de requête (importés localement dans web()) au runtime ; avec les strings
 # différées le corps serait pris pour un paramètre de query (400 systématique).
 import asyncio
+import os
 import threading
 import time
 from pathlib import Path
@@ -22,8 +23,11 @@ import modal
 
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
 
-APP_NAME = "sam3-live"
-GPU_TYPE = "A100"
+# Nom et GPU surchargeables au déploiement pour comparer deux cartes sans
+# duplicata de code :
+#   LIVE_APP_NAME=sam3-live-h200 LIVE_GPU=H200 modal deploy backend/live_app.py
+APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-live")
+GPU_TYPE = os.environ.get("LIVE_GPU", "A100")
 MODEL_LABEL = "sam3.1"
 BACKEND_DIR = Path(__file__).resolve().parent
 
