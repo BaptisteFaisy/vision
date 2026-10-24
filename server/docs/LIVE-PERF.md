@@ -36,3 +36,49 @@ Descendre sous 340 ms exigerait de toucher `processor.image_processor.size` (hor
 cd ~/Bureau/sam3-vision-app && /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy deploy backend/live_app.py
 /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy app stop sam3-live -y   # coupe le GPU
 ```
+## A100 40 Go vs H200 — même code, même contrat (2026-10-24 19:0x)
+
+Variante H200 déployée sans dupliquer le code : `LIVE_APP_NAME=sam3-live-h200 LIVE_GPU=H200
+modal deploy backend/live_app.py` (constantes surchargées par l'environnement).
+GPU réellement alloué (`/health`) : **NVIDIA H200**. Démarrage à froid : **25 s** (A100 : 27 s).
+
+Protocole identique aux mesures ci-dessus, **8 concepts** (`person,chair,table,laptop,bottle,cup,bag,door`),
+`max_objects=16`, 12 passes par résolution.
+
+### Frame téléphone (512×206, JPEG q65, 21 Ko de base64) — le cas réel de l'app
+
+| Carte | work_edge | serveur méd. | p95 serveur | A/R méd. | p95 A/R | objets |
+|---|---|---:|---:|---:|---:|---:|
+| A100-40GB | 512 | 413 ms | 418 ms | 1269 ms | 1289 ms | 8 |
+| A100-40GB | 640 | 406 ms | 430 ms | 1259 ms | 1345 ms | 8 |
+| A100-40GB | 768 | 402 ms | 406 ms | 1254 ms | 1260 ms | 8 |
+| **H200** | 512 | **244 ms** | 249 ms | **706 ms** | 756 ms | 8 |
+| **H200** | 640 | **245 ms** | 256 ms | **686 ms** | 706 ms | 8 |
+| **H200** | 768 | **247 ms** | 252 ms | **696 ms** | 710 ms | 8 |
+
+### Image de référence (2048×824, 2,38 Mo de base64)
+
+| Carte | serveur méd. (edge 640) | A/R méd. | objets |
+|---|---:|---:|---:|
+| A100-40GB | 551 ms | 1844 ms | 8 |
+| H200 | 446 ms | 1659 ms | 8 |
+
+### Lecture
+
+- **H200 = 1,7× plus rapide côté serveur** (245 vs 406 ms) et **1,8× sur l'aller-retour** (0,69 vs 1,26 s).
+  Plafond théorique du direct (concurrence 1, une frame à la fois) : **4,1 ips** (H200) vs **2,5 ips** (A100).
+- `work_edge` ne change presque rien (240→247 ms de 512 à 768) : le coût est dominé par les **8 passes DETR**
+  (une par concept) après un seul encodage vision. Baisser la résolution ne rend pas le direct plus rapide ;
+  **réduire le nombre de concepts, si.**
+- Coût par frame : **0,237 $/1000 frames en A100** vs **0,309 $/1000 en H200** — H200 est 2,16× plus cher
+  à l'heure pour 1,7× de vitesse, donc **plus cher par frame**. Il n'est intéressant que si l'on veut
+  ~4 ips au lieu de ~2,5 (fluidité) ou plus de concepts par frame.
+
+### Recommandation
+
+- Rester sur **A100** pour l'usage actuel (1,5–2 ips réels sur le téléphone, ~0,24 $/1000 frames).
+- Passer à **H200** si le direct doit être plus fluide : `local.properties` → `sam.base.url` =
+  `https://baptiste-faisy--sam3-live-h200-sam3live-web.us-east.modal.run`, rebuild, réinstaller.
+- Pour franchir un vrai cap (>10 ips, suivi d'objets persistant), ce n'est pas une question de carte :
+  c'est le **tracker vidéo** `sam3.1_multiplex.pt` (mesuré précédemment : 21,6 ips en A100, 35,8 en H100,
+  40,0 en H200) qu'il faut brancher à la place de la boucle image-par-image.
