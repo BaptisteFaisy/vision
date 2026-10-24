@@ -6,6 +6,8 @@ Exemples :
     API_URL=https://xxxx.modal.run python3 scripts/test_api.py
     python3 scripts/test_api.py --url ... --image photo.jpg --timeout 90
     python3 scripts/test_api.py --url ... --only health
+    python3 scripts/test_api.py --url ... --only contract-errors   # corps invalides → 400
+    python3 scripts/test_api.py --url ... --only analyze,ask       # nécessite une vraie clé LLM
 """
 
 from __future__ import annotations
@@ -27,7 +29,9 @@ SAMPLE_URLS = (
     "https://raw.githubusercontent.com/facebookresearch/segment-anything/main/notebooks/images/truck.jpg",
     "https://raw.githubusercontent.com/facebookresearch/segment-anything-2/main/notebooks/images/truck.jpg",
 )
-ALL_TESTS = ("health", "segment", "segment-prompts", "analyze", "ask", "bad-image")
+ALL_TESTS = ("health", "segment", "segment-prompts", "analyze", "ask", "bad-image",
+             "contract-errors")
+MAX_ERROR_RESPONSE_BYTES = 4096
 
 
 class Failure(Exception):
@@ -135,6 +139,23 @@ def http_json(url: str, path: str, payload=None, timeout: float = DEFAULT_TIMEOU
         reason = getattr(exc, "reason", exc)
         raise Failure(f"impossible de joindre {target} ({reason}) — URL ou déploiement ?") from None
     except (TimeoutError, OSError) as exc:
+        raise Failure(f"réseau/timeout ({timeout}s) sur {target} : {exc}") from None
+
+
+def http_raw(url: str, path: str, raw_body: bytes, timeout: float = DEFAULT_TIMEOUT):
+    """POST d'un corps brut (JSON volontairement malformé) → (status, corps, taille)."""
+    target = url.rstrip("/") + path
+    request = urllib.request.Request(target, data=raw_body, method="POST",
+                                     headers={"Content-Type": "application/json",
+                                              "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            body = resp.read()
+            return resp.status, _parse_json(body, target, strict=False), len(body)
+    except urllib.error.HTTPError as exc:
+        body = exc.read()
+        return exc.code, _parse_json(body, target, strict=False), len(body)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise Failure(f"réseau/timeout ({timeout}s) sur {target} : {exc}") from None
 
 
@@ -333,6 +354,34 @@ def test_bad_image(session) -> str:
     return "400 + detail OK"
 
 
+def test_contract_errors(session) -> str:
+    """Tout corps invalide doit donner 400 + {detail}, sans renvoyer l'envoi au client."""
+    cases = (
+        ("image_b64 absent", {"prompts": None}),
+        ("image_b64 non-string", {"image_b64": 12345}),
+        ("prompts vide", {"image_b64": session.image_b64, "prompts": []}),
+        ("prompts non-liste", {"image_b64": session.image_b64, "prompts": "voiture"}),
+        ("prompts non-chaînes", {"image_b64": session.image_b64, "prompts": [1, 2]}),
+    )
+    for name, payload in cases:
+        status, body = http_json(session.url, "/segment", payload, session.timeout)
+        _require(status == 400, f"{name} : attendu 400, reçu {status} — {_snippet(body)}")
+        _require(isinstance(body, dict) and isinstance(body.get("detail"), str),
+                 f"{name} : corps {{'detail': ...}} attendu, reçu {_snippet(body)}")
+    raw_cases = (
+        ("JSON malformé", b'{"image_b64": "abcdefgh", broken'),
+        ("corps = liste d'images", json.dumps([session.image_b64]).encode()),
+    )
+    for name, raw in raw_cases:
+        status, body, size = http_raw(session.url, "/segment", raw, session.timeout)
+        _require(status == 400, f"{name} : attendu 400, reçu {status}")
+        _require(isinstance(body, dict) and isinstance(body.get("detail"), str),
+                 f"{name} : corps {{'detail': ...}} attendu")
+        _require(size < MAX_ERROR_RESPONSE_BYTES,
+                 f"{name} : réponse de {size} octets — le serveur réémet l'image envoyée")
+    return f"{len(cases) + len(raw_cases)} cas invalides → 400"
+
+
 # --------------------------------------------------------------------------- main
 
 
@@ -397,6 +446,7 @@ def main(argv=None) -> int:
         "analyze": lambda: test_analyze(session),
         "ask": lambda: test_ask(session),
         "bad-image": lambda: test_bad_image(session),
+        "contract-errors": lambda: test_contract_errors(session),
     }
     labels = {
         "health": "GET /health",
@@ -405,6 +455,7 @@ def main(argv=None) -> int:
         "analyze": "POST /analyze",
         "ask": "POST /ask (+ history)",
         "bad-image": "POST /segment (image invalide → 400)",
+        "contract-errors": "POST /segment + /ask (corps invalides → 400, echo borné)",
     }
     for key in tests:
         run_test(report, labels[key], steps[key])
