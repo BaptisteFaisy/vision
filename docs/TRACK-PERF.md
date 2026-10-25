@@ -169,3 +169,33 @@ depuis le téléphone est de 36 ms. **Les 116 ms restants sont le calcul du mod�
 p95 à 164 ms. Le seul vrai levier restant pour descendre sous ~100 ms serait de **pipelines
 plusieurs frames en vol** (le GPU est inactif ~25 % du temps entre deux réponses) — cela
 demande de changer la porte côté app et l'ordre d'arrivée des frames côté serveur.
+
+## Cible 100 ms — verdict mesuré (2026-10-25 14:30)
+
+Toutes les mesures : 512×288 q65, **1 concept**, une frame en vol, chunk de grounding = 1.
+
+| Carte (région réelle) | Serveur méd. | Serveur p95 | **A/R téléphone** |
+|---|---:|---:|---:|
+| A100-40GB (eu-west) | 171 ms | 181 ms | **207 ms** |
+| A100-40GB, chunk de 4 | 119 ms | **326 ms** | ~300 ms |
+| H200 (eu-west) | 87 ms | 121 ms | **~123 ms** |
+| B200 (eu-north — pas de capacité en EU) | **53–70 ms** | 72–156 ms | **235 ms** |
+
+Le B200 calcule le plus vite (53–70 ms) mais n'obtient **pas de capacité en Europe** : il tourne
+en `eu-north`, et le trajet téléphone → `eu-west` → Stockholm coûte **165 ms** au lieu de 36 ms
+en eu-west (`/health` mesuré depuis le téléphone : 160–205 ms contre ~36 ms sur une app eu-west).
+Le gain GPU est entièrement mangé par le réseau.
+
+### Prédictions (chantier backend vs état actuel)
+
+- **Pipeline multi-frames en vol** (client) : augmente le **débit**, pas la latence. Le serveur
+  sérialise sous un verrou ; chaque frame attend les précédentes. Sur A100 : 171 ms fixes par
+  frame, la latence affichée *augmente* avec la profondeur de file.
+- **Chunk de grounding > 1** (backend) : baisse la médiane (119 vs 171 sur A100) mais fait payer
+  tout le lot à la première frame → **p95 326 ms**. Incompatible avec une cible de latence.
+- **Plancher A100** = 171 ms/frame : aucun chantier backend ne descend en dessous, le seul
+  levier restant (résolution d'entrée 1008²) **n'est pas exposé** par `build_sam3_multiplex_video_predictor`.
+
+**Conclusion : 100 ms n'est atteignable sur aucune combinaison disponible.**
+Meilleur compromis fiable : **H200 en eu-west, 1 concept → ~123 ms**. 100 ms deviendrait
+possible si B200 obtenait de la capacité en `eu-west` (prédiction : 53 + 36 ≈ **89 ms**).
