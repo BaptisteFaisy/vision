@@ -1,25 +1,23 @@
 name: deploy-live-fast
 
-# Le backend live (sam3-eu-a100) doit être **déployé avec ses leviers** : c'est ce qui
-# rend le graphe CUDA et la fenêtre de 5 min persistants. Un déploiement manuel « à la
-# main » sans les leviers efface le gain (le 25/10 : cuda_graph est repassé à false).
+# Le backend live (sam3-eu-a100) doit être déployé **avec ses leviers** : c'est ce qui
+# rend le graphe CUDA (vision 45 ms → 1,4 ms) et la fenêtre de 5 min persistants. Un
+# déploiement manuel sans eux les efface (vu le 25/10 : cuda_graph repassé à false).
 #
-# Ce workflow est donc **auto-réparateur** : toutes les 20 minutes il vérifie l'app
-# déployée et la redéploie si un levier a été perdu. Il se déclenche aussi à chaque push
-# sur `backend/`.
-#
-# Secrets : MODAL_TOKEN_ID, MODAL_TOKEN_SECRET (compte Modal du profil baptiste-faisy).
+# Deux règles, apprises le 25-26/10 :
+#  1. **aucun contrôle périodique** : un ping /health réveille le conteneur (29 s de
+#     démarrage) et empêche l'extinction que l'app demande quand elle passe en arrière-plan
+#     (`POST /release`). Donc pas de `schedule:` — on ne déploie qu'à un push.
+#  2. les jetons Modal vivent dans les **secrets du dépôt** (`MODAL_TOKEN_ID`,
+#     `MODAL_TOKEN_SECRET`) : jamais dans un fichier, jamais affichés (GitHub les masque
+#     dans les logs). `gh secret list` ne montre que leur nom et leur date.
 on:
   push:
     branches: [master]
     paths:
-      - 'backend/**'
+      - 'backend/live_fast/**'
       - 'scripts/deploy-live-fast.sh'
-  # Le contrôle périodique est désactivé tant que MODAL_TOKEN_ID/MODAL_TOKEN_SECRET ne
-  # sont pas dans les secrets du dépôt : sans eux, le job échouerait toutes les 20 min.
-  # Décommenter pour activer l'auto-réparation côté GitHub (en plus de sam3-live-guard).
-  # schedule:
-  #   - cron: '*/20 * * * *'
+      - '.github/workflows/deploy-live-fast.yml'
   workflow_dispatch:
 
 permissions:
@@ -36,8 +34,7 @@ jobs:
     env:
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
       MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-      # Le profil n'existe que sur les machines avec ~/.modal.toml ; en CI,
-      # l'authentification vient des secrets (MODAL_TOKEN_ID / MODAL_TOKEN_SECRET).
+      # Pas de ~/.modal.toml en CI : l'authentification vient des deux jetons ci-dessus.
       MODAL_PROFILE: ""
     steps:
       - uses: actions/checkout@v4
@@ -45,36 +42,12 @@ jobs:
       - name: Installer la CLI Modal
         run: python3 -m pip install --quiet "modal==0.73.0"
 
-      - name: Le déploiement est-il déjà bon
-        id: check
+      - name: Vérifier que les jetons sont présents (sans les afficher)
         run: |
           set -euo pipefail
-          url="https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/health"
-          body="$(curl -fsS --max-time 60 "$url" || true)"
-          ok="ko"
-          if [ -n "$body" ]; then
-            ok="$(printf '%s' "$body" | python3 -c '
-          import json, sys
-          try:
-              h = json.load(sys.stdin)
-          except Exception:
-              print("ko"); raise SystemExit
-          lev = h.get("levers") or {}
-          app = h.get("applied") or {}
-          good = ("fast" in str(h.get("model", "")).lower()
-                  and lev.get("cuda_graph") is True
-                  and lev.get("batch_prompts") is True
-                  and lev.get("edge") == 512
-                  and app.get("vision_accel") == "ok")
-          print("ok" if good else "ko")
-          ')"
-          fi
-          echo "etat=$ok" >> "$GITHUB_OUTPUT"
-          echo "leviers actuels : ${body:-injoignable}"
+          [ -n "${MODAL_TOKEN_ID:-}" ] || { echo "::error::MODAL_TOKEN_ID manquant"; exit 1; }
+          [ -n "${MODAL_TOKEN_SECRET:-}" ] || { echo "::error::MODAL_TOKEN_SECRET manquant"; exit 1; }
+          echo "jetons présents (valeurs masquées par GitHub)"
 
-      - name: Deployer si un levier a ete perdu
-        if: steps.check.outputs.etat != 'ok'
+      - name: Déployer avec les leviers
         run: bash scripts/deploy-live-fast.sh
-
-      - name: Verifier
-        run: bash scripts/deploy-live-fast.sh --no-deploy
