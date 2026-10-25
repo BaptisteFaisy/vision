@@ -53,19 +53,18 @@ from pathlib import Path
 
 import modal
 
-from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, clamp_int, load_cpu,
+from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, clamp_int,
                        gpu_name, levers, load, prepare, run_frame, segment_frame, vision_grid)
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
 from timing import Stage, elapsed_ms, format_server_timing, now
+
+import detr_graph
 
 APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-eu-a100")
 GPU_TYPE = os.environ.get("FAST_GPU", "A100")
 REGION = os.environ.get("FAST_REGION") or None
 ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
-# Délai avant autocommit de la mort : le temps que la réponse `/release` parte au téléphone.
-RELEASE_DELAY_S = clamp_int(os.environ.get("FAST_RELEASE_DELAY"), 1, 1, 30)
-SNAPSHOT = os.environ.get("FAST_SNAPSHOT", "1").strip().lower() in ("1", "true", "yes", "on")
 MODEL_LABEL = "sam3.1-fast"
 BACKEND_DIR = Path(__file__).resolve().parent
 
@@ -73,44 +72,14 @@ BACKEND_DIR = Path(__file__).resolve().parent
 # le conteneur importe ce module au démarrage, ses os.environ sont donc ceux de l'image
 # (les variables du shell de déploiement ne sont pas propagées telles quelles).
 LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COMPILE",
-                "FAST_CUDA_GRAPH", "FAST_DTYPE", "FAST_TIMING", "FAST_COMPILE_WARMUPS")
-
-
-MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "/opt/models/sam3.1")
-
-# Les poids sont téléchargés **au build de l'image**, plus au démarrage du conteneur :
-# ~20 s gagnées sur les 32 s de chargement à froid mesurées le 25/10 (le Hub HF renvoyait
-# même un avertissement de débit non authentifié). Étape cachée par le build Modal.
-WEIGHTS_BUILD = (
-    'python -c "from huggingface_hub import snapshot_download; '
-    + f"snapshot_download('unsloth/sam3.1', local_dir='{MODEL_DIR}')"
-    + '"'
-)
-
-
-def container_age_seconds():
-    """Âge du conteneur en secondes (uptime machine - début du processus).
-
-    Sert à mesurer le VRAI temps d'ouverture : après une restauration de snapshot, le
-    `enter(snap=True)` n'est pas rejoué, donc le chrono du code ne voit que la phase GPU.
-    """
-    try:
-        with open("/proc/uptime", "r", encoding="utf-8") as handle:
-            uptime = float(handle.read().split()[0])
-        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
-            fields = handle.read().rsplit(") ", 1)[1].split()
-        start_ticks = int(fields[19])
-        hertz = os.sysconf("SC_CLK_TCK")
-        return round(uptime - start_ticks / hertz, 1)
-    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
-        return None
+                "FAST_CUDA_GRAPH", "FAST_DETR_GRAPH", "FAST_DTYPE", "FAST_TIMING",
+                "FAST_COMPILE_WARMUPS")
 
 
 def lever_env() -> dict:
     """Env de l'image : PYTHONPATH + les leviers positionnés au déploiement."""
     values = {name: os.environ.get(name, "") for name in LEVER_NAMES}
     values["PYTHONPATH"] = "/root:/root/backend_src"
-    values["FAST_MODEL_DIR"] = MODEL_DIR
     return values
 
 
@@ -124,8 +93,6 @@ LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install_from_requirements(str(BACKEND_DIR / "requirements.txt"))
-    # Poids embarqués : une fois au build (en cache), jamais au démarrage du conteneur.
-    .run_commands(WEIGHTS_BUILD)
     # .env() est une étape de build : elle doit passer avant add_local_* (règle Modal).
     .env(lever_env())
     .add_local_dir(str(BACKEND_DIR), remote_path="/root/backend_src")
@@ -169,21 +136,6 @@ def accepts_mask_encoding(pipeline) -> bool:
         return False
 
 
-def live_response(result):
-    """Réponse de ``POST /live`` : le résultat, plus ``Server-Timing`` si les chronos existent.
-
-    En-tête additif (RFC 8673) : le levier ``FAST_TIMING`` reste le seul interrupteur.
-    Éteint, ``timings_ms`` est absent et aucun en-tête n'est émis — un client ancien ne
-    voit strictement rien changer ; un banc lit les postes sans parser le corps.
-    """
-    header = format_server_timing(result.get("timings_ms") if isinstance(result, dict) else None)
-    if not header:
-        return result
-    from fastapi.responses import JSONResponse
-
-    return JSONResponse(content=result, headers={"Server-Timing": header})
-
-
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
@@ -194,10 +146,6 @@ def live_response(result):
     max_containers=1,      # UN SEUL GPU, JAMAIS DEUX
     min_containers=0,      # la carte s'éteint dès la fin du direct (bail 20 s)
     scaledown_window=SCALEDOWN,
-    # Snapshot mémoire : le chargement CPU des poids est figé à la première ouverture,
-    # les suivantes repartent de là. C'est LE levier qui fait passer l'ouverture à froid
-    # sous les 10 s (sans lui : 12,3 s de poids + scheduling, mesuré le 25/10).
-    enable_memory_snapshot=SNAPSHOT,
 )
 # DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
 # n'admet qu'une entrée à la fois : la 2e frame en vol (le client iHear tourne à 2 créneaux)
@@ -212,46 +160,26 @@ def live_response(result):
 class Sam3Live:
     """Conteneur de probe : modèle chargé une fois, leviers activables, verrou GPU unique."""
 
-    @modal.enter(snap=True)
-    def load_weights(self) -> None:
-        """Phase snapshottée : poids + graphe sur **CPU** (aucun état CUDA, sinon Modal refuse)."""
-        started = time.monotonic()
-        model, processor, dtype = load_cpu(DTYPE_NAME, EDGE)
-        self.cpu = {"model": model, "processor": processor, "dtype": dtype}
-        self.snap_seconds = round(time.monotonic() - started, 1)
-
     @modal.enter()
     def load_container(self) -> None:
-        """Phase après restauration : passage sur GPU, leviers, nom de carte, verrou.
-
-        Après une restauration de snapshot, `load_weights` n'est **pas** rejoué : la
-        mémoire du conteneur revient telle quelle, y compris `snap_seconds`. On marque
-        donc explicitement le cas, et `load_seconds` ne mesure que le travail réellement
-        refait après la restauration (passage GPU + leviers).
-        """
+        """Charge le modèle au dtype demandé, applique résolution/compile/graph, chronomètre."""
         from segmentation import device_label
 
         started = time.monotonic()
-        age = container_age_seconds()
-        model, processor, dtype = self.cpu["model"], self.cpu["processor"], self.cpu["dtype"]
-        device = device_label()
-        model = model.to(device).eval()
+        model, processor, device, dtype = load(DTYPE_NAME, EDGE)
         self.ctx = {"model": model, "processor": processor, "device": device, "dtype": dtype,
                     "runtime_edge": RUNTIME_EDGE}
         self.ctx.update(prepare(model, processor, device, dtype, EDGE))
         self.ctx["device_label"] = device_label()
         self.ctx["vision_grid"] = vision_grid(model)
+        # Graphe CUDA de la passe DETR (levier FAST_DETR_GRAPH) : le cache vit ici, la
+        # passe elle-même est présentée par fast_core._detections.
+        if detr_graph.enabled():
+            self.ctx["detr_graphs"] = detr_graph.DetrGraphs()
+        else:
+            self.ctx["detr_graphs"] = None
         self.gpu_name = gpu_name()
-        gpu_seconds = round(time.monotonic() - started, 1)
-        # `container_age` = âge du conteneur quand la phase GPU commence : c'est le VRAI
-        # temps d'ouverture (restauration du snapshot comprise). `snap_seconds` ne sert
-        # qu'au tout premier démarrage (pas de snapshot encore disponible).
-        self.load_seconds = age if age is not None else round(
-            gpu_seconds + getattr(self, "snap_seconds", 0.0), 1)
-        self.load_breakdown = {"age_conteneur_s": age,
-                               "poids_cpu_1er_demarrage_s": getattr(self, "snap_seconds", None),
-                               "gpu_s": gpu_seconds}
-        del self.cpu
+        self.load_seconds = round(time.monotonic() - started, 1)
         self._gpu_lock = threading.Lock()
 
     def _live_sync(self, image_b64, prompts, max_objects, work_edge, batch_prompts, edge,
@@ -281,7 +209,9 @@ class Sam3Live:
         result["elapsed_ms"] = int(round(timers["total_ms"]))
         result["fast"] = {"batch_prompts": batch, "edge": result.pop("_edge_applied"),
                           "edge_asked": edge, "edge_ok": result.pop("_edge_ok"),
-                          "vision_accel": self.ctx.get("vision_accel"), "dtype": DTYPE_NAME,
+                          "vision_accel": self.ctx.get("vision_accel"),
+                        "attn": getattr(getattr(self.ctx.get("model"), "config", None),
+                                        "_attn_implementation", "?"), "dtype": DTYPE_NAME,
                           "timings": TIMING}
         return result
 
@@ -356,7 +286,7 @@ class Sam3Live:
     @modal.asgi_app()
     def web(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws."""
-        from fastapi import FastAPI, Request, WebSocket
+        from fastapi import FastAPI, WebSocket
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
         from schemas import LiveFastRequest, SegmentRequest
@@ -374,40 +304,28 @@ class Sam3Live:
                     "region": os.environ.get("MODAL_REGION", "unknown"),
                     "cloud": os.environ.get("MODAL_CLOUD_PROVIDER", "unknown"),
                     "load_seconds": getattr(self, "load_seconds", None),
-                    "load_breakdown": getattr(self, "load_breakdown", None),
-                    "weights_in_image": bool(os.environ.get("FAST_MODEL_DIR")),
-                    "memory_snapshot": SNAPSHOT,
                     "levers": levers(), "applied": {
                         "edge_applied": self.ctx.get("edge_applied"),
                         "vision_grid": self.ctx.get("vision_grid"),
-                        "vision_accel": self.ctx.get("vision_accel")}}
+                        "vision_accel": self.ctx.get("vision_accel"),
+                        "detr_graph": (self.ctx["detr_graphs"].status()
+                                       if self.ctx.get("detr_graphs") else None)}}
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
             return await call(self._segment_sync, request.image_b64, request.prompts)
 
-        @api.post("/release")
-        async def release(request: Request):
-            """Le téléphone ferme l'app : le conteneur se tue lui-même.
-
-            Sans cet appel, la carte A100 reste allumée jusqu'à la fenêtre de
-            réduintage (20 s ici) et, surtout, tant qu'un client continue de sonder
-            `/health` — ce qui rend le bail invisible. `min_containers=0` : Modal ne
-            relance rien, le prochain réveil repart d'un snapshot restauré (2-7 s).
-            Garde : en-tête de confirmation requis, sinon 400 (pas d'extinction
-            accidentelle par un simple curl).
-            """
-            from fastapi import HTTPException
-            from fastapi.responses import JSONResponse
-
-            if request.headers.get("x-sam-release") != "confirm":
-                raise HTTPException(status_code=400, detail="extinction refusée : en-tête x-sam-release: confirm requis")
-            asyncio.get_running_loop().call_later(RELEASE_DELAY_S, os._exit, 0)
-            return JSONResponse({"released": True, "in_seconds": RELEASE_DELAY_S})
-
         @api.post("/live")
         async def live(request: LiveFastRequest):
-            return live_response(await self._run_live(request))
+            result = await self._run_live(request)
+            # En-tête additif (RFC 8673) : le levier FAST_TIMING reste le seul interrupteur.
+            # Éteint, `timings_ms` est absent et aucun en-tête n'est émis — un client ancien
+            # ne voit strictement rien changer ; un banc lit les postes sans parser le corps.
+            header = format_server_timing(result.get("timings_ms") if isinstance(result, dict)
+                                          else None)
+            if not header:
+                return result
+            return JSONResponse(content=result, headers={"Server-Timing": header})
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
