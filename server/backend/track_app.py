@@ -35,6 +35,10 @@ from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detai
 
 APP_NAME = os.environ.get("TRACK_APP_NAME", "sam3-track")
 GPU_TYPE = os.environ.get("TRACK_GPU") or os.environ.get("LIVE_GPU") or "B200"
+# Mêmes leviers que live_app.py : `region` place le conteneur en Europe, `routing_region`
+# fait sortir le trafic web par Dublin (sinon tout passe par la Virginie, même GPU en EU).
+REGION = os.environ.get("TRACK_REGION") or None
+ROUTING = os.environ.get("TRACK_ROUTING_REGION") or None
 CAPACITY = int(os.environ.get("TRACK_CAPACITY", "900"))
 MODEL_LABEL = "sam3.1-tracker"
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -63,6 +67,8 @@ app = modal.App(APP_NAME)
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
+    region=REGION,
+    routing_region=ROUTING,
     timeout=600,
     startup_timeout=1800,
     scaledown_window=60,
@@ -174,6 +180,7 @@ class Sam3Track:
         @api.get("/health")
         async def health():
             return {"ok": True, "model": MODEL_LABEL, "gpu": getattr(self, "gpu_name", "unknown"),
+                    "region": os.environ.get("MODAL_REGION", "unknown"),
                     "max_objects": MAX_TRACKED_OBJECTS}
 
         @api.post("/session")
