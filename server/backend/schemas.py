@@ -50,10 +50,18 @@ class AskRequest(BaseModel):
     history: list[HistoryMessage] | None = None
 
 class TrackSessionRequest(BaseModel):
-    """POST /session body (docs/TRACK-SPEC.md): frame 0 plus the concepts to track."""
+    """POST /session body (docs/TRACK-SPEC.md): frame 0 plus the concepts to track.
+
+    ``capacity`` = nombre de frames que le client s'engage à envoyer (le tampon GPU est
+    pré-alloué à cette taille : c'est lui qui dimensionne la VRAM de la session, d'où le
+    réglage par requête et pas par variable d'environnement). ``debug`` ajoute le relevé
+    mémoire par frame — coûteux, réservé au diagnostic.
+    """
 
     image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
     prompts: list[str] | None = None
+    capacity: int | None = None
+    debug: bool = False
 
 
 class TrackFrameRequest(BaseModel):

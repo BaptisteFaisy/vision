@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import http.client
 import io
 import json
 import statistics
@@ -22,11 +23,66 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from PIL import Image
 
 JPEG_QUALITY = 80
+
+
+class Poster:
+    """Client HTTP keep-alive : une seule connexion TLS pour toutes les frames.
+
+    Sans lui chaque POST paie un handshake complet (deux allers-retours vers eu-west,
+    ~100–150 ms) : l'aller-retour mesuré ne dit plus rien de la latence réelle de l'app,
+    qui garde sa connexion ouverte.
+    """
+
+    def __init__(self, url: str, timeout: float):
+        parts = urllib.parse.urlsplit(url.rstrip("/"))
+        self.host, self.prefix, self.timeout = parts.netloc, parts.path or "", timeout
+        self.conn = None
+
+    def _send(self, method: str, path: str, body: str = "") -> tuple:
+        """Écrit la requête sur la connexion (reconnecte une fois si elle a expiré)."""
+        for attempt in (1, 2):
+            if self.conn is None:
+                self.conn = http.client.HTTPSConnection(self.host, timeout=self.timeout)
+            try:
+                self.conn.request(method, self.prefix + path, body=body,
+                                  headers={"Content-Type": "application/json",
+                                           "Accept": "application/json"})
+                response = self.conn.getresponse()
+                return response.status, response.read()
+            except (http.client.HTTPException, OSError):
+                self.close()
+                if attempt == 2:
+                    raise
+        raise RuntimeError("unreachable")
+
+    def post(self, path: str, payload: dict) -> tuple[int, dict, float]:
+        """POST JSON, renvoie (statut, corps, durée murale en ms)."""
+        started = time.monotonic()
+        try:
+            status, raw = self._send("POST", path, json.dumps(payload))
+        except Exception as exc:  # noqa: BLE001 — réseau : on remonte l'erreur textuellement
+            return 0, {"detail": str(exc)}, (time.monotonic() - started) * 1000
+        return status, json.loads(raw.decode() or "{}"), (time.monotonic() - started) * 1000
+
+    def delete(self, path: str) -> tuple[int, dict]:
+        """DELETE JSON (fermeture de session)."""
+        status, raw = self._send("DELETE", path)
+        return status, json.loads(raw.decode() or "{}")
+
+    def close(self) -> None:
+        """Ferme la connexion (silencieux)."""
+        conn, self.conn = self.conn, None
+        if conn is not None:
+            try:
+                conn.close()
+            except OSError:
+                pass
 
 
 def post_json(url: str, path: str, payload: dict, timeout: float) -> tuple[int, dict, float]:
@@ -95,10 +151,12 @@ def id_signature(objects: list) -> tuple:
     return tuple(sorted(int(item["id"]) for item in objects))
 
 
-def run_size(url: str, frames: list, prompt: str, timeout: float) -> dict:
+def run_size(url: str, frames: list, prompt: str, timeout: float, poster=None,
+             capacity: int = 240) -> dict:
     """/session sur la frame 0 puis un /frame par frame restante ; agrège les mesures."""
-    payload = {"image_b64": jpeg_b64(frames[0]), "prompts": [prompt]}
-    status, body, rtt = post_json(url, "/session", payload, timeout)
+    post = poster.post if poster else (lambda path, body: post_json(url, path, body, timeout))
+    payload = {"image_b64": jpeg_b64(frames[0]), "prompts": [prompt], "capacity": capacity}
+    status, body, rtt = post("/session", payload)
     if status != 200:
         return {"error": f"session HTTP {status}: {str(body)[:300]}"}
     session_id = body["session_id"]
@@ -107,16 +165,18 @@ def run_size(url: str, frames: list, prompt: str, timeout: float) -> dict:
               "ids": [int(item["id"]) for item in body.get("objects", [])],
               "labels": sorted({item["label"] for item in body.get("objects", [])}),
               "response_size": (body["width"], body["height"])}
-    server, client, sizes, signatures, payloads = [], [], [], [id_signature(body.get("objects", []))], []
+    server, client, sizes, signatures, payloads, vrams = [], [], [], [id_signature(body.get("objects", []))], [], []
     for frame in frames[1:]:
         encoded = jpeg_b64(frame)
         payloads.append(len(encoded))
-        status, body, rtt = post_json(url, "/frame", {"session_id": session_id, "image_b64": encoded}, timeout)
+        status, body, rtt = post("/frame", {"session_id": session_id, "image_b64": encoded})
         if status != 200:
             report["error"] = f"frame HTTP {status}: {str(body)[:300]}"
             break
         server.append(float(body.get("elapsed_ms", 0)))
         client.append(rtt)
+        if body.get("vram_mb") is not None:
+            vrams.append(float(body["vram_mb"]))
         sizes.append(len(json.dumps(body)))
         signatures.append(id_signature(body.get("objects", [])))
     report["frames"] = len(client)
@@ -126,11 +186,17 @@ def run_size(url: str, frames: list, prompt: str, timeout: float) -> dict:
     report["server_fps"] = round(1000.0 / statistics.median(server), 2) if server else 0
     report["payload_kb_median"] = round(statistics.median(payloads) / 1024) if payloads else 0
     report["response_kb_median"] = round(statistics.median(sizes) / 1024) if sizes else 0
+    report["server_first12"] = [round(value, 1) for value in server[:12]]
+    report["client_first12"] = [round(value, 1) for value in client[:12]]
+    if vrams:
+        report["vram_mb_first12"] = [round(value) for value in vrams[:12]]
+        report["vram_mb_max"] = round(max(vrams))
     distinct = sorted({str(item) for item in signatures})
     report["id_sets_distinct"] = len(distinct)
     report["id_sets"] = distinct[:4]
     report["ids_stable"] = len(distinct) == 1
-    delete_json(url, f"/session/{session_id}")
+    delete = poster.delete if poster else (lambda path: delete_json(url, path))
+    delete(f"/session/{session_id}")
     return report
 
 
@@ -144,6 +210,10 @@ def main() -> int:
     parser.add_argument("--prompt", default="person")
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--out", default="/tmp/track-bench.json")
+    parser.add_argument("--capacity", type=int, default=240,
+                        help="frames du tampon GPU demandé au serveur (dimensionne la VRAM)")
+    parser.add_argument("--no-keepalive", action="store_true",
+                        help="une connexion TLS par requête (le vieux comportement, +100 ms)")
     args = parser.parse_args()
 
     health = urllib.request.Request(args.url.rstrip("/") + "/health")
@@ -153,8 +223,12 @@ def main() -> int:
     for size in args.sizes.split(","):
         width, height = (int(value) for value in size.lower().split("x"))
         frames = extract_frames(args.video, width, height, args.frames)
-        print(f"--- {width}x{height} : {len(frames)} frames, {args.prompt!r} ---", flush=True)
-        report = run_size(args.url, frames, args.prompt, args.timeout)
+        poster = None if args.no_keepalive else Poster(args.url, args.timeout)
+        print(f"--- {width}x{height} : {len(frames)} frames, {args.prompt!r}"
+              f" {'keep-alive' if poster else 'connexions neuves'} ---", flush=True)
+        report = run_size(args.url, frames, args.prompt, args.timeout, poster, args.capacity)
+        if poster is not None:
+            poster.close()
         results[f"{width}x{height}"] = report
         print(json.dumps(report, indent=2), flush=True)
     with open(args.out, "w", encoding="utf-8") as handle:
