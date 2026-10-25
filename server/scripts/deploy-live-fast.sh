@@ -15,7 +15,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODAL="${MODAL_BIN:-modal}"
-PROFILE="${MODAL_PROFILE:-baptiste-faisy}"
+# `${VAR-default}` et non `${VAR:-default}` : en CI la variable est définie **vide**
+# exprès (pas de ~/.modal.toml), et `:-` y remettrait le profil local → erreur
+# « No such option: -profile » (vu le 26/10 sur le runner GitHub).
+PROFILE="${MODAL_PROFILE-baptiste-faisy}"
 URL="${LIVE_HEALTH_URL:-https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/health}"
 TIMEOUT="${LIVE_HEALTH_TIMEOUT:-300}"
 
