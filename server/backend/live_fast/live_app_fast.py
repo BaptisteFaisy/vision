@@ -66,6 +66,8 @@ REGION = os.environ.get("FAST_REGION") or None
 ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
 MODEL_LABEL = "sam3.1-fast"
+# Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
+RELEASE_GRACE_SECONDS = 0.5
 BACKEND_DIR = Path(__file__).resolve().parent
 
 # Leviers lus au moment du DEPLOIEMENT puis recuits dans l'environnement de l'image :
@@ -286,7 +288,7 @@ class Sam3Live:
     @modal.asgi_app()
     def web(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws."""
-        from fastapi import FastAPI, WebSocket
+        from fastapi import FastAPI, Request, WebSocket
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
         from schemas import LiveFastRequest, SegmentRequest
@@ -326,6 +328,24 @@ class Sam3Live:
             if not header:
                 return result
             return JSONResponse(content=result, headers={"Server-Timing": header})
+
+        @api.post("/release")
+        async def release(request: Request):
+            """Éteint le conteneur GPU — l'app l'appelle quand elle passe en arrière-plan.
+
+            Le téléphone n'a aucun identifiant Modal : il ne peut que demander. L'en-tête
+            `x-sam-release: confirm` évite qu'un scanner ou un préchargement de lien
+            éteigne la carte par accident. On répond **avant** de mourir, sinon le client
+            voit un timeout au lieu d'une confirmation ; le processus s'arrête juste après
+            (min_containers=0 ⇒ Modal ne le relance pas, et le prochain réveil repart d'un
+            snapshot restauré en 2-7 s).
+            """
+            from fastapi import HTTPException
+
+            if request.headers.get("x-sam-release", "") != "confirm":
+                raise HTTPException(status_code=400, detail="en-tête x-sam-release: confirm requis")
+            threading.Timer(RELEASE_GRACE_SECONDS, os._exit, args=(0,)).start()
+            return {"released": True, "grace_seconds": RELEASE_GRACE_SECONDS}
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
