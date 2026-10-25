@@ -1,40 +1,5 @@
 # LIVE-PERF — latences réelles de `/live` (app `sam3-live`, A100)
 
-## Démarrage à froid : poids dans l'image + snapshot mémoire (2026-10-25 21:15)
-
-Deux leviers, dans cet ordre, mesurés sur `sam3-eu-a100` (A100-40GB, eu-west) :
-
-1. **Poids embarqués dans l'image** (`.run_commands` → `snapshot_download` au build,
-   `FAST_MODEL_DIR=/opt/models/sam3.1`, `local_files_only=True` à la charge) : le
-   conteneur ne retélécharge plus 1,7 Go au démarrage. `load_seconds` passe de
-   **32 s à 12-13 s** ; le Hub HF ne renvoie plus son avertissement de débit.
-2. **Snapshot mémoire** (`enable_memory_snapshot=True` + `@modal.enter(snap=True)` pour
-   les poids chargés **sur CPU**, puis un `@modal.enter()` pour le passage GPU) : les
-   démarrages suivants restaurent la mémoire au lieu de recharger. Journaux Modal :
-   `Restoring Function from memory snapshot` puis `GET /health -> 200` en **2,3 à 7,3 s**.
-   Le tout premier démarrage après un déploiement crée le snapshot (≈ 24 s, incompressible).
-
-Contrainte à connaître : un snapshot mémoire ne contient pas d'état CUDA, d'où la
-coupure CPU/GPU entre les deux `enter`. `/health` expose `load_breakdown`
-(`age_conteneur_s`, `poids_cpu_1er_demarrage_s`, `gpu_s`) et `memory_snapshot`.
-
-## ⚠️ Ne pas déployer `live_app.py` (2026-10-25)
-
-`backend/live_app.py` est la version **LENTE** (1008 px, 1 forward DETR par concept) : **205-241 ms serveur**.
-La production du téléphone, c'est `backend/live_app_fast.py` avec `FAST_BATCH_PROMPTS=1` et
-`FAST_EDGE=512` : **83-125 ms serveur**, **213 ms d'aller-retour côté téléphone**. Un déploiement
-fait depuis le dépôt avec `live_app.py` double la latence, sans aucune erreur visible.
-
-Seule commande de déploiement du direct (réglages en dur + vérification de `/health`) :
-
-```bash
-bash scripts/deploy-live-fast.sh               # déploie backend/live_app_fast.py puis vérifie
-bash scripts/deploy-live-fast.sh --no-deploy   # vérifie seulement, n'allume rien
-```
-
-Les sections ci-dessous (mesures du 2026-10-24 sur `live_app.py`) documentent l'état **lent** :
-elles restent la référence de non-régression, pas la cible de production.
-
 Mesures 2026-10-24 · URL `https://baptiste-faisy--sam3-live-sam3live-web.us-east.modal.run` · GPU réellement alloué (`/health`) : **NVIDIA A100-SXM4-40GB**, `device=cuda`, `model=sam3.1`.
 Classe `Sam3Live` : `gpu="A100"`, `timeout=300`, `startup_timeout=900`, `scaledown_window=30`, **sans secret** ; démarrage à froid (poids 1,68 Go) : 38 s.
 Protocole : 10 appels `/live` consécutifs par résolution, `prompts=["person","car","dog","chair"]`, `max_objects=12` ; serveur = `elapsed_ms` (`time.monotonic`), client = aller-retour (`scripts/bench_live.py`).
@@ -171,56 +136,3 @@ Le goulot A100 n'est plus le réseau : c'est le GPU lui-même.
 
 max_containers=1 + scaledown 20 s : jamais deux cartes, la carte chauffe 20 s après la dernière frame.
 Session de test ≈ 9–10 min de GPU ≈ **0,36 $** (2,415 $/h). Garde : `KEEP=sam3-eu-a100 bash scripts/modal-one-gpu.sh`.
-
-## WebSocket `/live/ws` — supprimer l'overhead HTTP par frame (2026-10-25)
-
-Ajout d'une route **WebSocket** sur la même app et le même conteneur (`backend/live_app_fast.py`) :
-le pipeline GPU est **le même** (`Sam3Live._live_sync`, un seul verrou GPU), seul le transport change.
-
-- URL : `wss://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/live/ws`
-  (en local : `ws://<host>/live/ws`).
-- Entrée, un message **texte** JSON par frame — mêmes champs que `POST /live`, plus `id` :
-  `{"id": 7, "image_b64": "...", "prompts": ["person", "door"], "max_objects": 4, "work_edge": 640}`
-  (`prompts`, `max_objects`, `work_edge`, `batch_prompts`, `edge` restent optionnels et gardent les
-  mêmes défauts/bornes que `POST /live` ; `id` est **obligatoire**, il apparie la réponse à la frame).
-- Sortie, un message **texte** JSON par frame traitée, **même forme que `POST /live`** plus `id` :
-  `{"id": 7, "width": 512, "height": 1138, "elapsed_ms": 118, "objects": [{"label": "person", "score": 0.91, "box": [x1,y1,x2,y2], "mask_b64": "..."}]}`
-  (le champ `fast` de `/live` est conservé tel quel).
-- Erreur : `{"id": 7, "error": {"status": 400|500, "detail": "..."}}` — `id` à `-1` s'il est illisible
-  (JSON cassé, `id` absent ou non entier, message binaire). **Une erreur de frame ne ferme jamais la
-  connexion** ; les codes sont ceux de `POST /live` (400 décodage/prompt, 500 interne), détail borné à 300 car.
-- Une frame à la fois **par connexion** (la boucle attend la réponse avant de lire la suivante) ; le
-  verrou GPU global reste la seule file entre connexions.
-
-### Mesure
-
-Même région (backend eu-west, client en France), même frame, mêmes prompts :
-
-| Transport | Aller-retour mesuré |
-|---|---:|
-| `POST /live` (HTTP) | **81,4 ms** |
-| `WS /live/ws` | **50,3 ms** |
-
-**~31 ms gagnés par frame** (handshake, en-têtes et ouverture de connexion supprimés) ; le temps serveur
-(`elapsed_ms`, 83–125 ms avec `FAST_BATCH_PROMPTS=1` + `FAST_EDGE=512`) est inchangé — le WebSocket
-n'accélère pas le GPU, il retire la couche HTTP.
-
-### Banc
-
-```bash
-python3 scripts/bench_live_ws.py --url wss://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run \
-    --image /tmp/frame.jpg --runs 6 --prompts person,door
-```
-
-Une seule connexion, `--runs` frames enchaînées ; affiche par frame l'`id` reçu, l'`elapsed_ms` serveur,
-l'aller-retour mesuré, puis **moyenne et p95**. `--image` accepte un fichier binaire ou un JSON portant
-`image_b64` ; `--image-b64` passe la chaîne directement. `--url` est **obligatoire** : le banc n'a aucune
-URL par défaut et n'est jamais lancé automatiquement (il réveille un GPU).
-
-Contrôle du contrat sans GPU ni réseau : `python3 scripts/test_live_ws.py` (24 vérifications — forme de
-réponse identique à `POST /live`, `id` corrélé, erreurs sans fermeture de connexion).
-
-### Hors périmètre (fait ailleurs)
-
-Déploiement de la route (`bash scripts/deploy-live-fast.sh`) et mesure réelle contre la production :
-non joués ici — aucune GPU allumée, aucun `modal deploy`, aucun appel réseau depuis ce dépôt.
