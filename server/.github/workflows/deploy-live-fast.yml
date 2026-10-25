@@ -15,8 +15,11 @@ on:
     paths:
       - 'backend/**'
       - 'scripts/deploy-live-fast.sh'
-  schedule:
-    - cron: '*/20 * * * *'
+  # Le contrôle périodique est désactivé tant que MODAL_TOKEN_ID/MODAL_TOKEN_SECRET ne
+  # sont pas dans les secrets du dépôt : sans eux, le job échouerait toutes les 20 min.
+  # Décommenter pour activer l'auto-réparation côté GitHub (en plus de sam3-live-guard).
+  # schedule:
+  #   - cron: '*/20 * * * *'
   workflow_dispatch:
 
 permissions:
