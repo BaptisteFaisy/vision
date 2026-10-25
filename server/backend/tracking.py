@@ -24,32 +24,12 @@ import shutil
 import time
 from pathlib import Path
 
-def _env_int(name: str, default: int) -> int:
-    """Entier d'environnement (le conteneur ne voit que ce que `image.env()` a écrit)."""
-    try:
-        return int(os.environ.get(name) or default)
-    except (TypeError, ValueError):
-        return default
-
-
 BUCKET = "Baptiste12312/sam3.1-bucket"
 CKPT_DIR = os.environ.get("TRACK_CKPT_DIR", "/root/ckpts")
 CKPT_FILES = ["sam3.1_multiplex.pt", "config.json"]  # le BPE vient de sam3/assets
 MUX_COUNT = 16          # objets par bucket multiplex (figé par le checkpoint)
 MAX_TRACKED_OBJECTS = 16  # objets par concept — aussi le pas d'offset des ids
-
-
-
 CAPACITY_DEFAULT = 900  # frames par session (30 s à 30 fps), surchargeable par TRACK_CAPACITY
-# Frames tirées d'un même générateur de propagation. Le détecteur travaille par *chunk* de
-# frames (`batched_grounding_batch_size`) : un chunk de 8 = ~6 Go de tenseurs d'un coup
-# (mesuré), 1 = ~14 Go stable. 1 = un générateur neuf par frame (fenêtre toujours fraîche,
-# ids stables) ; > 1 = un générateur vivant d'une requête à l'autre.
-BATCH_DEFAULT = _env_int("TRACK_BATCH", 0)  # 0 = un générateur pour la session
-GROUNDING_BATCH = _env_int("TRACK_GROUNDING_BATCH", 1)  # frames par chunk du détecteur
-# torch.compile : supprime une partie du surcoût Python/dispatch par frame (le modèle est
-# appelé une frame à la fois en direct, là où le mode batch amortit ces coûts).
-COMPILE = os.environ.get("TRACK_COMPILE") == "1"
 PROMPT_LIMIT = 2        # concepts par session : chacun coûte une inférence de frame par /frame
 SESSIONS_ROOT = "/tmp/sessions"
 OUTPUT_PROB_THRESH = 0.5
@@ -156,10 +136,10 @@ def build_predictor(multiplex_count: int = MUX_COUNT, max_objects: int = MAX_TRA
     started = time.time()
     predictor = build_sam3_multiplex_video_predictor(
         checkpoint_path=os.path.join(CKPT_DIR, "sam3.1_multiplex.pt"),
-        multiplex_count=_env_int("TRACK_MUX", multiplex_count),
-        max_num_objects=_env_int("TRACK_MAXOBJ", max_objects),
+        multiplex_count=multiplex_count,
+        max_num_objects=max_objects,
         use_fa3=False,
-        compile=COMPILE,
+        compile=False,
         warm_up=False,
     )
     # Deux réglages du checkpoint sont écrits pour un run « vidéo entière » et rendent le
@@ -170,67 +150,18 @@ def build_predictor(multiplex_count: int = MUX_COUNT, max_objects: int = MAX_TRA
     # de calculer une frame de padding pour obtenir la réponse.
     predictor.model.hotstart_delay = 0
     predictor.model.postprocess_batch_size = 1
-    # Le détecteur calcule la grounding par *chunks* mémorisés sous une clé
-    # `(chunk_start, chunk_end)` et ne nettoie que la clé précédente, calculée sur la même
-    # grille. Le builder impose 16 frames par chunk : la clé sortante vaut alors
-    # (frame-16, frame) et ne correspond jamais à celle qu'on a créée -> le cache grossissait
-    # de ~200 Mo par frame (VRAM 5,6 -> 18 Go en 7 frames, OOM vers la frame 10). À 1, la clé
-    # est (frame, frame+1) et le nettoyage tombe juste : la mémoire reste plate.
-    predictor.model.batched_grounding_batch_size = GROUNDING_BATCH
     torch.cuda.synchronize()
     return predictor, round(time.time() - started, 1)
 
 
 def normalize_frame(model, image):
-    """Une frame PIL -> tenseur [1,3,S,S] fp16 GPU, avec la normalisation du paquet.
+    """Une frame PIL -> tenseur [1,3,S,S] fp16 GPU, avec la normalisation du paquet."""
+    from sam3.model.io_utils import load_resource_as_video_frames
 
-    Même recette que `load_resource_as_video_frames` (carré à `model.image_size`, /255,
-    moyenne/écart du modèle) mais faite **sur GPU** : la version du paquet (PIL bicubique +
-    numpy fp16 sur CPU) coûtait 30-45 ms par frame, soit un cinquième du budget 300 ms.
-    """
-    import numpy as np
-    import torch
-    import torch.nn.functional as F
-
-    size = int(model.image_size)
-    array = torch.from_numpy(np.asarray(image.convert("RGB")))
-    frame = array.to("cuda").permute(2, 0, 1).unsqueeze(0).to(torch.float16) / 255.0
-    frame = F.interpolate(frame, size=(size, size), mode="bicubic", align_corners=False)
-    mean = torch.tensor(model.image_mean, dtype=torch.float16, device=frame.device)[:, None, None]
-    std = torch.tensor(model.image_std, dtype=torch.float16, device=frame.device)[:, None, None]
-    return (frame - mean) / std
-
-
-def vram_mb() -> int | None:
-    """Mémoire GPU réellement allouée par torch (Mo), pour suivre les fuites en direct."""
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            return int(torch.cuda.memory_allocated() / 1e6)
-    except Exception:  # noqa: BLE001 — un relevé de VRAM ne doit jamais casser une frame
-        pass
-    return None
-
-
-def _tensor_bytes(obj, depth: int = 0) -> int:
-    """Taille approximative (octets) des tenseurs d'un objet, profondeur bornée (cycles)."""
-    import torch
-
-    if depth > 4:
-        return 0
-    if torch.is_tensor(obj):
-        return obj.numel() * obj.element_size()
-    if isinstance(obj, dict):
-        return sum(_tensor_bytes(value, depth + 1) for value in obj.values())
-    if isinstance(obj, (list, tuple, set)):
-        return sum(_tensor_bytes(value, depth + 1) for value in obj)
-    return 0
-
-
-def _mb(value: int) -> int:
-    """Octets -> mégaoctets."""
-    return int(value / 1e6)
+    images, _height, _width = load_resource_as_video_frames(
+        [image], image_size=model.image_size, offload_video_to_cpu=False,
+        img_mean=model.image_mean, img_std=model.image_std)
+    return images
 
 
 def gpu_name() -> str:
@@ -318,16 +249,13 @@ class LiveSession:
     Les frames sont aussi archivées en JPEG dans ``/tmp/sessions/<id>/`` (f00000.jpg…).
     """
 
-    def __init__(self, predictor, session_id: str, prompts: list, image, capacity: int,
-                 debug: bool = False):
+    def __init__(self, predictor, session_id: str, prompts: list, image, capacity: int):
         self.predictor = predictor
         self.model = predictor.model
         self.session_id = session_id
         self.prompts = prompts
         self.first_frame = image
         self.capacity = int(capacity)
-        self.batch = max(1, int(BATCH_DEFAULT)) if int(BATCH_DEFAULT) > 0 else max(1, self.capacity - 1)
-        self.debug = bool(debug)
         self.width, self.height = image.size
         self.next_index = 1
         self.subsessions: list[dict] = []
@@ -359,8 +287,7 @@ class LiveSession:
                 "text": prompt, "output_prob_thresh": OUTPUT_PROB_THRESH,
             })["outputs"]
             self.subsessions.append({"prompt": prompt, "tracker_id": tracker_id,
-                                     "offset": step * MAX_TRACKED_OBJECTS,
-                                     "stream": None, "stream_start": 0, "stream_next": 1})
+                                     "offset": step * MAX_TRACKED_OBJECTS})
             objects += objects_from_output(outputs, prompt, step * MAX_TRACKED_OBJECTS,
                                            (self.width, self.height))
         return objects
@@ -376,28 +303,21 @@ class LiveSession:
             image = image.resize((self.width, self.height))
         self._archive(index, payload)
         objects: list[dict] = []
-        marks = {"normalize": 0, "propagate": 0, "masks": 0}
         # Le tampon a été créé sous inference_mode (init_state) : l'écriture in place doit
         # l'être aussi, sinon torch refuse (« Inplace update to inference tensor »).
         with torch.inference_mode():
-            started = time.perf_counter()
             frame = normalize_frame(self.model, image)
-            marks["normalize"] = round((time.perf_counter() - started) * 1000)
             for sub in self.subsessions:
                 state = self._state(sub["tracker_id"])
                 state["input_batch"].img_batch.tensors[index].copy_(frame[0])
-                started = time.perf_counter()
-                outputs = self._propagate_one(sub, index)
-                marks["propagate"] += round((time.perf_counter() - started) * 1000)
-                started = time.perf_counter()
+                outputs = self._propagate_one(state, sub["tracker_id"], index)
                 objects += objects_from_output(outputs, sub["prompt"], sub["offset"], (self.width, self.height))
-                marks["masks"] += round((time.perf_counter() - started) * 1000)
         self.next_index = index + 1
         return {"session_id": self.session_id, "frame": index, "width": self.width,
-                "height": self.height, "objects": objects, "ms": marks}
+                "height": self.height, "objects": objects}
 
-    def _open_stream(self, sub: dict, index: int) -> None:
-        """Ouvre un générateur de propagation à `index`, de `self.batch` frames.
+    def _propagate_one(self, state, tracker_id: str, index: int):
+        """Propagation d'une frame (le générateur ne rend qu'un élément avec max=1).
 
         `handle_stream_request` ne pose pas d'autocast : le predictor l'entre une fois dans
         son `__init__`, donc uniquement dans le thread qui l'a construit. Un `asyncio.to_thread`
@@ -406,88 +326,36 @@ class LiveSession:
         """
         import torch
 
-        state = self._state(sub["tracker_id"])
         # Le predictor multiplex choisit son type de propagation d'après `action_history`
         # (pensé pour une UI) : à la 3e propagation il passe en « fetch » et relit
-        # cached_frame_outputs — vidé par l'éviction ci-dessous, d'où un KeyError. En direct
-        # chaque requête AJOUTE une frame : l'historique est vidé avant l'appel pour rester
-        # en « propagation_full », seul mode qui calcule réellement la frame demandée.
+        # cached_frame_outputs — vide pour une frame neuve, d'où un KeyError sur la frame 3.
+        # En direct chaque requête AJOUTE une frame : l'historique est vidé avant l'appel pour
+        # rester en « propagation_full », seul mode qui calcule réellement la frame demandée.
         state["action_history"] = []
+        # Le détecteur ne pré-calcule que la fenêtre [start, start+max) : avec max=1 la
+        # frame `index` est dans la fenêtre (max=0 la viderait -> batch de 0 -> crash), mais
+        # la processing order devient [index, index+1]. On consomme donc le PREMIER élément
+        # (la frame demandée, yield immédiat : postprocess_batch_size=1, hotstart_delay=0)
+        # et on abandonne le générateur pour ne pas calculer la frame de padding.
         request = {
-            "type": "propagate_in_video", "session_id": sub["tracker_id"],
+            "type": "propagate_in_video", "session_id": tracker_id,
             "propagation_direction": "forward", "start_frame_index": index,
-            "max_frame_num_to_track": self.batch, "output_prob_thresh": OUTPUT_PROB_THRESH,
-            # Sans ça le paquet garde `cached_frame_outputs[frame]` (masques pleine résolution
-            # de toutes les frames déjà calculées) : ~1 Go retenu par frame, OOM vers la frame
-            # 11 sur 40 Go et latence qui enfle (300 -> 850 ms) avant de tomber.
-            "evict_cached_frame_outputs": True,
+            "max_frame_num_to_track": 1, "output_prob_thresh": OUTPUT_PROB_THRESH,
         }
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            sub["stream"] = self.predictor.handle_stream_request(request)
-        sub["stream_start"] = index
-        sub["stream_next"] = index
-
-    @staticmethod
-    def _close_stream(sub: dict) -> None:
-        """Libère le générateur courant (rien si aucun)."""
-        stream, sub["stream"] = None, None
-        if stream is not None:
+            stream = self.predictor.handle_stream_request(request)
             try:
+                item = next(stream)
+            finally:
                 stream.close()
-            except Exception:  # noqa: BLE001 — la fermeture ne doit jamais casser le 200
-                pass
-
-    def _propagate_one(self, sub: dict, index: int):
-        """Une frame du flux : tire l'élément `index` du générateur courant.
-
-        Le générateur reste **vivant** d'une requête à l'autre (c'est le batching prévu par
-        le paquet, `generator_state` est conservé dans `inference_state`) : abandonner un
-        générateur à chaque frame retenait ses activations et coûtait une ré-initialisation.
-        La frame n'est lue dans le tampon qu'au moment où elle est calculée, donc écrire la
-        fente `index` avant de tirer l'élément suffit — pas de frame de padding calculée.
-        """
-        import torch
-
-        if sub["stream"] is None or sub["stream_next"] != index:
-            self._close_stream(sub)
-            self._open_stream(sub, index)
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            item = next(sub["stream"])
         if item.get("frame_index") != index:
             raise RuntimeError(f"propagate_in_video answered frame {item.get('frame_index')}, "
-                               f"expected {index}")
-        sub["stream_next"] = index + 1
-        if index - sub["stream_start"] + 1 >= self.batch:
-            self._close_stream(sub)  # batch consommé : le prochain /frame en rouvrira un
+                              f"expected {index}")
         return item["outputs"]
 
-    def memory_report(self) -> dict:
-        """Où part la VRAM : tailles des caches vivants de la session (diagnostic)."""
-        import torch
-
-        report = {"vram_allocated_mb": _mb(torch.cuda.memory_allocated()) if torch.cuda.is_available() else None,
-                  "vram_reserved_mb": _mb(torch.cuda.memory_reserved()) if torch.cuda.is_available() else None,
-                  "frames": self.next_index}
-        for sub in self.subsessions:
-            state = self._state(sub["tracker_id"])
-            generator_state = state.get("generator_state", {})
-            report[sub["prompt"]] = {
-                "cached_frame_outputs": {"n": len(state.get("cached_frame_outputs", {})),
-                                         "mb": _mb(_tensor_bytes(state.get("cached_frame_outputs", {})))},
-                "feature_cache": _mb(_tensor_bytes(state.get("feature_cache", {}))),
-                "generator_state": {
-                    "yield_list": len(generator_state.get("postprocess_yield_list", [])),
-                    "hotstart": len(generator_state.get("hotstart_buffer", [])),
-                    "mb": _mb(_tensor_bytes(generator_state))},
-                "tracker_metadata_mb": _mb(_tensor_bytes(state.get("tracker_metadata", {}))),
-                "input_batch_mb": _mb(_tensor_bytes(state.get("input_batch", {}))),
-            }
-        return report
-
     def close(self) -> None:
-        """Ferme les sous-sessions, leurs générateurs, et supprime l'archive de frames."""
+        """Ferme les sous-sessions et supprime l'archive de frames."""
         for sub in self.subsessions:
-            self._close_stream(sub)
             try:
                 self.predictor.handle_request({"type": "close_session", "session_id": sub["tracker_id"]})
             except Exception:  # noqa: BLE001 — la fermeture ne doit jamais bloquer le 200
