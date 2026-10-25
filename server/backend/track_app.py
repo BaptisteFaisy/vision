@@ -40,6 +40,7 @@ GPU_TYPE = os.environ.get("TRACK_GPU") or os.environ.get("LIVE_GPU") or "B200"
 REGION = os.environ.get("TRACK_REGION") or None
 ROUTING = os.environ.get("TRACK_ROUTING_REGION") or None
 CAPACITY = int(os.environ.get("TRACK_CAPACITY", "900"))
+CAPACITY_MIN, CAPACITY_MAX = 30, 900  # bornes du tampon demandé par le client
 MODEL_LABEL = "sam3.1-tracker"
 BACKEND_DIR = Path(__file__).resolve().parent
 
@@ -62,6 +63,24 @@ image = (
 )
 
 app = modal.App(APP_NAME)
+
+
+async def call(pipeline, *args):
+    """Lance le blocage GPU dans un thread, mappe les erreurs vers les codes HTTP."""
+    from fastapi import HTTPException
+
+    from imaging import ImageDecodeError
+    from tracking import CapacityFull, PromptTooLong, SessionUnknown
+
+    try:
+        return await asyncio.to_thread(pipeline, *args)
+    except SessionUnknown as exc:
+        raise HTTPException(status_code=404, detail=f"unknown session {exc}"[:MAX_DETAIL_CHARS]) from exc
+    except (ImageDecodeError, PromptTooLong, CapacityFull, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)[:MAX_DETAIL_CHARS]) from exc
+    except Exception as exc:  # noqa: BLE001 — borne la réponse, ne fuite pas la stack
+        traceback.print_exc()  # la stack complète reste dans les logs du conteneur
+        raise HTTPException(status_code=500, detail=f"internal error: {exc}"[:MAX_DETAIL_CHARS]) from exc
 
 
 @app.cls(
@@ -104,18 +123,21 @@ class Sam3Track:
         session.close()
         return session.session_id
 
-    def _start(self, image_b64: str, prompts) -> dict:
+    def _start(self, image_b64: str, prompts, capacity=None, debug: bool = False) -> dict:
         from imaging import decode_image
         from tracking import LiveSession, clean_prompts
 
         concepts = clean_prompts(prompts)
         started = time.monotonic()
         image = decode_image(image_b64)
+        decode_ms = round((time.monotonic() - started) * 1000)
         if image.size[0] < 16 or image.size[1] < 16:
             raise ValueError(f"image too small: {image.size[0]}x{image.size[1]}")
         with self._lock:
             self._close_locked()  # une seule session vivante : la précédente est libérée
-            session = LiveSession(self.predictor, uuid.uuid4().hex[:12], concepts, image, CAPACITY)
+            size = CAPACITY if capacity is None else max(CAPACITY_MIN, min(int(capacity), CAPACITY_MAX))
+            session = LiveSession(self.predictor, uuid.uuid4().hex[:12], concepts, image, size,
+                                  debug=bool(debug))
             objects = session.start()
             self.session = session
         return {"session_id": session.session_id, "width": session.width,
@@ -124,16 +146,21 @@ class Sam3Track:
 
     def _frame(self, session_id: str, image_b64: str) -> dict:
         from imaging import decode_image
-        from tracking import SessionUnknown
+        from tracking import SessionUnknown, vram_mb
 
         started = time.monotonic()
         image = decode_image(image_b64)
+        decode_ms = round((time.monotonic() - started) * 1000)
         with self._lock:
             session = self.session
             if session is None or session.session_id != session_id:
                 raise SessionUnknown(session_id)
             result = session.push(image, image_b64)
         result["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        result["ms"] = {"decode": decode_ms, **result.get("ms", {})}
+        result["vram_mb"] = vram_mb()  # relève live : une frame qui fuit se voit dans la courbe
+        if session.debug:
+            result["mem"] = session.memory_report()
         return result
 
     def _close(self, session_id: str) -> dict:
@@ -154,24 +181,10 @@ class Sam3Track:
         from fastapi import FastAPI, HTTPException
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
-        from imaging import ImageDecodeError
         from schemas import TrackCloseRequest, TrackFrameRequest, TrackSessionRequest
-        from tracking import CapacityFull, MAX_TRACKED_OBJECTS, PromptTooLong, SessionUnknown
+        from tracking import MAX_TRACKED_OBJECTS
 
         api = FastAPI(title=APP_NAME, version="1.0.0")
-
-        async def call(pipeline, *args):
-            """Lance le blocage GPU dans un thread, mappe les erreurs vers les codes HTTP."""
-            try:
-                return await asyncio.to_thread(pipeline, *args)
-            except SessionUnknown as exc:
-                raise HTTPException(status_code=404, detail=f"unknown session {exc}"[:MAX_DETAIL_CHARS]) from exc
-            except (ImageDecodeError, PromptTooLong, CapacityFull, ValueError) as exc:
-                raise HTTPException(status_code=400, detail=str(exc)[:MAX_DETAIL_CHARS]) from exc
-            except Exception as exc:  # noqa: BLE001 — borne la réponse, ne fuite pas la stack
-                traceback.print_exc()  # la stack complète reste dans les logs du conteneur
-                raise HTTPException(
-                    status_code=500, detail=f"internal error: {exc}"[:MAX_DETAIL_CHARS]) from exc
 
         @api.exception_handler(RequestValidationError)
         async def invalid_body(_request, exc):
@@ -185,7 +198,8 @@ class Sam3Track:
 
         @api.post("/session")
         async def open_session(request: TrackSessionRequest):
-            return await call(self._start, request.image_b64, request.prompts)
+            return await call(self._start, request.image_b64, request.prompts,
+                              request.capacity, request.debug)
 
         @api.post("/frame")
         async def push_frame(request: TrackFrameRequest):
