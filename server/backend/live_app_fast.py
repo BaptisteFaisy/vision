@@ -63,6 +63,8 @@ GPU_TYPE = os.environ.get("FAST_GPU", "A100")
 REGION = os.environ.get("FAST_REGION") or None
 ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
+# Délai avant autocommit de la mort : le temps que la réponse `/release` parte au téléphone.
+RELEASE_DELAY_S = clamp_int(os.environ.get("FAST_RELEASE_DELAY"), 1, 1, 30)
 SNAPSHOT = os.environ.get("FAST_SNAPSHOT", "1").strip().lower() in ("1", "true", "yes", "on")
 MODEL_LABEL = "sam3.1-fast"
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -354,7 +356,7 @@ class Sam3Live:
     @modal.asgi_app()
     def web(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws."""
-        from fastapi import FastAPI, WebSocket
+        from fastapi import FastAPI, Request, WebSocket
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
         from schemas import LiveFastRequest, SegmentRequest
@@ -383,6 +385,25 @@ class Sam3Live:
         @api.post("/segment")
         async def segment(request: SegmentRequest):
             return await call(self._segment_sync, request.image_b64, request.prompts)
+
+        @api.post("/release")
+        async def release(request: Request):
+            """Le téléphone ferme l'app : le conteneur se tue lui-même.
+
+            Sans cet appel, la carte A100 reste allumée jusqu'à la fenêtre de
+            réduintage (20 s ici) et, surtout, tant qu'un client continue de sonder
+            `/health` — ce qui rend le bail invisible. `min_containers=0` : Modal ne
+            relance rien, le prochain réveil repart d'un snapshot restauré (2-7 s).
+            Garde : en-tête de confirmation requis, sinon 400 (pas d'extinction
+            accidentelle par un simple curl).
+            """
+            from fastapi import HTTPException
+            from fastapi.responses import JSONResponse
+
+            if request.headers.get("x-sam-release") != "confirm":
+                raise HTTPException(status_code=400, detail="extinction refusée : en-tête x-sam-release: confirm requis")
+            asyncio.get_running_loop().call_later(RELEASE_DELAY_S, os._exit, 0)
+            return JSONResponse({"released": True, "in_seconds": RELEASE_DELAY_S})
 
         @api.post("/live")
         async def live(request: LiveFastRequest):
