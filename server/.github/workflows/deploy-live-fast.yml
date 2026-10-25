@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Installer la CLI Modal
-        run: python3 -m pip install --quiet "modal==0.73.0"
+        run: python3 -m pip install --quiet "modal==1.6.2"
 
       - name: Vérifier que les jetons sont présents (sans les afficher)
         run: |
