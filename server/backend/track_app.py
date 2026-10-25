@@ -47,7 +47,13 @@ BACKEND_DIR = Path(__file__).resolve().parent
 image = (
     modal.Image.debian_slim(python_version="3.12")
     # Même chaîne que backend/probe_video_tracker.py : les couches pip restent en cache.
-    .env({"PYTHONPATH": "/root"})
+    # `image.env()` est le SEUL moyen de faire passer un réglage dans le conteneur :
+    # une variable lue au niveau module y est réévaluée avec sa valeur par défaut.
+    .env({"PYTHONPATH": "/root", "TRACK_COMPILE": os.environ.get("TRACK_COMPILE", "0"),
+          "TRACK_MUX": os.environ.get("TRACK_MUX", ""),
+          "TRACK_MAXOBJ": os.environ.get("TRACK_MAXOBJ", ""),
+          "TRACK_GROUNDING_BATCH": os.environ.get("TRACK_GROUNDING_BATCH", ""),
+          "TRACK_BATCH": os.environ.get("TRACK_BATCH", "")})
     .pip_install_from_requirements(str(BACKEND_DIR / "requirements.txt"))
     .apt_install("git")  # après la couche pip : le cache de la couche torch reste valide
     .pip_install(

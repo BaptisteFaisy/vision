@@ -24,18 +24,32 @@ import shutil
 import time
 from pathlib import Path
 
+def _env_int(name: str, default: int) -> int:
+    """Entier d'environnement (le conteneur ne voit que ce que `image.env()` a écrit)."""
+    try:
+        return int(os.environ.get(name) or default)
+    except (TypeError, ValueError):
+        return default
+
+
 BUCKET = "Baptiste12312/sam3.1-bucket"
 CKPT_DIR = os.environ.get("TRACK_CKPT_DIR", "/root/ckpts")
 CKPT_FILES = ["sam3.1_multiplex.pt", "config.json"]  # le BPE vient de sam3/assets
 MUX_COUNT = 16          # objets par bucket multiplex (figé par le checkpoint)
 MAX_TRACKED_OBJECTS = 16  # objets par concept — aussi le pas d'offset des ids
+
+
+
 CAPACITY_DEFAULT = 900  # frames par session (30 s à 30 fps), surchargeable par TRACK_CAPACITY
 # Frames tirées d'un même générateur de propagation. Le détecteur travaille par *chunk* de
 # frames (`batched_grounding_batch_size`) : un chunk de 8 = ~6 Go de tenseurs d'un coup
 # (mesuré), 1 = ~14 Go stable. 1 = un générateur neuf par frame (fenêtre toujours fraîche,
 # ids stables) ; > 1 = un générateur vivant d'une requête à l'autre.
-BATCH_DEFAULT = int(os.environ.get("TRACK_BATCH", "0"))  # 0 = un générateur pour la session
-GROUNDING_BATCH = 1  # frames par chunk du détecteur — 1 = mémoire plate, latence régulière
+BATCH_DEFAULT = _env_int("TRACK_BATCH", 0)  # 0 = un générateur pour la session
+GROUNDING_BATCH = _env_int("TRACK_GROUNDING_BATCH", 1)  # frames par chunk du détecteur
+# torch.compile : supprime une partie du surcoût Python/dispatch par frame (le modèle est
+# appelé une frame à la fois en direct, là où le mode batch amortit ces coûts).
+COMPILE = os.environ.get("TRACK_COMPILE") == "1"
 PROMPT_LIMIT = 2        # concepts par session : chacun coûte une inférence de frame par /frame
 SESSIONS_ROOT = "/tmp/sessions"
 OUTPUT_PROB_THRESH = 0.5
@@ -142,10 +156,10 @@ def build_predictor(multiplex_count: int = MUX_COUNT, max_objects: int = MAX_TRA
     started = time.time()
     predictor = build_sam3_multiplex_video_predictor(
         checkpoint_path=os.path.join(CKPT_DIR, "sam3.1_multiplex.pt"),
-        multiplex_count=multiplex_count,
-        max_num_objects=max_objects,
+        multiplex_count=_env_int("TRACK_MUX", multiplex_count),
+        max_num_objects=_env_int("TRACK_MAXOBJ", max_objects),
         use_fa3=False,
-        compile=False,
+        compile=COMPILE,
         warm_up=False,
     )
     # Deux réglages du checkpoint sont écrits pour un run « vidéo entière » et rendent le
