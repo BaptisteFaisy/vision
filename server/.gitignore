@@ -7,3 +7,7 @@ __pycache__/
 .env
 *.log
 legacy-expo-app/android/
+
+# brouillons locaux (jamais versionnés)
+*.bak
+*.bak-*

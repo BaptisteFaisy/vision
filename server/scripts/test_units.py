@@ -20,6 +20,15 @@ import sys
 import types
 from pathlib import Path
 
+# Quand ce fichier est lancé comme script, il EST le module « test_units » des sous-groupes
+# (``scripts/tests_units/*`` font ``from test_units import check``) : sans cette ligne ils
+# importeraient un second exemplaire du module, avec ses propres compteurs PASSED/FAILED,
+# et leurs vérifications n'apparaîtraient nulle part.
+if __name__ == "__main__":
+    sys.modules.setdefault("test_units", sys.modules["__main__"])
+
+from tests_units import latency_tests, live_fast_tests, merge_tests, weights_tests  # noqa: E402
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
 FAILED: list[str] = []
@@ -72,6 +81,8 @@ def install_stubs() -> None:
         enter=_identity,
         asgi_app=_identity,
         method=_identity,
+        # Concurrence d'entrée dans un conteneur (@modal.concurrent(max_inputs=2)).
+        concurrent=_identity,
         Secret=types.SimpleNamespace(from_name=_identity),
     )
     stub_module("openai", OpenAI=types.SimpleNamespace)
@@ -170,8 +181,13 @@ def test_modal_helpers(modal_app) -> None:
     check("_validation_detail: nombre d'erreurs borné", modal_app._validation_detail(many).count("Field required") <= 8)
 
 
-async def asgi_call(app, method: str, path: str, body: bytes) -> tuple[int, dict]:
-    """Requête factice contre la vraie app ASGI, sans httpx ni TestClient."""
+async def asgi_call(app, method: str, path: str, body: bytes,
+                    headers_out: dict | None = None) -> tuple[int, dict]:
+    """Requête factice contre la vraie app ASGI, sans httpx ni TestClient.
+
+    ``headers_out`` (optionnel) reçoit les en-têtes de la réponse en minuscules : c'est
+    ainsi qu'on vérifie un en-tête additif comme ``Server-Timing`` sans changer le retour.
+    """
     scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method,
              "path": path, "raw_path": path.encode(), "query_string": b"",
              "headers": [(b"content-type", b"application/json")], "client": ("test", 1),
@@ -185,9 +201,12 @@ async def asgi_call(app, method: str, path: str, body: bytes) -> tuple[int, dict
         sent.append(message)
 
     await app(scope, receive, send)
-    status = next((m["status"] for m in sent if m["type"] == "http.response.start"), 0)
+    started = next((m for m in sent if m["type"] == "http.response.start"), {})
+    if headers_out is not None:
+        headers_out.update({key.decode("latin-1").lower(): value.decode("latin-1")
+                            for key, value in started.get("headers", [])})
     payload = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
-    return status, json.loads(payload.decode("utf-8") or "null")
+    return started.get("status", 0), json.loads(payload.decode("utf-8") or "null")
 
 
 def test_http_contract(modal_app) -> None:
@@ -311,6 +330,32 @@ RUNNERS = (
     ("contrat HTTP (app FastAPI)", "modal_app", test_http_contract),
     ("live_app (contrat /live)", "live_app", test_live_contract),
     ("live_app (pipeline /live)", "live_app", test_live_pipeline),
+    # Portage latence (mission 23) — codecs, cap, dédup, chronos, conteneur de prod.
+    ("latence : codec bits", "imaging", latency_tests.test_mask_bits),
+    ("latence : négociation mask_encoding", "imaging", latency_tests.test_mask_negotiation),
+    ("latence : cap max_objects avant encodage", "segmentation", latency_tests.test_finalize_cap),
+    ("latence : tri/cap par concept", "segmentation", latency_tests.test_top_indices),
+    ("latence : dédup alias FR/EN", "segmentation", latency_tests.test_alias_dedup),
+    ("latence : détection → objets", "segmentation", live_fast_tests.test_detection_entries),
+    ("chronos : postes et Server-Timing", "timing", latency_tests.test_timing),
+    ("chronos : levier FAST_TIMING", "fast_core", live_fast_tests.test_timing_gate),
+    ("latence : équivalence du cap par concept", "segmentation", live_fast_tests.test_cap_equivalence),
+    ("live_fast : ordre des étages / verrou", "fast_core", live_fast_tests.test_run_frame_order),
+    ("live_fast : chemin sans verrou", "fast_core", live_fast_tests.test_run_frame_no_lock),
+    ("live_fast : contention du verrou GPU", "fast_core", live_fast_tests.test_gpu_contention),
+    ("live_fast : frame de bout en bout (bits/none/png)", "fast_core",
+     live_fast_tests.test_run_frame_end_to_end),
+    ("live_fast : contrat POST /live", "live_app_fast", live_fast_tests.test_live_fast_contract),
+    ("live_fast : contrat /live/ws", "live_app_fast", live_fast_tests.test_live_fast_ws),
+    # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.
+    ("poids : comportement historique sans levier", "fast_core", weights_tests.test_weights_default),
+    ("poids : lecture locale + local_files_only", "fast_core", weights_tests.test_weights_local),
+    ("poids : edge injecté dans la config", "fast_core", weights_tests.test_weights_edge),
+    ("poids : image (téléchargement au build, snapshot)", "live_app_fast",
+     weights_tests.test_weights_image),
+    ("déploiement : leviers du script", "timing", weights_tests.test_deploy_script),
+    ("fusion : contrat de load_cpu", "fast_core", merge_tests.test_load_cpu),
+    ("fusion : conteneur (snapshot + latence)", "live_app_fast", merge_tests.test_fusion_live_app),
 )
 
 
