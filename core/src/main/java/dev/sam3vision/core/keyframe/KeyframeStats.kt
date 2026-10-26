@@ -20,7 +20,7 @@ class KeyframeStats(latencyWindow: Int = 20) {
 
     private var framesSeen = 0
     private var requestsSent = 0
-    private var successes = 0
+    private var successesSeen = 0
     private var failuresSeen = 0
     private var timeouts = 0
     private var ignored = 0
@@ -48,7 +48,7 @@ class KeyframeStats(latencyWindow: Int = 20) {
     @Synchronized
     fun onResult(success: Boolean, latencyMs: Long) {
         if (success) {
-            successes += 1
+            successesSeen += 1
             latency.record(latencyMs)
         } else {
             failuresSeen += 1
@@ -71,7 +71,7 @@ class KeyframeStats(latencyWindow: Int = 20) {
 
     val requests: Int get() = synchronized(this) { requestsSent }
 
-    val successes: Int get() = synchronized(this) { successes }
+    val successes: Int get() = synchronized(this) { successesSeen }
 
     val failures: Int get() = synchronized(this) { failuresSeen }
 
@@ -86,7 +86,7 @@ class KeyframeStats(latencyWindow: Int = 20) {
     /** Keyframes **reçus** ÷ frames examinées : l'efficacité de la propagation (0 si aucune frame). */
     val keyframeRatio: Float
         get() = synchronized(this) {
-            if (framesSeen == 0) 0f else successes.toFloat() / framesSeen
+            if (framesSeen == 0) 0f else successesSeen.toFloat() / framesSeen
         }
 
     val averageLatencyMs: Long get() = latency.averageMs
@@ -100,7 +100,7 @@ class KeyframeStats(latencyWindow: Int = 20) {
         latency.reset()
         framesSeen = 0
         requestsSent = 0
-        successes = 0
+        successesSeen = 0
         failuresSeen = 0
         timeouts = 0
         ignored = 0

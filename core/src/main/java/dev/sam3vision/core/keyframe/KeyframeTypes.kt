@@ -20,9 +20,19 @@ data class FrameSignal(
      * Même signal, débarrassé du bruit d'un estimateur cassé : `NaN`, ±infini et valeurs hors
      * `[0, 1]` sont ramenés dans la plage. Un estimateur fou ne doit **jamais** bloquer les
      * keyframes (sinon l'écran garde un masque faux pour toujours).
+     *
+     * Une mesure **non finie** (`NaN`, ±infini) ne vaut rien du tout : elle trahirait un
+     * estimateur cassé, dont les autres mesures ne sont pas fiables non plus. Le signal entier
+     * repart donc de zéro — ni erreur, ni coupure de scène — et le scheduler se rabat sur le
+     * plafond d'âge, qui redemande un keyframe toutes les 500 ms. (Un `+infini` ramené sur la
+     * borne, lui, déclencherait une coupure de scène en boucle : le budget fondrait et le
+     * keyframe finit par ne plus passer — précisément ce qu'on veut éviter.)
      */
     val sanitized: FrameSignal
         get() {
+            if (!reprojectionError.isFinite() || !sceneChange.isFinite()) {
+                return FrameSignal(0f, 0f, objectsPresent)
+            }
             val error = clamp01(reprojectionError)
             val scene = clamp01(sceneChange)
             return if (error == reprojectionError && scene == sceneChange) {
