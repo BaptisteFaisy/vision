@@ -13,6 +13,7 @@ contient `scripts/`, ce que chaque outil lit, écrit, et les règles communes.
 | `scripts/verify-tap-voix.sh` | recette manuelle sur émulateur : tap = vidéo, appui long 4 s = voix ; affiche l'écran, le vibreur et le nombre de lignes de crash | `EMULATOR_SERIAL`, `APK`, `ADB` | stdout seulement ; XML `uiautomator` dans `$TMP_WORK` (supprimé par `trap`), `/sdcard/isee_ui_<pid>.xml` (supprimé) | aucun — le logcat est **compté**, jamais recopié | `adb`, `timeout`, `grep`/`sed`/`awk`/`cut`/`tr` |
 | `scripts/lib/common.sh` | socle sourcé : `ROOT`, `die`, `warn`, `require_cmd`, `require_uint`, `std_args`, `safe_rm_rf`, `make_tmpdir`, `resolve_adb` | — | rien | aucun | — |
 | `scripts/test_scripts.sh` | les tests de cette page, en une seule commande | — | temporaires dans `$TMPDIR/test-scripts.XXXXXX` (supprimés à la sortie) | aucun | `bash`, `grep`, `sed`, `awk`, `wc` |
+| `scripts/gen_mask_golden.py` | fixtures dorées des masques (`bits`/`M1`) + IoU + arbitrage de variante ; `--write` écrit les deux artefacts, `--check` les compare (porte anti-dérive), `--selftest` réencode six vecteurs réels du dépôt à l'octet près | rien (aucun argument, aucun fichier d'entrée) | `core/src/test/java/dev/sam3vision/core/mask/MaskGoldenData.kt` (fixtures générées) et `docs/MESURES-u11c.txt` | aucun | `python3` (bibliothèque standard seule) |
 
 Aucun script ne lit, n'affiche ni ne copie `local.properties` (les clés y vivent, le fichier
 est gitignoré). Aucun script n'expose de clé d'API, de token ni de variable d'environnement
@@ -41,6 +42,8 @@ exécutions parallèles ne se marchent pas dessus.
 
 ```bash
 bash scripts/test_scripts.sh      # 53 assertions, code 0 si tout passe
+python3 scripts/gen_mask_golden.py --selftest   # 11 assertions sur l'encodeur de masques
+python3 scripts/gen_mask_golden.py --check      # fixtures dorées <-> générateur
 ```
 
 Les tests n'ouvrent ni Gradle ni un appareil réel : `adb` est remplacé par un faux binaire
