@@ -153,6 +153,20 @@ class LiveSession(
     }
 
     /**
+     * Intervalle continu de la pompe ([LivePump], u01) : la **moitié** de la latence
+     * moyenne, bornée [MIN_MS]-[MAX_MS]. C'est la fin de l'échelle à trois paliers de
+     * [intervalMsAdaptive] : le plancher de 350 ms attendait pour rien quand le backend
+     * répond en 50 ms, et la cible de 500 ms en faisait autant à 422 ms (u01 : 2,03 →
+     * 2,47 ips, −71 ms par frame). Sans mesure, on garde [Cadence.targetMs] : la première
+     * frame paie le démarrage du conteneur, elle ne doit pas régler la cadence.
+     */
+    fun intervalMsContinuous(): Long {
+        val average = stats.averageMs
+        if (average <= 0L) return cadence.targetMs
+        return (average / 2).coerceIn(MIN_MS, MAX_MS)
+    }
+
+    /**
      * Arrêt du direct : la frame en vol est **révoquée** (sa réponse sera jetée, voir
      * [runFrame]) et les mesures de la séance sont oubliées. Le créneau rendu est celui
      * de l'époque close, il n'est jamais volé à la séance suivante.
@@ -169,6 +183,12 @@ class LiveSession(
 
         /** Mesures minimum avant que le régulateur se prononce. */
         const val REGULATE_MIN_SAMPLES = 3
+
+        /** Plancher de la cadence continue : une frame caméra (30 fps), pas moins. */
+        const val MIN_MS = 33L
+
+        /** Plafond de la cadence continue : le palier lent du Direct, on n'attend pas plus. */
+        const val MAX_MS = 900L
 
         const val DEFAULT_WORK_EDGE = 640
         /** Plafond d'objets affichés en direct (voir [ObjectLimits.MAX_ON_SCREEN]). */
