@@ -7,6 +7,7 @@ import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.Camera
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.distance.Optics
 
 /**
  * Champ de vision réel du capteur, lu par l'interop Camera2 : la focale (mm) et
@@ -17,6 +18,9 @@ import dev.sam3vision.core.distance.LensSpec
  * Le direct analyse des frames réduites au plus grand côté de 512 px : réduire
  * une image ne change pas son champ de vision, seulement sa focale *en pixels*,
  * que [LensSpec.focalPx] recalcule pour chaque frame.
+ *
+ * La géométrie (recadrage du tableau de pixels, bornes, angles) vit dans
+ * [Optics.lensSpec] — testée sans téléphone ; ici on ne fait que lire le driver.
  */
 @OptIn(markerClass = [ExperimentalCamera2Interop::class])
 fun lensSpecOf(cameraInfo: CameraInfo?): LensSpec? {
@@ -35,8 +39,13 @@ private fun readLens(info: Camera2CameraInfo): LensSpec? {
     val active = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
     val array = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
     if (focalMm == null || physical == null || active == null || array == null) return null
-    if (array.width <= 0 || array.height <= 0) return null
-    val widthMm = physical.width * active.width() / array.width
-    val heightMm = physical.height * active.height() / array.height
-    return LensSpec.fromSensor(focalMm, widthMm, heightMm)
+    return Optics.lensSpec(
+        focalMm,
+        physical.width,
+        physical.height,
+        active.width(),
+        active.height(),
+        array.width,
+        array.height,
+    )
 }
