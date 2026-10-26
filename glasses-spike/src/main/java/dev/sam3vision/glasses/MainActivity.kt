@@ -39,7 +39,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * Spike « voix seule » : les lunettes (ou le mock) filment, SAM segmente, le LLM
- * décrit, la voix annonce. Un seul écran, un journal, quatre boutons.
+ * décrit, la voix annonce. Un seul écran, un journal, cinq boutons — dont « Mock »
+ * seulement en debug, et « Diag » qui rejoue le diagnostic sans ouvrir de session.
  *
  * Le pipeline réseau vient de `:core` (aucun appel HTTP réécrit ici) et le
  * transport DAT de `GlassesSession` / `GlassesFrameEncoder`.
@@ -71,9 +72,10 @@ class MainActivity : ComponentActivity() {
         handleRegistrationIntent(intent)
         session = GlassesSession(this, scope, onFrame = ::onFrame, onLog = ::log)
 
-        if (intent?.getBooleanExtra(EXTRA_AUTO_MOCK, false) == true) {
-            window.decorView.post { startWithMock() }
-        }
+        // Portes de la recette pilotée par adb : `--ez mock true`, `--ez real true`.
+        // Aussi dans onNewIntent : un `am start` sur une instance déjà vivante
+        // n'appelle pas onCreate, et la recette croirait à un échec du mode réel.
+        handleAutoStart(intent)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
                         onReal = ::startWithGlasses,
                         onStop = ::stopAll,
                         onAnalyze = ::analyzeLastFrame,
+                        onDiagnose = ::reportDiagnosis,
                         analyzing = analyzeFrames,
                     )
                 }
@@ -95,6 +98,18 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleRegistrationIntent(intent)
+        handleAutoStart(intent)
+    }
+
+    /** Démarre le mode demandé par extra ; sans extra, l'écran attend un doigt. */
+    private fun handleAutoStart(intent: Intent?) {
+        when {
+            intent?.getBooleanExtra(EXTRA_AUTO_MOCK, false) == true ->
+                window.decorView.post { startWithMock() }
+
+            intent?.getBooleanExtra(EXTRA_AUTO_REAL, false) == true ->
+                window.decorView.post { startWithGlasses() }
+        }
     }
 
     override fun onDestroy() {
@@ -109,21 +124,38 @@ class MainActivity : ComponentActivity() {
     /** Mode sans lunettes : appareil simulé + caméra du téléphone comme flux. */
     private fun startWithMock() {
         log("mode mock : caméra du téléphone en guise de lunettes")
-        MockGlassesHarness.enable(this, ::log)
-        MockGlassesHarness.usePhoneCameraFeed(this, ::log)
+        MockControl.start(this, ::log)
         launchSession()
     }
 
-    /** Mode réel : lunettes appairées à l'app Meta AI, Developer Mode activé. */
+    /**
+     * Mode réel : lunettes appairées à l'app Meta AI, Developer Mode activé.
+     *
+     * Les paires simulées d'un run précédent sont retirées **avant** la session :
+     * `AutoDeviceSelector` prend le premier appareil qui convient, et une paire
+     * fictive restée dans le SDK ferait passer la caméra du téléphone pour de
+     * vraies lunettes. Le diagnostic suit, puis la session s'ouvre même si tout
+     * n'est pas prêt — c'est le SDK qui tranche, l'écran dit seulement pourquoi.
+     */
     private fun startWithGlasses() {
-        log("mode réel : recherche de lunettes appairées")
-        launchSession()
+        log("mode réel : recherche de vraies lunettes appairées")
+        MockControl.dropSimulatedPairs(this, ::log)
+        scope.launch {
+            logRealStart(::log)
+            launchSession()
+        }
+    }
+
+    /** Diagnostic à la demande : même lecture que le démarrage réel, sans session. */
+    private fun reportDiagnosis() {
+        log("diagnostic : état des lunettes vu par le SDK")
+        scope.launch { logRealStart(::log) }
     }
 
     private fun launchSession() {
         if (running) return
         running = true
-        voice.routeToGlasses()
+        log(voice.routeToGlasses(knownDeviceName()))
         session?.start(this)
     }
 
@@ -141,7 +173,7 @@ class MainActivity : ComponentActivity() {
         log("arrêt demandé")
         session?.stop()
         voice.stop()
-        MockGlassesHarness.disable()
+        MockControl.dropSimulatedPairs(this, ::log)
         running = false
     }
 
@@ -207,6 +239,7 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val TAG = "GlassesSpike"
         const val EXTRA_AUTO_MOCK = "mock"
+        const val EXTRA_AUTO_REAL = "real"
     }
 }
 
@@ -219,15 +252,17 @@ private fun SpikeScreen(
     onReal: () -> Unit,
     onStop: () -> Unit,
     onAnalyze: () -> Unit,
+    onDiagnose: () -> Unit,
     analyzing: Boolean,
 ) {
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         Text("SAM Vision — lunettes, voix seule", style = MaterialTheme.typography.titleMedium)
         Row(modifier = Modifier.padding(vertical = 8.dp)) {
-            Button(onClick = onMock, enabled = !running) { Text("Mock") }
+            if (MockControl.available) Button(onClick = onMock, enabled = !running) { Text("Mock") }
             Button(onClick = onReal, enabled = !running) { Text("Lunettes") }
             Button(onClick = onStop, enabled = running) { Text("Stop") }
             Button(onClick = onAnalyze) { Text(if (analyzing) "Couper" else "Analyser") }
+            Button(onClick = onDiagnose) { Text("Diag") }
         }
         if (heard.isNotBlank()) {
             Text("« $heard »", style = MaterialTheme.typography.bodyLarge)
