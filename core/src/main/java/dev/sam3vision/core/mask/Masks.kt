@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
+import dev.sam3vision.core.model.SegObject
 import java.nio.ByteBuffer
 
 /**
@@ -81,8 +82,29 @@ fun colorizedMaskBitmap(
     alpha: Int,
 ): Bitmap? {
     val gray = decodeMaskAny(maskB64, encoding) ?: return null
-    return Bitmap.createBitmap(colorizeGray(gray, argb, alpha), gray.width, gray.height, Bitmap.Config.ARGB_8888)
+    return colorizeGrayBitmap(gray, argb, alpha)
 }
+
+/**
+ * Masque colorié d'un **objet du direct**, du base64 jusqu'au bitmap : décodage selon
+ * l'encodage de l'objet ([decodeObjectGray], formats compacts `rle`/`poly` et
+ * agrandissement depuis la grille réduite compris), puis coloriage par table.
+ * `null` si le masque est illisible ou absent : la boîte reste dessinée.
+ */
+fun colorizedObjectBitmap(
+    obj: SegObject,
+    frameWidth: Int,
+    frameHeight: Int,
+    argb: Int,
+    alpha: Int,
+): Bitmap? {
+    val gray = decodeObjectGray(obj, frameWidth, frameHeight) ?: return null
+    return colorizeGrayBitmap(gray, argb, alpha)
+}
+
+/** Masque gris déjà décodé → bitmap colorié (une allocation de pixels, aucune copie). */
+fun colorizeGrayBitmap(mask: GrayMask, argb: Int, alpha: Int): Bitmap =
+    Bitmap.createBitmap(colorizeGray(mask, argb, alpha), mask.width, mask.height, Bitmap.Config.ARGB_8888)
 
 /**
  * Niveaux 0-255 d'un bitmap ALPHA_8 (1 octet/pixel), `null` s'il faut passer par le repli.

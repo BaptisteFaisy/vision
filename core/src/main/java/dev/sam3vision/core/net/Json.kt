@@ -53,6 +53,40 @@ internal fun JSONObject.maskedFields(): MaskedFields = MaskedFields(
 )
 
 /**
+ * Anneaux `mask_poly` : un tableau de tableaux **plats** (`[x0, y0, x1, y1, …]`), un par
+ * anneau. Tolérant — un anneau illisible est ignoré plutôt que de faire échouer la frame —
+ * et un anneau de moins de trois sommets ne décrit aucune surface.
+ */
+internal fun JSONObject.polyRings(key: String): List<List<Int>> {
+    val rings = optJSONArray(key) ?: return emptyList()
+    return (0 until rings.length()).mapNotNull { index ->
+        val ring = rings.optJSONArray(index) ?: return@mapNotNull null
+        (0 until ring.length()).map { i -> ring.optInt(i, 0) }.takeIf { it.size >= 6 }
+    }
+}
+
+/**
+ * Un objet segmenté, masque compris : **une seule lecture** de `label`/`score`/`box`/
+ * `mask_b64` ([maskedFields]) pour `/segment` et `/live`, complétée des champs du codec
+ * masques. L'encodage de l'objet prime sur [frameEncoding] (`mask_encoding` de la réponse) ;
+ * `mask_scale` absent vaut 1 (masque à la taille de la frame) et `mask_poly` vide hors
+ * `poly` — un backend qui n'envoie que les champs d'avant garde donc exactement le
+ * décodage d'avant.
+ */
+internal fun JSONObject.segObject(frameEncoding: String = MASK_ENCODING_PNG): SegObject {
+    val fields = maskedFields()
+    return SegObject(
+        label = fields.label,
+        score = fields.score,
+        box = fields.box,
+        maskPngB64 = fields.maskB64,
+        maskEncoding = str("mask_encoding", frameEncoding).lowercase(),
+        maskScale = floatOr("mask_scale", 1f),
+        maskPoly = polyRings("mask_poly"),
+    )
+}
+
+/**
  * Extrait le premier objet JSON équilibré d'un texte libre (le modèle encadre
  * souvent sa réponse de ``` ou de phrases). `null` si aucun objet complet.
  */
@@ -252,9 +286,14 @@ private fun intAt(text: String, from: Int): Int? {
 
 /**
  * Construction du message de frame, identique pour les deux transports : `null` pour
- * [id] = corps de `POST /live`, un `id` pour la trame WebSocket. Les masques sont
- * **demandés** au format `bits` : un backend qui ignore le champ sert son défaut `png`,
- * et la réponse dit ce qu'il a réellement envoyé.
+ * [id] = corps de `POST /live`, un `id` pour la trame WebSocket. Les masques sont demandés
+ * au format `bits` par `mask_encoding` — **le corps historique, inchangé**, que le backend
+ * déployé honore.
+ *
+ * [maskFormat] et [maskEdge] ajoutent les knobs du codec masques (`mask_format`,
+ * `mask_edge`) : `rle`/`poly` sur une grille réduite, que seul un backend à jour sait
+ * servir. `maskFormat = null` restaure exactement le corps d'avant ; un serveur qui ne
+ * connaît pas ces champs les ignore et répond son défaut (`png`).
  */
 internal fun liveFrameJson(
     jpegB64: String,
@@ -262,6 +301,8 @@ internal fun liveFrameJson(
     workEdge: Int,
     maxObjects: Int,
     id: Int? = null,
+    maskFormat: String? = null,
+    maskEdge: Int = 0,
 ): String = JSONObject()
     .apply { if (id != null) put("id", id) }
     .put("image_b64", jpegB64)
@@ -269,26 +310,24 @@ internal fun liveFrameJson(
     .put("work_edge", workEdge)
     .put("max_objects", maxObjects)
     .put("mask_encoding", MASK_ENCODING_BITS)
+    .apply {
+        if (maskFormat == null) return@apply
+        put("mask_format", maskFormat)
+        if (maskEdge > 0) put("mask_edge", maskEdge)
+    }
     .toString()
 
 /** Assemblage d'une frame depuis un objet JSON déjà parsé : la seule voie de lecture. */
 private fun liveFrameOf(json: JSONObject): LiveFrame {
-    val objects = json.objects("objects").map { obj ->
-        val fields = obj.maskedFields()
-        SegObject(
-            label = fields.label,
-            score = fields.score,
-            box = fields.box,
-            maskPngB64 = fields.maskB64,
-        )
-    }
+    // Champ absent (backend déployé actuel) ⇒ "png" : l'ancien décodeur reste valable.
+    val encoding = json.str("mask_encoding", MASK_ENCODING_PNG).lowercase()
+    val objects = json.objects("objects").map { obj -> obj.segObject(encoding) }
     return LiveFrame(
         width = json.intOr("width"),
         height = json.intOr("height"),
         elapsedMs = json.intOr("elapsed_ms").toLong(),
         objects = objects,
-        // Champ absent (backend déployé actuel) ⇒ "png" : l'ancien décodeur reste valable.
-        maskEncoding = json.str("mask_encoding", MASK_ENCODING_PNG).lowercase(),
+        maskEncoding = encoding,
         timingsMs = timingsMsOf(json),
     )
 }

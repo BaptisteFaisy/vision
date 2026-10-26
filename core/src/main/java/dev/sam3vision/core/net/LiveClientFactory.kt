@@ -20,7 +20,11 @@ fun liveClient(
     baseUrl: String,
     timeoutSeconds: Long = LIVE_TIMEOUT_SECONDS,
     marks: WireMarks? = null,
-): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks) { milliseconds ->
+    /** Format de masque demandé (`mask_format`) ; `null` = corps historique (`mask_encoding`). */
+    maskFormat: String? = null,
+    /** Côté long de la grille réduite (`mask_edge`) ; 0 = pleine résolution. */
+    maskEdge: Int = 0,
+): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge) { milliseconds ->
     OkHttpWsTransport(liveWsClient(milliseconds / 1000))
 }
 
@@ -29,6 +33,8 @@ internal fun liveClientWith(
     baseUrl: String,
     timeoutSeconds: Long,
     marks: WireMarks? = null,
+    maskFormat: String? = null,
+    maskEdge: Int = 0,
     transportFor: (Long) -> WsTransport,
 ): LiveClient = WsLiveClient(
     baseUrl,
@@ -37,4 +43,6 @@ internal fun liveClientWith(
     // Seul `/health` passe par ce client : il utilise les clients partagés par défaut.
     http = HttpLiveClient(baseUrl),
     marks = marks,
+    maskFormat = maskFormat,
+    maskEdge = maskEdge,
 )
