@@ -1,19 +1,19 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-26T21:35:32+01:00",
-    "commit": "66a718f",
+    "le": "2026-10-26T21:58:07+01:00",
+    "commit": "a383cf7",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
-    "kotlin": 388,
+    "kotlin": 395,
     "python": 9,
     "toleres": []
   },
   "tests-jvm": {
     "plancher": {
       "app": 334,
-      "core": 678,
+      "core": 711,
       "glasses-spike": 56
     },
     "execute": {},
