@@ -81,6 +81,12 @@ data class Settings(
      * proche, à affiner avec des tokens côté backend si besoin.
      */
     val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
+    /** Envoi de la position + objets au relais pendant le Direct (site parent). */
+    val shareEnabled: Boolean = true,
+    /** Identifiant du flux de partage (relais `suivi-<shareId>`, lien générique). */
+    val shareId: String = DEFAULT_SHARE_ID,
+    /** Clé d'écriture vérifiée par le relais (jamais exposée côté site). */
+    val shareWriteKey: String = "",
     /** Plafond d'objets affichés à l'écran, commun au direct et à la photo. */
     val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
     /**
@@ -136,6 +142,9 @@ data class Settings(
         /** Site de suivi parent ouvert par le bouton « Partager le suivi » du Direct. */
         const val DEFAULT_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
 
+        /** Identifiant de partage par défaut (lien générique, un seul proche suivi). */
+        const val DEFAULT_SHARE_ID = "leo"
+
         val Default = Settings(
             llmBaseUrl = DEFAULT_LLM_BASE_URL,
             llmApiKey = "",
@@ -158,6 +167,9 @@ data class Settings(
             localOverlayEnabled = true,
             cameraFovDeg = 0f,
             parentSiteUrl = DEFAULT_PARENT_SITE_URL,
+            shareEnabled = true,
+            shareId = DEFAULT_SHARE_ID,
+            shareWriteKey = "",
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
     }

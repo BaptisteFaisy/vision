@@ -90,6 +90,21 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le partage survit a un aller-retour`() {
+        val custom = Settings.Default.copy(shareEnabled = false, shareId = "mia", shareWriteKey = "k")
+        val round = SettingsCodec.decode(SettingsCodec.encode(custom))
+        assertEquals(false, round.shareEnabled)
+        assertEquals("mia", round.shareId)
+        assertEquals("k", round.shareWriteKey)
+        // Un fichier écrit avant ces champs reprend les défauts (partage actif, flux « leo »).
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("shareEnabled=") || it.startsWith("shareId=") }
+        val back = SettingsCodec.decode(legacy.joinToString("\n"))
+        assertEquals(Settings.Default.shareEnabled, back.shareEnabled)
+        assertEquals(Settings.DEFAULT_SHARE_ID, back.shareId)
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)
