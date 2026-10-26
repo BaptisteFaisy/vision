@@ -25,7 +25,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   la même passe : `docs/TESTING.md` (comptages de tests **359/109 → 468/159**, JDK non épinglé,
   `/health` n'est plus une sonde, budget iSee **150 ms et un créneau**), `docs/MASQUES-DEBUG.md`
   (même cadence, frame **320 px** et non 448, ligne `gpu :` plus alimentée), `docs/CI-QUEUE.md`
-  (cinq jobs, runners `ubuntu-latest`, budget 5 min par job, file Mergify),
+  (cinq jobs, runners `ubuntu-latest`, budget 5 min par job),
   `docs/DISTANCES.md` (« les huit concepts par défaut » → **deux**), `NOTES.md` (comptages,
   `DistanceMeter` n'est pas un fichier).
 - **Constat, pas corrigé (hors périmètre docs)** : `LivePrompts.kt` annonce « huit » concepts en

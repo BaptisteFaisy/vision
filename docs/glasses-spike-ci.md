@@ -33,14 +33,13 @@ C'est **tout**. Conséquences, vérifiées une par une dans le workflow :
 
 ## 2. Le spike n'est pas dans le job `ci`
 
-Le job `ci` — celui qui est **exigé** par la file — lance exactement
-`:core:testDebugUnitTest :app:testDebugUnitTest` (`ci.yml:134-138`). `:glasses-spike` n'y figure pas.
+Le job `ci` lance exactement `:core:testDebugUnitTest :app:testDebugUnitTest`
+(`ci.yml:134-138`). `:glasses-spike` n'y figure pas : son verdict est porté par le job `spike`.
 
-Côté file d'attente, `.mergify.yml` n'exige que trois checks : `ci-budget`, `ci` et `couche0`. Donc
-**`spike`, `apk`, `apk-release` et `lint` ne bloquent pas l'embarquement** : un module cassé peut
-merger tant que `ci` reste vert. C'est un trou de porte, pas une fatalité — il se comble en ajoutant
-`- check-success = spike` aux `queue_conditions` de `.mergify.yml` (fichier de garde : hors du
-périmètre de cette relecture).
+Les cinq jobs tournent sur chaque PR, mais **seul `ci` est un passage obligé** pour la fusion.
+Donc `spike`, `apk`, `apk-release` et `lint` ne bloquent rien tant qu'aucune protection de branche
+ne les déclare requis : un module cassé peut être fusionné avec `ci` vert. Le trou se comble en
+mettant `spike` en check requis.
 
 ## 3. Détection de périmètre (le piège corrigé)
 

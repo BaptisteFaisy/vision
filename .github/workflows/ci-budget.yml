@@ -4,7 +4,7 @@ name: ci-budget (≤ 5 min)
 # Ce workflow est un garde-fou de configuration, pas un test applicatif :
 # il échoue si un job déclare plus de 5 minutes (ou aucun timeout).
 # Il tourne sur chaque PR pour que le check `ci-budget` existe toujours
-# (condition de file Mergify) — coût : quelques secondes.
+# (check attendu sur chaque PR) — coût : quelques secondes.
 
 on:
   pull_request:

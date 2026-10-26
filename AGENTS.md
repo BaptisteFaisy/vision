@@ -9,7 +9,7 @@
 
 - `README.md` — fonctionnalités réelles, transport du direct, endpoints, sécurité (clé debug).
 - `NOTES.md` — versions épinglées et décisions techniques.
-- `docs/CI-QUEUE.md` — CI, budget 5 min, file Mergify, contrat `## Scope`.
+- `docs/CI-QUEUE.md` — CI, budget 5 min par job, gardes `couche0` / `stale-base-guard`, contrat `## Scope`.
 - `docs/NETTOYAGE.md` — purge horaire (Room + WorkManager).
 - `docs/META-ASR.md` — contrat dictée Meta Muse (facturation 402, pièges).
 - `docs/ELEVENLABS-TTS.md` — contrat voix (voix premade vs bibliothèque, 402).
@@ -116,9 +116,9 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 
 - Base de référence : **`origin/master`** du dépôt **`BaptisteFaisy/vision`** — le seul nom qui
   fait autorité. Aucun autre nom de dépôt ne doit apparaître dans la doc.
-- Branche `feat/…` → PR → checks `ci` + `ci-budget` + `couche0` verts → file **Mergify**
-  (`.mergify.yml` : `batch_size: 1`, `mode: parallel`, `merge_method: rebase`). Il n'y a **pas**
-  de gate IA dans ce dépôt : la seule porte est la CI (`docs/CI-QUEUE.md`).
+- Branche `feat/…` → PR → checks `ci` + `ci-budget` + `couche0` verts → fusion en **rebase**.
+  Aucun outil de file externe, et pas de gate IA : la seule porte est la CI
+  (`docs/CI-QUEUE.md`).
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
   **2 concepts** (`core/live/LivePrompts.kt:20,28`) et **deux cadences** — Direct

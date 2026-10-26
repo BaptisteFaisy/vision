@@ -45,6 +45,6 @@ jobs:
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('behind_by', 0))")
           echo "behind=${BEHIND} base=${BASE}" >> "$GITHUB_OUTPUT" || true
           if [ "$BEHIND" -gt 0 ]; then
-            echo "::warning::La branche est en retard de ${BEHIND} commit(s) sur ${BASE} (information : la file Mergify re-teste après rebase)."
+            echo "::warning::La branche est en retard de ${BEHIND} commit(s) sur ${BASE} (information : la CI se relance après rebase)."
           fi
           exit 0

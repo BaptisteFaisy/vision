@@ -6,7 +6,7 @@ name: couche0
 #   - forbidden : motifs interdits dans le diff + fichiers de garde gelés.
 # Le juge vient de `master`, jamais du head de la PR : une PR ne modifie pas
 # son propre garde. Re-armable : `gh workflow run couche0.yml -f pr=<n>`.
-# Le check est exigé par la file Mergify (voir `.mergify.yml`).
+# Le check fait partie des portes de la PR (voir `docs/CI-QUEUE.md`).
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
@@ -21,10 +21,6 @@ permissions:
   contents: read
   pull-requests: read
 
-# Les PR-brouillon du batch Mergify (refs `mergify/*`) n'ont pas de corps
-# rédigé : la Couche 0 y serait toujours rouge et bloquerait la file. Elle n'y
-# a rien à contrôler — la vraie PR a déjà été passée au crible avant
-# l'embarquement.
 concurrency:
   group: couche0-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
@@ -35,18 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Brouillon de batch Mergify — rien à juger, mais il faut du vert
-        # Sauter le job ne suffit pas : `check-success = couche0` exige une
-        # réussite, et une PR-brouillon sautée reste « skipping » → le batch
-        # meurt en CHECKS_FAILED.
-        # On sort donc en succès, sans contrôler : la vraie PR, elle, passe.
-        run: |
-          case "${{ github.head_ref }}" in
-            mergify/*) echo "brouillon de file : garde déjà appliquée sur la PR réelle"; exit 0 ;;
-          esac
-          echo "PR réelle : contrôle complet enchaîné."
       - name: Récupérer le garde depuis master, puis contrôler la PR
-        if: ${{ !startsWith(github.head_ref, 'mergify/') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}

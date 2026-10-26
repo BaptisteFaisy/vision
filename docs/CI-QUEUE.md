@@ -1,7 +1,7 @@
 # CI et file de merge
 
 Relu le **2026-10-26 après 19 h** sur cet arbre. Chaque affirmation ci-dessous vient d'un fichier du
-dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`, `.mergify.yml`.
+dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`.
 
 ## 1. La règle : un verdict en 5 minutes
 
@@ -53,39 +53,33 @@ l'utilisateur saisit la sienne dans Réglages.
 - `scope` : tout fichier modifié par la PR doit être déclaré dans la section `## Scope` du corps, et
   toute déclaration doit servir ;
 - `forbidden` : motifs refusés dans les lignes ajoutées du diff, plus une liste de fichiers de garde
-  gelés — `.mergify.yml`, `.github/ci-budget/`, `.github/couche0/`, `ci-budget.yml`, `couche0.yml`,
-  `ci.yml`. Les toucher exige une mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
+  gelés — `.github/ci-budget/`, `.github/couche0/`, `.github/workflows/couche0.yml`,
+  `.github/workflows/ci-budget.yml`, `.github/workflows/ci.yml`. Les toucher exige une mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
 
 Le juge est **téléchargé depuis `master`**, jamais depuis le head de la PR : une PR ne peut pas
-assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml -f pr=<n>`. Les refs
-`mergify/*` (brouillons de la file) sortent en succès sans contrôle : ces brouillons n'ont pas de
-corps rédigé à juger.
+assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml -f pr=<n>`.
 
 ## 4. `stale-base-guard` — informatif
 
 `stale-base-guard.yml` compare la PR à sa base et **avertit** si la branche est en retard
 (`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
-sans bloquer, puisque seul un vrai conflit s'oppose au rebase de la file.
+sans bloquer : seul un vrai conflit s'oppose à un rebase.
 
-## 5. La file Mergify
+## 5. Fusion d'une PR
 
-`.mergify.yml`. Conditions d'entrée (`queue_conditions`) : `ci-budget`, `ci` et `couche0` verts,
-label `hold` absent, pas de conflit, pas de brouillon, base `master`.
+Aucun outil de file d'attente externe : la fusion se fait **rebase**, une fois `ci`, `ci-budget` et
+`couche0` verts, ce qui garde l'historique de `master` linéaire.
 
-- checks in-place : `batch_size: 1`, un seul check à la fois, `max_checks_retries: 0`,
-  `mode: parallel`, `max_parallel_checks: 8` ;
-- `merge_method: rebase` et `update_method: rebase` ;
-- priorités : label `urgent` → haute, `priority-low` → basse ; label `hold` sort la PR de la file ;
-- `merge_queue` en série, un check à la fois ;
-- `merge_protections` (« CI verte et pas de hold ») reprennent les mêmes conditions et supposent le
-  produit Merge Protections activé dans le dashboard.
-
-Réentrée d'une PR immobile (tête remplacée par un push forcé, ou auto-queue non activée) : un
-commentaire `@Mergifyio queue`.
+- La CI se relance sur chaque push de la PR (`on: pull_request`) : c'est elle qui filtre.
+- Une branche en retard sur `master` reste verte ; `stale-base-guard` avertit, le rebase se fait au
+  moment de la fusion.
+- Pour durcir la porte, deux gestes suffisent, côté réglages du dépôt : mettre `ci`, `ci-budget` et
+  `couche0` en checks requis dans une protection de branche, et activer la merge queue native
+  GitHub.
 
 ## 6. Ce qui n'est pas dans ce dépôt
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
 - Aucun secret de dépôt n'est exigé : les clés du build sont facultatives (section 2).
-- Aucun check n'est « requis » au niveau d'une protection de branche : le filtre, c'est la file
-  Mergify.
+- Aucun outil de file externe : la fusion est le fait d'un humain (ou de l'API), après des checks
+  verts.

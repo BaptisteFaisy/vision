@@ -24,7 +24,7 @@ API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 MAX_PAGES = 20
 
 # Fichiers de garde : les modifier exige une mention explicite dans le corps.
-GUARD_FILES = (".mergify.yml", ".github/ci-budget/", ".github/couche0/",
+GUARD_FILES = (".github/ci-budget/", ".github/couche0/",
                ".github/workflows/couche0.yml", ".github/workflows/ci-budget.yml",
                # Fermé le 26/10 : sans ça une PR pouvait retirer les tests du job
                # `ci` sans le déclarer — la porte ouverte derrière la garde.
