@@ -1,6 +1,5 @@
 package dev.sam3vision.core.net
 
-import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.SegmentResult
 import okhttp3.OkHttpClient
 import org.json.JSONObject
@@ -35,14 +34,8 @@ class HttpSamClient(
 
 private fun parseSegment(raw: String): SegmentResult {
     val json = parse(raw) ?: throw ApiError.BadResponse("/segment : JSON illisible")
-    val objects = json.objects("objects").map { obj ->
-        val fields = obj.maskedFields()
-        SegObject(
-            label = fields.label,
-            score = fields.score,
-            box = fields.box,
-            maskPngB64 = fields.maskB64,
-        )
-    }
+    // Même lecture d'objet que le direct ([segObject]) : `mask_encoding`, `mask_scale` et
+    // `mask_poly` sont lus ici comme là-bas, avec le défaut PNG de cet endpoint.
+    val objects = json.objects("objects").map { obj -> obj.segObject() }
     return SegmentResult(width = json.intOr("width"), height = json.intOr("height"), objects = objects)
 }
