@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi Léo — 10 propositions design</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;padding:24px}
+.top{max-width:1300px;margin:0 auto 20px}
+.top h1{font-size:26px;margin-bottom:6px}
+.top p{color:#94a3b8;font-size:14px;max-width:760px;line-height:1.6}
+.grid{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.variant{border:1px solid #26365a;border-radius:18px;overflow:hidden;background:#0f1830}
+.variant .vhead{padding:12px 14px;border-bottom:1px solid #26365a}
+.variant .vhead b{display:block;font-size:14px}
+.variant .vhead span{font-size:12px;color:#94a3b8}
+.phone{height:560px;overflow:hidden;position:relative}
+/* commun mini */
+.mini{height:100%;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.row{display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%}
+.pill{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:800}
+.cardx{border-radius:14px;padding:10px}
+.radarx{border-radius:12px;height:170px;display:grid;place-items:center;position:relative;overflow:hidden}
+.mapx{border-radius:12px;height:130px;display:grid;place-items:center;font-size:12px;text-align:center;padding:8px}
+.ob{display:flex;gap:8px;align-items:center;border-radius:12px;padding:8px 10px;margin-top:6px}
+.pin{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none}
+/* 1 */
+.d1{background:#0b1328;color:#e2e8f0}.d1 .cardx{background:#111c33;border:1px solid #24365a}
+/* 2 clair iOS */
+.d2{background:#f6f7f9;color:#111827}.d2 .cardx{background:#fff;border:1px solid #e5e7eb;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+/* 3 contraste */
+.d3{background:#000;color:#fff}.d3 .cardx{background:#000;border:2px solid #fff}
+/* 4 rassurant */
+.d4{background:#f0f9f4;color:#14532d}.d4 .cardx{background:#fff;border:1px solid #bbf7d0}
+/* 5 pro */
+.d5{background:#0f172a;color:#e2e8f0}.d5 .cardx{background:#151f36;border:1px solid #334155;border-left:4px solid #3b82f6}
+/* 6 kids */
+.d6{background:#fff7ed;color:#431407}.d6 .cardx{background:#fff;border:2px dashed #fb923c;border-radius:20px}
+/* 7 senior */
+.d7{background:#fff;color:#000;font-size:16px}.d7 .cardx{background:#f8fafc;border:2px solid #0f172a}
+/* 8 oled */
+.d8{background:#000;color:#e2e8f0}.d8 .cardx{background:#0a0a0a;border:1px solid #27272a}
+/* 9 carte plein écran */
+.d9{background:#0b1328;color:#fff;padding:0}.d9 .mapfull{flex:1;background:linear-gradient(135deg,#1e3a5f,#0ea5e9 40%,#86efac 70%,#e7e5e4);border-radius:0;display:grid;place-items:center;min-height:340px}
+/* 10 urgence */
+.d10{background:#1c0505;color:#fff}.d10 .cardx{background:#2a0a0a;border:1px solid #ef4444}
+.tag{font-size:11px;opacity:.8}
+.btn{border-radius:10px;padding:8px 12px;font-weight:800;font-size:12px;border:none}
+</style>
+</head>
+<body>
+<div class="top">
+<h1>Suivi Léo — 10 directions design</h1>
+<p>Même contenu (live, lien permanent, radar, carte, 3 catégories) décliné en 10 styles. Dis-moi les numéros que tu préfères (ex : « 2 + 9 ») et je les applique au vrai <code>index.html</code>. Fichier : <code>sam-vision/suivi-parent/designs.html</code>.</p>
+</div>
+<div class="grid">
+
+<!-- 1 -->
+<div class="variant"><div class="vhead"><b>01 — Actuel (référence)</b><span>Navy mobile-first, radar + carte empilés</span></div>
+<div class="phone d1"><div class="mini">
+<div class="row"><span class="dot" style="background:#22c55e"></span><b>Suivi de Léo</b><span class="pill" style="background:#22c55e;color:#06130b;margin-left:auto">LIVE</span></div>
+<div class="cardx">🔗 suivi-parent.vercel.app/f/leo… <b style="color:#60a5fa">Copier</b></div>
+<div class="cardx"><div class="tag">🎯 RADAR — NORD EN HAUT</div><div class="radarx" style="background:radial-gradient(circle,#16244a,#0b1328);border:1px solid #24365a;margin-top:6px">◉ Léo • 2m • 5m</div></div>
+<div class="cardx"><div class="tag">🗺️ CARTE RUE</div><div class="mapx" style="background:#dde3e9;color:#475569">MapLibre + OSM</div></div>
+<div class="cardx">🚧 Mobilier 1/2 &nbsp; 🚶 Personnes 0/1 &nbsp; 🚗 Véhicules 1/1</div>
+</div></div></div>
+
+<!-- 2 -->
+<div class="variant"><div class="vhead"><b>02 — Clair iOS parents</b><span>Fond blanc, gros boutons, texte rassurant</span></div>
+<div class="phone d2"><div class="mini">
+<div class="row"><span class="dot" style="background:#22c55e"></span><b>Léo est en route 🟢</b></div>
+<div style="font-size:12px;color:#6b7280">Mis à jour il y a 2 s • Lien famille copié en 1 tap</div>
+<div class="cardx"><b>🗺️ Où est Léo ?</b><div class="mapx" style="background:#e0f2fe;color:#0369a1">Carte claire + pastilles larges<br>📍 Rue de Rivoli</div></div>
+<div class="cardx"><b>Tout va bien</b><div style="font-size:12px;color:#6b7280">4 obstacles détectés, 2 déjà passés</div><div class="ob" style="background:#f0fdf4;border:1px solid #bbf7d0"><div class="pin" style="background:#22c55e;color:#fff">✓</div>poubelle évitée <span class="pill" style="background:#dcfce7;color:#166534;margin-left:auto">OK</span></div></div>
+<button class="btn" style="background:#2563eb;color:#fff">📋 Copier le lien famille</button>
+</div></div></div>
+
+<!-- 3 -->
+<div class="variant"><div class="vhead"><b>03 — Max contraste (malvoyants)</b><span>Noir pur, jaune, textes XXL</span></div>
+<div class="phone d3"><div class="mini">
+<div class="row"><span class="dot" style="background:#facc15"></span><b style="font-size:18px">LÉO — EN DIRECT</b></div>
+<div class="cardx" style="border-color:#facc15"><b style="color:#facc15;font-size:16px">⚠️ Personne à 1,4 m à droite</b><div>DANGER proche</div></div>
+<div class="cardx"><b>Liste simplifiée</b><div class="ob" style="border:2px solid #fff"><div class="pin" style="background:#ef4444">!</div><b>personne 1,4 m</b></div><div class="ob" style="border:2px solid #fff"><div class="pin" style="background:#22c55e">✓</div><b>poubelle passée</b></div></div>
+<button class="btn" style="background:#facc15;color:#000;font-size:15px">🔊 LIRE À VOIX HAUTE</button>
+</div></div></div>
+
+<!-- 4 -->
+<div class="variant"><div class="vhead"><b>04 — Rassurant famille</b><span>Vert doux, langage non-technique</span></div>
+<div class="phone d4"><div class="mini">
+<div class="row">💚 <b>Léo avance bien</b><span class="pill" style="background:#22c55e;color:#fff;margin-left:auto">Connecté</span></div>
+<div class="cardx"><b>📍 Il est rue de Rivoli</b><div style="font-size:12px">Marche à 4,2 km/h vers le nord</div><div class="mapx" style="background:#dcfce7;color:#166534">Jolie carte verte simplifiée</div></div>
+<div class="cardx">🛡️ <b>3 obstacles évités avec succès</b><div style="font-size:12px">On vous prévient seulement si besoin.</div></div>
+<button class="btn" style="background:#16a34a;color:#fff">Partager avec mamie 👵</button>
+</div></div></div>
+
+<!-- 5 -->
+<div class="variant"><div class="vhead"><b>05 — Pro / dashboard</b><span>3 colonnes, chiffres, dense</span></div>
+<div class="phone d5"><div class="mini">
+<div class="row"><b>LEO-TRACK v2</b><span class="pill" style="background:#1e293b;color:#93c5fd;margin-left:auto">2 Hz • GPS RTK</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+<div class="cardx"><small>Vitesse</small><br><b>4,2 km/h</b></div>
+<div class="cardx"><small>Cap</small><br><b>12° N</b></div>
+<div class="cardx"><small>Obstacles</small><br><b>4</b></div>
+</div>
+<div class="cardx"><small>TRAJECTOIRE + RADAR</small><div class="radarx" style="background:#0a1128;border:1px solid #334155">courbe + cône 60°</div></div>
+<div class="cardx"><small>LOG</small><div style="font-family:monospace;font-size:11px">12:01:02 personne 2,1m →<br>12:01:04 poubelle ✓ passée</div></div>
+</div></div></div>
+
+<!-- 6 -->
+<div class="variant"><div class="vhead"><b>06 — Ludique enfant</b><span>Gros emojis, jeu, badges</span></div>
+<div class="phone d6"><div class="mini">
+<div class="row">🦸 <b>Mission Léo !</b><span class="pill" style="background:#fb923c;color:#fff;margin-left:auto">⭐ 120 pts</span></div>
+<div class="cardx" style="text-align:center">🗺️<br><b>Tu es le héros !</b><div>Évite les obstacles 🚧🚶🚗</div></div>
+<div class="cardx"><div class="ob" style="background:#fef3c7"><div class="pin" style="background:#f59e0b">🚧</div>poteau ! à 2 m <b style="margin-left:auto">😱</b></div><div class="ob" style="background:#dcfce7"><div class="pin" style="background:#22c55e;color:#fff">✓</div>poubelle bravo ! <b style="margin-left:auto">🎉</b></div></div>
+<button class="btn" style="background:#fb923c;color:#fff">🎮 Mode jeu</button>
+</div></div></div>
+
+<!-- 7 -->
+<div class="variant"><div class="vhead"><b>07 — Senior XL</b><span>Boutons énormes, 1 info par écran</span></div>
+<div class="phone d7"><div class="mini">
+<b style="font-size:20px">Où est Léo ?</b>
+<div class="cardx" style="text-align:center"><div style="font-size:44px">📍</div><b style="font-size:19px">Rue de Rivoli</b><div>à 200 m de la maison</div></div>
+<div class="cardx" style="text-align:center"><b style="font-size:18px">✅ Tout va bien</b><div>Dernière nouvelle : il y a 5 secondes</div></div>
+<button class="btn" style="background:#0f172a;color:#fff;font-size:18px;padding:16px">📞 APPELER LÉO</button>
+<button class="btn" style="background:#fff;border:2px solid #0f172a;font-size:16px">Voir la carte</button>
+</div></div></div>
+
+<!-- 8 -->
+<div class="variant"><div class="vhead"><b>08 — Nuit OLED économe</b><span>Noir total, lignes fines, discret</span></div>
+<div class="phone d8"><div class="mini">
+<div class="row"><span class="dot" style="background:#22c55e"></span><span style="color:#a1a1aa">suivi • 01:24</span><span class="pill" style="border:1px solid #3f3f46;color:#e4e4e7;margin-left:auto">live</span></div>
+<div class="radarx" style="border:1px solid #27272a;background:#000;height:220px">○ ○ ◉ minimal</div>
+<div style="font-size:12px;color:#a1a1aa">personne — 1,4 m — droite<br>poubelle — passée ✓<br>voiture — 4,8 m</div>
+<div class="cardx" style="font-size:12px;color:#a1a1aa">🔋 2% batterie économisée • tuiles sombres</div>
+</div></div></div>
+
+<!-- 9 -->
+<div class="variant"><div class="vhead"><b>09 — Carte plein écran + radar flottant</b><span>Google Maps immersif, pastille radar</span></div>
+<div class="phone d9"><div class="mini" style="padding:0">
+<div style="padding:10px 12px" class="row"><span class="dot" style="background:#22c55e"></span><b>Léo • direct</b><span class="pill" style="background:#fff;color:#111;margin-left:auto">hybride 🛰️</span></div>
+<div class="mapfull">🛰️ CARTE SATELLITE<br><small>Paris 4e • zoom 18 • Léo au centre</small><div style="position:absolute;right:10px;bottom:120px;background:rgba(0,0,0,.8);border-radius:12px;padding:6px 10px;font-size:11px">🎯 radar mini<br>◉ 3 obstacles</div></div>
+<div style="padding:10px 12px;display:flex;gap:6px"><button class="btn" style="background:#fff;color:#111;flex:1">Recentrer</button><button class="btn" style="background:#2563eb;color:#fff;flex:1">Copier lien</button></div>
+</div></div></div>
+
+<!-- 10 -->
+<div class="variant"><div class="vhead"><b>10 — Alerte / urgence</b><span>Rouge, danger < 2 m, appel direct</span></div>
+<div class="phone d10"><div class="mini">
+<div class="row">🚨 <b>ATTENTION — obstacle proche</b></div>
+<div class="cardx" style="text-align:center"><div style="font-size:40px">🚶</div><b style="font-size:20px;color:#fca5a5">Personne à 1,2 m !</b><div>à droite — ralentir</div></div>
+<div class="cardx"><div class="ob" style="background:#450a0a;border:1px solid #ef4444"><div class="pin" style="background:#ef4444">!</div>personne 1,2 m <span class="pill" style="background:#ef4444;color:#fff;margin-left:auto">DANGER</span></div></div>
+<button class="btn" style="background:#ef4444;color:#fff;font-size:15px">📞 Appeler Léo maintenant</button>
+<button class="btn" style="background:transparent;border:1px solid #ef4444;color:#fca5a5">🔊 Bip d'avertissement</button>
+</div></div></div>
+
+</div>
+<div class="top" style="margin-top:18px"><p>💡 Mon conseil : <b>02</b> pour les parents au quotidien (le plus lisible), <b>09</b> pour la démo Google Maps satellite que tu viens de débloquer, <b>03</b> si accessibilité exigée. Je peux mixer : style 02 + carte plein écran 09.</p></div>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suivi Léo — vue du dessus</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+:root{--bg:#0b1328;--card:#111c33;--line:#24365a;--fg:#e2e8f0;--muted:#94a3b8;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--green:#22c55e}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:Inter,system-ui,sans-serif;background:#0f172a;color:var(--fg);min-height:100vh;display:flex;justify-content:center}
+.app{width:100%;max-width:480px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+header{position:sticky;top:0;z-index:10;background:rgba(11,19,40,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 14px}
+.topline{display:flex;align-items:center;gap:10px}
+.live-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(34,197,94,.2);animation:pulse 1.6s infinite;flex:none}
+@keyframes pulse{50%{box-shadow:0 0 0 9px rgba(34,197,94,.05)}}
+h1{font-size:16px}.sub{font-size:12px;color:var(--muted)}
+main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#93c5fd;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+#map{height:420px;border-radius:12px;overflow:hidden;background:#dde3e9;position:relative}
+#map-wrap{position:relative;border-radius:12px;overflow:hidden}
+.legend{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
+.pill{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:700}
+.pill.green{background:var(--green);color:#06130b}.pill.red{background:var(--red);color:#fff}.pill.orange{background:var(--orange);color:#111}.pill.grey{background:#334155;color:#e2e8f0}
+.styles{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.styles button{flex:1;min-width:70px;border:1px solid var(--line);background:#0d1730;color:var(--fg);border-radius:10px;padding:8px 6px;font-size:11px;font-weight:700;cursor:pointer}.styles button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.maprow{display:flex;gap:8px;margin-bottom:8px}
+.maprow button{flex:1;border:1px solid var(--line);background:#0d1730;color:var(--fg);border-radius:10px;padding:8px 6px;font-size:12px;font-weight:700;cursor:pointer}
+footer{font-size:11px;color:#64748b;text-align:center;padding:14px}
+@media(min-width:900px){.app{max-width:480px;box-shadow:0 0 60px rgba(0,0,0,.5)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<div class="topline"><span class="live-dot"></span><div><h1>Suivi de Léo — vue du dessus</h1><div class="sub">Mobile • <span class="pill grey" id="live-badge">DÉMO</span> • <span id="clock">démo hors-ligne</span></div><div class="sub" id="indoor" style="display:none;margin-top:4px"></div></div></div>
+</header>
+<main>
+<div class="card"><h2>🗺️ Carte <span class="pill green" id="map-provider">Google</span></h2><div class="styles"><button data-s="hybrid" class="on">🛰️ Hybride</button><button data-s="satellite">🌍 Satellite</button><button data-s="plan">✨ Plan</button><button data-s="terrain">⛰️ Relief</button></div><div class="maprow"><button id="recenter">📍 Recentrer sur Léo</button></div><div id="map-wrap"><div id="map"></div></div>
+<div class="keybox" id="keybox" style="display:flex;gap:8px;margin-top:8px"><input id="gkey" placeholder="Clé Google Maps (gardée dans ce navigateur) — ?key=TA_CLE marche aussi" style="flex:1;background:#0d1730;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 10px;font-size:12px"><button id="savekey" class="btn small primary" style="border:none;background:var(--blue);color:#fff;border-radius:10px;padding:8px 12px;font-weight:700">OK</button><button id="clearkey" class="btn small" title="Supprimer la clé enregistrée" style="display:none;border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:8px 12px;font-weight:700">✕</button></div>
+<div id="gerr" style="display:none;margin-top:6px;font-size:12px;line-height:1.5;color:#fca5a5;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:8px 10px"></div>
+<div class="legend">Pincez pour zoomer • boutons +/− en haut à droite • les pastilles sont les objets autour de Léo (point bleu, halo = imprécision GPS).</div></div>
+</main>
+<footer>Suivi de Léo — carte temps réel.</footer>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+// ---- Flux live : ?share=leo (lien partagé) -> GET /api/state toutes les 2 s.
+// Fait < 12 s = LIVE ; < 2 min = SIGNAL PERDU ; au-delà = démo locale (badge DÉMO).
+const SHARE_ID=(new URLSearchParams(location.search).get('share')||'leo').toLowerCase();
+const API='/api/state?share='+encodeURIComponent(SHARE_ID);
+const PARIS={lat:48.8566,lon:2.3522};
+let live=null,simT=0;
+const DEMO=[
+ {id:'poteau',label:'poteau',distM:2.3,angleDeg:-12},
+ {id:'poubelle',label:'poubelle',distM:3.1,angleDeg:-28},
+ {id:'personne',label:'personne à droite',distM:1.4,angleDeg:18},
+ {id:'voiture',label:'voiture garée',distM:4.8,angleDeg:8},
+];
+let passed=new Set(['poubelle']);
+function iconFor(label){
+ const l=String(label||'').toLowerCase();
+ if(/personne|homme|femme|enfant|piéton|pieton/.test(l)) return '🚶';
+ if(/chien|chat|animal/.test(l)) return '🐕';
+ if(/voiture|bus|camion|vélo|velo|moto|vehicule|véhicule/.test(l)) return '🚗';
+ if(/poteau|grille|barrière|barriere|chantier/.test(l)) return '🚧';
+ if(/poubelle/.test(l)) return '🗑️';
+ return '📦';
+}
+function colorFor(d){return d<2?'red':d<5?'orange':'green';}
+function liveAgeMs(){return live?Date.now()-live.serverAt:Infinity;}
+function isFresh(){return liveAgeMs()<12000;}
+function isStale(){return live&&liveAgeMs()<120000;}
+function origin(){return (live&&live.fix)?live.fix:PARIS;}
+function currentObstacles(){
+ if(live&&(isFresh()||isStale())){
+  return (live.objects||[]).map((o,i)=>({id:'live-'+i,label:o.label,ico:iconFor(o.label),distM:o.distM,angleDeg:o.angleDeg,color:colorFor(o.distM)}));
+ }
+ return DEMO.map(o=>({...o,ico:iconFor(o.label),color:colorFor(o.distM)}));
+}
+// angleDeg = cap absolu (cap téléphone + angle caméra) ; on place l'objet en polaire depuis Léo.
+function destPoint(o,from){
+ const r=o.angleDeg*Math.PI/180;
+ return {lat:from.lat-o.distM*Math.cos(r)/111320,lon:from.lon+o.distM*Math.sin(r)/(111320*Math.cos(from.lat*Math.PI/180))};
+}
+function renderHead(){
+ const b=document.getElementById('live-badge'),c=document.getElementById('clock'),age=Math.round(liveAgeMs()/1000);
+ if(isFresh()){b.textContent='LIVE';b.className='pill green';c.textContent='il y a '+age+' s';}
+ else if(isStale()){b.textContent='SIGNAL PERDU';b.className='pill orange';c.textContent='dernier état il y a '+age+' s';}
+ else {b.textContent='DÉMO';b.className='pill grey';c.textContent='démo hors-ligne';}
+ const ind=document.getElementById('indoor'),show=live&&live.fix&&live.fix.indoor&&(isFresh()||isStale());
+ ind.style.display=show?'block':'none';
+ if(show) ind.textContent='📍 position approximative (intérieur, ±'+Math.round(live.fix.accM)+' m)';
+}
+// ---- Google Maps si clé (qualité Google Earth), sinon repli OpenFreeMap gratuit.
+// Clé lue depuis ?key= ou localStorage 'gmaps_key' — jamais en dur dans le fichier.
+const STYLE_URLS={liberty:'https://tiles.openfreemap.org/styles/liberty',positron:'https://tiles.openfreemap.org/styles/positron'};
+const ESRI_IMG='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_REF_TR='https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}';
+const ESRI_REF_PL='https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+function mapStyle(key){
+ if(key==='sat') return {version:8,sources:{base:{type:'raster',tiles:[ESRI_IMG],tileSize:256,attribution:'© Esri, Maxar, Earthstar Geographics'}},layers:[{id:'base',type:'raster',source:'base',paint:{'raster-saturation':0.1,'raster-contrast':0.15}}]};
+ if(key==='hybrid') return {version:8,sources:{base:{type:'raster',tiles:[ESRI_IMG],tileSize:256,attribution:'© Esri, Maxar, Earthstar Geographics'},refT:{type:'raster',tiles:[ESRI_REF_TR],tileSize:256},refP:{type:'raster',tiles:[ESRI_REF_PL],tileSize:256}},layers:[{id:'base',type:'raster',source:'base',paint:{'raster-saturation':0.15,'raster-contrast':0.15,'raster-brightness-min':0.05}},{id:'refT',type:'raster',source:'refT',paint:{'raster-opacity':0.9}},{id:'refP',type:'raster',source:'refP',paint:{'raster-opacity':0.9}}]};
+ return STYLE_URLS[key]||STYLE_URLS.liberty;
+}
+let map=null,markers=[],gmap=null,gmarkers=[],mode='fallback',lastMapType='hybrid',lastCenter=null;
+const G_KEY=new URLSearchParams(location.search).get('key')||localStorage.getItem('gmaps_key')||'';
+if(G_KEY) document.getElementById('gkey').value=G_KEY;
+function gType(s){return s==='satellite'?'satellite':s==='plan'?'roadmap':s==='terrain'?'terrain':'hybrid';}
+function mlStyle(s){return s==='satellite'?mapStyle('sat'):s==='terrain'?mapStyle('positron'):s==='plan'?mapStyle('liberty'):mapStyle('hybrid');}
+function setModeButtons(s){document.querySelectorAll('.styles button').forEach(x=>x.classList.toggle('on',x.dataset.s===s));}
+let gAuthError='';window.gm_authFailure=()=>{gAuthError='clé refusée par Google (restriction HTTP, API non activée ou facturation).';};
+function loadGoogle(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();gAuthError='';const sc=document.createElement('script');sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&callback=__ginit';sc.async=true;sc.onerror=()=>rej(new Error('script_error'));window.__ginit=()=>{setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));else res();},400);};document.head.appendChild(sc);setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));},6000);});}
+function showGerr(msg){const e=document.getElementById('gerr');if(!e)return;e.style.display='block';e.innerHTML=msg;}
+function pxPerMeter(lat,zoom){return 156543.03*Math.cos(lat*Math.PI/180)/Math.pow(2,zoom);}
+async function bootMap(){
+ document.querySelectorAll('.styles button').forEach(b=>b.onclick=()=>{const s=b.dataset.s;setModeButtons(s);if(mode==='google'&&gmap)gmap.setMapTypeId(gType(s));else if(map){map.setStyle(mlStyle(s));map.once('styledata',syncPins);}lastMapType=s;});
+ if(G_KEY){
+  try{
+   await loadGoogle(G_KEY);
+   document.getElementById('keybox').style.display='flex';
+   document.getElementById('clearkey').style.display='';
+   document.getElementById('gkey').value=G_KEY;
+   document.getElementById('gkey').title='Clé Google active — collez une nouvelle clé puis OK pour la remplacer, ✕ pour la supprimer';
+   document.getElementById('map-provider').textContent='Google';
+   mode='google';
+   gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:PARIS.lat,lng:PARIS.lon},zoom:18,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
+   syncGoogle();return;
+  }catch(e){
+   document.getElementById('map-provider').textContent='Google refusé — repli OpenFreeMap';
+   showGerr('Google a refusé la clé : '+String((e&&e.message)||e)+'<br>1) Référents HTTP de la clé : ajoute <code>https://suivi-parent.vercel.app/*</code> + <code>https://*.vercel.app/*</code>.<br>2) API : <code>Maps JavaScript API</code> doit être <b>activée</b> sur le projet <code>isee-512818</code>.<br>3) Facturation : erreur <code>OR_BACR2_59</code> = CB refusée → les tuiles restent en erreur même avec une clé valide.<br>Ouvre la console (F12) : le détail Google apparaît aussi en haut de la carte.');
+  }
+ }
+ document.getElementById('map-provider').textContent='OpenFreeMap (sans clé)';
+ try{
+  if(window.maplibregl){
+   map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[PARIS.lon,PARIS.lat],zoom:17,attributionControl:{compact:true}});
+   map.addControl(new maplibregl.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
+   map.on('load',syncPins);
+   syncPins();
+  }
+ }catch(e){document.getElementById('map').innerHTML='<div style="padding:40px;text-align:center;color:#475569">Ajoute ?key=TA_CLE ou saisis ta clé Google ci-dessous.</div>';}
+}
+document.getElementById('savekey').onclick=()=>{const v=document.getElementById('gkey').value.trim();if(!v)return;localStorage.setItem('gmaps_key',v);const u=new URL(location.href);u.searchParams.set('key',v);location.href=u.toString();};
+document.getElementById('clearkey').onclick=()=>{localStorage.removeItem('gmaps_key');const u=new URL(location.href);u.searchParams.delete('key');location.href=u.toString();};
+if(G_KEY){document.getElementById('clearkey').style.display='';}
+function syncPins(){
+ if(!map)return;markers.forEach(m=>m.remove());markers=[];
+ const from=origin(),acc=(live&&live.fix)?live.fix.accM:10;
+ // Halo d'imprécision GPS, à sa taille réelle en mètres (borné pour rester lisible).
+ const ppm=pxPerMeter(from.lat,map.getZoom()),halo=Math.min(220,Math.max(34,2*acc/ppm));
+ const wrap=document.createElement('div');
+ wrap.style.cssText='position:relative;width:'+halo+'px;height:'+halo+'px';
+ wrap.innerHTML='<div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,.18);border:2px solid rgba(37,99,235,.45)"></div><div style="position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px;border-radius:50%;background:#2563eb;border:4px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.3)"></div>';
+ markers.push(new maplibregl.Marker({element:wrap}).setLngLat([from.lon,from.lat]).addTo(map));
+ currentObstacles().forEach(o=>{
+  const p=passed.has(o.id),pos=destPoint(o,from);
+  const el=document.createElement('div');
+  el.style.cssText='width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:17px;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.4);background:'+(p?'#64748b':o.distM<2?'#ef4444':o.distM<5?'#f59e0b':'#22c55e')+';'+(p?'filter:grayscale(1);transform:scale(.85);opacity:.85;':'');
+  el.textContent=p?'✓':o.ico;el.title=o.label+' '+o.distM.toFixed(1)+'m'+(p?' franchi':'');
+  markers.push(new maplibregl.Marker({element:el}).setLngLat([pos.lon,pos.lat]).addTo(map));
+ });
+ if(live&&live.fix&&(isFresh()||isStale())){
+  const moved=!lastCenter||Math.hypot(from.lat-lastCenter.lat,from.lon-lastCenter.lon)*111320>8;
+  if(moved){lastCenter={lat:from.lat,lon:from.lon};try{map.easeTo({center:[from.lon,from.lat],duration:600});}catch(e){}}
+ }
+}
+function syncGoogle(){
+ if(!gmap)return;gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
+ const from=origin(),acc=(live&&live.fix)?live.fix.accM:10;
+ currentObstacles().forEach(o=>{
+  const p=passed.has(o.id),pos=destPoint(o,from);
+  gmarkers.push(new google.maps.Marker({position:{lat:pos.lat,lng:pos.lon},map:gmap,title:o.label+' '+o.distM.toFixed(1)+'m'+(p?' franchi':''),label:{text:p?'X':o.ico,color:'#fff',fontSize:'15px'},opacity:p?0.6:1}));
+ });
+ gmarkers.push(new google.maps.Circle({map:gmap,center:{lat:from.lat,lng:from.lon},radius:Math.max(5,acc),strokeColor:'#2563eb',strokeOpacity:.45,strokeWeight:2,fillColor:'#2563eb',fillOpacity:.18}));
+ gmarkers.push(new google.maps.Marker({position:{lat:from.lat,lng:from.lon},map:gmap,title:'Léo',zIndex:9,icon:{path:google.maps.SymbolPath.CIRCLE,scale:9,fillColor:'#2563eb',fillOpacity:1,strokeColor:'#fff',strokeWeight:4}}));
+ if(live&&live.fix&&(isFresh()||isStale())){
+  const moved=!lastCenter||Math.hypot(from.lat-lastCenter.lat,from.lon-lastCenter.lon)*111320>8;
+  if(moved){lastCenter={lat:from.lat,lon:from.lon};gmap.panTo({lat:from.lat,lng:from.lon});}
+ }
+}
+document.getElementById('recenter').onclick=()=>{
+ const f=origin();lastCenter={lat:f.lat,lon:f.lon};
+ if(mode==='google'&&gmap)gmap.panTo({lat:f.lat,lng:f.lon});
+ else if(map)map.easeTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),17),duration:600});
+};
+// ---- Boucle : poll live 2 s, simu locale seulement quand il n'y a pas de live.
+async function poll(){
+ try{
+  const r=await fetch(API,{cache:'no-store'});
+  const j=await r.json();
+  if(j&&j.ok&&j.fix) live={fix:j.fix,objects:j.objects||[],serverAt:j.serverAt||Date.now()};
+ }catch(e){/* hors-ligne : on garde le dernier état reçu */}
+ renderHead();syncPins();syncGoogle();
+}
+setInterval(()=>{
+ if(!isFresh()){
+  simT++;
+  const p=DEMO.find(o=>o.id==='personne');
+  p.distM=Math.max(.6,1.4+Math.sin(simT/4)*1.6);p.angleDeg=18+Math.sin(simT/6)*30;
+  if(simT%18===0){passed.has('personne')?passed.delete('personne'):passed.add('personne');}
+  renderHead();syncPins();syncGoogle();
+ }
+},1200);
+setInterval(poll,2000);
+renderHead();poll();bootMap();
+</script>
+</body>
+</html>
