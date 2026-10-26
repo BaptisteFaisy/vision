@@ -21,12 +21,43 @@ class LiveRequest(BaseModel):
 
     ``work_edge`` and ``max_objects`` are clamped server-side (never rejected) so a
     client sending an out-of-range knob still gets a frame back.
+
+    ``mask_encoding`` choisit la représentation de ``mask_b64`` (``png`` par défaut —
+    contrat historique des APK installés —, ``bits`` pour le codec 1 bit/pixel + zlib,
+    ``none`` pour ne renvoyer que les boîtes). Absent = ``png`` : un client muet est servi
+    exactement comme avant. Déclaré ici, il est hérité par ``LiveFastRequest`` et
+    ``LiveWsRequest`` : ``POST /live`` et ``WS /live/ws`` négocient donc d'un seul coup.
     """
 
     image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
     prompts: list[str] | None = None
     max_objects: int | None = None
     work_edge: int | None = None
+    mask_encoding: Literal["bits", "png", "none"] | None = None
+
+
+class LiveFastRequest(LiveRequest):
+    """POST /live body pour ``live_app_fast.py`` : deux leviers par requête en plus.
+
+    ``batch_prompts`` (0/1) et ``edge`` surchargent les défauts du conteneur
+    (``FAST_BATCH_PROMPTS`` / ``FAST_EDGE``) pour mesurer un levier à la fois sur un
+    seul conteneur. Absent = défaut du conteneur : les clients existants ne changent pas.
+    """
+
+    batch_prompts: Literal[0, 1] | None = None
+    edge: int | None = Field(default=None, ge=112, le=1512)
+
+
+class LiveWsRequest(LiveFastRequest):
+    """Message du WebSocket ``/live/ws`` : le corps de ``POST /live`` plus un id.
+
+    ``id`` est **obligatoire** (absent → erreur de validation) : c'est lui qui apparie la
+    réponse à la frame envoyée, plusieurs frames s'enchaînant sur la même connexion.
+    ``image_b64`` reste obligatoire ; ``batch_prompts``/``edge`` restent optionnels, donc
+    une frame WS et un corps ``POST /live`` décrivent exactement la même requête.
+    """
+
+    id: int
 
 
 class AnalyzeRequest(BaseModel):

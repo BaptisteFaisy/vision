@@ -68,7 +68,12 @@ class Poster:
             status, raw = self._send("POST", path, json.dumps(payload))
         except Exception as exc:  # noqa: BLE001 — réseau : on remonte l'erreur textuellement
             return 0, {"detail": str(exc)}, (time.monotonic() - started) * 1000
-        return status, json.loads(raw.decode() or "{}"), (time.monotonic() - started) * 1000
+        body = raw.decode(errors="replace")
+        try:
+            parsed = json.loads(body) if body.strip() else {}
+        except json.JSONDecodeError:
+            parsed = {"detail": body[:300]}
+        return status, parsed, (time.monotonic() - started) * 1000
 
     def delete(self, path: str) -> tuple[int, dict]:
         """DELETE JSON (fermeture de session)."""
