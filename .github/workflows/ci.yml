@@ -129,6 +129,15 @@ jobs:
       - name: Garde de taille Kotlin (< 500 lignes/fichier, < 50 lignes/fonction)
         run: python3 tools/check-kotlin-limits.py
 
+      # Porte anti-dérive du budget de latence : un chiffre publié dans
+      # docs/LATENCE-BUDGET.md doit être celui du code (voir la lane L23).
+      # Quelques secondes, aucune compilation ; le document est écrit par la
+      # mission du budget, la porte s'active à sa publication.
+      - name: Porte anti-dérive du budget de latence (doc ↔ code)
+        run: |
+          python3 tools/check-budget-derive.py
+          python3 -m unittest tools/test_check_budget_derive.py
+
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
       - name: Tests JVM (:core + :app)
