@@ -73,7 +73,7 @@ class DistanceFusionTest {
     }
 
     @Test
-    fun `desaccord pose au sol : le stenope seul est rendu`() {
+    fun `desaccord sur la pose, le stenope seul est rendu`() {
         val reading = meter(CameraPose(1.5f))
             .measure(WIDTH, HEIGHT, listOf(detection("personne", tallPersonBox())))
             .firstOrNull()!!
