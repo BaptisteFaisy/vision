@@ -60,6 +60,8 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
+            parentSiteUrl = prefs.getString(KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
+                .ifBlank { default.parentSiteUrl },
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
@@ -90,6 +92,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
+            .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
             .apply()
     }
@@ -118,6 +121,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
+        const val KEY_PARENT_SITE_URL = "parent_site_url"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */
         internal fun createPrefs(context: Context): SharedPreferences {
