@@ -113,7 +113,9 @@ Ce qui reste ouvert après l'audit — aucun de ces points n'est fermable ici :
    monotone du téléphone, `GlassesFramePolicy.kt:23-25`). À unifier le jour où l'aval compare ces valeurs.
 4. **`MockGlassesTest`** : exige un appareil (ou un émulateur) et l'asset vidéo ; aucun workflow ne
    l'exécute, il n'est ni compilé ni lancé en CI.
-5. **`mockdevice` dans l'APK** : `TODO(spike)` (`build.gradle.kts:76`) — à retirer avant tout build public.
+5. **`mockdevice` dans l'APK** : `TODO(spike)` (`build.gradle.kts:76`) — **fermé le 26/10 au soir** :
+   l'artefact est passé en `debugImplementation` et tout ce qui parle mock a quitté `src/main`
+   (voir la dernière section).
 6. **Le harnais n'apparie qu'un modèle** : `RAYBAN_META` est en dur (`MockGlassesHarness.kt:137`) alors
    que le SDK expose **6** modèles simulés, dont **`META_RAYBAN_DISPLAY`**. La question ouverte
    « version lunettes Meta ? » (A-Z § 7.2) n'est donc **pas instruite** par le scaffold : la trancher
@@ -141,3 +143,35 @@ Ce qui reste ouvert après l'audit — aucun de ces points n'est fermable ici :
 
 Rien d'autre n'a été touché : ni le code du module (hors le commentaire ci-dessus), ni les fichiers de
 garde (`ci.yml`, `.mergify.yml`, `tools/`, `scripts/`), ni `:app`.
+## 26/10/2026 (soir) — le mode réel : ce que le code dit avant d'ouvrir la session
+
+Écrit dans la branche `lunettes-reelles` (base `origin/master` `ed10235`). Aucune paire de lunettes
+n'était branchée sur le téléphone au moment d'écrire : ce qui suit est **lu dans le code** et
+**mesuré au build**, pas constaté sur du matériel.
+
+Le démarrage réel ne casse pas quand rien n'est apprêté : `AutoDeviceSelector` ne rend aucune erreur
+sans paire, la session reste en attente et l'écran ne disait rien. Trois gestes utilisateur très
+différents (« pas de paire appairée », « Developer Mode inactif », « caméra refusée par l'app Meta
+AI ») se ressemblaient donc trait pour trait. Ce qui a changé :
+
+| Fait | Preuve |
+|---|---|
+| Le journal du mode « Lunettes » dit le geste à faire, ligne par ligne, en français | `GlassesSessionPolicy.kt` (`realStartAdvice`, fonction **pure**, 4 faits en entrée) ; appelée par `GlassesRealCheck.kt` (`logRealStart`) |
+| Les faits sont lus sur le SDK : `isDevMode`, `registrationState.value`, `devices.value.size`, `checkPermissionStatus(Permission.CAMERA)` | `GlassesRealCheck.kt` (`realStartFacts`, `cameraAllowed`) |
+| Chaque paire connue est décrite : type, lien, batterie (+ charge), portée, charnière, compatibilité | `GlassesRealCheck.kt` (`deviceLines`, `describeDevice`) |
+| Un bouton **Diag** rejoue ce diagnostic sans ouvrir de session (utile quand la session reste en attente) | `MainActivity.kt` (`reportDiagnosis`, `Button(onClick = onDiagnose)`) |
+| Le mode réel se lance aussi par adb, comme le mock : `--ez real true` | `MainActivity.kt` (`EXTRA_AUTO_REAL`), à côté de `EXTRA_AUTO_MOCK` |
+| Une paire simulée d'un run précédent est retirée **avant** la session : `MockDeviceKit` se souvient de l'appareil simulé même après un process tué, et `AutoDeviceSelector` l'aurait prise pour une vraie paire | `MockGlassesHarness.kt` (`dropSimulatedPairs`), appelé par `MainActivity.startWithGlasses`. La démo sans matériel est restée : elle vit maintenant en `src/debug` derrière `MockControl` |
+| L'endroit **où le son sort** est affiché dans le journal (nom de la sortie Bluetooth, sinon haut-parleur), au lieu du seul logcat | `GlassesVoice.kt` (`routeToGlasses(): String`), journalisé par `MainActivity.launchSession` |
+| `mockdevice` ne peut plus entrer dans un build public | `build.gradle.kts` (`debugImplementation`) ; **mesuré** : `MockDeviceKit` → **29** occurrences dans l'APK **debug**, **0** dans l'APK **release** (`unzip -p … classes.dex \| strings \| grep -c`) |
+
+**Vérifications** : `:glasses-spike:testDebugUnitTest` (**62** tests, **0** échec, dont **6** neufs sur
+`realStartAdvice`), `:glasses-spike:assembleDebug` **et** `:glasses-spike:assembleRelease`, plus
+`assembleDebugAndroidTest` (le test instrumenté est passé en `src/androidTestDebug`, il utilise le
+harnais). Garde de taille : `check-kotlin-limits.py` → OK (418 fichiers).
+
+**Ce qui reste non mesuré** (inchangé) : tout le matériel — appairage réel, firmware, latence et
+débit Bluetooth, optique, permissions réelles de l'app Meta AI, thermique, routage audio réellement
+entendu dans les lunettes. Les six gestes qui restent à un humain : appairer la paire dans l'app
+Meta AI (lunettes en mode appairage), activer le Developer Mode, accepter l'enregistrement de l'app,
+mettre la caméra en *Always allow*, déplier et porter les lunettes, les laisser allumées.

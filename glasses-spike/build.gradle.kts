@@ -73,8 +73,9 @@ dependencies {
     implementation(project(":core"))
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
-    // TODO(spike) : mockdevice ne doit pas survivre à un build public.
-    implementation(libs.mwdat.mockdevice)
+    // mockdevice ne survit plus à un build public : la variante release ne le
+    // porte pas, et son bouton « Mock » non plus (MockControl, src/release).
+    debugImplementation(libs.mwdat.mockdevice)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

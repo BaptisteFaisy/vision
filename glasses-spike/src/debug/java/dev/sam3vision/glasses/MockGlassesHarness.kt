@@ -127,6 +127,35 @@ object MockGlassesHarness {
             .onFailure { Log.w(TAG, "disable a échoué", it) }
     }
 
+    /**
+     * Retire **toutes** les paires simulées connues du SDK, y compris celles
+     * qu'un run précédent a laissées : après un process tué (ou un build
+     * réinstallé), `glasses` et `kit` de cet objet sont vides, mais le SDK, lui,
+     * se souvient de l'appareil simulé — et `AutoDeviceSelector` le prendrait
+     * pour une vraie paire. Ne journalise que s'il y avait vraiment quelque
+     * chose à retirer.
+     */
+    fun dropSimulatedPairs(context: Context, log: (String) -> Unit) {
+        val mockKit = runCatching { MockDeviceKit.getInstance(context.applicationContext) }.getOrNull()
+        if (mockKit == null) {
+            disable()
+            return
+        }
+        val stale = runCatching { mockKit.pairedDevices.toList() }.getOrDefault(emptyList())
+        stale.forEach { device ->
+            runCatching { mockKit.unpairDevice(device) }
+                .onFailure { Log.w(TAG, "unpairDevice a échoué", it) }
+        }
+        if (mockKit.isEnabled) {
+            runCatching { mockKit.disable() }.onFailure { Log.w(TAG, "disable a échoué", it) }
+        }
+        glasses = null
+        kit = null
+        if (stale.isNotEmpty()) {
+            log("${stale.size} paire(s) simulée(s) retirée(s) : le sélecteur ne verra qu'une vraie paire")
+        }
+    }
+
     /** Réutilise un appareil déjà apparié, sinon apparie des Ray-Ban Meta. */
     private fun MockDeviceKitInterface.reuseOrPair(log: (String) -> Unit): MockGlasses? {
         val existing = pairedDevices.filterIsInstance<MockGlasses>().firstOrNull()

@@ -5,7 +5,6 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -25,8 +24,11 @@ import kotlinx.coroutines.withContext
  * constructeur ([BuildConfig.TTS_API_KEY] / [BuildConfig.TTS_VOICE_ID] côté appelant).
  * Un seul son à la fois, une nouvelle phrase coupe la précédente.
  *
- * ⚠️ Le routage réel vers les lunettes exige `MODIFY_AUDIO_SETTINGS` dans le manifest
- * du module ; sans elle, [routeToGlasses] retombe silencieusement sur le haut-parleur.
+ * ⚠️ Le routage réel vers les lunettes passe par `MediaPlayer.setPreferredDevice`
+ * (API 23+) : la voix part sur la sortie choisie **sans changer le mode audio global**
+ * du téléphone. Exige `MODIFY_AUDIO_SETTINGS` (permission normale, déclarée au
+ * manifeste du module) ; sans sortie Bluetooth utilisable, la lecture reste sur la
+ * sortie par défaut et [routeToGlasses] le dit.
  */
 class GlassesVoice(
     context: Context,
@@ -45,32 +47,69 @@ class GlassesVoice(
     /** Lecture courante ; `null` quand rien ne joue. Toujours manipulé sur le main. */
     private var player: MediaPlayer? = null
 
-    /** Vrai quand une sortie Bluetooth (lunettes) a été effectivement sélectionnée. */
-    private var routedToGlasses = false
+    /** Sortie choisie pour la voix ; `null` = sortie par défaut (haut-parleur, écouteurs filaires). */
+    private var route: AudioDeviceInfo? = null
 
     /**
-     * Route la sortie audio vers les lunettes Bluetooth si un tel périphérique est
-     * connecté, sinon laisse (ou remet) le haut-parleur. Ne lève jamais : un refus de
-     * la plateforme est seulement journalisé.
+     * Choisit la sortie audio de la voix : la paire de lunettes si son nom est
+     * connu ([preferredName], celui que le SDK DAT annonce), sinon la meilleure
+     * sortie Bluetooth réellement disponible (BLE, A2DP, puis SCO). Ne lève jamais.
+     *
+     * Rend la ligne du journal : avec les lunettes sur les yeux, savoir **où** le son
+     * est sorti est la seule preuve audible de la chaîne, et logcat ne se lit pas
+     * depuis l'écran du spike. Le nom de la sortie est dans la ligne, pas le mot
+     * « lunettes » : ce choix prend aussi une paire d'écouteurs si elle est là.
      */
-    fun routeToGlasses() {
-        val manager = audio
-        if (manager == null) {
-            Log.i(TAG, "AudioManager indisponible : sortie par défaut conservée")
-            return
-        }
-        val device = findBluetoothOutput(manager)
-        routedToGlasses = device != null && applyRoute(manager, device)
-        if (!routedToGlasses) fallbackToSpeaker(manager)
-        Log.i(
-            TAG,
-            if (routedToGlasses) {
-                "voix routée vers les lunettes (type ${device?.type})"
+    fun routeToGlasses(preferredName: String? = null): String {
+        val manager = audio ?: return logLine("voix : sortie par défaut (AudioManager indisponible)")
+        val available = candidates(manager)
+        val picked = pickBluetoothOutput(available.map { it.first }, preferredName)
+        route = available.firstOrNull { it.first == picked }?.second
+        return logLine(
+            if (picked != null) {
+                "voix : Bluetooth « ${picked.name} » (type ${picked.type})"
             } else {
-                "aucune lunette connectée : sortie haut-parleur"
+                "voix : haut-parleur — aucune sortie Bluetooth utilisable"
             },
         )
     }
+
+    /** Double le journal : logcat pour le test automatisé, retour pour l'écran du spike. */
+    private fun logLine(line: String): String {
+        Log.i(TAG, line)
+        return line
+    }
+
+    /** Sorties Bluetooth proposées par la plateforme, avec leur objet Android d'origine. */
+    private fun candidates(manager: AudioManager): List<Pair<AudioOutput, AudioDeviceInfo>> =
+        runCatching { manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList() }
+            .getOrDefault(emptyList())
+            .filter { isBluetoothOutput(it.type) }
+            .map { device ->
+                AudioOutput(
+                    name = device.productName?.toString().orEmpty(),
+                    type = device.type,
+                    isSink = device.isSink,
+                    rank = rankOf(device.type),
+                ) to device
+            }
+
+    /** Ce qui peut sortir du son vers une paire : BLE d'abord, A2DP (la musique des lunettes) ensuite. */
+    private fun rankOf(type: Int): Int = when (type) {
+        AudioDeviceInfo.TYPE_BLE_HEADSET -> 0
+        AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> 1
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> 2
+        AudioDeviceInfo.TYPE_HEARING_AID -> 3
+        else -> 4
+    }
+
+    @Suppress("InlinedApi")
+    private fun isBluetoothOutput(type: Int): Boolean = type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+        type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+        type == AudioDeviceInfo.TYPE_BLE_BROADCAST ||
+        type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+        type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+        type == AudioDeviceInfo.TYPE_HEARING_AID
 
     /**
      * Synthétise [text] puis lance la lecture ; rend `null` dès que le son démarre,
@@ -125,6 +164,9 @@ class GlassesVoice(
 
             val ready = runCatching {
                 mp.setAudioAttributes(audioAttributes())
+                // La sortie (lunettes, ou rien) posée sur le lecteur lui-même : aucun
+                // réglage global du téléphone n'est touché, la phrase repart ailleurs.
+                route?.let { device -> runCatching { mp.preferredDevice = device } }
                 mp.setDataSource(file.absolutePath)
                 mp.setOnPreparedListener { prepared ->
                     prepared.start()
@@ -158,70 +200,16 @@ class GlassesVoice(
     /**
      * Accessibilité + parole : la voix doit s'entendre et se comprendre dehors.
      *
-     * Le flux demandé ([AudioManager.STREAM_VOICE_CALL] avec les lunettes, sinon
-     * [AudioManager.STREAM_MUSIC]) est posé d'abord ; le couple usage/type appliqué
-     * ensuite est ce que la plateforme retient vraiment. Le routage Bluetooth ne
-     * dépend donc pas du flux mais de [AudioManager] dans [routeToGlasses].
+     * Flux musique dans tous les cas : la sortie (lunettes ou haut-parleur) est
+     * choisie par [routeToGlasses] et appliquée sur le lecteur, pas par un mode
+     * audio global — `MODE_IN_COMMUNICATION` rabaisserait les lunettes en SCO mono
+     * 16 kHz et couperait le reste du téléphone.
      */
     private fun audioAttributes(): AudioAttributes = AudioAttributes.Builder()
-        .setLegacyStreamType(
-            if (routedToGlasses) AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC,
-        )
+        .setLegacyStreamType(AudioManager.STREAM_MUSIC)
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
-
-    // ---- Routage audio -------------------------------------------------------
-
-    /** Premier périphérique Bluetooth disponible, dans l'ordre de préférence. */
-    private fun findBluetoothOutput(manager: AudioManager): AudioDeviceInfo? {
-        val devices = runCatching { outputDevices(manager) }.getOrDefault(emptyList())
-        return PREFERRED_TYPES.firstNotNullOfOrNull { type ->
-            devices.firstOrNull { it.type == type }
-        }
-    }
-
-    /** Sorties connues : devices de communication sur API 31+, sorties classiques avant. */
-    private fun outputDevices(manager: AudioManager): List<AudioDeviceInfo> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            manager.availableCommunicationDevices
-        } else {
-            manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList()
-        }
-
-    /** Sélectionne [device] : communication device sur API 31+, SCO historique avant. */
-    @Suppress("DEPRECATION")
-    private fun applyRoute(manager: AudioManager, device: AudioDeviceInfo): Boolean =
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val selected = manager.setCommunicationDevice(device)
-                if (selected) manager.mode = AudioManager.MODE_IN_COMMUNICATION
-                selected
-            } else {
-                manager.isBluetoothScoOn = true
-                manager.startBluetoothSco()
-                // MODE_IN_COMMUNICATION : la seule constante qui fait router le SCO.
-                manager.mode = AudioManager.MODE_IN_COMMUNICATION
-                true
-            }
-        }.getOrElse { error ->
-            // Souvent MODIFY_AUDIO_SETTINGS absente → SecurityException : on reste en local.
-            Log.i(TAG, "routage Bluetooth refusé : ${error.message}")
-            false
-        }
-
-    /** Repli explicite : haut-parleur / sortie par défaut, sans lever. */
-    @Suppress("DEPRECATION")
-    private fun fallbackToSpeaker(manager: AudioManager) {
-        runCatching { manager.mode = AudioManager.MODE_NORMAL }
-        runCatching { manager.isBluetoothScoOn = false }
-        runCatching { manager.stopBluetoothSco() }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            runCatching { manager.clearCommunicationDevice() }
-        } else {
-            runCatching { manager.isSpeakerphoneOn = true }
-        }
-    }
 
     // ---- Cache et erreurs ----------------------------------------------------
 
@@ -241,14 +229,5 @@ class GlassesVoice(
         const val TAG = "GlassesVoice"
         const val CACHE_DIR = "glasses-voice"
         const val PREPARE_TIMEOUT_MS = 10_000L
-
-        /** Périphériques visés, BLE d'abord : c'est ce qu'exposent les lunettes récentes. */
-        @Suppress("InlinedApi")
-        val PREFERRED_TYPES = listOf(
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-            AudioDeviceInfo.TYPE_HEARING_AID,
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        )
     }
 }
