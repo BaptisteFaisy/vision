@@ -13,6 +13,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   les docs (`AGENTS.md`, `docs/CI-QUEUE.md`, `docs/DOC-ETAT.md`, `docs/glasses-spike-ci.md`) décrivent
   le flot GitHub natif. Aucun outil de file externe sur ce dépôt.
 
+## 2026-10-26 (24) — banc : les six cas instrumentés de la purge
+
+- **`CaptureCleanupTest` : 3 → 6 `@Test`.** Les trois cas manquants du contrat de la lane L14
+  sont écrits, sur de vrais fichiers du stockage privé (`CapturePaths.privateRoots`) :
+  capture de l'app supprimée · fichier déposé hors périmètre (`cacheDir`) intact · capture
+  en cours d'écriture (mtime < 60 s) reportée. Les trois déjà présents (trace MediaStore
+  dé-synchronisée, périmètre privé seulement, job unique sans réseau) sont inchangés.
+- Ce que les documents annonçaient déjà est donc vrai : `docs/NETTOYAGE.md` et
+  `docs/TESTING.md` comptaient **6 méthodes `@Test`** instrumentées avant le code.
+  **Exécution non mesurée ici** : ces tests demandent un appareil
+  (`./gradlew :app:connectedDebugAndroidTest`), aucun émulateur n'a été construit.
+
 ## 2026-10-26 (23) — docs : ce qui est vrai aujourd'hui
 
 - **README corrigé** contre cet arbre. Trois affirmations fausses retirées : le dossier
