@@ -156,3 +156,72 @@ internal fun frameVerdict(
     width <= 0 || height <= 0 -> FrameVerdict.DROP_DIMENSIONS
     else -> FrameVerdict.ENCODE
 }
+
+// ---- Démarrage sur de vraies lunettes ----------------------------------------
+
+/**
+ * Ce que le SDK voit au moment où le mode « Lunettes » démarre, réduit à des
+ * valeurs brutes (aucun `Context`, aucun appel DAT) : c'est [realStartAdvice] qui
+ * décide, et elle se teste sur JVM comme le reste de ce fichier.
+ *
+ * Le mode réel échoue silencieusement : `AutoDeviceSelector` sur un SDK sans
+ * paire ne rend jamais d'erreur, la session reste en attente et l'écran ne dit
+ * rien. Ces quatre faits sont exactement ce qui manque à l'utilisateur pour
+ * savoir quel geste faire — c'est pourquoi ils sont lus et affichés.
+ */
+internal data class RealStartFacts(
+    /** `Wearables.isDevMode` : sans lui, l'attestation est refusée et rien ne s'enregistre. */
+    val devMode: Boolean,
+    /** `Wearables.registrationState.value` : l'enregistrement auprès de l'app Meta AI. */
+    val registration: RegistrationState,
+    /** Nombre d'appareils connus du SDK (`Wearables.devices.value.size`). */
+    val devices: Int,
+    /** Permission caméra **côté DAT** (`Permission.CAMERA`), pas la permission Android. */
+    val cameraAllowed: Boolean,
+)
+
+/**
+ * Lignes de journal d'un démarrage réel, dans l'ordre où il faut les lire.
+ *
+ * Vide de sens tant qu'il y a un geste à faire : chaque ligne dit **où cliquer**,
+ * en français, et se termine par la ligne « prêt » seulement quand tout est en
+ * place. Aucune ligne n'est émise pour un fait déjà satisfait.
+ */
+internal fun realStartAdvice(facts: RealStartFacts): List<String> {
+    val lines = buildList {
+        if (!facts.devMode) add(DEV_MODE_HELP)
+        registrationHelp(facts.registration)?.let(::add)
+        if (facts.devices == 0) add(NO_DEVICE_HELP)
+        if (!facts.cameraAllowed) add(CAMERA_HELP)
+    }
+    return lines.ifEmpty { listOf(READY_HELP.format(facts.devices)) }
+}
+
+/** Aide par état d'enregistrement ; `null` quand il n'y a rien à demander. */
+private fun registrationHelp(state: RegistrationState): String? = when (state) {
+    RegistrationState.REGISTERED -> null
+    RegistrationState.AVAILABLE -> REGISTRATION_HELP
+    RegistrationState.REGISTERING, RegistrationState.UNREGISTERING -> REGISTERING_HELP
+    RegistrationState.UNAVAILABLE -> NO_REGISTRATION_HELP
+}
+
+private const val DEV_MODE_HELP =
+    "Developer Mode inactif : app Meta AI → Settings → App Info → taper 5× le numéro de version, puis Enable"
+
+private const val REGISTRATION_HELP =
+    "enregistrement à accepter : la fenêtre de l'app Meta AI va s'ouvrir, confirme-la"
+
+private const val REGISTERING_HELP =
+    "enregistrement en cours : reste dans l'app Meta AI jusqu'à la confirmation"
+
+private const val NO_REGISTRATION_HELP =
+    "aucune paire disponible pour l'enregistrement : lunettes allumées, portées et appairées dans Meta AI"
+
+private const val NO_DEVICE_HELP =
+    "le SDK ne voit aucune lunette : appaire la paire dans l'app Meta AI (lunettes en mode appairage, Bluetooth allumé), puis relance"
+
+private const val CAMERA_HELP =
+    "caméra non accordée à cette app : Meta AI → Settings → App connections → SAM Vision (spike lunettes) → Caméra → Always allow"
+
+private const val READY_HELP =
+    "prêt : %d paire(s) vue(s) par le SDK, caméra accordée"

@@ -18,6 +18,67 @@ import org.junit.Test
  */
 class SessionPolicyTest {
 
+    // ---- Démarrage sur de vraies lunettes ------------------------------------
+
+    @Test
+    fun `tout est pret, un seul conseil qui dit combien de paires sont vues`() {
+        val advice = realStartAdvice(ready())
+        assertEquals(1, advice.size)
+        assertTrue(advice.single().startsWith("prêt : 1 paire"))
+    }
+
+    @Test
+    fun `sans Developer Mode le conseil dit ou l activer`() {
+        val advice = realStartAdvice(ready().copy(devMode = false))
+        assertTrue(advice.any { it.contains("Developer Mode inactif") })
+    }
+
+    @Test
+    fun `aucune paire vue, le conseil dit d appairer dans Meta AI`() {
+        val advice = realStartAdvice(ready().copy(devices = 0))
+        assertTrue(advice.any { it.contains("appaire la paire dans l'app Meta AI") })
+    }
+
+    @Test
+    fun `camera DAT non accordee, le conseil dit ou cliquer`() {
+        val advice = realStartAdvice(ready().copy(cameraAllowed = false))
+        assertTrue(advice.any { it.contains("Always allow") })
+    }
+
+    @Test
+    fun `enregistrement a accepter, et aucune ligne pour un etat deja bon`() {
+        val waiting = realStartAdvice(ready().copy(registration = RegistrationState.AVAILABLE))
+        assertEquals(1, waiting.size)
+        assertTrue(waiting.single().contains("enregistrement à accepter"))
+
+        val registered = realStartAdvice(ready())
+        assertTrue(registered.none { it.contains("enregistrement") })
+    }
+
+    @Test
+    fun `les quatre manques se cumulent dans l ordre dev mode, enregistrement, paire, camera`() {
+        val advice = realStartAdvice(
+            RealStartFacts(
+                devMode = false,
+                registration = RegistrationState.UNAVAILABLE,
+                devices = 0,
+                cameraAllowed = false,
+            ),
+        )
+        assertEquals(4, advice.size)
+        assertTrue(advice[0].contains("Developer Mode"))
+        assertTrue(advice[1].contains("enregistrement"))
+        assertTrue(advice[2].contains("aucune lunette"))
+        assertTrue(advice[3].contains("caméra non accordée"))
+    }
+
+    private fun ready() = RealStartFacts(
+        devMode = true,
+        registration = RegistrationState.REGISTERED,
+        devices = 1,
+        cameraAllowed = true,
+    )
+
     // ---- Enregistrement ------------------------------------------------------
 
     @Test

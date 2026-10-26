@@ -13,6 +13,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   les docs (`AGENTS.md`, `docs/CI-QUEUE.md`, `docs/DOC-ETAT.md`, `docs/glasses-spike-ci.md`) décrivent
   le flot GitHub natif. Aucun outil de file externe sur ce dépôt.
 
+## 2026-10-26 (25) — lunettes : le mode réel dit ce qui manque
+
+- **`glasses-spike`, démarrage sur de vraies lunettes** : le journal du mode « Lunettes » énumère les
+  gestes à faire (Developer Mode, enregistrement, paire appairée, caméra *Always allow*) et décrit
+  chaque paire que le SDK voit (type, lien, batterie, portée, charnière, compatibilité). Décision
+  pure `realStartAdvice` (`GlassesSessionPolicy.kt`), lecture du SDK `GlassesRealCheck.kt`, bouton
+  **Diag** pour rejouer le diagnostic sans ouvrir de session (`MainActivity.kt`). Détail :
+  `docs/GLASSES-ETAT.md`, dernière section.
+- **Une paire simulée ne peut plus passer pour une vraie** : `MockGlassesHarness.dropSimulatedPairs`
+  retire les appareils simulés laissés par un run précédent (le SDK s'en souvient après un process
+  tué, et `AutoDeviceSelector` les aurait pris) ; le mode réel l'appelle avant d'ouvrir la session.
+- **`mockdevice` hors de l'APK public** : `debugImplementation` + `MockControl` (`src/debug` /
+  `src/release`). Mesuré : `MockDeviceKit` → **29** occurrences dans l'APK debug, **0** dans le release.
+- **La sortie audio se lit à l'écran** : `GlassesVoice.routeToGlasses()` rend la ligne du journal
+  (« voix : Bluetooth « <nom de la sortie> » (type …) » ou « voix : haut-parleur — aucune sortie Bluetooth connectée »).
+- **Vérifs** : `:glasses-spike:testDebugUnitTest` **62** tests / **0** échec (6 neufs), `assembleDebug`,
+  `assembleRelease`, `assembleDebugAndroidTest`, `tools/check-kotlin-limits.py` OK.
+- **Non mesuré** : tout le matériel (appairage, firmware, latence et débit Bluetooth, optique, routage
+  audio réellement entendu) — aucune paire de Ray-Ban Meta n'est branchée sur le téléphone de test.
+
 ## 2026-10-26 (24) — banc : les six cas instrumentés de la purge
 
 - **`CaptureCleanupTest` : 3 → 6 `@Test`.** Les trois cas manquants du contrat de la lane L14

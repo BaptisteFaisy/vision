@@ -8,7 +8,7 @@
          "lunettes" simulées. Aucun chemin "vraies lunettes" ne le demande. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Routage audio vers les lunettes (setCommunicationDevice / SCO). -->
+    <!-- Routage audio vers les lunettes : sortie choisie posée sur le lecteur (setPreferredDevice, A2DP/BLE). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <uses-feature
