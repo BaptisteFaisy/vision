@@ -116,9 +116,9 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 
 - Base de référence : **`origin/master`** du dépôt **`BaptisteFaisy/vision`** — le seul nom qui
   fait autorité. Aucun autre nom de dépôt ne doit apparaître dans la doc.
-- Branche `feat/…` → PR → checks `ci` + `ci-budget` + `couche0` verts → fusion en **rebase**.
-  Aucun outil de file externe, et pas de gate IA : la seule porte est la CI
-  (`docs/CI-QUEUE.md`).
+- Branche `feat/…` → PR → checks `ci` + `ci-budget` + `couche0` verts → **file de merge native
+  GitHub** (`master` est protégé : PR obligatoire, checks requis, auto-merge, rebase). Aucun outil
+  de file externe, et pas de gate IA : la seule porte est la CI (`docs/CI-QUEUE.md`).
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
   **2 concepts** (`core/live/LivePrompts.kt:20,28`) et **deux cadences** — Direct

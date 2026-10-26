@@ -11,7 +11,8 @@ LIB="${HERE}/lib/common.sh"
 BUILD="${HERE}/build.sh"
 INSTALL="${HERE}/install-emulator.sh"
 VERIFY="${HERE}/verify-tap-voix.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY")
+VERIFY_PORT="${HERE}/verify-longpress-port.sh"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -125,6 +126,10 @@ echo "== 4. verify-tap-voix.sh =="
 run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY"
 expect_nonzero 'verify-tap-voix refuse un APK absent'
 expect_grep 'APK absent' 'verify-tap-voix nomme l APK manquant'
+
+run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY_PORT"
+expect_nonzero 'verify-longpress-port refuse un APK absent'
+expect_grep 'APK absent' 'verify-longpress-port nomme l APK manquant'
 
 # --- 5. safe_rm_rf ---------------------------------------------------------
 echo "== 5. safe_rm_rf : garde des suppressions =="

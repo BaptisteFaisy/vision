@@ -3,28 +3,15 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-26 (24) — un keyframe SAM complet n'est redemandé que si les masques ont décroché
+## 2026-10-26 — `master` protégé, file de merge native GitHub
 
-- **Le scheduler manquant de la lane L13** : `core/.../keyframe/` — `KeyframeTypes` (signal
-  mesuré, décision, 6 `Trigger`, 5 `HoldReason`, `isUrgent`), `KeyframeConfig` (plancher 200 ms,
-  plafond 500 ms étirable à 1 000 ms, erreur 0,12 sur 2 frames, EMA 0,40, scène 0,35, 3 req/s
-  rafale 2, repli 0,5→8 s, timeout 12 s, validation au montage), `RequestBudget` (seau à jetons
-  + **jeton d'urgence** à découvert, remboursé par la reconstitution), `KeyframeScheduler` (la
-  machine à états, `FrameGate` de `:core/live` réutilisé pour **un seul** keyframe en vol,
-  `onKeyframeResult` idempotent) et `KeyframeStats` (compteurs + p95 via `LiveStats`, fenêtre
-  distincte de celle de la session).
-- **37 tests** : 21 sur le scheduler (démarrage, antiblocage 2 frames, coupure de scène
-  prioritaire, masque perdu, plafond, veille statique off par défaut, budget, jeton d'urgence
-  unique, repli, timeout 12 s, réponses fantômes, `reset`, estimateur `NaN`), 7 sur le seau,
-  9 sur le banc `8 scénarios × 4 politiques` — **0 violation partout** (budget d'une seconde, un
-  seul keyframe en vol, plafond d'âge dû). Les politiques « cadence fixe » sont le même
-  scheduler, aveuglé (seuils inatteignables, signal neutre) : aucune politique dupliquée.
-- **Chiffres calculés, pas mesurés** : horloge virtuelle 33 ms, A/R 150 ms / 1 200 ms, modèle
-  d'erreur synthétique ; tableau dans `core/build/keyframe-sim-u12.txt` (répertoire de build,
-  non versionné). Aucun téléphone, aucun GPU, aucun appel réseau.
-- **Contrat** : `docs/KEYFRAME-SCHEDULER.md` (entrées u10/u11, décision, garde-fous, câblage u13,
-  ce qui reste à recaler avec l'erreur réelle d'u11).
-- `:app` non touché : le scheduler est une brique de décision, u13 l'intégrera.
+- **Ruleset GitHub sur `master`** : PR obligatoire, checks requis `ci` + `ci-budget` + `couche0`
+  (base à jour), historique linéaire, force-push et suppression interdits.
+- **Merge queue native** : l'auto-merge d'une PR l'embarque dans la file GitHub ; le groupe de merge
+  (`gh-readonly-queue/master/pr-<n>-<sha>`) rejoue les checks requis, `couche0` compris.
+- **Plus de Mergify** : `.mergify.yml` supprimé, le step « brouillon de file » retiré de `couche0`,
+  les docs (`AGENTS.md`, `docs/CI-QUEUE.md`, `docs/DOC-ETAT.md`, `docs/glasses-spike-ci.md`) décrivent
+  le flot GitHub natif. Aucun outil de file externe sur ce dépôt.
 
 ## 2026-10-26 (23) — docs : ce qui est vrai aujourd'hui
 
@@ -55,6 +42,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   commentaire alors que `Default` en contient **deux** et que `MAX = 2` ; `LiveProbeState.gpu`
   n'est plus renseigné depuis la suppression des sondes `/health` ; `SECURITY.md` et `AGENTS.md`
   portent encore des phrases de l'ancien dépôt (détaillé dans `docs/DOC-ETAT.md`).
+
+## 2026-10-26 (24) — un keyframe SAM complet n'est redemandé que si les masques ont décroché
+
+- **Le scheduler manquant de la lane L13** : `core/.../keyframe/` — `KeyframeTypes` (signal
+  mesuré, décision, 6 `Trigger`, 5 `HoldReason`, `isUrgent`), `KeyframeConfig` (plancher 200 ms,
+  plafond 500 ms étirable à 1 000 ms, erreur 0,12 sur 2 frames, EMA 0,40, scène 0,35, 3 req/s
+  rafale 2, repli 0,5→8 s, timeout 12 s, validation au montage), `RequestBudget` (seau à jetons
+  + **jeton d'urgence** à découvert, remboursé par la reconstitution), `KeyframeScheduler` (la
+  machine à états, `FrameGate` de `:core/live` réutilisé pour **un seul** keyframe en vol,
+  `onKeyframeResult` idempotent) et `KeyframeStats` (compteurs + p95 via `LiveStats`, fenêtre
+  distincte de celle de la session).
+- **37 tests** : 21 sur le scheduler (démarrage, antiblocage 2 frames, coupure de scène
+  prioritaire, masque perdu, plafond, veille statique off par défaut, budget, jeton d'urgence
+  unique, repli, timeout 12 s, réponses fantômes, `reset`, estimateur `NaN`), 7 sur le seau,
+  9 sur le banc `8 scénarios × 4 politiques` — **0 violation partout** (budget d'une seconde, un
+  seul keyframe en vol, plafond d'âge dû). Les politiques « cadence fixe » sont le même
+  scheduler, aveuglé (seuils inatteignables, signal neutre) : aucune politique dupliquée.
+- **Chiffres calculés, pas mesurés** : horloge virtuelle 33 ms, A/R 150 ms / 1 200 ms, modèle
+  d'erreur synthétique ; tableau dans `core/build/keyframe-sim-u12.txt` (répertoire de build,
+  non versionné). Aucun téléphone, aucun GPU, aucun appel réseau.
+- **Contrat** : `docs/KEYFRAME-SCHEDULER.md` (entrées u10/u11, décision, garde-fous, câblage u13,
+  ce qui reste à recaler avec l'erreur réelle d'u11).
+- `:app` non touché : le scheduler est une brique de décision, u13 l'intégrera.
 
 ## 2026-10-26 (22) — la carte caméra se dissout et son monde reste sur la bulle
 

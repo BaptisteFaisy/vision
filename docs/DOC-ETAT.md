@@ -12,7 +12,7 @@ une affirmation fausse pour cet arbre — corrigée ou encadrée).
 | `docs/DOC-ETAT.md` | **nouveau** (26/10) | Ce tableau |
 | `docs/TESTING.md` | **périmée → corrigée** | Comptages de tests faux pour cet arbre (359/109 annoncé, **468/159** mesuré) ; le `JAVA_HOME` cité est un chemin de poste, pas une vérité du dépôt ; les mesures WS du 26/10 restent valables comme relevés datés |
 | `docs/MASQUES-DEBUG.md` | **inexacte → corrigée** | Cadence iSee : « 2 requêtes en vol, budget 200 ms » alors que `Cadence.Fast` est à **1 créneau / 150 ms** ; « cadre 448 px » alors que `IHEAR_FRAME_EDGE = 320` |
-| `docs/CI-QUEUE.md` | **à jour** | Cinq jobs dans `ci.yml` (`ci`, `apk`, `apk-release`, `lint`, `spike`), `couche0` (scope + forbidden, juge pris sur `master`), `stale-base-guard` informatif, budget 5 min par job, fusion en rebase après checks verts |
+| `docs/CI-QUEUE.md` | **à jour** | Cinq jobs dans `ci.yml` (`ci`, `apk`, `apk-release`, `lint`, `spike`), `couche0` (scope + forbidden, juge pris sur `master`), `stale-base-guard` informatif, budget 5 min par job, `master` protégé (PR obligatoire, checks requis, file de merge native) |
 | `docs/NETTOYAGE.md` | **à jour** | 12 fichiers, 599 lignes, purge horaire (`PERIOD_HOURS = 1`), Room + WorkManager — vérifié à l'identique le 26/10 |
 | `docs/DISTANCES.md` | **à jour**, une correction | Formule et constantes justes (lissage 0,35 / 0,85 ; `KnownSizes` ; `LensSpec` 67° borné 15–130°). « Les **huit** concepts par défaut du direct sont calibrés » : les concepts par défaut sont **2** (`LivePrompts.Default`) |
 | `docs/ELEVENLABS-TTS.md` | **à jour** | En-tête `xi-api-key`, base `https://api.elevenlabs.io/v1`, modèle `eleven_v4_turbo`, voix premade vs bibliothèque (402) |

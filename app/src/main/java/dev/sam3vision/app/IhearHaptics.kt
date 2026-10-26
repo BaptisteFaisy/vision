@@ -1,95 +1,48 @@
 package dev.sam3vision.app
 
 import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import dev.sam3vision.core.haptics.HapticPattern
 
 /**
- * Haptique iSee : deux motifs **distinguables d'emblée**, comme demandé :
- * - appui long (micro) : une salve franche au démarrage (deux temps, amplitude forte),
- * - balayage vertical : un créneau léger continu tant que le doigt glisse.
+ * Haptique iSee : deux retours **distinguables d'emblée** :
+ * - appui long (micro) : une salve franche au seuil, puis une nappe légère tant que le
+ *   doigt reste posé ([HapticLoop.startHold]) ; le relâchement laisse une queue de 200 ms ;
+ * - balayage vertical : un créneau léger **répété** tant que le doigt glisse — nettement
+ *   différent de la nappe de la tenue.
+ *
+ * Le moteur (vibreur, envoi des motifs, garde `runCatching`) vit dans [HapticLoop] ; les
+ * motifs eux-mêmes en `:core` ([HapticPattern]). Une seule implémentation pour les deux
+ * gestes : ce fichier ne fait que l'ordre des appels.
  */
 class IhearHaptics(context: Context) {
 
-    private val vibrator: Vibrator
+    private val motor = HapticLoop(context)
 
-    init {
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            manager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-    }
+    private var swiping = false
 
-    /** Appui long : salve perceptible unique (deux temps forts séparés d'un creux). */
-    fun holdStart() {
-        waveform(
-            longArrayOf(0, HOLD_ON_MS, HOLD_OFF_MS, HOLD_ON_MS),
-            intArrayOf(0, HOLD_AMP, 0, HOLD_AMP),
-            -1,
-        )
-    }
+    /** Appui long : salve franche puis nappe continue pendant toute la tenue. */
+    fun holdStart() = motor.startHold()
 
-    /** Relâchement : micro-signal de fin, volontairement court. */
-    fun holdEnd() {
-        vibrateSafe {
-            VibrationEffect.createOneShot(END_ON_MS, END_AMP)
-        }
-    }
+    /** Relâchement : nappe coupée, queue de 200 ms. */
+    fun holdEnd() = motor.release()
 
-    /**
-     * Balayage vertical démarré : créneau léger **répété** (doigt qui glisse) —
-     * ressentit nettement différent de la salve de l'appui long.
-     */
+    /** Balayage vertical démarré : créneau léger répété (doigt qui glisse). */
     fun verticalSwipeStart() {
         if (swiping) return
         swiping = true
-        // trois amplitudes pour trois timings : le creux porte aussi son 0,
-        // sinon VibrationEffect.createWaveform lève IllegalArgumentException
-        // et l'app crashe dès la première marche du balayage.
-        waveform(
-            longArrayOf(0, SWIPE_ON_MS, SWIPE_OFF_MS),
-            intArrayOf(0, SWIPE_AMP, 0),
-            1, // répète la boucle « marche/creux » tant que le doigt glisse
-        )
+        motor.play(HapticPattern.swipeCrest())
     }
 
     /** Fin du balayage vertical : créneau arrêté. */
     fun verticalSwipeEnd() {
         if (!swiping) return
         swiping = false
-        vibrator.cancel()
+        motor.stop()
     }
 
+    /** Coupe tout motif en cours, tenue comprise (arrêt de l'app, geste perdu). */
     fun cancelAll() {
         swiping = false
-        vibrator.cancel()
-    }
-
-    /** Construction + envoi protégés : un paramètre invalide ne doit jamais tuer l'app —
-     * l'effet est construit *dans* le runCatching. */
-    private fun waveform(timings: LongArray, amplitudes: IntArray, repeat: Int) {
-        vibrateSafe { VibrationEffect.createWaveform(timings, amplitudes, repeat) }
-    }
-
-    private inline fun vibrateSafe(effect: () -> VibrationEffect) {
-        runCatching { vibrator.vibrate(effect()) }
-    }
-
-    private var swiping = false
-
-    companion object {
-        private const val HOLD_ON_MS = 70L
-        private const val HOLD_OFF_MS = 90L
-        private const val HOLD_AMP = 255
-        private const val END_ON_MS = 35L
-        private const val END_AMP = 120
-        private const val SWIPE_ON_MS = 30L
-        private const val SWIPE_OFF_MS = 60L
-        private const val SWIPE_AMP = 96
+        motor.stop()
     }
 }
