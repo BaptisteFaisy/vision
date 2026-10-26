@@ -61,7 +61,7 @@ class LatencyBenchTest {
         var best = Double.MAX_VALUE
         var attempt = 1
         while (attempt <= ATTEMPTS) {
-            best = minOf(best, bench.measure("$label — essai $attempt", op))
+            best = minOf(best, bench.measure("$label — essai $attempt", op).microsPerOp)
             attempt++
         }
         return best
