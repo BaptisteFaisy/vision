@@ -8,9 +8,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.NetworkType
 import androidx.work.WorkManager
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -18,15 +20,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Preuves **liées à l'appareil** du module de nettoyage — les trois seules qui ne peuvent
- * pas descendre en JVM. Chacune dit ce qu'elle exige :
+ * Les **six** preuves de la purge qui exigent l'appareil : un vrai système de fichiers privé,
+ * un vrai `ContentResolver`/`MediaStore` et le `WorkManager` du téléphone. Contrat du module
+ * (`docs/NETTOYAGE.md`) :
  *
- * 1. [uneTraceMediaStoreDesynchroniseeEstOublieeSansErreur] : un vrai
- *    `ContentResolver` + `MediaStore` (l'`_ID` tracé n'existe pas → `query` rend 0 ligne)
- *    et une base Room sur le téléphone ;
- * 2. [lePerimetreNeContientQueLeStockagePriveDeLApp] : `Context.getExternalFilesDir`, donc
+ * 1. [uneCaptureDeLAppEstSupprimee] : un vrai fichier de `getExternalFilesDir` disparaît ;
+ * 2. [unFichierHorsPerimetreResteIntact] : un fichier de `cacheDir`, hors racines, survit —
+ *    c'est l'angle mort historique (`ImageSource.newCacheFile`) ;
+ * 3. [uneCaptureEnCoursDEcritureEstReportee] : touché il y a moins de 60 s → reporté ;
+ * 4. [uneTraceMediaStoreDesynchroniseeEstOublieeSansErreur] : l'`_ID` tracé n'existe plus
+ *    (`query` rend 0 ligne) → oubli silencieux, base Room vidée ;
+ * 5. [lePerimetreNeContientQueLeStockagePriveDeLApp] : `Context.getExternalFilesDir`, donc
  *    un appareil (`Android/data/<package>/…`) ;
- * 3. [leJobHoraireEstUniqueEtSansReseau] : `WorkManager`, qui a besoin de l'appareil
+ * 6. [leJobHoraireEstUniqueEtSansReseau] : `WorkManager`, qui a besoin de l'appareil
  *    (base de travail, `PackageManager`, redémarrages).
  *
  * **Aucun workflow ne les exécute** : la CI ne lance que `:core:` et `:app:`
@@ -45,10 +51,9 @@ import org.junit.runner.RunWith
  *   dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
  * ```
  *
- * La logique de la passe elle-même (fichiers supprimés, fichier hors périmètre intact,
- * capture en cours d'écriture reportée, trace dé-synchronisée oubliée, échec de suppression
- * compté) est prouvée en JVM par `app/src/test/…/cleanup/CaptureCleanerTest.kt`, exécuté
- * par le job `ci`.
+ * La variante **systématique** de la passe (store factice, suppression qui échoue, absence de
+ * store, horloge figée) reste en JVM dans `app/src/test/…/cleanup/CaptureCleanerTest.kt`,
+ * exécutée par le job `ci` ; ici, seuls les cas qui exigent l'appareil sont rejoués.
  */
 @RunWith(AndroidJUnit4::class)
 class CaptureCleanupTest {
@@ -73,6 +78,47 @@ class CaptureCleanupTest {
         roots = emptyList(),
         store = RoomTracedCaptureStore(db.tracedCaptures(), context.contentResolver, context.packageName),
     )
+
+    /** Purge branchée sur les vrais répertoires privés : c'est le périmètre réel de l'app. */
+    private fun cleanerReel() = CaptureCleaner(roots = CapturePaths.privateRoots(context))
+
+    /** Un répertoire du périmètre, garanti présent sur l'appareil. */
+    private fun privateDir(): File =
+        CapturePaths.imagesDir(context)?.takeIf { it.isDirectory } ?: CapturePaths.internalDir(context)
+
+    /** Fichier réel daté d'il y a [ageMinutes] minutes (au-delà de la grâce d'écriture). */
+    private fun captureFile(dir: File, name: String, ageMinutes: Long = 10L): File =
+        File(dir, "capture-test-$name").apply {
+            writeText("capture")
+            setLastModified(System.currentTimeMillis() - ageMinutes * 60_000L)
+        }
+
+    @Test
+    fun uneCaptureDeLAppEstSupprimee() = runBlocking {
+        val fichier = captureFile(privateDir(), "supprimee.jpg")
+        val report = cleanerReel().runOnce()
+        assertFalse("la capture aurait dû être purgée", fichier.exists())
+        assertTrue(report.filesDeleted >= 1)
+        assertEquals(0, report.filesFailed)
+    }
+
+    @Test
+    fun unFichierHorsPerimetreResteIntact() = runBlocking {
+        val dehors = captureFile(context.cacheDir, "hors-perimetre.jpg")
+        val dedans = captureFile(privateDir(), "dedans.jpg")
+        val report = cleanerReel().runOnce()
+        assertTrue("cacheDir n'est pas dans le périmètre de la purge", dehors.exists())
+        assertFalse(dedans.exists())
+        assertTrue(report.filesDeleted >= 1)
+    }
+
+    @Test
+    fun uneCaptureEnCoursDEcritureEstReportee() = runBlocking {
+        val enCours = captureFile(privateDir(), "en-cours.mp4", ageMinutes = 0L)
+        val report = cleanerReel().runOnce()
+        assertTrue("trop jeune pour être purgée", enCours.exists())
+        assertTrue(report.skippedInProgress >= 1)
+    }
 
     @Test
     fun uneTraceMediaStoreDesynchroniseeEstOublieeSansErreur() = runBlocking {
