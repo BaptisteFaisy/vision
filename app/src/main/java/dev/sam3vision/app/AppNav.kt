@@ -16,6 +16,7 @@ import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.ihear.IhearHome
 import dev.sam3vision.app.ihear.IhearViewModel
+import dev.sam3vision.app.ihear.OnboardingGesturesScreen
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
 
@@ -29,6 +30,9 @@ sealed interface Route {
     data object Live : Route
     data object Settings : Route
 
+    /** Onboarding des trois gestes : ouvert depuis les Réglages, rejouable à volonté. */
+    data object Onboarding : Route
+
     /**
      * Mode vidéo (tap court) : vidéo → SAM 3.1, annonces ElevenLabs.
      * [autoStart] = lancé par un tap sur l'aperçu de l'accueil : la session démarre
@@ -41,6 +45,9 @@ sealed interface Route {
  * Racine de navigation : iSee en page d'accueil (chat + fenêtre caméra),
  * puis les écrans d'origine. Les gestes racine (IhearRootLayout) pilotent la
  * caméra et le chat via [IhearViewModel] quand iSee est à l'écran.
+ *
+ * L'onboarding des trois gestes ([Route.Onboarding]) est un écran de la pile :
+ * ouvert depuis les Réglages, rejouable sans réinstaller l'app.
  */
 @Composable
 fun AppNav(
@@ -70,6 +77,7 @@ fun AppNav(
             Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop)
             Route.Chat -> ChatRoute(state, viewModel, pop)
             is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
+            Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
             Route.Settings -> SettingsRoute(
                 viewModel = viewModel,
                 state = state,
@@ -77,6 +85,7 @@ fun AppNav(
                 pop = pop,
                 onOpenLive = { push(Route.Live) },
                 onOpenClassic = { push(Route.Capture) },
+                onOpenGestures = { push(Route.Onboarding) },
             )
         }
 
@@ -176,6 +185,7 @@ private fun SettingsRoute(
     pop: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenGestures: () -> Unit,
 ) {
     SettingsScreen(
         settings = state.settings,
@@ -191,6 +201,7 @@ private fun SettingsRoute(
         onStopVoice = viewModel::stopSpeaking,
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
+        onOpenGestures = onOpenGestures,
         onBack = pop,
     )
 }
