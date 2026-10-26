@@ -41,6 +41,14 @@ data class Settings(
      */
     val liveSamEnabled: Boolean = true,
     /**
+     * Prédiction locale des boîtes (`core/predict`, T8) : entre deux réponses serveur,
+     * la boîte extrapolée prend le relais quand le masque a vieilli, au lieu d'attendre
+     * la réponse suivante. **`false` par défaut** : le branchement n'est allumé
+     * qu'après la mesure de la latence perçue — sans elle, une boîte qui bouge peut
+     * être pire qu'une boîte qui saute. Le câblage vit côté app (`live/LivePrediction`).
+     */
+    val boxPredictionEnabled: Boolean = false,
+    /**
      * Champ de vision horizontal imposé à la caméra, en degrés : 0 = lu sur le
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
@@ -97,6 +105,7 @@ data class Settings(
             introPlayed = false,
             distanceOverlayEnabled = true,
             liveSamEnabled = true,
+            boxPredictionEnabled = false,
             cameraFovDeg = 0f,
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
@@ -154,6 +163,7 @@ data class Settings(
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
+        "boxPredictionEnabled=$boxPredictionEnabled, " +
         "cameraFovDeg=$cameraFovDeg, maxObjects=$maxObjects)"
 }
 
