@@ -201,6 +201,9 @@ private fun LiveCameraStage(state: LiveUiState, previewView: PreviewView, onReco
         modifier = Modifier.fillMaxSize(),
     )
     LiveDistanceLayer(state.distanceLayer)
+    // Boîtes prédites (T8) : couche vide tant que la prédiction est éteinte — l'overlay
+    // reste alors celui d'avant (les masques serveur seuls).
+    LivePredictionOverlay(state.prediction)
     // Direct arrêté ou en erreur : un tap relance. Jamais pendant que le flux tourne.
     if (!state.running || state.error != null) RecoveryTap(onRecover)
 }

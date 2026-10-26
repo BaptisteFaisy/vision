@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.app.live.PredictionLayer
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.Cadence
@@ -70,6 +71,12 @@ data class LiveUiState(
     val prompts: List<String> = emptyList(),
     val memory: LiveMemoryState = LiveMemoryState(),
     val distanceLayer: DistanceLayer? = null,
+    /**
+     * Boîtes prédites de la frame caméra (T8) : vides tant que la prédiction est
+     * éteinte ou que le masque serveur est encore frais — l'overlay suit alors les
+     * masques seuls.
+     */
+    val prediction: PredictionLayer = PredictionLayer(),
     /** Dernière phrase dite par la voix (positions) : affichée comme sous-titre. */
     val spoken: String? = null,
     /** Porteur de la dernière frame JPEG (identité seule : rien à copier d'une frame à l'autre). */
