@@ -6,10 +6,13 @@ name: couche0
 #   - forbidden : motifs interdits dans le diff + fichiers de garde gelés.
 # Le juge vient de `master`, jamais du head de la PR : une PR ne modifie pas
 # son propre garde. Re-armable : `gh workflow run couche0.yml -f pr=<n>`.
-# Le check fait partie des portes de la PR (voir `docs/CI-QUEUE.md`).
+# Le check est requis : il doit donc rendre son verdict aussi bien sur la PR
+# que sur le groupe de merge de la file native (`gh-readonly-queue/<base>/pr-<n>-<sha>`).
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  push:
+    branches: ['gh-readonly-queue/**']
   workflow_dispatch:
     inputs:
       pr:
@@ -22,7 +25,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: couche0-${{ github.event.pull_request.number || inputs.pr }}
+  group: couche0-${{ github.event.pull_request.number || inputs.pr || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -38,7 +41,20 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          [ -n "$PR_NUMBER" ] || { echo "::error::aucun numéro de PR"; exit 1; }
+          # Sur un groupe de merge, il n'y a pas d'événement `pull_request` : le numéro
+          # de PR est dans le nom du ref (`…/pr-<n>-<sha>`).
+          if [ -z "$PR_NUMBER" ]; then
+            case "$GITHUB_REF_NAME" in
+              gh-readonly-queue/*/pr-*-*)
+                PR_NUMBER="${GITHUB_REF_NAME#*pr-}"
+                PR_NUMBER="${PR_NUMBER%%-*}"
+                ;;
+            esac
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::aucun numéro de PR joignable depuis ce ref ($GITHUB_REF_NAME) — rien à juger"
+            exit 0
+          fi
           GARDE="$RUNNER_TEMP/check_couche0.py"
           recuperer() {
             curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \

@@ -65,17 +65,27 @@ assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml
 (`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
 sans bloquer : seul un vrai conflit s'oppose à un rebase.
 
-## 5. Fusion d'une PR
+## 5. Protection de `master` et file de merge native
 
-Aucun outil de file d'attente externe : la fusion se fait **rebase**, une fois `ci`, `ci-budget` et
-`couche0` verts, ce qui garde l'historique de `master` linéaire.
+`master` est protégé par un **ruleset GitHub** (règles du dépôt, aucun outil externe) :
 
-- La CI se relance sur chaque push de la PR (`on: pull_request`) : c'est elle qui filtre.
-- Une branche en retard sur `master` reste verte ; `stale-base-guard` avertit, le rebase se fait au
-  moment de la fusion.
-- Pour durcir la porte, deux gestes suffisent, côté réglages du dépôt : mettre `ci`, `ci-budget` et
-  `couche0` en checks requis dans une protection de branche, et activer la merge queue native
-  GitHub.
+- **PR obligatoire** : pas de push direct sur `master` ;
+- **checks requis** : `ci`, `ci-budget`, `couche0`, exigés sur une base à jour (`strict`) ;
+- **historique linéaire** : que des rebases, pas de commit de fusion ;
+- **force-push et suppression de `master` interdits** ;
+- **merge queue native** : une PR dont l'auto-merge est activé entre dans la file GitHub.
+
+Comment ça marche, concrètement :
+
+1. la PR est ouverte, la CI tourne sur `pull_request` ;
+2. l'auto-merge est activé (`gh pr merge <n> --auto --rebase`, ou le bouton « Enable auto-merge ») ;
+3. GitHub crée un **groupe de merge** (`gh-readonly-queue/master/pr-<n>-<sha>`) et y rejoue les
+   checks requis — `couche0` se déclenche aussi sur ces refs, en retrouvant le numéro de PR dans le
+   nom du ref (section 3) ;
+4. le groupe est rebasé sur `master`, les checks repassent, la PR fusionne.
+
+Une branche en retard sur `master` reste verte : `stale-base-guard` avertit, c'est le rebase du
+groupe qui met la PR à jour.
 
 ## 6. Ce qui n'est pas dans ce dépôt
 

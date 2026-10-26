@@ -3,6 +3,16 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-26 — `master` protégé, file de merge native GitHub
+
+- **Ruleset GitHub sur `master`** : PR obligatoire, checks requis `ci` + `ci-budget` + `couche0`
+  (base à jour), historique linéaire, force-push et suppression interdits.
+- **Merge queue native** : l'auto-merge d'une PR l'embarque dans la file GitHub ; le groupe de merge
+  (`gh-readonly-queue/master/pr-<n>-<sha>`) rejoue les checks requis, `couche0` compris.
+- **Plus de Mergify** : `.mergify.yml` supprimé, le step « brouillon de file » retiré de `couche0`,
+  les docs (`AGENTS.md`, `docs/CI-QUEUE.md`, `docs/DOC-ETAT.md`, `docs/glasses-spike-ci.md`) décrivent
+  le flot GitHub natif. Aucun outil de file externe sur ce dépôt.
+
 ## 2026-10-26 (23) — docs : ce qui est vrai aujourd'hui
 
 - **README corrigé** contre cet arbre. Trois affirmations fausses retirées : le dossier
