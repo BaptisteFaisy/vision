@@ -24,6 +24,7 @@ une affirmation fausse pour cet arbre — corrigée ou encadrée).
 | `docs/glasses-spike-ci.md` | **à jour** | Le module et le périmètre sont justes : le spike a son **job `spike`** (la CI en compte cinq), `ubuntu-latest` + `gradle/actions/setup-gradle`, et la durée du job est mesurée |
 | `docs/VOIX-ANGLAIS.md` | **à jour** | `SpeechLanguage.DEFAULT = En` ; l'interface reste en français |
 | `docs/TEST-LONGPRESS-DICTEE.md` | **à jour** (recette datée) | Seuil d'appui long 300 ms et tolérance 24 px lus dans `LongPressTrigger.kt` ; la recette elle-même n'a pas été rejouée (le doc le dit) |
+| `docs/L13-FUSION.md` | **nouveau** (26/10) | Contrat de fusion de la lane L13 (7 points de `u13`) ramené aux ancres de **cet** arbre, protocole de recalage d'`errorThreshold`, schéma du tableau de simulation. Dit lui-même ce qui manque : A→B→C→D et le décodage L11 sont **absents** — c'est un plan, pas une mesure |
 | `docs/chat-voix.png` | ressource | Capture d'écran, pas une affirmation |
 | `NOTES.md` | **périmée → corrigée** | Comptages de tests et « 48 entrées dans `app/…/app/` » (mesuré : **53 entrées**, 110 fichiers `.kt` dans `app/src/main`), `DistanceMeter` n'est pas un fichier mais une classe de `DistanceEstimator.kt` ; les versions épinglées sont justes |
 | `CHANGELOG.md` | **à jour** | Le journal des faits livrés depuis le 26/10 ; `docs/PERF.md` reste le seul endroit où chercher un chiffre tenu |
