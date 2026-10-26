@@ -39,6 +39,10 @@ class WsLiveClient(
      * Injectée pour que les tests comptent les conversions.
      */
     private val readJson: (String) -> JSONObject? = { parse(it) },
+    /** Format de masque demandé (`mask_format`) ; `null` = corps historique (`mask_encoding`). */
+    private val maskFormat: String? = null,
+    /** Côté long de la grille réduite (`mask_edge`) ; 0 = pleine résolution. */
+    private val maskEdge: Int = 0,
 ) : LiveClient {
 
     private val lock = Any()
@@ -103,7 +107,8 @@ class WsLiveClient(
 
     /**
      * Message de requête : **exactement** le corps de `POST /live` (mêmes champs, mêmes
-     * défauts, `mask_encoding` compris — voir [liveFrameJson]), plus l'`id` de corrélation.
+     * défauts, `mask_encoding` compris — voir [liveFrameJson]), plus l'`id` de corrélation et,
+     * quand ils sont demandés, les knobs du codec masques (`mask_format`, `mask_edge`).
      */
     private fun frameMessage(
         id: Int,
@@ -111,7 +116,7 @@ class WsLiveClient(
         prompts: List<String>?,
         workEdge: Int,
         maxObjects: Int,
-    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id)
+    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge)
 
     /**
      * Réponse du serveur : même forme que `POST /live`, ou `error` (connexion maintenue).

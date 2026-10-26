@@ -37,6 +37,10 @@ class HttpLiveClient(
     private val client: OkHttpClient = liveHttpClient(),
     private val wakeClient: OkHttpClient = wakeSharedClient,
     private val marks: WireMarks? = null,
+    /** Format de masque demandé (`mask_format`) ; `null` = corps historique (`mask_encoding`). */
+    private val maskFormat: String? = null,
+    /** Côté long de la grille réduite (`mask_edge`) ; 0 = pleine résolution. */
+    private val maskEdge: Int = 0,
 ) : LiveClient {
 
     /** Client effectif : exposé aux tests, qui prouvent le partage du pool. */
@@ -56,7 +60,9 @@ class HttpLiveClient(
         workEdge: Int,
         maxObjects: Int,
     ): Result<LiveFrame> = client.executeBytesBuilt(marks) {
-        val body = OneShotJsonBody(liveFrameJson(jpegB64, prompts, workEdge, maxObjects))
+        val body = OneShotJsonBody(
+            liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge),
+        )
         requestTo(baseUrl, "/live", "POST", body, LIVE_USER_AGENT)
     }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
 
