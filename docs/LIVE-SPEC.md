@@ -263,11 +263,14 @@ horizontal proche (`matchRadius = 0.18` de la largeur), dans la fenêtre
 
 Le tracker `sam3-track` (`POST /session`, `POST /frame`, `DELETE /session/{id}`,
 `GET /health`) renvoie bien des `id` stables
-(`core/src/main/java/dev/sam3vision/core/net/TrackClient.kt:16-36`,
-`core/src/main/java/dev/sam3vision/core/live/TrackRunner.kt:9-20`), mais **aucun écran de
-`:app` ne l'appelle** : ce n'est pas lui qui fournit les identités du direct
-(`NOTES.md:158-160`). L'association locale qui comble l'absence d'`id` serveur est décrite
-dans `core/src/main/java/dev/sam3vision/core/predict/ObjectAssociator.kt:3-9`.
+(`core/src/main/java/dev/sam3vision/core/net/TrackClient.kt:23-31`,
+`core/src/main/java/dev/sam3vision/core/live/TrackRunner.kt:20-30`). C'est un **second
+transport du direct**, à la demande : la pastille « Tracker » du bandeau du haut construit
+`HttpTrackClient` + `TrackRunner` (`app/LiveViewModel.kt`), qui remplacent alors la boucle
+`/live`. **Le défaut reste `/live`** : c'est donc l'association locale qui fournit les
+identités dans le cas courant, et le serveur seulement quand le tracker est actif
+(`docs/TRACK-PERF.md`, § 2). L'association locale est décrite dans
+`core/src/main/java/dev/sam3vision/core/predict/ObjectAssociator.kt:3-9`.
 
 ## 7. Écrire un serveur compatible — la liste minimale
 

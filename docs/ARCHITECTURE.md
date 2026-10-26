@@ -157,7 +157,7 @@ des Réglages, d'un preset de région (`core/settings/SamRegion.kt:21,26`) ou de
 | `POST {elevenlabs}/text-to-speech/{voiceId}?output_format=mp3_44100_128` | `core/net/ElevenLabsTtsClient.kt:55-62` | `{text, model_id, voice_settings}`, en-tête `xi-api-key` | octets MP3 (un corps texte en 2xx = échec) |
 | `POST {elevenlabs}/speech-to-text` | `core/net/ElevenLabsSttClient.kt:42` | multipart `model_id` + `file` (audio/wav), en-tête `xi-api-key` | texte de transcription |
 | `POST {meta}/asr/transcribe` | `core/net/MetaAsrClient.kt:40` | multipart **2 parts** : `request` (JSON `{"model","audioEncoding":"WAV"}`) + `audio` (audio/wav), en-tête `Authorization: Bearer` | texte de transcription |
-| `POST {track}/session`, `POST {track}/frame`, `DELETE {track}/session/{id}`, `GET {track}/health` | `core/net/TrackClient.kt:38-70` | `{image_b64,prompts}` / `{session_id,image_b64}` | session + objets suivis (délai 15 s) |
+| `POST {track}/session`, `POST {track}/frame`, `DELETE {track}/session/{id}`, `GET {track}/health` | `core/net/TrackClient.kt:39-74` | `{image_b64,prompts}` / `{session_id,image_b64}` | session + objets suivis (délai 15 s) |
 
 Précisions qui comptent :
 
@@ -167,8 +167,11 @@ Précisions qui comptent :
   tests.
 - **`GET /health` n'est appelé que par le bouton « Tester SAM »** (`app/vm/AppDiagnostics.kt:63`)
   et par la délégation ci-dessus. Aucune sonde périodique.
-- **Le tracker n'est pas câblé dans `:app`** : `HttpTrackClient` n'est construit nulle part
-  dans `main` (ni `app/` ni `core/`) ; il n'existe que pour les tests et un usage futur.
+- **Le tracker est câblé dans `:app`** : l'écran Direct construit `HttpTrackClient` +
+  `TrackRunner` quand sa pastille « Tracker » est active (`app/LiveViewModel.kt`, `start()`) ;
+  c'est le second transport des frames, à côté de `/live` en WebSocket qui reste le défaut.
+  Le débit relevé pour ce chemin est dans `docs/TRACK-PERF.md` (§ 2 : 1,8 ips sur le téléphone,
+  le 25/10 — soit à peine mieux que `/live`, le serveur étant le facteur limitant).
 - **Il n'existe aucun endpoint `/ask`** : la question part au LLM par `POST {llm}/chat/completions`
   (`grep -rn '"/ask"' core/src/main app/src/main` : rien).
 - **Erreurs typées**, un seul barème (`core/net/Http.kt:191-207`) : 401/403 → `InvalidKey`,
@@ -288,4 +291,5 @@ foi.
 - Le **protocole `/live/ws` côté serveur** : le client est ici, le serveur est ailleurs.
 - Les **secrets** : aucune clé, aucun jeton, aucune URL signée.
 - Le **tracker** (`sam3-track`) côté serveur : le client existe (`core/net/TrackClient.kt`,
-  `core/live/TrackRunner.kt`) mais aucun écran ne l'instancie.
+  `core/live/TrackRunner.kt`) et l'écran Direct l'instancie à la demande (pastille
+  « Tracker ») ; le **serveur**, lui, est ailleurs (dépôt non public).
