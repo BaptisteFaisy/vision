@@ -1,10 +1,12 @@
 package dev.sam3vision.app
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sam3vision.app.glasses.GlassesController
+import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
@@ -99,7 +102,7 @@ fun AppNav(
             )
             Route.Capture -> CaptureRoute(viewModel, push)
             Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)
-            Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop, state.settings.parentSiteUrl)
+            Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop, state.settings)
             Route.Chat -> ChatRoute(state, viewModel, pop)
             is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
             Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
@@ -180,19 +183,39 @@ private fun LiveRoute(
     liveViewModel: LiveViewModel,
     push: (Route) -> Unit,
     pop: () -> Unit,
-    parentSiteUrl: String,
+    settings: Settings,
 ) {
     val context = LocalContext.current
+    val liveState by liveViewModel.state.collectAsState()
+    ShareRelay(liveState.distanceLayer, settings, context)
     LiveScreen(
         viewModel = liveViewModel,
         onBack = { liveViewModel.stop(); pop() },
-        onShareParent = { shareParentSite(context, parentSiteUrl) },
+        onShareParent = { shareParentSite(context, settings.parentSiteUrl, settings.shareId) },
         onAsk = {
             viewModel.useLiveFrame(liveViewModel.latestFrameB64())
             push(Route.Chat)
         },
         onOpenSettings = { push(Route.Settings) },
     )
+}
+
+/**
+ * Relais GPS+objets vers le site parent pendant le Direct : écoute active tant
+ * que l'écran est affiché, envoi à chaque couche de distances (throttle 2 s).
+ */
+@Composable
+private fun ShareRelay(layer: DistanceLayer?, settings: Settings, context: Context) {
+    val broadcaster = remember(context) { ShareBroadcaster(context) }
+    LaunchedEffect(settings.shareEnabled) {
+        broadcaster.start(settings.shareEnabled)
+    }
+    DisposableEffect(Unit) { onDispose { broadcaster.stop() } }
+    LaunchedEffect(layer) {
+        if (layer != null && !layer.empty) {
+            broadcaster.publish(System.currentTimeMillis(), settings, layer)
+        }
+    }
 }
 
 @Composable

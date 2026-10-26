@@ -132,6 +132,8 @@ data class DistanceLayer(
     val width: Int = 0,
     val height: Int = 0,
     val readings: List<DistanceReading> = emptyList(),
+    /** Champ de vision porté par la largeur, au moment de la mesure (relais site). */
+    val fovDeg: Float = 0f,
 ) {
     /** Vrai si l'overlay n'a rien à poser (pas d'objet calibré, taille inconnue). */
     val empty: Boolean get() = width <= 0 || height <= 0 || readings.isEmpty()

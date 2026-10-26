@@ -14,8 +14,8 @@ import java.net.URLEncoder
  * (SMS), puis sur le sélecteur Android générique. Lien générique (Réglages) :
  * pas de cloisonnement par proche.
  */
-fun shareParentSite(context: Context, siteUrl: String) {
-    val link = siteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
+fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
+    val link = shareLink(siteUrl, shareId)
     val text = "Suivi de Léo en direct : $link"
     val whatsapp = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
@@ -34,6 +34,18 @@ fun shareParentSite(context: Context, siteUrl: String) {
         "Partager le suivi",
     )
     startShare(context, chooser)
+}
+
+/**
+ * Lien envoyé au proche : le site lit `?share=` pour ouvrir le bon flux.
+ * Un lien déjà paramétré (token manuel) est conservé tel quel.
+ */
+fun shareLink(siteUrl: String, shareId: String): String {
+    val base = siteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
+    val id = shareId.ifBlank { Settings.DEFAULT_SHARE_ID }
+    if (base.contains("?share=") || base.contains("&share=")) return base
+    val sep = if (base.contains("?")) "&" else "?"
+    return base.trim().trimEnd('/') + sep + "share=" + id.trim()
 }
 
 /** Lance un partage ; `false` si aucune app ne le prend en charge. */

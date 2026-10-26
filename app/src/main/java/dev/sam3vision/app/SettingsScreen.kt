@@ -162,6 +162,21 @@ private fun ParentShareSettings(draft: Settings, onChange: (Settings) -> Unit) {
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
+        SwitchRow("Envoyer la position + objets au site pendant le Direct", draft.shareEnabled) {
+            onChange(draft.copy(shareEnabled = it))
+        }
+        LabeledField("Identifiant du flux (?share=, un par proche suivi)", draft.shareId, false) {
+            onChange(draft.copy(shareId = it))
+        }
+        LabeledField("Clé d'écriture du relais (vide = relais sans clé)", draft.shareWriteKey, true) {
+            onChange(draft.copy(shareWriteKey = it))
+        }
+        Text(
+            "La géoloc demandée au démarrage sert uniquement à ce partage ; sans elle," +
+                " le site affiche le dernier état connu puis « signal perdu ».",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
     }
 }
 

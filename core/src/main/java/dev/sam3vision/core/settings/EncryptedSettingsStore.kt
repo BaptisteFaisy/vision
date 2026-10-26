@@ -62,6 +62,10 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
             parentSiteUrl = prefs.getString(KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
                 .ifBlank { default.parentSiteUrl },
+            shareEnabled = prefs.getBoolean(KEY_SHARE_ENABLED, default.shareEnabled),
+            shareId = prefs.getString(KEY_SHARE_ID, default.shareId).orEmpty()
+                .ifBlank { default.shareId },
+            shareWriteKey = prefs.getString(KEY_SHARE_WRITE_KEY, default.shareWriteKey).orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
@@ -93,6 +97,9 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
             .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
+            .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
+            .putString(KEY_SHARE_ID, s.shareId)
+            .putString(KEY_SHARE_WRITE_KEY, s.shareWriteKey)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
             .apply()
     }
@@ -122,6 +129,9 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LOCAL_OVERLAY = "local_overlay"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
         const val KEY_PARENT_SITE_URL = "parent_site_url"
+        const val KEY_SHARE_ENABLED = "share_enabled"
+        const val KEY_SHARE_ID = "share_id"
+        const val KEY_SHARE_WRITE_KEY = "share_write_key"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */
         internal fun createPrefs(context: Context): SharedPreferences {

@@ -384,7 +384,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 error = null,
                 starting = false,
                 memory = current.memory.copy(tracks = recent.tracks),
-                distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings),
+                distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
             )
         }
