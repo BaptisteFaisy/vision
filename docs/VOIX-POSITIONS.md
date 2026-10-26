@@ -28,19 +28,19 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
   `PositionText.kt:183-186`) : c'est un **repère** (« en haut à gauche »), pas un secteur
   annoncé séparément.
 - La géométrie est **la même pour toutes les langues** ; la langue ne change que les mots
-  (`PositionText.kt:52-88`).
+  (`PositionText.kt:47-79`).
 
 ## 3. Ce que la phrase dit
 
 - **Forme** : label + secteur, **sans article** — donc aucune faute de genre sur des
-  labels libres (`Personne à gauche, chaise en bas à droite.`, `PositionText.kt:99-121`).
-- **Ordre** : gauche → droite (`centerX` croissant, puis label) — `PositionText.kt:107`.
+  labels libres (`Personne à gauche, chaise en bas à droite.`, `PositionText.kt:101-122`).
+- **Ordre** : gauche → droite (`centerX` croissant, puis label) — `PositionText.kt:111`.
 - **Doublons** : même label à la même position cité **une fois** (`PositionText.kt:110`).
 - **Plafond** : `MAX_OBJECTS = 3` (`PositionText.kt:44`) puis « et N autres objets »
-  (`PositionText.kt:119-121`).
+  (`PositionText.kt:118-119`).
 - **Distance** : quand elle est connue, `DistanceText.spoken` la met en mots et les objets
   sont séparés par ` ; ` (la virgule sert déjà à séparer position et distance) —
-  `PositionText.kt:113-118`.
+  `PositionText.kt:113-119`.
 
 ## 4. Quand elle parle : trois garde-fous
 
@@ -51,14 +51,14 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
    déclenche rien ;
 2. **nouveauté** — une scène déjà annoncée reste muette, même si les objets sont toujours
    là. La signature de scène est `label|secteur|distance arrondie au mètre`
-   (`PositionText.key`, `PositionText.kt:140-146`) : c'est ce qui fait reparler un objet
+   (`PositionText.key`, `PositionText.kt:140-145`) : c'est ce qui fait reparler un objet
    **qui s'approche** (3 m → 2 m → 1 m) sans le faire bavarder à chaque frame ;
 3. **délai** — jamais deux annonces à moins de **4 s** (`DEFAULT_COOLDOWN_MS = 4_000L`,
    `PositionAnnouncer.kt:91`).
 
 Plus : **scène vide ⇒ la mémoire de scène retombe** (`onEmptyScene`,
-`PositionAnnouncer.kt:73-79`), donc le retour des objets est de nouveau annoncé ; et
-`reset()` (`:66-71`) à chaque nouvelle séance, sinon la première scène resterait muette.
+`PositionAnnouncer.kt:69-75`), donc le retour des objets est de nouveau annoncé ; et
+`reset()` (`:60-65`) à chaque nouvelle séance, sinon la première scène resterait muette.
 
 ## 5. Un seul moteur de voix
 
@@ -66,22 +66,22 @@ L'annonce passe par le moteur **unique** de l'app, jamais par un second lecteur.
 
 | Chemin | Câblage | Garde « ne coupe rien » |
 |---|---|---|
-| Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:95`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:93`, dossier `POSITION_VOICE_DIR = "positions"`, `:410`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
+| Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:112`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:110`, dossier `POSITION_VOICE_DIR = "positions"`, `:490`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
 | iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../ihear/LiveProbe.kt:394-397`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
-| Analyse photo | `AppViewModel.announcePositions` (`AppViewModel.kt:187-198`) | même voix, un seul `say` à la fois |
+| Analyse photo | `AppViewModel.announcePositions` (`AppViewModel.kt:187-195`) | même voix, un seul `say` à la fois |
 
 Réglage : **`Settings.ttsAnnouncePositions`** (défaut `true`, `Settings.kt:28`), bascule
-« Annoncer les objets et leur distance » (`app/TtsSettings.kt:74-80`). La bascule effective
+« Annoncer les objets et leur distance » (`app/TtsSettings.kt:73-76`). La bascule effective
 est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:131`) :
 **sans clé ElevenLabs ni voix, l'annonce est muette** — par construction, pas par bug.
 
 ## 6. Ce qui n'est jamais annoncé
 
 - **Label vide** ou géométrie inutilisable (taille d'image inconnue, boîte < 4 valeurs) :
-  l'objet est omis (`PositionText.fromDetection`, `PositionText.kt:80-86`).
+  l'objet est omis (`PositionText.fromDetection`, `PositionText.kt:81-86`).
 - **Objet coupé par le bord haut ou bas** : sa hauteur ne mesure plus l'objet, donc sa
   **distance est écartée** (`Pinhole.isVerticallyCut`, marge **2 px**,
-  `core/.../distance/DistanceEstimator.kt:47,114`). Il reste **annoncé sans distance** :
+  `core/.../distance/DistanceEstimator.kt:47,156`). Il reste **annoncé sans distance** :
   l'annonce de position ne filtre pas les bords. Le contrat écrit de la lane
   (« aucun objet coupé par le bord n'est annoncé ») n'est donc **pas** tenu tel quel —
   écart documenté, non corrigé ici (hors du périmètre de cette fiche).
@@ -107,13 +107,16 @@ Tests JVM qui verrouillent le contrat : `PositionTextTest` (10), `PositionTextEn
 
 ### 8.1 Sans GPU — le chemin photo (recommandé)
 
-L'analyse d'une photo suffit à prouver détection → phrase → voix, et le faux serveur SAM ne
-sert que `/health` et `/segment` (`tools/mock-sam.py`, docstring) : le **Direct** (WebSocket
-`/live/ws`, `core/.../net/WsTransport.kt:35`) n'a **pas** de faux serveur ici et exige le
-vrai backend.
+L'analyse d'une photo suffit à prouver détection → phrase → voix. Le contrat du client SAM
+est `GET /health` et `POST /segment {"image_b64","prompts"}`
+(`core/.../net/HttpSamClient.kt:10,22`) : un faux serveur qui ne sert que ces deux routes
+suffit, **aucune carte GPU** (le script utilisé en 2025 était un `/tmp/mock_sam.py` hors
+dépôt — il n'est **pas** dans cet arbre). Le **Direct**, lui, parle en WebSocket
+`/live/ws` (`core/.../net/WsTransport.kt:35`) : pas de faux serveur ici, il exige le vrai
+backend.
 
 ```bash
-python3 tools/mock-sam.py 8099                    # /health + /segment, aucune carte
+python3 <un faux serveur SAM sur /health + /segment> 8099   # aucune carte
 adb -s <serial> reverse tcp:8099 tcp:8099         # le téléphone atteint le port du poste
 # local.properties : sam.base.url=http://127.0.0.1:8099   puis  ./gradlew :app:assembleDebug
 ```
@@ -136,9 +139,9 @@ Jamais d'`adb` nu : tout passe par le verrou partagé.
 # sortie 2 = occupé par un autre agent : attendre, ne pas forcer (jamais PHONE_FORCE)
 ```
 
-`install -r` échoue si la signature a changé (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) : ne pas
-désinstaller l'app d'un autre agent sans accord — l'app installée peut être le build qu'il
-est en train de tester.
+`install -r` échoue si un build antérieur a changé de signature (`docs/TESTING.md` § 3) : ne
+pas désinstaller l'app d'un autre agent sans accord — l'app installée peut être le build
+qu'il est en train de tester.
 
 Attendu de la porte de sortie : **3 objets → 3 annonces distinctes, aucune répétition
 < 4 s**, et silence pendant une question au chat.
