@@ -54,17 +54,11 @@ fun SettingsScreen(
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenGestures: () -> Unit,
     onBack: () -> Unit,
 ) {
     var draft by remember { mutableStateOf(settings) }
-    val scroll = Modifier
-        .fillMaxSize()
-        .background(AppColors.background)
-        .statusBarsPadding()
-        .navigationBarsPadding()
-        .imePadding()
-        .verticalScroll(rememberScrollState())
-    Column(scroll) {
+    Column(settingsScroll()) {
         ScreenHeader("Réglages du backend", "Aucune clé n'est écrite dans le code.", onBack, null)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -83,12 +77,26 @@ fun SettingsScreen(
             )
             DictationSettings(draft) { draft = it }
             SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
+            GestureHelp(onOpenGestures)
             ClassicScreens(onOpenLive, onOpenClassic)
             Diagnostics(statusLine)
             GlassesBlock(glasses)
         }
     }
 }
+
+/**
+ * Le scroll commun de l'écran : fond sombre, barres système prises en compte, clavier
+ * compris. Extrait pour que [SettingsScreen] reste sous la garde des 50 lignes.
+ */
+@Composable
+private fun settingsScroll(): Modifier = Modifier
+    .fillMaxSize()
+    .background(AppColors.background)
+    .statusBarsPadding()
+    .navigationBarsPadding()
+    .imePadding()
+    .verticalScroll(rememberScrollState())
 
 /** Bas de page : version de ce build, puis dernière ligne de statut. */
 @Composable
@@ -139,6 +147,31 @@ private fun SettingsActions(
     BigButton("Tester le LLM", llmConfigured, AppColors.surfaceHigh, onTestLlm)
     BigButton("Tester SAM", draft.samConfigured(), AppColors.surfaceHigh, onTestSam)
     BigButton("Tester la dictée Meta", draft.asrConfigured, AppColors.surfaceHigh, onTestAsr)
+}
+
+/**
+ * La page d'accueil iSee n'a **aucun bouton** : les gestes sont la seule interface,
+ * et ils ne s'apprennent pas tout seuls. Cette porte rouvre à volonté l'onboarding
+ * animé des trois gestes (tap, double tap, appui long) — y compris pour un utilisateur
+ * qui a déjà vu l'écran une fois.
+ */
+@Composable
+private fun GestureHelp(onOpenGestures: () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Gestes de l'accueil",
+            color = AppColors.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        BigButton("Revoir les gestes", true, AppColors.surfaceHigh, onOpenGestures)
+        Text(
+            "Tap = vidéo, double tap = photo, appui long = parler. Sur l'accueil iSee, " +
+                "ces gestes marchent n'importe où sur l'écran.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+    }
 }
 
 /**
