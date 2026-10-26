@@ -125,8 +125,10 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
 
 ## 6. SDK, placeholders, `minSdk 29`
 
-- Dépendances : `mwdat-core`, `-camera`, `-inputs`, `-mockdevice`, version `1.0.1`
-  (`gradle/libs.versions.toml:21,53-56`, `app/build.gradle.kts:136-139`), depuis Maven
+- Dépendances : `mwdat-core`, `-camera`, `-inputs` en `implementation` et `-mockdevice` en
+  `debugImplementation` (`app/build.gradle.kts:177-181`) : l'artefact de simulation n'entre plus
+  dans l'APK public (voir §12). Version `1.0.1`
+  (`gradle/libs.versions.toml:21,53-56`), depuis Maven
   Central. Le Toolkit est en **developer preview** : c'est une donnée du vendeur
   (« Meta Platforms, Inc. », POM des artefacts), à considérer comme instable.
 - Les placeholders `com.meta.wearable.mwdat.APPLICATION_ID` / `.CLIENT_TOKEN` sont dans le
@@ -250,7 +252,7 @@ isole dans des fichiers courts et on met la décision dans `GlassesPolicy.kt`.
 
 | Point | État |
 |---|---|
-| `mwdat-mockdevice` en `implementation` : l'artefact est **embarqué dans l'APK de release**, seuls les boutons sont en debug (`GlassesSection.kt:61-63`, `SettingsScreen.kt:106`) | ouvert — sortir l'artefact du build public |
+| `mwdat-mockdevice` embedding : **corrigé le 26/10** — `debugImplementation` (`app/build.gradle.kts:181`), `GlassesMock.kt` en `app/src/debug/`, `main` passe par l'interface `GlassesMockDevice.kt` + une fabrique réflexive (AGP interdit de redéclarer la classe dans `main`, qui ne peut pas la lier) ; les boutons restent gatés debug (`GlassesSection.kt:61-63`, `SettingsScreen.kt:106`) | **fait** — `:app:compileDebugKotlin`, `:app:compileReleaseKotlin` et `:app:testDebugUnitTest` verts (334 tests) |
 | Aucun délai n'expire un `STARTING` ; **jamais essayé** sur lunettes | ouvert, assumé |
 | Messages visibles seulement dans Réglages (§7) | ouvert, hors périmètre |
 | `DonState.UNKNOWN` est affiché « non portées » (`GlassesStatus.kt:22-27`) : l'état inconnu et l'état « retirées » se ressemblent | ouvert, sans risque |

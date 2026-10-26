@@ -87,6 +87,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    // org.json réel pour les tests JVM : sans lui, android.jar répond « not mocked »
+    // et le pipeline de :core (HttpSamClient, InferHubLlmClient) est intestable ici.
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.test.ext.junit)

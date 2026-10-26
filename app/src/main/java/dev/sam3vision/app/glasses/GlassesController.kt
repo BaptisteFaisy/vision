@@ -47,7 +47,9 @@ class GlassesController(
     val state: StateFlow<GlassesUiState> = _state
     val events: SharedFlow<GlassesEvent> = _events
 
-    private val mock = GlassesMock(context)
+    // Implémentation (Mock Device Kit) en `app/src/debug/` : la dépendance n'est pas
+    // embarquée dans l'APK de release, d'où la fabrique réflexive [mockDevice].
+    private val mock: GlassesMockDevice = mockDevice(context)
     private var session: DeviceSession? = null
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
