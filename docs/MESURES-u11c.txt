@@ -1,0 +1,52 @@
+MESURES — u11c : fixtures dorées, IoU, arbitrage de variante
+
+Dépôt : `BaptisteFaisy/vision` (app seule ; le backend SAM 3.1 vit dans un autre dépôt).
+Codec réel du client : `bits` — format `M1`, magic + dimensions uint16 little-endian +
+zlib de lignes 1 bit/pixel (`core/src/main/java/dev/sam3vision/core/mask/MaskCore.kt`).
+
+Fichier généré : `python3 scripts/gen_mask_golden.py --write`. Aucun chiffre à la main ;
+`--check` compare ce fichier à ce que produit le script.
+
+## 1. Fixtures dorées — fidélité serveur → client
+
+Le payload vient de l'encodeur **Python** (ancre : 6 vecteurs réels du dépôt réencodés à
+l'identique, `--selftest`). `MaskGoldenTest` décode chaque fixture par le chemin réel du
+client (`decodeMaskAny(..., "bits")`) et exige 6/6 au pixel près : chaque ligne est
+comparée, l'IoU doit valoir **1,000**.
+
+| forme | taille | pixels objet | payload `M1` (o) | base64 `M1` (car.) | base64 PNG 8 bits (car.) | IoU |
+|---|---|---|---|---|---|---|
+| `disque` | 48×32 | 540 | 77 | 104 | 172 | 1.000 |
+| `rectangle` | 37×24 | 442 | 26 | 36 | 108 | 1.000 |
+| `anneau` | 33×33 | 500 | 98 | 132 | 200 | 1.000 |
+| `bruit` | 40×20 | 376 | 117 | 156 | 308 | 1.000 |
+| `ellipse` | 45×29 | 669 | 85 | 116 | 176 | 1.000 |
+| `deux_disques` | 48×32 | 308 | 42 | 56 | 144 | 1.000 |
+
+## 2. Poids — `bits` contre la variante historique
+
+- **640×360 (direct)** : `bits` 43404 car. base64 · PNG gris 8 bits 53404 car. → 1,23× plus léger. Sans le bruit (incompressible) : 5040 contre 6652 car. → 1,32×.
+- **256×103 (grille L11)** : `bits` 5728 car. base64 · PNG gris 8 bits 7624 car. → 1,33× plus léger. Sans le bruit (incompressible) : 1308 contre 1808 car. → 1,38×.
+- Pour comparaison : la lane L11 annonce **652 car. base64** (RLE, 6 objets
+  256×103) — autre codec, hors de ce dépôt, non reproduit ici.
+
+## 3. Arbitrage — une seule variante
+
+- **Retenue** : `bits` (`M1`), la seule variante compacte que le client sait lire. Elle
+  est **sans perte** (IoU 1,000 sur les six formes, bruit compris) et plus légère que le
+  PNG gris 8 bits à fidélité égale.
+- **Repli historique** : `png` (gris 8 bits) et `none` (aucun masque). Encodage absent ou
+  inconnu ⇒ `png` : un backend non redéployé reste lisible.
+- **Refusées** : RLE LEB128, polygones, conteneur auto-décrit (« bis ») : **absents de ce
+  dépôt**, aucun décodeur côté client. En introduire un casserait `MaskGoldenTest` — c'est
+  la porte anti-dérive du format.
+
+## 4. Non mesuré / hors dépôt
+
+- IoU d'une variante **à perte** (polygones ≤ 1 px, grille réduite + plus proche voisin
+  0,97–0,98) : sans objet ici, aucune variante à perte dans ce dépôt — **non mesuré**.
+- Décodage PNG côté JVM : impossible (le `BitmapFactory` des tests JVM rend `null`) —
+  **non mesuré** ici ; la variante `bits` n'en a pas besoin.
+- IoU à l'écran (aperçu, `CENTER_CROP` + filtre bilinéaire) : rendu Android, hors JVM —
+  **non mesuré**.
+- Mesure sur téléphone : hors de ce dépôt — **non mesuré**.

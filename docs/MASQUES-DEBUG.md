@@ -116,9 +116,27 @@ La chaîne réelle, vérifiée dans `app/…/ihear/MaskPainter.kt`, `core/…/ma
    `CameraSurface.merge` (`CameraSurface.kt:71-79`) et affichés en `CENTER_CROP` — cadrage identique à la
    `PreviewView` (`FILL_CENTER`). Le direct colorise par la même classe (`LiveProbe.kt:99`, `:415-422`).
 
-Couverture JVM : `core.mask.MaskCoreTest` **20** et `core.mask.MaskRobustnessTest` **20** (base64 à
-préfixe `data:`, IHDR, luminance, colorisation, masque 255, formats hostiles) ; formatage du panneau
+Couverture JVM : `core.mask.MaskCoreTest` **20**, `core.mask.MaskRobustnessTest` **20** (base64 à
+préfixe `data:`, IHDR, luminance, colorisation, masque 255, formats hostiles) et
+`core.mask.MaskGoldenTest` **2** (fixtures dorées : 6/6 au pixel près, IoU 1) ; formatage du panneau
 `app.ihear.LiveProbeTextTest` **21**. Le rendu bitmap lui-même (décodage Android) n'est pas testé en JVM.
+
+### Une seule variante de codec (arbitrage)
+
+Le client ne lit **qu'une** variante compacte : `bits` (format `M1`). `png` reste le repli historique
+— encodage absent ou inconnu ⇒ `png` — et `none` veut dire « pas de masque ». Rien d'autre n'est
+retenu : ni RLE LEB128, ni polygones, ni conteneur auto-décrit (« bis »). Aucun décodeur ne les lit
+ici, et en ajouter un ferait échouer `MaskGoldenTest` : c'est la porte anti-dérive du format.
+
+Pourquoi trancher ainsi : `bits` est **sans perte** — IoU mesurée **1,000** sur six formes (disque,
+rectangle, anneau à trou, bruit, ellipse, deux disques), bruit compris — et plus léger que le PNG
+gris 8 bits à fidélité égale. Poids, méthode et « non mesuré » : `docs/MESURES-u11c.txt`, régénéré
+par `python3 scripts/gen_mask_golden.py --write`.
+
+Les fixtures dorées (`core/…/mask/MaskGoldenData.kt`, fichier généré par ce script) viennent de
+l'encodeur **Python** du format `M1`, pas de l'encodeur Kotlin des tests : les deux lectures ne
+peuvent plus se tromper ensemble (`--selftest` réencode à l'octet près six vecteurs réels du dépôt).
+La fidélité de `bits` côté client n'est donc pas supposée, elle est mesurée.
 
 ## Recette
 
