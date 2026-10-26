@@ -75,6 +75,12 @@ data class Settings(
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
     val cameraFovDeg: Float = 0f,
+    /**
+     * Lien du site de suivi parent envoyé par le bouton « Partager le suivi »
+     * du Direct (message WhatsApp). Lien générique : pas de cloisonnement par
+     * proche, à affiner avec des tokens côté backend si besoin.
+     */
+    val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
     /** Plafond d'objets affichés à l'écran, commun au direct et à la photo. */
     val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
     /**
@@ -127,6 +133,9 @@ data class Settings(
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
         const val DEFAULT_ASR_MODEL = "muse-voice-transcribe-1.0"
 
+        /** Site de suivi parent ouvert par le bouton « Partager le suivi » du Direct. */
+        const val DEFAULT_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
+
         val Default = Settings(
             llmBaseUrl = DEFAULT_LLM_BASE_URL,
             llmApiKey = "",
@@ -148,6 +157,7 @@ data class Settings(
             boxPredictionEnabled = false,
             localOverlayEnabled = true,
             cameraFovDeg = 0f,
+            parentSiteUrl = DEFAULT_PARENT_SITE_URL,
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
     }

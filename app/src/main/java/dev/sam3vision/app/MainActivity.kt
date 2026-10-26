@@ -52,6 +52,15 @@ class MainActivity : ComponentActivity() {
     /** Racine des gestes : annulée si l'app passe en arrière-plan en pleine tenue. */
     private lateinit var root: IhearRootLayout
 
+    /** Permission demandée au premier lancement ; un refus est annoncé à la voix. */
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) viewModel.onMicDenied()
+    }
+
+    /** Géolocalisation demandée au premier lancement (suivi parent) ; optionnelle. */
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         glasses = GlassesController(applicationContext).also {
@@ -62,6 +71,8 @@ class MainActivity : ComponentActivity() {
         ihear = ViewModelProvider(this)[IhearViewModel::class.java]
         applyDarkSystemBars()
         setContentView(buildRoot())
+        requestMicIfNeeded()
+        requestLocationIfNeeded()
         routeIntent(intent)
     }
 
@@ -159,6 +170,27 @@ class MainActivity : ComponentActivity() {
         // App fermée pour de bon : le service du micro verrouillé n'a plus de raison de vivre.
         if (isFinishing) LockedMicBridge.disarm(this)
         super.onDestroy()
+    }
+
+    private fun requestMicIfNeeded() {
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) micPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun requestLocationIfNeeded() {
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!fine || !coarse) {
+            locationPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
     }
 }
 

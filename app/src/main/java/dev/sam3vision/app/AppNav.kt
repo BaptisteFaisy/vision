@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesEvent
@@ -98,7 +99,7 @@ fun AppNav(
             )
             Route.Capture -> CaptureRoute(viewModel, push)
             Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)
-            Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop)
+            Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop, state.settings.parentSiteUrl)
             Route.Chat -> ChatRoute(state, viewModel, pop)
             is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
             Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
@@ -179,10 +180,13 @@ private fun LiveRoute(
     liveViewModel: LiveViewModel,
     push: (Route) -> Unit,
     pop: () -> Unit,
+    parentSiteUrl: String,
 ) {
+    val context = LocalContext.current
     LiveScreen(
         viewModel = liveViewModel,
         onBack = { liveViewModel.stop(); pop() },
+        onShareParent = { shareParentSite(context, parentSiteUrl) },
         onAsk = {
             viewModel.useLiveFrame(liveViewModel.latestFrameB64())
             push(Route.Chat)
