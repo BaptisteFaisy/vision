@@ -14,7 +14,7 @@
 
 | | |
 |---|---|
-| fichiers Kotlin | **21** — 14 dans `src/main` (1 596 l.), 6 dans `src/test` (642 l.), 1 dans `src/androidTest` (135 l.) = **2 373 l.** |
+| fichiers Kotlin | **21** — 14 dans `src/main` (1 596 l.), 6 dans `src/test` (642 l.), 1 dans `src/androidTest` (158 l.) = **2 396 l.** |
 | plus gros fichier | `GlassesVoice.kt` (253 l.) ; plus grosse fonction `play` (43 l.) — limites 500 / 50 respectées |
 | tests | **56 tests JVM verts** (`:glasses-spike:testDebugUnitTest`) + **1** test d'instrumentation (`MockGlassesTest`), jamais exécuté en CI |
 | Android | `minSdk = 29`, `compileSdk = 36`, `targetSdk = 36`, JVM 17, `versionName = "0.1-spike"` (`glasses-spike/build.gradle.kts:24-31`) |
@@ -125,8 +125,13 @@ Ces faits viennent des AAR du cache Gradle local, pas d'un téléchargement de c
   l'ambiguïté est **mesurée** : un NV12 serré fait exactement la même taille qu'un I420 serré
   (24 o en 4×4) → l'inférence renvoie une disposition planaire (test
   `un buffer NV12 serre est indiscernable d un I420 par la taille`). Une vraie frame NV12 serait donc
-  lue avec des couleurs fausses. Seul le commentaire du code affirme que le décodeur négocie
-  `color-format = 19` (`GlassesFrameEncoder.kt:30-33`) : **non vérifié** dans le SDK ici.
+  lue avec des couleurs fausses. Le décodeur du SDK **demande** bien `color-format = 19`
+  (`COLOR_FormatYUV420Planar`) : vérifié au `javap`, `StreamImpl.createVideoFormat()` conserve le
+  `colorFormat = 19` de `VideoFormat.getDefaultFormat()` et `VideoDecoder` écrit
+  `MediaFormat.setInteger("color-format", 19)` — détail dans
+  [`GLASSES-ETAT.md`](GLASSES-ETAT.md) § « Ce que le bytecode prouve ». Ce qui reste ouvert n'est donc
+  pas la constante demandée mais le format **effectivement** livré (un `MediaCodec` peut la refuser)
+  et les strides/padding du buffer, que le SDK n'expose pas.
 - **Padding de ligne réel** : les alignements testés vont de 1 à 256 px ; si le matériel en utilise un
   autre, le repli « serré » décale l'image (commentaire `FrameTypes.kt:146-148`).
 - **Cadence, latence, pertes, reprises de session** : non mesurées.
