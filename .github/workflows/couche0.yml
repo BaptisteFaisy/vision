@@ -1,0 +1,68 @@
+name: couche0
+
+# Couche 0 anti-régression. Deux contrôles déterministes, quasi gratuits,
+# sans checkout :
+#   - scope     : tout fichier modifié est déclaré dans `## Scope` du corps ;
+#   - forbidden : motifs interdits dans le diff + fichiers de garde gelés.
+# Le juge vient de `master`, jamais du head de la PR : une PR ne modifie pas
+# son propre garde. Re-armable : `gh workflow run couche0.yml -f pr=<n>`.
+# Le check est exigé par la file Mergify (voir `.mergify.yml`).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numéro de PR à contrôler"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Les PR-brouillon du batch Mergify (refs `mergify/*`) n'ont pas de corps
+# rédigé : la Couche 0 y serait toujours rouge et bloquerait la file. Elle n'y
+# a rien à contrôler — la vraie PR a déjà été passée au crible avant
+# l'embarquement.
+concurrency:
+  group: couche0-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  couche0:
+    name: couche0
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Brouillon de batch Mergify — rien à juger, mais il faut du vert
+        # Sauter le job ne suffit pas : `check-success = couche0` exige une
+        # réussite, et une PR-brouillon sautée reste « skipping » → le batch
+        # meurt en CHECKS_FAILED.
+        # On sort donc en succès, sans contrôler : la vraie PR, elle, passe.
+        run: |
+          case "${{ github.head_ref }}" in
+            mergify/*) echo "brouillon de file : garde déjà appliquée sur la PR réelle"; exit 0 ;;
+          esac
+          echo "PR réelle : contrôle complet enchaîné."
+      - name: Récupérer le garde depuis master, puis contrôler la PR
+        if: ${{ !startsWith(github.head_ref, 'mergify/') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [ -n "$PR_NUMBER" ] || { echo "::error::aucun numéro de PR"; exit 1; }
+          GARDE="$RUNNER_TEMP/check_couche0.py"
+          recuperer() {
+            curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.raw" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/.github/couche0/check_couche0.py?ref=$1" \
+              -o "$GARDE"
+          }
+          recuperer master || {
+            echo "::warning::garde absent de master — repli sur le head de la PR (premier atterrissage)"
+            recuperer "$HEAD_SHA"
+          }
+          python3 "$GARDE" check --pr "$PR_NUMBER"

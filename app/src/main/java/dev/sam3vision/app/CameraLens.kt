@@ -1,0 +1,42 @@
+package dev.sam3vision.app
+
+import android.hardware.camera2.CameraCharacteristics
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.CameraInfo
+import androidx.camera.core.Camera
+import dev.sam3vision.core.distance.LensSpec
+
+/**
+ * Champ de vision réel du capteur, lu par l'interop Camera2 : la focale (mm) et
+ * la taille physique du capteur donnent les deux angles. `null` si le driver ne
+ * répond rien d'exploitable — l'appelant retombe alors sur le réglage
+ * utilisateur, puis sur [LensSpec.Default].
+ *
+ * Le direct analyse des frames réduites au plus grand côté de 512 px : réduire
+ * une image ne change pas son champ de vision, seulement sa focale *en pixels*,
+ * que [LensSpec.focalPx] recalcule pour chaque frame.
+ */
+@OptIn(markerClass = [ExperimentalCamera2Interop::class])
+fun lensSpecOf(cameraInfo: CameraInfo?): LensSpec? {
+    if (cameraInfo == null) return null
+    return runCatching { readLens(Camera2CameraInfo.from(cameraInfo)) }.getOrNull()
+}
+
+/** Calibrage d'un caméra déjà liée (raccourci de l'écran Direct). */
+fun lensSpecOf(camera: Camera?): LensSpec? = lensSpecOf(camera?.cameraInfo)
+
+@OptIn(markerClass = [ExperimentalCamera2Interop::class])
+private fun readLens(info: Camera2CameraInfo): LensSpec? {
+    val focalMm = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+        ?.firstOrNull()
+    val physical = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+    val active = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+    val array = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+    if (focalMm == null || physical == null || active == null || array == null) return null
+    if (array.width <= 0 || array.height <= 0) return null
+    val widthMm = physical.width * active.width() / array.width
+    val heightMm = physical.height * active.height() / array.height
+    return LensSpec.fromSensor(focalMm, widthMm, heightMm)
+}

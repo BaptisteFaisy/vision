@@ -1,0 +1,175 @@
+package dev.sam3vision.app
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.sqrt
+
+/**
+ * Distances du direct, posées sur l'aperçu : pour chaque objet mesuré, une
+ * **pastille de verre** sombre — texte blanc, puce de la couleur de son masque —
+ * reliée par un **fil de rappel** au coin haut-gauche de sa boîte, où un point de
+ * la même couleur marque l'objet. Plus de rectangle plein saturé sur la vidéo :
+ * l'image reste lisible, la couleur ne sert plus qu'à désigner l'objet.
+ *
+ * Les positions sont recalculées avec la même transformation que l'aperçu
+ * (`ContentScale.Crop`) — [cropTransform], [screenLabels] et [placePills] restent
+ * purs et testés en JVM, seule la mise en forme vit ici. Rien à afficher : rien de
+ * composé.
+ */
+@Composable
+fun LiveDistanceLayer(
+    layer: DistanceLayer?,
+    topInset: Dp = TOP_SAFE_INSET,
+    withLabel: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    if (layer == null || layer.empty) return
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        DistancePills(
+            layer = layer,
+            topInset = topInset,
+            withLabel = withLabel,
+            boxWidth = constraints.maxWidth.toFloat(),
+            boxHeight = constraints.maxHeight.toFloat(),
+        )
+    }
+}
+
+/**
+ * Mesure chaque texte, place les pastilles ([placePills]) puis les dessine d'un
+ * seul [Canvas] : les fils passent sous les pastilles, jamais l'inverse.
+ */
+@Composable
+private fun DistancePills(
+    layer: DistanceLayer,
+    topInset: Dp,
+    withLabel: Boolean,
+    boxWidth: Float,
+    boxHeight: Float,
+) {
+    val measurer = rememberTextMeasurer()
+    val metrics = pillMetrics(topInset)
+    val transform = cropTransform(layer.width, layer.height, boxWidth, boxHeight)
+    val fontSize = (BASE_FONT_SP * sqrt(transform.scale)).coerceIn(MIN_FONT_SP, MAX_FONT_SP).sp
+    val style = TextStyle(color = Color.White, fontSize = fontSize, fontWeight = FontWeight.SemiBold)
+    val labels = screenLabels(layer, transform, withLabel)
+    val texts = labels.map { measurer.measure(it.text, style, maxLines = 1) }
+    val widths = texts.map { it.size.width + metrics.dotRadius * 2f + metrics.dotGap + metrics.padH * 2f }
+    val heights = texts.map { it.size.height + metrics.padV * 2f }
+    val pills = placePills(
+        labels = labels,
+        widths = widths,
+        heights = heights,
+        boxWidth = boxWidth,
+        boxHeight = boxHeight,
+        topInset = metrics.topInset,
+        leadGap = metrics.leadGap,
+        stackGap = metrics.stackGap,
+    )
+    Canvas(Modifier.fillMaxSize()) {
+        pills.forEachIndexed { index, pill -> drawPill(pill, texts[index], metrics) }
+    }
+}
+
+/** Une pastille : le fil depuis la boîte, le point de repère, le verre, la puce, le texte. */
+private fun DrawScope.drawPill(pill: PillPlacement, text: TextLayoutResult, metrics: PillMetrics) {
+    val color = maskColorAt(pill.colorIndex)
+    val dotX = pill.left + metrics.padH + metrics.dotRadius
+    val topLeft = Offset(pill.left, pill.top)
+    val pillSize = Size(pill.width, pill.height)
+    drawLine(
+        color = color.copy(alpha = LEAD_ALPHA),
+        start = Offset(pill.anchorX, pill.anchorY),
+        end = Offset(dotX, pill.leadY()),
+        strokeWidth = metrics.stroke,
+    )
+    drawCircle(color = color, radius = metrics.dotRadius * 0.8f, center = Offset(pill.anchorX, pill.anchorY))
+    drawRoundRect(GLASS, topLeft, pillSize, CornerRadius(metrics.corner))
+    drawRoundRect(
+        color = color.copy(alpha = RIM_ALPHA),
+        topLeft = topLeft,
+        size = pillSize,
+        cornerRadius = CornerRadius(metrics.corner),
+        style = Stroke(width = metrics.stroke),
+    )
+    drawCircle(color, radius = metrics.dotRadius, center = Offset(dotX, pill.top + pill.height / 2f))
+    drawText(
+        textLayoutResult = text,
+        topLeft = Offset(pill.left + metrics.padH + metrics.dotRadius * 2f + metrics.dotGap, pill.top + metrics.padV),
+    )
+}
+
+/** Les mesures de la pastille, converties une seule fois depuis les dp. */
+private data class PillMetrics(
+    val topInset: Float,
+    val padH: Float,
+    val padV: Float,
+    val dotRadius: Float,
+    val dotGap: Float,
+    val leadGap: Float,
+    val stackGap: Float,
+    val corner: Float,
+    val stroke: Float,
+)
+
+/** Conversions dp → px de la pastille, une seule fois par composition. */
+@Composable
+private fun pillMetrics(topInset: Dp): PillMetrics {
+    val density = LocalDensity.current
+    return with(density) {
+        PillMetrics(
+            topInset = topInset.toPx(),
+            padH = PILL_PAD_H.toPx(),
+            padV = PILL_PAD_V.toPx(),
+            dotRadius = PILL_DOT_RADIUS.toPx(),
+            dotGap = PILL_DOT_GAP.toPx(),
+            leadGap = PILL_LEAD_GAP.dp.toPx(),
+            stackGap = PILL_STACK_GAP.dp.toPx(),
+            corner = PILL_CORNER.toPx(),
+            stroke = PILL_STROKE.toPx(),
+        )
+    }
+}
+
+/** Verre de la pastille : noir très opaque, la vidéo ne doit pas traverser le texte. */
+private val GLASS = Color(0xF20B0D12)
+
+/** Opacité du fil de rappel et du liseré coloré. */
+private const val LEAD_ALPHA = 0.85f
+private const val RIM_ALPHA = 0.55f
+
+private val PILL_PAD_H = 8.dp
+private val PILL_PAD_V = 3.dp
+private val PILL_DOT_RADIUS = 3.dp
+private val PILL_DOT_GAP = 5.dp
+private val PILL_CORNER = 7.dp
+private val PILL_STROKE = 1.dp
+
+/**
+ * Bandeau du haut (boutons + état + concepts) : aucune pastille ne s'y cache.
+ * Les autres hôtes — la fenêtre flottante d'iSee — passent leur propre marge.
+ */
+private val TOP_SAFE_INSET = 230.dp
+
+/** Corps de la police : adapté à la résolution de l'aperçu, borné pour rester lisible. */
+private const val BASE_FONT_SP = 11f
+private const val MIN_FONT_SP = 10f
+private const val MAX_FONT_SP = 20f

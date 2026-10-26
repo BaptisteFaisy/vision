@@ -1,0 +1,59 @@
+package dev.sam3vision.core.live
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LivePromptsTest {
+
+    @Test
+    fun `deux concepts par defaut, plafond client a deux`() {
+        assertEquals(2, LivePrompts.Default.size)
+        assertEquals(listOf("person", "door"), LivePrompts.Default)
+        assertEquals(2, LivePrompts.MAX)
+        assertEquals(LivePrompts.Default, LivePrompts.normalize(LivePrompts.Default))
+    }
+
+    @Test
+    fun `une liste vide retombe sur les defauts`() {
+        assertEquals(LivePrompts.Default, LivePrompts.normalize(emptyList()))
+    }
+
+    @Test
+    fun `une liste uniquement blanche retombe sur les defauts`() {
+        assertEquals(LivePrompts.Default, LivePrompts.normalize(listOf("", "   ", "\t")))
+    }
+
+    @Test
+    fun `les espaces sont retires et les doublons elimines`() {
+        assertEquals(listOf("person", "car"), LivePrompts.normalize(listOf(" person ", "car", "person")))
+    }
+
+    @Test
+    fun `la liste est bornee a deux prompts`() {
+        val many = (1..12).map { "objet$it" }
+        val normalized = LivePrompts.normalize(many)
+        assertEquals(LivePrompts.MAX, normalized.size)
+        assertEquals("objet1", normalized.first())
+        assertEquals("objet2", normalized.last())
+    }
+
+    @Test
+    fun `un prompt trop long est rejete`() {
+        val tooLong = "x".repeat(LivePrompts.MAX_LENGTH + 1)
+        assertEquals(listOf("cat"), LivePrompts.normalize(listOf(tooLong, "cat")))
+        assertTrue(LivePrompts.normalize(listOf(tooLong)).isNotEmpty())
+    }
+
+    @Test
+    fun `une liste entierement rejetee retombe sur les defauts`() {
+        val tooLong = "y".repeat(LivePrompts.MAX_LENGTH + 1)
+        assertEquals(LivePrompts.Default, LivePrompts.normalize(listOf(tooLong)))
+    }
+
+    @Test
+    fun `un prompt a la longueur maximale est accepte`() {
+        val atLimit = "z".repeat(LivePrompts.MAX_LENGTH)
+        assertEquals(listOf(atLimit), LivePrompts.normalize(listOf(atLimit)))
+    }
+}

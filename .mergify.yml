@@ -1,0 +1,74 @@
+# File de merge Mergify — budget CI 5 min.
+#
+# queue_conditions n'exigent que les checks livrés par ce dépôt :
+#   - ci-budget : aucun job ne peut être déclaré au-delà de 5 minutes ;
+#   - ci        : tests `:core` + `:app`, APK debug, garde anti-secret ;
+#   - couche0   : tout fichier hors `## Scope` de la PR est refusé.
+# Le frein manuel `hold` sort la PR de la file, labels `urgent` et
+# `priority-low` pour la priorité.
+queue_rules:
+  - name: default
+    queue_conditions:
+      # Budget CI 5 min (règle user) : le garde-fou du socle.
+      - check-success = ci-budget
+      # CI reelle du depot (tests core+app, APK debug, garde anti-secret).
+      - check-success = ci
+      # Couche 0 : elle refuse tout fichier hors `## Scope` — « une modif non
+      # demandée n'est jamais prise en compte ».
+      - check-success = couche0
+      # Frein manuel : etiqueter `hold` sort la PR de la file.
+      - -label = hold
+      - -conflict
+      - -draft
+      - base = master
+    # In-place checks : batch 1 + un seul check à la fois + pas de retry +
+    # merge_conditions identiques = Mergify teste SUR la branche de la PR.
+    # Conséquence : un seul run CI par PR (avant, la PR puis le brouillon de
+    # batch : 2× 40 s), et merge immédiat quand la base n'a pas bougé.
+    batch_size: 1
+    max_checks_retries: 0
+    # Dépôt public = une VM par check : plus de contrainte de RAM,
+    # 8 PR sont testées en parallèle au lieu d'une.
+    mode: parallel
+    max_parallel_checks: 8
+    merge_method: rebase
+    update_method: rebase
+
+priority_rules:
+  - name: urgent
+    conditions:
+      - label = urgent
+    priority: high
+  - name: priority-low
+    conditions:
+      - label = priority-low
+    priority: low
+
+merge_queue:
+  # In-place checks obligent max_parallel_checks = 1 (pas de brouillon de batch
+  # donc pas de spéculation) : on échange de la spéculation contre un run CI
+  # unique — mesuré plus rapide de bout en bout. Les checks de PR tournent en
+  # parallèle, eux.
+  mode: serial
+  max_parallel_checks: 1
+
+# Auto-queue natif (produit Merge Queue) : évite de dépendre du produit
+# « Workflow Automation » (pull_request_rules), désactivé.
+merge_protections:
+  # Règles évaluées par le produit « Merge Protections » (à activer dans le
+  # dashboard : sans lui, auto_merge_conditions reste sans effet et la file
+  # n'embarque que sur @Mergifyio queue — doc /merge-protections/setup).
+  # Volontairement identiques aux conditions de file : pas de double garde.
+  # `couche0` est exigée (voir queue_conditions).
+  - name: CI verte et pas de hold
+    description: "Ce qui doit passer avant d'entrer dans la file."
+    if:
+      - base = master
+    success_conditions:
+      - check-success = ci
+      - check-success = ci-budget
+      - check-success = couche0
+      - -label = hold
+
+merge_protections_settings:
+  auto_merge_conditions: true

@@ -1,0 +1,257 @@
+package dev.sam3vision.core.net
+
+import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okio.BufferedSink
+
+/** User-Agent identifiable côté backend. */
+internal const val USER_AGENT = "sam3-vision-android/1.0"
+
+/** Nom exact de l'en-tête posé par [request] sur toutes les requêtes sortantes. */
+private const val USER_AGENT_HEADER = "User-Agent"
+
+internal val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+
+/** Délai par défaut imposé par la spec : 60 s. */
+const val DEFAULT_TIMEOUT_SECONDS: Long = 60L
+
+/** Un seul endroit qui fabrique le client HTTP (timeouts identiques pour LLM et SAM). */
+fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpClient =
+    OkHttpClient.Builder()
+        .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+
+/**
+ * Client **partagé** du direct : un seul `OkHttpClient` pour toute l'app, donc un seul
+ * `ConnectionPool` et un seul cache TLS. Un client neuf coûte 71,3 ms mesurés (DNS 3,4 +
+ * TCP 32,4 + TLS 35,5) et chaque `start()` / `restartWith()` en fabriquait un, alors que la
+ * caméra tourne déjà et que la 1re frame part aussitôt.
+ *
+ * Délais réglés sur la réalité du direct :
+ * - connect 3 s (un lien chaud qui ne répond pas en 3 s est mort) ;
+ * - write 5 s (27 Ko de frame JPEG s'écrivent en quelques ms) ;
+ * - read 60 s : le **réveil** du conteneur Modal est mesuré à 20-27 s ;
+ * - callTimeout 0 : aucun plafond global. L'ancien plafond de 10 s tuait la 1re frame après
+ *   sommeil du conteneur (26,8 s mesurés) tout en facturant l'inférence quand même.
+ *
+ * `retryOnConnectionFailure(false)` : une frame n'est jamais renvoyée (voir [OneShotJsonBody]) ;
+ * un keep-alive mort échoue franchement au lieu de rejouer 28 Ko et une 2e inférence GPU.
+ */
+private val liveSharedClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(LIVE_CONNECT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(LIVE_WRITE_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(LIVE_READ_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
+        // 8 connexions idle / 5 min : marge pour 1 frame en vol + `/health`, et tunnel chaud
+        // entre deux sessions rapprochées (défaut OkHttp : 5 idle).
+        .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+        .build()
+}
+
+/** Le client HTTP du direct : **toujours le même** (pool, DNS, TLS partagés). */
+fun liveHttpClient(): OkHttpClient = liveSharedClient
+
+/**
+ * Client du **WebSocket** du direct : `newBuilder()` ne refait pas un client à neuf — il
+ * **partage le pool de connexions et le dispatcher** de [liveHttpClient], donc le handshake
+ * `wss://` bénéficie du DNS/TCP/TLS déjà payés par `/health` et les frames HTTP.
+ *
+ * Seul le délai de lecture est ajusté : le handshake d'un conteneur endormi attend le
+ * démarrage, il ne doit pas être coupé à 10 s. Le budget de la **frame** reste celui de
+ * [WsLiveClient] (`withTimeoutOrNull`) — le socket, lui, vit toute la session.
+ */
+fun liveWsClient(timeoutSeconds: Long = LIVE_TIMEOUT_SECONDS): OkHttpClient =
+    liveSharedClient.newBuilder()
+        .readTimeout(maxOf(timeoutSeconds, LIVE_READ_SECONDS), TimeUnit.SECONDS)
+        .build()
+
+private const val LIVE_CONNECT_SECONDS = 3L
+private const val LIVE_WRITE_SECONDS = 5L
+private const val LIVE_READ_SECONDS = 60L
+
+/** Réponse HTTP brute. */
+internal data class HttpOutcome(val code: Int, val body: String)
+
+/**
+ * Corps JSON **non rejouable** : OkHttp ne relance jamais un POST dont le corps est déjà
+ * parti. Sans ça, une connexion keep-alive morte fait re-POSTer la frame (28 Ko + une 2e
+ * inférence GPU facturée). Les octets sont encodés une fois, à la construction.
+ */
+internal class OneShotJsonBody(json: String) : RequestBody() {
+
+    private val bytes: ByteArray = json.toByteArray(Charsets.UTF_8)
+
+    override fun contentType(): MediaType = JSON_MEDIA
+
+    override fun contentLength(): Long = bytes.size.toLong()
+
+    override fun writeTo(sink: BufferedSink) {
+        sink.write(bytes)
+    }
+
+    /** Un corps one-shot n'est jamais rejoué par OkHttp. */
+    override fun isOneShot(): Boolean = true
+}
+
+internal fun joinUrl(baseUrl: String, path: String): String =
+    baseUrl.trim().trimEnd('/') + path
+
+/**
+ * **Fabrique unique de requêtes** : URL, méthode, corps, en-têtes.
+ *
+ * Avant, chaque client construisait son `Request.Builder` à la main — dix fois, avec
+ * autant de façons d'oublier le `User-Agent` ou le `Content-Type`. Ici, une seule
+ * implémentation existe : impossible d'oublier un en-tête commun, et le comportement
+ * observé par le backend ne change pas (mêmes noms, mêmes valeurs, mêmes méthodes).
+ *
+ * L'ordre relatif des en-têtes n'a pas d'importance (RFC 9110 §5.3 : l'ordre des
+ * champs de noms différents n'est pas significatif) ; `User-Agent` passe donc en tête.
+ *
+ * @param body `null` = requête sans corps (GET, DELETE).
+ */
+internal fun request(
+    url: String,
+    method: String = "GET",
+    body: RequestBody? = null,
+    userAgent: String = USER_AGENT,
+    headers: Map<String, String> = emptyMap(),
+): Request {
+    val builder = Request.Builder().url(url).header(USER_AGENT_HEADER, userAgent)
+    headers.forEach { (name, value) -> builder.header(name, value) }
+    return builder.method(method, body).build()
+}
+
+/** [request] sur une base + un chemin joints comme [joinUrl] (base sans slash final). */
+internal fun requestTo(
+    base: String,
+    path: String,
+    method: String = "GET",
+    body: RequestBody? = null,
+    userAgent: String = USER_AGENT,
+    headers: Map<String, String> = emptyMap(),
+): Request = request(joinUrl(base, path), method, body, userAgent, headers)
+
+/**
+ * Corps JSON `application/json; charset=utf-8` : un seul endroit connaît le
+ * `Content-Type` du JSON, les clients ne le redéclarent plus.
+ */
+internal fun jsonBody(json: String): RequestBody = json.toRequestBody(JSON_MEDIA)
+
+/** Exécute un appel bloquant sur `Dispatchers.IO` et normalise toutes les erreurs. */
+private suspend fun <T> ioResult(block: () -> T): Result<T> =
+    withContext(Dispatchers.IO) {
+        try {
+            Result.success(block())
+        } catch (c: CancellationException) {
+            throw c
+        } catch (e: Exception) {
+            Result.failure(e.toApiError())
+        }
+    }
+
+/**
+ * Exécute une requête **construite dans** `Dispatchers.IO` : le corps JSON du direct
+ * (~28 Ko de base64) est assemblé hors du thread principal, qui doit rester libre pour
+ * la capture et le rendu.
+ */
+internal suspend fun OkHttpClient.executeBuilt(build: () -> Request): Result<HttpOutcome> =
+    ioResult { newCall(build()).execute().use { HttpOutcome(it.code, it.body?.string().orEmpty()) } }
+
+/** Exécute une requête déjà construite hors du thread principal. */
+internal suspend fun OkHttpClient.execute(request: Request): Result<HttpOutcome> =
+    executeBuilt { request }
+
+internal fun Throwable.toApiError(): ApiError = when (this) {
+    is ApiError -> this
+    is SocketTimeoutException -> ApiError.Timeout()
+    is InterruptedIOException -> ApiError.Timeout()
+    is IOException -> ApiError.Network(cause = this)
+    else -> ApiError.Network(message = message ?: "backend injoignable", cause = this)
+}
+
+/** 401/402/409/429 ont des messages dédiés, le reste tombe dans [ApiError.Http]. */
+internal fun httpError(code: Int, body: String): ApiError = when (code) {
+    401, 403 -> ApiError.InvalidKey(if (code == 403) "accès refusé (403)" else "clé invalide (401)")
+    402 -> ApiError.PaymentRequired()
+    // 409 du proxy LLM : la requête a été refusée pour une limite côté service (quota ou
+    // requête concurrente) — le corps brut ne dit pas laquelle, le message reste actionnable.
+    409 -> ApiError.RateLimited("limite atteinte côté IA (409) : réessaie dans un instant")
+    429 -> ApiError.RateLimited()
+    // Modal répond 404 « modal-http: invalid function call » quand l'app n'est pas déployée
+    // (arrêtée) : message actionnable, et surtout pas de nouvelle tentative.
+    404 -> if (body.contains("invalid function call", ignoreCase = true)) {
+        ApiError.BackendStopped()
+    } else {
+        ApiError.Http(code, body)
+    }
+
+    else -> ApiError.Http(code, body)
+}
+
+/**
+ * Comme [executeBuilt], mais conserve les octets bruts : le direct s'en sert pour parser
+ * sans `String` intermédiaire (les réponses portent les masques), le TTS pour le corps audio.
+ * Le corps n'est jamais converti en String sauf en cas d'erreur, où il sert de message.
+ *
+ * [marks] date les deux postes que le transport seul peut voir : en-têtes reçus, puis
+ * corps complet **avant** parsing — c'est ce qui sépare `descente` de `parse` dans la
+ * chronologie de l'écran. Passer `null` (le cas de `/health` et du TTS) ne date rien.
+ */
+internal suspend fun OkHttpClient.executeBytesBuilt(
+    marks: WireMarks? = null,
+    build: () -> Request,
+): Result<ByteArray> = ioResult {
+    newCall(build()).execute().use { response ->
+        marks?.onHeaders()
+        val bytes = response.body?.bytes() ?: ByteArray(0)
+        marks?.onBody()
+        if (response.code in 200..299) {
+            bytes
+        } else {
+            // Levée ApiError : reprise telle quelle par ioResult.
+            throw httpError(response.code, bytes.toString(Charsets.UTF_8))
+        }
+    }
+}
+
+internal suspend fun OkHttpClient.executeBytes(request: Request): Result<ByteArray> =
+    executeBytesBuilt { request }
+
+/** Vérifie un code 2xx, sinon renvoie l'erreur typée correspondante. */
+internal fun HttpOutcome.requireSuccess(): Result<String> =
+    if (code in 200..299) Result.success(body) else Result.failure(httpError(code, body))
+
+/** Enveloppe un bloc qui lève [ApiError] (ou autre) en `Result`. */
+internal inline fun <R> catchingResult(block: () -> R): Result<R> =
+    try {
+        Result.success(block())
+    } catch (c: CancellationException) {
+        throw c
+    } catch (e: ApiError) {
+        Result.failure(e)
+    } catch (e: Exception) {
+        Result.failure(ApiError.BadResponse(e.message ?: "réponse illisible"))
+    }
+
+
+/** Chaînon : garde l'erreur de gauche, enchaîne une opération qui renvoie déjà un Result. */
+internal inline fun <T, R> Result<T>.then(block: (T) -> Result<R>): Result<R> =
+    fold(onSuccess = { block(it) }, onFailure = { Result.failure(it) })

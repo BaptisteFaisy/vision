@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug uniquement : autorise un endpoint SAM 3.1 en http:// sur le poste de dev
+     (10.0.2.2 = l'hôte de l'émulateur) ou en local sur le téléphone.
+     Le build release garde le HTTPS obligatoire. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+
+</manifest>

@@ -1,0 +1,117 @@
+package dev.sam3vision.app.media
+
+import android.content.Context
+import dev.sam3vision.core.audio.Wav
+import dev.sam3vision.core.net.SpeechClient
+import dev.sam3vision.core.usecase.DictationUseCase
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+
+/**
+ * Le cache physique iSee : tout fichier lourd est écrit dans `context.cacheDir/ihear`
+ * — `user-<ts>.mp3` (micro maintenu), `reply-<ts>.mp3` (voix ElevenLabs), `env-<ts>.mp4`
+ * (vidéo d'environnement). Chaque écriture met à jour la ligne Room correspondante, si
+ * bien que la purge FIFO de [CacheCleanerManager] sait toujours quel(s) fichier(s)
+ * supprimer en premier.
+ */
+class MediaCacheStore internal constructor(
+    private val root: File,
+    private val dao: MessageMultimediaDao,
+    private val encoder: PcmToMp3Encoder = PcmToMp3Encoder(),
+) {
+
+    /** Chemin habituel en production : `cacheDir/ihear`. */
+    constructor(context: Context, dao: MessageMultimediaDao, encoder: PcmToMp3Encoder = PcmToMp3Encoder()) :
+        this(File(context.cacheDir, HEAR_DIR), dao, encoder)
+
+    /** Dossier racine du cache iSee. */
+    fun dir(): File = root
+
+    /** Transcription effectuée : crée la ligne message avec texte + audio utilisateur. */
+    suspend fun saveUserMessage(pcm: ByteArray, text: String): MessageMultimedia = withContext(Dispatchers.IO) {
+        val timestamp = now()
+        val audio = File(dir(), "user-$timestamp.mp3")
+        writeOrThrow(audio) { encoder.encode(pcm, it) }
+        val row = MessageMultimedia(
+            timestamp = timestamp,
+            texteUtilisateur = text.trim(),
+            cheminAudioUtilisateur = audio.path,
+        )
+        // L'identifiant auto-généré doit revenir avec la ligne : sans lui, la réponse
+        // IA et le MP3 s'écrivaient sur une ligne d'id 0 (mise à jour sans effet),
+        // donc aucune réponse visible ni prononcée.
+        row.copy(id = dao.insert(row))
+    }
+
+    /** Ligne congénitale pour un fichier vidéo sans échange (« plan d'environnement »). */
+    suspend fun saveEnvironmentVideo(video: File): MessageMultimedia = withContext(Dispatchers.IO) {
+        val row = MessageMultimedia(
+            timestamp = now(),
+            cheminVideoEnvironnement = video.path,
+        )
+        row.copy(id = dao.insert(row))
+    }
+
+    /** Texte brut transcrit, mais encodage MP3 en échec : l'échange reste consultable. */
+    suspend fun saveUserMessageWithoutAudio(text: String): MessageMultimedia = withContext(Dispatchers.IO) {
+        val row = MessageMultimedia(timestamp = now(), texteUtilisateur = text.trim())
+        row.copy(id = dao.insert(row))
+    }
+
+    /**
+     * Réponse IA : sauvegarde le MP3 ElevenLabs [bytes] en cache, l'attache à la ligne
+     * de l'utilisateur ([userRow]) et renvoie le fichier prêt à être lu.
+     */
+    suspend fun saveReplyAudio(userRow: MessageMultimedia, bytes: ByteArray) = withContext(Dispatchers.IO) {
+        val audio = File(dir(), "reply-${userRow.timestamp}.mp3")
+        writeOrThrow(audio) { it.writeBytes(bytes) }
+        dao.update(userRow.copy(texteIA = userRow.texteIA, cheminAudioElevenLabs = audio.path))
+    }
+
+    /** Enregistre le texte de la réponse IA sur la ligne utilisateur associée. */
+    suspend fun setAnswerText(userRow: MessageMultimedia, answer: String) = withContext(Dispatchers.IO) {
+        dao.update(userRow.copy(texteIA = answer.trim()))
+    }
+
+    /** Chemin du MP3 de la réponse, si déjà synthétisé et encore présent en cache. */
+    fun replyAudioFile(row: MessageMultimedia): File? =
+        row.cheminAudioElevenLabs?.let { File(it).takeIf { f -> f.isFile } }
+
+    /** Historique complet en mémoire (le cache Room peut avoir été purgé). */
+    suspend fun history(): List<MessageMultimedia> = dao.all()
+
+    suspend fun deleteMessage(row: MessageMultimedia) {
+        dao.deleteById(row.id)
+    }
+
+    /** Transcrit le PCM capté avec le client dictée courant (Meta, repli Scribe). */
+    suspend fun transcribe(client: SpeechClient, pcm: ByteArray): Result<String> =
+        DictationUseCase(client).invoke(Wav.pcm16(pcm))
+
+    /** Fichier vidéo nommé pour l'enregistrement à venir (CameraX écrit directement dedans). */
+    fun newVideoFile(): File = File(dir(), "env-${now()}.mp4")
+
+    /** Fichier JPEG du double-tap ; contexte visuel du prochain échange, jamais Room. */
+    fun newPhotoFile(): File = File(dir(), "snap-${now()}.jpg")
+
+    /** Crochets internes : mutex d'écriture pour éviter deux fichiers au même timestamp. */
+    private val writeMutex = Mutex()
+
+    private suspend fun writeOrThrow(file: File, write: (File) -> Unit) {
+        writeMutex.withLock {
+            withContext(Dispatchers.IO) {
+                file.parentFile?.mkdirs()
+                write(file)
+            }
+        }
+    }
+
+    private fun now(): Long = System.currentTimeMillis()
+
+    companion object {
+        private const val HEAR_DIR = "ihear"
+    }
+}

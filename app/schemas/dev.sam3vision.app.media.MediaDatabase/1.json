@@ -1,0 +1,62 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "6cd3dcb73ea2f0a6ec4004e6482bd9f8",
+    "entities": [
+      {
+        "tableName": "message_multimedia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `texteUtilisateur` TEXT, `texteIA` TEXT, `cheminAudioUtilisateur` TEXT, `cheminAudioElevenLabs` TEXT, `cheminVideoEnvironnement` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "texteUtilisateur",
+            "columnName": "texteUtilisateur",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "texteIA",
+            "columnName": "texteIA",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminAudioUtilisateur",
+            "columnName": "cheminAudioUtilisateur",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminAudioElevenLabs",
+            "columnName": "cheminAudioElevenLabs",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminVideoEnvironnement",
+            "columnName": "cheminVideoEnvironnement",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6cd3dcb73ea2f0a6ec4004e6482bd9f8')"
+    ]
+  }
+}
