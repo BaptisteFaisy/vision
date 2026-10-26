@@ -93,3 +93,4 @@ groupe qui met la PR à jour.
 - Aucun secret de dépôt n'est exigé : les clés du build sont facultatives (section 2).
 - Aucun outil de file externe : la fusion est le fait d'un humain (ou de l'API), après des checks
   verts.
+Test de la file de merge native : note de cadrage.
