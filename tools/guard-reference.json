@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "gele": {
+    "le": "2026-10-26T20:48:17+01:00",
+    "commit": "790ce7f",
+    "arbre": "BaptisteFaisy/vision"
+  },
+  "limites-500/50": {
+    "kotlin": 368,
+    "python": 8,
+    "toleres": []
+  },
+  "tests-jvm": {
+    "plancher": {
+      "app": 308,
+      "core": 633,
+      "glasses-spike": 56
+    },
+    "execute": {},
+    "note": "plancher = annotations @Test de <module>/src/test, comptées sans compiler ; `execute` se remplit au premier passage avec XML JUnit."
+  },
+  "tests-backend": {
+    "bancs": [
+      {
+        "nom": "unittest-limites",
+        "cmd": [
+          "python3",
+          "-m",
+          "unittest",
+          "tools/test_check_kotlin_limits.py"
+        ],
+        "tests_min": 28
+      },
+      {
+        "nom": "ci-budget",
+        "cmd": [
+          "python3",
+          ".github/ci-budget/check_timeouts.py"
+        ],
+        "tests_min": 0
+      }
+    ],
+    "fichiers_py_min": 8
+  },
+  "banc-cadence": {
+    "paliers": [
+      {
+        "latence_ms": 41.0,
+        "nouveau_ips_min": 10.0
+      },
+      {
+        "latence_ms": 422.0,
+        "nouveau_ips_min": 2.3
+      }
+    ],
+    "tolerance": {
+      "ips": 0.05,
+      "ms": 0.2
+    },
+    "mesures": [],
+    "note": "table relue dans le system-out JUnit du banc de cadence ; vide tant que ce banc n'existe pas ici."
+  }
+}
