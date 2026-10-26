@@ -161,9 +161,12 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
   route n'est vérifiable depuis ce dépôt. `TapConfig.ON_DEVICE_INFERENCE = false`
   (`app/tap/TapConfig.kt:48`) : sans endpoint saisi, rien ne part
   (`TapConfig.sendConfigured`, `:83`).
-- **`TrackClient`/`HttpTrackClient`, `TrackRunner` et `core/predict/*`** (suivi local entre deux
-  frames serveur) sont écrits dans `:core`, **aucun écran de `:app` ne les appelle** (mesuré :
-  zéro occurrence de `TrackClient`/`TrackRunner`/`predict.` sous `app/src/main`).
+- **`TrackClient`/`HttpTrackClient` et `TrackRunner`** (suivi local entre deux frames serveur)
+  sont écrits dans `:core`, **aucun écran de `:app` ne les appelle** (mesuré : zéro occurrence de
+  `TrackClient`/`TrackRunner` sous `app/src/main`). **`core/predict/*` n'est plus dans ce cas** :
+  le Direct l'appelle depuis `app/…/live/LivePrediction.kt`, **derrière le flag
+  `Settings.boxPredictionEnabled`, éteint par défaut** — le branchement (T8) n'est allumé
+  qu'après la mesure de la latence perçue. Flag éteint, le direct est celui d'avant.
 - Deux commentaires de code sont périmés depuis le passage en WS : `HttpLiveClient.kt:30`
   (cite `docs/LIVE-SPEC.md`, absent du dépôt) et le KDoc « huit concepts » de
   `LivePrompts.kt:9-19`.
