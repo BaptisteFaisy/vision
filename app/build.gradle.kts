@@ -180,7 +180,8 @@ dependencies {
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     implementation(libs.mwdat.inputs)
-    implementation(libs.mwdat.mockdevice)
+    // Mock Device Kit (lunettes simulées) : build debug seulement, hors de l'APK public.
+    debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)

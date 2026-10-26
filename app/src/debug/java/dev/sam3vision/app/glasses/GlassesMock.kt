@@ -19,15 +19,15 @@ import java.io.FileOutputStream
 /**
  * Lunettes simulées (Mock Device Kit) : démo complète sans matériel, et filet de
  * sécurité le jour J si l'appairage ou la mise à jour firmware coince.
+ *
+ * Vit dans `app/src/debug/` : la bibliothèque `mwdat-mockdevice` est en
+ * `debugImplementation` (`app/build.gradle.kts`) et n'est donc pas dans l'APK public.
  */
-internal class GlassesMock(private val context: Context) {
+internal class GlassesMock(private val context: Context) : GlassesMockDevice {
 
     private var glasses: MockGlasses? = null
 
-    var active: Boolean = false
-        private set
-
-    fun start(): Boolean {
+    override fun start(): Boolean {
         val kit = MockDeviceKit.getInstance(context)
         if (!kit.isEnabled) {
             kit.enable(MockDeviceKitConfig(initiallyRegistered = true, initialPermissionsGranted = true))
@@ -36,22 +36,20 @@ internal class GlassesMock(private val context: Context) {
         val paired = kit.pairGlasses(GlassesModel.RAYBAN_META).getOrNull() ?: return false
         feedScene(paired)
         glasses = paired
-        active = true
         return true
     }
 
     /** Injecte un appui sur le bouton capture, comme le ferait un vrai porteur. */
-    fun press(type: CapturePressType = CapturePressType.SHORT_PRESS): Boolean {
+    override fun press(type: CapturePressType): Boolean {
         val device = glasses ?: return false
         device.services.input.capture(type)
         return true
     }
 
-    fun stop() {
+    override fun stop() {
         val device = glasses ?: return
         MockDeviceKit.getInstance(context).unpairDevice(device)
         glasses = null
-        active = false
     }
 
     /** Scène synthétique : des formes franches, la segmentation a de quoi travailler. */

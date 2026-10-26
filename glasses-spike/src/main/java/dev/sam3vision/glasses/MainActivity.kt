@@ -35,7 +35,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Spike « voix seule » : les lunettes (ou le mock) filment, SAM segmente, le LLM
@@ -44,6 +43,9 @@ import kotlinx.coroutines.withContext
  *
  * Le pipeline réseau vient de `:core` (aucun appel HTTP réécrit ici) et le
  * transport DAT de `GlassesSession` / `GlassesFrameEncoder`.
+ *
+ * Lancement sans tap possible : `am start … --ez mock true [--ez analyze true]`
+ * (décision et ordre dans [SpikeLaunch], prouvés sur JVM).
  */
 class MainActivity : ComponentActivity() {
 
@@ -58,6 +60,14 @@ class MainActivity : ComponentActivity() {
     private var lastFrame: JpegFrame? = null
 
     private val analyze: AnalyzeUseCase by lazy { buildPipeline() }
+
+    /**
+     * Maillon « frame → analyse → voix », sorti de l'activité pour être éprouvé sur JVM
+     * (voir `ChaineCompleteTest`) : ici on ne fait que le câblage réel.
+     */
+    private val analysisStep: GlassesAnalysisStep by lazy {
+        GlassesAnalysisStep(analyze = { analyze.invoke(it) }, say = { voice.say(it) })
+    }
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -104,11 +114,20 @@ class MainActivity : ComponentActivity() {
     /** Démarre le mode demandé par extra ; sans extra, l'écran attend un doigt. */
     private fun handleAutoStart(intent: Intent?) {
         when {
-            intent?.getBooleanExtra(EXTRA_AUTO_MOCK, false) == true ->
-                window.decorView.post { startWithMock() }
+            intent?.getBooleanExtra(EXTRA_MOCK, false) == true -> {
+                val launch = SpikeLaunch.fromExtras(
+                    mock = true,
+                    analyze = intent.getBooleanExtra(EXTRA_ANALYZE, false),
+                )
+                window.decorView.post { applyLaunchPlan(launch) }
+            }
 
             intent?.getBooleanExtra(EXTRA_AUTO_REAL, false) == true ->
-                window.decorView.post { startWithGlasses() }
+                window.decorView.post {
+                    // Armé avant la session : la première frame part à SAM puis au LLM.
+                    if (intent.getBooleanExtra(EXTRA_ANALYZE, false)) armAnalysis()
+                    startWithGlasses()
+                }
         }
     }
 
@@ -122,11 +141,7 @@ class MainActivity : ComponentActivity() {
     // --- démarrage -----------------------------------------------------------
 
     /** Mode sans lunettes : appareil simulé + caméra du téléphone comme flux. */
-    private fun startWithMock() {
-        log("mode mock : caméra du téléphone en guise de lunettes")
-        MockControl.start(this, ::log)
-        launchSession()
-    }
+    private fun startWithMock() = applyLaunchPlan(SpikeLaunch.Options(mock = true))
 
     /**
      * Mode réel : lunettes appairées à l'app Meta AI, Developer Mode activé.
@@ -152,6 +167,34 @@ class MainActivity : ComponentActivity() {
         scope.launch { logRealStart(::log) }
     }
 
+    /** Exécute le plan de lancement dans l'ordre décidé par [SpikeLaunch.plan]. */
+    private fun applyLaunchPlan(options: SpikeLaunch.Options) {
+        SpikeLaunch.plan(options).forEach(::applyLaunchStep)
+    }
+
+    private fun applyLaunchStep(step: LaunchStep) {
+        when (step) {
+            LaunchStep.ARM_ANALYZE -> armAnalysis()
+            LaunchStep.ENABLE_MOCK -> enableMock()
+            // MockControl.start apparie ET alimente le flux caméra : les deux étapes
+            // du plan tombent sur le même appel, une seule fois.
+            LaunchStep.PHONE_CAMERA_FEED -> Unit
+            LaunchStep.START_SESSION -> launchSession()
+        }
+    }
+
+    /** Autorise l'envoi réseau avant toute session : la première frame part à SAM/LLM. */
+    private fun armAnalysis() {
+        analyzeFrames = true
+        log(ANALYZE_ARMED_MESSAGE)
+    }
+
+    /** Active le mock (apparié un appareil simulé), sans ouvrir de session. */
+    private fun enableMock() {
+        log("mode mock : caméra du téléphone en guise de lunettes")
+        MockControl.start(this, ::log)
+    }
+
     private fun launchSession() {
         if (running) return
         running = true
@@ -162,7 +205,7 @@ class MainActivity : ComponentActivity() {
     /** Bascule l'envoi réseau : par défaut le spike ne fait que prouver la réception. */
     private fun analyzeLastFrame() {
         analyzeFrames = !analyzeFrames
-        log(if (analyzeFrames) "analyse réseau ACTIVÉE (1 frame / 1,5 s)" else "analyse réseau coupée")
+        log(if (analyzeFrames) ANALYZE_ARMED_MESSAGE else "analyse réseau coupée")
         if (analyzeFrames) {
             val frame = lastFrame
             if (frame != null) scope.launch { onFrame(frame) } else log("aucune frame reçue pour l'instant")
@@ -182,19 +225,14 @@ class MainActivity : ComponentActivity() {
     /** Une frame → SAM/LLM → voix. Un seul appel réseau par frame, aucune exception qui remonte. */
     private suspend fun onFrame(frame: JpegFrame) {
         lastFrame = frame
-        val ko = frame.base64.length
-        log("frame ${frame.width}x${frame.height} — ${ko / 1024} Ko base64")
-        if (!analyzeFrames) return
-        val outcome = withContext(Dispatchers.IO) { analyze.invoke(frame.base64) }
-        val analysis = outcome.getOrNull()
-        if (analysis == null || analysis.description.isBlank()) {
-            val why = outcome.exceptionOrNull()?.message ?: "description vide"
-            log("analyse échouée : $why")
+        if (!analyzeFrames) {
+            log("frame ${frame.width}x${frame.height} — ${frame.base64.length / 1024} Ko base64")
             return
         }
-        log("objets : ${analysis.objects.map { it.label }.distinct().take(6)}")
-        heard = analysis.description
-        voice.say(analysis.description)?.let { log("voix : $it") }
+        when (val sortie = analysisStep.onFrame(frame, ::log)) {
+            is FrameOutcome.Dit -> heard = sortie.description
+            is FrameOutcome.Muet -> Unit
+        }
     }
 
     private fun buildPipeline(): AnalyzeUseCase {
@@ -238,7 +276,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val TAG = "GlassesSpike"
-        const val EXTRA_AUTO_MOCK = "mock"
+        // `mock` et `analyze` sont déclarés dans SpikeLaunch.kt (avec la décision).
         const val EXTRA_AUTO_REAL = "real"
     }
 }
