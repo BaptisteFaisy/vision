@@ -89,6 +89,7 @@ fun LiveScreen(
         onVoiceStart = viewModel::startVoice,
         onVoiceStop = viewModel::stopVoice,
         onToggleSam = viewModel::toggleSam,
+        onToggleTracker = viewModel::toggleTracker,
     )
 }
 
@@ -155,6 +156,7 @@ private fun LiveStage(
     onVoiceStart: () -> Unit,
     onVoiceStop: () -> Unit,
     onToggleSam: () -> Unit,
+    onToggleTracker: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
         LiveCameraStage(state, previewView, onRecover)
@@ -167,6 +169,7 @@ private fun LiveStage(
             onBack = onBack,
             onOpenSettings = onOpenSettings,
             onToggleSam = onToggleSam,
+            onToggleTracker = onToggleTracker,
             modifier = Modifier.align(Alignment.TopCenter),
         )
         LiveFooter(

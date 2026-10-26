@@ -84,6 +84,9 @@ Comment ça marche, concrètement :
    nom du ref (section 3) ;
 4. le groupe est rebasé sur `master`, les checks repassent, la PR fusionne.
 
+Tant que la règle « Require merge queue » n'est pas ajoutée au ruleset, l'étape 3 n'existe pas :
+l'auto-merge fusionne directement dès que les trois checks requis sont verts (vérifié sur deux PR).
+
 Une branche en retard sur `master` reste verte : `stale-base-guard` avertit, c'est le rebase du
 groupe qui met la PR à jour.
 
@@ -91,6 +94,5 @@ groupe qui met la PR à jour.
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
 - Aucun secret de dépôt n'est exigé : les clés du build sont facultatives (section 2).
-- Aucun outil de file externe : la fusion est le fait d'un humain (ou de l'API), après des checks
-  verts.
-Test de la file de merge native : note de cadrage.
+- Aucun outil de file externe : l'auto-merge du dépôt est activé, la PR fusionne donc dès que les
+  checks requis sont verts.

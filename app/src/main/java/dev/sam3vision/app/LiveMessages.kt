@@ -23,6 +23,12 @@ const val TRANSPORT_WS: String = "WebSocket"
 /** Socket tombé : plus aucun transport (le POST a été retiré), à signaler franchement. */
 const val TRANSPORT_WS_KO: String = "WebSocket KO"
 
+/**
+ * Direct sur le **tracker** (`/session` + `/frame`) : les ids d'objets sont stables d'une
+ * frame à l'autre, une frame en vol dans un `FrameGate`.
+ */
+const val TRANSPORT_TRACK: String = "Tracker"
+
 /** Aucune clé LLM : rien ne peut fonctionner, ni la vision ni les questions. */
 const val LLM_ABSENT_LINE = "Clé LLM absente — renseigne-la dans Réglages"
 

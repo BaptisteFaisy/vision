@@ -56,18 +56,21 @@ data class Cadence(
  *
  * [stats] porte la latence bout-en-bout (celle qui cadence la capture),
  * [serverStats] la durée serveur `elapsed_ms` annoncée par `/live`.
+ *
+ * C'est l'implémentation **par défaut** de [FramePipeline] ; le tracker
+ * ([TrackRunner], `/session` + `/frame`) est l'autre.
  */
 class LiveSession(
     private val client: LiveClient,
     gate: FrameGate? = null,
-    val stats: LiveStats = LiveStats(),
+    override val stats: LiveStats = LiveStats(),
     val serverStats: LiveStats = LiveStats(),
     val prompts: List<String> = LivePrompts.Default,
     private val workEdge: Int = DEFAULT_WORK_EDGE,
     private val maxObjects: Int = DEFAULT_MAX_OBJECTS,
     private val cadence: Cadence = Cadence.Direct,
     private val clock: () -> Long = System::currentTimeMillis,
-) {
+) : FramePipeline {
     /** Créneaux d'envoi : 1 par défaut, [Cadence.concurrency] pour la cadence rapide. */
     private val gate: FrameGate = gate ?: FrameGate(cadence.concurrency)
 
@@ -79,7 +82,7 @@ class LiveSession(
     private val normalizedPrompts: List<String> by lazy { LivePrompts.normalize(prompts) }
 
     /** Une frame est-elle en train d'être traitée ? */
-    val inFlight: Boolean get() = gate.inFlight
+    override val inFlight: Boolean get() = gate.inFlight
 
     /** Tous les créneaux sont-ils pris ? (la frame suivante serait jetée) */
     val saturated: Boolean get() = gate.freeSlots == 0
@@ -112,10 +115,10 @@ class LiveSession(
     }
 
     /** Époque de la séance : elle change à chaque [reset] (arrêt, nouvelle séance). */
-    val generation: Long get() = gate.generation
+    override val generation: Long get() = gate.generation
 
     /** Vrai si une frame admise sous l'époque [era] est encore d'actualité. */
-    fun isCurrent(era: Long): Boolean = gate.isCurrent(era)
+    override fun isCurrent(era: Long): Boolean = gate.isCurrent(era)
 
     /**
      * Traite une frame si le créneau est libre, sinon renvoie `null` immédiatement.
@@ -146,7 +149,7 @@ class LiveSession(
      * Intervalle de capture conseillé d'après la latence moyenne :
      * > [Cadence.slowMs] → on ralentit, < [Cadence.fastMs] → plancher, sinon la cible.
      */
-    fun intervalMsAdaptive(): Long = when {
+    override fun intervalMsAdaptive(): Long = when {
         stats.averageMs > cadence.slowMs -> cadence.slowMs
         stats.averageMs < cadence.fastMs -> cadence.fastMs
         else -> cadence.targetMs
@@ -171,7 +174,7 @@ class LiveSession(
      * [runFrame]) et les mesures de la séance sont oubliées. Le créneau rendu est celui
      * de l'époque close, il n'est jamais volé à la séance suivante.
      */
-    fun reset() {
+    override fun reset() {
         gate.invalidate()
         stats.reset()
         serverStats.reset()

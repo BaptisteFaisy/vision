@@ -63,6 +63,11 @@ data class LiveUiState(
     val error: String? = null,
     /** Détecteur SAM actif : `false` = vision LLM seule (l'image part directement au LLM). */
     val samEnabled: Boolean = false,
+    /**
+     * Direct piloté par le **tracker** (`/session` + `/frame`) au lieu de `/live` :
+     * les ids d'objets sont stables d'une frame à l'autre. `false` = transport `/live`.
+     */
+    val trackerEnabled: Boolean = false,
     val prompts: List<String> = emptyList(),
     val memory: LiveMemoryState = LiveMemoryState(),
     val distanceLayer: DistanceLayer? = null,
