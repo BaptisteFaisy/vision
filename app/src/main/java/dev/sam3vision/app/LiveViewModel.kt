@@ -20,7 +20,7 @@ import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.ScreenTimings
-import dev.sam3vision.core.mask.colorizedMaskBitmap
+import dev.sam3vision.core.mask.colorizedObjectBitmap
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.LiveClient
@@ -81,9 +81,15 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Une frame en vol maximum, cadence adaptative de la session. */
     private val cadence = LiveFrameCadence()
 
-    /** Masques coloriés hors thread principal ; le poste `overlays` est posé au retour. */
+    /**
+     * Masques coloriés hors thread principal ; le poste `overlays` est posé au retour.
+     * Le décodage se fait **par objet** ([colorizedObjectBitmap]) : `rle` et `poly` arrivent
+     * sur la grille réduite annoncée par `mask_scale` et sont agrandis avant coloriage.
+     */
     private val masks: LiveMaskDecoder<Bitmap> = LiveMaskDecoder(
-        paint = MaskPainter { mask, encoding, argb, alpha -> colorizedMaskBitmap(mask, encoding, argb, alpha) },
+        paint = MaskPainter { obj, frameWidth, frameHeight, argb, alpha ->
+            colorizedObjectBitmap(obj, frameWidth, frameHeight, argb, alpha)
+        },
         colorAt = { maskColorAt(it).toArgb() },
         alpha = MASK_ALPHA,
         onDecoded = { chronology.markOverlays() },
@@ -158,7 +164,12 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // WebSocket uniquement : plus aucun POST /live pour les frames, et **aucun
         // /health** : la première frame réveille le conteneur (Modal met la requête en
         // file pendant le démarrage, mesuré 8-35 s).
-        val live = liveClient(base, marks = chronology)
+        val live = liveClient(
+            base,
+            marks = chronology,
+            maskFormat = LiveMaskTransport.MASK_FORMAT,
+            maskEdge = LiveMaskTransport.MASK_EDGE,
+        )
         client = live
         session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
         _state.update {

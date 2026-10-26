@@ -4,15 +4,18 @@ import android.graphics.Bitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.SegObject
 
 /**
- * Dessin d'un masque (base64 + encodage) : colorié si le masque est lisible, `null` si le
- * backend n'en envoie pas (`"none"`) ou si le corps est corrompu — l'écran dessine alors
- * la boîte seule. C'est le point d'injection des tests : décoder un vrai PNG demande
- * [Bitmap], absent d'une JVM nue.
+ * Dessin du masque **d'un objet** de la frame (colorisé si le masque est lisible, `null` si
+ * le backend n'en envoie pas — `"none"` — ou si le corps est corrompu : l'écran dessine
+ * alors la boîte seule). L'objet porte son encodage, son `mask_scale` et ses anneaux
+ * `poly` ; [frameWidth]/[frameHeight] donnent la taille de la frame en cours.
+ * C'est le point d'injection des tests : décoder un vrai PNG demande [Bitmap], absent d'une
+ * JVM nue.
  */
 fun interface MaskPainter<T> {
-    fun paint(maskB64: String, encoding: String, argb: Int, alpha: Int): T?
+    fun paint(obj: SegObject, frameWidth: Int, frameHeight: Int, argb: Int, alpha: Int): T?
 }
 
 /**
@@ -35,7 +38,7 @@ class LiveMaskDecoder<T>(
     /** Overlays de la frame, dans l'ordre des objets ; les masques illisibles sont omis. */
     suspend fun decode(frame: LiveFrame): List<T> = withContext(Dispatchers.Default) {
         val drawn = frame.objects.mapIndexedNotNull { index, obj ->
-            paint.paint(obj.maskPngB64, frame.maskEncoding, colorAt(index), alpha)
+            paint.paint(obj, frame.width, frame.height, colorAt(index), alpha)
         }
         onDecoded()
         drawn
