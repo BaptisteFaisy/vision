@@ -6,7 +6,13 @@ importable (for tests and tooling) without the heavy GPU stack installed.
 
 from __future__ import annotations
 
-from imaging import encode_mask_png_b64, resize_max_edge, scale_factors
+from imaging import (
+    DEFAULT_MASK_ENCODING,
+    check_mask_encoding,
+    encode_mask_b64,
+    resize_max_edge,
+    scale_factors,
+)
 
 MODEL_ID = "unsloth/sam3.1"
 # Generic, broad concept list used when /segment gets prompts == null.
@@ -89,13 +95,19 @@ class PromptError(ValueError):
 
 
 def model_concept(prompt: str) -> str:
-    """English concept handed to the model; unknown prompts are passed through."""
+    """Concept anglais remis au modèle.
+
+    Les alias FR/EN sont traduits ; un prompt inconnu est remis **normalisé** (minuscules,
+    articles retirés, espaces pliés) au lieu d'être recopié tel quel : c'est aussi la clé
+    de dédoublonnage de ``normalize_prompts``, donc « chaise », « Chair » et « une chaise »
+    ne peuvent plus désigner deux concepts différents pour le serveur.
+    """
     key = prompt.strip().lower()
     for article in _ARTICLES:
         if key.startswith(article):
             key = key[len(article) :].strip()
             break
-    return CONCEPT_ALIASES.get(key, prompt)
+    return CONCEPT_ALIASES.get(key, key)
 
 
 def _torch():
@@ -122,16 +134,26 @@ def load_model(model_id: str = MODEL_ID):
 
 
 def normalize_prompts(prompts) -> list[str]:
-    """Validate client prompts, trimming blanks and removing duplicates."""
+    """Validate client prompts, trimming blanks and removing duplicates.
+
+    Le dédoublonnage se fait sur le concept **modèle** (après ``CONCEPT_ALIASES``) et plus
+    sur le texte brut : sinon « chaise » et « chair » passent tous les deux et coûtent deux
+    passes DETR pour le même concept anglais (mesuré : +14 ms serveur, +5 masques encodés
+    pour rien, +4,5 Ko de réponse). Le label renvoyé reste celui du **premier** prompt saisi.
+    """
     cleaned: list[str] = []
+    seen: set[str] = set()
     for raw in prompts or []:
         text = " ".join(str(raw).split())
         if not text:
             continue
         if len(text) > MAX_PROMPT_CHARS:
             raise PromptError(f"prompt too long (max {MAX_PROMPT_CHARS} chars): {text[:32]}...")
-        if text not in cleaned:
-            cleaned.append(text)
+        key = model_concept(text)
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
     if not cleaned:
         raise PromptError("prompts must contain at least one non-empty concept")
     if len(cleaned) > MAX_PROMPTS:
@@ -151,7 +173,72 @@ def _clamp_box(box, scale_x: float, scale_y: float, size: tuple[int, int]) -> li
     ]
 
 
-def _run_prompt(model, processor, device, vision, prompt: str, work_size, image_size) -> list[dict]:
+def _top_indices(scores, keep: int) -> list[int]:
+    """Indices des ``keep`` meilleurs scores, ordre stable (à égalité, ordre de détection).
+
+    Borer un concept à ``keep`` objets (``keep`` ≥ ``max_objects``) ne retire que des objets
+    qui **ne peuvent pas** entrer dans le top global : ``keep`` objets du même concept les
+    précèdent dans le tri stable, donc ils passeraient aussi avant eux. La sélection finale
+    est identique à « tout garder, trier, tronquer » — sans encoder les masques jetés.
+    """
+    if keep <= 0:
+        return []
+    return sorted(range(len(scores)), key=lambda index: -float(scores[index]))[:keep]
+
+
+def detection_entries(detection, label: str, work_size, image_size,
+                      keep: int = MAX_OBJECTS) -> list[dict]:
+    """Une détection SAM3 -> objets du contrat, **masque non encodé** (tableau brut).
+
+    L'encodage (1,015 ms par masque en PNG) est le poste le plus cher du CPU serveur et il
+    était payé pour **chaque** détection, y compris celles jetées par ``max_objects`` : il
+    est donc reporté après le tri global, dans :func:`finalize`. Le ``label`` reste le prompt
+    tel que saisi (pas le concept anglais) — contrat historique.
+    """
+    scale_x, scale_y = scale_factors(work_size, image_size)
+    boxes = detection["boxes"].float().cpu().numpy()
+    scores = detection["scores"].float().cpu().numpy()
+    masks = detection["masks"].cpu().numpy()
+    return [
+        {
+            "label": label,
+            "score": round(float(scores[index]), 4),
+            "box": _clamp_box(boxes[index], scale_x, scale_y, image_size),
+            "mask": masks[index],
+        }
+        for index in _top_indices(scores, keep)
+    ]
+
+
+def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
+             mask_encoding: str = DEFAULT_MASK_ENCODING) -> dict:
+    """Tri global, troncature, puis encodage des **seuls** objets renvoyés.
+
+    Renvoie la charge utile du contrat (``width``/``height``/``objects``) augmentée de
+    ``mask_encoding`` : la représentation **appliquée** (jamais absente), pour qu'un client
+    sache décoder ``mask_b64`` sans deviner. Point d'entrée partagé par ``/segment``
+    (``segment_image``) et ``/live`` (``fast_core``) — un seul chemin d'encodage.
+    """
+    encoding = check_mask_encoding(mask_encoding)
+    ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
+    return {
+        "width": image_size[0],
+        "height": image_size[1],
+        "mask_encoding": encoding,
+        "objects": [
+            {
+                "label": item["label"],
+                "score": item["score"],
+                "box": item["box"],
+                "mask_b64": encode_mask_b64(item["mask"], image_size, encoding),
+            }
+            for item in ordered[:max_objects]
+        ],
+    }
+
+
+def _run_prompt(model, processor, device, vision, prompt: str, work_size, image_size,
+                keep: int = MAX_OBJECTS) -> list[dict]:
     """Run one text prompt against pre-computed vision embeddings."""
     torch = _torch()
     text_inputs = {
@@ -166,27 +253,18 @@ def _run_prompt(model, processor, device, vision, prompt: str, work_size, image_
             mask_threshold=MASK_THRESHOLD,
             target_sizes=[(work_size[1], work_size[0])],
         )[0]
-    scale_x, scale_y = scale_factors(work_size, image_size)
-    boxes = detection["boxes"].float().cpu().numpy()
-    scores = detection["scores"].float().cpu().numpy()
-    masks = detection["masks"].cpu().numpy()
-    return [
-        {
-            "label": prompt,
-            "score": round(float(score), 4),
-            "box": _clamp_box(box, scale_x, scale_y, image_size),
-            "mask_b64": encode_mask_png_b64(mask, image_size),
-        }
-        for mask, box, score in zip(masks, boxes, scores)
-    ]
+    return detection_entries(detection, prompt, work_size, image_size, keep)
 
 
 def segment_image(model, processor, device, dtype, image, prompts: list[str],
-                  work_edge: int = SEG_MAX_EDGE, max_objects: int = MAX_OBJECTS) -> dict:
+                  work_edge: int = SEG_MAX_EDGE, max_objects: int = MAX_OBJECTS,
+                  mask_encoding: str = DEFAULT_MASK_ENCODING) -> dict:
     """Segment ``image`` for every prompt and build the SPEC-shaped payload.
 
     ``work_edge`` caps the resolution handed to the encoder (the live route trades
-    it for latency), ``max_objects`` caps the score-sorted slice.
+    it for latency), ``max_objects`` caps the score-sorted slice, ``mask_encoding``
+    choisit la représentation des masques (``png`` par défaut — le contrat historique
+    des APK installés — ``bits`` sur demande, ``none`` pour ne renvoyer que les boîtes).
     """
     torch = _torch()
     image_size = image.size
@@ -196,16 +274,24 @@ def segment_image(model, processor, device, dtype, image, prompts: list[str],
         vision = model.vision_encoder(pixel_values.to(device=device, dtype=dtype))
     objects: list[dict] = []
     for prompt in prompts:
-        objects.extend(_run_prompt(model, processor, device, vision, prompt, work.size, image_size))
-    objects.sort(key=lambda item: item["score"], reverse=True)
-    return {"width": image_size[0], "height": image_size[1], "objects": objects[:max_objects]}
+        objects.extend(_run_prompt(model, processor, device, vision, prompt, work.size,
+                                   image_size, keep=max_objects))
+    return finalize(objects, image_size, max_objects, mask_encoding)
 
 
-def run_segmentation(model, processor, device, dtype, image, prompts=None) -> dict:
-    """Server-side concept choice (defaults + generic fallback) when prompts is None."""
+def run_segmentation(model, processor, device, dtype, image, prompts=None,
+                     mask_encoding: str = DEFAULT_MASK_ENCODING) -> dict:
+    """Server-side concept choice (defaults + generic fallback) when prompts is None.
+
+    Le défaut reste ``png`` ici : ``/segment`` et ``/analyze`` servent le contrat historique
+    (docs/SPEC.md) ; c'est ``/live`` qui négocie ``bits`` avec le client moderne.
+    """
     if prompts is not None:
-        return segment_image(model, processor, device, dtype, image, normalize_prompts(prompts))
-    result = segment_image(model, processor, device, dtype, image, list(DEFAULT_PROMPTS))
+        return segment_image(model, processor, device, dtype, image, normalize_prompts(prompts),
+                             mask_encoding=mask_encoding)
+    result = segment_image(model, processor, device, dtype, image, list(DEFAULT_PROMPTS),
+                           mask_encoding=mask_encoding)
     if result["objects"]:
         return result
-    return segment_image(model, processor, device, dtype, image, list(FALLBACK_PROMPTS))
+    return segment_image(model, processor, device, dtype, image, list(FALLBACK_PROMPTS),
+                         mask_encoding=mask_encoding)
