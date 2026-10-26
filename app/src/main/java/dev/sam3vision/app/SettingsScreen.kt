@@ -68,6 +68,7 @@ fun SettingsScreen(
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
             DistanceSettings(draft) { draft = it }
+            PredictionSettings(draft) { draft = it }
             TtsSettings(
                 draft = draft,
                 speaking = speaking,
@@ -194,6 +195,35 @@ private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {
         Text(
             "Le Direct décrit à voix haute la position des objets détectés ; " +
                 "l'accueil classique garde la photo, les masques SAM et le chat par image.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+/**
+ * Section « Direct » : la **prédiction locale des boîtes** (T8), éteinte par défaut.
+ *
+ * Le branchement existe, mais il n'est allumé qu'après la mesure de la latence
+ * perçue : une boîte qui bouge peut être pire qu'une boîte qui saute. Tant que la
+ * mesure n'a pas rendu son verdict, le direct reste celui d'avant (masques serveur).
+ */
+@Composable
+private fun PredictionSettings(draft: Settings, onChange: (Settings) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Direct — prédiction des boîtes (T8)",
+            color = AppColors.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        SwitchRow(
+            "Boîtes prédites entre deux inférences (expérimental, non mesuré)",
+            draft.boxPredictionEnabled,
+        ) { onChange(draft.copy(boxPredictionEnabled = it)) }
+        Text(
+            "Éteint par défaut : c'est la mesure de la latence perçue qui décide, " +
+                "pas l'inverse. La distance affichée n'est jamais prédite.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )

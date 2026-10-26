@@ -52,6 +52,21 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le flag de prediction des boites est eteint par defaut et survit a un aller-retour`() {
+        // Off par défaut : le branchement de la prédiction (T8) attend une mesure.
+        assertEquals(false, Settings.Default.boxPredictionEnabled)
+        assertEquals(false, SettingsCodec.decode("").boxPredictionEnabled)
+
+        val on = Settings.Default.copy(boxPredictionEnabled = true)
+        assertEquals(true, SettingsCodec.decode(SettingsCodec.encode(on)).boxPredictionEnabled)
+
+        // Un fichier écrit avant le flag : éteint, jamais de prédiction héritée.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("boxPredictionEnabled=") }
+        assertEquals(false, SettingsCodec.decode(legacy.joinToString("\n")).boxPredictionEnabled)
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)

@@ -11,6 +11,7 @@ import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.app.live.LiveMaskDecoder
 import dev.sam3vision.app.live.LiveNarration
+import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveWakeGuard
 import dev.sam3vision.app.live.MaskPainter
@@ -84,6 +85,13 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Distances caméra→objets : sténopé + hauteurs connues, lissées par piste. */
     private val distances = DistanceMeter()
+
+    /**
+     * Prédiction locale des boîtes (T8) : remplacée à chaque démarrage, car c'est le
+     * réglage [Settings.boxPredictionEnabled] — **éteint par défaut** — qui décide.
+     * Éteinte, la classe ci-dessus n'entre dans aucun chemin : le direct est celui d'avant.
+     */
+    private var prediction = LivePrediction(enabled = false)
     private var sensorLens: LensSpec? = null
 
     private var settings: Settings = Settings.Default
@@ -223,6 +231,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         asker.reset()
         distances.enabled = settings.distanceOverlayEnabled
         distances.reset()
+        prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
         distances.setLens(chosenLens())
         wake.reset()
         cadence.reset()
@@ -276,6 +285,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (jpegB64.isBlank()) return
         narration.narrate(jpegB64)
+        publishPrediction()
         val active = pipeline
         if (active == null) {
             keepFrame(jpegB64)
@@ -372,10 +382,14 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         }
         val detections = frame.objects.toDetections(width, height)
         val seen = timeline.record(now, detections)
+        // Réponse serveur absorbée par la prédiction : elle sert d'ancre aux boîtes
+        // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
+        prediction.absorb(frame, now, width, height)
         val readings = distances.measure(width, height, detections, seen.map { it?.id })
         positions.announce(frame, width, height, now, readings)
         // Calcul hors thread principal (voir LiveMaskDecoder) ; le poste `overlays` est posé là-bas.
         val overlays = masks.decode(frame)
+        val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
         publishStages(frame)
@@ -390,8 +404,21 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 starting = false,
                 memory = current.memory.copy(tracks = recent.tracks),
                 distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings),
+                prediction = predicted,
             )
         }
+    }
+
+    /**
+     * Boîtes prédites de la frame caméra, posées une fois par frame (30 fois par
+     * seconde) : c'est ce qui fait avancer l'overlay **entre** deux réponses serveur.
+     * Flag éteint ou rien de périmé : aucune écriture d'état, aucun coût.
+     */
+    private fun publishPrediction() {
+        if (!prediction.enabled) return
+        val layer = prediction.boxesAt(System.currentTimeMillis(), lastKnownWidth, lastKnownHeight)
+        if (layer.empty && _state.value.prediction.empty) return
+        _state.update { it.copy(prediction = layer) }
     }
 
     /** Instantané de la chronologie dans l'état : l'UI ne lit jamais les marques. */
@@ -462,6 +489,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // Fermeture de session côté backend, sans bloquer l'arrêt de l'écran.
         viewModelScope.launch { closing?.stop() }
         distances.reset()
+        prediction.reset()
         wake.reset()
         positions.reset()
         voice.stop()
