@@ -67,6 +67,29 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le lien du suivi parent survit a un aller-retour`() {
+        val custom = Settings.Default.copy(parentSiteUrl = "https://exemple.invalid/suivi/")
+        assertEquals(
+            "https://exemple.invalid/suivi/",
+            SettingsCodec.decode(SettingsCodec.encode(custom)).parentSiteUrl,
+        )
+        // Un fichier écrit avant ce champ reprend le site de prod par défaut.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("parentSiteUrl=") }
+        assertEquals(
+            Settings.DEFAULT_PARENT_SITE_URL,
+            SettingsCodec.decode(legacy.joinToString("\n")).parentSiteUrl,
+        )
+        // Une valeur vide (ancien défaut) retombe aussi sur le site de prod.
+        val blank = SettingsCodec.encode(Settings.Default)
+            .replace("parentSiteUrl=${Settings.DEFAULT_PARENT_SITE_URL}", "parentSiteUrl=")
+        assertEquals(
+            Settings.DEFAULT_PARENT_SITE_URL,
+            SettingsCodec.decode(blank).parentSiteUrl,
+        )
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)

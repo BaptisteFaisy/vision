@@ -111,6 +111,7 @@ internal object SettingsCodec {
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_CAMERA_FOV = "cameraFovDeg"
+    private const val K_PARENT_SITE_URL = "parentSiteUrl"
     private const val K_MAX_OBJECTS = "maxObjects"
 
     fun encode(s: Settings): String = buildString {
@@ -136,6 +137,7 @@ internal object SettingsCodec {
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
+        appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
     }
 
@@ -174,6 +176,7 @@ internal object SettingsCodec {
                 ?: default.localOverlayEnabled,
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
+            parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),

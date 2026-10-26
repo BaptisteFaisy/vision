@@ -35,7 +35,8 @@ import dev.sam3vision.core.settings.Settings
  * (mode Europe / **mode US**) + section
  * « Distances » (overlay du direct, champ de vision) + section « Voix ElevenLabs »
  * (clé, voix, lecture automatique, test) + section « Dictée Meta » (base URL, clé,
- * modèle ASR, test) + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
+ * modèle ASR, test) + section « Suivi parent » (lien du site partagé par WhatsApp)
+ * + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
  * Meta AI, session, capture photo, lunettes simulées en build debug).
  * Chaque moteur a son bouton de test.
  */
@@ -78,6 +79,7 @@ fun SettingsScreen(
                 onStop = onStopVoice,
             )
             DictationSettings(draft) { draft = it }
+            ParentShareSettings(draft) { draft = it }
             SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
             GestureHelp(onOpenGestures)
             ClassicScreens(onOpenLive, onOpenClassic)
@@ -135,6 +137,31 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     }
     LabeledField("Base URL SAM 3.1 (vide = région choisie ci-dessous)", draft.samBaseUrl, false) {
         onChange(draft.copy(samBaseUrl = it))
+    }
+}
+
+/**
+ * Section « Suivi parent » : lien du site envoyé par le bouton « Partager le
+ * suivi » du Direct (message WhatsApp). Lien générique tant qu'un seul proche
+ * est suivi (pas de cloisonnement par utilisateur pour l'instant).
+ */
+@Composable
+private fun ParentShareSettings(draft: Settings, onChange: (Settings) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Suivi parent",
+            color = AppColors.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        LabeledField("Lien du site de suivi (bouton Partager du Direct)", draft.parentSiteUrl, false) {
+            onChange(draft.copy(parentSiteUrl = it))
+        }
+        Text(
+            "Le bouton « Partager le suivi » du Direct envoie ce lien par WhatsApp.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
     }
 }
 
