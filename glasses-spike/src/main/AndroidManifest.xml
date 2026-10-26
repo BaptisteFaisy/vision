@@ -19,6 +19,7 @@
         android:name=".GlassesApp"
         android:allowBackup="false"
         android:label="SAM Vision (spike lunettes)"
+        android:networkSecurityConfig="@xml/network_security"
         android:supportsRtl="true"
         android:theme="@style/Theme.GlassesSpike">
 
