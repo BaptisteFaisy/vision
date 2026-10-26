@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Spike « voix seule » : les lunettes (ou le mock) filment, SAM segmente, le LLM
- * décrit, la voix annonce. Un seul écran, un journal, trois boutons.
+ * décrit, la voix annonce. Un seul écran, un journal, quatre boutons.
  *
  * Le pipeline réseau vient de `:core` (aucun appel HTTP réécrit ici) et le
  * transport DAT de `GlassesSession` / `GlassesFrameEncoder`.
