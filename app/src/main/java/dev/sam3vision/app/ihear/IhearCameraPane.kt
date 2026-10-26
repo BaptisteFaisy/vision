@@ -16,6 +16,7 @@ import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.lensSpecOf
+import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.captureStamp
@@ -114,7 +115,13 @@ class IhearCameraHost(private val context: Context) {
     suspend fun bind(owner: LifecycleOwner): String? {
         val provider = withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
         val view = boundPreview ?: return "Preview not attached yet"
-        val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
+        // L'aperçu prend **sa** résolution : sans `ResolutionSelector` propre, CameraX le
+        // faisait descendre dans la famille de l'analyse (320 px) et la carte l'étirait
+        // ~3× — aplats de couleur de ~3 px mesurés sur le téléphone.
+        val preview = Preview.Builder()
+            .setResolutionSelector(previewResolutionSelector())
+            .build()
+            .also { it.setSurfaceProvider(view.surfaceProvider) }
         val image = ImageCapture.Builder().build()
         val analysis = newAnalysis()
         val video = androidx.camera.video.VideoCapture.withOutput(

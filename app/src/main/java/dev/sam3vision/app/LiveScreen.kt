@@ -254,7 +254,9 @@ private fun RecoveryTap(onRestart: () -> Unit) {
 }
 
 /**
- * Preview + analyseur « une frame à la fois », résolution capteur réduite.
+ * Aperçu plein capteur + analyseur « une frame à la fois », réduit à [LIVE_EDGE].
+ * L'aperçu a sa propre résolution ([previewResolutionSelector]) : sinon l'analyse le
+ * tirait vers le bas et la carte affichait des aplats.
  * [onLens] reçoit le champ de vision réel du capteur dès la liaison (les distances
  * en ont besoin ; `null` si le driver est muet).
  */
@@ -267,7 +269,10 @@ private suspend fun bindLiveCamera(
 ) {
     val owner = previewView.findViewTreeLifecycleOwner() ?: error("Cycle de vie indisponible")
     val provider = withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
-    val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+    val preview = Preview.Builder()
+        .setResolutionSelector(previewResolutionSelector())
+        .build()
+        .also { it.setSurfaceProvider(previewView.surfaceProvider) }
     val analysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setResolutionSelector(
