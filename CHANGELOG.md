@@ -49,6 +49,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   les docs (`AGENTS.md`, `docs/CI-QUEUE.md`, `docs/DOC-ETAT.md`, `docs/glasses-spike-ci.md`) décrivent
   le flot GitHub natif. Aucun outil de file externe sur ce dépôt.
 
+## 2026-10-26 (26) — un keyframe SAM complet n'est redemandé que si les masques ont décroché
+
+- **Le scheduler manquant de la lane L13** : `core/.../keyframe/` — `KeyframeTypes` (signal
+  mesuré, décision, 6 `Trigger`, 5 `HoldReason`, `isUrgent`), `KeyframeConfig` (plancher 200 ms,
+  plafond 500 ms étirable à 1 000 ms, erreur 0,12 sur 2 frames, EMA 0,40, scène 0,35, 3 req/s
+  rafale 2, repli 0,5→8 s, timeout 12 s, validation au montage), `RequestBudget` (seau à jetons
+  + **jeton d'urgence** à découvert, remboursé par la reconstitution), `KeyframeScheduler` (la
+  machine à états, `FrameGate` de `:core/live` réutilisé pour **un seul** keyframe en vol,
+  `onKeyframeResult` idempotent) et `KeyframeStats` (compteurs + p95 via `LiveStats`, fenêtre
+  distincte de celle de la session).
+- **37 tests** : 21 sur le scheduler (démarrage, antiblocage 2 frames, coupure de scène
+  prioritaire, masque perdu, plafond, veille statique off par défaut, budget, jeton d'urgence
+  unique, repli, timeout 12 s, réponses fantômes, `reset`, estimateur `NaN`), 7 sur le seau,
+  9 sur le banc `8 scénarios × 4 politiques` — **0 violation partout** (budget d'une seconde, un
+  seul keyframe en vol, plafond d'âge dû). Les politiques « cadence fixe » sont le même
+  scheduler, aveuglé (seuils inatteignables, signal neutre) : aucune politique dupliquée.
+- **Chiffres calculés, pas mesurés** : horloge virtuelle 33 ms, A/R 150 ms / 1 200 ms, modèle
+  d'erreur synthétique ; tableau dans `core/build/keyframe-sim-u12.txt` (répertoire de build,
+  non versionné). Aucun téléphone, aucun GPU, aucun appel réseau.
+- **Contrat** : `docs/KEYFRAME-SCHEDULER.md` (entrées u10/u11, décision, garde-fous, câblage u13,
+  ce qui reste à recaler avec l'erreur réelle d'u11).
+- `:app` non touché : le scheduler est une brique de décision, u13 l'intégrera.
+
 ## 2026-10-26 (25) — lunettes : le mode réel dit ce qui manque
 
 - **`glasses-spike`, démarrage sur de vraies lunettes** : le journal du mode « Lunettes » énumère les
