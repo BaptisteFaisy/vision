@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.alphaLut
 import dev.sam3vision.core.mask.colorizeGrayToBitmap
-import dev.sam3vision.core.mask.decodeMaskAny
+import dev.sam3vision.core.mask.decodeObjectGray
 import dev.sam3vision.core.model.LiveFrame
 
 /**
@@ -37,7 +37,7 @@ class MaskPainter(
     fun overlays(frame: LiveFrame): List<Bitmap> {
         front = 1 - front
         return frame.objects.mapIndexedNotNull { index, obj ->
-            val gray = decodeMaskAny(obj.maskPngB64, frame.maskEncoding) ?: return@mapIndexedNotNull null
+            val gray = decodeObjectGray(obj, frame.width, frame.height) ?: return@mapIndexedNotNull null
             paint(index, gray, paletteArgb(index))
         }
     }

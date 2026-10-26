@@ -21,7 +21,7 @@ class LiveMaskDecoderTest {
         height = 100,
         elapsedMs = 12L,
         objects = masks.mapIndexed { index, mask ->
-            SegObject("objet$index", 0.9f, listOf(1f, 1f, 20f, 20f), mask)
+            SegObject("objet$index", 0.9f, listOf(1f, 1f, 20f, 20f), mask, maskEncoding = encoding)
         },
         maskEncoding = encoding,
     )
@@ -31,7 +31,7 @@ class LiveMaskDecoderTest {
         val caller = Thread.currentThread().name
         var decoderThread = ""
         val decoder = LiveMaskDecoder<String>(
-            paint = { mask, _, _, _ -> decoderThread = Thread.currentThread().name; mask },
+            paint = { obj, _, _, _, _ -> decoderThread = Thread.currentThread().name; obj.maskPngB64 },
             colorAt = { 0 },
             alpha = 115,
         )
@@ -44,7 +44,7 @@ class LiveMaskDecoderTest {
     @Test
     fun `un masque illisible est omis sans casser les autres`() = runTest {
         val decoder = LiveMaskDecoder<String>(
-            paint = { mask, _, _, _ -> if (mask == "casse") null else mask },
+            paint = { obj, _, _, _, _ -> if (obj.maskPngB64 == "casse") null else obj.maskPngB64 },
             colorAt = { 0 },
             alpha = 115,
         )
@@ -56,7 +56,7 @@ class LiveMaskDecoderTest {
     fun `une frame sans masque lisible rend une liste vide`() = runTest {
         var decoded = false
         val decoder = LiveMaskDecoder<String>(
-            paint = { _, _, _, _ -> null },
+            paint = { _, _, _, _, _ -> null },
             colorAt = { 0 },
             alpha = 115,
             onDecoded = { decoded = true },
@@ -69,7 +69,7 @@ class LiveMaskDecoderTest {
     fun `chaque objet recoit sa couleur dans l ordre`() = runTest {
         val colors = mutableListOf<Int>()
         val decoder = LiveMaskDecoder<String>(
-            paint = { mask, _, argb, _ -> colors += argb; mask },
+            paint = { obj, _, _, argb, _ -> colors += argb; obj.maskPngB64 },
             colorAt = { index -> index * 10 },
             alpha = 115,
         )
@@ -78,22 +78,24 @@ class LiveMaskDecoderTest {
     }
 
     @Test
-    fun `l encodage de la frame est transmis au decodeur`() = runTest {
+    fun `l encodage de l objet est transmis au decodeur`() = runTest {
         var encoding = ""
         val decoder = LiveMaskDecoder<String>(
-            paint = { mask, enc, _, _ -> encoding = enc; mask },
+            paint = { obj, _, _, _, _ -> encoding = obj.maskEncoding; obj.maskPngB64 },
             colorAt = { 0 },
             alpha = 115,
         )
-        decoder.decode(frame("a", encoding = "bits"))
-        assertEquals("bits", encoding)
+        // L'objet porte l'encodage **de la frame** quand il n'a pas le sien (`Json.kt`),
+        // donc le decodeur lit `rle` ici comme le serveur l'a annoncé.
+        decoder.decode(frame("a", encoding = "rle"))
+        assertEquals("rle", encoding)
     }
 
     @Test
     fun `le poste overlays est pose apres le coloriage`() = runTest {
         val events = mutableListOf<String>()
         val decoder = LiveMaskDecoder<String>(
-            paint = { mask, _, _, _ -> events += "paint"; mask },
+            paint = { obj, _, _, _, _ -> events += "paint"; obj.maskPngB64 },
             colorAt = { 0 },
             alpha = 115,
             onDecoded = { events += "decoded" },
