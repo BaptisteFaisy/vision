@@ -30,7 +30,7 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `tap simple : un seul contact, la video s'allume pendant la pression`() {
+    fun `tap simple, un seul contact, la video s'allume pendant la pression`() {
         val pendant = onboardingPose(OnboardingGesture.Tap, 0.4f)
         assertEquals(1f, pendant.press, delta)
         assertTrue(pendant.pressed)
@@ -47,7 +47,7 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `double tap : deux contacts separes par une pause`() {
+    fun `double tap, deux contacts separes par une pause`() {
         assertEquals("premier tap", 1f, onboardingPose(OnboardingGesture.DoubleTap, 0.25f).press, delta)
         val pause = onboardingPose(OnboardingGesture.DoubleTap, 0.39f)
         assertEquals("doigt relevé entre les deux", 0f, pause.press, delta)
@@ -56,7 +56,7 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `double tap : la photo s'allume juste apres le deuxieme contact`() {
+    fun `double tap, la photo s'allume juste apres le deuxieme contact`() {
         val apres = onboardingPose(OnboardingGesture.DoubleTap, 0.5f)
         assertTrue("icône photo allumée", apres.cameraFlash)
         assertTrue("éclat en cours", apres.flash in 0f..1f)
@@ -65,7 +65,7 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `appui long : le doigt reste pose et les ondes pulsent`() {
+    fun `appui long, le doigt reste pose et les ondes pulsent`() {
         val debut = onboardingPose(OnboardingGesture.Hold, 0.3f)
         val fin = onboardingPose(OnboardingGesture.Hold, 0.9f)
         assertEquals(1f, debut.press, delta)
