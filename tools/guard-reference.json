@@ -1,19 +1,19 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-26T20:48:17+01:00",
-    "commit": "790ce7f",
+    "le": "2026-10-26T21:35:32+01:00",
+    "commit": "66a718f",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
-    "kotlin": 368,
-    "python": 8,
+    "kotlin": 388,
+    "python": 9,
     "toleres": []
   },
   "tests-jvm": {
     "plancher": {
-      "app": 308,
-      "core": 633,
+      "app": 334,
+      "core": 678,
       "glasses-spike": 56
     },
     "execute": {},
@@ -40,7 +40,7 @@
         "tests_min": 0
       }
     ],
-    "fichiers_py_min": 8
+    "fichiers_py_min": 9
   },
   "banc-cadence": {
     "paliers": [
@@ -58,6 +58,6 @@
       "ms": 0.2
     },
     "mesures": [],
-    "note": "table relue dans le system-out JUnit du banc de cadence ; vide tant que ce banc n'existe pas ici."
+    "note": "mesures = tableau de LiveCadenceSimTest relu dans le system-out JUnit ; vide tant qu'aucun rapport n'a été produit ici (la CI le produit)."
   }
 }
