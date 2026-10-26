@@ -22,13 +22,13 @@ import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.PositionAnnouncer
+import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
-import dev.sam3vision.core.net.liveClient
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -55,8 +55,14 @@ class LiveProbe(
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
     private val background: CoroutineDispatcher = Dispatchers.Default,
-    /** Fabrique de client du direct : les tests y branchent un faux transport, sans réseau. */
-    private val clientFor: (String, Long, WireMarks?) -> LiveClient = ::liveClient,
+    /**
+     * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
+     * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
+     * réduite demandée au serveur est alors celle que le client sait relire.
+     */
+    private val clientFor: (String, Long, WireMarks?) -> LiveClient = { base, timeout, marks ->
+        LiveMaskTransport.clientFor(base, timeout, marks)
+    },
 ) {
 
     private val _state = MutableStateFlow(LiveProbeState())
@@ -406,8 +412,8 @@ class LiveProbe(
 
     /**
      * Masques colorisés de la frame, calculés hors du thread principal : décodage selon
-     * `frame.maskEncoding` (`bits` = 1 bit + zlib, sinon PNG gris) puis coloriage par table
-     * de 256 niveaux — jamais de luminance sur un masque déjà gris.
+     * l'encodage **de l'objet** (`rle`/`poly` sur la grille réduite, `bits` = 1 bit + zlib,
+     * sinon PNG gris) puis coloriage par table de 256 niveaux — jamais de luminance sur un masque déjà gris.
      *
      * Le coût est mesuré (une ligne tous les [LOG_EVERY_FRAMES] paquets) : c'est du temps
      * mural entre la réponse réseau et ce qui arrive à l'écran, et il n'est pas dans `latence`.
