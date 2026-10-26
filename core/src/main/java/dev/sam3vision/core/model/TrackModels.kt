@@ -19,3 +19,19 @@ data class TrackFrame(
     val height: Int,
     val objects: List<TrackedObject>,
 )
+
+/** Réponse de `POST /session` : identifiant de session + objets de la frame initiale. */
+data class TrackSessionStart(
+    val sessionId: String,
+    val width: Int,
+    val height: Int,
+    val objects: List<TrackedObject>,
+)
+
+/** État du tracker : `GET /health`. */
+data class TrackHealth(
+    val ok: Boolean,
+    val model: String,
+    val gpu: String,
+    val maxObjects: Int,
+)
