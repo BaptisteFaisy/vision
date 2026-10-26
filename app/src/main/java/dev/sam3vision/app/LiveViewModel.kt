@@ -16,13 +16,18 @@ import dev.sam3vision.app.live.LiveWakeGuard
 import dev.sam3vision.app.live.MaskPainter
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.FramePipeline
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
+import dev.sam3vision.core.live.TrackRunner
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.core.mask.colorizedMaskBitmap
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.model.TrackFrame
 import dev.sam3vision.core.model.toDetections
+import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
 import dev.sam3vision.core.net.liveClient
@@ -56,6 +61,18 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<LiveUiState> = _state
     private var session: LiveSession? = null
     private var client: LiveClient? = null
+
+    /** Session du tracker (`/session` + `/frame`), `null` quand le direct est sur `/live`. */
+    private var tracker: TrackRunner? = null
+
+    /** Transport choisi dans le bandeau : tracker à ids stables, ou `/live` en WebSocket. */
+    private var trackerEnabled = false
+
+    /**
+     * Pipeline actif, quel que soit le transport : la cadence, l'époque de la séance et la
+     * latence mesurée passent par lui — l'écran ne connaît pas le client utilisé.
+     */
+    internal val pipeline: FramePipeline? get() = tracker ?: session
 
     /** Dernière frame gardée pour les questions (indépendant de SAM). */
     private var lastKeepAt = 0L
@@ -152,15 +169,24 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         if (base.isBlank()) {
             session = null
             client = null
+            tracker = null
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // WebSocket uniquement : plus aucun POST /live pour les frames, et **aucun
-        // /health** : la première frame réveille le conteneur (Modal met la requête en
-        // file pendant le démarrage, mesuré 8-35 s).
-        val live = liveClient(base, marks = chronology)
-        client = live
-        session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
+        // Deux transports pour les frames, et **aucun `/health`** dans les deux cas : la
+        // première frame réveille le conteneur (Modal met la requête en file pendant le
+        // démarrage, mesuré 8-35 s). Le tracker ouvre une session et suit des ids stables ;
+        // `/live` en WebSocket est le défaut.
+        session = null
+        client = null
+        tracker = null
+        if (trackerEnabled) {
+            tracker = TrackRunner(HttpTrackClient(base))
+        } else {
+            val live = liveClient(base, marks = chronology)
+            client = live
+            session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
+        }
         _state.update {
             it.copy(
                 running = true,
@@ -168,7 +194,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 error = null,
                 memory = LiveMemoryState(),
                 spoken = null,
-                transport = TRANSPORT_WS,
+                transport = if (trackerEnabled) TRANSPORT_TRACK else TRANSPORT_WS,
             )
         }
         wake.arm()
@@ -178,6 +204,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     private fun startVisionOnly() {
         session = null
         client = null
+        tracker = null
         _state.update {
             it.copy(running = true, starting = false, error = null, gpu = "", spoken = null)
         }
@@ -196,7 +223,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         cadence.reset()
         fps.reset()
         lastKeepAt = 0L
-        _state.update { it.copy(prompts = chosen, samEnabled = settings.liveSamEnabled) }
+        _state.update {
+            it.copy(prompts = chosen, samEnabled = settings.liveSamEnabled, trackerEnabled = trackerEnabled)
+        }
     }
 
     /** Change les concepts suivis : `[promptsText]` séparé par virgules, vide = défaut. */
@@ -223,6 +252,16 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     private fun restart(prompts: List<String>) = viewModelScope.launch { start(store.load(), prompts) }
 
     /**
+     * Bascule le transport du direct depuis le bandeau : `/live` en WebSocket ↔ tracker
+     * par sessions (ids stables). Le choix vit le temps de l'app (non persisté) ; la
+     * séance est relancée dans le nouveau mode.
+     */
+    fun toggleTracker() {
+        trackerEnabled = !trackerEnabled
+        restartActive()
+    }
+
+    /**
      * Frame venue de l'analyseur caméra. Sans session SAM, elle est seulement **gardée
      * pour les questions** — les questions marchent donc même quand SAM est injoignable.
      * Sinon elle part au GPU (c'est elle qui réveille le conteneur endormi), sauf si une
@@ -232,7 +271,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (jpegB64.isBlank()) return
         narration.narrate(jpegB64)
-        val active = session
+        val active = pipeline
         if (active == null) {
             keepFrame(jpegB64)
             return
@@ -249,7 +288,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // requête (normalisation des concepts, JSON, base64 de 28 Ko) partirait sur la
         // boucle de composition. Ce travail n'a rien à y faire.
         viewModelScope.launch(Dispatchers.Default) {
-            val result = active.runFrame(jpegB64)
+            val result = sendFrame(active, jpegB64)
             if (!active.isCurrent(era)) return@launch
             chronology.markReceived()
             if (result == null) {
@@ -273,6 +312,38 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
     }
+
+    /**
+     * Envoie la frame au pipeline actif, quel que soit le transport ; `null` = frame jetée
+     * (créneau pris — la caméra n'attend jamais le réseau).
+     */
+    private suspend fun sendFrame(active: FramePipeline, jpegB64: String): Result<LiveFrame>? =
+        when (active) {
+            is TrackRunner -> sendTrackFrame(active, jpegB64)
+            is LiveSession -> active.runFrame(jpegB64)
+            else -> null
+        }
+
+    /**
+     * Tracker : la **première** frame ouvre la session (le backend analyse cette image, ses
+     * objets deviennent la frame d'ouverture) ; les suivantes partent à `/frame`, et les
+     * `id` ne changent plus tant que la session vit.
+     */
+    private suspend fun sendTrackFrame(active: TrackRunner, jpegB64: String): Result<LiveFrame>? {
+        if (active.sessionId == null) {
+            return active.start(_state.value.prompts, jpegB64).map { it.asLiveFrame() }
+        }
+        return active.submit(jpegB64)?.map { it.asLiveFrame() }
+    }
+
+    /** Le tracker a ses propres objets ; le rendu du direct attend un [LiveFrame]. */
+    private fun TrackFrame.asLiveFrame(): LiveFrame = LiveFrame(
+        width = width,
+        height = height,
+        // La latence affichée vient du pipeline, mesurée côté téléphone (pas de durée serveur).
+        elapsedMs = 0L,
+        objects = objects.map { SegObject(it.label, it.score, it.box, it.maskPngB64) },
+    )
 
     /** Garde la frame courante pour les questions : au plus une par [FRAME_KEEP_MS]. */
     private fun keepFrame(jpegB64: String) {
@@ -308,7 +379,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 frame = frame,
                 overlays = overlays,
                 objectsCount = frame.objects.size,
-                latencyMs = session?.stats?.averageMs ?: 0L,
+                latencyMs = pipeline?.stats?.averageMs ?: 0L,
                 fps = LiveFpsMeter.fpsFor(gap, current.fps),
                 error = null,
                 starting = false,
@@ -375,10 +446,16 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     fun stop() {
         narration.close()
         liveVoice.cancel()
-        session?.reset()
-        client?.close()
+        // La frame en vol est révoquée (époque close) : sa réponse tardive est jetée, elle
+        // ne réécrit pas l'état « arrêté » et ne vole pas le créneau de la séance suivante.
+        pipeline?.reset()
+        val closing = tracker
         session = null
+        tracker = null
+        client?.close()
         client = null
+        // Fermeture de session côté backend, sans bloquer l'arrêt de l'écran.
+        viewModelScope.launch { closing?.stop() }
         distances.reset()
         wake.reset()
         positions.reset()
@@ -395,9 +472,12 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
-    /** « WebSocket » quand le socket tient, « WebSocket KO » dès qu'il est tombé (aucun repli). */
-    private fun transportLabel(): String =
-        if ((client as? WsLiveClient)?.isConnected == true) TRANSPORT_WS else TRANSPORT_WS_KO
+    /** « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST). */
+    private fun transportLabel(): String = when {
+        trackerEnabled -> TRANSPORT_TRACK
+        (client as? WsLiveClient)?.isConnected == true -> TRANSPORT_WS
+        else -> TRANSPORT_WS_KO
+    }
 
     /** Lit les réglages chiffrés puis démarre la session (appelé à l'entrée à l'écran). */
     fun startFromSettings() = viewModelScope.launch { start(store.load()) }

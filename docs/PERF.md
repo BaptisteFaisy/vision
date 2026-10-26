@@ -89,6 +89,7 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Délai d'extinction `/release` | **45 s** | `core/net/SamLifecycle.kt:10` (`RELEASE_TIMEOUT_SECONDS`) |
 | Délai d'envoi vidéo (mode tap) | **120 s** | `core/net/HttpSam31VideoClient.kt:69` (`UPLOAD_TIMEOUT_SECONDS`) |
 | Délai du tracker | **15 s** | `core/net/TrackClient.kt:11` (`TRACK_TIMEOUT_SECONDS`) |
+| Cadence du tracker | plancher **33 ms** (30 fps), plafond **500 ms**, **1** frame en vol | `core/live/TrackRunner.kt:153-159` (`TARGET_FPS`, `MIN_INTERVAL_MS`, `MAX_INTERVAL_MS`) |
 | Client du direct | connexion 3 s, écriture 5 s, lecture 60 s, `callTimeout` 0 | `core/net/Http.kt:86-88` |
 | Pool du direct | 8 connexions inactives, 5 min | `core/net/Http.kt:65` |
 | Cadence Direct (plancher / cible / lent) | **350 / 500 / 900 ms** | `core/live/LiveSession.kt:33` (`Cadence.Direct`) |

@@ -33,6 +33,7 @@ fun LiveTopBar(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleSam: () -> Unit,
+    onToggleTracker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
@@ -40,6 +41,7 @@ fun LiveTopBar(
             Chip("Arrêter", AppColors.danger, onBack)
             Chip("Réglages", AppColors.surfaceHigh, onOpenSettings)
             SamModeChip(state.samEnabled, onToggleSam)
+            TrackerChip(state.trackerEnabled, onToggleTracker)
             TransportChip(state.transport)
         }
         LiveStatusLines(state)
@@ -81,18 +83,29 @@ private fun LiveStatusLines(state: LiveUiState) {
 }
 
 /**
- * Pastille du transport : « WebSocket » (vert) ou « WebSocket KO » (rouge) — il n'y a
- * plus de repli POST, donc un socket tombé se voit tout de suite.
+ * Pastille du transport du direct : « Tracker » = sessions à ids stables (`/session` +
+ * `/frame`), « WebSocket » = `/live`, « WebSocket KO » = socket tombé (aucun repli POST,
+ * donc une chute se voit tout de suite).
  */
 @Composable
 fun TransportChip(transport: String) {
     if (transport.isBlank()) return
     val color = when (transport) {
-        TRANSPORT_WS -> AppColors.success
+        TRANSPORT_WS, TRANSPORT_TRACK -> AppColors.success
         TRANSPORT_WS_KO -> AppColors.danger
         else -> AppColors.surfaceHigh
     }
     Chip(transport, color, null)
+}
+
+/**
+ * Pastille du transport : « Tracker » bascule le direct sur les sessions du tracker
+ * (ids stables d'une frame à l'autre), « Live » le laisse sur `/live`.
+ */
+@Composable
+fun TrackerChip(trackerEnabled: Boolean, onToggle: () -> Unit) {
+    val label = if (trackerEnabled) "Tracker" else "Live"
+    Chip(label, if (trackerEnabled) AppColors.success else AppColors.surfaceHigh, onToggle)
 }
 
 /**
