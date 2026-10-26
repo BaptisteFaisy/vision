@@ -112,6 +112,9 @@ internal object SettingsCodec {
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_CAMERA_FOV = "cameraFovDeg"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
+    private const val K_SHARE_ENABLED = "shareEnabled"
+    private const val K_SHARE_ID = "shareId"
+    private const val K_SHARE_WRITE_KEY = "shareWriteKey"
     private const val K_MAX_OBJECTS = "maxObjects"
 
     fun encode(s: Settings): String = buildString {
@@ -138,6 +141,9 @@ internal object SettingsCodec {
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
+        appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
+        appendLine("$K_SHARE_ID=${s.shareId}")
+        appendLine("$K_SHARE_WRITE_KEY=${s.shareWriteKey}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
     }
 
@@ -177,6 +183,9 @@ internal object SettingsCodec {
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
             parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
+            shareEnabled = values[K_SHARE_ENABLED]?.toBooleanStrictOrNull() ?: default.shareEnabled,
+            shareId = values[K_SHARE_ID].orEmpty().ifBlank { default.shareId },
+            shareWriteKey = values[K_SHARE_WRITE_KEY].orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
