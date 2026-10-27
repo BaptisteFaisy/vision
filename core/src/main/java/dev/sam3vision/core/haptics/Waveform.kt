@@ -102,6 +102,27 @@ object HapticPattern {
         repeatIndex = 1,
     )
 
+    /** Traversée : le vert se sent — deux salves franches, « vas-y ». */
+    const val CROSSING_GREEN_MS = 90L
+    const val CROSSING_GREEN_OFF_MS = 110L
+    const val CROSSING_GREEN_AMPLITUDE = 255
+
+    /** Traversée : le rouge se sent — un créneau long unique, « stop ». */
+    const val CROSSING_RED_MS = 320L
+    const val CROSSING_RED_AMPLITUDE = 200
+
+    /** Vert confirmé : deux salves franches séparées d'un creux, une seule fois. */
+    fun crossingGreen(): Waveform = Waveform(
+        timings = listOf(0L, CROSSING_GREEN_MS, CROSSING_GREEN_OFF_MS, CROSSING_GREEN_MS),
+        amplitudes = listOf(0, CROSSING_GREEN_AMPLITUDE, 0, CROSSING_GREEN_AMPLITUDE),
+    )
+
+    /** Passage au rouge : un créneau long unique, une seule fois. */
+    fun crossingRed(): Waveform = Waveform(
+        timings = listOf(0L, CROSSING_RED_MS),
+        amplitudes = listOf(0, CROSSING_RED_AMPLITUDE),
+    )
+
     /** Index de la nappe dans [holdLoop] : juste après les deux salves. */
     private const val FIRST_LOOP_INDEX = 5
 }
