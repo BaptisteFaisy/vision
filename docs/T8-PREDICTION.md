@@ -3,6 +3,8 @@
 > Relu dans le **code de cet arbre** (`origin/master`, `dfe81f3`) le 26/10 ; chaque
 > affirmation porte un `chemin:ligne`. Les chiffres sont datés et attribués ; tout ce qui
 > exige le téléphone et n'a pas été mesuré ici est marqué **non mesuré** — jamais deviné.
+> § 1, § 4 et § 6 recorrigés le 27/10 : le module est branché derrière
+> `Settings.boxPredictionEnabled` (éteint par défaut).
 > La fiche de conception d'origine (`sam-vision-doc/20-latence-predict.md`, PR #100 de
 > l'ancien dépôt) décrit le même contrat : le code ci-dessous est l'autorité.
 
@@ -15,9 +17,9 @@ réponses, sans requête supplémentaire et sans GPU.
 
 L'intervalle à couvrir est celui du direct : une frame en vol maximum, cadence déduite de
 la latence moyenne (`LiveSession.intervalMsAdaptive()`,
-`core/src/main/java/dev/sam3vision/core/live/LiveSession.kt:149`). Page caméra iSee :
-`Cadence.Fast` = pas de plancher, budget 150 ms (`LiveSession.kt:42-48`) ; Direct :
-350/500/900 ms (`LiveSession.kt:33`).
+`core/src/main/java/dev/sam3vision/core/live/LiveSession.kt:153`). Page caméra iSee :
+`Cadence.Fast` = pas de plancher, budget 150 ms (`LiveSession.kt:43-48`) ; Direct :
+350/500/900 ms (`LiveSession.kt:34`).
 
 ## 2. Ce qui est prédit, et ce qui ne l'est pas
 
@@ -47,15 +49,17 @@ la latence moyenne (`LiveSession.intervalMsAdaptive()`,
 
 Contrôle de cohérence : `python3 tools/check-kotlin-limits.py` → OK.
 
-## 4. Branchement : le module n'est **pas** branché (c'est voulu)
+## 4. Branchement : derrière un flag éteint par défaut (depuis le 27/10)
 
-`git grep -l -i predict origin/master -- app/` → **aucun fichier**. Rien dans
-`LiveViewModel.kt` / `LiveScreen.kt` / `LiveWiring.kt` ne construit de `BoxPredictor` :
-la prédiction est écrite, testée (39 `@Test` dans `core/src/test/…/predict/`), et
-volontairement **hors du chemin d'affichage** tant que la latence perçue n'est pas mesurée.
-Le branchement vise un **flag par défaut à off**, avec repli exact sur le rendu actuel
-(masque serveur seul). Tant que le flag n'existe pas, il n'y a **pas de build « après »** :
-la comparaison avant/après de la § 5 ne peut pas être exécutée.
+`LivePrediction` (`app/…/live/LivePrediction.kt`) enveloppe `BoxPredictor` +
+`ObjectAssociator` : `LiveViewModel.kt:94` le monte éteint, `:235` le rallume avec
+`Settings.boxPredictionEnabled` (défaut `false`, `Settings.kt:65`), `:368` absorbe
+chaque réponse serveur et `:373` expose les boîtes à l'overlay — qui ne dessine que
+celles dont le masque serveur n'est plus frais (`useMask`). Flag éteint : couche
+vide, l'écran reste exactement celui d'avant (masques serveur seuls). Les 39 `@Test`
+de `core/src/test/…/predict/` verrouillent le calcul.
+
+Le build « après » de la § 5 existe donc : même APK, flag à on.
 
 ## 5. Recette sur le téléphone (protocole avant / après)
 
@@ -88,7 +92,7 @@ objet masqué une seconde doit être prédit puis oublié (`COAST`/`DROP`, § 3)
 | Grandeur | Valeur | Source |
 |---|---|---|
 | Appareil de recette | 2312DRA50G, Android 15, écran 1220 × 2712, modes 60/90/120 Hz (mode courant 60 Hz, mode par défaut 120 Hz) | mesuré le 26/10 par `~/bin/phone run … dumpsys display` (M95) |
-| **T8 perçue avant/après** | **non mesuré** | pas de build « après » (§ 4) et backend Modal/GPU requis pour le direct — hors mandat |
+| **T8 perçue avant/après** | **non mesuré** | le flag existe (§ 4) mais la recette avant/après (§ 5) n'a pas été jouée ; backend Modal/GPU requis pour le direct — hors mandat |
 | Latence serveur, RTT, encodage JPEG | **non mesuré ici** | relevés antérieurs, hors de cet arbre (fiches `18-latence-200ms.md`, `20-latence-predict.md`) : 0,5–1,1 s serveur, ~213 ms aller-retour, 1,2 ms d'encodage — **valeurs d'un autre jour, pas de cet arbre** |
 | 417 ms à deux frames en vol contre 185 ms à un seul | lu dans le commentaire de `Cadence.Fast` | `LiveSession.kt:36-41` (relevé téléphone cité par le code) |
 | `@Test` de `core/src/test/…/predict/` | 39 | `grep -rho '@Test' core/src/test/java/dev/sam3vision/core/predict \| wc -l` |

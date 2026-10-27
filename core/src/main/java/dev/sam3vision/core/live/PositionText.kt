@@ -137,7 +137,7 @@ object PositionText {
      */
     fun key(labels: List<PlacedLabel>): String = labels
         .filter { it.label.isNotBlank() }
-        .map { "${it.label.trim().lowercase()}|${it.position}|${bucket(it.meters)}" }
+        .map { "${it.label.trim().lowercase()}|${it.position}|${sceneBucket(it.meters)}" }
         .distinct()
         .sorted()
         .joinToString(";")
@@ -154,7 +154,10 @@ object PositionText {
         SpeechLanguage.En -> "; "
     }
 
-    /** Distance au mètre près pour la signature ; « ? » quand elle est inconnue. */
-    private fun bucket(meters: Float?): String =
+    /**
+     * Distance au mètre près pour les signatures anti-répétition ; « ? » quand elle
+     * est inconnue. Partagé avec [Guidance.key] : une seule définition du seau.
+     */
+    fun sceneBucket(meters: Float?): String =
         if (meters == null || !meters.isFinite()) "?" else meters.roundToInt().toString()
 }

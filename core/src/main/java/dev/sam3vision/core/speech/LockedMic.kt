@@ -6,7 +6,7 @@ import dev.sam3vision.core.usecase.DictationUseCase
  * Micro **mains libres** de l'écran verrouillé.
  *
  * Au premier plan, la tenue du doigt ouvre le micro et le relâchement l'envoie
- * (`IhearViewModel.onHoldStart/onHoldEnd`). Écran verrouillé il n'y a plus de doigt, plus de
+ * (`IseeViewModel.onHoldStart/onHoldEnd`). Écran verrouillé il n'y a plus de doigt, plus de
  * surface, plus de caméra : l'unique geste est l'action d'une notification. Cet objet dit donc
  * les trois choses qui restent — **quand envoyer** (un plafond, puisque aucune relâche ne
  * viendra), **ce qu'on affiche** et **ce qu'on prononce** — sans une ligne d'Android, pour que

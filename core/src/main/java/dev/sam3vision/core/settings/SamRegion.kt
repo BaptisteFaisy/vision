@@ -45,7 +45,7 @@ enum class SamRegion(
 
 /**
  * Endpoint SAM réellement appelé, dans cet ordre : saisie manuelle (hors preset) →
- * preset de la région choisie → URL injectée au build pour cette région.
+ * URL injectée au build pour cette région → preset de la région choisie.
  */
 fun Settings.resolveSamEndpoint(buildEu: String = "", buildUs: String = ""): String {
     val manual = samBaseUrl.trim()

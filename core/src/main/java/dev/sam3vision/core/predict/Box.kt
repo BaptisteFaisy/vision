@@ -44,9 +44,6 @@ data class Box(val x1: Float, val y1: Float, val x2: Float, val y2: Float) {
         )
     }
 
-    /** Marge négative = rognure (bordure d'un masque dessinée autour de la boîte). */
-    fun expanded(marginPx: Float): Box = grown(2f * marginPx, 2f * marginPx)
-
     /** Ramène la boîte dans `[0,w] × [0,h]` en préservant sa taille quand c'est possible. */
     fun clampedTo(widthPx: Int, heightPx: Int): Box {
         if (widthPx <= 0 || heightPx <= 0) return this

@@ -3,7 +3,6 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /** Côté vers lequel le guidage envoie l'utilisateur quand le couloir est bouché. */
 enum class GuidanceSide { Left, Right }
@@ -105,8 +104,7 @@ object Guidance {
         val prefix = if (decision.cap == SteeringCap.Straight) "" else "${decision.cap.name}:"
         val obstacle = decision.obstacle?.takeIf { decision.blocked } ?: return prefix + "free"
         val exit = if (decision.cap == SteeringCap.Straight) decision.side?.name else decision.passage?.name
-        val meters = obstacle.meters
-        val bucket = if (meters == null || !meters.isFinite()) "?" else meters.roundToInt().toString()
+        val bucket = PositionText.sceneBucket(obstacle.meters)
         val hour = "${PositionText.clockHour(obstacle.centerX)}h"
         return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour"
     }

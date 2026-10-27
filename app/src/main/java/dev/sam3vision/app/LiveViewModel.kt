@@ -242,8 +242,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Change les concepts suivis : `[promptsText]` séparé par virgules, vide = défaut. */
     fun restartWith(promptsText: String) {
-        val list = promptsText.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }
-        restart(if (list.isEmpty()) LivePrompts.Default else list)
+        restart(LivePrompts.field(promptsText))
     }
 
     /** Relance la session avec les concepts déjà actifs (flux arrêté ou en erreur). */
@@ -323,19 +322,19 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             restartActive()
             return true
         }
-        val waking = _state.value.starting && wake.isWaking()
         LiveTransportLog.failure("frame echec transport=" + transportLabel(trackerEnabled, client) + " " + (error.message ?: "GPU injoignable"))
-        _state.update {
-            it.copy(
-                objectsCount = 0,
-                transport = transportLabel(trackerEnabled, client),
-                starting = waking,
-                error = if (waking) null else samUnreachableLine(error.message ?: "GPU injoignable"),
-            )
-        }
+        onFrameError(error)
         return false
     }
 
+    /**
+     * Échec réseau d'une frame (voir [frameErrorState] : réveil GPU = erreur masquée) ;
+     * l'envoi de la frame, lui, passe par [FramePipeline.sendFrame] (tout transport).
+     */
+    private fun onFrameError(error: Throwable) {
+        val waking = _state.value.starting && wake.isWaking()
+        _state.update { frameErrorState(it, waking, transportLabel(trackerEnabled, client), error.message) }
+    }
 
     /** Garde la frame courante pour les questions : au plus une par [FRAME_KEEP_MS]. */
     private fun keepFrame(jpegB64: String) {

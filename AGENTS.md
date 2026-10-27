@@ -24,10 +24,11 @@ unique du 26/10.
 - `docs/DISTANCES.md` — distances sténopé sur le téléphone.
 - `docs/TESTING.md` — recette émulateur, limites connues.
 - `docs/META-GLASSES.md` + `docs/glasses-dat-spike.md` — lunettes Ray-Ban Meta (lire avant de
-  toucher `app/glasses/` ou `glasses-spike/`).
+  toucher `app/glasses/` ; l'ancien module séparé `glasses-spike` n'existe plus, ni dans
+  `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
-- `CHANGELOG.md` — historique. **`docs/LIVE-SPEC.md` est cité par `core/net/HttpLiveClient.kt:30`
-  mais n'existe pas dans ce dépôt** : le contrat serveur est dans le dépôt backend.
+- `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:30`).
+- `CHANGELOG.md` — historique.
 
 ## 1. C'est quoi ce dépôt
 
@@ -42,12 +43,11 @@ là, atteignables par « Autres écrans » des Réglages (`app/AppNav.kt:63-81`,
 | Élément | Valeur |
 |---|---|
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
-| `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:43`) |
-| `:glasses-spike` | prototype DAT lunettes, `include` dans le build, **non production** |
+| `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:84`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **2** (`person`, `door`), `LivePrompts.MAX = 2` (`core/live/LivePrompts.kt:20,28`) |
-| Tests | **1 011 `@Test`** = 1 004 JVM (`:core` 663, `:app` 305, `glasses-spike` 36) + 7 instrumentés (`:app` 6, spike 1) |
-| Taille | **364** fichiers `.kt`, **22 565** lignes de prod (`:core` 7 666, `:app` 13 394, spike 1 505) |
+| Tests | **1 462 `@Test`** JVM (`:core` 947, `:app` 515, mesure du 27/10/2026 : 194 classes, 0 échec) + 7 instrumentés (`:app` : 6 `CaptureCleanupTest`, 1 `MockGlassesTest`) |
+| Taille | **492** fichiers `.kt`, **30 289** lignes de prod (`:core` 11 654, `:app` 18 635, mesure du 27/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
@@ -74,9 +74,11 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 1. **Tailles Kotlin** : fichier `.kt` < 500 lignes, fonction/composable < 50 lignes
    (`tools/check-kotlin-limits.py`, `ci.yml:129-131`). **Zéro duplication** : paramétrer et
    extraire un helper plutôt que copier. Le garde-fou passe sans exception sur cet arbre ; le
-   plus gros fichier est `app/ihear/IseeScenePane.kt` (**496** lignes) — ne pas le faire
-   grossir, extraire comme ça a été fait pour `app/LiveMessages.kt` (45 lignes) et
-   `app/ihear/LiveProbeText.kt` (94 lignes).
+   plus gros fichier est `app/LiveViewModel.kt` (**492** lignes) — ne pas le faire
+   grossir, extraire comme ça a été fait pour `app/isee/IseeScenePane.kt` (487 → 222 lignes,
+   en-tête/dissolution/couches sortis), `app/isee/LiveProbe.kt` (489 → 471 lignes,
+   `cleared()`/`probeFailureText()` sortis et testés) et `app/LiveViewModel.kt` lui-même
+   (498 → 492, `frameErrorState()`/`transportLabel()` purs et testés).
 2. **Aucune clé ni secret versionné** (`sk-…`, `sk_…`, `ghp_…`), jamais de `local.properties`.
    Les clés vivent dans Réglages (chiffré, Keystore, repli `PrivateFileSettingsStore`) ou
    `local.properties` (gitignoré) → `BuildConfig`. **Par défaut** (demande 2026-10-26) l'APK
@@ -131,7 +133,7 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
   **2 concepts** (`core/live/LivePrompts.kt:20,28`) et **deux cadences** — Direct
   350/500/900 ms (`core/live/LiveSession.kt:33`), sonde iSee `fastMs = 0`, `concurrency = 1`,
   budget 150 ms (`LiveSession.kt:42-47`).
-- Langue du projet : **français** (code commenté, commits `feat(ihear): …`, docs).
+- Langue du projet : **français** (code commenté, commits `feat(isee): …`, docs).
 
 ## 4 bis. Arbre de travail — partir d'un état vérifié, jamais d'un arbre sale
 

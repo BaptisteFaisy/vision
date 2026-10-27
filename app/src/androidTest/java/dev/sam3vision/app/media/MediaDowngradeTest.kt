@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 /**
  * Non-régression du crash Room au lancement : un téléphone qui porte une base
- * `ihear-media.db` **plus récente** que le schéma de l'app (build mission en
+ * `isee-media.db` **plus récente** que le schéma de l'app (build mission en
  * version 2, puis retour sur ce schéma en version 1) ne doit plus crasher —
  * la base est recréée vide (repli destructif au downgrade, `MediaDatabase.build`).
  *

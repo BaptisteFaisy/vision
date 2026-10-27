@@ -24,16 +24,16 @@ import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.BenchScreen
-import dev.sam3vision.app.ihear.IhearHome
-import dev.sam3vision.app.ihear.IhearViewModel
-import dev.sam3vision.app.ihear.OnboardingGesturesScreen
+import dev.sam3vision.app.isee.IseeHome
+import dev.sam3vision.app.isee.IseeViewModel
+import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
 
 /** Routes de l'app (navigation par état, sans dépendance navigation-compose). */
 sealed interface Route {
     /** Page d'accueil iSee : chat plein écran + fenêtre caméra flottante. */
-    data object Ihear : Route
+    data object Isee : Route
     data object Capture : Route
     data object Analysis : Route
     data object Chat : Route
@@ -67,8 +67,8 @@ sealed interface Route {
 
 /**
  * Racine de navigation : iSee en page d'accueil (chat + fenêtre caméra),
- * puis les écrans d'origine. Les gestes racine (IhearRootLayout) pilotent la
- * caméra et le chat via [IhearViewModel] quand iSee est à l'écran.
+ * puis les écrans d'origine. Les gestes racine (IseeRootLayout) pilotent la
+ * caméra et le chat via [IseeViewModel] quand iSee est à l'écran.
  *
  * L'onboarding des trois gestes ([Route.Onboarding]) est un écran de la pile :
  * ouvert depuis les Réglages, rejouable sans réinstaller l'app.
@@ -87,12 +87,12 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
 @Composable
 fun AppNav(
     viewModel: AppViewModel,
-    ihear: IhearViewModel,
+    isee: IseeViewModel,
     glasses: GlassesController,
     liveViewModel: LiveViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    var stack by remember { mutableStateOf(listOf<Route>(Route.Ihear)) }
+    var stack by remember { mutableStateOf(listOf<Route>(Route.Isee)) }
     val route = stack.first()
     val push: (Route) -> Unit = { stack = listOf(it) + stack }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.drop(1) }
@@ -107,13 +107,13 @@ fun AppNav(
             route = route,
             state = state,
             viewModel = viewModel,
-            ihear = ihear,
+            isee = isee,
             glasses = glasses,
             liveViewModel = liveViewModel,
             push = push,
             pop = pop,
             // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
-            onHome = { stack = listOf(Route.Ihear) },
+            onHome = { stack = listOf(Route.Isee) },
             // Page du proche à la racine (rôle Caregiver au lancement) : « Retour » ouvre
             // les Réglages, sinon le bouton ne ferait rien du tout.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
@@ -144,7 +144,7 @@ private fun RouteHost(
     route: Route,
     state: UiState,
     viewModel: AppViewModel,
-    ihear: IhearViewModel,
+    isee: IseeViewModel,
     glasses: GlassesController,
     liveViewModel: LiveViewModel,
     push: (Route) -> Unit,
@@ -153,8 +153,8 @@ private fun RouteHost(
     onCaregiverBack: () -> Unit,
 ) {
     when (route) {
-        Route.Ihear -> IhearHome(
-            viewModel = ihear,
+        Route.Isee -> IseeHome(
+            viewModel = isee,
             onOpenSettings = { push(Route.Settings) },
         )
         Route.Capture -> CaptureRoute(viewModel, push)
