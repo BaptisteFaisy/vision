@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses.bench
 
 import com.meta.wearable.dat.camera.types.StreamError
+import com.meta.wearable.dat.core.types.LinkState
 import com.meta.wearable.dat.core.types.RegistrationState
 
 /**
@@ -158,6 +159,22 @@ internal fun frameVerdict(
 }
 
 // ---- Démarrage sur de vraies lunettes ----------------------------------------
+
+/** Attente maximale du lien Bluetooth avant d'ouvrir la session (mesuré : 10 à 30 s). */
+internal const val LINK_WAIT_MS = 30_000L
+
+/** Période de relecture des états de lien pendant cette attente. */
+internal const val LINK_POLL_MS = 500L
+
+/**
+ * Vrai dès qu'une paire est `CONNECTED`.
+ *
+ * `createSession` refuse tout autre état (« Aucun appareil éligible disponible »),
+ * et l'enregistrement peut aboutir **avant** que le lien Bluetooth soit monté :
+ * il faut attendre, pas réessayer à l'aveugle.
+ */
+internal fun hasLinkedDevice(links: List<LinkState>): Boolean =
+    links.any { it == LinkState.CONNECTED }
 
 /**
  * Ce que le SDK voit au moment où le mode « Lunettes » démarre, réduit à des
