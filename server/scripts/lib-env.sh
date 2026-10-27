@@ -83,7 +83,7 @@ sync_secret_from_env() {
   chmod 600 "$SECRET_TMP"
   _secret_json "$SECRET_TMP" || die "écriture du JSON du secret impossible"
   timeout 120 "$MODAL_BIN" secret create "$SECRET_NAME" --from-json "$SECRET_TMP" \
-    --force --profile "$MODAL_PROFILE" >/dev/null || rc=$?
+    --force --profile "$MODAL_PROFILE" >/dev/null || rc=$?  # modal secret create : écrasement idempotent
   cleanup_secret_tmp
   [[ $rc -eq 0 ]] || die "création du secret impossible (profil $MODAL_PROFILE, jeton valide ?)"
   ok "secret « $SECRET_NAME » à jour"

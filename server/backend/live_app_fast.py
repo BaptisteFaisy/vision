@@ -57,6 +57,8 @@ import modal
 from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, clamp_int, load_cpu,
                        gpu_name, levers, load, prepare, run_frame, segment_frame, vision_grid)
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
+from live_app_utils import (accepts_mask_encoding, accepts_param, call, container_age_seconds,
+                            live_response)
 from timing import Stage, elapsed_ms, format_server_timing, now
 
 APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-eu-a100")
@@ -99,24 +101,6 @@ WEIGHTS_BUILD = (
 )
 
 
-def container_age_seconds():
-    """Âge du conteneur en secondes (uptime machine - début du processus).
-
-    Sert à mesurer le VRAI temps d'ouverture : après une restauration de snapshot, le
-    `enter(snap=True)` n'est pas rejoué, donc le chrono du code ne voit que la phase GPU.
-    """
-    try:
-        with open("/proc/uptime", "r", encoding="utf-8") as handle:
-            uptime = float(handle.read().split()[0])
-        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
-            fields = handle.read().rsplit(") ", 1)[1].split()
-        start_ticks = int(fields[19])
-        hertz = os.sysconf("SC_CLK_TCK")
-        return round(uptime - start_ticks / hertz, 1)
-    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
-        return None
-
-
 def lever_env() -> dict:
     """Env de l'image : PYTHONPATH + les leviers positionnés au déploiement."""
     values = {name: os.environ.get(name, "") for name in LEVER_NAMES}
@@ -143,61 +127,6 @@ image = (
 )
 
 app = modal.App(APP_NAME)
-
-
-async def call(pipeline, *args, **kwargs):
-    """Lance le blocage GPU dans un thread ; mappe les erreurs vers les codes HTTP.
-
-    Point de vérité unique des statuts : ``POST /live`` laisse remonter l'``HTTPException``
-    (400 décodage/prompt, 500 interne), ``/live/ws`` l'attrape et en fait un message
-    d'erreur — même code, même détail borné, aucune logique dupliquée. ``kwargs`` porte
-    ``mask_encoding`` (les arguments optionnels du pipeline ne sont pas positionnels).
-    """
-    from fastapi import HTTPException
-    from imaging import ImageDecodeError, MaskEncodingError
-    from segmentation import PromptError
-
-    try:
-        return await asyncio.to_thread(pipeline, *args, **kwargs)
-    except (ImageDecodeError, MaskEncodingError, PromptError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)[:MAX_DETAIL_CHARS]) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500,
-                            detail=f"internal error: {exc}"[:MAX_DETAIL_CHARS]) from exc
-
-
-def accepts_param(pipeline, name: str) -> bool:
-    """Le pipeline accepte-t-il le paramètre ``name`` ?
-
-    Les doublures de test de ``/live`` (``scripts/test_live_ws.py``) ont la signature
-    historique à six paramètres : on ne leur impose pas les suivants, on les leur demande.
-    Même motif que la référence ``accepts_text_cache`` — une vérification par signature,
-    pas un ``try/except TypeError`` qui avalerait les vraies erreurs du pipeline.
-    """
-    try:
-        return name in inspect.signature(pipeline).parameters
-    except (TypeError, ValueError):  # callable sans signature introspectable
-        return False
-
-
-def accepts_mask_encoding(pipeline) -> bool:
-    """Le pipeline accepte-t-il le paramètre ``mask_encoding`` ? (Compat historique.)"""
-    return accepts_param(pipeline, "mask_encoding")
-
-
-def live_response(result):
-    """Réponse de ``POST /live`` : le résultat, plus ``Server-Timing`` si les chronos existent.
-
-    En-tête additif (RFC 8673) : le levier ``FAST_TIMING`` reste le seul interrupteur.
-    Éteint, ``timings_ms`` est absent et aucun en-tête n'est émis — un client ancien ne
-    voit strictement rien changer ; un banc lit les postes sans parser le corps.
-    """
-    header = format_server_timing(result.get("timings_ms") if isinstance(result, dict) else None)
-    if not header:
-        return result
-    from fastapi.responses import JSONResponse
-
-    return JSONResponse(content=result, headers={"Server-Timing": header})
 
 
 @app.cls(
@@ -388,6 +317,42 @@ class Sam3Live:
             return error_message(parsed["id"], 500, f"internal error: {exc}")
         return success_message(result, parsed["id"])
 
+    async def _ws_step(self, websocket, raw, frame_seconds) -> bool:
+        """Un message reçu : réponse calculée puis envoyée. Faux = fermer la boucle."""
+        from fastapi import WebSocketDisconnect
+
+        from live_ws import UNKNOWN_ID, error_message, frame_id
+
+        try:
+            if raw is None:
+                reply = error_message(UNKNOWN_ID, 400, "expected a JSON text message")
+            else:
+                try:
+                    reply = await asyncio.wait_for(self._ws_frame(raw),
+                                                   timeout=frame_seconds)
+                except asyncio.TimeoutError:
+                    try:
+                        stuck = frame_id(json.loads(raw).get("id"))
+                    except Exception:  # noqa: BLE001 — frame illisible, id inconnu
+                        stuck = UNKNOWN_ID
+                    print(f"ws: frame id={stuck} > {frame_seconds:g} s, erreur 503",
+                          flush=True)
+                    reply = error_message(stuck, 503, "inference timeout, retry")
+            text = json.dumps(reply, separators=(",", ":"))
+            print(f"ws id={reply.get('id')} in={len(raw) if raw else 0}B "
+                  f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
+            if len(text) > WS_MAX_REPLY_BYTES:
+                print(f"ws id={reply.get('id')}: {len(text)}B > "
+                      f"{WS_MAX_REPLY_BYTES}B, fermeture 1009", flush=True)
+                await websocket.close(code=1009, reason="response too large")
+                return False
+            await websocket.send_text(text)
+            return True
+        except WebSocketDisconnect:
+            return False
+        except Exception:  # noqa: BLE001 — client parti entre réception et réponse
+            return False
+
     async def _ws_loop(self, websocket, idle_seconds=WS_IDLE_SECONDS,
                        frame_seconds=WS_FRAME_SECONDS) -> None:
         """Une frame à la fois par connexion ; le verrou GPU global reste la seule file.
@@ -402,8 +367,6 @@ class Sam3Live:
         """
         from fastapi import WebSocketDisconnect
 
-        from live_ws import UNKNOWN_ID, error_message, frame_id
-
         try:
             while True:
                 try:
@@ -417,33 +380,7 @@ class Sam3Live:
                     return
                 except Exception:  # noqa: BLE001 — message binaire ou socket déjà fermé
                     raw = None
-                try:
-                    if raw is None:
-                        reply = error_message(UNKNOWN_ID, 400, "expected a JSON text message")
-                    else:
-                        try:
-                            reply = await asyncio.wait_for(self._ws_frame(raw),
-                                                           timeout=frame_seconds)
-                        except asyncio.TimeoutError:
-                            try:
-                                stuck = frame_id(json.loads(raw).get("id"))
-                            except Exception:  # noqa: BLE001 — frame illisible, id inconnu
-                                stuck = UNKNOWN_ID
-                            print(f"ws: frame id={stuck} > {frame_seconds:g} s, erreur 503",
-                                  flush=True)
-                            reply = error_message(stuck, 503, "inference timeout, retry")
-                    text = json.dumps(reply, separators=(",", ":"))
-                    print(f"ws id={reply.get('id')} in={len(raw) if raw else 0}B "
-                          f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
-                    if len(text) > WS_MAX_REPLY_BYTES:
-                        print(f"ws id={reply.get('id')}: {len(text)}B > "
-                              f"{WS_MAX_REPLY_BYTES}B, fermeture 1009", flush=True)
-                        await websocket.close(code=1009, reason="response too large")
-                        return
-                    await websocket.send_text(text)
-                except WebSocketDisconnect:
-                    return
-                except Exception:  # noqa: BLE001 — client parti entre réception et réponse
+                if not await self._ws_step(websocket, raw, frame_seconds):
                     return
         finally:
             try:
@@ -454,10 +391,9 @@ class Sam3Live:
     @modal.asgi_app()
     def web(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws."""
-        from fastapi import FastAPI, Request, WebSocket
+        from fastapi import FastAPI
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
-        from schemas import LiveFastRequest, SegmentRequest
 
         api = FastAPI(title=APP_NAME, version="1.0.0")
         if GZIP_MIN_BYTES > 0:
@@ -468,6 +404,15 @@ class Sam3Live:
         @api.exception_handler(RequestValidationError)
         async def invalid_body(_request, exc):
             return JSONResponse(status_code=400, content={"detail": _validation_detail(exc.errors())})
+
+        self._routes_probe(api)
+        self._routes_live(api)
+        self._routes_control(api)
+        return api
+
+    def _routes_probe(self, api):
+        """GET /health (état + carte) et POST /segment (route historique, SPEC)."""
+        from schemas import SegmentRequest
 
         @api.get("/health")
         async def health():
@@ -488,6 +433,34 @@ class Sam3Live:
         async def segment(request: SegmentRequest):
             return await call(self._segment_sync, request.image_b64, request.prompts)
 
+    def _routes_live(self, api):
+        """POST /live : frame JSON (contrat historique) ou JPEG brut + knobs en query."""
+        from fastapi import Request
+        from fastapi.responses import JSONResponse
+        from schemas import LiveFastRequest
+
+        @api.post("/live")
+        async def live(request: Request):
+            """Le binaire évite les +33 % du base64 ; réponse identique, 400 si illisible."""
+            ctype = request.headers.get("content-type", "")
+            if ctype.split(";")[0].strip().lower() == "application/octet-stream":
+                return live_response(await self._run_live_binary(request))
+            try:
+                parsed = LiveFastRequest(**await request.json())
+            except Exception as exc:  # noqa: BLE001 — même 400 string que le handler FastAPI
+                from pydantic import ValidationError as PydanticValidationError
+
+                if isinstance(exc, PydanticValidationError):
+                    return JSONResponse(status_code=400,
+                                        content={"detail": _validation_detail(exc.errors())})
+                return JSONResponse(status_code=400,
+                                    content={"detail": "invalid request body: JSON illisible"})
+            return live_response(await self._run_live(parsed))
+
+    def _routes_control(self, api):
+        """POST /release (extinction GPU) et WS /live/ws (même pipeline que /live)."""
+        from fastapi import Request, WebSocket
+
         @api.post("/release")
         async def release(request: Request):
             """Le téléphone ferme l'app : le conteneur se tue lui-même.
@@ -507,35 +480,8 @@ class Sam3Live:
             asyncio.get_running_loop().call_later(RELEASE_DELAY_S, os._exit, 0)
             return JSONResponse({"released": True, "in_seconds": RELEASE_DELAY_S})
 
-        @api.post("/live")
-        async def live(request: Request):
-            """Frame JSON (contrat historique) ou JPEG brut (``octet-stream`` + knobs en query).
-
-            Le binaire évite les +33 % du base64 à la montée (~9 Ko/frame) : le corps
-            est le JPEG tel quel, les knobs passent en query (``prompts`` répété,
-            ``work_edge``, ``max_objects``, ``mask_encoding``, ``mask_format``,
-            ``mask_edge``, ``batch_prompts``, ``edge``). Réponse strictement
-            identique dans les deux cas. Une image illisible → 400, comme en JSON.
-            """
-            ctype = request.headers.get("content-type", "")
-            if ctype.split(";")[0].strip().lower() == "application/octet-stream":
-                return live_response(await self._run_live_binary(request))
-            try:
-                parsed = LiveFastRequest(**await request.json())
-            except Exception as exc:  # noqa: BLE001 — même 400 string que le handler FastAPI
-                from pydantic import ValidationError as PydanticValidationError
-
-                if isinstance(exc, PydanticValidationError):
-                    return JSONResponse(status_code=400,
-                                        content={"detail": _validation_detail(exc.errors())})
-                return JSONResponse(status_code=400,
-                                    content={"detail": "invalid request body: JSON illisible"})
-            return live_response(await self._run_live(parsed))
-
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
             """Même pipeline que POST /live, un message texte JSON par frame."""
             await websocket.accept()
             await self._ws_loop(websocket)
-
-        return api
