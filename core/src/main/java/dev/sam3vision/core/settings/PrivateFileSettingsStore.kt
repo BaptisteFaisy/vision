@@ -113,6 +113,7 @@ internal object SettingsCodec {
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
     private const val K_CAMERA_FOV = "cameraFovDeg"
+    private const val K_CAREGIVER_ROLE = "caregiverRole"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
     private const val K_SHARE_ENABLED = "shareEnabled"
     private const val K_SHARE_ID = "shareId"
@@ -144,6 +145,7 @@ internal object SettingsCodec {
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
+        appendLine("$K_CAREGIVER_ROLE=${s.caregiverRole.name}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
         appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
         appendLine("$K_SHARE_ID=${s.shareId}")
@@ -190,6 +192,7 @@ internal object SettingsCodec {
                 ?: default.navigationGuidanceEnabled,
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
+            caregiverRole = CaregiverRole.fromName(values[K_CAREGIVER_ROLE]),
             parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
             shareEnabled = values[K_SHARE_ENABLED]?.toBooleanStrictOrNull() ?: default.shareEnabled,
             shareId = values[K_SHARE_ID].orEmpty().ifBlank { default.shareId },
