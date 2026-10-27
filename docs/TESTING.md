@@ -53,7 +53,7 @@ export JAVA_HOME=<un JDK 17 qui a javac> ANDROID_HOME=$HOME/android-sdk
 ./gradlew :glasses-spike:assembleDebug :glasses-spike:testDebugUnitTest --offline
 bash scripts/build.sh                            # assembleDebug --offline (GRADLE_TIMEOUT, 600 s par défaut)
 python3 tools/check-kotlin-limits.py             # fichier < 500 l, fonction < 50 l
-bash scripts/test_scripts.sh                     # 53 assertions
+bash scripts/test_scripts.sh                     # 75 assertions
 python3 -m unittest tools/test_check_kotlin_limits.py    # 28 tests
 python3 .github/ci-budget/check_timeouts.py      # 4 workflows
 ```
@@ -104,6 +104,17 @@ Jamais d'`adb` nu : passer par le verrou de la machine.
 `~/bin/phone run --task "…" -- adb -s 2c6852ac install -r app/build/outputs/apk/debug/app-debug.apk`
 (sortie `2` = occupé). Un téléphone `2c6852ac` était branché au moment de la rédaction, mais
 **rien n'a été installé ni lancé** par cette passe.
+
+**Le téléphone suit `master` tout seul** : `bash scripts/install-phone-latest.sh` compare le
+`versionName` installé (`1.0.<commits>-<sha>`) au `master` de GitHub, reconstruit dans un miroir
+dédié (`~/vision-phone/master`, jamais l'arbre de travail partagé) et installe (`adb install -r -d`,
+donc un `versionCode` plus ancien est accepté sans perdre les données de l'app). Sur le poste, un
+cron le relance toutes les 10 minutes : `*/10 * * * * ~/bin/vision-phone-latest --quiet`
+(`~/bin/vision-phone-latest` exécute la copie du miroir, donc une correction du script arrive par
+`master`). Options : `--check` (rien n'est installé, sortie `0` = à jour / `3` = en retard /
+`2` = occupé), `--reinstall`, `--wait S`, `--init`, et `--hold 30m` pour **figer** le téléphone le temps
+de tester une branche de mission. Le script ne prend jamais le verrou d'un autre agent : téléphone
+occupé = sortie `2`, le tour suivant réessaie.
 
 ## 4. Ce qui n'a jamais été rejoué sur appareil
 
