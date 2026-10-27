@@ -9,7 +9,10 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_COMPILE=1``       — ``torch.compile`` de l'encodeur vision + warm-up explicite ;
 * ``FAST_CUDA_GRAPH=1``    — capture CUDA graph de l'encodeur vision (exclusive de compile) ;
 * ``FAST_DTYPE=bf16|fp16|fp32`` ;
-* ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de banc).
+* ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de banc) ;
+* ``FAST_SNAPSHOT=1``      — snapshot mémoire Modal (poids figés, réveil 2-7 s).
+
+Les poids et leurs chargements vivent dans ``weights.py`` (ré-exportés ici).
 
 Deux champs gouvernent la résolution d'entrée (vérifié dans transformers 5.20.2 installée,
 ``models/sam3/{image_processing,processing}_sam3.py``) : ``image_processor.size`` fait le
@@ -26,14 +29,30 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from types import SimpleNamespace
-from types import SimpleNamespace
 
-from fast_env import clamp_int, env_bool, env_int, gpu_name
 from timing import Stage, add_ms, elapsed_ms, now
+# Poids + chargements (extrait ici pour la limite 500 lignes) : ré-exportés pour
+# `service.py` et les bancs (`from fast_core import load, ...` inchangé).
+from weights import (ATTN_IMPL, DTYPE_NAME, MODEL_DIR, MODEL_ID, MODEL_SOURCE, load,
+                     load_cpu, local_only, round_edge, torch_dtype)
 
-PATCH = 14
-MODEL_ID = "unsloth/sam3.1"
 DTYPES = ("bf16", "fp16", "fp32")
+_TRUTHY = ("1", "true", "yes", "on")
+
+
+def env_bool(raw, default: bool = False) -> bool:
+    """Knob d'environnement ou de requête : absent/"" -> default, sinon 1|true|yes|on."""
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().lower() in _TRUTHY
+
+
+def env_int(raw, default=None):
+    """Entier d'environnement optionnel ; None si absent ou non numérique."""
+    try:
+        return int(str(raw).strip()) if raw not in (None, "") else default
+    except ValueError:
+        return default
 
 
 # --- leviers du conteneur (lus à l'import, surchargeables par requête) -------------
@@ -43,97 +62,59 @@ RUNTIME_EDGE = env_bool(os.environ.get("FAST_EDGE_RUNTIME"))
 COMPILE = env_bool(os.environ.get("FAST_COMPILE"))
 CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
 # Graphe CUDA de la passe DETR (voir `detr_graph.py`) : le vision est déjà graphé, DETR
-# est le dernier gros poste (~55 ms mesurés le 25 octobre pour ~1,5 ms de calcul).
+# est le dernier gros poste (~55 ms mesurés fin octobre pour ~1,5 ms de calcul).
 DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
-# Implémentation d'attention du modèle (`sdpa` par défaut dans transformers, `eager` dans
-# certaines versions). L'attention eager materialise la matrice complète : c'est elle qui
-# mange les ~55 ms du poste `detr_ms` (mesuré le 25 octobre). Levier : FAST_ATTN=sdpa.
-ATTN_IMPL = os.environ.get("FAST_ATTN") or ""
-
-
-def _set_attn(model, impl: str) -> str:
-    """Force l'implémentation d'attention ; renvoie ce qui a réellement été appliqué."""
-    if not impl:
-        return getattr(getattr(model, "config", None), "_attn_implementation", "?")
-    try:
-        model.set_attn_implementation(impl)
-    except Exception:  # noqa: BLE001 — version sans set_attn_implementation
-        pass
-    # Chaque sous-module d'attention lit **son propre** `config._attn_implementation`
-    # (le config racine n'est pas le même) : il faut donc balayer les modules. Sans ça,
-    # l'attention reste en `eager` — la matrice complète est matérialisée, d'où les
-    # ~55 ms du poste `detr_ms`.
-    touched = 0
-    for module in model.modules():
-        cfg = getattr(module, "config", None)
-        if cfg is None or not hasattr(cfg, "_attn_implementation"):
-            continue
-        try:
-            cfg._attn_implementation = impl
-            touched += 1
-        except Exception:  # noqa: BLE001
-            pass
-    root = getattr(model, "config", None)
-    if root is not None:
-        try:
-            root._attn_implementation = impl
-        except Exception:  # noqa: BLE001
-            pass
-    applied = getattr(root, "_attn_implementation", "?")
-    return applied if applied == impl else f"failed:{applied}:touched={touched}"
-DTYPE_NAME = (os.environ.get("FAST_DTYPE") or "bf16").strip().lower()
 WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
+# Snapshot mémoire Modal (poids figés après le 1er démarrage) : défaut False — honnête
+# pour Baseten (pas de snapshot) ; le déploiement Modal pose FAST_SNAPSHOT=1.
+SNAPSHOT = env_bool(os.environ.get("FAST_SNAPSHOT"))
 
 
 def levers() -> dict:
     """État des leviers tels que lus à l'import — étiquette /health et lignes du banc."""
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
-            "dtype": DTYPE_NAME,
+            "dtype": DTYPE_NAME, "snapshot": SNAPSHOT,
             "warmups": WARMUPS, "timing": TIMING}
+
+
+def clamp_int(value, default: int, low: int, high: int) -> int:
+    """Ramener un knob optionnel dans [low, high] ; absent ou non numérique -> default."""
+    if value is None:
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
+def gpu_name() -> str:
+    """Nom du GPU réellement alloué, relevé une fois (nvidia-smi, secours torch)."""
+    import subprocess
+
+    try:
+        result = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                                capture_output=True, text=True, timeout=15)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().splitlines()[0].strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return torch.cuda.get_device_name(0)
+    except Exception:  # noqa: BLE001 — /health ne doit jamais tomber pour un nom de GPU
+        pass
+    return "unknown"
 
 
 def _torch():
     import torch
 
     return torch
-
-
-def torch_dtype(name: str):
-    """``bf16|fp16|fp32`` -> dtype torch ; inconnu -> bf16 (le défaut historical du backend)."""
-    import torch
-
-    return {"fp16": torch.float16, "bf16": torch.bfloat16, "fp32": torch.float32}.get(name,
-                                                                                       torch.bfloat16)
-
-
-def load(dtype_name: str = DTYPE_NAME, edge=None):
-    """Charge SAM 3.1 avec le dtype demandé ; retourne (model, processor, device, dtype).
-
-    ``edge`` (< 1008) doit être injecté **dans la config avant la construction du
-    modèle** : le RoPE 2D du ViT est pré-calculé à l'init (grille
-    ``image_size / patch_size`` = 72x72 pour 1008 px) et ne se recalcule pas tout seul.
-    Un simple ``processor.image_processor.size`` suffit au préprocesseur mais fait
-    planter l'attention globale (256 tokens contre une table de 5184).
-    """
-    import torch
-    from segmentation import device_label
-    from transformers import Sam3Model, Sam3Processor
-
-    device = device_label()
-    dtype = torch_dtype(dtype_name if device == "cuda" else "fp32")
-    kwargs = {}
-    if edge:
-        from transformers import Sam3Config
-
-        config = Sam3Config.from_pretrained(MODEL_ID)
-        config.vision_config.backbone_config.image_size = round_edge(int(edge))
-        kwargs["config"] = config
-    model = Sam3Model.from_pretrained(MODEL_ID, dtype=dtype, **kwargs).to(device).eval()
-    _set_attn(model, ATTN_IMPL)
-    processor = Sam3Processor.from_pretrained(MODEL_ID)
-    return model, processor, device, dtype
 
 
 def vision_grid(model) -> int:
@@ -157,11 +138,6 @@ def set_vision_grid(model, edge: int) -> str:
             module.position_ids = torch.tensor(
                 module.precompute_positions(module.config, module.window_size), dtype=torch.long)
     return "ok"
-
-
-def round_edge(edge: int) -> int:
-    """Arrondi au multiple de 14 le plus proche : la grille de patchs du ViT l'exige."""
-    return max(PATCH, int(round(edge / PATCH)) * PATCH)
 
 
 def apply_edge(processor, edge) -> int | None:
@@ -205,20 +181,6 @@ def compile_vision(model, device: str, dtype, edge: int) -> str:
         return f"failed:{type(exc).__name__}:{str(exc)[:120]}"
 
 
-def _capture_graph(module, device: str, dtype, edge: int, torch):
-    """Entrée statique, rodage puis capture du graphe (voir :func:`graph_vision`)."""
-    static_in = torch.zeros(1, 3, edge, edge, device=device, dtype=dtype)
-    side = torch.cuda.Stream()
-    side.wait_stream(torch.cuda.current_stream())
-    with torch.cuda.stream(side):
-        _warmup(module, device, dtype, edge)
-    torch.cuda.current_stream().wait_stream(side)
-    graph = torch.cuda.CUDAGraph()
-    with torch.inference_mode(), torch.cuda.graph(graph):
-        static_out = module(static_in)
-    return graph, static_in, static_out
-
-
 def graph_vision(model, device: str, dtype, edge: int) -> str:
     """Capture CUDA graph de l'encodeur vision (forme statique) ; repli silencieux.
 
@@ -231,8 +193,8 @@ def graph_vision(model, device: str, dtype, edge: int) -> str:
         return "skipped:no-cuda"
     module = model.vision_encoder
     try:
-        graph, static_in, static_out = _capture_graph(module, device, dtype, edge, torch)
-
+        static_in, static_out, graph = _capture_vision_graph(module, torch, device,
+                                                             dtype, edge)
         class _GraphReplay(torch.nn.Module):
             """Encodeur vision rejoué par graphe CUDA, à forme d'entrée fixe.
 
@@ -240,7 +202,8 @@ def graph_vision(model, device: str, dtype, edge: int) -> str:
             sous-module enregistré, PyTorch refuse d'y assigner une closure
             (``cannot assign ... as child module``). La forme est stable parce que
             ``runtime_edge`` est faux ; si une autre forme arrive, on repasse par le
-            module d'origine au lieu de corrompre le graphe.
+            module d'origine au lieu de corrompre le graphe. Nichée ici : torch
+            n'est importable qu'à l'intérieur (pas de stack GPU aux tests).
             """
 
             def __init__(self) -> None:
@@ -265,6 +228,18 @@ def graph_vision(model, device: str, dtype, edge: int) -> str:
         return f"failed:{type(exc).__name__}:{str(exc)[:120]}"
 
 
+def _capture_vision_graph(module, torch, device: str, dtype, edge: int):
+    """Capture le graphe CUDA de l'encodeur (warm-up + enregistrement) ; lève sinon."""
+    static_in = torch.zeros(1, 3, edge, edge, device=device, dtype=dtype)
+    side = torch.cuda.Stream()
+    side.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(side):
+        _warmup(module, device, dtype, edge)
+    torch.cuda.current_stream().wait_stream(side)
+    graph = torch.cuda.CUDGraph()
+    with torch.inference_mode(), torch.cuda.graph(graph):
+        static_out = module(static_in)
+    return static_in, static_out, graph
 def prepare(model, processor, device, dtype, edge=EDGE, compile_flag=COMPILE,
             graph_flag=CUDA_GRAPH) -> dict:
     """Applique les leviers structurels au conteneur et dit ce qui a réellement tenu.
