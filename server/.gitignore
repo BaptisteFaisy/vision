@@ -11,3 +11,4 @@ legacy-expo-app/android/
 # brouillons locaux (jamais versionnés)
 *.bak
 *.bak-*
+backend/baseten/data/
