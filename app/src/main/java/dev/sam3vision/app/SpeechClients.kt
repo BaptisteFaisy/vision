@@ -1,9 +1,11 @@
 package dev.sam3vision.app
 
 import dev.sam3vision.core.net.ElevenLabsSttClient
+import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.net.FallbackSpeechClient
 import dev.sam3vision.core.net.MetaAsrClient
 import dev.sam3vision.core.net.SpeechClient
+import dev.sam3vision.core.net.TtsClient
 import dev.sam3vision.core.settings.Settings
 
 /**
@@ -24,3 +26,16 @@ fun speechClient(settings: Settings): SpeechClient? {
         else -> eleven
     }
 }
+
+/**
+ * Client de synthèse de l'app : ElevenLabs, clé et voix des réglages.
+ *
+ * Rien à revalider chez l'appelant : le client refuse lui-même un texte vide, une clé
+ * absente ou une voix absente, avec un message déjà affichable
+ * ([dev.sam3vision.core.net.ApiError.InvalidKey], [dev.sam3vision.core.net.ApiError.BadResponse]),
+ * et sans aucun appel réseau dans ces trois cas. C'est la capacité synthèse qui manquait
+ * ici — [speechClient] ne couvre que la dictée — et elle sert autant la voix du banc
+ * lunettes (`GlassesVoice`) que celle de l'app ([VoiceAnnouncer]).
+ */
+fun ttsClient(settings: Settings): TtsClient =
+    ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId)

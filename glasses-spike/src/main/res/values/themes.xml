@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Thème local au spike : :app n'est pas une dépendance du module. -->
-    <style name="Theme.GlassesSpike" parent="android:Theme.Material.NoActionBar" />
-</resources>

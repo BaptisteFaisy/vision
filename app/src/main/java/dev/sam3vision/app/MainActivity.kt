@@ -14,6 +14,10 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import dev.sam3vision.app.glasses.GlassesController
+import dev.sam3vision.app.glasses.bench.BenchEntryPoint
+import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
+import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
+import dev.sam3vision.app.glasses.bench.SpikeLaunch
 import dev.sam3vision.app.ihear.IhearViewModel
 import dev.sam3vision.app.locked.LockedMicBridge
 
@@ -67,9 +71,22 @@ class MainActivity : ComponentActivity() {
         routeIntent(intent)
     }
 
-    /** Callbacks de l'app Meta AI (enregistrement, invocation vocale) passés au SDK. */
+    /**
+     * Deux entrées par `Intent` : les callbacks de l'app Meta AI (enregistrement,
+     * invocation vocale) vont au SDK ; `--ez mock` / `--ez analyze` ouvrent le banc
+     * d'essai. Le banc n'étant plus une `Activity`, c'est la seule façon de le
+     * lancer depuis adb (voir `tools/phone-lunettes.sh`).
+     */
     private fun routeIntent(intent: Intent) {
         glasses.handleIntent(intent)
+        if (intent.hasExtra(EXTRA_MOCK) || intent.hasExtra(EXTRA_ANALYZE)) {
+            BenchEntryPoint.request(
+                SpikeLaunch.fromExtras(
+                    mock = intent.getBooleanExtra(EXTRA_MOCK, false).takeIf { intent.hasExtra(EXTRA_MOCK) },
+                    analyze = intent.getBooleanExtra(EXTRA_ANALYZE, false).takeIf { intent.hasExtra(EXTRA_ANALYZE) },
+                ),
+            )
+        }
     }
 
     /**

@@ -3,6 +3,30 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (5) — une seule app : le banc lunettes entre dans iSee
+
+- **Le module `:glasses-spike` est supprimé et son banc d'essai lunettes vit désormais dans
+  `:app`**, paquet `dev.sam3vision.app.glasses.bench`, ouvert depuis l'écran Lunettes
+  (`Route.Bench`, `AppNav.kt:45`, `:95`) : 30 `.kt` / 3 488 lignes copiés depuis
+  `glasses-spike/src/{main,debug,release,test,androidTestDebug}` vers les source sets
+  correspondants de `:app`, paquet renommé, assets compris (`mock_feed.mp4`, 54 964 o).
+  Raison : un seul paquet déclaré dans la console Meta Wearables (`dev.sam3vision.app`), donc
+  une seule app installée et plus de confusion entre « l'app iSee » et « l'app du banc » — le
+  banc reste un banc, il n'est pas une seconde voie de production. Décision, tableau de
+  migration vérifié et conséquences : `docs/GLASSES-DECISION.md`.
+- **CI** : plus de job `spike` — `.github/workflows/ci.yml` ne contient plus aucune occurrence
+  de `glasses-spike` et garde **quatre** jobs de 5 min (`ci`, `apk`, `apk-release`, `lint`) ; le
+  banc est compilé et testé avec `:app`. Le module coûtait **50 s** de job, mesurées le 26/10/2026 (relevé conservé dans
+  `docs/glasses-spike-ci.md` §1).
+- **Docs** : `docs/GLASSES-DECISION.md` réécrit (la décision du 26/10 « `:glasses-spike` reste
+  un module séparé » est remplacée), `docs/glasses-dat-spike.md` et `docs/glasses-spike-ci.md`
+  réécrits pour décrire le paquet `bench/` (noms de fichiers conservés pour les liens),
+  `docs/META-GLASSES.md` §10 et §5 alignés, `README.md` et `NOTES.md` recomptés le 27/10.
+  Les entrées **antérieures** de ce journal gardent `:glasses-spike` : c'était le nom du module
+  aux dates où elles ont été écrites.
+- **Non mesuré** : aucun `gradlew` lancé ici (l'intégration est faite par l'orchestrateur) ; le
+  banc n'a pas été exécuté sur des lunettes, ; `ChaineCompleteTest` embarque son JPEG 64×64 en base64, faute d'asset dans `app/src/test/resources/`.
+
 ## 2026-10-27 (3) — le build du téléphone rattrape un cache KSP corrompu
 
 - **Constat** : vers 11 h, le cron `vision-phone-latest` échouait **en boucle** sur

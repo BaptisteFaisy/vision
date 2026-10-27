@@ -21,7 +21,7 @@ import tempfile
 
 LEVELS = (1, 2, 3)                 # conventions de préfixe rencontrées dans les campagnes
 PATCH_GLOB = "PATCH-*.patch"
-BASES = ("", "app", "core", "glasses-spike", "backend", "src")
+BASES = ("", "app", "core", "backend", "src")
 IGNORES = (".git", ".gradle", "build", "__pycache__", "*.lock")
 BIN = "patch"
 

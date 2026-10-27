@@ -1,6 +1,6 @@
 # CI et file de merge
 
-Relu le **2026-10-26 après 19 h** sur cet arbre. Chaque affirmation ci-dessous vient d'un fichier du
+Relu le **2026-10-27** sur cet arbre. Chaque affirmation ci-dessous vient d'un fichier du
 dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`.
 
 ## 1. La règle : un verdict en 5 minutes
@@ -14,10 +14,12 @@ dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`.
 - Il tourne sur chaque PR pour que le check `ci-budget` existe toujours : c'est une condition
   d'entrée de la file. Sans lui, une PR pourrait entrer dans la file avec un job de 30 minutes.
 
-## 2. Les cinq jobs de `ci.yml`
+## 2. Les quatre jobs de `ci.yml`
 
-Déclencheurs : `pull_request` et `push`. Runners `ubuntu-latest`, cache Gradle via
-`gradle/actions/setup-gradle`, mise en cache avec `cache-read-only: false`.
+Déclencheurs : `pull_request` et `push`. Runners **auto-hébergés** —
+`runs-on: [self-hosted, linux, x64, vision]` (`ci.yml:28`) sur les quatre jobs, pas
+`ubuntu-latest` —, cache Gradle via `gradle/actions/setup-gradle@v4`, mise en cache avec
+`cache-read-only: false`. Chaque job porte `timeout-minutes: 5`.
 
 | Job | Ce qu'il fait |
 |---|---|
@@ -25,7 +27,11 @@ Déclencheurs : `pull_request` et `push`. Runners `ubuntu-latest`, cache Gradle 
 | `apk` | `:app:assembleDebug` ; artefact publié seulement sur `master` |
 | `apk-release` | `:app:assembleRelease` |
 | `lint` | `:app:lintDebug` + rapport |
-| `spike` | module `:glasses-spike` : assemble + tests |
+
+Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et testé avec `:app`
+(`:app:assembleDebug` au job `apk`, ses tests JVM dans `:app:testDebugUnitTest` au job `ci`).
+Détail : la page « Le banc lunettes dans la CI » sous `docs/` (nom de fichier inchangé pour ne
+pas casser les liens).
 
 **Périmètre.** Le job `ci` demande d'abord à l'API la liste des fichiers de la PR (le checkout est
 superficiel, la base n'y est pas) et publie `steps.perimetre.outputs.code`. Une PR purement
