@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.ServiceCompat
 import dev.sam3vision.app.DictationRecorder
 import dev.sam3vision.app.MicBus
@@ -75,11 +76,13 @@ class LockedMicService : Service() {
     private fun arm() {
         if (state.phase == LockedMicPhase.OFF) publish(state.armed())
         startForegroundNow()
+        Log.i(TAG, "armé (${state.phase})")
     }
 
     /** Le geste unique : fermé → écoute ; en écoute → envoie. */
     @Synchronized
     private fun toggle() {
+        Log.i(TAG, "geste reçu en phase ${state.phase}")
         if (state.phase == LockedMicPhase.LISTENING) send() else listen()
     }
 
@@ -96,6 +99,7 @@ class LockedMicService : Service() {
             publish(state.failed("micro indisponible (permission ou matériel)"))
             return
         }
+        Log.i(TAG, "micro ouvert")
         voice.stop()
         MicBus.acquire(MicBus.Owner.DICTATION)
         recorder = rec
@@ -118,6 +122,7 @@ class LockedMicService : Service() {
         autoSend?.cancel()
         autoSend = null
         val pcm = rec.stopAndCollect()
+        Log.i(TAG, "micro fermé : ${pcm.size} octets PCM")
         MicBus.release(MicBus.Owner.DICTATION)
         releaseWakeLock()
         publish(state.transcribing())
@@ -129,8 +134,13 @@ class LockedMicService : Service() {
                 llm = llmClient(settings),
                 speak = { answer -> voice.say(settings, answer) },
             )
+            val outcome = chain.run(pcm)
+            outcome.fold(
+                onSuccess = { Log.i(TAG, "réponse : ${it.answer.take(80)}") },
+                onFailure = { Log.w(TAG, "échec : ${it.message}") },
+            )
             publish(
-                chain.run(pcm).fold(
+                outcome.fold(
                     onSuccess = { state.answered(it.answer) },
                     onFailure = { state.failed(it.message ?: "échec sans message") },
                 ),
@@ -221,5 +231,8 @@ class LockedMicService : Service() {
         const val WAKE_MARGIN_MS = 120_000L
 
         const val WAKE_TAG = "iSee:microVerrouille"
+
+        /** Étiquette des traces : `adb logcat -s LockedMic`. */
+        const val TAG = "LockedMic"
     }
 }
