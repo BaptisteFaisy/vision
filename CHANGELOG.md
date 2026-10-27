@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (12) — premier plan = carte active : réveil à 3 essais, stop franc si backend arrêté
+
+- **Activation fiable à l'ouverture** : `warmGpu()` fait jusqu'à 3 `GET /health`
+  silencieux espacés de 2 s (`AppDiagnostics.kt`, `WARM_ATTEMPTS`,
+  `WARM_RETRY_DELAY_MS`) — une ouverture dans un trou de réseau ne laisse plus la
+  carte éteinte. Arrêt au premier succès, silence UI et sans `Log` inchangés.
+- **Arrêt immédiat si backend stoppé** : sur `ApiError.BackendStopped` (404 Modal
+  « invalid function call », app plus déployée), aucune nouvelle tentative —
+  réessayer est inutile, seul un redéploiement (`deploy-live-fast.sh`) rallume.
+- **Rappel d'architecture** : le téléphone ne peut pas `modal deploy` ; l'état stable
+  est « app déployée + conteneur à zéro » (0 $ au repos), le premier plan réveille,
+  l'arrière-plan éteint (`POST /release` + `scaledown=300` en garde). Un `app stop`
+  manuel casse le réveil jusqu'au prochain déploiement.
+- **Preuves** : `AppDiagnosticsTest` +2 (succès au 2e essai, `BackendStopped` sans
+  retentative), test d'échec passé à 3 essais ; `FakeSam.onHealthSeq` scripté.
+
 ## 2026-10-27 (11) — positions et consignes au cadran horaire (9 h … midi … 3 h)
 
 - **Vocabulaire unique au cadran** (`PositionText.clockHour`/`clockLabel`, sept bandes
