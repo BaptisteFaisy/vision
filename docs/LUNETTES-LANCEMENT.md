@@ -293,6 +293,27 @@ cause : Network(…) ← UnknownHostException(Unable to resolve host "api.inferh
 (réglages MIUI de l'application : accès réseau / économie de données), ou à rejouer sur un
 autre appareil. **Ce n'est pas un défaut du spike.**
 
+**Résolu le 27/10 (matin), sans toucher au code** : le téléphone résout de nouveau les noms
+(`run-as … ping -c1 api.inferhub.dev` → 6,8 ms, `private_dns_mode=null`, aucune restriction dans
+`cmd netpolicy list restrict-background-uid`, `inet` bien dans les groupes de l'UID). Le blocage
+venait donc du réseau du téléphone (WiFi à portail, réseau changé), pas de l'application.
+Chaîne **complète** observée ce jour-là, avec les vrais fournisseurs et les vraies lunettes
+appairées (`RB Meta 01TK`) :
+
+```
+analyse réseau ACTIVÉE (1 frame / 1,5 s)
+voix : Bluetooth « RB Meta 01TK » (type 8)      ← sortie routée vers les lunettes
+objets : [personne, téléphone, ordinateur]      ← SAM, puis LLM réel (api.inferhub.dev)
+```
+La description réelle (« This is a slightly tilted, high-angle shot of a bedroom… ») s'affiche à
+l'écran et l'audio part en `bt_a2dp` (`dumpsys media.player` : client `dev.sam3vision.glasses`,
+`mime(audio/mpeg)`, `Devices: bt_a2dp(80)`). La description est **en anglais** : c'est voulu
+(`SpeechLanguage.DEFAULT = En`, demande du 26/10) ; « Voix en français » est un bouton des
+Réglages de `:app`.
+⚠️ Un build posé par un autre agent (23:55) **ignore l'extra `analyze`** : sans lui, aucune
+analyse n'est tentée et le journal ne montre que des frames. Vérifier avec
+`grep -c "analyse réseau ACTIVÉE"` avant de conclure.
+
 ## 8. Lire la preuve
 
 Tout le journal de l'écran passe par `log()` (`MainActivity.kt:233-236`) : **double écriture**,
