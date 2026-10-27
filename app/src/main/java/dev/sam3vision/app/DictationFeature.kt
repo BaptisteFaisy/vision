@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import dev.sam3vision.app.glasses.GlassesMicLink
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
@@ -54,6 +55,12 @@ class DictationFeature(
     /** Micro réutilisé d'une dictée à l'autre (AudioRecord coûteux à créer). */
     private var transcript: MuseTranscript? = null
 
+    /** Micro de la dictée en cours : lunettes ou téléphone, jamais les deux. */
+    private var activeMic: MuseTranscript? = null
+
+    /** Vrai quand la dictée en cours capte le micro des lunettes. */
+    private var fromGlasses = false
+
     /** Compteur des bandeaux : chaque nouveau bandeau relance la lecture à voix haute. */
     private var overlayCount = 0
 
@@ -61,7 +68,9 @@ class DictationFeature(
     fun start(hold: Boolean) {
         val snapshot = state.value
         if (snapshot.dictation.recording || snapshot.dictation.busy) return
-        val blocker = blocker(snapshot.settings)
+        // Micro des lunettes quand la session le prête : il ne demande aucune permission ici.
+        val glasses = GlassesMicLink.source()
+        val blocker = blocker(snapshot.settings, glasses = glasses != null)
         if (blocker != null) {
             report(hold, blocker)
             return
@@ -70,8 +79,8 @@ class DictationFeature(
             report(hold, "micro déjà occupé par la vidéo")
             return
         }
-        val mic = transcript ?: MuseTranscript().also { transcript = it }
-        if (!mic.start()) {
+        val mic = open(glasses)
+        if (mic == null) {
             report(hold, "micro indisponible")
             return
         }
@@ -83,17 +92,38 @@ class DictationFeature(
                     hold = hold,
                     overlay = if (hold) nextOverlay("J'écoute", "Parle, puis relâche pour envoyer.") else null,
                 ),
-                statusLine = if (hold) null else "Enregistrement… parle, puis appuie sur Stop.",
+                statusLine = if (hold) null else recordingLine(),
             )
         }
     }
 
+    /**
+     * Micro effectivement ouvert : celui des lunettes s'il démarre, celui du téléphone sinon
+     * (aucune régression quand la session n'existe pas ou que le flux est arrêté).
+     */
+    private fun open(glasses: PcmSource?): MuseTranscript? {
+        if (glasses != null && glasses.start()) {
+            fromGlasses = true
+            return MuseTranscript(glasses).also { activeMic = it }
+        }
+        fromGlasses = false
+        val phone = transcript ?: MuseTranscript().also { transcript = it }
+        if (!phone.start()) return null
+        return phone.also { activeMic = it }
+    }
+
+    /** La ligne d'état dit d'où vient le son : l'utilisateur doit savoir qui écoute. */
+    private fun recordingLine(): String = if (fromGlasses) {
+        "Enregistrement (micro lunettes)… parle, puis appuie sur Stop."
+    } else {
+        "Enregistrement… parle, puis appuie sur Stop."
+    }
+
     /** Coupe le micro puis transcrit le PCM capté (Meta, à défaut Scribe). */
     fun stop(hold: Boolean) {
-        val started = transcript != null && state.value.dictation.recording
-        if (!started) return
+        if (!state.value.dictation.recording) return
         scope.launch {
-            val mic = transcript ?: return@launch
+            val mic = activeMic ?: return@launch
             state.update {
                 it.copy(
                     dictation = it.dictation.copy(
@@ -112,6 +142,8 @@ class DictationFeature(
             } else {
                 mic.stop(client)
             }
+            activeMic = null
+            fromGlasses = false
             state.update { shown(it, outcome, hold) }
         }
     }
@@ -124,12 +156,15 @@ class DictationFeature(
     /** Jette un enregistrement en cours sans transcription (réinitialisation de la vue). */
     fun abort() = scope.launch(Dispatchers.IO) {
         MicBus.release(MicBus.Owner.DICTATION)
-        transcript?.abort()
+        activeMic?.abort()
+        activeMic = null
+        fromGlasses = false
     }
 
     /** Motif de refus, ou `null` quand la dictée peut démarrer. */
-    private fun blocker(settings: Settings): String? = when {
-        !micGranted() -> "Micro non autorisé"
+    private fun blocker(settings: Settings, glasses: Boolean): String? = when {
+        // Le micro des lunettes ne passe pas par `AudioRecord` : sa permission ne sert à rien.
+        !glasses && !micGranted() -> "Micro non autorisé"
         !settings.sttConfigured -> "aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"
         else -> null
     }

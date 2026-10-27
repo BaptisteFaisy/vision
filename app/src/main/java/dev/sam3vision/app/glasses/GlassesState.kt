@@ -16,6 +16,10 @@ data class GlassesUiState(
     val worn: Boolean = false,
     val phase: SessionPhase = SessionPhase.IDLE,
     val cameraAllowed: Boolean = false,
+    /** Micro autorisé côté app Meta AI : sans lui le flux part sans piste audio. */
+    val micAllowed: Boolean = false,
+    /** Vrai pendant que la dictée capte réellement le micro des lunettes. */
+    val micActive: Boolean = false,
     val streaming: Boolean = false,
     val mockActive: Boolean = false,
     val message: GlassesMessage? = null,

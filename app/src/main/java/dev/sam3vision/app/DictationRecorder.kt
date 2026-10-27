@@ -17,14 +17,14 @@ import kotlin.concurrent.thread
 class DictationRecorder(
     private val sampleRate: Int = Wav.SAMPLE_RATE,
     private val maxDurationMs: Long = MAX_DURATION_MS,
-) {
+) : PcmSource {
     private var record: AudioRecord? = null
     private var worker: Thread? = null
     private var startedAt = 0L
     private val captured = ByteArrayOutputStream()
 
     @SuppressLint("MissingPermission") // la permission RECORD_AUDIO est demandée par l'écran
-    fun start(): Boolean {
+    override fun start(): Boolean {
         if (record != null) return false
         return try {
             val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -55,7 +55,7 @@ class DictationRecorder(
     }
 
     /** Coupe le micro et rend le PCM capturé (vide si rien n'a été enregistré). */
-    fun stopAndCollect(): ByteArray {
+    override fun stopAndCollect(): ByteArray {
         val rec = record ?: return ByteArray(0)
         record = null
         runCatching { rec.stop() }

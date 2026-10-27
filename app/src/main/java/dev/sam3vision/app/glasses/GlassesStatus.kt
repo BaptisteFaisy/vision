@@ -9,6 +9,7 @@ fun statusLines(state: GlassesUiState): List<String> = listOf(
     registrationLine(state),
     deviceLine(state),
     sessionLine(state),
+    micLine(state),
 )
 
 private fun sdkLine(state: GlassesUiState): String {
@@ -30,4 +31,15 @@ private fun sessionLine(state: GlassesUiState): String {
     val camera = if (state.cameraAllowed) "autorisée" else "non autorisée"
     val stream = if (state.streaming) "actif" else "arrêté"
     return "Session : ${state.phase.labelFr()} · caméra $camera · flux $stream"
+}
+
+/** Ligne discrète du micro : ce que la dictée peut réellement prendre, et quand. */
+private fun micLine(state: GlassesUiState): String {
+    val status = when {
+        state.micActive -> "actif"
+        !state.micAllowed -> "non autorisé"
+        GlassesAudioPlan.usable(state.connected, state.streaming, state.micAllowed) -> "prêt"
+        else -> "en veille"
+    }
+    return "Micro lunettes : $status"
 }

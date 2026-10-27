@@ -59,6 +59,22 @@ object GlassesMessages {
 
     fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Caméra indisponible : $reason")
 
+    fun micPermissionMissing() = GlassesMessage(
+        MessageKind.ERROR,
+        "Micro non autorisé : app Meta AI → App connections → SAM Vision → Always allow (micro).",
+    )
+
+    fun audioRefused(hertz: Int, reason: String) = GlassesMessage(
+        MessageKind.WARNING,
+        "Micro lunettes refusé en ${hertz / 1000} kHz ($reason) : repli sur le format suivant.",
+    )
+
+    fun audioUnavailable() = GlassesMessage(
+        MessageKind.WARNING,
+        "Micro lunettes indisponible : la session continue en caméra seule, " +
+            "la dictée garde le micro du téléphone.",
+    )
+
     fun streamRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Flux refusé : $reason")
 
     fun streamError(reason: String) = GlassesMessage(MessageKind.WARNING, "Flux lunettes : $reason")

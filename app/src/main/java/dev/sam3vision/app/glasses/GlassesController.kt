@@ -15,7 +15,9 @@ import com.meta.wearable.dat.core.types.RegistrationError
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
 import com.meta.wearable.dat.inputs.types.CapturePressType
+import dev.sam3vision.app.PcmSource
 import dev.sam3vision.core.glasses.CaptureAction
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +30,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** WAV des dictées prises avec le micro des lunettes, sous `filesDir`. */
+private const val AUDIO_DIR = "glasses-audio"
 
 /**
  * Chef d'orchestre des lunettes Ray-Ban Meta : enregistrement auprès de l'app Meta AI,
@@ -201,12 +206,30 @@ class GlassesController(
     private suspend fun attachCapabilities(created: DeviceSession) {
         if (camera != null) return
         if (!ensureCameraPermission()) return
-        val cam = GlassesCamera(created, scope, ::note) { streaming ->
-            _state.update { it.copy(streaming = streaming) }
-        }
+        val micAllowed = ensureMicPermission()
+        val cam = GlassesCamera(
+            session = created,
+            scope = scope,
+            audioDir = File(context.filesDir, AUDIO_DIR),
+            audioAllowed = micAllowed,
+            onNote = ::note,
+            onStreaming = { streaming -> _state.update { it.copy(streaming = streaming) } },
+            onMicActive = { active -> _state.update { it.copy(micActive = active) } },
+        )
         // Une caméra qui n'a pas démarré n'est pas retenue : elle bloquerait toute reprise.
-        if (cam.start()) camera = cam
+        if (cam.start()) {
+            camera = cam
+            // La dictée peut prendre le micro des lunettes tant que le flux tourne.
+            GlassesMicLink.attach { currentAudio() }
+        }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
+    }
+
+    /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
+    private fun currentAudio(): PcmSource? {
+        val snapshot = _state.value
+        val usable = GlassesAudioPlan.usable(snapshot.connected, snapshot.streaming, snapshot.micAllowed)
+        return if (usable) camera?.audio else null
     }
 
     private suspend fun ensureCameraPermission(): Boolean {
@@ -216,6 +239,15 @@ class GlassesController(
         if (!granted) {
             note(GlassesMessages.cameraPermissionMissing())
         }
+        return granted
+    }
+
+    /** Micro côté app Meta AI : refusé, la session continue mais sans piste audio. */
+    private suspend fun ensureMicPermission(): Boolean {
+        val status = Wearables.checkPermissionStatus(Permission.MICROPHONE).getOrNull()
+        val granted = status is PermissionStatus.Granted
+        _state.update { it.copy(micAllowed = granted) }
+        if (!granted) note(GlassesMessages.micPermissionMissing())
         return granted
     }
 
@@ -249,11 +281,13 @@ class GlassesController(
     }
 
     private fun releaseCapabilities() {
+        // Plus de flux, donc plus de micro à prêter à la dictée.
+        GlassesMicLink.detach()
         inputs?.stop()
         inputs = null
         camera?.stop()
         camera = null
-        _state.update { it.copy(streaming = false) }
+        _state.update { it.copy(streaming = false, micActive = false) }
     }
 
     /** Lunettes simulées : démo sans matériel, et plan B si l'appairage coince. */
