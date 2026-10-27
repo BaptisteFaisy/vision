@@ -49,6 +49,13 @@ data class Settings(
      */
     val boxPredictionEnabled: Boolean = false,
     /**
+     * Calque local (lane L13) : entre deux keyframes du serveur, le masque du dernier
+     * keyframe est propagé sur le téléphone (30 ips visés, budget de peinture 4 ms).
+     * `true` par défaut ; sans estimateur de mouvement branché, le calque reste **inerte**
+     * et l'écran se comporte exactement comme avant.
+     */
+    val localOverlayEnabled: Boolean = true,
+    /**
      * Champ de vision horizontal imposé à la caméra, en degrés : 0 = lu sur le
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
@@ -106,6 +113,7 @@ data class Settings(
             distanceOverlayEnabled = true,
             liveSamEnabled = true,
             boxPredictionEnabled = false,
+            localOverlayEnabled = true,
             cameraFovDeg = 0f,
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
@@ -164,6 +172,7 @@ data class Settings(
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
+        "localOverlayEnabled=$localOverlayEnabled, " +
         "cameraFovDeg=$cameraFovDeg, maxObjects=$maxObjects)"
 }
 

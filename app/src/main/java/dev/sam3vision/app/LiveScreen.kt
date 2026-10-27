@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -26,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,8 @@ import dev.sam3vision.core.distance.LensSpec
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Le téléphone envoie des frames de 512 px maximum, en JPEG léger (lien montant limité). */
@@ -63,6 +67,7 @@ fun LiveScreen(
     var failure by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
     var memoryOpen by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val previewView = rememberLivePreview(context) { attached = it }
 
     LaunchedEffect(Unit) { viewModel.startFromSettings() }
@@ -91,6 +96,8 @@ fun LiveScreen(
         onVoiceStop = viewModel::stopVoice,
         onToggleSam = viewModel::toggleSam,
         onToggleTracker = viewModel::toggleTracker,
+        onToggleLocal = { scope.launch { viewModel.local.toggle() } },
+        localFrame = viewModel.local.frame,
     )
 }
 
@@ -132,6 +139,7 @@ private fun LiveCameraHost(
     DisposableEffect(Unit) {
         onDispose {
             viewModel.stop()
+            viewModel.local.reset()
             runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
             executor.shutdown()
         }
@@ -159,9 +167,10 @@ private fun LiveStage(
     onVoiceStop: () -> Unit,
     onToggleSam: () -> Unit,
     onToggleTracker: () -> Unit,
+    onToggleLocal: () -> Unit, localFrame: StateFlow<Bitmap?>,
 ) {
     Box(Modifier.fillMaxSize()) {
-        LiveCameraStage(state, previewView, onRecover)
+        LiveCameraStage(state, previewView, localFrame, onRecover)
         LiveTopBar(
             state = state,
             draft = draft,
@@ -172,6 +181,7 @@ private fun LiveStage(
             onOpenSettings = onOpenSettings,
             onToggleSam = onToggleSam,
             onToggleTracker = onToggleTracker,
+            onToggleLocal = onToggleLocal,
             modifier = Modifier.align(Alignment.TopCenter),
         )
         LiveFooter(
@@ -189,15 +199,27 @@ private fun LiveStage(
 }
 
 /**
- * Aperçu, masques et pastilles de distance : les masques vivent dans la même surface
- * native que l'aperçu (un `AndroidView` passe au-dessus du canevas Compose), les
- * pastilles sont composées après, donc au-dessus. Un tap relance un flux arrêté.
+ * Aperçu, masques, calque local et pastilles de distance : les masques vivent dans la
+ * même surface native que l'aperçu (un `AndroidView` passe au-dessus du canevas
+ * Compose), les pastilles sont composées après, donc au-dessus. Un tap relance un flux
+ * arrêté.
+ *
+ * La surface native unique reçoit **soit** l'image du calque (30 ips), **soit** les
+ * masques du serveur — jamais les deux (contrat de fusion §2.3). Le calque est collecté
+ * ici et nulle part ailleurs : les bandeaux ne se recomposent pas à cette cadence. Direct
+ * arrêté : rien n'est affiché, l'image locale est périmée.
  */
 @Composable
-private fun LiveCameraStage(state: LiveUiState, previewView: PreviewView, onRecover: () -> Unit) {
+private fun LiveCameraStage(
+    state: LiveUiState,
+    previewView: PreviewView,
+    localFrame: StateFlow<Bitmap?>,
+    onRecover: () -> Unit,
+) {
+    val local by localFrame.collectAsState()
     AndroidView(
         factory = { ctx -> CameraSurface(ctx, previewView) },
-        update = { surface -> surface.setMasks(state.overlays) },
+        update = { surface -> surface.setMasks(overlayLayers(state.overlays, if (state.running) local else null)) },
         modifier = Modifier.fillMaxSize(),
     )
     LiveDistanceLayer(state.distanceLayer)
@@ -303,12 +325,18 @@ private suspend fun bindLiveCamera(
  */
 private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21JpegEncoder) {
     try {
-        val jpeg = encoder.encodeBase64(proxy, LIVE_EDGE, LIVE_JPEG_QUALITY)
-            ?: bitmapToJpegBase64(
-                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, LIVE_EDGE),
-                LIVE_JPEG_QUALITY,
-            )
-        viewModel.onFrame(jpeg, proxy.imageInfo.timestamp)
+        // NV21 direct (zéro bitmap par frame) **et** luminance du calque local :
+        // le plan Y du NV21 est déjà tourné et réduit, donc c'est la même géométrie que
+        // l'ancien bitmap `uprightScaled` — sans le payer.
+        val frame = encoder.encodeFrame(proxy, LIVE_EDGE, LIVE_JPEG_QUALITY)
+        if (frame != null) {
+            viewModel.onFrame(frame.jpegBase64, proxy.imageInfo.timestamp, frame.luma)
+        } else {
+            // Repli (buffer non YUV 4:2:0) : la luminance vient du bitmap déjà tourné.
+            val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, LIVE_EDGE)
+            val luma = viewModel.local.lumaFor(upright)
+            viewModel.onFrame(bitmapToJpegBase64(upright, LIVE_JPEG_QUALITY), proxy.imageInfo.timestamp, luma)
+        }
     } catch (_: Throwable) {
         // frame illisible : la suivante part tout de suite
     } finally {
