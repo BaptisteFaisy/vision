@@ -39,6 +39,6 @@ class IseeStatusLineTest {
     @Test
     fun `sans statut ni reflexion il n'y a pas de ligne`() {
         assertNull(statusLineOf(IseeUiState(holding = true)))
-        assertNull(statusLineOf(IseeUiState(recordingVideo = true, photoPath = "/tmp/p.jpg")))
+        assertNull(statusLineOf(IseeUiState(recordingVideo = true)))
     }
 }

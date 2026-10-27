@@ -162,5 +162,5 @@ chez l'auteur. Corrigé (`Locale.FRANCE`) et **verrouillé** par un test qui jou
 
 Le build compile, les tests passent, les previews existent — mais **rien n'a été regardé sur
 un écran dans cette passe**. La recette iSee (swipe gauche/droite du gros texte, texte bleu
-pendant la dictée, dissolution au double tap, monde persistant) reste à jouer sur l'appareil :
+pendant la dictée, monde persistant) reste à jouer sur l'appareil :
 c'est la seule validation qui vaille pour un écran.

@@ -32,7 +32,6 @@ class IseeSession(
                 entries = emptyList(),
                 selected = INTRO_SELECTION,
                 speakingEntryId = null,
-                photoPath = null,
             )
         }
         purgeScope.launch { cleaner.purgeAll() }

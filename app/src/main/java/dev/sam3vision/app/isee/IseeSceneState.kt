@@ -29,7 +29,7 @@ fun selectedEntry(state: IseeUiState): ChatEntry? = when {
 fun iseeSceneOf(state: IseeUiState, entry: ChatEntry?): IseeScene = when {
     state.holding || state.transcribing -> IseeScene.LISTENING
     state.thinking -> IseeScene.THINKING
-    state.recordingVideo || state.photoPath != null -> IseeScene.VISION
+    state.recordingVideo -> IseeScene.VISION
     state.speakingEntryId != null -> IseeScene.VOICE
     entry == null -> IseeScene.READY
     entry is ChatEntry.UserBubble && isLast(state) -> IseeScene.READY

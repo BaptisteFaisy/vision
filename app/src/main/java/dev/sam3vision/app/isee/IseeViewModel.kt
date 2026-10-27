@@ -38,11 +38,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Le chef d'orchestre de l'écran unique (chat, caméra dans une bulle : vidéo du tap,
- * photo du double tap) : il tient l'état affiché et branche les collaborateurs —
- * [IseeTranscript] (bulles), [IseeDictation] (micro et transcription),
- * [IseeAnswers] (question → réponse → voix), [IseePhotoShot] (photo et pastilles),
- * [IseeCameraCoordinator] (vidéo), plus la lecture, l'intro et la sonde déjà extraites.
+ * Le chef d'orchestre de l'écran unique (chat, caméra : vidéo du tap, photo
+ * automatique de l'appui long) : il tient l'état affiché et branche les
+ * collaborateurs — [IseeTranscript] (bulles), [IseeDictation] (micro et
+ * transcription), [IseeAnswers] (question → réponse → voix), [IseePhotoShot]
+ * (photo-contexte des questions), [IseeCameraCoordinator] (vidéo), plus la
+ * lecture, l'intro et la sonde déjà extraites.
  *
  * Lui-même ne fait que conduire : gestes, cycle de vie, et réglages lus une fois.
  */
@@ -93,14 +94,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         synthesize = { text -> voice.synthesize(text) },
     )
 
-    /** Photo du double tap et contexte image des questions : gel, fenêtre, pastilles. */
+    /** Photo-contexte des questions : frame filmée captée à chaque appui long. */
     private val shots = IseePhotoShot(
         media = media,
         camera = { camera },
-        state = { _state.value },
-        settings = { settings },
-        update = ::update,
-        scope = viewModelScope,
     )
 
     /** Micro de l'appui long, transcription incluse. */
@@ -204,7 +201,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun attachCamera(actions: IseeCameraActions) {
         camera = actions
-        shots.setLens(actions.lensSpec)
     }
 
     fun detachCamera() {
@@ -234,8 +230,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
         }
-        // Ce qui est filmé devient le contexte de la question : la photo gelée d'avant
-        // est périmée et gagnerait sinon la place (question portant sur une image figée).
+        // Ce qui est filmé devient le contexte de la question : une frame d'une
+        // tenue précédente est périmée et gagnerait sinon la place (question
+        // portant sur une image figée).
         if (_state.value.recordingVideo) shots.releaseContext()
         shots.captureForHold()
         update { it.copy(holding = true, status = null) }
@@ -264,12 +261,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun onSingleTap() {
         if (!active) return
         if (_state.value.recordingVideo) cameraOps.stopVideo() else cameraOps.startVideo()
-    }
-
-    /** Double tap rapide : photo immédiate (texture, flash, évaporation en fenêtre). */
-    fun onDoubleTap() {
-        if (!active || _state.value.recordingVideo) return
-        shots.takePhoto()
     }
 
     // ————— Appui long : micro → texte → réponse parlée —————
@@ -383,11 +374,4 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.onForeground()
     }
 
-    companion object {
-        /** Une photo du double tap reste à l'écran avant de s'évaporer. */
-        const val PHOTO_SHOW_MS = IseePhotoShot.SHOW_MS
-
-        /** Photo portant des pastilles de distance : laissée plus longtemps, le temps de lire. */
-        const val PHOTO_MEASURED_MS = IseePhotoShot.MEASURED_MS
-    }
 }

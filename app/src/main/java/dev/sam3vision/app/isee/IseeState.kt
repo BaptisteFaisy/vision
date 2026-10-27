@@ -1,6 +1,5 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.core.distance.LensSpec
 import java.io.File
 
@@ -27,12 +26,6 @@ data class IseeUiState(
 
     /** La bulle d'intro est posée en tête du chat tant que l'audio pousse (1re ouverture). */
     val introVisible: Boolean = false,
-
-    /** Dernière photo du double tap, affichée dans la fenêtre flottante avant d'évaporer. */
-    val photoPath: String? = null,
-
-    /** Pastilles de distance posées sur cette photo ; `null` = rien de mesurable. */
-    val distanceLayer: DistanceLayer? = null,
 
     /** Bulle affichée : index dans les bulles affichées, intro comprise (`0` = l'intro).
      * Il est toujours posé sur la dernière bulle : il n'y a plus de navigation. */
@@ -74,8 +67,8 @@ interface IseeCameraActions {
     suspend fun stopRecording(): File?
 
     /**
-     * Photo immédiate du double tap ; `true` = demande acceptée. [onSaved] est rappelé
-     * plus tard sur le thread principal : `true` si la photo est écrite, `false` sinon.
+     * Photo de la frame filmée (appui long) ; `true` = demande acceptée. [onSaved]
+     * est rappelé plus tard sur le thread principal : `true` si écrite, `false` sinon.
      */
     fun takePhoto(target: File, onSaved: (Boolean) -> Unit): Boolean
 }

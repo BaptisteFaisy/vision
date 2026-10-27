@@ -7,7 +7,7 @@ import kotlinx.coroutines.launch
 
 /**
  * La caméra de la fenêtre flottante côté ViewModel : le lien aux actions CameraX et
- * la vidéo d'environnement du tap. La photo (double tap) est [IseePhotoShot].
+ * la vidéo d'environnement du tap. La photo-contexte des questions est [IseePhotoShot].
  *
  * Rien ici ne parle à CameraX : tout passe par [IseeCameraActions], ce qui garde
  * l'écran testable sans appareil.

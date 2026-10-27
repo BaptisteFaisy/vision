@@ -44,10 +44,10 @@ private val SamColorScheme = darkColorScheme(
  * d'origine, iSee en page d'accueil, lunettes Ray-Ban Meta.
  *
  * La racine n'est pas le ComposeView mais [IseeRootLayout] : elle voit chaque geste
- * de la surface de l'app — appui long (micro maintenu, transcription Muse), tap
- * simple (vidéo), double tap (photo), balayage horizontal (reconnu, sans effet).
- * Le balayage vertical (sélection de bulle) a été supprimé. Les gestes ne s'appliquent
- * que quand les panneaux iSee sont à l'écran.
+ * de la surface de l'app — appui long (micro maintenu, transcription Muse, photo
+ * filmée jointe), tap simple (vidéo), balayage horizontal (reconnu, sans effet).
+ * Double tap et balayage vertical supprimés. Les gestes ne s'appliquent que quand
+ * les panneaux iSee sont à l'écran.
  */
 class MainActivity : ComponentActivity() {
 
@@ -144,7 +144,6 @@ class MainActivity : ComponentActivity() {
         onHoldEnd = isee::onHoldEnd
         onHoldCancel = isee::onHoldCancel
         onSingleTap = isee::onSingleTap
-        onDoubleTap = isee::onDoubleTap
         addView(
             ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, isee, glasses) } },
             MATCH_PARENT,

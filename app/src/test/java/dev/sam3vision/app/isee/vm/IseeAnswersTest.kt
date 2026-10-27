@@ -4,7 +4,6 @@ import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isee.IseeCameraActions
 import dev.sam3vision.app.isee.IseePlayback
 import dev.sam3vision.app.isee.IseeUiState
-import dev.sam3vision.app.isee.PhotoMeasure
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
 import dev.sam3vision.core.model.ChatTurn
@@ -13,8 +12,6 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -32,7 +29,7 @@ import org.junit.Test
  * « … » : il ne laisse jamais l'écran bloqué.
  *
  * La photo-contexte, elle, est **toujours** relâchée (succès, échec, clé absente) :
- * un gel oublié figeait la caméra jusqu'à la prochaine question.
+ * un contexte oublié joindrait une vieille frame à la question suivante.
  */
 class IseeAnswersTest {
 
@@ -148,35 +145,41 @@ class IseeAnswersTest {
     }
 
     @Test
-    fun `succes — le gel de la photo est relache`() = runBlocking {
-        val answers = answers({ _, _, _ -> Result.success("Devant toi") })
-        shots.takePhoto()
-        assertTrue("la photo gelée bloque la capture", captureBlocked(shots))
+    fun `succes — le contexte photo est relache`() = runBlocking {
+        val held = photoShot(encode = { "QUJD" })
+        val answers = answers({ _, _, _ -> Result.success("Devant toi") }, photo = held)
+        held.captureForHold()
+        assertTrue("contexte en mains", imageHeld(held))
 
         answers.answer(seedRow(), "question")
 
-        assertFalse("le gel est relâché après la réponse", captureBlocked(shots))
+        camera.accept = false
+        assertFalse("contexte relâché après la réponse", imageHeld(held))
     }
 
     @Test
-    fun `echec du LLM — le gel de la photo est relache`() = runBlocking {
-        val answers = answers({ _, _, _ -> Result.failure(IllegalStateException("409")) })
-        shots.takePhoto()
-        assertTrue("la photo gelée bloque la capture", captureBlocked(shots))
+    fun `echec du LLM — le contexte photo est relache`() = runBlocking {
+        val held = photoShot(encode = { "QUJD" })
+        val answers = answers({ _, _, _ -> Result.failure(IllegalStateException("409")) }, photo = held)
+        held.captureForHold()
+        assertTrue("contexte en mains", imageHeld(held))
 
         answers.answer(seedRow(), "question")
 
-        assertFalse("le gel est relâché malgré l'échec", captureBlocked(shots))
+        camera.accept = false
+        assertFalse("contexte relâché malgré l'échec", imageHeld(held))
     }
 
     @Test
-    fun `sans cle LLM — le gel de la photo est relache`() = runBlocking {
-        shots.takePhoto()
-        assertTrue("la photo gelée bloque la capture", captureBlocked(shots))
+    fun `sans cle LLM — le contexte photo est relache`() = runBlocking {
+        val held = photoShot(encode = { "QUJD" })
+        held.captureForHold()
+        assertTrue("contexte en mains", imageHeld(held))
 
-        answersWithoutKey().answer(seedRow(), "question")
+        answersWithoutKey(photo = held).answer(seedRow(), "question")
 
-        assertFalse("le gel est relâché même sans clé", captureBlocked(shots))
+        camera.accept = false
+        assertFalse("contexte relâché même sans clé", imageHeld(held))
     }
 
     @Test
@@ -205,12 +208,11 @@ class IseeAnswersTest {
         // question part en texte seul — c'est ce qu'une image vide ne doit plus provoquer (400).
         var image: String? = null
         val answers = answers({ img, _, _ -> image = img; Result.success("ok") })
-        shots.takePhoto()
+        shots.captureForHold()
 
         answers.answer(seedRow(), "question")
 
         assertEquals("", image)
-        assertFalse("le gel est relâché", captureBlocked(shots))
     }
 
     @Test
@@ -218,11 +220,11 @@ class IseeAnswersTest {
         var image: String? = null
         val readable = photoShot(encode = { "QUJD" })
         val answers = answers({ img, _, _ -> image = img; Result.success("ok") }, photo = readable)
-        readable.takePhoto()
+        readable.captureForHold()
 
         answers.answer(seedRow(), "question")
 
-        assertEquals("l'image de la photo gelée est jointe", "QUJD", image)
+        assertEquals("l'image de la frame est jointe", "QUJD", image)
     }
 
     @Test
@@ -250,12 +252,13 @@ class IseeAnswersTest {
     private fun seedRow(): MessageMultimedia =
         dao.seed(MessageMultimedia(timestamp = 1L, texteUtilisateur = "question"))
 
-    /** Vrai quand le gel empêche une nouvelle capture : c'est lui que `answer` relâche. */
-    private fun captureBlocked(photo: IseePhotoShot): Boolean {
-        val before = camera.demands
-        photo.captureForHold()
-        return camera.demands == before
-    }
+    /**
+     * Vrai quand une image est en mains. La sonde relit le contexte, ce qui
+     * redéclenche une capture quand il est vide : les tests de fin de vie
+     * coupent la caméra (`accept = false`) avant de sonder après `answer`.
+     */
+    private fun imageHeld(photo: IseePhotoShot): Boolean =
+        runBlocking { photo.imageBase64() } != null
 
     private fun update(fn: (IseeUiState) -> IseeUiState) {
         state.value = fn(state.value)
@@ -273,12 +276,6 @@ class IseeAnswersTest {
     private fun photoShot(encode: (File) -> String?): IseePhotoShot = IseePhotoShot(
         media = media,
         camera = { camera },
-        state = { state.value },
-        settings = { settings },
-        update = ::update,
-        scope = CoroutineScope(Dispatchers.Unconfined),
-        // Pastilles muettes : ces tests ne parlent que du gel et de l'image jointe.
-        measure = { _, _ -> PhotoMeasure.NoObjects },
         encode = encode,
     )
 
@@ -288,9 +285,9 @@ class IseeAnswersTest {
     private fun tempDir(): File =
         Files.createTempDirectory("isee-vm-answers").toFile().apply { deleteOnExit() }
 
-    /** Caméra factice : chaque demande de photo est comptée, écrite sur disque et réussit. */
+    /** Caméra factice : photo écrite sur disque et réussie, sauf `accept = false`. */
     private class FakeCamera : IseeCameraActions {
-        var demands = 0
+        var accept = true
 
         override val ready: Boolean = true
 
@@ -299,7 +296,7 @@ class IseeAnswersTest {
         override suspend fun stopRecording(): File? = null
 
         override fun takePhoto(target: File, onSaved: (Boolean) -> Unit): Boolean {
-            demands++
+            if (!accept) return false
             target.parentFile?.mkdirs()
             target.writeBytes(PHOTO_BYTES)
             onSaved(true)
