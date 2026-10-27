@@ -37,14 +37,17 @@ class GuidanceAnnouncer(
     /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
-     * change ni les seuils, ni la mémoire de décision.
+     * change ni les seuils, ni la mémoire de décision. [cap] est la direction
+     * demandée à la voix : il change le couloir marché, et sa signature fait
+     * reparler dès que le cap change.
      */
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
         language: SpeechLanguage = SpeechLanguage.Fr,
+        cap: SteeringCap = SteeringCap.Straight,
     ): String? {
-        val decision = Guidance.decide(labels, rangeMeters)
+        val decision = Guidance.decide(labels, cap, rangeMeters)
         val key = Guidance.key(decision)
         advance(key)
         if (pendingCount < minFrames || key == spokenKey) return null

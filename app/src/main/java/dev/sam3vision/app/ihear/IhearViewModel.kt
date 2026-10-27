@@ -25,6 +25,8 @@ import dev.sam3vision.app.ihear.vm.NavigationHook
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
 import dev.sam3vision.core.crossing.CrossingVoiceCommand
+import dev.sam3vision.core.live.SteeringCommand
+import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
@@ -180,6 +182,20 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             probe.setCrossingActive(settings, wantActive)
         }
         speakNavigation(CrossingText.mode(wantActive, settings.speechLanguage))
+        return true
+    }
+
+    /**
+     * Ordre vocal de cap (« va à gauche ») : le guidage recalcule le passage
+     * vers ce cap, la confirmation part par le même chemin que la navigation.
+     * Vrai si [text] portait un ordre (la dictée ne part ni à Maps ni au LLM).
+     */
+    private suspend fun runSteeringCommand(text: String): Boolean {
+        val cap = SteeringCommand.parse(text) ?: return false
+        probe.setSteering(cap)
+        val confirm = SteeringText.confirm(cap, settings.guideStraight, settings.speechLanguage)
+        update { it.copy(status = confirm) }
+        speakNavigation(confirm)
         return true
     }
 
@@ -358,6 +374,9 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IhearStatusText.ANSWER_PENDING)
             return
         }
+        // Ordre de cap (« va à gauche ») : consommé ici AVANT la navigation Maps
+        // (« va à gauche » matche aussi « va à X ») — guidage + voix, jamais LLM.
+        if (runSteeringCommand(text)) return
         // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
