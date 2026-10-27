@@ -1,16 +1,21 @@
 package dev.sam3vision.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import dev.sam3vision.app.glasses.GlassesController
@@ -60,6 +65,18 @@ class MainActivity : ComponentActivity() {
     /** Géolocalisation demandée au premier lancement (suivi parent) ; optionnelle. */
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
+
+    /** Notification (Android 13+) demandée par le bouton « Partager » (Réglages). */
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
+    /**
+     * Localisation d'arrière-plan du suivi permanent, demandée seule : Android
+     * ignore silencieusement une demande groupée avec d'autres permissions,
+     * passée par le bouton « Partager » (Réglages).
+     */
+    private val backgroundLocationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -190,6 +207,23 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                 ),
             )
+        }
+    }
+
+    /**
+     * Demandes manquantes pour le suivi permanent (bouton « Partager » de la
+     * section Suivi parent) : notification, puis localisation d'arrière-plan,
+     * une boîte de dialogue par appui (la demande groupée est ignorée).
+     */
+    fun ensureSharePermissions() {
+        val granted = { permission: String ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+        }
+        if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (!granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
 }
