@@ -230,6 +230,42 @@ class Sam3LiveService:
             return error_message(parsed["id"], 500, f"internal error: {exc}")
         return success_message(result, parsed["id"])
 
+    async def _ws_step(self, websocket, raw, frame_seconds) -> bool:
+        """Un message reçu : réponse calculée puis envoyée. Faux = fermer la boucle."""
+        from fastapi import WebSocketDisconnect
+
+        from live_ws import UNKNOWN_ID, error_message, frame_id
+
+        try:
+            if raw is None:
+                reply = error_message(UNKNOWN_ID, 400, "expected a JSON text message")
+            else:
+                try:
+                    reply = await asyncio.wait_for(self._ws_frame(raw),
+                                                   timeout=frame_seconds)
+                except asyncio.TimeoutError:
+                    try:
+                        stuck = frame_id(json.loads(raw).get("id"))
+                    except Exception:  # noqa: BLE001 — frame illisible, id inconnu
+                        stuck = UNKNOWN_ID
+                    print(f"ws: frame id={stuck} > {frame_seconds:g} s, erreur 503",
+                          flush=True)
+                    reply = error_message(stuck, 503, "inference timeout, retry")
+            text = json.dumps(reply, separators=(",", ":"))
+            print(f"ws id={reply.get('id')} in={len(raw) if raw else 0}B "
+                  f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
+            if len(text) > WS_MAX_REPLY_BYTES:
+                print(f"ws id={reply.get('id')}: {len(text)}B > "
+                      f"{WS_MAX_REPLY_BYTES}B, fermeture 1009", flush=True)
+                await websocket.close(code=1009, reason="response too large")
+                return False
+            await websocket.send_text(text)
+            return True
+        except WebSocketDisconnect:
+            return False
+        except Exception:  # noqa: BLE001 — client parti entre réception et réponse
+            return False
+
     async def _ws_loop(self, websocket, idle_seconds=WS_IDLE_SECONDS,
                        frame_seconds=WS_FRAME_SECONDS) -> None:
         """Une frame à la fois par connexion ; le verrou GPU global reste la seule file.
@@ -244,8 +280,6 @@ class Sam3LiveService:
         """
         from fastapi import WebSocketDisconnect
 
-        from live_ws import UNKNOWN_ID, error_message, frame_id
-
         try:
             while True:
                 try:
@@ -259,33 +293,7 @@ class Sam3LiveService:
                     return
                 except Exception:  # noqa: BLE001 — message binaire ou socket déjà fermé
                     raw = None
-                try:
-                    if raw is None:
-                        reply = error_message(UNKNOWN_ID, 400, "expected a JSON text message")
-                    else:
-                        try:
-                            reply = await asyncio.wait_for(self._ws_frame(raw),
-                                                           timeout=frame_seconds)
-                        except asyncio.TimeoutError:
-                            try:
-                                stuck = frame_id(json.loads(raw).get("id"))
-                            except Exception:  # noqa: BLE001 — frame illisible, id inconnu
-                                stuck = UNKNOWN_ID
-                            print(f"ws: frame id={stuck} > {frame_seconds:g} s, erreur 503",
-                                  flush=True)
-                            reply = error_message(stuck, 503, "inference timeout, retry")
-                    text = json.dumps(reply, separators=(",", ":"))
-                    print(f"ws id={reply.get('id')} in={len(raw) if raw else 0}B "
-                          f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
-                    if len(text) > WS_MAX_REPLY_BYTES:
-                        print(f"ws id={reply.get('id')}: {len(text)}B > "
-                              f"{WS_MAX_REPLY_BYTES}B, fermeture 1009", flush=True)
-                        await websocket.close(code=1009, reason="response too large")
-                        return
-                    await websocket.send_text(text)
-                except WebSocketDisconnect:
-                    return
-                except Exception:  # noqa: BLE001 — client parti entre réception et réponse
+                if not await self._ws_step(websocket, raw, frame_seconds):
                     return
         finally:
             try:
@@ -322,12 +330,10 @@ class Sam3LiveService:
 
     def api(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws, /release."""
-        from fastapi import FastAPI, Request, WebSocket
+        from fastapi import FastAPI
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
-        from schemas import LiveFastRequest, SegmentRequest
 
-        service = self
         api = FastAPI(title=MODEL_LABEL, version="1.0.0", lifespan=self._lifespan)
         gzip_min = clamp_int(os.environ.get("FAST_GZIP_MIN_BYTES"), 1024, 0, 65536)
         if gzip_min > 0:
@@ -339,13 +345,28 @@ class Sam3LiveService:
         async def invalid_body(_request, exc):
             return JSONResponse(status_code=400, content={"detail": _validation_detail(exc.errors())})
 
+        self._routes_probe(api)
+        self._routes_live(api)
+        self._routes_control(api)
+        return api
+
+    def _routes_probe(self, api):
+        """GET /health et POST /segment (route historique, SPEC)."""
+        from schemas import SegmentRequest
+
         @api.get("/health")
         async def health():
-            return service.health()
+            return self.health()
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
-            return await call(service._segment_sync, request.image_b64, request.prompts)
+            return await call(self._segment_sync, request.image_b64, request.prompts)
+
+    def _routes_live(self, api):
+        """POST /live : frame JSON (contrat historique) ou JPEG brut + knobs en query."""
+        from fastapi import Request
+        from fastapi.responses import JSONResponse
+        from schemas import LiveFastRequest
 
         @api.post("/live")
         async def live(request: Request):
@@ -358,7 +379,7 @@ class Sam3LiveService:
             """
             ctype = request.headers.get("content-type", "")
             if ctype.split(";")[0].strip().lower() == "application/octet-stream":
-                result = await service._run_live_binary(request)
+                result = await self._run_live_binary(request)
             else:
                 try:
                     parsed = LiveFastRequest(**await request.json())
@@ -370,7 +391,7 @@ class Sam3LiveService:
                                             content={"detail": _validation_detail(exc.errors())})
                     return JSONResponse(status_code=400,
                                         content={"detail": "invalid request body: JSON illisible"})
-                result = await service._run_live(parsed)
+                result = await self._run_live(parsed)
             # En-tête additif (RFC 8673) : le levier FAST_TIMING reste le seul interrupteur.
             # Éteint, `timings_ms` est absent et aucun en-tête n'est émis — un client ancien
             # ne voit strictement rien changer ; un banc lit les postes sans parser le corps.
@@ -379,6 +400,10 @@ class Sam3LiveService:
             if not header:
                 return result
             return JSONResponse(content=result, headers={"Server-Timing": header})
+
+    def _routes_control(self, api):
+        """POST /release (extinction GPU) et WS /live/ws (même pipeline que /live)."""
+        from fastapi import Request, WebSocket
 
         @api.post("/release")
         async def release(request: Request):
@@ -402,6 +427,4 @@ class Sam3LiveService:
         async def live_ws(websocket: WebSocket):
             """Même pipeline que POST /live, un message texte JSON par frame."""
             await websocket.accept()
-            await service._ws_loop(websocket)
-
-        return api
+            await self._ws_loop(websocket)

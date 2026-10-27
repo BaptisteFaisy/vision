@@ -92,12 +92,8 @@ def patch_start_session() -> None:
     Sam3BasePredictor.start_session = start_session
 
 
-def run_session(predictor, video_path: str, prompts: list[str]) -> dict:
-    """Une session complète : start → prompts sur la frame 0 → propagation avant chronométrée."""
-    import numpy as np
-    import torch
-
-    session_id = predictor.handle_request({"type": "start_session", "resource_path": video_path})["session_id"]
+def _prompt_objects(predictor, session_id: str, prompts: list[str]):
+    """Prompts posés sur la frame 0 : ids, probas et temps cumulé."""
     obj_ids, probs, prompt_s = [], [], 0.0
     for text in prompts:
         start = time.time()
@@ -108,6 +104,16 @@ def run_session(predictor, video_path: str, prompts: list[str]) -> dict:
         if out.get("out_obj_ids") is not None:
             obj_ids += [int(i) for i in out["out_obj_ids"].flatten().tolist()]
             probs += [round(float(p), 3) for p in (out["out_probs"].flatten().tolist() if out.get("out_probs") is not None else [])]
+    return obj_ids, probs, prompt_s
+
+
+def run_session(predictor, video_path: str, prompts: list[str]) -> dict:
+    """Une session complète : start → prompts sur la frame 0 → propagation avant chronométrée."""
+    import numpy as np
+    import torch
+
+    session_id = predictor.handle_request({"type": "start_session", "resource_path": video_path})["session_id"]
+    obj_ids, probs, prompt_s = _prompt_objects(predictor, session_id, prompts)
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
     stamps, frames, last = [time.time()], 0, None

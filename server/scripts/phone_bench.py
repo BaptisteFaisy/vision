@@ -63,6 +63,71 @@ def stats(values: list) -> dict:
             "p95": round(ordered[index], 1), "max": round(ordered[-1], 1)}
 
 
+def _push_payloads(clip, session_id: str, url: str) -> None:
+    """Payloads poussés sur le téléphone (frames + script de mesure)."""
+    import tarfile
+
+    with tarfile.open("/tmp/payloads.tar.gz", "w:gz") as archive:
+        for index, frame in enumerate(clip[1:], start=1):
+            path = f"/tmp/trackbench_{index:03d}.json"
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps({"session_id": session_id, "image_b64": jpeg_b64(frame)}))
+            archive.add(path, arcname=f"f{index:03d}.json")
+    adb("push", "/tmp/payloads.tar.gz", f"{REMOTE}/payloads.tar.gz")
+    script = build_script(len(clip), url.rstrip("/"))
+    with open("/tmp/trackbench.sh", "w", encoding="utf-8") as handle:
+        handle.write(script)
+    adb("push", "/tmp/trackbench.sh", f"{REMOTE}/bench.sh")
+    adb("shell", f"cd {REMOTE} && tar xzf payloads.tar.gz")
+    print(f"payloads poussés ({len(clip) - 1} frames, script {len(script)} o)")
+
+
+def _run_measures():
+    """Une seule invocation curl sur le téléphone, lignes numériques parsées."""
+    output = adb("shell", f"sh {REMOTE}/bench.sh")
+    rows = [line.split() for line in output.splitlines() if line and line[0].isdigit()]
+    if not rows:
+        raise SystemExit(f"aucune mesure exploitable: {output[-400:]}")
+    total = [float(row[0]) * 1000 for row in rows]
+    appconnect = [float(row[1]) * 1000 for row in rows if len(row) > 1]
+    return rows, total, appconnect
+
+
+def _fetch_server_ms(poster, session_id: str) -> list:
+    """Ce que le serveur a mesuré : rapatriement des out*.json, best-effort."""
+    import tarfile
+
+    server = []
+    try:
+        adb("shell", f"cd {REMOTE} && tar czf outs.tar.gz out*.json")
+        adb("pull", f"{REMOTE}/outs.tar.gz", "/tmp/outs.tar.gz")
+        with tarfile.open("/tmp/outs.tar.gz", "r:gz") as archive:
+            for member in sorted(archive.getmembers(), key=lambda item: item.name):
+                handle = archive.extractfile(member)
+                if handle is not None:
+                    server.append(float(json.load(handle).get("elapsed_ms", 0)))
+    except Exception as exc:  # noqa: BLE001 — un pull raté ne doit pas jeter la mesure réseau
+        print(f"rapatriement partiel: {exc}")
+    poster.delete(f"/session/{session_id}")
+    poster.close()
+    return server
+
+
+def _write_report(args, rows, total, appconnect, server) -> int:
+    """Rapport console + JSON : RTT téléphone, appconnect, serveur, verdict p95."""
+    report = {"size": args.size, "quality": args.quality, "frames": len(rows),
+              "phone_rtt_ms": stats(total), "phone_appconnect_ms": stats(appconnect[1:]) if len(appconnect) > 1 else {},
+              "server_ms": stats(server) if server else {},
+              "first3": [round(value, 1) for value in total[:3]],
+              "over_300": [round(value, 1) for value in total if value > 300],
+              "raw_ms": [round(value, 1) for value in total],
+              "p95_under_300": stats(total)["p95"] < 300}
+    print(json.dumps(report, indent=2))
+    with open("/tmp/phone-bench.json", "w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
@@ -92,57 +157,10 @@ def main() -> int:
     print(f"session {session_id} ouverte en {rtt:.0f} ms, {len(body['objects'])} objet(s), "
           f"serveur {body.get('elapsed_ms')} ms")
 
-    # 2) payloads poussés sur le téléphone
-    import tarfile
-
-    with tarfile.open("/tmp/payloads.tar.gz", "w:gz") as archive:
-        for index, frame in enumerate(clip[1:], start=1):
-            path = f"/tmp/trackbench_{index:03d}.json"
-            with open(path, "w", encoding="utf-8") as handle:
-                handle.write(json.dumps({"session_id": session_id, "image_b64": jpeg_b64(frame)}))
-            archive.add(path, arcname=f"f{index:03d}.json")
-    adb("push", "/tmp/payloads.tar.gz", f"{REMOTE}/payloads.tar.gz")
-    script = build_script(len(clip), args.url.rstrip("/"))
-    with open("/tmp/trackbench.sh", "w", encoding="utf-8") as handle:
-        handle.write(script)
-    adb("push", "/tmp/trackbench.sh", f"{REMOTE}/bench.sh")
-    adb("shell", f"cd {REMOTE} && tar xzf payloads.tar.gz")
-    print(f"payloads poussés ({len(clip) - 1} frames, script {len(script)} o)")
-
-    # 3) mesure : une seule invocation curl sur le téléphone
-    output = adb("shell", f"sh {REMOTE}/bench.sh")
-    rows = [line.split() for line in output.splitlines() if line and line[0].isdigit()]
-    if not rows:
-        raise SystemExit(f"aucune mesure exploitable: {output[-400:]}")
-    total = [float(row[0]) * 1000 for row in rows]
-    appconnect = [float(row[1]) * 1000 for row in rows if len(row) > 1]
-
-    # 4) ce que le serveur a mesuré sur les mêmes frames
-    server = []
-    try:
-        adb("shell", f"cd {REMOTE} && tar czf outs.tar.gz out*.json")
-        adb("pull", f"{REMOTE}/outs.tar.gz", "/tmp/outs.tar.gz")
-        with tarfile.open("/tmp/outs.tar.gz", "r:gz") as archive:
-            for member in sorted(archive.getmembers(), key=lambda item: item.name):
-                handle = archive.extractfile(member)
-                if handle is not None:
-                    server.append(float(json.load(handle).get("elapsed_ms", 0)))
-    except Exception as exc:  # noqa: BLE001 — un pull raté ne doit pas jeter la mesure réseau
-        print(f"rapatriement partiel: {exc}")
-    poster.delete(f"/session/{session_id}")
-    poster.close()
-
-    report = {"size": args.size, "quality": args.quality, "frames": len(rows),
-              "phone_rtt_ms": stats(total), "phone_appconnect_ms": stats(appconnect[1:]) if len(appconnect) > 1 else {},
-              "server_ms": stats(server) if server else {},
-              "first3": [round(value, 1) for value in total[:3]],
-              "over_300": [round(value, 1) for value in total if value > 300],
-              "raw_ms": [round(value, 1) for value in total],
-              "p95_under_300": stats(total)["p95"] < 300}
-    print(json.dumps(report, indent=2))
-    with open("/tmp/phone-bench.json", "w", encoding="utf-8") as handle:
-        json.dump(report, handle, indent=2)
-    return 0
+    _push_payloads(clip, session_id, args.url)
+    rows, total, appconnect = _run_measures()
+    server = _fetch_server_ms(poster, session_id)
+    return _write_report(args, rows, total, appconnect, server)
 
 
 if __name__ == "__main__":
