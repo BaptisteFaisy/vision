@@ -14,8 +14,9 @@ import androidx.compose.ui.Modifier
  * entourée de satellites porte le message courant (gros texte paginé sur 3 lignes,
  * libellé YOU / ISEE, texte bleu quand c'est la voix du user) ; la carte caméra prend
  * sa place pendant l'enregistrement, puis se dissout en pixels dans la bulle qui
- * grandit. L'historique se parcourt au balayage vertical, un message à la fois : c'est
- * [IseeScenePane] qui remplace l'ancienne liste de bulles, il n'en reste qu'une.
+ * grandit. Le message affiché est toujours le dernier : la navigation entre messages
+ * (balayage vertical) a été supprimée — c'est [IseeScenePane] qui remplace l'ancienne
+ * liste de bulles, il n'en reste qu'une à l'écran.
  *
  * Toute l'interaction passe par les gestes de `IhearRootLayout` ; le pane reste muet.
  */

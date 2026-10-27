@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 /**
  * Le chef d'orchestre de l'écran unique (chat, caméra dans une bulle : vidéo du tap,
  * photo du double tap) : il tient l'état affiché et branche les collaborateurs —
- * [IhearTranscript] (bulles et historique), [IhearDictation] (micro et transcription),
+ * [IhearTranscript] (bulles), [IhearDictation] (micro et transcription),
  * [IhearAnswers] (question → réponse → voix), [IhearPhotoShot] (photo et pastilles),
  * [IhearCameraCoordinator] (vidéo), plus la lecture, l'intro et la sonde déjà extraites.
  *
@@ -78,7 +78,7 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     /** Voix de l'intro (le texte écrit, lui, ne part jamais). */
     private val intro = IhearIntro(getApplication(), player, { settings }, { settings = it }, prefs, ::update)
 
-    /** Bulles du chat et tours d'historique, reconstruits depuis Room. */
+    /** Bulles du chat, reconstruites depuis Room. */
     private val transcript = IhearTranscript(dao, ::update)
 
     /** Voix ElevenLabs d'un texte de bulle : octets vides si rien à dire. */
@@ -89,10 +89,8 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         dao = dao,
         media = media,
         player = player,
-        state = { _state.value },
         update = ::update,
         synthesize = { text -> voice.synthesize(text) },
-        replayIntro = { intro.replay() },
     )
 
     /** Photo du double tap et contexte image des questions : gel, fenêtre, pastilles. */
@@ -262,46 +260,6 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         update { it.copy(holding = false) }
     }
 
-    /** Balayage vertical commencé : vibration tant que le doigt glisse, sauf à bulle unique. */
-    fun onVerticalDragStart() {
-        if (!active) return
-        if (!hasBubbleChoice(bubbleCount(_state.value.entries.size))) return
-        haptics.verticalSwipeStart()
-    }
-
-    /** Début du glissement vertical : la marche se joue ici (un geste = une bulle), pas
-     * au relâchement — un balayage court emporte son effet. */
-    fun onVerticalDragMove(downward: Boolean) {
-        if (!active) return
-        if (_state.value.recordingVideo) return
-        viewModelScope.launch {
-            val current = _state.value
-            // L'intro compte comme une bulle : on peut y revenir pour la relire.
-            val total = bubbleCount(current.entries.size)
-            when (val step = swipeStep(total, current.selected, current.firstSwipeDownDone, downward)) {
-                is SwipeStep.Move -> {
-                    update { it.copy(selected = step.selected) }
-                    playback.playSelected()
-                }
-                is SwipeStep.Replay -> {
-                    update { it.copy(firstSwipeDownDone = step.firstSwipeDownDone) }
-                    playback.playSelected()
-                }
-                // Bulle unique ou bord atteint : pas de vibration, relecture seule.
-                SwipeStep.NoMove -> {
-                    if (!hasBubbleChoice(total)) playback.playSelected()
-                }
-            }
-        }
-    }
-
-    /** Relâchement : la marche a déjà été jouée au début du glissement ; on coupe
-     * juste l'haptique — même en dehors d'iSee, pour ne pas laisser la vibration collée. */
-    fun onVerticalSwipeEnd(committed: Boolean, downward: Boolean) {
-        haptics.verticalSwipeEnd()
-        if (!active) return
-    }
-
     /** Tap simple n'importe où : démarre la vidéo (fenêtre flottante), ou la ferme. */
     fun onSingleTap() {
         if (!active) return
@@ -426,8 +384,6 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        const val CHAT_HISTORY = IhearTranscript.CHAT_HISTORY
-
         /** Une photo du double tap reste à l'écran avant de s'évaporer. */
         const val PHOTO_SHOW_MS = IhearPhotoShot.SHOW_MS
 

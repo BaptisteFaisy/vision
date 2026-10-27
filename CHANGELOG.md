@@ -3,6 +3,43 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (14) — zéro mémoire des anciens messages + balayage supprimé
+
+- **L'IA n'a plus aucune mémoire** : `IhearTranscript` perd `questionTurns()` /
+  `turnsOf()` / `CHAT_HISTORY` ; `IhearAnswers` joint `emptyList()` à chaque question
+  (`app/ihear/vm/IhearAnswers.kt`) — aucun tour n'est lu de la base, même en pleine
+  session. `MediaCacheStore.history()` (« historique complet en mémoire ») supprimé.
+  Le plafond `AskUseCase.MAX_HISTORY_TURNS` (20 tours) ne vaut plus que pour le Direct.
+- **Les messages passés ne sont plus mémorisés en cache** : rien d'une session
+  antérieure n'est restauré — table Room et `cacheDir/ihear` vidés à l'ouverture
+  (`IhearViewModel.init`) et à la fermeture (`IhearSession.onClosed`), donc rien ne
+  revient, ne s'affiche et ne repart vers le modèle.
+- **Balayage entre messages supprimé** : machine `swipeStep`/`SwipeStep`,
+  `firstSwipeDownDone`, `hasBubbleChoice`, `selectedEntryIndex` (`IhearState.kt`) ;
+  callbacks `onVerticalDragStart/Move/End` (`IhearViewModel`, `IhearRootLayout`,
+  `MainActivity`) ; rail vertical de `IhearGestureBrain` (le glissement verrouille
+  toujours le geste — il ne devient jamais un tap — mais n'émet plus rien) ; haptique
+  dédiée (`IhearHaptics.verticalSwipe*`, `HapticPattern.swipeCrest`) ; lecture ciblée
+  (`IhearPlayback.playSelected`, `IhearIntro.replay`). Le message affiché est toujours
+  le dernier (`IhearTranscript.refresh`).
+- **UI** : pill d'instructions réduit à « Tap see / Hold ask » (`IseeStatusLine.kt`) ;
+  intro sans la phrase de balayage (`IntroLogic.kt`, 351 → 307 caractères).
+  ⚠️ `intro_ihear.mp3` annonce encore le swipe : à régénérer (procédure
+  `docs/ELEVENLABS-TTS.md`).
+- **Docs** : README (liste des gestes), `docs/ARCHITECTURE.md` (table des gestes +
+  « historique borné à 20 tours » → historique vide), `docs/ELEVENLABS-TTS.md`,
+  `docs/TESTING.md` (comptes de tests).
+- **Tests** : `SwipeStepTest` (9) renommé `BubbleCountTest` (2) ; `IhearTranscriptTest`
+  : les 2 tests d'historique deviennent « la sélection suit toujours la dernière
+  bulle » ; `IhearAnswersTest` : « aucun historique — la question part seule, même si
+  la base garde des messages » ; `UiLogicTest` : plus de « swipe down » dans l'intro ;
+  `WaveformTest` −2 ; `IhearGestureBrainTest` sans callbacks verticaux.
+- **Vérifié** (après rebase sur le master de 49 commits) :
+  `:app:testDebugUnitTest` vert ; `:core:testDebugUnitTest` avec les 5 échecs
+  `PrivateFileSettingsStoreTest` **retrouvés à l'identique sur un `origin/master`
+  vierge** (permissions POSIX non supportées sur Windows) ;
+  `tools/check-kotlin-limits.py` vert ; `assembleDebug` vert.
+
 ## 2026-10-27 (13) — cap vocal : le guidage marche vers la direction demandée
 
 - **Ordre vocal de cap** (`SteeringCommand`, avant Maps et le LLM) : « va à gauche »,

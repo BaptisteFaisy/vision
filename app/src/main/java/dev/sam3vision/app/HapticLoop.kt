@@ -54,7 +54,7 @@ class HapticLoop(context: Context) {
         play(HapticPattern.releaseTail())
     }
 
-    /** Coupe tout motif en cours (tenue comme balayage). */
+    /** Coupe tout motif en cours, tenue comprise. */
     fun stop() {
         runCatching { vibrator?.cancel() }
     }

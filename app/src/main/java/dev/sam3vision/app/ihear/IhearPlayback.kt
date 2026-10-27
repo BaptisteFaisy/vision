@@ -9,28 +9,16 @@ import java.io.File
 /**
  * La lecture du chat iSee, extraite du ViewModel (limite de 500 lignes, même motif
  * que `ProbeWiring.kt`) : une seule source sonore à la fois, MP3 déjà en cache ou
- * synthèse à la volée. L'intro se relit comme n'importe quelle autre bulle dès
- * qu'elle est sélectionnée par un balayage.
+ * synthèse à la volée. La lecture ciblée d'une bulle (anciennement balayage) a été
+ * supprimée : il ne reste que la réponse la plus récente, jouée dès son arrivée.
  */
 class IhearPlayback(
     private val dao: MessageMultimediaDao,
     private val media: MediaCacheStore,
     private val player: SpeechPlayer,
-    private val state: () -> IhearUiState,
     private val update: ((IhearUiState) -> IhearUiState) -> Unit,
     private val synthesize: suspend (String) -> ByteArray,
-    private val replayIntro: suspend () -> Unit,
 ) {
-
-    /** Lit la bulle sélectionnée : l'intro en tête du chat, sinon l'échange visé. */
-    suspend fun playSelected() {
-        val current = state()
-        if (current.selected <= INTRO_SELECTION) return replayIntro()
-        val entry = selectedEntryIndex(current.selected, current.entries.size)
-            ?.let(current.entries::getOrNull) ?: return
-        val row = dao.byId(entry.id / BUBBLE_STRIDE) ?: return
-        playFromRow(row, preferAi = entry is ChatEntry.AiBubble)
-    }
 
     /** La réponse la plus récente est jouée à voix haute dès son arrivée. */
     suspend fun speakLatestAnswer() {
