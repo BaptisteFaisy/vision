@@ -174,7 +174,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         resetForStart(prompts)
-        narration.open(inferHub(this.settings))
+        liveNarration(this.settings)?.let { narration.open(it) }
         if (!this.settings.liveSamEnabled) {
             startVisionOnly()
             return

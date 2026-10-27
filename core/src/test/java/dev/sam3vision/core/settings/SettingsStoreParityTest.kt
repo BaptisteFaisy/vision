@@ -28,6 +28,7 @@ class SettingsStoreParityTest {
         asrBaseUrl = "https://asr.test/v1",
         asrApiKey = "cle-complete-asr",
         asrModel = "modele-asr-complet",
+        liveLlmApiKey = "cle-narration-complete",
         ttsAnnouncePositions = false,
         introEnabled = false,
         introPlayed = true,
@@ -42,7 +43,7 @@ class SettingsStoreParityTest {
     )
 
     @Test
-    fun `le codec restitue les vingt champs sans en perdre un`() {
+    fun `le codec restitue tous les champs sans en perdre un`() {
         val relu = SettingsCodec.decode(SettingsCodec.encode(complet))
 
         assertEquals(complet, relu)

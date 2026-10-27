@@ -23,3 +23,21 @@ fun inferHub(settings: Settings): InferHubLlmClient = InferHubLlmClient(
     settings.llmModel,
     settings.speechLanguage,
 )
+
+/**
+ * Client de la **narration du Direct** : modèle rapide ([Settings.DEFAULT_LIVE_LLM_MODEL]),
+ * jamais celui des questions — un modèle à raisonnement dépenserait la totalité du budget
+ * de narration (200 tokens) avant sa première phrase, donc une frame sur deux serait perdue.
+ *
+ * `null` quand la clé de narration manque : le Direct se tait, plutôt que d'appeler le
+ * modèle des questions à chaque frame.
+ */
+fun liveNarration(settings: Settings): InferHubLlmClient? {
+    if (!settings.liveLlmConfigured) return null
+    return InferHubLlmClient(
+        Settings.DEFAULT_LIVE_LLM_BASE_URL,
+        settings.liveLlmApiKey,
+        Settings.DEFAULT_LIVE_LLM_MODEL,
+        settings.speechLanguage,
+    )
+}

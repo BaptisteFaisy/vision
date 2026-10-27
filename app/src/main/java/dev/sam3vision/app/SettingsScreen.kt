@@ -130,6 +130,9 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     LabeledField("Base URL LLM", draft.llmBaseUrl, false) { onChange(draft.copy(llmBaseUrl = it)) }
     LabeledField("Clé API LLM", draft.llmApiKey, true) { onChange(draft.copy(llmApiKey = it)) }
     LabeledField("Modèle LLM (vision)", draft.llmModel, false) { onChange(draft.copy(llmModel = it)) }
+    LabeledField("Clé narration Direct (vide = narration muette)", draft.liveLlmApiKey, true) {
+        onChange(draft.copy(liveLlmApiKey = it))
+    }
     LabeledField("Base URL SAM 3.1 (vide = région choisie ci-dessous)", draft.samBaseUrl, false) {
         onChange(draft.copy(samBaseUrl = it))
     }
