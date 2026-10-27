@@ -162,11 +162,41 @@ keys_build
 say "build de $short dans le miroir…"
 
 # --- build (hors verrou : c'est long) --------------------------------------
+# Deux essais maximum. Le second sert à un cas vu le 27/10 : le cache KSP du
+# miroir se corrompt quand il saute de commit en commit (« Storage corrupted
+# …/id-to-file.tab_i », puis « Storage … file-to-id.tab is already registered »
+# — le démon Gradle garde l'ancien enregistrement). Sans rattrapage, le cron
+# échouait en boucle et le téléphone restait figé sur un vieux master, en
+# silence. Le second essai repasse par Gradle directement : `clean` (le démon
+# nettoie lui-même, son registre reste cohérent) puis `--no-daemon`, pour ne pas
+# tuer le démon des autres agents qui compilent en parallèle.
+jdk_home() {  # même ordre que select_jdk de scripts/build.sh, en une ligne
+    local c
+    for c in "$HOME"/.gradle/jdks/*/; do
+        [ -x "${c}bin/javac" ] && { printf '%s' "${c%/}"; return 0; }
+    done
+    return 1
+}
+
+retry_build() {
+    local jdk
+    jdk="$(jdk_home)" || jdk="${JAVA_HOME:-}"
+    ( cd "$MIRROR" && JAVA_HOME="$jdk" timeout "$BUILD_TIMEOUT" \
+        ./gradlew --no-daemon clean assembleDebug --offline )
+}
+
 set +e
 ( cd "$MIRROR" && GRADLE_TIMEOUT="$BUILD_TIMEOUT" timeout "$BUILD_TIMEOUT" bash scripts/build.sh ) \
     > "$STATE_DIR/build.log" 2>&1
 built=$?
 set -e
+if [ "$built" != 0 ] && grep -qE 'Storage corrupted|Storage for .* is already registered' "$STATE_DIR/build.log"; then
+    say "cache KSP corrompu — nettoyage Gradle, second essai sans démon"
+    set +e
+    retry_build >> "$STATE_DIR/build.log" 2>&1
+    built=$?
+    set -e
+fi
 if [ "$built" != 0 ]; then
     tail -5 "$STATE_DIR/build.log" >&2
     die "build en échec (log : $STATE_DIR/build.log)"
