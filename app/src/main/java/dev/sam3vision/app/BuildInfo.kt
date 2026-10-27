@@ -14,10 +14,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Bloc « build » des Réglages : la version compilée et ce que **ce** build embarque.
- * Deux téléphones sur la même version peuvent se comporter différemment : le nom de
- * version ne décrit que le commit Git, pas les clés lues dans le `local.properties`
- * de chaque poste (hors dépôt) ni les réglages déjà enregistrés sur l'appareil.
+ * "Build" block of Settings: the compiled version and what **this** build embeds.
+ * Two phones on the same version may behave differently: the version name only
+ * describes the Git commit, not the keys read from each machine's
+ * `local.properties` (outside the repo) nor the settings already saved on device.
  */
 @Composable
 internal fun BuildInfoBlock() {
@@ -29,24 +29,24 @@ internal fun BuildInfoBlock() {
     )
     Column(
         Modifier.fillMaxWidth()
-            .background(AppColors.surfaceHigh, RoundedCornerShape(12.dp))
+            .background(SettingsLight.border.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             "Version ${BuildConfig.VERSION_NAME}",
-            color = AppColors.text,
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(summary, color = AppColors.textMuted, fontSize = 11.sp)
+        Text(summary, color = SettingsLight.muted, fontSize = 11.sp)
     }
 }
 
-/** Résumé des clés injectées au build — jamais leur valeur, qui vient de `local.properties`. */
+/** Summary of build-injected keys — never their value, which comes from `local.properties`. */
 internal fun buildConfigSummary(llm: Boolean, voice: Boolean, sam: Boolean, asr: Boolean): String =
-    "Clés du build — LLM : ${oui(llm)} · voix : ${oui(voice)} · dictée : ${oui(asr)} · SAM : ${oui(sam)}. " +
-        "Elles remplissent à l'installation tout champ encore vide : rien à saisir. " +
-        "Une valeur enregistrée sur ce téléphone l'emporte sur le build."
+    "Build keys — LLM: ${yes(present = llm)} · voice: ${yes(present = voice)} · dictation: ${yes(present = asr)} · SAM: ${yes(present = sam)}. " +
+        "They fill every still-empty field at install: nothing to type. " +
+        "A value saved on this phone wins over the build."
 
-private fun oui(present: Boolean): String = if (present) "oui" else "non"
+private fun yes(present: Boolean): String = if (present) "yes" else "no"

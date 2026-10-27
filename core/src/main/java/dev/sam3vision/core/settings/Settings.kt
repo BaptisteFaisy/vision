@@ -103,6 +103,12 @@ data class Settings(
     val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
     /** Envoi de la position + objets au relais pendant le Direct (site parent). */
     val shareEnabled: Boolean = true,
+    /**
+     * Invitation collée par le proche (rôle Caregiver) : le lien ou le code que la
+     * personne aveugle lui a envoyé. Acceptée telle quelle (« léo », « ?share=léo »
+     * ou le lien complet) — voir `parseCaregiverInvite`. Vide = pas d'invitation.
+     */
+    val caregiverInvite: String = "",
     /** Identifiant du flux de partage (relais `suivi-<shareId>`, lien générique). */
     val shareId: String = DEFAULT_SHARE_ID,
     /** Clé d'écriture vérifiée par le relais (jamais exposée côté site). */
@@ -281,7 +287,8 @@ data class Settings(
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
-        "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, maxObjects=$maxObjects)"
+        "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +
+        "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects)"
 }
 
 /** Marqueur de substitution d'une secret masqué (voir [maskSecret]). */

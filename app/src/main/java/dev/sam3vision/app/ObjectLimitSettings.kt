@@ -15,24 +15,24 @@ import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Objets à l'écran » : plafond commun au direct et à la photo
- * ([ObjectLimits.MIN_ON_SCREEN] à [ObjectLimits.MAX_ON_SCREEN]).
- * Deux gros boutons − / + plutôt qu'un curseur : visée et lecture faciles au doigt.
+ * "On-screen objects" section: cap shared by Direct and photo
+ * ([ObjectLimits.MIN_ON_SCREEN] to [ObjectLimits.MAX_ON_SCREEN]).
+ * Two big − / + buttons instead of a slider: easy to aim and read by finger.
  */
 @Composable
 fun ObjectsSettings(draft: Settings, onChange: (Settings) -> Unit) {
     val current = draft.objectsOnScreen
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "Objets à l'écran",
-            color = AppColors.text,
+            "On-screen objects",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "Au plus $current objet${if (current > 1) "s" else ""} — direct et photo. " +
-                "Moins d'objets = moins de masques, direct plus fluide.",
-            color = AppColors.textMuted,
+            "At most $current object${if (current > 1) "s" else ""} — Direct and photo. " +
+                "Fewer objects = fewer masks, smoother Direct.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
         Row(
@@ -40,25 +40,25 @@ fun ObjectsSettings(draft: Settings, onChange: (Settings) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BigButton(
+            GlassButton(
                 label = "−",
                 enabled = current > ObjectLimits.MIN_ON_SCREEN,
-                color = AppColors.surfaceHigh,
+                primary = false,
                 onClick = { onChange(draft.copy(maxObjects = ObjectLimits.step(current, -1))) },
                 widthFactor = 0.3f,
             )
             Text(
                 "$current",
-                color = AppColors.text,
+                color = SettingsLight.text,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            BigButton(
-                label = "＋",
+            GlassButton(
+                label = "+",
                 enabled = current < ObjectLimits.MAX_ON_SCREEN,
-                color = AppColors.surfaceHigh,
+                primary = false,
                 onClick = { onChange(draft.copy(maxObjects = ObjectLimits.step(current, +1))) },
                 widthFactor = 0.3f,
             )

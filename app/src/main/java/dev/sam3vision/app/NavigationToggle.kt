@@ -12,29 +12,29 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Navigation » des réglages : l'interrupteur « Guidage GPS » branché
- * sur [Settings.navigationGuidanceEnabled] (`navigation_guidance` en prefs).
+ * "Navigation" settings section: the "GPS guidance" switch wired to
+ * [Settings.navigationGuidanceEnabled] (`navigation_guidance` in prefs).
  *
- * Allumé (défaut d'une installation fraîche) : la destination confirmée part en
- * guidage (intent `google.navigation:` puis repli URL universelle) ; éteint :
- * seule la fiche du lieu s'affiche, sans lancer de guidage.
+ * On (fresh install default): the confirmed destination goes to guidance
+ * (`google.navigation:` intent, then universal URL fallback); off: only the
+ * place card shows, with no guidance started.
  */
 @Composable
 internal fun NavigationToggle(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Navigation — guidage GPS",
-            color = AppColors.text,
+            "Navigation — GPS guidance",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        SwitchRow("Guider vers la destination confirmée", draft.navigationGuidanceEnabled) {
+        SwitchRow("Guide to the confirmed destination", draft.navigationGuidanceEnabled) {
             onChange(draft.copy(navigationGuidanceEnabled = it))
         }
         Text(
-            "« Emmène-moi à la gare » ouvre Google Maps en guidage. Éteint, seule " +
-                "la fiche du lieu s'affiche, sans lancer de guidage.",
-            color = AppColors.textMuted,
+            "« Take me to the station » opens Google Maps in guidance. Off, only " +
+                "the place card shows, with no guidance started.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
     }
