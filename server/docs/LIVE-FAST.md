@@ -7,7 +7,7 @@ Source réellement déployée : `backend/live_fast/` (app Modal `sam3-eu-a100`, 
 
 ## Les leviers, et pourquoi ils sont dans le script
 
-| levier | effet mesuré (25/10, A100 eu-west) |
+| levier | effet mesuré (25 octobre, A100 eu-west) |
 |---|---|
 | `FAST_CUDA_GRAPH=1` | encodeur vision **45 ms → 1,4 ms** |
 | `FAST_SCALEDOWN=300` | plus de réveil de 25-50 s entre deux gestes (20 s par défaut) |

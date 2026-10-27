@@ -24,8 +24,28 @@ Image : mêmes dépendances que `backend/requirements.txt` + `torchvision` (déj
 
 `GET /health` → `{"ok": true, "model": "sam3.1", "device": "cuda", "gpu": "<nom nvidia-smi>"}`
 
+`POST /release` → `{"released": true, "grace_seconds": 0.5}` (corps ignoré, en-tête
+`x-sam-release: confirm` exigé, sinon 400). Le conteneur se tue après avoir répondu
+et `min_containers=0` : Modal ne relance rien, le prochain réveil repart du snapshot.
+
 Objectif de performance mesuré : **< 600 ms par frame** à 768 px avec 4 prompts sur A100. Si dépassé,
 descendre `work_edge` côté client avant de toucher au modèle.
+
+### Cycle de vie GPU — la carte ne travaille qu'au premier plan
+
+- `ON_PAUSE` (sortie du premier plan) : chaque flux SAM (Direct, sonde iSee) coupe son
+  trafic **tout de suite** (socket fermé, frames jetées), avant même l'arrêt caméra —
+  `onStop` tarde sur certains téléphones, et une frame partie après `/release`
+  rallume la carte aussitôt, indéfiniment ;
+- au même moment, l'app envoie `POST /release` (best-effort, 2 essais) sur l'endpoint
+  actif (même résolution que le direct : saisie manuelle > région EU/US > build) ;
+- `ON_RESUME` : le flux coupé repart tout seul (réveil 2-7 s depuis le snapshot) ; un
+  arrêt manuel (retour, sortie d'écran) ne repart pas ;
+- navigation interne, app toujours au premier plan (Direct → Réglages → Direct) : le
+  flux s'arrête mais la carte reste chaude jusqu'au scaledown (retour immédiat).
+
+Ne jamais sonder `/health` en boucle : la route est servie par le conteneur GPU
+lui-même, chaque appel le réveille (~29 s à froid) et repousse son extinction.
 
 ## Kotlin — `:core` (signatures exactes, `:app` code dessus)
 

@@ -69,13 +69,13 @@ PY
 }
 
 # Chemin UNIQUE du secret : mktemp chmod 600 → JSON → `modal secret create --from-json
-# --force`. La clé n'est jamais un argument de commande (historique shell, `ps`).
+# (avec écrasement)`. La clé n'est jamais un argument de commande (historique shell, `ps`).
 # Refuse de tourner sans LLM_API_KEY ; DRY_RUN=1 valide sans rien créer.
 sync_secret_from_env() {
   local rc=0
   require_keys "${SECRET_KEYS[@]}"
   if [[ "$DRY_RUN" == "1" ]]; then
-    log "DRY_RUN : modal secret create $SECRET_NAME --from-json <fichier 600> --force (profil $MODAL_PROFILE)"
+    log "DRY_RUN : modal secret create $SECRET_NAME --from-json <fichier 600> (avec écrasement) (profil $MODAL_PROFILE)"
     return 0
   fi
   SECRET_TMP="$(mktemp "${TMPDIR:-/tmp}/${SECRET_NAME}-secret.XXXXXX.json")" \

@@ -1,6 +1,6 @@
 # LIVE-PERF — latences réelles de `/live` (app `sam3-live`, A100)
 
-## Démarrage à froid : poids dans l'image + snapshot mémoire (2026-10-25 21:15)
+## Démarrage à froid : poids dans l'image + snapshot mémoire (25 octobre 2026 21:15)
 
 Deux leviers, dans cet ordre, mesurés sur `sam3-eu-a100` (A100-40GB, eu-west) :
 
@@ -18,7 +18,7 @@ Contrainte à connaître : un snapshot mémoire ne contient pas d'état CUDA, d'
 coupure CPU/GPU entre les deux `enter`. `/health` expose `load_breakdown`
 (`age_conteneur_s`, `poids_cpu_1er_demarrage_s`, `gpu_s`) et `memory_snapshot`.
 
-## ⚠️ Ne pas déployer `live_app.py` (2026-10-25)
+## ⚠️ Ne pas déployer `live_app.py` (25 octobre 2026)
 
 `backend/live_app.py` est la version **LENTE** (1008 px, 1 forward DETR par concept) : **205-241 ms serveur**.
 La production du téléphone, c'est `backend/live_app_fast.py` avec `FAST_BATCH_PROMPTS=1` et
@@ -32,10 +32,10 @@ bash scripts/deploy-live-fast.sh               # déploie backend/live_app_fast.
 bash scripts/deploy-live-fast.sh --no-deploy   # vérifie seulement, n'allume rien
 ```
 
-Les sections ci-dessous (mesures du 2026-10-24 sur `live_app.py`) documentent l'état **lent** :
+Les sections ci-dessous (mesures du 24 octobre 2026 sur `live_app.py`) documentent l'état **lent** :
 elles restent la référence de non-régression, pas la cible de production.
 
-Mesures 2026-10-24 · URL `https://baptiste-faisy--sam3-live-sam3live-web.us-east.modal.run` · GPU réellement alloué (`/health`) : **NVIDIA A100-SXM4-40GB**, `device=cuda`, `model=sam3.1`.
+Mesures 24 octobre 2026 · URL `https://baptiste-faisy--sam3-live-sam3live-web.us-east.modal.run` · GPU réellement alloué (`/health`) : **NVIDIA A100-SXM4-40GB**, `device=cuda`, `model=sam3.1`.
 Classe `Sam3Live` : `gpu="A100"`, `timeout=300`, `startup_timeout=900`, `scaledown_window=30`, **sans secret** ; démarrage à froid (poids 1,68 Go) : 38 s.
 Protocole : 10 appels `/live` consécutifs par résolution, `prompts=["person","car","dog","chair"]`, `max_objects=12` ; serveur = `elapsed_ms` (`time.monotonic`), client = aller-retour (`scripts/bench_live.py`).
 
@@ -71,7 +71,7 @@ Descendre sous 340 ms exigerait de toucher `processor.image_processor.size` (hor
 cd ~/Bureau/sam3-vision-app && /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy deploy backend/live_app.py
 /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy app stop sam3-live -y   # coupe le GPU
 ```
-## A100 40 Go vs H200 — même code, même contrat (2026-10-24 19:0x)
+## A100 40 Go vs H200 — même code, même contrat (24 octobre 2026 19:0x)
 
 Variante H200 déployée sans dupliquer le code : `LIVE_APP_NAME=sam3-live-h200 LIVE_GPU=H200
 modal deploy backend/live_app.py` (constantes surchargées par l'environnement).
@@ -130,7 +130,7 @@ Protocole identique aux mesures ci-dessus, **8 concepts** (`person,chair,table,l
 serveur de H200 (406 → 245 ms) est avalé par le réseau. L'app reste donc sur **A100** (2,10 $/h au lieu
 de 4,54 $/h). H200 ne redevient utile qu'avec le tracker vidéo (40 ips) ou plusieurs flux simultanés.
 
-## A100-40GB en Europe — region + routing (2026-10-24 20:3x)
+## A100-40GB en Europe — region + routing (24 octobre 2026 20:3x)
 
 Demande : « tester une A100 40 Go en Europe pour le moins de latence possible ».
 Modal permet deux réglages distincts (docs/guide/region-selection) :
@@ -172,7 +172,7 @@ Le goulot A100 n'est plus le réseau : c'est le GPU lui-même.
 max_containers=1 + scaledown 20 s : jamais deux cartes, la carte chauffe 20 s après la dernière frame.
 Session de test ≈ 9–10 min de GPU ≈ **0,36 $** (2,415 $/h). Garde : `KEEP=sam3-eu-a100 bash scripts/modal-one-gpu.sh`.
 
-## WebSocket `/live/ws` — supprimer l'overhead HTTP par frame (2026-10-25)
+## WebSocket `/live/ws` — supprimer l'overhead HTTP par frame (25 octobre 2026)
 
 Ajout d'une route **WebSocket** sur la même app et le même conteneur (`backend/live_app_fast.py`) :
 le pipeline GPU est **le même** (`Sam3Live._live_sync`, un seul verrou GPU), seul le transport change.

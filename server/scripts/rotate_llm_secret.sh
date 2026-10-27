@@ -8,7 +8,7 @@
 # Le fichier accepte des lignes `CLE=valeur` (api_key|key|token|secret, base_url|
 # endpoint, model — avec ou sans préfixe LLM_), des commentaires `#` ou `//`, ou UNE
 # SEULE LIGNE BRUTE = la clé API. Variables d'environnement LLM_BASE_URL /
-# LLM_API_KEY / LLM_MODEL priment sur le fichier. Idempotent (--force).
+# LLM_API_KEY / LLM_MODEL priment sur le fichier. Idempotent (avec écrasement).
 # La clé n'est JAMAIS affichée ni loggée : le secret passe par --from-json (lib-env.sh).
 set -euo pipefail
 
@@ -54,7 +54,7 @@ log "clé lue : ${#LLM_API_KEY} caractères (masquée) | modèle : $LLM_MODEL"
 
 # ----------------------- 3. secret Modal : chemin unique de lib-env.sh (600 + JSON)
 export LLM_BASE_URL LLM_API_KEY LLM_MODEL
-log "secret « $SECRET_NAME » (profil $MODAL_PROFILE, create --force)"
+log "secret « $SECRET_NAME » (profil $MODAL_PROFILE, create (avec écrasement))"
 sync_secret_from_env
 
 if [[ "$DRY_RUN" == "1" ]]; then
