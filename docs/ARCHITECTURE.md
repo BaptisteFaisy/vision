@@ -171,7 +171,7 @@ Précisions qui comptent :
   `TrackRunner` quand sa pastille « Tracker » est active (`app/LiveViewModel.kt`, `start()`) ;
   c'est le second transport des frames, à côté de `/live` en WebSocket qui reste le défaut.
   Le débit relevé pour ce chemin est dans `docs/TRACK-PERF.md` (§ 2 : 1,8 ips sur le téléphone,
-  le 25/10 — soit à peine mieux que `/live`, le serveur étant le facteur limitant).
+  lors d'un relevé antérieur — soit à peine mieux que `/live`, le serveur étant le facteur limitant).
 - **Il n'existe aucun endpoint `/ask`** : la question part au LLM par `POST {llm}/chat/completions`
   (`grep -rn '"/ask"' core/src/main app/src/main` : rien).
 - **Erreurs typées**, un seul barème (`core/net/Http.kt:191-207`) : 401/403 → `InvalidKey`,

@@ -9,7 +9,7 @@ Le tracker est le transport par **sessions** du direct (`POST /session` + `POST 
 `core/net/TrackClient.kt` + `core/live/TrackRunner.kt` ; il est branché à l'écran Direct
 (pastille « Live » / « Tracker » du bandeau du haut).
 
-## 1. Les relevés qui existent (25/10, backend `sam3-vision-app`)
+## 1. Les relevés qui existent (relevés antérieurs, backend `sam3-vision-app`)
 
 Origine : campagne du tracker côté backend (fiche `15-tracker-http-sessions.md`, dépôt
 `~/Bureau/sam3-vision-app`), frames **640×360 JPEG q65**, instance **A100-40GB eu-west**.
@@ -18,13 +18,13 @@ Origine : campagne du tracker côté backend (fiche `15-tracker-http-sessions.md
 |---|---:|---:|---:|---:|
 | **Serveur**, 239 frames d'affilée | 156 | **169** | **181** | 204 ms |
 | **Aller-retour depuis le PC** (client Python) | 246 | **260** | **287** | 360 ms |
-| **Aller-retour depuis le téléphone** (`scripts/phone_bench.py`, 25/10 **12:03**, 59 frames) | 198 | **205** | **224** | 448 ms |
+| **Aller-retour depuis le téléphone** (`scripts/phone_bench.py`, relevé antérieur, 59 frames) | 198 | **205** | **224** | 448 ms |
 
 Précisions mesurées au même moment : `POST /session` = **3,1 s** (chargement de la session) ;
 la **première** frame d'une connexion neuve coûte **431 ms** ; la connexion est bien réutilisée
 (`time_appconnect = 0` sur 58 des 59 frames, une seule invocation `curl`).
 
-## 2. Dans l'app, tracker branché sur l'écran Direct (25/10 **13:23**)
+## 2. Dans l'app, tracker branché sur l'écran Direct (relevé antérieur)
 
 Client `TrackClient` + `TrackRunner`, une frame en vol (`FrameGate`) : bandeau relevé
 **« Direct (tracker) · 1,8 ips · 522 ms · 2 objets »**, contre **~1,6 ips** sur `/live` au même
@@ -47,7 +47,7 @@ pas le client — le p95 de 224 ms du banc devient 522 ms en usage réel.
 - **Le débit du tracker depuis ce téléphone, avec ce client, n'a pas été re-mesuré le
   26/10** : le backend `sam3-track` n'est déployé nulle part (`~/bin/sam3-gpu status` → aucune
   app, aucun conteneur actif) et allumer une GPU Modal est interdit sans accord explicite.
-  Les chiffres des § 1 et 2 sont ceux du **25/10**, avec la source ci-dessus — pas une mesure
+  Les chiffres des § 1 et 2 sont ceux d'un relevé **antérieur**, avec la source ci-dessus — pas une mesure
   de cet arbre.
 - Ce que cet arbre vérifie sans GPU : les tests JVM du client et du runner
   (`:core:testDebugUnitTest`, `TrackClientTest` / `TrackRunnerTest`), le budget de lignes et
