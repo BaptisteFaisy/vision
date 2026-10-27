@@ -59,6 +59,19 @@ class UiLogicTest {
     }
 
     @Test
+    fun `la phrase francaise desactive iSee intro coupe aussi l'intro`() {
+        // L'interface est en français : la phrase dictée en français doit couper.
+        assertTrue(isIntroDisablePhrase("désactive isee intro"))
+        assertTrue(isIntroDisablePhrase("Desactive iSee intro !"))
+        // La dictée entend « i see » en deux mots, avec l'accent de « désactive ».
+        assertTrue(isIntroDisablePhrase("ok, désactive i see intro s'il te plaît"))
+        assertTrue(isIntroDisablePhrase("Désactiver iSee intro"))
+        // Une question sur l'intro, même en français, ne coupe rien.
+        assertFalse(isIntroDisablePhrase("Que dit l'intro iSee ?"))
+        assertFalse(isIntroDisablePhrase("désactive le micro"))
+    }
+
+    @Test
     fun `le texte de l'intro est celui que la voix dit`() {
         assertTrue(IHEAR_INTRO_TEXT.startsWith("Welcome to iSee."))
         assertTrue(IHEAR_INTRO_TEXT.contains("tap again to stop"))
