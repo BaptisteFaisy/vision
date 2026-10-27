@@ -1,0 +1,61 @@
+name: deploy-live-fast
+
+# Le backend live (sam3-eu-a100) doit être déployé **avec ses leviers** : c'est ce qui
+# rend le graphe CUDA (vision 45 ms → 1,4 ms) et la fenêtre de 5 min persistants. Un
+# déploiement manuel sans eux les efface (vu le 25 octobre : cuda_graph repassé à false).
+#
+# Deux règles, apprises le 25-26/10 :
+#  1. **aucun contrôle périodique** : un ping /health réveille le conteneur (29 s de
+#     démarrage) et empêche l'extinction que l'app demande quand elle passe en arrière-plan
+#     (`POST /release`). Donc pas de `schedule:` — on ne déploie qu'à un push.
+#  2. les jetons Modal vivent dans les **secrets du dépôt** (`MODAL_TOKEN_ID`,
+#     `MODAL_TOKEN_SECRET`) : jamais dans un fichier, jamais affichés (GitHub les masque
+#     dans les logs). `gh secret list` ne montre que leur nom et leur date.
+#
+# ACTIF : tout push sur la branche protégée qui touche le backend ou ce fichier
+# redéploie l'app — donc réveille la carte GPU (facturé). Pas de `schedule:`,
+# jamais de ping périodique : seul un changement déploie.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'server/backend/live_fast/**'
+      - 'server/scripts/deploy-live-fast.sh'
+      - '.github/workflows/deploy-live-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-live-fast
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Hors PR : déploiement Modal + attente que la nouvelle version serve
+    # (jusqu'à quelques minutes si l'ancien conteneur vit encore).
+    timeout-minutes: 10
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      # Pas de ~/.modal.toml en CI : l'authentification vient des deux jetons ci-dessus.
+      MODAL_PROFILE: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Installer la CLI Modal
+        run: python3 -m pip install --quiet "modal==1.6.2"
+
+      - name: Vérifier que les jetons sont présents (sans les afficher)
+        run: |
+          set -euo pipefail
+          [ -n "${MODAL_TOKEN_ID:-}" ] || { echo "::error::MODAL_TOKEN_ID manquant"; exit 1; }
+          [ -n "${MODAL_TOKEN_SECRET:-}" ] || { echo "::error::MODAL_TOKEN_SECRET manquant"; exit 1; }
+          echo "jetons présents (valeurs masquées par GitHub)"
+
+      - name: Déployer avec les leviers
+        run: bash server/scripts/deploy-live-fast.sh

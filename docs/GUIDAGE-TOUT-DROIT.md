@@ -62,12 +62,12 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
    dans le couloir parle aussitôt, sans attendre le délai. Le lecteur coupe la phrase
    en cours (`SpeechPlayer` : une seule lecture à la fois), donc le danger coupe la
    réassurance — c'est voulu. Le retour au libre, lui, attend : la réassurance peut
-   patienter (`GuidanceAnnouncer.kt:56-69`).
+   patienter (`GuidanceAnnouncer.kt:40`, `urgent = decision.blocked`).
 
 Différence assumée avec les positions : **la voie libre se dit** (« Continue tout
 droit. », une fois par période libre) là où une scène vide reste muette
-(`PositionAnnouncer.onEmptyScene`). Le guidage confirme qu'il veille ; les positions
-décrivent ce qu'il y a.
+(`AnnouncementGate.clearScene`, via `PositionAnnouncer`). Le guidage confirme qu'il
+veille ; les positions décrivent ce qu'il y a.
 
 ## 5. Câblage : une seule voix, le guidage prime
 
@@ -75,8 +75,8 @@ décrivent ce qu'il y a.
 |---|---|
 | Décision, phrase, signature | `core/.../live/Guidance.kt` |
 | Machine 2 frames / 4 s / danger prioritaire | `core/.../live/GuidanceAnnouncer.kt` |
-| Sonde iSee : `guide` prime sur `announce` | `app/.../ihear/LiveProbe.kt` (`phraseOf`), `ProbeWiring.kt` (`configureFrom`) |
-| Voix (inchangée) | `app/.../ihear/ProximityVoice.kt` → ElevenLabs, jamais par-dessus le chat |
+| Sonde iSee : `guide` prime sur `announce` | `app/.../isee/LiveProbe.kt` (`phraseOf`), `ProbeWiring.kt` (`configureFrom`) |
+| Voix (inchangée) | `app/.../isee/ProximityVoice.kt` → ElevenLabs, jamais par-dessus le chat |
 | Réglage | `Settings.ttsGuidanceStraight` (défaut `true`), effectif `guideStraight = bascule && ttsConfigured` (`Settings.kt`), bascule « Guider tout droit (caméra iSee) » (`app/TtsSettings.kt`) |
 
 Le Direct et l'analyse photo gardent l'annonce des positions : le guidage ne concerne

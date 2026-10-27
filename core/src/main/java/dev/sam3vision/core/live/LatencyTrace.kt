@@ -6,7 +6,7 @@ package dev.sam3vision.core.live
  * comp → aff.
  *
  * À ne pas confondre avec [LiveStage], la chronologie en **millisecondes** de l'écran
- * Direct/iHear ([LiveTimings], huit postes de transport) : ici, l'unité est la microseconde,
+ * Direct/iSee ([LiveTimings], huit postes de transport) : ici, l'unité est la microseconde,
  * chaque étage couvre une portion disjointe du trajet et le cycle complet donne la
  * **latence perçue**. `label` est le nom court des lignes de journal.
  */

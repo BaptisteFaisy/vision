@@ -56,4 +56,11 @@ class LivePromptsTest {
         val atLimit = "z".repeat(LivePrompts.MAX_LENGTH)
         assertEquals(listOf(atLimit), LivePrompts.normalize(listOf(atLimit)))
     }
+
+    @Test
+    fun `le champ suit accepte virgules points virgules et retours ligne`() {
+        assertEquals(listOf("a", "b", "c"), LivePrompts.field(" a , b;c "))
+        assertEquals(listOf("x", "y"), LivePrompts.field("x\ny"))
+        assertEquals(LivePrompts.Default, LivePrompts.field(" , ;\n"))
+    }
 }

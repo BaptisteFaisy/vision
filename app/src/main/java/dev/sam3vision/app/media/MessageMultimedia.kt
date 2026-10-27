@@ -130,7 +130,7 @@ abstract class MediaDatabase : RoomDatabase() {
          * mission au schéma plus récent vers ce schéma), Room la recrée vide au lieu
          * de crasher (`IllegalStateException: A migration from 2 to 1…`, vu sur
          * l'appareil). Perte acceptée : le ViewModel purge cette table à chaque
-         * démarrage de toute façon (`IhearViewModel.kt`). Les montées de version
+         * démarrage de toute façon (`IseeViewModel.kt`). Les montées de version
          * sans migration restent des crashs volontaires (vraie migration exigée).
          * Journal WAL : les lectures ne bloquent plus les écritures (purge FIFO).
          */
@@ -140,6 +140,6 @@ abstract class MediaDatabase : RoomDatabase() {
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
 
-        private const val DB_NAME = "ihear-media.db"
+        private const val DB_NAME = "isee-media.db"
     }
 }

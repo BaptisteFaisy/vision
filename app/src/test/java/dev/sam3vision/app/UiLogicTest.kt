@@ -79,14 +79,12 @@ class UiLogicTest {
 
     @Test
     fun `le texte de l'intro est celui que la voix dit`() {
-        assertTrue(IHEAR_INTRO_TEXT.startsWith("Welcome to iSee."))
-        assertTrue(IHEAR_INTRO_TEXT.contains("tap again to stop"))
-        assertTrue(IHEAR_INTRO_TEXT.contains("Disable iSee intro"))
-        // Le geste de balayage est annoncé avant la phrase de désactivation.
-        val swipe = IHEAR_INTRO_TEXT.indexOf("swipe down")
-        val disable = IHEAR_INTRO_TEXT.indexOf("Disable iSee intro")
-        assertTrue(swipe > 0)
-        assertTrue(swipe < disable)
+        assertTrue(ISEE_INTRO_TEXT.startsWith("Welcome to iSee."))
+        assertTrue(ISEE_INTRO_TEXT.contains("tap again to stop"))
+        assertTrue(ISEE_INTRO_TEXT.contains("Disable iSee intro"))
+        // Plus de navigation entre messages : l'intro n'annonce plus de balayage.
+        assertFalse(ISEE_INTRO_TEXT.contains("swipe down"))
+        assertTrue(ISEE_INTRO_TEXT.indexOf("Disable iSee intro") > 0)
     }
 
     @Test

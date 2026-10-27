@@ -53,31 +53,35 @@ Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PA
 
 `app/src/main/AndroidManifest.xml` déclare une **activité unique** (`MainActivity`) et une
 `Application` maison (`android:name=".SamApp"`). `MainActivity.buildRoot` installe
-`IhearRootLayout` (un `FrameLayout` qui intercepte le toucher) et lui pose une `ComposeView`
-→ `SamRoot` → `AppNav` (`app/AppNav.kt`). La route d'accueil est `Route.Ihear` →
-`IhearHome` → **`IseeScenePane`** en plein écran (`app/ihear/IhearHome.kt:33`) : bulle de
+`IseeRootLayout` (un `FrameLayout` qui intercepte le toucher) et lui pose une `ComposeView`
+→ `SamRoot` → `AppNav` (`app/AppNav.kt`). La route d'accueil est `Route.Isee` →
+`IseeHome` → **`IseeScenePane`** en plein écran (`app/isee/IseeHome.kt:33`) : bulle de
 verre, gros texte paginé, carte caméra qui se dissout.
 
 Gestes, tous câblés dans `MainActivity.buildRoot` :
 
 | Geste | Effet | Code |
 |---|---|---|
-| tap simple | démarre / arrête l'enregistrement vidéo | `IhearViewModel.onSingleTap` (`app/ihear/IhearViewModel.kt:248`) |
-| double tap | photo immédiate | `IhearViewModel.onDoubleTap` (`:254`) |
+| tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:248`) |
+| double tap | photo immédiate | `IseeViewModel.onDoubleTap` (`:254`) |
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu | `core/gesture/LongPressTrigger.kt:102,105` |
-| glissement vertical | change de bulle, une par geste | `IhearViewModel.onVerticalDragMove` (`:216`) |
-| balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IhearRootLayout.kt:75` |
+| balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IseeRootLayout.kt` |
+
+Le **glissement vertical** (changement de bulle) a été supprimé : `IseeViewModel`
+n'a plus `onVerticalDrag*`, le rail vertical de `core/gesture/IseeGestureBrain.kt`
+verrouille le geste **sans rien émettre** (un glissement ne peut donc jamais passer
+pour un tap), et il n'y a aucun moyen de revenir à un message antérieur.
 
 ### 2.1 Photo (double tap sur l'accueil)
 
-1. `IhearViewModel.onDoubleTap` → `shots.takePhoto()` (`app/ihear/vm/IhearPhotoShot.kt`) :
-   `media.newPhotoFile()` puis `camera().takePhoto(target)` — c'est `IhearCameraHost`
-   (`app/ihear/IhearCameraPane.kt`), le pilote CameraX d'iSee (`ImageCapture` +
+1. `IseeViewModel.onDoubleTap` → `shots.takePhoto()` (`app/isee/vm/IseePhotoShot.kt`) :
+   `media.newPhotoFile()` puis `camera().takePhoto(target)` — c'est `IseeCameraHost`
+   (`app/isee/IseeCameraPane.kt`), le pilote CameraX d'iSee (`ImageCapture` +
    `VideoCapture<Recorder>` + `ImageAnalysis`, liés ensemble).
-2. Photo écrite → `onSaved` : elle **gèle** le contexte de question (`IhearPhotoContext`),
+2. Photo écrite → `onSaved` : elle **gèle** le contexte de question (`IseePhotoContext`),
    s'affiche dans la fenêtre, puis s'évapore après un minuteur (`SHOW_MS`, allongé en
    `MEASURED_MS` si des pastilles sont posées).
-3. **Pastilles de distance** : `IhearPhotoDistances.measureOutcome` envoie la photo au
+3. **Pastilles de distance** : `IseePhotoDistances.measureOutcome` envoie la photo au
    `POST {sam}/segment` de `core/net/HttpSamClient` (`prompts = null`), puis le sténopé
    convertit les boîtes en mètres. Un échec est **dit** (`PhotoMeasure.Failed`,
    `NoEndpoint`, `NoObjects`, `Unreadable`), pas avalé.
@@ -86,13 +90,13 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 
 ### 2.2 Enregistrement (tap simple) — le direct de la page caméra
 
-1. `IhearViewModel.onSingleTap` → `cameraOps.startVideo()` / `stopVideo()`
-   (`app/ihear/vm/IhearCameraCoordinator.kt`) → `IhearCameraHost`.
+1. `IseeViewModel.onSingleTap` → `cameraOps.startVideo()` / `stopVideo()`
+   (`app/isee/vm/IseeCameraCoordinator.kt`) → `IseeCameraHost`.
 2. **Hors enregistrement, aucune frame n'est convertie** : `host.wantsFrame` vaut
-   `recordingVideo && probe.wantsFrame()` (`app/ihear/IseeVisionCard.kt:262-265`).
-3. Pendant l'enregistrement, `host.onFrame` → `LiveProbe.onFrame` (`app/ihear/LiveProbe.kt`) :
-   sérialisation JPEG au côté long **320 px** (`IHEAR_FRAME_EDGE`,
-   `app/ihear/IhearCameraPane.kt:39`, qualité 55, `:42`).
+   `recordingVideo && probe.wantsFrame()` (`app/isee/IseeVisionCard.kt:262-265`).
+3. Pendant l'enregistrement, `host.onFrame` → `LiveProbe.onFrame` (`app/isee/LiveProbe.kt`) :
+   sérialisation JPEG au côté long **320 px** (`ISEE_FRAME_EDGE`,
+   `app/isee/IseeCameraPane.kt:39`, qualité 55, `:42`).
 4. `core/live/LiveSession` (`Cadence.Fast`) régule les créneaux, puis
    `core/net/WsLiveClient` envoie **un message JSON par frame sur `/live/ws`**, corrélé par
    `id` (une attente par `id`, pas une file FIFO).
@@ -101,26 +105,27 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
    `core/mask/MaskCore.kt` + `core/mask/Masks.kt`), distances calculées **sur le téléphone**
    (`core/distance/DistanceEstimator.kt`).
 6. **Voix** : `LiveProbe.phraseOf` → `PositionAnnouncer` (`core/live/PositionAnnouncer.kt`),
-   phrase confiée à `ProximityVoice` (`app/ihear/ProximityVoice.kt`) → ElevenLabs →
+   phrase confiée à `ProximityVoice` (`app/isee/ProximityVoice.kt`) → ElevenLabs →
    `SpeechPlayer`. Une phrase par scène ; la bascule des Réglages et la clé ElevenLabs
    conditionnent l'annonce (`Settings.announcePositions`, `core/settings/Settings.kt:131`).
 
 ### 2.3 Question (appui long → dictée → LLM → voix)
 
-1. `LongPressTrigger` → `IhearViewModel.onHoldStart/onHoldEnd` → `IhearDictation`
-   (`app/ihear/vm/IhearDictation.kt`) : PCM 16 bits mono du micro.
+1. `LongPressTrigger` → `IseeViewModel.onHoldStart/onHoldEnd` → `IseeDictation`
+   (`app/isee/vm/IseeDictation.kt`) : PCM 16 bits mono du micro.
 2. `core/usecase/DictationUseCase` : PCM → WAV → transcription. Refus **local** si
    l'enregistrement dure moins de 400 ms (`MIN_DURATION_MS`), puis texte vide = « aucune
    parole détectée ».
 3. Moteur de dictée : `app/SpeechClients.kt` est la **seule** règle — Meta ASR d'abord
    (`core/net/MetaAsrClient`), repli `core/net/ElevenLabsSttClient` dès qu'une clé de voix
    existe (`FallbackSpeechClient` quand les deux sont configurés).
-4. `IhearAnswers` (`app/ihear/vm/IhearAnswers.kt`) → `AskUseCase` (`core/usecase/UseCases.kt`)
+4. `IseeAnswers` (`app/isee/vm/IseeAnswers.kt`) → `AskUseCase` (`core/usecase/UseCases.kt`)
    → `core/net/InferHubLlmClient.ask` → `POST {llm}/chat/completions`, image = dernière photo
-   en data-URL, historique borné à **20 tours** (`AskUseCase.MAX_HISTORY_TURNS`,
-   `UseCases.kt:60`).
-5. Réponse : ligne Room + MP3 (`IhearVoice` → `ElevenLabsTtsClient`), puis lecture
-   (`IhearPlayback` → `app/SpeechPlayer.kt`).
+   en data-URL, et **historique toujours vide** : iSee joint `emptyList()` (`IseeAnswers`),
+   aucune ligne de la base n'est reconstruite en tour de conversation. Le plafond de
+   **20 tours** (`AskUseCase.MAX_HISTORY_TURNS`) ne vaut plus que pour l'écran Direct.
+5. Réponse : ligne Room + MP3 (`IseeVoice` → `ElevenLabsTtsClient`), puis lecture
+   (`IseePlayback` → `app/SpeechPlayer.kt`).
 
 **Contexte de journal caméra** : le paramètre `context` d'`AskUseCase` n'est alimenté que par
 l'écran **Direct** (`app/live/LiveAskSession.kt:82`, `timelineContextOrNull` de
@@ -255,7 +260,7 @@ foi.
   budget (`:168`). Créneau pris = frame **jetée** (`runFrame` renvoie `null`), jamais mise en
   attente.
 - **Réveil** : le conteneur est réveillé par la **première frame** ; `LiveProbe.markWarming()`
-  ne pose qu'un drapeau d'affichage, aucun appel réseau (`app/ihear/LiveProbe.kt:441`). Côté
+  ne pose qu'un drapeau d'affichage, aucun appel réseau (`app/isee/LiveProbe.kt:441`). Côté
   Direct, `LiveWakeGuard` (`app/live/LiveWakeGuard.kt`) ouvre une fenêtre de 60 s pendant
   laquelle un échec s'affiche « réveil du GPU… ». L'app appelle `POST /release` quand elle se
   ferme (`MainActivity.onPause`/`onDestroy` → `AppViewModel.releaseGpu` →
@@ -273,20 +278,20 @@ foi.
 | Question | Où regarder |
 |---|---|
 | Point d'entrée Android | `app/src/main/AndroidManifest.xml`, `app/…/MainActivity.kt` (activité unique), `app/…/SamApp.kt` (planifie la purge) |
-| Écrans et navigation | `app/…/AppNav.kt` (routes), `app/…/ihear/IhearHome.kt` (accueil), `app/…/ihear/IseeScenePane.kt` (la scène, plein écran) |
-| Carte caméra de la scène | `app/…/ihear/IseeVisionCard.kt` (`VisionCard`, `CameraLive`, `CameraGlue`, `rememberCameraGlue`) |
-| Gestes | `app/…/IhearRootLayout.kt` (surface), `core/…/gesture/IhearGestureBrain.kt`, `TapOrHold.kt`, `LongPressTrigger.kt` |
-| Caméra | `app/…/ihear/IhearCameraPane.kt` (`IhearCameraHost`, pilote CameraX), `app/…/CameraSurface.kt` (aperçu + masques), `app/…/CameraLens.kt` |
+| Écrans et navigation | `app/…/AppNav.kt` (routes), `app/…/isee/IseeHome.kt` (accueil), `app/…/isee/IseeScenePane.kt` (la scène, plein écran) |
+| Carte caméra de la scène | `app/…/isee/IseeVisionCard.kt` (`VisionCard`, `CameraLive`, `CameraGlue`, `rememberCameraGlue`) |
+| Gestes | `app/…/IseeRootLayout.kt` (surface), `core/…/gesture/IseeGestureBrain.kt`, `TapOrHold.kt`, `LongPressTrigger.kt` |
+| Caméra | `app/…/isee/IseeCameraPane.kt` (`IseeCameraHost`, pilote CameraX), `app/…/CameraSurface.kt` (aperçu + masques), `app/…/CameraLens.kt` |
 | Client LLM | `core/…/net/InferHubLlmClient.kt`, prompts `core/…/net/LlmPrompts.kt` |
 | Client SAM | `core/…/net/HttpSamClient.kt` (photo), `core/…/net/WsLiveClient.kt` (direct), `core/…/net/WsTransport.kt` (transport), `core/…/net/LiveClientFactory.kt` (fabrique unique) |
 | Cycle de vie du GPU | `core/…/net/SamLifecycle.kt` (`/release`), `app/…/vm/AppDiagnostics.kt` (`releaseGpu`, `testSam`) |
 | Cadence et régulation | `core/…/live/LiveSession.kt`, `core/…/live/FrameGate.kt`, `core/…/live/PipelineGate.kt`, `core/…/live/LatestFrameSlot.kt` |
-| Sonde de la page caméra | `app/…/ihear/LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, affichage `LiveProbeText.kt` + `LiveDebugPanel.kt` |
+| Sonde de la page caméra | `app/…/isee/LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, affichage `LiveProbeText.kt` + `LiveDebugPanel.kt` |
 | Masques | `core/…/mask/MaskCore.kt` (pur : `M1`/bits, LUT, coloriage sans allocation), `core/…/mask/Masks.kt` (Bitmap), `app/…/live/LiveMaskDecoder.kt` |
 | Distances | `core/…/distance/DistanceEstimator.kt` (`DistanceMeter`), `KnownSizes.kt`, `LensSpec.kt`, `DistanceSmoother.kt`, `DistanceText.kt` |
 | Voix | `core/…/net/ElevenLabsTtsClient.kt`, `core/…/net/ElevenLabsSttClient.kt`, `core/…/net/MetaAsrClient.kt`, `core/…/net/FallbackSpeechClient.kt`, `app/…/SpeechPlayer.kt`, `app/…/VoiceAnnouncer.kt`, `app/…/SpeechClients.kt` |
 | Réglages | `core/…/settings/Settings.kt`, `EncryptedSettingsStore.kt`, `PrivateFileSettingsStore.kt`, `SettingsStoreFactory.kt`, `SamRegion.kt`, `app/…/SettingsScreen.kt`, `app/…/SettingsSeed.kt` |
-| Design iSee | `core/…/iseedesign/Dissolve.kt`, `core/…/iseedesign/IseeScene.kt`, `app/…/ihear/IseeSceneArt.kt`, `IseeScenePane.kt`, `IseeSceneState.kt`, `IseeDissolve.kt` |
+| Design iSee | `core/…/iseedesign/Dissolve.kt`, `core/…/iseedesign/IseeScene.kt`, `app/…/isee/IseeSceneArt.kt`, `IseeScenePane.kt`, `IseeSceneState.kt`, `IseeDissolve.kt` |
 | Purge des captures | `app/…/cleanup/` (12 fichiers : Room + WorkManager), planificateur `CleanupScheduler.kt`, config `CleanupConfig.kt` (`PERIOD_HOURS = 1`) |
 | Lunettes | `app/…/glasses/` (12 fichiers : état, contrôleur, caméra, audio, politique, section de réglages) et `app/…/glasses/bench/` (18 fichiers : banc d'essai, SDK DAT) — le dossier de l'ancien module n'est plus dans le build |
 | Gardes | `tools/check-kotlin-limits.py`, `.github/workflows/ci.yml`, `.github/couche0/check_couche0.py` |

@@ -24,7 +24,7 @@ import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
 import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
 import dev.sam3vision.app.glasses.bench.SpikeLaunch
-import dev.sam3vision.app.ihear.IhearViewModel
+import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.locked.LockedMicBridge
 
 private val SamColorScheme = darkColorScheme(
@@ -43,20 +43,20 @@ private val SamColorScheme = darkColorScheme(
  * Activité unique : Compose + navigation par état, thème sombre pour les écrans
  * d'origine, iSee en page d'accueil, lunettes Ray-Ban Meta.
  *
- * La racine n'est pas le ComposeView mais [IhearRootLayout] : elle voit chaque geste
+ * La racine n'est pas le ComposeView mais [IseeRootLayout] : elle voit chaque geste
  * de la surface de l'app — appui long (micro maintenu, transcription Muse), tap
- * simple (vidéo), double tap (photo), balayages horizontal (page) et vertical
- * (sélection de bulle, avec haptique dédiée). Les gestes ne s'appliquent que quand
- * les panneaux iSee sont à l'écran.
+ * simple (vidéo), double tap (photo), balayage horizontal (reconnu, sans effet).
+ * Le balayage vertical (sélection de bulle) a été supprimé. Les gestes ne s'appliquent
+ * que quand les panneaux iSee sont à l'écran.
  */
 class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: AppViewModel
-    private lateinit var ihear: IhearViewModel
+    private lateinit var isee: IseeViewModel
     private lateinit var glasses: GlassesController
 
     /** Racine des gestes : annulée si l'app passe en arrière-plan en pleine tenue. */
-    private lateinit var root: IhearRootLayout
+    private lateinit var root: IseeRootLayout
 
     /** Permission demandée au premier lancement ; un refus est annoncé à la voix. */
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
             it.initialize()
         }
         viewModel = ViewModelProvider(this)[AppViewModel::class.java]
-        ihear = ViewModelProvider(this)[IhearViewModel::class.java]
+        isee = ViewModelProvider(this)[IseeViewModel::class.java]
         applyDarkSystemBars()
         setContentView(buildRoot())
         requestMicIfNeeded()
@@ -138,18 +138,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun buildRoot() = IhearRootLayout(this).also { root = it }.apply {
-        gesturesEnabled = { ihear.active }
-        onHoldStart = ihear::onHoldStart
-        onHoldEnd = ihear::onHoldEnd
-        onHoldCancel = ihear::onHoldCancel
-        onSingleTap = ihear::onSingleTap
-        onDoubleTap = ihear::onDoubleTap
-        onVerticalDragStart = ihear::onVerticalDragStart
-        onVerticalDragMove = { downward -> ihear.onVerticalDragMove(downward) }
-        onVerticalSwipeEnd = { committed, downward -> ihear.onVerticalSwipeEnd(committed, downward) }
+    private fun buildRoot() = IseeRootLayout(this).also { root = it }.apply {
+        gesturesEnabled = { isee.active }
+        onHoldStart = isee::onHoldStart
+        onHoldEnd = isee::onHoldEnd
+        onHoldCancel = isee::onHoldCancel
+        onSingleTap = isee::onSingleTap
+        onDoubleTap = isee::onDoubleTap
         addView(
-            ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, ihear, glasses) } },
+            ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, isee, glasses) } },
             MATCH_PARENT,
             MATCH_PARENT,
         )
@@ -162,13 +159,13 @@ class MainActivity : ComponentActivity() {
         // le GPU ici et pas à onStop — sur ce téléphone, home ne déclenche pas toujours onStop
         // et un minuteur ne servirait à rien, Android gèle le processus en arrière-plan.
         if (!isChangingConfigurations) viewModel.releaseGpu()
-        ihear.onBackground()
+        isee.onBackground()
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        ihear.onForeground()
+        isee.onForeground()
         // App ouverte (ou de retour au premier plan) : on réveille la GPU Modal
         // (`/health` silencieux) pour qu'iSee réponde sans cold start.
         viewModel.warmGpu()
@@ -196,7 +193,7 @@ class MainActivity : ComponentActivity() {
         // App quittée pour de bon (pas une simple rotation) : on éteint le GPU, sinon la
         // carte A100 reste facturée jusqu'à sa fenêtre de réduintage.
         if (isFinishing) viewModel.releaseGpu()
-        if (!isChangingConfigurations) ihear.onAppClosed()
+        if (!isChangingConfigurations) isee.onAppClosed()
         if (isFinishing) glasses.close()
         // App fermée pour de bon : le service du micro verrouillé n'a plus de raison de vivre.
         if (isFinishing) LockedMicBridge.disarm(this)
@@ -242,15 +239,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Thème + navigation : une seule racine Compose sous [IhearRootLayout]. */
+/** Thème + navigation : une seule racine Compose sous [IseeRootLayout]. */
 @Composable
-private fun SamRoot(viewModel: AppViewModel, ihear: IhearViewModel, glasses: GlassesController) {
+private fun SamRoot(viewModel: AppViewModel, isee: IseeViewModel, glasses: GlassesController) {
     MaterialTheme(colorScheme = SamColorScheme) {
         Surface(color = AppColors.background) {
             // Au premier lancement : les trois dialogues système s'enchaînent directement,
             // sans question supplémentaire de l'app.
             IseePermissionRequest(viewModel)
-            AppNav(viewModel = viewModel, ihear = ihear, glasses = glasses)
+            AppNav(viewModel = viewModel, isee = isee, glasses = glasses)
         }
     }
 }

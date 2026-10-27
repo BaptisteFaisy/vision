@@ -55,7 +55,7 @@ les proportions non.
 | dont `app/src/androidTest` (`cleanup/CaptureCleanupTest`) | **6** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes |
+| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **492** lignes |
 
 Le nombre de tests réellement **exécutés** est **non mesuré ici** : aucun `gradlew` n'a été
 lancé sur cette machine pour ce comptage.
@@ -91,7 +91,7 @@ lancé sur cette machine pour ce comptage.
   renseigne-la dans Réglages », échec immédiat sans appel réseau.
 - **Logique pure d'abord** : cadence (`core/live/FrameRate.kt`), régulation
   (`FrameGate.kt`, `PipelineGate.kt`), journal (`LiveTimeline.kt`), annonces
-  (`PositionAnnouncer.kt`, `LiveNarrator.kt`), gestes (`gesture/IhearGestureBrain.kt`,
+  (`PositionAnnouncer.kt`, `LiveNarrator.kt`), gestes (`gesture/IseeGestureBrain.kt`,
   `LongPressTrigger.kt`, `TapOrHold.kt`), distances (`distance/DistanceEstimator.kt`,
   `LensSpec.kt`) vivent dans `:core` et se testent sans Android.
 - **Distances sur le téléphone** : sténopé + hauteurs connues, 0 GPU et aucune requête
@@ -101,7 +101,7 @@ lancé sur cette machine pour ce comptage.
   est une `View` dessinée **après** le canevas Compose, donc les masques composés au-dessus
   passaient derrière l'aperçu — piège consigné dans `docs/MASQUES-DEBUG.md`.
 - **Intro sans marqueur persisté** : l'audio se rejoue à chaque ouverture complète et ne se
-  coupe que par la voix (`app/ihear/IhearIntro.kt:29-38`) — choix assumé plutôt que « une
+  coupe que par la voix (`app/isee/IseeIntro.kt:29-38`) — choix assumé plutôt que « une
   seule fois à vie ».
 
 ## Direct : WebSocket `/live/ws`, une frame en vol
@@ -125,12 +125,12 @@ lancé sur cette machine pour ce comptage.
   `withTimeoutOrNull` (`WsLiveClient.kt:151`).
 - **Trois délais distincts, assumés** : frame 10 s (`LIVE_TIMEOUT_SECONDS`,
   `HttpLiveClient.kt:13`), première frame / session froide 60 s (`COLD_TIMEOUT_SECONDS`,
-  `app/ihear/LiveProbe.kt:458`), `/health` 180 s (`WAKE_TIMEOUT_SECONDS`,
+  `app/isee/LiveProbe.kt:458`), `/health` 180 s (`WAKE_TIMEOUT_SECONDS`,
   `HttpLiveClient.kt:21`). Motif : un transport figé à 10 s échouait pendant les 26-50 s de
   réveil du conteneur (`LiveClientFactory.kt:15-17`).
 - **Pastille de transport honnête** : « WebSocket » / « WebSocket KO », sans prétendre à un
   repli qui n'existe plus (`app/LiveMessages.kt`).
-- **`LiveMessages.kt`** (45 lignes) et **`app/ihear/LiveProbeText.kt`** (94 lignes) : messages
+- **`LiveMessages.kt`** (45 lignes) et **`app/isee/LiveProbeText.kt`** (94 lignes) : messages
   d'état et libellés extraits des ViewModels pour tenir sous les 500 lignes et rester
   testables en JVM.
 - **Deux concepts par défaut, et deux au maximum** : `LivePrompts.Default =
@@ -141,7 +141,7 @@ lancé sur cette machine pour ce comptage.
   à corriger (hors du périmètre de cette relecture).
 - **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:33`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
-  (`app/ihear/LiveProbe.kt:128,137`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
+  (`app/isee/LiveProbe.kt:128,137`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
   `latencyBudgetMs = 150` (`LiveSession.kt:42-47`). Le KDoc de `LiveSession.kt:16` annonce
   « 100 ms » : c'est le commentaire qui est périmé, la valeur du code est 0 (pas de plancher).
 - **Régulation par hystérésis** (`LiveSession.kt:95-115`) : on ne rouvre un créneau que sous la
@@ -154,8 +154,9 @@ lancé sur cette machine pour ce comptage.
 
 `resolveSamEndpoint()` (`core/settings/SamRegion.kt:50-55`, appelé par
 `app/SamEndpoint.kt:13-14`) applique l'ordre du code : **saisie manuelle hors preset** → **URL
-injectée au build** pour la région → **preset de la région**. (Le KDoc de `SamRegion.kt:45-49`
-annonce preset avant URL injectée : c'est le code qui fait foi.) Choisir une région efface une
+injectée au build** pour la région → **preset de la région**. (Le KDoc de
+`SamRegion.kt:46-49`, qui annonçait l'ordre inverse, a été corrigé le 27/10.) Choisir une région
+efface une
 URL qui n'était que le preset (`SamRegion.isPreset`, `SamRegion.kt:39-44`). **Une seule GPU à
 la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n'allume rien.
 
@@ -167,15 +168,12 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
   route n'est vérifiable depuis ce dépôt. `TapConfig.ON_DEVICE_INFERENCE = false`
   (`app/tap/TapConfig.kt:48`) : sans endpoint saisi, rien ne part
   (`TapConfig.sendConfigured`, `:83`).
-- **`TrackClient`/`HttpTrackClient` et `TrackRunner`** (suivi local entre deux frames serveur)
-  sont écrits dans `:core`, **aucun écran de `:app` ne les appelle** (mesuré : zéro occurrence de
-  `TrackClient`/`TrackRunner` sous `app/src/main`). **`core/predict/*` n'est plus dans ce cas** :
-  le Direct l'appelle depuis `app/…/live/LivePrediction.kt`, **derrière le flag
+- **`core/predict/*`** — le Direct l'appelle depuis `app/…/live/LivePrediction.kt`, **derrière le flag
   `Settings.boxPredictionEnabled`, éteint par défaut** — le branchement (T8) n'est allumé
   qu'après la mesure de la latence perçue. Flag éteint, le direct est celui d'avant.
-- Deux commentaires de code sont périmés depuis le passage en WS : `HttpLiveClient.kt:30`
-  (cite `docs/LIVE-SPEC.md`, absent du dépôt) et le KDoc « huit concepts » de
-  `LivePrompts.kt:9-19`.
+- Deux commentaires de code ont été corrigés le 27/10 : `HttpLiveClient.kt:30` cite
+  `docs/LIVE-SPEC.md`, qui **existe** (310 lignes, contrat du direct), et le KDoc de
+  `LivePrompts.kt:9-19` dit désormais « 2 concepts », comme le code (`Default`, `MAX = 2`).
 
 ## Non mesuré ici
 

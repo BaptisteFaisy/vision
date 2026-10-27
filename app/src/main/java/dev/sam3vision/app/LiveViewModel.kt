@@ -32,7 +32,6 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
-import dev.sam3vision.core.net.WsLiveClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +60,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Tracker à ids stables par défaut (~30 ms serveur) ; `/live` WS en repli via le bandeau. */
     private var trackerEnabled = true
+
+    /** Premier plan : en arrière-plan les frames sont jetées (la carte reste éteinte). */
+    private val foregroundGate = ForegroundTracker()
 
     private val trackFallback = LiveTrackFallback()
 
@@ -162,6 +164,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun start(settings: Settings, prompts: List<String> = LivePrompts.Default) {
         this.settings = seededFromBuild(settings)
+        foregroundGate.reset()
         if (!this.settings.llmConfigured) {
             _state.update { it.copy(error = LLM_ABSENT_LINE) }
             return
@@ -239,8 +242,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Change les concepts suivis : `[promptsText]` séparé par virgules, vide = défaut. */
     fun restartWith(promptsText: String) {
-        val list = promptsText.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }
-        restart(if (list.isEmpty()) LivePrompts.Default else list)
+        restart(LivePrompts.field(promptsText))
     }
 
     /** Relance la session avec les concepts déjà actifs (flux arrêté ou en erreur). */
@@ -274,7 +276,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * sature sinon).
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L, frameLuma: ByteArray? = null) {
-        if (jpegB64.isBlank()) return
+        if (!foregroundGate.foreground || jpegB64.isBlank()) return
         narration.narrate(jpegB64)
         publishPrediction()
         local.tick(frameLuma, System.currentTimeMillis())
@@ -295,7 +297,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // requête (normalisation des concepts, JSON, base64 de 28 Ko) partirait sur la
         // boucle de composition. Ce travail n'a rien à y faire.
         viewModelScope.launch(Dispatchers.Default) {
-            val result = sendFrame(active, jpegB64)
+            val result = active.sendFrame(_state.value.prompts, jpegB64)
             if (!active.isCurrent(era)) return@launch
             chronology.markReceived()
             if (result == null) {
@@ -320,29 +322,19 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             restartActive()
             return true
         }
-        val waking = _state.value.starting && wake.isWaking()
-        LiveTransportLog.failure("frame echec transport=" + transportLabel() + " " + (error.message ?: "GPU injoignable"))
-        _state.update {
-            it.copy(
-                objectsCount = 0,
-                transport = transportLabel(),
-                starting = waking,
-                error = if (waking) null else samUnreachableLine(error.message ?: "GPU injoignable"),
-            )
-        }
+        LiveTransportLog.failure("frame echec transport=" + transportLabel(trackerEnabled, client) + " " + (error.message ?: "GPU injoignable"))
+        onFrameError(error)
         return false
     }
 
     /**
-     * Envoie la frame au pipeline actif, quel que soit le transport ; `null` = frame jetée
-     * (créneau pris — la caméra n'attend jamais le réseau).
+     * Échec réseau d'une frame (voir [frameErrorState] : réveil GPU = erreur masquée) ;
+     * l'envoi de la frame, lui, passe par [FramePipeline.sendFrame] (tout transport).
      */
-    private suspend fun sendFrame(active: FramePipeline, jpegB64: String): Result<LiveFrame>? =
-        when (active) {
-            is TrackRunner -> active.runAsFrame(_state.value.prompts, jpegB64)
-            is LiveSession -> active.runFrame(jpegB64)
-            else -> null
-        }
+    private fun onFrameError(error: Throwable) {
+        val waking = _state.value.starting && wake.isWaking()
+        _state.update { frameErrorState(it, waking, transportLabel(trackerEnabled, client), error.message) }
+    }
 
     /** Garde la frame courante pour les questions : au plus une par [FRAME_KEEP_MS]. */
     private fun keepFrame(jpegB64: String) {
@@ -382,7 +374,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 frame = frame,
                 overlays = overlays,
                 objectsCount = frame.objects.size,
-                transport = transportLabel(),
+                transport = transportLabel(trackerEnabled, client),
                 latencyMs = pipeline?.stats?.averageMs ?: 0L,
                 fps = LiveFpsMeter.fpsFor(gap, current.fps),
                 error = null,
@@ -443,8 +435,29 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Bouton « Stop » : fin de la parole, transcription puis question automatique. */
     fun stopVoice() = liveVoice.stop()
 
+    /** Quitte le premier plan : flux SAM coupé (`POST /release` reste dans `AppViewModel.releaseGpu`). */
+    fun onBackground() {
+        val wasRunning = _state.value.running
+        foregroundGate.onBackground(wasRunning)
+        if (!wasRunning) return
+        pipeline?.reset()
+        val closing = tracker
+        session = null
+        tracker = null
+        client?.close()
+        client = null
+        viewModelScope.launch { closing?.stop() }
+        _state.update { it.copy(running = false, starting = false) }
+    }
+
+    /** Retour au premier plan : le direct coupé par [onBackground] repart tout seul. */
+    fun onForeground() {
+        if (foregroundGate.onForeground()) startFromSettings()
+    }
+
     /** Bouton « Stop » : vol révoqué, mémoire effacée — un direct arrêté ne répond plus. */
     fun stop() {
+        foregroundGate.reset()
         narration.close()
         liveVoice.cancel()
         // La frame en vol est révoquée (époque close) : sa réponse tardive est jetée, elle
@@ -475,21 +488,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
-    /** « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST). */
-    private fun transportLabel(): String = when {
-        trackerEnabled -> TRANSPORT_TRACK
-        (client as? WsLiveClient)?.isConnected == true -> TRANSPORT_WS
-        else -> TRANSPORT_WS_KO
-    }
-
     /** Lit les réglages chiffrés puis démarre la session (appelé à l'entrée à l'écran). */
     fun startFromSettings() = viewModelScope.launch { start(store.load()) }
-
-    private companion object {
-        /** Fenêtre du journal envoyée au LLM : 30 s suffisent pour « il y a 5 s ». */
-        const val MEMORY_WINDOW_MS = 30_000L
-
-        /** Dossier audio de l'annonce des positions : distinct de celui des bandeaux. */
-        const val POSITION_VOICE_DIR = "positions"
-    }
 }

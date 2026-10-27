@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
  *
  * [GlassesFrameEncoder] garde le travail de plateforme (`Bitmap`, `Base64`) ;
  * ces fonctions gardent les décisions (quel horodatage, quel recadrage, quelle
- * taille), ce qui les rend prouvables sur JVM par `FramePolicyTest` sans
+ * taille), ce qui les rend prouvables sur JVM par `GlassesFramePolicyTest` sans
  * `Bitmap` ni `SystemClock`.
  */
 
@@ -35,6 +35,10 @@ internal fun frameTimestampMs(presentationTimeUs: Long, fallbackMs: Long): Long 
  * @return `null` quand aucune réduction n'est nécessaire, ou quand les
  *   dimensions d'entrée sont inexploitables ; sinon des dimensions ≥ 1 (une
  *   image très allongée garde au moins un pixel sur son petit côté).
+ *
+ * Arrondi volontaire (`roundToInt`) + `null` si inutile : ne pas factoriser avec
+ * `FramePolicy.requestedSize` (troncature, jamais `null`) — les deux politiques
+ * diffèrent par contrat, pas par oubli.
  */
 internal fun scaledDimensions(
     width: Int,

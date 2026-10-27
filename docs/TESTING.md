@@ -38,7 +38,7 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
   `net/NetContractHarness.kt`, `net/TestLiveClients.kt`, `live/FrameBench.kt`,
   `mask/M1Fixtures.kt`, `mask/MaskCodecFixtures.kt`, `mask/MaskFixtures.kt`,
   `mask/MaskGoldenData.kt`, `mask/JvmAllocations.kt`, `keyframe/KeyframeScene.kt`,
-  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `ihear/vm/FakeMessageDao.kt`,
+  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `isee/vm/FakeMessageDao.kt`,
   `vm/Fakes.kt`.
 
 ### Ce que Gradle exécute réellement
@@ -176,13 +176,13 @@ périmètre limité au stockage privé de l'app · job horaire unique et sans r�
 
 Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un seul fichier porte deux classes : `TapZonesTest.kt`).
 
-### `:core` — 907
+### `:core` — 905
 
 - **audio** (13) : SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **distance** (87) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 6, DistanceTextTest 7, GroundPlaneTest 17, KnownSizesTest 5, LensSpecTest 7, OpticsTest 24
-- **gesture** (17) : IhearGestureBrainTest 3, LongPressTriggerTest 10, TapOrHoldTest 4
+- **gesture** (17) : IseeGestureBrainTest 3, LongPressTriggerTest 10, TapOrHoldTest 4
 - **glasses** (6) : CaptureGestureTest 6
-- **haptics** (10) : WaveformTest 10
+- **haptics** (8) : WaveformTest 8
 - **iseedesign** (19) : DissolveTest 10, IseeSceneTest 9
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
 - **live** (208) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsTest 8, LivePumpTest 4, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 4, PositionAnnouncerTest 8, PositionTextEnglishTest 7, PositionTextTest 10, ScreenTimingsTest 4, TimelineTextTest 7, TrackRunnerTest 14, UploadLadderTest 19
@@ -197,14 +197,14 @@ Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un se
 - **text** (14) : PromptShieldTest 10, TextSanitizerTest 4
 - **usecase** (22) : DictationUseCaseTest 4, SpeechUseCaseTest 8, UseCasesTest 10
 
-### `:app` — 466
+### `:app` — 458
 
 - **(racine)** (100) : BuildInfoTest 2, DistanceLayoutTest 15, FirstRunPermissionsTest 3, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 16, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, SettingsSeedTest 4, SpeechClientsTest 6, TtsLogicTest 6, UiLogicTest 13, VoiceLanguageSettingsTest 4
 - **cleanup** (11) : CaptureCleanerTest 6, CaptureScannerTest 5
 - **glasses** (26) : GlassesAudioPlanTest 7, GlassesMessagesTest 6, GlassesPhaseMappingTest 2, GlassesPolicyTest 4, GlassesUiStateTest 7
 - **glasses.bench** (84) : ChaineCompleteTest 8, CycleLatchTest 5, FramePolicyTest 6, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, SessionPolicyTest 26, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
-- **ihear** (93) : FramePolicyTest 6, IhearDistancesTest 5, IhearPhotoContextTest 8, IseeRenderTest 12, IseeSceneTest 11, LiveProbeCadenceTest 4, LiveProbeSchedulingTest 2, LiveProbeTextTest 21, OnboardingGesturesTest 8, RevealShiftTest 4, SpeakableTextTest 3, SwipeStepTest 9
-- **ihear.vm** (42) : IhearAnswersTest 6, IhearCameraCoordinatorTest 6, IhearDictationTest 9, IhearPhotoShotTest 6, IhearStatusTextTest 9, IhearTranscriptTest 6
+- **isee** (86) : FramePolicyTest 6, IseeDistancesTest 5, IseePhotoContextTest 8, IseeRenderTest 12, IseeSceneTest 11, LiveProbeCadenceTest 4, LiveProbeSchedulingTest 2, LiveProbeTextTest 21, OnboardingGesturesTest 8, RevealShiftTest 4, SpeakableTextTest 3, BubbleCountTest 2
+- **isee.vm** (41) : IseeAnswersTest 6, IseeCameraCoordinatorTest 6, IseeDictationTest 9, IseePhotoShotTest 6, IseeStatusTextTest 9, IseeTranscriptTest 5
 - **live** (50) : LiveAskForgetTest 1, LiveAskSessionTest 7, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 5, LivePredictionTest 8, LiveWakeGuardTest 7
 - **media** (13) : MediaCacheStoreTest 3, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **tap** (14) : TapMachineTest 8, TapZonesTest.kt 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)

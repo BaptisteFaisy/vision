@@ -13,15 +13,15 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **huit**, les plus utiles au guidage à l'intérieur,
-     * modifiables à chaud dans le direct (champ « Suivre »).
+     * Concepts par défaut : **2** (« person », « door »), les plus utiles au guidage
+     * à l'intérieur, modifiables à chaud dans le direct (champ « Suivre »).
      *
-     * Une version antérieure les avait réduits à deux (« person », « door ») parce que
-     * chaque concept semblait coûter ~4 ms de serveur. Ce n'est plus vrai : l'app
-     * déployée batche les prompts (`/health` → `levers.batch_prompts = true`) et
-     * **mesure du 2026-10-26 sur `/live` (5 tirs par point, même image, 4 objets max) :
-     * 2 concepts = 118 ms médian, 8 concepts = 118 ms médian**. Huit concepts sont
-     * gratuits : autant tout suivre.
+     * Huit concepts avaient été envisagés : l'app déployée batche les prompts
+     * (`/health` → `levers.batch_prompts = true`) et la mesure du 2026-10-26 sur
+     * `/live` (5 tirs par point, même image, 4 objets max) donnait 2 concepts =
+     * 118 ms médian, 8 concepts = 118 ms médian. Mais le tracker backend tronque à
+     * `PROMPT_LIMIT = 2` : envoyer davantage afficherait des concepts jamais
+     * détectés — d'où [MAX] = 2, décision du 26/10.
      */
     val Default: List<String> = listOf("person", "door")
 
@@ -50,4 +50,12 @@ object LivePrompts {
             .toList()
         return cleaned.ifEmpty { Default }
     }
+
+    /**
+     * Champ « Suivre » saisi par l'utilisateur : découpé sur les virgules,
+     * points-virgules et retours ligne, nettoyé des vides — vide = [Default].
+     * La session borne et normalise ensuite (voir [normalize]).
+     */
+    fun field(text: String): List<String> =
+        text.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { Default }
 }

@@ -1,7 +1,7 @@
-# sam3-vision-app
+# server/ — backend Modal SAM 3.1 (dépôt vision)
 
-> ⚠️ **24 octobre 2026 : l'app Android est désormais native Kotlin (`~/Bureau/sam-vision-kotlin`).
-> Ce dépôt garde le backend Modal SAM 3.1 (actuellement STOPPÉ) et l'ancienne app Expo (legacy).**
+> ⚠️ **L'app Android est native Kotlin (à la racine du dépôt : `app/`, `core/`).
+> Ce dossier garde le backend Modal SAM 3.1 et l'ancienne app Expo (legacy).**
 > Fermeture Modal, relance en une commande et preuve de l'état : [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).
 
 Photo → segmentation SAM 3.1 sur Modal → description et questions/réponses par un LLM vision, dans une app Android (Expo / React Native).

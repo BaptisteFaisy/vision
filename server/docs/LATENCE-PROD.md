@@ -1,8 +1,8 @@
 # Latence du direct — note de déploiement (app `sam3-eu-a100`, backend `live_app_fast.py`)
 
 Ce backend est celui **réellement en production** (modèle `sam3.1-fast`, `batch_prompts`,
-grille vision 518, 82-125 ms serveur). Il n'est pas dans un dépôt : `backend/` de
-`~/Bureau/sam3-vision-app` sur ms7d18 est la copie de référence. **Ne jamais déployer
+grille vision 518, 82-125 ms serveur). `server/backend/` du dépôt vision
+est la copie de référence. **Ne jamais déployer
 `backend/live_app.py`** (205-241 ms, +235 ms de régression).
 
 ## La commande, avec les leviers de cette salve

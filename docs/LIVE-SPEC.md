@@ -30,43 +30,43 @@ qu'elles entourent le direct (réveil, photo, vidéo, extinction).
   `WsTransport.kt:59`. C'est le client qui borne **chaque frame** (voir §4).
 - Un socket apparemment vivant mais silencieux (conteneur arrêté, redéployé) est fermé au
   premier dépassement de délai, et la frame suivante rouvre le handshake :
-  `WsLiveClient.kt:160-176`.
+  `WsLiveClient.kt:158-176`.
 - **Aucun repli HTTP pour les frames.** L'UI n'a que deux libellés, « WebSocket » et
   « WebSocket KO » (`app/src/main/java/dev/sam3vision/app/LiveMessages.kt:20-24`), et le
-  démarrage du direct ne fait plus que `liveClient(base, marks = chronology)`
-  (`app/src/main/java/dev/sam3vision/app/LiveViewModel.kt:157-161`).
+  démarrage du direct ne fait plus que `LiveMaskTransport.clientFor(base, marks = chronology)`
+  (`app/src/main/java/dev/sam3vision/app/LiveViewModel.kt:200`, via `LiveMaskTransport.kt:38-39`).
 
 ### `POST /live` : écrit, jamais appelé pour une frame
 
 Le corps du message WebSocket est **exactement** le corps de `POST /live` plus l'`id`
-(`WsLiveClient.kt:104-114`, `core/src/main/java/dev/sam3vision/core/net/Json.kt:259-272`,
+(`WsLiveClient.kt:109-122`, `core/src/main/java/dev/sam3vision/core/net/Json.kt:298-318`,
 verrouillé par `core/src/test/java/dev/sam3vision/core/live/LiveWireGuardTest.kt:51-70`).
 La route HTTP subsiste dans `HttpLiveClient.live()` (`HttpLiveClient.kt:53-61`), mais :
 
 - la fabrique de production ne rend que le client WebSocket, et ne garde le client HTTP que
   pour `/health` (`core/src/main/java/dev/sam3vision/core/net/LiveClientFactory.kt:19-39`) ;
-- le seul appelant de production est `LiveViewModel.kt:161` ;
+- les appelants de production passent tous par `LiveMaskTransport.clientFor` :
+  `LiveViewModel.kt:200` (Direct) et `LiveProbe.kt:64-65,178` (iSee) ;
 - `POST /live` n'est plus exercé que par les tests JVM (`LiveContractTest.kt:22`).
 
-Preuve par recherche — `git grep -n "POST /live"` dans cet arbre (26/10/2026) ne renvoie que
+Preuve par recherche — `git grep -n "POST /live"` dans cet arbre (27/10/2026) ne renvoie que
 des commentaires, de la documentation et des tests ; **aucun site d'appel** :
 
 ```
-AGENTS.md:83            « n'est plus appelé depuis »
-CHANGELOG.md:259        historique d'un ancien repli, supprimé
-NOTES.md:103            « reste écrit … uniquement pour /health délégué et les tests »
-app/…/LiveViewModel.kt:158        « plus aucun POST /live pour les frames »
-app/…/ihear/IhearCameraPane.kt:33 mesure d'une époque où il servait
-core/…/Json.kt:150,170,255        commentaires de forme de corps
+AGENTS.md:99,102        « n'est plus appelé », HTTP gardé pour les tests JVM
+NOTES.md:113,116        « n'est plus appelé en production », POST pour les tests JVM
+README.md:37,44         « ne passe plus par POST /live », tests JVM uniquement
+app/…/isee/IseeCameraPane.kt:35 mesure d'une époque où il servait
+core/…/Json.kt:184,204,289        commentaires de forme de corps
 core/…/LiveClientFactory.kt:6     « a abandonné POST /live pour les frames »
-core/…/WsLiveClient.kt:105,117    commentaires du contrat WS
+core/…/WsLiveClient.kt:109,122    commentaires du contrat WS
 core/…/WsTransport.kt:34          commentaire du chemin
 core/…/predict/ObjectAssociator.kt:7  commentaire
 core/src/test/…/LiveContractTest.kt:12      test JVM de la route
 core/src/test/…/WsLiveContractTest.kt:93    test JVM du barème d'erreurs
 core/src/test/…/LiveWireGuardTest.kt:51     test JVM de la forme du corps
-docs/ARCHITECTURE.md:142, docs/ELEVENLABS-TTS.md:168,
-docs/OPTIMISATIONS.md:92, docs/TESTING.md:60,204   documentation
+docs/ARCHITECTURE.md:174, docs/ELEVENLABS-TTS.md:167,
+docs/OPTIMISATIONS.md:92   documentation
 ```
 
 Le seul code qui appelle réellement `POST /live` est `HttpLiveClient.live()`, lui-même atteint
@@ -75,7 +75,7 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 
 ## 2. Une frame = un message JSON, corrélé par `id`
 
-**Requête** (un message texte par frame) — `Json.kt:259-272` :
+**Requête** (un message texte par frame) — `Json.kt:298-318` :
 
 ```json
 {"id":7,"image_b64":"<JPEG base64>","prompts":["person","door"],
@@ -86,12 +86,12 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 |---|---|---|
 | `id` | entier | corrélation ; absent de `POST /live`, présent sur chaque trame WS |
 | `image_b64` | chaîne | JPEG encodé en base64, sans bourrage de ligne |
-| `prompts` | tableau ou `null` | concepts suivis ; `null` accepté (`Json.kt:268`) |
+| `prompts` | tableau ou `null` | concepts suivis ; `null` accepté (`Json.kt:309`) |
 | `work_edge` | entier | côté long de travail côté serveur (`640`, voir §4) |
 | `max_objects` | entier | plafond d'objets demandé au serveur |
 | `mask_encoding` | chaîne | `"bits"` demandé ; le serveur peut répondre autre chose |
 
-**Réponse** — `Json.kt:275-294`, exemple de forme : `NetContractHarness.kt:106-113` :
+**Réponse** — `Json.kt:321-333`, exemple de forme : `NetContractHarness.kt:106-113` :
 
 ```json
 {"id":7,"width":512,"height":1138,"elapsed_ms":118,
@@ -100,28 +100,28 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 ```
 
 - `id` doit être **au premier niveau** et de préférence **en tête** : le client le lit sans
-  parser le JSON (`leadingId`, `Json.kt:195-221`), et ignore un message dont l'`id` n'est pas
+  parser le JSON (`leadingId`, `Json.kt:229`), et ignore un message dont l'`id` n'est pas
   en vol. Un `id` absent, illisible ou niché dans un sous-objet vaut `-1` → message ignoré.
 - `objects[]` : `label` (défaut `"objet"`), `score`, `box` (4 flottants), `mask_b64`
   (`Json.kt:40-53`).
 - `mask_encoding` absent ⇒ `"png"` (ancien décodeur) ; valeurs connues `bits`, `png`, `none`
-  (`core/src/main/java/dev/sam3vision/core/model/Models.kt:31-38`, `Json.kt:291`).
+  (`Json.kt:323`, défaut `MASK_ENCODING_PNG` ; `Models.kt:18`, consts `:59-60`).
 - `timings_ms` est facultatif : postes serveur flottants, carte vide si absent
-  (`Json.kt:300-308`).
+  (`Json.kt:336-346`).
 - `elapsed_ms` est la durée serveur annoncée, complétée par `timings_ms` quand le backend
-  est instrumenté (`Models.kt:41-58`).
+  est instrumenté (`Models.kt:69-82`).
 
 **Erreur dans la trame** — la connexion reste ouverte, l'`id` est celui de la requête
-(`Json.kt:161-163`, `NetContractHarness.kt:115-117`) :
+(`Json.kt:196-198`, `NetContractHarness.kt:115-117`) :
 
 ```json
 {"id":7,"error":{"status":402,"detail":"credits epuises"}}
 ```
 
-Le `status` suit le **même barème** que les codes HTTP (`Json.kt:174-184`, `Http.kt:191-207`) :
+Le `status` suit le **même barème** que les codes HTTP (`Json.kt:208-219`, `Http.kt:190-197`) :
 401/403 clé refusée, 402 crédits, 409/429 limite, autres statuts en erreur de réponse.
 
-**Corrélation** : une file **par `id`**, pas une FIFO (`WsLiveClient.kt:14-17`, `:47`).
+**Corrélation** : une file **par `id`**, pas une FIFO (`WsLiveClient.kt:51-52`, `:61-68`).
 Conséquences pour un serveur : il peut répondre **dans le désordre**
 (`core/src/test/java/dev/sam3vision/core/net/WsLiveContractTest.kt:131-147`) ;
 un message d'`id` inconnu est ignoré sans effet (`WsLiveClient.kt:131-137`) ; l'attente est
@@ -132,7 +132,7 @@ pendue (`WsLiveClient.kt:59-68`).
 
 `/health`, `/segment`, `/release`, `/live` et `/live/ws` partagent la **même base** — la base
 SAM résolue par les réglages (`app/src/main/java/dev/sam3vision/app/SamEndpoint.kt:13-14`,
-`app/src/main/java/dev/sam3vision/app/LiveState.kt:160`). `/video` fait exception : il vise un
+`app/src/main/java/dev/sam3vision/app/LiveState.kt:186`). `/video` fait exception : il vise un
 endpoint distinct injecté au build (`BuildConfig.SAM31_ENDPOINT`,
 `app/src/main/java/dev/sam3vision/app/tap/TapConfig.kt:35`,
 `app/src/main/java/dev/sam3vision/app/tap/TapCaptureScreen.kt:171`).
@@ -152,17 +152,17 @@ Le délai de 10 s (`LIVE_TIMEOUT_SECONDS`) ne s'applique **plus** qu'à la frame
 ### `GET /health` — réveil, pas sonde
 
 - Client : `HttpLiveClient.health()`, `GET /health` sur le client de réveil
-  (`HttpLiveClient.kt:63-68`) ; réponse `ok`, `model`, `device`, `gpu`
-  (`HttpLiveClient.kt:71-79`, `Models.kt:61-66`).
+  (`HttpLiveClient.kt:69-75`) ; réponse `ok`, `model`, `device`, `gpu`
+  (`Models.kt:86-90`).
 - **Pourquoi un délai de 180 s** : la requête qui réveille un conteneur Modal froid attend
   son démarrage — image + poids ≈ 30-50 s mesurés, jusqu'à ~150 s si l'image doit être
   reconstruite (`HttpLiveClient.kt:15-21`, `WAKE_TIMEOUT_SECONDS`).
 - **Pourquoi ce n'est plus une sonde** : appelée périodiquement, `/health` sortait la carte
   de veille (~20 s facturées) **sans aucune analyse** et tenait une A100 allumée en continu
   à 2,415 $/h. La sonde a été supprimée le 26/10/2026
-  (`app/src/main/java/dev/sam3vision/app/live/LiveWakeGuard.kt:10-12`, `CHANGELOG.md:49-56`) ;
+  (`app/src/main/java/dev/sam3vision/app/live/LiveWakeGuard.kt:10-12`, `CHANGELOG.md:266`) ;
   le réveil passe désormais par la **première frame**, que Modal met en file pendant le
-  démarrage (`LiveViewModel.kt:157-160`, fenêtre d'attente 60 s :
+  démarrage (`LiveViewModel.kt:214,319`, fenêtre d'attente 60 s :
   `LiveWakeGuard.kt:41-43`).
 - Il reste **un** appel `/health` dans l'app : le bouton « Tester SAM » des Réglages, via
   `HttpSamClient` (`app/src/main/java/dev/sam3vision/app/vm/AppDiagnostics.kt:54-72`). Aucun
@@ -183,7 +183,7 @@ Délai par défaut de 60 s (`Http.kt:28`).
 base64 sur une vidéo de plusieurs Mo (`HttpSam31VideoClient.kt:17-22`). La réponse est lue de
 façon tolérante : `text`, `description`, `answer`, `caption`, sinon corps brut, bornée à
 600 caractères (`HttpSam31VideoClient.kt:74-97`). Si `TapConfig.ON_DEVICE_INFERENCE` est vrai,
-le client refuse sans appel réseau (`app/src/main/java/dev/sam3vision/app/tap/TapConfig.kt:47`,
+le client refuse sans appel réseau (`app/src/main/java/dev/sam3vision/app/tap/TapConfig.kt:48`,
 `HttpSam31VideoClient.kt:36`).
 
 ### `POST /release` — extinction du GPU
@@ -192,8 +192,8 @@ le client refuse sans appel réseau (`app/src/main/java/dev/sam3vision/app/tap/T
 backend répond 400 (pas d'extinction par erreur) ; délai 45 s parce que la requête peut
 arriver sur un conteneur endormi (`core/src/main/java/dev/sam3vision/core/net/SamLifecycle.kt:10-48`).
 Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au lieu d'un
-`false` muet (`SamLifecycle.kt:20`, `:58-67`). Appelé à la fermeture de l'app
-(`app/src/main/java/dev/sam3vision/app/MainActivity.kt:117`, `:135` →
+`false` muet (`SamLifecycle.kt:20`, `:58-67`). Appelé quand l'app quitte le premier plan
+(`app/src/main/java/dev/sam3vision/app/MainActivity.kt:135`, `:156` →
 `AppDiagnostics.kt:97-114`).
 
 ## 4. Cadence et dimensionnement
@@ -203,33 +203,33 @@ Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au
 | Règle | Valeur | Référence |
 |---|---|---|
 | Frames en vol | **1** (les autres sont jetées, jamais mises en attente) | `core/src/main/java/dev/sam3vision/core/live/FrameGate.kt:22`, `LiveSession.kt:52-55` |
-| Palier rapide | 350 ms | `core/src/main/java/dev/sam3vision/core/live/LiveSession.kt:33` |
-| Palier cible | 500 ms | `LiveSession.kt:33` |
-| Palier lent | 900 ms | `LiveSession.kt:33` |
-| Intervalle appliqué | `> 900 ms` → 900, `< 350 ms` → 350, sinon 500 | `LiveSession.kt:149-153` |
-| Image envoyée | côté long **512 px**, JPEG **q65** | `app/src/main/java/dev/sam3vision/app/LiveScreen.kt:44-46`, `:273`, `:291-292` |
-| `work_edge` | **640** | `LiveSession.kt:173` |
-| `max_objects` | 8 par défaut, borné 1..12 | `LiveSession.kt:175`, `core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt:16-18` |
-| Budget de frame | 10 s (`withTimeoutOrNull`) | `WsLiveClient.kt:27`, `:150-155` |
+| Palier rapide | 350 ms | `core/src/main/java/dev/sam3vision/core/live/LiveSession.kt:34` |
+| Palier cible | 500 ms | `LiveSession.kt:34` |
+| Palier lent | 900 ms | `LiveSession.kt:34` |
+| Intervalle appliqué | `> 900 ms` → 900, `< 350 ms` → 350, sinon 500 | `LiveSession.kt:153-157` |
+| Image envoyée | côté long **512 px**, JPEG **q65** | `app/src/main/java/dev/sam3vision/app/LiveScreen.kt:50-51`, `:308`, `:331` |
+| `work_edge` | **640** | `LiveSession.kt:197` |
+| `max_objects` | 8 par défaut, borné 1..12 | `LiveSession.kt:199`, `core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt:16-18` |
+| Budget de frame | 10 s (`withTimeoutOrNull`) | `WsLiveClient.kt:27`, `:156` |
 
 ### Écran caméra iSee
 
 | Règle | Valeur | Référence |
 |---|---|---|
-| Créneaux | **1** | `LiveSession.kt:42-48` (`concurrency = 1`) |
-| Budget de latence | **150 ms** | `LiveSession.kt:47` |
-| Plancher / cible | 0 ms : on repart dès qu'un créneau se libère | `LiveSession.kt:43-44` |
-| Palier lent | 900 ms | `LiveSession.kt:45` |
-| Image envoyée | côté long **320 px**, JPEG **q55** | `app/src/main/java/dev/sam3vision/app/ihear/FramePolicy.kt:17`, `:20` ; `IhearCameraPane.kt:39`, `:42`, `:183-184` |
-| Cadence | `Cadence.Fast` | `app/src/main/java/dev/sam3vision/app/ihear/LiveProbe.kt:128`, `:137` |
-| Délai normal / première frame | 10 s / 60 s | `LiveProbe.kt:455`, `:458` |
+| Créneaux | **1** | `LiveSession.kt:43-48` (`concurrency = 1`) |
+| Budget de latence | **150 ms** | `LiveSession.kt:48` |
+| Plancher / cible | 0 ms : on repart dès qu'un créneau se libère | `LiveSession.kt:44-45` |
+| Palier lent | 900 ms | `LiveSession.kt:46` |
+| Image envoyée | côté long **320 px**, JPEG **q55** | `app/src/main/java/dev/sam3vision/app/isee/FramePolicy.kt:17`, `:20` ; `IseeCameraPane.kt:41`, `:165`, `:217` |
+| Cadence | `Cadence.Fast` | `app/src/main/java/dev/sam3vision/app/isee/LiveProbe.kt:181` |
+| Délai normal / première frame | 10 s / 60 s | `LiveProbe.kt:481`, `:484` |
 
 Régulation de l'écran iSee : au-delà du budget de latence, le régulateur **referme** à un
 créneau ; il ne rouvre que sous la moitié du budget (`RELAX_RATIO = 0.5`) et après trois
 mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du conteneur
-(`LiveSession.kt:99-112`, `:168`, `:171`). Une frame encodée peut attendre en **réserve**
+(`LiveSession.kt:99-112`, `:168`, `:186`, `:189`). Une frame encodée peut attendre en **réserve**
 (une seule, remplacée, jamais empilée) pendant que la précédente est en vol
-(`LiveProbe.kt:200-260`, `core/src/main/java/dev/sam3vision/core/live/LatestFrameSlot.kt:37`).
+(`LiveProbe.kt:228-260`, `core/src/main/java/dev/sam3vision/core/live/LatestFrameSlot.kt:45`).
 
 ### Délais du client HTTP du direct
 
@@ -247,7 +247,7 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
 - `normalize()` retire les espaces, les vides et les doublons, rejette les concepts trop
   longs, borne à `MAX`, et retombe sur la liste par défaut si le résultat est vide
   (`LivePrompts.kt:38-46`). La liste est normalisée **une fois** par session
-  (`LiveSession.kt:74-79`).
+  (`LiveSession.kt:83`).
 
 ## 6. Les identités stables sont reconstruites sur le téléphone
 
@@ -292,19 +292,19 @@ identités dans le cas courant, et le serveur seulement quand le tracker est act
   Modal (`/health`, `/segment`, `/live`, `/live/ws`, `/release`) vit dans un autre dépôt,
   privé, non publié ici (`README.md:28-32`). Ce document décrit ce que le client **envoie et
   sait lire**, pas ce que le serveur fait de ces octets.
-- **Le conteneur réellement déployé.** Son source n'existe nulle part et le dépôt backend ne
-  contient pas `/live/ws` (`NOTES.md:163-166`) : rien de ce qui est serveur n'est vérifiable
-  depuis cet arbre.
+- **Le conteneur réellement déployé.** Son source n'existe nulle part et le dépôt backend,
+  privé et non publié ici (`README.md:28-32`), n'est pas vérifiable : rien de ce qui est
+  serveur ne l'est depuis cet arbre.
 - **Les débits.** Aucun débit n'est mesuré ici. Les chiffres cités dans les commentaires du
   code (50,3 ms en WebSocket contre 81,4 ms en POST, `WsLiveClient.kt:9-12` ; 71,3 ms de
   DNS/TCP/TLS, `Http.kt:41-44` ; réveil 20-27 s, `Http.kt:49`) sont des mesures **rapportées
   par le commentaire**, non reproduites pour ce document.
-- **Les coûts GPU.** Le 2,415 $/h d'une A100-40GB vient de `CHANGELOG.md:52` et
-  `docs/MODE-US.md:114` ; ce n'est pas une mesure faite ici, et le tarif peut changer.
+- **Les coûts GPU.** Le 2,415 $/h d'une A100-40GB vient de `CHANGELOG.md:269` et
+  `docs/MODE-US.md:116-117` ; ce n'est pas une mesure faite ici, et le tarif peut changer.
 - **Le mode tap.** La route qu'il utilise, `POST {endpoint}/video` en multipart
   (`docs/MODE-TAP.md:146-158`), n'a **aucune implémentation connue côté serveur** : aucun
   contrat de réponse n'est écrit, seulement la lecture tolérante du client
   (`HttpSam31VideoClient.kt:74-97`). La question « cloud ou on-device ? » reste ouverte
-  (`TapConfig.kt:47`).
+  (`TapConfig.kt:48`).
 - **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 2` est affirmé par un
   commentaire (`LivePrompts.kt:24-26`), pas par du code de ce dépôt.

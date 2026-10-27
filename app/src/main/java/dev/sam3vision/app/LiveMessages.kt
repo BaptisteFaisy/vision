@@ -32,6 +32,16 @@ const val TRANSPORT_TRACK: String = "Tracker"
 /** Aucune clé LLM : rien ne peut fonctionner, ni la vision ni les questions. */
 const val LLM_ABSENT_LINE = "Clé LLM absente — renseigne-la dans Réglages"
 
+/**
+ * Libellé du transport : le tracker prime, sinon WebSocket ou KO selon le socket.
+ * Fonction pure, testée en JVM.
+ */
+fun transportLabel(trackerEnabled: Boolean, wsConnected: Boolean): String = when {
+    trackerEnabled -> TRANSPORT_TRACK
+    wsConnected -> TRANSPORT_WS
+    else -> TRANSPORT_WS_KO
+}
+
 /** Question posée avant la première frame gardée : on le dit clairement, sans bloquer. */
 const val NO_FRAME_LINE = "Aucune image pour l'instant — recadre et réessaie dans une seconde"
 

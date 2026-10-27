@@ -8,12 +8,12 @@ ce qui ne vient pas d'une mesure est marqué « non mesuré ».
 ## Ce qui s'affiche
 
 Pendant l'enregistrement vidéo — dans la fenêtre caméra iSee, **un tap démarre le REC, un second
-l'arrête** (`IhearViewModel.kt:248-251`, gestualité dans `IseeVisionCard.kt`) :
+l'arrête** (`IseeViewModel.kt:248-251`, gestualité dans `IseeVisionCard.kt`) :
 
 - les **masques SAM** de la dernière frame analysée, colorisés et posés sur l'aperçu au cadrage exact de la
   `PreviewView` (`CENTER_CROP` dans la vue native, `app/…/CameraSurface.kt:26-28`) ;
 - les **pastilles de distance** par objet (`≈ 1,1 m`, composées **après** l'`AndroidView`, voir z-order) ;
-- la **ligne d'état**, texte exact produit par `liveProbeHeadline` (`app/…/ihear/LiveProbeText.kt:18-25`) :
+- la **ligne d'état**, texte exact produit par `liveProbeHeadline` (`app/…/isee/LiveProbeText.kt:18-25`) :
   `SAM · X ips · Y ms · N objets · plus proche ≈ Z m` — le suffixe « plus proche » n'apparaît que si une
   distance est mesurée. **Le nom du GPU n'est plus dans cette ligne** : l'exemple historique
   `SAM · 1,4 ips · 640 ms · 8 objets · A100-40GB` est **périmé** — le GPU, quand il est connu, est sur
@@ -65,14 +65,14 @@ Une frame de réserve est convertie pendant que la requête court (emplacement d
 
 | Élément | Fichier |
 |---|---|
-| Analyseur de frames + `bind` caméra | `app/…/ihear/IhearCameraPane.kt` (`IhearCameraHost`, côté long **320 px** : `IHEAR_FRAME_EDGE`, `:39`) |
-| Envoi `/live/ws`, masques, stats | `app/…/ihear/LiveProbe.kt` (l'appel passe par `liveClient()`, **WS uniquement**) |
-| Coloriage des masques (tampons réutilisés) | `app/…/ihear/MaskPainter.kt:37-50` |
-| Formatage (pur, testé JVM) | `app/…/ihear/LiveProbeText.kt` (21 tests `LiveProbeTextTest`) |
-| Panneau à l'écran | `app/…/ihear/LiveDebugPanel.kt` |
+| Analyseur de frames + `bind` caméra | `app/…/isee/IseeCameraPane.kt` (`IseeCameraHost`, côté long **320 px** : `ISEE_FRAME_EDGE`, `:39`) |
+| Envoi `/live/ws`, masques, stats | `app/…/isee/LiveProbe.kt` (l'appel passe par `liveClient()`, **WS uniquement**) |
+| Coloriage des masques (tampons réutilisés) | `app/…/isee/MaskPainter.kt:37-50` |
+| Formatage (pur, testé JVM) | `app/…/isee/LiveProbeText.kt` (21 tests `LiveProbeTextTest`) |
+| Panneau à l'écran | `app/…/isee/LiveDebugPanel.kt` |
 | Rendu des masques sur l'aperçu | `app/…/CameraSurface.kt` (partagé avec le Direct, `LiveScreen.kt:194-198`) |
 | Pastilles de distance | `app/…/DistanceOverlay.kt` (`LiveDistanceLayer`, `:38`) + câblage `IseeVisionCard.kt:144-149` |
-| Câblage Réglages → sonde | `app/…/ihear/ProbeWiring.kt` (`configureFrom`, `:22-31`) |
+| Câblage Réglages → sonde | `app/…/isee/ProbeWiring.kt` (`configureFrom`, `:22-31`) |
 
 > **Piège de z-order (incident « les masques étaient dessinés sous l'aperçu caméra », corrigé depuis)** :
 > un `AndroidView` est une vraie `View`, dessinée par le `ViewGroup` **après** le canevas Compose. Un
@@ -93,7 +93,7 @@ région est effacée au chargement (`SettingsSeed.dropPresetUrl`, `app/…/Setti
 
 ## Décodage et colorisation des masques
 
-La chaîne réelle, vérifiée dans `app/…/ihear/MaskPainter.kt`, `core/…/mask/Masks.kt` et `MaskCore.kt` :
+La chaîne réelle, vérifiée dans `app/…/isee/MaskPainter.kt`, `core/…/mask/Masks.kt` et `MaskCore.kt` :
 
 1. **base64 tolérant** (préfixe `data:…;base64,` et espaces acceptés) → octets (`MaskCore.base64Bytes`,
    `MaskCore.kt:51-66`) ;
@@ -119,7 +119,7 @@ La chaîne réelle, vérifiée dans `app/…/ihear/MaskPainter.kt`, `core/…/ma
 Couverture JVM : `core.mask.MaskCoreTest` **20**, `core.mask.MaskRobustnessTest` **20** (base64 à
 préfixe `data:`, IHDR, luminance, colorisation, masque 255, formats hostiles) et
 `core.mask.MaskGoldenTest` **2** (fixtures dorées : 6/6 au pixel près, IoU 1) ; formatage du panneau
-`app.ihear.LiveProbeTextTest` **21**. Le rendu bitmap lui-même (décodage Android) n'est pas testé en JVM.
+`app.isee.LiveProbeTextTest` **21**. Le rendu bitmap lui-même (décodage Android) n'est pas testé en JVM.
 
 ### Une seule variante de codec (arbitrage)
 
@@ -178,7 +178,7 @@ pour l'ordre des valeurs, pas pour la forme.
 - Bascule « Distances » (`distanceOverlayEnabled`) ⇒ plus de mesure du tout (`DistanceMeter.enabled`).
 - Focale en REC : `LensSpec.fromSettings(settings.cameraFovDeg)` (`ProbeWiring.kt:26`) — champ forcé (borné
   15–130°), sinon repli 67° ; **la lecture du capteur n'alimente ici que les pastilles de la photo** du double
-  tap (`IhearPhotoDistances.chosenLens`, `:53-56`), pas la sonde.
+  tap (`IseePhotoDistances.chosenLens`, `:53-56`), pas la sonde.
 - La voix ne coupe jamais une réponse du chat (`playerIdle()`, `ProbeWiring.kt:37-48`), et une scène déjà dite
   n'est pas répétée (`PositionAnnouncer` + `LiveProbeState.spoken`).
 - **Mesure non lissée** pendant le REC : pas de journal de pistes sur cette page (`LiveProbe.readingsOf`) —

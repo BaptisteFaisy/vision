@@ -56,7 +56,7 @@ Un backend qui n'envoie aucun de ces champs garde **exactement** le décodage d'
 |---|---|---|
 | `decodeObjectMask(obj, frameW, frameH)` | masque **dans la grille du serveur** | comparaison à un raster de référence, bancs |
 | `decodeObjectGray(obj, frameW, frameH)` | masque **à la taille de la frame** | affichage (agrandissement compris) |
-| `colorizedObjectBitmap(obj, frameW, frameH, argb, alpha)` | `Bitmap` colorié | écrans (`LiveViewModel`, `MaskPainter` d'iHear) |
+| `colorizedObjectBitmap(obj, frameW, frameH, argb, alpha)` | `Bitmap` colorié | écrans (`LiveViewModel`, `MaskPainter` d'iSee) |
 
 Chaîne : `mask_encoding` de l'objet → `rle` (`MaskRle.kt`), `poly` (`MaskPoly.kt`), sinon
 `decodeMaskAny` (`Masks.kt`, `png`/`bits`/`none`). Les formats compacts se relisent sur la

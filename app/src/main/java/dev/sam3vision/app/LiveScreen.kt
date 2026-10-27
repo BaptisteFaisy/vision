@@ -33,6 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -71,6 +74,7 @@ fun LiveScreen(
     val previewView = rememberLivePreview(context) { attached = it }
 
     LaunchedEffect(Unit) { viewModel.startFromSettings() }
+    ForegroundGate(viewModel)
     LiveCameraHost(viewModel, previewView, attached) { failure = it }
     // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
     // La clé est la liste de masques (neuve à chaque frame), pas la frame : deux scènes
@@ -113,6 +117,27 @@ private fun rememberLivePreview(context: Context, onAttached: (Boolean) -> Unit)
             })
         }
     }
+
+/**
+ * Coupe le flux SAM dès que l'app quitte le premier plan (`ON_PAUSE`, plus fiable que
+ * `onStop` sur ce téléphone) et le relance au retour : sans ça, des frames en
+ * arrière-plan rallument la carte après `/release`.
+ */
+@Composable
+private fun ForegroundGate(viewModel: LiveViewModel) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> viewModel.onBackground()
+                Lifecycle.Event.ON_RESUME -> viewModel.onForeground()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+}
 
 /**
  * Cycle de vie de la caméra d'analyse : liée quand l'aperçu est à l'écran, déliée

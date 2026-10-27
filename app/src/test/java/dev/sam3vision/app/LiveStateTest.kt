@@ -130,4 +130,29 @@ class LiveStateTest {
         val sam = LiveUiState(running = true, samEnabled = true, gpu = "A100-SXM4-40GB")
         assertTrue(sam.statusLine.contains("A100-SXM4-40GB"))
     }
+
+    @Test
+    fun `libelle de transport suit le mode et le socket`() {
+        assertEquals("Tracker", transportLabel(trackerEnabled = true, wsConnected = false))
+        assertEquals("WebSocket", transportLabel(trackerEnabled = false, wsConnected = true))
+        assertEquals("WebSocket KO", transportLabel(trackerEnabled = false, wsConnected = false))
+    }
+
+    @Test
+    fun `le porteur est conserve au plus une fois par seconde`() {
+        assertTrue(shouldKeepFrame(nowMs = 1_000L, lastKeepAtMs = 0L))
+        assertFalse(shouldKeepFrame(nowMs = 1_500L, lastKeepAtMs = 1_000L))
+    }
+
+    @Test
+    fun `l'echec reseau masque l'erreur pendant le reveil gpu`() {
+        val current = LiveUiState(running = true, starting = true, objectsCount = 5)
+        val waking = frameErrorState(current, waking = true, transport = "WebSocket KO", message = "boom")
+        assertEquals(null, waking.error)
+        assertTrue(waking.starting)
+        assertEquals(0, waking.objectsCount)
+        val failed = frameErrorState(current, waking = false, transport = "WebSocket KO", message = "boom")
+        assertEquals(samUnreachableLine("boom"), failed.error)
+        assertFalse(failed.starting)
+    }
 }
