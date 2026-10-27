@@ -34,6 +34,13 @@ data class Settings(
      * le TTS système. `true` par défaut : c'est la fonction d'assistance attendue.
      */
     val ttsAnnouncePositions: Boolean = true,
+    /**
+     * Guidage « tout droit » de la page caméra iSee : la voix dit la consigne de
+     * marche (« Continue tout droit. », « Personne à 2 mètres devant, va à gauche. »)
+     * au lieu de la position des objets. `true` par défaut : c'est l'intention de
+     * marche attendue. Via ElevenLabs, jamais le TTS système, et sans aucun appel LLM.
+     */
+    val ttsGuidanceStraight: Boolean = true,
     /** Intro vocale embarquée autorisée (bascule des Réglages, `true` par défaut). */
     val introEnabled: Boolean = true,
     /** Marqueur historique « intro déjà entendue », conservé pour le format de fichier
@@ -133,6 +140,7 @@ data class Settings(
             asrModel = DEFAULT_ASR_MODEL,
             liveLlmApiKey = "",
             ttsAnnouncePositions = true,
+            ttsGuidanceStraight = true,
             introEnabled = true,
             introPlayed = false,
             distanceOverlayEnabled = true,
@@ -175,6 +183,9 @@ data class Settings(
     /** Vrai si les positions détectées doivent être dites à voix haute. */
     val announcePositions: Boolean get() = ttsAnnouncePositions && ttsConfigured
 
+    /** Vrai si la page caméra iSee doit guider la marche au lieu de décrire les positions. */
+    val guideStraight: Boolean get() = ttsGuidanceStraight && ttsConfigured
+
     /** Vrai si la dictée Meta est utilisable (endpoint + clé renseignés). */
     val asrConfigured: Boolean get() = asrBaseUrl.isNotBlank() && asrApiKey.isNotBlank()
 
@@ -196,6 +207,7 @@ data class Settings(
         "samBaseUrl=$samBaseUrl, samRegion=$samRegion, speechLanguage=$speechLanguage, " +
         "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, " +
         "ttsAutoplay=$ttsAutoplay, ttsAnnouncePositions=$ttsAnnouncePositions, " +
+        "ttsGuidanceStraight=$ttsGuidanceStraight, " +
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +

@@ -99,6 +99,7 @@ internal object SettingsCodec {
     private const val K_TTS_VOICE_ID = "ttsVoiceId"
     private const val K_TTS_AUTOPLAY = "ttsAutoplay"
     private const val K_TTS_ANNOUNCE_POSITIONS = "ttsAnnouncePositions"
+    private const val K_TTS_GUIDANCE_STRAIGHT = "ttsGuidanceStraight"
     private const val K_ASR_BASE_URL = "asrBaseUrl"
     private const val K_ASR_API_KEY = "asrApiKey"
     private const val K_ASR_MODEL = "asrModel"
@@ -123,6 +124,7 @@ internal object SettingsCodec {
         appendLine("$K_TTS_VOICE_ID=${s.ttsVoiceId}")
         appendLine("$K_TTS_AUTOPLAY=${s.ttsAutoplay}")
         appendLine("$K_TTS_ANNOUNCE_POSITIONS=${s.ttsAnnouncePositions}")
+        appendLine("$K_TTS_GUIDANCE_STRAIGHT=${s.ttsGuidanceStraight}")
         appendLine("$K_ASR_BASE_URL=${s.asrBaseUrl}")
         appendLine("$K_ASR_API_KEY=${s.asrApiKey}")
         appendLine("$K_ASR_MODEL=${s.asrModel}")
@@ -155,6 +157,8 @@ internal object SettingsCodec {
             ttsAutoplay = values[K_TTS_AUTOPLAY]?.toBooleanStrictOrNull() ?: default.ttsAutoplay,
             ttsAnnouncePositions = values[K_TTS_ANNOUNCE_POSITIONS]?.toBooleanStrictOrNull()
                 ?: default.ttsAnnouncePositions,
+            ttsGuidanceStraight = values[K_TTS_GUIDANCE_STRAIGHT]?.toBooleanStrictOrNull()
+                ?: default.ttsGuidanceStraight,
             asrBaseUrl = values[K_ASR_BASE_URL].orEmpty().ifBlank { default.asrBaseUrl },
             asrApiKey = values[K_ASR_API_KEY].orEmpty(),
             asrModel = values[K_ASR_MODEL].orEmpty().ifBlank { default.asrModel },
