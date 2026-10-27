@@ -16,12 +16,26 @@ class IseePortraitTest {
     }
 
     @Test
-    fun `camera ouverte, la boule se pose sur la jointure de la rue`() {
+    fun `camera ouverte au repos, image plus haute et boule entierement dessous`() {
         val g = portraitGeometry(1080f, 2400f, 1f)
-        assertEquals(2400f * 0.58f, g.pictureH, 0.1f)
-        assertEquals(2400f * 0.555f, g.orbY, 0.1f)
-        // La jointure (bas de la rue) passe dans la boule.
-        assertTrue(g.orbY - g.orbR < g.pictureH && g.pictureH < g.orbY + g.orbR)
+        assertEquals(2400f * 0.64f, g.pictureH, 0.1f)
+        assertTrue(g.orbY - g.orbR * 1.30f > g.pictureH)
+    }
+
+    @Test
+    fun `la parole compacte l'image et garde la boule et sa couronne dessous`() {
+        for ((w, h) in listOf(360f to 720f, 320f to 520f, 1080f to 2400f)) {
+            val idle = portraitGeometry(w, h, 1f)
+            for (speech in listOf(0f, 0.3f, 0.6f, 1f)) {
+                val g = portraitGeometry(w, h, 1f, speech)
+                assertTrue(g.pictureH <= idle.pictureH)
+                assertTrue(g.orbY - g.orbR * 1.30f > g.pictureH)
+                assertTrue(g.textTop < h)
+            }
+            val spoken = portraitGeometry(w, h, 1f, 1f)
+            assertTrue(spoken.pictureH < h * IseePortrait.PICTURE_H)
+            assertTrue(spoken.textTop + h * 0.14f < h)
+        }
     }
 
     @Test

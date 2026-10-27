@@ -17,6 +17,9 @@ class HoldTranscript(private val recorder: DictationRecorder = DictationRecorder
     /** Ouvre le micro ; `false` si le micro est indisponible (permission, matériel). */
     fun start(): Boolean = recorder.start()
 
+    /** Le même micro alimente les sous-titres pendant la tenue. */
+    fun preview() = recorder.preview()
+
     /** Coupe le micro puis rend le texte transcrit avec le PCM capté (thread I/O). */
     suspend fun stop(client: SpeechClient): Result<Pair<String, ByteArray>> = withContext(Dispatchers.IO) {
         val pcm = recorder.stopAndCollect()

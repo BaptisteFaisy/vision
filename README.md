@@ -3,9 +3,11 @@
 Application Android (Kotlin / Jetpack Compose) qui regarde avec la caméra, **segmente** ce
 qu'elle voit avec SAM 3.1 sur une GPU distante, **décrit** la scène avec un LLM vision
 (API `chat/completions`) et **répond à la voix**. L'accueil est la **scène iSee** : une grande bulle « verre »
-centrée, des satellites autour, un **gros texte paginé** (3 lignes) qui porte le dernier
-message, et la **carte caméra** qui se dissout en damier dans la bulle en laissant son
-« monde » aux couleurs de la photo. Tout passe par les gestes : tap = enregistrement
+sur fond blanc, avec son ombre douce. La **caméra se fond dans le blanc au-dessus de
+la boule** : plus haute au repos, plus compacte pendant la parole. Les **sous-titres
+courts** suivent la lecture audio et disparaissent au silence ; pendant l'appui long,
+le moteur de dictée fournit des aperçus périodiques de la voix du user. Tout passe
+par les gestes : tap = enregistrement
 vidéo, double tap = photo, appui long = dictée. **Plus de balayage** : ni changement
 de bulle, ni retour aux messages passés — le message affiché est toujours le dernier et
 chaque question part **sans aucun historique** ; rien d'une conversation précédente

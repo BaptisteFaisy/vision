@@ -12,7 +12,12 @@ import dev.sam3vision.core.settings.Settings
  * ElevenLabs, et jamais par-dessus la réponse du chat (une seule source sonore à la
  * fois — c'est l'appelant qui dit si le lecteur est libre).
  */
-class ProximityVoice(private val player: SpeechPlayer, private val settings: () -> Settings) {
+class ProximityVoice(
+    private val player: SpeechPlayer,
+    private val settings: () -> Settings,
+    private val onSpeaking: (String) -> Unit = {},
+    private val canPlay: () -> Boolean = { true },
+) {
 
     private var lastPhrase: String? = null
 
@@ -34,6 +39,9 @@ class ProximityVoice(private val player: SpeechPlayer, private val settings: () 
         val bytes = ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
             .synthesize(phrase)
             .getOrElse { return }
-        if (bytes.isNotEmpty()) player.play(bytes)
+        if (bytes.isNotEmpty() && canPlay()) {
+            onSpeaking(phrase)
+            player.play(bytes).onFailure { onSpeaking("") }
+        }
     }
 }
