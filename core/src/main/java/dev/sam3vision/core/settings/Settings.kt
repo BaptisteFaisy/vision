@@ -38,13 +38,13 @@ data class Settings(
     val liveLlmApiKey: String = "",
     /**
      * Annonce vocale des **positions** dès qu'un objet est détecté (mode Direct et
-     * analyse photo) : « Personne à gauche, chien à droite. » Via ElevenLabs, jamais
+     * analyse photo) : « Personne à 9 heures, chien à 3 heures. » Via ElevenLabs, jamais
      * le TTS système. `true` par défaut : c'est la fonction d'assistance attendue.
      */
     val ttsAnnouncePositions: Boolean = true,
     /**
      * Guidage « tout droit » de la page caméra iSee : la voix dit la consigne de
-     * marche (« Continue tout droit. », « Personne à 2 mètres devant, va à gauche. »)
+     * marche (« Continue tout droit. », « Personne à 2 mètres à midi, va à gauche. »)
      * au lieu de la position des objets. `true` par défaut : c'est l'intention de
      * marche attendue. Via ElevenLabs, jamais le TTS système, et sans aucun appel LLM.
      */

@@ -40,7 +40,7 @@ class GuidanceTest {
 
         assertTrue(decision.blocked)
         assertEquals(GuidanceSide.Right, decision.side)
-        assertEquals("Personne à 2 mètres devant, va à droite.", Guidance.phrase(decision))
+        assertEquals("Personne à 2 mètres à midi, va à droite.", Guidance.phrase(decision))
     }
 
     @Test
@@ -48,8 +48,8 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Personne devant, va à gauche.", Guidance.phrase(decision))
-        assertEquals("Personne ahead, go left.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Personne à midi, va à gauche.", Guidance.phrase(decision))
+        assertEquals("Personne at 12 o'clock, go left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
@@ -63,7 +63,7 @@ class GuidanceTest {
     fun `phrase anglaise avec distance`() {
         val decision = Guidance.decide(listOf(placed("person", 0.5f, 2f)))
 
-        assertEquals("Person 2 meters ahead, go left.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Person 2 meters at 12 o'clock, go left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
@@ -88,7 +88,7 @@ class GuidanceTest {
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
 
-        assertEquals("b|personne|Left|2", Guidance.key(bloque))
+        assertEquals("b|personne|Left|2|12h", Guidance.key(bloque))
     }
 
     @Test
@@ -99,5 +99,15 @@ class GuidanceTest {
 
         assertNotEquals(Guidance.key(deux), Guidance.key(trois))
         assertEquals(Guidance.key(deux), Guidance.key(deuxBis))
+    }
+
+    @Test
+    fun `la signature bouge a l heure pres dans le couloir`() {
+        val onze = Guidance.decide(listOf(placed("personne", 0.36f, 2f)))
+        val midi = Guidance.decide(listOf(placed("personne", 0.44f, 2f)))
+
+        assertEquals("b|personne|Right|2|11h", Guidance.key(onze))
+        assertEquals("b|personne|Right|2|12h", Guidance.key(midi))
+        assertEquals("Personne à 2 mètres à 11 heures, va à droite.", Guidance.phrase(onze))
     }
 }

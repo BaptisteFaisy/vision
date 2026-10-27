@@ -1,6 +1,6 @@
 # Annonce vocale des positions — contrat, seuils, recette
 
-Fiche relue dans le **code de cet arbre** le 2026-10-26 : chaque affirmation porte un
+Fiche relue dans le **code de cet arbre** le 2026-10-27 : chaque affirmation porte un
 `chemin:ligne`. Le contrat HTTP de la voix (endpoint, modèle, clé, cache) est dans
 `docs/ELEVENLABS-TTS.md` ; les mots par langue dans `docs/VOIX-ANGLAIS.md`. Ici : **où est
 l'objet**, **quand la voix le dit**, et **comment le vérifier sur un appareil**.
@@ -10,37 +10,41 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 
 ## 1. Le contrat, en une phrase
 
-Dire à voix haute **où est** l'objet détecté (« Personne à gauche, à 1,4 mètre »), **une
+Dire à voix haute **où est** l'objet détecté (« Personne à 9 heures, à 1,4 mètre »), **une
 seule fois** par scène, sans se répéter et sans couper une réponse en cours.
 
-## 2. Trois secteurs, deux seuils
+## 2. Le cadran horaire : sept bandes égales
 
-| `centerX` normalisé | Mot (fr) | Mot (en) |
-|---|---|---|
-| `< 0,34` | à gauche | on the left |
-| `0,34 … 0,66` | au centre | in the middle |
-| `> 0,66` | à droite | on the right |
+| Bande (`centerX × 7`, entier) | Heure | Mot (fr) | Mot (en) |
+|---|---|---|---|
+| 0 | 9 | à 9 heures | at 9 o'clock |
+| 1 | 10 | à 10 heures | at 10 o'clock |
+| 2 | 11 | à 11 heures | at 11 o'clock |
+| 3 | 12 | à midi | at 12 o'clock |
+| 4 | 1 | à 1 heure | at 1 o'clock |
+| 5 | 2 | à 2 heures | at 2 o'clock |
+| 6 | 3 | à 3 heures | at 3 o'clock |
 
-- Seuil bas : `SIDE_EDGE = 0.34f` (`core/.../live/PositionText.kt:41`) ; seuil haut
-  `1 - SIDE_EDGE` = **0,66** (`PositionText.kt:178`). Les deux bornes sont **exclusives** :
-  une boîte centrée à 0,34 pile est « au centre ».
-- Même découpe en vertical (`< 0,34` en haut, `> 0,66` en bas, sinon rien,
-  `PositionText.kt:183-186`) : c'est un **repère** (« en haut à gauche »), pas un secteur
-  annoncé séparément.
+- Heures (`clockHours`, `core/.../live/PositionText.kt:52`) ; `clockHour` (`:59-62`) :
+  sept bandes égales, un bord tombe dans la bande du dessus, 1.0 reste à 3 h.
+- `SIDE_EDGE = 0.34f` (`:46`) ne sert plus qu'au couloir du guidage
+  (`docs/GUIDAGE-TOUT-DROIT.md`) : le parlé n'a plus de repère vertical — la
+  hauteur dans l'image dépend du tangage de la caméra, elle n'oriente pas
+  quelqu'un qui marche.
 - La géométrie est **la même pour toutes les langues** ; la langue ne change que les mots
-  (`PositionText.kt:47-78`).
+  (`clockLabel`, `PositionText.kt:69-76`).
 
 ## 3. Ce que la phrase dit
 
-- **Forme** : label + secteur, **sans article** — donc aucune faute de genre sur des
-  labels libres (`Personne à gauche, chaise en bas à droite.`, `PositionText.kt:101-122`).
-- **Ordre** : gauche → droite (`centerX` croissant, puis label) — `PositionText.kt:111`.
-- **Doublons** : même label à la même position cité **une fois** (`PositionText.kt:110`).
-- **Plafond** : `MAX_OBJECTS = 3` (`PositionText.kt:44`) puis « et N autres objets »
-  (`PositionText.kt:118-119`).
+- **Forme** : label + heure, **sans article** — donc aucune faute de genre sur des
+  labels libres (`Personne à 9 heures, chien à 3 heures.`, `PositionText.kt:99-119`).
+- **Ordre** : gauche → droite (`centerX` croissant, puis label) — `PositionText.kt:109`.
+- **Doublons** : même label à la même heure cité **une fois** (`PositionText.kt:108`).
+- **Plafond** : `MAX_OBJECTS = 3` (`PositionText.kt:49`) puis « et N autres objets »
+  (`PositionText.kt:116-117`).
 - **Distance** : quand elle est connue, `DistanceText.spoken` la met en mots et les objets
   sont séparés par ` ; ` (la virgule sert déjà à séparer position et distance) —
-  `PositionText.kt:113-119`.
+  `PositionText.kt:114` et `item` (`:122-130`).
 
 ## 4. Quand elle parle : trois garde-fous
 
@@ -50,9 +54,10 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
    (`DEFAULT_MIN_FRAMES = 2`, `PositionAnnouncer.kt:88`) : un masque qui clignote ne
    déclenche rien ;
 2. **nouveauté** — une scène déjà annoncée reste muette, même si les objets sont toujours
-   là. La signature de scène est `label|secteur|distance arrondie au mètre`
-   (`PositionText.key`, `PositionText.kt:140-145`) : c'est ce qui fait reparler un objet
-   **qui s'approche** (3 m → 2 m → 1 m) sans le faire bavarder à chaque frame ;
+   là. La signature de scène est `label|heure|distance arrondie au mètre`
+   (`PositionText.key`, `PositionText.kt:138-143`) : c'est ce qui fait reparler un objet
+   **qui s'approche** (3 m → 2 m → 1 m) ou **qui glisse** (10 h → 11 h) sans le faire
+   bavarder à chaque frame ;
 3. **délai** — jamais deux annonces à moins de **4 s** (`DEFAULT_COOLDOWN_MS = 4_000L`,
    `PositionAnnouncer.kt:91`).
 
@@ -78,7 +83,7 @@ est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:14
 ## 6. Ce qui n'est jamais annoncé
 
 - **Label vide** ou géométrie inutilisable (taille d'image inconnue, boîte < 4 valeurs) :
-  l'objet est omis (`PositionText.fromDetection`, `PositionText.kt:81-86`).
+  l'objet est omis (`PositionText.fromDetection`, `PositionText.kt:79-84`).
 - **Objet coupé par le bord haut ou bas** : sa hauteur ne mesure plus l'objet, donc sa
   **distance est écartée** (`Pinhole.isVerticallyCut`, marge **2 px**,
   `core/.../distance/DistanceEstimator.kt:47,156`). Il reste **annoncé sans distance** :
@@ -86,13 +91,13 @@ est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:14
   (« aucun objet coupé par le bord n'est annoncé ») n'est donc **pas** tenu tel quel —
   écart documenté, non corrigé ici (hors du périmètre de cette fiche).
 - **« Hors zone »** : il n'existe pas de zone « hors champ ». Tout objet dont la boîte est
-  lisible reçoit un secteur ; la seule exclusion est celle des lignes ci-dessus.
+  lisible reçoit une heure ; la seule exclusion est celle des lignes ci-dessus.
 
 ## 7. Où ça vit
 
 | Élément | Fichier |
 |---|---|
-| Zones, phrase, signature de scène | `core/.../live/PositionText.kt` (195 l.) |
+| Heures, phrase, signature de scène | `core/.../live/PositionText.kt` (160 l.) |
 | Machine 2 frames / 4 s / non-répétition | `core/.../live/PositionAnnouncer.kt` (92 l.) |
 | Frame → objets placés + distance | `core/.../live/FrameRoster.kt` (`placedLabels`, `:62-77`) |
 | Direct (VM + annonce) | `app/.../LiveViewModel.kt`, `app/.../live/LivePositionVoice.kt` |
@@ -101,7 +106,7 @@ est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:14
 | Réglages | `core/.../settings/Settings.kt`, `app/.../TtsSettings.kt` |
 
 Tests JVM qui verrouillent le contrat : `PositionTextTest` (10), `PositionTextEnglishTest`
-(7), `PositionAnnouncerTest` (8), `LivePositionVoiceTest` (5), `SettingsAnnounceTest` (4).
+(5), `PositionAnnouncerTest` (8), `LivePositionVoiceTest` (5), `SettingsAnnounceTest` (4).
 
 ## 8. Recette
 
@@ -125,8 +130,8 @@ Attendus, dans l'ordre :
 
 1. Réglages → **clé ElevenLabs** + **ID de voix** renseignés (sinon muet, cf. § 5) et
    bascule « Annoncer les objets et leur distance » **activée** ;
-2. analyse d'une photo contenant **trois objets séparés** (gauche, centre, droite) →
-   **une** phrase, p. ex. `Personne à gauche, chaise au centre, bouteille à droite.` ;
+2. analyse d'une photo contenant **trois objets séparés** (9 h, midi, 3 h) →
+   **une** phrase, p. ex. `Personne à 9 heures, chaise à midi, bouteille à 3 heures.` ;
 3. la même photo réanalysée → **aucune** nouvelle annonce (scène déjà dite) ;
 4. bascule **coupée** + Enregistrer → l'analyse tourne, **plus aucune** annonce.
 

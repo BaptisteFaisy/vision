@@ -6,7 +6,7 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Voix de proximité de la fenêtre caméra : dit **une fois** chaque nouvelle phrase de
- * [LiveProbe] (« Personne à gauche, à 1,4 mètre »).
+ * [LiveProbe] (« Personne à 9 heures, à 1,4 mètre »).
  *
  * Trois garde-fous : la même phrase n'est jamais répétée, rien n'est dit sans clé
  * ElevenLabs, et jamais par-dessus la réponse du chat (une seule source sonore à la

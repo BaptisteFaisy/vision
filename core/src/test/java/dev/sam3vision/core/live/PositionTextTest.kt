@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Mise en mots des positions : secteurs, ordre de lecture, doublons, troncature. */
+/** Mise en mots des positions : cadran horaire, ordre de lecture, doublons, troncature. */
 class PositionTextTest {
 
     private fun placed(label: String, x: Float, y: Float = 0.5f) = PlacedLabel(label, x, y)
@@ -16,21 +16,24 @@ class PositionTextTest {
         Detection(label, 0.9f, box, width, height)
 
     @Test
-    fun `secteurs horizontaux`() {
-        assertEquals("à gauche", PositionText.horizontal(0.1f))
-        assertEquals("au centre", PositionText.horizontal(0.5f))
-        assertEquals("à droite", PositionText.horizontal(0.9f))
+    fun `cadran de 9h à gauche à 3h à droite`() {
+        assertEquals(9, PositionText.clockHour(0.05f))
+        assertEquals(10, PositionText.clockHour(0.2f))
+        assertEquals(11, PositionText.clockHour(0.35f))
+        assertEquals(12, PositionText.clockHour(0.5f))
+        assertEquals(1, PositionText.clockHour(0.65f))
+        assertEquals(2, PositionText.clockHour(0.8f))
+        assertEquals(3, PositionText.clockHour(0.95f))
+        assertEquals(3, PositionText.clockHour(1.0f))
     }
 
     @Test
-    fun `secteurs verticaux et position complete`() {
-        assertEquals("en haut", PositionText.vertical(0.1f))
-        assertNull(PositionText.vertical(0.5f))
-        assertEquals("en bas", PositionText.vertical(0.9f))
-        assertEquals("en haut à gauche", PositionText.positionLabel(0.1f, 0.1f))
-        assertEquals("au centre", PositionText.positionLabel(0.5f, 0.5f))
-        assertEquals("en bas à droite", PositionText.positionLabel(0.9f, 0.9f))
-        assertEquals("à droite", PositionText.positionLabel(0.9f, 0.5f))
+    fun `libelle de position au cadran`() {
+        assertEquals("à 9 heures", PositionText.clockLabel(0.1f))
+        assertEquals("à midi", PositionText.clockLabel(0.5f))
+        assertEquals("à 3 heures", PositionText.clockLabel(0.9f))
+        assertEquals("à 1 heure", PositionText.clockLabel(0.65f))
+        assertEquals("à 11 heures", PositionText.clockLabel(0.35f))
     }
 
     @Test
@@ -39,7 +42,7 @@ class PositionTextTest {
 
         assertEquals(0.1f, obj!!.centerX, 0.001f)
         assertEquals(0.1f, obj.centerY, 0.001f)
-        assertEquals("en haut à gauche", obj.position)
+        assertEquals("à 9 heures", obj.position)
     }
 
     @Test
@@ -56,14 +59,14 @@ class PositionTextTest {
             listOf(placed("chien", 0.9f), placed("personne", 0.1f), placed("livre", 0.5f)),
         )
 
-        assertEquals("Personne à gauche, livre au centre, chien à droite.", phrase)
+        assertEquals("Personne à 9 heures, livre à midi, chien à 3 heures.", phrase)
     }
 
     @Test
-    fun `meme label meme secteur cite une seule fois`() {
+    fun `meme label meme heure cite une seule fois`() {
         val phrase = PositionText.phrase(listOf(placed("personne", 0.1f), placed("personne", 0.05f)))
 
-        assertEquals("Personne à gauche.", phrase)
+        assertEquals("Personne à 9 heures.", phrase)
     }
 
     @Test
@@ -78,7 +81,7 @@ class PositionTextTest {
 
         val phrase = PositionText.phrase(labels, maxObjects = 3)
 
-        assertTrue(phrase!!.startsWith("Personne à gauche, chien à gauche, livre au centre"))
+        assertTrue(phrase!!.startsWith("Personne à 9 heures, chien à 10 heures, livre à midi"))
         assertTrue(phrase.endsWith(", et 2 autres objets."))
     }
 
@@ -97,13 +100,13 @@ class PositionTextTest {
         val loin = PlacedLabel("chien", 0.9f, 0.5f, meters = 3.0f)
 
         assertEquals(
-            "Personne à gauche, à 1,4 mètre ; chien à droite, à 3 mètres.",
+            "Personne à 9 heures, à 1,4 mètre ; chien à 3 heures, à 3 mètres.",
             PositionText.phrase(listOf(proche, loin)),
         )
         // un seul objet avec distance : même règle, la phrase reste courte
-        assertEquals("Personne à gauche, à 1,4 mètre.", PositionText.phrase(listOf(proche)))
+        assertEquals("Personne à 9 heures, à 1,4 mètre.", PositionText.phrase(listOf(proche)))
         // sans distance connue : forme d'origine, virgules
-        assertEquals("Personne à gauche, chien à droite.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
+        assertEquals("Personne à 9 heures, chien à 3 heures.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
     }
 
     @Test
@@ -115,7 +118,7 @@ class PositionTextTest {
         assertTrue(PositionText.key(listOf(trois)) != PositionText.key(listOf(deux)))
         // même mètre près : pas de nouvelle annonce (le lissage suffit)
         assertEquals(PositionText.key(listOf(trois)), PositionText.key(listOf(troisBis)))
-        assertEquals("personne|au centre|2", PositionText.key(listOf(deux)))
-        assertEquals("personne|au centre|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
+        assertEquals("personne|à midi|2", PositionText.key(listOf(deux)))
+        assertEquals("personne|à midi|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
     }
 }

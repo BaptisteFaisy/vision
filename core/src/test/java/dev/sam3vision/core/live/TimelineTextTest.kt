@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.model.SeenTrack
 import dev.sam3vision.core.model.TimelineSummary
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,16 +28,16 @@ class TimelineTextTest {
     }
 
     @Test
-    fun `la position se lit de gauche a droite`() {
-        assertTrue(TimelineText.position(track(centerX = 0.1f)).contains("gauche"))
-        assertTrue(TimelineText.position(track(centerX = 0.5f)).contains("centre"))
-        assertTrue(TimelineText.position(track(centerX = 0.9f)).contains("droite"))
+    fun `la position suit le cadran horaire`() {
+        assertEquals("à 9 heures", TimelineText.position(track(centerX = 0.1f)))
+        assertEquals("à midi", TimelineText.position(track(centerX = 0.5f)))
+        assertEquals("à 3 heures", TimelineText.position(track(centerX = 0.9f)))
     }
 
     @Test
-    fun `la position mentionne la hauteur quand elle est nette`() {
-        assertTrue(TimelineText.position(track(centerY = 0.1f)).contains("en haut"))
-        assertTrue(TimelineText.position(track(centerY = 0.9f)).contains("en bas"))
+    fun `la position anglaise suit le cadran`() {
+        assertEquals("at 9 o'clock", TimelineText.position(track(centerX = 0.1f), SpeechLanguage.En))
+        assertEquals("at 12 o'clock", TimelineText.position(track(centerX = 0.5f), SpeechLanguage.En))
     }
 
     @Test
@@ -45,7 +46,7 @@ class TimelineTextTest {
         val line = TimelineText.describe(summary)
 
         assertTrue(line.contains("personne"))
-        assertTrue(line.contains("gauche"))
+        assertTrue(line.contains("9 heures"))
         assertTrue(line.contains("il y a 3 s"))
     }
 
