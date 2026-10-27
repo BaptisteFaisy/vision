@@ -5,11 +5,15 @@
 # déclencheur sur synchronize : un humain qui coupe l'auto-merge reste coupé.
 # Posé le 2026-10-27 sur demande : « toutes les modifs passent en PR + merge
 # auto ». Repli si GITHUB_TOKEN ne suffit plus : PAT dans un secret.
+# Second job (push sur master) : met à jour les PR armées en retard, sinon
+# la file se bloque dès que deux PR se suivent (BEHIND ne merge jamais).
 name: pr-auto-merge
 
 on:
   pull_request:
     types: [opened, ready_for_review, reopened]
+  push:
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +27,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     if: >
+      github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     steps:
@@ -38,3 +43,29 @@ jobs:
             gh pr merge --auto --rebase "$PR_URL"
             echo "auto-merge armé (rebase) sur $PR_URL"
           fi
+
+  update-stale:
+    # À chaque atterrissage sur master : remet à jour les PR armées en
+    # retard (BEHIND), sinon elles restent bloquées et la file ne se vide
+    # jamais. Seules les PR déjà en auto-merge (un humain qui a coupé reste
+    # coupé), jamais les brouillons. Conflits (DIRTY) : on saute, l'auteur
+    # rebase à la main.
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    if: github.event_name == 'push'
+    steps:
+      - name: Mettre à jour les PR armées en retard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list --base master --state open \
+            --json number,mergeStateStatus,autoMergeRequest,isDraft \
+            --jq '.[] | select(.mergeStateStatus == "BEHIND") | select(.autoMergeRequest != null) | select(.isDraft == false) | .number' \
+          | while read -r pr; do
+            [ -n "$pr" ] || continue
+            if gh pr merge --update-branch "$pr" 2>&1; then
+              echo "PR #$pr mise à jour"
+            else
+              echo "PR #$pr sautée (conflit probable, à l'auteur de rebaser)"
+            fi
+          done
