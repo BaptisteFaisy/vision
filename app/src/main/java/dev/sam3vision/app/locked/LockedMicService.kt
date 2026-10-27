@@ -10,6 +10,7 @@ import dev.sam3vision.app.DictationRecorder
 import dev.sam3vision.app.MicBus
 import dev.sam3vision.app.VoiceAnnouncer
 import dev.sam3vision.app.llmClient
+import dev.sam3vision.app.seededFromBuild
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
@@ -201,8 +202,13 @@ class LockedMicService : Service() {
         wake = null
     }
 
-    /** Réglages lus hors du thread principal (Keystore : quelques dizaines de ms). */
-    private suspend fun loadSettings(): Settings = withContext(Dispatchers.IO) { store.load() }
+    /**
+     * Réglages lus hors du thread principal (Keystore : quelques dizaines de ms) **et amorcés
+     * par l'APK** (`seededFromBuild`) : les clés embarquées au build ne sont pas dans le store,
+     * et sans cet amorçage un téléphone neuf répondrait « aucun moteur de dictée ».
+     */
+    private suspend fun loadSettings(): Settings =
+        withContext(Dispatchers.IO) { seededFromBuild(store.load()) }
 
     private companion object {
         /** Dossier de voix distinct : n'écrase pas le MP3 des bandeaux de dictée. */
