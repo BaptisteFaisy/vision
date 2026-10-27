@@ -100,7 +100,8 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | `work_edge` par défaut du direct | **640 px** | `core/live/LiveSession.kt:173` (`DEFAULT_WORK_EDGE`) |
 | Objets affichés par défaut | **8** (bornes 1–12) | `core/model/ObjectLimits.kt:16-18` |
 | Concepts suivis par défaut | **2** (`person`, `door`), max 2, 32 caractères | `core/live/LivePrompts.kt:20,28,31` |
-| Budget de tokens du LLM | **800** (photo/chat), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/InferHubLlmClient.kt:11-14` |
+| Budget de tokens du LLM | **1200** (photo/chat, le défaut raisonne avant de répondre), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/InferHubLlmClient.kt:11-21` |
+| Modèle de narration | **séparé** du modèle des questions : `ali/qwen3.8-omni-flash`, clé dédiée (`liveLlmApiKey`) ; sans clé, le Direct se tait et n'appelle pas le LLM des questions | `core/settings/Settings.kt` (`DEFAULT_LIVE_LLM_MODEL`), `app/LlmFactory.kt` (`liveNarration`) |
 | Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:60` (`MAX_HISTORY_TURNS`) |
 | Champ de vision de repli | **67°**, bornes **15–130°** | `core/distance/LensSpec.kt:43,46,49` |
 | Lissage des distances | **0,35** (suivi), **0,85** (saut) | `core/distance/DistanceSmoother.kt:18-19` |

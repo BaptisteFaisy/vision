@@ -105,6 +105,8 @@ android {
         buildConfigField("String", "TTS_VOICE_ID", "\"${localProp("tts.voice.id")}\"")
         // Dictée Meta Muse (facultative : sans clé, repli ElevenLabs Scribe avec la clé ci-dessus).
         buildConfigField("String", "ASR_API_KEY", "\"${localProp("asr.api.key")}\"")
+        // Narration du Direct : clé dédiée (le modèle des questions ne narre pas).
+        buildConfigField("String", "LIVE_LLM_API_KEY", "\"${localProp("llm.live.api.key")}\"")
         // Tap court : endpoint vidéo SAM 3.1 (laisser vide → annonce « Failed », aucun envoi).
         buildConfigField("String", "SAM31_ENDPOINT", "\"${localProp("sam31.endpoint")}\"")
         // Direct : base de l'app Modal sam3-eu-a100 (/live).
