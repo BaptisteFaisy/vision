@@ -15,17 +15,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.iseedesign.pictureAlpha
 
 /**
- * La caméra du design « Portrait » : la rue occupe le haut de l'écran (58 %) et se fond dans
+ * La caméra du design « Portrait » : la rue occupe le haut, sa hauteur suit la parole et se fond dans
  * le blanc par le bas ; pas de cadre, pas de carte. À l'ouverture la rue arrive floue et un peu
  * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les
  * distances.
@@ -41,12 +41,12 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
 ) {
     if (open <= 0.001f) return
     val focus = focusPull(open)
-    val pictureH = height * IseePortrait.PICTURE_H
     Box(
         Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth()
-            .height(pictureH)
+            .height(height)
+            .clipToBounds()
             .graphicsLayer { alpha = open.coerceIn(0f, 1f) },
     ) {
         Box(

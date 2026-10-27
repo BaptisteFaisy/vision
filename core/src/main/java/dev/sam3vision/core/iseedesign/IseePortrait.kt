@@ -3,7 +3,7 @@ package dev.sam3vision.core.iseedesign
 /**
  * Le design « Portrait » de l'écran iSee (choisi sur la maquette web) : logique pure, testable
  * sur JVM. La rue occupe le haut de l'écran et se fond dans le blanc ; la boule de verre est
- * posée sur la jointure, la phrase en cours dessous. Couleurs « Amber » : le user en bleu,
+ * posée sous l'image, le court passage en cours dessous. Couleurs « Amber » : le user en bleu,
  * iSee en ambre. Aucun pixel sur la boule : verre + liquide marbré seulement.
  */
 object IseePortrait {
@@ -27,8 +27,10 @@ object IseePortrait {
     const val REST_Y = 0.40f
     const val REST_R = 0.335f
 
-    /** Caméra ouverte : la rue fait 58 % du haut, la boule se pose sur la jointure. */
+    /** Caméra ouverte : plus haute au repos, compacte pendant la parole. */
     const val PICTURE_H = 0.58f
+    const val PICTURE_IDLE_H = 0.64f
+    const val PICTURE_SPEAKING_H = 0.50f
     const val CAM_Y = 0.555f
     const val CAM_R = 0.20f
 
@@ -59,15 +61,20 @@ fun smoothOpen(k: Float): Float {
  * Où sont la boule, la rue et la phrase pour un écran [width]×[height] quand la caméra est
  * ouverte à [open] (0 fermée, 1 ouverte). La phrase est toujours sous la boule.
  */
-fun portraitGeometry(width: Float, height: Float, open: Float): PortraitGeometry {
+fun portraitGeometry(width: Float, height: Float, open: Float, speech: Float = 0f): PortraitGeometry {
     val k = smoothOpen(open)
-    val r = mix(width * IseePortrait.REST_R, width * IseePortrait.CAM_R, k)
-    val y = mix(height * IseePortrait.REST_Y, height * IseePortrait.CAM_Y, k)
+    val talking = smoothOpen(speech)
+    val cameraR = minOf(width * IseePortrait.CAM_R, height * 0.105f)
+    val r = mix(width * IseePortrait.REST_R, cameraR, k)
+    val picture = height * mix(IseePortrait.PICTURE_IDLE_H, IseePortrait.PICTURE_SPEAKING_H, talking)
+    // Même la couronne et la respiration restent sous l'image, sans recouvrement.
+    val cameraY = picture + cameraR * 1.32f + width * 0.025f
+    val y = mix(height * IseePortrait.REST_Y, cameraY, k)
     return PortraitGeometry(
         orbX = width / 2f,
         orbY = y,
         orbR = r,
-        pictureH = height * IseePortrait.PICTURE_H * k,
+        pictureH = picture * k,
         textTop = y + r * 1.3f + width * 0.03f,
     )
 }

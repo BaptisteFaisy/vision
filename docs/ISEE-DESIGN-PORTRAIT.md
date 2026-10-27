@@ -16,24 +16,29 @@
   de boîte à lumière, irisation au bord, liseré. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
-  elle occupe 58 % du haut (`PICTURE_H`) et **se fond dans le blanc** sur
+  elle occupe 64 % du haut au repos (`PICTURE_IDLE_H`) et 50 % pendant la
+  parole (`PICTURE_SPEAKING_H`), avec une transition douce, et **se fond dans le blanc** sur
   ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture elle arrive
   **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
   quel que soit l'état (tenir le micro sous vidéo ne la cache pas).
 - **La boule respire** (respiration + ombre de contact). Au repos : centrée à
   40 % de la hauteur (`REST_Y`), rayon 33,5 % de la largeur (`REST_R`).
-  Caméra ouverte : elle rétrécit et **se pose sur la jointure** de la rue
-  (`CAM_Y` 55,5 %, `CAM_R` 20 %).
+  Caméra ouverte : elle rétrécit et reste **entièrement sous l'image**, couronne
+  comprise (`CAM_R` 20 % de la largeur, plafonné selon la hauteur disponible).
   Son ombre superpose une pénombre large, une ombre portée et un cœur de
-  contact fin. Chaque dégradé radial est comprimé en ellipse, sans découpe
-  nette en haut ou en bas ; le léger décalage vers la droite suit la lumière
-  venant du haut-gauche. L'ombre accompagne la respiration et s'efface à
-  l'ouverture de la caméra comme auparavant.
+  contact fin. Les dégradés elliptiques et le léger décalage vers la droite
+  suivent la lumière venant du haut-gauche. L'ombre accompagne la respiration
+  et reste visible sous la caméra. La place des boutons système est réservée.
 - **Seule la phrase en cours**, en gros, **sous la boule** (`IseeSpokenLine`,
-  4 lignes max + ellipsis, label YOU/ISEE au-dessus). Elle **s'allume mot à
+  5 mots / 32 caractères par passage, 2 lignes, label YOU/ISEE au-dessus).
+  Les passages avancent avec la position et la durée réelles du lecteur MP3,
+  quelle que soit sa vitesse. Elle **s'allume mot à
   mot** : mot en cours dans la couleur de qui parle, mots dits en noir, mots
-  à venir en gris très clair (`DIM` = encre à 18 %). Hors parole : tout noir.
+  à venir en gris très clair (`DIM` = encre à 18 %). Hors parole : **aucun texte**,
+  y compris après une réponse, pendant la préparation audio et la réflexion.
+  Sans alignement phonétique fourni par la synthèse, la position des mots dans
+  le MP3 reste proportionnelle ; elle n'est pas un horodatage mot à mot.
 - **Le user parle (écoute)** : liquide **bleu**. **iSee parle** : liquide
   **ambre** + **couronne de 120 barres ambre** autour de la boule. Pastille :
   LISTENING bleu, SPEAKING ambre, SEEING / THINKING / MEMORY / READY sinon.
@@ -86,6 +91,12 @@ tout nouvel écran iSee reprend ce design. En cas de doute : le code
 `IseePortrait.kt` + ses tests font foi, pas la maquette d'origine.
 
 ## 6. Boule gelée : le rendu ne change plus sans le user
+
+Modification explicitement demandée le 2026-10-27 : caméra adaptative, boule
+sous l'image et ombre plus réaliste. L'ombre à trois niveaux de `master` est
+conservée et reste visible sous la caméra. Seule l'unité `OrbLayer` du rendu
+gelé est modifiée ; shader, liquide, palettes, respiration et couronne
+restent ceux de `master`.
 
 Le code qui dessine la boule est figé à l'octet près :
 `tools/orb-frozen-baseline.json` garde les empreintes de `IseePortraitOrb.kt`

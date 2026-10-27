@@ -17,6 +17,7 @@ import dev.sam3vision.app.isee.vm.IseeAnswers
 import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeHoldMic
+import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
@@ -58,10 +59,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val player = SpeechPlayer(
         dir = File(app.cacheDir, "isee-play"),
         onComplete = {
-            // L'intro reste posée à l'écran : seule la coupure par la voix la retire.
-            update { st -> st.copy(speakingEntryId = null) }
+            // Fin de la lecture : les sous-titres disparaissent aussitôt.
+            update { st -> st.copy(speakingEntryId = null, speakingText = "") }
         },
-        onPlaybackError = { update { st -> st.copy(speakingEntryId = null) } },
+        onPlaybackError = { update { st -> st.copy(speakingEntryId = null, speakingText = "") } },
     )
 
     private val _state = MutableStateFlow(IseeUiState())
@@ -74,7 +75,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     val probe = LiveProbe(viewModelScope)
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player) { settings }
+    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
 
     /** Voix de l'intro (le texte écrit, lui, ne part jamais). */
     private val intro = IseeIntro(getApplication(), player, { settings }, { settings = it }, prefs, ::update)
@@ -101,7 +102,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /** Micro de l'appui long, transcription incluse. */
-    private val dictation = IseeDictation(IseeHoldMic(), ::speechClient, ::update)
+    private val mic = IseeHoldMic()
+    private val dictation = IseeDictation(mic, ::speechClient, ::update)
+    private val liveDictation = IseeLiveDictation(viewModelScope, mic::preview, ::speechClient, ::update)
 
     /** Vidéo d'environnement du tap, et lien aux actions de la caméra. */
     private val cameraOps = IseeCameraCoordinator(
@@ -156,7 +159,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             transcript.refresh()
             intro.playIfPending()
         }
-        probe.observeSpoken(viewModelScope, proximity) { playerIdle() }
+        probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }
         probe.observeCrossing(viewModelScope, haptics)
     }
 
@@ -195,6 +198,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        liveDictation.stop()
+        dictation.discard()
         player.release()
         super.onCleared()
     }
@@ -237,7 +242,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         shots.captureForHold()
         update { it.copy(holding = true, status = null) }
         haptics.holdStart()
-        dictation.start()
+        if (dictation.start()) liveDictation.start(settings)
     }
 
     /** Doigt relâché : micro coupé, transcription, MP3 en cache, réponse IA parlée. */
@@ -245,6 +250,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         if (!active) return
         haptics.holdEnd()
         if (!_state.value.holding) return
+        liveDictation.stop()
         update { it.copy(holding = false) }
         viewModelScope.launch { transcribeAndAnswer() }
     }
@@ -252,6 +258,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Tenue annulée (app en arrière-plan ou geste perdu) : micro relâché, rien de transcrit. */
     fun onHoldCancel() {
         if (!_state.value.holding) return
+        liveDictation.stop()
         dictation.discard()
         haptics.holdEnd()
         update { it.copy(holding = false) }
@@ -304,7 +311,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val bytes = voice.synthesize(confirmation)
             if (bytes.isNotEmpty()) {
-                update { it.copy(speakingEntryId = SPEED_BUBBLE_ID, status = confirmation) }
+                update { it.copy(speakingEntryId = SPEED_BUBBLE_ID, speakingText = confirmation, status = confirmation) }
                 player.play(bytes)
             }
         }
@@ -349,9 +356,24 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun playerIdle(): Boolean = _state.value.speakingEntryId == null
 
+    private fun canAnnounce(): Boolean {
+        val state = _state.value
+        return playerIdle() && !state.holding && !state.transcribing && !state.thinking
+    }
+
+    /** Position média pour les sous-titres ; aucune estimation d'une vitesse de parole. */
+    fun speechPosition() = player.position()
+
+    private fun speakAnnouncement(text: String) {
+        update { it.copy(speakingEntryId = if (text.isBlank()) null else ANNOUNCEMENT_BUBBLE_ID, speakingText = text) }
+    }
+
     /** Annonce de navigation : même chemin audio que les bulles (ElevenLabs + lecteur partagé). */
     private suspend fun speakNavigation(text: String): Unit {
-        player.play(voice.synthesize(text))
+        val audio = voice.synthesize(text)
+        if (audio.isEmpty()) return
+        speakAnnouncement(text)
+        player.play(audio).onFailure { update { it.copy(speakingEntryId = null, speakingText = "") } }
     }
 
     /** Sécurité FIFO silencieuse après chaque écriture de fichier multimédia. */
@@ -360,10 +382,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Purge totale à la fermeture de l'activité (option A) : table + cache. */
-    fun onAppClosed() = session.onClosed()
+    fun onAppClosed() {
+        onHoldCancel()
+        session.onClosed()
+    }
 
     /** L'app part derrière : minuteur armé (option C) et envoi SAM de la sonde coupé. */
     fun onBackground() {
+        onHoldCancel()
         session.onBackground()
         probe.onBackground()
     }
