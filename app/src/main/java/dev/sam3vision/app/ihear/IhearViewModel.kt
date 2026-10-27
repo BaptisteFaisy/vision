@@ -9,7 +9,9 @@ import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MediaDatabase
+import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.seededFromBuild
+import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.ihear.vm.IhearAnswers
 import dev.sam3vision.app.ihear.vm.IhearCameraCoordinator
@@ -19,6 +21,7 @@ import dev.sam3vision.app.ihear.vm.IhearPhotoShot
 import dev.sam3vision.app.ihear.vm.IhearStatusText
 import dev.sam3vision.app.ihear.vm.IhearTranscript
 import dev.sam3vision.app.ihear.vm.IhearVoice
+import dev.sam3vision.app.ihear.vm.NavigationHook
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -120,6 +123,14 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         playback = playback,
         photo = shots,
         prune = ::enforceFifo,
+    )
+
+    /** Ordre vocal « je veux aller à X » : Google Maps + annonce, avant le LLM. */
+    private val navigation = NavigationHook(
+        launcher = AndroidNavigationLauncher(getApplication()),
+        guidanceEnabled = { settings.navigationGuidanceEnabled },
+        announcer = NavigationAnnouncer({ settings }) { _, text -> speakNavigation(text) },
+        update = ::update,
     )
 
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
@@ -290,6 +301,8 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             update { it.copy(status = IhearStatusText.ANSWER_PENDING) }
             return
         }
+        // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
+        if (navigation.onTranscript(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
@@ -301,6 +314,11 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     private fun update(fn: (IhearUiState) -> IhearUiState) = _state.update(fn)
 
     private fun playerIdle(): Boolean = _state.value.speakingEntryId == null
+
+    /** Annonce de navigation : même chemin audio que les bulles (ElevenLabs + lecteur partagé). */
+    private suspend fun speakNavigation(text: String): Unit {
+        player.play(voice.synthesize(text))
+    }
 
     /** Sécurité FIFO silencieuse après chaque écriture de fichier multimédia. */
     private suspend fun enforceFifo() {

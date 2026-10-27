@@ -70,6 +70,7 @@ fun SettingsScreen(
             DistanceSettings(draft) { draft = it }
             PredictionSettings(draft) { draft = it }
             LocalOverlaySettings(draft) { draft = it }
+            NavigationToggle(draft) { draft = it }
             TtsSettings(
                 draft = draft,
                 speaking = speaking,

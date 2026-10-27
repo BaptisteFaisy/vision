@@ -35,6 +35,7 @@ class SettingsStoreParityTest {
         liveSamEnabled = false,
         boxPredictionEnabled = true,
         localOverlayEnabled = false,
+        navigationGuidanceEnabled = false,
         cameraFovDeg = 63.5f,
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
@@ -42,7 +43,7 @@ class SettingsStoreParityTest {
     )
 
     @Test
-    fun `le codec restitue les vingt champs sans en perdre un`() {
+    fun `le codec restitue les vingt-deux champs sans en perdre un`() {
         val relu = SettingsCodec.decode(SettingsCodec.encode(complet))
 
         assertEquals(complet, relu)
@@ -52,6 +53,7 @@ class SettingsStoreParityTest {
         assertEquals("cle-complete-asr", relu.asrApiKey)
         assertEquals(63.5f, relu.cameraFovDeg, 0.001f)
         assertEquals(false, relu.distanceOverlayEnabled)
+        assertEquals(false, relu.navigationGuidanceEnabled)
         assertEquals(true, relu.boxPredictionEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.Fr, relu.speechLanguage)

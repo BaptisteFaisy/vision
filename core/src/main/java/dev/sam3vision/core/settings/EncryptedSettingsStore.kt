@@ -56,6 +56,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
+            navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
             maxObjects = ObjectLimits.clamp(
@@ -85,6 +86,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
+            .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
             .apply()
@@ -111,6 +113,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
+        const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */

@@ -56,6 +56,12 @@ data class Settings(
      */
     val localOverlayEnabled: Boolean = true,
     /**
+     * Guidage GPS : la destination confirmée (« emmène-moi à X ») part en guidage
+     * Google Maps (`google.navigation:` puis repli URL universelle). Éteint : seule
+     * la fiche du lieu s'affiche, sans lancer de guidage. `true` par défaut.
+     */
+    val navigationGuidanceEnabled: Boolean = true,
+    /**
      * Champ de vision horizontal imposé à la caméra, en degrés : 0 = lu sur le
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
@@ -114,6 +120,7 @@ data class Settings(
             liveSamEnabled = true,
             boxPredictionEnabled = false,
             localOverlayEnabled = true,
+            navigationGuidanceEnabled = true,
             cameraFovDeg = 0f,
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
@@ -173,6 +180,7 @@ data class Settings(
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
+        "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "cameraFovDeg=$cameraFovDeg, maxObjects=$maxObjects)"
 }
 
