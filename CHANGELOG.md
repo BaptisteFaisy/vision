@@ -3,6 +3,16 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 — caregiver : Portrait gris et session distante
+
+- Fond blanc, boule Portrait grise, phrase courante puis carte en bas, sur le
+  site et dans la WebView Caregiver. Le shader Android gelé reste inchangé.
+- Import du lien reçu depuis un autre téléphone ; aucune session choisie à
+  partir de l'identifiant local du caregiver.
+- iSee et Direct partagent le même relais pour les objets et la phrase. Le
+  déplacement GPS est décrit seulement au-delà de son incertitude ; les
+  repères se figent à la perte du signal et disparaissent après deux minutes.
+
 ## 2026-10-27 (14) — zéro mémoire des anciens messages + balayage supprimé
 
 - **L'IA n'a plus aucune mémoire** : `IhearTranscript` perd `questionTurns()` /

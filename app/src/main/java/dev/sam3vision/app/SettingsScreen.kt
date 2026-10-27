@@ -215,7 +215,7 @@ private fun ParentShareSettings(
         LabeledField("Lien du site de suivi", draft.parentSiteUrl, false) {
             onChange(draft.copy(parentSiteUrl = it))
         }
-        SwitchRow("Envoyer la position + objets au site pendant le Direct", draft.shareEnabled) {
+        SwitchRow("Partager la position, les objets et le texte iSee", draft.shareEnabled) {
             onChange(draft.copy(shareEnabled = it))
         }
         LabeledField("Identifiant du flux (?share=, un par proche suivi)", draft.shareId, false) {
@@ -239,7 +239,7 @@ private fun ParentShareSettings(
         Text(
             "En poche (écran éteint), la position seule continue d'être envoyée toutes les " +
                 "15 s pour la batterie ; écran allumé, le partage complet reste à la cadence " +
-                "de 2 s. Les objets entourés réapparaissent dès que le Direct rouvre.",
+                "de 2 s. Les objets réapparaissent dès que la caméra iSee ou le Direct rouvre.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )

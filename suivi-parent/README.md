@@ -1,57 +1,74 @@
-# Suivi parent — page unique mobile-first (repo vision)
+# Suivi caregiver — session iSee partagée
 
-Une seule page `index.html` autonome, hébergeable en statique sur Vercel
-(dossier racine Vercel : ce dossier, framework « Other », build vide).
-Le relais live vit dans `api/` (fonctions serverless, sans aucune dépendance npm).
+Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
+Android : fond blanc, boule Portrait grise, phrase courante et carte en bas.
 
-## Ce que la page affiche
-- **Un seul bloc Carte** : les objets détectés par le téléphone + Léo (point bleu)
-  et un halo bleu = imprécision GPS réelle en mètres. Plus de radar séparé ni de
-  liste par catégorie : tout est posé directement sur la carte.
-- **Zoom** : pincez, boutons +/− et boussole (MapLibre) ou contrôle natif Google ;
-  bouton « Recentrer sur Léo » + recentrage auto.
-- **Google Maps** si une clé est présente (`?key=TA_CLE` ou champ sous la carte,
-  gardée dans le navigateur — jamais en dur), sinon repli gratuit OpenFreeMap/Esri.
-- **En-tete** : trois etats seulement, sans aucune simulation — `LIVE` (< 12 s),
-  `SIGNAL LOST` (< 2 min, position et pastilles figees en gris, bandeau « nothing is
-  moving »), puis `OFFLINE` (au-dela du TTL de 2 min du relais, ou avant tout envoi :
-  plus aucun repere sur la carte, bandeau explicite). L'interface est entierement en
-  anglais, sans lettres accentuees (les libelles d'objets sont normalises avant
-  reconnaissance, donc « velo » ou « vehicule » restent detectes avec ou sans accent).
-- Mention « approximate location (indoors, +/-X m) » quand le telephone signale une
-  precision degradee.
+## Ouvrir la bonne session sur un autre téléphone
 
-## Flux live (câblé)
-Téléphone (`sam-vision-master`, écran Direct) → `POST /api/share` toutes les 2 s :
-`{shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor}, objects:[{label,distM,angleDeg}]}`
-(`angleDeg` = cap absolu : cap téléphone + angle boîte/FOV, voir `SharePayload.kt`).
-La page lit `GET /api/state?share=<id>` toutes les 2 s et place chaque objet en
-polaire depuis la position GPS reçue (`destPoint`). Un identifiant de flux par
-proche (`?share=`) : personne d'autre ne voit la carte d'un autre.
+1. Sur le téléphone accompagné : configurer un identifiant de flux par proche
+   dans Réglages → Suivi parent, puis « Partager le suivi ».
+2. Le caregiver ouvre le lien reçu (`https://…/?share=<identifiant>`) dans son
+   navigateur, ou le colle via **Lien** dans son app en rôle Caregiver.
+3. La page lit uniquement ce flux. Sans lien valide, aucune session implicite
+   n'est choisie. Aucune position du téléphone caregiver n'est demandée.
 
-## Variables d'environnement Vercel
-- `SHARE_WRITE_KEY` : si définie, `POST /api/share` exige la même clé (sinon 403).
-  À saisir aussi dans l'app : Réglages → « Clé d'écriture du relais »
-  (vide des deux côtés = relais ouvert).
-- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` : stockage partagé
-  (indispensable en prod : sans eux, le relais retombe sur une mémoire
-  par instance serverless, donc l'état écrit n'est pas relu de façon fiable).
-  Les noms de l'intégration Vercel KV fonctionnent aussi :
-  `KV_REST_API_URL` / `KV_REST_API_TOKEN`.
+## Rendu et données
 
-## Prod actuelle
-Base Upstash Redis `suivi-parent-live` installée via le Marketplace Vercel
-(projet `suivi-parent`, variables en Production + Preview + Development,
-noms `KV_REST_API_*`). Vérification de bout en bout : le script
-`tmp/verify-live-prod.js` à la racine du workspace (POST signé puis
-`GET /api/state` doit répondre `live:true`).
+- La boule reprend le shader Portrait Android, désaturé. À la racine,
+  `python tools/export-caregiver-orb.py` régénère son port WebGL. Le shader
+  Android gelé reste inchangé. Repli en verre gris si WebGL est indisponible.
+- Texte Portrait, quatre lignes maximum, même cadence d'éclairage mot à mot
+  quand le téléphone indique qu'il parle. La dernière phrase est transmise
+  sans historique ; sinon le site décrit les deux objets reçus les plus proches.
+- Les déplacements GPS distinguent avance, recul et décalage par rapport au
+  cap précédent. Le déplacement doit dépasser la somme des incertitudes GPS et
+  être compatible avec une marche. Aucun petit pas en intérieur ni contournement
+  n'est affirmé à partir d'une simple consigne. La précision reste limitée par
+  le GPS du téléphone accompagné.
+- Carte : icônes des objets, halo de précision, zoom et recentrage. Un cap de
+  0° place l'objet au nord ; 90° à l'est.
+- LIVE avant 12 s ; SIGNAL LOST jusqu'à 2 min (objets et position figés en gris) ;
+  OFFLINE ensuite (aucun repère ni phrase active). Aucune simulation en production.
 
-## Déployer
-```bash
-npx vercel deploy --prod --yes
+## Flux
+
+Le téléphone accompagné publie toutes les deux secondes pendant iSee ou Direct :
+
+```text
+POST /api/share
+{shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor},
+ objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking}}
+GET /api/state?share=<identifiant>
 ```
-Dossier déployé : ce dossier (`suivi-parent/`), projet Vercel `suivi-parent`
-→ https://suivi-parent.vercel.app/.
 
-## Ancien contrat (remplacé)
-`POST /api/share { t, lat, lon, capDeg, objets:[{id,label,cat,distM,angleDeg}] }`.
+`scene` est facultatif pour les anciennes versions de l'app ; le texte est borné
+à 2 000 caractères. Le service reprend la position seule en arrière-plan, sans
+inventer les objets d'une caméra fermée. Le relais utilise l'origine du site,
+même si les réglages contiennent un lien complet avec `?share=`.
+
+## Vérification locale
+
+Depuis la racine, sans dépendance npm :
+
+```bash
+node --test suivi-parent/test/session.test.mjs suivi-parent/test/relay.test.mjs
+node suivi-parent/test/preview-server.cjs
+```
+
+Prévisualisation : `http://127.0.0.1:8836/?share=ton-flux`. Le serveur local
+utilise les handlers Vercel et un stockage mémoire isolé de la production.
+Tests : deux flux indépendants, rétrocompatibilité, cap des objets, déconnexion,
+bruit GPS et éclairage des mots.
+
+## Hébergement
+
+Racine Vercel : `suivi-parent/`, framework « Other », build vide. Les modules
+`.mjs`, le CSS et le shader généré sont statiques ; `api/` n'a pas de dépendance npm.
+
+- `SHARE_WRITE_KEY` : si définie, même clé dans les réglages de l'émetteur.
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, ou les noms Vercel KV
+  `KV_REST_API_URL` + `KV_REST_API_TOKEN` : stockage partagé entre instances.
+  Le repli mémoire est réservé au développement.
+
+Carte OpenFreeMap par défaut ; clé Google Maps facultative dans **Options de la
+carte**, conservée uniquement dans le navigateur concerné.

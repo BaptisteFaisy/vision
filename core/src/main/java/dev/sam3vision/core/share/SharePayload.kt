@@ -76,6 +76,7 @@ fun shareJson(
     writeKey: String,
     fix: SharedFix,
     objects: List<SharedObject>,
+    scene: SharedScene? = null,
 ): JSONObject = JSONObject()
     .put("shareId", shareId)
     .put("writeKey", writeKey)
@@ -95,6 +96,7 @@ fun shareJson(
             objects.forEach { put(JSONObject().put("label", it.label).put("distM", it.distM.toDouble()).put("angleDeg", it.angleDeg.toDouble())) }
         },
     )
+    .apply { scene?.let { put("scene", it.toJson()) } }
 
 /** Nombre d'objets envoyés au plus par rapport (le site n'en affiche pas plus). */
 const val MAX_SHARED_OBJECTS = 8
