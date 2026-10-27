@@ -41,6 +41,12 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuves** : `bash scripts/test_scripts.sh` → **80 assertions, 80 ok** (dont les gardes
   statiques : aucun `rm -rf` brut, `set -euo pipefail`, zéro chemin `/home/` en dur) ; `bash -n` OK ;
   `python3 tools/check-kotlin-limits.py` OK.
+- **Second correctif, trouvé au test** : l'essai de secours appelait Gradle en direct, donc **sans**
+  `ANDROID_HOME` — `scripts/build.sh` le pose pour lui-même, pas pour son appelant. En cron (aucune
+  variable d'environnement) le secours serait mort sur « SDK location not found ». Le défaut
+  `$HOME/Android/Sdk` est maintenant reposé dans l'appel de secours ; mesuré ensuite :
+  `./gradlew --no-daemon clean assembleDebug --offline` → **BUILD SUCCESSFUL in 37 s**, APK 76,7 Mo.
+
 ## 2026-10-27 (4) — le micro répond écran verrouillé
 
 - **La panne** : `MainActivity.onPause()` annule la tenue du doigt et Android 11+ coupe de toute
