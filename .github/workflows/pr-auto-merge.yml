@@ -1,15 +1,12 @@
 # pr-auto-merge — file de merge automatique : chaque PR interne prête est
-# mise à jour si en retard (BEHIND) puis mergée (rebase) dès que les 6 checks
-# requis sont verts. La seule porte reste la CI ; pas de gate humaine.
-# v3 (2026-10-27) : comme v2, mais avec un PAT (secret AUTOMERGE_PAT) —
-# prouvé en prod que GITHUB_TOKEN ne suffit pas : il ne peut ni armer
-# l'auto-merge (« Resource not accessible », run 40558390933), ni pousser
-# des updates qui déclenchent la CI (runs fantômes « action_required »,
-# file bloquée). Les pushes du PAT, eux, relancent la vraie CI.
-# Sans le secret, le sweep se met en pause propre (exit 0) au lieu d'échouer.
-# Brouillons et forks exclus. Conflits (DIRTY) : on saute, l'auteur rebase
-# à la main. Toute PR mergée par un humain entre deux passages est
-# simplement trouvée fermée (erreur ignorée).
+# rebasée sur master si en retard (BEHIND) puis mergée (rebase) dès que les
+# 6 checks requis sont verts. La seule porte reste la CI ; pas de gate humaine.
+# v4 (2026-10-27) : vrai rebase (pas de bulle de merge) via PAT (secret
+# AUTOMERGE_PAT) — GITHUB_TOKEN ne suffit pas (ni auto-merge, ni pushes qui
+# relancent la CI : runs fantômes « action_required »). Sans le secret, pause
+# propre au lieu d'échouer. Poussée avec bail (lease) : jamais d'écrasement
+# d'un push d'auteur arrivé entre-temps. Brouillons et forks exclus.
+# Conflits : on saute, l'auteur rebase à la main.
 name: pr-auto-merge
 
 on:
@@ -33,15 +30,11 @@ jobs:
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
-      - name: Balayer la file (update + merge)
+      - name: Balayer la file (rebase + merge)
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
-            exit 0
-          fi
           green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
             gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
               ["ci","apk","apk-release","lint","ci-budget","couche0"] as $req |
@@ -50,23 +43,44 @@ jobs:
               ([$got[] | select(.state == "SUCCESS")] | length == 6)
             ' >/dev/null
           }
+          if [ -z "$GH_TOKEN" ]; then
+            echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
+            exit 0
+          fi
           if [ "$EVENT" = push ]; then
             sleep 60 # laisse GitHub recalculer les états après l'atterrissage
           fi
+          rm -rf repo
+          git -c http.extraHeader="Authorization: Bearer $GH_TOKEN" clone --quiet \
+            --filter=blob:none https://github.com/BaptisteFaisy/vision.git repo
+          cd repo
+          gh auth setup-git
+          git config user.name "isee-automerge"
+          git config user.email "isee-automerge@users.noreply.github.com"
+          export GIT_EDITOR=true
           gh pr list --base master --state open \
-            --json number,headRefOid,mergeStateStatus,isDraft,headRepository \
+            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
             --jq '.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
               | select(.isDraft == false)
-              | "\(.number) \(.headRefOid) \(.mergeStateStatus)"' \
-          | while read -r pr sha state; do
+              | "\(.number) \(.headRefOid) \(.headRefName) \(.mergeStateStatus)"' \
+          | while read -r pr sha branch state; do
             [ -n "$pr" ] || continue
             case "$state" in
               BEHIND)
-                if gh pr update-branch "$pr" >/dev/null 2>&1; then
-                  echo "PR #$pr mise à jour"
+                if git fetch -q origin "pull/$pr/head:pr-$pr" 2>/dev/null \
+                  && git checkout -q "pr-$pr" 2>/dev/null \
+                  && git rebase -q origin/master >/dev/null 2>&1; then
+                  if git push -q --force-with-lease="$branch:$sha" origin "HEAD:$branch" 2>&1; then
+                    echo "PR #$pr rebasée sur master"
+                  else
+                    echo "PR #$pr : a bougé entre-temps, prochain passage"
+                  fi
                 else
-                  echo "PR #$pr sautée (conflit probable, à l'auteur de rebaser)"
+                  git rebase --abort >/dev/null 2>&1 || true
+                  git checkout -q master 2>/dev/null || true
+                  echo "PR #$pr sautée (conflit, à l'auteur de rebaser)"
                 fi
+                git branch -q -D "pr-$pr" >/dev/null 2>&1 || true
                 ;;
               CLEAN)
                 if green "$pr"; then
