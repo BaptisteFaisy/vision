@@ -345,6 +345,7 @@ private fun SettingsRoute(
         onTestLlm = viewModel::testLlm,
         onTestSam = viewModel::testSam,
         onTestAsr = viewModel::testAsr,
+        onTestDepth = viewModel::testDepth,
         onSpeak = viewModel::speak,
         onStopVoice = viewModel::stopSpeaking,
         onOpenLive = onOpenLive,

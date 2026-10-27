@@ -1,5 +1,6 @@
 package dev.sam3vision.core.settings
 
+import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
@@ -125,6 +126,7 @@ internal object SettingsCodec {
     private const val K_SHARE_WRITE_KEY = "shareWriteKey"
     private const val K_CAREGIVER_INVITE = "caregiverInvite"
     private const val K_MAX_OBJECTS = "maxObjects"
+    private const val K_DEPTH_BACKEND = "depthBackend"
 
     fun encode(s: Settings): String = buildString {
         appendLine("$K_LLM_BASE_URL=${s.llmBaseUrl}")
@@ -159,6 +161,7 @@ internal object SettingsCodec {
         appendLine("$K_SHARE_WRITE_KEY=${s.shareWriteKey}")
         appendLine("$K_CAREGIVER_INVITE=${s.caregiverInvite}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
+        appendLine("$K_DEPTH_BACKEND=${s.depthBackend.name}")
     }
 
     /** Tolérant : une clé absente (ancien fichier) reprend sa valeur par défaut. */
@@ -203,6 +206,7 @@ internal object SettingsCodec {
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
+            depthBackend = DepthBackend.fromName(values[K_DEPTH_BACKEND]),
         ).let { decodeShare(values, it) }
     }
 
