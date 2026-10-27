@@ -110,6 +110,7 @@ internal object SettingsCodec {
     private const val K_LIVE_SAM = "liveSamEnabled"
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
+    private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
     private const val K_CAMERA_FOV = "cameraFovDeg"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
     private const val K_SHARE_ENABLED = "shareEnabled"
@@ -139,6 +140,7 @@ internal object SettingsCodec {
         appendLine("$K_LIVE_SAM=${s.liveSamEnabled}")
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
+        appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
         appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
@@ -180,6 +182,8 @@ internal object SettingsCodec {
                 ?: default.boxPredictionEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
+            navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()
+                ?: default.navigationGuidanceEnabled,
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
             parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
