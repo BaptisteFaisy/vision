@@ -2,6 +2,7 @@ package dev.sam3vision.app.ihear.vm
 
 import dev.sam3vision.app.ihear.ChatEntry
 import dev.sam3vision.app.ihear.IhearUiState
+import dev.sam3vision.app.ihear.bubbleCount
 import dev.sam3vision.app.ihear.INTRO_SELECTION
 import dev.sam3vision.app.media.MessageMultimedia
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,8 +13,8 @@ import org.junit.Test
 
 /**
  * Le fil du chat : une ligne Room = deux bulles possibles, l'intro reste la première
- * bulle (index 0), et l'historique envoyé au LLM est borné. Ces tests fixent ce que
- * la découpe du ViewModel ne doit pas changer : mêmes bulles, même sélection.
+ * bulle (index 0) et la sélection reste toujours sur la dernière bulle — il n'y a plus
+ * d'envoi d'historique au LLM ni de navigation entre messages.
  */
 class IhearTranscriptTest {
 
@@ -67,25 +68,15 @@ class IhearTranscriptTest {
     }
 
     @Test
-    fun `l'historique du LLM alterne user et assistant et se borne aux derniers tours`() = runBlocking {
-        for (i in 1..12) {
+    fun `aucune navigation — la selection suit toujours la derniere bulle`() = runBlocking {
+        for (i in 1..3) {
             dao.insert(MessageMultimedia(timestamp = i.toLong(), texteUtilisateur = "q$i", texteIA = "r$i"))
         }
 
-        val turns = transcript.questionTurns(limit = 4)
+        transcript.refresh()
 
-        assertEquals(4, turns.size)
-        assertEquals("q11", turns.first().content)
-        assertEquals("r12", turns.last().content)
-    }
-
-    @Test
-    fun `l'historique complet par defaut garde les vingt derniers messages`() = runBlocking {
-        for (i in 1..15) {
-            dao.insert(MessageMultimedia(timestamp = i.toLong(), texteUtilisateur = "q$i", texteIA = "r$i"))
-        }
-
-        assertEquals(20, transcript.questionTurns().size)
-        assertEquals(20, IhearTranscript.CHAT_HISTORY)
+        // Pas de balayage : la sélection ne peut rester que sur le dernier échange.
+        assertEquals(bubbleCount(state.value.entries.size) - 1, state.value.selected)
+        assertEquals(state.value.entries.last().text, "r3")
     }
 }

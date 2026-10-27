@@ -63,7 +63,6 @@ class IhearStatusTextTest {
 
     @Test
     fun `contrat public — les constantes du ViewModel ne bougent pas`() {
-        assertEquals(20, IhearViewModel.CHAT_HISTORY)
         assertEquals(2_600L, IhearViewModel.PHOTO_SHOW_MS)
         assertEquals(6_000L, IhearViewModel.PHOTO_MEASURED_MS)
     }

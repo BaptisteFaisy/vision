@@ -15,6 +15,10 @@ import kotlinx.coroutines.CancellationException
  * Le chemin de la réponse : question écrite en base, image = photo-contexte, texte
  * rendu par le LLM, puis voix et relecture de la dernière réponse.
  *
+ * **Aucune mémoire** : la question part avec une liste d'historique **toujours vide**
+ * (`emptyList()`) — le LLM ne reçoit jamais les messages précédents, même dans la
+ * même session. Les tours ne sont plus jamais lus de la base.
+ *
  * Les clients (LLM, ElevenLabs) viennent de `:core` et des fabriques de l'app
  * (`llmClient`) : aucune implémentation réseau ici.
  */
@@ -91,7 +95,8 @@ class IhearAnswers(
         image: String,
         question: String,
     ): Result<Unit> =
-        runCatching { ask(image, question, transcript.questionTurns()) }
+        // Zéro mémoire : la liste est vide, quoi que la base garde encore.
+        runCatching { ask(image, question, emptyList()) }
             .getOrElse { Result.failure(it) }
             .fold(
                 onSuccess = { answer -> runCatching { spoken(row, answer) } },

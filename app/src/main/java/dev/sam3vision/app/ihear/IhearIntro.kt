@@ -5,7 +5,6 @@ import dev.sam3vision.app.IntroAudio
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -22,15 +21,11 @@ class IhearIntro(
     private val prefs: SettingsStore,
     private val update: ((IhearUiState) -> IhearUiState) -> Unit,
 ) {
-    /** Fichier audio gardé pour la relecture au swipe à bulle unique. */
-    private var introFile: File? = null
-
     /** Audio dit à l'ouverture complète, sauf s'il a été coupé par la voix. */
     suspend fun playIfPending() {
         // Aucun marqueur persisté : chaque ouverture complète rejoue l'audio ; une simple
         // mise en arrière-plan puis retour ne recrée pas le ViewModel, donc ne rejoue pas.
         val file = withContext(Dispatchers.IO) { IntroAudio.ensure(app) }
-        introFile = file
         update { it.copy(introVisible = true, speakingEntryId = null, status = null) }
         // Trace volontairement gardée : « l'intro ne se dit plus » se diagnostique en une
         // ligne (audio coupé par la voix, ou lecture réellement lancée).
@@ -42,21 +37,6 @@ class IhearIntro(
                 st.copy(
                     speakingEntryId = if (st.speakingEntryId == INTRO_BUBBLE_ID) null else st.speakingEntryId,
                     status = "Intro: $cause",
-                )
-            }
-        }
-    }
-
-    /** Relecture de l'intro (swipe sans autre bulle) : le texte reste, l'audio rejoue. */
-    suspend fun replay() {
-        val file = introFile ?: withContext(Dispatchers.IO) { IntroAudio.ensure(app) }
-        introFile = file
-        update { it.copy(speakingEntryId = INTRO_BUBBLE_ID, status = null) }
-        player.playFile(file).onFailure { cause ->
-            update { st ->
-                st.copy(
-                    speakingEntryId = if (st.speakingEntryId == INTRO_BUBBLE_ID) null else st.speakingEntryId,
-                    status = "audio playback failed: $cause",
                 )
             }
         }

@@ -6,8 +6,10 @@ qu'elle voit avec SAM 3.1 sur une GPU distante, **décrit** la scène avec un LL
 centrée, des satellites autour, un **gros texte paginé** (3 lignes) qui porte le dernier
 message, et la **carte caméra** qui se dissout en damier dans la bulle en laissant son
 « monde » aux couleurs de la photo. Tout passe par les gestes : tap = enregistrement
-vidéo, double tap = photo, appui long = dictée, balayage vertical = changer de bulle,
-balayage horizontal = tourner la page.
+vidéo, double tap = photo, appui long = dictée. **Plus de balayage** : ni changement
+de bulle, ni retour aux messages passés — le message affiché est toujours le dernier et
+chaque question part **sans aucun historique** ; rien d'une conversation précédente
+n'est mémorisé d'une ouverture à l'autre (table Room et cache vidés à l'ouverture).
 
 > Ce dépôt (`BaptisteFaisy/vision`) porte le produit : un seul commit de départ, daté du
 > 26/10/2026. Chaque affirmation ici est relue dans le code de cet arbre ; ce qui vient d'une mesure appareil est daté et sourcé
