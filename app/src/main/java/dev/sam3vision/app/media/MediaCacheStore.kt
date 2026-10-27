@@ -97,7 +97,7 @@ class MediaCacheStore internal constructor(
     /** Fichier vidéo nommé pour l'enregistrement à venir (CameraX écrit directement dedans). */
     fun newVideoFile(): File = File(dir(), "env-${now()}.mp4")
 
-    /** Fichier JPEG du double-tap ; contexte visuel du prochain échange, jamais Room. */
+    /** Frame filmée de l'appui long ; contexte visuel du prochain échange, jamais Room. */
     fun newPhotoFile(): File = File(dir(), "snap-${now()}.jpg")
 
     /** Crochets internes : mutex d'écriture pour éviter deux fichiers au même timestamp. */

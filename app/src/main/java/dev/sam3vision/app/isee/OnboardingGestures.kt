@@ -30,13 +30,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.BigButton
-import kotlin.math.max
 
 /**
- * Onboarding des **trois gestes** de la page iSee : un doigt dessiné (Canvas, aucun
- * asset embarqué) rejoue en boucle tap = vidéo, double tap = photo, appui long =
- * dicter. Les cartes remplacent les boutons : la page d'accueil n'en a aucun, le
- * geste est la seule interface.
+ * Onboarding des **deux gestes** de la page iSee : un doigt dessiné (Canvas, aucun
+ * asset embarqué) rejoue en boucle tap = vidéo, appui long = dicter (la photo
+ * filmée part avec la question). Les cartes remplacent les boutons : la page
+ * d'accueil n'en a aucun, le geste est la seule interface.
  *
  * L'écran est **rejouable** depuis les Réglages (« Revoir les gestes ») : c'est un
  * écran de la pile de navigation ([dev.sam3vision.app.Route.Onboarding]), pas une
@@ -46,8 +45,8 @@ import kotlin.math.max
  * rendu vit dans `OnboardingGestureArt.kt`.
  */
 
-/** Les trois gestes expliqués, dans l'ordre du discours d'accueil. */
-enum class OnboardingGesture { Tap, DoubleTap, Hold }
+/** Les deux gestes expliqués, dans l'ordre du discours d'accueil. */
+enum class OnboardingGesture { Tap, Hold }
 
 /** Snapshot complet de l'état d'une carte : la pose pousse tout le dessin. */
 internal data class OnboardingPose(
@@ -76,17 +75,15 @@ internal const val ONBOARDING_OFF = -1f
 internal const val ONBOARDING_REST_Y = 0.20f
 internal const val ONBOARDING_TOUCH_Y = 0.70f
 
-/** Durée d'une boucle, par geste : les trois cartes ne pulsent pas ensemble. */
+/** Durée d'une boucle, par geste : les deux cartes ne pulsent pas ensemble. */
 internal fun onboardingPeriodMs(kind: OnboardingGesture): Int = when (kind) {
     OnboardingGesture.Tap -> 2_000
-    OnboardingGesture.DoubleTap -> 2_600
     OnboardingGesture.Hold -> 3_200
 }
 
 /** Pose du geste [kind] à l'instant [t] (0..1 d'une boucle) : fonction pure. */
 internal fun onboardingPose(kind: OnboardingGesture, t: Float): OnboardingPose = when (kind) {
     OnboardingGesture.Tap -> tapPose(t)
-    OnboardingGesture.DoubleTap -> doubleTapPose(t)
     OnboardingGesture.Hold -> holdPose(t)
 }
 
@@ -106,20 +103,6 @@ private fun tapPose(t: Float): OnboardingPose {
     val press = pressAmount(t, 0.14f, 0.22f, 0.56f, 0.68f)
     val ripple = if (t >= 0.22f && t < 0.56f) (t - 0.22f) / 0.34f else ONBOARDING_OFF
     return pose(press, ripple, ONBOARDING_OFF, ONBOARDING_OFF, recOn = press > 0.5f, cameraFlash = false)
-}
-
-/** Double tap : deux pressions rapprochées, éclat photo juste après la deuxième. */
-private fun doubleTapPose(t: Float): OnboardingPose {
-    val first = pressAmount(t, 0.10f, 0.16f, 0.30f, 0.38f)
-    val second = pressAmount(t, 0.40f, 0.46f, 0.62f, 0.70f)
-    val press = max(first, second)
-    val ripple = when {
-        t in 0.16f..0.38f -> (t - 0.16f) / 0.22f
-        t in 0.46f..0.70f -> (t - 0.46f) / 0.24f
-        else -> ONBOARDING_OFF
-    }
-    val flash = if (t in 0.46f..0.82f) (t - 0.46f) / 0.36f else ONBOARDING_OFF
-    return pose(press, ripple, flash, ONBOARDING_OFF, recOn = false, cameraFlash = t in 0.46f..0.82f)
 }
 
 /** Appui long : le doigt reste posé, les ondes « voix » pulsent. */
@@ -153,11 +136,14 @@ private data class OnboardingCard(val kind: OnboardingGesture, val title: String
 
 private val ONBOARDING_CARDS = listOf(
     OnboardingCard(OnboardingGesture.Tap, "1 · Un tap", "La vidéo démarre. Un autre tap l'arrête."),
-    OnboardingCard(OnboardingGesture.DoubleTap, "2 · Deux taps", "Prend une photo aussitôt."),
-    OnboardingCard(OnboardingGesture.Hold, "3 · Appui long", "Parlez en tenant, relâchez pour envoyer."),
+    OnboardingCard(
+        OnboardingGesture.Hold,
+        "2 · Appui long",
+        "Parlez en tenant : la photo filmée part avec la question.",
+    ),
 )
 
-/** Les trois cartes côte à côte : le geste compte partout sur l'écran. */
+/** Les deux cartes côte à côte : le geste compte partout sur l'écran. */
 @Composable
 fun OnboardingGestureRow(modifier: Modifier = Modifier) {
     Row(
@@ -225,7 +211,7 @@ fun OnboardingGesturesScreen(onClose: () -> Unit) {
     ) {
         Text("iSee", color = IseeSceneColors.wordmark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Les trois gestes",
+            "Les deux gestes",
             color = IseeSceneColors.headingDark,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,

@@ -265,7 +265,7 @@ private fun SettingsActions(
 /**
  * La page d'accueil iSee n'a **aucun bouton** : les gestes sont la seule interface,
  * et ils ne s'apprennent pas tout seuls. Cette porte rouvre à volonté l'onboarding
- * animé des trois gestes (tap, double tap, appui long) — y compris pour un utilisateur
+ * animé des deux gestes (tap, appui long) — y compris pour un utilisateur
  * qui a déjà vu l'écran une fois.
  */
 @Composable
@@ -279,7 +279,7 @@ private fun GestureHelp(onOpenGestures: () -> Unit) {
         )
         BigButton("Revoir les gestes", true, AppColors.surfaceHigh, onOpenGestures)
         Text(
-            "Tap = vidéo, double tap = photo, appui long = parler. Sur l'accueil iSee, " +
+            "Tap = vidéo, appui long = parler (la photo filmée part avec). Sur l'accueil iSee, " +
                 "ces gestes marchent n'importe où sur l'écran.",
             color = AppColors.textMuted,
             fontSize = 11.sp,

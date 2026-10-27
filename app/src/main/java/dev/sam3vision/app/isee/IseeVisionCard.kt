@@ -3,15 +3,12 @@ package dev.sam3vision.app.isee
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,15 +30,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,19 +49,16 @@ import dev.sam3vision.app.CameraSurface
 import dev.sam3vision.app.FirstPixelWatcher
 import dev.sam3vision.app.IseePermissionFlow
 import dev.sam3vision.app.LiveDistanceLayer
-import dev.sam3vision.app.decodeScaledExact
 import dev.sam3vision.app.missingPermissions
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
  * La carte caméra du design (VISION) — extraite du pane pour garder les fichiers
  * courts. Géométrie de la vidéo : grande carte ≈ 84 % de la largeur, 22 % de la
- * hauteur, centrée à ~0,198 de l'écran ; le double tap pose la photo dedans,
- * le voile de pixels n'est que l'entrée de la carte (il s'efface, voir
- * [rememberPixelVeil]) et la chip REC tient en haut à gauche.
+ * hauteur, centrée à ~0,198 de l'écran ; l'aperçu direct y vit pendant
+ * l'enregistrement, le voile de pixels n'est que l'entrée de la carte (il
+ * s'efface, voir [rememberPixelVeil]) et la chip REC tient en haut à gauche.
  *
  * C'est **l'unique** carte caméra de l'app : elle porte aussi la liaison caméra
  * ([rememberCameraGlue]), le câblage SAM ([IseeCameraWiring]) et les pastilles de
@@ -96,11 +87,6 @@ internal fun BoxWithConstraintsScope.VisionCard(
             .background(Color(0xFF14161B)),
     ) {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
-        state.photoPath?.let { path ->
-            PhotoInside(path)
-            // Une pastille par objet mesuré, posée sur la photo le temps qu'elle reste.
-            LiveDistanceLayer(state.distanceLayer, topInset = 0.dp, withLabel = true)
-        }
         PixelMosaic(grid, veil.value, circle = false, modifier = Modifier.fillMaxSize())
         if (state.recordingVideo) RecordingChip()
         CrossingChip(probe, Modifier.align(Alignment.BottomCenter)) { viewModel.toggleCrossing() }
@@ -111,8 +97,7 @@ internal fun BoxWithConstraintsScope.VisionCard(
 
 /**
  * Le voile de pixels de la carte : à 1 quand la carte s'allume, effacé en
- * [PIXEL_VEIL_MS] pour rendre l'aperçu caméra net ; à 0 sur une photo (la photo du
- * double tap se montre telle quelle).
+ * [PIXEL_VEIL_MS] pour rendre l'aperçu caméra net.
  *
  * Avant : la mosaïque restait opaque pendant tout l'enregistrement — la carte
  * n'était que 26×16 = 416 gros blocs (~39×32 px), et l'aperçu CameraX comme les
@@ -126,8 +111,8 @@ internal fun BoxWithConstraintsScope.VisionCard(
 @Composable
 private fun rememberPixelVeil(state: IseeUiState): Animatable<Float, AnimationVector1D> {
     val veil = remember { Animatable(1f) }
-    LaunchedEffect(state.recordingVideo, state.photoPath) {
-        if (state.recordingVideo && state.photoPath == null) {
+    LaunchedEffect(state.recordingVideo) {
+        if (state.recordingVideo) {
             veil.animateTo(0f, tween(PIXEL_VEIL_MS))
         } else {
             veil.snapTo(0f)
@@ -177,30 +162,6 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     )
     LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
     SteeringLayer(probe.steering)
-}
-
-/** Photo du double tap : la même fenêtre sert de cadre, flash puis affichage. */
-@Composable
-private fun PhotoInside(path: String) {
-    val flash = remember { Animatable(1f) }
-    LaunchedEffect(path) {
-        flash.snapTo(1f)
-        flash.animateTo(0f, tween(PHOTO_FLASH_MS, easing = LinearEasing))
-    }
-    val bitmap by produceState<Bitmap?>(initialValue = null, path) {
-        value = withContext(Dispatchers.IO) { decodeScaledExact(File(path)) }
-    }
-    Box(Modifier.fillMaxSize()) {
-        bitmap?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = "Photo taken",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value)))
-    }
 }
 
 /** Point bleu « REC » sur la chip de la carte pendant l'enregistrement. */
@@ -254,8 +215,6 @@ private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onT
     }
 }
 
-/** La photo du double tap reste affichée un peu plus longtemps que le flash. */
-internal const val PHOTO_FLASH_MS = 340
 
 /* ————————————————— Liaison caméra et câblage SAM ————————————————— */
 
