@@ -12,9 +12,9 @@ name: deploy-live-fast
 #     `MODAL_TOKEN_SECRET`) : jamais dans un fichier, jamais affichés (GitHub les masque
 #     dans les logs). `gh secret list` ne montre que leur nom et leur date.
 #
-# INERTE tant que ce fichier vit sous server/ (GitHub ne lit que la racine) : l'activation
-# (déplacement vers .github/workflows/) fera l'objet d'une PR dédiée, car le merge qui
-# l'active déclenche un déploiement — donc un réveil facturé de la carte GPU.
+# ACTIF : tout push sur la branche protégée qui touche le backend ou ce fichier
+# redéploie l'app — donc réveille la carte GPU (facturé). Pas de `schedule:`,
+# jamais de ping périodique : seul un changement déploie.
 on:
   push:
     branches: [master]
@@ -34,6 +34,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Hors PR : déploiement Modal + attente que la nouvelle version serve
+    # (jusqu'à quelques minutes si l'ancien conteneur vit encore).
     timeout-minutes: 10
     env:
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
@@ -42,6 +44,8 @@ jobs:
       MODAL_PROFILE: ""
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Installer la CLI Modal
         run: python3 -m pip install --quiet "modal==1.6.2"
