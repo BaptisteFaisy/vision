@@ -1,6 +1,7 @@
 package dev.sam3vision.app.locked
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -67,6 +68,7 @@ object LockedMicNotifications {
      * Publie la notification. Sans la permission `POST_NOTIFICATIONS` (Android 13+), la
      * notification reste invisible mais le service tourne : on n'échoue pas, on n'affiche rien.
      */
+    @SuppressLint("MissingPermission") // garde juste au-dessus : `canNotify` lit POST_NOTIFICATIONS
     fun show(context: Context, state: LockedMicState) {
         if (!canNotify(context)) return
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, build(context, state))
