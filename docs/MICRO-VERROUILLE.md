@@ -54,6 +54,19 @@ Attendu : notification « iSee — j'écoute » → « transcription » → « r
 - Le service ne survit pas à un `force-stop` : iSee doit avoir été **ouverte** une fois depuis le
   démarrage (la tuile le dit : « Ouvre d'abord iSee »).
 
+### Rejouer le geste sans doigt (debug)
+
+Sur l'écran de verrouillage, `uiautomator` ne voit pas la notification (fenêtre sécurisée) et le
+service n'est **pas** exporté — c'est voulu. Le manifeste de `debug` porte donc une receiver qui
+appelle exactement le même geste :
+
+```bash
+adb shell am broadcast -n dev.sam3vision.app/.locked.LockedMicDebugReceiver \
+    -a dev.sam3vision.app.locked.DEBUG_TOGGLE
+```
+
+Elle est absente du build `release` : aucun chemin de production ne passe par là.
+
 ## Preuves
 
 | Quoi | Commande | Résultat |
@@ -62,3 +75,20 @@ Attendu : notification « iSee — j'écoute » → « transcription » → « r
 | Trajet | `./gradlew :app:testDebugUnitTest --offline` | `LockedMicAnswerTest` 5/5 |
 | Contrat sans image | idem | `LlmContractTest` 13/13 (`askText`, `NotSupported`) |
 | Tailles | `python3 tools/check-kotlin-limits.py` | OK, aucun dépassement |
+| Garde unique | `python3 tools/guard.py --quick` | OK |
+
+Mesuré **sur le téléphone** (`2c6852ac`, build `1.0.54-0bb9794`), écran en `mWakefulness=Dozing` :
+
+| Contrôle | Résultat |
+|---|---|
+| Service armé par l'activité visible | `isForeground=true foregroundId=4201 types=0x00000080` (`microphone`) |
+| Geste rejoué écran verrouillé | notification « iSee — j'écoute » / « Parle, puis appuie sur « Envoyer » » |
+| Micro réellement ouvert écran éteint | flux `AUDIO_FORMAT_PCM_16_BIT / 16000 Hz / scenario=record` pour `dev.sam3vision.app` dans `MQSserver` |
+| Envoi automatique à 20 s | notification « iSee — échec » → « réponse inattendue : aucune parole détectée » (l'appel de transcription a bien atteint le réseau ; personne ne parlait dans le micro) |
+| Amorçage des clés | **bug trouvé et corrigé sur l'appareil** : sans `seededFromBuild`, la réponse était « aucun moteur de dictée » alors que l'APK porte les clés |
+
+**Non mesuré sur l'appareil** : la réponse du LLM et la voix ElevenLabs dans ce trajet (personne
+n'a parlé dans le micro, et rien ne permet de faire entendre une phrase au téléphone depuis le
+poste). Ces deux étapes sont couvertes en JVM (`LockedMicAnswerTest`) et partagent les clients déjà
+utilisés par le chat ; la lecture `MediaPlayer` écran éteint reste donc à confirmer à la voix, par
+toi, en une phrase.
