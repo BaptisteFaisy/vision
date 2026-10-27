@@ -7,13 +7,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.live.LiveAskSession
-import dev.sam3vision.app.live.LiveFrameCadence
+import dev.sam3vision.app.live.LiveFrameDispatcher
 import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.app.live.LiveMaskDecoder
 import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
-import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
@@ -97,8 +96,15 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Ips sur l'intervalle réel entre deux frames publiées, trous rejetés. */
     private val fps = LiveFpsMeter()
 
-    /** Une frame en vol maximum, cadence adaptative de la session. */
-    private val cadence = LiveFrameCadence()
+    /** Envois du Direct : pompe `/live` (continue + réserve) ou cadence tracker. */
+    private val dispatcher = LiveFrameDispatcher(
+        viewModelScope,
+        Dispatchers.Default,
+        { session },
+        { _state.value.prompts },
+        { jpeg, at -> chronology.beginFrame(at); keepFrame(jpeg) },
+        { active, era, result -> handleResult(active, era, result) },
+    )
     val local = dev.sam3vision.app.live.LiveLocalOverlayWiring(_state, store) { settings.localOverlayEnabled }
 
     /**
@@ -234,7 +240,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
         distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
         wake.reset()
-        cadence.reset()
+        dispatcher.reset()
         fps.reset()
         lastKeepAt = 0L
         _state.update {
@@ -273,9 +279,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Frame venue de l'analyseur caméra. Sans session SAM, elle est seulement **gardée
      * pour les questions** — les questions marchent donc même quand SAM est injoignable.
-     * Sinon elle part au GPU (c'est elle qui réveille le conteneur endormi), sauf si une
-     * requête est en vol ou si la cadence adaptative n'est pas écoulée (le lien montant
-     * sature sinon).
+     * Sinon elle part au GPU (c'est elle qui réveille le conteneur endormi) : `/live`
+     * en cadence continue avec une frame de réserve, tracker en cadence adaptative.
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L, frameLuma: ByteArray? = null) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
@@ -287,30 +292,24 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             keepFrame(jpegB64)
             return
         }
-        if (!cadence.admits(active, System.currentTimeMillis())) return
-        // Nouvelle frame : le JPEG vient d'être produit, la chronologie repart de là.
-        chronology.beginFrame(captureAtNs)
-        keepFrame(jpegB64)
-        // Époque de la séance au départ de la frame : si un arrêt (ou un changement de
-        // concepts) survient pendant l'aller-retour, la réponse est périmée et rien ne
-        // doit être publié — sinon l'écran d'un direct arrêté se rallume tout seul.
-        val era = active.generation
-        // Dispatchers.Default : `viewModelScope` est Main.immediate, et le corps de la
-        // requête (normalisation des concepts, JSON, base64 de 28 Ko) partirait sur la
-        // boucle de composition. Ce travail n'a rien à y faire.
-        viewModelScope.launch(Dispatchers.Default) {
-            val result = active.sendFrame(_state.value.prompts, jpegB64)
-            if (!active.isCurrent(era)) return@launch
-            chronology.markReceived()
-            if (result == null) {
-                publishStages(null)
-                return@launch
-            }
-            result.fold(
-                onSuccess = { frame -> publish(frame) },
-                onFailure = { error -> if (publishFailure(active, error)) return@launch },
-            )
+        dispatcher.onFrame(active, jpegB64, captureAtNs, System.currentTimeMillis())
+    }
+
+    /**
+     * Réponse du pipeline : périmée (arrêt, nouveaux concepts) = rien n'est publié,
+     * sinon accusé de réception puis publication ou échec ([publishFailure]).
+     */
+    private suspend fun handleResult(active: FramePipeline, era: Long, result: Result<LiveFrame>?) {
+        if (!active.isCurrent(era)) return
+        chronology.markReceived()
+        if (result == null) {
+            publishStages(null)
+            return
         }
+        result.fold(
+            onSuccess = { frame -> publish(frame) },
+            onFailure = { error -> publishFailure(active, error) },
+        )
     }
 
     /** Échec : repli `/live` au démarrage (vrai = relancé), sinon erreur hors réveil. */
@@ -331,7 +330,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Échec réseau d'une frame (voir [frameErrorState] : réveil GPU = erreur masquée) ;
-     * l'envoi de la frame, lui, passe par [FramePipeline.sendFrame] (tout transport).
+     * l'envoi, lui, passe par [LiveFrameDispatcher] (tous les transports).
      */
     private fun onFrameError(error: Throwable) {
         val waking = _state.value.starting && wake.isWaking()
