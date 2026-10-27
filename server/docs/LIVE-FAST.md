@@ -10,7 +10,7 @@ Source réellement déployée : `backend/live_fast/` (app Modal `sam3-eu-a100`, 
 | levier | effet mesuré (25 octobre, A100 eu-west) |
 |---|---|
 | `FAST_CUDA_GRAPH=1` | encodeur vision **45 ms → 1,4 ms** |
-| `FAST_SCALEDOWN=300` | plus de réveil de 25-50 s entre deux gestes (20 s par défaut) |
+| `FAST_SCALEDOWN=60` | fuite max ~0,04 $ si `/release` raté (60 s au lieu de 300) |
 | `FAST_BATCH_PROMPTS=1` | les N concepts dans un seul forward |
 | `FAST_EDGE=512` | grille 518 côté serveur |
 
@@ -19,8 +19,8 @@ Trois déploiements manuels d'autres agents ont effacé ces leviers dans la soir
 backend rapide vivait dans `~/builds/prod-backend`, **hors dépôt**. D'où :
 
 - `sam3-gpu` (l'arbitre « une seule GPU ») déploie maintenant `live_fast` **avec** les leviers ;
-- `~/bin/sam3-live-guard auto` vérifie `/health` toutes les 5 min et redéploie si un levier
-  a sauté (sans jamais toucher si une autre app GPU tourne) ;
+- aucun contrôle périodique : un ping `/health` réveillerait la carte (règle du
+  workflow : déploiement au push uniquement, jamais de `schedule:`) ;
 - `.github/workflows/deploy-live-fast.yml` ferait la même chose côté GitHub — mais il faut
   pour cela un dépôt **avec remote** et un jeton Modal dans les secrets : non fait, à décider.
 

@@ -55,7 +55,9 @@ APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-eu-a100")
 GPU_TYPE = os.environ.get("FAST_GPU", "A100")
 REGION = os.environ.get("FAST_REGION") or None
 ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
-SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
+# Plafond 60 s : une sortie ratée coûte ≤ 0,04 $, pas 0,20 $ (règle user 27/10 :
+# éteinte = 0 €). La voie normale reste POST /release (~1 s).
+SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 60)
 # Warm pool : 0 = extinction après le bail (défaut) ; 1 = conteneur chaud permanent
 # (cold start supprimé, ~500 $/mois A100). Jamais plus de 1 : UN SEUL GPU, JAMAIS DEUX.
 MIN_CONTAINERS = clamp_int(os.environ.get("FAST_MIN_CONTAINERS"), 0, 0, 1)
