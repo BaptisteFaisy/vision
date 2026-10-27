@@ -2,6 +2,8 @@ package dev.sam3vision.core.share
 
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
+import dev.sam3vision.core.settings.CaregiverRole
+import dev.sam3vision.core.settings.Settings
 
 /** Phrase courante du téléphone accompagné, sans historique ni données du caregiver. */
 data class SharedScene(
@@ -16,6 +18,10 @@ data class SharedScene(
 }
 
 const val MAX_SHARED_TEXT = 2_000
+
+/** Un appareil caregiver ne doit jamais remplacer la position du téléphone accompagné. */
+fun canPublishShare(settings: Settings): Boolean =
+    settings.shareEnabled && settings.caregiverRole == CaregiverRole.Blind
 
 /** Un caregiver choisit le flux du lien reçu, jamais l'identifiant local de son téléphone. */
 fun validatedShareLink(value: String): String? {

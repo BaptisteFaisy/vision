@@ -18,6 +18,7 @@ import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.ShareTrackingPolicy
 import dev.sam3vision.core.share.shareJson
 import dev.sam3vision.core.share.shareEndpoint
+import dev.sam3vision.core.share.canPublishShare
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,7 +108,7 @@ class ShareTrackingService : Service() {
 
     /** Un envoi ; `false` = le partage doit s'arrêter (canal manquant). */
     private suspend fun sendOnce(settings: Settings): Boolean {
-        if (settings.shareId.isBlank()) return false
+        if (!canPublishShare(settings) || settings.shareId.isBlank()) return false
         if (ShareGate.screenPublishing) return true // le Direct publie déjà son état complet
         val fix = positions.lastFix ?: return true // pas encore de position : on patiente
         val url = shareEndpoint(settings.parentSiteUrl) ?: return false
