@@ -20,6 +20,13 @@ Toutes les routes sont `POST` sauf `/health` (`GET`). Content-Type JSON. Images 
    - `prompts == null` ⇒ le serveur choisit lui-même la liste de concepts (détection large + labels génériques).
    - réponse : `{"width": int, "height": int, "objects": [{"label": str, "score": float, "box": [x1,y1,x2,y2], "mask_b64": str}]}`
    - `mask_b64` = PNG 8 bits niveaux de gris, taille exacte `width`×`height`, 255 = objet.
+   - `objects` est trié par `score` décroissant puis **coupé silencieusement à 24 entrées**
+     (`MAX_OBJECTS = 24`, `backend/segmentation.py`). Au-delà, les objets de score plus faible
+     ne figurent pas dans la réponse : **aucun champ d'avertissement, aucun total, aucun
+     `truncated`** n'est renvoyé (choix assumé — le champ n'est pas ajouté). Le client ne peut
+     donc pas distinguer « 24 objets dans l'image » de « 24 objets retenus sur N » ; un usage
+     qui exige l'exhaustivité doit demander des `prompts` ciblés pour faire remonter les objets
+     voulus dans le top 24.
 3. `POST /analyze`
    - corps : `{"image_b64": str}`
    - réponse : `{"description": str, "tags": [str], "objects": [...]}` (mêmes objets que `/segment`, plus la description LLM qui cite explicitement les objets segmentés).
@@ -35,7 +42,8 @@ Erreurs : HTTP 400 `{"detail": "..."}` pour image illisible, HTTP 500 sinon.
 - GPU : `A10G` par défaut ; chargement en `@modal.enter()` (image build : `transformers`, `torch`, `accelerate`, `Pillow`, `numpy`, `fastapi[standard]`).
 - Masques encodés en PNG base64 (numpy → PIL), pas de RLE.
 - LLM : API compatible OpenAI (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). Vision obligatoire. Défaut : OpenRouter + modèle vision rapide.
-- Secrets Modal : `sam3-llm` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). Aucune clé en dur, aucun fichier `.env` commité.
+- Secrets Modal : `sam3-llm` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). Aucune clé en dur, aucun fichier `.env` commité. Jamais de clé en argument de commande : passage par `--from-json` (`scripts/lib-env.sh` → `sync_secret_from_env`).
+- Bornes : `MAX_PROMPTS` 16, `MAX_PROMPT_CHARS` 64, `MAX_OBJECTS` 24 (tri par score décroissant puis **coupe silencieuse**, sans champ d'avertissement — voir le détail au § Contrat HTTP, `/segment`).
 - Fichiers < 500 lignes, fonctions < 50 lignes, pas de duplication (helpers partagés : décodage image, encodage masque, appel LLM).
 
 ## App Expo
