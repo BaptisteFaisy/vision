@@ -12,9 +12,14 @@ Le relais live vit dans `api/` (fonctions serverless, sans aucune dépendance np
   bouton « Recentrer sur Léo » + recentrage auto.
 - **Google Maps** si une clé est présente (`?key=TA_CLE` ou champ sous la carte,
   gardée dans le navigateur — jamais en dur), sinon repli gratuit OpenFreeMap/Esri.
-- **En-tête** : badge `LIVE` (< 12 s) / `SIGNAL PERDU` (< 2 min) / `DÉMO` (aucun flux),
-  âge du dernier état, et mention « position approximative (intérieur, ±X m) »
-  quand le téléphone signale une précision dégradée.
+- **En-tete** : trois etats seulement, sans aucune simulation — `LIVE` (< 12 s),
+  `SIGNAL LOST` (< 2 min, position et pastilles figees en gris, bandeau « nothing is
+  moving »), puis `OFFLINE` (au-dela du TTL de 2 min du relais, ou avant tout envoi :
+  plus aucun repere sur la carte, bandeau explicite). L'interface est entierement en
+  anglais, sans lettres accentuees (les libelles d'objets sont normalises avant
+  reconnaissance, donc « velo » ou « vehicule » restent detectes avec ou sans accent).
+- Mention « approximate location (indoors, +/-X m) » quand le telephone signale une
+  precision degradee.
 
 ## Flux live (câblé)
 Téléphone (`sam-vision-master`, écran Direct) → `POST /api/share` toutes les 2 s :
