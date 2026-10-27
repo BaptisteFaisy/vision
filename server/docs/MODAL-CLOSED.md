@@ -1,9 +1,9 @@
 # Modal fermé — 24 octobre 2026
 
 ## Nouvelle app : Kotlin natif
-L'app Android est désormais **native Kotlin** : `~/Bureau/sam-vision-kotlin` (LLM → InferHub
-`https://api.inferhub.dev/v1`, SAM 3.1 en endpoint optionnel). Ce dépôt garde le backend Modal
-(**STOPPÉ**, zéro GPU) et l'ancienne app Expo, déplacée en `legacy-expo-app/`.
+L'app Android est désormais **native Kotlin** (à la racine du dépôt vision : LLM → InferHub
+`https://api.inferhub.dev/v1`, SAM 3.1 en endpoint optionnel). `server/` garde le backend Modal
+et l'ancienne app Expo, déplacée en `legacy-expo-app/`.
 
 ## Relancer SAM 3.1 (une commande)
 ```bash

@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import subprocess
 import sys
 
-sys.path.insert(0, "/home/baptiste/Bureau/sam3-vision-app/scripts")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from bench_track import Poster, extract_frames, jpeg_b64  # noqa: E402
 

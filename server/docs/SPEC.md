@@ -1,8 +1,8 @@
-# SPEC — sam3-vision-app
+# SPEC — backend + app Expo legacy (server/)
 
 App Android React Native (Expo) : photo → SAM 3.1 sur Modal (segmentation) → LLM vision (description) → questions/réponses sur la photo.
 
-## Répertoires (racine = ~/Bureau/sam3-vision-app)
+## Répertoires (racine = `server/` du dépôt vision)
 
 - `backend/` — app Modal (Python)
 - `legacy-expo-app/` — app Expo React Native (TypeScript)
