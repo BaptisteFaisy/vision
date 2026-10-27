@@ -83,3 +83,28 @@ TRACK_APP_NAME=sam3-track-eu TRACK_GPU=A100-40GB TRACK_REGION=eu TRACK_ROUTING_R
 
 Banc : `python3 scripts/bench_track.py --url <url> --frames 240 --sizes 640x360 --capacity 300`
 (garde-fou : `KEEP=sam3-track-eu bash scripts/modal-one-gpu.sh`).
+
+## Mesure sur le téléphone (2026-10-25 12:03) — le vrai juge
+
+Xiaomi **2312DRA50G** (Android 15), Wi-Fi 5 GHz *Wifirst*, RSSI −39 dBm, 173 Mbps.
+Protocole `scripts/phone_bench.py` : payloads poussés en **un tar**, puis **une seule
+invocation `curl` native** sur le téléphone (`--next`, donc **une seule connexion TLS
+réutilisée**, comme OkHttp). 59 frames **640×360 JPEG q65**, session ouverte depuis le PC.
+Serveur : `sam3-track-eu`, **A100-SXM4-40GB eu-west** (`/health`).
+
+| Mesure (téléphone) | min | médiane | p95 | max |
+|---|---:|---:|---:|---:|
+| **Aller-retour** | 198 | **205** | **224** | 448 |
+| 1re frame (TLS à ouvrir) | — | — | — | 431 |
+
+`time_appconnect = 0` sur les 58 frames suivantes → la connexion est bien réutilisée.
+Ouverture de session (`POST /session`) : **3,1 s** côté client, 2,97 s côté serveur.
+
+**Verdict : l'objectif tient sur le téléphone, mieux que depuis le PC** — p95 **224 ms**
+contre 287 ms au PC, et médiane 205 ms. Sur les 59 frames, **une seule dépasse 300 ms**
+(448 ms) en plus de la première (431 ms, handshake TLS inclus).
+
+Ce qu'il faut retenir pour l'app : le p95 est à 224 ms, mais **la toute première frame après
+réveil et la première requête d'une connexion neuve dépassent 300 ms** (~430 ms). Si l'app
+doit garantir < 300 ms « tout le temps », elle doit garder sa connexion ouverte et préchauffer
+le conteneur (`/health`) avant d'afficher la mesure.
