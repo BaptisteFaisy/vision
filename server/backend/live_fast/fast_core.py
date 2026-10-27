@@ -28,27 +28,12 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from types import SimpleNamespace
 
+from fast_env import clamp_int, env_bool, env_int, gpu_name
 from timing import Stage, add_ms, elapsed_ms, now
 
 PATCH = 14
 MODEL_ID = "unsloth/sam3.1"
 DTYPES = ("bf16", "fp16", "fp32")
-_TRUTHY = ("1", "true", "yes", "on")
-
-
-def env_bool(raw, default: bool = False) -> bool:
-    """Knob d'environnement ou de requête : absent/"" -> default, sinon 1|true|yes|on."""
-    if raw is None or str(raw).strip() == "":
-        return default
-    return str(raw).strip().lower() in _TRUTHY
-
-
-def env_int(raw, default=None):
-    """Entier d'environnement optionnel ; None si absent ou non numérique."""
-    try:
-        return int(str(raw).strip()) if raw not in (None, "") else default
-    except ValueError:
-        return default
 
 
 # --- leviers du conteneur (lus à l'import, surchargeables par requête) -------------
@@ -107,38 +92,6 @@ def levers() -> dict:
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
             "dtype": DTYPE_NAME,
             "warmups": WARMUPS, "timing": TIMING}
-
-
-def clamp_int(value, default: int, low: int, high: int) -> int:
-    """Ramener un knob optionnel dans [low, high] ; absent ou non numérique -> default."""
-    if value is None:
-        return default
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(low, min(high, number))
-
-
-def gpu_name() -> str:
-    """Nom du GPU réellement alloué, relevé une fois (nvidia-smi, secours torch)."""
-    import subprocess
-
-    try:
-        result = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-                                capture_output=True, text=True, timeout=15)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip().splitlines()[0].strip()
-    except (OSError, subprocess.SubprocessError):
-        pass
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            return torch.cuda.get_device_name(0)
-    except Exception:  # noqa: BLE001 — /health ne doit jamais tomber pour un nom de GPU
-        pass
-    return "unknown"
 
 
 def _torch():
@@ -252,6 +205,20 @@ def compile_vision(model, device: str, dtype, edge: int) -> str:
         return f"failed:{type(exc).__name__}:{str(exc)[:120]}"
 
 
+def _capture_graph(module, device: str, dtype, edge: int, torch):
+    """Entrée statique, rodage puis capture du graphe (voir :func:`graph_vision`)."""
+    static_in = torch.zeros(1, 3, edge, edge, device=device, dtype=dtype)
+    side = torch.cuda.Stream()
+    side.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(side):
+        _warmup(module, device, dtype, edge)
+    torch.cuda.current_stream().wait_stream(side)
+    graph = torch.cuda.CUDAGraph()
+    with torch.inference_mode(), torch.cuda.graph(graph):
+        static_out = module(static_in)
+    return graph, static_in, static_out
+
+
 def graph_vision(model, device: str, dtype, edge: int) -> str:
     """Capture CUDA graph de l'encodeur vision (forme statique) ; repli silencieux.
 
@@ -264,15 +231,7 @@ def graph_vision(model, device: str, dtype, edge: int) -> str:
         return "skipped:no-cuda"
     module = model.vision_encoder
     try:
-        static_in = torch.zeros(1, 3, edge, edge, device=device, dtype=dtype)
-        side = torch.cuda.Stream()
-        side.wait_stream(torch.cuda.current_stream())
-        with torch.cuda.stream(side):
-            _warmup(module, device, dtype, edge)
-        torch.cuda.current_stream().wait_stream(side)
-        graph = torch.cuda.CUDAGraph()
-        with torch.inference_mode(), torch.cuda.graph(graph):
-            static_out = module(static_in)
+        graph, static_in, static_out = _capture_graph(module, device, dtype, edge, torch)
 
         class _GraphReplay(torch.nn.Module):
             """Encodeur vision rejoué par graphe CUDA, à forme d'entrée fixe.
