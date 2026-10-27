@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import dev.sam3vision.app.cleanup.CapturePaths
+import dev.sam3vision.app.media.jpegBytesToBase64
 import kotlin.math.max
 import kotlin.math.min
 
@@ -53,11 +54,11 @@ fun decodeScaledExact(file: File, maxEdge: Int = MAX_IMAGE_EDGE): Bitmap? {
     )
 }
 
-/** Bitmap → base64 JPEG sans préfixe `data:`. */
+/** Bitmap → base64 JPEG sans préfixe `data:` (l'encodage base64 vient de `media`). */
 fun bitmapToJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String {
     val buffer = ByteArrayOutputStream()
     bitmap.compress(Bitmap.CompressFormat.JPEG, quality, buffer)
-    return android.util.Base64.encodeToString(buffer.toByteArray(), android.util.Base64.NO_WRAP)
+    return jpegBytesToBase64(buffer.toByteArray())
 }
 
 /** Mini image monochrome pour tester un endpoint LLM sans consommer de crédit. */
