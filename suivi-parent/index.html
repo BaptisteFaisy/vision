@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Leo</title>
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <style>
 :root{--bg:#0b1328;--card:#111c33;--line:#24365a;--fg:#e2e8f0;--muted:#94a3b8;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--green:#22c55e}
@@ -17,6 +20,7 @@ header{position:sticky;top:0;z-index:10;background:rgba(11,19,40,.96);backdrop-f
 .live-dot.off{background:#475569;box-shadow:none;animation:none}
 @keyframes pulse{50%{box-shadow:0 0 0 9px rgba(34,197,94,.05)}}
 .sub{font-size:12px;color:var(--muted)}
+.credit{font-size:10px;line-height:1.4;color:#64748b;margin-top:6px}
 main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
 .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#93c5fd;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
@@ -42,6 +46,7 @@ main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32p
 </header>
 <main>
 <div class="card"><div class="styles"><button data-s="hybrid" class="on">🛰️ Hybrid</button><button data-s="satellite">🌍 Satellite</button><button data-s="plan">✨ Plan</button><button data-s="terrain">⛰️ Terrain</button></div><div class="maprow"><button id="recenter">📍 Center on Leo</button></div><div id="map-wrap"><div id="map"></div></div>
+<div class="credit" id="credit">Imagery © Esri, Maxar, Earthstar Geographics · Map data © OpenStreetMap contributors</div>
 <div id="status-note"><b id="note-title"></b><span id="note-text"></span></div>
 <div class="keybox" id="keybox" style="display:flex;gap:8px;margin-top:8px"><input id="gkey" placeholder="Google Maps key (kept in this browser) — ?key=YOUR_KEY also works" style="flex:1;background:#0d1730;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 10px;font-size:12px"><button id="savekey" class="btn small primary" style="border:none;background:var(--blue);color:#fff;border-radius:10px;padding:8px 12px;font-weight:700">OK</button><button id="clearkey" class="btn small" title="Forget the saved key" style="display:none;border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:8px 12px;font-weight:700">✕</button></div>
 <div id="gerr" style="display:none;margin-top:6px;font-size:12px;line-height:1.5;color:#fca5a5;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:8px 10px"></div>
@@ -151,6 +156,7 @@ async function bootMap(){
    document.getElementById('gkey').value=G_KEY;
    document.getElementById('gkey').title='Google key active — paste a new key and press OK to replace it, ✕ to forget it';
    mode='google';
+   document.getElementById('credit').style.display='none'; // Google draws its own attribution on the map
    gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
    syncGoogle();return;
   }catch(e){
@@ -159,7 +165,7 @@ async function bootMap(){
  }
  try{
   if(window.maplibregl){
-   map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[HOME.lon,HOME.lat],zoom:3,attributionControl:{compact:true}});
+   map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[HOME.lon,HOME.lat],zoom:3,attributionControl:false});
    map.addControl(new maplibregl.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
    map.on('load',syncPins);
    syncPins();
