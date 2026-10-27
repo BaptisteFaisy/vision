@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import dev.sam3vision.app.live.PredictionLayer
+import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.Cadence
