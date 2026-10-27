@@ -122,7 +122,9 @@ class LocalOverlaySimTest {
             }
         }
         println(texte)
-        assertEquals("une ligne par latence, plus l'en-tête", latences.size + 1, texte.lines().size)
+        // `lines()` garde la ligne vide qui suit le dernier saut de ligne : on la coupe,
+        // sinon le compte dépend du terminateur de la dernière ligne.
+        assertEquals("une ligne par latence, plus l'en-tête", latences.size + 1, texte.trimEnd().lines().size)
     }
 
     private fun formater(latenceMs: Long, sans: Ligne, avec: Ligne): String = String.format(
