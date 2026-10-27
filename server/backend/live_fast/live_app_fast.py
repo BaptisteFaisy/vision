@@ -59,14 +59,25 @@ SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
 # Warm pool : 0 = extinction après le bail (défaut) ; 1 = conteneur chaud permanent
 # (cold start supprimé, ~500 $/mois A100). Jamais plus de 1 : UN SEUL GPU, JAMAIS DEUX.
 MIN_CONTAINERS = clamp_int(os.environ.get("FAST_MIN_CONTAINERS"), 0, 0, 1)
+SNAPSHOT = os.environ.get("FAST_SNAPSHOT", "1").strip().lower() in ("1", "true", "yes", "on")
+MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "/opt/models/sam3.1")
 BACKEND_DIR = Path(__file__).resolve().parent
+
+# Les poids sont téléchargés **au build de l'image**, plus au démarrage du conteneur :
+# ~20 s gagnées sur les 32 s de chargement à froid mesurées fin octobre (le Hub HF renvoyait
+# même un avertissement de débit non authentifié). Étape cachée par le build Modal.
+WEIGHTS_BUILD = (
+    'python -c "from huggingface_hub import snapshot_download; '
+    + f"snapshot_download('unsloth/sam3.1', local_dir='{MODEL_DIR}')"
+    + '"'
+)
 
 # Leviers lus au moment du DEPLOIEMENT puis recuits dans l'environnement de l'image :
 # le conteneur importe ce module au démarrage, ses os.environ sont donc ceux de l'image
 # (les variables du shell de déploiement ne sont pas propagées telles quelles).
 LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COMPILE",
                 "FAST_CUDA_GRAPH", "FAST_DETR_GRAPH", "FAST_DTYPE", "FAST_TIMING",
-                "FAST_COMPILE_WARMUPS", "FAST_GZIP_MIN_BYTES")
+                "FAST_COMPILE_WARMUPS", "FAST_GZIP_MIN_BYTES", "FAST_SNAPSHOT")
 
 
 def lever_env() -> dict:
@@ -74,12 +85,15 @@ def lever_env() -> dict:
     values = {name: os.environ.get(name, "") for name in LEVER_NAMES}
     values["PYTHONPATH"] = "/root:/root/backend_src"
     values["BACKEND_PLATFORM"] = "modal"
+    values["FAST_MODEL_DIR"] = MODEL_DIR
     return values
 
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install_from_requirements(str(BACKEND_DIR / "requirements.txt"))
+    # Poids embarqués : une fois au build (en cache), jamais au démarrage du conteneur.
+    .run_commands(WEIGHTS_BUILD)
     # .env() est une étape de build : elle doit passer avant add_local_* (règle Modal).
     .env(lever_env())
     .add_local_dir(str(BACKEND_DIR), remote_path="/root/backend_src")
@@ -98,6 +112,10 @@ app = modal.App(APP_NAME)
     max_containers=1,      # UN SEUL GPU, JAMAIS DEUX
     min_containers=MIN_CONTAINERS,  # 0 = extinction après le bail ; 1 = warm pool (FAST_MIN_CONTAINERS)
     scaledown_window=SCALEDOWN,
+    # Snapshot mémoire : le chargement CPU des poids est figé à la première ouverture,
+    # les suivantes repartent de là. C'est LE levier qui fait passer l'ouverture à froid
+    # sous les 10 s (sans lui : ~12 s de poids + scheduling, relevé antérieur).
+    enable_memory_snapshot=SNAPSHOT,
 )
 # DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
 # n'admet qu'une entrée à la fois : la 2e frame en vol (le client iHear tourne à 2 créneaux)
@@ -112,9 +130,14 @@ app = modal.App(APP_NAME)
 class Sam3Live(Sam3LiveService):
     """Conteneur de probe : modèle chargé une fois, leviers activables, verrou GPU unique."""
 
+    @modal.enter(snap=True)
+    def load_weights(self) -> None:
+        """Phase snapshottée : poids sur **CPU** (aucun état CUDA, sinon Modal refuse)."""
+        self.load_cpu_weights()
+
     @modal.enter()
     def load_container_on_enter(self) -> None:
-        """Chargement à l'entrée du conteneur (idempotent : le lifespan ne le refait pas)."""
+        """Après restauration : passage GPU + leviers (idempotent, le lifespan suit)."""
         self.load_container()
 
     @modal.asgi_app()
