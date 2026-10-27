@@ -29,6 +29,7 @@ import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.live.SteeringCommand
 import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SettingsVoiceCommand
 import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -295,6 +296,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (runSpeedCommand(heard.text)) return
+        if (runSettingsCommand(heard.text)) return
         handleDictated(heard.text, heard.audio)
     }
 
@@ -320,6 +322,23 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         return true
+    }
+
+    /**
+     * Ordre vocal d'ouverture des Réglages (« settings », « réglages ») : la
+     * navigation pousse la page, la dictée ne part ni au LLM ni ailleurs.
+     * Vrai si [text] portait l'ordre.
+     */
+    private fun runSettingsCommand(text: String): Boolean {
+        if (!SettingsVoiceCommand.isSettingsOrder(text)) return false
+        dropHeard()
+        update { it.copy(openSettings = true) }
+        return true
+    }
+
+    /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
+    fun settingsOpened() {
+        update { it.copy(openSettings = false) }
     }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */

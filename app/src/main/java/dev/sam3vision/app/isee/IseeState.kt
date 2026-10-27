@@ -40,6 +40,11 @@ data class IseeUiState(
     val userSpeaking: Boolean = false,
     val recordingVideo: Boolean = false,
     val status: String? = null,
+    /**
+     * Ordre vocal « settings » entendu : la navigation ouvre les Réglages une fois
+     * ([IseeHome] consomme le drapeau via `settingsOpened`).
+     */
+    val openSettings: Boolean = false,
 )
 
 // ————— Sélection : toujours la dernière bulle (aucune navigation entre messages) —————

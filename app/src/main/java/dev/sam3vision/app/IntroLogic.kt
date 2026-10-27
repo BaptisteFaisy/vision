@@ -10,7 +10,7 @@ import dev.sam3vision.core.distance.KnownSizes
 
 /** Libellé de la bascule « intro » des Réglages. */
 fun introToggleLabel(enabled: Boolean): String =
-    if (enabled) "Intro à chaque ouverture : on" else "Intro à chaque ouverture : off"
+    if (enabled) "Intro on every opening: on" else "Intro on every opening: off"
 
 /**
  * Le texte de l'intro, écrit mot pour mot comme le MP3 embarqué (`intro_isee.mp3`,

@@ -12,29 +12,29 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Calque local » des réglages : la propagation du masque du dernier keyframe
- * entre deux réponses du serveur (30 ips visés, budget de peinture 4 ms).
+ * "Local overlay" settings section: propagation of the last keyframe's mask
+ * between two server responses (30 fps target, 4 ms paint budget).
  *
- * Tant que l'estimateur de mouvement n'est pas branché (lane A de L13), le calque reste
- * **inerte** : la bascule est donc décrite comme telle, sans annoncer un gain.
+ * While no motion estimator is plugged in (L13 lane A), the overlay stays
+ * **inert**: the switch is described as such, with no gain advertised.
  */
 @Composable
 internal fun LocalOverlaySettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Calque local",
-            color = AppColors.text,
+            "Local overlay",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        SwitchRow("Propagation locale du masque", draft.localOverlayEnabled) {
+        SwitchRow("Local mask propagation", draft.localOverlayEnabled) {
             onChange(draft.copy(localOverlayEnabled = it))
         }
         Text(
-            "Entre deux keyframes du serveur, le masque est redessiné sur le téléphone à " +
-                "30 ips. Sans estimateur de mouvement, le calque reste inerte et l'écran " +
-                "ne change pas.",
-            color = AppColors.textMuted,
+            "Between two server keyframes, the mask is redrawn on the phone at " +
+                "30 fps. With no motion estimator, the overlay stays inert and the screen " +
+                "does not change.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
     }

@@ -13,49 +13,49 @@ import dev.sam3vision.core.settings.SamRegion
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « GPU SAM — région » des Réglages : mode Europe (eu) ou **mode US** (us).
- * Ne change que l'endpoint appelé ; allumer la carte reste une décision explicite
- * (`~/bin/sam3-gpu on` / `~/bin/sam3-gpu-us on`) et jamais deux GPU à la fois.
+ * "SAM GPU — region" section of Settings: Europe mode (eu) or **US mode** (us).
+ * Only changes the endpoint being called; powering the card stays an explicit
+ * decision (`~/bin/sam3-gpu on` / `~/bin/sam3-gpu-us on`), never two GPUs at once.
  */
 @Composable
 fun GpuRegionSettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "GPU SAM 3.1 — région",
-            color = AppColors.text,
+            "SAM 3.1 GPU — region",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
         RegionButtons(draft, onChange)
         Text(
-            "Mode US : la carte tourne aux États-Unis (us-east) au lieu de l'Europe. " +
-                "Une seule GPU est autorisée à la fois : allume l'app de la région choisie " +
-                "(~/bin/sam3-gpu on · ~/bin/sam3-gpu-us on) et éteins l'autre.",
-            color = AppColors.textMuted,
+            "US mode: the card runs in the United States (us-east) instead of Europe. " +
+                "Only one GPU is allowed at a time: power the app of the chosen region " +
+                "(~/bin/sam3-gpu on · ~/bin/sam3-gpu-us on) and switch the other off.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
         Text(
-            "Endpoint actif : ${draft.samEndpoint()}",
-            color = AppColors.textMuted,
+            "Active endpoint: ${draft.samEndpoint()}",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
     }
 }
 
 /**
- * Un bouton **pleine largeur** par région, la région active en couleur pleine.
- * Mesuré sur le téléphone : côte à côte (0,47), le libellé était coupé en
- * « US · États- » — illisible pour un réglage qui coûte de l'argent.
+ * One **full-width** button per region, the active region in full color.
+ * Measured on the phone: side by side (0.47), the label was cut as
+ * "US · États-" — unreadable for a setting that costs money.
  */
 @Composable
 private fun RegionButtons(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SamRegion.entries.forEach { region ->
             val active = draft.samRegion == region
-            BigButton(
+            GlassButton(
                 label = region.label,
                 enabled = true,
-                color = if (active) AppColors.primary else AppColors.surfaceHigh,
+                primary = active,
                 onClick = { onChange(pickRegion(draft, region)) },
             )
         }
@@ -63,9 +63,9 @@ private fun RegionButtons(draft: Settings, onChange: (Settings) -> Unit) {
 }
 
 /**
- * Choisir une région efface une URL SAM qui n'était que le preset d'une région
- * (injectée par le build ou héritée d'une ancienne version) : sans ça, elle
- * continuerait de gagner sur le choix. Une URL saisie à la main est conservée.
+ * Choosing a region clears a SAM URL that was only a region preset (injected by
+ * the build or inherited from an older version): without that, it would keep
+ * winning over the choice. A hand-typed URL is kept.
  */
 internal fun pickRegion(draft: Settings, region: SamRegion): Settings = draft.copy(
     samRegion = region,

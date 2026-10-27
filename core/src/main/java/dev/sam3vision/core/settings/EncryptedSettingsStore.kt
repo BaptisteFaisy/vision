@@ -45,8 +45,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             ttsAutoplay = prefs.getBoolean(KEY_TTS_AUTOPLAY, default.ttsAutoplay),
             ttsAnnouncePositions = prefs.getBoolean(KEY_TTS_ANNOUNCE_POSITIONS, default.ttsAnnouncePositions),
             ttsGuidanceStraight = prefs.getBoolean(KEY_TTS_GUIDANCE_STRAIGHT, default.ttsGuidanceStraight),
-            // `.ifBlank` : une valeur vide persistée par une version antérieure retombe sur
-            // le défaut au lieu de laisser un endpoint invalide (origin/master, commit f77c61c).
+            // `.ifBlank` : un vide persisté avant retombe sur le défaut (f77c61c).
             asrBaseUrl = prefs.getString(KEY_ASR_BASE_URL, default.asrBaseUrl).orEmpty()
                 .ifBlank { default.asrBaseUrl },
             asrApiKey = prefs.getString(KEY_ASR_API_KEY, default.asrApiKey).orEmpty(),
@@ -69,6 +68,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             shareId = prefs.getString(KEY_SHARE_ID, default.shareId).orEmpty()
                 .ifBlank { default.shareId },
             shareWriteKey = prefs.getString(KEY_SHARE_WRITE_KEY, default.shareWriteKey).orEmpty(),
+            caregiverInvite = prefs.getString(KEY_CAREGIVER_INVITE, default.caregiverInvite).orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
@@ -106,6 +106,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
             .putString(KEY_SHARE_ID, s.shareId)
             .putString(KEY_SHARE_WRITE_KEY, s.shareWriteKey)
+            .putString(KEY_CAREGIVER_INVITE, s.caregiverInvite)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
             .apply()
     }
@@ -141,6 +142,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_SHARE_ENABLED = "share_enabled"
         const val KEY_SHARE_ID = "share_id"
         const val KEY_SHARE_WRITE_KEY = "share_write_key"
+        const val KEY_CAREGIVER_INVITE = "caregiver_invite"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */
         internal fun createPrefs(context: Context): SharedPreferences {

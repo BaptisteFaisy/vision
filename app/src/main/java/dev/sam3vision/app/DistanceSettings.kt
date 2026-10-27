@@ -13,41 +13,41 @@ import dev.sam3vision.core.settings.Settings
 import java.util.Locale
 
 /**
- * Section « Distances » des réglages : bascule de l'overlay du direct et champ de
- * vision de repli (`0` = lecture directe du capteur, la voie normale).
+ * "Distances" settings section: Direct overlay switch and fallback field of
+ * view (`0` = straight sensor reading, the normal path).
  */
 @Composable
 internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Distances",
-            color = AppColors.text,
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
         )
-        SwitchRow("Distances sur le direct", draft.distanceOverlayEnabled) {
+        SwitchRow("Distances on Direct", draft.distanceOverlayEnabled) {
             onChange(draft.copy(distanceOverlayEnabled = it))
         }
         Text(
-            "Une distance par objet suivi, estimée par sténopé à partir de sa hauteur réelle " +
-                "connue (personne 1,70 m, voiture 1,45 m…). Précision ±15-20 %, calcul sur le " +
-                "téléphone : aucun GPU, aucune requête.",
-            color = AppColors.textMuted,
+            "One distance per tracked object, estimated by pinhole from its known real " +
+                "height (person 1.70 m, car 1.45 m…). ±15-20% accuracy, computed on the " +
+                "phone: no GPU, no request.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
         LabeledField(
-            label = "Champ de vision caméra (°, 0 = lecture du capteur)",
+            label = "Camera field of view (°, 0 = sensor reading)",
             value = fovText(draft.cameraFovDeg),
             secret = false,
         ) { text -> onChange(draft.copy(cameraFovDeg = parseFov(text))) }
     }
 }
 
-/** Valeur affichée du champ de vision : vide quand c'est le capteur qui décide. */
+/** Displayed field-of-view value: empty when the sensor decides. */
 internal fun fovText(deg: Float): String =
     if (deg > 0f) String.format(Locale.FRANCE, "%.1f", deg).removeSuffix(",0") else ""
 
-/** Saisie tolérante du champ de vision : virgule acceptée, bornes de [LensSpec], 0 = auto. */
+/** Tolerant field-of-view input: comma accepted, [LensSpec] bounds, 0 = auto. */
 internal fun parseFov(text: String): Float {
     val value = text.replace(',', '.').trim().toFloatOrNull() ?: return 0f
     return if (value <= 0f) 0f else value.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
