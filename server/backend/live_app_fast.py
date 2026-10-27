@@ -86,6 +86,24 @@ WEIGHTS_BUILD = (
 )
 
 
+def container_age_seconds():
+    """Âge du conteneur en secondes (uptime machine - début du processus).
+
+    Sert à mesurer le VRAI temps d'ouverture : après une restauration de snapshot, le
+    `enter(snap=True)` n'est pas rejoué, donc le chrono du code ne voit que la phase GPU.
+    """
+    try:
+        with open("/proc/uptime", "r", encoding="utf-8") as handle:
+            uptime = float(handle.read().split()[0])
+        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
+            fields = handle.read().rsplit(") ", 1)[1].split()
+        start_ticks = int(fields[19])
+        hertz = os.sysconf("SC_CLK_TCK")
+        return round(uptime - start_ticks / hertz, 1)
+    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
+        return None
+
+
 def lever_env() -> dict:
     """Env de l'image : PYTHONPATH + les leviers positionnés au déploiement."""
     values = {name: os.environ.get(name, "") for name in LEVER_NAMES}
@@ -202,10 +220,17 @@ class Sam3Live:
 
     @modal.enter()
     def load_container(self) -> None:
-        """Phase après restauration : passage sur GPU, leviers, nom de carte, verrou."""
+        """Phase après restauration : passage sur GPU, leviers, nom de carte, verrou.
+
+        Après une restauration de snapshot, `load_weights` n'est **pas** rejoué : la
+        mémoire du conteneur revient telle quelle, y compris `snap_seconds`. On marque
+        donc explicitement le cas, et `load_seconds` ne mesure que le travail réellement
+        refait après la restauration (passage GPU + leviers).
+        """
         from segmentation import device_label
 
         started = time.monotonic()
+        age = container_age_seconds()
         model, processor, dtype = self.cpu["model"], self.cpu["processor"], self.cpu["dtype"]
         device = device_label()
         model = model.to(device).eval()
@@ -215,9 +240,15 @@ class Sam3Live:
         self.ctx["device_label"] = device_label()
         self.ctx["vision_grid"] = vision_grid(model)
         self.gpu_name = gpu_name()
-        self.load_seconds = round((time.monotonic() - started) + getattr(self, "snap_seconds", 0.0), 1)
-        self.load_breakdown = {"poids_cpu": getattr(self, "snap_seconds", None),
-                               "gpu": round(time.monotonic() - started, 1)}
+        gpu_seconds = round(time.monotonic() - started, 1)
+        # `container_age` = âge du conteneur quand la phase GPU commence : c'est le VRAI
+        # temps d'ouverture (restauration du snapshot comprise). `snap_seconds` ne sert
+        # qu'au tout premier démarrage (pas de snapshot encore disponible).
+        self.load_seconds = age if age is not None else round(
+            gpu_seconds + getattr(self, "snap_seconds", 0.0), 1)
+        self.load_breakdown = {"age_conteneur_s": age,
+                               "poids_cpu_1er_demarrage_s": getattr(self, "snap_seconds", None),
+                               "gpu_s": gpu_seconds}
         del self.cpu
         self._gpu_lock = threading.Lock()
 
