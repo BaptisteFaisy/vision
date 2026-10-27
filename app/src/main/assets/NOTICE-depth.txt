@@ -1,0 +1,25 @@
+Modèles de profondeur embarqués (inférence 100 % sur le téléphone).
+Voir docs/DEPTH.md pour le choix, le banc et les recettes.
+
+1) da2_small_uint8.onnx (26 Mo)
+   Depth Anything V2 Small, export ONNX quantifié uint8.
+   Source : https://huggingface.co/onnx-community/depth-anything-v2-small
+   Fichier : onnx/model_uint8.onnx (dynamique 1x3xHxW, testé en 256x256 → 252x252).
+   Base : depth-anything/Depth-Anything-V2-Small (LiheYoung / HKU).
+   Licence : Apache-2.0 (le variant Small est Apache-2.0 ; Base/Large/Giant
+   sont CC-BY-NC-4.0 et donc exclus). Texte complet :
+   https://www.apache.org/licenses/LICENSE-2.0
+   sha256 : fcf51f1b230362b28690bb9d1809bf0431f29cad20534e3f589bd7285547f20d
+
+2) midas_v21_small.tflite (64 Mo)
+   MiDaS v2.1 small, conversion TensorFlow Lite float32.
+   Source : https://huggingface.co/foodforever/midas_v21_small.tflite
+   Entrée fixe 1x256x256x3 NHWC, sortie 1x256x256x1 (profondeur inverse).
+   Base : isl-org/MiDaS (Intel ISL).
+   Licence : MIT (Copyright Intel ISL). Texte complet :
+   https://opensource.org/licenses/MIT
+   sha256 : 93d871071edff1218973ce25ee27ce95ccd20450c70a55e1b89efa3f5a772cdd
+
+Attribution (à garder visible, ex. écran À propos) :
+- « Depth Anything V2 Small — LiheYoung / HKU, Apache-2.0 »
+- « MiDaS v2.1 small — Intel ISL, MIT »
