@@ -58,6 +58,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
+            navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
             parentSiteUrl = prefs.getString(KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
@@ -95,6 +96,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
+            .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
             .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
             .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
@@ -127,6 +129,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
+        const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
         const val KEY_PARENT_SITE_URL = "parent_site_url"
         const val KEY_SHARE_ENABLED = "share_enabled"

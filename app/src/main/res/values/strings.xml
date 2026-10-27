@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">iSee</string>
+
+    <!-- Navigation : clés stables, textes FR du contrat. -->
+    <!-- Confirmation : « Navigation vers X » (cf. NavigationPhrases.started). -->
+    <string name="nav_confirm_destination">Navigation vers %1$s</string>
+    <!-- Erreur : guidage impossible à ouvrir (cf. GUIDANCE_UNAVAILABLE). -->
+    <string name="nav_guidance_unavailable">Je ne peux pas ouvrir le guidage</string>
+    <!-- Réglages : interrupteur « Guidage GPS » (cf. NavigationToggle). -->
+    <string name="nav_guidance_toggle_label">Guider vers la destination confirmée</string>
 </resources>

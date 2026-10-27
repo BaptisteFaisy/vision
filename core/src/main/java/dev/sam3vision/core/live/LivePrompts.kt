@@ -3,6 +3,12 @@ package dev.sam3vision.core.live
 /**
  * Prompts du direct : concepts suivis par SAM 3.1, liste courte modifiable depuis l'UI.
  * [normalize] assainit avant l'envoi au backend (`/live` borne de toute façon à 12 objets).
+ *
+ * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
+ * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
+ * pas par un concept suivi ni par le LLM. Ces prompts sont des noms de concepts SAM 3.1
+ * (2 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
+ * aucun sens et volerait un slot de suivi.
  */
 object LivePrompts {
 

@@ -37,6 +37,11 @@
         android:name="android.hardware.bluetooth"
         android:required="false" />
 
+    <!-- Visibilité du package Google Maps (Android 11+) pour les intents de navigation. -->
+    <queries>
+        <package android:name="com.google.android.apps.maps" />
+    </queries>
+
     <application
         android:name=".SamApp"
         android:allowBackup="false"
