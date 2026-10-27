@@ -1,13 +1,19 @@
 package dev.sam3vision.app
 
 import dev.sam3vision.app.live.PredictionLayer
+import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.Cadence
+import dev.sam3vision.core.live.FramePipeline
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.TimingsText
+import dev.sam3vision.core.live.TrackRunner
+import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SeenTrack
+import dev.sam3vision.core.net.LiveClient
+import dev.sam3vision.core.net.WsLiveClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.util.Locale
@@ -220,3 +226,27 @@ fun focusLabel(
         else -> "Il y a $seconds s (± $half s)"
     }
 }
+
+/** Fenêtre du journal envoyée au LLM : 30 s suffisent pour « il y a 5 s ». */
+internal const val MEMORY_WINDOW_MS = 30_000L
+
+/** Dossier audio de l'annonce des positions : distinct de celui des bandeaux. */
+internal const val POSITION_VOICE_DIR = "positions"
+
+/** « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST). */
+internal fun transportLabel(trackerEnabled: Boolean, client: LiveClient?): String = when {
+    trackerEnabled -> TRANSPORT_TRACK
+    (client as? WsLiveClient)?.isConnected == true -> TRANSPORT_WS
+    else -> TRANSPORT_WS_KO
+}
+
+/**
+ * Envoie la frame au pipeline actif, quel que soit le transport ; `null` = frame jetée
+ * (créneau pris — la caméra n'attend jamais le réseau).
+ */
+internal suspend fun FramePipeline.sendFrame(prompts: List<String>, jpegB64: String): Result<LiveFrame>? =
+    when (this) {
+        is TrackRunner -> runAsFrame(prompts, jpegB64)
+        is LiveSession -> runFrame(jpegB64)
+        else -> null
+    }
