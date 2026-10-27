@@ -1,22 +1,24 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-26T21:58:07+01:00",
-    "commit": "a383cf7",
+    "le": "2026-10-27T11:37:10+01:00",
+    "commit": "eac65bc",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
-    "kotlin": 395,
-    "python": 9,
+    "kotlin": 477,
+    "python": 14,
     "toleres": []
   },
   "tests-jvm": {
     "plancher": {
-      "app": 334,
-      "core": 711,
-      "glasses-spike": 56
+      "app": 466,
+      "core": 907
     },
-    "execute": {},
+    "execute": {
+      "app": 466,
+      "core": 907
+    },
     "note": "plancher = annotations @Test de <module>/src/test, comptées sans compiler ; `execute` se remplit au premier passage avec XML JUnit."
   },
   "tests-backend": {
@@ -40,7 +42,7 @@
         "tests_min": 0
       }
     ],
-    "fichiers_py_min": 9
+    "fichiers_py_min": 14
   },
   "banc-cadence": {
     "paliers": [
@@ -57,7 +59,32 @@
       "ips": 0.05,
       "ms": 0.2
     },
-    "mesures": [],
+    "mesures": [
+      {
+        "latence_ms": 41.0,
+        "ancien_ips": 2.8,
+        "percue_avant": 222.0,
+        "nouveau_ips": 24.4,
+        "percue_apres": 78.0,
+        "ecrasees": 118.0
+      },
+      {
+        "latence_ms": 245.0,
+        "ancien_ips": 2.8,
+        "percue_avant": 421.0,
+        "nouveau_ips": 4.1,
+        "percue_apres": 380.0,
+        "ecrasees": 524.0
+      },
+      {
+        "latence_ms": 422.0,
+        "ancien_ips": 1.95,
+        "percue_avant": 673.0,
+        "nouveau_ips": 2.4,
+        "percue_apres": 639.0,
+        "ecrasees": 558.0
+      }
+    ],
     "note": "mesures = tableau de LiveCadenceSimTest relu dans le system-out JUnit ; vide tant qu'aucun rapport n'a été produit ici (la CI le produit)."
   }
 }

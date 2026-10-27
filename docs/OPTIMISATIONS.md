@@ -111,16 +111,18 @@ journal / l'historique n'étaient vidés qu'au `start()` suivant. Les deux sont 
 
 ## 11. La CI tient les 5 minutes
 
-Un seul job enchaînait tests + 2 APK + lint + spike : **coupé au budget** (mesuré). Le dépôt
-public donne **une VM par job**, d'où 5 jobs parallèles, chacun borné à 5 minutes, cache
-Gradle compris :
+Un seul job enchaînait tests + 2 APK + lint + le module lunettes : **coupé au budget** (mesuré).
+Le dépôt public donne **une VM par job**, d'où des jobs parallèles, chacun borné à 5 minutes,
+cache Gradle compris :
 
 | Job | Durée mesurée |
 |---|---:|
 | `ci` (tests JVM, le check exigé) | **33 s** |
-| `spike` (lunettes) | 143 s |
 | `lint` | ~2 min |
 | `apk` / `apk-release` | ~1 min 40 / 2 min 34 |
+
+Le job du module lunettes (143 s mesurés) a disparu avec le module : le banc vit maintenant dans
+`:app` et c'est le job `ci` qui exécute ses tests.
 
 Lint ensuite allégé **sans retirer de contrôle** : `ignoreTestSources` (lint n'analysait des
 tests pour rien), `checkReleaseBuilds` coupé **en CI seulement** (`assembleRelease` relançait
@@ -144,8 +146,10 @@ chez l'auteur. Corrigé (`Locale.FRANCE`) et **verrouillé** par un test qui jou
   suppression récursive (`safe_rm_rf` refuse un chemin vide, `..` ou hors `TMPDIR`), racine du
   dépôt déduite de `BASH_SOURCE`, dépendances annoncées, `--help` en 0 / argument inconnu en 2.
   **53 assertions** de test et un inventaire de ce que chaque script lit comme secret.
-- **`:glasses-spike`** : `GlassesSession` (341 l.) découpé en session / runtime / phases /
-  politique pure, tests JVM sur la partie pure (sans stubber le SDK Meta).
+- **Le banc lunettes, aujourd'hui dans `:app`** : `GlassesSession` (83 l.) découpé en session /
+  runtime (`GlassesSessionRuntime.kt`, 107 l.) / phases (`GlassesRegistrationPhase.kt`, 69 l.) /
+  politique pure (`GlassesSessionPolicy.kt`, 226 l.), et **84** tests JVM sur la partie pure —
+  sans stubber le SDK Meta (`SessionPolicyTest` importe ses types, il n'en instancie aucun).
 - **Documentation** : `README.md` (qui annonçait un dossier `backend/` inexistant ici),
   `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/DOC-ETAT.md` — chaque affirmation relue dans
   le code de cet arbre.

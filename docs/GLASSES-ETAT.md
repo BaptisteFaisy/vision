@@ -1,177 +1,140 @@
-# État du scaffold lunettes — audit `glasses-spike/` contre la fiche
+# État du banc d'essai lunettes — `app/…/glasses/bench/`
 
-> **Relu le 26/10/2026** dans l'arbre de la mission M67 (`mission/m067`, base `master`).
-> Deux sources seulement, comme la fiche : **le code**, cité `fichier:ligne` (c'est l'autorité), et le
-> **bytecode** des AAR `com.meta.wearable:mwdat-*` **1.0.1** du cache Gradle local, relu au `javap`
-> (`javap` n'est pas dans le `PATH` de ce poste : celui du JDK 17 du cache Gradle a servi).
-> **Aucune paire de lunettes n'était disponible ici** : tout le matériel reste « non vérifié ».
+> **Relu le 27/10/2026** dans l'arbre `~/isee-wt/glasses-bench` (branche `glasses-bench`).
+> Le banc n'est plus un module séparé : il vit dans **`:app`**, paquet
+> `dev.sam3vision.app.glasses.bench`, et se lance depuis l'app elle-même.
 >
-> Référence comparée : [`glasses-dat-spike.md`](glasses-dat-spike.md) (fiche) et
-> [`glasses-spike-ci.md`](glasses-spike-ci.md) (CI). Le module est **identique bit à bit** sur
-> l'import `790ce7f` et sur le `master` courant : l'audit du code vaut pour les deux.
+> **Rien n'a été compilé ni exécuté dans cette passe** (règle de la mission : aucun `./gradlew`) :
+> tout ce qui suit est **lu dans le code** (fichier:ligne) ou **compté** (commande donnée). Aucune
+> paire de lunettes n'était branchée : le matériel reste « non vérifié », comme avant.
 >
-> **Trois écarts prouvés ont été corrigés dans cette PR** (détail en fin de § 4) : le commentaire
-> « trois boutons » de `MainActivity.kt`, et deux passages périmés de la fiche (§ 0 chiffres du
-> module, § 5 `color-format = 19`).
+> Cette page remplace l'audit du module séparé, supprimé du build. La fiche SDK
+> [`glasses-dat-spike.md`](glasses-dat-spike.md) porte l'audit du **bytecode** des AAR
+> `mwdat-*` 1.0.1 (`javap`, relevé du 26/10/2026) : ce relevé n'a **pas** été rejoué le 27/10 et
+> n'est donc pas recopié ici.
 
-## Ce que le bytecode prouve
+## 1. Où vit le banc (compté le 27/10/2026)
 
-`javap -p -c` sur les `classes.jar` extraits des trois AAR : rejouable hors ligne, sans réseau et
-sans lunettes. Rejeu :
+| Partie | Emplacement | Compte |
+|---|---|---|
+| code du banc | `app/src/main/java/dev/sam3vision/app/glasses/bench/` | **18** fichiers `.kt`, **1 923** lignes |
+| variante **debug** (démo sans matériel) | `app/src/debug/java/dev/sam3vision/app/glasses/` | **3** fichiers (`MockControl.kt`, `MockGlassesHarness.kt`, `GlassesMock.kt`) |
+| variante **release** | `app/src/release/java/dev/sam3vision/app/glasses/bench/` | **1** fichier (`MockControl.kt`, muet) |
+| tests JVM | `app/src/test/java/dev/sam3vision/app/glasses/bench/` | **9** fichiers / **84** `@Test` |
+| test instrumenté | `app/src/androidTestDebug/java/dev/sam3vision/app/glasses/bench/` | **1** fichier / **1** test |
+| asset du test | `app/src/androidTest/assets/mock_feed.mp4` | 54 964 o |
 
 ```bash
-W=/tmp/mwdat && mkdir -p "$W"
-for m in core camera mockdevice; do
-  unzip -o -q "$(find ~/.gradle/caches/modules-2/files-2.1/com.meta.wearable/mwdat-$m \
-      -name '*.aar' | head -1)" -d "$W/$m"
-done
-javap -p -c -classpath "$W/camera/classes.jar" \
-  'com.meta.wearable.dat.camera.internal.codec.types.VideoFormat$Companion'
+find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l                    # 18
+cat app/src/main/java/dev/sam3vision/app/glasses/bench/*.kt | wc -l                             # 1923
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l                    # 84
 ```
 
-| Élément vérifié | Constat (bytecode) |
-|---|---|
-| `VideoFrame` | `(ByteBuffer, int width, int height, long presentationTimeUs, boolean isCompressed, boolean isCodecConfig)` + 6 accesseurs. **Ni format, ni rowStride, ni pixelStride** → c'est ce qui justifie `inferYuv420Layout` (`FrameTypes.kt:134-151`) |
-| `StreamConfiguration` | 4 paramètres ; le constructeur de défauts substitue **`null` / `MEDIUM` / `24` / `false`** (masque `15`) — la configuration explicite du spike (`GlassesDeviceSession.kt:44-47`) ne change donc rien aux défauts du SDK |
-| `VideoFormat.getDefaultFormat()` | **H.265, 504×896, 30 i/s**, `iFrameInterval = 3`, `bitRate = 750 000`, **`colorFormat = 19`** |
-| `StreamImpl.createVideoFormat()` | copie ce format avec un masque `113` (`0b1110001`) : codec, `iFrameInterval`, `bitRate` **et `colorFormat` sont conservés**, seuls largeur, hauteur et cadence sont résolus depuis la `StreamConfiguration` |
-| `VideoDecoder` | construit son `MediaFormat` par `createVideoFormat(codec.type, width, height)` puis `setInteger("frame-format", …)`, `"i-frame-interval"`, `"bitrate"` et **`setInteger("color-format", getColorFormat())`** → la constante demandée au décodeur est bien **19** |
-| sortie du décodeur | `VideoDecoder.setOnDecodedVideoAvailable(Function4<ByteBuffer, Int width, Int height, Long ptsUs, Unit>)` : c'est la source des `VideoFrame` brutes livrées à l'app ; **aucun stride n'y est transmis** |
-| `Stream` | `getState()`, `getVideoStream()`, `getAudioStream()`, `getErrorStream()`, `start()` → `DatResult<Unit, StreamError>`, `capturePhoto()` (suspend), `stop()` |
-| `Camera` | `getState()`, `getStream()`, `getPhoto()`, `stop()` ; `addCamera`/`removeCamera` sont des **extensions** de `SessionCameraExtensionsKt` → `DatResult<…, DeviceSessionError>` |
-| `DeviceSession` | `getState()`, `getErrors()`, **`start()` et `stop()` sont `void`** (non suspendus), le reste est `internal` sous `$fbandroid_java_com_meta_wearable_dat_core_core` |
-| énumérations | `RegistrationState` **5**, `StreamError` **8** (dont `CRITICAL_STREAM_ERROR`), `DeviceSessionState` **6**, `StreamState` **7**, `CameraState` **4**, `VideoQuality` **3** |
-| `DatResult` / `DatError` | `fold`, `onFailure(error, cause)`, `getOrNull`, `errorOrNull`, `getOrThrow`, `map`… ; `DatError` = `description` + `getLocalizedDescription(Context)` → seule cette dernière exige un `Context` (d'où le repli de `GlassesRuntime.describe`, `GlassesSessionRuntime.kt:76`) |
-| `minSdk` des AAR | **29** dans les trois manifestes binaires (`strings … | grep minSdkVersion`), `targetSdkVersion 33` → c'est bien ce qui impose `minSdk = 29` au module |
-| tailles des AAR 1.0.1 | `mwdat-core` **8 979 777 o**, `mwdat-camera` **784 799 o**, `mwdat-mockdevice` **871 060 o** = **10 635 636 o ≈ 10,64 Mo** (10,14 Mio) |
-| modèles simulables | `GlassesModel` : `RAYBAN_META`, **`META_RAYBAN_DISPLAY`**, `OAKLEY_META_HSTN`, `OAKLEY_META_VANGUARD`, `RAYBAN_META_OPTICS`, `META_GLASSES` |
-| API du mock | `MockDeviceKit` : `enable(MockDeviceKitConfig)`, `isEnabled`, `disable()`, `pairGlasses(GlassesModel)`, `getPairedDevices()`, `unpairDevice`, `simulateRegistrationOutcome(boolean)`, `startTestServer(int)`, `stopTestServer()` |
+`rg` n'est pas installé sur ce poste : un `rg` absent rend **0** sans le dire, d'où le `grep -rho`.
 
-Ce que ce tableau **change par rapport à la fiche** : la fiche § 5 classait `color-format = 19` en
-« non vérifié dans le SDK ici ». C'est faux sur ce cache Gradle : la constante est demandée par le
-SDK lui-même (`VideoDecoder` → `"color-format"` = 19 = `COLOR_FormatYUV420Planar`, I420). Ce qui
-reste ouvert n'est pas la constante demandée, c'est **le format effectivement livré** (MediaCodec
-peut refuser une couleur) et **les strides/padding du buffer** — et ceux-là, aucun bytecode ne les
-expose, seul le matériel peut les trancher.
+## 2. Comment on l'ouvre (lu dans le code)
 
-## Ce que le mock prouve
+- **Réglages → Lunettes → « Banc d'essai lunettes »** : `GlassesSection.kt:90-97` (`BenchEntry`)
+  lit `LocalBenchOpener` (`:23`), posé par `AppNav.kt:77` (`openBench`) → `push(Route.Bench)`
+  (`:45`), rendu par `BenchScreen` (`:99`).
+- **Par adb**, comme n'importe quel écran de l'app :
+  `am start -n dev.sam3vision.app/.MainActivity --ez mock true --ez analyze true`. `MainActivity.kt:81-85`
+  lit `EXTRA_MOCK` / `EXTRA_ANALYZE` (`SpikeLaunch.kt:20,23`) et pose la demande **hors
+  composition** (`BenchEntryPoint.kt`), qu'`AppNav.kt:80-81` observe pour pousser `Route.Bench`.
+  C'est ce détour qui garde la recette adb utilisable alors que le banc n'est plus une `Activity`.
+- Le banc est donc un **écran Compose de l'app** : il hérite de son processus, de ses réglages et
+  de sa navigation.
 
-Le harnais (`MockGlassesHarness.kt`) est la seule chose exécutable sans matériel, et il prouve
-**la chaîne DAT**, pas les lunettes :
+## 3. Ce qui est prouvé sur JVM — 84 tests, 9 fichiers
 
-- **`MockDeviceKit.enable`** + **`pairGlasses(GlassesModel.RAYBAN_META)`** (`MockGlassesHarness.kt:137`)
-  enregistrent un appareil simulé et accordent les permissions simulées (`mockKit.enable(MockDeviceKitConfig())`) ;
-- **allumer / porter / déplier** (`:148-165`, `powerOn` → `don` → `unfold`) : sans ces trois états, le
-  SDK simulé refuse de streamer ;
-- **la source vidéo** : caméra arrière du téléphone (`setCameraFeed(CameraFacing.BACK)`, `:71-94`) ou
-  **fichier vidéo h.265** (`setCameraFeed(uri)`, `:100-115`) ;
-- **la chaîne s'ouvre** : session (`Wearables.createSession(AutoDeviceSelector())`) → `STARTED` →
-  `addCamera` → `stream.start()` → `videoStream` émet, sans qu'aucune exception ne sorte du harnais —
-  toutes les erreurs passent dans le journal, jamais dans une exception non capturée (`enable`,
-  `usePhoneCameraFeed`, `useVideoFeed` rendent un `Boolean` et journalisent le motif) ;
-- **`MockGlassesTest`** (instrumentation, 1 test) ferme la démonstration : il attend une première
-  frame du flux simulé (2 délais de 20 s) sur un appareil réel ou un émulateur.
+| Fichier | `@Test` | Ce que ça prouve |
+|---|---:|---|
+| `SessionPolicyTest` | 26 | décisions du cycle : enregistrement, erreurs de flux, verdict de frame, étranglement, `realStartAdvice` (4 faits en entrée) |
+| `YuvConverterTest` | 13 | conversion YUV → ARGB pure, et `inferYuv420Layout` (`FrameTypes.kt:134`) qui **déduit** la disposition d'un buffer sans strides |
+| `SpikeLaunchTest` | 9 | séquence de démarrage (`SpikeLaunch.plan`) sans `Intent` ni `Context` |
+| `ChaineCompleteTest` | 8 | bout en bout de la **logique** : frame JPEG réelle → `AnalyzeUseCase` de `:core` → SAM et LLM servis par un faux serveur local → texte à dire |
+| `GlassesAudioRouteTest` | 7 | choix de la sortie audio : une paire nommée passe avant toute autre sortie, un appareil qui n'est pas un puits de son n'est jamais choisi |
+| `FramePolicyTest` | 6 | `frameTimestampMs` / `scaledDimensions`, sortis de l'encodeur pour être testables |
+| `SpikeLogTest` | 6 | bornage du journal et erreurs tenant en une ligne |
+| `CycleLatchTest` | 5 | un seul armement par cycle (ne pas relancer l'UI, la session ou la caméra à chaque émission d'état du SDK) |
+| `GlassesFrameEncoderTest` | 4 | garde-fous de l'encodeur, éprouvés sur de vraies `VideoFrame` |
+| **Total** | **84** | aucun `Context`, aucun Robolectric |
 
-Côté JVM, **56 tests** (`src/test`, 6 fichiers) prouvent la **couche de décision**, sans aucun stub du
-SDK : c'est elle qui porte tout le raisonnement (états d'enregistrement, erreurs de flux, verdict de
-frame, étranglement, horodatage, réduction, journal, conversion YUV). `python3 tools/check-kotlin-limits.py`
-→ **372 fichiers inspectés, OK — aucun dépassement** (module couvert comme le reste du dépôt).
+Le SDK n'est pas stubbé : `SessionPolicyTest` importe `StreamError` et `RegistrationState`,
+`GlassesFrameEncoderTest` instancie `VideoFrame`. Ce sont des **types** utilisés sur la JVM, pas un
+SDK simulé.
 
-## Ce que le mock ne prouve pas
+## 4. Ce que la variante de build garantit (lu, pas éprouvé)
 
-À lire avant toute phrase du type « ça marche avec les lunettes ». **Rien de cette liste n'a été
-observé sur matériel.**
+`mwdat.mockdevice` est en `debugImplementation` (`app/build.gradle.kts:184`). `MockControl` a deux
+implémentations du même contrat (`BenchMock`) : `available = true` côté debug, `available = false`
+côté release (stub qui journalise). `BenchScreen.kt:130-131` n'affiche le bouton **Mock** que si
+`available`.
 
-- **Latence et débit Bluetooth** : jamais mesurés. La cadence **24 i/s est une demande**
-  (`GlassesDeviceSession.kt:12`, `:44-47`), égale au défaut du SDK : aucune cadence constatée n'existe.
-- **L'optique** : champ, distorsion, exposition, rolling shutter — le mock reçoit des pixels du
-  téléphone ou d'un fichier, pas d'un capteur de lunettes. La résolution `MEDIUM` (504×896) est un
-  **format de flux**, pas une mesure d'image.
-- **Le routage audio vers les lunettes** : `GlassesVoice.routeToGlasses()` (`:56-73`) et `applyRoute`
-  (`:194-224`) n'ont jamais tourné sur une paire réelle ; `MODIFY_AUDIO_SETTINGS` est déclarée
-  (`AndroidManifest.xml:12`), un refus de la plateforme retombe silencieusement sur le haut-parleur.
-- **Les verrous Meta** : appairage réel, Developer Mode, firmware, permissions de l'app Meta AI.
-- **Le thermique et la batterie** : ni la montée en température, ni l'autonomie, ni la mise en pause du
-  flux quand les lunettes sont retirées (les erreurs `THERMAL_HOT`, `BATTERY_LOW`, `HINGE_CLOSED`
-  sont traitées comme transitoires, `GlassesSessionPolicy.kt:120-124` — c'est un choix, pas une mesure).
-- **`mock_feed.mp4`** (54 964 o) : le harnais attend du **h.265** (Android ne transcode pas, le h.264 est
-  rejeté) ; le contenu du fichier n'a **pas** été inspecté (lecture binaire hors périmètre) → non vérifié.
-- **`MockGlassesTest` n'est jamais exécuté en CI** (le job `spike` ne fait qu'`assembleDebug` et
-  `testDebugUnitTest`) : vert ici = vert sur *cet* appareil, jamais « vert en CI ».
+Ce que cela garantit **par construction** : un APK public ne peut ni apparier ni retirer une paire
+simulée, et `AutoDeviceSelector` ne peut pas prendre un mock oublié pour de vraies lunettes.
+Ce que cela **ne** garantit pas : que la variante release compile — elle n'a pas été construite
+dans cette passe.
 
-## Écarts restants
+## 5. Le harnais mock — exécutable, mais seulement sur un appareil
 
-Ce qui reste ouvert après l'audit — aucun de ces points n'est fermable ici :
+`MockGlassesHarness` (debug) enchaîne : `enable` (`:45`) → `reuseOrPair` (`:166`) →
+`pairGlasses(GlassesModel.RAYBAN_META)` (`:172`) → `prepareForStreaming` (`:183`) ; la source vidéo
+est la caméra arrière du téléphone (`:75`, `:89`) ou un fichier h.265 (`:106`, `:113`).
+`dropSimulatedPairs` (`:144`) retire une paire simulée laissée par un run précédent — sans quoi le
+mode « vraies lunettes » la verrait.
 
-1. **Format et strides du buffer livré** : I420 ou NV12, et quel padding de ligne. L'ambiguïté est
-   *mesurée* par un test du module (un NV12 serré fait exactement la taille d'un I420 serré) ; le
-   bytecode prouve seulement que **19** est demandé au décodeur. À trancher sur matériel, en premier.
-2. **Cadence, latence, pertes, reprises de session** : non mesurées (pas de lunettes). Et la sortie
-   du spike est de toute façon bornée à ≈ **0,67 image/s** par `FRAME_THROTTLE_MS = 1_500L`
-   (`GlassesSessionPolicy.kt:22`) : « pipeline 24 i/s » désigne l'entrée, pas la cadence utile.
-3. **`presentationTimeUs`** : référentiel inconnu (horloge média côté lunettes/décodeur vs horloge
-   monotone du téléphone, `GlassesFramePolicy.kt:23-25`). À unifier le jour où l'aval compare ces valeurs.
-4. **`MockGlassesTest`** : exige un appareil (ou un émulateur) et l'asset vidéo ; aucun workflow ne
-   l'exécute, il n'est ni compilé ni lancé en CI.
-5. **`mockdevice` dans l'APK** : `TODO(spike)` (`build.gradle.kts:76`) — **fermé le 26/10 au soir** :
-   l'artefact est passé en `debugImplementation` et tout ce qui parle mock a quitté `src/main`
-   (voir la dernière section).
-6. **Le harnais n'apparie qu'un modèle** : `RAYBAN_META` est en dur (`MockGlassesHarness.kt:137`) alors
-   que le SDK expose **6** modèles simulés, dont **`META_RAYBAN_DISPLAY`**. La question ouverte
-   « version lunettes Meta ? » (A-Z § 7.2) n'est donc **pas instruite** par le scaffold : la trancher
-   demande une ligne de code, pas du matériel.
-7. **Constantes dupliquées** : `MAX_IMAGE_EDGE = 1024` et `JPEG_QUALITY = 85`
-   (`GlassesFrameEncoder.kt:13,16`) valent exactement celles de `:app`
-   (`app/src/main/java/dev/sam3vision/app/ImageSource.kt:16-17`) — duplication **voulue** (le spike ne
-   dépend pas de `:app` et ne doit pas en dépendre) : à ne pas « factoriser ».
-8. **Le job `spike` n'est pas un passage obligé** : `.mergify.yml` est **vide** sur ce `master` (aucun
-   check requis déclaré dans le dépôt), donc `spike`, `apk`, `apk-release` et `lint` ne bloquent rien
-   tant qu'aucune protection de branche ne les déclare requis — un module cassé peut être fusionné
-   avec `ci` vert. Ce n'est pas un écart du scaffold, c'est un trou de porte.
+`MockGlassesTest` (`androidTestDebug`, 1 test) ferme la démonstration : il attend l'apparition de
+la paire simulée puis la première frame du flux (2 délais de 20 s, `:180-181`), et vérifie que
+`dropSimulatedPairs` retire bien la paire (`:147-156`). L'asset `mock_feed.mp4` a été vérifié le
+27/10 au `ffprobe` : **hevc, 540×960, 3,000 s, 54 964 o** — c'est bien du h.265, comme l'exige le
+harnais. Ce que la vidéo montre n'a pas été regardé.
 
-**Les trois écarts corrigés dans cette PR** (et eux seuls) :
+**Aucun workflow ne l'exécute** (vérifié : `grep -n 'androidTest\|instrument' .github/workflows/*.yml`
+ne rend rien). La CI a 4 jobs — `ci` (tests JVM `:core` + `:app`, `ci.yml:145-148`), `apk`
+(`:174`), `apk-release` (`:196`), `lint` (`:215`) — aucun n'a d'appareil. Vert ici = vert sur *cet*
+appareil, jamais « vert en CI ».
 
-- **`MainActivity.kt`** : le commentaire annonçait « un journal, **trois** boutons » ; `SpikeScreen`
-  en déclare **quatre** (`Button(onClick` × 4 : Mock, Lunettes, Stop, Analyser, `:227-230`), comme la
-  fiche § 1. Commentaire aligné sur le code.
-- **`glasses-dat-spike.md` § 0** : « 1 dans `src/androidTest` (**135 l.**) = **2 373 l.** » → mesuré
-  ici **158 l.** et **2 396 l.** (14 fichiers `main` 1 596 l. + 6 `test` 642 l. + 1 `androidTest` 158 l.).
-  Les deux autres totaux de la fiche (1 596 et 642) étaient exacts.
-- **`glasses-dat-spike.md` § 5** : « `color-format = 19` : **non vérifié** dans le SDK ici » → vérifié
-  au `javap` sur ce cache Gradle (voir § « Ce que le bytecode prouve »), en gardant ce qui reste ouvert
-  (format réellement livré, strides).
+## 6. Ce qui reste à prouver — et qui demande le matériel
 
-Rien d'autre n'a été touché : ni le code du module (hors le commentaire ci-dessus), ni les fichiers de
-garde (`ci.yml`, `.mergify.yml`, `tools/`, `scripts/`), ni `:app`.
-## 26/10/2026 (soir) — le mode réel : ce que le code dit avant d'ouvrir la session
+Aucun de ces points n'a été observé, ni avant ni maintenant :
 
-Écrit dans la branche `lunettes-reelles` (base `origin/master` `ed10235`). Aucune paire de lunettes
-n'était branchée sur le téléphone au moment d'écrire : ce qui suit est **lu dans le code** et
-**mesuré au build**, pas constaté sur du matériel.
+1. **Format et strides du buffer livré.** `inferYuv420Layout` (`FrameTypes.kt:134-152`) essaie trois
+   conventions d'alignement et retombe sur une disposition serrée ; le code le dit lui-même
+   « À VÉRIFIER » (`:148`). À trancher en premier, sur un flux réel.
+2. **Cadence, latence, pertes, reprises de session.** `FRAME_RATE = 24` (`GlassesDeviceSession.kt:11-12`)
+   est une **demande**, pas une mesure ; et la sortie du banc est de toute façon bornée à
+   ≈ **0,67 frame/s** par `FRAME_THROTTLE_MS = 1_500L` (`GlassesSessionPolicy.kt:22`) : « 24 i/s »
+   désigne l'entrée, jamais la cadence utile.
+3. **L'optique** : champ, distorsion, exposition, rolling shutter. La résolution de flux est un
+   format, pas une mesure d'image.
+4. **Le routage audio réellement entendu dans les lunettes.** `GlassesVoice.routeToGlasses()`
+   (`GlassesVoice.kt:74`) n'a jamais tourné sur une paire ; un refus de la plateforme retombe
+   silencieusement sur le haut-parleur.
+5. **Les verrous Meta** : appairage réel, Developer Mode, firmware, permissions de l'app Meta AI.
+   `GlassesRealCheck.kt` ne fait que **lire** ces faits et les dire en français.
+6. **Thermique et batterie** : rien sur la montée en température, l'autonomie, ni la mise en pause
+   quand les lunettes sont retirées.
+7. **`Map` du harnais** : il n'apparie qu'un modèle, `RAYBAN_META` en dur (`:172`), alors que le SDK
+   simulé en expose plusieurs (dont un modèle à écran). La question « quelle paire ? » n'est donc
+   pas instruite par le banc — une ligne de code suffirait, pas du matériel.
+8. **Le test instrumenté** n'est exécuté nulle part ailleurs que sur un appareil branché à la main.
 
-Le démarrage réel ne casse pas quand rien n'est apprêté : `AutoDeviceSelector` ne rend aucune erreur
-sans paire, la session reste en attente et l'écran ne disait rien. Trois gestes utilisateur très
-différents (« pas de paire appairée », « Developer Mode inactif », « caméra refusée par l'app Meta
-AI ») se ressemblaient donc trait pour trait. Ce qui a changé :
+## 7. Écarts vérifiés le 27/10
 
-| Fait | Preuve |
-|---|---|
-| Le journal du mode « Lunettes » dit le geste à faire, ligne par ligne, en français | `GlassesSessionPolicy.kt` (`realStartAdvice`, fonction **pure**, 4 faits en entrée) ; appelée par `GlassesRealCheck.kt` (`logRealStart`) |
-| Les faits sont lus sur le SDK : `isDevMode`, `registrationState.value`, `devices.value.size`, `checkPermissionStatus(Permission.CAMERA)` | `GlassesRealCheck.kt` (`realStartFacts`, `cameraAllowed`) |
-| Chaque paire connue est décrite : type, lien, batterie (+ charge), portée, charnière, compatibilité | `GlassesRealCheck.kt` (`deviceLines`, `describeDevice`) |
-| Un bouton **Diag** rejoue ce diagnostic sans ouvrir de session (utile quand la session reste en attente) | `MainActivity.kt` (`reportDiagnosis`, `Button(onClick = onDiagnose)`) |
-| Le mode réel se lance aussi par adb, comme le mock : `--ez real true` | `MainActivity.kt` (`EXTRA_AUTO_REAL`), à côté de `EXTRA_AUTO_MOCK` |
-| Une paire simulée d'un run précédent est retirée **avant** la session : `MockDeviceKit` se souvient de l'appareil simulé même après un process tué, et `AutoDeviceSelector` l'aurait prise pour une vraie paire | `MockGlassesHarness.kt` (`dropSimulatedPairs`), appelé par `MainActivity.startWithGlasses`. La démo sans matériel est restée : elle vit maintenant en `src/debug` derrière `MockControl` |
-| L'endroit **où le son sort** est affiché dans le journal (nom de la sortie Bluetooth, sinon haut-parleur), au lieu du seul logcat | `GlassesVoice.kt` (`routeToGlasses(): String`), journalisé par `MainActivity.launchSession` |
-| `mockdevice` ne peut plus entrer dans un build public | `build.gradle.kts` (`debugImplementation`) ; **mesuré** : `MockDeviceKit` → **29** occurrences dans l'APK **debug**, **0** dans l'APK **release** (`unzip -p … classes.dex \| strings \| grep -c`) |
+- **Garde de taille** : `python3 tools/check-kotlin-limits.py` → **522** fichiers inspectés,
+  **1** dépassement : `app/src/main/java/dev/sam3vision/app/AppNav.kt:64`, fonction de **54** lignes
+  pour 50 autorisées. Aucun fichier du banc n'est en cause.
+- **Plus de duplication avec `:app`** : `GlassesFrameEncoder.kt:6-7` importe `MAX_IMAGE_EDGE` et
+  `JPEG_QUALITY` de `:app` (`ImageSource.kt:17-18`) au lieu de les recopier — la duplication
+  signalée avant l'intégration a disparu.
+- **Noms hérités** : `SpikeLaunch.kt`, `SpikeLog.kt`, `SpikeLogTest.kt`, `SpikeLaunchTest.kt`
+  gardent leur nom d'origine. Cosmétique, sans effet ; à renommer seulement si on touche au fichier.
 
-**Vérifications** : `:glasses-spike:testDebugUnitTest` (**62** tests, **0** échec, dont **6** neufs sur
-`realStartAdvice`), `:glasses-spike:assembleDebug` **et** `:glasses-spike:assembleRelease`, plus
-`assembleDebugAndroidTest` (le test instrumenté est passé en `src/androidTestDebug`, il utilise le
-harnais). Garde de taille : `check-kotlin-limits.py` → OK (418 fichiers).
+## 8. Ce que cette page ne dit pas
 
-**Ce qui reste non mesuré** (inchangé) : tout le matériel — appairage réel, firmware, latence et
-débit Bluetooth, optique, permissions réelles de l'app Meta AI, thermique, routage audio réellement
-entendu dans les lunettes. Les six gestes qui restent à un humain : appairer la paire dans l'app
-Meta AI (lunettes en mode appairage), activer le Developer Mode, accepter l'enregistrement de l'app,
-mettre la caméra en *Always allow*, déplier et porter les lunettes, les laisser allumées.
+- Aucun build, aucun test n'a tourné dans cette passe : « compile » et « vert » ne sont pas
+  constatés ici.
+- L'audit bytecode du SDK (AAR 1.0.1, `javap`) date du 26/10 et n'a pas été rejoué ; il n'est pas
+  recopié ici pour ne pas faire passer un relevé ancien pour une vérification du jour.
+- Rien n'a été mesuré sur un téléphone : ni durée, ni débit, ni image.

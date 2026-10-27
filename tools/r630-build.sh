@@ -3,14 +3,14 @@
 #
 # Différence avec ~/.local/bin/build-serveur : les clés de local.properties
 # (llm.api.key, tts.api.key, sam31.endpoint…) sont transmises au serveur, sinon
-# BuildConfig sort avec des chaînes vides et le spike ne peut appeler personne.
+# BuildConfig sort avec des chaînes vides et l’app ne peut appeler personne.
 #
 #   tools/r630-build.sh [worktree] [tâche gradle]
 #
 set -euo pipefail
 
 WT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
-TASK="${2:-:glasses-spike:assembleDebug}"
+TASK="${2:-:app:assembleDebug}"
 SRV="${BUILD_SERVER:-baptiste@100.124.18.48}"
 JDK="${BUILD_JDK:-/home/baptiste/toolchains/jdk17}"
 SDK="${BUILD_SDK:-/home/baptiste/android-sdk}"

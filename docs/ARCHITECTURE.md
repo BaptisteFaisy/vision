@@ -1,38 +1,48 @@
 # ARCHITECTURE — iSee
 
-Ce document décrit **l'arbre de ce dépôt**, relu dans le code le 26/10 après 19 h (commit
-unique de ce dépôt). Le service SAM 3.1 (GPU) vit dans un dépôt séparé, non
+Ce document décrit **l'arbre de ce dépôt**, relu dans le code le **27/10/2026** (comptes
+recomptés ce jour-là, après l'entrée du banc lunettes dans `:app` ; première rédaction le 26/10
+après 19 h). Le service SAM 3.1 (GPU) vit dans un dépôt séparé, non
 public : rien de ce qui est serveur n'est vérifiable d'ici. Chaque chiffre ci-dessous est soit
 une constante du code (fichier + ligne cités), soit un comptage reproductible (commande
 donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici.
 
-## 1. Trois modules, leurs comptes réels
+## 1. Deux modules, leurs comptes réels
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **74** fichiers | 92 fichiers / **663** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **130** fichiers | 51 fichiers / **305** `@Test` | 1 fichier / **6** tests |
-| `:glasses-spike` | `com.android.application` | `dev.sam3vision.glasses` | 29 | **12** fichiers | 3 fichiers / **36** `@Test` | 1 fichier / **1** test |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **105** fichiers | 126 fichiers / **907** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **165** fichiers | 71 fichiers / **466** `@Test` | 2 fichiers / **7** tests |
+| `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **18** fichiers | 9 fichiers / **84** `@Test` | 1 fichier / **1** test |
 
-Les déclarations sont dans `core/build.gradle.kts:9,13`,
-`app/build.gradle.kts:38,43` et `glasses-spike/build.gradle.kts:23,28` ; `compileSdk = 36`
-partout.
+La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
+d'essai lunettes (l'ancien module séparé) n'est plus un module, il vit dans l'APK d'iSee.
+
+Les déclarations sont dans `core/build.gradle.kts:9,10,13` et `app/build.gradle.kts:79,80,84` ;
+`settings.gradle.kts` n'inclut que `:core` et `:app`, et `compileSdk = 36` pour les deux. Le
+dossier de l'ancien module (37 fichiers suivis, dont 30 `.kt`) est encore **sur le disque**, mais
+aucun build ne l'inclut : il ne sert plus que de référence en lecture.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 74
-find core/src/test -name '*.kt' | wc -l            # 92
-find app/src/main -name '*.kt' | wc -l             # 130
-find app/src/test -name '*.kt' | wc -l             # 51
-find glasses-spike/src/main -name '*.kt' | wc -l   # 12
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 364
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 37 755
+find core/src/main -name '*.kt' | wc -l            # 105
+find core/src/test -name '*.kt' | wc -l            # 126
+find app/src/main -name '*.kt' | wc -l             # 165
+find app/src/test -name '*.kt' | wc -l             # 71
+find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 18
+find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 9
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 84
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 503
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 54 551
 ```
 
-- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 74 fichiers `main`,
+Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
+`rg` absent rend **0** sans le dire (piège à connaître avant de conclure « aucun test »).
+
+- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 105 fichiers `main`,
   **4** importent `android.*` : `mask/Masks.kt`, `settings/EncryptedSettingsStore.kt`,
   `settings/SettingsCipher.kt`, `settings/SettingsStoreFactory.kt`. Tout le reste — réseau,
   gestes, cadence, distances, masques, texte, prédiction — est du Kotlin pur, testé sur la JVM.
-- Les 130 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
+- Les 165 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
   `app/src/main/java/javax/sound/sampled/AudioFormat.kt`, surface minimale de
   `javax.sound.sampled` pour que le port Java de LAME (`jump3r`) encode du MP3 sur Android.
 - Le détail des tests (par module et par domaine) est dans `docs/TESTING.md`.
@@ -194,16 +204,16 @@ les porte vides, l'app refuse d'appeler et le dit (`ApiError.InvalidKey` — LLM
 | Étape | Emplacement | Noms (jamais de valeurs) |
 |---|---|---|
 | 1. build | `local.properties` (gitignoré) | `llm.base.url`, `llm.api.key`, `llm.model`, `tts.api.key`, `tts.voice.id`, `asr.api.key`, `sam31.endpoint`, `sam.base.url`, `sam.us.base.url`, `mwdat.application.id`, `mwdat.client.token` |
-| 2. injection | `BuildConfig` (`app/build.gradle.kts:59-72`) | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `TTS_API_KEY`, `TTS_VOICE_ID`, `ASR_API_KEY`, `SAM31_ENDPOINT`, `SAM_BASE_URL`, `SAM_US_BASE_URL` |
-| 2 bis. manifeste | placeholders `mwdat_*` (`app/build.gradle.kts:55-56`, lus dans `AndroidManifest.xml`) | `com.meta.wearable.mwdat.APPLICATION_ID`, `…CLIENT_TOKEN` |
+| 2. injection | `BuildConfig` (`app/build.gradle.kts:100-116`) | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `TTS_API_KEY`, `TTS_VOICE_ID`, `ASR_API_KEY`, `SAM31_ENDPOINT`, `SAM_BASE_URL`, `SAM_US_BASE_URL` |
+| 2 bis. manifeste | placeholders `mwdat_*` (`app/build.gradle.kts:96-97`, lus dans `AndroidManifest.xml`) | `com.meta.wearable.mwdat.APPLICATION_ID`, `…CLIENT_TOKEN` |
 | 3. amorçage | `app/SettingsSeed.kt` (`seeded`) | remplit les champs **vides** (clé LLM, voix, dictée) ; une valeur saisie dans Réglages gagne toujours |
 | 4. stockage | `core/settings/EncryptedSettingsStore.kt` : `EncryptedSharedPreferences` fichier `sam3vision_secure_settings` (`:12`), clés `KEY_*` (`:90-108`) — repli `core/settings/PrivateFileSettingsStore.kt` : `filesDir/settings.enc`, AES-256/GCM, clé Keystore non exportable, choisi par `SettingsStoreFactory.create` | `llm_base_url`, `llm_api_key`, `llm_model`, `sam_base_url`, `sam_region`, `speech_language`, `tts_api_key`, `tts_voice_id`, `tts_autoplay`, `tts_announce_positions`, `asr_base_url`, `asr_api_key`, `asr_model`, `intro_enabled`, `intro_played`, `distance_overlay`, `live_sam`, `camera_fov_deg`, `max_objects` |
 | 5. envoi | en-têtes HTTP | `Authorization: Bearer` (LLM, Meta ASR), `xi-api-key` (ElevenLabs TTS/STT) ; **les endpoints SAM ne portent aucune clé** ; `/release` porte `x-sam-release: confirm` |
 
 Deux nuances : les URL SAM ne passent **pas** par `BuildConfig` à l'amorçage — elles sont
 résolues à l'appel par `Settings.samEndpoint()` (`app/SamEndpoint.kt`) ; et `BuildConfig` est
-bien la seule porte d'entrée d'une clé sans saisie manuelle, pour `:app` comme pour
-`:glasses-spike` (`glasses-spike/build.gradle.kts:38-43`).
+bien la seule porte d'entrée d'une clé sans saisie manuelle, désormais pour la seule `:app`
+(`app/build.gradle.kts:100-116`).
 
 ## 5. Réglages par défaut et endpoint SAM
 
@@ -278,7 +288,7 @@ foi.
 | Réglages | `core/…/settings/Settings.kt`, `EncryptedSettingsStore.kt`, `PrivateFileSettingsStore.kt`, `SettingsStoreFactory.kt`, `SamRegion.kt`, `app/…/SettingsScreen.kt`, `app/…/SettingsSeed.kt` |
 | Design iSee | `core/…/iseedesign/Dissolve.kt`, `core/…/iseedesign/IseeScene.kt`, `app/…/ihear/IseeSceneArt.kt`, `IseeScenePane.kt`, `IseeSceneState.kt`, `IseeDissolve.kt` |
 | Purge des captures | `app/…/cleanup/` (12 fichiers : Room + WorkManager), planificateur `CleanupScheduler.kt`, config `CleanupConfig.kt` (`PERIOD_HOURS = 1`) |
-| Lunettes | `app/…/glasses/` (7 fichiers, SDK DAT), `glasses-spike/` (12 fichiers, app séparée) |
+| Lunettes | `app/…/glasses/` (12 fichiers : état, contrôleur, caméra, audio, politique, section de réglages) et `app/…/glasses/bench/` (18 fichiers : banc d'essai, SDK DAT) — le dossier de l'ancien module n'est plus dans le build |
 | Gardes | `tools/check-kotlin-limits.py`, `.github/workflows/ci.yml`, `.github/couche0/check_couche0.py` |
 
 ## 8. Ce que ce dépôt ne contient pas

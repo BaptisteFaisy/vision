@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,6 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesEvent
+import dev.sam3vision.app.glasses.LocalBenchOpener
+import dev.sam3vision.app.glasses.bench.BenchEntryPoint
+import dev.sam3vision.app.glasses.bench.BenchScreen
 import dev.sam3vision.app.ihear.IhearHome
 import dev.sam3vision.app.ihear.IhearViewModel
 import dev.sam3vision.app.ihear.OnboardingGesturesScreen
@@ -34,6 +38,14 @@ sealed interface Route {
     data object Onboarding : Route
 
     /**
+     * Banc d'essai lunettes (session DAT réelle ou appareil simulé, journal, voix).
+     * Ouvert depuis le bloc « Lunettes » des Réglages : c'est un écran d'iSee, plus
+     * une `Activity` séparée — les paires simulées et la recette adb n'ont plus
+     * d'entrée propre.
+     */
+    data object Bench : Route
+
+    /**
      * Mode vidéo (tap court) : vidéo → SAM 3.1, annonces ElevenLabs.
      * [autoStart] = lancé par un tap sur l'aperçu de l'accueil : la session démarre
      * d'elle-même, sans deuxième tap.
@@ -49,6 +61,17 @@ sealed interface Route {
  * L'onboarding des trois gestes ([Route.Onboarding]) est un écran de la pile :
  * ouvert depuis les Réglages, rejouable sans réinstaller l'app.
  */
+/**
+ * Ouvre le banc quand une demande est posée de l'extérieur — la recette adb
+ * (`--ez mock true`) arrive avant la composition de la pile. Les options sont
+ * consommées par [BenchScreen] : ici on ne fait que pousser l'écran.
+ */
+@Composable
+private fun BenchRequestEffect(push: (Route) -> Unit) {
+    val request by BenchEntryPoint.pending.collectAsState()
+    LaunchedEffect(request) { if (request != null) push(Route.Bench) }
+}
+
 @Composable
 fun AppNav(
     viewModel: AppViewModel,
@@ -61,6 +84,7 @@ fun AppNav(
     val route = stack.first()
     val push: (Route) -> Unit = { stack = listOf(it) + stack }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.drop(1) }
+    BenchRequestEffect(push)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
@@ -78,15 +102,19 @@ fun AppNav(
             Route.Chat -> ChatRoute(state, viewModel, pop)
             is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
             Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
-            Route.Settings -> SettingsRoute(
-                viewModel = viewModel,
-                state = state,
-                glasses = glasses,
-                pop = pop,
-                onOpenLive = { push(Route.Live) },
-                onOpenClassic = { push(Route.Capture) },
-                onOpenGestures = { push(Route.Onboarding) },
-            )
+            Route.Bench -> BenchScreen(onBack = pop)
+            // `remember` : la valeur du CompositionLocal ne doit pas changer à chaque recomposition.
+            Route.Settings -> CompositionLocalProvider(LocalBenchOpener provides remember { { push(Route.Bench) } }) {
+                SettingsRoute(
+                    viewModel = viewModel,
+                    state = state,
+                    glasses = glasses,
+                    pop = pop,
+                    onOpenLive = { push(Route.Live) },
+                    onOpenClassic = { push(Route.Capture) },
+                    onOpenGestures = { push(Route.Onboarding) },
+                )
+            }
         }
 
         state.dictation.overlay?.let { overlay ->

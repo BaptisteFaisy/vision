@@ -2,8 +2,10 @@
 
 Périmètre de cette page : **`:app` seulement**, c'est-à-dire
 `app/src/main/java/dev/sam3vision/app/glasses/`, ses tests JVM et le manifeste de `:app`.
-Le prototype `:glasses-spike` a sa propre doc (`docs/glasses-dat-spike.md`) et ses propres
-conclusions : **rien ici ne se déduit du spike** (§10).
+Le banc d'essai lunettes (paquet `app/src/main/java/dev/sam3vision/app/glasses/bench/`, ouvert
+depuis l'écran Lunettes) a sa propre fiche de référence (`docs/glasses-dat-spike.md`) et ses
+propres conclusions : **rien ici ne se déduit du banc** (§10). Le module `:glasses-spike` a été
+supprimé le 2026-10-27 — décision et chemins dans `docs/GLASSES-DECISION.md`.
 
 Méthode, le 26/10/2026 : lecture intégrale des fichiers cités, et relevé des signatures du
 SDK au `javap` **sur les AAR en cache Gradle** (`com.meta.wearable:mwdat-*:1.0.1`) — pas sur
@@ -104,18 +106,24 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
 
 ## 5. Flux d'images : 15 i/s, photo à la demande
 
-- Configuration demandée au SDK : `StreamConfiguration(audioCodec = null,
-  videoQuality = MEDIUM, frameRate = 15, compressVideo = true)`
-  (`GlassesCamera.kt:45-50`), `FRAME_RATE = 15` (`:89`). Le commentaire du code justifie la
+- Configuration demandée au SDK : `StreamConfiguration(audioCodec = choice.toCodec(),
+  videoQuality = MEDIUM, frameRate = FRAME_RATE, compressVideo = true)`
+  (`GlassesCamera.kt:59-63`), `FRAME_RATE = 15` (`:129`). Le commentaire du code justifie la
   limite (« au-delà, le lien Bluetooth Classic casse l'image ») : c'est un **constat matériel
   repris tel quel, non remesuré ici**.
+- L'audio n'est pas `null` : `grep -n "audioCodec = null" app/src/main` → 0. Le code monte un
+  **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
+  48 kHz mono en repli, puis « sans micro » — et `GlassesCamera.start()` essaie les trois
+  (`:43-54`), en annonçant chaque refus (`GlassesMessages.audioRefused`). Un refus de micro
+  laisse donc la caméra seule, sans code mort. Ce qui reste **absent**, c'est le **routage de la
+  voix vers les lunettes** : il n'existe que dans le banc (`bench/GlassesVoice.kt`).
 - Le flux vidéo est **démarré mais jamais consommé** : l'app n'appelle nulle part
   `stream.videoStream` (mesuré : zéro occurrence dans `app/src/main`). `compressVideo = true`
   est donc un choix de lien, pas un chemin d'image.
 - Conséquence assumée : `VideoFrame.toBitmapOrNull()` et son `rawToBitmap`
-  (`GlassesFrames.kt:22-37`) **ne sont appelés par personne** — code mort côté app, gardé
-  parce qu'une autre mission tient `:glasses-spike` et qu'il n'a rien à y faire. Il n'est pas
-  testé (il faudrait un `Bitmap` Android).
+  (`GlassesFrames.kt:22-37`) **ne sont appelés par personne** — code mort côté app : le banc a
+  sa propre conversion (`bench/FrameTypes.kt:76`, `bench/GlassesFrameEncoder.kt:42`, mesuré :
+  zéro `toBitmapOrNull` sous `bench/`). Il n'est pas testé (il faudrait un `Bitmap` Android).
 - Seul `PhotoData.toBitmapOrNull()` sert (`GlassesFrames.kt:40`), appelé par
   `GlassesCamera.capture()` (`:66`) : `PhotoData.Bitmap` est utilisé tel quel, `PhotoData.HEIC`
   passe par `BitmapFactory.decodeByteArray`.
@@ -191,8 +199,10 @@ lunettes simulées en debug.
 Ne marche pas, et c'est écrit dans le code :
 
 - pas de trames vidéo consommées par l'app (donc pas de mode Direct sur lunettes) ;
-- aucun audio : `audioCodec = null` (`GlassesCamera.kt:46`) ; pas de routage Bluetooth de la
-  voix vers les lunettes, et `MODIFY_AUDIO_SETTINGS` n'est pas déclaré par `:app` ;
+- pas de routage de la voix vers les lunettes : le micro des lunettes est demandé (palier
+  `GlassesAudioPlan`), mais la sortie audio reste celle du téléphone ; la permission
+  `MODIFY_AUDIO_SETTINGS` est déclarée (`AndroidManifest.xml:15`), pour le banc et non pour
+  l'app ;
 - pas de tap ni tap-long du pavé : l'app ne s'abonne qu'à `InputSource.CAPTURE_BUTTON`
   (`GlassesInputs.kt:39-43`), ces gestes étant réservés par le système (pause/arrêt) ;
 - pas d'invocation vocale par mot-clé : exigerait un projet Developer Center et une version
@@ -213,21 +223,24 @@ Rien de cette liste n'a été exécuté ici : **jamais essayé**, à vérifier a
 - le mock : il n'a pas été lancé non plus (il demande un appareil Android) ;
 - tout ce qui est thermique, autonomie, distance, optique : hors du périmètre du code.
 
-## 10. Frontière avec `:glasses-spike`
+## 10. Frontière avec le banc (`glasses/bench/`)
 
-`glasses-spike/` est un **module séparé** (package `dev.sam3vision.glasses`, `:app` ne dépend
-pas de lui). Il explore autre chose, et **aucune conclusion du spike ne vaut pour l'app** :
+Le banc d'essai est dans **le même module** que cette page depuis le 2026-10-27, mais dans un
+autre paquet : `app/src/main/java/dev/sam3vision/app/glasses/bench/`. Un paquet commun ne crée
+pas de dépendance — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune occurrence de
+`glasses.bench` hors du paquet), et **aucune conclusion du banc ne vaut pour l'app** :
 
-| | `:app` (ici) | `:glasses-spike` |
+| | production (`glasses/`, ici) | banc (`glasses/bench/`) |
 |---|---|---|
-| Cadence | 15 i/s (`GlassesCamera.kt:89`) | 24 i/s (`GlassesDeviceSession.kt:12`) |
-| Compression | `compressVideo = true` | autre choix, et un encodeur dédié (`GlassesFrameEncoder.kt`) |
-| Trames vidéo | jamais consommées | pompées et décodées (`GlassesFramePump.kt:21`) |
-| Audio | aucun | routage SCO (`GlassesVoice.kt:197-204`) + `MODIFY_AUDIO_SETTINGS` |
+| Cadence | 15 i/s (`GlassesCamera.kt:129`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
+| Compression | `compressVideo = true` (`:63`) | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
+| Trames vidéo | jamais consommées (0 occurrence de `videoStream`) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
+| Audio | piste PCM demandée par palier (`GlassesAudioPlan`), pas de routage de sortie | routage de la voix vers les lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
+| Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |
 
-Les deux chemins coexistent volontairement : le spike peut essayer, l'app reste prudente.
-Les chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autre.
+Les deux chemins coexistent volontairement : le banc peut essayer, l'app reste prudente. Les
+chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autre.
 
 ## 11. Tests JVM : ce qui est couvert, ce qui ne peut pas l'être
 

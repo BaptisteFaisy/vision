@@ -20,8 +20,7 @@ balayage horizontal = tourner la page.
 | Module ou dossier | Rôle |
 |---|---|
 | `:core` | Bibliothèque Android (`dev.sam3vision.core`) : modèles, clients HTTP (LLM `chat/completions`, SAM `/segment` et `/release`, vidéo `/video`), **WebSocket `/live/ws`** pour le direct, TTS/STT, masques, distances, gestes, cadence du direct, réglages chiffrés, texte, design iSee (`core/…/iseedesign`) |
-| `:app` | L'APK (`dev.sam3vision.app`) : Compose + CameraX, accueil iSee (`app/ihear`), Capture, Analyse, Chat, Direct, Réglages, mode tap vidéo (`app/tap`), lunettes (`app/glasses`), purge des captures (`app/cleanup`) |
-| `:glasses-spike` | Spike jetable lunettes Meta (Wearables DAT), application séparée `dev.sam3vision.glasses`, hors APK de production |
+| `:app` | L'APK (`dev.sam3vision.app`) : Compose + CameraX, accueil iSee (`app/ihear`), Capture, Analyse, Chat, Direct, Réglages, mode tap vidéo (`app/tap`), lunettes (`app/glasses`), banc d'essai lunettes (`app/glasses/bench`, ouvert depuis l'écran Lunettes), purge des captures (`app/cleanup`) |
 | `tools/` | Garde passée en CI : fichier `.kt` < 500 lignes, fonction < 50 lignes |
 | `docs/` | Architecture, contrats, recettes, et l'état de chaque doc (`docs/DOC-ETAT.md`) |
 
@@ -48,16 +47,25 @@ Les concepts suivis sont **deux** par défaut — `person` et `door` —, et `Li
 borne toute liste saisie dans le champ « Suivre » (`core/live/LivePrompts.kt:20,28`) : le
 backend tronque de toute façon à `PROMPT_LIMIT = 2`.
 
-## Taille de l'arbre (mesurée sur ce commit)
+## Taille de l'arbre (mesurée le 2026-10-27)
+
+Le module `:glasses-spike` a été supprimé ce jour-là ; les chiffres ci-dessous l'**excluent**.
+Le banc lunettes est un paquet de `:app` (`app/…/glasses/bench/`) et compte donc dans `:app`.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` versionnés | **364** | `git ls-files '*.kt' \| wc -l` |
-| Lignes de production (`*/src/main`) | **22 565** | `git ls-files '*/src/main/*.kt' \| xargs cat \| wc -l` |
-| dont `:core` / `:app` / `:glasses-spike` | **74 f. / 7 666 l.** · **130 f. / 13 394 l.** · **12 f. / 1 505 l.** | idem, par module |
-| `@Test` | **1 011** = **1 004 JVM** (`:core` 663, `:app` 305, spike 36) + **7 instrumentés** (`:app` 6, spike 1) | `git ls-files '*.kt' \| xargs grep -h '@Test' \| wc -l` |
-| `@Preview` Compose | **11** | `git ls-files '*.kt' \| xargs grep -h '@Preview' \| wc -l` |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/ihear/IseeScenePane.kt` — **496** lignes | `git ls-files '*/src/main/*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Fichiers `.kt` | **472** | `find core app -name '*.kt' -not -path '*/build/*' \| wc -l` |
+| Lignes de production (`*/src/main`) | **28 706** | `find core app -path '*/src/main/*' -name '*.kt' \| xargs cat \| wc -l` |
+| dont `:core` / `:app` | **105 f. / 11 121 l.** · **164 f. / 17 585 l.** (dont le banc : **17 f. / 1 824 l.**) | idem, par module |
+| `@Test` | **1 380** = **1 373 JVM** (`:core` 907, `:app` 466, dont banc 86) + **7 instrumentés** (`:app` 6 + 1 pour le banc) | `find core app -name '*.kt' -not -path '*/build/*' \| xargs grep -h '@Test' \| wc -l` |
+| `@Preview` Compose | **11** | idem avec `@Preview` |
+| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+
+Les fichiers du banc étaient encore **non suivis par git** à l'heure de ce relevé (copie en
+cours d'intégration) : c'est pourquoi le comptage se fait sur le disque et non par
+`git ls-files`. Le relevé date de 11 h 10 et l'arbre reçoit du code en parallèle pendant la
+fusion : ces totaux bougent de quelques dizaines de lignes d'une heure à l'autre, les
+proportions non.
 
 ## Ce qu'il faut pour s'en servir
 
@@ -78,8 +86,8 @@ backend tronque de toute façon à `PROMPT_LIMIT = 2`.
 ## Construire
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:assembleDebug      # tests JVM + APK debug
-./gradlew :glasses-spike:assembleDebug                    # le spike lunettes, séparément
+./gradlew :core:testDebugUnitTest :app:assembleDebug      # tests JVM + APK debug (banc compris)
+                                                          # le banc lunettes n'a plus de commande à lui
 python3 tools/check-kotlin-limits.py                      # gardes de style
 bash scripts/build.sh                                     # assembleDebug --offline + contrôle de l'APK
 ```
@@ -89,7 +97,7 @@ bash scripts/build.sh                                     # assembleDebug --offl
 | Gradle | 8.14.1 (`gradle/wrapper/gradle-wrapper.properties:3`) |
 | AGP | 8.11.1 · Kotlin 2.2.21 · KSP 2.2.21-2.0.5 (`gradle/libs.versions.toml`) |
 | compileSdk / targetSdk | 36 partout |
-| minSdk | **29** pour `:app` et `:glasses-spike`, 26 pour `:core` (bibliothèque) |
+| minSdk | **29** pour `:app` (banc lunettes compris), 26 pour `:core` (bibliothèque) |
 | Java | bytecode et `-jvm-target` **17** ; le JDK n'est **pas** épinglé dans le dépôt (`JAVA_HOME` du poste, jamais `org.gradle.java.home`) |
 
 Sur cette machine (r630) : `export JAVA_HOME=~/toolchains/jdk17 ANDROID_HOME=$HOME/android-sdk`,
@@ -98,21 +106,25 @@ le SDK lunettes Meta l'exige. Dépendances : coroutines, OkHttp, AndroidX (Compo
 Room, WorkManager, security-crypto), JUnit 4, plus Guava, jump3r (MP3 pur Java) et
 `mwdat-*` pour les lunettes.
 
-Comptage des tests (fait sur cet arbre par `grep -h '@Test'`, commandes ci-dessus) : **1 011**
-annotations, dont **1 004 JVM** (`:core` 663, `:app` 305, spike 36) et **7 instrumentés**
-(`app/src/androidTest` 6, `glasses-spike/src/androidTest` 1). Le nombre de tests réellement
-**exécutés** n'est pas mesuré ici ; `docs/TESTING.md` donne la recette.
+Comptage des tests (fait sur cet arbre le 2026-10-27 par `grep -h '@Test'`, commandes
+ci-dessus) : **1 380** annotations, dont **1 373 JVM** (`:core` 907, `:app` 466) et **7
+instrumentés** (`app/src/androidTest` 6, `app/src/androidTestDebug` 1 — `MockGlassesTest`, qui
+appartient au banc). Le nombre de tests réellement **exécutés** n'est pas mesuré ici ;
+`docs/TESTING.md` donne la recette.
 
 ## CI
 
-Quatre workflows (`.github/workflows/`) : `ci.yml` — cinq jobs, un par VM, chacun borné à
-**5 minutes** : `ci` (gardes + tests JVM), `apk` (debug), `apk-release`, `lint`, `spike`
-(lunettes) ; `ci-budget.yml` (refuse un job qui déclarerait plus de 5 minutes) ; `couche0.yml`
-(toute PR déclare son `## Scope` en chemins, et refuse les clés en clair) ;
-`stale-base-guard.yml` (retard sur la base, informatif). Tout tourne sur `ubuntu-latest` avec
-cache Gradle via `gradle/actions/setup-gradle` : dépôt public, donc minutes gratuites et VM
-neuve par job. Une PR qui ne touche que de la doc ou de la config ne lance aucun Gradle
-(l'étape de périmètre de `ci` le décide) : son verdict tombe en quelques secondes.
+Quatre workflows (`.github/workflows/`) : `ci.yml` — **quatre** jobs, un par VM (le job
+`spike` a disparu avec le module le 2026-10-27), chacun borné à **5 minutes** : `ci` (gardes +
+tests JVM de `:core` et `:app`), `apk` (debug), `apk-release`, `lint` ; `ci-budget.yml` (refuse
+un job qui déclarerait plus de 5 minutes) ; `couche0.yml` (toute PR déclare son `## Scope` en
+chemins, et refuse les clés en clair) ; `stale-base-guard.yml` (retard sur la base,
+informatif). Tout tourne sur un runner **auto-hébergé**
+(`runs-on: [self-hosted, linux, x64, vision]`, `ci.yml:28`) avec cache Gradle via
+`gradle/actions/setup-gradle`, un checkout en `fetch-depth: 1` et une annulation des runs
+précédents de la même branche (`concurrency`, `ci.yml:16-17`). Une PR qui ne touche que de la
+doc ou de la config ne lance aucun Gradle (l'étape de périmètre de `ci` le décide, `ci.yml:70`) :
+son verdict tombe en quelques secondes.
 
 Aucune clé n'est **versionnée**, et un job déclenché par la PR d'un **fork** ne voit aucun
 secret. Le job `ci` sait en revanche lire des secrets **facultatifs** du dépôt
