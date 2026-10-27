@@ -23,6 +23,7 @@ import dev.sam3vision.app.ihear.vm.IhearTranscript
 import dev.sam3vision.app.ihear.vm.IhearVoice
 import dev.sam3vision.app.ihear.vm.NavigationHook
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import java.io.File
@@ -180,7 +181,11 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Les Réglages pilotent la sonde SAM (endpoint, voix, focale, distances). */
-    private fun syncProbe() = probe.configureFrom(settings)
+    /** Les Réglages pilotent la sonde SAM et la vitesse de lecture. */
+    private fun syncProbe() {
+        probe.configureFrom(settings)
+        player.speed = settings.ttsSpeed
+    }
 
     // ————— Gestes —————
 
@@ -290,7 +295,32 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             intro.disable()
             return
         }
+        if (runSpeedCommand(heard.text)) return
         handleDictated(heard.text, heard.audio)
+    }
+
+    /**
+     * Ordre vocal de vitesse (« vitesse 1,5 », « parle plus vite ») : réglage
+     * persisté, lecteur à jour, confirmation dite à la nouvelle vitesse.
+     * Vrai si [text] portait un ordre (la dictée ne part pas au LLM).
+     */
+    private fun runSpeedCommand(text: String): Boolean {
+        val speed = TtsSpeedCommand.parse(text, settings.ttsSpeed) ?: return false
+        settings = settings.copy(ttsSpeed = speed)
+        viewModelScope.launch { runCatching { prefs.save(settings) } }
+        player.speed = speed
+        val confirmation = TtsSpeedCommand.spoken(speed, settings.speechLanguage)
+        dropHeard(confirmation)
+        // Sans clé ElevenLabs, le texte reste affiché et la vitesse s'applique
+        // aux prochaines lectures : un ordre vocal n'échoue jamais à voix haute.
+        viewModelScope.launch {
+            val bytes = voice.synthesize(confirmation)
+            if (bytes.isNotEmpty()) {
+                update { it.copy(speakingEntryId = SPEED_BUBBLE_ID, status = confirmation) }
+                player.play(bytes)
+            }
+        }
+        return true
     }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */

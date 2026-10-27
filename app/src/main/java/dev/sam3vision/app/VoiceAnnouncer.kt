@@ -23,6 +23,7 @@ class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
     suspend fun say(settings: Settings, text: String) {
         val clean = text.trim()
         if (clean.isEmpty() || settings.ttsApiKey.isBlank()) return
+        player.speed = settings.ttsSpeed
         ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId).synthesize(clean).onSuccess { audio ->
             player.play(audio)
         }

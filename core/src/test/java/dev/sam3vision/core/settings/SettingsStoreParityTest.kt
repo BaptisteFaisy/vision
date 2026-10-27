@@ -24,6 +24,7 @@ class SettingsStoreParityTest {
         samBaseUrl = "https://sam.test/live",
         ttsApiKey = "cle-complete-tts",
         ttsVoiceId = "voix-complete",
+        ttsSpeed = 1.2f,
         ttsAutoplay = false,
         asrBaseUrl = "https://asr.test/v1",
         asrApiKey = "cle-complete-asr",

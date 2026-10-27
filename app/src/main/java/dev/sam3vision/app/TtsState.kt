@@ -68,3 +68,16 @@ fun sameSpeech(stored: String, candidate: String): Boolean = stored == candidate
 /** Complète l'ID de voix vide par le défaut ElevenLabs : jamais de champ vide persisté. */
 fun withTtsDefaults(settings: Settings): Settings =
     if (settings.ttsVoiceId.isBlank()) settings.copy(ttsVoiceId = Settings.DEFAULT_TTS_VOICE_ID) else settings
+
+/** Un cran de vitesse (±0,1), arrondi au dixième et borné 0,5..2 (pas de dérive flottante). */
+fun bumpTtsSpeed(current: Float, delta: Float): Float {
+    val rounded = kotlin.math.round((current + delta) * 10) / 10f
+    return Settings.clampTtsSpeed(rounded)
+}
+
+/** Vitesse affichée dans les Réglages (« ×1,9 », « ×2 »). */
+fun formatTtsSpeed(speed: Float): String {
+    val rounded = kotlin.math.round(Settings.clampTtsSpeed(speed) * 10) / 10f
+    val digits = if (rounded % 1 == 0f) rounded.toInt().toString() else rounded.toString()
+    return "×" + digits.replace('.', ',')
+}

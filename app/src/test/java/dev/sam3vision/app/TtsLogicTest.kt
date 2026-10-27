@@ -59,4 +59,25 @@ class TtsLogicTest {
         assertEquals(Settings.DEFAULT_TTS_VOICE_ID, withTtsDefaults(sansVoix).ttsVoiceId)
         assertEquals("voix-42", withTtsDefaults(sansVoix.copy(ttsVoiceId = "voix-42")).ttsVoiceId)
     }
+
+    @Test
+    fun `voix par defaut est Laure`() {
+        assertEquals(Settings.LAURE_VOICE_ID, Settings.Default.ttsVoiceId)
+        assertEquals("3b8fXc91YHS1i2DYAlBQ", Settings.DEFAULT_TTS_VOICE_ID)
+    }
+
+    @Test
+    fun `cran de vitesse borne sans derive flottante`() {
+        assertEquals(2.0f, bumpTtsSpeed(1.9f, 0.1f), 0.001f)
+        assertEquals(1.8f, bumpTtsSpeed(1.9f, -0.1f), 0.001f)
+        assertEquals(2.0f, bumpTtsSpeed(2.0f, 0.1f), 0.001f)
+        assertEquals(0.5f, bumpTtsSpeed(0.5f, -0.1f), 0.001f)
+    }
+
+    @Test
+    fun `vitesse affichee en francais`() {
+        assertEquals("×1,9", formatTtsSpeed(1.9f))
+        assertEquals("×2", formatTtsSpeed(2.0f))
+        assertEquals("×0,5", formatTtsSpeed(0.1f))
+    }
 }

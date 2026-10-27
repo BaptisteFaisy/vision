@@ -36,7 +36,7 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = withTtsDefaults(
-    seedAsr(seedLiveLlm(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build),
+    seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build),
 )
 
 /**
@@ -106,4 +106,14 @@ internal fun seedVoice(loaded: Settings, build: BuildDefaults): Settings {
         ttsApiKey = build.ttsApiKey,
         ttsVoiceId = loaded.ttsVoiceId.ifBlank { build.ttsVoiceId },
     )
+}
+
+/**
+ * Migration silencieuse : un réglage resté sur l'ancien défaut (Sarah) n'a jamais
+ * été choisi, on l'aligne sur la voix de **ce** build (ou Laure à défaut). Une voix
+ * saisie à la main n'est jamais touchée : seul l'ancien défaut est reconnu.
+ */
+internal fun migrateLegacyVoice(loaded: Settings, build: BuildDefaults): Settings {
+    if (loaded.ttsVoiceId != Settings.SARAH_VOICE_ID) return loaded
+    return loaded.copy(ttsVoiceId = build.ttsVoiceId.ifBlank { Settings.LAURE_VOICE_ID })
 }

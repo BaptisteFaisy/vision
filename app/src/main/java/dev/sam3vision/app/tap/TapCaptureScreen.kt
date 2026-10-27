@@ -156,13 +156,13 @@ private fun rememberTapDependencies(
 ): TapDependencies {
     val key = TapConfig.elevenLabsKey(settings)
     val voice = TapConfig.elevenLabsVoice(settings)
-    return remember(key, voice, context) {
-        val speech = SpeechPlayer(File(context.cacheDir, "tap-clips"))
+    return remember(key, voice, settings.ttsSpeed, context) {
+        val speech = SpeechPlayer(File(context.cacheDir, "tap-clips"), speed = settings.ttsSpeed)
         TapDependencies(
             scope = scope,
             video = TapVideoSession(context),
             announcements = AnnouncementPlayer(
-                dir = TapConfig.clipDir(context),
+                dir = TapConfig.clipDir(context, voice),
                 tts = ElevenLabsTtsClient(key, voice),
                 player = speech,
                 scope = scope,

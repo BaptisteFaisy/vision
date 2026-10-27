@@ -82,6 +82,11 @@ object TapConfig {
     /** Vrai si l'endpoint vidéo est joignable tel que configuré. */
     val sendConfigured: Boolean get() = !ON_DEVICE_INFERENCE && sam31Endpoint.isNotBlank()
 
-    /** Dossier privé des clips : `filesDir/announcements`, hors stockage partagé. */
-    fun clipDir(context: Context): File = File(context.filesDir, "announcements")
+    /**
+     * Dossier privé des clips, un par voix : un changement de voix (Sarah hier,
+     * Laure aujourd'hui) régénère les trois mots au lieu de rejouer l'ancienne voix
+     * jusqu'à la fin du TTL. Hors stockage partagé.
+     */
+    fun clipDir(context: Context, voiceId: String): File =
+        File(context.filesDir, "announcements-${voiceId.take(8).ifBlank { "defaut" }}")
 }
