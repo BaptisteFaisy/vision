@@ -97,13 +97,41 @@ class AppDiagnosticsTest {
     }
 
     @Test
-    fun `warmGpu en echec — silence, aucun verdict`() = runTest {
+    fun `warmGpu en echec — 3 essais puis silence, aucun verdict`() = runTest {
         val sam = FakeSam(onHealth = Result.failure(ApiError.Network("réseau")))
         val before = screen.value.statusLine
 
         diagnostics(sam = sam).warmGpu()
 
-        assertEquals(1, sam.healthCalls)
+        assertEquals("3 essais bornés", 3, sam.healthCalls)
+        assertEquals(before, screen.value.statusLine)
+    }
+
+    @Test
+    fun `warmGpu — succes au 2e essai, arret immediat`() = runTest {
+        val sam = FakeSam(
+            onHealthSeq = listOf(
+                Result.failure(ApiError.Network("trou de réseau")),
+                Result.success(true),
+                Result.success(true),
+            ),
+        )
+        val before = screen.value.statusLine
+
+        diagnostics(sam = sam).warmGpu()
+
+        assertEquals("arrêt au premier succès", 2, sam.healthCalls)
+        assertEquals(before, screen.value.statusLine)
+    }
+
+    @Test
+    fun `warmGpu — backend arrete, aucune nouvelle tentative`() = runTest {
+        val sam = FakeSam(onHealth = Result.failure(ApiError.BackendStopped()))
+        val before = screen.value.statusLine
+
+        diagnostics(sam = sam).warmGpu()
+
+        assertEquals("inutile de réessayer, il faut redéployer", 1, sam.healthCalls)
         assertEquals(before, screen.value.statusLine)
     }
 
