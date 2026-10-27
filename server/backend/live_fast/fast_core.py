@@ -58,11 +58,11 @@ RUNTIME_EDGE = env_bool(os.environ.get("FAST_EDGE_RUNTIME"))
 COMPILE = env_bool(os.environ.get("FAST_COMPILE"))
 CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
 # Graphe CUDA de la passe DETR (voir `detr_graph.py`) : le vision est déjà graphé, DETR
-# est le dernier gros poste (~55 ms mesurés le 25/10 pour ~1,5 ms de calcul).
+# est le dernier gros poste (~55 ms mesurés le 25 octobre pour ~1,5 ms de calcul).
 DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
 # Implémentation d'attention du modèle (`sdpa` par défaut dans transformers, `eager` dans
 # certaines versions). L'attention eager materialise la matrice complète : c'est elle qui
-# mange les ~55 ms du poste `detr_ms` (mesuré le 25/10). Levier : FAST_ATTN=sdpa.
+# mange les ~55 ms du poste `detr_ms` (mesuré le 25 octobre). Levier : FAST_ATTN=sdpa.
 ATTN_IMPL = os.environ.get("FAST_ATTN") or ""
 
 

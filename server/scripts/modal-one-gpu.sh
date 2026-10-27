@@ -8,7 +8,7 @@
 #
 # Déploiement du direct : scripts/deploy-live-fast.sh (jamais backend/live_app.py).
 #
-# Défaut corrigé le 2026-10-24 : l'ancien défaut (KEEP=sam3-live-b200) arrêtait
+# Défaut corrigé le 24 octobre 2026 : l'ancien défaut (KEEP=sam3-live-b200) arrêtait
 # silencieusement l'app live du téléphone (sam3-eu-a100) — incident de 22:21.
 set -euo pipefail
 
