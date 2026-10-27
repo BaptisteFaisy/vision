@@ -7,11 +7,10 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
-import dev.sam3vision.app.DistanceLayer
+import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.MASK_ALPHA
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
-import dev.sam3vision.app.TRANSPORT_WS_KO
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
@@ -27,7 +26,6 @@ import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
@@ -122,6 +120,9 @@ class LiveProbe(
 
     /** Un réveil `/health` est en cours (un seul à la fois). */
     private var warming = false
+
+    /** Premier plan : en arrière-plan les frames sont jetées (la carte reste éteinte). */
+    private val foregroundGate = ForegroundTracker()
 
     /**
      * Change d'endpoint, de focale ou de voix (Réglages) : nouvelle session, masques et
@@ -230,6 +231,14 @@ class LiveProbe(
 
     fun toggleDebug() = _state.update { it.copy(debugVisible = !it.debugVisible) }
 
+    /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
+    fun onBackground() = foregroundGate.onBackground(running = false)
+
+    /** Retour au premier plan : la frame suivante repart (l'enregistrement continue). */
+    fun onForeground() {
+        foregroundGate.onForeground()
+    }
+
     /**
      * Frame encodée en réserve (**une seule**) : elle est convertie **pendant** que la
      * requête précédente est en vol, puis part dès que le créneau se libère.
@@ -253,6 +262,7 @@ class LiveProbe(
      * et on prépare la suivante. Un seul buffer : au-delà, l'encodage serait du gâchis.
      */
     fun wantsFrame(): Boolean {
+        if (!foregroundGate.foreground) return false
         val active = (if (warmed) session else coldSession) ?: return false
         // Réserve pleine : convertir une image de plus serait du CPU jeté.
         if (reserve.pending) return false
@@ -270,7 +280,7 @@ class LiveProbe(
      * monotones) : c'est lui qui rend la latence per\u00e7ue mesurable de bout en bout.
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
-        if (jpegB64.isBlank()) return
+        if (!foregroundGate.foreground || jpegB64.isBlank()) return
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -336,7 +346,7 @@ class LiveProbe(
             // restent les derniers connus, seul le message d'erreur change.
             val error = result.exceptionOrNull() ?: ApiError.BadResponse("échec de l'appel SAM")
             android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
-            _state.update { it.copy(error = failureText(error), timings = shown.snapshot()) }
+            _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
             return
         }
         if (_state.value.frames == 0) {
@@ -366,13 +376,13 @@ class LiveProbe(
         active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
         val overlays = overlaysFor(frame, shown)
-        val readings = readingsOf(frame)
+        val readings = probeReadings(distances, frame)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
         val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(frame, readings, at)
         _state.update { current ->
             current.copy(
                 masks = overlays,
-                labels = labelsOf(frame),
+                labels = probeLabels(labels, frame),
                 objects = frame.objects.size,
                 latencyMs = active.stats.averageMs,
                 p95Ms = active.stats.p95Ms,
@@ -382,10 +392,10 @@ class LiveProbe(
                 height = frame.height,
                 frames = current.frames + 1,
                 fps = rate.rate,
-                distanceLayer = distanceLayerOf(frame, readings),
+                distanceLayer = probeDistanceLayer(frame, readings),
                 spoken = phrase ?: current.spoken,
                 crossing = cross?.state ?: current.crossing,
-                transport = transportLabel(active),
+                transport = probeTransportLabel(active),
                 error = null,
             )
         }
@@ -401,25 +411,6 @@ class LiveProbe(
         _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
     }
 
-    /** Étiquettes de la frame, sans doublon (ensemble réutilisé, voir [FrameLabels]). */
-    private fun labelsOf(frame: LiveFrame): List<String> = labels.of(frame.objects)
-
-    /** Libellé de transport : ce que le socket fait vraiment, pas ce qu'on voudrait. */
-    private fun transportLabel(active: LiveSession): String =
-        if (active.socketOpen) TRANSPORT_WS else TRANSPORT_WS_KO
-
-    /** Distances de la frame (sténopé) ; aucun journal de suivi ici : mesure brute. */
-    private fun readingsOf(frame: LiveFrame): List<DistanceReading> {
-        if (frame.width <= 0 || frame.height <= 0) return emptyList()
-        val detections = frame.objects.toDetections(frame.width, frame.height)
-        if (detections.isEmpty()) return emptyList()
-        return distances.measure(frame.width, frame.height, detections)
-    }
-
-    /** Couche des pastilles ; `null` quand aucune distance n'est exploitable. */
-    private fun distanceLayerOf(frame: LiveFrame, readings: List<DistanceReading>): DistanceLayer? =
-        if (readings.isEmpty() || frame.width <= 0 || frame.height <= 0) null
-        else DistanceLayer(frame.width, frame.height, readings)
 
     /**
      * Phrase à dire, ou `null` pour rester muet : bascules des Réglages coupées, ou scène
@@ -432,14 +423,6 @@ class LiveProbe(
         if (!announcePositions) return null
         return announcer.onFrame(at, placed, speechLanguage)
     }
-
-    /**
-     * Message d'échec lisible. Un délai dépassé au premier appel = conteneur Modal
-     * endormi (~30 s de réveil) : on le dit, et la frame suivante réessaie d'elle-même.
-     */
-    private fun failureText(error: Throwable): String =
-        if (error is ApiError.Timeout) "réveil du GPU en cours… (nouvel essai à la frame suivante)"
-        else error.message ?: "échec de l'appel SAM"
 
     /**
      * Masques colorisés de la frame, calculés hors du thread principal : décodage selon
