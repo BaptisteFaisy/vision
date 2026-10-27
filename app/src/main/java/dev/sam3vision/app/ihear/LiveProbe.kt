@@ -3,6 +3,7 @@ package dev.sam3vision.app.ihear
 import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
+import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
@@ -96,6 +97,8 @@ class LiveProbe(
 
     /** Déclencheur des consignes de guidage : même rythme, mais le danger parle aussitôt. */
     private val guidance = GuidanceAnnouncer()
+    /** Déclencheur du mode Traversée : vert confirmé, rouge vite, doute une fois. */
+    private val crossing = CrossingAnnouncer()
 
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
     private val chronology = ScreenTimings(clock)
@@ -133,6 +136,7 @@ class LiveProbe(
         distancesOn: Boolean = true,
         maxObjects: Int = 0,
         language: SpeechLanguage = SpeechLanguage.Fr,
+        crossingActive: Boolean = false,
     ) {
         val clean = baseUrl.trim()
         session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
@@ -152,6 +156,7 @@ class LiveProbe(
         rate.reset()
         announcer.reset()
         guidance.reset()
+        crossing.reset()
         _state.update {
             LiveProbeState(
                 endpoint = clean,
@@ -160,6 +165,7 @@ class LiveProbe(
                 transport = TRANSPORT_WS,
                 debugVisible = it.debugVisible,
                 error = if (clean.isBlank()) "aucun endpoint (Réglages)" else null,
+                crossingActive = crossingActive,
             )
         }
         if (clean.isNotBlank()) markWarming()
@@ -192,6 +198,7 @@ class LiveProbe(
         distances.reset()
         announcer.reset()
         guidance.reset()
+        crossing.reset()
         nextTickAt = 0L
         reserve.clear()
         chronology.reset()
@@ -201,6 +208,7 @@ class LiveProbe(
                 gpu = it.gpu,
                 conceptsSent = it.conceptsSent,
                 debugVisible = it.debugVisible,
+                crossingActive = it.crossingActive,
             )
         }
         markWarming()
@@ -215,6 +223,7 @@ class LiveProbe(
                 gpu = it.gpu,
                 conceptsSent = it.conceptsSent,
                 debugVisible = it.debugVisible,
+                crossingActive = it.crossingActive,
             )
         }
     }
@@ -336,7 +345,7 @@ class LiveProbe(
                 "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms",
             )
         }
-        publish(active, frame, at, shown)
+        publish(active, frame, jpegB64, at, shown)
     }
 
     /** Première frame aboutie : le conteneur est chaud, la session froide a fait son travail. */
@@ -354,11 +363,12 @@ class LiveProbe(
 
     /** Publie une frame analysée : masques recolorés, objets, distances, cadence et latences. */
     private suspend fun publish(
-        active: LiveSession, frame: LiveFrame, at: Long, shown: LiveTimings,
+        active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
         val overlays = overlaysFor(frame, shown)
         val readings = readingsOf(frame)
-        val phrase = phraseOf(frame, readings, at)
+        val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
+        val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(frame, readings, at)
         _state.update { current ->
             current.copy(
                 masks = overlays,
@@ -374,6 +384,7 @@ class LiveProbe(
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
+                crossing = cross?.state ?: current.crossing,
                 transport = transportLabel(active),
                 error = null,
             )
