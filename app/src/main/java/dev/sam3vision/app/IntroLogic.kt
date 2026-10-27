@@ -1,9 +1,11 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.distance.KnownSizes
+
 /**
  * Logique pure de l'intro vocale (hors Compose) : libellé de la bascule, visibilité
- * de la bulle du chat et phrase de coupe « Disable iSee intro ». Testée en JVM
- * (`app.UiLogicTest`).
+ * de la bulle du chat et phrases de coupe (« Disable iSee intro » en anglais,
+ * « Désactive iSee intro » en français). Testée en JVM (`app.UiLogicTest`).
  */
 
 /** Libellé de la bascule « intro » des Réglages. */
@@ -30,10 +32,23 @@ val IHEAR_INTRO_TEXT = "Welcome to iSee. To record your surroundings, tap anywhe
 fun introBubbleVisible(settingsReady: Boolean, introEnabled: Boolean): Boolean =
     settingsReady && introEnabled
 
+/** Verbes de coupe reconnus (forme canonique, sans accent : voir [KnownSizes.canonical]). */
+private val INTRO_VERBS = setOf("disable", "desactive", "desactiver")
+
 /**
- * Vrai si la dictée demande la coupe de l'intro (« Disable iSee intro », sans casse).
- * La reconnaissance vocale écrit « iSee » en deux mots (« I see ») ou colle la
- * ponctuation : on compare donc sans espaces ni ponctuation.
+ * Vrai si la dictée demande la coupe de l'intro : « Disable iSee intro » en
+ * anglais, « Désactive iSee intro » en français (l'interface est en français).
+ * La reconnaissance vocale écrit « iSee » en deux mots (« I see »), garde
+ * l'accent de « désactive » et colle la ponctuation : la comparaison passe
+ * par la forme canonique (minuscules, sans accents ni ponctuation) et exige
+ * un verbe de coupe **et** la mention « iSee intro » — une question sur
+ * l'intro (« Que dit l'intro iSee ? ») ne coupe donc rien.
  */
-fun isIntroDisablePhrase(text: String): Boolean =
-    text.lowercase().filter { it.isLetterOrDigit() }.contains("disableiseeintro")
+fun isIntroDisablePhrase(text: String): Boolean {
+    val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+    val introMention = words.indices.any { i ->
+        (words[i] == "isee" && words.getOrNull(i + 1) == "intro") ||
+            (words[i] == "i" && words.getOrNull(i + 1) == "see" && words.getOrNull(i + 2) == "intro")
+    }
+    return introMention && words.any { it in INTRO_VERBS }
+}

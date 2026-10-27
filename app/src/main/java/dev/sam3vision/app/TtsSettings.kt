@@ -103,7 +103,7 @@ private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     Text(
         "Intro embarquée (voix Jade US, hors ligne) : jouée une seule fois à la première " +
             "ouverture, comme premier message du chat. On la coupe à l'appui long en " +
-            "dictant : « Disable iSee intro ».",
+            "dictant : « Désactive iSee intro » (ou « Disable iSee intro »).",
         color = AppColors.textMuted,
         fontSize = 11.sp,
     )
