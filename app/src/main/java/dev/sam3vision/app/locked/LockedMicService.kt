@@ -13,6 +13,7 @@ import dev.sam3vision.app.VoiceAnnouncer
 import dev.sam3vision.app.llmClient
 import dev.sam3vision.app.seededFromBuild
 import dev.sam3vision.app.speechClient
+import dev.sam3vision.app.tap.hasAudioPermission
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -63,27 +64,45 @@ class LockedMicService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            // Même si le service était mort, le geste le remet debout avant d'agir : un
-            // PendingIntent de notification réveille le service, et armer juste après évite
-            // le cas « la notification ne répond plus » (processus tué entre deux).
-            LockedMicBridge.ACTION_TOGGLE -> {
-                arm()
-                toggle()
-            }
-            LockedMicBridge.ACTION_STOP -> stopEverything()
-            else -> arm()
+        // Même si le service était mort, le geste le remet debout avant d'agir : un
+        // PendingIntent de notification réveille le service, et armer juste après évite
+        // le cas « la notification ne répond plus » (processus tué entre deux).
+        val gesture = intent?.action == LockedMicBridge.ACTION_TOGGLE
+        if (intent?.action == LockedMicBridge.ACTION_STOP) {
+            stopEverything()
+            return START_NOT_STICKY
         }
-        // Le système relance un service de premier plan tué : il se ré-arme seul (`intent` nul).
+        // Armer peut être illégal (Android 14+ refuse le type `microphone` à une app en
+        // arrière-plan : relance système après kill, geste reçu processus mort). On le dit
+        // et on s'arrête — jamais un FATAL.
+        if (!arm()) {
+            giveUp(if (gesture) UNAVAILABLE else OPEN_ISEE)
+            return START_NOT_STICKY
+        }
+        if (gesture) toggle()
         return START_STICKY
     }
 
-    /** Arme le service : premier plan + notification « prêt ». Aucun micro ouvert. */
+    /**
+     * Arme le service : premier plan + notification « prêt ». Aucun micro ouvert.
+     *
+     * Rend `false` sans tuer le processus quand l'armement est refusé (permission micro
+     * absente, ou premier plan `microphone` interdit à une app en arrière-plan sur Android
+     * 14+) : l'appelant décide de la dégradation via [giveUp].
+     */
     @Synchronized
-    private fun arm() {
+    private fun arm(): Boolean {
+        if (!hasAudioPermission(this)) return false
         if (state.phase == LockedMicPhase.OFF) publish(state.armed())
-        startForegroundNow()
-        Log.i(TAG, "armé (${state.phase})")
+        return enterForeground()
+    }
+
+    /** Dégradation honnête : l'état dit pourquoi, la notification tombe, le service s'arrête. */
+    private fun giveUp(reason: String) {
+        Log.w(TAG, "armement refusé : $reason")
+        publish(state.failed(reason))
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     /** Le geste unique : fermé → écoute ; en écoute → envoie. */
@@ -199,15 +218,22 @@ class LockedMicService : Service() {
         LockedMicNotifications.show(this, next)
     }
 
-    /** Le premier plan, avec le type `microphone` : sans lui, Android couperait le micro. */
-    private fun startForegroundNow() {
+    /**
+     * Le premier plan, avec le type `microphone` : sans lui, Android couperait le micro.
+     *
+     * Rend `false` au lieu de lever (`SecurityException` « while-in-use » sur Android 14+
+     * quand l'app est en arrière-plan) : une seule implémentation du try/catch, ici.
+     */
+    private fun enterForeground(): Boolean = runCatching {
         ServiceCompat.startForeground(
             this,
             LockedMicNotifications.NOTIFICATION_ID,
             LockedMicNotifications.build(this, state),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
         )
-    }
+    }.onFailure {
+        Log.w(TAG, "premier plan refusé : ${it.javaClass.simpleName} — ${it.message}")
+    }.isSuccess
 
     /** Réveil partiel **pendant la capture seulement** : l'écran est éteint, la CPU dort. */
     private fun holdWakeLock() {
@@ -243,6 +269,10 @@ class LockedMicService : Service() {
         const val WAKE_MARGIN_MS = 120_000L
 
         const val WAKE_TAG = "iSee:microVerrouille"
+
+        /** Motifs de dégradation : lisibles dans la tuile et dans logcat. */
+        const val UNAVAILABLE = "micro verrouillé indisponible"
+        const val OPEN_ISEE = "ouvre iSee pour armer le micro"
 
         /** Étiquette des traces : `adb logcat -s LockedMic`. */
         const val TAG = "LockedMic"
