@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.ihear.IhearViewModel
+import dev.sam3vision.app.locked.LockedMicBridge
 
 private val SamColorScheme = darkColorScheme(
     primary = AppColors.primary,
@@ -122,6 +123,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ihear.onForeground()
+        // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
+        // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
+        LockedMicBridge.arm(this)
     }
 
     /**
@@ -135,6 +139,8 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) viewModel.releaseGpu()
         if (!isChangingConfigurations) ihear.onAppClosed()
         if (isFinishing) glasses.close()
+        // App fermée pour de bon : le service du micro verrouillé n'a plus de raison de vivre.
+        if (isFinishing) LockedMicBridge.disarm(this)
         super.onDestroy()
     }
 }
