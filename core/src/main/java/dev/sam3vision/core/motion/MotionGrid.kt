@@ -81,8 +81,68 @@ internal class MotionGrids {
     }
 }
 
-/** Un candidat d'alignement : translation en cellules de grille, échelle en millièmes. */
-internal data class Fit(val dx: Int, val dy: Int, val scalePermille: Int, val cost: Long)
+/**
+ * Meilleur candidat d'alignement : translation en cellules de grille, échelle en millièmes.
+ *
+ * Objet **mutable, réutilisé** d'une frame à l'autre (un par niveau, porté par
+ * [BlockMotionSource]) : un `data class` rendu par la recherche allouerait un candidat par
+ * translation essayée — 126 par frame — et le banc verrait cette allocation sur le chemin chaud.
+ */
+internal class Fit {
+    var dx: Int = 0
+        private set
+    var dy: Int = 0
+        private set
+    var scalePermille: Int = 0
+        private set
+    var cost: Long = NO_COST
+        private set
+
+    /** Oublie le candidat précédent : à appeler avant chaque recherche. */
+    fun reset() {
+        dx = 0
+        dy = 0
+        scalePermille = 0
+        cost = NO_COST
+    }
+
+    /** Retient le candidat s'il coûte **strictement** moins que le meilleur courant. */
+    fun offer(dx: Int, dy: Int, scalePermille: Int, cost: Long) {
+        if (cost == NO_COST || cost >= this.cost) return
+        this.dx = dx
+        this.dy = dy
+        this.scalePermille = scalePermille
+        this.cost = cost
+    }
+}
+
+/** Meilleure translation entière autour de ([centerDx], [centerDy]), rayon [radius] cellules. */
+internal fun Fit.translation(
+    ref: MotionGrid,
+    cur: MotionGrid,
+    centerDx: Int,
+    centerDy: Int,
+    radius: Int,
+    scalePermille: Int,
+) {
+    for (dy in centerDy - radius..centerDy + radius) {
+        for (dx in centerDx - radius..centerDx + radius) {
+            offer(dx, dy, scalePermille, alignmentCost(ref, cur, dx, dy, scalePermille))
+        }
+    }
+}
+
+/** Meilleure translation + échelle : chaque échelle de [scales], autour du centre. */
+internal fun Fit.withScales(
+    ref: MotionGrid,
+    cur: MotionGrid,
+    centerDx: Int,
+    centerDy: Int,
+    radius: Int,
+    scales: IntArray,
+) {
+    for (scale in scales) translation(ref, cur, centerDx, centerDy, radius, scale)
+}
 
 /**
  * Coût d'alignement de [ref] sur [cur] pour ([dx], [dy], [scalePermille]), en millièmes de

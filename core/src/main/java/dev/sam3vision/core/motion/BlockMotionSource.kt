@@ -41,6 +41,10 @@ class BlockMotionSource(
 
     private val grids = MotionGrids()
 
+    /** État des deux recherches, réutilisé : une estimation ne doit rien allouer. */
+    private val coarse = Fit()
+    private val fine = Fit()
+
     init {
         require(coarseStride > 0 && fineStride > 0) { "pas de grille invalide" }
         require(coarseStride % fineStride == 0) { "la grille grossière doit être un multiple de la fine" }
@@ -52,8 +56,8 @@ class BlockMotionSource(
         val staticCost = alignmentCost(grids.refFine, grids.curFine, 0, 0, NEUTRAL_SCALE)
         if (staticCost == NO_COST) return null
         if (staticCost == 0L) return MotionSample.Zero
-        val coarse = coarseFit() ?: return null
-        val fine = fineFit(coarse) ?: return null
+        if (!coarseFit()) return null
+        if (!fineFit()) return null
         val gain = confidence(staticCost, fine.cost)
         if (gain < trustMin) return null
         return MotionSample(
@@ -64,18 +68,24 @@ class BlockMotionSource(
         )
     }
 
-    /** Niveau grossier : translation seule, échelle neutre, sur la grille grossière. */
-    private fun coarseFit(): Fit? {
-        val ref = grids.refCoarse
-        val cur = grids.curCoarse
-        if (alignmentCost(ref, cur, 0, 0, NEUTRAL_SCALE) == NO_COST) return null
-        return bestTranslation(ref, cur, 0, 0, coarseSearchCells, NEUTRAL_SCALE)
+    /**
+     * Niveau grossier : translation seule, échelle neutre, sur la grille grossière.
+     * `false` si aucun candidat n'a assez de points alignés.
+     */
+    private fun coarseFit(): Boolean {
+        coarse.reset()
+        coarse.translation(grids.refCoarse, grids.curCoarse, 0, 0, coarseSearchCells, NEUTRAL_SCALE)
+        return coarse.cost != NO_COST
     }
 
-    /** Niveau fin : translation ±1 cellule de la grille fine, à chaque échelle essayée. */
-    private fun fineFit(coarse: Fit): Fit? {
+    /**
+     * Niveau fin : translation ±1 cellule de la grille fine, à chaque échelle essayée.
+     * `false` si aucun candidat n'a assez de points alignés.
+     */
+    private fun fineFit(): Boolean {
         val ratio = coarseStride / fineStride
-        return bestWithScales(
+        fine.reset()
+        fine.withScales(
             grids.refFine,
             grids.curFine,
             coarse.dx * ratio,
@@ -83,6 +93,7 @@ class BlockMotionSource(
             1,
             scalesPermille,
         )
+        return fine.cost != NO_COST
     }
 
     companion object {
@@ -104,42 +115,6 @@ class BlockMotionSource(
         /** Échelle neutre : « rien n'a changé ». */
         internal const val NEUTRAL_SCALE = 1000
     }
-}
-
-/** Meilleure translation entière autour de ([centerDx], [centerDy]), rayon [radius] cellules. */
-private fun bestTranslation(
-    ref: MotionGrid,
-    cur: MotionGrid,
-    centerDx: Int,
-    centerDy: Int,
-    radius: Int,
-    scalePermille: Int,
-): Fit? {
-    var best: Fit? = null
-    for (dy in centerDy - radius..centerDy + radius) {
-        for (dx in centerDx - radius..centerDx + radius) {
-            val cost = alignmentCost(ref, cur, dx, dy, scalePermille)
-            if (cost != NO_COST && cost < (best?.cost ?: NO_COST)) best = Fit(dx, dy, scalePermille, cost)
-        }
-    }
-    return best
-}
-
-/** Meilleure translation + échelle : chaque échelle de [scales], translation autour du centre. */
-private fun bestWithScales(
-    ref: MotionGrid,
-    cur: MotionGrid,
-    centerDx: Int,
-    centerDy: Int,
-    radius: Int,
-    scales: IntArray,
-): Fit? {
-    var best: Fit? = null
-    for (scale in scales) {
-        val fit = bestTranslation(ref, cur, centerDx, centerDy, radius, scale) ?: continue
-        if (fit.cost < (best?.cost ?: NO_COST)) best = fit
-    }
-    return best
 }
 
 /** Gain de l'alignement retenu sur l'immobile, dans [0, 1] — même formule que `Shift`. */
