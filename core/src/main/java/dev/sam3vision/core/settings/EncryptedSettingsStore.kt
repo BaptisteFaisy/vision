@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,9 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
+            depthBackend = DepthBackend.fromName(
+                prefs.getString(KEY_DEPTH_BACKEND, default.depthBackend.name),
+            ),
         ).let { readShareSettings(prefs, it) }
     }
 
@@ -101,6 +105,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putString(KEY_SHARE_WRITE_KEY, s.shareWriteKey)
             .putString(KEY_CAREGIVER_INVITE, s.caregiverInvite)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
+            .putString(KEY_DEPTH_BACKEND, s.depthBackend.name)
             .apply()
     }
 
@@ -137,6 +142,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_SHARE_ID = "share_id"
         const val KEY_SHARE_WRITE_KEY = "share_write_key"
         const val KEY_CAREGIVER_INVITE = "caregiver_invite"
+        const val KEY_DEPTH_BACKEND = "depth_backend"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */
         internal fun createPrefs(context: Context): SharedPreferences {
