@@ -48,7 +48,7 @@ class Waveform(
     }
 }
 
-/** Les motifs de l'app, en `:core` : testables en JVM, partagés par les deux gestes. */
+/** Les motifs de l'app, en `:core` : testables en JVM, partagés par les gestes. */
 object HapticPattern {
     /** Salve de l'appui long : franche, deux temps forts séparés d'un creux. */
     const val HOLD_MS = 70L
@@ -59,11 +59,6 @@ object HapticPattern {
     const val LOOP_MS = 300L
     const val LOOP_OFF_MS = 60L
     const val LIGHT_AMPLITUDE = 80
-
-    /** Créneau du balayage vertical : léger et court, il marque chaque marche. */
-    const val SWIPE_MS = 30L
-    const val SWIPE_OFF_MS = 60L
-    const val SWIPE_AMPLITUDE = 96
 
     /** Queue du relâchement : la tension retombe, elle ne s'arrête pas net. */
     const val TAIL_MS = 200L
@@ -90,17 +85,6 @@ object HapticPattern {
         amplitude: Int = TAIL_AMPLITUDE,
         ms: Long = TAIL_MS,
     ): Waveform = Waveform(timings = listOf(ms), amplitudes = listOf(amplitude))
-
-    /** Balayage vertical : créneau marche/creux répété tant que le doigt glisse. */
-    fun swipeCrest(
-        amplitude: Int = SWIPE_AMPLITUDE,
-        onMs: Long = SWIPE_MS,
-        offMs: Long = SWIPE_OFF_MS,
-    ): Waveform = Waveform(
-        timings = listOf(0L, onMs, offMs),
-        amplitudes = listOf(0, amplitude, 0),
-        repeatIndex = 1,
-    )
 
     /** Traversée : le vert se sent — deux salves franches, « vas-y ». */
     const val CROSSING_GREEN_MS = 90L

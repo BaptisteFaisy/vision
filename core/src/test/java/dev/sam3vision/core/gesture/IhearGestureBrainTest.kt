@@ -41,10 +41,6 @@ class IhearGestureBrainTest {
             }
 
             override fun onHorizontalSwipe(rightToLeft: Boolean) = Unit
-
-            override fun onVerticalDrag(downward: Boolean) = Unit
-
-            override fun onVerticalSwipe(committed: Boolean, downward: Boolean) = Unit
         }
     }
 

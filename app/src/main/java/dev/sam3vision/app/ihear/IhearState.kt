@@ -34,78 +34,24 @@ data class IhearUiState(
     /** Pastilles de distance posées sur cette photo ; `null` = rien de mesurable. */
     val distanceLayer: DistanceLayer? = null,
 
-    /** Bulle sélectionnée : index dans les bulles affichées, intro comprise (`0` = l'intro). */
+    /** Bulle affichée : index dans les bulles affichées, intro comprise (`0` = l'intro).
+     * Il est toujours posé sur la dernière bulle : il n'y a plus de navigation. */
     val selected: Int = INTRO_SELECTION,
-    val firstSwipeDownDone: Boolean = false,
     val holding: Boolean = false,
     val transcribing: Boolean = false,
     val thinking: Boolean = false,
     val speakingEntryId: Long? = null,
     val recordingVideo: Boolean = false,
     val status: String? = null,
-) {
-    /** Vrai sur la dernière bulle du chat (l'intro seule compte comme dernière). */
-    val lastSelected: Boolean get() = selected >= entries.size
-}
+)
 
-// ————— Geste vertical : une marche de bulle par geste —————
-
-/** Décision d'une marche verticale du chat (pure, testable JVM). */
-sealed interface SwipeStep {
-    /** La sélection change de bulle (index dans les bulles affichées, intro comprise). */
-    data class Move(val selected: Int) : SwipeStep
-
-    /** La sélection ne quitte pas la dernière bulle : elle est relue ; la première
-     * marche descendante se mémorise ([IhearUiState.firstSwipeDownDone]). */
-    data class Replay(val firstSwipeDownDone: Boolean) : SwipeStep
-
-    /** Rien à faire : on est déjà au bord demandé. */
-    object NoMove : SwipeStep
-}
-
-/** Un geste = une marche de bulle, appliquée dès le début du glissement (pas au
- * relâchement) : vers le bas on remonte vers les bulles plus anciennes, vers le
- * haut on descend vers les plus récentes. La première marche vers le bas sur la
- * dernière bulle ne la quitte pas : elle la relit (marche de découverte).
- *
- * [bubbleCount] compte **toutes** les bulles affichées, intro comprise : la marche
- * vers le bas depuis le premier échange atteint donc l'intro, qui reste relisible. */
-fun swipeStep(
-    bubbleCount: Int,
-    selected: Int,
-    firstSwipeDownDone: Boolean,
-    downward: Boolean,
-): SwipeStep {
-    val lastIndex = bubbleCount - 1
-    return if (downward) {
-        when {
-            !firstSwipeDownDone && selected >= lastIndex -> SwipeStep.Replay(firstSwipeDownDone = true)
-            selected > INTRO_SELECTION -> SwipeStep.Move(selected - 1)
-            else -> SwipeStep.NoMove
-        }
-    } else {
-        if (selected < lastIndex) SwipeStep.Move(selected + 1) else SwipeStep.NoMove
-    }
-}
-
-/**
- * Une seule bulle (ou aucune) : aucun changement de bulle n'est possible —
- * le balayage ne vibre pas, il relit juste la bulle unique.
- */
-fun hasBubbleChoice(entriesSize: Int): Boolean = entriesSize > 1
+// ————— Sélection : toujours la dernière bulle (aucune navigation entre messages) —————
 
 /**
  * Bulles à l'écran : l'historique plus l'intro, toujours première et jamais
  * retirée (seul son audio se coupe par la voix).
  */
 fun bubbleCount(entriesSize: Int): Int = entriesSize + 1
-
-/**
- * Index dans [IhearUiState.entries] de la bulle sélectionnée, `null` quand la
- * sélection est l'intro (ou hors des bulles affichées).
- */
-fun selectedEntryIndex(selected: Int, entriesSize: Int): Int? =
-    (selected - 1).takeIf { it in 0 until entriesSize }
 
 /**
  * Défilement à jouer pour que la bulle `[top, bottom]` (pixels écran) soit entière
@@ -156,7 +102,7 @@ private val AUDIO_MARKER = Regex("\\[[^\\]]*]").toPattern()
  * Vrai si le texte vaut la peine d'être synthétisé : une fois les marqueurs audio
  * retirés, il reste au moins une lettre ou un chiffre. ElevenLabs retire lui aussi ces
  * marqueurs et répond 400 « empty text » sur une transcription qui n'en contient que
- * (mesuré sur le téléphone : « Voice: erreur HTTP 400 » après un swipe).
+ * (mesuré sur le téléphone : « Voice: erreur HTTP 400 »).
  */
 fun speakableText(text: String): Boolean =
     AUDIO_MARKER.matcher(text).replaceAll(" ").any { it.isLetterOrDigit() }

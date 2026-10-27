@@ -45,9 +45,9 @@ private val SamColorScheme = darkColorScheme(
  *
  * La racine n'est pas le ComposeView mais [IhearRootLayout] : elle voit chaque geste
  * de la surface de l'app — appui long (micro maintenu, transcription Muse), tap
- * simple (vidéo), double tap (photo), balayages horizontal (page) et vertical
- * (sélection de bulle, avec haptique dédiée). Les gestes ne s'appliquent que quand
- * les panneaux iSee sont à l'écran.
+ * simple (vidéo), double tap (photo), balayage horizontal (reconnu, sans effet).
+ * Le balayage vertical (sélection de bulle) a été supprimé. Les gestes ne s'appliquent
+ * que quand les panneaux iSee sont à l'écran.
  */
 class MainActivity : ComponentActivity() {
 
@@ -145,9 +145,6 @@ class MainActivity : ComponentActivity() {
         onHoldCancel = ihear::onHoldCancel
         onSingleTap = ihear::onSingleTap
         onDoubleTap = ihear::onDoubleTap
-        onVerticalDragStart = ihear::onVerticalDragStart
-        onVerticalDragMove = { downward -> ihear.onVerticalDragMove(downward) }
-        onVerticalSwipeEnd = { committed, downward -> ihear.onVerticalSwipeEnd(committed, downward) }
         addView(
             ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, ihear, glasses) } },
             MATCH_PARENT,

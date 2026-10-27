@@ -86,9 +86,6 @@ class MediaCacheStore internal constructor(
     fun replyAudioFile(row: MessageMultimedia): File? =
         row.cheminAudioElevenLabs?.let { File(it).takeIf { f -> f.isFile } }
 
-    /** Historique complet en mémoire (le cache Room peut avoir été purgé). */
-    suspend fun history(): List<MessageMultimedia> = dao.all()
-
     suspend fun deleteMessage(row: MessageMultimedia) {
         dao.deleteById(row.id)
     }

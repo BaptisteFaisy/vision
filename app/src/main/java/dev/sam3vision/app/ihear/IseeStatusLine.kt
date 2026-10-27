@@ -74,8 +74,6 @@ private fun InstructionPill(modifier: Modifier = Modifier) {
             withStyle(soft) { append(" see") }
             withStyle(strong) { append("   Hold") }
             withStyle(soft) { append(" ask") }
-            withStyle(strong) { append("   Swipe") }
-            withStyle(soft) { append(" remember") }
         },
         color = IseeSceneColors.instructStrong,
         fontSize = 13.sp,

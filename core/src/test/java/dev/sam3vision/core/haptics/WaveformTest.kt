@@ -44,29 +44,11 @@ class WaveformTest {
     }
 
     @Test
-    fun `le creneau du balayage est repeté depuis son premier temps fort`() {
-        val wave = HapticPattern.swipeCrest()
-
-        assertEquals(listOf(0L, 30L, 60L), wave.timings)
-        assertEquals(listOf(0, 96, 0), wave.amplitudes)
-        assertEquals(1, wave.repeatIndex)
-        assertTrue(wave.looped)
-    }
-
-    @Test
     fun `un moteur sans controle de force utilise l'amplitude par defaut`() {
         val wave = HapticPattern.holdLoop(salveAmplitude = Waveform.DEFAULT_AMPLITUDE, loopAmplitude = -1)
 
         assertEquals(listOf(0, -1, 0, -1, 0, -1, 0), wave.amplitudes)
         assertEquals(7, wave.timings.size)
-    }
-
-    @Test
-    fun `les tableaux rendus sont ceux attendus par VibrationEffect`() {
-        val wave = HapticPattern.swipeCrest(onMs = 120, offMs = 40)
-
-        assertEquals(listOf(0L, 120L, 40L), wave.timingsArray().toList())
-        assertEquals(listOf(0, 96, 0), wave.amplitudesArray().toList())
     }
 
     @Test(expected = IllegalArgumentException::class)
