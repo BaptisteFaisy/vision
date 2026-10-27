@@ -152,12 +152,17 @@ expect_nonzero 'install-phone-latest refuse un miroir absent'
 expect_grep 'miroir absent' 'install-phone-latest nomme le miroir manquant'
 expect_grep '--init' 'install-phone-latest indique --init'
 
-run env VISION_PHONE_STATE="${TMP}/etat" bash "$LATEST" --hold 5m
-expect_status 0 'install-phone-latest --hold sort 0'
-if [ -f "${TMP}/etat/hold" ]; then ok 'install-phone-latest --hold écrit la pause'; else ko 'install-phone-latest --hold écrit la pause'; fi
+run env VISION_PHONE_STATE="${TMP}/etat" bash "$LATEST" --lock "recette micro"
+expect_status 0 'install-phone-latest --lock sort 0'
+if [ -f "${TMP}/etat/lock" ]; then ok 'install-phone-latest --lock écrit le verrou'; else ko 'install-phone-latest --lock écrit le verrou'; fi
 
 run env VISION_PHONE_STATE="${TMP}/etat" VISION_MIRROR="${TMP}/pas-de-miroir" bash "$LATEST"
-expect_status 0 'install-phone-latest respecte la pause (aucun build)'
+expect_status 0 'install-phone-latest respecte le verrou (aucun build)'
+expect_grep 'verrouillé' 'le verrou dit qui le tient'
+
+run env VISION_PHONE_STATE="${TMP}/etat" bash "$LATEST" --unlock
+expect_status 0 'install-phone-latest --unlock sort 0'
+if [ ! -f "${TMP}/etat/lock" ]; then ok 'install-phone-latest --unlock retire le verrou'; else ko 'install-phone-latest --unlock retire le verrou'; fi
 
 run grep -n 'build-keys.properties' "$LATEST"
 expect_status 0 'install-phone-latest lie le fichier de cles de la machine'
