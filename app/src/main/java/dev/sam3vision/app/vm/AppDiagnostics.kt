@@ -88,6 +88,21 @@ class AppDiagnostics(
     }
 
     /**
+     * Réveil de la GPU à l'ouverture de l'app (`GET /health`, silencieux).
+     *
+     * Sur un conteneur endormi, `/health` le réveille (snapshot Modal) ; sur un
+     * conteneur chaud, c'est une requête quasi gratuite. Best-effort : le verdict est
+     * ignoré, la sonde iSee et le Direct réveilleraient de toute façon la carte à leur
+     * première frame. Aucune écriture dans `statusLine`, aucun `Log` — l'ouverture ne
+     * doit ni clignoter ni dépendre d'Android (tests JVM).
+     */
+    suspend fun warmGpu() {
+        val url = samUrl(state().settings)
+        if (url.isBlank()) return
+        samClient(url).health()
+    }
+
+    /**
      * Extinction volontaire du conteneur GPU à la fermeture de l'app.
      *
      * Hors du scope du ViewModel **exprès** : à `onDestroy`, le scope du ViewModel est

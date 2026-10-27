@@ -76,6 +76,38 @@ class AppDiagnosticsTest {
     }
 
     @Test
+    fun `warmGpu — un health silencieux sur l endpoint des reglages`() = runTest {
+        val sam = FakeSam(onHealth = Result.success(true))
+        val before = screen.value.statusLine
+
+        diagnostics(sam = sam).warmGpu()
+
+        assertEquals("https://sam.test", samUrlCalled)
+        assertEquals(1, sam.healthCalls)
+        assertEquals("aucune écriture UI à l'ouverture", before, screen.value.statusLine)
+    }
+
+    @Test
+    fun `warmGpu sans URL — aucun appel reseau`() = runTest {
+        val sam = FakeSam()
+
+        diagnostics(samUrl = { "" }, sam = sam).warmGpu()
+
+        assertEquals(0, sam.healthCalls)
+    }
+
+    @Test
+    fun `warmGpu en echec — silence, aucun verdict`() = runTest {
+        val sam = FakeSam(onHealth = Result.failure(ApiError.Network("réseau")))
+        val before = screen.value.statusLine
+
+        diagnostics(sam = sam).warmGpu()
+
+        assertEquals(1, sam.healthCalls)
+        assertEquals(before, screen.value.statusLine)
+    }
+
+    @Test
     fun `ASR sans moteur — message clair, aucun appel reseau`() = runTest {
         diagnostics(speech = { null }).testAsr()
 

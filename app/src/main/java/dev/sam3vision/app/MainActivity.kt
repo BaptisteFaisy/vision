@@ -3,6 +3,7 @@ package dev.sam3vision.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -168,9 +169,22 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ihear.onForeground()
+        // App ouverte (ou de retour au premier plan) : on réveille la GPU Modal
+        // (`/health` silencieux) pour qu'iSee réponde sans cold start.
+        viewModel.warmGpu()
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
+    }
+
+    /**
+     * Split-screen : l'app n'est plus en plein écran, on éteint la GPU comme à
+     * `onPause`. Au retour en plein écran, `onResume` (ou la première frame du
+     * Direct / de la sonde) la réveillera.
+     */
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        if (isInMultiWindowMode) viewModel.releaseGpu()
     }
 
     /**
