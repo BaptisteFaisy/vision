@@ -64,11 +64,18 @@ class LockedMicService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            LockedMicBridge.ACTION_TOGGLE -> toggle()
+            // Même si le service était mort, le geste le remet debout avant d'agir : un
+            // PendingIntent de notification réveille le service, et armer juste après évite
+            // le cas « la notification ne répond plus » (processus tué entre deux).
+            LockedMicBridge.ACTION_TOGGLE -> {
+                arm()
+                toggle()
+            }
             LockedMicBridge.ACTION_STOP -> stopEverything()
             else -> arm()
         }
-        return START_NOT_STICKY
+        // Le système relance un service de premier plan tué : il se ré-arme seul (`intent` nul).
+        return START_STICKY
     }
 
     /** Arme le service : premier plan + notification « prêt ». Aucun micro ouvert. */
@@ -165,9 +172,14 @@ class LockedMicService : Service() {
         stopSelf()
     }
 
-    /** App retirée des récentes : plus rien à garder vivant. */
+    /**
+     * App retirée des récentes : le service **reste armé**. Mesuré sur ce téléphone (HyperOS) :
+     * le processus se fait tuer dès que l'app n'est plus visible, et un service arrêté ici
+     * laissait l'écran verrouillé sans aucune notification — donc sans bouton. Il ne s'arrête
+     * plus que sur le geste « Arrêter » ou à la fermeture explicite de l'activité.
+     */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        stopEverything()
+        Log.i(TAG, "tâche retirée : le service reste armé")
         super.onTaskRemoved(rootIntent)
     }
 
