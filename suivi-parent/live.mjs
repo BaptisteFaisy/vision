@@ -20,7 +20,9 @@ function render() {
   indoor.textContent = status !== 'offline' && live?.fix.indoor ? `Position approximative · ±${Math.round(live.fix.accM)} m` : '';
   const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
   showWords(narrationOf(live, status, motion, !!shareId), status === 'live' && live?.scene?.speaking);
-  document.getElementById('speaker').textContent = status === 'live' && live?.scene?.fromUser ? 'YOU' : 'ISEE';
+  const fromUser = status === 'live' && live?.scene?.fromUser;
+  document.getElementById('speaker').textContent = fromUser ? 'YOU' : 'ISEE';
+  document.querySelector('.spoken').dataset.speaker = fromUser ? 'you' : 'isee';
   document.getElementById('session-note').textContent = !shareId ? 'Le lien reçu ouvre la session de ton proche.' :
     status === 'lost' ? 'Dernières détections figées · en attente de reconnexion' :
     status === 'offline' ? 'La carte se remplira quand le téléphone enverra sa position.' : 'Position et objets du téléphone partagé';

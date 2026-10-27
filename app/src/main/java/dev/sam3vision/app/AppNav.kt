@@ -157,6 +157,7 @@ private fun RouteHost(
             viewModel = isee,
             onOpenSettings = { push(Route.Settings) },
             settings = state.settings,
+            sharingReady = state.settingsReady,
         )
         Route.Capture -> CaptureRoute(viewModel, push)
         Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)

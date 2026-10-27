@@ -18,7 +18,7 @@ import dev.sam3vision.core.settings.Settings
  * Toute l'interaction passe par les gestes de `IseeRootLayout` ; le pane reste muet.
  */
 @Composable
-fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Settings) {
+fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Settings, sharingReady: Boolean) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(Unit) { viewModel.refreshSettings() }
     DisposableEffect(Unit) {
@@ -27,7 +27,7 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Set
     }
     // Retour système : ouvre les Réglages (clés API, tests) sans bouton sur la surface.
     BackHandler(enabled = true) { onOpenSettings() }
-    IseeShare(state, viewModel, settings)
+    if (sharingReady) IseeShare(state, viewModel, settings)
 
     IseeScenePane(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
 }

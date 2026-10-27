@@ -12,6 +12,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.SHARE_INTERVAL_MS
 import dev.sam3vision.core.share.SharedScene
+import dev.sam3vision.core.share.canPublishShare
 import kotlinx.coroutines.delay
 
 /** Même publication pour Direct et iSee : le service reprend dès que l'écran s'efface. */
@@ -23,7 +24,7 @@ fun ShareRelay(layer: DistanceLayer?, settings: Settings, scene: SharedScene? = 
     val currentLayer by rememberUpdatedState(layer)
     val currentScene by rememberUpdatedState(scene)
     LaunchedEffect(settings, lifecycle) {
-        if (!settings.shareEnabled) return@LaunchedEffect
+        if (!canPublishShare(settings)) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             broadcaster.start(true)
             ShareGate.screenPublishing = true

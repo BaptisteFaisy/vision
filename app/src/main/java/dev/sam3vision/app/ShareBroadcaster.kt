@@ -4,6 +4,7 @@ import android.content.Context
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.SharedScene
+import dev.sam3vision.core.share.canPublishShare
 import dev.sam3vision.core.share.shareEndpoint
 import dev.sam3vision.core.share.shareJson
 import dev.sam3vision.core.share.sharedObjectsOf
@@ -35,7 +36,7 @@ class ShareBroadcaster(context: Context) {
 
     /** Envoie l'état courant si complet, sinon ne fait rien. */
     suspend fun publish(nowMs: Long, settings: Settings, layer: DistanceLayer?, scene: SharedScene? = null) {
-        if (settings.shareId.isBlank()) return
+        if (!canPublishShare(settings) || settings.shareId.isBlank()) return
         val fix = positions.lastFix ?: return
         val objects = layer?.let { sharedObjectsOf(it.readings, it.width, it.height, it.fovDeg, fix.headingDeg) }.orEmpty()
         val url = shareEndpoint(settings.parentSiteUrl) ?: return
