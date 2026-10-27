@@ -210,6 +210,29 @@ def detection_entries(detection, label: str, work_size, image_size,
     ]
 
 
+def _finalize_rle(entries: list[dict], image_size, max_objects: int, mask_edge: int) -> dict:
+    """Variante RLE : runs LEB128 sur grille réduite + ``mask_scale`` par objet."""
+    from imaging import encode_mask_rle_b64, rle_grid
+
+    grid, scale = rle_grid(tuple(image_size), mask_edge or 0)
+    ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
+    return {
+        "width": image_size[0],
+        "height": image_size[1],
+        "mask_encoding": "rle",
+        "objects": [
+            {
+                "label": item["label"],
+                "score": item["score"],
+                "box": item["box"],
+                "mask_b64": encode_mask_rle_b64(item["mask"], grid),
+                "mask_scale": scale,
+            }
+            for item in ordered[:max_objects]
+        ],
+    }
+
+
 def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
              mask_encoding: str = DEFAULT_MASK_ENCODING, mask_format=None,
              mask_edge: int = 0) -> dict:
@@ -224,26 +247,8 @@ def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
     grille réduite, chaque objet portant ``mask_scale`` (ratio grille/frame) pour que
     le client redérive les dimensions. Absent = chemin historique inchangé.
     """
-    from imaging import encode_mask_rle_b64, rle_grid
-
     if (mask_format or "").strip().lower() == "rle":
-        grid, scale = rle_grid(tuple(image_size), mask_edge or 0)
-        ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
-        return {
-            "width": image_size[0],
-            "height": image_size[1],
-            "mask_encoding": "rle",
-            "objects": [
-                {
-                    "label": item["label"],
-                    "score": item["score"],
-                    "box": item["box"],
-                    "mask_b64": encode_mask_rle_b64(item["mask"], grid),
-                    "mask_scale": scale,
-                }
-                for item in ordered[:max_objects]
-            ],
-        }
+        return _finalize_rle(entries, image_size, max_objects, mask_edge)
     encoding = check_mask_encoding(mask_encoding)
     ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
     return {
