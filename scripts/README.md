@@ -11,6 +11,7 @@ contient `scripts/`, ce que chaque outil lit, écrit, et les règles communes.
 | `scripts/build.sh` | `assembleDebug --offline` puis contrôle que l'APK existe vraiment ; timeout 600 s par défaut | `JAVA_HOME`, `ANDROID_HOME`, `GRADLE_TIMEOUT` | `app/build/outputs/apk/debug/app-debug.apk` (via Gradle), cache `~/.gradle` ; stdout : `JAVA_HOME`, `ANDROID_HOME`, chemin + taille de l'APK | aucun | `bash`, `timeout` (coreutils), JDK avec `bin/javac`, `./gradlew` |
 | `scripts/install-emulator.sh` | `install -r` sur un émulateur en ligne, `pm grant CAMERA`, `am start`, capture d'écran rapatriée | `EMULATOR_SERIAL`, `SKIP_BUILD`, `APK`, `ADB`, `TMPDIR`, `ANDROID_HOME` (repli pour trouver `adb`) | `$TMPDIR/samvision-emu.XXXXXX/samvision_screen_<serial>.png` (**conservée** : c'est le livrable) ; `/sdcard/samvision_install_<pid>.png` (supprimé par `trap`) | aucun | `adb` (platform-tools), `timeout`, `awk` |
 | `scripts/verify-tap-voix.sh` | recette manuelle sur émulateur : tap = vidéo, appui long 4 s = voix ; affiche l'écran, le vibreur et le nombre de lignes de crash | `EMULATOR_SERIAL`, `APK`, `ADB` | stdout seulement ; XML `uiautomator` dans `$TMP_WORK` (supprimé par `trap`), `/sdcard/isee_ui_<pid>.xml` (supprimé) | aucun — le logcat est **compté**, jamais recopié | `adb`, `timeout`, `grep`/`sed`/`awk`/`cut`/`tr` |
+| `scripts/install-phone-latest.sh` | garde le téléphone de test sur le `master` de GitHub : compare le `versionName` installé au SHA distant, reconstruit dans un miroir dédié, installe ; `--check` ne touche à rien, `--hold 30m` fige le téléphone | `VISION_MIRROR`, `VISION_PHONE_STATE`, `PHONE_BIN`, `PHONE_SERIAL`, `VISION_BUILD_TIMEOUT` | `~/.vision-phone/state.env`, `~/.vision-phone/{build,install-phone-latest}.log`, miroir `~/vision-phone/master` ; `adb install -r -d` sur le téléphone (sous le verrou `~/bin/phone`) | aucun | `git`, `bash`, `timeout`, `~/bin/phone`, `adb`, JDK + SDK pour le build |
 | `scripts/lib/common.sh` | socle sourcé : `ROOT`, `die`, `warn`, `require_cmd`, `require_uint`, `std_args`, `safe_rm_rf`, `make_tmpdir`, `resolve_adb` | — | rien | aucun | — |
 | `scripts/test_scripts.sh` | les tests de cette page, en une seule commande | — | temporaires dans `$TMPDIR/test-scripts.XXXXXX` (supprimés à la sortie) | aucun | `bash`, `grep`, `sed`, `awk`, `wc` |
 | `scripts/gen_mask_golden.py` | fixtures dorées des masques (`bits`/`M1`) + IoU + arbitrage de variante ; `--write` écrit les deux artefacts, `--check` les compare (porte anti-dérive), `--selftest` réencode six vecteurs réels du dépôt à l'octet près | rien (aucun argument, aucun fichier d'entrée) | `core/src/test/java/dev/sam3vision/core/mask/MaskGoldenData.kt` (fixtures générées) et `docs/MESURES-u11c.txt` | aucun | `python3` (bibliothèque standard seule) |
@@ -41,7 +42,7 @@ exécutions parallèles ne se marchent pas dessus.
 ## Lancer les tests
 
 ```bash
-bash scripts/test_scripts.sh      # 53 assertions, code 0 si tout passe
+bash scripts/test_scripts.sh      # 75 assertions, code 0 si tout passe
 python3 scripts/gen_mask_golden.py --selftest   # 11 assertions sur l'encodeur de masques
 python3 scripts/gen_mask_golden.py --check      # fixtures dorées <-> générateur
 ```

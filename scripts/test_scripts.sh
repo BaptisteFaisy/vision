@@ -12,7 +12,8 @@ BUILD="${HERE}/build.sh"
 INSTALL="${HERE}/install-emulator.sh"
 VERIFY="${HERE}/verify-tap-voix.sh"
 VERIFY_PORT="${HERE}/verify-longpress-port.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT")
+LATEST="${HERE}/install-phone-latest.sh"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -143,6 +144,20 @@ mkdir -p "${TMP}/a-|nettoyer/sous"
 run bash -c '. "$1"; safe_rm_rf "$2"' _ "$LIB" "${TMP}/a-|nettoyer"
 expect_status 0 'safe_rm_rf supprime un chemin sous TMPDIR'
 if [[ -e "${TMP}/a-|nettoyer" ]]; then ko 'safe_rm_rf a bien effacé la cible'; else ok 'safe_rm_rf a bien effacé la cible'; fi
+
+# --- 5 bis. install-phone-latest.sh --------------------------------------
+echo "== 5 bis. install-phone-latest.sh : miroir et pause =="
+run env VISION_MIRROR="${TMP}/pas-de-miroir" VISION_PHONE_STATE="${TMP}/etat" bash "$LATEST"
+expect_nonzero 'install-phone-latest refuse un miroir absent'
+expect_grep 'miroir absent' 'install-phone-latest nomme le miroir manquant'
+expect_grep '--init' 'install-phone-latest indique --init'
+
+run env VISION_PHONE_STATE="${TMP}/etat" bash "$LATEST" --hold 5m
+expect_status 0 'install-phone-latest --hold sort 0'
+if [ -f "${TMP}/etat/hold" ]; then ok 'install-phone-latest --hold écrit la pause'; else ko 'install-phone-latest --hold écrit la pause'; fi
+
+run env VISION_PHONE_STATE="${TMP}/etat" VISION_MIRROR="${TMP}/pas-de-miroir" bash "$LATEST"
+expect_status 0 'install-phone-latest respecte la pause (aucun build)'
 
 # --- 6. garde-fous statiques ----------------------------------------------
 echo "== 6. garde-fous statiques =="

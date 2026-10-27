@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (2) — le téléphone suit `master` tout seul
+
+- **`scripts/install-phone-latest.sh`** : le téléphone de test ne peut plus rester sur une build
+  périmée. Le script lit le `versionName` installé (`1.0.<commits>-<sha>`), le compare au `master`
+  de GitHub, reconstruit dans un **miroir dédié** (`~/vision-phone/master`, `git worktree` — jamais
+  l'arbre de travail partagé où les agents écrivent) et installe sous le verrou `~/bin/phone`.
+  `adb install -r -d` : un `versionCode` plus ancien (build de mission) est accepté, les données de
+  l'app restent. Il **ne prend jamais** le verrou d'un autre agent : occupé = sortie `2`.
+- **Options** : `--check` (0 = à jour / 3 = en retard / 2 = occupé), `--reinstall`, `--wait S`,
+  `--init` (crée le miroir), `--hold 30m` (fige le téléphone pour tester une branche de mission).
+- **Cron du poste** : `*/10 * * * * ~/bin/vision-phone-latest --quiet` ; ce wrapper exécute la
+  copie du **miroir**, donc une correction du script arrive par `master` sans toucher au poste.
+- **Tests** : `scripts/test_scripts.sh` passe de 53 à **75** assertions (le nouveau script est dans
+  `SCRIPTS` : syntaxe, `--help`, argument inconnu, `< 500` lignes, zéro `/home/` en dur) et gagne
+  quatre cas dédiés (miroir absent, `--init` conseillé, `--hold` qui écrit la pause, pause
+  respectée).
+- **Preuves** : téléphone `2c6852ac` réinstallé `1.0.36-e2f6984` puis `1.0.39-8f95191` par le script
+  lui-même, `state.env` à jour, `bash scripts/test_scripts.sh` 75/75.
+
 ## 2026-10-27 — carte caméra : le voile de pixels s'efface
 
 - **La carte caméra (scène VISION) n'est plus un damier permanent.** La mosaïque restait opaque
