@@ -25,7 +25,7 @@ json = "20240303"
 mwdat = "1.0.0"
 guava = "33.3.1-android"
 onnxMobile = "1.18.0"
-litert = "2.3.2"
+litert = "2.17.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -63,7 +63,10 @@ mwdat-inputs = { module = "com.meta.wearable:mwdat-inputs", version.ref = "mwdat
 mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "mwdat" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 onnxruntime-mobile = { module = "com.microsoft.onnxruntime:onnxruntime-mobile", version.ref = "onnxMobile" }
-litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
+# tensorflow-lite (pas com.google.ai.edge.litert:litert:2.3.x : son litert-api est
+# en metadata Kotlin 2.4, illisible par le Kotlin 2.2 du projet). Même API
+# org.tensorflow.lite.Interpreter, Java pur.
+litert = { module = "org.tensorflow:tensorflow-lite", version.ref = "litert" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
