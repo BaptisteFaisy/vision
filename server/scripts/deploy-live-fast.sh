@@ -6,7 +6,7 @@
 #
 # Les leviers sont ici, et **seulement ici** : c'est ce qui les rend persistants.
 #   FAST_CUDA_GRAPH=1    graphe CUDA de l'encodeur vision (45 ms → 1,4 ms mesurés)
-#   FAST_SCALEDOWN=300   5 min de fenêtre avant extinction du conteneur
+#   FAST_SCALEDOWN=60    60 s de fenêtre avant extinction du conteneur
 #   FAST_EDGE=512        grille du modèle (le serveur rééchantillonne à 518)
 #   FAST_BATCH_PROMPTS=1 les N concepts en un forward (le lot est actif)
 #   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
@@ -45,10 +45,31 @@ case "${1:-}" in
   *) echo "option inconnue : $1 (voir --help)" >&2; exit 2 ;;
 esac
 
+# Garde anti-stale (27/10) : déployer depuis un arbre en retard sur origin/master
+# écrase les leviers mergés entre-temps (vu : le snapshot effacé le soir même par
+# un deploy manuel d'un arbre d'avant) ; un arbre sale déploie de l'inreproductible.
+# CI exclue (checkout détaché : HEAD == push). Échappatoire : DEPLOY_ALLOW_STALE=1
+# (jamais en CI, jamais sans raison écrite).
+if (( deploy )) && [ -z "${DEPLOY_ALLOW_STALE:-}" ]; then
+  branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
+  base="$(git -C "$ROOT" rev-parse -q --verify origin/master 2>/dev/null || true)"
+  if [ "$branch" != "HEAD" ] && [ -n "$base" ]; then
+    if [ "$(git -C "$ROOT" rev-parse HEAD)" != "$base" ]; then
+      echo "KO : arbre en retard ou divergent sur origin/master —" >&2
+      echo "  git fetch origin && git rebase origin/master, puis relance." >&2
+      exit 1
+    fi
+    if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
+      echo "KO : arbre sale — committe avant de déployer (ou DEPLOY_ALLOW_STALE=1)." >&2
+      exit 1
+    fi
+  fi
+fi
+
 deploy_once() {
   ( cd "$ROOT" && LIVE_APP_NAME="$APP_NAME" FAST_GPU="$GPU" FAST_REGION="$REGION" \
       FAST_ROUTING_REGION="$ROUTING" FAST_BATCH_PROMPTS=1 FAST_EDGE=512 \
-      FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=300 \
+      FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=60 \
       FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 \
       "$MODAL" deploy backend/live_fast/live_app_fast.py "${profile_arg[@]}" )
 }
@@ -88,7 +109,7 @@ wait_for_new_version() { # essais, délai
 }
 
 if (( deploy )); then
-  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, scaledown=300, edge=512)"
+  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, scaledown=60, edge=512)"
   deploy_once || { echo "KO : le déploiement a échoué" >&2; exit 1; }
   echo "== attente de la nouvelle version"
   if wait_for_new_version 6 10; then

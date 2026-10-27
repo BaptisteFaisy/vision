@@ -183,12 +183,12 @@ def test_weights_image(live_app_fast) -> None:
 
 
 def test_deploy_script(_module) -> None:
-    """Le script de déploiement porte les leviers de mesure et le scaledown long."""
+    """Le script de déploiement porte les leviers de mesure et le scaledown court (60 s)."""
     from test_units import check, raises
 
     script = (BACKEND_DIR.parent / "scripts" / "deploy-live-fast.sh").read_text(encoding="utf-8")
-    # Scaledown 300 (5 min, déployé fin octobre) : 120 n'a jamais été déployé.
-    for lever in ("FAST_TIMING=1", "FAST_SCALEDOWN=300", "FAST_BATCH_PROMPTS=1",
+    # Scaledown 60 (fuite max ~0,04 $ si /release raté, règle user 27/10).
+    for lever in ("FAST_TIMING=1", "FAST_SCALEDOWN=60", "FAST_BATCH_PROMPTS=1",
                   "FAST_EDGE=512", "FAST_SNAPSHOT=1", "FAST_MODEL_DIR=/opt/models/sam3.1"):
         check(f"déploiement : {lever} présent", lever in script, "absent du script")
     # GPU et nom d'app passent par des variables (`${FAST_GPU:-...}`) : on fige
@@ -199,6 +199,15 @@ def test_deploy_script(_module) -> None:
           "LIVE_APP_NAME" in script and "sam3-eu-a100" in script, "absent du script")
     check("déploiement : le contrôle exige le snapshot",
           '"snapshot": True' in script, "absent du contrôle")
+
+
+def test_no_cudagraph_typo(_module) -> None:
+    """Pas de `CUDGraph` (sans A) : la faute a cassé vision_accel au déploiement du 27/10."""
+    from test_units import check
+
+    src = (BACKEND_DIR / "live_fast" / "fast_core.py").read_text(encoding="utf-8")
+    check("graphe : CUDAGraph orthographié", "CUDAGraph" in src, "absent")
+    check("graphe : pas de CUDGraph", "CUDGraph" not in src, "faute présente")
 
 
 def _fresh_live_fast(module_name: str, model_dir: str | None = "/opt/models/sam3.1",

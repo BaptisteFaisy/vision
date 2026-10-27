@@ -71,34 +71,38 @@ assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml
 (`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
 sans bloquer : seul un vrai conflit s'oppose à un rebase.
 
-## 5. Protection de `master` et file de merge native
+## 5. Protection de `master` et file de merge (balayeur v4)
 
-`master` est protégé par un **ruleset GitHub** (règles du dépôt, aucun outil externe) :
+`master` est protégé (PR obligatoire, historique linéaire, pas de push direct) et les
+PR sont fusionnées par le workflow `pr-auto-merge` (job `sweep`, toutes les 10 min
+et à chaque push sur `master` ou événement de PR). La seule porte reste la CI : les
+6 checks `ci`, `apk`, `apk-release`, `lint`, `ci-budget`, `couche0` verts, puis merge
+en rebase. Pas de gate humaine, pas de merge à la main.
 
-- **PR obligatoire** : pas de push direct sur `master` ;
-- **checks requis** : `ci`, `ci-budget`, `couche0`, exigés sur une base à jour (`strict`) ;
-- **historique linéaire** : que des rebases, pas de commit de fusion ;
-- **force-push et suppression de `master` interdits** ;
-- **merge queue native** : une PR dont l'auto-merge est activé entre dans la file GitHub.
+Concrètement, à chaque passage, pour chaque PR interne non-brouillon :
 
-Comment ça marche, concrètement :
+- `BEHIND` : vrai rebase sur `master` (pas de bulle de merge), poussé avec bail —
+  jamais d'écrasement d'un push d'auteur arrivé entre-temps. Conflit : on saute,
+  l'auteur rebase à la main ;
+- `CLEAN` + CI verte : merge (`--rebase --match-head-commit`) ;
+- autre état : rien à faire (une PR `BLOCKED` par retard + base stricte ne sera
+  reprise qu'une fois rebasée — limite connue, à l'auteur de rebaser).
 
-1. la PR est ouverte, la CI tourne sur `pull_request` ;
-2. l'auto-merge est activé (`gh pr merge <n> --auto --rebase`, ou le bouton « Enable auto-merge ») ;
-3. GitHub crée un **groupe de merge** (`gh-readonly-queue/master/pr-<n>-<sha>`) et y rejoue les
-   checks requis — `couche0` se déclenche aussi sur ces refs, en retrouvant le numéro de PR dans le
-   nom du ref (section 3) ;
-4. le groupe est rebasé sur `master`, les checks repassent, la PR fusionne.
+Le balayeur a besoin du secret dépôt **`AUTOMERGE_PAT`** (PAT `repo`, créé le
+2026-10-27) : `GITHUB_TOKEN` ne suffit pas (ni auto-merge, ni pushes qui relancent
+la CI — runs fantômes `action_required`). Sans le secret, pause propre (« file en
+pause », exit 0) au lieu d'échouer — file à l'arrêt jusqu'à sa (re)création.
+`gh`/`jq` viennent de `~/bin` sur les runners (`export PATH`, vu le 27/10 : sans
+ça, `gh` introuvable et file muette selon le runner).
 
-Tant que la règle « Require merge queue » n'est pas ajoutée au ruleset, l'étape 3 n'existe pas :
-l'auto-merge fusionne directement dès que les trois checks requis sont verts (vérifié sur deux PR).
-
-Une branche en retard sur `master` reste verte : `stale-base-guard` avertit, c'est le rebase du
-groupe qui met la PR à jour.
+Une branche en retard sur `master` reste verte : `stale-base-guard` avertit
+(informatif), c'est le rebase du balayeur qui met la PR à jour.
 
 ## 6. Ce qui n'est pas dans ce dépôt
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
-- Aucun secret de dépôt n'est exigé : les clés du build sont facultatives (section 2).
-- Aucun outil de file externe : l'auto-merge du dépôt est activé, la PR fusionne donc dès que les
-  checks requis sont verts.
+- Secrets dépôt : `AUTOMERGE_PAT` (file de merge, section 5) et `MODAL_TOKEN_ID` /
+  `MODAL_TOKEN_SECRET` (déploiement GPU) exigés ; les clés du build restent
+  facultatives (section 2).
+- Aucun outil de file externe : le balayeur du dépôt fusionne dès que les checks
+  requis sont verts.
