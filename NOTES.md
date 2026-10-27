@@ -178,3 +178,25 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
   soit des mesures appareil datées et sourcées ; rien n'a été re-mesuré sur cet arbre.
 - **Aucun build ni aucune suite de tests n'a été lancée** pour ces notes : les comptages sont
   des `grep`/`wc`, les versions sont lues dans les fichiers.
+
+## Micro des lunettes — décision et recette (27/10/2026)
+
+Le SDK DAT 1.0.1 expose bien l'audio public : `Stream.getAudioStream(): Flow<AudioFrame>`
+(**aucune** annotation `@Deprecated`, `@RequiresOptIn` ni `@Experimental*` — vérifié au
+`javap` sur `mwdat-camera-1.0.1.aar`, seule `@NotNull` est présente). `AudioFrame.buffer` est
+du PCM déjà décodé par le SDK (le transport, lui, est AAC : `internal.codec.types.AudioCodec`,
+`AudioCodecProfile.AAC_LC`, décodé par `AudioDecoder` via `MediaCodec`). `Permission.MICROPHONE`
+existe côté `mwdat-core`, à côté de `Permission.CAMERA`.
+
+Décision : `GlassesCamera` demande `AudioCodec.PCM(RATE_16000, 1)` — le format exact de la
+dictée. Si le flux refuse, on descend le plan `GlassesAudioPlan.ladder` : 48 kHz mono (ramené à
+16 kHz par `PcmRate.to16k`, moyenne de 3 échantillons), puis caméra seule. `GlassesAudio`
+collecte les trames et écrit un WAV 16 kHz mono sous `filesDir/glasses-audio/lunettes-*.wav`
+(`TempWavStore`, préfixe `lunettes`, 5 derniers gardés) ; la dictée le prend via `PcmSource` /
+`MuseTranscript` — `DictationUseCase` + `SpeechClient` restent la seule transcription.
+`MicBus` n'a pas bougé : la dictée des lunettes prend le même jeton `DICTATION`, donc la vidéo
+du mode tap reste exclue pendant qu'on parle.
+
+Non vérifié (aucune paire ici) : que 16 kHz soit accepté par le firmware, que les trames
+arrivent à la fréquence annoncée, et le rendu réel de la transcription. Recette : voir le
+corps de la PR.

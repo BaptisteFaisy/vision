@@ -10,14 +10,19 @@ import java.io.File
  *
  * Aucune dépendance Android : testable en JVM, sans appareil.
  */
-class TempWavStore(private val dir: File, private val keep: Int = KEEP_RECENT) {
+class TempWavStore(
+    private val dir: File,
+    private val keep: Int = KEEP_RECENT,
+    /** Préfixe des fichiers : `dictee` (micro du téléphone) ou `lunettes`. */
+    private val prefix: String = DEFAULT_PREFIX,
+) {
 
     private var sequence = 0
 
     /** Écrit le WAV complet et rend le fichier ; dossier inaccessible -> [Result.failure]. */
     fun write(pcm: ByteArray, sampleRate: Int = Wav.SAMPLE_RATE): Result<File> = runCatching {
         if (!dir.isDirectory && !dir.mkdirs()) error("dossier inaccessible : $dir")
-        val target = File(dir, "dictee-${System.currentTimeMillis()}-${sequence++}.wav")
+        val target = File(dir, "$prefix-${System.currentTimeMillis()}-${sequence++}.wav")
         target.writeBytes(Wav.pcm16(pcm, sampleRate))
         prune()
         target
@@ -39,6 +44,7 @@ class TempWavStore(private val dir: File, private val keep: Int = KEEP_RECENT) {
     companion object {
         /** Cinq dictées suffisent à rejouer la dernière ; au-delà, c'est du cache mort. */
         const val KEEP_RECENT = 5
+        const val DEFAULT_PREFIX = "dictee"
         private const val WAV_SUFFIX = ".wav"
     }
 }

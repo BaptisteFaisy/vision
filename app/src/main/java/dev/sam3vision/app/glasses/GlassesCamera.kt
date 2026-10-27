@@ -5,49 +5,86 @@ import com.meta.wearable.dat.camera.Camera
 import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.removeCamera
+import com.meta.wearable.dat.camera.types.AudioCodec
+import com.meta.wearable.dat.camera.types.AudioSampleRate
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** Caméra des lunettes : un flux, une photo à la demande, aucun état global. */
+/** Caméra des lunettes : un flux (image **et** micro), une photo à la demande, aucun état global. */
 internal class GlassesCamera(
     private val session: DeviceSession,
     private val scope: CoroutineScope,
+    private val audioDir: File,
+    private val audioAllowed: Boolean,
     private val onNote: (GlassesMessage) -> Unit,
     private val onStreaming: (Boolean) -> Unit,
+    private val onMicActive: (Boolean) -> Unit,
 ) {
     private var camera: Camera? = null
     private var stream: Stream? = null
 
+    /** Micro des lunettes, créé avec le flux : `null` tant que rien n'est attaché. */
+    var audio: GlassesAudio? = null
+        private set
+
+    /**
+     * Attache la caméra en descendant le plan audio ([GlassesAudioPlan]) : 16 kHz — le format
+     * de la dictée — puis 48 kHz mono, puis caméra seule. Un codec refusé par le flux ne doit
+     * ni priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
+     */
     fun start(): Boolean {
         if (camera != null) return true
-        return session.addCamera(configuration()).fold(
-            onSuccess = { attached ->
-                camera = attached
-                stream = attached.stream
-                watch(attached)
-                attached.stream.start()
-                    .onFailure { error, _ -> onNote(GlassesMessages.streamRefused(error.description)) }
-                true
-            },
-            onFailure = { error, _ ->
-                onNote(GlassesMessages.cameraUnavailable(error.description))
-                false
-            },
-        )
+        var reason = NO_REASON
+        for (choice in GlassesAudioPlan.ladder(audioAllowed)) {
+            val attempt = session.addCamera(configuration(choice))
+            val attached = attempt.getOrNull()
+            if (attached != null) {
+                adopt(attached, choice)
+                return true
+            }
+            reason = attempt.errorOrNull()?.description ?: reason
+            if (!choice.silent) onNote(GlassesMessages.audioRefused(choice.hertz, reason))
+        }
+        onNote(GlassesMessages.cameraUnavailable(reason))
+        return false
     }
 
     /** 15 i/s et qualité moyenne : au-delà, le lien Bluetooth Classic casserait l'image
      *  (constat matériel repris tel quel, **non remesuré** : aucun matériel ici). */
-    private fun configuration() = StreamConfiguration(
-        audioCodec = null,
+    private fun configuration(choice: AudioChoice) = StreamConfiguration(
+        audioCodec = choice.toCodec(),
         videoQuality = VideoQuality.MEDIUM,
         frameRate = FRAME_RATE,
         compressVideo = true,
     )
+
+    /** Format du plan → codec du SDK ; `null` = pas de piste audio demandée. */
+    private fun AudioChoice.toCodec(): AudioCodec? {
+        if (silent) return null
+        val rate = when (hertz) {
+            PcmRate.DOWNSTREAM_HZ -> AudioSampleRate.RATE_16000
+            HERTZ_44K -> AudioSampleRate.RATE_44100
+            HERTZ_48K -> AudioSampleRate.RATE_48000
+            else -> return null
+        }
+        return AudioCodec.PCM(rate, channels)
+    }
+
+    /** Le flux est là : micro prêt (si négocié), collecteurs lancés. */
+    private fun adopt(attached: Camera, choice: AudioChoice) {
+        camera = attached
+        stream = attached.stream
+        audio = GlassesAudio(attached.stream.audioStream, choice, audioDir, scope, onMicActive)
+        if (choice.silent && audioAllowed) onNote(GlassesMessages.audioUnavailable())
+        watch(attached)
+        attached.stream.start()
+            .onFailure { error, _ -> onNote(GlassesMessages.streamRefused(error.description)) }
+    }
 
     private fun watch(attached: Camera) {
         scope.launch {
@@ -78,6 +115,9 @@ internal class GlassesCamera(
     }
 
     fun stop() {
+        audio?.abort()
+        audio = null
+        onMicActive(false)
         stream?.stop()
         if (camera != null) session.removeCamera()
         camera = null
@@ -87,5 +127,8 @@ internal class GlassesCamera(
 
     private companion object {
         const val FRAME_RATE = 15
+        const val HERTZ_44K = 44_100
+        const val HERTZ_48K = 48_000
+        const val NO_REASON = "refus du SDK"
     }
 }

@@ -43,10 +43,10 @@ class GlassesUiStateTest {
     }
 
     @Test
-    fun `les quatre lignes d etat existent toujours`() {
-        listOf(GlassesUiState(), ready()).forEach { state ->
+    fun `les cinq lignes d etat existent toujours`() {
+        listOf(GlassesUiState(), ready(), idleStream()).forEach { state ->
             val lines = statusLines(state)
-            assertEquals(4, lines.size)
+            assertEquals(5, lines.size)
             assertTrue(lines.all { it.isNotBlank() })
         }
     }
@@ -58,11 +58,13 @@ class GlassesUiStateTest {
         assertEquals("Enregistrement : non enregistrée", idle[1])
         assertEquals("Appareil : aucune paire détectée · batterie inconnue · non portées", idle[2])
         assertEquals("Session : arrêtée · caméra non autorisée · flux arrêté", idle[3])
+        assertEquals("Micro lunettes : non autorisé", idle[4])
 
         val live = statusLines(ready())
         assertEquals("SDK : prêt (dev mode)", live[0])
         assertEquals("Appareil : Ray-Ban Meta · 62 % · portées", live[2])
         assertEquals("Session : en cours · caméra autorisée · flux actif", live[3])
+        assertEquals("Micro lunettes : prêt", live[4])
         // Aucun nom d'énumération du SDK ne fuit à l'écran.
         live.forEach { line -> assertFalse(line, line.contains("STARTED")) }
     }
@@ -76,6 +78,22 @@ class GlassesUiStateTest {
         worn = true,
         phase = SessionPhase.STARTED,
         cameraAllowed = true,
+        micAllowed = true,
         streaming = true,
     )
+
+    /** Session vivante mais flux arrêté : micro autorisé, donc « en veille ». */
+    private fun idleStream() = GlassesUiState(
+        phase = SessionPhase.STARTED,
+        micAllowed = true,
+    )
+
+    @Test
+    fun `la ligne du micro dit qui ecoute`() {
+        assertEquals("Micro lunettes : non autorisé", statusLines(GlassesUiState())[4])
+        assertEquals("Micro lunettes : en veille", statusLines(idleStream())[4])
+        assertEquals("Micro lunettes : prêt", statusLines(ready())[4])
+        val active = ready().copy(micActive = true)
+        assertEquals("Micro lunettes : actif", statusLines(active)[4])
+    }
 }
