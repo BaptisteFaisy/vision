@@ -103,13 +103,13 @@ data class LockedMicState(
         LockedMicPhase.OFF -> LockedMicView(LockedMic.TITLE, "Micro arrêté.", null, null)
         LockedMicPhase.READY -> LockedMicView(
             title = LockedMic.TITLE,
-            message = "Prêt : le micro s'ouvre même écran verrouillé.",
+            message = "Touche la notification pour parler, même écran verrouillé.",
             action = LockedMic.ACTION_LISTEN,
             spoken = null,
         )
         LockedMicPhase.LISTENING -> LockedMicView(
             title = LockedMic.TITLE_LISTENING,
-            message = "Parle, puis appuie sur « ${LockedMic.ACTION_SEND} ».",
+            message = "Parle, puis touche la notification pour « ${LockedMic.ACTION_SEND} ».",
             action = LockedMic.ACTION_SEND,
             spoken = "J'écoute",
         )

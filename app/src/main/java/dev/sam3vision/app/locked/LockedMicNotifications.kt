@@ -66,7 +66,10 @@ object LockedMicNotifications {
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setContentIntent(openApp(context))
+            // Toucher la notification **est** le geste : HyperOS replie les notifications et
+            // cache leurs boutons, or on ne demande pas à un utilisateur non-voyant d'ouvrir un
+            // chevron. Un seul appui, n'importe où sur la carte, ouvre (ou envoie) le micro.
+            .setContentIntent(service(context, LockedMicBridge.ACTION_TOGGLE, TOGGLE_REQUEST))
             .addAction(0, "Arrêter", service(context, LockedMicBridge.ACTION_STOP, STOP_REQUEST))
 
         view.action?.let { label -> builder.addAction(0, label, service(context, LockedMicBridge.ACTION_TOGGLE, TOGGLE_REQUEST)) }
@@ -96,18 +99,9 @@ object LockedMicNotifications {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    /** Toucher le corps de la notification ramène à iSee (là où tout s'explique). */
-    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
-        context,
-        OPEN_REQUEST,
-        context.packageManager.getLaunchIntentForPackage(context.packageName),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
-
     /** Canal d'avant la correction (importance basse) : supprimé à la création du nouveau. */
     private const val LEGACY_CHANNEL_ID = "isee_mic_verrou"
 
     private const val TOGGLE_REQUEST = 1
     private const val STOP_REQUEST = 2
-    private const val OPEN_REQUEST = 3
 }
