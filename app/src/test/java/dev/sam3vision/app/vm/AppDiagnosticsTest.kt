@@ -7,6 +7,7 @@ import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
