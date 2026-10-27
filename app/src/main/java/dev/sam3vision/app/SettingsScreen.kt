@@ -32,11 +32,11 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Réglages : LLM (base URL, clé, modèle) + endpoint SAM + région de la GPU
- * (mode Europe / **mode US**) + section
- * « Distances » (overlay du direct, champ de vision) + section « Voix ElevenLabs »
- * (clé, voix, lecture automatique, test) + section « Dictée Meta » (base URL, clé,
- * modèle ASR, test) + section « Suivi parent » (lien du site partagé par WhatsApp)
- * + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
+ * (mode Europe / **mode US**) + section « Distances » (overlay du direct, champ
+ * de vision) + section « Voix ElevenLabs » (clé, voix, lecture automatique,
+ * test) + section « Dictée Meta » (base URL, clé, modèle ASR, test) + section
+ * « Suivi parent » (lien du site, boutons Partager / Arrêter le suivi
+ * permanent) + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
  * Meta AI, session, capture photo, lunettes simulées en build debug).
  * Chaque moteur a son bouton de test.
  */
@@ -56,15 +56,15 @@ fun SettingsScreen(
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
+    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStopTracking: () -> Unit,
     onBack: () -> Unit,
 ) {
     var draft by remember { mutableStateOf(settings) }
+    val trackingActive by ShareTracking.running.collectAsState()
     Column(settingsScroll()) {
         ScreenHeader("Réglages du backend", "Aucune clé n'est écrite dans le code.", onBack, null)
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             BackendFields(draft) { draft = it }
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
@@ -79,7 +79,7 @@ fun SettingsScreen(
                 onStop = onStopVoice,
             )
             DictationSettings(draft) { draft = it }
-            ParentShareSettings(draft) { draft = it }
+            ParentShareSettings(draft, trackingActive, onStartTracking, onStopTracking) { draft = it }
             SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
             GestureHelp(onOpenGestures)
             ClassicScreens(onOpenLive, onOpenClassic)
@@ -141,27 +141,23 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
 }
 
 /**
- * Section « Suivi parent » : lien du site envoyé par le bouton « Partager le
- * suivi » du Direct (message WhatsApp). Lien générique tant qu'un seul proche
- * est suivi (pas de cloisonnement par utilisateur pour l'instant).
+ * Section « Suivi parent » : lien du site envoyé par « Partager le suivi »
+ * (message WhatsApp) + démarrage/arrêt du suivi permanent. Lien générique tant
+ * qu'un seul proche est suivi (pas de cloisonnement par utilisateur pour l'instant).
  */
 @Composable
-private fun ParentShareSettings(draft: Settings, onChange: (Settings) -> Unit) {
+private fun ParentShareSettings(
+    draft: Settings,
+    trackingActive: Boolean,
+    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStopTracking: () -> Unit,
+    onChange: (Settings) -> Unit,
+) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Suivi parent",
-            color = AppColors.text,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        LabeledField("Lien du site de suivi (bouton Partager du Direct)", draft.parentSiteUrl, false) {
+        Text("Suivi parent", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        LabeledField("Lien du site de suivi", draft.parentSiteUrl, false) {
             onChange(draft.copy(parentSiteUrl = it))
         }
-        Text(
-            "Le bouton « Partager le suivi » du Direct envoie ce lien par WhatsApp.",
-            color = AppColors.textMuted,
-            fontSize = 11.sp,
-        )
         SwitchRow("Envoyer la position + objets au site pendant le Direct", draft.shareEnabled) {
             onChange(draft.copy(shareEnabled = it))
         }
@@ -172,8 +168,21 @@ private fun ParentShareSettings(draft: Settings, onChange: (Settings) -> Unit) {
             onChange(draft.copy(shareWriteKey = it))
         }
         Text(
-            "La géoloc demandée au démarrage sert uniquement à ce partage ; sans elle," +
-                " le site affiche le dernier état connu puis « signal perdu ».",
+            "Partager envoie le lien du site à un proche par WhatsApp, puis démarre le suivi " +
+                "permanent (notification en haut de l'écran). Le bouton « Arrêter le suivi », " +
+                "ci-dessous ou dans la notification, le coupe.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+        if (trackingActive) {
+            BigButton("Arrêter le suivi", true, AppColors.danger, onStopTracking)
+        } else {
+            BigButton("📤 Partager le suivi", true, AppColors.primary, onClick = { onStartTracking(draft.parentSiteUrl, draft.shareId) })
+        }
+        Text(
+            "En poche (écran éteint), la position seule continue d'être envoyée toutes les " +
+                "15 s pour la batterie ; écran allumé, le partage complet reste à la cadence " +
+                "de 2 s. Les objets entourés réapparaissent dès que le Direct rouvre.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )

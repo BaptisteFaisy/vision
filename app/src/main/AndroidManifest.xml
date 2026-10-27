@@ -5,10 +5,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Suivi parent : position du téléphone envoyée au site pendant le partage
-         (premier plan uniquement, jamais en arrière-plan). -->
+    <!-- Suivi parent : position du téléphone envoyée au site pendant le partage.
+         ACCESS_BACKGROUND_LOCATION + service de premier plan type location =
+         le suivi continue écran éteint (notification « Suivi en direct actif »). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Micro de l'écran verrouillé : service de premier plan typé `microphone` (Android 14+),
          réveil partiel pendant la capture, et notification visible sur l'écran de verrouillage. -->
@@ -84,6 +89,12 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Suivi permanent : notification + position GPS, écran éteint ou non. -->
+        <service
+            android:name=".ShareTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
     </application>
 

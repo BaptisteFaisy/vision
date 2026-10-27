@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.distance.DistanceText
 
-/** Bandeau du haut : retour, réglages, mode de vision, ligne d'état du direct, erreurs. */
+/* * Bandeau du haut : retour, réglages, mode de vision, ligne d'état du direct, erreurs.
+ * Le bouton « Partager le suivi » vit dans les Réglages, pas ici (suivi permanent). */
 @Composable
 fun LiveTopBar(
     state: LiveUiState,
@@ -36,7 +37,6 @@ fun LiveTopBar(
     onToggleSam: () -> Unit,
     onToggleTracker: () -> Unit,
     onToggleLocal: () -> Unit,
-    onShareParent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
@@ -47,8 +47,6 @@ fun LiveTopBar(
             TrackerChip(state.trackerEnabled, onToggleTracker)
             LocalModeChip(state, onToggleLocal)
             TransportChip(state.transport)
-            Spacer(Modifier.weight(1f))
-            Chip("📤 Partager", AppColors.success, onShareParent)
         }
         LiveStatusLines(state)
         state.spoken?.let { phrase ->
