@@ -74,6 +74,14 @@ plus à remplir la vignette ; le fil lève l'ambiguïté entre deux boîtes vois
 centrée ne disait pas de quel objet elle parlait, et une pastille poussée vers le bas pouvait atterrir sur un
 autre objet).
 
+Sur demande du user le 27/10/2026, ce verre devient **partiellement transparent**, en forme de capsule :
+la caméra reste visible à travers un fond sombre en dégradé, légèrement teinté par le masque. Le contour
+reprend `maskColorAt(colorIndex)`, comme la puce et le fil, avec un reflet intérieur discret. Le texte blanc
+garde une ombre courte pour rester lisible sur une scène claire, et les chiffres tabulaires évitent les
+variations de largeur d'un chiffre à l'autre. Le fond est isolé dans `DistanceBadgeSurface.kt`, partagé par
+les hôtes de `LiveDistanceLayer` (caméra iSee, photo et Direct). Tous les fils sont dessinés avant toutes
+les pastilles pour ne jamais passer par-dessus leur texte.
+
 Le placement est une fonction pure (`placePills`, `DistanceLayout.kt`) : alignement sur le coin de la boîte,
 **bornage dans le cadre**, **jamais sous le bandeau du haut** (inset **230 dp** — `TOP_SAFE_INSET` : boutons
 « Arrêter / Réglages », ligne d'état, concepts), et **empilement vers le bas** par pas de
