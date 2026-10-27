@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Voix ElevenLabs » des réglages : clé API (masquée), ID de voix et test de
- * synthèse. La clé reste chiffrée dans le store : elle n'est jamais écrite dans le code.
+ * "ElevenLabs voice" section of Settings: masked API key, voice ID and synthesis
+ * test. The key stays encrypted in the store: it is never written into the code.
  */
 @Composable
 fun TtsSettings(
@@ -29,20 +29,20 @@ fun TtsSettings(
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Voix ElevenLabs (lecture à voix haute)",
-            color = AppColors.text,
+            "ElevenLabs voice (read aloud)",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
         VoiceLanguageSettings(draft, onChange)
-        LabeledField("Clé API ElevenLabs", draft.ttsApiKey, true) { onChange(draft.copy(ttsApiKey = it)) }
-        LabeledField("ID de voix ElevenLabs", draft.ttsVoiceId, false) { onChange(draft.copy(ttsVoiceId = it)) }
+        LabeledField("ElevenLabs API key", draft.ttsApiKey, true) { onChange(draft.copy(ttsApiKey = it)) }
+        LabeledField("ElevenLabs voice ID", draft.ttsVoiceId, false) { onChange(draft.copy(ttsVoiceId = it)) }
         Text(
-            "Voix par défaut : Laure ${Settings.LAURE_VOICE_ID}. Replis : Sarah " +
-                "${Settings.SARAH_VOICE_ID} (premade, compte free) · George " +
-                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} (celle de " +
-                "l'intro) est une voix de bibliothèque : elle répond 402 sans crédits.",
-            color = AppColors.textMuted,
+            "Default voice: Laure ${Settings.LAURE_VOICE_ID}. Fallbacks: Sarah " +
+                "${Settings.SARAH_VOICE_ID} (premade, free tier) · George " +
+                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} (the intro " +
+                "voice) is a library voice: it answers 402 without credits.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
         SpeedSetting(draft, onChange)
@@ -51,7 +51,10 @@ fun TtsSettings(
             text = testVoiceText(draft.speechLanguage),
             onSpeak = onSpeak,
             onStop = onStop,
-            actionLabel = "Tester la voix",
+            actionLabel = "Test voice",
+            labelColor = SettingsLight.muted,
+            buttonTextColor = SettingsLight.text,
+            buttonBorderColor = SettingsLight.border,
         )
         VoiceSwitches(draft, onChange)
         IntroSetting(draft) { onChange(draft.copy(introEnabled = it)) }
@@ -59,8 +62,8 @@ fun TtsSettings(
 }
 
 /**
- * Vitesse des voix (×0,5 à ×2, ×1,9 par défaut) : crans de ±0,1 au bouton,
- * appliqués en lecture locale — même l'audio en cache parle à la vitesse choisie.
+ * Voice speed (×0.5 to ×2, ×1.9 by default): ±0.1 steps on the buttons, applied
+ * in local playback — even cached audio speaks at the chosen speed.
  */
 @Composable
 private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
@@ -69,80 +72,80 @@ private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Vitesse de la voix", color = AppColors.text, fontSize = 13.sp)
+        Text("Voice speed", color = SettingsLight.text, fontSize = 13.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, -0.1f))) }) {
                 Text("−", fontSize = 18.sp)
             }
-            Text(formatTtsSpeed(draft.ttsSpeed), color = AppColors.text, fontSize = 15.sp)
+            Text(formatTtsSpeed(draft.ttsSpeed), color = SettingsLight.text, fontSize = 15.sp)
             TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, 0.1f))) }) {
                 Text("+", fontSize = 18.sp)
             }
         }
     }
     Text(
-        "Aussi réglable à la voix sur iSee : « vitesse 1,5 », « parle plus vite », " +
-            "« ralentis », « vitesse normale ».",
-        color = AppColors.textMuted,
+        "Also adjustable by voice on iSee: « speed 1.5 », « speak faster », " +
+            "« slow down », « normal speed ».",
+        color = SettingsLight.muted,
         fontSize = 11.sp,
     )
 }
 
 /**
- * Les deux bascules de lecture : réponses du chat (bouton 🔊 ou automatique) et
- * annonce des positions détectées. Une ligne d'explication sous chacune.
+ * The playback switches: chat replies (🔊 button or automatic) and detected
+ * position announcements. One explanation line under each.
  */
 @Composable
 private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
     SwitchRow(
-        label = "Lire les réponses automatiquement",
+        label = "Read replies automatically",
         checked = draft.ttsAutoplay,
     ) { onChange(draft.copy(ttsAutoplay = it)) }
     Text(
-        "Activé : chaque réponse du chat est lue dès qu'elle arrive. Désactivé : bouton 🔊 seulement.",
-        color = AppColors.textMuted,
+        "On: every chat reply is read as soon as it arrives. Off: 🔊 button only.",
+        color = SettingsLight.muted,
         fontSize = 11.sp,
     )
     SwitchRow(
-        label = "Annoncer les objets et leur distance",
+        label = "Announce objects and their distance",
         checked = draft.ttsAnnouncePositions,
     ) { onChange(draft.copy(ttsAnnouncePositions = it)) }
     Text(
-        "Activé : en mode Direct (et après l'analyse d'une photo), la voix dit où sont les " +
-            "objets et à quelle distance — « Personne à 9 heures, à 1,4 mètre ; chien à " +
-            "midi, à 3 mètres ». Une annonce toutes les 4 s au plus, et seulement si la " +
-            "scène change : un objet qui s'approche d'un mètre est ré-annoncé.",
-        color = AppColors.textMuted,
+        "On: in Direct mode (and after a photo analysis), the voice says where " +
+            "objects are and how far — « Person at 9 o'clock, 1.4 meters; dog at " +
+            "noon, 3 meters ». At most one announcement every 4 s, and only when the " +
+            "scene changes: an object coming one meter closer is re-announced.",
+        color = SettingsLight.muted,
         fontSize = 11.sp,
     )
     SwitchRow(
-        label = "Guider tout droit (caméra iSee)",
+        label = "Guide straight ahead (iSee camera)",
         checked = draft.ttsGuidanceStraight,
     ) { onChange(draft.copy(ttsGuidanceStraight = it)) }
     Text(
-        "Activé : la page caméra dit la consigne de marche au lieu des positions — " +
-            "« Continue tout droit. » ou « Personne à 2 mètres à midi, va à gauche. ». " +
-            "Calculé sur le téléphone depuis SAM, sans appel LLM ; un obstacle qui entre " +
-            "dans le couloir parle aussitôt, même avant les 4 s.",
-        color = AppColors.textMuted,
+        "On: the camera page speaks the walking instruction instead of positions — " +
+            "« Keep going straight. » or « Person 2 meters away at noon, go left. ». " +
+            "Computed on the phone from SAM, no LLM call; an obstacle entering the " +
+            "corridor speaks up at once, even before the 4 s.",
+        color = SettingsLight.muted,
         fontSize = 11.sp,
     )
 }
 
-/** Bascule « intro » + son explication : le premier message du chat de iSee. */
+/** "Intro" switch + its explanation: the first message of the iSee chat. */
 @Composable
 private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     SwitchRow(label = introToggleLabel(draft.introEnabled), checked = draft.introEnabled, onChange = onChange)
     Text(
-        "Intro embarquée (voix Jade US, hors ligne) : jouée une seule fois à la première " +
-            "ouverture, comme premier message du chat. On la coupe à l'appui long en " +
-            "dictant : « Désactive iSee intro » (ou « Disable iSee intro »).",
-        color = AppColors.textMuted,
+        "Built-in intro (Jade US voice, offline): played once at the first opening, " +
+            "as the first chat message. It is cut with a long press by dictating " +
+            "« Disable iSee intro ».",
+        color = SettingsLight.muted,
         fontSize = 11.sp,
     )
 }
 
-/** Ligne « libellé + interrupteur » : une seule implémentation pour toutes les bascules. */
+/** "Label + switch" row: a single implementation for all switches. */
 @Composable
 internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
@@ -150,7 +153,7 @@ internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> U
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, color = AppColors.text, fontSize = 13.sp)
+        Text(label, color = SettingsLight.text, fontSize = 13.sp)
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }

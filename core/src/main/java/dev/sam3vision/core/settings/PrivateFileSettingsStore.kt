@@ -118,6 +118,7 @@ internal object SettingsCodec {
     private const val K_SHARE_ENABLED = "shareEnabled"
     private const val K_SHARE_ID = "shareId"
     private const val K_SHARE_WRITE_KEY = "shareWriteKey"
+    private const val K_CAREGIVER_INVITE = "caregiverInvite"
     private const val K_MAX_OBJECTS = "maxObjects"
 
     fun encode(s: Settings): String = buildString {
@@ -150,6 +151,7 @@ internal object SettingsCodec {
         appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
         appendLine("$K_SHARE_ID=${s.shareId}")
         appendLine("$K_SHARE_WRITE_KEY=${s.shareWriteKey}")
+        appendLine("$K_CAREGIVER_INVITE=${s.caregiverInvite}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
     }
 
@@ -197,6 +199,7 @@ internal object SettingsCodec {
             shareEnabled = values[K_SHARE_ENABLED]?.toBooleanStrictOrNull() ?: default.shareEnabled,
             shareId = values[K_SHARE_ID].orEmpty().ifBlank { default.shareId },
             shareWriteKey = values[K_SHARE_WRITE_KEY].orEmpty(),
+            caregiverInvite = values[K_CAREGIVER_INVITE].orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),

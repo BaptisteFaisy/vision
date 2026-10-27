@@ -165,7 +165,7 @@ private fun RouteHost(
         Route.Chat -> ChatRoute(state, viewModel, pop)
         is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
         Route.Caregiver -> CaregiverScreen(
-            link = dev.sam3vision.core.share.validatedShareLink(state.settings.parentSiteUrl).orEmpty(),
+            link = dev.sam3vision.core.share.validatedShareLink(caregiverShareLink(state.settings)).orEmpty(),
             onBack = onCaregiverBack,
             onLinkChanged = { viewModel.saveSettings(state.settings.copy(parentSiteUrl = it)) },
         )

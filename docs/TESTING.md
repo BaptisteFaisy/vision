@@ -14,23 +14,23 @@ ce qui n'a pas été rejoué est au §4.
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 907
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 466
-grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 84
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1137
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 562
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 92
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 6
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 ```
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 126 (dont 12 aides) | 114 | **907** |
-| `:app` | 71 (dont 2 aides) | 69 | **466** |
-| **Total JVM** | **197** | **183** | **1 373** |
+| `:core` | 154 (dont 12 aides) | 142 | **1137** |
+| `:app` | 86 (dont 3 aides) | 83 | **562** |
+| **Total JVM** | **240** | **225** | **1 699** |
 | `:app` `androidTest` | 1 | 1 | **6** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **1 373 tests JVM** au total, dont **907** dans `:core` et **466** dans `:app`. Dans `:app`, le
-  banc lunettes pèse **84** (`glasses/bench/`) et le reste du paquet `glasses` **26**. Les
+- **1 699 tests JVM** au total, dont **1137** dans `:core` et **562** dans `:app`. Dans `:app`, le
+  banc lunettes pèse **92** (`glasses/bench/`) et le reste du paquet `glasses` **26**. Les
   **7 tests instrumentés** (6 + 1) sont hors de ce total.
 - Le banc lunettes **n'est plus un module** : ses tests JVM sont dans
   `app/src/test/…/glasses/bench/` et comptent donc dans `:app`, sans ligne à part.

@@ -13,41 +13,39 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Section « Langue de la voix » des Réglages : la personne parle **français** ou
- * **anglais**.
+ * "Voice language" section of Settings: the person speaks **French** or **English**.
  *
- * Ce que la langue change : les annonces des objets et de leur distance, les réponses
- * du chat (elles sont lues telles quelles) et la consigne donnée au modèle. Ce qu'elle
- * ne change pas : l'interface, qui reste en français.
+ * What the language changes: object and distance announcements, chat replies
+ * (read as-is) and the instruction given to the model. What it does not change:
+ * anything else.
  */
 @Composable
 fun VoiceLanguageSettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Langue de la voix",
-            color = AppColors.text,
+            "Voice language",
+            color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
         SpeechLanguage.entries.forEach { language ->
             val active = draft.speechLanguage == language
-            BigButton(
+            GlassButton(
                 label = language.label,
                 enabled = true,
-                color = if (active) AppColors.primary else AppColors.surfaceHigh,
+                primary = active,
                 onClick = { onChange(pickVoiceLanguage(draft, language)) },
             )
         }
         Text(
-            "La personne parle dans cette langue : annonces des objets et de leur " +
-                "distance, réponses du chat lues à voix haute. L'interface, elle, reste " +
-                "en français.",
-            color = AppColors.textMuted,
+            "The person speaks in this language: object and distance announcements, " +
+                "chat replies read aloud.",
+            color = SettingsLight.muted,
             fontSize = 11.sp,
         )
     }
 }
 
-/** Choix de la langue de la voix : un seul endroit qui écrit le réglage. */
+/** Voice language choice: a single place that writes the setting. */
 internal fun pickVoiceLanguage(draft: Settings, language: SpeechLanguage): Settings =
     draft.copy(speechLanguage = language)

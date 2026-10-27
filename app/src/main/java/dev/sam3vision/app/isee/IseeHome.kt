@@ -28,6 +28,14 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Set
     // Retour système : ouvre les Réglages (clés API, tests) sans bouton sur la surface.
     BackHandler(enabled = true) { onOpenSettings() }
     if (sharingReady) IseeShare(state, viewModel, settings)
+    // Ordre vocal « settings » : ouvre les Réglages une fois, puis consomme la demande.
+    val openSettings = state.openSettings
+    LaunchedEffect(openSettings) {
+        if (openSettings) {
+            viewModel.settingsOpened()
+            onOpenSettings()
+        }
+    }
 
     IseeScenePane(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
 }

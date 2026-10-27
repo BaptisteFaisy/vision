@@ -4,22 +4,22 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Le bloc « build » dit seulement si une clé est là — jamais sa valeur. */
+/** The "build" block only says whether a key is there — never its value. */
 class BuildInfoTest {
 
     @Test
-    fun `le resume dit oui ou non pour chaque moteur`() {
+    fun `the summary says yes or no for each engine`() {
         val summary = buildConfigSummary(llm = true, voice = false, sam = true, asr = false)
-        assertTrue(summary.contains("LLM : oui"))
-        assertTrue(summary.contains("voix : non"))
-        assertTrue(summary.contains("dictée : non"))
-        assertTrue(summary.contains("SAM : oui"))
+        assertTrue(summary.contains("LLM: yes"))
+        assertTrue(summary.contains("voice: no"))
+        assertTrue(summary.contains("dictation: no"))
+        assertTrue(summary.contains("SAM: yes"))
     }
 
     @Test
-    fun `un build sans aucune cle le dit sans rien inventer`() {
+    fun `a keyless build says so without inventing anything`() {
         val summary = buildConfigSummary(llm = false, voice = false, sam = false, asr = false)
-        assertTrue(summary.contains("LLM : non"))
-        assertFalse(summary.contains(": oui"))
+        assertTrue(summary.contains("LLM: no"))
+        assertFalse(summary.contains(": yes"))
     }
 }

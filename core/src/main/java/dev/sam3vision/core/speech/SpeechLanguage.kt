@@ -18,8 +18,8 @@ enum class SpeechLanguage(
     /** Nom de la langue écrit dans les consignes envoyées au LLM. */
     val llmName: String,
 ) {
-    Fr(label = "Voix en français (fr)", code = "fr", llmName = "français"),
-    En(label = "Voix en anglais (en)", code = "en", llmName = "English"),
+    Fr(label = "French voice (fr)", code = "fr", llmName = "français"),
+    En(label = "English voice (en)", code = "en", llmName = "English"),
     ;
 
     companion object {

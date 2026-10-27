@@ -16,12 +16,12 @@ enum class SamRegion(
     val presetBaseUrl: String,
 ) {
     Eu(
-        label = "GPU en Europe (eu)",
+        label = "GPU in Europe (eu)",
         code = "EU",
         presetBaseUrl = "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
     ),
     Us(
-        label = "GPU aux États-Unis (us)",
+        label = "GPU in the United States (us)",
         code = "US",
         presetBaseUrl = "https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run",
     );
