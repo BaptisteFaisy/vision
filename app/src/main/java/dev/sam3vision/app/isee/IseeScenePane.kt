@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -38,7 +39,7 @@ import dev.sam3vision.core.iseedesign.voiceEnvelope
  * L'écran iSee au design « Portrait » : fond blanc, une seule boule de verre au liquide marbré
  * (plus de satellites, plus de pixels), et seulement la phrase en cours, en gros, sous la boule.
  * Quand la caméra tourne (vidéo ou photo), la rue occupe le haut de l'écran et se fond dans le
- * blanc ; la boule rétrécit et se pose sur la jointure. Le user parle : liquide bleu, mots qui
+ * blanc ; la boule rétrécit et reste dessous. Le user parle : liquide bleu, mots qui
  * s'allument en bleu puis passent au noir. iSee parle : liquide ambre, couronne ambre autour de
  * la boule, mot en cours en ambre. Toute l'interaction reste aux gestes de `IseeRootLayout`.
  *
@@ -69,13 +70,16 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val captureLive = state.recordingVideo
     val layers = iseeSceneLayers(bubbleCount(state.entries.size), dissolving = false, captureLive = captureLive)
     val open = rememberCameraOpen(layers.cameraCard)
+    val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
+    val talking = position != null || (state.holding && state.userSpeaking)
+    val speech by animateFloatAsState(if (talking) 1f else 0f, tween(420), label = "camera-speech")
     val density = LocalDensity.current
-    val geo = with(density) { portraitGeometry(width.toPx(), height.toPx(), open) }
+    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
     val time = rememberSceneTime()
-    PortraitCamera(state, glue, probe, viewModel, open, height)
+    with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp()) }
     OrbLayer(view.scene, geo, time, open)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
-    with(density) { SpokenLine(view, state, (geo.textTop).toDp(), compact = open > 0.5f) }
+    with(density) { SpokenLine(currentCaption(state, position), state.holding, geo.textTop.toDp(), compact = open > 0.5f) }
     BottomScrim()
 }
 
@@ -96,7 +100,7 @@ private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, time: Float, open:
     Canvas(Modifier.fillMaxSize()) {
         val c = Offset(geo.orbX, geo.orbY + lift)
         val r = geo.orbR * breathe
-        drawOrbShadow(c, r, 1f - open)
+        drawOrbShadow(c, r, 1f)
         paint(this, c, r, look)
         if (look.see > 0.01f) drawVoiceCrown(c, r, time, look.see, look.amp)
     }

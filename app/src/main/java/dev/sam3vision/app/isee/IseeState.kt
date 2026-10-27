@@ -34,6 +34,10 @@ data class IseeUiState(
     val transcribing: Boolean = false,
     val thinking: Boolean = false,
     val speakingEntryId: Long? = null,
+    /** Annonce parlée hors des bulles (proximité, navigation, réglage vocal). */
+    val speakingText: String = "",
+    val liveTranscript: String = "",
+    val userSpeaking: Boolean = false,
     val recordingVideo: Boolean = false,
     val status: String? = null,
 )
@@ -78,6 +82,9 @@ const val INTRO_BUBBLE_ID = -2L
 
 /** ID de la confirmation de vitesse : pas une bulle, mais une lecture à part entière. */
 const val SPEED_BUBBLE_ID = -3L
+
+/** Annonce hors conversation, avec le même lecteur et les mêmes sous-titres. */
+const val ANNOUNCEMENT_BUBBLE_ID = -4L
 
 /** Sélection de l'intro : elle occupe toujours la première bulle du chat. */
 const val INTRO_SELECTION = 0

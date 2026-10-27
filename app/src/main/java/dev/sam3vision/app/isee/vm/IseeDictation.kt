@@ -20,6 +20,8 @@ class IseeHoldMic(
 ) : IseeMic {
     override fun start(): Boolean = transcript.start()
 
+    fun preview() = transcript.preview()
+
     override suspend fun stop(client: SpeechClient): Result<Pair<String, ByteArray>> =
         transcript.stop(client)
 
