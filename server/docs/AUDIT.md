@@ -1,4 +1,4 @@
-# AUDIT — sam3-vision-app (2026-10-24)
+# AUDIT — sam3-vision-app (24 octobre 2026)
 
 Périmètre : backend Modal SAM 3.1 + app Expo. Audit statique, tests unitaires, tests E2E contre le
 backend déployé (`…sam3service-web.us-east.modal.run`), cas d'erreur du contrat, latence.
@@ -78,7 +78,7 @@ Relevées, **non corrigées** (hors périmètre d'autorisation : `scripts/*.sh`,
 
 1. `scripts/rotate_llm_secret.sh` recopie `scripts/deploy_backend.sh` : en-tête `MODAL_BIN` /
    `MODAL_PROFILE` / `SECRET_NAME` / `BASE_URL_DEFAULT`, les helpers `log()` et `die()`, et surtout le
-   bloc « mktemp chmod 600 → heredoc python JSON → `modal secret create --from-json --force` → rm ».
+   bloc « mktemp chmod 600 → heredoc python JSON → `modal secret create --from-json (avec écrasement)` → rm ».
    Deux implémentations d'un chemin sensible aux secrets : à remonter dans `scripts/lib-env.sh`
    (`sync_secret` + `log`/`die` + par défauts Modal), les deux scripts ne gardant que l'appel.
 2. `legacy-expo-app/src/theme.ts` : `MASK_COLORS` réécrit les littéraux déjà dans `colors`
@@ -162,7 +162,7 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
 400 de validation **0,30 s**. Le décodage d'entrée coûte ~1 s, l'encodeur vision une seule fois pour
 tous les prompts : c'est ce qui explique que 8 concepts et 2 concepts soient à ~0,3 s d'écart.
 
-## 9. Finitions (2026-10-24, après audit)
+## 9. Finitions (24 octobre 2026, après audit)
 
 Points §4 et §5 traités sans déploiement, sans modification de secret, sans toucher à
 `legacy-expo-app/app.json` ni `legacy-expo-app/android/`.
@@ -170,7 +170,7 @@ Points §4 et §5 traités sans déploiement, sans modification de secret, sans 
 1. **Dédup du chemin secret (§4.1)** : `scripts/lib-env.sh` porte désormais `log/ok/warn/die`,
    les défauts Modal (`MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAME`, `APP_NAME`, `BASE_URL_DEFAULT`),
    `DRY_RUN`, `check_env_keys`/`require_keys` et **`sync_secret_from_env`** (mktemp `chmod 600` →
-   JSON → `modal secret create --from-json --force`). `deploy_backend.sh` (149 lignes) et
+   JSON → `modal secret create --from-json (avec écrasement)`). `deploy_backend.sh` (149 lignes) et
    `rotate_llm_secret.sh` (67 lignes) ne gardent que leur logique propre ; `dev_qr.sh` réutilise
    aussi les helpers. Une seule implémentation du chemin sensible, et elle **refuse** de tourner
    sans `LLM_API_KEY` (vérifié : `DRY_RUN=1` sans clé → code 1, aucun appel modal).

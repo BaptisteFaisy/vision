@@ -3,7 +3,7 @@
 Un script = un rôle. `lib-env.sh` est un helper *sourcé* (pas exécutable seul) :
 `PROJECT_ROOT`, `log/ok/warn/die`, `find_jdk` / `sdk_env` (Android) et le **chemin unique
 du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret create
---from-json --force`, jamais de clé en argument).
+--from-json (avec écrasement)`, jamais de clé en argument).
 
 ## Tests
 
