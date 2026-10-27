@@ -8,20 +8,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import dev.sam3vision.core.settings.Settings
 
 /**
- * L'écran d'accueil iSee : la scène du design, plein écran. Une grande bulle de verre
- * entourée de satellites porte le message courant (gros texte paginé sur 3 lignes,
- * libellé YOU / ISEE, texte bleu quand c'est la voix du user) ; la carte caméra prend
- * sa place pendant l'enregistrement, puis se dissout en pixels dans la bulle qui
- * grandit. Le message affiché est toujours le dernier : la navigation entre messages
- * (balayage vertical) a été supprimée — c'est [IseeScenePane] qui remplace l'ancienne
- * liste de bulles, il n'en reste qu'une à l'écran.
+ * L'accueil Portrait : fond blanc, une seule boule de verre et la phrase courante.
+ * La caméra se fond en haut pendant la capture ; aucun historique ni satellite.
+ * Le partage relaie les objets et le texte vers le lien reçu par le caregiver.
  *
  * Toute l'interaction passe par les gestes de `IseeRootLayout` ; le pane reste muet.
  */
 @Composable
-fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit) {
+fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Settings) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(Unit) { viewModel.refreshSettings() }
     DisposableEffect(Unit) {
@@ -30,6 +27,7 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit) {
     }
     // Retour système : ouvre les Réglages (clés API, tests) sans bouton sur la surface.
     BackHandler(enabled = true) { onOpenSettings() }
+    IseeShare(state, viewModel, settings)
 
     IseeScenePane(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
 }

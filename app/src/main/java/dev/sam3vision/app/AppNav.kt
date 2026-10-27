@@ -156,6 +156,7 @@ private fun RouteHost(
         Route.Isee -> IseeHome(
             viewModel = isee,
             onOpenSettings = { push(Route.Settings) },
+            settings = state.settings,
         )
         Route.Capture -> CaptureRoute(viewModel, push)
         Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)
@@ -163,8 +164,9 @@ private fun RouteHost(
         Route.Chat -> ChatRoute(state, viewModel, pop)
         is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
         Route.Caregiver -> CaregiverScreen(
-            link = shareLink(state.settings.parentSiteUrl, state.settings.shareId),
+            link = dev.sam3vision.core.share.validatedShareLink(state.settings.parentSiteUrl).orEmpty(),
             onBack = onCaregiverBack,
+            onLinkChanged = { viewModel.saveSettings(state.settings.copy(parentSiteUrl = it)) },
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
@@ -230,9 +232,8 @@ private fun LiveRoute(
     pop: () -> Unit,
     settings: Settings,
 ) {
-    val context = LocalContext.current
     val liveState by liveViewModel.state.collectAsState()
-    ShareRelay(liveState.distanceLayer, settings, context)
+    ShareRelay(liveState.distanceLayer, settings)
     LiveScreen(
         viewModel = liveViewModel,
         onBack = { liveViewModel.stop(); pop() },
@@ -242,31 +243,6 @@ private fun LiveRoute(
         },
         onOpenSettings = { push(Route.Settings) },
     )
-}
-
-/**
- * Relais GPS+objets vers le site parent pendant le Direct : écoute active tant
- * que l'écran est affiché, envoi à chaque couche de distances (throttle 2 s).
- * [ShareGate] dit au service de suivi de patienter, pour ne pas doubler l'envoi.
- */
-@Composable
-private fun ShareRelay(layer: DistanceLayer?, settings: Settings, context: Context) {
-    val broadcaster = remember(context) { ShareBroadcaster(context) }
-    LaunchedEffect(settings.shareEnabled) {
-        ShareGate.screenPublishing = settings.shareEnabled
-        broadcaster.start(settings.shareEnabled)
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            ShareGate.screenPublishing = false
-            broadcaster.stop()
-        }
-    }
-    LaunchedEffect(layer) {
-        if (layer != null && !layer.empty) {
-            broadcaster.publish(System.currentTimeMillis(), settings, layer)
-        }
-    }
 }
 
 @Composable

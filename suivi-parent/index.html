@@ -1,250 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Leo</title>
-<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-<style>
-:root{--bg:#0b1328;--card:#111c33;--line:#24365a;--fg:#e2e8f0;--muted:#94a3b8;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--green:#22c55e}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:Inter,system-ui,sans-serif;background:#0f172a;color:var(--fg);min-height:100vh;display:flex;justify-content:center}
-.app{width:100%;max-width:480px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
-header{position:sticky;top:0;z-index:10;background:rgba(11,19,40,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 14px}
-.topline{display:flex;align-items:center;gap:10px}
-.live-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(34,197,94,.2);animation:pulse 1.6s infinite;flex:none}
-.live-dot.lost{background:var(--orange);box-shadow:0 0 0 5px rgba(245,158,11,.18);animation:none}
-.live-dot.off{background:#475569;box-shadow:none;animation:none}
-@keyframes pulse{50%{box-shadow:0 0 0 9px rgba(34,197,94,.05)}}
-.sub{font-size:12px;color:var(--muted)}
-.credit{font-size:10px;line-height:1.4;color:#64748b;margin-top:6px}
-main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
-.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#93c5fd;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-#map{height:420px;border-radius:12px;overflow:hidden;background:#dde3e9;position:relative}
-#map-wrap{position:relative;border-radius:12px;overflow:hidden}
-.legend{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
-.pill{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:700}
-.pill.green{background:var(--green);color:#06130b}.pill.red{background:var(--red);color:#fff}.pill.orange{background:var(--orange);color:#111}.pill.grey{background:#334155;color:#e2e8f0}
-.styles{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.styles button{flex:1;min-width:70px;border:1px solid var(--line);background:#0d1730;color:var(--fg);border-radius:10px;padding:8px 6px;font-size:11px;font-weight:700;cursor:pointer}.styles button.on{background:var(--blue);border-color:var(--blue);color:#fff}
-.maprow{display:flex;gap:8px;margin-bottom:8px}
-.maprow button{flex:1;border:1px solid var(--line);background:#0d1730;color:var(--fg);border-radius:10px;padding:8px 6px;font-size:12px;font-weight:700;cursor:pointer}
-#status-note{display:none;background:rgba(11,19,40,.6);border:1px solid var(--line);border-radius:12px;padding:9px 11px;font-size:12px;line-height:1.45;color:var(--fg);margin-top:8px}
-#status-note b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
-#status-note.lost{border-color:rgba(245,158,11,.5)}#status-note.lost b{color:#fbbf24}
-#status-note.off{border-color:#334155}#status-note.off b{color:#cbd5e1}
-@media(min-width:900px){.app{max-width:480px;box-shadow:0 0 60px rgba(0,0,0,.5)}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>iSee · Caregiver</title>
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script type="module" src="./live.mjs"></script>
 </head>
 <body>
-<div class="app">
-<header>
-<div class="topline"><span class="live-dot off" id="dot"></span><div><span class="pill grey" id="live-badge">OFFLINE</span><div class="sub" id="indoor" style="display:none;margin-top:4px"></div></div></div>
-</header>
-<main>
-<div class="card"><div class="styles"><button data-s="hybrid" class="on">🛰️ Hybrid</button><button data-s="satellite">🌍 Satellite</button><button data-s="plan">✨ Plan</button><button data-s="terrain">⛰️ Terrain</button></div><div class="maprow"><button id="recenter">📍 Center on Leo</button></div><div id="map-wrap"><div id="map"></div></div>
-<div class="credit" id="credit">Imagery © Esri, Maxar, Earthstar Geographics · Map data © OpenStreetMap contributors</div>
-<div id="status-note"><b id="note-title"></b><span id="note-text"></span></div>
-<div class="keybox" id="keybox" style="display:flex;gap:8px;margin-top:8px"><input id="gkey" placeholder="Google Maps key (kept in this browser) — ?key=YOUR_KEY also works" style="flex:1;background:#0d1730;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 10px;font-size:12px"><button id="savekey" class="btn small primary" style="border:none;background:var(--blue);color:#fff;border-radius:10px;padding:8px 12px;font-weight:700">OK</button><button id="clearkey" class="btn small" title="Forget the saved key" style="display:none;border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:8px 12px;font-weight:700">✕</button></div>
-<div id="gerr" style="display:none;margin-top:6px;font-size:12px;line-height:1.5;color:#fca5a5;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:8px 10px"></div>
-<div class="legend">Pinch to zoom • +/− buttons top right • dots are the objects detected around Leo (blue point, halo = GPS accuracy).</div></div>
-</main>
-</div>
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script>
-// ---- Live stream: ?share=leo (the shared link) -> GET /api/state every 2 s.
-// Three honest states, no simulation: LIVE (< 12 s), SIGNAL LOST (< 2 min, frozen),
-// OFFLINE (no state at all, or older than the 2 min server TTL).
-const SHARE_ID=(new URLSearchParams(location.search).get('share')||'leo').toLowerCase();
-const API='/api/state?share='+encodeURIComponent(SHARE_ID);
-const HOME={lat:48.8566,lon:2.3522};
-const LIVE_MS=12000,LOST_MS=120000;
-let live=null,lastPos=null,lastState='';
-// Labels may arrive in French or English, with or without accents: strip diacritics before matching.
-function iconFor(label){
- const l=String(label||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- if(/personne|homme|femme|enfant|pieton|person|man|woman|child|pedestrian/.test(l)) return '🚶';
- if(/chien|chat|animal|dog|cat/.test(l)) return '🐕';
- if(/voiture|bus|camion|velo|moto|vehicule|car|truck|bike|motorcycle/.test(l)) return '🚗';
- if(/poteau|grille|barriere|chantier|pole|post|barrier|fence/.test(l)) return '🚧';
- if(/poubelle|bin|trash/.test(l)) return '🗑️';
- return '📦';
-}
-function ageMs(){return live?Date.now()-live.serverAt:Infinity;}
-function state(){
- if(!live) return 'offline';
- const a=ageMs();
- if(a<LIVE_MS) return 'live';
- if(a<LOST_MS) return 'lost';
- return 'offline';
-}
-function fmtAge(ms){
- if(!isFinite(ms)) return '';
- const s=Math.round(ms/1000);
- if(s<1) return 'just now';
- if(s<90) return s+' s ago';
- return Math.round(s/60)+' min ago';
-}
-// angleDeg = absolute heading (phone heading + camera angle); place the object in polar form around Leo.
-function destPoint(o,from){
- const r=o.angleDeg*Math.PI/180;
- return {lat:from.lat-o.distM*Math.cos(r)/111320,lon:from.lon+o.distM*Math.sin(r)/(111320*Math.cos(from.lat*Math.PI/180))};
-}
-// Objects only exist while the phone is reporting. Frozen (grey) during SIGNAL LOST, none when OFFLINE.
-function currentObjects(){
- const s=state();
- if(s==='offline'||!live) return [];
- return (live.objects||[]).map((o,i)=>({id:'o'+i,label:o.label,ico:iconFor(o.label),distM:o.distM,angleDeg:o.angleDeg,frozen:s==='lost'}));
-}
-function renderHead(){
- const b=document.getElementById('live-badge'),dot=document.getElementById('dot'),s=state();
- if(s==='live'){
-  b.textContent='LIVE';b.className='pill green';dot.className='live-dot';
- }else if(s==='lost'){
-  b.textContent='SIGNAL LOST';b.className='pill orange';dot.className='live-dot lost';
- }else{
-  b.textContent='OFFLINE';b.className='pill grey';dot.className='live-dot off';
- }
- const ind=document.getElementById('indoor'),show=s!=='offline'&&live&&live.fix&&live.fix.indoor;
- ind.style.display=show?'block':'none';
- if(show) ind.textContent='📍 approximate location (indoors, ±'+Math.round(live.fix.accM)+' m)';
- let note=document.getElementById('status-note');
- if(s==='live'){note.style.display='none';}
- else if(s==='lost'){
-  document.getElementById('note-title').textContent='Signal lost';
-  document.getElementById('note-text').textContent='Last position held for 2 minutes. Showing what was detected '+fmtAge(ageMs())+'; nothing is moving.';
-  note.className='lost';note.style.display='block';
- }else{
-  document.getElementById('note-title').textContent='Offline';
-  document.getElementById('note-text').textContent=lastPos
-   ?'The phone stopped reporting '+fmtAge(Date.now()-lastPos.at)+'. Nothing is shown on the map until it comes back.'
-   :'No live position yet. Open the app, start the live camera screen, then this map fills in.';
-  note.className='off';note.style.display='block';
- }
-}
-// ---- Google Maps when a key is present, otherwise the free OpenFreeMap fallback.
-// Key read from ?key= or localStorage 'gmaps_key' — never hardcoded in this file.
-const STYLE_URLS={liberty:'https://tiles.openfreemap.org/styles/liberty',positron:'https://tiles.openfreemap.org/styles/positron'};
-const ESRI_IMG='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const ESRI_REF_TR='https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}';
-const ESRI_REF_PL='https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
-function mapStyle(key){
- if(key==='sat') return {version:8,sources:{base:{type:'raster',tiles:[ESRI_IMG],tileSize:256,attribution:'© Esri, Maxar, Earthstar Geographics'}},layers:[{id:'base',type:'raster',source:'base',paint:{'raster-saturation':0.1,'raster-contrast':0.15}}]};
- if(key==='hybrid') return {version:8,sources:{base:{type:'raster',tiles:[ESRI_IMG],tileSize:256,attribution:'© Esri, Maxar, Earthstar Geographics'},refT:{type:'raster',tiles:[ESRI_REF_TR],tileSize:256},refP:{type:'raster',tiles:[ESRI_REF_PL],tileSize:256}},layers:[{id:'base',type:'raster',source:'base',paint:{'raster-saturation':0.15,'raster-contrast':0.15,'raster-brightness-min':0.05}},{id:'refT',type:'raster',source:'refT',paint:{'raster-opacity':0.9}},{id:'refP',type:'raster',source:'refP',paint:{'raster-opacity':0.9}}]};
- return STYLE_URLS[key]||STYLE_URLS.liberty;
-}
-let map=null,markers=[],gmap=null,gmarkers=[],mode='fallback',lastMapType='hybrid',lastCenter=null;
-const G_KEY=new URLSearchParams(location.search).get('key')||localStorage.getItem('gmaps_key')||'';
-if(G_KEY) document.getElementById('gkey').value=G_KEY;
-function gType(s){return s==='satellite'?'satellite':s==='plan'?'roadmap':s==='terrain'?'terrain':'hybrid';}
-function mlStyle(s){return s==='satellite'?mapStyle('sat'):s==='terrain'?mapStyle('positron'):s==='plan'?mapStyle('liberty'):mapStyle('hybrid');}
-function setModeButtons(s){document.querySelectorAll('.styles button').forEach(x=>x.classList.toggle('on',x.dataset.s===s));}
-let gAuthError='';window.gm_authFailure=()=>{gAuthError='key refused by Google (HTTP referrer restriction, API not enabled, or billing).';};
-function loadGoogle(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();gAuthError='';const sc=document.createElement('script');sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&callback=__ginit';sc.async=true;sc.onerror=()=>rej(new Error('script_error'));window.__ginit=()=>{setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));else res();},400);};document.head.appendChild(sc);setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));},6000);});}
-function showGerr(msg){const e=document.getElementById('gerr');if(!e)return;e.style.display='block';e.innerHTML=msg;}
-function pxPerMeter(lat,zoom){return 156543.03*Math.cos(lat*Math.PI/180)/Math.pow(2,zoom);}
-async function bootMap(){
- document.querySelectorAll('.styles button').forEach(b=>b.onclick=()=>{const s=b.dataset.s;setModeButtons(s);if(mode==='google'&&gmap)gmap.setMapTypeId(gType(s));else if(map){map.setStyle(mlStyle(s));map.once('styledata',syncPins);}lastMapType=s;});
- if(G_KEY){
-  try{
-   await loadGoogle(G_KEY);
-   document.getElementById('keybox').style.display='flex';
-   document.getElementById('clearkey').style.display='';
-   document.getElementById('gkey').value=G_KEY;
-   document.getElementById('gkey').title='Google key active — paste a new key and press OK to replace it, ✕ to forget it';
-   mode='google';
-   document.getElementById('credit').style.display='none'; // Google draws its own attribution on the map
-   gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
-   syncGoogle();return;
-  }catch(e){
-   showGerr('Google refused this key: '+String((e&&e.message)||e)+'<br>1) HTTP referrers of the key: add <code>https://suivi-parent.vercel.app/*</code> and <code>https://*.vercel.app/*</code>.<br>2) <code>Maps JavaScript API</code> must be <b>enabled</b> on the project.<br>3) Billing must be active, otherwise tiles stay in error even with a valid key.<br>The browser console (F12) also shows Google\'s exact message.');
-  }
- }
- try{
-  if(window.maplibregl){
-   map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[HOME.lon,HOME.lat],zoom:3,attributionControl:false});
-   map.addControl(new maplibregl.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
-   map.on('load',syncPins);
-   syncPins();
-  }
- }catch(e){document.getElementById('map').innerHTML='<div style="padding:40px;text-align:center;color:#475569">Add ?key=YOUR_KEY or enter your Google key below.</div>';}
-}
-document.getElementById('savekey').onclick=()=>{const v=document.getElementById('gkey').value.trim();if(!v)return;localStorage.setItem('gmaps_key',v);const u=new URL(location.href);u.searchParams.set('key',v);location.href=u.toString();};
-document.getElementById('clearkey').onclick=()=>{localStorage.removeItem('gmaps_key');const u=new URL(location.href);u.searchParams.delete('key');location.href=u.toString();};
-if(G_KEY){document.getElementById('clearkey').style.display='';}
-function syncPins(){
- if(!map)return;markers.forEach(m=>m.remove());markers=[];
- if(!live||!live.fix){return;}
- const from=live.fix,acc=from.accM,st=state();
- // GPS accuracy halo, drawn at its real size in metres (clamped to stay readable).
- const ppm=pxPerMeter(from.lat,map.getZoom()),halo=Math.min(220,Math.max(34,2*acc/ppm)),frozen=st!=='live';
- const wrap=document.createElement('div');
- wrap.style.cssText='position:relative;width:'+halo+'px;height:'+halo+'px';
- wrap.innerHTML='<div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,'+(frozen?'.08':'.18')+');border:2px solid rgba(37,99,235,'+(frozen?'.25':'.45')+')"></div><div style="position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px;border-radius:50%;background:'+(frozen?'#64748b':'#2563eb')+';border:4px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,'+(frozen?'.1':'.3')+')"></div>';
- markers.push(new maplibregl.Marker({element:wrap}).setLngLat([from.lon,from.lat]).addTo(map));
- currentObjects().forEach(o=>{
-  const pos=destPoint(o,from);
-  const el=document.createElement('div');
-  el.style.cssText='width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:17px;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.4);background:'+(o.frozen?'#64748b':o.distM<2?'#ef4444':o.distM<5?'#f59e0b':'#22c55e')+';'+(o.frozen?'opacity:.7;':'');
-  el.textContent=o.ico;el.title=o.label+' '+o.distM.toFixed(1)+'m';
-  markers.push(new maplibregl.Marker({element:el}).setLngLat([pos.lon,pos.lat]).addTo(map));
- });
- const moved=!lastCenter||Math.hypot(from.lat-lastCenter.lat,from.lon-lastCenter.lon)*111320>8;
- if(moved){
-  const first=!lastCenter;lastCenter={lat:from.lat,lon:from.lon};
-  try{
-   if(first) map.jumpTo({center:[from.lon,from.lat],zoom:Math.max(map.getZoom(),17)});
-   else map.easeTo({center:[from.lon,from.lat],duration:600});
-  }catch(e){}
- }
-}
-function syncGoogle(){
- if(!gmap)return;gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
- if(!live||!live.fix)return;
- const from=live.fix,acc=from.accM,st=state(),frozen=st!=='live';
- currentObjects().forEach(o=>{
-  const pos=destPoint(o,from);
-  gmarkers.push(new google.maps.Marker({position:{lat:pos.lat,lng:pos.lon},map:gmap,title:o.label+' '+o.distM.toFixed(1)+'m',label:{text:o.ico,color:'#fff',fontSize:'15px'},opacity:frozen?0.7:1}));
- });
- gmarkers.push(new google.maps.Circle({map:gmap,center:{lat:from.lat,lng:from.lon},radius:Math.max(5,acc),strokeColor:'#2563eb',strokeOpacity:frozen?.25:.45,strokeWeight:2,fillColor:'#2563eb',fillOpacity:frozen?.08:.18}));
- gmarkers.push(new google.maps.Marker({position:{lat:from.lat,lng:from.lon},map:gmap,title:'Leo',zIndex:9,icon:{path:google.maps.SymbolPath.CIRCLE,scale:9,fillColor:frozen?'#64748b':'#2563eb',fillOpacity:1,strokeColor:'#fff',strokeWeight:4}}));
- const moved=!lastCenter||Math.hypot(from.lat-lastCenter.lat,from.lon-lastCenter.lon)*111320>8;
- if(moved){
-  const first=!lastCenter;lastCenter={lat:from.lat,lon:from.lon};
-  gmap.panTo({lat:from.lat,lng:from.lon});
-  if(first&&gmap.getZoom()<16) gmap.setZoom(17);
- }
-}
-document.getElementById('recenter').onclick=()=>{
- const f=(live&&live.fix)||(lastPos?{lat:lastPos.lat,lon:lastPos.lon}:HOME);
- lastCenter={lat:f.lat,lon:f.lon};
- if(mode==='google'&&gmap)gmap.panTo({lat:f.lat,lng:f.lon});
- else if(map)map.easeTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),17),duration:600});
-};
-function renderAll(){renderHead();syncPins();syncGoogle();}
-// ---- Loop: poll the relay every 2 s; the age of the last state decides LIVE / SIGNAL LOST / OFFLINE.
-async function poll(){
- try{
-  const r=await fetch(API,{cache:'no-store'});
-  const j=await r.json();
-  if(j&&j.ok&&j.fix){
-   live={fix:j.fix,objects:j.objects||[],serverAt:j.serverAt||Date.now()};
-   lastPos={lat:j.fix.lat,lon:j.fix.lon,accM:j.fix.accM,at:live.serverAt};
-  }else if(j&&j.ok&&j.live===false){
-   live=null; // the relay dropped this stream (2 min TTL): nothing left to show
-  }
- }catch(e){/* network error: keep the last state, its age will move it to SIGNAL LOST then OFFLINE */}
- renderAll();
-}
-setInterval(()=>{
- const s=state();renderHead();
- if(s!==lastState){lastState=s;syncPins();syncGoogle();}
-},1000);
-setInterval(poll,2000);
-renderHead();poll();bootMap();
-</script>
+  <div class="app">
+    <header>
+      <div class="brand">iSee<span class="role">CAREGIVER</span></div>
+      <div class="topline" role="status"><span class="live-dot" id="dot"></span><span class="pill grey" id="live-badge">OFFLINE</span></div>
+    </header>
+    <main>
+      <section class="scene" aria-label="Description de la session partagée">
+        <div class="orb-frame" aria-hidden="true"><canvas id="orb"></canvas></div>
+        <div class="spoken">
+          <div id="speaker">ISEE</div>
+          <p id="spoken-line" aria-live="polite" aria-atomic="true">En attente du téléphone de ton proche.</p>
+        </div>
+      </section>
+      <section class="map-card" aria-label="Carte des objets détectés">
+        <div class="map-heading"><h2>Autour de ton proche</h2><button id="recenter" type="button">↗ Recentrer</button></div>
+        <div id="map-wrap"><div id="map" role="region" aria-label="Position et objets du téléphone partagé"></div></div>
+        <div class="map-footer">
+          <div><p id="session-note">La carte se remplira quand le téléphone enverra sa position.</p><p id="indoor"></p></div>
+          <details id="link-settings">
+            <summary>Lien de suivi</summary>
+          </details>
+        </div>
+        <div id="link-panel" class="settings-content" hidden>
+          <form id="shared-link-form">
+            <label for="shared-link">Lien reçu depuis le téléphone de ton proche</label>
+            <div class="input-row"><input id="shared-link" type="url" required placeholder="Colle le lien partagé" autocomplete="off"><button type="submit">Suivre</button></div>
+          </form>
+        </div>
+        <details class="map-options">
+          <summary>Options de la carte</summary>
+          <div class="styles"><button data-s="hybrid">Hybride</button><button data-s="satellite">Satellite</button><button data-s="plan" class="on">Plan</button><button data-s="terrain">Terrain</button></div>
+          <div class="input-row" id="keybox"><input id="gkey" aria-label="Clé Google Maps facultative" placeholder="Clé Google Maps (facultative)"><button type="button" id="savekey">OK</button><button type="button" id="clearkey" aria-label="Oublier la clé" style="display:none">×</button></div>
+          <div id="gerr" role="status"></div>
+          <p class="legend">Pince pour zoomer. Les icônes représentent les objets détectés ; le halo indique la précision du GPS.</p>
+        </details>
+        <p class="credit" id="credit">© OpenStreetMap contributors · OpenFreeMap · Esri, Maxar, Earthstar Geographics</p>
+      </section>
+    </main>
+  </div>
+  <script>
+    document.getElementById('link-settings').addEventListener('toggle', event => {
+      document.getElementById('link-panel').hidden = !event.target.open;
+    });
+  </script>
 </body>
 </html>
