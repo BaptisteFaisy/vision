@@ -8,8 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -65,7 +65,8 @@ import java.io.File
  * La carte caméra du design (VISION) — extraite du pane pour garder les fichiers
  * courts. Géométrie de la vidéo : grande carte ≈ 84 % de la largeur, 22 % de la
  * hauteur, centrée à ~0,198 de l'écran ; le double tap pose la photo dedans,
- * la mosaïque de pixels remplit le reste et la chip REC tient en haut à gauche.
+ * le voile de pixels n'est que l'entrée de la carte (il s'efface, voir
+ * [rememberPixelVeil]) et la chip REC tient en haut à gauche.
  *
  * C'est **l'unique** carte caméra de l'app : elle porte aussi la liaison caméra
  * ([rememberCameraGlue]), le câblage SAM ([IhearCameraWiring]) et les pastilles de
@@ -83,11 +84,7 @@ internal fun BoxWithConstraintsScope.VisionCard(
 ) {
     val w = width * 0.84f
     val h = height * 0.22f
-    val fill by animateFloatAsState(
-        targetValue = if (state.recordingVideo) 1f else 0.42f,
-        animationSpec = tween(2_400),
-        label = "vision-fill",
-    )
+    val veil = rememberPixelVeil(state)
     Box(
         Modifier
             .align(Alignment.TopCenter)
@@ -103,12 +100,37 @@ internal fun BoxWithConstraintsScope.VisionCard(
             // Une pastille par objet mesuré, posée sur la photo le temps qu'elle reste.
             LiveDistanceLayer(state.distanceLayer, topInset = 0.dp, withLabel = true)
         }
-        PixelMosaic(grid, if (state.photoPath != null) 0f else fill, circle = false, modifier = Modifier.fillMaxSize())
+        PixelMosaic(grid, veil.value, circle = false, modifier = Modifier.fillMaxSize())
         if (state.recordingVideo) RecordingChip()
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         ProbeNoticeCard(probe)
     }
 }
+
+/**
+ * Le voile de pixels de la carte : à 1 quand la carte s'allume, effacé en
+ * [PIXEL_VEIL_MS] pour rendre l'aperçu caméra net ; à 0 sur une photo (la photo du
+ * double tap se montre telle quelle).
+ *
+ * Avant : la mosaïque restait opaque pendant tout l'enregistrement — la carte
+ * n'était que 26×16 = 416 gros blocs (~39×32 px), et l'aperçu CameraX comme les
+ * masques SAM affichés dans la même surface native étaient cachés dessous.
+ */
+@Composable
+private fun rememberPixelVeil(state: IhearUiState): Animatable<Float, AnimationVector1D> {
+    val veil = remember { Animatable(1f) }
+    LaunchedEffect(state.recordingVideo, state.photoPath) {
+        when {
+            state.photoPath != null -> veil.snapTo(0f)
+            state.recordingVideo -> veil.animateTo(0f, tween(PIXEL_VEIL_MS))
+            else -> veil.snapTo(1f)
+        }
+    }
+    return veil
+}
+
+/** Durée d'effacement du voile de pixels à l'entrée de la carte (ms). */
+internal const val PIXEL_VEIL_MS = 1_100
 
 /** Notice courte en centre de carte quand aucun masque n'est là (réveil GPU, etc). */
 @Composable
