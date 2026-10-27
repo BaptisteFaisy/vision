@@ -7,6 +7,25 @@ function num(v, min, max) {
   return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 }
 
+// Optionnel : les anciennes versions de l'app continuent d'envoyer GPS + objets seuls.
+function sceneOf(scene) {
+  if (!scene || typeof scene.text !== 'string') return null;
+  return {
+    text: scene.text.slice(0, 2000),
+    fromUser: scene.fromUser === true,
+    speaking: scene.speaking === true,
+  };
+}
+
+function fixOf(f) {
+  return {
+    lat: f.lat, lon: f.lon, accM: f.accM,
+    headingDeg: num(f.headingDeg, 0, 360) ? f.headingDeg : null,
+    atMs: num(f.atMs, 0, 9e15) ? f.atMs : Date.now(),
+    indoor: f.indoor === true,
+  };
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST attendu' });
@@ -26,17 +45,12 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'objet invalide' });
     }
   }
-  await storeSet('suivi:' + b.shareId, {
-    fix: {
-      lat: f.lat,
-      lon: f.lon,
-      accM: f.accM,
-      headingDeg: num(f.headingDeg, 0, 360) ? f.headingDeg : null,
-      atMs: num(f.atMs, 0, 9e15) ? f.atMs : Date.now(),
-      indoor: f.indoor === true,
-    },
+  const stored = await storeSet('suivi:' + b.shareId, {
+    fix: fixOf(f),
     objects: objects.map((o) => ({ label: String(o.label).slice(0, 40), distM: o.distM, angleDeg: o.angleDeg })),
+    scene: sceneOf(b.scene),
     serverAt: Date.now(),
   });
+  if (!stored) return res.status(503).json({ ok: false, error: 'relais indisponible' });
   return res.status(200).json({ ok: true });
 };
