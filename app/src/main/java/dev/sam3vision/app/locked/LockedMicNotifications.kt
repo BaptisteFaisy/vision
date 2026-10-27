@@ -23,8 +23,13 @@ import dev.sam3vision.core.speech.LockedMicState
  */
 object LockedMicNotifications {
 
-    /** Une chaîne à part : elle ne se confond pas avec les autres notifications de l'app. */
-    const val CHANNEL_ID = "isee_mic_verrou"
+    /**
+     * Une chaîne à part, **et une version dans l'identifiant** : l'importance d'un canal est
+     * figée à sa création (Android ignore toute baisse ultérieure). Mesuré sur le téléphone :
+     * en `IMPORTANCE_LOW`, HyperOS replie la notification et **cache ses boutons** — l'écran de
+     * verrouillage n'offrait donc rien à toucher. `_v2` = `IMPORTANCE_DEFAULT`, sans son.
+     */
+    const val CHANNEL_ID = "isee_mic_verrou_v2"
 
     /** Identifiant fixe : une seule notification, toujours remplacée. */
     const val NOTIFICATION_ID = 4_201
@@ -34,12 +39,16 @@ object LockedMicNotifications {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Micro verrouillé",
-            NotificationManager.IMPORTANCE_LOW,
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = "Écouter et répondre sans déverrouiller le téléphone."
+            setSound(null, null)          // visible et dépliable, mais muette
+            enableVibration(false)
             setShowBadge(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
+        // L'ancienne chaîne silencieuse est retirée : sinon elle reste dans les réglages.
+        context.getSystemService(NotificationManager::class.java)?.deleteNotificationChannel(LEGACY_CHANNEL_ID)
         context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
     }
 
@@ -52,8 +61,8 @@ object LockedMicNotifications {
             .setContentText(view.message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(view.message))
             .setOngoing(true)
-            .setSilent(true)
             .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -94,6 +103,9 @@ object LockedMicNotifications {
         context.packageManager.getLaunchIntentForPackage(context.packageName),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
+
+    /** Canal d'avant la correction (importance basse) : supprimé à la création du nouveau. */
+    private const val LEGACY_CHANNEL_ID = "isee_mic_verrou"
 
     private const val TOGGLE_REQUEST = 1
     private const val STOP_REQUEST = 2
