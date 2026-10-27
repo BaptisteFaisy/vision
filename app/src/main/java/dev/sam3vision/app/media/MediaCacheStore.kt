@@ -71,10 +71,16 @@ class MediaCacheStore internal constructor(
         dao.update(userRow.copy(texteIA = userRow.texteIA, cheminAudioElevenLabs = audio.path))
     }
 
-    /** Enregistre le texte de la réponse IA sur la ligne utilisateur associée. */
-    suspend fun setAnswerText(userRow: MessageMultimedia, answer: String) = withContext(Dispatchers.IO) {
-        dao.update(userRow.copy(texteIA = answer.trim()))
-    }
+    /**
+     * Enregistre le texte de la réponse IA sur la ligne utilisateur associée.
+     * Rend la ligne à jour : l'appelant n'a pas à la relire avant d'attacher le MP3.
+     */
+    suspend fun setAnswerText(userRow: MessageMultimedia, answer: String): MessageMultimedia =
+        withContext(Dispatchers.IO) {
+            val updated = userRow.copy(texteIA = answer.trim())
+            dao.update(updated)
+            updated
+        }
 
     /** Chemin du MP3 de la réponse, si déjà synthétisé et encore présent en cache. */
     fun replyAudioFile(row: MessageMultimedia): File? =

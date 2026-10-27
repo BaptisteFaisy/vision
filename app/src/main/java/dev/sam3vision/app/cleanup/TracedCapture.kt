@@ -48,6 +48,9 @@ interface TracedCaptureDao {
     @Query("DELETE FROM traced_captures WHERE id = :id")
     suspend fun deleteById(id: Long): Int
 
+    @Query("DELETE FROM traced_captures WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>): Int
+
     @Query("SELECT COUNT(*) FROM traced_captures")
     suspend fun count(): Int
 }

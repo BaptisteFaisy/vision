@@ -42,19 +42,13 @@ class HttpTrackClient(
 ) : TrackClient {
 
     override suspend fun start(imageB64: String, prompts: List<String>): Result<TrackSessionStart> {
-        val body = JSONObject()
-            .put("image_b64", imageB64)
-            .put("prompts", jsonArrayOf(prompts))
-            .toString()
-        return post("/session", body).then { raw -> catchingResult { parseSessionStart(raw) } }
+        return postBuilt("/session") { trackStartJson(imageB64, prompts) }
+            .then { raw -> catchingResult { parseSessionStart(raw) } }
     }
 
     override suspend fun frame(sessionId: String, imageB64: String): Result<TrackFrame> {
-        val body = JSONObject()
-            .put("session_id", sessionId)
-            .put("image_b64", imageB64)
-            .toString()
-        return post("/frame", body).then { raw -> catchingResult { parseFrame(raw) } }
+        return postBuilt("/frame") { trackFrameJson(sessionId, imageB64) }
+            .then { raw -> catchingResult { parseFrame(raw) } }
     }
 
     override suspend fun close(sessionId: String): Result<Unit> =
@@ -67,11 +61,27 @@ class HttpTrackClient(
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseTrackHealth(raw) } }
 
-    /** Un POST JSON sur le tracker, succès 2xx vérifié avant tout parsing. */
-    private suspend fun post(path: String, body: String): Result<String> =
-        client.execute(requestTo(baseUrl, path, "POST", jsonBody(body), TRACK_USER_AGENT))
+    /** Un POST JSON sur le tracker, corps assemblé en IO et non rejouable. */
+    private suspend fun postBuilt(path: String, buildBody: () -> String): Result<String> =
+        client.executeBuilt { requestTo(baseUrl, path, "POST", OneShotJsonBody(buildBody()), TRACK_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
 }
+
+/** Corps `/session` manuel : base64 brut, prompts échappés. */
+internal fun trackStartJson(imageB64: String, prompts: List<String>): String {
+    val out = StringBuilder(imageB64.length + 128)
+    out.append("{\"image_b64\":\"").append(imageB64).append("\",\"prompts\":[")
+    prompts.forEachIndexed { index, prompt ->
+        if (index > 0) out.append(',')
+        out.append('"').append(jsonEscape(prompt)).append('"')
+    }
+    out.append("]}")
+    return out.toString()
+}
+
+/** Corps `/frame` manuel : ids et base64 bruts (aucun échappement utile). */
+internal fun trackFrameJson(sessionId: String, imageB64: String): String =
+    "{\"session_id\":\"" + jsonEscape(sessionId) + "\",\"image_b64\":\"" + imageB64 + "\"}"
 
 internal fun parseSessionStart(raw: String): TrackSessionStart {
     val json = parse(raw) ?: throw ApiError.BadResponse("/session : JSON illisible")

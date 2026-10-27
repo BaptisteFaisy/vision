@@ -22,6 +22,13 @@ class TrackRunner(
     private val gate: FrameGate = FrameGate(),
     override val stats: LiveStats = LiveStats(),
     private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Âge maximal d'une session : au-delà, la frame suivante rouvre une session
+     * (re-keyframe) au lieu d'un `/frame`. Sans ça, un objet entré dans le champ
+     * après l'ouverture ne serait **jamais** détecté — impensable rue piétonne,
+     * où un vélo ou une personne peut surgir devant l'utilisateur.
+     */
+    private val rekeyMs: Long = DEFAULT_REKEY_MS,
 ) : FramePipeline {
 
     /** État immuable d'une session : remplacé en bloc, jamais muté. */
@@ -30,10 +37,21 @@ class TrackRunner(
         val width: Int,
         val height: Int,
         val prompts: List<String>,
+        val startedAtMs: Long,
     )
 
     @Volatile
     private var current: Session? = null
+
+    /**
+     * Dernier échec d'ouverture : sa cause est rejouée telle quelle pendant
+     * [START_RETRY_MS], sans nouveau `POST /session`. `null` = ré-armé.
+     */
+    @Volatile
+    private var lastStartFailureAtMs: Long? = null
+
+    @Volatile
+    private var lastStartError: Throwable? = null
 
     /** Identifiant de la session en cours, `null` si aucune. */
     val sessionId: String? get() = current?.id
@@ -58,18 +76,46 @@ class TrackRunner(
      * [LivePrompts.normalize]) et retient la taille renvoyée par le backend. La frame
      * d'ouverture est rendue telle quelle : le backend vient d'analyser cette image,
      * l'écran n'a donc rien de plus à attendre pour la première image.
+     *
+     * Régulée par [gate] comme [submit] : une seule ouverture en vol, l'appel
+     * concurrent échoue vite ([ApiError.BadResponse], sans `POST /session`) — pas
+     * `null` comme [submit], la signature non-nullable est le contrat du pont
+     * (`runAsFrame`). Après un échec, la même erreur est rejouée sans appel réseau
+     * pendant [START_RETRY_MS] ; un succès ré-arme.
      */
     suspend fun start(prompts: List<String>, firstFrameB64: String): Result<TrackFrame> {
-        val normalized = LivePrompts.normalize(prompts)
-        return client.start(firstFrameB64, normalized).map { opened ->
-            current = Session(opened.sessionId, opened.width, opened.height, normalized)
-            TrackFrame(opened.width, opened.height, opened.objects)
+        lastStartError?.let { cached ->
+            val failedAt = lastStartFailureAtMs
+            if (failedAt != null && clock() - failedAt < START_RETRY_MS) return Result.failure(cached)
+        }
+        if (!gate.tryStart()) {
+            return Result.failure(ApiError.BadResponse("tracker : ouverture déjà en cours"))
+        }
+        try {
+            val normalized = LivePrompts.normalize(prompts)
+            return client.start(firstFrameB64, normalized).fold(
+                onSuccess = { opened ->
+                    lastStartError = null
+                    lastStartFailureAtMs = null
+                    current = Session(opened.sessionId, opened.width, opened.height, normalized, clock())
+                    Result.success(TrackFrame(opened.width, opened.height, opened.objects))
+                },
+                onFailure = { error ->
+                    lastStartFailureAtMs = clock()
+                    lastStartError = error
+                    Result.failure(error)
+                },
+            )
+        } finally {
+            gate.finish()
         }
     }
 
     /**
      * Envoie une frame au tracker ; `null` si une frame est déjà en vol (frame jetée).
-     * La latence bout-en-bout est consignée dans [stats], échec compris.
+     * Session périmée ([rekeyMs]) → re-keyframe (`/session` neuve : les nouveaux
+     * obstacles entrent dans le suivi). La latence bout-en-bout est consignée dans
+     * [stats], échec compris.
      */
     suspend fun submit(jpegB64: String): Result<TrackFrame>? {
         if (!gate.tryStart()) return null
@@ -77,8 +123,12 @@ class TrackRunner(
         try {
             val session = current
                 ?: return Result.failure(ApiError.BadResponse("tracker : session non démarrée"))
-            val result = client.frame(session.id, jpegB64)
-            val frame = if (sessionLost(result)) recover(jpegB64) else result
+            val frame = if (startedAt - session.startedAtMs >= rekeyMs) {
+                rekey(session, jpegB64)
+            } else {
+                val result = client.frame(session.id, jpegB64)
+                if (sessionLost(result)) recover(jpegB64) else result
+            }
             stats.record(clock() - startedAt)
             return frame.map { it.withSessionSize() }
         } finally {
@@ -133,7 +183,22 @@ class TrackRunner(
             current = null
             return Result.failure(error)
         }
-        current = Session(opened.sessionId, opened.width, opened.height, prompts)
+        current = Session(opened.sessionId, opened.width, opened.height, prompts, clock())
+        return Result.success(TrackFrame(opened.width, opened.height, opened.objects))
+    }
+
+    /**
+     * Re-keyframe : nouvelle session sur [jpegB64] (les objets entrés depuis
+     * l'ouverture entrent dans le suivi), ancienne session fermée au mieux.
+     * Si l'ouverture échoue, repli sur un `/frame` de l'ancienne session — un
+     * suivi périmé vaut mieux qu'un écran vide rue piétonne.
+     */
+    private suspend fun rekey(session: Session, jpegB64: String): Result<TrackFrame> {
+        val opened = client.start(jpegB64, session.prompts).getOrElse {
+            return client.frame(session.id, jpegB64)
+        }
+        runCatching { client.close(session.id) }
+        current = Session(opened.sessionId, opened.width, opened.height, session.prompts, clock())
         return Result.success(TrackFrame(opened.width, opened.height, opened.objects))
     }
 
@@ -149,6 +214,20 @@ class TrackRunner(
     }
 
     companion object {
+        /**
+         * Âge maximal d'une session : 3 s. À ~1 m/s, un nouvel obstacle est
+         * détecté au pire 3 m plus tard ; en deçà, les re-keyframes (1 analyse
+         * complète chacun) mangeraient le gain du suivi.
+         */
+        const val DEFAULT_REKEY_MS = 3_000L
+
+        /**
+         * Après un [start] en échec, la même erreur est rejouée sans appel réseau
+         * pendant 5 s : backend track absent, chaque frame relancerait sinon un
+         * `POST /session` (~180 requêtes 404 observées). Un succès ré-arme aussitôt.
+         */
+        const val START_RETRY_MS = 5_000L
+
         /** Cadence visée du direct. */
         const val TARGET_FPS = 30
 

@@ -55,10 +55,12 @@ class CacheCleanerManager(
     /** Option B — après chaque écriture : FIFO dès que le cache dépasse le plafond. */
     suspend fun enforceFifoAfterWrite() = purgeMutex.withLock {
         withContext(Dispatchers.IO) {
+            // Par lots : 1 mesure du dossier + 2 requêtes par lot, au lieu de N mesures + 2N requêtes.
             while (dirSize(cacheDir) > maxTotalBytes) {
-                val oldest = dao.oldest() ?: return@withContext
-                deleteRowFiles(oldest)
-                dao.deleteById(oldest.id)
+                val batch = dao.oldestBatch(FIFO_BATCH)
+                if (batch.isEmpty()) return@withContext
+                batch.forEach(::deleteRowFiles)
+                dao.deleteByIds(batch.map { it.id })
             }
         }
     }
@@ -86,6 +88,9 @@ class CacheCleanerManager(
 
         /** Option B : plafond global du cache. */
         const val MAX_TOTAL_BYTES = 500L * 1024L * 1024L
+
+        /** Lignes purgées par lot : 16 suppressions de fichiers pour 1 mesure du dossier. */
+        const val FIFO_BATCH = 16
 
         /** Taille récursive d'un dossier (0 si absent). Utilisée avant/après chaque écriture. */
         fun dirSize(dir: File): Long {

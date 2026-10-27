@@ -60,16 +60,26 @@ class WsLiveClient(
     ): Result<LiveFrame> {
         val id = synchronized(lock) { ++nextId }
         val reply = CompletableDeferred<String>()
-        val sent = synchronized(lock) {
+        // Message (~28 Ko) assemblé hors verrou : `onText` (même lock) ne doit pas attendre.
+        val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects)
+        val opened = synchronized(lock) {
             // L'attente est enregistrée **avant** l'ouverture : un échec de socket
             // (connexion refusée) peut survenir immédiatement, il doit réveiller la frame.
             pending[id] = reply
             if (!openLocked()) {
                 pending.remove(id)
-                return Result.failure(ApiError.Network(WS_UNREACHABLE))
+                false
+            } else {
+                true
             }
-            transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects))
         }
+        if (!opened) return Result.failure(ApiError.Network(WS_UNREACHABLE))
+        // Envoi **hors verrou** : pendant que ~28 Ko partent sur le socket, le thread
+        // lecteur (`onText`, même verrou) continue de réveiller les frames en vol —
+        // sinon un envoi lent figeait toutes les réceptions. Si le socket meurt entre
+        // l'ouverture et l'envoi, `send` refuse (ou `onClosed` a déjà réveillé la
+        // frame en échec) : les deux chemins rendent un échec réseau, jamais un succès.
+        val sent = transport.send(message)
         if (!sent) {
             synchronized(lock) { pending.remove(id) }
             return Result.failure(ApiError.Network("WebSocket /live/ws : envoi refusé"))

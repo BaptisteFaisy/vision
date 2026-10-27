@@ -99,10 +99,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Appui long + bouton « Dicter » : toute la mécanique est dans [DictationFeature]. */
     private val dictation = DictationFeature(app, _state, viewModelScope) { settings -> speechClient(settings) }
 
-    /** Photo : décodage réduit au bord max, puis JPEG base64 — les helpers d'`ImageSource`. */
+    /**
+     * Photo : décodage réduit à [PHOTO_SEND_EDGE], puis JPEG base64. Le serveur
+     * travaille à 640 px max de toute façon : envoyer 1024 ne donnait que des
+     * octets (+60 % d'upload), jamais de précision. Affichage et envoi partagent
+     * le même bitmap, donc boîtes et positions restent cohérentes.
+     */
     private val loader = AppImageLoader<Bitmap>(
         decode = { file, edge -> decodeScaledExact(file, edge) },
         encode = { bitmap -> bitmapToJpegBase64(bitmap) },
+        maxEdge = PHOTO_SEND_EDGE,
     )
 
     /** Voix du chat et de l'analyse : synthèse `:core`, lecture par le `SpeechPlayer`. */
@@ -279,5 +285,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stopSpeaking()
         dictation.abort()
         _state.update { UiState(settings = it.settings, settingsReady = it.settingsReady) }
+    }
+
+    companion object {
+        /** Bord max envoyé : le serveur travaille à 640 px, inutile d'envoyer plus. */
+        const val PHOTO_SEND_EDGE = 640
     }
 }
