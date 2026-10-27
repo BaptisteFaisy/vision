@@ -75,4 +75,31 @@ class SettingsSeedTest {
 
         assertTrue("le preset ne doit pas figer l'Europe", seed.samBaseUrl.isEmpty())
     }
+
+    /** App d'avant le 2026-10-27 : réglages d'usine InferHub + clé déjà saisie (ou héritée). */
+    private val ancienne = Settings.Default.copy(
+        llmBaseUrl = "https://api.inferhub.dev/v1",
+        llmModel = "ali/qwen3.8-omni-flash",
+        llmApiKey = "sk-ancienne-cle-inferhub",
+    )
+
+    @Test
+    fun `un reglage reste sur l ancien defaut migre vers le defaut du build`() {
+        val seed = seeded(ancienne, build)
+
+        assertEquals("https://build.example/v1", seed.llmBaseUrl)
+        assertEquals("modele-du-build", seed.llmModel)
+        assertEquals("la clé de l'ancien service ne doit pas partir chez le nouveau", "cle-llm-du-build", seed.llmApiKey)
+        assertTrue(seed.llmConfigured)
+    }
+
+    @Test
+    fun `une base URL saisie a la main n est jamais migree`() {
+        val choisi = ancienne.copy(llmBaseUrl = "https://mon-propre-endpoint/v1", llmApiKey = "ma-cle")
+
+        val seed = seeded(choisi, build)
+
+        assertEquals("https://mon-propre-endpoint/v1", seed.llmBaseUrl)
+        assertEquals("ma-cle", seed.llmApiKey)
+    }
 }

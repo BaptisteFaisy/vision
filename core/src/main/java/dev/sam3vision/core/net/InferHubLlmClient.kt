@@ -8,7 +8,17 @@ import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val MAX_TOKENS = 800
+/**
+ * Budget de sortie d'une question ou d'une description.
+ *
+ * 800 suffisait à un modèle qui répond directement ; le défaut actuel
+ * (`muse-spark-open-1026`) **raisonne d'abord** : mesuré sur les vrais prompts
+ * (2026-10-27), 515 à 606 tokens de raisonnement avant le premier mot de réponse, soit
+ * 579-667 sur 800 — une marge trop courte, un dépassement rendant `content` vide. 1200
+ * garde la même réponse visible en cas de raisonnement plus long ; seuls les tokens
+ * réellement émis sont facturés.
+ */
+private const val MAX_TOKENS = 1200
 private const val MAX_LIVE_TOKENS = 200
 private const val MAX_LIVE_CHARS = 400
 private const val TEMPERATURE = 0.2
