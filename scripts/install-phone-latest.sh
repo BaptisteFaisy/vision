@@ -118,6 +118,12 @@ fi
 # --- ce que dit GitHub -----------------------------------------------------
 [ -e "$MIRROR/.git" ] || die "miroir absent : $MIRROR — lancer d'abord : $0 --init"
 latest="$(timeout 60 git -C "$MIRROR" ls-remote origin refs/heads/master 2>/dev/null | cut -f1)" || latest=""
+if [ -z "$latest" ]; then
+    # Un DNS qui hoquette ne doit pas coûter un tour de cron (vu le 27/10 :
+    # « GitHub injoignable (ls-remote) » une fois, alors que le réseau allait bien).
+    sleep 5
+    latest="$(timeout 60 git -C "$MIRROR" ls-remote origin refs/heads/master 2>/dev/null | cut -f1)" || latest=""
+fi
 [ -n "$latest" ] || { log "GitHub injoignable (ls-remote)"; echo "install-phone-latest: GitHub injoignable" >&2; exit 4; }
 short="${latest:0:7}"
 
@@ -157,7 +163,21 @@ say "téléphone sur ${on_phone:-rien}, master sur $short → build"
 timeout 120 git -C "$MIRROR" fetch -q origin || die "fetch impossible dans le miroir"
 timeout 60 git -C "$MIRROR" checkout -q --detach origin/master || die "checkout origin/master impossible"
 head_sha="$(git -C "$MIRROR" rev-parse HEAD)" || die "rev-parse impossible dans le miroir"
-[ "$head_sha" = "$latest" ] || die "miroir sur ${head_sha:0:7}, GitHub sur $short — refus d'installer autre chose"
+if [ "$head_sha" != "$latest" ]; then
+    # master a bougé entre le `ls-remote` et le `fetch` (vu le 27/10 en pleine
+    # rafale de merges : « miroir sur 07f8c64, GitHub sur 00d09c8 — refus
+    # d'installer autre chose », et un tour de cron perdu pour rien). Le miroir
+    # sort d'un `fetch origin` suivi d'un checkout d'`origin/master` : son HEAD
+    # **est** master, simplement plus récent. On l'adopte — mais seulement s'il
+    # descend bien du master qu'on venait de voir (une réécriture d'historique,
+    # elle, reste refusée).
+    timeout 30 git -C "$MIRROR" merge-base --is-ancestor "$latest" "$head_sha" 2>/dev/null || \
+        die "miroir sur ${head_sha:0:7}, injoignable depuis GitHub master $short — refus d'installer autre chose"
+    say "master a bougé pendant le fetch : $short → ${head_sha:0:7} (toujours master)"
+    log "master avancé pendant le fetch : $short → ${head_sha:0:7}"
+    latest="$head_sha"
+    short="${latest:0:7}"
+fi
 keys_build
 say "build de $short dans le miroir…"
 
