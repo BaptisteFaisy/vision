@@ -1,79 +1,52 @@
 package dev.sam3vision.app.ihear
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.sam3vision.core.iseedesign.DISSOLVE_MS
-import dev.sam3vision.core.iseedesign.HEADING_MAX_LINES
-import dev.sam3vision.core.iseedesign.bubbleLookIndex
-import dev.sam3vision.core.iseedesign.DissolvePlan
+import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
-import dev.sam3vision.core.iseedesign.dissolvePlan
-import dev.sam3vision.core.iseedesign.iSeeGeometry
-import dev.sam3vision.core.iseedesign.textPages
-import kotlinx.coroutines.delay
+import dev.sam3vision.core.iseedesign.PortraitGeometry
+import dev.sam3vision.core.iseedesign.portraitGeometry
+import dev.sam3vision.core.iseedesign.voiceEnvelope
 
 /**
- * L'écran iSee au design de la vidéo : fond dégradé clair, grande bulle de verre
- * entourée de satellites (une apparence par message), gros texte paginé sur
- * 3 lignes max, pill d'état en haut à droite, dots de pagination et pill
- * d'instructions en bas. À la sortie d'une capture, la carte caméra se dissolve
- * en damier pendant que sa gerbe de pixels plonge dans la bulle qui grandit
- * jusqu'au centre — le « monde » posé par les pixels reste collé à la réponse
- * tant qu'elle est sélectionnée.
+ * L'écran iSee au design « Portrait » : fond blanc, une seule boule de verre au liquide marbré
+ * (plus de satellites, plus de pixels), et seulement la phrase en cours, en gros, sous la boule.
+ * Quand la caméra tourne (vidéo ou photo), la rue occupe le haut de l'écran et se fond dans le
+ * blanc ; la boule rétrécit et se pose sur la jointure. Le user parle : liquide bleu, mots qui
+ * s'allument en bleu puis passent au noir. iSee parle : liquide ambre, couronne ambre autour de
+ * la boule, mot en cours en ambre. Toute l'interaction reste aux gestes de `IhearRootLayout`.
  */
 @Composable
 fun IseeScenePane(state: IhearUiState, viewModel: IhearViewModel, modifier: Modifier = Modifier) {
@@ -81,407 +54,164 @@ fun IseeScenePane(state: IhearUiState, viewModel: IhearViewModel, modifier: Modi
     val probe by viewModel.probe.state.collectAsState()
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
-    BoxWithConstraints(
-        modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to IseeSceneColors.bgTop,
-                    0.87f to IseeSceneColors.bgLower,
-                    1f to IseeSceneColors.bgBottom,
-                ),
-            ),
-    ) {
-        SceneScaffold(state, viewModel, glue, probe, entry, view, maxWidth, maxHeight)
+    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight)
     }
 }
 
-/** Tout le contenu du pane : bandeaux système, commande, scène, gros texte, dots
- * et pill d'instructions — posé dans un BoxWithConstraints déjà dimensionné. */
+/** La scène complète, posée dans un BoxWithConstraints déjà dimensionné. */
 @Composable
-private fun BoxWithConstraintsScope.SceneScaffold(
+private fun BoxWithConstraintsScope.PortraitScene(
     state: IhearUiState,
     viewModel: IhearViewModel,
     glue: CameraGlue,
     probe: LiveProbeState,
-    entry: ChatEntry?,
     view: IseeSceneView,
     width: Dp,
     height: Dp,
 ) {
-    SystemBarScrims()
-    Header(view.scene, Modifier.fillMaxWidth())
-
-    // Grille vivante de la capture : échantillonnée ici, partagée carte/dissolution.
-    val grid = rememberGridState(state, glue)
-
-    // La dissolution et le monde qu'elle pose, pilotés par la scène.
-    val (dissolve, world) = rememberDissolution(state, view.scene, grid, width, height)
-
-    val total = bubbleCount(state.entries.size)
-    // Une capture vivante (vidéo qui tourne, photo posée) garde sa carte à l'écran,
-    // même pendant l'écoute : on continue de voir ce qu'on filme en parlant.
     val captureLive = state.recordingVideo || state.photoPath != null
-    val layers = iseeSceneLayers(total, dissolving = dissolve.second != null, captureLive = captureLive)
-    SceneArea(
-        layers = layers,
-        scene = view.scene,
-        state = state,
-        glue = glue,
-        probe = probe,
-        viewModel = viewModel,
-        entry = entry,
-        width = width,
-        height = height,
-        grid = grid,
-        dissolve = dissolve,
-        world = world,
-    )
-    HeadingArea(view, height)
-    PageDotsLayer(layers, total, state.selected, height)
-    SceneBottomBar(
-        state,
-        Modifier
-            .align(Alignment.BottomCenter)
-            .padding(bottom = navInsetDp() + 10.dp),
-    )
-}
-
-/** La grille de capture : rafraîchie en continu pendant l'enregistrement, une seule
- * fois pour une photo ; vide sinon. Élevée au niveau du pane pour que la dissolution
- * parte exactement de ce que la carte montrait. */
-@Composable
-private fun rememberGridState(state: IhearUiState, glue: CameraGlue): PixelGrid {
-    var grid by remember { mutableStateOf(PixelGrid(IntArray(0), GRID_COLS, GRID_ROWS)) }
-    LaunchedEffect(state.recordingVideo, state.photoPath) {
-        when {
-            state.recordingVideo -> while (true) {
-                grid = samplePreviewGrid(glue.preview.bitmap)
-                delay(SAMPLE_MS)
-            }
-            else -> grid = samplePhotoGrid(state.photoPath)
-        }
-    }
-    return grid
-}
-
-/** L'état partagé de la dissolution : horloge, run en cours, monde posé. */
-private class DissolveClock {
-    val clock: Animatable<Float, AnimationVector1D> = Animatable(0f)
-    var run by mutableStateOf<DissolveRun?>(null)
-    var world by mutableStateOf<WorldMemory?>(null)
-}
-
-/** L'horloge partagée de la dissolution, et l'amorçage du run. */
-@Composable
-private fun rememberDissolution(
-    state: IhearUiState,
-    scene: IseeScene,
-    grid: PixelGrid,
-    width: Dp,
-    height: Dp,
-): Pair<Pair<Animatable<Float, AnimationVector1D>, DissolveRun?>, WorldMemory?> {
-    val cv = remember { DissolveClock() }
-    armDissolve(cv, state, scene, grid, width, height)
-    tumClockIn(cv)
-    // Le monde se lie au dernier message arrivé (la réponse), pas à la question.
-    val newest = state.entries.lastOrNull()
-    LaunchedEffect(newest?.id) {
-        val w = cv.world
-        if (w != null && w.boundId == null && newest != null) w.boundId = newest.id
-    }
-    return (cv.clock to cv.run) to cv.world
-}
-
-/** L'horloge ne court que pour le run courant ; à son terme, il s'envole et le
- * monde reste sur la bulle (accroché à la réponse qui sera arrivée au fil). */
-@Composable
-private fun tumClockIn(cv: DissolveClock) {
-    LaunchedEffect(cv.run) {
-        if (cv.run != null) {
-            cv.clock.snapTo(0f)
-            cv.clock.animateTo(1f, tween(DISSOLVE_MS, easing = LinearEasing))
-            cv.run = null
-        } else {
-            cv.clock.snapTo(0f)
-        }
-    }
-}
-
-/** Une nouvelle capture réarme la transition ; la scène qui lâche VISION la lance. */
-@Composable
-private fun armDissolve(
-    cv: DissolveClock,
-    state: IhearUiState,
-    scene: IseeScene,
-    grid: PixelGrid,
-    width: Dp,
-    height: Dp,
-) {
-    var armed by remember { mutableStateOf(true) }
+    val layers = iseeSceneLayers(bubbleCount(state.entries.size), dissolving = false, captureLive = captureLive)
+    val open = rememberCameraOpen(layers.cameraCard)
     val density = LocalDensity.current
-    LaunchedEffect(state.recordingVideo, state.photoPath) {
-        if (state.recordingVideo || state.photoPath != null) armed = true
-    }
-    LaunchedEffect(scene, grid) {
-        // Une capture vivante garde la carte : rien ne part en gerbe tant qu'on filme
-        // ou tant qu'une photo est à l'écran, même si la pill est passée en THINKING.
-        if (state.recordingVideo || state.photoPath != null) return@LaunchedEffect
-        when (scene) {
-            IseeScene.VISION -> Unit
-            IseeScene.THINKING, IseeScene.VOICE, IseeScene.ANSWERED -> {
-                if (armed && cv.run == null && grid.colors.isNotEmpty()) {
-                    armed = false
-                    val geom = iSeeGeometry(with(density) { width.toPx() }, with(density) { height.toPx() })
-                    val plan = dissolvePlan(geom)
-                    cv.run = DissolveRun(grid, plan, geom)
-                    cv.world = WorldMemory(grid, plan)
-                }
-            }
-            else -> Unit
-        }
+    val geo = with(density) { portraitGeometry(width.toPx(), height.toPx(), open) }
+    val time = rememberSceneTime()
+    PortraitCamera(state, glue, probe, viewModel, open, height)
+    OrbLayer(view.scene, geo, time, open)
+    Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
+    with(density) { SpokenLine(view, state, (geo.textTop).toDp(), compact = open > 0.5f) }
+    BottomScrim()
+}
+
+/**
+ * Ce que la scène montre en plus du décor fixe : la caméra (la rue en haut) et les dots de
+ * pagination. Pur, testable sur JVM.
+ */
+internal data class IseeSceneLayers(val cameraCard: Boolean, val pageDots: Boolean) {
+    /** La boule est au repos (grande, au centre) chaque fois que la caméra est fermée. */
+    val bubble: Boolean get() = !cameraCard
+}
+
+/**
+ * La caméra est montrée tant qu'une capture est vivante (`captureLive`), quelle que soit la
+ * scène : tenir le micro pendant la vidéo ne doit pas cacher ce qu'on filme. `dissolving` est
+ * gardé pour le contrat : le design Portrait n'a plus de dissolution en pixels.
+ */
+internal fun iseeSceneLayers(bubbles: Int, dissolving: Boolean, captureLive: Boolean): IseeSceneLayers {
+    val cameraCard = captureLive && !dissolving
+    return IseeSceneLayers(cameraCard = cameraCard, pageDots = !captureLive && bubbles > 1)
+}
+
+/** Le temps de la scène en secondes, pour le marbre et la voix (boucle de 10 min). */
+@Composable
+private fun rememberSceneTime(): Float {
+    val t = rememberInfiniteTransition(label = "isee-time")
+    return t.animateFloat(0f, 600f, infiniteRepeatable(tween(600_000, easing = LinearEasing)), label = "t").value
+}
+
+/** La boule, et la couronne de barres ambre quand iSee parle. */
+@Composable
+private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, time: Float, open: Float) {
+    val look = orbLookOf(scene, time, open)
+    val paint = rememberOrbPainter()
+    val breathe = 1f + 0.012f * kotlin.math.sin(time * 1.3f) + 0.03f * look.you * look.amp
+    val lift = geo.orbR * 0.02f * kotlin.math.sin(time * 0.9f) * (1f - open)
+    Canvas(Modifier.fillMaxSize()) {
+        val c = Offset(geo.orbX, geo.orbY + lift)
+        val r = geo.orbR * breathe
+        drawOrbShadow(c, r, 1f - open)
+        paint(this, c, r, look)
+        if (look.see > 0.01f) drawVoiceCrown(c, r, time, look.see, look.amp)
     }
 }
 
-/** Les deux bandeaux système en blanc : l'heure/batterie en haut, les 3 boutons en bas. */
-@Composable
-private fun BoxWithConstraintsScope.SystemBarScrims() {
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    Box(Modifier.fillMaxWidth().height(top).background(Color.White))
-    Box(
-        Modifier.fillMaxWidth().height(bottom).background(Color.White)
-            .align(Alignment.BottomCenter),
+/** Ce que montre la boule selon la scène : bleu à l'écoute, ambre quand iSee parle. */
+internal fun orbLookOf(scene: IseeScene, time: Float, open: Float): OrbLook {
+    val you = if (scene == IseeScene.LISTENING) 1f else 0f
+    val see = if (scene == IseeScene.VOICE) 1f else 0f
+    val amp = if (you + see > 0f) voiceEnvelope(time, if (see > 0f) 3 else 1) else 0f
+    val level = 0.4f + 0.08f * kotlin.math.sin(time * 0.5f) + 0.08f * see - 0.06f * open
+    return OrbLook(time = time, you = you, see = see, amp = amp, level = level)
+}
+
+/** Ombre de contact sous la boule qui flotte, plus une légère caustique ambre. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Offset, r: Float, k: Float) {
+    if (k <= 0.01f) return
+    val center = Offset(c.x, c.y + r * 1.17f)
+    drawOval(
+        brush = Brush.radialGradient(listOf(Color(0x290B1220), Color.Transparent), center, r * 0.85f),
+        topLeft = Offset(center.x - r * 0.85f, center.y - r * 0.09f),
+        size = androidx.compose.ui.geometry.Size(r * 1.7f, r * 0.18f),
+        alpha = k,
     )
+}
+
+/** La couronne de 120 barres fines qui monte du verre avec la voix d'iSee. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVoiceCrown(c: Offset, r: Float, t: Float, k: Float, amp: Float) {
+    val n = 120
+    val see = Color(IseePortrait.SEE)
+    for (i in 0 until n) {
+        val a = i / n.toFloat() * 2f * Math.PI.toFloat()
+        val e = 0.5f + 0.28f * kotlin.math.sin(a * 3 + t * 2.1f) + 0.18f * kotlin.math.sin(a * 7 - t * 3.3f + 1.3f) +
+            0.12f * kotlin.math.sin(a * 13 + t * 5.2f)
+        val len = r * (0.02f + 0.2f * amp * e * e) * k
+        val r0 = r * 1.07f
+        val dx = kotlin.math.cos(a)
+        val dy = kotlin.math.sin(a)
+        drawLine(
+            color = see.copy(alpha = (k * (0.3f + 0.6f * e)).coerceIn(0f, 1f)),
+            start = Offset(c.x + dx * r0, c.y + dy * r0),
+            end = Offset(c.x + dx * (r0 + len), c.y + dy * (r0 + len)),
+            strokeWidth = (r * 0.011f).coerceAtLeast(1f),
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+        )
+    }
+}
+
+/** En-tête : « iSee » et la pastille d'état ; en blanc sur la rue quand elle est ouverte. */
+@Composable
+private fun Header(scene: IseeScene, onPicture: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier.statusBarsPadding().padding(horizontal = 22.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("iSee", color = if (onPicture) Color.White else Color(IseePortrait.INK), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.weight(1f))
+        StatusChip(scene, onPicture)
+    }
+}
+
+/** Pastille d'état : bleu à l'écoute, ambre quand iSee parle, discrète sinon. */
+@Composable
+private fun StatusChip(scene: IseeScene, onPicture: Boolean) {
+    val (bg, fg) = when (scene) {
+        IseeScene.LISTENING -> Color(IseePortrait.YOU) to Color.White
+        IseeScene.VOICE -> Color(IseePortrait.SEE) to Color(IseePortrait.INK)
+        else -> (if (onPicture) Color(0x38FFFFFF) else Color.White) to (if (onPicture) Color.White else Color(IseePortrait.SUB))
+    }
+    Text(
+        chipLabel(scene),
+        color = fg,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 1.3.sp,
+        modifier = Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 7.dp),
+    )
+}
+
+/** Le mot de la pastille, en anglais comme le reste de l'interface. */
+internal fun chipLabel(scene: IseeScene): String = when (scene) {
+    IseeScene.LISTENING -> "LISTENING"
+    IseeScene.VISION -> "SEEING"
+    IseeScene.THINKING -> "THINKING"
+    IseeScene.VOICE -> "SPEAKING"
+    IseeScene.MEMORY -> "MEMORY"
+    IseeScene.ANSWERED, IseeScene.READY -> "READY"
+}
+
+/** Bandeau blanc derrière les boutons système du bas. */
+@Composable
+private fun BoxWithConstraintsScope.BottomScrim() {
+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 0.dp).background(Color.White).padding(bottom = navInsetDp()))
 }
 
 /** Le crochet de navigation (raccourci : l'inset de navigation du téléphone). */
 @Composable
 internal fun navInsetDp(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-
-/** En-tête : wordmark « iSee » (point noir du i) et pill d'état à droite. */
-@Composable
-private fun Header(scene: IseeScene, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .statusBarsPadding()
-            .padding(horizontal = 22.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("iSee", color = IseeSceneColors.wordmark, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f))
-        StatusPill(scene)
-    }
-}
-
-/** Pill d'état : fond / texte / mots par scène, en majuscules. */
-@Composable
-private fun StatusPill(scene: IseeScene) {
-    val (bg, fg, label) = pillOf(scene)
-    Text(
-        label,
-        color = fg,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .background(bg, RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-    )
-}
-
-/** Couleur de la pill et mot selon la scène — les couleurs mesurées de la vidéo. */
-private fun pillOf(scene: IseeScene): Triple<Color, Color, String> = when (scene) {
-    IseeScene.VISION -> Triple(IseeSceneColors.pillActiveBg, Color.White, "VISION")
-    IseeScene.LISTENING -> Triple(IseeSceneColors.pillListenBg, Color.White, "LISTENING")
-    IseeScene.THINKING -> Triple(IseeSceneColors.pillActiveBg, Color.White, "THINKING")
-    IseeScene.VOICE -> Triple(IseeSceneColors.pillVoiceBg, Color.White, "VOICE")
-    IseeScene.ANSWERED -> Triple(IseeSceneColors.pillDoneBg, IseeSceneColors.pillDoneText, "ANSWERED")
-    IseeScene.MEMORY -> Triple(IseeSceneColors.pillMemoryBg, Color.White, "MEMORY")
-    IseeScene.READY -> Triple(IseeSceneColors.pillQuietBg, IseeSceneColors.pillQuietText, "READY")
-}
-
-/**
- * Ce que la scène montre en plus du décor fixe (bandeaux, en-tête, gros texte,
- * pill) : la carte caméra — la grande bulle en est le strict complément — et les
- * dots de pagination. Pur : même scène, même écran, testable sur JVM.
- */
-internal data class IseeSceneLayers(val cameraCard: Boolean, val pageDots: Boolean) {
-    /** La bulle occupe la scène chaque fois que la carte caméra ne le fait pas. */
-    val bubble: Boolean get() = !cameraCard
-}
-
-/**
- * Les règles de visibilité du design : la carte caméra est affichée tant qu'une
- * capture est vivante (`captureLive`), quelle que soit la scène — tenir le micro
- * pendant que la vidéo tourne ne doit pas cacher ce qu'on filme — et jamais
- * pendant qu'elle se dissout (la carte gelée prend sa place). Les dots
- * n'apparaissent que hors capture et seulement s'il y a plusieurs bulles.
- *
- * La scène ne décide plus de la carte : elle garde son rôle dans la pill d'état,
- * et la réflexion peut donc s'afficher au-dessus d'une caméra vivante.
- */
-internal fun iseeSceneLayers(
-    bubbles: Int,
-    dissolving: Boolean,
-    captureLive: Boolean,
-): IseeSceneLayers {
-    val cameraCard = captureLive && !dissolving
-    return IseeSceneLayers(cameraCard = cameraCard, pageDots = !captureLive && bubbles > 1)
-}
-
-/** La scène : la carte vivante (VISION), ou la bulle — et pendant la dissolution la
- * carte gelée sous la gerbe, toutes les deux posées au-dessus de la bulle. */
-@Composable
-private fun BoxWithConstraintsScope.SceneArea(
-    layers: IseeSceneLayers,
-    scene: IseeScene,
-    state: IhearUiState,
-    glue: CameraGlue,
-    probe: LiveProbeState,
-    viewModel: IhearViewModel,
-    entry: ChatEntry?,
-    width: Dp,
-    height: Dp,
-    grid: PixelGrid,
-    dissolve: Pair<Animatable<Float, AnimationVector1D>, DissolveRun?>,
-    world: WorldMemory?,
-) {
-    val (clock, run) = dissolve
-    if (layers.bubble) BigBubble(state, entry, scene, world, dissolve)
-    if (run != null) {
-        FrozenCard(run)
-        DissolveOverlay(run, clock, Modifier.fillMaxSize())
-    }
-    if (layers.cameraCard) VisionCard(state, glue, probe, viewModel, grid, width, height)
-}
-
-/** Grande bulle + satellites dans un plein écran : géométrie du cœur, morph du
- * dissolve, monde des pixels atterris, ticks rayonnants violets ou bleus. */
-@Composable
-private fun BoxWithConstraintsScope.BigBubble(
-    state: IhearUiState,
-    entry: ChatEntry?,
-    scene: IseeScene,
-    world: WorldMemory?,
-    dissolve: Pair<Animatable<Float, AnimationVector1D>, DissolveRun?>,
-) {
-    val (clock, run) = dissolve
-    val look = bubbleLookIndex(entry?.id ?: INTRO_BUBBLE_ID)
-    val answered = scene == IseeScene.ANSWERED
-    val tickColor = when (scene) {
-        IseeScene.VOICE -> IseeSceneColors.pillVoiceBg
-        IseeScene.LISTENING -> IseeSceneColors.pillListenBg
-        else -> null
-    }
-    val tickPhase = rememberInfiniteTransition(label = "ticks").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1_400, easing = LinearEasing)),
-        label = "tick-phase",
-    )
-    Canvas(Modifier.fillMaxSize()) {
-        bigBubbleBody(
-            look = look,
-            answered = answered,
-            clock = clock.value,
-            run = run,
-            world = world,
-            entry = entry,
-            tickPhase = tickPhase.value,
-            tickColor = tickColor,
-        )
-    }
-}
-
-/* ————— Gros texte paginé, dots, pill d'instructions ————— */
-
-/** Label (YOU/ISEE) + gros texte : au plus 3 lignes à l'écran, le reste glisse. */
-@Composable
-private fun BoxWithConstraintsScope.HeadingArea(view: IseeSceneView, height: Dp) {
-    var page by remember(view.heading) { mutableIntStateOf(0) }
-    val pages = remember(view.heading) { textPages(view.heading) }
-    LaunchedEffect(view.heading) {
-        while (page < pages.size - 1) {
-            delay(3800)
-            page++
-        }
-    }
-    val pageIndex = page.coerceIn(0, pages.size - 1)
-    Column(
-        Modifier
-            .align(Alignment.TopCenter)
-            .offset(y = height * 0.615f)
-            .padding(horizontal = 26.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        view.label?.let {
-            Text(
-                it,
-                color = IseeSceneColors.label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-        }
-        AnimatedContent(
-            targetState = pages[pageIndex],
-            transitionSpec = {
-                (slideInVertically { it / 2 } + fadeIn(tween(300))) togetherWith
-                    (slideOutVertically { -it / 2 } + fadeOut(tween(220)))
-            },
-            label = "heading-page",
-        ) { pageText ->
-            Text(
-                pageText.joinToString("\n"),
-                color = if (view.fromUser) IseeSceneColors.headingUser else IseeSceneColors.headingDark,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 46.sp,
-                textAlign = TextAlign.Center,
-                maxLines = HEADING_MAX_LINES,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.alpha(1f),
-            )
-        }
-    }
-}
-
-/** Les dots de pagination, posés bas-droite au-dessus de la pill d'instructions. */
-@Composable
-private fun BoxWithConstraintsScope.PageDotsLayer(
-    layers: IseeSceneLayers,
-    total: Int,
-    selected: Int,
-    height: Dp,
-) {
-    if (!layers.pageDots) return
-    PageDots(
-        total = total,
-        selected = selected,
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = 26.dp, bottom = height * 0.19f),
-    )
-}
-
-/** Dots de pagination : l'actif plus gros et bleu, les autres plus petits et gris. */
-@Composable
-private fun PageDots(total: Int, selected: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(total) { i ->
-            val active = i == selected
-            Box(
-                Modifier
-                    .size(if (active) 9.dp else 6.dp)
-                    .background(
-                        color = if (active) IseeSceneColors.dotActive else IseeSceneColors.dotInactive,
-                        shape = CircleShape,
-                    ),
-            )
-        }
-    }
-}

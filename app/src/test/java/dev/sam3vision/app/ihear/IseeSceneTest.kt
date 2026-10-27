@@ -157,6 +157,30 @@ class IseeSceneTest {
     }
 
     @Test
+    fun `les mots dits passent au noir, le mot en cours garde la couleur de qui parle`() {
+        val s = spokenText("is it safe", shown = 2, fromUser = true)
+        val colours = s.spanStyles.map { it.item.color.value }
+        assertEquals(3, colours.size)
+        assertEquals(androidx.compose.ui.graphics.Color(dev.sam3vision.core.iseedesign.IseePortrait.INK).value, colours[0])
+        assertEquals(androidx.compose.ui.graphics.Color(dev.sam3vision.core.iseedesign.IseePortrait.YOU_INK).value, colours[1])
+        assertEquals(androidx.compose.ui.graphics.Color(dev.sam3vision.core.iseedesign.IseePortrait.DIM).value, colours[2])
+        // Phrase finie : tout en noir.
+        val done = spokenText("is it safe", shown = Int.MAX_VALUE, fromUser = true)
+        assertTrue(done.spanStyles.all { it.item.color.value == androidx.compose.ui.graphics.Color(dev.sam3vision.core.iseedesign.IseePortrait.INK).value })
+        assertEquals("is it safe", done.text)
+    }
+
+    @Test
+    fun `la boule passe au bleu a l'ecoute et a l'ambre quand iSee parle`() {
+        assertEquals(1f, orbLookOf(IseeScene.LISTENING, 1f, 0f).you, 0f)
+        assertEquals(0f, orbLookOf(IseeScene.LISTENING, 1f, 0f).see, 0f)
+        assertEquals(1f, orbLookOf(IseeScene.VOICE, 1f, 0f).see, 0f)
+        assertEquals(0f, orbLookOf(IseeScene.READY, 1f, 0f).amp, 0f)
+        assertEquals("SPEAKING", chipLabel(IseeScene.VOICE))
+        assertEquals("LISTENING", chipLabel(IseeScene.LISTENING))
+    }
+
+    @Test
     fun `les dots n'apparaissent qu'avec plusieurs bulles hors capture`() {
         assertFalse(iseeSceneLayers(bubbles = 1, dissolving = false, captureLive = false).pageDots)
         assertTrue(iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = false).pageDots)
