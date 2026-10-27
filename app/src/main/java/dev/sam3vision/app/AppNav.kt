@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -191,7 +192,6 @@ private fun LiveRoute(
     LiveScreen(
         viewModel = liveViewModel,
         onBack = { liveViewModel.stop(); pop() },
-        onShareParent = { shareParentSite(context, settings.parentSiteUrl, settings.shareId) },
         onAsk = {
             viewModel.useLiveFrame(liveViewModel.latestFrameB64())
             push(Route.Chat)
@@ -203,14 +203,21 @@ private fun LiveRoute(
 /**
  * Relais GPS+objets vers le site parent pendant le Direct : écoute active tant
  * que l'écran est affiché, envoi à chaque couche de distances (throttle 2 s).
+ * [ShareGate] dit au service de suivi de patienter, pour ne pas doubler l'envoi.
  */
 @Composable
 private fun ShareRelay(layer: DistanceLayer?, settings: Settings, context: Context) {
     val broadcaster = remember(context) { ShareBroadcaster(context) }
     LaunchedEffect(settings.shareEnabled) {
+        ShareGate.screenPublishing = settings.shareEnabled
         broadcaster.start(settings.shareEnabled)
     }
-    DisposableEffect(Unit) { onDispose { broadcaster.stop() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            ShareGate.screenPublishing = false
+            broadcaster.stop()
+        }
+    }
     LaunchedEffect(layer) {
         if (layer != null && !layer.empty) {
             broadcaster.publish(System.currentTimeMillis(), settings, layer)
@@ -242,6 +249,7 @@ private fun SettingsRoute(
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
 ) {
+    val context = LocalContext.current
     SettingsScreen(
         settings = state.settings,
         statusLine = state.statusLine,
@@ -257,6 +265,14 @@ private fun SettingsRoute(
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
         onOpenGestures = onOpenGestures,
+        onStartTracking = { siteUrl, shareId ->
+            (context as? MainActivity)?.ensureSharePermissions()
+            ShareTrackingService.start(context)
+            shareParentSite(context, siteUrl, shareId)
+        },
+        onStopTracking = {
+            context.stopService(Intent(context, ShareTrackingService::class.java))
+        },
         onBack = pop,
     )
 }
