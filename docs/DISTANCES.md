@@ -23,12 +23,12 @@ Deux entrées, deux sources :
 | Entrée | D'où elle vient |
 |---|---|
 | **Hauteur réelle** | `KnownSizes.TABLE` (`KnownSizes.kt:40+`) : table label → mètres (personne 1,70 · voiture 1,45 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. |
-| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **focale mm + taille physique lues par l'interop Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt:22-27`), sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Ordre vérifié : direct `LiveViewModel.chosenLens` (`:338-341`), photo iSee `IhearPhotoDistances.chosenLens` (`:53-56`). **Attention : la voie REC d'iSee ne passe pas par le capteur** — `LiveProbe.configureFrom` applique `LensSpec.fromSettings` (`ProbeWiring.kt:22-31`), qui borne en plus la valeur saisie à 15–130° (`LensSpec.kt:43-46,71-72`) alors que le direct accepte tout champ positif. Écart connu, non corrigé. |
+| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **focale mm + taille physique lues par l'interop Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt:22-27`), sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Ordre vérifié : direct `LiveViewModel.chosenLens` (`:338-341`), photo iSee `IseePhotoDistances.chosenLens` (`:53-56`). **Attention : la voie REC d'iSee ne passe pas par le capteur** — `LiveProbe.configureFrom` applique `LensSpec.fromSettings` (`ProbeWiring.kt:22-31`), qui borne en plus la valeur saisie à 15–130° (`LensSpec.kt:43-46,71-72`) alors que le direct accepte tout champ positif. Écart connu, non corrigé. |
 
 L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`, `LensSpec.kt:23-29`)
 — le direct redresse chaque frame avant envoi (`uprightScaled`, `LiveScreen.kt:291`). La mesure est indépendante de la
 résolution envoyée : `focalPx` se recalcule pour chaque frame depuis les dimensions **revenant du serveur**
-(512 px côté direct `LIVE_EDGE`, `LiveScreen.kt:45` ; **320 px** côté iSee `IHEAR_FRAME_EDGE`, `IhearCameraPane.kt:39` ;
+(512 px côté direct `LIVE_EDGE`, `LiveScreen.kt:45` ; **320 px** côté iSee `ISEE_FRAME_EDGE`, `IseeCameraPane.kt:39` ;
 `work_edge` demandé au serveur : 640, `LiveSession.kt:66,173`).
 
 **Bornes de plausibilité** (`Pinhole`, `DistanceEstimator.kt:30,33,36`) : rien sous **0,3 m** (`MIN_METERS`),
@@ -49,7 +49,7 @@ piste muette plus de **2 s** est oubliée : l'objet qui revient est mesuré à n
 constructeur (`DistanceSmoother.kt:17-22`), testées dans `DistanceMeterTest`.
 
 Sur la page caméra iSee (REC) et sur la photo du double tap : **pas de journal de pistes, mesure brute**
-(`LiveProbe.readingsOf` n'appelle jamais `record` ; `IhearPhotoDistances.layerOf`) — la pastille y bouge donc
+(`LiveProbe.readingsOf` n'appelle jamais `record` ; `IseePhotoDistances.layerOf`) — la pastille y bouge donc
 un peu plus qu'en Direct.
 
 ## Précision — ce que le chiffre vaut
@@ -86,17 +86,17 @@ Testé dans `DistanceLayoutTest` ; l'aperçu avant/après qui a servi à choisir
 ## iSee : les pastilles sur la photo du double tap
 
 L'accueil iSee (chat + fenêtre caméra) ne suit aucun flux `/live` pendant la navigation : ni masques, ni
-pistes, donc aucun objet à étiqueter en continu. Le **double tap** (`IhearViewModel.onDoubleTap`, `:254`)
+pistes, donc aucun objet à étiqueter en continu. Le **double tap** (`IseeViewModel.onDoubleTap`, `:254`)
 prend une photo, l'affiche dans la fenêtre flottante et l'envoie au `/segment` de SAM (`HttpSamClient.segment`,
-`IhearPhotoDistances.kt:45-47` ; le segment est **resté en HTTP** — seul le direct est en WS) ; chaque objet dont
+`IseePhotoDistances.kt:45-47` ; le segment est **resté en HTTP** — seul le direct est en WS) ; chaque objet dont
 le concept a une hauteur connue reçoit sa pastille **avec son nom** (`personne ≈ 3,9 m` — `withLabel = true`,
 `IseeVisionCard.kt:104`) — sans masque sur une photo, c'est le seul moyen de savoir de quel objet parle la
 pastille. Une photo ne bouge pas : pas de lissage, une mesure brute.
 
-La photo reste 2,6 s (`PHOTO_SHOW_MS`, `IhearViewModel.kt:323` ; valeur 2,6 s dans `IhearPhotoShot.kt:102`) ; dès que des pastilles arrivent, elle est
-**maintenue 6 s** (`PHOTO_MEASURED_MS`, `:326` ; 6 s, `IhearPhotoShot.kt:105`) le temps de lire. Échec de mesure expliqué au chat, pas muet :
+La photo reste 2,6 s (`PHOTO_SHOW_MS`, `IseeViewModel.kt:323` ; valeur 2,6 s dans `IseePhotoShot.kt:102`) ; dès que des pastilles arrivent, elle est
+**maintenue 6 s** (`PHOTO_MEASURED_MS`, `:326` ; 6 s, `IseePhotoShot.kt:105`) le temps de lire. Échec de mesure expliqué au chat, pas muet :
 `PhotoMeasure` distingue bascule coupée, endpoint absent, image illisible, SAM injoignable, rien de mesurable
-(`IhearPhotoDistances.kt:62-69`). Rien de mesurable : la photo s'évapore comme avant, sans pastille.
+(`IseePhotoDistances.kt:62-69`). Rien de mesurable : la photo s'évapore comme avant, sans pastille.
 
 ## À voix haute
 
@@ -112,7 +112,7 @@ autres objets. ») ; le séparateur devient le point-virgule dès qu'une distanc
 `core/…/live/PositionText.kt:101-121`).
 
 Pas de duplication : c'est l'annonce de positions existante (`PositionAnnouncer` : stabilité **2 frames**,
-pas de répétition, **4 s** entre deux phrases — `PositionAnnouncer.kt:88,91`) qui porte désormais la distance
+pas de répétition, **4 s** entre deux phrases — `AnnouncementGate.kt:83,86`) qui porte désormais la distance
 dans `PositionText.item`, et **la distance arrondie au mètre entre dans la signature de scène**
 (`PositionText.key` `:140-145` + `bucket` `:190-191`) — c'est ce qui fait reparler un objet qui s'approche (3 m → 2 m →
 1 m) sans bavarder à chaque frame. `DistanceText.spoken` met les mètres en mots de la langue de la voix — français ici
@@ -148,10 +148,10 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   son coin, empilement vers le bas quand deux pastilles se recouvrent, deux pastilles éloignées qui ne bougent
   pas, pastille plus large que le cadre), bord touché par le fil (`leadY`), saisie du champ (± bornes),
   pastilles du bas, préfixe du concept.
-- `app.ihear.IhearDistancesTest` (**5**) : pastilles d'une photo segmentée — personne haute mesurée (≈ 3,9 m),
+- `app.isee.IseeDistancesTest` (**5**) : pastilles d'une photo segmentée — personne haute mesurée (≈ 3,9 m),
   une pastille par objet, concept inconnu ignoré, photo vide ou de taille nulle, boîte coupée par le bord bas
   non mesurée.
-- `app.ihear.LiveProbeTextTest` : ligne d'état REC avec `plus proche ≈ 1,1 m` et détail `distances :` trié.
+- `app.isee.LiveProbeTextTest` : ligne d'état REC avec `plus proche ≈ 1,1 m` et détail `distances :` trié.
 - Recette sur téléphone réel (1220×2712, relevé non rejoué ici) : ligne d'état
   « Direct · 1,5 ips · 635 ms · 4 objets · plus proche 2,0 m · NVIDIA A100 », pastilles
   « ≈ 2,0 m / ≈ 2,1 m / ≈ 2,3 m » superposées aux masques, section Réglages « Distances » rendue.

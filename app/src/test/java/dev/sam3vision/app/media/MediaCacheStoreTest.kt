@@ -57,7 +57,7 @@ class MediaCacheStoreTest {
     }
 
     private fun tempDir(): File =
-        Files.createTempDirectory("ihear-media").toFile().apply { deleteOnExit() }
+        Files.createTempDirectory("isee-media").toFile().apply { deleteOnExit() }
 
     /** DAO en mémoire : suffit pour vérifier l'identité des lignes mises à jour. */
     private class FakeDao : MessageMultimediaDao {

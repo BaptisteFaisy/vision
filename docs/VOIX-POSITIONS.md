@@ -48,10 +48,11 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
 
 ## 4. Quand elle parle : trois garde-fous
 
-`core/.../live/PositionAnnouncer.kt` — machine à états **pure** (l'horodatage est fourni) :
+`core/.../live/AnnouncementGate.kt` — machine à états **pure** (l'horodatage est fourni),
+partagée avec les consignes de guidage (`GuidanceAnnouncer.kt`) :
 
 1. **stabilité** — la même scène doit être vue **2 frames de suite**
-   (`DEFAULT_MIN_FRAMES = 2`, `PositionAnnouncer.kt:88`) : un masque qui clignote ne
+   (`DEFAULT_MIN_FRAMES = 2`, `AnnouncementGate.kt:83`) : un masque qui clignote ne
    déclenche rien ;
 2. **nouveauté** — une scène déjà annoncée reste muette, même si les objets sont toujours
    là. La signature de scène est `label|heure|distance arrondie au mètre`
@@ -59,11 +60,12 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
    **qui s'approche** (3 m → 2 m → 1 m) ou **qui glisse** (10 h → 11 h) sans le faire
    bavarder à chaque frame ;
 3. **délai** — jamais deux annonces à moins de **4 s** (`DEFAULT_COOLDOWN_MS = 4_000L`,
-   `PositionAnnouncer.kt:91`).
+   `AnnouncementGate.kt:86`).
 
-Plus : **scène vide ⇒ la mémoire de scène retombe** (`onEmptyScene`,
-`PositionAnnouncer.kt:69-75`), donc le retour des objets est de nouveau annoncé ; et
-`reset()` (`:60-65`) à chaque nouvelle séance, sinon la première scène resterait muette.
+Plus : **scène vide ⇒ la mémoire de scène retombe** (`clearScene`,
+`AnnouncementGate.kt:65-69`), donc le retour des objets est de nouveau annoncé ; et
+`reset()` (`PositionAnnouncer.kt:48`, → `AnnouncementGate.reset`) à chaque nouvelle
+séance, sinon la première scène resterait muette.
 
 ## 5. Un seul moteur de voix
 
@@ -72,12 +74,12 @@ L'annonce passe par le moteur **unique** de l'app, jamais par un second lecteur.
 | Chemin | Câblage | Garde « ne coupe rien » |
 |---|---|---|
 | Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:126`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:124`, dossier `POSITION_VOICE_DIR = "positions"`, `:497`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
-| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../ihear/LiveProbe.kt:400-403`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
+| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../isee/LiveProbe.kt:418-423`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
 | Analyse photo | `AppViewModel.announcePositions` (`AppViewModel.kt:187-195`) | même voix, un seul `say` à la fois |
 
-Réglage : **`Settings.ttsAnnouncePositions`** (défaut `true`, `Settings.kt:28`), bascule
+Réglage : **`Settings.ttsAnnouncePositions`** (défaut `true`, `Settings.kt:36`), bascule
 « Annoncer les objets et leur distance » (`app/TtsSettings.kt:73-76`). La bascule effective
-est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:148`) :
+est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:184`) :
 **sans clé ElevenLabs ni voix, l'annonce est muette** — par construction, pas par bug.
 
 ## 6. Ce qui n'est jamais annoncé
@@ -97,11 +99,11 @@ est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:14
 
 | Élément | Fichier |
 |---|---|
-| Heures, phrase, signature de scène | `core/.../live/PositionText.kt` (160 l.) |
-| Machine 2 frames / 4 s / non-répétition | `core/.../live/PositionAnnouncer.kt` (92 l.) |
+| Heures, phrase, signature de scène | `core/.../live/PositionText.kt` (163 l.) |
+| Machine 2 frames / 4 s / non-répétition | `core/.../live/AnnouncementGate.kt` (88 l.), `PositionAnnouncer.kt` (49 l.) |
 | Frame → objets placés + distance | `core/.../live/FrameRoster.kt` (`placedLabels`, `:62-77`) |
 | Direct (VM + annonce) | `app/.../LiveViewModel.kt`, `app/.../live/LivePositionVoice.kt` |
-| iSee (sonde + voix) | `app/.../ihear/LiveProbe.kt`, `ProbeWiring.kt`, `ProximityVoice.kt` |
+| iSee (sonde + voix) | `app/.../isee/LiveProbe.kt`, `ProbeWiring.kt`, `ProximityVoice.kt` |
 | Photo | `app/.../AppViewModel.kt` |
 | Réglages | `core/.../settings/Settings.kt`, `app/.../TtsSettings.kt` |
 

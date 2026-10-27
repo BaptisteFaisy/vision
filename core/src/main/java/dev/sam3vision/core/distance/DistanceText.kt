@@ -85,6 +85,10 @@ object DistanceText {
     fun nearestLabel(readings: List<DistanceReading>): String =
         nearest(readings)?.let { "plus proche ${format(it.meters)}" }.orEmpty()
 
-    private fun decimal(value: Float, digits: Int, locale: Locale): String =
+    /**
+     * Nombre décimal brut, locale explicite : l'unique formatage `String.format` des
+     * nombres affichés (`LiveProbeText` l'utilise aussi — une seule implémentation).
+     */
+    fun decimal(value: Float, digits: Int, locale: Locale): String =
         String.format(locale, "%.${digits}f", value)
 }

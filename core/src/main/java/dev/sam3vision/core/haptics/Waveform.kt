@@ -10,7 +10,7 @@ package dev.sam3vision.core.haptics
  *
  * Un motif incohérent ne casse pas ici mais **à l'envoi** : le crash du balayage
  * vertical venait de trois timings pour deux amplitudes (correctif #129,
- * `IhearHaptics.kt:52`). La garde est donc dans `init`, et l'envoi côté app reste
+ * `IseeHaptics.kt:52`). La garde est donc dans `init`, et l'envoi côté app reste
  * enveloppé dans un `runCatching` : un motif refusé ne doit jamais tuer l'app.
  */
 class Waveform(

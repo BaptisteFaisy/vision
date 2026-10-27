@@ -187,6 +187,18 @@ const val FRAME_KEEP_MS = 1_000L
 fun shouldKeepFrame(nowMs: Long, lastKeepAtMs: Long, intervalMs: Long = FRAME_KEEP_MS): Boolean =
     lastKeepAtMs <= 0L || nowMs - lastKeepAtMs >= intervalMs
 
+/**
+ * État après un échec réseau : compteur remis à zéro, transport reflétant le socket —
+ * et erreur **masquée** pendant le réveil GPU au lieu d'affoler l'écran.
+ */
+fun frameErrorState(current: LiveUiState, waking: Boolean, transport: String, message: String?): LiveUiState =
+    current.copy(
+        objectsCount = 0,
+        transport = transport,
+        starting = waking,
+        error = if (waking) null else samUnreachableLine(message ?: "GPU injoignable"),
+    )
+
 /** Cadence du prochain tick, bornée par les constantes de [LiveSession]. */
 fun nextIntervalMs(session: LiveSession?): Long = session?.intervalMsAdaptive() ?: Cadence.Direct.targetMs
 
@@ -233,12 +245,13 @@ internal const val MEMORY_WINDOW_MS = 30_000L
 /** Dossier audio de l'annonce des positions : distinct de celui des bandeaux. */
 internal const val POSITION_VOICE_DIR = "positions"
 
-/** « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST). */
-internal fun transportLabel(trackerEnabled: Boolean, client: LiveClient?): String = when {
-    trackerEnabled -> TRANSPORT_TRACK
-    (client as? WsLiveClient)?.isConnected == true -> TRANSPORT_WS
-    else -> TRANSPORT_WS_KO
-}
+/**
+ * « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST) :
+ * lit l'état du socket sur le client, la table des libellés restant pure et testée en JVM
+ * ([transportLabel] à drapeau, dans `LiveMessages`).
+ */
+internal fun transportLabel(trackerEnabled: Boolean, client: LiveClient?): String =
+    transportLabel(trackerEnabled, (client as? WsLiveClient)?.isConnected == true)
 
 /**
  * Envoie la frame au pipeline actif, quel que soit le transport ; `null` = frame jetée

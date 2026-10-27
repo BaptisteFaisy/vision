@@ -24,9 +24,9 @@ enum class SpeechLanguage(
 
     companion object {
         /**
-         * Langue par défaut : **anglais**. L'intro embarquée (`res/raw/intro_ihear.mp3`,
+         * Langue par défaut : **anglais**. L'intro embarquée (`res/raw/intro_isee.mp3`,
          * voix Jade US) est déjà en anglais, et c'est la demande du 2026-10-26 :
-         * « dans l'app ihear, la personne nous parle en anglais ». Le français reste
+         * « dans l'app isee, la personne nous parle en anglais ». Le français reste
          * à un bouton de distance dans les Réglages.
          */
         val DEFAULT: SpeechLanguage = En

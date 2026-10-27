@@ -111,17 +111,17 @@ identifiant technique, il ne se traduit pas.
 Ne pas confondre la purge des **captures** (ce document) avec la purge du **cache multimédia**
 d'iSee, qui a ses propres règles et ses propres fichiers :
 
-- `app/media/MediaCacheStore.kt:14-18` — tout fichier lourd s'écrit dans `cacheDir/ihear` :
+- `app/media/MediaCacheStore.kt:14-18` — tout fichier lourd s'écrit dans `cacheDir/isee` :
   `user-<ts>.mp3` (micro maintenu), `reply-<ts>.mp3` (voix ElevenLabs), `env-<ts>.mp4` (vidéo
   d'environnement), chacun lié à une ligne Room (`MediaDatabase`, schéma v1) ;
 - `app/media/CacheCleanerManager.kt` — trois règles : purge totale (`purgeAll`, table +
   `cacheDir.deleteRecursively()`), timer d'inactivité programmé à `onPause` et annulé à
   `onResume`, et **sécurité FIFO** après chaque écriture (au-delà d'un plafond d'octets, on
   détruit le message le plus ancien) ;
-- la purge totale part de **deux endroits** : `onDestroy` (`IhearSession.onClosed`) et le
+- la purge totale part de **deux endroits** : `onDestroy` (`IseeSession.onClosed`) et le
   **démarrage du ViewModel**. Un force-stop ou un balayage depuis les apps récentes ne passe pas
   par `onDestroy` : sans la purge au démarrage, les messages survivaient à une réouverture ;
-- assemblage dans `app/ihear/IhearViewModel.kt:44-45` (`MediaCacheStore(app, dao)` puis `CacheCleanerManager(dao, media.dir())`).
+- assemblage dans `app/isee/IseeViewModel.kt:44-45` (`MediaCacheStore(app, dao)` puis `CacheCleanerManager(dao, media.dir())`).
 
 Ce cache n'est **pas** planifié par WorkManager et n'est **pas** concerné par
 `CleanupConfig` : changer la périodicité horaire ne purge pas le cache, et vice versa.

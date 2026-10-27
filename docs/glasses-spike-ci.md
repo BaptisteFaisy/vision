@@ -23,7 +23,7 @@ borné à **5 minutes** :
 
 | Job | Ligne | Ce qu'il fait pour le banc |
 |---|---|---|
-| `ci` | `:26` (`timeout-minutes: 5` `:29`) | `./gradlew :core:testDebugUnitTest :app:testDebugUnitTest` (`:148`) → les **84 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
+| `ci` | `:26` (`timeout-minutes: 5` `:29`) | `./gradlew :core:testDebugUnitTest :app:testDebugUnitTest` (`:149`) → les **92 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
 | `apk` | `:164` | `:app:assembleDebug` (`:174`) → compile le banc, y compris `MockGlassesHarness` et le mock (`debugImplementation`) |
 | `apk-release` | `:186` | `:app:assembleRelease` (`:196`) → compile le banc **sans** le mock : c'est le stub `src/release/MockControl.kt` qui prend le relais |
 | `lint` | `:199` | `:app:lintDebug` (`:215`) → le banc passe au lint comme le reste de l'app |
@@ -39,7 +39,7 @@ Trois propriétés à retenir :
   de la fusion, c'était déjà le cas avant ;
 - **la garde de taille couvre le banc** : `tools/check-kotlin-limits.py` parcourt la racine en
   sautant `{.git, .gradle, build, .idea, tmp, …}`, donc `app/src/main/.../bench/` est contrôlé
-  comme le reste. Plus gros fichier du paquet au 27/10 : `BenchScreen.kt` (337 l.), plus grosse
+  comme le reste. Plus gros fichier du paquet au 27/10 : `BenchScreen.kt` (350 l.), plus grosse
   limite respectée avec de la marge.
 
 ## 3. Les garde-fous de budget, inchangés
@@ -47,7 +47,7 @@ Trois propriétés à retenir :
 - `.github/ci-budget/check_timeouts.py` refuse tout job sans `timeout-minutes` ou au-delà de
   **5 min** ; les quatre jobs de `ci.yml` déclarent `timeout-minutes: 5`.
 - `concurrency: ci-${{ github.workflow }}-${{ github.ref }}` + `cancel-in-progress: true`
-  (`ci.yml:16-17`) : un nouveau push annule le run précédent de la même branche.
+  (`ci.yml:15-17`) : un nouveau push annule le run précédent de la même branche.
 - Tous les `checkout` sont en `fetch-depth: 1` ; le cache Gradle vient de
   `gradle/actions/setup-gradle@v4` (`cache-read-only: false`).
 - Les runners sont **auto-hébergés** (`runs-on: [self-hosted, linux, x64, vision]`,

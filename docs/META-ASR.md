@@ -157,5 +157,5 @@ remède pour `custom.muse` côté ZeroClaw et pour le pont local `meta-asr-bridg
 | Façade « audio → texte » | `app/MuseTranscript.kt`, `app/media/HoldTranscript.kt` |
 | Dictée du chat (bouton) | `app/DictationFeature.kt`, `app/ChatScreen.kt`, `app/DictationOverlay.kt` |
 | Dictée du direct (voix de la question) | `app/LiveVoice.kt` |
-| Appui long iSee | `app/ihear/IhearViewModel.kt` (`onHoldStart`, `transcribeAndAnswer`) |
+| Appui long iSee | `app/isee/IseeViewModel.kt` (`onHoldStart`, `transcribeAndAnswer`) |
 | Réglages (base URL, clé, modèle, test) | `app/SettingsScreen.kt` ; test = `AppViewModel.testAsr` |

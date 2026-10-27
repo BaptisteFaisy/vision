@@ -38,7 +38,7 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
   `net/NetContractHarness.kt`, `net/TestLiveClients.kt`, `live/FrameBench.kt`,
   `mask/M1Fixtures.kt`, `mask/MaskCodecFixtures.kt`, `mask/MaskFixtures.kt`,
   `mask/MaskGoldenData.kt`, `mask/JvmAllocations.kt`, `keyframe/KeyframeScene.kt`,
-  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `ihear/vm/FakeMessageDao.kt`,
+  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `isee/vm/FakeMessageDao.kt`,
   `vm/Fakes.kt`.
 
 ### Ce que Gradle exécute réellement
@@ -180,7 +180,7 @@ Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un se
 
 - **audio** (13) : SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **distance** (87) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 6, DistanceTextTest 7, GroundPlaneTest 17, KnownSizesTest 5, LensSpecTest 7, OpticsTest 24
-- **gesture** (17) : IhearGestureBrainTest 3, LongPressTriggerTest 10, TapOrHoldTest 4
+- **gesture** (17) : IseeGestureBrainTest 3, LongPressTriggerTest 10, TapOrHoldTest 4
 - **glasses** (6) : CaptureGestureTest 6
 - **haptics** (8) : WaveformTest 8
 - **iseedesign** (19) : DissolveTest 10, IseeSceneTest 9
@@ -203,8 +203,8 @@ Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un se
 - **cleanup** (11) : CaptureCleanerTest 6, CaptureScannerTest 5
 - **glasses** (26) : GlassesAudioPlanTest 7, GlassesMessagesTest 6, GlassesPhaseMappingTest 2, GlassesPolicyTest 4, GlassesUiStateTest 7
 - **glasses.bench** (84) : ChaineCompleteTest 8, CycleLatchTest 5, FramePolicyTest 6, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, SessionPolicyTest 26, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
-- **ihear** (86) : FramePolicyTest 6, IhearDistancesTest 5, IhearPhotoContextTest 8, IseeRenderTest 12, IseeSceneTest 11, LiveProbeCadenceTest 4, LiveProbeSchedulingTest 2, LiveProbeTextTest 21, OnboardingGesturesTest 8, RevealShiftTest 4, SpeakableTextTest 3, BubbleCountTest 2
-- **ihear.vm** (41) : IhearAnswersTest 6, IhearCameraCoordinatorTest 6, IhearDictationTest 9, IhearPhotoShotTest 6, IhearStatusTextTest 9, IhearTranscriptTest 5
+- **isee** (86) : FramePolicyTest 6, IseeDistancesTest 5, IseePhotoContextTest 8, IseeRenderTest 12, IseeSceneTest 11, LiveProbeCadenceTest 4, LiveProbeSchedulingTest 2, LiveProbeTextTest 21, OnboardingGesturesTest 8, RevealShiftTest 4, SpeakableTextTest 3, BubbleCountTest 2
+- **isee.vm** (41) : IseeAnswersTest 6, IseeCameraCoordinatorTest 6, IseeDictationTest 9, IseePhotoShotTest 6, IseeStatusTextTest 9, IseeTranscriptTest 5
 - **live** (50) : LiveAskForgetTest 1, LiveAskSessionTest 7, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 5, LivePredictionTest 8, LiveWakeGuardTest 7
 - **media** (13) : MediaCacheStoreTest 3, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **tap** (14) : TapMachineTest 8, TapZonesTest.kt 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)

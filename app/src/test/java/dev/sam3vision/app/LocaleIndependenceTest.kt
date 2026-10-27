@@ -1,6 +1,6 @@
 package dev.sam3vision.app
 
-import dev.sam3vision.app.ihear.decimal
+import dev.sam3vision.core.distance.DistanceText
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,8 +14,8 @@ import java.util.Locale
  * Régression mesurée le 26/10 : `formatLiveStatus` formatait « %.1f » sans locale,
  * donc « 1,4 ips » sur le poste (français) et « 1.4 ips » sur le runner GitHub
  * (anglais) — le test passait chez l'un, échouait chez l'autre. Le même défaut
- * existait dans `decimal()`, masqué par un `replace('.', ',')` qui ne tient que
- * si la locale fractionnaire est le point.
+ * existait dans `DistanceText.decimal()`, masqué par un `replace('.', ',')` qui ne
+ * tient que si la locale fractionnaire est le point.
  */
 class LocaleIndependenceTest {
 
@@ -47,8 +47,8 @@ class LocaleIndependenceTest {
     fun `decimal garde la virgule quelle que soit la locale`() {
         for (locale in listOf(Locale.US, Locale.GERMANY, Locale.FRANCE, Locale.ROOT)) {
             Locale.setDefault(locale)
-            assertEquals("locale $locale", "1,4", decimal(1.4f))
-            assertEquals("locale $locale", "0,0", decimal(0f))
+            assertEquals("locale $locale", "1,4", DistanceText.decimal(1.4f, 1, Locale.FRANCE))
+            assertEquals("locale $locale", "0,0", DistanceText.decimal(0f, 1, Locale.FRANCE))
         }
     }
 }

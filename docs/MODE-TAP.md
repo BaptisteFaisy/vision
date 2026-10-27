@@ -177,8 +177,8 @@ file d'annonces et le nettoyage restent identiques.
 
 - **tap court** (relâchement sous le seuil) → mode tap : `TapAreaView` déclenche l'enregistrement ;
 - **appui long maintenu** → dictée : c'est la racine posée par `MainActivity` qui capte le geste.
-  ⚠️ Cette racine est **`IhearRootLayout`** (`MainActivity.kt:94-95`) et ses gestes ne s'activent
-  que si `ihear.active` est vrai (`MainActivity.kt:95`, `IhearHome.kt:26-29`), c'est-à-dire
+  ⚠️ Cette racine est **`IseeRootLayout`** (`MainActivity.kt:94-95`) et ses gestes ne s'activent
+  que si `isee.active` est vrai (`MainActivity.kt:95`, `IseeHome.kt:26-29`), c'est-à-dire
   quand l'accueil iSee est à l'écran. Sur l'écran `Route.Tap`, l'appui long **ne fait rien** :
   `TapCaptureScreen` accepte un `longPressAction` (`TapCaptureScreen.kt:54`, `:64`) mais la
   navigation ne lui en passe pas (`AppNav.kt:72` : `TapCaptureScreen(state.settings, pop,
@@ -194,7 +194,7 @@ côté tap, bandeau côté dictée.
 
 L'accueil par défaut (iSee) a aussi un tap, mais il **n'appelle pas ce mode** : tap simple →
 `startVideo()` dans la fenêtre caméra flottante, second tap → `stopVideo()` et archivage du MP4
-avec les frames SAM du `LiveProbe` (`IhearViewModel.kt:248-251` → `IhearCameraCoordinator.kt:25-50`). Pas d'annonces
+avec les frames SAM du `LiveProbe` (`IseeViewModel.kt:248-251` → `IseeCameraCoordinator.kt:25-50`). Pas d'annonces
 trois-mots, pas d'upload `/video`, pas de `TapConfig` : les messages y sont en anglais
-(`IhearStatus.kt:17,22` : « Camera not ready — try again », « Recording lost »). Deux gestes qui se ressemblent, deux
+(`IseeStatus.kt:17,22` : « Camera not ready — try again », « Recording lost »). Deux gestes qui se ressemblent, deux
 implémentations distinctes.
