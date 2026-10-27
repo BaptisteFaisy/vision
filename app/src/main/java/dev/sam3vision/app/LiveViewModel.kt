@@ -32,6 +32,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
+import dev.sam3vision.core.net.prewarmSam
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +184,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // Deux transports, aucun `/health` : la 1re frame réveille le conteneur (file Modal, 8-35 s).
+        // Pré-chauffe single-shot : le réveil chevauche l'arrivée de la caméra.
+        viewModelScope.launch { prewarmSam(base) }
         // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
         session = null
         client = null
