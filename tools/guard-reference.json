@@ -1,23 +1,23 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-27T09:56:18+01:00",
-    "commit": "36bd1f9",
+    "le": "2026-10-27T10:31:47+01:00",
+    "commit": "2367e6d",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
-    "kotlin": 475,
-    "python": 12,
+    "kotlin": 481,
+    "python": 14,
     "toleres": []
   },
   "tests-jvm": {
     "plancher": {
-      "app": 373,
+      "app": 377,
       "core": 919,
-      "glasses-spike": 68
+      "glasses-spike": 86
     },
     "execute": {
-      "app": 373,
+      "app": 377,
       "core": 919
     },
     "note": "plancher = annotations @Test de <module>/src/test, comptées sans compiler ; `execute` se remplit au premier passage avec XML JUnit."
@@ -43,7 +43,7 @@
         "tests_min": 0
       }
     ],
-    "fichiers_py_min": 12
+    "fichiers_py_min": 14
   },
   "banc-cadence": {
     "paliers": [
