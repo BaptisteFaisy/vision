@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.findViewTreeLifecycleOwner
+import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.core.distance.LensSpec
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -119,11 +120,12 @@ private fun LiveCameraHost(
 ) {
     val context = LocalContext.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+    val encoder = remember { Nv21JpegEncoder() }
     LaunchedEffect(attached) {
         if (!attached) return@LaunchedEffect
         runCatching {
             bindLiveCamera(context, previewView, executor, viewModel::applyLens) { proxy ->
-                pushFrame(proxy, viewModel)
+                pushFrame(proxy, viewModel, encoder)
             }
         }.onFailure { onFailure("Caméra indisponible : ${it.message}") }
     }
@@ -290,14 +292,20 @@ private suspend fun bindLiveCamera(
 }
 
 /**
- * ImageProxy → JPEG base64 en **une** passe de matrice (rotation + échelle), avec
- * l'instant d'exposition du capteur : c'est lui qui rend la latence perçue mesurable
- * de bout en bout. Les frames ne s'accumulent jamais : gate côté ViewModel.
+ * ImageProxy → JPEG base64 **NV21 direct** (rotation et réduction dans la copie des
+ * plans : zéro bitmap par frame), avec l'instant d'exposition du capteur : c'est lui qui
+ * rend la latence perçue mesurable de bout en bout. Les frames ne s'accumulent jamais :
+ * gate côté ViewModel. Repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV
+ * 4:2:0.
  */
-private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel) {
+private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21JpegEncoder) {
     try {
-        val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, LIVE_EDGE)
-        viewModel.onFrame(bitmapToJpegBase64(upright, LIVE_JPEG_QUALITY), proxy.imageInfo.timestamp)
+        val jpeg = encoder.encodeBase64(proxy, LIVE_EDGE, LIVE_JPEG_QUALITY)
+            ?: bitmapToJpegBase64(
+                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, LIVE_EDGE),
+                LIVE_JPEG_QUALITY,
+            )
+        viewModel.onFrame(jpeg, proxy.imageInfo.timestamp)
     } catch (_: Throwable) {
         // frame illisible : la suivante part tout de suite
     } finally {
