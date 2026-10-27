@@ -35,8 +35,34 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = withTtsDefaults(
-    seedAsr(seedVoice(withLlmKey(dropPresetUrl(loaded), build), build), build),
+    seedAsr(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build),
 )
+
+/** Ancien défaut du code (InferHub) et son modèle : ce qu'une app d'avant migre. */
+private const val LEGACY_LLM_BASE_URL = "https://api.inferhub.dev/v1"
+private const val LEGACY_LLM_MODEL = "ali/qwen3.8-omni-flash"
+
+/** Le réglage est-il resté sur l'ancien défaut, sans choix de l'utilisateur ? */
+private fun Settings.onLegacyLlm(): Boolean =
+    llmBaseUrl.trim().trimEnd('/').equals(LEGACY_LLM_BASE_URL, ignoreCase = true) &&
+        (llmModel.isBlank() || llmModel == LEGACY_LLM_MODEL)
+
+/**
+ * Migration silencieuse : un réglage resté sur l'ancien défaut (InferHub + qwen) n'a
+ * jamais été choisi, on l'aligne donc sur le défaut de **ce** build — base, modèle **et**
+ * clé, sinon la clé InferHub partirait chez Baseten et répondrait 401. Une base URL saisie
+ * à la main n'est jamais touchée : seule la valeur d'usine est reconnue.
+ *
+ * C'est ce qui évite toute manipulation après une mise à jour de l'APK.
+ */
+internal fun migrateLegacyLlm(loaded: Settings, build: BuildDefaults): Settings {
+    if (!loaded.onLegacyLlm()) return loaded
+    return loaded.copy(
+        llmBaseUrl = build.llmBaseUrl.ifBlank { Settings.DEFAULT_LLM_BASE_URL },
+        llmModel = build.llmModel.ifBlank { Settings.DEFAULT_LLM_MODEL },
+        llmApiKey = build.llmApiKey.ifBlank { loaded.llmApiKey },
+    )
+}
 
 /**
  * Une URL SAM qui n'est que le preset d'une région (injectée par ce build, ou persistée
