@@ -58,6 +58,7 @@ main { display: flex; flex: 1; flex-direction: column; padding-top: 4px; }
 #recenter { border: 0; background: none; color: var(--fg); font-size: 12px; padding: 6px; }
 #map-wrap { position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); }
 #map { height: clamp(210px, 31svh, 340px); background: #f1f2f3; }
+#map-loading { position: absolute; top: 12px; left: 12px; padding: 7px 10px; border-radius: 20px; background: #fffffff2; font-size: 11px; color: var(--muted); }
 .map-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 6px 0; }
 #session-note, #indoor { font-size: 11px; line-height: 1.45; color: var(--muted); }
 #indoor:empty { display: none; }
