@@ -46,8 +46,8 @@ retirées. Le format de frame reste ambigu : `inferYuv420Layout` le **déduit de
 | Élément | Valeur | Statut |
 |---|---|---|
 | Téléphone | **Android 10+** (API 29), imposé par les AAR `mwdat-*` | MESURÉ : `glasses-spike/build.gradle.kts:28` |
-| App Meta AI | ≥ **v292** (doc 20/10) ; « v295 installée » = constat orchestrateur | **NON MESURÉ** |
-| Firmware lunettes ≥ **v128**, Developer Mode **activé** (Meta AI → Settings → App Info → taper 5× la version) | constats externes 20/10 | **NON MESURÉ** |
+| App Meta AI | ≥ **v292** (doc antérieure, hors de cet arbre) ; « v295 installée » = constat orchestrateur | **NON MESURÉ** |
+| Firmware lunettes ≥ **v128**, Developer Mode **activé** (Meta AI → Settings → App Info → taper 5× la version) | constats externes antérieurs | **NON MESURÉ** |
 
 En Developer Mode l'attestation n'est pas utilisée : les deux `meta-data` restent à `"0"`
 (`build.gradle.kts:35-36` → `AndroidManifest.xml:26-31`) — aucune clé Meta, aucun projet Developer
@@ -370,7 +370,7 @@ Ce qui n'a **pas** été observé le 26/10/2026, et qui ne doit pas être prése
   `:glasses-spike` et `:core` ont été compilés.
 - **L'app Meta AI v295 est bien installée** (constat orchestrateur) mais **aucune paire de lunettes
   n'est appairée** ; Developer Mode et firmware ≥ v128 restent **non vérifiés** (constats externes
-  du 20/10).
+  antérieurs).
 - **Le téléphone est partagé** (verrou `~/bin/phone`) : pendant qu'un autre agent le tenait, le flux
   a lâché sur « erreur de flux : Erreur critique, le stream devrait prendre fin » et le lancement a
   même été refusé (« téléphone occupé … »). **Relancer après libération : ça passe.**
