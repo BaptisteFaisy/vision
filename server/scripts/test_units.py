@@ -132,6 +132,61 @@ def test_masks(imaging) -> None:
     check("mask: remise à l'échelle nearest", resized.shape == (8, 12) and resized.max() == 255)
 
 
+def test_rle(imaging) -> None:
+    """Codec RLE : miroir du décodeur Kotlin (MaskRle.kt + maskGrid), octet par octet."""
+    import numpy as np
+
+    mask = np.zeros((4, 6), dtype=np.uint8)
+    mask[1:3, 2:5] = 1
+    encoded = imaging.encode_mask_rle_b64(mask, (6, 4))
+    raw = base64.b64decode(encoded)
+    # 4x6 : ligne0 = 6 zéros, lignes1-2 = 2 zéros + 3 uns + 1 zéro, ligne3 = 6 zéros.
+    # Runs : 8,3,3,3,7 → varints 1 octet chacun.
+    check("RLE: runs exacts", list(raw) == [8, 3, 3, 3, 7], str(list(raw)))
+    check("RLE: golden base64", encoded == "CAMDAwc=",
+          encoded)
+    back = imaging.decode_mask_rle_b64(encoded, (6, 4))
+    check("RLE: roundtrip sans perte",
+          back.shape == (4, 6) and (back == (mask * 255).astype(np.uint8)).all())
+    leading = np.ones((1, 4), dtype=np.uint8)
+    check("RLE: masque commençant par 1 → run 0 initial",
+          list(base64.b64decode(imaging.encode_mask_rle_b64(leading, (4, 1)))) == [0, 4])
+    grid, scale = imaging.rle_grid((512, 1138), 256)
+    expected_scale = 256 / 1138
+    gw = int(np.floor(np.float32(512) * np.float32(expected_scale) + np.float32(0.5)))
+    gh = int(np.floor(np.float32(1138) * np.float32(expected_scale) + np.float32(0.5)))
+    check("RLE: grille = calcul client float32", grid == (gw, gh), f"{grid} vs {(gw, gh)}")
+    check("RLE: mask_scale = edge/long", abs(scale - expected_scale) < 1e-12, str(scale))
+    check("RLE: edge borné, jamais rejeté",
+          imaging.rle_grid((512, 512), 99999)[0][0] <= 1024
+          and imaging.rle_grid((512, 512), 0)[0] == imaging.rle_grid((512, 512), 256)[0])
+    check("RLE: total inexact refusé",
+          raises(lambda: imaging.decode_mask_rle_b64(
+              base64.b64encode(bytes([2, 2])).decode(), (6, 4)), imaging.MaskFormatError))
+
+
+def test_rle_finalize(segmentation) -> None:
+    """finalize(mask_format=rle) : grille réduite + mask_scale par objet."""
+    import numpy as np
+
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+    entries = [{"label": "person", "score": 0.9, "box": [0.0, 0.0, 8.0, 8.0], "mask": mask}]
+    result = segmentation.finalize(entries, (512, 512), 4, "png",
+                                   mask_format="rle", mask_edge=256)
+    check("finalize RLE: encodage appliqué", result["mask_encoding"] == "rle",
+          str(result.get("mask_encoding")))
+    obj = result["objects"][0]
+    check("finalize RLE: mask_scale = 0,5", abs(obj["mask_scale"] - 0.5) < 1e-12,
+          str(obj.get("mask_scale")))
+    check("finalize RLE: masque non vide", isinstance(obj["mask_b64"], str) and len(obj["mask_b64"]) > 8)
+    legacy = segmentation.finalize(entries, (512, 512), 4, "png")
+    check("finalize sans knob: chemin historique", legacy["mask_encoding"] == "png"
+          and "mask_scale" not in legacy["objects"][0])
+    unknown = segmentation.finalize(entries, (512, 512), 4, "png", mask_format="poly")
+    check("finalize knob inconnu: ignoré, pas d'erreur", unknown["mask_encoding"] == "png")
+
+
 def test_segmentation_logic(segmentation) -> None:
     check("prompts null géré en amont (normalize lève)",
           raises(lambda: segmentation.normalize_prompts(None), segmentation.PromptError))
@@ -182,15 +237,18 @@ def test_modal_helpers(modal_app) -> None:
 
 
 async def asgi_call(app, method: str, path: str, body: bytes,
-                    headers_out: dict | None = None) -> tuple[int, dict]:
+                    headers_out: dict | None = None,
+                    content_type: str = "application/json",
+                    query_string: bytes = b"") -> tuple[int, dict]:
     """Requête factice contre la vraie app ASGI, sans httpx ni TestClient.
 
     ``headers_out`` (optionnel) reçoit les en-têtes de la réponse en minuscules : c'est
     ainsi qu'on vérifie un en-tête additif comme ``Server-Timing`` sans changer le retour.
+    ``content_type``/``query_string`` servent l'entrée binaire (``octet-stream`` + knobs).
     """
     scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method,
-             "path": path, "raw_path": path.encode(), "query_string": b"",
-             "headers": [(b"content-type", b"application/json")], "client": ("test", 1),
+             "path": path, "raw_path": path.encode(), "query_string": query_string,
+             "headers": [(b"content-type", content_type.encode())], "client": ("test", 1),
              "server": ("test", 80), "root_path": "", "scheme": "http"}
     sent: list[dict] = []
 
@@ -324,6 +382,8 @@ def test_live_pipeline(live_app) -> None:
 RUNNERS = (
     ("imaging", "imaging", test_imaging),
     ("masques", "imaging", test_masks),
+    ("masques : codec RLE (miroir Kotlin)", "imaging", test_rle),
+    ("masques : finalize RLE + mask_scale", "segmentation", test_rle_finalize),
     ("segmentation (logique)", "segmentation", test_segmentation_logic),
     ("llm (logique)", "llm", test_llm_logic),
     ("modal_app (helpers)", "modal_app", test_modal_helpers),
@@ -346,6 +406,7 @@ RUNNERS = (
     ("live_fast : frame de bout en bout (bits/none/png)", "fast_core",
      live_fast_tests.test_run_frame_end_to_end),
     ("live_fast : contrat POST /live", "live_app_fast", live_fast_tests.test_live_fast_contract),
+    ("live_fast : entrée binaire /live", "live_app_fast", live_fast_tests.test_live_fast_binary),
     ("live_fast : contrat /live/ws", "live_app_fast", live_fast_tests.test_live_fast_ws),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.
     ("poids : comportement historique sans levier", "fast_core", weights_tests.test_weights_default),

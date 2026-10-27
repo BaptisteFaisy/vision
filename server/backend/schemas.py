@@ -34,6 +34,10 @@ class LiveRequest(BaseModel):
     max_objects: int | None = None
     work_edge: int | None = None
     mask_encoding: Literal["bits", "png", "none"] | None = None
+    # Codec compact : "rle" (+ mask_edge, défaut 256) ; toute autre valeur est
+    # ignorée (chemin historique), jamais rejetée — un knob ne vaut pas un 400.
+    mask_format: str | None = None
+    mask_edge: int | None = None
 
 
 class LiveFastRequest(LiveRequest):
