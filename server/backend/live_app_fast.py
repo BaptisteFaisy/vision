@@ -90,7 +90,7 @@ LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COM
 MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "/opt/models/sam3.1")
 
 # Les poids sont téléchargés **au build de l'image**, plus au démarrage du conteneur :
-# ~20 s gagnées sur les 32 s de chargement à froid mesurées le 25/10 (le Hub HF renvoyait
+# ~20 s gagnées sur les 32 s de chargement à froid mesurées le 25 octobre (le Hub HF renvoyait
 # même un avertissement de débit non authentifié). Étape cachée par le build Modal.
 WEIGHTS_BUILD = (
     'python -c "from huggingface_hub import snapshot_download; '
@@ -212,7 +212,7 @@ def live_response(result):
     scaledown_window=SCALEDOWN,
     # Snapshot mémoire : le chargement CPU des poids est figé à la première ouverture,
     # les suivantes repartent de là. C'est LE levier qui fait passer l'ouverture à froid
-    # sous les 10 s (sans lui : 12,3 s de poids + scheduling, mesuré le 25/10).
+    # sous les 10 s (sans lui : 12,3 s de poids + scheduling, mesuré le 25 octobre).
     enable_memory_snapshot=SNAPSHOT,
 )
 # DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
