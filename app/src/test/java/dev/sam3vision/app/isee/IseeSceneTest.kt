@@ -185,4 +185,22 @@ class IseeSceneTest {
         assertTrue(iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = false).pageDots)
         assertFalse(iseeSceneLayers(bubbles = 3, dissolving = false, captureLive = true).pageDots)
     }
+
+    @Test
+    fun `le look de la boule est fige pour chaque scene`() {
+        val listen = orbLookOf(IseeScene.LISTENING, 1f, 0f)
+        assertEquals(1f, listen.time, 0f)
+        assertEquals(1f, listen.you, 0f)
+        assertEquals(0f, listen.see, 0f)
+        assertEquals(0.138603f, listen.amp, 1e-4f)
+        assertEquals(0.438354f, listen.level, 1e-4f)
+        val voice = orbLookOf(IseeScene.VOICE, 1f, 0.5f)
+        assertEquals(0f, voice.you, 0f)
+        assertEquals(1f, voice.see, 0f)
+        assertEquals(0.345615f, voice.amp, 1e-4f)
+        assertEquals(0.488354f, voice.level, 1e-4f)
+        val ready = orbLookOf(IseeScene.READY, 0f, 1f)
+        assertEquals(0f, ready.amp, 0f)
+        assertEquals(0.34f, ready.level, 1e-4f)
+    }
 }
