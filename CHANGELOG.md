@@ -284,6 +284,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` vert, test instrumenté vert sur `2c6852ac`, lancement
   `master` sans crash vérifié sur l'appareil.
 
+## 2026-10-27 (9 bis) — le Direct `/live` passe en cadence continue (pompe)
+
+- **`LivePump` branchée sur le Direct** (u01, jusque-là écrite mais non appelée) :
+  nouveau `app/.../live/LiveFrameDispatcher.kt` — session `/live` en cadence continue
+  (moitié de la latence, 33-900 ms) avec une frame de réserve renvoyée sans attendre
+  à la réponse ; tracker inchangé (cadence adaptative, pas de réserve). Le tracker
+  restant le transport par défaut, le gain ne s'applique qu'au chemin `/live` (bandeau).
+- **`LiveViewModel` : 498 → 486 lignes** (plafond 500) : le cycle offre/envoi/drain est
+  extrait (`onFrame` délègue, `sendFrame` déménage dans le dispatcher, `handleResult`
+  garde l'époque + la publication).
+- **Contrat serveur inchangé** : toujours une seule frame en vol (drain refusé si le
+  créneau est pris), époque vérifiée avant publication comme avant.
+- **`WsLiveClient` : l'envoi (~28 Ko) sort du `synchronized`** (attente + ouverture
+  restent sous verrou) : un envoi lent ne fige plus les réceptions des autres frames.
+  Si le socket meurt entre l'ouverture et l'envoi, échec réseau des deux côtés, jamais
+  de succès fantôme.
+- **Preuves** : `LiveFrameDispatcherTest` 7/7 (réserve drainée sans attendre, tick
+  continu, tracker adaptatif, séance close = pas de drain, reset) ; `WsLiveClientTest`
+  +1 (envoi bloqué, réception libre — échouait avant) ; `:core:testDebugUnitTest`
+  956/956, `:app:testDebugUnitTest` 523/523, `check-kotlin-limits.py` OK. Recette
+  téléphone : § ci-dessous.
+
 ## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
 
 - **Ouverture → réveil** : `MainActivity.onResume` appelle `AppViewModel.warmGpu()` →
