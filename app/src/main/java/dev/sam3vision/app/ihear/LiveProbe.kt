@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.live.FrameTimings
+import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.MASK_ALPHA
@@ -93,6 +94,9 @@ class LiveProbe(
     /** Déclencheur des annonces vocales : stabilité, non-répétition, 4 s d'écart. */
     private val announcer = PositionAnnouncer()
 
+    /** Déclencheur des consignes de guidage : même rythme, mais le danger parle aussitôt. */
+    private val guidance = GuidanceAnnouncer()
+
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
     private val chronology = ScreenTimings(clock)
 
@@ -106,6 +110,9 @@ class LiveProbe(
 
     /** Vrai si les Réglages autorisent l'annonce (« Annoncer les objets et leur distance »). */
     private var announcePositions = false
+
+    /** Vrai si les Réglages demandent le guidage (« Guider tout droit ») : il prime sur l'annonce. */
+    private var guideStraight = false
 
     /** Langue de la voix (Réglages) : le français reste le défaut des fonctions pures. */
     private var speechLanguage: SpeechLanguage = SpeechLanguage.Fr
@@ -121,29 +128,21 @@ class LiveProbe(
         baseUrl: String,
         prompts: List<String> = LivePrompts.Default,
         announce: Boolean = false,
+        guide: Boolean = false,
         lens: LensSpec = LensSpec.Default,
         distancesOn: Boolean = true,
         maxObjects: Int = 0,
         language: SpeechLanguage = SpeechLanguage.Fr,
     ) {
         val clean = baseUrl.trim()
-        session = if (clean.isBlank()) null else LiveSession(
-            clientFor(clean, DEFAULT_TIMEOUT_SECONDS, chronology),
-            prompts = prompts,
-            maxObjects = if (maxObjects > 0) maxObjects else DEFAULT_MAX_OBJECTS,
-            cadence = Cadence.Fast,
-        )
+        session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
         // Session « froide » : même transport, délai long (60 s) — c'est le réveil du
         // conteneur qui parle, pas la frame. Une fois la première analyse passée, on
         // repart sur la session normale à délai court (10 s).
-        coldSession = if (clean.isBlank()) null else LiveSession(
-            clientFor(clean, COLD_TIMEOUT_SECONDS, chronology),
-            prompts = prompts,
-            maxObjects = if (maxObjects > 0) maxObjects else DEFAULT_MAX_OBJECTS,
-            cadence = Cadence.Fast,
-        )
+        coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
         warmed = false
         announcePositions = announce
+        guideStraight = guide
         speechLanguage = language
         distances.enabled = distancesOn
         distances.setLens(lens)
@@ -152,6 +151,7 @@ class LiveProbe(
         chronology.reset()
         rate.reset()
         announcer.reset()
+        guidance.reset()
         _state.update {
             LiveProbeState(
                 endpoint = clean,
@@ -165,6 +165,22 @@ class LiveProbe(
         if (clean.isNotBlank()) markWarming()
     }
 
+    /**
+     * Session du direct sur [clean], `null` sans endpoint : une seule construction pour
+     * la session normale et la session froide (même transport, seul le délai change).
+     */
+    private fun openSession(
+        clean: String,
+        prompts: List<String>,
+        maxObjects: Int,
+        timeoutSeconds: Long,
+    ): LiveSession? = if (clean.isBlank()) null else LiveSession(
+        clientFor(clean, timeoutSeconds, chronology),
+        prompts = prompts,
+        maxObjects = if (maxObjects > 0) maxObjects else DEFAULT_MAX_OBJECTS,
+        cadence = Cadence.Fast,
+    )
+
     /** Début d'enregistrement : on repart de zéro, mais l'endpoint et le GPU restent connus. */
     fun begin() {
         session?.stats?.reset()
@@ -175,6 +191,7 @@ class LiveProbe(
         rate.reset()
         distances.reset()
         announcer.reset()
+        guidance.reset()
         nextTickAt = 0L
         reserve.clear()
         chronology.reset()
@@ -394,12 +411,15 @@ class LiveProbe(
         else DistanceLayer(frame.width, frame.height, readings)
 
     /**
-     * Phrase à dire, ou `null` pour rester muet : bascule des Réglages coupée, ou scène
-     * déjà annoncée. La distance suit la boîte qui l'a produite (aucune indexation fragile).
+     * Phrase à dire, ou `null` pour rester muet : bascules des Réglages coupées, ou scène
+     * déjà dite. Le guidage prime sur l'annonce des positions : une seule voix à la fois.
+     * La distance suit la boîte qui l'a produite (aucune indexation fragile).
      */
     private fun phraseOf(frame: LiveFrame, readings: List<DistanceReading>, at: Long): String? {
+        val placed = placedLabels(frame, readings)
+        if (guideStraight) return guidance.onFrame(at, placed, speechLanguage)
         if (!announcePositions) return null
-        return announcer.onFrame(at, placedLabels(frame, readings), speechLanguage)
+        return announcer.onFrame(at, placed, speechLanguage)
     }
 
     /**

@@ -16,13 +16,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
- * EU/US > URL du build), annonce vocale des objets et de leur distance, focale de
- * la caméra, distances on/off, plafond d'objets.
+ * EU/US > URL du build), guidage « tout droit » (il prime sur l'annonce), annonce
+ * vocale des objets et de leur distance, focale de la caméra, distances on/off,
+ * plafond d'objets.
  */
 internal fun LiveProbe.configureFrom(settings: Settings) {
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
         announce = settings.announcePositions,
+        guide = settings.guideStraight,
         lens = LensSpec.fromSettings(settings.cameraFovDeg),
         distancesOn = settings.distanceOverlayEnabled,
         maxObjects = settings.objectsOnScreen,

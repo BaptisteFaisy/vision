@@ -82,6 +82,18 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
         color = AppColors.textMuted,
         fontSize = 11.sp,
     )
+    SwitchRow(
+        label = "Guider tout droit (caméra iSee)",
+        checked = draft.ttsGuidanceStraight,
+    ) { onChange(draft.copy(ttsGuidanceStraight = it)) }
+    Text(
+        "Activé : la page caméra dit la consigne de marche au lieu des positions — " +
+            "« Continue tout droit. » ou « Personne à 2 mètres devant, va à gauche. ». " +
+            "Calculé sur le téléphone depuis SAM, sans appel LLM ; un obstacle qui entre " +
+            "dans le couloir parle aussitôt, même avant les 4 s.",
+        color = AppColors.textMuted,
+        fontSize = 11.sp,
+    )
 }
 
 /** Bascule « intro » + son explication : le premier message du chat de iSee. */
