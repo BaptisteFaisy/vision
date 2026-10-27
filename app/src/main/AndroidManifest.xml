@@ -31,6 +31,8 @@
     <application
         android:name=".SamApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security"
         android:supportsRtl="true"
