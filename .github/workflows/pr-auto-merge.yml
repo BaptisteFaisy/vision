@@ -51,10 +51,12 @@ jobs:
             sleep 60 # laisse GitHub recalculer les états après l'atterrissage
           fi
           rm -rf repo
-          git -c http.extraHeader="Authorization: Bearer $GH_TOKEN" clone --quiet \
+          # Auth git via le helper gh (PAT dans GH_TOKEN), en one-shot : rien
+          # n'est persisté dans la conf git du runner. http.extraHeader est
+          # ignoré ici (prouvé : « invalid credentials » puis prompt).
+          git -c credential.helper='!gh auth git-credential' clone --quiet \
             --filter=blob:none https://github.com/BaptisteFaisy/vision.git repo
           cd repo
-          gh auth setup-git
           git config user.name "isee-automerge"
           git config user.email "isee-automerge@users.noreply.github.com"
           export GIT_EDITOR=true
@@ -67,10 +69,10 @@ jobs:
             [ -n "$pr" ] || continue
             case "$state" in
               BEHIND)
-                if git fetch -q origin "pull/$pr/head:pr-$pr" 2>/dev/null \
+                if git -c credential.helper='!gh auth git-credential' fetch -q origin "pull/$pr/head:pr-$pr" 2>/dev/null \
                   && git checkout -q "pr-$pr" 2>/dev/null \
                   && git rebase -q origin/master >/dev/null 2>&1; then
-                  if git push -q --force-with-lease="$branch:$sha" origin "HEAD:$branch" 2>&1; then
+                  if git -c credential.helper='!gh auth git-credential' push -q --force-with-lease="$branch:$sha" origin "HEAD:$branch" 2>&1; then
                     echo "PR #$pr rebasée sur master"
                   else
                     echo "PR #$pr : a bougé entre-temps, prochain passage"
