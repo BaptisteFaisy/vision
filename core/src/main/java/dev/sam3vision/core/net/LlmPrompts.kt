@@ -117,6 +117,24 @@ internal object LlmPrompts {
             "You answer in English, in a few sentences, based on the photo provided." + DATA_RULE_EN
     }
 
+    /**
+     * Question **sans image** (micro de l'écran verrouillé : caméra fermée). La réponse est lue
+     * à voix haute telle quelle, donc : pas de markdown, pas de liste, et l'aveu franc quand la
+     * question portait sur ce qu'on voit — le modèle n'a alors aucune image.
+     */
+    fun askVoiceSystem(language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr ->
+            "Tu réponds en français à une question posée à la voix, sans aucune image : " +
+                "personne ne t'envoie de photo. Réponds en deux phrases maximum, en texte " +
+                "parlé, sans liste, sans markdown. Si la question porte sur ce que voit la " +
+                "personne, dis que tu n'as pas d'image et demande-lui de décrire." + DATA_RULE_FR
+        SpeechLanguage.En ->
+            "You answer in English a question asked out loud, with no image at all: nobody " +
+                "sends you a photo. Answer in two sentences at most, in spoken prose, no lists, " +
+                "no markdown. If the question is about what the person sees, say you have no " +
+                "image and ask them to describe it." + DATA_RULE_EN
+    }
+
     /** Question sur ce que la caméra a vu (journal joint en contexte). */
     fun askMemorySystem(language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr ->

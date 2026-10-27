@@ -54,14 +54,43 @@ class InferHubLlmClient(
         context: String?,
     ): Result<String> {
         val withContext = !context.isNullOrBlank()
-        val messages = JSONArray()
-            .put(system(if (withContext) LlmPrompts.askMemorySystem(language) else LlmPrompts.askSystem(language)))
-        if (withContext) {
-            messages.put(system("${LlmPrompts.contextHeader(language)}\n${LlmPrompts.memoryContext(context.orEmpty())}"))
+        val messages = conversation(
+            systemText = if (withContext) LlmPrompts.askMemorySystem(language) else LlmPrompts.askSystem(language),
+            context = context,
+            history = history,
+            last = userWithImage(LlmPrompts.askQuestion(question), jpegB64),
+        )
+        return postChat(messages).map { it.trim() }
+    }
+
+    /** Même conversation, **sans image** : écran verrouillé, caméra fermée (cf. `Clients.kt`). */
+    override suspend fun askText(
+        question: String,
+        history: List<ChatTurn>,
+        context: String?,
+    ): Result<String> {
+        val messages = conversation(
+            systemText = LlmPrompts.askVoiceSystem(language),
+            context = context,
+            history = history,
+            last = role(Role.USER, LlmPrompts.askQuestion(question)),
+        )
+        return postChat(messages).map { it.trim() }
+    }
+
+    /** Assemblage commun aux deux questions : consigne, contexte éventuel, historique, tour final. */
+    private fun conversation(
+        systemText: String,
+        context: String?,
+        history: List<ChatTurn>,
+        last: JSONObject,
+    ): JSONArray {
+        val messages = JSONArray().put(system(systemText))
+        if (!context.isNullOrBlank()) {
+            messages.put(system("${LlmPrompts.contextHeader(language)}\n${LlmPrompts.memoryContext(context)}"))
         }
         history.takeLast(maxHistoryTurns).forEach { messages.put(role(it.role, it.content)) }
-        messages.put(userWithImage(LlmPrompts.askQuestion(question), jpegB64))
-        return postChat(messages).map { it.trim() }
+        return messages.put(last)
     }
 
     /** Un seul point de sortie HTTP pour les deux méthodes : corps, en-têtes, extraction du texte. */
