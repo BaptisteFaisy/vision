@@ -71,11 +71,22 @@ abstract class MediaDatabase : RoomDatabase() {
 
         fun get(context: Context): MediaDatabase =
             instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    MediaDatabase::class.java,
-                    "ihear-media.db",
-                ).build().also { instance = it }
+                instance ?: build(context.applicationContext, DB_NAME).also { instance = it }
             }
+
+        /**
+         * Ouvre (ou recrée) la base : en **downgrade** (téléphone revenu d'un build
+         * mission au schéma plus récent vers ce schéma), Room la recrée vide au lieu
+         * de crasher (`IllegalStateException: A migration from 2 to 1…`, vu sur
+         * l'appareil). Perte acceptée : le ViewModel purge cette table à chaque
+         * démarrage de toute façon (`IhearViewModel.kt`). Les montées de version
+         * sans migration restent des crashs volontaires (vraie migration exigée).
+         */
+        internal fun build(context: Context, name: String): MediaDatabase =
+            Room.databaseBuilder(context, MediaDatabase::class.java, name)
+                .fallbackToDestructiveMigrationOnDowngrade()
+                .build()
+
+        private const val DB_NAME = "ihear-media.db"
     }
 }

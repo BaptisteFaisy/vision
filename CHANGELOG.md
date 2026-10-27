@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (9) — retour de mission : la base médias se recrée au lieu de crasher
+
+- **Crash au lancement sur le téléphone** (`IllegalStateException: A migration from
+  2 to 1 was required but not found`, vu sur `2c6852ac`) : l'appareil portait une
+  base `ihear-media.db` v2 (build mission) et master est en v1 sans stratégie de
+  migration. `MediaDatabase.build()` déclare désormais
+  `fallbackToDestructiveMigrationOnDowngrade()` : en downgrade la base est recréée
+  vide, l'app démarre. Perte acceptée : le ViewModel purge cette table à chaque
+  démarrage (`IhearViewModel.kt:141`) ; les montées de version sans migration
+  restent des crashs volontaires.
+- **Non-régression instrumentée** (`MediaDowngradeTest`, exige l'appareil, la CI ne
+  l'exécute pas) : base v1 tamponnée en v2 + une ligne, ouverture via `build()`,
+  table vide sans crash. Ne touche jamais la vraie base (fichier de test effacé).
+- **Preuves** : suites JVM `:core` + `:app` vertes, `assembleDebug` vert,
+  `check-kotlin-limits.py` vert, test instrumenté vert sur `2c6852ac`, lancement
+  `master` sans crash vérifié sur l'appareil.
+
 ## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
 
 - **Ouverture → réveil** : `MainActivity.onResume` appelle `AppViewModel.warmGpu()` →
