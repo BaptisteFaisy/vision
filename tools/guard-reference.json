@@ -1,23 +1,23 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-27T11:37:10+01:00",
-    "commit": "eac65bc",
+    "le": "2026-10-27T11:43:12+01:00",
+    "commit": "3f5ebfa",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
-    "kotlin": 477,
+    "kotlin": 486,
     "python": 14,
     "toleres": []
   },
   "tests-jvm": {
     "plancher": {
-      "app": 466,
-      "core": 907
+      "app": 473,
+      "core": 920
     },
     "execute": {
-      "app": 466,
-      "core": 907
+      "app": 473,
+      "core": 920
     },
     "note": "plancher = annotations @Test de <module>/src/test, comptées sans compiler ; `execute` se remplit au premier passage avec XML JUnit."
   },
