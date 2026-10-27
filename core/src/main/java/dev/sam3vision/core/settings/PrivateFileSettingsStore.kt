@@ -102,6 +102,7 @@ internal object SettingsCodec {
     private const val K_ASR_BASE_URL = "asrBaseUrl"
     private const val K_ASR_API_KEY = "asrApiKey"
     private const val K_ASR_MODEL = "asrModel"
+    private const val K_LIVE_LLM_API_KEY = "liveLlmApiKey"
     private const val K_INTRO_ENABLED = "introEnabled"
     private const val K_INTRO_PLAYED = "introPlayed"
     private const val K_DISTANCE_OVERLAY = "distanceOverlayEnabled"
@@ -125,6 +126,7 @@ internal object SettingsCodec {
         appendLine("$K_ASR_BASE_URL=${s.asrBaseUrl}")
         appendLine("$K_ASR_API_KEY=${s.asrApiKey}")
         appendLine("$K_ASR_MODEL=${s.asrModel}")
+        appendLine("$K_LIVE_LLM_API_KEY=${s.liveLlmApiKey}")
         appendLine("$K_INTRO_ENABLED=${s.introEnabled}")
         appendLine("$K_INTRO_PLAYED=${s.introPlayed}")
         appendLine("$K_DISTANCE_OVERLAY=${s.distanceOverlayEnabled}")
@@ -156,6 +158,7 @@ internal object SettingsCodec {
             asrBaseUrl = values[K_ASR_BASE_URL].orEmpty().ifBlank { default.asrBaseUrl },
             asrApiKey = values[K_ASR_API_KEY].orEmpty(),
             asrModel = values[K_ASR_MODEL].orEmpty().ifBlank { default.asrModel },
+            liveLlmApiKey = values[K_LIVE_LLM_API_KEY].orEmpty(),
             introEnabled = values[K_INTRO_ENABLED]?.toBooleanStrictOrNull() ?: default.introEnabled,
             introPlayed = values[K_INTRO_PLAYED]?.toBooleanStrictOrNull() ?: default.introPlayed,
             distanceOverlayEnabled = values[K_DISTANCE_OVERLAY]?.toBooleanStrictOrNull()

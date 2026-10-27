@@ -14,6 +14,7 @@ internal data class BuildDefaults(
     val ttsApiKey: String = BuildConfig.TTS_API_KEY,
     val ttsVoiceId: String = BuildConfig.TTS_VOICE_ID,
     val asrApiKey: String = BuildConfig.ASR_API_KEY,
+    val liveLlmApiKey: String = BuildConfig.LIVE_LLM_API_KEY,
 ) {
     companion object {
         val FromBuild: BuildDefaults = BuildDefaults()
@@ -35,8 +36,18 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = withTtsDefaults(
-    seedAsr(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build),
+    seedAsr(seedLiveLlm(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build),
 )
+
+/**
+ * Clé de **narration du Direct** (modèle rapide, distinct de celui des questions) : elle
+ * ne sert qu'à la narration. Sans elle, le Direct se tait mais n'appelle jamais le modèle
+ * des questions frame par frame — c'est le sens du réglage.
+ */
+internal fun seedLiveLlm(loaded: Settings, build: BuildDefaults): Settings {
+    if (loaded.liveLlmApiKey.isNotBlank() || build.liveLlmApiKey.isBlank()) return loaded
+    return loaded.copy(liveLlmApiKey = build.liveLlmApiKey)
+}
 
 /** Ancien défaut du code (InferHub) et son modèle : ce qu'une app d'avant migre. */
 private const val LEGACY_LLM_BASE_URL = "https://api.inferhub.dev/v1"

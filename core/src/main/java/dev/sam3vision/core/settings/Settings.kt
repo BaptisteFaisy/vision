@@ -21,6 +21,14 @@ data class Settings(
     val asrApiKey: String = "",
     val asrModel: String = DEFAULT_ASR_MODEL,
     /**
+     * Narration continue du **Direct** : modèle distinct de celui des questions.
+     * Le défaut LLM (`muse-spark-open-1026`) raisonne ~600 tokens avant sa première phrase
+     * alors que la narration est plafonnée à 200 : la frame serait perdue, à chaque frame.
+     * La narration garde donc [DEFAULT_LIVE_LLM_MODEL] et ne part **que** si cette clé est
+     * renseignée — vide = aucune narration, donc aucun appel au modèle des questions.
+     */
+    val liveLlmApiKey: String = "",
+    /**
      * Annonce vocale des **positions** dès qu'un objet est détecté (mode Direct et
      * analyse photo) : « Personne à gauche, chien à droite. » Via ElevenLabs, jamais
      * le TTS système. `true` par défaut : c'est la fonction d'assistance attendue.
@@ -101,6 +109,13 @@ data class Settings(
          */
         const val JADE_US_VOICE_ID = "TOXPlnYC7z5SQSV2Zgc5"
 
+        /**
+         * Narration du Direct : modèle rapide, volontairement **différent** du défaut des
+         * questions. Seule la clé est réglable (Réglages) ; base et modèle sont figés ici.
+         */
+        const val DEFAULT_LIVE_LLM_BASE_URL = "https://api.inferhub.dev/v1"
+        const val DEFAULT_LIVE_LLM_MODEL = "ali/qwen3.8-omni-flash"
+
         /** API Meta (non compatible OpenAI) : la route est `{base}/asr/transcribe`. */
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
         const val DEFAULT_ASR_MODEL = "muse-voice-transcribe-1.0"
@@ -116,6 +131,7 @@ data class Settings(
             asrBaseUrl = DEFAULT_ASR_BASE_URL,
             asrApiKey = "",
             asrModel = DEFAULT_ASR_MODEL,
+            liveLlmApiKey = "",
             ttsAnnouncePositions = true,
             introEnabled = true,
             introPlayed = false,
@@ -143,6 +159,9 @@ data class Settings(
      * région choisie ([resolveSamEndpoint] — donc toujours vrai, sauf preset vide).
      */
     val segmentationEnabled: Boolean get() = resolveSamEndpoint().isNotBlank()
+
+    /** Vrai si la narration du Direct peut partir (clé dédiée renseignée). */
+    val liveLlmConfigured: Boolean get() = liveLlmApiKey.isNotBlank()
 
     /** Vrai si l'app peut appeler le LLM. */
     val llmConfigured: Boolean get() = llmBaseUrl.isNotBlank() && llmApiKey.isNotBlank()

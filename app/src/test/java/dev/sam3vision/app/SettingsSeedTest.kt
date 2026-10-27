@@ -20,6 +20,7 @@ class SettingsSeedTest {
         ttsApiKey = "cle-voix-du-build",
         ttsVoiceId = "voix-du-build",
         asrApiKey = "cle-dictee-du-build",
+        liveLlmApiKey = "cle-narration-du-build",
     )
 
     @Test
@@ -34,6 +35,8 @@ class SettingsSeedTest {
         assertEquals("cle-voix-du-build", seed.ttsApiKey)
         assertEquals("voix-du-build", seed.ttsVoiceId)
         assertEquals("cle-dictee-du-build", seed.asrApiKey)
+        assertEquals("cle-narration-du-build", seed.liveLlmApiKey)
+        assertTrue("la narration du Direct doit pouvoir parler", seed.liveLlmConfigured)
         assertTrue("l'app doit être utilisable sans rien saisir", seed.llmConfigured)
         assertTrue(seed.ttsConfigured)
         assertTrue(seed.asrConfigured)
