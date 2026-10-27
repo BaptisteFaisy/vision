@@ -3,6 +3,26 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (6) — la caméra iSee guide tout droit, sans LLM
+
+- **La page caméra iSee dit la consigne de marche** (« Continue tout droit. », « Personne
+  à 2 mètres devant, va à gauche. ») au lieu de la position des objets : couloir central
+  0,34–0,66, portée 4 m, côté de sortie le moins encombré, distance inconnue = prudence
+  (`core/.../live/Guidance.kt`, pur, aucun import réseau — le guidage ne peut pas appeler
+  le LLM). Le déclencheur (`GuidanceAnnouncer.kt`) garde stabilité 2 frames et non-répétition,
+  mais un obstacle qui entre dans le couloir parle aussitôt, sans attendre les 4 s.
+- **Branchement** : `LiveProbe.phraseOf` préfère la consigne à l'annonce quand le réglage
+  est actif (`ProbeWiring.configureFrom`, `Settings.guideStraight`), la voix reste
+  `ProximityVoice` → ElevenLabs. Le Direct et l'analyse photo gardent les positions.
+  Réglage `ttsGuidanceStraight` (défaut `true`, persisté par les deux stores),
+  bascule « Guider tout droit (caméra iSee) » dans `TtsSettings.kt`.
+- **Preuves** : 24 tests JVM nouveaux (`GuidanceTest` 10, `GuidanceAnnouncerTest` 7,
+  `SettingsGuidanceTest` 4, `LiveProbeGuidanceTest` 3) ; suites complètes `:core` 943 et
+  `:app` 479, 0 échec le 27/10 ; `tools/check-kotlin-limits.py` vert (extraction
+  `LiveProbe.openSession`, qui supprime aussi la duplication des deux constructions de
+  session) ; APK debug construit. Contrat et recette : `docs/GUIDAGE-TOUT-DROIT.md`.
+- **Non mesuré** : sur appareil (exige téléphone + GPU SAM + clé ElevenLabs).
+
 ## 2026-10-27 (5) — une seule app : le banc lunettes entre dans iSee
 
 - **Le module `:glasses-spike` est supprimé et son banc d'essai lunettes vit désormais dans
