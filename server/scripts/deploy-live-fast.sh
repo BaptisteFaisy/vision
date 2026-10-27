@@ -9,6 +9,9 @@
 #   FAST_SCALEDOWN=300   5 min de fenêtre avant extinction du conteneur
 #   FAST_EDGE=512        grille du modèle (le serveur rééchantillonne à 518)
 #   FAST_BATCH_PROMPTS=1 les N concepts en un forward (le lot est actif)
+#   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
+#   FAST_MODEL_DIR=...   poids dans l'image (plus de re-téléchargement au réveil)
+#   FAST_TIMING=1        timings_ms + Server-Timing (validation des < 10 s)
 #
 # Ne JAMAIS déployer backend/live_app.py (version lente, 205-241 ms).
 #
@@ -46,6 +49,7 @@ deploy_once() {
   ( cd "$ROOT" && LIVE_APP_NAME="$APP_NAME" FAST_GPU="$GPU" FAST_REGION="$REGION" \
       FAST_ROUTING_REGION="$ROUTING" FAST_BATCH_PROMPTS=1 FAST_EDGE=512 \
       FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=300 \
+      FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 \
       "$MODAL" deploy backend/live_fast/live_app_fast.py "${profile_arg[@]}" )
 }
 
@@ -61,7 +65,8 @@ print("gpu    :", h.get("gpu"))
 print("model  :", h.get("model"))
 print("levers :", json.dumps(lev, ensure_ascii=False, sort_keys=True))
 print("applied:", json.dumps(app, ensure_ascii=False, sort_keys=True))
-missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512}.items()
+missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
+                           "snapshot": True}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
     sys.exit("model pas \"fast\"")
