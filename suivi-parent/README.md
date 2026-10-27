@@ -12,6 +12,9 @@ Android : fond blanc, boule Portrait grise, phrase courante et carte en bas.
 3. La page lit uniquement ce flux. Sans lien valide, aucune session implicite
    n'est choisie. Aucune position du téléphone caregiver n'est demandée.
 
+Le rôle Caregiver interdit aussi les publications Android : ni l'écran Direct
+ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
+
 ## Rendu et données
 
 - La boule reprend le shader Portrait Android, désaturé. À la racine,

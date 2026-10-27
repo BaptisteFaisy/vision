@@ -4,9 +4,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
+import dev.sam3vision.core.settings.CaregiverRole
+import dev.sam3vision.core.settings.Settings
+import org.junit.Assert.assertTrue
 
 class SharedSceneTest {
     private val fix = SharedFix(48.85, 2.35, 5f, 90f, 1L, false)
+
+    @Test
+    fun `un caregiver ne publie jamais sa propre position meme si le partage est coche`() {
+        assertTrue(canPublishShare(Settings.Default.copy(caregiverRole = CaregiverRole.Blind, shareEnabled = true)))
+        assertFalse(canPublishShare(Settings.Default.copy(caregiverRole = CaregiverRole.Caregiver, shareEnabled = true)))
+        assertFalse(canPublishShare(Settings.Default.copy(caregiverRole = CaregiverRole.Blind, shareEnabled = false)))
+    }
 
     @Test
     fun `la phrase et son etat voyagent avec les objets de la meme session`() {
