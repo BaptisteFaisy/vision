@@ -9,7 +9,7 @@ courts** suivent la lecture audio et disparaissent au silence ; pendant l'appui 
 le moteur de dictée fournit des aperçus périodiques de la voix du user. Tout passe
 par les gestes : tap = enregistrement
 vidéo, double tap = photo, appui long = dictée. **Plus de balayage** : ni changement
-de bulle, ni retour aux messages passés — le message affiché est toujours le dernier et
+de bulle, ni retour aux messages passés — seuls les mots en cours de parole sont affichés et
 chaque question part **sans aucun historique** ; rien d'une conversation précédente
 n'est mémorisé d'une ouverture à l'autre (table Room et cache vidés à l'ouverture).
 
