@@ -211,14 +211,17 @@ annonce muette n'est donc jamais une raison de redéployer.
   effective seulement si `ttsConfigured`).
 - **iSee, bulles** : chaque bulle garde son MP3 dans Room ; la réponse la plus récente
   est lue dès son arrivée (`speakLatestAnswer`). Une seule lecture à la fois.
-- **Intro embarquée** : `app/src/main/res/raw/intro_ihear.mp3` — 351 caractères
-  (`IHEAR_INTRO_TEXT`, `IntroLogic.kt:19-23`), voix Jade US (`TOXPlnYC7z5SQSV2Zgc5`), rendu
-  **une fois** en `eleven_v3`, MP3 44,1 kHz mono 128 kb/s, 386 237 octets (`ls -l` de cet
-  arbre, 2026-10-26). La **durée** (24,08 s relevée) n'est pas revérifiée ici : pas de
-  `ffprobe` sur cette machine. Aucun réseau pour la jouer. Le texte dit
-  « Welcome to iSee… », annonce le balayage vers le bas pour relire les messages
-  précédents, puis la phrase de coupe « Disable iSee intro. » — dans cet ordre, et
-  `app.UiLogicTest` le vérifie. **Non écouté ici** (pas de sortie audio sur le poste de
+- **Intro embarquée** : `app/src/main/res/raw/intro_ihear.mp3` — voix Jade US
+  (`TOXPlnYC7z5SQSV2Zgc5`), rendu **une fois** en `eleven_v3`, MP3 44,1 kHz mono 128 kb/s,
+  386 237 octets (`ls -l` de cet arbre, 2026-10-26). La **durée** (24,08 s relevée) n'est pas
+  revérifiée ici : pas de `ffprobe` sur cette machine. Aucun réseau pour la jouer.
+  Le texte (`IHEAR_INTRO_TEXT`, `IntroLogic.kt`) — **307 caractères** depuis le retrait du
+  swipe (27/10) — dit « Welcome to iSee… », puis la phrase
+  de coupe « Disable iSee intro. » — dans cet ordre, et `app.UiLogicTest` le vérifie.
+  ⚠️ **Désaligné** : la phrase « To listen to previous messages, swipe down » a été retirée
+  du texte avec la suppression du balayage (27/10), mais elle est **encore dans le MP3** :
+  il faut régénérer `intro_ihear.mp3` (même voix, même réglages) pour réaligner la voix.
+  **Non écouté ici** (pas de sortie audio sur le poste de
   travail) : contrôle par `ffprobe` et par le texte seulement.
   ⚠️ **Périmé** : l'ancienne note « lue **une seule fois**, `introPlayed` posé avant lecture »
   ne décrit plus le comportement. Aujourd'hui l'intro est **rejouée à chaque ouverture

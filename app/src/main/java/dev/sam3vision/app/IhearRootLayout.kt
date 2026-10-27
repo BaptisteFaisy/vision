@@ -18,16 +18,14 @@ import dev.sam3vision.core.gesture.LongPressTrigger
  * - [LongPressTrigger] : appui maintenu ~300 ms → [onHoldStart] (micro ouvert) ; la
  *   vue intercepte alors tout (les enfants reçoivent un ACTION_CANCEL) jusqu'au
  *   relâchement qui émet [onHoldEnd] ;
- * - [IhearGestureBrain] : tap simple (vidéo), double tap (photo) et balayage vertical
- *   (sélection de bulle). L'ancien balayage horizontal n'est plus écouté : iSee
- *   n'a plus qu'une page.
+ * - [IhearGestureBrain] : tap simple (vidéo) et double tap (photo). L'ancien balayage
+ *   horizontal n'est plus écouté et le balayage vertical (changement de bulle) a été
+ *   supprimé : iSee n'a plus qu'une page ni qu'une bulle à parcourir.
  *
  * Les taps ne sont jamais consommés en-dehors d'une tenue : ce sont des observations
  * posées sur les événements, les écrans iSee restent libres de leur rendu. Les deux
- * bords latéraux restent exclus du geste système « retour » ; en revanche les balayages
- * haut/bas appartiennent à l'app : la page est alimentée sur **toute** la surface, bande
- * du bas comprise — quand la navigation gestuelle d'Android revendique d'elle-même son
- * geste « Home », le toucher n'arrive jamais jusqu'ici et la bulle n'est pas avancée.
+ * bords latéraux restent exclus du geste système « retour » ; les balayages haut/bas
+ * appartiennent au système (navigation Android), l'application ne les utilise plus.
  */
 class IhearRootLayout(context: Context) : FrameLayout(context) {
 
@@ -38,18 +36,12 @@ class IhearRootLayout(context: Context) : FrameLayout(context) {
     var onHoldCancel: (() -> Unit)? = null
     var onSingleTap: (() -> Unit)? = null
     var onDoubleTap: (() -> Unit)? = null
-    var onVerticalDragStart: (() -> Unit)? = null
-    var onVerticalSwipeEnd: ((committed: Boolean, downward: Boolean) -> Unit)? = null
-
-    /** Marche décidée dès le début du glissement vertical : une bulle par geste. */
-    var onVerticalDragMove: ((downward: Boolean) -> Unit)? = null
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */
     var gesturesEnabled: () -> Boolean = { true }
 
     private val handler = Handler(Looper.getMainLooper())
     private var capturing = false
-    private var draggingVertical = false
 
     private val trigger = LongPressTrigger(
         scheduler = ::scheduleDelayed,
@@ -73,16 +65,6 @@ class IhearRootLayout(context: Context) : FrameLayout(context) {
             override fun onSingleTap() = onSingleTap?.invoke() ?: Unit
             override fun onDoubleTap() = onDoubleTap?.invoke() ?: Unit
             override fun onHorizontalSwipe(rightToLeft: Boolean) = Unit // aucune page à changer
-            override fun onVerticalDrag(downward: Boolean) {
-                draggingVertical = true
-                onVerticalDragStart?.invoke()
-                onVerticalDragMove?.invoke(downward)
-            }
-
-            override fun onVerticalSwipe(committed: Boolean, downward: Boolean) {
-                draggingVertical = false
-                onVerticalSwipeEnd?.invoke(committed, downward)
-            }
         },
         scheduler = ::scheduleDelayed,
     )
@@ -120,10 +102,6 @@ class IhearRootLayout(context: Context) : FrameLayout(context) {
     fun cancelGesture() {
         trigger.reset()
         brain.reset()
-        if (draggingVertical) {
-            draggingVertical = false
-            onVerticalSwipeEnd?.invoke(false, false)
-        }
         if (capturing) {
             capturing = false
             onHoldCancel?.invoke()
@@ -142,11 +120,6 @@ class IhearRootLayout(context: Context) : FrameLayout(context) {
     private fun feed(ev: MotionEvent) {
         if (!gesturesEnabled()) {
             trigger.reset()
-            if (draggingVertical) {
-                draggingVertical = false
-                onVerticalSwipeEnd?.invoke(false, false)
-                return
-            }
             return
         }
         val now = System.currentTimeMillis()

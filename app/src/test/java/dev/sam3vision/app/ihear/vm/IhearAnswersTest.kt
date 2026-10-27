@@ -101,16 +101,16 @@ class IhearAnswersTest {
     }
 
     @Test
-    fun `l'historique joint a la question vient de la base`() = runBlocking {
+    fun `aucun historique — la question part seule, meme si la base garde des messages`() = runBlocking {
         dao.seed(MessageMultimedia(timestamp = 1L, texteUtilisateur = "avant", texteIA = "réponse avant"))
-        var history: List<ChatTurn> = emptyList()
+        var history: List<ChatTurn>? = null
         val answers = answers({ _, _, turns -> history = turns; Result.success("ok") })
         val row = dao.seed(MessageMultimedia(timestamp = 2L, texteUtilisateur = "maintenant"))
 
         answers.answer(row, "maintenant")
 
-        // L'historique vient de la base, question comprise (elle est déjà écrite).
-        assertEquals(listOf("avant", "réponse avant", "maintenant"), history.map { it.content })
+        // Zéro mémoire : ni les messages précédents, ni rien de la base.
+        assertTrue("aucun tour envoyé au LLM", history?.isEmpty() == true)
     }
 
     @Test
@@ -265,10 +265,8 @@ class IhearAnswersTest {
         dao = dao,
         media = media,
         player = SpeechPlayer(File(tempDir(), "play")),
-        state = { state.value },
         update = ::update,
         synthesize = { ByteArray(0) },
-        replayIntro = {},
     )
 
     /** Contexte photo de test : [encode] simule le décodage JPEG, absent sur JVM. */

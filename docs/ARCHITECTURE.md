@@ -65,8 +65,12 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 | tap simple | démarre / arrête l'enregistrement vidéo | `IhearViewModel.onSingleTap` (`app/ihear/IhearViewModel.kt:248`) |
 | double tap | photo immédiate | `IhearViewModel.onDoubleTap` (`:254`) |
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu | `core/gesture/LongPressTrigger.kt:102,105` |
-| glissement vertical | change de bulle, une par geste | `IhearViewModel.onVerticalDragMove` (`:216`) |
-| balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IhearRootLayout.kt:75` |
+| balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IhearRootLayout.kt` |
+
+Le **glissement vertical** (changement de bulle) a été supprimé : `IhearViewModel`
+n'a plus `onVerticalDrag*`, le rail vertical de `core/gesture/IhearGestureBrain.kt`
+verrouille le geste **sans rien émettre** (un glissement ne peut donc jamais passer
+pour un tap), et il n'y a aucun moyen de revenir à un message antérieur.
 
 ### 2.1 Photo (double tap sur l'accueil)
 
@@ -117,8 +121,9 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
    existe (`FallbackSpeechClient` quand les deux sont configurés).
 4. `IhearAnswers` (`app/ihear/vm/IhearAnswers.kt`) → `AskUseCase` (`core/usecase/UseCases.kt`)
    → `core/net/InferHubLlmClient.ask` → `POST {llm}/chat/completions`, image = dernière photo
-   en data-URL, historique borné à **20 tours** (`AskUseCase.MAX_HISTORY_TURNS`,
-   `UseCases.kt:60`).
+   en data-URL, et **historique toujours vide** : iSee joint `emptyList()` (`IhearAnswers`),
+   aucune ligne de la base n'est reconstruite en tour de conversation. Le plafond de
+   **20 tours** (`AskUseCase.MAX_HISTORY_TURNS`) ne vaut plus que pour l'écran Direct.
 5. Réponse : ligne Room + MP3 (`IhearVoice` → `ElevenLabsTtsClient`), puis lecture
    (`IhearPlayback` → `app/SpeechPlayer.kt`).
 
