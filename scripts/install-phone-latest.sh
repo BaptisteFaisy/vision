@@ -9,8 +9,9 @@
 #   --reinstall    reconstruit et réinstalle même si le SHA est déjà connu
 #   --quiet        silencieux sauf erreur (mode cron)
 #   --wait S       attente max du verrou téléphone (défaut 0 : ne préempte jamais)
-#   --hold 30m     pause : le téléphone ne bouge plus pendant 30 min
-#                  (à poser avant de tester une branche de mission)
+#   --lock [motif] verrou MANUEL : le téléphone ne bouge plus tant que --unlock
+#                  n'a pas été dit (à poser avant de tester une branche de mission)
+#   --unlock       lève le verrou (dit qui le tenait)
 #   --init         crée le miroir de build et son état
 #
 # Règles :
@@ -39,14 +40,16 @@ PHONE="${PHONE_BIN:-$HOME/bin/phone}"
 APK="$MIRROR/app/build/outputs/apk/debug/app-debug.apk"
 BUILD_TIMEOUT="${VISION_BUILD_TIMEOUT:-900}"
 
-CHECK=0 REINSTALL=0 QUIET=0 WAIT=0 HOLD="" INIT=0
+CHECK=0 REINSTALL=0 QUIET=0 WAIT=0 LOCK=0 UNLOCK=0 INIT=0 LOCK_MOTIF=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --check) CHECK=1; shift ;;
         --reinstall) REINSTALL=1; shift ;;
         --quiet) QUIET=1; shift ;;
         --wait)  WAIT="${2:-0}"; shift 2 ;;
-        --hold)  HOLD="${2:-30m}"; shift 2 ;;
+        --lock)   LOCK=1; shift                                  # motif libre après --lock
+                  while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do LOCK_MOTIF="$LOCK_MOTIF $1"; shift; done ;;
+        --unlock) UNLOCK=1; shift ;;
         --init)  INIT=1; shift ;;
         -h|--help) awk '/^set -euo/{exit} /^#/{sub(/^# ?/, ""); print}' "$0"; exit 0 ;;
         *) echo "install-phone-latest: argument inconnu : $1 (--help)" >&2; exit 2 ;;
@@ -82,21 +85,33 @@ if [ "$INIT" = 1 ]; then
     exit 0
 fi
 
-# --- pause demandée (test d'une branche de mission) ------------------------
-if [ -n "$HOLD" ]; then
-    case "$HOLD" in
-        *m) secs=$(( ${HOLD%m} * 60 )) ;;
-        *h) secs=$(( ${HOLD%h} * 3600 )) ;;
-        *s) secs=${HOLD%s} ;;
-        *)  secs="$HOLD" ;;
-    esac
-    echo $(( $(date +%s) + secs )) > "$STATE_DIR/hold"
-    say "pause posée : le téléphone ne bougera pas pendant ${HOLD}"
+# --- verrou manuel : je lock tant que j'en ai besoin, je délocke après -------
+# Décision user 2026-10-27 : plus de gel programmé (--hold 30m). Un verrou tenu
+# jusqu'à ce que quelqu'un le lève, avec qui et pourquoi écrit dedans.
+LOCKFILE="$STATE_DIR/lock"
+if [ "$LOCK" = 1 ]; then
+    {
+        printf 'AGENT=%s\n' "${PHONE_AGENT:-$(whoami)@$(hostname -s)}"
+        printf 'AT=%s\n' "$(date -Is)"
+        printf 'MOTIF=%s\n' "${LOCK_MOTIF# }"
+    } > "$LOCKFILE"
+    say "verrou posé : le téléphone ne bougera plus jusqu'à --unlock"
     exit 0
 fi
-if [ -f "$STATE_DIR/hold" ] && [ "$(cat "$STATE_DIR/hold" 2>/dev/null || echo 0)" -gt "$(date +%s)" ]; then
-    log "pause en cours jusqu'à $(date -d "@$(cat "$STATE_DIR/hold")" -Is)"
-    say "pause en cours — rien à faire"
+lock_field() { sed -n "s/^$1=//p" "$LOCKFILE" 2>/dev/null | head -1; }
+if [ "$UNLOCK" = 1 ]; then
+    if [ -f "$LOCKFILE" ]; then
+        holder="$(lock_field AGENT)"; since="$(lock_field AT)"
+        rm -f "$LOCKFILE"
+        say "verrou levé (tenu par ${holder:-?} depuis ${since:-?})"
+    else
+        say "aucun verrou à lever"
+    fi
+    exit 0
+fi
+if [ -f "$LOCKFILE" ]; then
+    say "verrouillé par $(lock_field AGENT) depuis $(lock_field AT) — rien à faire (--unlock pour lever)"
+    log "verrou tenu par $(lock_field AGENT) depuis $(lock_field AT)"
     exit 0
 fi
 
