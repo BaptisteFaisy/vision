@@ -127,7 +127,7 @@ APK produite : `legacy-expo-app/android/app/build/outputs/apk/{debug,release}/`.
 | Requête `/segment` | ~1,6–2,0 s à chaud (médians mesurés sur 3 passes) → quelques centimes |
 | Requête `/analyze` | segmentation + appel LLM : non mesuré tant que la clé LLM est absente (500 attendu) |
 | LLM vision `/analyze`, `/ask` | ~0,001–0,01 $ par appel selon le modèle |
-| App au repos | 0 $ si `scaledown_window` est court (300 s dans `modal_app.py`) ; si le conteneur ne descend pas, le GPU reste facturé |
+| App au repos | 0 $ si `scaledown_window` est court (60 s) ; si le conteneur ne descend pas, le GPU reste facturé |
 
 À retenir : le coût dominant est le **temps de GPU allumé**, pas le nombre de requêtes.
 Un `keep_warm` évite les cold starts mais facture en continu.

@@ -236,7 +236,7 @@ def _capture_vision_graph(module, torch, device: str, dtype, edge: int):
     with torch.cuda.stream(side):
         _warmup(module, device, dtype, edge)
     torch.cuda.current_stream().wait_stream(side)
-    graph = torch.cuda.CUDGraph()
+    graph = torch.cuda.CUDAGraph()
     with torch.inference_mode(), torch.cuda.graph(graph):
         static_out = module(static_in)
     return static_in, static_out, graph
