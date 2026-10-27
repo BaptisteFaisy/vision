@@ -7,6 +7,7 @@ import androidx.camera.core.ImageProxy
 import dev.sam3vision.app.isQuarterTurn
 import dev.sam3vision.app.normalizeDegrees
 import dev.sam3vision.app.targetSize
+import dev.sam3vision.core.local.LumaPlane
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.Base64
@@ -183,18 +184,48 @@ class Nv21JpegEncoder {
     private val jpeg = ByteArrayOutputStream(JPEG_BUFFER_BYTES)
 
     /**
-     * Frame → JPEG base64 (sans préfixe `data:`), ou `null` si le buffer n'est pas en
-     * YUV 4:2:0 : l'appelant garde alors son chemin `Bitmap` en repli.
+     * Frame → JPEG base64 **et** plan de luminance [LumaPlane] : la luminance est lue sur
+     * le plan Y du NV21 déjà tourné et réduit — même géométrie que l'ancien bitmap
+     * `uprightScaled`, donc le calque local ne paie pas un bitmap par frame.
+     *
+     * Le plan de luminance est un tampon **neuf** : il devient la référence de mouvement
+     * du keyframe, il ne doit pas être réécrit par la frame suivante.
+     *
+     * `null` si le buffer n'est pas en YUV 4:2:0 : l'appelant garde alors son chemin
+     * `Bitmap` en repli.
      */
-    fun encodeBase64(proxy: ImageProxy, edge: Int, quality: Int): String? {
+    fun encodeFrame(proxy: ImageProxy, edge: Int, quality: Int): EncodedFrame? {
+        val size = pack(proxy, edge) ?: return null
+        val bytes = compress(nv21, size.width, size.height, quality) ?: return null
+        return EncodedFrame(jpegBytesToBase64(bytes), lumaPlan(size))
+    }
+
+    /** Sans la luminance : même implémentation, [encodeFrame] fait tout le travail. */
+    fun encodeBase64(proxy: ImageProxy, edge: Int, quality: Int): String? =
+        encodeFrame(proxy, edge, quality)?.jpegBase64
+
+    /** Recopie NV21 des plans caméra (rotation et réduction) ; `null` si la forme manque. */
+    private fun pack(proxy: ImageProxy, edge: Int): Packed? {
         if (proxy.format != ImageFormat.YUV_420_888) return null
         val planes = planesOf(proxy) ?: return null
         val degrees = normalizeDegrees(proxy.imageInfo.rotationDegrees)
         val (width, height) = nv21TargetSize(planes.width, planes.height, degrees, edge)
         val buffer = bufferFor(width * height * 3 / 2)
         if (packNv21(planes, degrees, width, height, buffer) < 0) return null
-        val bytes = compress(buffer, width, height, quality) ?: return null
-        return jpegBytesToBase64(bytes)
+        return Packed(width, height)
+    }
+
+    /** Plan Y du NV21 (déjà tourné) → plan de référence [LumaPlane], au plus proche voisin. */
+    private fun lumaPlan(size: Packed): ByteArray {
+        val out = ByteArray(LumaPlane.SIZE)
+        var index = 0
+        for (y in 0 until LumaPlane.HEIGHT) {
+            val row = (y.toLong() * size.height / LumaPlane.HEIGHT).toInt() * size.width
+            for (x in 0 until LumaPlane.WIDTH) {
+                out[index++] = nv21[row + (x.toLong() * size.width / LumaPlane.WIDTH).toInt()]
+            }
+        }
+        return out
     }
 
     /** Les trois plans du buffer caméra ; `null` si la forme attendue n'est pas là. */
@@ -232,7 +263,13 @@ class Nv21JpegEncoder {
         /** Capacité initiale du tampon JPEG : une frame à 512 px q65 tient dedans. */
         private const val JPEG_BUFFER_BYTES = 64 * 1024
     }
+
+    /** Taille de la frame packée en NV21 : ce que `packNv21` vient d'écrire. */
+    private class Packed(val width: Int, val height: Int)
 }
+
+/** Frame encodée : JPEG base64 (sans préfixe `data:`) et son plan de luminance. */
+class EncodedFrame(val jpegBase64: String, val luma: ByteArray)
 
 /** JPEG → base64 sans préfixe `data:` — une seule implémentation pour toute l'app. */
 fun jpegBytesToBase64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)

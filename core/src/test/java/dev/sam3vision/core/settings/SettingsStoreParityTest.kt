@@ -34,6 +34,7 @@ class SettingsStoreParityTest {
         distanceOverlayEnabled = false,
         liveSamEnabled = false,
         boxPredictionEnabled = true,
+        localOverlayEnabled = false,
         cameraFovDeg = 63.5f,
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,

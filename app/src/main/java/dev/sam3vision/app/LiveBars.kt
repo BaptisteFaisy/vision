@@ -34,6 +34,7 @@ fun LiveTopBar(
     onOpenSettings: () -> Unit,
     onToggleSam: () -> Unit,
     onToggleTracker: () -> Unit,
+    onToggleLocal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
@@ -42,6 +43,7 @@ fun LiveTopBar(
             Chip("Réglages", AppColors.surfaceHigh, onOpenSettings)
             SamModeChip(state.samEnabled, onToggleSam)
             TrackerChip(state.trackerEnabled, onToggleTracker)
+            LocalModeChip(state, onToggleLocal)
             TransportChip(state.transport)
         }
         LiveStatusLines(state)
@@ -116,6 +118,22 @@ fun TrackerChip(trackerEnabled: Boolean, onToggle: () -> Unit) {
 fun SamModeChip(samEnabled: Boolean, onToggle: () -> Unit) {
     val label = if (samEnabled) "SAM" else "Vision"
     Chip(label, if (samEnabled) AppColors.success else AppColors.primary, onToggle)
+}
+
+/**
+ * Pastille du calque local : « Local ON » quand il peint, « Local OFF » quand il est
+ * éteint, « Local … » quand il est allumé mais **inerte** (sans estimateur, keyframe
+ * périmé, confiance basse). Même structure que [SamModeChip] : aucune primitive neuve,
+ * et un calque inerte ne se présente jamais comme un gain.
+ */
+@Composable
+fun LocalModeChip(state: LiveUiState, onToggle: () -> Unit) {
+    val label = when {
+        !state.localEnabled -> "Local OFF"
+        state.localActive -> "Local ON"
+        else -> "Local …"
+    }
+    Chip(label, if (state.localActive) AppColors.success else AppColors.surfaceHigh, onToggle)
 }
 
 /**
