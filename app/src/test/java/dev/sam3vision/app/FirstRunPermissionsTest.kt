@@ -4,16 +4,17 @@ import android.Manifest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Les trois permissions runtime d'iSee, groupees et filtrees au premier lancement. */
+/** Les quatre permissions runtime d'iSee, groupees et filtrees au premier lancement. */
 class FirstRunPermissionsTest {
 
     @Test
-    fun `les trois permissions sont groupees en une seule demande`() {
+    fun `les quatre permissions sont groupees en une seule demande`() {
         assertEquals(
             setOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.POST_NOTIFICATIONS,
             ),
             IseePermissions.toSet(),
         )
@@ -34,6 +35,7 @@ class FirstRunPermissionsTest {
             listOf(
                 Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.POST_NOTIFICATIONS,
             ),
             IseePermissions.missingFrom(granted),
         )
