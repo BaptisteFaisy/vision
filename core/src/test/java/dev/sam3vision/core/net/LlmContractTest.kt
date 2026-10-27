@@ -138,6 +138,30 @@ class LlmContractTest {
     }
 
     @Test
+    fun `le raisonnement du modele est eteint par defaut`() = runBlocking {
+        NetContract.server(body = NetContract.chatReply("ok")).use { server ->
+            client(server.baseUrl).askText("et la ?", emptyList()).getOrThrow()
+
+            val sent = JSONObject(server.requests.single().body)
+            assertFalse(
+                "sans ce drapeau, muse-spark dépense 0,7 à 1,2 s en pensées avant de répondre",
+                sent.getJSONObject("chat_template_kwargs").getBoolean("enable_thinking"),
+            )
+        }
+    }
+
+    @Test
+    fun `le raisonnement peut etre rallume explicitement`() = runBlocking {
+        NetContract.server(body = NetContract.chatReply("ok")).use { server ->
+            InferHubLlmClient(server.baseUrl, NetContract.KEY, NetContract.MODEL, thinking = true)
+                .askText("et la ?", emptyList()).getOrThrow()
+
+            val sent = JSONObject(server.requests.single().body)
+            assertFalse("aucun drapeau quand on garde le raisonnement", sent.has("chat_template_kwargs"))
+        }
+    }
+
+    @Test
     fun `describeFrame porte le meme contrat de transport que describe`() = runBlocking {
         NetContract.server(body = NetContract.chatReply("une personne avance")).use { server ->
             client(server.baseUrl).describeFrame("QUJD", listOf("personne"), "").getOrThrow()
