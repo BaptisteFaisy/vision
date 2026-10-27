@@ -87,6 +87,24 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Milieu de page : prédiction, overlay, navigation et profondeur embarquée.
+ * Extrait pour que l'appelant reste sous la garde des 50 lignes.
+ */
+@Composable
+private fun PerceptionSettings(
+    draft: Settings,
+    onTestDepth: () -> Unit,
+    onChange: (Settings) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        PredictionSettings(draft) { onChange(it) }
+        LocalOverlaySettings(draft) { onChange(it) }
+        NavigationToggle(draft) { onChange(it) }
+        DepthSettings(draft, onChange, onTestDepth)
+    }
+}
+
 /** White scroll of the page: system bars and keyboard accounted for. */
 @Composable
 private fun settingsLightScroll(): Modifier = Modifier
@@ -252,10 +270,7 @@ private fun TechnicalSection(
         ObjectsSettings(draft) { onChange(it) }
         GpuRegionSettings(draft) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
-        PredictionSettings(draft) { onChange(it) }
-        LocalOverlaySettings(draft) { onChange(it) }
-        NavigationToggle(draft) { onChange(it) }
-        DepthSettings(draft, { onChange(it) }, onTestDepth)
+        PerceptionSettings(draft, onTestDepth) { onChange(it) }
         TtsSettings(
             draft = draft,
             speaking = speaking,
