@@ -60,6 +60,7 @@ class FakeLlm(
 class FakeSam(
     var onSegment: Result<SegmentResult> = Result.failure(ApiError.Network()),
     var onHealth: Result<Boolean> = Result.success(true),
+    var onHealthSeq: List<Result<Boolean>> = emptyList(),
 ) : SamClient {
 
     var segmentCalls = 0
@@ -73,7 +74,8 @@ class FakeSam(
     }
 
     override suspend fun health(): Result<Boolean> {
+        val scripted = onHealthSeq.getOrNull(healthCalls)
         healthCalls++
-        return onHealth
+        return scripted ?: onHealth
     }
 }

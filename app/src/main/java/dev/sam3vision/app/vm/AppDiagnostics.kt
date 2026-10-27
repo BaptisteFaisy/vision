@@ -7,6 +7,7 @@ import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.samEndpoint
 import dev.sam3vision.app.testBitmap
 import dev.sam3vision.core.audio.Wav
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.HttpSamClient
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
@@ -17,6 +18,7 @@ import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -88,18 +90,27 @@ class AppDiagnostics(
     }
 
     /**
-     * Réveil de la GPU à l'ouverture de l'app (`GET /health`, silencieux).
+     * Activation de la GPU à l'ouverture de l'app (`GET /health`, silencieux).
      *
      * Sur un conteneur endormi, `/health` le réveille (snapshot Modal) ; sur un
-     * conteneur chaud, c'est une requête quasi gratuite. Best-effort : le verdict est
-     * ignoré, la sonde iSee et le Direct réveilleraient de toute façon la carte à leur
-     * première frame. Aucune écriture dans `statusLine`, aucun `Log` — l'ouverture ne
-     * doit ni clignoter ni dépendre d'Android (tests JVM).
+     * conteneur chaud, c'est une requête quasi gratuite. Jusqu'à [WARM_ATTEMPTS]
+     * essais espacés de [WARM_RETRY_DELAY_MS] : une ouverture dans un trou de réseau
+     * ne doit pas laisser la carte éteinte. Arrêt immédiat sur
+     * [ApiError.BackendStopped] — l'app Modal n'est plus déployée, réessayer est
+     * inutile, seul un redéploiement (`deploy-live-fast.sh`) la rallume. Aucune
+     * écriture dans `statusLine`, aucun `Log` — l'ouverture ne doit ni clignoter ni
+     * dépendre d'Android (tests JVM).
      */
     suspend fun warmGpu() {
         val url = samUrl(state().settings)
         if (url.isBlank()) return
-        samClient(url).health()
+        val client = samClient(url)
+        repeat(WARM_ATTEMPTS) { attempt ->
+            val outcome = client.health()
+            if (outcome.getOrNull() == true) return
+            if (outcome.exceptionOrNull() is ApiError.BackendStopped) return
+            if (attempt < WARM_ATTEMPTS - 1) delay(WARM_RETRY_DELAY_MS)
+        }
     }
 
     /**
@@ -127,5 +138,11 @@ class AppDiagnostics(
     private companion object {
         /** Étiquette de la mini image de test LLM. */
         const val PROBE_LABEL = "vert"
+
+        /** Essais de réveil à l'ouverture : assez pour un trou de réseau, borné. */
+        const val WARM_ATTEMPTS = 3
+
+        /** Pause entre deux essais de réveil (annulable si l'app repart en fond). */
+        const val WARM_RETRY_DELAY_MS = 2_000L
     }
 }
