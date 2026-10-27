@@ -28,7 +28,7 @@
       </section>
       <section class="map-card" aria-label="Carte des objets détectés">
         <div class="map-heading"><h2>Autour de ton proche</h2><button id="recenter" type="button">↗ Recentrer</button></div>
-        <div id="map-wrap"><div id="map" role="region" aria-label="Position et objets du téléphone partagé"></div></div>
+        <div id="map-wrap"><div id="map" role="region" aria-label="Position et objets du téléphone partagé" aria-busy="true"></div><p id="map-loading" role="status">Chargement de la carte…</p></div>
         <div class="map-footer">
           <div><p id="session-note">La carte se remplira quand le téléphone enverra sa position.</p><p id="indoor"></p></div>
           <details id="link-settings">

@@ -1,6 +1,11 @@
 // Carte existante, partagée entre le navigateur et la WebView Android.
 import { destPoint, objectsOf } from './session.mjs';
 const HOME={lat:48.8566,lon:2.3522};
+const DETAIL_ZOOM=20;
+function mapReady(){
+ document.getElementById('map').setAttribute('aria-busy','false');
+ document.getElementById('map-loading').hidden=true;
+}
 let live=null,lastPos=null,status='offline';
 function state(){return status;}
 function currentObjects(){return objectsOf(live,status);}
@@ -40,19 +45,22 @@ export async function bootMap(){
    mode='google';
    document.getElementById('credit').style.display='none'; // Google draws its own attribution on the map
    gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
+   google.maps.event.addListenerOnce(gmap,'tilesloaded',mapReady);
    syncGoogle();return;
   }catch(e){
    showGerr('Google refused this key: '+String((e&&e.message)||e)+'<br>1) HTTP referrers of the key: add <code>https://suivi-parent.vercel.app/*</code> and <code>https://*.vercel.app/*</code>.<br>2) <code>Maps JavaScript API</code> must be <b>enabled</b> on the project.<br>3) Billing must be active, otherwise tiles stay in error even with a valid key.<br>The browser console (F12) also shows Google\'s exact message.');
   }
  }
  try{
+  if(!window.maplibregl)throw new Error('map_unavailable');
   if(window.maplibregl){
    map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[HOME.lon,HOME.lat],zoom:3,attributionControl:false});
    map.addControl(new maplibregl.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
    map.on('load',syncPins);map.on('zoomend',syncPins);
+   map.once('idle',mapReady);
    syncPins();
   }
- }catch(e){document.getElementById('map').innerHTML='<div style="padding:40px;text-align:center;color:#475569">Add ?key=YOUR_KEY or enter your Google key below.</div>';}
+ }catch(e){document.getElementById('map').innerHTML='<div style="padding:40px;text-align:center;color:#475569">La carte est momentanément indisponible.</div>';mapReady();}
 }
 document.getElementById('savekey').onclick=()=>{const v=document.getElementById('gkey').value.trim();if(!v)return;localStorage.setItem('gmaps_key',v);const u=new URL(location.href);u.searchParams.set('key',v);location.href=u.toString();};
 document.getElementById('clearkey').onclick=()=>{localStorage.removeItem('gmaps_key');const u=new URL(location.href);u.searchParams.delete('key');location.href=u.toString();};
@@ -64,8 +72,8 @@ function syncPins(){
  // GPS accuracy halo, drawn at its real size in metres (clamped to stay readable).
  const ppm=pxPerMeter(from.lat,map.getZoom()),halo=Math.min(220,Math.max(34,2*acc/ppm)),frozen=st!=='live';
  const wrap=document.createElement('div');
- wrap.style.filter=frozen?'grayscale(1)':'';
  wrap.style.cssText='position:relative;width:'+halo+'px;height:'+halo+'px';
+ wrap.style.filter=frozen?'grayscale(1)':'';
  wrap.innerHTML='<div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,'+(frozen?'.08':'.18')+');border:2px solid rgba(37,99,235,'+(frozen?'.25':'.45')+')"></div><div style="position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px;border-radius:50%;background:'+(frozen?'#64748b':'#2563eb')+';border:4px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,'+(frozen?'.1':'.3')+')"></div>';
  markers.push(new maplibregl.Marker({element:wrap}).setLngLat([from.lon,from.lat]).addTo(map));
  currentObjects().forEach(o=>{
@@ -79,7 +87,7 @@ function syncPins(){
  if(moved){
   const first=!lastCenter;lastCenter={lat:from.lat,lon:from.lon};
   try{
-   if(first) map.jumpTo({center:[from.lon,from.lat],zoom:Math.max(map.getZoom(),17)});
+   if(first) map.jumpTo({center:[from.lon,from.lat],zoom:Math.max(map.getZoom(),DETAIL_ZOOM)});
    else map.easeTo({center:[from.lon,from.lat],duration:600});
   }catch(e){}
  }
@@ -98,14 +106,14 @@ function syncGoogle(){
  if(moved){
   const first=!lastCenter;lastCenter={lat:from.lat,lon:from.lon};
   gmap.panTo({lat:from.lat,lng:from.lon});
-  if(first&&gmap.getZoom()<16) gmap.setZoom(17);
+  if(first&&gmap.getZoom()<DETAIL_ZOOM) gmap.setZoom(DETAIL_ZOOM);
  }
 }
 document.getElementById('recenter').onclick=()=>{
  const f=(live&&live.fix)||(lastPos?{lat:lastPos.lat,lon:lastPos.lon}:HOME);
  lastCenter={lat:f.lat,lon:f.lon};
  if(mode==='google'&&gmap)gmap.panTo({lat:f.lat,lng:f.lon});
- else if(map)map.easeTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),17),duration:600});
+ else if(map)map.easeTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),DETAIL_ZOOM),duration:600});
 };
 
 new ResizeObserver(()=>{
