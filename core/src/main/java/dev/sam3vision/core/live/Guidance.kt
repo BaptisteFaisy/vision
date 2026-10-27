@@ -53,8 +53,9 @@ object Guidance {
 
     /**
      * Consigne prononcée, jamais `null` : le guidage a toujours quelque chose à dire.
-     * Forme (fr) : `Continue tout droit.` ou `Personne à 2 mètres devant, va à gauche.`
-     * Forme (en) : `Continue straight ahead.` ou `Person 2 meters ahead, go left.`
+     * Forme (fr) : `Continue tout droit.` ou `Personne à 2 mètres à midi, va à gauche.`
+     * Forme (en) : `Continue straight ahead.` ou `Person 2 meters at 12 o'clock, go left.`
+     * L'obstacle se dit au cadran ([PositionText.clockLabel]), comme les positions.
      */
     fun phrase(
         decision: GuidanceDecision,
@@ -67,16 +68,19 @@ object Guidance {
     }
 
     /**
-     * Signature anti-répétition : `free`, ou `b|label|côté|mètre` — le mètre arrondi
-     * fait reparler un obstacle qui s'approche, comme [PositionText.key]. Toujours
-     * française, pour ne pas rebavarder au changement de langue de la voix.
+     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure` — le mètre
+     * arrondi fait reparler un obstacle qui s'approche, comme [PositionText.key],
+     * et l'heure un obstacle qui glisse dans le couloir (11 h → midi dit une
+     * autre phrase, elle doit pouvoir se dire). Toujours française, pour ne pas
+     * rebavarder au changement de langue de la voix.
      */
     fun key(decision: GuidanceDecision): String {
         val obstacle = decision.obstacle?.takeIf { decision.blocked } ?: return "free"
         val side = decision.side?.name ?: "?"
         val meters = obstacle.meters
         val bucket = if (meters == null || !meters.isFinite()) "?" else meters.roundToInt().toString()
-        return "b|${obstacle.label.trim().lowercase()}|$side|$bucket"
+        val hour = "${PositionText.clockHour(obstacle.centerX)}h"
+        return "b|${obstacle.label.trim().lowercase()}|$side|$bucket|$hour"
     }
 
     /** Bande centrale : les mêmes seuils que les secteurs annoncés. */
@@ -123,20 +127,21 @@ object Guidance {
         SpeechLanguage.En -> "Continue straight ahead."
     }
 
-    /** « personne à 2 mètres devant, va à gauche » / « person 2 meters ahead, go left ». */
+    /** « personne à 2 mètres à midi, va à gauche » / « person 2 meters at 12 o'clock, go left ». */
     private fun blocked(obstacle: PlacedLabel, side: String, language: SpeechLanguage): String {
         val label = obstacle.label.trim()
+        val clock = PositionText.clockLabel(obstacle.centerX, language)
         val meters = obstacle.meters?.takeIf { it.isFinite() }
         return when (language) {
             SpeechLanguage.Fr -> if (meters == null) {
-                "$label devant, va à $side."
+                "$label $clock, va à $side."
             } else {
-                "$label à ${DistanceText.spoken(meters, language)} devant, va à $side."
+                "$label à ${DistanceText.spoken(meters, language)} $clock, va à $side."
             }
             SpeechLanguage.En -> if (meters == null) {
-                "$label ahead, go $side."
+                "$label $clock, go $side."
             } else {
-                "$label ${DistanceText.spoken(meters, language)} ahead, go $side."
+                "$label ${DistanceText.spoken(meters, language)} $clock, go $side."
             }
         }
     }

@@ -125,22 +125,22 @@ Aucune de ces étapes ne passe par un POST de frames : le direct est en **WebSoc
 
 ## Ce que la voix dit, et comment les distances entrent
 
-- **Forme** : labels + secteur, sans article (donc sans faute de genre sur des labels
-  libres) : `Personne à gauche, chaise en bas à droite.`
+- **Forme** : labels + heure, sans article (donc sans faute de genre sur des labels
+  libres) : `Personne à 9 heures, chien à 3 heures.`
 - **Ordre** : gauche → droite (`centerX` croissant) ; un label répété **à la même
-  position** n'est cité qu'une fois ; **3 objets au plus** puis « et N autres objets ».
-- **Secteurs** : `centerX < 0,34` → à gauche, `> 0,66` → à droite, sinon au centre ;
-  même découpage en vertical (`en haut` / au milieu / `en bas`).
+  heure** n'est cité qu'une fois ; **3 objets au plus** puis « et N autres objets ».
+- **Cadran** : sept bandes égales (`PositionText.clockHour`), 9 h tout à gauche,
+  midi au centre, 3 h tout à droite ; plus de repère vertical.
 - **Distance** : `PlacedLabel.meters` est rempli depuis `DistanceReading`
   (`readings.associate { it.box to it.meters }`), puis mis en mots par
   **`DistanceText.spoken`** (`core/distance/DistanceText.kt`) :
   `85 centimètres`, `1,4 mètre` (singulier jusqu'à 2), `12 mètres`, `distance inconnue`.
   Dès qu'une distance est présente, `PositionText.phrase` sépare les objets par ` ; `
   (la virgule sert déjà à la position) :
-  `Personne à gauche, à 1,4 mètre ; chien au centre, à 3 mètres.`
-- **Signature de scène** : `PositionText.key` = `label|secteur|distance arrondie au
+  `Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.`
+- **Signature de scène** : `PositionText.key` = `label|heure|distance arrondie au
   mètre`. C'est ce qui fait reparler un objet **qui s'approche** (3 m → 2 m → 1 m)
-  sans le faire bavarder à chaque frame.
+  ou **qui glisse** (10 h → 11 h) sans le faire bavarder à chaque frame.
 
 ## Anti-bavardage et « cache » de l'énoncé
 

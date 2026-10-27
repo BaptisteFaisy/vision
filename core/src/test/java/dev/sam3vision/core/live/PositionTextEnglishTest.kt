@@ -2,11 +2,10 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * La voix en anglais : mêmes secteurs, mêmes seuils, mots anglais.
+ * La voix en anglais : mêmes heures, mêmes bandes, mots anglais.
  * Le français reste la référence (les tests de [PositionTextTest] le verrouillent).
  */
 class PositionTextEnglishTest {
@@ -15,27 +14,10 @@ class PositionTextEnglishTest {
         PlacedLabel(label, x, y, meters)
 
     @Test
-    fun `secteurs horizontaux en anglais`() {
-        assertEquals("on the left", PositionText.horizontal(0.1f, SpeechLanguage.En))
-        assertEquals("in the middle", PositionText.horizontal(0.5f, SpeechLanguage.En))
-        assertEquals("on the right", PositionText.horizontal(0.9f, SpeechLanguage.En))
-    }
-
-    @Test
-    fun `position complete en anglais`() {
-        assertEquals("in the top left", PositionText.positionLabel(0.1f, 0.1f, SpeechLanguage.En))
-        assertEquals("in the middle", PositionText.positionLabel(0.5f, 0.5f, SpeechLanguage.En))
-        assertEquals("in the bottom right", PositionText.positionLabel(0.9f, 0.9f, SpeechLanguage.En))
-        assertEquals("on the right", PositionText.positionLabel(0.9f, 0.5f, SpeechLanguage.En))
-        assertEquals("at the top", PositionText.positionLabel(0.5f, 0.1f, SpeechLanguage.En))
-        assertEquals("at the bottom", PositionText.positionLabel(0.5f, 0.9f, SpeechLanguage.En))
-    }
-
-    @Test
-    fun `repere vertical nul dans la bande centrale`() {
-        assertNull(PositionText.vertical(0.5f, SpeechLanguage.En))
-        assertEquals("top", PositionText.vertical(0.1f, SpeechLanguage.En))
-        assertEquals("bottom", PositionText.vertical(0.9f, SpeechLanguage.En))
+    fun `cadran en anglais`() {
+        assertEquals("at 9 o'clock", PositionText.clockLabel(0.1f, SpeechLanguage.En))
+        assertEquals("at 12 o'clock", PositionText.clockLabel(0.5f, SpeechLanguage.En))
+        assertEquals("at 3 o'clock", PositionText.clockLabel(0.9f, SpeechLanguage.En))
     }
 
     @Test
@@ -45,7 +27,7 @@ class PositionTextEnglishTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person on the left, book in the middle, chair on the right.", phrase)
+        assertEquals("Person at 9 o'clock, book at 12 o'clock, chair at 3 o'clock.", phrase)
     }
 
     @Test
@@ -55,7 +37,7 @@ class PositionTextEnglishTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person on the left, 1.4 meters away; dog on the right, 3.2 meters away.", phrase)
+        assertEquals("Person at 9 o'clock, 1.4 meters away; dog at 2 o'clock, 3.2 meters away.", phrase)
     }
 
     @Test
@@ -71,12 +53,12 @@ class PositionTextEnglishTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person on the left, chair on the left, and 2 other objects.", phrase)
+        assertEquals("Person at 9 o'clock, chair at 11 o'clock, and 2 other objects.", phrase)
     }
 
     @Test
-    fun `le francais ne change pas`() {
+    fun `le francais par defaut`() {
         val phrase = PositionText.phrase(listOf(placed("personne", 0.1f, meters = 1.44f)))
-        assertEquals("Personne à gauche, à 1,4 mètre.", phrase)
+        assertEquals("Personne à 9 heures, à 1,4 mètre.", phrase)
     }
 }
