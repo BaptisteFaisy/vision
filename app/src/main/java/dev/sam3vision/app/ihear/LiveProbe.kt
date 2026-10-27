@@ -7,27 +7,27 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
-import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.MASK_ALPHA
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
-import dev.sam3vision.app.TRANSPORT_WS_KO
 import dev.sam3vision.core.distance.DistanceMeter
-import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.Cadence
 import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.FramePayload
 import dev.sam3vision.core.live.FrameRate
+import dev.sam3vision.core.live.Guidance
 import dev.sam3vision.core.live.LatestFrameSlot
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimings
+import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
+import dev.sam3vision.core.live.SteeringCap
+import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
@@ -231,6 +231,18 @@ class LiveProbe(
     fun toggleDebug() = _state.update { it.copy(debugVisible = !it.debugVisible) }
 
     /**
+     * Cap demandé à la voix (« va à gauche ») : le guidage recalcule le passage
+     * vers ce cap dès la prochaine frame. L'annonceur repart de zéro pour que
+     * la nouvelle consigne se dise sans attendre ; sans effet à cap identique.
+     * Le cap retombe à tout droit à la prochaine session (voir [begin]).
+     */
+    fun setSteering(cap: SteeringCap) {
+        if (_state.value.steeringCap == cap) return
+        guidance.reset()
+        _state.update { it.copy(steeringCap = cap) }
+    }
+
+    /**
      * Frame encodée en réserve (**une seule**) : elle est convertie **pendant** que la
      * requête précédente est en vol, puis part dès que le créneau se libère.
      * Sans elle, chaque cycle payait l'encodage JPEG après la réponse (+30-40 ms).
@@ -366,13 +378,15 @@ class LiveProbe(
         active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
         val overlays = overlaysFor(frame, shown)
-        val readings = readingsOf(frame)
+        val readings = readingsOf(distances, frame)
+        val placed = placedLabels(frame, readings)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
-        val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(frame, readings, at)
+        val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(placed, at)
+        val steering = steeringCueOf(placed)
         _state.update { current ->
             current.copy(
                 masks = overlays,
-                labels = labelsOf(frame),
+                labels = labelsOf(labels, frame),
                 objects = frame.objects.size,
                 latencyMs = active.stats.averageMs,
                 p95Ms = active.stats.p95Ms,
@@ -384,6 +398,7 @@ class LiveProbe(
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
+                steering = steering,
                 crossing = cross?.state ?: current.crossing,
                 transport = transportLabel(active),
                 error = null,
@@ -401,45 +416,26 @@ class LiveProbe(
         _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
     }
 
-    /** Étiquettes de la frame, sans doublon (ensemble réutilisé, voir [FrameLabels]). */
-    private fun labelsOf(frame: LiveFrame): List<String> = labels.of(frame.objects)
-
-    /** Libellé de transport : ce que le socket fait vraiment, pas ce qu'on voudrait. */
-    private fun transportLabel(active: LiveSession): String =
-        if (active.socketOpen) TRANSPORT_WS else TRANSPORT_WS_KO
-
-    /** Distances de la frame (sténopé) ; aucun journal de suivi ici : mesure brute. */
-    private fun readingsOf(frame: LiveFrame): List<DistanceReading> {
-        if (frame.width <= 0 || frame.height <= 0) return emptyList()
-        val detections = frame.objects.toDetections(frame.width, frame.height)
-        if (detections.isEmpty()) return emptyList()
-        return distances.measure(frame.width, frame.height, detections)
-    }
-
-    /** Couche des pastilles ; `null` quand aucune distance n'est exploitable. */
-    private fun distanceLayerOf(frame: LiveFrame, readings: List<DistanceReading>): DistanceLayer? =
-        if (readings.isEmpty() || frame.width <= 0 || frame.height <= 0) null
-        else DistanceLayer(frame.width, frame.height, readings)
-
     /**
      * Phrase à dire, ou `null` pour rester muet : bascules des Réglages coupées, ou scène
      * déjà dite. Le guidage prime sur l'annonce des positions : une seule voix à la fois.
-     * La distance suit la boîte qui l'a produite (aucune indexation fragile).
+     * Les objets arrivent déjà placés (la vidéo dessine le même chemin).
      */
-    private fun phraseOf(frame: LiveFrame, readings: List<DistanceReading>, at: Long): String? {
-        val placed = placedLabels(frame, readings)
-        if (guideStraight) return guidance.onFrame(at, placed, speechLanguage)
+    private fun phraseOf(placed: List<PlacedLabel>, at: Long): String? {
+        if (guideStraight) return guidance.onFrame(at, placed, speechLanguage, _state.value.steeringCap)
         if (!announcePositions) return null
         return announcer.onFrame(at, placed, speechLanguage)
     }
 
     /**
-     * Message d'échec lisible. Un délai dépassé au premier appel = conteneur Modal
-     * endormi (~30 s de réveil) : on le dit, et la frame suivante réessaie d'elle-même.
+     * Chemin dessiné sur la vidéo : recalculé à chaque frame (la vidéo est en
+     * direct, la voix seule est débouncée). `null` en Traversée (ses prompts
+     * feu+voitures ne disent pas où marcher) ou guidage coupé.
      */
-    private fun failureText(error: Throwable): String =
-        if (error is ApiError.Timeout) "réveil du GPU en cours… (nouvel essai à la frame suivante)"
-        else error.message ?: "échec de l'appel SAM"
+    private fun steeringCueOf(placed: List<PlacedLabel>): SteeringCue? {
+        if (_state.value.crossingActive || !guideStraight) return null
+        return SteeringCue.from(Guidance.decide(placed, _state.value.steeringCap))
+    }
 
     /**
      * Masques colorisés de la frame, calculés hors du thread principal : décodage selon

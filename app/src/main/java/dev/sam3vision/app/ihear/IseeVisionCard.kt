@@ -176,6 +176,7 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Ihea
         modifier = modifier,
     )
     LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
+    SteeringLayer(probe.steering)
 }
 
 /** Photo du double tap : la même fenêtre sert de cadre, flash puis affichage. */

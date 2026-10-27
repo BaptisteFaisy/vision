@@ -5,6 +5,8 @@ import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameTimings
+import dev.sam3vision.core.live.SteeringCap
+import dev.sam3vision.core.live.SteeringCue
 
 /**
  * Ce que la page caméra montre de SAM : les masques décodés de la dernière frame,
@@ -14,7 +16,9 @@ import dev.sam3vision.core.live.FrameTimings
  * [spoken] est la phrase que la voix doit dire (« Continue tout droit. » en guidage,
  * « Personne à 9 heures, à 1,4 mètre » en annonce des positions) : elle reste dans
  * l'état (rien ne se perd si l'écran se recompose) et change de valeur une seule
- * fois par nouvelle scène.
+ * fois par nouvelle scène. [steering] est le chemin calculé pour la dernière
+ * frame, dessiné sur la vidéo à chaque frame (la vidéo est en direct, la voix
+ * seule est débouncée).
  */
 data class LiveProbeState(
     val endpoint: String = "",
@@ -37,6 +41,10 @@ data class LiveProbeState(
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     val spoken: String? = null,
+    /** Cap demandé à la voix (tout droit par défaut) : le couloir que le guidage marche. */
+    val steeringCap: SteeringCap = SteeringCap.Straight,
+    /** Chemin de la dernière frame (`null` = guidage coupé ou mode Traversée). */
+    val steering: SteeringCue? = null,
     /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */
     val crossingActive: Boolean = false,
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
