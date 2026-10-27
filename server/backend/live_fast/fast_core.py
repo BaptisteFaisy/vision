@@ -26,15 +26,12 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from types import SimpleNamespace
+from types import SimpleNamespace
 
 from timing import Stage, add_ms, elapsed_ms, now
 
 PATCH = 14
 MODEL_ID = "unsloth/sam3.1"
-# Poids embarqués dans l'image (FAST_MODEL_DIR) : sans ça chaque démarrage à froid
-# retélécharge ~1,7 Go depuis le Hub HF. `local_files_only=True` interdit tout retour réseau.
-MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "") or ""
-MODEL_SOURCE = MODEL_DIR or MODEL_ID
 DTYPES = ("bf16", "fp16", "fp32")
 _TRUTHY = ("1", "true", "yes", "on")
 
@@ -60,6 +57,45 @@ EDGE = env_int(os.environ.get("FAST_EDGE"))
 RUNTIME_EDGE = env_bool(os.environ.get("FAST_EDGE_RUNTIME"))
 COMPILE = env_bool(os.environ.get("FAST_COMPILE"))
 CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
+# Graphe CUDA de la passe DETR (voir `detr_graph.py`) : le vision est déjà graphé, DETR
+# est le dernier gros poste (~55 ms mesurés le 25/10 pour ~1,5 ms de calcul).
+DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
+# Implémentation d'attention du modèle (`sdpa` par défaut dans transformers, `eager` dans
+# certaines versions). L'attention eager materialise la matrice complète : c'est elle qui
+# mange les ~55 ms du poste `detr_ms` (mesuré le 25/10). Levier : FAST_ATTN=sdpa.
+ATTN_IMPL = os.environ.get("FAST_ATTN") or ""
+
+
+def _set_attn(model, impl: str) -> str:
+    """Force l'implémentation d'attention ; renvoie ce qui a réellement été appliqué."""
+    if not impl:
+        return getattr(getattr(model, "config", None), "_attn_implementation", "?")
+    try:
+        model.set_attn_implementation(impl)
+    except Exception:  # noqa: BLE001 — version sans set_attn_implementation
+        pass
+    # Chaque sous-module d'attention lit **son propre** `config._attn_implementation`
+    # (le config racine n'est pas le même) : il faut donc balayer les modules. Sans ça,
+    # l'attention reste en `eager` — la matrice complète est matérialisée, d'où les
+    # ~55 ms du poste `detr_ms`.
+    touched = 0
+    for module in model.modules():
+        cfg = getattr(module, "config", None)
+        if cfg is None or not hasattr(cfg, "_attn_implementation"):
+            continue
+        try:
+            cfg._attn_implementation = impl
+            touched += 1
+        except Exception:  # noqa: BLE001
+            pass
+    root = getattr(model, "config", None)
+    if root is not None:
+        try:
+            root._attn_implementation = impl
+        except Exception:  # noqa: BLE001
+            pass
+    applied = getattr(root, "_attn_implementation", "?")
+    return applied if applied == impl else f"failed:{applied}:touched={touched}"
 DTYPE_NAME = (os.environ.get("FAST_DTYPE") or "bf16").strip().lower()
 WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
@@ -68,7 +104,8 @@ TIMING = env_bool(os.environ.get("FAST_TIMING"))
 def levers() -> dict:
     """État des leviers tels que lus à l'import — étiquette /health et lignes du banc."""
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
-            "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "dtype": DTYPE_NAME,
+            "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
+            "dtype": DTYPE_NAME,
             "warmups": WARMUPS, "timing": TIMING}
 
 
@@ -118,11 +155,6 @@ def torch_dtype(name: str):
                                                                                        torch.bfloat16)
 
 
-def local_only() -> dict:
-    """Poids déjà dans l'image -> pas de réseau au chargement (rapide, déterministe)."""
-    return {"local_files_only": True} if MODEL_DIR else {}
-
-
 def load(dtype_name: str = DTYPE_NAME, edge=None):
     """Charge SAM 3.1 avec le dtype demandé ; retourne (model, processor, device, dtype).
 
@@ -142,34 +174,13 @@ def load(dtype_name: str = DTYPE_NAME, edge=None):
     if edge:
         from transformers import Sam3Config
 
-        config = Sam3Config.from_pretrained(MODEL_SOURCE, **local_only())
+        config = Sam3Config.from_pretrained(MODEL_ID)
         config.vision_config.backbone_config.image_size = round_edge(int(edge))
         kwargs["config"] = config
-    model = Sam3Model.from_pretrained(MODEL_SOURCE, dtype=dtype, **kwargs).to(device).eval()
-    processor = Sam3Processor.from_pretrained(MODEL_SOURCE, **local_only())
+    model = Sam3Model.from_pretrained(MODEL_ID, dtype=dtype, **kwargs).to(device).eval()
+    _set_attn(model, ATTN_IMPL)
+    processor = Sam3Processor.from_pretrained(MODEL_ID)
     return model, processor, device, dtype
-
-
-def load_cpu(dtype_name: str = DTYPE_NAME, edge=None):
-    """Poids chargés **sur CPU** : la partie du démarrage qui peut être snapshottée.
-
-    Un snapshot mémoire Modal ne contient pas d'état GPU (contexte CUDA, allocations).
-    D'où la coupure : lecture des 1,7 Go et construction du graphe sur CPU ici, puis
-    ``.to("cuda")`` dans une méthode `enter` normale, après restauration du snapshot.
-    Retourne (model, processor, dtype) — le device n'est pas encore choisi.
-    """
-    import torch
-    from transformers import Sam3Config, Sam3Model, Sam3Processor
-
-    dtype = torch_dtype(dtype_name)
-    kwargs = {}
-    if edge:
-        config = Sam3Config.from_pretrained(MODEL_SOURCE, **local_only())
-        config.vision_config.backbone_config.image_size = round_edge(int(edge))
-        kwargs["config"] = config
-    model = Sam3Model.from_pretrained(MODEL_SOURCE, dtype=dtype, **kwargs).eval()
-    processor = Sam3Processor.from_pretrained(MODEL_SOURCE, **local_only())
-    return model, processor, dtype
 
 
 def vision_grid(model) -> int:
@@ -263,13 +274,32 @@ def graph_vision(model, device: str, dtype, edge: int) -> str:
         with torch.inference_mode(), torch.cuda.graph(graph):
             static_out = module(static_in)
 
-        def replay(pixel_values, _in=static_in, _graph=graph, _out=static_out):
-            _in.copy_(pixel_values)
-            _graph.replay()
-            return _out
+        class _GraphReplay(torch.nn.Module):
+            """Encodeur vision rejoué par graphe CUDA, à forme d'entrée fixe.
 
-        model.vision_encoder = replay
-        model._vision_original = module
+            Un ``nn.Module`` et pas une fonction : ``vision_encoder`` est un
+            sous-module enregistré, PyTorch refuse d'y assigner une closure
+            (``cannot assign ... as child module``). La forme est stable parce que
+            ``runtime_edge`` est faux ; si une autre forme arrive, on repasse par le
+            module d'origine au lieu de corrompre le graphe.
+            """
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.static_in = static_in
+                self.static_out = static_out
+                self.shape = tuple(static_in.shape)
+                self.original = module
+                self._graph = graph
+
+            def forward(self, pixel_values):
+                if tuple(pixel_values.shape) != self.shape:
+                    return self.original(pixel_values)
+                self.static_in.copy_(pixel_values)
+                self._graph.replay()
+                return self.static_out
+
+        model.vision_encoder = _GraphReplay()
         return "ok"
     except Exception as exc:  # noqa: BLE001
         model.vision_encoder = module
@@ -344,8 +374,13 @@ def repeat_vision(vision, n: int):
         pooler_output=None, hidden_states=None, attentions=None)
 
 
-def _detections(model, processor, device, dtype, vision, concepts, work_size, timers):
-    """UN forward pour les N concepts (batch=N) -> N détections post-traitées."""
+def _detections(model, processor, device, dtype, vision, concepts, work_size, timers,
+                graphs=None):
+    """UN forward pour les N concepts (batch=N) -> N détections post-traitées.
+
+    ``graphs`` (cache `DetrGraphs`) est optionnel : sans lui, eager only. La capture et la
+    vérification sont dans `detr_graph.py` ; ici on ne fait que présenter la passe.
+    """
     torch = _torch()
     from segmentation import MASK_THRESHOLD, SCORE_THRESHOLD
 
@@ -353,13 +388,20 @@ def _detections(model, processor, device, dtype, vision, concepts, work_size, ti
     inputs = {name: value.to(device)
               for name, value in processor(text=list(concepts), return_tensors="pt").items()}
     add_ms(timers, "tokenize_ms", elapsed_ms(started))
+    embeds = repeat_vision(vision, len(concepts))
+
+    def forward(static_embeds, static_inputs):
+        with torch.inference_mode():
+            return model(vision_embeds=static_embeds, **static_inputs)
+
     started = now()
-    with torch.inference_mode():
-        outputs = model(vision_embeds=repeat_vision(vision, len(concepts)), **inputs)
-        found = processor.post_process_instance_segmentation(
-            outputs, threshold=SCORE_THRESHOLD, mask_threshold=MASK_THRESHOLD,
-            target_sizes=[(work_size[1], work_size[0])] * len(concepts))
+    outputs = graphs(forward, embeds, inputs) if graphs is not None else forward(embeds, inputs)
     add_ms(timers, "detr_ms", elapsed_ms(started))
+    started = now()
+    found = processor.post_process_instance_segmentation(
+        outputs, threshold=SCORE_THRESHOLD, mask_threshold=MASK_THRESHOLD,
+        target_sizes=[(work_size[1], work_size[0])] * len(concepts))
+    add_ms(timers, "post_ms", elapsed_ms(started))
     return found
 
 
@@ -395,7 +437,7 @@ def _collect(ctx, vision, prompts, concepts, work_size, image_size, batch: bool,
 
     if batch:
         found = _detections(ctx["model"], ctx["processor"], ctx["device"], ctx["dtype"],
-                           vision, concepts, work_size, timers)
+                           vision, concepts, work_size, timers, ctx.get("detr_graphs"))
         pairs = list(zip(found, prompts))
     else:
         pairs = []
