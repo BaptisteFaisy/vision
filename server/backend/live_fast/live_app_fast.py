@@ -15,8 +15,9 @@ Depuis le portage de latence (``docs/LATENCE-PROD.md``) :
 * ``mask_encoding`` (``png`` par défaut, ``bits`` sur demande, ``none`` pour les boîtes)
   est négocié sur ``POST /live`` **et** sur ``/live/ws`` ; la réponse porte toujours la
   représentation appliquée ;
-* ``@modal.concurrent(max_inputs=2)`` : deux entrées par conteneur (une seule inférence à
-  la fois, ``_gpu_lock``), ce qui supprime l'attente de ~90 ms de la 2ᵉ frame en vol ;
+* ``@modal.concurrent(max_inputs=4)`` : quatre slots par conteneur (une seule inférence
+  à la fois, ``_gpu_lock``), ce qui supprime l'attente des frames en vol et laisse un
+  zombie résiduel sans bloquer les reconnexions ;
 * ``run_frame`` garde le verrou GPU sur la seule inférence : le décodage, le préprocess et
   l'encodage des masques se font hors verrou ;
 * ``FAST_TIMING=1`` ajoute ``timings_ms`` à la réponse et l'en-tête ``Server-Timing``.
@@ -55,6 +56,9 @@ GPU_TYPE = os.environ.get("FAST_GPU", "A100")
 REGION = os.environ.get("FAST_REGION") or None
 ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 300)
+# Warm pool : 0 = extinction après le bail (défaut) ; 1 = conteneur chaud permanent
+# (cold start supprimé, ~500 $/mois A100). Jamais plus de 1 : UN SEUL GPU, JAMAIS DEUX.
+MIN_CONTAINERS = clamp_int(os.environ.get("FAST_MIN_CONTAINERS"), 0, 0, 1)
 BACKEND_DIR = Path(__file__).resolve().parent
 
 # Leviers lus au moment du DEPLOIEMENT puis recuits dans l'environnement de l'image :
@@ -62,7 +66,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 # (les variables du shell de déploiement ne sont pas propagées telles quelles).
 LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COMPILE",
                 "FAST_CUDA_GRAPH", "FAST_DETR_GRAPH", "FAST_DTYPE", "FAST_TIMING",
-                "FAST_COMPILE_WARMUPS")
+                "FAST_COMPILE_WARMUPS", "FAST_GZIP_MIN_BYTES")
 
 
 def lever_env() -> dict:
@@ -89,10 +93,10 @@ app = modal.App(APP_NAME)
     gpu=GPU_TYPE,
     region=REGION,
     routing_region=ROUTING,
-    timeout=300,
+    timeout=3600,  # sessions longues saines ; les zombies meurent par idle-timeout 45 s
     startup_timeout=1200,  # torch.compile + warm-up au chargement : plus long que le simple load
     max_containers=1,      # UN SEUL GPU, JAMAIS DEUX
-    min_containers=0,      # la carte s'éteint dès la fin du direct (bail 20 s)
+    min_containers=MIN_CONTAINERS,  # 0 = extinction après le bail ; 1 = warm pool (FAST_MIN_CONTAINERS)
     scaledown_window=SCALEDOWN,
 )
 # DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
@@ -104,7 +108,7 @@ app = modal.App(APP_NAME)
 # sérialisée (une frame sur la carte, aucune VRAM en plus) et `max_containers=1` interdit
 # toujours une seconde carte. Le décorateur se pose sur la CLASSE, sous `@app.cls`
 # (doc Modal « Input concurrency »).
-@modal.concurrent(max_inputs=2)
+@modal.concurrent(max_inputs=4)  # 4 slots : un zombie résiduel ne bloque plus tout
 class Sam3Live(Sam3LiveService):
     """Conteneur de probe : modèle chargé une fois, leviers activables, verrou GPU unique."""
 

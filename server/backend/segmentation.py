@@ -211,14 +211,39 @@ def detection_entries(detection, label: str, work_size, image_size,
 
 
 def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
-             mask_encoding: str = DEFAULT_MASK_ENCODING) -> dict:
+             mask_encoding: str = DEFAULT_MASK_ENCODING, mask_format=None,
+             mask_edge: int = 0) -> dict:
     """Tri global, troncature, puis encodage des **seuls** objets renvoyés.
 
     Renvoie la charge utile du contrat (``width``/``height``/``objects``) augmentée de
     ``mask_encoding`` : la représentation **appliquée** (jamais absente), pour qu'un client
     sache décoder ``mask_b64`` sans deviner. Point d'entrée partagé par ``/segment``
     (``segment_image``) et ``/live`` (``fast_core``) — un seul chemin d'encodage.
+
+    ``mask_format="rle"`` (+ ``mask_edge``, défaut 256) : masques en runs LEB128 sur
+    grille réduite, chaque objet portant ``mask_scale`` (ratio grille/frame) pour que
+    le client redérive les dimensions. Absent = chemin historique inchangé.
     """
+    from imaging import encode_mask_rle_b64, rle_grid
+
+    if (mask_format or "").strip().lower() == "rle":
+        grid, scale = rle_grid(tuple(image_size), mask_edge or 0)
+        ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
+        return {
+            "width": image_size[0],
+            "height": image_size[1],
+            "mask_encoding": "rle",
+            "objects": [
+                {
+                    "label": item["label"],
+                    "score": item["score"],
+                    "box": item["box"],
+                    "mask_b64": encode_mask_rle_b64(item["mask"], grid),
+                    "mask_scale": scale,
+                }
+                for item in ordered[:max_objects]
+            ],
+        }
     encoding = check_mask_encoding(mask_encoding)
     ordered = sorted(entries, key=lambda item: item["score"], reverse=True)
     return {
