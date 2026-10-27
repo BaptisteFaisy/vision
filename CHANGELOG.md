@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (13) — cap vocal : le guidage marche vers la direction demandée
+
+- **Ordre vocal de cap** (`SteeringCommand`, avant Maps et le LLM) : « va à gauche »,
+  « tourne à droite », « tout droit » (+ anglais) ; une question (« qu'y a-t-il à
+  gauche ? ») et une phrase ambiguë ne déclenchent pas. Confirmation parlée
+  (`SteeringText`), qui dit aussi quand le guidage est coupé dans les Réglages.
+- **Chemin calculé vers le cap** (`Guidance`, couloir = moitié visée, passage = plus
+  libre des deux autres secteurs, centre en premier) : « Va à gauche. »,
+  « Personne à 2 mètres à 10 heures, passe au centre. » L'obstacle se dit au cadran
+  comme en cap droit ; cap droit inchangé au caractère près.
+- **Flèche sur la vidéo** (`SteeringLayer`, verte voie libre, ambre + passage si
+  bouché) ; chemin recalculé à chaque frame, voix débouncée comme avant ; cap de
+  session (retombe à tout droit), coupé en mode Traversée.
+- **Preuves** : `SteeringTest` (12), `GuidanceSteeringTest` (13),
+  `GuidanceAnnouncerSteeringTest` (2), `LiveProbeSteeringTest` (5) ;
+  `:core:testDebugUnitTest` 1125/1125, `:app:testDebugUnitTest` 556/556,
+  `check-kotlin-limits.py` OK. Non vérifié sur téléphone (ni à l'oreille, ni la
+  flèche à l'écran).
+
 ## 2026-10-27 (12) — premier plan = carte active : réveil à 3 essais, stop franc si backend arrêté
 
 - **Activation fiable à l'ouverture** : `warmGpu()` fait jusqu'à 3 `GET /health`
