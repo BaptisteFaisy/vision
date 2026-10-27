@@ -17,6 +17,7 @@ import dev.sam3vision.core.settings.SettingsStoreFactory
 import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.ShareTrackingPolicy
 import dev.sam3vision.core.share.shareJson
+import dev.sam3vision.core.share.shareEndpoint
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +110,7 @@ class ShareTrackingService : Service() {
         if (settings.shareId.isBlank()) return false
         if (ShareGate.screenPublishing) return true // le Direct publie déjà son état complet
         val fix = positions.lastFix ?: return true // pas encore de position : on patiente
-        val url = settings.parentSiteUrl.trim().trimEnd('/') + "/api/share"
+        val url = shareEndpoint(settings.parentSiteUrl) ?: return false
         reporter.maybeSend(
             System.currentTimeMillis(),
             url,

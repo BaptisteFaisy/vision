@@ -1,13 +1,13 @@
 // GET /api/state?share=leo — le site parent lit le dernier état (poll toutes les 2 s).
 // Réponse : {ok, live, ageMs, fix, objects, serverAt} ou {ok:true, live:false} sans état.
-// live = état de moins de 12 s ; au-delà, le front affiche « signal perdu » puis la démo.
+// live = état de moins de 12 s ; puis signal perdu et hors ligne, sans simulation.
 const { storeGet, validId } = require('./_store');
 
 const FRESH_MS = 12_000;
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const shareId = (req.query && req.query.share) || 'leo';
+  const shareId = req.query && req.query.share;
   if (!validId(shareId)) return res.status(400).json({ ok: false, error: 'share invalide' });
   const state = await storeGet('suivi:' + shareId);
   if (!state) return res.status(200).json({ ok: true, live: false });
@@ -18,6 +18,7 @@ module.exports = async (req, res) => {
     ageMs,
     fix: state.fix,
     objects: state.objects,
+    scene: state.scene || null,
     serverAt: state.serverAt,
   });
 };
