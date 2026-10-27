@@ -67,7 +67,7 @@ fun SettingsScreen(
     Column(settingsScroll()) {
         ScreenHeader("Réglages du backend", "Aucune clé n'est écrite dans le code.", onBack, null)
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            CaregiverSettings(draft, onPickRole)
+            CaregiverSettings(draft, onPickRole) { draft = it }
             BackendFields(draft) { draft = it }
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
@@ -137,7 +137,18 @@ private fun GlassesBlock(glasses: GlassesController) {
  * redémarrage) et ouvre la page quand c'est Caregiver.
  */
 @Composable
-private fun CaregiverSettings(draft: Settings, onPickRole: (Settings) -> Unit) {
+private fun CaregiverSettings(
+    draft: Settings,
+    onPickRole: (Settings) -> Unit,
+    onChange: (Settings) -> Unit,
+) {
+    // Le brouillon local suit le clic : le bouton choisi passe en bleu immédiatement,
+    // même quand le rôle n'ouvre pas d'écran (Blind person).
+    val pick = { role: CaregiverRole ->
+        val next = draft.copy(caregiverRole = role)
+        onChange(next)
+        onPickRole(next)
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Caregiver", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(
@@ -150,17 +161,17 @@ private fun CaregiverSettings(draft: Settings, onPickRole: (Settings) -> Unit) {
             "Blind person (défaut)",
             true,
             roleColor(draft, CaregiverRole.Blind),
-            onClick = { onPickRole(draft.copy(caregiverRole = CaregiverRole.Blind)) },
+            onClick = { pick(CaregiverRole.Blind) },
         )
         BigButton(
             "Caregiver",
             true,
             roleColor(draft, CaregiverRole.Caregiver),
-            onClick = { onPickRole(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
+            onClick = { pick(CaregiverRole.Caregiver) },
         )
         Text(
-            "Le rôle est enregistré tout de suite, sans passer par « Enregistrer » ; " +
-                "choisir Caregiver ouvre la carte du proche.",
+            "Le rôle est enregistré tout de suite, sans passer par « Enregistrer » : " +
+                "Caregiver ouvre la carte du proche, Blind person revient à iSee.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
