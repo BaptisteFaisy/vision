@@ -1,5 +1,6 @@
 package dev.sam3vision.core.iseedesign
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,5 +67,38 @@ class IseePortraitTest {
         assertEquals(1, wordsSpoken(s, 200, 2000))
         assertEquals(5, wordsSpoken(s, 2000, 2000))
         assertEquals(0, wordsSpoken("", 900, 2000))
+    }
+
+    @Test
+    fun `la palette Amber est figee, bleu user et ambre iSee`() {
+        assertEquals(0xFF0B5FFF.toInt(), IseePortrait.YOU)
+        assertEquals(0xFF0A50D8.toInt(), IseePortrait.YOU_INK)
+        assertEquals(0xFFF5A300.toInt(), IseePortrait.SEE)
+        assertEquals(0xFFC98200.toInt(), IseePortrait.SEE_INK)
+        assertEquals(0xFF0B1220.toInt(), IseePortrait.INK)
+        assertEquals(0xFF6A7486.toInt(), IseePortrait.SUB)
+        assertEquals(0x2E0B1220, IseePortrait.DIM)
+        assertArrayEquals(
+            intArrayOf(0xFF0B5FFF.toInt(), 0xFF3FB8FF.toInt(), 0xFFFFC93C.toInt(), 0xFFFF9F1C.toInt(), 0xFFFFE8A3.toInt()),
+            IseePortrait.IDLE,
+        )
+        assertArrayEquals(
+            intArrayOf(0xFF0A4FD8.toInt(), 0xFF0B5FFF.toInt(), 0xFF4C8DFF.toInt(), 0xFF93BBFF.toInt(), 0xFF3FB8FF.toInt()),
+            IseePortrait.PAL_YOU,
+        )
+        assertArrayEquals(
+            intArrayOf(0xFFF59E0B.toInt(), 0xFFFFC93C.toInt(), 0xFFFFB020.toInt(), 0xFFFFE08A.toInt(), 0xFFFF8A3D.toInt()),
+            IseePortrait.PAL_SEE,
+        )
+    }
+
+    @Test
+    fun `la geometrie Portrait est figee`() {
+        assertEquals(0.40f, IseePortrait.REST_Y, 0f)
+        assertEquals(0.335f, IseePortrait.REST_R, 0f)
+        assertEquals(0.58f, IseePortrait.PICTURE_H, 0f)
+        assertEquals(0.555f, IseePortrait.CAM_Y, 0f)
+        assertEquals(0.20f, IseePortrait.CAM_R, 0f)
+        assertEquals(0.34f, IseePortrait.FADE, 0f)
     }
 }
