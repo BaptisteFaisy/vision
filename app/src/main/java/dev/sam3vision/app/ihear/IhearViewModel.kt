@@ -394,11 +394,17 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     /** Purge totale à la fermeture de l'activité (option A) : table + cache. */
     fun onAppClosed() = session.onClosed()
 
-    /** L'app part derrière : minuteur d'inactivité de 30 min armé (option C). */
-    fun onBackground() = session.onBackground()
+    /** L'app part derrière : minuteur armé (option C) et envoi SAM de la sonde coupé. */
+    fun onBackground() {
+        session.onBackground()
+        probe.onBackground()
+    }
 
-    /** L'app revient au premier plan : minuteur annulé (option C). */
-    fun onForeground() = session.onForeground()
+    /** L'app revient au premier plan : minuteur annulé (option C), sonde réarmée. */
+    fun onForeground() {
+        session.onForeground()
+        probe.onForeground()
+    }
 
     companion object {
         const val CHAT_HISTORY = IhearTranscript.CHAT_HISTORY
