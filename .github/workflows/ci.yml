@@ -131,6 +131,11 @@ jobs:
       - name: Garde de taille Kotlin (< 500 lignes/fichier, < 50 lignes/fonction)
         run: python3 tools/check-kotlin-limits.py
 
+      # Le design Portrait est obligatoire (docs/ISEE-DESIGN-PORTRAIT.md) :
+      # l'ancien design reste en quarantaine, le pane assemble la scène.
+      - name: Garde du design Portrait (quarantaine ancien design)
+        run: python3 tools/check-isee-design.py
+
       # Porte anti-dérive du budget de latence : un chiffre publié dans
       # docs/LATENCE-BUDGET.md doit être celui du code (voir la lane L23).
       # Quelques secondes, aucune compilation ; le document est écrit par la

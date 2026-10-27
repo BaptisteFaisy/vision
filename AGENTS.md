@@ -27,7 +27,8 @@ unique du 26/10.
   toucher `app/glasses/` ; l'ancien module séparé `glasses-spike` n'existe plus, ni dans
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
-- `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:30`).
+- `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
+- `docs/ISEE-DESIGN-PORTRAIT.md` — design Portrait de l'écran iSee, obligatoire (§3.12).
 - `CHANGELOG.md` — historique.
 
 ## 1. C'est quoi ce dépôt
@@ -120,6 +121,13 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
     passer un build : corriger la cause. Pas de push direct sur `master`, pas de merge sans
     demande explicite, pas de réécriture de branche partagée ; seule tolérance,
     `--force-with-lease` après un push normal raté.
+12. **Design iSee = Portrait, obligatoire** (`docs/ISEE-DESIGN-PORTRAIT.md`, décision user
+    2026-10-27) : fond blanc, une seule boule de verre (aucun satellite, aucun pixel),
+    caméra fondue en haut, seule la phrase en cours sous la boule, palette Amber figée.
+    Ne pas réintroduire l'ancien design (`IseeSceneArt`, `IseeScenePixels`,
+    `satellitePositions`, `sampleGrid`, `pixelTrip`, `bubbleLookIndex`, `BubbleLook`,
+    `textPages` — quarantaine, garde `tools/check-isee-design.py`), ne pas modifier
+    palettes ni géométrie sans demande explicite du user.
 
 ## 4. Git & merge
 
