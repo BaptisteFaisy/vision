@@ -35,6 +35,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
         run: |
+          export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
           green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
             gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
               ["ci","apk","apk-release","lint","ci-budget","couche0"] as $req |
