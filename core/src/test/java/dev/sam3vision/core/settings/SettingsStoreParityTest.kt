@@ -40,6 +40,7 @@ class SettingsStoreParityTest {
         localOverlayEnabled = false,
         navigationGuidanceEnabled = false,
         cameraFovDeg = 63.5f,
+        caregiverRole = CaregiverRole.Caregiver,
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
         speechLanguage = SpeechLanguage.Fr,

@@ -90,6 +90,12 @@ data class Settings(
      */
     val cameraFovDeg: Float = 0f,
     /**
+     * Rôle de ce téléphone : [CaregiverRole.Blind] (défaut, iSee) ou
+     * [CaregiverRole.Caregiver] (page de suivi du proche). Persisté : l'app
+     * rouvre sur la page du rôle choisi.
+     */
+    val caregiverRole: CaregiverRole = CaregiverRole.Blind,
+    /**
      * Lien du site de suivi parent envoyé par le bouton « Partager le suivi »
      * du Direct (message WhatsApp). Lien générique : pas de cloisonnement par
      * proche, à affiner avec des tokens côté backend si besoin.
@@ -204,6 +210,7 @@ data class Settings(
             localOverlayEnabled = true,
             navigationGuidanceEnabled = true,
             cameraFovDeg = 0f,
+            caregiverRole = CaregiverRole.Blind,
             parentSiteUrl = DEFAULT_PARENT_SITE_URL,
             shareEnabled = true,
             shareId = DEFAULT_SHARE_ID,
@@ -274,7 +281,7 @@ data class Settings(
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
-        "cameraFovDeg=$cameraFovDeg, maxObjects=$maxObjects)"
+        "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, maxObjects=$maxObjects)"
 }
 
 /** Marqueur de substitution d'une secret masqué (voir [maskSecret]). */

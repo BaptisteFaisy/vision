@@ -105,6 +105,23 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le role caregiver survit a un aller-retour et reste aveugle par defaut`() {
+        // Défaut « Blind person » : une installation neuve ouvre iSee, pas la page suivi.
+        assertEquals(CaregiverRole.Blind, Settings.Default.caregiverRole)
+        assertEquals(CaregiverRole.Blind, SettingsCodec.decode("").caregiverRole)
+
+        val caregiver = Settings.Default.copy(caregiverRole = CaregiverRole.Caregiver)
+        assertEquals(
+            CaregiverRole.Caregiver,
+            SettingsCodec.decode(SettingsCodec.encode(caregiver)).caregiverRole,
+        )
+        // Un fichier écrit avant ce champ reprend le rôle aveugle, jamais le suivi.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("caregiverRole=") }
+        assertEquals(CaregiverRole.Blind, SettingsCodec.decode(legacy.joinToString("\n")).caregiverRole)
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)
