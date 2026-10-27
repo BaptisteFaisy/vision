@@ -4,8 +4,8 @@ package dev.sam3vision.app.glasses.bench
  * Frame JPEG prête pour l'API (SAM / LLM).
  *
  * @property base64 JPEG encodé en base64, **sans** préfixe `data:image/jpeg;base64,`.
- * @property width largeur de l'image réellement encodée (après réduction).
- * @property height hauteur de l'image réellement encodée (après réduction).
+ * @property width largeur de l'image réellement encodée (après recadrage 16:9 et réduction).
+ * @property height hauteur de l'image réellement encodée (après recadrage 16:9 et réduction).
  * @property capturedAtMs horodatage de capture, en millisecondes.
  */
 data class JpegFrame(

@@ -55,7 +55,7 @@ Conséquence, inchangée : **une conclusion prise sur le banc ne s'applique pas 
 Wearables (SDK DAT) → Stream.videoStream
   → collectFrames      : jette les frames de config codec, dépose dans un canal CONFLATÉ
   → consumeFrames      : attend la fenêtre de 1,5 s, garde la frame la plus récente
-  → GlassesFrameEncoder: verdict → octets → disposition YUV → ARGB → Bitmap → ≤1024 px → JPEG 85 → base64
+  → GlassesFrameEncoder: verdict → octets → disposition YUV → ARGB → Bitmap → 16:9 → ≤1024 px → JPEG 85 → base64
   → BenchController.onFrame (BenchScreen.kt:290) — journal toujours ; réseau seulement si « Analyser » est activé
   → AnalyzeUseCase de :core (SAM 3.1 + LLM) → GlassesVoice (ElevenLabs + MediaPlayer)
 ```
@@ -78,9 +78,10 @@ Wearables (SDK DAT) → Stream.videoStream
    « serré ». Le SDK n'expose aucun format.
 7. **Conversion** — `YuvConverter.yuv420ToArgb` (`FrameTypes.kt:76`) : BT.601 en arithmétique
    entière, sans allocation dans la boucle, refus explicite des entrées incohérentes.
-8. **Encodage** — `encode` (`GlassesFrameEncoder.kt:65`) : `Bitmap` ARGB → réduction sous
-   `MAX_IMAGE_EDGE = 1024` (`:13`, via `scaleDown`, `:86`) → JPEG qualité 85 (`:16`) → base64
-   sans préfixe `data:`.
+8. **Encodage** — `encode` (`GlassesFrameEncoder.kt:65`) : `Bitmap` ARGB → recadrage
+   centré 16:9 (`cropTo16x9`, `GlassesFramePolicy.kt` : le 504×896 du SDK perd le haut et
+   le bas) → réduction sous `MAX_IMAGE_EDGE = 1024` (`:13`, via `scaleDown`, `:86`) →
+   JPEG qualité 85 (`:16`) → base64 sans préfixe `data:`.
 9. **Horodatage** — `frameTimestampMs` (`GlassesFramePolicy.kt`) : µs du SDK → ms, sinon
    `SystemClock.elapsedRealtime()`. Les deux branches ne sont **pas** dans le même référentiel
    (voir §5).
@@ -90,8 +91,8 @@ Wearables (SDK DAT) → Stream.videoStream
 
 Toute la décision vit hors Android : `GlassesSessionPolicy.kt` (états d'enregistrement, erreurs
 de flux, verdict de frame, étranglement, `CycleLatch`), `GlassesFramePolicy.kt` (horodatage,
-réduction), `SpikeLog.kt` (journal, messages courts). C'est ce qui rend les tests JVM possibles
-sans stub du SDK.
+recadrage 16:9, réduction), `SpikeLog.kt` (journal, messages courts). C'est ce qui rend les tests
+JVM possibles sans stub du SDK.
 
 ## 3. Les 24 i/s : ce qui est demandé, ce qui est mesuré
 

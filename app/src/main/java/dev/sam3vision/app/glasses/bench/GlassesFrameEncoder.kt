@@ -59,25 +59,39 @@ class GlassesFrameEncoder {
         return runCatching { encode(argb, frame) }.getOrNull()
     }
 
-    /** ARGB → Bitmap → réduction sous [MAX_IMAGE_EDGE] → JPEG → base64. */
+    /** ARGB → Bitmap → recadrage 16:9 → réduction sous [MAX_IMAGE_EDGE] → JPEG → base64. */
     private fun encode(argb: IntArray, frame: VideoFrame): JpegFrame? {
         val source = Bitmap.createBitmap(argb, frame.width, frame.height, Bitmap.Config.ARGB_8888)
-        val scaled = scaleDown(source)
+        val cropped = cropToLandscape(source)
         try {
-            val buffer = ByteArrayOutputStream()
-            if (!scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, buffer)) return null
-            val encoded = buffer.toByteArray()
-            if (encoded.isEmpty()) return null
-            val base64 = Base64.encodeToString(encoded, Base64.NO_WRAP)
-            // Horodatage : la décision (horloge média du SDK ou repli monotone) est
-            // dans `frameTimestampMs`, testée sur JVM.
-            val capturedAtMs =
-                frameTimestampMs(frame.presentationTimeUs, SystemClock.elapsedRealtime())
-            return JpegFrame(base64, scaled.width, scaled.height, capturedAtMs)
+            val scaled = scaleDown(cropped)
+            try {
+                val buffer = ByteArrayOutputStream()
+                if (!scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, buffer)) return null
+                val encoded = buffer.toByteArray()
+                if (encoded.isEmpty()) return null
+                val base64 = Base64.encodeToString(encoded, Base64.NO_WRAP)
+                // Horodatage : la décision (horloge média du SDK ou repli monotone) est
+                // dans `frameTimestampMs`, testée sur JVM.
+                val capturedAtMs =
+                    frameTimestampMs(frame.presentationTimeUs, SystemClock.elapsedRealtime())
+                return JpegFrame(base64, scaled.width, scaled.height, capturedAtMs)
+            } finally {
+                if (scaled !== cropped) scaled.recycle()
+            }
         } finally {
-            if (scaled !== source) scaled.recycle()
+            if (cropped !== source) cropped.recycle()
             source.recycle()
         }
+    }
+
+    /**
+     * Recadre l'image au 16:9 paysage ([cropTo16x9]) ; rend le bitmap d'origine
+     * quand il est déjà au format (aucune copie dans ce cas).
+     */
+    private fun cropToLandscape(source: Bitmap): Bitmap {
+        val rect = cropTo16x9(source.width, source.height) ?: return source
+        return Bitmap.createBitmap(source, rect.x, rect.y, rect.width, rect.height)
     }
 
     /** Réduit l'image pour que son plus grand côté fasse au plus [MAX_IMAGE_EDGE]. */

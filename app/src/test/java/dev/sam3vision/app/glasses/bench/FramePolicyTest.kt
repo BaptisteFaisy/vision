@@ -5,9 +5,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Politique de frame ([frameTimestampMs], [scaledDimensions]) testée sur JVM :
- * ces deux décisions étaient enfouies dans [GlassesFrameEncoder], où les appeler
- * demandait un `Bitmap` et `SystemClock`.
+ * Politique de frame ([frameTimestampMs], [scaledDimensions], [cropTo16x9])
+ * testée sur JVM : ces décisions étaient enfouies dans [GlassesFrameEncoder],
+ * où les appeler demandait un `Bitmap` et `SystemClock`.
  */
 class FramePolicyTest {
 
@@ -57,5 +57,37 @@ class FramePolicyTest {
         assertNull(scaledDimensions(640, 0))
         assertNull(scaledDimensions(-2, -2))
         assertNull("une borne nulle n'a pas de sens", scaledDimensions(2000, 1000, maxEdge = 0))
+    }
+
+    // ---- Recadrage 16:9 -----------------------------------------------------
+
+    @Test
+    fun `le portrait des lunettes perd le haut et le bas`() {
+        // 504x896 = VideoQuality.MEDIUM : 504 de large → 283 de haut, centré.
+        assertEquals(CropRect(0, 306, 504, 283), cropTo16x9(504, 896))
+    }
+
+    @Test
+    fun `un 16-9 exact ne bouge pas`() {
+        assertNull(cropTo16x9(1280, 720))
+        assertNull(cropTo16x9(1920, 1080))
+        assertNull(cropTo16x9(16, 9))
+    }
+
+    @Test
+    fun `un carre perd le haut et le bas`() {
+        assertEquals(CropRect(0, 109, 500, 281), cropTo16x9(500, 500))
+    }
+
+    @Test
+    fun `un paysage plus large que 16-9 perd les cotes`() {
+        assertEquals(CropRect(249, 0, 1422, 800), cropTo16x9(1920, 800))
+    }
+
+    @Test
+    fun `un recadrage impossible garde l image entiere`() {
+        assertNull(cropTo16x9(0, 480))
+        assertNull(cropTo16x9(640, 0))
+        assertNull("1 px de large ne fait pas un 16:9", cropTo16x9(1, 100))
     }
 }
