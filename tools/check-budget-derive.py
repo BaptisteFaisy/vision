@@ -232,6 +232,20 @@ def entiers(ligne):
     return {int(valeur) for valeur, _ in jetons(ligne) if float(valeur).is_integer()}
 
 
+def decimaux(ligne):
+    """Valeurs non entières d'une ligne : 50,3 se lit 50.3, comme dans le code."""
+    return [valeur for valeur, _ in jetons(ligne) if not float(valeur).is_integer()]
+
+
+def memes_decimaux(ligne, ligne_code):
+    """Les deux lignes publient-elles un même nombre à virgule (arrondi près) ?
+
+    Les entiers se comparent exactement ([entiers]) ; les chiffres à virgule — 50,3 ms,
+    81,4 ms — n'ont pas d'écriture entière et se comparent donc à l'arrondi près.
+    """
+    return any(proche(a, b) for a in decimaux(ligne) for b in decimaux(ligne_code))
+
+
 # ————— contrôle A : renvois explicites —————
 
 def controle_renvoi(chemin, absolu, symbole, ligne_code, ligne, numero, garde):
@@ -251,7 +265,8 @@ def controle_renvoi(chemin, absolu, symbole, ligne_code, ligne, numero, garde):
     cible = int(ligne_code)
     if cible < 1 or cible > len(lignes_code):
         return ["ligne %d : `%s:%d` dépasse le fichier" % (numero, chemin, cible)]
-    if entiers(lignes_code[cible - 1]) & entiers(ligne):
+    ligne_code_texte = lignes_code[cible - 1]
+    if entiers(ligne_code_texte) & entiers(ligne) or memes_decimaux(ligne, ligne_code_texte):
         return []
     return ["ligne %d : `%s:%d` ne porte aucun des chiffres publiés (renvoi périmé ?)"
             % (numero, chemin, cible)]

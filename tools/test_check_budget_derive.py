@@ -204,6 +204,22 @@ class TestRenvois(FauxDepot):
         self.assertEqual(code, 0, sortie)
         self.assertNotIn("::error::", sortie)
 
+    def test_renvoi_de_ligne_avec_chiffres_a_virgule(self):
+        ecrit(self.tmp.name, CTX + "/Ws.kt",
+              "package dev.sam3vision.core.net\n\n"
+              "/** Mesuré : 50,3 ms en WebSocket contre 81,4 ms en POST. */\n")
+        code, sortie = self.doc("| gain | 50,3 ms contre 81,4 ms | `%s/Ws.kt:3` |\n" % CTX)
+        self.assertEqual(code, 0, sortie)
+        self.assertNotIn("::error::", sortie)
+
+    def test_renvoi_de_ligne_a_virgule_divergent(self):
+        ecrit(self.tmp.name, CTX + "/Ws.kt",
+              "package dev.sam3vision.core.net\n\n"
+              "/** Mesuré : 50,3 ms en WebSocket contre 81,4 ms en POST. */\n")
+        code, sortie = self.doc("| gain | 42,7 ms contre 71,4 ms | `%s/Ws.kt:3` |\n" % CTX)
+        self.assertEqual(code, 1, sortie)
+        self.assertIn("renvoi périmé", sortie)
+
     def test_renvoi_de_ligne_perime(self):
         code, sortie = self.doc("| délai HTTP | 60 s | `%s/Http.kt:3` |\n" % CTX)
         self.assertEqual(code, 1, sortie)
