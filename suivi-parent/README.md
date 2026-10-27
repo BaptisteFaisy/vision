@@ -34,6 +34,13 @@ proche (`?share=`) : personne d'autre ne voit la carte d'un autre.
   Les noms de l'intégration Vercel KV fonctionnent aussi :
   `KV_REST_API_URL` / `KV_REST_API_TOKEN`.
 
+## Prod actuelle
+Base Upstash Redis `suivi-parent-live` installée via le Marketplace Vercel
+(projet `suivi-parent`, variables en Production + Preview + Development,
+noms `KV_REST_API_*`). Vérification de bout en bout : le script
+`tmp/verify-live-prod.js` à la racine du workspace (POST signé puis
+`GET /api/state` doit répondre `live:true`).
+
 ## Déployer
 ```bash
 npx vercel deploy --prod --yes
