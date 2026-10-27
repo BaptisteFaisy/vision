@@ -6,6 +6,8 @@ import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -133,6 +135,22 @@ class AppDiagnosticsTest {
 
         assertEquals("inutile de réessayer, il faut redéployer", 1, sam.healthCalls)
         assertEquals(before, screen.value.statusLine)
+    }
+
+    @Test
+    fun `warmGpu — nouveau réveil annule les essais du précédent`() = runTest {
+        // Même mécanisme que `releaseGpu` en arrière-plan (génération périmée) : pas de
+        // rallumage derrière l'extinction. `releaseGpu` n'est pas appelable ici, il
+        // logue via `android.util.Log`, absent des tests JVM (constat, pas de Robolectric).
+        val sam = FakeSam(onHealth = Result.failure(ApiError.Network("trou de réseau")))
+        val d = diagnostics(sam = sam)
+
+        launch { d.warmGpu() }
+        runCurrent()
+        launch { d.warmGpu() }
+        advanceUntilIdle()
+
+        assertEquals("1 essai du premier + 3 du second", 4, sam.healthCalls)
     }
 
     @Test
