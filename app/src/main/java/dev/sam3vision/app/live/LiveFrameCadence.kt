@@ -9,11 +9,12 @@ import dev.sam3vision.core.live.FramePipeline
  * vieillissent, y compris celles qui partent.
  *
  * Extrait de `LiveViewModel` pour être testable seul : la décision est une fonction du
- * temps, de l'occupation du pipeline et de sa cadence. Elle vaut pour les deux transports
- * du direct (`/live` en WebSocket et le tracker par sessions) **et** pour la sonde iSee
- * (`LiveProbe`), qui garde sa réserve d'une frame mais partage l'échéance : [admits]
- * pour le chemin strict (créneau + cadence), [isDue] + [markSent] pour le chemin avec
- * réserve (la frame en attente avance l'échéance sans repasser le garde).
+ * temps, de l'occupation du pipeline et de sa cadence. Elle vaut pour le tracker par
+ * sessions **et** pour la sonde iSee (`LiveProbe`), qui garde sa réserve d'une frame
+ * mais partage l'échéance : [admits] pour le chemin strict (créneau + cadence),
+ * [isDue] + [markSent] pour le chemin avec réserve (la frame en attente avance
+ * l'échéance sans repasser le garde). Le Direct `/live` ne passe plus par ici : il
+ * envoie par la pompe, voir [LiveFrameDispatcher].
  */
 class LiveFrameCadence {
 
