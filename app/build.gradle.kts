@@ -138,7 +138,7 @@ android {
     }
 
     // Tests JVM du module app : `Log`, `SystemClock` et `Bitmap` rendent leur valeur par
-    // défaut au lieu de lever « not mocked » — les sondes iHear se testent sans appareil.
+    // défaut au lieu de lever « not mocked » — les sondes iSee se testent sans appareil.
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -175,7 +175,8 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation("com.google.guava:guava:33.3.1-android")
+    // Pinning explicite du Guava transitif de Room (ListenableFuture) : aucun import direct.
+    implementation(libs.guava)
 // Encodage MP3 pur Java (port LAME) : la voix du micro est archivée en cache.
     implementation(libs.jump3r)
     // Lunettes Ray-Ban Meta : Device Access Toolkit (developer preview, Maven Central).

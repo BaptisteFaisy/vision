@@ -22,7 +22,7 @@ n'est mémorisé d'une ouverture à l'autre (table Room et cache vidés à l'ouv
 | Module ou dossier | Rôle |
 |---|---|
 | `:core` | Bibliothèque Android (`dev.sam3vision.core`) : modèles, clients HTTP (LLM `chat/completions`, SAM `/segment` et `/release`, vidéo `/video`), **WebSocket `/live/ws`** pour le direct, TTS/STT, masques, distances, gestes, cadence du direct, réglages chiffrés, texte, design iSee (`core/…/iseedesign`) |
-| `:app` | L'APK (`dev.sam3vision.app`) : Compose + CameraX, accueil iSee (`app/ihear`), Capture, Analyse, Chat, Direct, Réglages, mode tap vidéo (`app/tap`), lunettes (`app/glasses`), banc d'essai lunettes (`app/glasses/bench`, ouvert depuis l'écran Lunettes), purge des captures (`app/cleanup`) |
+| `:app` | L'APK (`dev.sam3vision.app`) : Compose + CameraX, accueil iSee (`app/isee`), Capture, Analyse, Chat, Direct, Réglages, mode tap vidéo (`app/tap`), lunettes (`app/glasses`), banc d'essai lunettes (`app/glasses/bench`, ouvert depuis l'écran Lunettes), purge des captures (`app/cleanup`) |
 | `tools/` | Garde passée en CI : fichier `.kt` < 500 lignes, fonction < 50 lignes |
 | `docs/` | Architecture, contrats, recettes, et l'état de chaque doc (`docs/DOC-ETAT.md`) |
 
@@ -61,7 +61,7 @@ Le banc lunettes est un paquet de `:app` (`app/…/glasses/bench/`) et compte do
 | dont `:core` / `:app` | **105 f. / 11 121 l.** · **164 f. / 17 585 l.** (dont le banc : **17 f. / 1 824 l.**) | idem, par module |
 | `@Test` | **1 380** = **1 373 JVM** (`:core` 907, `:app` 466, dont banc 86) + **7 instrumentés** (`:app` 6 + 1 pour le banc) | `find core app -name '*.kt' -not -path '*/build/*' \| xargs grep -h '@Test' \| wc -l` |
 | `@Preview` Compose | **11** | idem avec `@Preview` |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **492** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Les fichiers du banc étaient encore **non suivis par git** à l'heure de ce relevé (copie en
 cours d'intégration) : c'est pourquoi le comptage se fait sur le disque et non par

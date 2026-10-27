@@ -19,15 +19,6 @@ private val GRAY_OPTIONS = BitmapFactory.Options().apply {
     inScaled = false
 }
 
-/**
- * Décode un masque PNG gris 8 bits (base64) en Bitmap gris ARGB_8888.
- * `null` si le base64 ou le PNG est invalide. Chemin « froid » (snapshot du chat).
- */
-fun decodeMaskPng(maskPngB64: String): Bitmap? {
-    val gray = decodeGrayMask(maskPngB64) ?: return null
-    return maskToBitmap(gray)
-}
-
 /** Overlay coloré du masque : même dimensions que [src], alpha modulé par la luminance. */
 fun colorizeMask(src: Bitmap, argb: Int, alpha: Int): Bitmap {
     val width = src.width
@@ -136,15 +127,6 @@ private fun decodeGrayMaskArgb(bytes: ByteArray): GrayMask? {
     bmp.getPixels(pixels, 0, width, 0, 0, width, height)
     bmp.recycle()
     return grayFromArgb(pixels, width, height)
-}
-
-/** Masque gris → Bitmap affichable (niveaux de gris opaques). */
-fun maskToBitmap(mask: GrayMask): Bitmap {
-    val pixels = IntArray(mask.size) { i ->
-        val level = mask.pixels[i].toInt() and 0xFF
-        (0xFF shl 24) or (level shl 16) or (level shl 8) or level
-    }
-    return Bitmap.createBitmap(pixels, mask.width, mask.height, Bitmap.Config.ARGB_8888)
 }
 
 /**

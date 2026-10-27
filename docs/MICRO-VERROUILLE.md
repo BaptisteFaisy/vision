@@ -1,7 +1,7 @@
 # Micro de l'écran verrouillé
 
 **Ce qui marchait mal** : appui long → le micro s'ouvre ; l'écran se verrouille → plus rien.
-`MainActivity.onPause()` annule la tenue (`root.cancelGesture()` → `ihear.onHoldCancel()` →
+`MainActivity.onPause()` annule la tenue (`root.cancelGesture()` → `isee.onHoldCancel()` →
 `dictation.discard()`), et de toute façon Android ne laisse pas une app en arrière-plan garder le
 micro. Ce n'était donc ni un réglage ni un bug de geste : il manquait un **service de premier
 plan** dans l'app.
@@ -28,7 +28,7 @@ plan** dans l'app.
 4. **Réponse** → prononcée, et affichée dans la notification (elle survit à l'écran éteint).
 
 Ce que le service ne fait pas : la caméra. Le direct et la sonde s'arrêtent à `onPause`
-(`IhearSession.onBackground`), et une photo prise en arrière-plan n'a pas de sens ici. La
+(`IseeSession.onBackground`), et une photo prise en arrière-plan n'a pas de sens ici. La
 question orale est donc **sans image**, et le modèle le dit s'il n'a pas de quoi répondre.
 
 ## Recette sur le téléphone
@@ -47,7 +47,7 @@ Attendu : notification « iSee — j'écoute » → « transcription » → « r
 
 - **Pas de photo** : la réponse est texte seul, d'où la consigne explicite du modèle.
 - **Pas d'insertion dans le chat iSee** : l'échange vit dans la notification. La prochaine étape
-  serait de pousser `Done(transcript, answer)` dans `IhearViewModel` quand l'app revient.
+  serait de pousser `Done(transcript, answer)` dans `IseeViewModel` quand l'app revient.
 - **20 s maximum** par question (mémoire : 32 ko/s de PCM en RAM).
 - **`POST_NOTIFICATIONS`** est indispensable : sans elle la notification (donc le bouton) reste
   invisible. Elle rejoint la demande groupée du premier lancement (`FirstRunPermissions.kt`).
@@ -73,7 +73,7 @@ Elle est absente du build `release` : aucun chemin de production ne passe par l�
 |---|---|---|
 | Règles pures | `./gradlew :core:testDebugUnitTest --offline` | `LockedMicTest` 11/11 |
 | Trajet | `./gradlew :app:testDebugUnitTest --offline` | `LockedMicAnswerTest` 5/5 |
-| Contrat sans image | idem | `LlmContractTest` 13/13 (`askText`, `NotSupported`) |
+| Contrat sans image | idem | `LlmContractTest` 15/15 (`askText`, `NotSupported`) |
 | Tailles | `python3 tools/check-kotlin-limits.py` | OK, aucun dépassement |
 | Garde unique | `python3 tools/guard.py --quick` | OK |
 

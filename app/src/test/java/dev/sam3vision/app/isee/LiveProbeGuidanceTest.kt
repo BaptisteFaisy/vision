@@ -1,0 +1,132 @@
+package dev.sam3vision.app.isee
+
+import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.LiveHealth
+import dev.sam3vision.core.model.MASK_ENCODING_NONE
+import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.LiveClient
+import dev.sam3vision.core.net.WireMarks
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * La page caméra iSee guide la marche quand le réglage est actif : « Continue tout
+ * droit. » sur voie libre, consigne de contournement devant un obstacle — au lieu
+ * de l'annonce des positions. Sans objet à décorer ni masque à décoder, sans Android.
+ */
+class LiveProbeGuidanceTest {
+
+    private var ns = 0L
+
+    private fun frame(objects: List<SegObject> = emptyList(), elapsedMs: Long = 120L) =
+        LiveFrame(width = 512, height = 1138, elapsedMs = elapsedMs, objects = objects)
+
+    /** Personne au centre du champ, sans masque (inutile à la consigne). */
+    private fun personne() = SegObject(
+        label = "person",
+        score = 0.9f,
+        box = listOf(206f, 400f, 306f, 900f),
+        maskPngB64 = "",
+        maskEncoding = MASK_ENCODING_NONE,
+    )
+
+    @Test
+    fun `guidage dit continue tout droit sur voie libre`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame())
+        advanceUntilIdle()
+        fake.respond("B", frame())
+        advanceUntilIdle()
+
+        assertEquals("Continue tout droit.", probe.state.value.spoken)
+    }
+
+    @Test
+    fun `guidage dit le cote de sortie devant un obstacle`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame())
+        advanceUntilIdle()
+        probe.onFrame("C", captureAtNs = 20_000_000L)
+        advanceUntilIdle()
+        fake.respond("B", frame(listOf(personne())))
+        advanceUntilIdle()
+        fake.respond("C", frame(listOf(personne())))
+        advanceUntilIdle()
+
+        val spoken = probe.state.value.spoken.orEmpty()
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Person"))
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("à midi, va à"))
+    }
+
+    @Test
+    fun `sans guidage la voie libre reste muette`() = runTest {
+        val (probe, fake) = harness(this, guide = false, announce = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame())
+        advanceUntilIdle()
+        fake.respond("B", frame())
+        advanceUntilIdle()
+
+        assertNull(probe.state.value.spoken)
+    }
+
+    /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */
+    private fun harness(scope: TestScope, guide: Boolean, announce: Boolean = false): Pair<LiveProbe, FakeLiveClient> {
+        val fake = FakeLiveClient()
+        val probe = LiveProbe(
+            scope = scope,
+            clock = { ns },
+            background = StandardTestDispatcher(scope.testScheduler),
+            clientFor = { _, _, marks -> fake.also { it.marks = marks } },
+        )
+        probe.configure("https://sam.test", announce = announce, guide = guide)
+        probe.begin()
+        return probe to fake
+    }
+
+    /** Client de test : chaque `live` attend que le test livre sa réponse. */
+    private class FakeLiveClient : LiveClient {
+
+        var marks: WireMarks? = null
+
+        private val waiting = mutableMapOf<String, CompletableDeferred<Result<LiveFrame>>>()
+
+        override suspend fun live(
+            jpegB64: String,
+            prompts: List<String>?,
+            workEdge: Int,
+            maxObjects: Int,
+        ): Result<LiveFrame> {
+            val slot = CompletableDeferred<Result<LiveFrame>>()
+            waiting[jpegB64] = slot
+            return slot.await()
+        }
+
+        fun respond(jpeg: String, frame: LiveFrame) {
+            val slot = waiting.remove(jpeg) ?: error("aucune frame « $jpeg » en attente")
+            marks?.onBody()
+            slot.complete(Result.success(frame))
+        }
+
+        override suspend fun health(): Result<LiveHealth> =
+            Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+    }
+}

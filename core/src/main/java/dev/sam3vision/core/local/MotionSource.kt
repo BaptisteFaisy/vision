@@ -3,15 +3,22 @@ package dev.sam3vision.core.local
 import dev.sam3vision.core.mask.MaskMotion
 
 /**
- * Couture vers l'estimateur de mouvement (lane L13, agent A/u10) : le mouvement rendu est
- * un [MaskMotion] — le type de la lane B, qui sert déjà au warp du masque — exprimé dans
- * le **plan de référence** [LumaPlane] (pixels de 256×103), l'appelant le remet à
- * l'échelle du plan masque avec [MaskMotion.scaledBy].
+ * Couture vers l'estimateur de mouvement **consommée par [LocalOverlayEngine]**
+ * (`setMotion`) : le mouvement rendu est un [MaskMotion] — le type de la lane B,
+ * qui sert déjà au warp du masque — exprimé dans le **plan de référence**
+ * [LumaPlane] (pixels de 256×103), l'appelant le remet à l'échelle du plan masque
+ * avec [MaskMotion.scaledBy].
  *
  * Aucune géométrie n'est réécrite ici : [MaskMotion] porte déjà la similitude
  * (translation + échelle autour d'un centre), ses bornes d'échelle et son inversion.
  * Le calque (agent D/u13) ne fait **aucune** estimation : il consomme ce que produit
  * cette couture, et reste inerte tant qu'elle n'est pas branchée ([NoMotion]).
+ *
+ * Ne pas confondre avec `core.motion.MotionSource` (lane L13, agent A/u10) : c'est
+ * la couture **produite** par l'estimateur `BlockMotionSource` (`GrayMask` →
+ * `MotionSample`), testée mais pas encore branchée au calque. La fusion des deux
+ * coutures (`docs/L13-FUSION.md` §3), c'est activer la propagation : un changement
+ * de comportement, pas un nettoyage.
  *
  * Pur JVM : aucun Android, donc testable sans appareil.
  */
@@ -25,9 +32,9 @@ fun interface MotionSource {
 
 /**
  * Estimateur absent : le calque reste **inerte** (`LocalReason.NO_ESTIMATOR`) et l'écran
- * se comporte exactement comme avant. C'est l'état de cet arbre tant que l'agent A de la
- * lane (M52) n'a pas posé `core/…/motion/` — aucune propagation n'est simulée pour faire
- * croire à un gain.
+ * se comporte exactement comme avant. C'est l'état de cet arbre : l'estimateur existe
+ * (`core.motion.BlockMotionSource`, testé) mais n'est pas branché au calque — aucune
+ * propagation n'est simulée pour faire croire à un gain.
  */
 object NoMotion : MotionSource {
     override fun estimateSince(prevLuma: ByteArray?, curLuma: ByteArray?): MaskMotion? = null

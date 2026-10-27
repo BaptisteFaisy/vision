@@ -3,7 +3,7 @@ package dev.sam3vision.core.live
 import kotlin.math.roundToLong
 
 /**
- * Chronologie d'une frame du direct / d'iHear, **côté téléphone**.
+ * Chronologie d'une frame du direct / d'iSee, **côté téléphone**.
  *
  * Le trajet complet est `capture → jpeg → envoi → réponse → masques → pixel`. Les postes
  * sont posés par l'écran, la caméra et le ViewModel ; le détail **serveur** vient de

@@ -4,7 +4,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.net.WireMarks
 
 /**
- * Chronologie d'un écran (Direct ou iHear) : les postes de la frame en cours, la garde du
+ * Chronologie d'un écran (Direct ou iSee) : les postes de la frame en cours, la garde du
  * premier pixel et l'instantané lu par l'UI. Isolée ici pour que les deux écrans partagent
  * exactement la même logique — et pour garder les ViewModel sous la limite de lignes.
  *

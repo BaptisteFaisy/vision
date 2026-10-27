@@ -21,7 +21,7 @@ Gradle `:glasses-spike` disparaît. Provenance : `CONTRAT.md` de cet arbre, déc
 
 1. **Un seul identifiant d'application chez Meta.** Le SDK DAT identifie l'app appelante par
    deux `meta-data` du manifeste, `com.meta.wearable.mwdat.APPLICATION_ID` et `.CLIENT_TOKEN`
-   (`app/src/main/AndroidManifest.xml:34-39`), injectés par Gradle depuis `local.properties`.
+   (`app/src/main/AndroidManifest.xml:41-47`), injectés par Gradle depuis `local.properties`.
    Ces valeurs se déclarent **par paquet** dans la console Meta Wearables : un second APK au
    paquet `dev.sam3vision.glasses` était une **seconde** déclaration à tenir à jour, avec son
    propre enregistrement à refaire. Un seul paquet = une seule déclaration, donc une seule
@@ -39,22 +39,22 @@ Gradle `:glasses-spike` disparaît. Provenance : `CONTRAT.md` de cet arbre, déc
 
 ## 2. Ce qui reste vrai — et une correction
 
-- Le chemin lunettes de **production** vit dans `:app` : **12 fichiers** mesurés sous
-  `app/src/main/java/dev/sam3vision/app/glasses/`
-  (`git ls-tree --name-only HEAD app/src/main/java/dev/sam3vision/app/glasses/ | wc -l` → 12,
-  12 sur le disque aussi). L'ancienne version de cette page annonçait **7** fichiers : le
-  chiffre ne tient pas contre cet arbre, même au commit de départ.
+- Le chemin lunettes de **production** vit dans `:app` : **12 fichiers** `.kt` mesurés sous
+  `app/src/main/java/dev/sam3vision/app/glasses/` (+ le sous-dossier `bench/`, donc
+  `git ls-tree --name-only HEAD …/glasses/ | wc -l` → 13). L'ancienne version de cette
+  page annonçait **7** fichiers : le chiffre ne tient pas contre cet arbre, même au
+  commit de départ.
 - La logique pure des appuis reste dans `:core` :
   `core/src/main/java/dev/sam3vision/core/glasses/CaptureGesture.kt` (unique fichier du
   dossier), testée là-bas.
-- Le pont photo → analyse/chat reste `GlassesBridge` (`app/src/main/java/dev/sam3vision/app/AppNav.kt:100`),
-  monté par la route (`AppNav.kt:68`).
+- Le pont photo → analyse/chat reste `GlassesBridge` (`app/src/main/java/dev/sam3vision/app/AppNav.kt:92`,
+  définition `:128`).
 - `minSdk = 29` dans `:app` (`app/build.gradle.kts:84`), imposé par les AAR `mwdat-*` ; `:core`
   reste une bibliothèque (`core/build.gradle.kts`). L'argument `minSdk` de l'arbitrage
   d'origine est donc mort depuis longtemps : il opposait un spike en 29 à un `:app` en 26, ce
   qui n'est plus le cas.
 - La cadence de production reste **15 i/s, `MEDIUM`, `compressVideo = true`**
-  (`app/src/main/java/dev/sam3vision/app/glasses/GlassesCamera.kt:59-63`, `FRAME_RATE = 15`
+  (`app/src/main/java/dev/sam3vision/app/glasses/GlassesCamera.kt:61-63`, `FRAME_RATE = 15`
   ligne 129) : le banc demande autre chose (24 i/s, §4), et cela ne change pas la production.
 
 ## 3. Migration : ancien → nouveau chemin
@@ -62,8 +62,8 @@ Gradle `:glasses-spike` disparaît. Provenance : `CONTRAT.md` de cet arbre, déc
 Le contenu du module supprimé a été copié dans `:app`, paquet renommé. Le tableau dit la
 **correspondance de chemins** et ce qui a été contrôlé sur le disque le 2026-10-27 ; il ne
 prétend pas que les fichiers sont restés identiques depuis — le banc évolue (voir la note
-après le tableau). Les deux arbres existent encore côte à côte, le module restant en lecture
-seule le temps de l'intégration, ce qui permet la comparaison directe.
+après le tableau). Au moment du relevé, les deux arbres existaient encore côte à côte ;
+depuis, le module a disparu du disque : seule cette page garde la correspondance.
 
 | Ancien chemin (`:glasses-spike`, supprimé) | Nouveau chemin dans `:app` | Contrôle effectué le 27/10 |
 |---|---|---|
@@ -74,10 +74,10 @@ seule le temps de l'intégration, ce qui permet la comparaison directe.
 | `glasses-spike/src/androidTestDebug/java/dev/sam3vision/glasses/*.kt` — **1**, 158 l. | `app/src/androidTestDebug/java/dev/sam3vision/app/glasses/bench/` | 1 destination (`MockGlassesTest.kt`) |
 | paquet `dev.sam3vision.glasses` | paquet `dev.sam3vision.app.glasses.bench` | 20 déclarations `package` sous `bench/` (`main` + `debug` + `release`), toutes `dev.sam3vision.app.glasses.bench` |
 | `glasses-spike/src/androidTest/assets/mock_feed.mp4` (54 964 o) | `app/src/androidTest/assets/mock_feed.mp4` | présent, **54 964 o** des deux côtés |
-| `glasses-spike/src/test/resources/frame-64.jpg` | *aucune destination* | **manquant** : il n'y a pas de `app/src/test/resources/`, alors que `app/src/test/.../bench/ChaineCompleteTest.kt:205-216` lit `/frame-64.jpg` sur le classpath et échoue s'il est absent |
+| `glasses-spike/src/test/resources/frame-64.jpg` | *aucune destination (plus nécessaire)* | **résolu** : le JPEG 64×64 est embarqué en base64 (`ChaineCompleteTest.kt:199-228`, `FRAME_JPEG_B64`), plus aucune ressource externe à charger |
 | `glasses-spike/src/main/res/values/themes.xml`, `…/res/xml/network_security.xml` | non copiés : `:app` a déjà les siens | `app/src/main/res/values/themes.xml`, `app/src/main/res/xml/network_security.xml` |
-| `glasses-spike/src/main/AndroidManifest.xml` (activité du banc, schéma `samglasses`) | pas de manifeste de banc : un écran dans la navigation d'iSee | `MODIFY_AUDIO_SETTINGS` ajouté (`app/src/main/AndroidManifest.xml:15`) ; le seul schéma déclaré par `:app` est `samvision` (`:55`) ; aucune activité de banc au manifeste |
-| `glasses-spike/build.gradle.kts` (module `application`, `versionName "0.1-spike"`) | plus rien à créer : `:app` porte déjà `buildConfigField` et `mockdevice` | `app/build.gradle.kts:100-116` (LLM/TTS/SAM31) et `:184` (`libs.mwdat.mockdevice` en `debugImplementation`) |
+| `glasses-spike/src/main/AndroidManifest.xml` (activité du banc, schéma `samglasses`) | pas de manifeste de banc : un écran dans la navigation d'iSee | `MODIFY_AUDIO_SETTINGS` ajouté (`app/src/main/AndroidManifest.xml:22`) ; le seul schéma déclaré par `:app` est `samvision` (`:62`) ; aucune activité de banc au manifeste |
+| `glasses-spike/build.gradle.kts` (module `application`, `versionName "0.1-spike"`) | plus rien à créer : `:app` porte déjà `buildConfigField` et `mockdevice` | `app/build.gradle.kts:100-115` (LLM/TTS/SAM31/SAM) et `:186` (`libs.mwdat.mockdevice` en `debugImplementation`) |
 | job CI `spike` (`:glasses-spike:assembleDebug testDebugUnitTest`) | aucun job dédié : le banc compile et se teste dans les jobs de `:app` | `.github/workflows/ci.yml` : **0** occurrence de `glasses-spike`, **4** jobs (`ci`, `apk`, `apk-release`, `lint`), périmètre `^(app\|core)/…` (`ci.yml:70`) |
 
 Le module totalisait **30 `.kt` / 3 488 lignes** (17 + 2 + 1 + 9 + 1 fichiers). L'ancienne
@@ -99,8 +99,8 @@ qu'il livre vraiment, pas pour livrer.
 |---|---|---|
 | cadence demandée | **15** (`GlassesCamera.kt:129`, `:62`) | **24** (`bench/GlassesDeviceSession.kt:12`, `:46`) — soit le défaut du SDK |
 | compression | `compressVideo = true` (`GlassesCamera.kt:63`) | autre choix, avec son propre encodeur (`bench/GlassesFrameEncoder.kt`) |
-| trames vidéo | **jamais** consommées (0 occurrence de `videoStream` hors `bench/`, mesuré) | pompées et étranglées à une frame / 1,5 s (`bench/GlassesFramePump.kt:38-44`, `bench/GlassesSessionPolicy.kt:22`) |
-| audio | piste PCM demandée par palier (`GlassesAudioPlan`, `GlassesCamera.kt:44`), pas de routage Bluetooth | routage de la voix vers la sortie des lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
+| trames vidéo | **jamais** consommées (0 occurrence de `videoStream` hors `bench/`, mesuré) | pompées et étranglées à une frame / 1,5 s (`bench/GlassesFramePump.kt:38-44`, `bench/GlassesSessionPolicy.kt:23`) |
+| audio | piste PCM demandée par palier (`GlassesAudioPlan`, `GlassesCamera.kt:43-44`), pas de routage Bluetooth | routage de la voix vers la sortie des lunettes (`bench/GlassesVoice.kt:74-86`, `routeToGlasses`) |
 | conversion d'image | aucune (`PhotoData.toBitmapOrNull()`, `glasses/GlassesFrames.kt:40`) | convertisseur YUV écrit pour le banc (`bench/FrameTypes.kt:76`, `:134`) |
 
 Conséquence, inchangée depuis le 26/10 : **aucun chiffre du banc ne se transpose à la
@@ -110,25 +110,23 @@ les rend seulement plus faciles à comparer.
 ## 5. Le câblage : un écran d'iSee, pas une seconde app
 
 La cible du `CONTRAT.md` est tenue par la navigation d'iSee, pas par un manifeste : le banc est
-une **route** (`Route.Bench`, `app/src/main/java/dev/sam3vision/app/AppNav.kt:45`) rendue par
-`BenchScreen` (`AppNav.kt:95`), ouverte depuis le bloc « Lunettes » des Réglages par une
-`CompositionLocal` (`LocalBenchOpener`, `glasses/GlassesSection.kt:23`, consommée ligne 73,
-fournie par `AppNav.kt:96`). Conséquences, toutes vérifiables :
+une **route** (`Route.Bench`, `app/src/main/java/dev/sam3vision/app/AppNav.kt:46`) rendue par
+`BenchScreen` (`AppNav.kt:105`), ouverte depuis le bloc « Lunettes » des Réglages par une
+`CompositionLocal` (`LocalBenchOpener`, `glasses/GlassesSection.kt:23`, consommée ligne 91,
+fournie par `AppNav.kt:107`). Conséquences, toutes vérifiables :
 
 - **aucune `Activity` de banc au manifeste** : `app/src/main/AndroidManifest.xml` ne déclare que
-  `.MainActivity` (`:42`), et une seule activité exportée — la seule app installée, la seule
+  `.MainActivity` (`:49`), et une seule activité exportée — la seule app installée, la seule
   icône ;
-- **aucun schéma dédié** : `:app` ne déclare que `samvision` (`AndroidManifest.xml:55`) ; le
+- **aucun schéma dédié** : `:app` ne déclare que `samvision` (`AndroidManifest.xml:62`) ; le
   retour d'enregistrement de l'app Meta AI revient donc à iSee, qui est bien l'app enregistrée ;
 - **le banc ne peut pas être lancé par `adb am start`** sur un paquet séparé : il n'existe plus.
 
-Un écart mesuré au 27/10, à corriger avant que la CI ne le découvre :
+Un écart mesuré au 27/10, **corrigé depuis** :
 
-- **`frame-64.jpg` manque** — `app/src/test/.../bench/ChaineCompleteTest.kt:205-216` charge
-  `/frame-64.jpg` sur le classpath et échoue par `requireNotNull` s'il est absent ; le fichier
-  n'existe que dans `glasses-spike/src/test/resources/` et il n'y a pas de
-  `app/src/test/resources/`. Une copie du fichier suffit ; c'est un fichier de test, pas du
-  code, et il n'est pas dans le périmètre de cette page.
+- **`frame-64.jpg` manquait** — résolu sans copie : le JPEG 64×64 est embarqué en base64
+  (`ChaineCompleteTest.kt:199-228`, `FRAME_JPEG_B64`), le test ne charge plus rien sur le
+  classpath.
 
 ## 6. Écrans
 
@@ -136,7 +134,7 @@ Deux écrans existants sont réutilisés, deux sont explicitement écartés aujo
 
 | Écran candidat | Verdict | Preuve |
 |---|---|---|
-| `AnalysisScreen` | **réutilisé** — appui court sur le bouton capture → photo → analyse (masques SAM + description) | `GlassesBridge` (`AppNav.kt:100`) pousse `Route.Analysis` ou `Route.Chat` selon l'appui |
+| `AnalysisScreen` | **réutilisé** — appui court sur le bouton capture → photo → analyse (masques SAM + description) | `GlassesBridge` (`AppNav.kt:92`) pousse `Route.Analysis` ou `Route.Chat` selon l'appui |
 | `ChatScreen` | **réutilisé** — appui long (`HOLD`) → photo → question posée sur le téléphone | idem ; gestes dans `core/…/glasses/CaptureGesture.kt` |
 | `LiveScreen` / `LiveViewModel` | **non portés** — le double appui ne lance rien et le dit à l'écran | `GlassesMessages.liveNotOnGlasses` : « Mode Direct : pas encore porté sur lunettes, il reste sur le téléphone. » (`GlassesPolicy.kt:97`) |
 | écran des lunettes (Ray-Ban Display) | **écarté** — aucun rendu n'est envoyé aux lunettes | le Direct est le seul chemin écran, et il n'est pas porté ci-dessus |
@@ -157,7 +155,7 @@ livré, et il est justifié par ce que l'app fait vraiment : elle **ne consomme 
 vidéo** et prend une photo à la demande.
 
 - demandé par `:app` : `videoQuality = MEDIUM`, `frameRate = FRAME_RATE` (15),
-  `compressVideo = true` (`glasses/GlassesCamera.kt:59-63`, constante ligne 129) ;
+  `compressVideo = true` (`glasses/GlassesCamera.kt:61-63`, constante ligne 129) ;
 - le commentaire du code pose la règle (« au-delà, le lien Bluetooth Classic casse l'image ») :
   c'est un **constat matériel non remesuré ici**, aucune lunette n'étant disponible ;
 - le banc, lui, demande **24** (`bench/GlassesDeviceSession.kt:12`, `:46`), qui est exactement

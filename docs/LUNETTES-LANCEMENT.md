@@ -5,7 +5,7 @@ Runbook du **banc d'essai lunettes**, écran d'iSee (`Route.Bench`) livré dans 
 dans logcat.
 
 Le banc **n'est plus une app séparée** : il vit dans `:app`, paquet `dev.sam3vision.app.glasses.bench`
-(18 fichiers main, 2 debug, 1 release, 9 tests JVM, 1 test instrumenté). Une seule app à installer, une
+(18 fichiers main, 3 debug, 1 release, 10 tests JVM, 1 test instrumenté). Une seule app à installer, une
 seule commande de lancement.
 
 **Mesures du 26/10/2026 sur le téléphone 2c6852ac (Redmi Note 13 Pro, Android 15), build r630.**
@@ -27,8 +27,8 @@ d'une doc, déduit, ou jamais exécuté. Ce qui reste hors de portée est listé
 
 `app/src/main/java/dev/sam3vision/app/glasses/bench/` (18 fichiers) : il n'y a **plus de module dédié**
 — `settings.gradle.kts:18-19` ne déclare que `:core` et `:app`. Le banc est compilé dans l'app
-(`app/build.gradle.kts:180-184` pour les artefacts `mwdat-*`), et son entrée est un écran de la pile de
-navigation : `AppNav.kt:45` (`data object Bench : Route`), `:99`
+(`app/build.gradle.kts:180-186` pour les artefacts `mwdat-*`), et son entrée est un écran de la pile de
+navigation : `AppNav.kt:46` (`data object Bench : Route`), `:105`
 (`Route.Bench -> BenchScreen(onBack = pop)`).
 
 Chaîne visée : lunettes (ou appareil simulé) → frames → SAM 3.1 → LLM → voix ElevenLabs.
@@ -51,17 +51,18 @@ pour le banc (`GlassesDeviceSession.kt:12`), 15 i/s compressé côté Direct de 
 
 | Élément | Valeur | Statut |
 |---|---|---|
-| Téléphone | **Android 10+** (API 29), imposé par les AAR `mwdat-*` | MESURÉ : `app/build.gradle.kts:84` (`minSdk = 29`), `:180-182` |
+| Téléphone | **Android 10+** (API 29), imposé par les AAR `mwdat-*` | MESURÉ : `app/build.gradle.kts:84` (`minSdk = 29`), `:180-186` |
 | App Meta AI | ≥ **v292** (doc antérieure, hors de cet arbre) ; « v295 installée » = constat orchestrateur | **NON MESURÉ** |
 | Firmware lunettes ≥ **v128**, Developer Mode **activé** (Meta AI → Settings → App Info → taper 5× la version) | constats externes antérieurs | **NON MESURÉ** |
 
 En Developer Mode l'attestation n'est pas utilisée : les deux `meta-data` restent à `"0"`
-(`app/build.gradle.kts:96-97` → `app/src/main/AndroidManifest.xml:34-39`) — aucune clé Meta, aucun
+(`app/build.gradle.kts:96-97` → `app/src/main/AndroidManifest.xml:41-47`) — aucune clé Meta, aucun
 projet Developer Center.
 
 Permissions : `CAMERA`, `RECORD_AUDIO`, `BLUETOOTH_CONNECT`, `MODIFY_AUDIO_SETTINGS` et `INTERNET` sont
-déclarées (`app/src/main/AndroidManifest.xml:4-15`). Au premier lancement d'iSee, l'app demande `CAMERA`
-+ `RECORD_AUDIO` + `BLUETOOTH_CONNECT` (`FirstRunPermissions.kt:19-22`, appelé à `MainActivity.kt:166`)
+déclarées (`app/src/main/AndroidManifest.xml:4-22`). Au premier lancement d'iSee, l'app demande `CAMERA`
++ `RECORD_AUDIO` + `BLUETOOTH_CONNECT` + `POST_NOTIFICATIONS` (`FirstRunPermissions.kt:22-25`,
+appelé à `MainActivity.kt:172`)
 ; à l'ouverture du banc, l'écran redemande ce qui manque pour une session DAT — `BLUETOOTH_CONNECT` (API
 31+) et `CAMERA` (`BenchScreen.kt:328-334`) — et journalise le verdict (`:337-339`, ligne
 `permissions : CAMERA=true …`).
@@ -72,7 +73,7 @@ Bluetooth. Il faut juste `CAMERA` pour que le flux simulé soit la caméra du t�
 **n'existe que dans l'APK debug** : `MockControl.available = true` en `src/debug`
 (`app/src/debug/java/dev/sam3vision/app/glasses/bench/MockControl.kt:16`), `false` en `src/release`
 (`app/src/release/java/dev/sam3vision/app/glasses/bench/MockControl.kt:16`) où l'artefact
-`mwdat-mockdevice` est absent (`debugImplementation`, `app/build.gradle.kts:184`). En release, le bouton
+`mwdat-mockdevice` est absent (`debugImplementation`, `app/build.gradle.kts:186`). En release, le bouton
 « Mock » n'est pas affiché (`BenchScreen.kt:130`) et un lancement `--ez mock true` journalise « appareil
 simulé absent de ce build (release) ».
 
@@ -86,8 +87,8 @@ simulé absent de ce build (release) ».
 | `sdk.dir` (+ `llm.base.url` / `llm.api.key` / `llm.model`) | — / `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | SDK local (retiré avant l'envoi au r630, §4) ; `app/build.gradle.kts:100-102` |
 | `tts.api.key` / `tts.voice.id` | `TTS_API_KEY` / `TTS_VOICE_ID` | `:104-105` |
 | `asr.api.key` | `ASR_API_KEY` | `:107` |
-| `sam31.endpoint` | `SAM31_ENDPOINT` | `:109` |
-| `sam.base.url` / `sam.us.base.url` | `SAM_BASE_URL` / `SAM_US_BASE_URL` | `:111-113` |
+| `sam31.endpoint` | `SAM31_ENDPOINT` | `:111` |
+| `sam.base.url` / `sam.us.base.url` | `SAM_BASE_URL` / `SAM_US_BASE_URL` | `:113-115` |
 | `mwdat.application.id` / `mwdat.client.token` | placeholders de manifeste | `:96-97` |
 
 Le banc lit ces valeurs **au build**, pas dans les Réglages : `BuildDefaults.FromBuild`
@@ -98,7 +99,7 @@ faut rebâtir (§4). Assemblage du pipeline : `BenchScreen.kt:309-323`.
 
 - **Sans `sam31.endpoint`** : segmentation désactivée, pas cassée —
 `sam = if (settings.segmentationEnabled) HttpSamClient(...) else null` (`BenchScreen.kt:319`),
-`segmentationEnabled = resolveSamEndpoint().isNotBlank()` (`core/…/settings/Settings.kt:136`) ;
+`segmentationEnabled = resolveSamEndpoint().isNotBlank()` (`core/…/settings/Settings.kt:169`) ;
 l'analyse continue en LLM seul (`UseCases.kt:21`).
 - **Sans `llm.api.key`** : le banc se lance quand même mais journalise
 « `ATTENTION : llm.api.key absente de local.properties` » (`BenchScreen.kt:320`), puis l'analyse échoue
@@ -129,7 +130,7 @@ enfin `find … -name '*.apk' -newermt '-30 minutes'` pour le chemin réel (`:33
 |---|---|---|
 | Durée `:app:assembleDebug` sur r630 | — | **NON MESURÉ** (les 47 s / ~6 s du 26/10 portaient sur l'ancien module) |
 | Taille de l'APK debug | — | **NON MESURÉ** (les 62 619 498 o du 26/10 portaient sur l'ancien module) |
-| Tests JVM du banc | `./gradlew :app:testDebugUnitTest --tests 'dev.sam3vision.app.glasses.bench.*'` — 9 fichiers : `ChaineCompleteTest`, `CycleLatchTest`, `FramePolicyTest`, `GlassesAudioRouteTest`, `GlassesFrameEncoderTest`, `SessionPolicyTest`, `SpikeLaunchTest`, `SpikeLogTest`, `YuvConverterTest` | MESURÉ (fichiers présents dans cet arbre) ; **compte de tests NON MESURÉ** |
+| Tests JVM du banc | `./gradlew :app:testDebugUnitTest --tests 'dev.sam3vision.app.glasses.bench.*'` — 10 fichiers : `ChaineCompleteTest`, `CycleLatchTest`, `GlassesAudioRouteTest`, `GlassesFrameEncoderTest`, `GlassesFramePolicyTest`, `LinkGateTest`, `SessionPolicyTest`, `SpikeLaunchTest`, `SpikeLogTest`, `YuvConverterTest` | MESURÉ (fichiers présents dans cet arbre) ; 92 `@Test` au 27/10 |
 | Chemin de l'APK (serveur) | `~/builds/<nom>/app/build/outputs/apk/debug/app-debug.apk` | chemin Gradle de `:app` (module `app`, variante debug) |
 
 **Le piège** : `~/.local/bin/build-serveur` écrit un `local.properties` contenant **seulement**
@@ -189,9 +190,8 @@ adb shell pm install -r /data/local/tmp/isee.apk   # → Success
 `app/build.gradle.kts:86-91`, donc le cas se produit surtout avec un tarball ou une branche plus
 vieille). Contrôle : `pm path` non vide après coup (`:90`), puis `codePath` / `versionName` (`:91`).
 
-Le téléphone est branché en USB sur ce poste ; **tout** accès passe par le verrou `~/bin/phone`. Dans le
-montage décrit par `ref/BUILD-SERVEUR-TEST-PHONE.md` §2, c'est le r630 qui le voit —
-`~/bin/phone-adb -s 2c6852ac …`. Dans les deux cas : jamais d'`adb` nu.
+Le téléphone est branché en USB sur ce poste ; **tout** accès passe par le verrou `~/bin/phone`. Si
+c'est le r630 qui le voit — `~/bin/phone-adb -s 2c6852ac …`. Dans les deux cas : jamais d'`adb` nu.
 
 ## 6. Lancement automatisé
 
@@ -207,12 +207,12 @@ Sous le verrou (règle maison, c'est ce que fait le script) :
 ```
 
 Composant MESURÉ : `applicationId = "dev.sam3vision.app"` (`app/build.gradle.kts:83`) et activité
-`MAIN`/`LAUNCHER`, `exported="true"` (`app/src/main/AndroidManifest.xml:41-49`).
+`MAIN`/`LAUNCHER`, `exported="true"` (`app/src/main/AndroidManifest.xml:48-55`).
 
-Chaîne de routage : `MainActivity.routeIntent` (`MainActivity.kt:79-90`) reconnaît les deux extras
-(`:81`, `hasExtra`) → `BenchEntryPoint.request` (`BenchEntryPoint.kt:21-23`) → `AppNav` observe
-`pending` et pousse `Route.Bench` (`AppNav.kt:80-81`). `routeIntent` est appelé depuis `onCreate`
-(`MainActivity.kt:64`) **et** `onNewIntent` (`:70`) : relancer la commande sur une app déjà ouverte
+Chaîne de routage : `MainActivity.routeIntent` (`MainActivity.kt:80-90`) reconnaît les deux extras
+(`:82`, `hasExtra`) → `BenchEntryPoint.request` (`BenchEntryPoint.kt:21-23`) → `AppNav` observe
+`pending` et pousse `Route.Bench` (`AppNav.kt:71-72`). `routeIntent` est appelé depuis `onCreate`
+(`MainActivity.kt:65`) **et** `onNewIntent` (`:68-71`) : relancer la commande sur une app déjà ouverte
 rouvre donc le banc.
 
 La **décision** de lancement vit dans `SpikeLaunch.kt` (75 l.), **l'exécution** dans `BenchScreen`. Le
@@ -250,7 +250,7 @@ Le processus est bien au **premier plan** (`topResumedActivity`).
 **Analyser** / **Couper l'analyse**, **Diag** (`BenchScreen.kt:128-142`). Le bouton « Analyser » reste
 la bascule manuelle (`BenchScreen.kt:229-235`) — l'extra `analyze` la rend inutile au lancement. Le
 retour d'enregistrement / d'invocation vocale de l'app Meta AI passe par le deep-link `samvision`
-(`app/src/main/AndroidManifest.xml:51-56`).
+(`app/src/main/AndroidManifest.xml:58-63`).
 
 ⚠️ En **APK release**, `--ez mock true` n'a aucun effet (pas de Mock Device Kit, §2) : la recette
 complète suppose un build **debug**.
@@ -300,7 +300,7 @@ l'allume pas). Le chemin sans GPU ci-dessus existe précisément pour ne pas en 
 ### 7.2 Le piège du clair — MESURÉ
 
 Sans `app/src/main/res/xml/network_security.xml` (+ `android:networkSecurityConfig` dans le manifeste,
-`app/src/main/AndroidManifest.xml:28`), **Android 15 (targetSdk 36) bloque le trafic en clair** : chaque
+`app/src/main/AndroidManifest.xml:35`), **Android 15 (targetSdk 36) bloque le trafic en clair** : chaque
 frame se termine par « analyse échouée : backend injoignable : réseau » et le faux serveur SAM **ne
 reçoit RIEN**. La règle en place autorise le clair vers `10.0.2.2`, `localhost`, `127.0.0.1`
 **seulement** — tout le reste (api.inferhub.dev, api.elevenlabs.io) reste HTTPS
@@ -409,7 +409,7 @@ Points de vigilance :
 (`MockGlassesHarness.kt:33`, `Log.e` `:67`, `:96`, `:119`) — en cas de crash, ajouter
 `-s MockGlassesHarness:V`.
 - L'analyse est **bornée** : une frame utile au plus toutes les 1,5 s
-(`FRAME_THROTTLE_MS = 1_500L`, `GlassesSessionPolicy.kt:22`), canal conflaté
+(`FRAME_THROTTLE_MS = 1_500L`, `GlassesSessionPolicy.kt:23`), canal conflaté
 (`GlassesSessionRuntime.kt:43`) — un `tail` trop tôt ne montre rien.
 - **Capture d'écran** : `adb exec-out screencap -p > ecran.png` — le script le fait déjà
 (`phone-lunettes.sh:108`) avec `logcat.txt` (`:105`) et `version.txt` (`:106-107`) dans
@@ -425,9 +425,9 @@ capture montre la fin, pas le début ; logcat garde tout.
 | Le banc ne s'ouvre pas alors que l'app se lance | les extras n'ont pas été posés, ou l'APK est **release** (`--ez mock true` sans effet) | vérifier `--ez mock true` / `--ez analyze true` (§6) et la variante de build (debug, §2) |
 | `adb install -r` → **`INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`** | **MIUI** : « Installer via USB » désactivé | `adb push` de l'APK vers `/data/local/tmp/`, puis `adb shell pm install -r /data/local/tmp/isee.apk` → `Success` (§5.2) |
 | `adb install -r` → **`INSTALL_FAILED_VERSION_DOWNGRADE`** | `versionCode` = **date du commit HEAD** (`app/build.gradle.kts:86-91`) : la build posée est plus récente | `install -r -d` (descente assumée), ou rebâtir sur `origin/master` ; tarball : `SAM_VERSION_CODE=<versionCode installé>` (§4) |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | keystore différent entre machines qui signent | unifier sur celui du poste (`ref/BUILD-SERVEUR-TEST-PHONE.md`, pièges 1) |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | keystore différent entre machines qui signent | unifier sur le keystore du poste (piège déjà payé) |
 | **404** backend | `sam31.endpoint` sans `/segment`, ou `mock-sam.py` arrêté | tester `GET /health` d'abord (`HttpSamClient.kt:27-28`), contrôler le build et les clés (§3-§4) |
-| **« analyse échouée : backend injoignable : réseau »** sur *chaque* frame | le **clair** vers `127.0.0.1` est bloqué | `app/src/main/res/xml/network_security.xml` + `android:networkSecurityConfig` (`app/src/main/AndroidManifest.xml:28`) — sinon le faux SAM ne reçoit rien (§7.2) |
+| **« analyse échouée : backend injoignable : réseau »** sur *chaque* frame | le **clair** vers `127.0.0.1` est bloqué | `app/src/main/res/xml/network_security.xml` + `android:networkSecurityConfig` (`app/src/main/AndroidManifest.xml:35`) — sinon le faux SAM ne reçoit rien (§7.2) |
 | Une clé tapée dans Réglages « ne marche pas » pour le banc | le banc lit `BuildConfig` au build, jamais les Réglages | mettre la clé dans `local.properties` et **rebâtir** (§3-§4) |
 | « erreur de flux : Erreur critique, le stream devrait prendre fin » | **téléphone occupé par un autre agent** (verrou `~/bin/phone`), ou caméra déjà prise | `~/bin/phone status`, attendre la libération, **relancer** : après libération, ça passe (§10) |
 | **429 `capacity_saturated`** (« every provider within your price limit is busy ») | **fournisseur LLM saturé**, pas l'app | changer `llm.model` dans `local.properties` (ex. `gemini-3.8-flash`, qui a répondu 200), rebâtir (§4) |
@@ -479,20 +479,19 @@ Chemins relatifs à `app/src/main/java/dev/sam3vision/app/` sauf mention contrai
 | `BenchEntryPoint.kt` (26 l.) | demande d'ouverture du banc posée hors composition, consommée par `AppNav` / `BenchScreen` |
 | `BenchMock.kt` (24 l.) | contrat de l'appareil simulé entre les variantes debug et release |
 | `GlassesAnalysisStep.kt` (65 l.) | maillon frame → analyse → voix (`frame …`, `objets :`, `voix :`, `analyse échouée :`) |
-| `GlassesSession.kt` (83 l.), `GlassesDeviceSession.kt` (74 l.), `GlassesFramePump.kt` (57 l.), `GlassesSessionPolicy.kt` (226 l.), `GlassesSessionRuntime.kt` (107 l.), `GlassesFrameEncoder.kt` (103 l.) | cycle DAT, session/caméra/flux, collecte et étranglement (`FRAME_THROTTLE_MS = 1_500L`, `GlassesSessionPolicy.kt:22`), encodage des frames |
-| `FrameTypes.kt` (154 l.), `GlassesFramePolicy.kt` (49 l.) | YUV → JPEG (`inferYuv420Layout`, `:134-151`), politique d'encodage |
+| `GlassesSession.kt` (83 l.), `GlassesDeviceSession.kt` (74 l.), `GlassesFramePump.kt` (57 l.), `GlassesSessionPolicy.kt` (243 l.), `GlassesSessionRuntime.kt` (107 l.), `GlassesFrameEncoder.kt` (117 l.) | cycle DAT, session/caméra/flux, collecte et étranglement (`FRAME_THROTTLE_MS = 1_500L`, `GlassesSessionPolicy.kt:23`), encodage des frames |
+| `FrameTypes.kt` (154 l.), `GlassesFramePolicy.kt` (79 l.) | YUV → JPEG (`inferYuv420Layout`, `:134-151`), politique d'encodage |
 | `GlassesVoice.kt` (261 l.) | ElevenLabs + routage audio des lunettes (`routeToGlasses`, `:74-86`) |
-| `GlassesRealCheck.kt` (108 l.), `GlassesRegistrationPhase.kt` (69 l.), `GlassesAudioRoute.kt` (55 l.) | diagnostic du mode réel, phases d'enregistrement Meta AI, choix de sortie audio |
+| `GlassesRealCheck.kt` (108 l.), `GlassesRegistrationPhase.kt` (100 l.), `GlassesAudioRoute.kt` (55 l.) | diagnostic du mode réel, phases d'enregistrement Meta AI, choix de sortie audio |
 | `SpikeLog.kt` (37 l.) | journal borné (`SPIKE_LOG_LINES = 60`, `:12`), messages courts |
-| `src/debug/java/…/bench/MockGlassesHarness.kt` (223 l.), `src/debug/java/…/bench/MockControl.kt` (26 l.), `src/release/java/…/bench/MockControl.kt` (25 l.) | Mock Device Kit (debug uniquement) : activation, appariement, source vidéo |
+| `src/debug/java/…/glasses/GlassesMock.kt` (88 l.), `src/debug/java/…/bench/MockGlassesHarness.kt` (223 l.), `src/debug/java/…/bench/MockControl.kt` (26 l.), `src/release/java/…/bench/MockControl.kt` (24 l.) | Mock Device Kit (debug uniquement) : activation, appariement, source vidéo |
 | `src/androidTestDebug/java/…/bench/MockGlassesTest.kt` | test instrumenté du mock |
 | `app/build.gradle.kts` (racine de `:app`), `app/src/main/AndroidManifest.xml`, `app/src/debug/AndroidManifest.xml`, `app/src/main/res/xml/network_security.xml` | `applicationId`/`minSdk`/`versionCode`/`BuildConfig` ; permissions, activité `LAUNCHER`, deep-link `samvision` ; clair autorisé en debug ; clair local |
 | `settings.gradle.kts` (racine du dépôt) | deux modules seulement : `:core` et `:app` (`:18-19`) |
 | `MainActivity.kt`, `AppNav.kt` (`Route.Bench`), `glasses/GlassesSection.kt`, `SettingsScreen.kt`, `FirstRunPermissions.kt`, `SettingsSeed.kt`, `LlmFactory.kt`, `LiveMessages.kt` | routage des extras, écran `Route.Bench`, entrée du banc dans Réglages, permissions, valeurs de build |
-| `core/…/settings/Settings.kt`, `core/…/usecase/UseCases.kt`, `core/…/net/HttpSamClient.kt`, `core/…/net/ElevenLabsTtsClient.kt` | `segmentationEnabled` (`:136`), `llmConfigured` (`:139`) ; pipeline ; contrat `/health` + `/segment` ; messages de clé absente |
+| `core/…/settings/Settings.kt`, `core/…/usecase/UseCases.kt`, `core/…/net/HttpSamClient.kt`, `core/…/net/ElevenLabsTtsClient.kt` | `segmentationEnabled` (`:169`), `llmConfigured` (`:175`) ; pipeline ; contrat `/health` + `/segment` ; messages de clé absente |
 | `tools/r630-build.sh`, `tools/phone-lunettes.sh`, `tools/mock-sam.py`, `tools/mock-llm.py`, `tools/test-mock-sam.sh` | build r630, install + lancement + preuves, faux serveur SAM, faux LLM, banc hors téléphone |
 | `docs/glasses-dat-spike.md`, `docs/META-GLASSES.md` | relevé SDK, prérequis datés |
-| `ref/BUILD-SERVEUR-TEST-PHONE.md` | montage build r630 / test téléphone, pièges déjà payés |
 
 ## 12. Preuves
 

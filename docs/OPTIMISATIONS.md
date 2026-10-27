@@ -15,8 +15,12 @@
 | `@Preview` (relire un écran sans téléphone) | **0** | **11** |
 | `Request.Builder` dans `core/net` | 10 fichiers / 15 sites | **1 fichier / 1 site** |
 | Écran iSee réellement affiché | **non** (2 198 lignes de code mort) | **oui** |
-| Jobs de CI | 1 (dépassait les 5 min) | **5, en parallèle** |
+| Jobs de CI | 1 (dépassait les 5 min) | **4, en parallèle** |
 | ViewModels au-dessus de 420 lignes | **3** | **0** |
+
+> Les chiffres « Après » sont ceux de la **fin de la campagne (26/10)**, pas de cet
+> arbre : `LiveViewModel.kt` a regrossi depuis (498 l. au 27/10, prédiction T8), les
+> comptes de fichiers et de tests ont bougé. L'état courant est dans `AGENTS.md` §1.
 
 ## 1. L'écran iSee branché — le point mort n°1
 
@@ -24,9 +28,9 @@ Le design iSee (bulle centrale, satellites, gros texte paginé, dissolution en d
 carte caméra) pesait **2 198 lignes** et **n'était appelé nulle part** : `grep -rn IseeScenePane`
 ne renvoyait que sa définition. L'écran n'existait donc pas pour l'utilisateur.
 
-- L'accueil monte maintenant la scène (`IhearHome` → `IseeScenePane`).
-- Le doublon a été tranché : la liste de bulles (`IhearChatPane`, 418 l.) et l'ancienne
-  fenêtre caméra (`IhearCameraWindow`, 296 l.) sont **supprimées**, pas masquées ; leurs
+- L'accueil monte maintenant la scène (`IseeHome` → `IseeScenePane`).
+- Le doublon a été tranché : la liste de bulles (`IseeChatPane`, 418 l.) et l'ancienne
+  fenêtre caméra (`IseeCameraWindow`, 296 l.) sont **supprimées**, pas masquées ; leurs
   contenus utiles (liaison caméra, pastilles de distance, panneau de debug) sont rapatriés
   sur la carte du design.
 - Bilan : **+307 / −739 lignes**, 11 tests JVM sur le mapping état → scène.
@@ -74,7 +78,7 @@ borné (8 Mio), l'en-tête est départagé **par la longueur du corps**, et un e
 | Fichier | Avant | Après | Tests ajoutés |
 |---|---:|---:|---:|
 | `LiveViewModel.kt` (+ `app/live/`) | 490 l. | **411 l.** (391, puis +20 pour le budget frame) | 41 |
-| `IhearViewModel.kt` (+ `app/ihear/vm/`) | 469 l. | **327 l.** | oui |
+| `IseeViewModel.kt` (+ `app/isee/vm/`) | 469 l. | **327 l.** | oui |
 | `AppViewModel.kt` (+ `app/vm/`) | 417 l. | **276 l.** | oui |
 
 Comportement public **inchangé** (listes de membres publiées avant/après dans chaque PR),
