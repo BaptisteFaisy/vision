@@ -8,9 +8,9 @@ import kotlin.math.roundToInt
  * Politique de frame du spike : arithmétique pure, sans Android.
  *
  * [GlassesFrameEncoder] garde le travail de plateforme (`Bitmap`, `Base64`) ;
- * ces deux fonctions gardent les décisions (quel horodatage, quelle taille), ce
- * qui les rend prouvables sur JVM par `FramePolicyTest` sans `Bitmap` ni
- * `SystemClock`.
+ * ces fonctions gardent les décisions (quel horodatage, quel recadrage, quelle
+ * taille), ce qui les rend prouvables sur JVM par `FramePolicyTest` sans
+ * `Bitmap` ni `SystemClock`.
  */
 
 /**
@@ -46,4 +46,34 @@ internal fun scaledDimensions(
     if (longest <= maxEdge) return null
     val ratio = maxEdge.toFloat() / longest
     return max(1, (width * ratio).roundToInt()) to max(1, (height * ratio).roundToInt())
+}
+
+/** Rectangle de recadrage centré, en pixels (origine en haut à gauche). */
+internal data class CropRect(val x: Int, val y: Int, val width: Int, val height: Int)
+
+/**
+ * Recadrage centré au format 16:9 paysage.
+ *
+ * Les lunettes livrent du portrait 9:16 (`VideoQuality.MEDIUM` = 504×896,
+ * imposé par le SDK Meta : `StreamConfiguration` n'expose ni dimensions ni
+ * orientation) ; le banc envoie du 16:9 à l'API en coupant le haut et le bas.
+ *
+ * @return `null` quand l'image est déjà au 16:9 exact (rien à couper), quand
+ *   ses dimensions sont inexploitables, ou quand le côté coupé tomberait à zéro
+ *   (image d'un pixel : on garde l'image entière plutôt qu'un recadrage vide).
+ */
+internal fun cropTo16x9(width: Int, height: Int): CropRect? {
+    if (width <= 0 || height <= 0) return null
+    // Comparaison sans flottant : `largeur × 9` contre `hauteur × 16`.
+    val wide = width * 9
+    val tall = height * 16
+    if (wide == tall) return null
+    if (wide < tall) {
+        val cropped = wide / 16
+        if (cropped < 1) return null
+        return CropRect(0, (height - cropped) / 2, width, cropped)
+    }
+    val cropped = tall / 9
+    if (cropped < 1) return null
+    return CropRect((width - cropped) / 2, 0, cropped, height)
 }
