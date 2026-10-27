@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
 """Garde du design Portrait (obligatoire, docs/ISEE-DESIGN-PORTRAIT.md).
 
-Deux contrôles, sans compilation :
+Trois contrôles, sans compilation :
 
 1. Quarantaine : les symboles de l'ancien design (satellites, grille de
    pixels, looks de bulles, pagination) ne sont utilisables que par les
    fichiers legacy et les tests — jamais par le chemin de production.
 2. Câblage : le pane iSee assemble bien la scène Portrait, et le contrat
    `IseePortrait` expose bien palettes, géométrie et fonctions (les valeurs
-   sont figées par `IseePortraitTest`).
+   sont figées par `IseePortraitTest`). Les commentaires ne comptent pas :
+   un câblage commenté est un câblage absent.
+3. Boule gelée : le code qui dessine la boule (`IseePortraitOrb.kt` entier
+   et 5 unités d'animation de `IseeScenePane.kt`) correspond à l'octet près
+   à `tools/orb-frozen-baseline.json`. Changement voulu (demande explicite
+   du user uniquement) : `python3 tools/freeze-orb-baseline.py`, puis
+   relire le diff — docs/ISEE-DESIGN-PORTRAIT.md §6.
 
 Usage : python3 tools/check-isee-design.py [racine]
 Sortie : 0 si conforme, 1 sinon (2 si la racine n'existe pas).
 """
 import argparse
+import hashlib
+import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import guard_lib
 
 # Symboles legacy : définis dans core/.../iseedesign/IseeScene.kt (sauf les
 # deux classes d'art), utilisables par les fichiers LEGACY_OK et les tests.
@@ -72,6 +83,20 @@ PORTRAIT_NEEDS = (
     "wordsSpoken",
 )
 
+# Boule gelée : le fichier boule entier (shader, repli, peintre) et les
+# unités d'animation du pane (horloge, couche, mapping, ombre, couronne).
+# L'assemblage autour (caméra, en-tête, phrase) reste libre d'évoluer.
+ORB_FILE = "app/src/main/java/dev/sam3vision/app/isee/IseePortraitOrb.kt"
+ORB_PANE = "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt"
+ORB_REGIONS = (
+    "rememberSceneTime",
+    "OrbLayer",
+    "orbLookOf",
+    "drawOrbShadow",
+    "drawVoiceCrown",
+)
+ORB_BASELINE = "tools/orb-frozen-baseline.json"
+
 SKIP_DIRS = {".git", ".gradle", "build", ".idea", "tmp", "node_modules",
              "__pycache__", ".venv", "venv"}
 
@@ -111,33 +136,94 @@ def check_quarantine(root):
     return errors
 
 
-def check_wiring(root):
-    """Le pane assemble la scène Portrait, le contrat expose ses symboles."""
+def check_wiring(root, limits):
+    """Le pane assemble la scène Portrait, le contrat expose ses symboles.
+
+    Commentaires et chaînes neutralisés (garde de limites) : un symbole
+    seulement cité en commentaire ne câble rien.
+    """
     errors = []
     for rel, needs in ((PANE, PANE_NEEDS), (PORTRAIT, PORTRAIT_NEEDS)):
         path = os.path.join(root, rel)
         if not os.path.isfile(path):
             errors.append("%s — fichier Portrait manquant" % rel)
             continue
-        text = _read(path)
+        code = limits.strip_strings_comments(_read(path))
         for symbol in needs:
-            if symbol not in text:
+            if symbol not in code:
                 errors.append(
                     "%s — symbole Portrait `%s` manquant" % (rel, symbol))
     return errors
 
 
+def orb_hashes(root, limits):
+    """Empreintes du code gelé : fichier boule + 5 unités d'animation."""
+    hashes = {"version": 1, "files": {}, "regions": {}}
+    with open(os.path.join(root, ORB_FILE), "rb") as handle:
+        hashes["files"][ORB_FILE] = hashlib.sha256(handle.read()).hexdigest()
+    text = _read(os.path.join(root, ORB_PANE))
+    _, found = limits.kotlin_declarations(text)
+    for name in ORB_REGIONS:
+        spans = [(start, end) for found_name, start, end in found
+                 if found_name == name]
+        if len(spans) != 1:
+            raise LookupError("%s : %d occurrence(s) de `%s` (attendu 1)"
+                              % (ORB_PANE, len(spans), name))
+        start, end = spans[0]
+        region = text[start:end + 1].rstrip() + "\n"
+        key = "%s::%s" % (ORB_PANE, name)
+        hashes["regions"][key] = hashlib.sha256(
+            region.encode("utf-8")).hexdigest()
+    return hashes
+
+
+def check_frozen_orb(root, limits):
+    """Le code gelé de la boule correspond à la baseline, à l'octet près."""
+    base_path = os.path.join(root, ORB_BASELINE)
+    if not os.path.isfile(base_path):
+        return ["%s — baseline absente, la régénérer : "
+                "python3 tools/freeze-orb-baseline.py" % ORB_BASELINE]
+    try:
+        with open(base_path, encoding="utf-8") as handle:
+            baseline = json.load(handle)
+    except ValueError:
+        return ["%s — baseline illisible, la régénérer : "
+                "python3 tools/freeze-orb-baseline.py" % ORB_BASELINE]
+    try:
+        current = orb_hashes(root, limits)
+    except (OSError, LookupError) as exc:
+        return ["boule Portrait gelée — %s" % exc]
+    errors = []
+    for section in ("files", "regions"):
+        want = baseline.get(section, {})
+        for key, sha in sorted(current[section].items()):
+            if want.get(key) != sha:
+                errors.append(
+                    "boule Portrait modifiée — `%s` ne correspond plus à %s "
+                    "(changement voulu et demandé par le user ? "
+                    "python3 tools/freeze-orb-baseline.py puis relire le diff ; "
+                    "sinon, annuler la modification) — "
+                    "docs/ISEE-DESIGN-PORTRAIT.md §6" % (key, ORB_BASELINE))
+    return errors
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Garde : design Portrait obligatoire, ancien design en quarantaine.")
+        description="Garde : design Portrait obligatoire, ancien design en quarantaine, boule gelée.")
     parser.add_argument("root", nargs="?", default=".")
     args = parser.parse_args(argv)
     if not os.path.isdir(args.root):
         print("racine introuvable : %s" % args.root, file=sys.stderr)
         return 2
-    errors = check_quarantine(args.root) + check_wiring(args.root)
+    try:
+        limits = guard_lib.load_checker(args.root)
+    except FileNotFoundError as exc:
+        print("check-isee-design : %s" % exc, file=sys.stderr)
+        return 1
+    errors = (check_quarantine(args.root) + check_wiring(args.root, limits)
+              + check_frozen_orb(args.root, limits))
     if not errors:
-        print("check-isee-design : OK — Portrait câblé, ancien design en quarantaine.")
+        print("check-isee-design : OK — Portrait câblé, boule gelée, ancien design en quarantaine.")
         return 0
     print("check-isee-design : %d erreur(s) :" % len(errors))
     for error in errors:
