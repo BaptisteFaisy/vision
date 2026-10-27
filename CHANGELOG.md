@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 — carte caméra : le voile de pixels s'efface
+
+- **La carte caméra (scène VISION) n'est plus un damier permanent.** La mosaïque restait opaque
+  pendant tout l'enregistrement — 26 × 16 = 416 cellules d'environ 39 × 32 px — si bien que la
+  carte n'était que de gros blocs et que l'aperçu CameraX comme les masques SAM, dessinés dans la
+  même surface native, étaient cachés dessous. Le paramètre `fill` (0,42 au repos / 1 en
+  enregistrement) ne pilotait aucune opacité : il ne servait que de drapeau « dessine ou pas ».
+- **Le voile est désormais une entrée** : `PixelMosaic` prend une opacité (`alpha`) appliquée à
+  chaque cellule ; `VisionCard` la pose à 1 puis l'efface en `PIXEL_VEIL_MS` = **1 100 ms**
+  (`rememberPixelVeil`). Sur une photo du double tap, voile à 0 comme avant. La dissolution vers la
+  bulle (`DissolveOverlay`, plan 26 × 16) est **inchangée**.
+- **Preuves** : PR **#33** (`app/…/ihear/IseeVisionCard.kt`, `IseeScenePixels.kt`),
+  `tools/check-kotlin-limits.py` OK, `:app:compileDebugKotlin` et `:app:testDebugUnitTest`
+  (`--offline`) OK, checks `ci` + `ci-budget` + `couche0` verts, APK debug installé sur `2c6852ac`.
+- **Non mesuré** : le rendu à l'œil pendant l'enregistrement — l'objectif du téléphone de test ne
+  renvoyait que du noir au moment de la vérification (aperçu et photo noirs, masques absents).
+
 ## 2026-10-26 — `master` protégé, file de merge native GitHub
 
 - **Ruleset GitHub sur `master`** : PR obligatoire, checks requis `ci` + `ci-budget` + `couche0`
