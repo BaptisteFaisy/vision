@@ -7,6 +7,7 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
+import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.MASK_ALPHA
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
@@ -123,6 +124,9 @@ class LiveProbe(
     /** Un réveil `/health` est en cours (un seul à la fois). */
     private var warming = false
 
+    /** Premier plan : en arrière-plan les frames sont jetées (la carte reste éteinte). */
+    private val foregroundGate = ForegroundTracker()
+
     /**
      * Change d'endpoint, de focale ou de voix (Réglages) : nouvelle session, masques et
      * distances précédents effacés.
@@ -230,6 +234,14 @@ class LiveProbe(
 
     fun toggleDebug() = _state.update { it.copy(debugVisible = !it.debugVisible) }
 
+    /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
+    fun onBackground() = foregroundGate.onBackground(running = false)
+
+    /** Retour au premier plan : la frame suivante repart (l'enregistrement continue). */
+    fun onForeground() {
+        foregroundGate.onForeground()
+    }
+
     /**
      * Cap demandé à la voix (« va à gauche ») : le guidage recalcule le passage
      * vers ce cap dès la prochaine frame. L'annonceur repart de zéro pour que
@@ -265,6 +277,7 @@ class LiveProbe(
      * et on prépare la suivante. Un seul buffer : au-delà, l'encodage serait du gâchis.
      */
     fun wantsFrame(): Boolean {
+        if (!foregroundGate.foreground) return false
         val active = (if (warmed) session else coldSession) ?: return false
         // Réserve pleine : convertir une image de plus serait du CPU jeté.
         if (reserve.pending) return false
@@ -282,7 +295,7 @@ class LiveProbe(
      * monotones) : c'est lui qui rend la latence per\u00e7ue mesurable de bout en bout.
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
-        if (jpegB64.isBlank()) return
+        if (!foregroundGate.foreground || jpegB64.isBlank()) return
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -477,18 +490,4 @@ class LiveProbe(
         _state.update { it.copy(warming = true) }
     }
 
-    companion object {
-        /** Plafond d'objets quand les Réglages n'en imposent pas (valeur du Direct). */
-        private const val DEFAULT_MAX_OBJECTS = 12
-
-        /** Un log de décodage toutes N frames décodées. */
-        private const val LOG_EVERY_FRAMES = 20
-
-        /** Délai normal d'un appel du direct (le réveil du conteneur passe par [COLD_TIMEOUT_SECONDS]). */
-        private const val DEFAULT_TIMEOUT_SECONDS = 10L
-
-        /** Délai du premier appel : couvre le démarrage d'un conteneur Modal (30-50 s). */
-        const val COLD_TIMEOUT_SECONDS = 60L
-
-    }
 }

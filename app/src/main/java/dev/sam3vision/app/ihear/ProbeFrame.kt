@@ -47,3 +47,15 @@ internal fun distanceLayerOf(frame: LiveFrame, readings: List<DistanceReading>):
 internal fun failureText(error: Throwable): String =
     if (error is ApiError.Timeout) "réveil du GPU en cours… (nouvel essai à la frame suivante)"
     else error.message ?: "échec de l'appel SAM"
+
+/** Plafond d'objets quand les Réglages n'en imposent pas (valeur du Direct). */
+internal const val DEFAULT_MAX_OBJECTS = 12
+
+/** Un log de décodage toutes N frames décodées. */
+internal const val LOG_EVERY_FRAMES = 20
+
+/** Délai normal d'un appel du direct (le réveil du conteneur passe par [COLD_TIMEOUT_SECONDS]). */
+internal const val DEFAULT_TIMEOUT_SECONDS = 10L
+
+/** Délai du premier appel : couvre le démarrage d'un conteneur Modal (30-50 s). */
+internal const val COLD_TIMEOUT_SECONDS = 60L
