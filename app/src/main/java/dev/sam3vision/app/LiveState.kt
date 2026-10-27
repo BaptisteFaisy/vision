@@ -84,6 +84,14 @@ data class LiveUiState(
     val voice: LiveVoiceState = LiveVoiceState(),
     /** Transport du direct : « WebSocket » (rapide) ou « HTTP » (repli). Vide = inconnu. */
     val transport: String = "",
+    /** Calque local : drapeau effectif (réglage **et** build) — voir `localOverlayFlag`. */
+    val localEnabled: Boolean = false,
+    /** Le calque peint-il en ce moment ? (faux = inerte : sans estimateur, keyframe périmé) */
+    val localActive: Boolean = false,
+    /** Cadence tenue par le calque local, en ips. */
+    val localFps: Float = 0f,
+    /** Motif court du dernier refus (« sans estimateur », « keyframe périmé »…). */
+    val localNote: String = "",
 ) {
     /** Une frame a-t-elle déjà été gardée ? (bouton « Analyser la frame », questions). */
     val hasFrame: Boolean get() = latestFrame.present
@@ -95,8 +103,14 @@ data class LiveUiState(
         get() = if (running && starting) {
             WAKING_LINE
         } else {
-            formatLiveStatus(running, fps, latencyMs, gpu, objectsCount, nearestMeters, samEnabled)
+            formatLiveStatus(running, fps, latencyMs, gpu, objectsCount, nearestMeters, samEnabled) + localPart
         }
+
+    /**
+     * Part du calque local dans la ligne d'état (contrat de fusion §2.4) : concaténation,
+     * [formatLiveStatus] ne change pas (son contrat est testé tel quel).
+     */
+    val localPart: String get() = localStatusPart(localEnabled, localActive, localFps, localNote)
 
     /** Distance de l'objet le plus proche de la frame, `null` si rien n'est mesuré. */
     val nearestMeters: Float?

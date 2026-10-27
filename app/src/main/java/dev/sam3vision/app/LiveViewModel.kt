@@ -96,6 +96,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Une frame en vol maximum, cadence adaptative de la session. */
     private val cadence = LiveFrameCadence()
+    val local = dev.sam3vision.app.live.LiveLocalOverlayWiring(_state, store) { settings.localOverlayEnabled }
 
     /**
      * Masques coloriés hors thread principal ; le poste `overlays` est posé au retour.
@@ -273,9 +274,10 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * requête est en vol ou si la cadence adaptative n'est pas écoulée (le lien montant
      * sature sinon).
      */
-    fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
+    fun onFrame(jpegB64: String, captureAtNs: Long = 0L, frameLuma: ByteArray? = null) {
         if (jpegB64.isBlank()) return
         narration.narrate(jpegB64)
+        local.tick(frameLuma, System.currentTimeMillis())
         val active = pipeline
         if (active == null) {
             keepFrame(jpegB64)

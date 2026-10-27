@@ -68,6 +68,7 @@ fun SettingsScreen(
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
             DistanceSettings(draft) { draft = it }
+            LocalOverlaySettings(draft) { draft = it }
             TtsSettings(
                 draft = draft,
                 speaking = speaking,
