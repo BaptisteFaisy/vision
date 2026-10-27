@@ -56,7 +56,10 @@ internal fun webSocketUrl(baseUrl: String, path: String): String {
 class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
 
     /** Exposé aux tests : ils prouvent que le transport partage bien le pool du direct. */
-    internal val client = client.newBuilder().callTimeout(0, TimeUnit.MILLISECONDS).build()
+    internal val client = client.newBuilder()
+        .callTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(30, TimeUnit.SECONDS)
+        .build()
     private var socket: WebSocket? = null
 
     override fun open(

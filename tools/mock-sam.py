@@ -25,6 +25,7 @@ import struct
 import sys
 import time
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -71,6 +72,12 @@ def _png_size(data: bytes) -> tuple[int, int] | None:
 def image_size(image_b64: str) -> tuple[int, int]:
     """Taille annoncée pour n'importe quelle entrée : en-tête lu, sinon défaut."""
     try:
+        # L'en-tête (SOF JPEG, IHDR PNG) tient dans les premiers Ko : on décode
+        # d'abord une tranche (~3 Ko), l'image entière seulement si ça ne suffit pas.
+        head = base64.b64decode(image_b64[:4096], validate=False)
+        size = _jpeg_size(head) or _png_size(head)
+        if size is not None:
+            return size
         data = base64.b64decode(image_b64, validate=False)
     except (binascii.Error, ValueError):
         return (DEFAULT_W, DEFAULT_H)
@@ -88,7 +95,7 @@ def encode_gray_png(width: int, height: int, rows: list[bytearray]) -> bytes:
     header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
     raw = b"".join(b"\x00" + bytes(row) for row in rows)  # filtre 0 par ligne
     return (b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", header)
-            + _chunk(b"IDAT", zlib.compress(raw, 6)) + _chunk(b"IEND", b""))
+            + _chunk(b"IDAT", zlib.compress(raw, 1)) + _chunk(b"IEND", b""))
 
 
 def geometry(width: int, height: int, index: int, total: int) -> tuple[int, int, int, int]:
@@ -199,7 +206,7 @@ class MockSamHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             return b""
-        return self.rfile.read(max(0, min(length, 64 * 1024 * 1024)))
+        return self.rfile.read(max(0, min(length, 4 * 1024 * 1024)))
 
     def send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -217,6 +224,23 @@ class MockSamHandler(BaseHTTPRequestHandler):
               f"{size} octets {count} masques {elapsed:.1f} ms", flush=True)
 
 
+class PoolHTTPServer(ThreadingHTTPServer):
+    """Threads bornés (8) : des bancs déterministes même en rafale."""
+
+    daemon_threads = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mock-sam")
+
+    def process_request(self, request, client_address):
+        self._pool.submit(self.process_request_thread, request, client_address)
+
+    def server_close(self):
+        super().server_close()
+        self._pool.shutdown(wait=False)
+
+
 def announce(host: str, port: int) -> None:
     """Ligne de démarrage lisible par les scripts (et par un humain)."""
     print(f"mock-sam: écoute sur http://{host}:{port} "
@@ -232,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.labels:
         MockSamHandler.default_labels = tuple(filter(None, args.labels.split(",")))
 
-    server = ThreadingHTTPServer((args.host, args.port), MockSamHandler)
+    server = PoolHTTPServer((args.host, args.port), MockSamHandler)
     announce(args.host, server.server_address[1])
     try:
         server.serve_forever()

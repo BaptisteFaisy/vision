@@ -41,6 +41,37 @@ class LiveContractTest {
     }
 
     @Test
+    fun `live binaire poste le JPEG brut avec les knobs en query`() = runBlocking {
+        NetContract.server(body = NetContract.frameReply()).use { server ->
+            val frame = HttpLiveClient(server.baseUrl, binaryUpload = true)
+                .live("QUJD", listOf("personne"), 640, 4).getOrThrow()
+
+            assertEquals(512, frame.width)
+            val request = server.requests.single()
+            assertEquals("POST", request.method)
+            assertTrue("knobs en query : ${request.path}", request.path.startsWith("/live?"))
+            assertEquals("application/octet-stream", request.headers["content-type"])
+            assertEquals("3", request.headers["content-length"])
+            assertEquals("ABC", request.body)
+            assertTrue(request.path.contains("prompts=personne"))
+            assertTrue(request.path.contains("work_edge=640"))
+            assertTrue(request.path.contains("max_objects=4"))
+            assertTrue(request.path.contains("mask_encoding=bits"))
+        }
+    }
+
+    @Test
+    fun `live binaire refuse un base64 illisible sans appel reseau`() = runBlocking {
+        NetContract.server(body = NetContract.frameReply()).use { server ->
+            val failure = HttpLiveClient(server.baseUrl, binaryUpload = true)
+                .live("!!!", listOf("personne"), 640, 4).exceptionOrNull()
+
+            assertTrue("attendu BadResponse, obtenu $failure", failure is ApiError.BadResponse)
+            assertTrue(server.requests.isEmpty())
+        }
+    }
+
+    @Test
     fun `401 devient InvalidKey`() = runBlocking {
         NetContract.assertCode("live", 401, ApiError.InvalidKey::class.java, ::live)
     }

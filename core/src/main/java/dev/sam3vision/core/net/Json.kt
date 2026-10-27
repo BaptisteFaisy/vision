@@ -303,19 +303,56 @@ internal fun liveFrameJson(
     id: Int? = null,
     maskFormat: String? = null,
     maskEdge: Int = 0,
-): String = JSONObject()
-    .apply { if (id != null) put("id", id) }
-    .put("image_b64", jpegB64)
-    .put("prompts", if (prompts == null) JSONObject.NULL else jsonArrayOf(prompts))
-    .put("work_edge", workEdge)
-    .put("max_objects", maxObjects)
-    .put("mask_encoding", MASK_ENCODING_BITS)
-    .apply {
-        if (maskFormat == null) return@apply
-        put("mask_format", maskFormat)
-        if (maskEdge > 0) put("mask_edge", maskEdge)
+): String {
+    // Concaténation manuelle : `JSONObject` rescanne et échappe les ~28 Ko de base64 à
+    // chaque frame, alors que l'alphabet base64 (A-Za-z0-9+/=) n'a rien à échapper.
+    // Seuls les prompts et `mask_format` (texte libre) sont échappés.
+    val out = StringBuilder(jpegB64.length + 256)
+    out.append('{')
+    if (id != null) out.append("\"id\":").append(id).append(',')
+    out.append("\"image_b64\":\"").append(jpegB64).append("\",")
+    out.append("\"prompts\":")
+    if (prompts == null) {
+        out.append("null")
+    } else {
+        out.append('[')
+        prompts.forEachIndexed { index, prompt ->
+            if (index > 0) out.append(',')
+            out.append('"').append(jsonEscape(prompt)).append('"')
+        }
+        out.append(']')
     }
-    .toString()
+    out.append(",\"work_edge\":").append(workEdge)
+    out.append(",\"max_objects\":").append(maxObjects)
+    out.append(",\"mask_encoding\":\"").append(MASK_ENCODING_BITS).append('"')
+    if (maskFormat != null) {
+        out.append(",\"mask_format\":\"").append(jsonEscape(maskFormat)).append('"')
+        if (maskEdge > 0) out.append(",\"mask_edge\":").append(maskEdge)
+    }
+    out.append('}')
+    return out.toString()
+}
+
+/** Échappement JSON minimal pour les champs texte libre (prompts, `mask_format`). */
+internal fun jsonEscape(value: String): String {
+    val out = StringBuilder(value.length + 16)
+    for (c in value) {
+        when (c) {
+            '"' -> out.append("\\\"")
+            '\\' -> out.append("\\\\")
+            '\n' -> out.append("\\n")
+            '\r' -> out.append("\\r")
+            '\t' -> out.append("\\t")
+            else -> if (c.isISOControl()) {
+                out.append("\\u")
+                out.append(c.code.toString(16).padStart(4, '0'))
+            } else {
+                out.append(c)
+            }
+        }
+    }
+    return out.toString()
+}
 
 /** Assemblage d'une frame depuis un objet JSON déjà parsé : la seule voie de lecture. */
 private fun liveFrameOf(json: JSONObject): LiveFrame {

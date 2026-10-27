@@ -27,15 +27,42 @@ internal val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 /** Délai par défaut imposé par la spec : 60 s. */
 const val DEFAULT_TIMEOUT_SECONDS: Long = 60L
 
-/** Un seul endroit qui fabrique le client HTTP (timeouts identiques pour LLM et SAM). */
-fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpClient =
+/**
+ * Socle HTTP **partagé** : un seul `ConnectionPool` + `Dispatcher` pour LLM, SAM photo,
+ * tracker, ASR, TTS et vidéo. Avant, chaque `defaultHttpClient()` fabriquait un pool neuf
+ * (71,3 ms mesurés de DNS+TCP+TLS à chaque premier appel). `newBuilder()` partage le pool
+ * et le dispatcher par défaut, donc les variantes de timeouts restent chaudes.
+ */
+private val sharedBaseClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
-        .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .connectTimeout(DEFAULT_CONNECT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+        .dispatcher(
+            okhttp3.Dispatcher().apply {
+                maxRequests = 64
+                maxRequestsPerHost = 12
+            },
+        )
+        .build()
+}
+
+/** Connect long = fail-slow (60 s avant) ; 10 s suffit, le read garde le budget long. */
+private const val DEFAULT_CONNECT_SECONDS = 10L
+
+/** Un seul endroit qui fabrique le client HTTP (pool partagé, timeouts par usage). */
+fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpClient {
+    if (timeoutSeconds == DEFAULT_TIMEOUT_SECONDS) return sharedBaseClient
+    return sharedBaseClient.newBuilder()
+        .connectTimeout(minOf(timeoutSeconds, DEFAULT_CONNECT_SECONDS), TimeUnit.SECONDS)
         .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
         .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
         .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
         .build()
+}
 
 /**
  * Client **partagé** du direct : un seul `OkHttpClient` pour toute l'app, donc un seul
@@ -110,6 +137,26 @@ internal class OneShotJsonBody(json: String) : RequestBody() {
     /** Un corps one-shot n'est jamais rejoué par OkHttp. */
     override fun isOneShot(): Boolean = true
 }
+
+/** Corps binaire **non rejouable** : même protection que [OneShotJsonBody] pour `/live` binaire. */
+internal class OneShotBytesBody(
+    private val bytes: ByteArray,
+    private val mediaType: MediaType,
+) : RequestBody() {
+
+    override fun contentType(): MediaType = mediaType
+
+    override fun contentLength(): Long = bytes.size.toLong()
+
+    override fun writeTo(sink: BufferedSink) {
+        sink.write(bytes)
+    }
+
+    override fun isOneShot(): Boolean = true
+}
+
+/** Type MIME d'une frame envoyée en binaire (JPEG brut, knobs en query). */
+internal val OCTET_MEDIA = "application/octet-stream".toMediaType()
 
 internal fun joinUrl(baseUrl: String, path: String): String =
     baseUrl.trim().trimEnd('/') + path

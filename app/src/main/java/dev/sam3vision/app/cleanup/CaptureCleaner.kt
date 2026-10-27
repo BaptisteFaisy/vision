@@ -72,14 +72,16 @@ class CaptureCleaner(
         val store = store ?: return TraceOutcome(0, 0)
         var deleted = 0
         var left = 0
+        val gone = mutableListOf<TracedCapture>()
         store.traced().forEach { entry ->
             if (store.delete(entry)) {
-                store.forget(entry)
+                gone += entry
                 deleted++
             } else {
                 left++
             }
         }
+        store.forgetAll(gone)
         return TraceOutcome(deleted, left)
     }
 }

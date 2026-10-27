@@ -1,0 +1,74 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "6175d58860ab637eff068c6a4b711b6c",
+    "entities": [
+      {
+        "tableName": "message_multimedia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `texteUtilisateur` TEXT, `texteIA` TEXT, `cheminAudioUtilisateur` TEXT, `cheminAudioElevenLabs` TEXT, `cheminVideoEnvironnement` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "texteUtilisateur",
+            "columnName": "texteUtilisateur",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "texteIA",
+            "columnName": "texteIA",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminAudioUtilisateur",
+            "columnName": "cheminAudioUtilisateur",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminAudioElevenLabs",
+            "columnName": "cheminAudioElevenLabs",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cheminVideoEnvironnement",
+            "columnName": "cheminVideoEnvironnement",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_message_multimedia_timestamp_id",
+            "unique": false,
+            "columnNames": [
+              "timestamp",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_message_multimedia_timestamp_id` ON `${TABLE_NAME}` (`timestamp`, `id`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6175d58860ab637eff068c6a4b711b6c')"
+    ]
+  }
+}

@@ -24,7 +24,7 @@ abstract class CleanupDatabase : RoomDatabase() {
                     context.applicationContext,
                     CleanupDatabase::class.java,
                     "capture-cleanup.db",
-                ).build().also { instance = it }
+                ).setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING).build().also { instance = it }
             }
     }
 }

@@ -193,7 +193,12 @@ class LiveSession(
         /** Plafond de la cadence continue : le palier lent du Direct, on n'attend pas plus. */
         const val MAX_MS = 900L
 
-        const val DEFAULT_WORK_EDGE = 640
+        /**
+         * Bord de travail déclaré au serveur : 512, la taille exacte envoyée par
+         * le direct (`LIVE_EDGE`). À 640, le serveur agrandissait l'image avant
+         * l'encodeur vision — des pixels inventés, payés plein tarif.
+         */
+        const val DEFAULT_WORK_EDGE = 512
         /** Plafond d'objets affichés en direct (voir [ObjectLimits.MAX_ON_SCREEN]). */
         const val DEFAULT_MAX_OBJECTS = ObjectLimits.DEFAULT_ON_SCREEN
     }

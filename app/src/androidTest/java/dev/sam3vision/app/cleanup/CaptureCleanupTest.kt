@@ -29,7 +29,7 @@ import org.junit.runner.RunWith
  *    c'est l'angle mort historique (`ImageSource.newCacheFile`) ;
  * 3. [uneCaptureEnCoursDEcritureEstReportee] : touché il y a moins de 60 s → reporté ;
  * 4. [uneTraceMediaStoreDesynchroniseeEstOublieeSansErreur] : l'`_ID` tracé n'existe plus
- *    (`query` rend 0 ligne) → oubli silencieux, base Room vidée ;
+ *    (`delete` rend 0 ligne, sans `query` préalable) → oubli silencieux, base Room vidée ;
  * 5. [lePerimetreNeContientQueLeStockagePriveDeLApp] : `Context.getExternalFilesDir`, donc
  *    un appareil (`Android/data/<package>/…`) ;
  * 6. [leJobHoraireEstUniqueEtSansReseau] : `WorkManager`, qui a besoin de l'appareil
