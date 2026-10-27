@@ -20,7 +20,7 @@ import kotlinx.coroutines.sync.Semaphore
  *   compté (anti-rebond du rendu), donc une réponse en retard ne réécrit jamais un
  *   affichage postérieur.
  *
- * Mesuré sur A100 eu-west (relevé user du 25/10) : 1 frame en vol = 150 ms d'aller-retour,
+ * Mesuré sur A100 eu-west (relevé user, hors de cet arbre) : 1 frame en vol = 150 ms d'aller-retour,
  * 8 en vol = 300 ms pour 5,9 ips. Le multi-frames coûte +150 ms et rend 8× le débit : la
  * fenêtre vaut le coup. Le serveur, lui, sérialise ses inférences (`max_containers=1` +
  * verrou GPU) : au-delà de quelques frames en vol, on ne gagne plus de débit, on ne

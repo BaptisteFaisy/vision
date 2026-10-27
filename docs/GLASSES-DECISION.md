@@ -9,7 +9,7 @@ Sources lues (pas citées de mémoire) : `app/src/main/java/dev/sam3vision/app/g
 `glasses-spike/` (21 `.kt`), `core/src/main/java/dev/sam3vision/core/glasses/CaptureGesture.kt`,
 `docs/META-GLASSES.md`, `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md`,
 `app/src/main/AndroidManifest.xml`, `app/src/main/java/dev/sam3vision/app/AppNav.kt`,
-`~/Bureau/sam-vision-chats/pages/pc-P15.md` (chat du 24/10 20:43) et le maître
+`~/Bureau/sam-vision-chats/pages/pc-P15.md` (chat antérieur, hors de cet arbre) et le maître
 `~/Bureau/SAM-VISION-A-Z.md` (§ 5 bis, § 5 ter, § 7.2, règle 34).
 
 ## Décision
@@ -119,7 +119,7 @@ Ce qui est **déjà payé** dans le code (et n'est donc plus une estimation) : l
 (`app/…/ImageSource.kt`), et la logique des gestes est testée en JVM dans `:core`. La position
 « adaptateur, pas refonte » est un **fait mesuré dans cet arbre**, pas une projection.
 
-Estimations de la page 15 (chat du 24/10 20:43, **non revérifiées**, reprises telles quelles) :
+Estimations de la page 15 (chat antérieur, hors de cet arbre, **non revérifiées**, reprises telles quelles) :
 
 | Poste | Estimation |
 |---|---|
@@ -144,13 +144,13 @@ inventé.
 
 | Affirmation | Provenance | Statut |
 |---|---|---|
-| `4 600 lignes de Kotlin` pour l'app actuelle | page 15 (24/10), marqué « à confirmer » | **contredit, ne pas reprendre.** La mesure du maître (§ 5 bis, relevé du 24/10 23:55 sur `sam-vision-kotlin` `235206a`) donne **137 `.kt`, 12 643 l, 247 `@Test`**. Mesure prise dans cet arbre le 26/10 : **363 `.kt`, 37 329 l, 1 001 `@Test`** (`:core` 162/16 702, `:app` 180/18 231, `:glasses-spike` 21/2 396) |
+| `4 600 lignes de Kotlin` pour l'app actuelle | page 15, marqué « à confirmer » | **contredit, ne pas reprendre.** La mesure du maître (§ 5 bis, relevé antérieur, hors de cet arbre) donne **137 `.kt`, 12 643 l, 247 `@Test`**. Mesure prise dans cet arbre le 26/10 : **363 `.kt`, 37 329 l, 1 001 `@Test`** (`:core` 162/16 702, `:app` 180/18 231, `:glasses-spike` 21/2 396) |
 | `7–12 j` MVP sans écran, `~3–4 semaines` avec Display | page 15 | estimation, **jamais mesurée** |
-| `~350–400 €` Ray-Ban Meta Gen 2, `~800 $` Display | page 15 | prix du 24/10, **non revérifiés** |
+| `~350–400 €` Ray-Ban Meta Gen 2, `~800 $` Display | page 15 | prix relevés hors de cet arbre, **non revérifiés** |
 | cadences acceptées 2 / 7 / 15 / 24 / 30 i/s et ladder à 15 i/s | doc Meta citée par le maître | donnée externe, **non revérifiée** |
 | `A10G` à `1,21 $/h`, facturée en service, scale-to-zero | page 15 | donnée externe |
 | 15 i/s permanent = 54 000 frames/h = 69 % d'une A100 = 1 512 $/mois | chat cité par le maître | estimation, **non recalculée sur facture** |
-| `VideoFormat.getDefaultFormat()` = H.265, 504×896, 30 i/s | bytecode des AAR 1.0.1 (`javap`, 20/10) | prouvé au bytecode, **non revérifié dans cet arbre** |
+| `VideoFormat.getDefaultFormat()` = H.265, 504×896, 30 i/s | bytecode des AAR 1.0.1 (`javap`, analyse antérieure) | prouvé au bytecode, **non revérifié dans cet arbre** |
 | dimensions `MEDIUM` annoncées par le SDK | bytecode | format de flux, pas une mesure optique |
 | I420 vs NV12 et padding de ligne réel | — | **non vérifié** ; l'ambiguïté est mesurée (un NV12 serré ≡ un I420 serré) |
 | latence, débit, pertes de frames sur le lien Bluetooth | — | **non mesuré** (aucune lunette) |
