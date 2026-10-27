@@ -24,7 +24,7 @@ concurrency:
 jobs:
   guard:
     name: stale-base-guard
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - name: Mesurer le retard sur la base
