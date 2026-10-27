@@ -186,12 +186,111 @@ def test_ws_binary(live_app) -> None:
           answers[1].get("id") == 41, str(answers)[:160])
 
 
+class _FakeSocket:
+    """WebSocket factice piloté par script : messages, exceptions, ou silence total."""
+
+    def __init__(self, messages, hang=False):
+        self._messages = list(messages)
+        self.hang = hang
+        self.sent_texts: list[str] = []
+        self.closes: list[int] = []
+
+    async def receive_text(self):
+        if self.hang:
+            await asyncio.sleep(3600)
+            raise AssertionError("unreachable")
+        if not self._messages:
+            from fastapi import WebSocketDisconnect
+
+            raise WebSocketDisconnect()
+        item = self._messages.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    async def send_text(self, text):
+        self.sent_texts.append(text)
+
+    async def close(self, code=1000, reason=None):
+        self.closes.append(code)
+
+
+def test_ws_idle_closes(live_app) -> None:
+    """Silence radio → fermeture 1011, pas de connexion pendante (anti-zombie)."""
+    service, _api = _live_service(live_app)
+    service._live_sync = fake_pipeline()
+    socket = _FakeSocket([], hang=True)
+    asyncio.run(service._ws_loop(socket, idle_seconds=0.02))
+    check("WS: inactivité → fermeture 1011", socket.closes[:1] == [1011], str(socket.closes))
+    check("WS: inactivité → aucune réponse envoyée",
+          socket.sent_texts == [], str(socket.sent_texts)[:120])
+
+
+def test_ws_slow_frame_keeps_connection(live_app) -> None:
+    """Frame qui dépasse le budget → 503 avec l'id, la connexion continue."""
+    service, _api = _live_service(live_app)
+    slowed: list[int] = []
+
+    async def slow_once(raw):
+        if not slowed:
+            slowed.append(1)
+            await asyncio.sleep(5)
+            raise AssertionError("unreachable")
+        return {"id": json.loads(raw)["id"], "objects": []}
+
+    service._ws_frame = slow_once
+    png = sample_png()
+    socket = _FakeSocket([frame(51, png), frame(52, png)])
+    asyncio.run(service._ws_loop(socket, frame_seconds=0.02))
+    answers = [json.loads(text) for text in socket.sent_texts]
+    check("WS: frame lente → 503, id conservé",
+          len(answers) == 2 and answers[0]["id"] == 51
+          and answers[0]["error"]["status"] == 503, str(answers)[:200])
+    check("WS: après un 503, la frame suivante passe",
+          answers[1]["id"] == 52 and "error" not in answers[1], str(answers)[:200])
+
+
+def test_ws_huge_reply_closes(live_app) -> None:
+    """Réponse géante → fermeture 1009 avant que le proxy ne tue sans prévenir."""
+    service, _api = _live_service(live_app)
+
+    async def huge(_raw):
+        return {"id": 61, "objects": [{"mask": "x" * 256}]}
+
+    service._ws_frame = huge
+    socket = _FakeSocket([frame(61, sample_png())])
+    old, live_app.WS_MAX_REPLY_BYTES = live_app.WS_MAX_REPLY_BYTES, 64
+    try:
+        asyncio.run(service._ws_loop(socket))
+    finally:
+        live_app.WS_MAX_REPLY_BYTES = old
+    check("WS: réponse géante → fermeture 1009", 1009 in socket.closes, str(socket.closes))
+    check("WS: réponse géante → rien d'envoyé",
+          socket.sent_texts == [], str(socket.sent_texts)[:120])
+
+
+def test_ws_disconnect_closes(live_app) -> None:
+    """Déconnexion normale → fermeture explicite, aucun socket orphelin."""
+    service, _api = _live_service(live_app)
+    service._live_sync = fake_pipeline()
+    socket = _FakeSocket([frame(71, sample_png())])
+    asyncio.run(service._ws_loop(socket))
+    check("WS: session normale → une réponse",
+          len(socket.sent_texts) == 1, str(socket.sent_texts)[:160])
+    check("WS: session normale → close() explicite",
+          socket.closes == [1000], str(socket.closes))
+
+
 RUNNERS = (
     ("schéma LiveWsRequest", "schemas", test_schema),
     ("protocole WS (parse_frame)", "live_ws", test_parse_frame),
     ("WS: contrat de réponse", "live_app_fast", test_ws_contract),
     ("WS: erreurs sans fermeture", "live_app_fast", test_ws_errors),
     ("WS: message binaire", "live_app_fast", test_ws_binary),
+    ("WS: inactivité → 1011", "live_app_fast", test_ws_idle_closes),
+    ("WS: frame lente → 503", "live_app_fast", test_ws_slow_frame_keeps_connection),
+    ("WS: réponse géante → 1009", "live_app_fast", test_ws_huge_reply_closes),
+    ("WS: disconnect → close()", "live_app_fast", test_ws_disconnect_closes),
 )
 
 

@@ -430,12 +430,14 @@ def _locked(gpu_lock, timers: dict):
         gpu_lock.release()
 
 
-def _payload(entries, image_size, max_objects, mask_encoding, timers: dict) -> dict:
+def _payload(entries, image_size, max_objects, mask_encoding, timers: dict,
+             mask_format=None, mask_edge: int = 0) -> dict:
     """Tri global, troncature à ``max_objects``, puis encodage des seuls objets gardés."""
     from segmentation import finalize
 
     started = now()
-    result = finalize(entries, image_size, max_objects, mask_encoding)
+    result = finalize(entries, image_size, max_objects, mask_encoding,
+                      mask_format=mask_format, mask_edge=mask_edge)
     add_ms(timers, "masks_ms", elapsed_ms(started))
     return result
 
@@ -455,7 +457,8 @@ def _decorate(ctx, result: dict, edge, edge_ok: bool, timers: dict) -> dict:
 
 
 def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, batch: bool,
-              edge=None, mask_encoding=None, gpu_lock=None, timers: dict | None = None) -> dict:
+              edge=None, mask_encoding=None, gpu_lock=None, timers: dict | None = None,
+              mask_format=None, mask_edge: int = 0) -> dict:
     """UNE frame de bout en bout : CPU hors verrou, GPU sous verrou, encodage hors verrou.
 
     Chemin chaud unique de ``/live`` (HTTP et WebSocket) — les deux routes appellent ici,
@@ -478,16 +481,18 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
         vision = _vision(ctx, pixels, timers)
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,
                            max_objects, timers)
-    result = _payload(entries, image_size, max_objects, mask_encoding, timers)
+    result = _payload(entries, image_size, max_objects, mask_encoding, timers,
+                      mask_format=mask_format, mask_edge=mask_edge)
     return _decorate(ctx, result, edge, edge_ok, timers)
 
 
 def segment_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int,
-                  batch: bool, edge=None, mask_encoding=None) -> dict:
+                  batch: bool, edge=None, mask_encoding=None, mask_format=None,
+                  mask_edge: int = 0) -> dict:
     """Une frame : vision UNE fois, puis un forward groupé (batch) ou N passes seules.
 
     Interface historique, sans verrou (l'appelant tient le sien). Équivalente à
     :func:`run_frame` avec ``gpu_lock=None`` — conservée pour ``_segment_sync`` et les bancs.
     """
     return run_frame(ctx, image, prompts, work_edge, max_objects, batch, edge=edge,
-                     mask_encoding=mask_encoding)
+                     mask_encoding=mask_encoding, mask_format=mask_format, mask_edge=mask_edge)

@@ -143,7 +143,7 @@ def _fake_stages(fast_core, lock: threading.Lock):
         return [{"label": label, "score": 0.5, "box": [0.0, 0.0, 1.0, 1.0],
                  "mask": np.zeros((4, 4), dtype=np.uint8)} for label in prompts]
 
-    def payload(_entries, _size, _max, mask_encoding, _timers):
+    def payload(_entries, _size, _max, mask_encoding, _timers, **_knobs):
         probe("payload")
         applied = mask_encoding or "png"  # le vrai _payload passe par check_mask_encoding
         calls.append(("mask_encoding", mask_encoding))
@@ -345,6 +345,47 @@ def test_live_fast_contract(live_app_fast) -> None:
     asyncio.run(asgi_call(api, "POST", "/live", json.dumps({"image_b64": png}).encode(),
                           headers_out=headers))
     check("/live: levier éteint → aucun en-tête", "server-timing" not in headers, str(headers))
+
+
+def test_live_fast_binary(live_app_fast) -> None:
+    """``POST /live`` binaire : JPEG brut + knobs en query, même réponse que le JSON."""
+    import base64
+
+    from test_units import _live_service, asgi_call, check, sample_png
+
+    service, api = _live_service(live_app_fast)
+    captured: dict = {}
+
+    def from_image(image, prompts, max_objects, work_edge, batch_prompts, edge,
+                   mask_encoding, mask_format, mask_edge, timers, started):
+        captured.update(size=image.size, prompts=prompts, max_objects=max_objects,
+                        work_edge=work_edge, mask_encoding=mask_encoding,
+                        mask_format=mask_format, mask_edge=mask_edge)
+        return {"width": 64, "height": 40, "elapsed_ms": 12, "objects": [],
+                "mask_encoding": mask_encoding or "png"}
+
+    service._live_from_image = from_image
+    raw = base64.b64decode(sample_png())
+    status, payload = asyncio.run(asgi_call(
+        api, "POST", "/live", raw, content_type="application/octet-stream",
+        query_string=b"prompts=personne&prompts=porte&work_edge=640&max_objects=5"
+                     b"&mask_encoding=bits&mask_format=rle&mask_edge=256"))
+    check("/live binaire: 200 + réponse du pipeline",
+          status == 200 and payload.get("elapsed_ms") == 12, f"{status} {payload!r}"[:120])
+    check("/live binaire: image décodée (64x40)", captured.get("size") == (64, 40),
+          str(captured.get("size")))
+    check("/live binaire: knobs query transmis",
+          captured.get("prompts") == ["personne", "porte"]
+          and captured.get("work_edge") == 640 and captured.get("max_objects") == 5
+          and captured.get("mask_encoding") == "bits"
+          and captured.get("mask_format") == "rle" and captured.get("mask_edge") == 256,
+          str(captured))
+    status, _ = asyncio.run(asgi_call(api, "POST", "/live", b"pas une image",
+                                      content_type="application/octet-stream"))
+    check("/live binaire: octets non image → 400", status == 400, str(status))
+    status, _ = asyncio.run(asgi_call(api, "POST", "/live", b"",
+                                      content_type="application/octet-stream"))
+    check("/live binaire: corps vide → 400", status == 400, str(status))
 
 
 def test_live_fast_ws(live_app_fast) -> None:
