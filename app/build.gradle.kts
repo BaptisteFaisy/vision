@@ -185,6 +185,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.test.ext.junit)

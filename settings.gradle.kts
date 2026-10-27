@@ -17,4 +17,3 @@ dependencyResolutionManagement {
 rootProject.name = "vision"
 include(":core")
 include(":app")
-include(":glasses-spike")

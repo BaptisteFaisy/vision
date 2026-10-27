@@ -83,7 +83,7 @@ manuelle gagne donc toujours — c'est voulu, et c'est le seul moyen de viser un
 | `segmentationEnabled` = `resolveSamEndpoint().isNotBlank()` | `Settings.kt:119` — appelé **sans** argument de build, donc c'est le preset qui décide ici |
 | ❌ **Mode tap** : `BuildConfig.SAM31_ENDPOINT` en direct, aucune région | `TapConfig.kt:35`, `TapCaptureScreen.kt:171` (voir `docs/MODE-TAP.md`) |
 | ❌ **Réveil préventif** : il n'y en a plus | `prewarmGpu()` **n'existe plus** dans cet arbre (`grep -rn prewarmGpu app/ core/` → aucun résultat). Ce qui réveille le conteneur : la **première frame** du Direct (`LiveViewModel.kt:158-161`) ou de la sonde iSee (session froide 60 s, `LiveProbe.kt:130-138`) |
-| ❌ **Spike lunettes** : `Settings(...)` construit depuis `BuildConfig`, SAM = `SAM31_ENDPOINT` | `glasses-spike/…/MainActivity.kt:169-175` (`samBaseUrl = BuildConfig.SAM31_ENDPOINT`, `:173`) |
+| ❌ **Banc d'essai lunettes** (écran `Route.Bench` d'iSee, plus d'app séparée) : `Settings(...)` construit depuis `BuildConfig`, SAM = `SAM31_ENDPOINT` en direct, aucune région | `BenchScreen.kt:309-322` (`samBaseUrl = BuildConfig.SAM31_ENDPOINT`, `:315`) |
 
 ## Transport depuis iSee : WebSocket uniquement
 

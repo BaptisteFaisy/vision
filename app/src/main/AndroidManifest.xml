@@ -18,6 +18,8 @@
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Banc lunettes : la voix est routée vers la sortie des lunettes (setPreferredDevice, A2DP/BLE). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <uses-feature
         android:name="android.hardware.camera.any"

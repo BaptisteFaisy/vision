@@ -1,6 +1,8 @@
 # NOTES — versions épinglées et décisions techniques
 
-Relu le **26/10/2026** sur cet arbre (commit unique de ce dépôt). Les versions viennent
+Relu le **26/10/2026**, puis recompté le **27/10/2026** après la suppression du module
+`:glasses-spike` (le banc lunettes vit maintenant dans `:app`, `docs/GLASSES-DECISION.md`). Les
+versions viennent
 des fichiers du dépôt, pas du souvenir d'un build : `gradle/libs.versions.toml`,
 `gradle/wrapper/gradle-wrapper.properties`, `app/build.gradle.kts`, `core/build.gradle.kts`.
 Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est marqué **non mesuré**.
@@ -15,7 +17,7 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | KSP | **2.2.21-2.0.5** | `libs.versions.toml:14` |
 | JDK | **17 par `JAVA_HOME` — PAS épinglé dans le dépôt** | `gradle.properties:21-24` |
 | compileSdk / targetSdk | **36** partout | `app/build.gradle.kts:39,44`, `core/build.gradle.kts:10` |
-| minSdk | **29 (`:app`, `:glasses-spike`)** · 26 (`:core`, lib) | `app/build.gradle.kts:43`, `glasses-spike/build.gradle.kts:28`, `core/build.gradle.kts:13` |
+| minSdk | **29 (`:app`, banc lunettes compris)** · 26 (`:core`, lib) | `app/build.gradle.kts:84`, `core/build.gradle.kts` |
 | Compose BOM | **2026.05.01** (activity-compose 1.13.0, lifecycle 2.10.0) | `libs.versions.toml:7,8,9` |
 | CameraX | **1.6.0** (core, camera2, lifecycle, view, **video**) | `libs.versions.toml:10` |
 | OkHttp | **4.12.0** | `libs.versions.toml:6` |
@@ -38,18 +40,22 @@ le retour de cette ligne (`.github/workflows/ci.yml:95-100`). Sur cette machine 
 
 ## Taille et tests : chiffres réels
 
+Relevé du 27/10/2026 à 11 h 10, **module `:glasses-spike` exclu** (supprimé ce jour-là), compté
+sur le disque : les fichiers du banc (`app/…/glasses/bench/`) n'étaient pas encore suivis par
+git. L'arbre reçoit du code en parallèle : les totaux bougent de quelques dizaines de lignes,
+les proportions non.
+
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` versionnés | **364** |
-| Lignes de prod (`*/src/main`) | **22 565** — `:core` 74 f./7 666 l. · `:app` 130 f./13 394 l. · `:glasses-spike` 12 f./1 505 l. |
-| `@Test` | **1 011** = **1 004 JVM** + **7 instrumentés** |
-| dont `core/src/test` | **663** |
-| dont `app/src/test` | **305** |
-| dont `glasses-spike/src/test` | **36** |
+| Fichiers `.kt` | **472** |
+| Lignes de prod (`*/src/main`) | **28 706** — `:core` 105 f./11 121 l. · `:app` 164 f./17 585 l. (dont banc 17 f./1 824 l.) |
+| `@Test` | **1 380** = **1 373 JVM** + **7 instrumentés** |
+| dont `core/src/test` | **907** |
+| dont `app/src/test` | **466** (dont banc **86**) |
 | dont `app/src/androidTest` (`cleanup/CaptureCleanupTest`) | **6** (appareil requis) |
-| dont `glasses-spike/src/androidTest` (`MockGlassesTest`) | **1** (appareil requis) |
+| dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/ihear/IseeScenePane.kt` — **496** lignes |
+| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes |
 
 Le nombre de tests réellement **exécutés** est **non mesuré ici** : aucun `gradlew` n'a été
 lancé sur cette machine pour ce comptage.

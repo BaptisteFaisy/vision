@@ -1,8 +1,8 @@
 {
   "version": 1,
   "gele": {
-    "le": "2026-10-27T11:42:51+01:00",
-    "commit": "c008135",
+    "le": "2026-10-27T11:52:59+01:00",
+    "commit": "dfb3276",
     "arbre": "BaptisteFaisy/vision"
   },
   "limites-500/50": {
@@ -12,12 +12,11 @@
   },
   "tests-jvm": {
     "plancher": {
-      "app": 387,
-      "core": 920,
-      "glasses-spike": 86
+      "app": 473,
+      "core": 920
     },
     "execute": {
-      "app": 387,
+      "app": 473,
       "core": 920
     },
     "note": "plancher = annotations @Test de <module>/src/test, comptées sans compiler ; `execute` se remplit au premier passage avec XML JUnit."

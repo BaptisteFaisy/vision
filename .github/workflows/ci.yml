@@ -67,7 +67,7 @@ jobs:
           # périmètre, où qu'elle soit.
           if [ -n "$fichiers" ]; then
             if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' \
-              | grep -qE '^(app|core|glasses-spike)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$|^tools/'; then
+              | grep -qE '^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$|^tools/'; then
               code=1; echo "Code touché : Gradle complet."
             else
               code=0; echo "Sans code (${fichiers//$'\n'/, }) : étapes Gradle sautées."
@@ -222,17 +222,3 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-  # ── 4. spike lunettes Meta ──────────────────────────────────────────────────
-  spike:
-    name: spike
-    runs-on: [self-hosted, linux, x64, vision]
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Spike lunettes (assemble + tests)
-        run: >-
-          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g"
-          :glasses-spike:assembleDebug :glasses-spike:testDebugUnitTest

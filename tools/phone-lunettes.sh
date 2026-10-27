@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Usage : tools/phone-lunettes.sh <apk> [--dry] [--no-launch]
-#  Installe et lance le spike lunettes (dev.sam3vision.glasses, .MainActivity) sur le
-#  téléphone USB 2c6852ac, à travers le verrou ~/bin/phone (jamais d'adb nu). --dry =
-#  diagnostic seul, lecture seule ; --no-launch = installe sans lancer. Preuve dans
-#  ~/preuves/lunettes/<horodatage>/. Sortie : 0 si l'app tourne, 1 sinon.
+#  Installe et lance le banc d'essai lunettes, écran d'iSee (dev.sam3vision.app,
+#  .MainActivity : --ez mock/--ez analyze y poussent Route.Bench), sur le téléphone
+#  USB 2c6852ac via le verrou ~/bin/phone (jamais d'adb nu). --dry = diagnostic seul ;
+#  --no-launch = installe sans lancer ; preuve : ~/preuves/lunettes/. Code 0 = OK, 1 = échec.
 set -euo pipefail
-PKG="dev.sam3vision.glasses"; ACT="$PKG/.MainActivity"
+PKG="dev.sam3vision.app"; ACT="$PKG/.MainActivity"
 SERIAL="${PHONE_SERIAL:-2c6852ac}"; PHONE="$HOME/bin/phone"; PROOF_ROOT="${PROOF_ROOT:-$HOME/preuves/lunettes}"
 APK=""; DRY=0; LAUNCH=1; WAIT=300; ADB=""; P_LISTED=""; P_PATHS=""; P_DUMP=""
 
@@ -45,9 +45,9 @@ read_diag() {
   printf '%s\n' "$out"
 }
 # Paquet FANTÔME : `pm list packages` le liste encore alors que `pm path` ne rend rien et
-# que /data/app/~~…/dev.sam3vision.glasses-… a disparu (install interrompue, nettoyage ART).
-# Là, `adb install -r` ne remplace rien et `am start` répond « Activity class does not
-# exist » : purger (uninstall, puis --user 0 pour une trace) avant d'installer.
+# que /data/app/~~…/dev.sam3vision.app-… a disparu (install interrompue, nettoyage ART) :
+# `adb install -r` ne remplace rien et `am start` répond « Activity class does not exist ».
+# Purger (uninstall, puis --user 0) ; ici le paquet est iSee : toute l'app est cassée.
 is_ghost() { [ "${P_LISTED:-0}" -gt 0 ] && [ -z "$P_PATHS" ]; }
 
 purge() {
