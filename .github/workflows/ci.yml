@@ -1,10 +1,12 @@
 name: CI
 
 # Budget : 5 min maximum PAR JOB (règle projet) — jamais allongé.
-# Runner = ubuntu-latest : dépôt PUBLIC ⇒ minutes Actions gratuites et illimitées,
-# et surtout UNE VM PAR JOB. C'est ce qui permet de découper le build en 4 jobs
-# qui tournent en même temps sur 4 machines, au lieu d'un seul job qui enchaînait
-# tout et dépassait les 5 minutes (mesuré le 26/10 : un job unique = coupé à 5 min).
+# Runner = le Dell du user, self-hosted (labels `self-hosted, linux, x64, vision`) :
+# le dépôt est PRIVÉ, donc `ubuntu-latest` consommait des minutes payantes et la CI
+# est tombée le 27/10 (« recent account payments have failed or your spending limit
+# needs to be increased »). Self-hosted = minutes gratuites, et une machine par job.
+# La découpe en 4 jobs reste : elle borne chaque job à 5 min (mesuré le 26/10 : un
+# job unique enchaînant tout = coupé au budget).
 on:
   pull_request:
   push:
@@ -23,7 +25,7 @@ jobs:
   # ── 1. le check exigé par la file : les tests JVM ────────────────────────────
   ci:
     name: ci
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -161,7 +163,7 @@ jobs:
   # 5 minutes (mesuré le 26/10 : coupé au budget). Deux VM = deux budgets.
   apk:
     name: apk
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -183,7 +185,7 @@ jobs:
   # ── 2 bis. APK release — compile la variante release (R8 désactivé) ─────────
   apk-release:
     name: apk-release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +198,7 @@ jobs:
   # ── 3. lint — le poste le plus cher, donc sa propre VM ───────────────────────
   lint:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -223,7 +225,7 @@ jobs:
   # ── 4. spike lunettes Meta ──────────────────────────────────────────────────
   spike:
     name: spike
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4

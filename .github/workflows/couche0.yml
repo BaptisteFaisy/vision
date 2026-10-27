@@ -31,7 +31,7 @@ concurrency:
 jobs:
   couche0:
     name: couche0
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
       - name: Récupérer le garde depuis master, puis contrôler la PR
