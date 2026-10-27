@@ -28,7 +28,7 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
   `PositionText.kt:183-186`) : c'est un **repère** (« en haut à gauche »), pas un secteur
   annoncé séparément.
 - La géométrie est **la même pour toutes les langues** ; la langue ne change que les mots
-  (`PositionText.kt:47-79`).
+  (`PositionText.kt:47-78`).
 
 ## 3. Ce que la phrase dit
 
@@ -66,13 +66,13 @@ L'annonce passe par le moteur **unique** de l'app, jamais par un second lecteur.
 
 | Chemin | Câblage | Garde « ne coupe rien » |
 |---|---|---|
-| Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:112`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:110`, dossier `POSITION_VOICE_DIR = "positions"`, `:490`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
-| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../ihear/LiveProbe.kt:394-397`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
+| Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:126`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:124`, dossier `POSITION_VOICE_DIR = "positions"`, `:497`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
+| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../ihear/LiveProbe.kt:400-403`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
 | Analyse photo | `AppViewModel.announcePositions` (`AppViewModel.kt:187-195`) | même voix, un seul `say` à la fois |
 
 Réglage : **`Settings.ttsAnnouncePositions`** (défaut `true`, `Settings.kt:28`), bascule
 « Annoncer les objets et leur distance » (`app/TtsSettings.kt:73-76`). La bascule effective
-est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:131`) :
+est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:148`) :
 **sans clé ElevenLabs ni voix, l'annonce est muette** — par construction, pas par bug.
 
 ## 6. Ce qui n'est jamais annoncé
@@ -109,7 +109,7 @@ Tests JVM qui verrouillent le contrat : `PositionTextTest` (10), `PositionTextEn
 
 L'analyse d'une photo suffit à prouver détection → phrase → voix. Le contrat du client SAM
 est `GET /health` et `POST /segment {"image_b64","prompts"}`
-(`core/.../net/HttpSamClient.kt:10,22`) : un faux serveur qui ne sert que ces deux routes
+(`core/.../net/HttpSamClient.kt:9,21,28`) : un faux serveur qui ne sert que ces deux routes
 suffit, **aucune carte GPU** (le script utilisé en 2025 était un `/tmp/mock_sam.py` hors
 dépôt — il n'est **pas** dans cet arbre). Le **Direct**, lui, parle en WebSocket
 `/live/ws` (`core/.../net/WsTransport.kt:35`) : pas de faux serveur ici, il exige le vrai
