@@ -17,9 +17,10 @@ import java.nio.ByteOrder
  * entrée 256×256 → carte 256×256. Asset absent ou inférence tombée ⇒
  * `Result.failure` avec un message explicite (lu par le banc embarqué).
  *
- * Pas de délégué GPU en phase 1 : `litert-gpu` ne fournit que le natif
- * d'accélération (pas de `GpuDelegate` Java dans l'artefact 2.3.2), et le CPU
- * suffit au budget du direct (350-900 ms) — le banc tranche.
+ * Pas de délégué GPU en phase 1 (le CPU suffit au budget du direct, 350-900 ms
+ * — le banc tranche) ; artefact `org.tensorflow:tensorflow-lite` (le
+ * `com.google.ai.edge.litert:litert:2.3.x` est en metadata Kotlin 2.4,
+ * illisible par le Kotlin 2.2 du projet).
  */
 class LiteRtDepthEstimator private constructor(
     private val interpreter: Interpreter,
