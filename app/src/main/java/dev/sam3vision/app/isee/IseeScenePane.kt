@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -110,16 +111,39 @@ internal fun orbLookOf(scene: IseeScene, time: Float, open: Float): OrbLook {
     return OrbLook(time = time, you = you, see = see, amp = amp, level = level)
 }
 
-/** Ombre de contact sous la boule qui flotte, plus une légère caustique ambre. */
+/** Pénombre diffuse, ombre portée et cœur de contact, fondus sur le sol blanc. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Offset, r: Float, k: Float) {
     if (k <= 0.01f) return
-    val center = Offset(c.x, c.y + r * 1.17f)
-    drawOval(
-        brush = Brush.radialGradient(listOf(Color(0x290B1220), Color.Transparent), center, r * 0.85f),
-        topLeft = Offset(center.x - r * 0.85f, center.y - r * 0.09f),
-        size = androidx.compose.ui.geometry.Size(r * 1.7f, r * 0.18f),
-        alpha = k,
+    // Demi-largeur, demi-hauteur, opacité : le contact se resserre vers le centre.
+    val lobes = listOf(
+        Triple(0.94f, 0.18f, 0.09f),
+        Triple(0.66f, 0.085f, 0.14f),
+        Triple(0.34f, 0.032f, 0.18f),
     )
+    val center = Offset(c.x + r * 0.045f, c.y + r * 1.13f)
+    val ink = Color(IseePortrait.INK)
+    lobes.forEach { (width, height, opacity) ->
+        // Comprimer le dégradé lui-même évite le bord dur d'un disque rogné en ovale.
+        withTransform({
+            translate(center.x, center.y)
+            scale(1f, height / width, pivot = Offset.Zero)
+        }) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to ink.copy(alpha = opacity),
+                    0.28f to ink.copy(alpha = opacity * 0.78f),
+                    0.58f to ink.copy(alpha = opacity * 0.32f),
+                    0.82f to ink.copy(alpha = opacity * 0.06f),
+                    1f to ink.copy(alpha = 0f),
+                    center = Offset.Zero,
+                    radius = r * width,
+                ),
+                radius = r * width,
+                center = Offset.Zero,
+                alpha = k,
+            )
+        }
+    }
 }
 
 /** La couronne de 120 barres fines qui monte du verre avec la voix d'iSee. */
