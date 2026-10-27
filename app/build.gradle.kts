@@ -204,6 +204,9 @@ dependencies {
     // Mock Device Kit (lunettes simulées) : build debug seulement, hors de l'APK public.
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
+    // Profondeur embarquée : DA2 Small (ONNX, primaire) + MiDaS small (LiteRT, repli).
+    implementation(libs.onnxruntime.mobile)
+    implementation(libs.litert)
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
