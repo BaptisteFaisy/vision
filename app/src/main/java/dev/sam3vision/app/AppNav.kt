@@ -103,11 +103,21 @@ fun AppNav(
     Box(Modifier.fillMaxSize()) {
         // Les lunettes poussent leurs photos directement dans la navigation.
         GlassesBridge(glasses = glasses, viewModel = viewModel, push = push)
-        RouteHost(route, state, viewModel, ihear, glasses, liveViewModel, push, pop) {
+        RouteHost(
+            route = route,
+            state = state,
+            viewModel = viewModel,
+            ihear = ihear,
+            glasses = glasses,
+            liveViewModel = liveViewModel,
+            push = push,
+            pop = pop,
+            // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
+            onHome = { stack = listOf(Route.Ihear) },
             // Page du proche à la racine (rôle Caregiver au lancement) : « Retour » ouvre
             // les Réglages, sinon le bouton ne ferait rien du tout.
-            if (stack.size > 1) pop() else push(Route.Settings)
-        }
+            onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
+        )
         state.dictation.overlay?.let { overlay ->
             DictationOverlay(overlay = overlay, onDismiss = viewModel::dismissOverlay)
         }
@@ -139,6 +149,7 @@ private fun RouteHost(
     liveViewModel: LiveViewModel,
     push: (Route) -> Unit,
     pop: () -> Unit,
+    onHome: () -> Unit,
     onCaregiverBack: () -> Unit,
 ) {
     when (route) {
@@ -157,7 +168,7 @@ private fun RouteHost(
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
-        Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop)
+        Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
 }
 
@@ -283,6 +294,7 @@ private fun SettingsEntry(
     glasses: GlassesController,
     push: (Route) -> Unit,
     pop: () -> Unit,
+    onHome: () -> Unit,
 ) {
     CompositionLocalProvider(LocalBenchOpener provides remember { { push(Route.Bench) } }) {
         SettingsRoute(
@@ -295,7 +307,7 @@ private fun SettingsEntry(
             onOpenGestures = { push(Route.Onboarding) },
             onPickRole = { next ->
                 viewModel.saveSettings(next)
-                if (next.caregiverRole == CaregiverRole.Caregiver) push(Route.Caregiver)
+                if (next.caregiverRole == CaregiverRole.Caregiver) push(Route.Caregiver) else onHome()
             },
         )
     }
