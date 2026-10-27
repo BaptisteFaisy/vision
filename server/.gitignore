@@ -1,8 +1,9 @@
 node_modules/
+legacy-expo-app/node_modules/
 .expo/
 __pycache__/
 *.pyc
 .DS_Store
 .env
 *.log
-app/android/
+legacy-expo-app/android/

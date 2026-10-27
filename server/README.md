@@ -1,8 +1,13 @@
 # sam3-vision-app
 
+> ⚠️ **2026-10-24 : l'app Android est désormais native Kotlin (`~/Bureau/sam-vision-kotlin`).
+> Ce dépôt garde le backend Modal SAM 3.1 (actuellement STOPPÉ) et l'ancienne app Expo (legacy).**
+> Fermeture Modal, relance en une commande et preuve de l'état : [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).
+
 Photo → segmentation SAM 3.1 sur Modal → description et questions/réponses par un LLM vision, dans une app Android (Expo / React Native).
 
 L'app ne contient aucune clé API : elle appelle un backend FastAPI déployé sur Modal, qui détient le modèle de segmentation et la clé du LLM.
+*Description héritée de l'app Expo : l'app Kotlin appelle le LLM (InferHub) depuis le téléphone et n'utilise le backend Modal que pour `/segment` — la clé côté serveur n'est donc plus nécessaire, voir [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).*
 
 ## Ce que fait l'app
 
@@ -20,10 +25,10 @@ L'app ne contient aucune clé API : elle appelle un backend FastAPI déployé su
 │  expo-image-picker      │ ◄─────────────────── │  ├─ SAM 3.1  → masques PNG b64   │
 │  overlays + chat        │  masques + texte     │  └─ LLM vision (API OpenAI-like) │
 └─────────────────────────┘                      └──────────────────────────────────┘
-        app/                                       backend/  (secret `sam3-llm`)
+   legacy-expo-app/                                backend/  (secret `sam3-llm`)
 ```
 
-- **App** : Expo SDK stable, TypeScript, client API unique (`app/src/api.ts`).
+- **App** : Expo SDK stable, TypeScript, client API unique (`legacy-expo-app/src/api.ts`).
 - **Segmentation** : `unsloth/sam3.1` (miroir non gated de `facebook/sam3.1`), chargé via `transformers` dans `@modal.enter()`, masques encodés en PNG base64.
 - **LLM** : endpoint compatible OpenAI (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`), vision obligatoire, injecté par le secret Modal `sam3-llm`.
 
@@ -83,7 +88,7 @@ python3 scripts/test_api.py --url … --only contract-errors
 python3 scripts/test_api.py --url … --only segment,segment-prompts,bad-image
 
 # tests du client Expo (parsing, api.ts contre un serveur local, masques) — sans npm
-node app/tools/test-client.mjs
+node legacy-expo-app/tools/test-client.mjs
 ```
 
 Sans `--image`, `test_api.py` télécharge un échantillon public ; à défaut il génère une scène
@@ -94,7 +99,7 @@ deux routes renvoient 500).
 ## Dev Expo Go
 
 ```bash
-./scripts/dev_qr.sh            # npx expo start --tunnel depuis app/
+./scripts/dev_qr.sh            # npx expo start --tunnel depuis legacy-expo-app/
 ```
 
 Vérifie `node_modules` (installe si absent), puis affiche un QR code à scanner avec Expo Go.
@@ -110,8 +115,8 @@ Renseigne ensuite l'URL Modal dans l'écran **Réglages** de l'app.
 Le script vérifie le SDK Android (`ANDROID_HOME`, défaut `~/Android/Sdk`), installe les
 dépendances JS, lance `expo prebuild` puis Gradle (`ABI`, `GRADLE_JVMARGS` surchargeables).
 
-APK produite : `app/android/app/build/outputs/apk/{debug,release}/`.
-Équivalent manuel : `cd app && npx expo prebuild -p android && cd android && ./gradlew assembleDebug`.
+APK produite : `legacy-expo-app/android/app/build/outputs/apk/{debug,release}/`.
+Équivalent manuel : `cd legacy-expo-app && npx expo prebuild -p android && cd android && ./gradlew assembleDebug`.
 
 ## Coûts indicatifs (GPU)
 
