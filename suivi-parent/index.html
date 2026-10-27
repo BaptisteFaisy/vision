@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Leo - live map</title>
+<title>Leo</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <style>
 :root{--bg:#0b1328;--card:#111c33;--line:#24365a;--fg:#e2e8f0;--muted:#94a3b8;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--green:#22c55e}
@@ -16,7 +16,7 @@ header{position:sticky;top:0;z-index:10;background:rgba(11,19,40,.96);backdrop-f
 .live-dot.lost{background:var(--orange);box-shadow:0 0 0 5px rgba(245,158,11,.18);animation:none}
 .live-dot.off{background:#475569;box-shadow:none;animation:none}
 @keyframes pulse{50%{box-shadow:0 0 0 9px rgba(34,197,94,.05)}}
-h1{font-size:16px}.sub{font-size:12px;color:var(--muted)}
+.sub{font-size:12px;color:var(--muted)}
 main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
 .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#93c5fd;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
@@ -32,23 +32,21 @@ main{padding:12px;display:flex;flex-direction:column;gap:12px;padding-bottom:32p
 #status-note b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
 #status-note.lost{border-color:rgba(245,158,11,.5)}#status-note.lost b{color:#fbbf24}
 #status-note.off{border-color:#334155}#status-note.off b{color:#cbd5e1}
-footer{font-size:11px;color:#64748b;text-align:center;padding:14px}
 @media(min-width:900px){.app{max-width:480px;box-shadow:0 0 60px rgba(0,0,0,.5)}}
 </style>
 </head>
 <body>
 <div class="app">
 <header>
-<div class="topline"><span class="live-dot off" id="dot"></span><div><h1>Leo - live map</h1><div class="sub">Mobile • <span class="pill grey" id="live-badge">OFFLINE</span> • <span id="clock">waiting for the phone</span></div><div class="sub" id="indoor" style="display:none;margin-top:4px"></div></div></div>
+<div class="topline"><span class="live-dot off" id="dot"></span><div><span class="pill grey" id="live-badge">OFFLINE</span><div class="sub" id="indoor" style="display:none;margin-top:4px"></div></div></div>
 </header>
 <main>
-<div class="card"><h2>🗺️ Map <span class="pill green" id="map-provider">Google</span></h2><div class="styles"><button data-s="hybrid" class="on">🛰️ Hybrid</button><button data-s="satellite">🌍 Satellite</button><button data-s="plan">✨ Plan</button><button data-s="terrain">⛰️ Terrain</button></div><div class="maprow"><button id="recenter">📍 Center on Leo</button></div><div id="map-wrap"><div id="map"></div></div>
+<div class="card"><div class="styles"><button data-s="hybrid" class="on">🛰️ Hybrid</button><button data-s="satellite">🌍 Satellite</button><button data-s="plan">✨ Plan</button><button data-s="terrain">⛰️ Terrain</button></div><div class="maprow"><button id="recenter">📍 Center on Leo</button></div><div id="map-wrap"><div id="map"></div></div>
 <div id="status-note"><b id="note-title"></b><span id="note-text"></span></div>
 <div class="keybox" id="keybox" style="display:flex;gap:8px;margin-top:8px"><input id="gkey" placeholder="Google Maps key (kept in this browser) — ?key=YOUR_KEY also works" style="flex:1;background:#0d1730;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 10px;font-size:12px"><button id="savekey" class="btn small primary" style="border:none;background:var(--blue);color:#fff;border-radius:10px;padding:8px 12px;font-weight:700">OK</button><button id="clearkey" class="btn small" title="Forget the saved key" style="display:none;border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:8px 12px;font-weight:700">✕</button></div>
 <div id="gerr" style="display:none;margin-top:6px;font-size:12px;line-height:1.5;color:#fca5a5;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:8px 10px"></div>
 <div class="legend">Pinch to zoom • +/− buttons top right • dots are the objects detected around Leo (blue point, halo = GPS accuracy).</div></div>
 </main>
-<footer>Leo - realtime map.</footer>
 </div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -97,16 +95,13 @@ function currentObjects(){
  return (live.objects||[]).map((o,i)=>({id:'o'+i,label:o.label,ico:iconFor(o.label),distM:o.distM,angleDeg:o.angleDeg,frozen:s==='lost'}));
 }
 function renderHead(){
- const b=document.getElementById('live-badge'),c=document.getElementById('clock'),dot=document.getElementById('dot'),s=state();
+ const b=document.getElementById('live-badge'),dot=document.getElementById('dot'),s=state();
  if(s==='live'){
   b.textContent='LIVE';b.className='pill green';dot.className='live-dot';
-  c.textContent='updated '+fmtAge(ageMs());
  }else if(s==='lost'){
   b.textContent='SIGNAL LOST';b.className='pill orange';dot.className='live-dot lost';
-  c.textContent='last update '+fmtAge(ageMs());
  }else{
   b.textContent='OFFLINE';b.className='pill grey';dot.className='live-dot off';
-  c.textContent=lastPos?'last known '+fmtAge(Date.now()-lastPos.at):'waiting for the phone';
  }
  const ind=document.getElementById('indoor'),show=s!=='offline'&&live&&live.fix&&live.fix.indoor;
  ind.style.display=show?'block':'none';
@@ -155,16 +150,13 @@ async function bootMap(){
    document.getElementById('clearkey').style.display='';
    document.getElementById('gkey').value=G_KEY;
    document.getElementById('gkey').title='Google key active — paste a new key and press OK to replace it, ✕ to forget it';
-   document.getElementById('map-provider').textContent='Google';
    mode='google';
    gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
    syncGoogle();return;
   }catch(e){
-   document.getElementById('map-provider').textContent='Google refused — OpenFreeMap fallback';
    showGerr('Google refused this key: '+String((e&&e.message)||e)+'<br>1) HTTP referrers of the key: add <code>https://suivi-parent.vercel.app/*</code> and <code>https://*.vercel.app/*</code>.<br>2) <code>Maps JavaScript API</code> must be <b>enabled</b> on the project.<br>3) Billing must be active, otherwise tiles stay in error even with a valid key.<br>The browser console (F12) also shows Google\'s exact message.');
   }
  }
- document.getElementById('map-provider').textContent='OpenFreeMap (no key)';
  try{
   if(window.maplibregl){
    map=new maplibregl.Map({container:'map',style:mlStyle(lastMapType||'hybrid'),center:[HOME.lon,HOME.lat],zoom:3,attributionControl:{compact:true}});
