@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -32,8 +33,9 @@ import dev.sam3vision.core.iseedesign.SpokenCaption
 @Composable
 internal fun BoxWithConstraintsScope.SpokenLine(caption: SpokenCaption?, fromUser: Boolean, top: Dp, compact: Boolean) {
     if (caption == null) return
+    val room = (maxHeight - top - navInsetDp()).coerceAtLeast(0.dp)
     Column(
-        Modifier.align(Alignment.TopCenter).offset(y = top).padding(horizontal = 24.dp),
+        Modifier.align(Alignment.TopCenter).offset(y = top).padding(horizontal = 24.dp).heightIn(max = room),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
