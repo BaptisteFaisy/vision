@@ -1,6 +1,6 @@
 # SPEC — app Android native Kotlin (sam3-vision)
 
-Remplace l'app Expo (conservée en legacy dans `legacy-expo-app/`). Nouveau projet : `~/Bureau/sam-vision-kotlin`.
+Remplace l'app Expo (conservée en legacy dans `legacy-expo-app/`). L'app Kotlin vit désormais à la racine du dépôt vision (`app/`, `core/`).
 Phone = client unique : pas de Modal (fermé), pas de backend à nous. Le LLM passe directement à
 **InferHub** (`https://api.inferhub.dev/v1`, compatible OpenAI), la segmentation SAM 3.1 passe par un
 **endpoint HTTP optionnel** (URL saisie dans Réglages ; contrat identique à l'ancien backend Modal).

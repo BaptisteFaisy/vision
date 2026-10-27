@@ -68,7 +68,7 @@ Descendre sous 340 ms exigerait de toucher `processor.image_processor.size` (hor
 ## Relancer / arrêter
 
 ```bash
-cd ~/Bureau/sam3-vision-app && /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy deploy backend/live_app.py
+cd server && /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy deploy backend/live_app.py  # depuis la racine du dépôt vision
 /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy app stop sam3-live -y   # coupe le GPU
 ```
 ## A100 40 Go vs H200 — même code, même contrat (24 octobre 2026 19:0x)

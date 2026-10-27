@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Construit l'APK Android de sam3-vision-app à partir de zéro, de façon idempotente.
+# Construit l'APK Android de l'app legacy (legacy-expo-app) à partir de zéro,
+# de façon idempotente. L'app Kotlin se construit à la racine du dépôt (CI `apk`).
 #
 #   ./scripts/build-apk.sh              # release (défaut)
 #   ./scripts/build-apk.sh debug        # debug, signée avec le keystore debug

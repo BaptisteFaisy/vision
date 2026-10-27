@@ -44,7 +44,7 @@ d'URL (`BASE_URL_DEFAULT` dans `scripts/lib-env.sh`). La clé, elle, est obligat
 ## Déploiement
 
 ```bash
-cd /home/baptiste/Bureau/sam3-vision-app
+cd server  # depuis la racine du dépôt vision
 ./scripts/deploy_backend.sh            # secret + deploy + smoke /health (idempotent)
 ```
 

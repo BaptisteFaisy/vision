@@ -75,7 +75,7 @@ coûte. À 720p le p95 d'aller-retour dépasse 300 ms avec un client Python ; su
 ## Relancer / arrêter
 
 ```bash
-cd ~/Bureau/sam3-vision-app
+cd server  # depuis la racine du dépôt vision
 TRACK_APP_NAME=sam3-track-eu TRACK_GPU=A100-40GB TRACK_REGION=eu TRACK_ROUTING_REGION=eu-west \
   /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy deploy backend/track_app.py
 /home/baptiste/.venv-modal/bin/modal --profile baptiste-faisy app stop sam3-track-eu -y   # coupe le GPU

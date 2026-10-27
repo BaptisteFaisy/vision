@@ -1,4 +1,4 @@
-# NOTES de build — sam3-vision-app
+# NOTES de build — backend legacy (server/)
 
 ## Réglages hors `scripts/` (à valider par le parent)
 
