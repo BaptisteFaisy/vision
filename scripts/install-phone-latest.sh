@@ -18,6 +18,9 @@
 #     occupé = sortie 2, le prochain tour de cron réessaie ;
 #   - construit dans un miroir dédié ($VISION_MIRROR, défaut ~/vision-phone/master),
 #     jamais dans l'arbre de travail partagé où les agents écrivent ;
+#   - lie le fichier de clés de la machine (VISION_KEYS, défaut
+#     ~/.config/sam-vision/build-keys.properties) dans le miroir, sinon l'APK
+#     s'installerait sans clé ;
 #   - n'installe que du master ; `adb install -r -d` accepte un versionCode plus
 #     ancien qu'une build de mission déjà posée (les données de l'app restent).
 #
@@ -54,6 +57,19 @@ mkdir -p "$STATE_DIR"
 say() { [ "$QUIET" = 1 ] || echo "$@"; }
 log() { printf '%s %s\n' "$(date -Is)" "$*" >> "$STATE_DIR/install-phone-latest.log"; }
 die() { echo "install-phone-latest: $*" >&2; log "ERREUR $*"; exit 1; }
+
+# keys_build : le miroir est une copie propre, donc sans son `local.properties`
+# l'APK part sans aucune clé et la dictée Meta n'a pas de moteur. On **lie** (jamais
+# copié, jamais affiché, jamais versionné) le fichier de clés de CETTE machine.
+# Absent = on installe quand même, en le disant dans le journal (APK sans clé).
+keys_build() {
+    local keys="${VISION_KEYS:-$HOME/.config/sam-vision/build-keys.properties}"
+    if [ ! -f "$keys" ]; then
+        log "aucun fichier de clés ($keys) : APK sans clé"
+        return 0
+    fi
+    ln -sfn "$keys" "$MIRROR/local.properties" || die "lien des clés impossible dans le miroir"
+}
 
 # --- miroir de build (une fois) -------------------------------------------
 if [ "$INIT" = 1 ]; then
@@ -127,6 +143,7 @@ timeout 120 git -C "$MIRROR" fetch -q origin || die "fetch impossible dans le mi
 timeout 60 git -C "$MIRROR" checkout -q --detach origin/master || die "checkout origin/master impossible"
 head_sha="$(git -C "$MIRROR" rev-parse HEAD)" || die "rev-parse impossible dans le miroir"
 [ "$head_sha" = "$latest" ] || die "miroir sur ${head_sha:0:7}, GitHub sur $short — refus d'installer autre chose"
+keys_build
 say "build de $short dans le miroir…"
 
 # --- build (hors verrou : c'est long) --------------------------------------

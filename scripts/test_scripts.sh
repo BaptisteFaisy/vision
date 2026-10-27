@@ -159,6 +159,11 @@ if [ -f "${TMP}/etat/hold" ]; then ok 'install-phone-latest --hold écrit la pau
 run env VISION_PHONE_STATE="${TMP}/etat" VISION_MIRROR="${TMP}/pas-de-miroir" bash "$LATEST"
 expect_status 0 'install-phone-latest respecte la pause (aucun build)'
 
+run grep -n 'build-keys.properties' "$LATEST"
+expect_status 0 'install-phone-latest lie le fichier de cles de la machine'
+run grep -nE '(cat|echo|tee|printf|head|tail)[^#]*build-keys' "$LATEST"
+expect_nonzero 'le fichier de cles ne sort jamais du script'
+
 # --- 6. garde-fous statiques ----------------------------------------------
 echo "== 6. garde-fous statiques =="
 run grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "${SCRIPTS[@]}" "$LIB"
