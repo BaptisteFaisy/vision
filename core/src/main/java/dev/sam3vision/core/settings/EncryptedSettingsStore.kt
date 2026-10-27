@@ -36,9 +36,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
                 .ifBlank { default.llmModel },
             samBaseUrl = prefs.getString(KEY_SAM_BASE_URL, default.samBaseUrl).orEmpty(),
             samRegion = SamRegion.fromName(prefs.getString(KEY_SAM_REGION, default.samRegion.name)),
-            speechLanguage = SpeechLanguage.fromName(
-                prefs.getString(KEY_SPEECH_LANGUAGE, default.speechLanguage.name),
-            ),
+            speechLanguage = speechOf(prefs, default),
             ttsApiKey = prefs.getString(KEY_TTS_API_KEY, default.ttsApiKey).orEmpty(),
             ttsVoiceId = prefs.getString(KEY_TTS_VOICE_ID, default.ttsVoiceId).orEmpty()
                 .ifBlank { default.ttsVoiceId },
@@ -65,11 +63,15 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
-            depthBackend = DepthBackend.fromName(
-                prefs.getString(KEY_DEPTH_BACKEND, default.depthBackend.name),
-            ),
+            depthBackend = depthOf(prefs, default),
         ).let { readShareSettings(prefs, it) }
     }
+
+    private fun depthOf(prefs: SharedPreferences, default: Settings): DepthBackend =
+        DepthBackend.fromName(prefs.getString(KEY_DEPTH_BACKEND, default.depthBackend.name))
+
+    private fun speechOf(prefs: SharedPreferences, default: Settings): SpeechLanguage =
+        SpeechLanguage.fromName(prefs.getString(KEY_SPEECH_LANGUAGE, default.speechLanguage.name))
 
     override suspend fun save(s: Settings) = withContext(Dispatchers.IO) {
         prefs.edit()
