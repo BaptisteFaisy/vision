@@ -417,6 +417,10 @@ RUNNERS = (
     ("déploiement : leviers du script", "timing", weights_tests.test_deploy_script),
     ("fusion : contrat de load_cpu", "fast_core", merge_tests.test_load_cpu),
     ("fusion : conteneur (snapshot + latence)", "live_app_fast", merge_tests.test_fusion_live_app),
+    # Portage live_fast (déployé) : poids locaux + snapshot + double phase.
+    ("live_fast : poids locaux (module déployé)", "timing", weights_tests.test_live_fast_weights),
+    ("live_fast : image (poids + snapshot déployés)", "timing", weights_tests.test_live_fast_image),
+    ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
 )
 
 

@@ -21,7 +21,8 @@ from contextlib import asynccontextmanager
 
 import detr_graph
 from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, clamp_int,
-                       gpu_name, levers, load, prepare, run_frame, segment_frame, vision_grid)
+                       gpu_name, levers, load, load_cpu, prepare, run_frame,
+                       segment_frame, vision_grid)
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
 from timing import Stage, elapsed_ms, format_server_timing, now
 
@@ -83,9 +84,19 @@ def accepts_mask_encoding(pipeline) -> bool:
 class Sam3LiveService:
     """Modèle chargé une fois, leviers activables, verrou GPU unique.
 
-    ``load_container()`` est idempotent : Modal l'appelle depuis ``@modal.enter``,
-    Baseten depuis le lifespan ASGI de l'app (les deux chemins se rejoignent).
+    ``load_container()`` est idempotent : Modal l'appelle depuis le second
+    ``@modal.enter`` (après restauration du snapshot), Baseten depuis le lifespan
+    ASGI de l'app (les deux chemins se rejoignent).
     """
+
+    def load_cpu_weights(self) -> None:
+        """Phase snapshottée (Modal ``enter(snap=True)``) : poids sur CPU, aucun état CUDA."""
+        if getattr(self, "cpu", None) is not None:  # déjà chargés : ne rien refaire
+            return
+        started = time.monotonic()
+        model, processor, dtype = load_cpu(DTYPE_NAME, EDGE)
+        self.cpu = {"model": model, "processor": processor, "dtype": dtype}
+        self.snap_seconds = round(time.monotonic() - started, 1)
 
     def load_container(self) -> None:
         """Charge le modèle au dtype demandé, applique résolution/compile/graph, chronomètre."""
@@ -94,7 +105,16 @@ class Sam3LiveService:
         from segmentation import device_label
 
         started = time.monotonic()
-        model, processor, device, dtype = load(DTYPE_NAME, EDGE)
+        if getattr(self, "cpu", None) is None:
+            # Baseten / 1er démarrage : pas d'état snapshotté, chargement complet.
+            model, processor, device, dtype = load(DTYPE_NAME, EDGE)
+        else:
+            # Restauration snapshot : les poids CPU reviennent tels quels, reste le GPU.
+            model, processor, dtype = (self.cpu["model"], self.cpu["processor"],
+                                       self.cpu["dtype"])
+            device = device_label()
+            model = model.to(device).eval()
+            del self.cpu
         self.ctx = {"model": model, "processor": processor, "device": device, "dtype": dtype,
                     "runtime_edge": RUNTIME_EDGE}
         self.ctx.update(prepare(model, processor, device, dtype, EDGE))
@@ -230,8 +250,12 @@ class Sam3LiveService:
             return error_message(parsed["id"], 500, f"internal error: {exc}")
         return success_message(result, parsed["id"])
 
-    async def _ws_step(self, websocket, raw, frame_seconds) -> bool:
-        """Un message reçu : réponse calculée puis envoyée. Faux = fermer la boucle."""
+    async def _ws_answer(self, websocket, raw, frame_seconds) -> bool:
+        """Traite un message reçu : inférence bornée, réponse bornée, envoi.
+
+        Renvoie False quand la boucle doit s'arrêter (réponse trop grosse,
+        client déconnecté, socket cassé), True pour attendre le message suivant.
+        """
         from fastapi import WebSocketDisconnect
 
         from live_ws import UNKNOWN_ID, error_message, frame_id
@@ -280,6 +304,8 @@ class Sam3LiveService:
         """
         from fastapi import WebSocketDisconnect
 
+        from live_ws import UNKNOWN_ID, error_message, frame_id
+
         try:
             while True:
                 try:
@@ -293,7 +319,7 @@ class Sam3LiveService:
                     return
                 except Exception:  # noqa: BLE001 — message binaire ou socket déjà fermé
                     raw = None
-                if not await self._ws_step(websocket, raw, frame_seconds):
+                if not await self._ws_answer(websocket, raw, frame_seconds):
                     return
         finally:
             try:
@@ -328,12 +354,64 @@ class Sam3LiveService:
         await asyncio.to_thread(self.load_container)
         yield
 
+    async def _handle_live(self, request):
+        """Frame JSON (contrat historique) ou JPEG brut (``octet-stream`` + knobs en query).
+
+        Le binaire évite les +33 % du base64 à la montée : le corps est le JPEG tel
+        quel, les knobs passent en query (``prompts`` répété, ``work_edge``,
+        ``max_objects``, ``mask_encoding``, ``mask_format``, ``mask_edge``,
+        ``batch_prompts``, ``edge``). Réponse strictement identique dans les deux cas.
+        """
+        from fastapi.responses import JSONResponse
+        from schemas import LiveFastRequest
+
+        ctype = request.headers.get("content-type", "")
+        if ctype.split(";")[0].strip().lower() == "application/octet-stream":
+            result = await self._run_live_binary(request)
+        else:
+            try:
+                parsed = LiveFastRequest(**await request.json())
+            except Exception as exc:  # noqa: BLE001 — même 400 string que le handler
+                from pydantic import ValidationError as PydanticValidationError
+
+                if isinstance(exc, PydanticValidationError):
+                    return JSONResponse(status_code=400,
+                                        content={"detail": _validation_detail(exc.errors())})
+                return JSONResponse(status_code=400,
+                                    content={"detail": "invalid request body: JSON illisible"})
+            result = await self._run_live(parsed)
+        # En-tête additif (RFC 8673) : le levier FAST_TIMING reste le seul interrupteur.
+        # Éteint, `timings_ms` est absent et aucun en-tête n'est émis — un client ancien
+        # ne voit strictement rien changer ; un banc lit les postes sans parser le corps.
+        header = format_server_timing(result.get("timings_ms") if isinstance(result, dict)
+                                      else None)
+        if not header:
+            return result
+        return JSONResponse(content=result, headers={"Server-Timing": header})
+    async def _handle_release(self, request):
+        """Éteint le conteneur GPU — l'app l'appelle quand elle passe en arrière-plan.
+
+        Le téléphone n'a aucun identifiant du fournisseur : il ne peut que demander.
+        L'en-tête `x-sam-release: confirm` évite qu'un scanner ou un préchargement de
+        lien éteigne la carte par accident. On répond **avant** de mourir, sinon le
+        client voit un timeout au lieu d'une confirmation ; le processus s'arrête juste
+        après (min_replica=0 ⇒ pas de relance, et le prochain réveil repart d'un
+        snapshot restauré ou d'un conteneur neuf).
+        """
+        from fastapi import HTTPException
+
+        if request.headers.get("x-sam-release", "") != "confirm":
+            raise HTTPException(status_code=400, detail="en-tête x-sam-release: confirm requis")
+        threading.Timer(RELEASE_GRACE_SECONDS, os._exit, args=(0,)).start()
+        return {"released": True, "grace_seconds": RELEASE_GRACE_SECONDS}
     def api(self):
         """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws, /release."""
-        from fastapi import FastAPI
+        from fastapi import FastAPI, Request, WebSocket
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import JSONResponse
+        from schemas import SegmentRequest
 
+        service = self
         api = FastAPI(title=MODEL_LABEL, version="1.0.0", lifespan=self._lifespan)
         gzip_min = clamp_int(os.environ.get("FAST_GZIP_MIN_BYTES"), 1024, 0, 65536)
         if gzip_min > 0:
@@ -345,86 +423,30 @@ class Sam3LiveService:
         async def invalid_body(_request, exc):
             return JSONResponse(status_code=400, content={"detail": _validation_detail(exc.errors())})
 
-        self._routes_probe(api)
-        self._routes_live(api)
-        self._routes_control(api)
-        return api
-
-    def _routes_probe(self, api):
-        """GET /health et POST /segment (route historique, SPEC)."""
-        from schemas import SegmentRequest
-
         @api.get("/health")
         async def health():
-            return self.health()
+            return service.health()
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
-            return await call(self._segment_sync, request.image_b64, request.prompts)
-
-    def _routes_live(self, api):
-        """POST /live : frame JSON (contrat historique) ou JPEG brut + knobs en query."""
-        from fastapi import Request
-        from fastapi.responses import JSONResponse
-        from schemas import LiveFastRequest
+            return await call(service._segment_sync, request.image_b64, request.prompts)
 
         @api.post("/live")
         async def live(request: Request):
-            """Frame JSON (contrat historique) ou JPEG brut (``octet-stream`` + knobs en query).
+            """Frame JSON ou JPEG brut — voir _handle_live."""
+            return await service._handle_live(request)
 
-            Le binaire évite les +33 % du base64 à la montée : le corps est le JPEG tel
-            quel, les knobs passent en query (``prompts`` répété, ``work_edge``,
-            ``max_objects``, ``mask_encoding``, ``mask_format``, ``mask_edge``,
-            ``batch_prompts``, ``edge``). Réponse strictement identique dans les deux cas.
-            """
-            ctype = request.headers.get("content-type", "")
-            if ctype.split(";")[0].strip().lower() == "application/octet-stream":
-                result = await self._run_live_binary(request)
-            else:
-                try:
-                    parsed = LiveFastRequest(**await request.json())
-                except Exception as exc:  # noqa: BLE001 — même 400 string que le handler
-                    from pydantic import ValidationError as PydanticValidationError
-
-                    if isinstance(exc, PydanticValidationError):
-                        return JSONResponse(status_code=400,
-                                            content={"detail": _validation_detail(exc.errors())})
-                    return JSONResponse(status_code=400,
-                                        content={"detail": "invalid request body: JSON illisible"})
-                result = await self._run_live(parsed)
-            # En-tête additif (RFC 8673) : le levier FAST_TIMING reste le seul interrupteur.
-            # Éteint, `timings_ms` est absent et aucun en-tête n'est émis — un client ancien
-            # ne voit strictement rien changer ; un banc lit les postes sans parser le corps.
-            header = format_server_timing(result.get("timings_ms") if isinstance(result, dict)
-                                          else None)
-            if not header:
-                return result
-            return JSONResponse(content=result, headers={"Server-Timing": header})
-
-    def _routes_control(self, api):
-        """POST /release (extinction GPU) et WS /live/ws (même pipeline que /live)."""
-        from fastapi import Request, WebSocket
 
         @api.post("/release")
         async def release(request: Request):
-            """Éteint le conteneur GPU — l'app l'appelle quand elle passe en arrière-plan.
+            """Éteint le conteneur — voir _handle_release."""
+            return await service._handle_release(request)
 
-            Le téléphone n'a aucun identifiant du fournisseur : il ne peut que demander.
-            L'en-tête `x-sam-release: confirm` évite qu'un scanner ou un préchargement de
-            lien éteigne la carte par accident. On répond **avant** de mourir, sinon le
-            client voit un timeout au lieu d'une confirmation ; le processus s'arrête juste
-            après (min_replica=0 ⇒ pas de relance, et le prochain réveil repart d'un
-            snapshot restauré ou d'un conteneur neuf).
-            """
-            from fastapi import HTTPException
-
-            if request.headers.get("x-sam-release", "") != "confirm":
-                raise HTTPException(status_code=400, detail="en-tête x-sam-release: confirm requis")
-            threading.Timer(RELEASE_GRACE_SECONDS, os._exit, args=(0,)).start()
-            return {"released": True, "grace_seconds": RELEASE_GRACE_SECONDS}
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
             """Même pipeline que POST /live, un message texte JSON par frame."""
             await websocket.accept()
-            await self._ws_loop(websocket)
+            await service._ws_loop(websocket)
+
+        return api
