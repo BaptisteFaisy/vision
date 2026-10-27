@@ -54,7 +54,12 @@ class UiLogicTest {
         assertTrue(isIntroDisablePhrase("  DISABLE ISEE INTRO. "))
         // La dictée entend « i see » en deux mots : la coupe doit quand même marcher.
         assertTrue(isIntroDisablePhrase("ok, disable I see intro please"))
+        // La dictée écrit parfois « iSee » en lettres (« IC », « I.C. », « I C »).
+        assertTrue(isIntroDisablePhrase("disable IC intro"))
+        assertTrue(isIntroDisablePhrase("Please, disable I.C. intro!"))
+        assertTrue(isIntroDisablePhrase("disable I C intro"))
         assertFalse(isIntroDisablePhrase("What does iSee intro say?"))
+        assertFalse(isIntroDisablePhrase("disable intro"))
         assertFalse(isIntroDisablePhrase(""))
     }
 
@@ -66,6 +71,7 @@ class UiLogicTest {
         // La dictée entend « i see » en deux mots, avec l'accent de « désactive ».
         assertTrue(isIntroDisablePhrase("ok, désactive i see intro s'il te plaît"))
         assertTrue(isIntroDisablePhrase("Désactiver iSee intro"))
+        assertTrue(isIntroDisablePhrase("désactive IC intro"))
         // Une question sur l'intro, même en français, ne coupe rien.
         assertFalse(isIntroDisablePhrase("Que dit l'intro iSee ?"))
         assertFalse(isIntroDisablePhrase("désactive le micro"))
