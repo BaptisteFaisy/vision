@@ -31,18 +31,22 @@ c'est le comportement demandé, pas une surprise de migration.
 
 ### Les mots, par langue
 
-Les secteurs sont les mêmes (mêmes seuils `SIDE_EDGE = 0,34`, `PositionText.kt:41`), seuls les mots changent :
+Le cadran est le même (sept bandes égales, `clockHours`, `PositionText.kt:52`), seuls les mots changent :
 
-| Secteur | fr | en |
+| Heure | fr | en |
 |---|---|---|
-| gauche / centre / droite | à gauche · au centre · à droite | on the left · in the middle · on the right |
-| en haut à gauche | en haut à gauche | in the top left |
-| bande centrale verticale | en haut · en bas | at the top · at the bottom |
+| 9 | à 9 heures | at 9 o'clock |
+| 10 | à 10 heures | at 10 o'clock |
+| 11 | à 11 heures | at 11 o'clock |
+| 12 | à midi | at 12 o'clock |
+| 1 | à 1 heure | at 1 o'clock |
+| 2 | à 2 heures | at 2 o'clock |
+| 3 | à 3 heures | at 3 o'clock |
 | distance prononcée | 1,4 mètre · 85 centimètres · 12 mètres | 1.4 meters · 85 centimeters · 12 meters |
 | objets non cités | et 2 autres objets | and 2 other objects |
 
 Forme complète produite en anglais :
-`Person on the left, 1.4 meters away; chair in the middle, 3 meters away.`
+`Person at 9 o'clock, 1.4 meters away; chair at 12 o'clock, 3 meters away.`
 
 Deux points qui ont leur raison :
 
@@ -77,5 +81,5 @@ sans rien traduire. Les distances affichées à l'écran gardent le format fran�
 1. Réglages → « Langue de la voix » → deux boutons, **Voix en anglais (en)** actif par défaut.
 2. « Tester la voix » dit « This is the SAM Vision voice. »
 3. Repasser en « Voix en français (fr) » → la même phrase dit « Test de voix SAM Vision. »,
-   et les annonces redisent « Personne à gauche, à 1,4 mètre. »
+   et les annonces redisent « Personne à 9 heures, à 1,4 mètre. »
 4. Enregistrer ferme les Réglages (`onSave = { save; pop() }`) : y revenir pour tester.
