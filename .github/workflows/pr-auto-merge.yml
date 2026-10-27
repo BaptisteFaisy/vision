@@ -63,7 +63,7 @@ jobs:
             --jq '.[] | select(.mergeStateStatus == "BEHIND") | select(.autoMergeRequest != null) | select(.isDraft == false) | .number' \
           | while read -r pr; do
             [ -n "$pr" ] || continue
-            if gh pr merge --update-branch "$pr" 2>&1; then
+            if gh pr update-branch "$pr" 2>&1; then
               echo "PR #$pr mise à jour"
             else
               echo "PR #$pr sautée (conflit probable, à l'auteur de rebaser)"
