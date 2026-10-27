@@ -23,7 +23,7 @@ data class PrewarmReport(val ready: Int, val generated: Int, val missing: List<S
  *    trop lente → le mot est tu **cette fois** (aucun son qui arrive après coup et couvre
  *    la piste audio) et la génération continue en arrière-plan pour le prochain tap.
  *
- * Les clips vivent dans `filesDir/announcements` (stockage privé), relus par
+ * Les clips vivent dans un dossier privé par voix ([TapConfig.clipDir]), relus par
  * [SpeechPlayer.playFile] : le moteur est partagé, la liste blanche et le dossier ne le sont pas.
  */
 class AnnouncementPlayer(

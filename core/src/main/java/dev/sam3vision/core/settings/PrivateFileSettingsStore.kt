@@ -97,6 +97,7 @@ internal object SettingsCodec {
     private const val K_SPEECH_LANGUAGE = "speechLanguage"
     private const val K_TTS_API_KEY = "ttsApiKey"
     private const val K_TTS_VOICE_ID = "ttsVoiceId"
+    private const val K_TTS_SPEED = "ttsSpeed"
     private const val K_TTS_AUTOPLAY = "ttsAutoplay"
     private const val K_TTS_ANNOUNCE_POSITIONS = "ttsAnnouncePositions"
     private const val K_TTS_GUIDANCE_STRAIGHT = "ttsGuidanceStraight"
@@ -127,6 +128,7 @@ internal object SettingsCodec {
         appendLine("$K_SPEECH_LANGUAGE=${s.speechLanguage.name}")
         appendLine("$K_TTS_API_KEY=${s.ttsApiKey}")
         appendLine("$K_TTS_VOICE_ID=${s.ttsVoiceId}")
+        appendLine("$K_TTS_SPEED=${s.ttsSpeed}")
         appendLine("$K_TTS_AUTOPLAY=${s.ttsAutoplay}")
         appendLine("$K_TTS_ANNOUNCE_POSITIONS=${s.ttsAnnouncePositions}")
         appendLine("$K_TTS_GUIDANCE_STRAIGHT=${s.ttsGuidanceStraight}")
@@ -164,6 +166,8 @@ internal object SettingsCodec {
             speechLanguage = SpeechLanguage.fromName(values[K_SPEECH_LANGUAGE]),
             ttsApiKey = values[K_TTS_API_KEY].orEmpty(),
             ttsVoiceId = values[K_TTS_VOICE_ID].orEmpty().ifBlank { default.ttsVoiceId },
+            ttsSpeed = values[K_TTS_SPEED]?.toFloatOrNull()?.let(Settings::clampTtsSpeed)
+                ?: default.ttsSpeed,
             ttsAutoplay = values[K_TTS_AUTOPLAY]?.toBooleanStrictOrNull() ?: default.ttsAutoplay,
             ttsAnnouncePositions = values[K_TTS_ANNOUNCE_POSITIONS]?.toBooleanStrictOrNull()
                 ?: default.ttsAnnouncePositions,

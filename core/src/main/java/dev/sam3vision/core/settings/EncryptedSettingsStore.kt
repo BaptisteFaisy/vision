@@ -41,6 +41,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             ttsApiKey = prefs.getString(KEY_TTS_API_KEY, default.ttsApiKey).orEmpty(),
             ttsVoiceId = prefs.getString(KEY_TTS_VOICE_ID, default.ttsVoiceId).orEmpty()
                 .ifBlank { default.ttsVoiceId },
+            ttsSpeed = Settings.clampTtsSpeed(prefs.getFloat(KEY_TTS_SPEED, default.ttsSpeed)),
             ttsAutoplay = prefs.getBoolean(KEY_TTS_AUTOPLAY, default.ttsAutoplay),
             ttsAnnouncePositions = prefs.getBoolean(KEY_TTS_ANNOUNCE_POSITIONS, default.ttsAnnouncePositions),
             ttsGuidanceStraight = prefs.getBoolean(KEY_TTS_GUIDANCE_STRAIGHT, default.ttsGuidanceStraight),
@@ -83,6 +84,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putString(KEY_SPEECH_LANGUAGE, s.speechLanguage.name)
             .putString(KEY_TTS_API_KEY, s.ttsApiKey)
             .putString(KEY_TTS_VOICE_ID, s.ttsVoiceId)
+            .putFloat(KEY_TTS_SPEED, Settings.clampTtsSpeed(s.ttsSpeed))
             .putBoolean(KEY_TTS_AUTOPLAY, s.ttsAutoplay)
             .putBoolean(KEY_TTS_ANNOUNCE_POSITIONS, s.ttsAnnouncePositions)
             .putBoolean(KEY_TTS_GUIDANCE_STRAIGHT, s.ttsGuidanceStraight)
@@ -116,6 +118,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_SPEECH_LANGUAGE = "speech_language"
         const val KEY_TTS_API_KEY = "tts_api_key"
         const val KEY_TTS_VOICE_ID = "tts_voice_id"
+        const val KEY_TTS_SPEED = "tts_speed"
         const val KEY_TTS_AUTOPLAY = "tts_autoplay"
         const val KEY_TTS_ANNOUNCE_POSITIONS = "tts_announce_positions"
         const val KEY_TTS_GUIDANCE_STRAIGHT = "tts_guidance_straight"

@@ -23,15 +23,23 @@ Deux sujets distincts, souvent mélangés :
 | **Modèle runtime** | **`eleven_v4_turbo`** | `DEFAULT_TTS_MODEL`, `ElevenLabsTtsClient.kt:80` + test `ElevenLabsTtsClientTest` qui asserte `model_id` |
 | Clé | en-tête **`xi-api-key`** (pas `Authorization: Bearer`) | `buildRequest()` |
 | Sortie | MP3 `mp3_44100_128` | `OUTPUT_FORMAT` |
-| **Voix par défaut** | **Sarah `EXAVITQu4vr4xnSDxMaL`** (premade, marche en compte free) | `Settings.DEFAULT_TTS_VOICE_ID`, `core/settings/Settings.kt:71` |
-| Voix « Jade US » | `TOXPlnYC7z5SQSV2Zgc5`, optionnelle (bibliothèque → 402 sans crédits) | `Settings.JADE_US_VOICE_ID`, `core/settings/Settings.kt:78` |
+| **Voix par défaut** | **Laure `3b8fXc91YHS1i2DYAlBQ`** (voix du projet) | `Settings.DEFAULT_TTS_VOICE_ID` |
+| Sarah (ancien défaut) | `EXAVITQu4vr4xnSDxMaL` (premade, marche en compte free) : un réglage resté dessus migre vers la voix du build, sinon Laure | `Settings.SARAH_VOICE_ID`, `app/SettingsSeed.kt` (`migrateLegacyVoice`) |
+| Voix « Jade US » | `TOXPlnYC7z5SQSV2Zgc5`, optionnelle (bibliothèque → 402 sans crédits) | `Settings.JADE_US_VOICE_ID` |
+| **Vitesse** | **`ttsSpeed`, ×1,9 par défaut, ×0,5..×2** — boutons des Réglages ou ordre vocal (« vitesse 1,5 », « parle plus vite », « ralentis ») | `Settings.ttsSpeed`, `core/speech/TtsSpeedCommand.kt`, `app/TtsSettings.kt` |
 | Origine de la clé | `Settings.ttsApiKey`, complétée par `local.properties` (`tts.api.key`) via `seededFromBuild()` | `app/SettingsSeed.kt:34`, `:66-72` |
 
 ⚠️ **Correction** — l'ancienne note « modèle `eleven_v3`, voix par défaut » ne décrit **pas**
 ce que l'app envoie. `git grep eleven_v3` dans le code Kotlin ne donne qu'**une** occurrence :
 un préfixe de clé de cache dans `SpeechUseCaseTest.kt:42` (§ à ne pas confondre avec le modèle des appels) : `eleven_v3` est le modèle qui a servi à **fabriquer** le
 MP3 de l'intro embarquée, pas le modèle des appels. Tout appel runtime part en
-`eleven_v4_turbo`, avec Sarah si l'utilisateur n'a rien choisi.
+`eleven_v4_turbo`, avec Laure si l'utilisateur n'a rien choisi.
+
+⚠️ **Vitesse = lecture locale, jamais cloud.** `eleven_v4_turbo` ignore le réglage
+`speed` (un non-défaut peut même être rejeté) : le client n'envoie **aucun** `speed`
+(test `ElevenLabsTtsClientTest` qui asserte son absence) et la vitesse s'applique en
+lecture (`MediaPlayer.playbackParams`). Tout l'audio parle donc à la vitesse choisie,
+frais ou en cache, même hors ligne.
 
 ## Réponses vérifiées au curl (relevé de recette, conservé, non rejoué ici)
 
