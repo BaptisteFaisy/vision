@@ -11,15 +11,20 @@ import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * La photo iSee : celle du double tap, qui s'affiche dans la fenêtre flottante puis
  * s'évapore, et celle de l'appui long (frame vivante) qui sert de contexte à la
- * question suivante. Le gel du double tap reste prioritaire jusqu'à la question.
+ * question suivante. Le gel du double tap reste prioritaire tant que son fichier vit,
+ * et le contexte a une fin de vie explicite ([releaseContext]) : démarrage vidéo,
+ * évaporation de la photo, sortie précoce.
  *
  * Les pastilles de distance sont mesurées par [IhearPhotoDistances] (client SAM de
  * `:core`, jamais réécrit) ; chaque échec est dit à l'écran au lieu de rester muet.
@@ -34,6 +39,11 @@ class IhearPhotoShot(
     private val distances: IhearPhotoDistances = IhearPhotoDistances(),
     private val measure: suspend (File, Settings) -> PhotoMeasure =
         { file, current -> distances.measureOutcome(file, current) },
+    private val encode: (File) -> String? = { target ->
+        decodeScaledExact(target)?.let(::bitmapToJpegBase64)
+    },
+    /** Dispatcheur du décodage : I/O en production, dispatcheur de test en JVM. */
+    private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     private val context = IhearPhotoContext()
@@ -54,12 +64,19 @@ class IhearPhotoShot(
         if (asked != true) update { it.copy(status = IhearStatusText.CAMERA_NOT_READY) }
     }
 
-    /** Question envoyée : le gel du double tap est consommé. */
-    fun releaseFreeze() = context.releaseFreeze()
+    /** Fin de vie du contexte photo : vidéo qui démarre, photo évaporée, sortie précoce. */
+    fun releaseContext() = context.release()
 
-    /** La photo-contexte, réencodée en base64 JPEG ; vide si aucune photo en mains. */
-    fun imageBase64(): String =
-        context.file?.let(::decodeScaledExact)?.let(::bitmapToJpegBase64) ?: ""
+    /**
+     * La photo-contexte, réencodée en base64 JPEG hors du thread principal ; `null`
+     * quand il n'y a rien d'utilisable (pas de photo, fichier purgé ou vide, décodage
+     * raté, encodage vide) — une chaîne vide partait au LLM et rendait un 400 muet.
+     */
+    suspend fun imageBase64(): String? = withContext(io) {
+        val target = context.file ?: return@withContext null
+        if (!target.isFile || target.length() == 0L) return@withContext null
+        runCatching { encode(target) }.getOrNull()?.takeIf { it.isNotEmpty() }
+    }
 
     /** Photo écrite : elle se montre dans la fenêtre, puis s'évapore (rafale : remplace). */
     private fun onSaved(target: File, saved: Boolean) {
@@ -75,7 +92,11 @@ class IhearPhotoShot(
         evaporation?.cancel()
         evaporation = scope.launch {
             delay(showMs)
-            if (isOnScreen(target)) update { it.copy(photoPath = null, distanceLayer = null) }
+            if (!isOnScreen(target)) return@launch
+            val busy = state().let { it.holding || it.transcribing || it.thinking }
+            update { it.copy(photoPath = null, distanceLayer = null) }
+            // Une question en cours de préparation joint encore cette photo : on la garde.
+            if (!busy) context.release()
         }
     }
 

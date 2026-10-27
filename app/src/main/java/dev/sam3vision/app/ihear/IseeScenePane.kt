@@ -50,12 +50,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,7 +119,10 @@ private fun BoxWithConstraintsScope.SceneScaffold(
     val (dissolve, world) = rememberDissolution(state, view.scene, grid, width, height)
 
     val total = bubbleCount(state.entries.size)
-    val layers = iseeSceneLayers(view.scene, total, dissolving = dissolve.second != null)
+    // Une capture vivante (vidéo qui tourne, photo posée) garde sa carte à l'écran,
+    // même pendant l'écoute : on continue de voir ce qu'on filme en parlant.
+    val captureLive = state.recordingVideo || state.photoPath != null
+    val layers = iseeSceneLayers(total, dissolving = dissolve.second != null, captureLive = captureLive)
     SceneArea(
         layers = layers,
         scene = view.scene,
@@ -139,7 +139,8 @@ private fun BoxWithConstraintsScope.SceneScaffold(
     )
     HeadingArea(view, height)
     PageDotsLayer(layers, total, state.selected, height)
-    InstructionPill(
+    SceneBottomBar(
+        state,
         Modifier
             .align(Alignment.BottomCenter)
             .padding(bottom = navInsetDp() + 10.dp),
@@ -223,6 +224,9 @@ private fun armDissolve(
         if (state.recordingVideo || state.photoPath != null) armed = true
     }
     LaunchedEffect(scene, grid) {
+        // Une capture vivante garde la carte : rien ne part en gerbe tant qu'on filme
+        // ou tant qu'une photo est à l'écran, même si la pill est passée en THINKING.
+        if (state.recordingVideo || state.photoPath != null) return@LaunchedEffect
         when (scene) {
             IseeScene.VISION -> Unit
             IseeScene.THINKING, IseeScene.VOICE, IseeScene.ANSWERED -> {
@@ -307,13 +311,22 @@ internal data class IseeSceneLayers(val cameraCard: Boolean, val pageDots: Boole
 }
 
 /**
- * Les règles de visibilité du design : la carte caméra n'apparaît que dans la scène
- * VISION, et jamais pendant qu'elle se dissout (la carte gelée prend sa place) ; les
- * dots n'apparaissent qu'hors VISION et seulement s'il y a plusieurs bulles.
+ * Les règles de visibilité du design : la carte caméra est affichée tant qu'une
+ * capture est vivante (`captureLive`), quelle que soit la scène — tenir le micro
+ * pendant que la vidéo tourne ne doit pas cacher ce qu'on filme — et jamais
+ * pendant qu'elle se dissout (la carte gelée prend sa place). Les dots
+ * n'apparaissent que hors capture et seulement s'il y a plusieurs bulles.
+ *
+ * La scène ne décide plus de la carte : elle garde son rôle dans la pill d'état,
+ * et la réflexion peut donc s'afficher au-dessus d'une caméra vivante.
  */
-internal fun iseeSceneLayers(scene: IseeScene, bubbles: Int, dissolving: Boolean): IseeSceneLayers {
-    val cameraCard = scene == IseeScene.VISION && !dissolving
-    return IseeSceneLayers(cameraCard = cameraCard, pageDots = scene != IseeScene.VISION && bubbles > 1)
+internal fun iseeSceneLayers(
+    bubbles: Int,
+    dissolving: Boolean,
+    captureLive: Boolean,
+): IseeSceneLayers {
+    val cameraCard = captureLive && !dissolving
+    return IseeSceneLayers(cameraCard = cameraCard, pageDots = !captureLive && bubbles > 1)
 }
 
 /** La scène : la carte vivante (VISION), ou la bulle — et pendant la dissolution la
@@ -471,26 +484,4 @@ private fun PageDots(total: Int, selected: Int, modifier: Modifier = Modifier) {
             )
         }
     }
-}
-
-/** La pill d'instructions du bas : actions fortes sombres, verbes de service gris. */
-@Composable
-private fun InstructionPill(modifier: Modifier = Modifier) {
-    Text(
-        buildAnnotatedString {
-            val strong = SpanStyle(color = IseeSceneColors.instructStrong, fontWeight = FontWeight.Bold)
-            val soft = SpanStyle(color = IseeSceneColors.instructGray)
-            withStyle(strong) { append("Tap") }
-            withStyle(soft) { append(" see") }
-            withStyle(strong) { append("   Hold") }
-            withStyle(soft) { append(" ask") }
-            withStyle(strong) { append("   Swipe") }
-            withStyle(soft) { append(" remember") }
-        },
-        color = IseeSceneColors.instructStrong,
-        fontSize = 13.sp,
-        modifier = Modifier
-            .background(IseeSceneColors.instructBg, RoundedCornerShape(50))
-            .padding(horizontal = 18.dp, vertical = 9.dp),
-    )
 }

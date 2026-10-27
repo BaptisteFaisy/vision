@@ -3,6 +3,40 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (7) — la question porte sur ce qu'on filme, et l'échec se voit
+
+- **Cause trouvée (10 agents, rapports `isee-diag-2026-10-27/`)** : le « gel » d'une photo du
+  double tap n'avait **aucune fin de vie**. Il n'était levé que par `IhearAnswers.releaseFreeze()`
+  sur le chemin nominal — jamais à l'évaporation, jamais au démarrage d'une vidéo, jamais sur une
+  sortie précoce (clé LLM absente, texte vide, question déjà en vol). Conséquence : dès qu'une
+  photo avait été prise, `captureForHold` devenait un no-op **à vie**, et toute question partait
+  avec cette photo morte, y compris pendant un enregistrement vidéo.
+- **Fin de vie explicite** : `IhearPhotoContext.release()` (gel + fichier à zéro) et
+  `IhearPhotoShot.releaseContext()`, appelés au démarrage de la vidéo, à l'évaporation de la photo
+  (sauf tenue/transcription/réflexion en cours), sur chaque sortie précoce du ViewModel et dans le
+  `finally` de `IhearAnswers.answer`. Un gel dont le fichier a été purgé est reconnu mort :
+  `captureForHold` le relâche et reprend la frame filmée.
+- **Image inutilisable** : `IhearPhotoShot.imageBase64()` devient `suspend` et rend `null` (jamais
+  `""`), sur `Dispatchers.IO` (injectable : les tests restent sur le dispatcheur virtuel). Une
+  image vide partait en `data:image/jpeg;base64,` → 400 du backend → **aucune réponse, aucun
+  message**. `InferHubLlmClient` envoie désormais la question **en texte seul** quand il n'y a pas
+  d'image (une seule fabrique `userMessage` pour les trois appels).
+- **Réponse jamais muette** : `IhearAnswers` prend une seule question à la fois (`AtomicBoolean`
+  posé avant toute suspension — deux tenues rapprochées donnaient 409 sur la seconde), enveloppe
+  `ask` **et** `spoken` dans un `Result`, et relâche le contexte dans un `finally`.
+- **L'échec s'affiche** : `IhearUiState.status` était écrit de partout et **lu par aucun
+  composable**. Nouveau `IseeStatusLine.kt` (`statusLineOf` pure + `SceneBottomBar`) : la ligne de
+  statut est posée au-dessus de la pill d'instructions, dans toutes les scènes, et affiche
+  « Thinking… » pendant la réflexion.
+- **On voit ce qu'on filme** : `iseeSceneLayers` ne dépend plus de la scène mais de
+  `captureLive` — la carte caméra reste à l'écran pendant la tenue du micro. La réflexion passe
+  devant l'enregistrement dans `iseeSceneOf` (la pill passe en THINKING sans cacher la carte), et
+  la dissolution ne part plus tant qu'une capture est vivante.
+- **Tests** : 1 451 JVM verts (`:core` + `:app`), 0 échec ; `check-kotlin-limits.py` OK. Nouveaux
+  cas : gel → vidéo → frame filmée ; gel au fichier purgé ; évaporation pendant une tenue ; gel
+  relâché sur succès/échec/clé absente ; deux `answer()` concurrents → un seul appel ; corps HTTP
+  sans `image_url` quand l'image est vide ; ligne de statut et carte visible sous tenue.
+
 ## 2026-10-27 (6) — la caméra iSee guide tout droit, sans LLM
 
 - **La page caméra iSee dit la consigne de marche** (« Continue tout droit. », « Personne

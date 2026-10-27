@@ -22,11 +22,14 @@ fun selectedEntry(state: IhearUiState): ChatEntry? = when {
 }
 
 /** La scène qui s'affiche au moment t, dans l'ordre de priorité du design :
- * écoute > enregistrement > réflexion > voix > la vue du message courant. */
+ * écoute > réflexion > enregistrement > voix > la vue du message courant.
+ *
+ * La réflexion passe devant l'enregistrement : c'est le seul retour visible quand
+ * la question part (la carte caméra, elle, reste affichée — voir `iseeSceneLayers`). */
 fun iseeSceneOf(state: IhearUiState, entry: ChatEntry?): IseeScene = when {
     state.holding || state.transcribing -> IseeScene.LISTENING
-    state.recordingVideo || state.photoPath != null -> IseeScene.VISION
     state.thinking -> IseeScene.THINKING
+    state.recordingVideo || state.photoPath != null -> IseeScene.VISION
     state.speakingEntryId != null -> IseeScene.VOICE
     entry == null -> IseeScene.READY
     entry is ChatEntry.UserBubble && isLast(state) -> IseeScene.READY

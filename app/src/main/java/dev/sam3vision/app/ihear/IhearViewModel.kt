@@ -181,6 +181,9 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
         }
+        // Ce qui est filmé devient le contexte de la question : la photo gelée d'avant
+        // est périmée et gagnerait sinon la place (question portant sur une image figée).
+        if (_state.value.recordingVideo) shots.releaseContext()
         shots.captureForHold()
         update { it.copy(holding = true, status = null) }
         haptics.holdStart()
@@ -262,14 +265,17 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun transcribeAndAnswer() {
         if (!playerIdle()) {
             // Tenue pendant une lecture : capture jetée, micro jamais bloqué, et dit.
-            dictation.discard()
-            update { it.copy(status = IhearStatusText.BUSY_SPEAKING) }
+            dropHeard(IhearStatusText.BUSY_SPEAKING)
             return
         }
         // Échec de dictée : le motif est déjà affiché, la conversation reste à l'écran.
-        val heard = dictation.finish(settings) ?: return
+        // Le contexte photo de cette tenue est relâché : il ne gèle pas à vie.
+        val heard = dictation.finish(settings) ?: run {
+            shots.releaseContext()
+            return
+        }
         if (isIntroDisablePhrase(heard.text)) {
-            dictation.discard()
+            dropHeard()
             intro.disable()
             return
         }
@@ -279,21 +285,26 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */
     private suspend fun handleDictated(text: String, pcm: ByteArray) {
         if (text.isBlank()) {
-            dictation.discard()
-            update { it.copy(status = IhearStatusText.NOTHING_HEARD) }
+            dropHeard(IhearStatusText.NOTHING_HEARD)
             return
         }
         // Une seule question à la fois : deux appels LLM concurrents sont refusés
         // par le backend (409 « limite atteinte ») et le second restait sans réponse.
         if (_state.value.thinking) {
-            dictation.discard()
-            update { it.copy(status = IhearStatusText.ANSWER_PENDING) }
+            dropHeard(IhearStatusText.ANSWER_PENDING)
             return
         }
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
         answers.answer(row, text)
+    }
+
+    /** Sortie précoce après une tenue : micro rendu, contexte photo relâché, motif éventuel. */
+    private fun dropHeard(status: String? = null) {
+        dictation.discard()
+        shots.releaseContext()
+        if (status != null) update { it.copy(status = status) }
     }
 
     // ————— Coulisses —————
