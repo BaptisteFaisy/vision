@@ -1,5 +1,6 @@
 package dev.sam3vision.core.settings
 
+import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -128,6 +129,12 @@ data class Settings(
      * anglais. L'interface, elle, reste en français.
      */
     val speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT,
+    /**
+     * Moteur de profondeur embarqué (100 % sur le téléphone, 0 GPU Modal).
+     * Coupé par défaut : le banc embarqué (Réglages → Profondeur) valide la
+     * latence sur l'appareil avant toute activation.
+     */
+    val depthBackend: DepthBackend = DepthBackend.OFF,
 ) {
     companion object {
         /**

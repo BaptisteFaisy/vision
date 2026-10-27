@@ -12,7 +12,12 @@ import dev.sam3vision.app.vm.AppImageLoader
 import dev.sam3vision.app.vm.AppStatusText
 import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
+import dev.sam3vision.core.depth.DepthBackend
+import dev.sam3vision.core.depth.syntheticGradientArgb
 import dev.sam3vision.core.live.PositionText
+import dev.sam3vision.app.depth.DepthBench
+import dev.sam3vision.app.depth.DepthEstimators
+import dev.sam3vision.core.mask.colorizedMaskBitmap
 import dev.sam3vision.core.mask.colorizedOverlays
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
@@ -246,6 +251,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun testSam() = viewModelScope.launch { diagnostics.testSam() }
 
+    /**
+     * Banc profondeur embarqué : 5 inférences du moteur choisi sur une image
+     * synthétique, verdict dans la ligne de statut (et logcat `DepthBench`).
+     * Moteur coupé ⇒ message immédiat, aucun chargement de modèle.
+     */
+    fun testDepth() = viewModelScope.launch {
+        val backend = _state.value.settings.depthBackend
+        if (backend == DepthBackend.OFF) {
+            _state.update { it.copy(statusLine = "Profondeur coupée — choisis un moteur.") }
+            return@launch
+        }
+        _state.update { it.copy(statusLine = "Test profondeur en cours… (${backend.code})") }
+        val verdict = withContext(Dispatchers.Default) {
+            val estimator = DepthEstimators.open(getApplication(), backend)
+            try {
+                val image = syntheticGradientArgb(BENCH_SIZE, BENCH_SIZE)
+                DepthBench.run(estimator, image, BENCH_SIZE, BENCH_SIZE)
+            } finally {
+                estimator.close()
+            }
+        }
+        _state.update { it.copy(statusLine = "Profondeur : ${DepthBench.summary(verdict)}") }
+    }
+
     // ————— Dictée (appui long partout, bouton « Dicter » dans le chat) —————
 
     /** Bouton « Dicter » du chat : ouvre le micro jusqu'au prochain Stop. */
@@ -286,5 +315,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Bord max envoyé : le serveur travaille à 640 px, inutile d'envoyer plus. */
         const val PHOTO_SEND_EDGE = 640
+
+        /** Côté de l'image synthétique du banc profondeur (carré, px). */
+        const val BENCH_SIZE = 256
     }
 }

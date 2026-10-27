@@ -47,6 +47,7 @@ fun SettingsScreen(
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
+    onTestDepth: () -> Unit,
     onSpeak: (String) -> Unit,
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
@@ -74,6 +75,7 @@ fun SettingsScreen(
                 onTestLlm = onTestLlm,
                 onTestSam = onTestSam,
                 onTestAsr = onTestAsr,
+                onTestDepth = onTestDepth,
                 onStartTracking = onStartTracking,
                 onStopTracking = onStopTracking,
                 onOpenLive = onOpenLive,
@@ -236,6 +238,7 @@ private fun TechnicalSection(
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
+    onTestDepth: () -> Unit,
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     onOpenLive: () -> Unit,
@@ -253,6 +256,7 @@ private fun TechnicalSection(
         PredictionSettings(draft) { onChange(it) }
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
+        DepthSettings(draft, { onChange(it) }, onTestDepth)
         TtsSettings(
             draft = draft,
             speaking = speaking,
