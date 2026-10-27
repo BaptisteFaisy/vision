@@ -71,6 +71,17 @@ def decode_image(image_b64: str) -> Image.Image:
         raise ImageDecodeError(f"unreadable image: {exc}") from exc
 
 
+def decode_jpeg_bytes(raw: bytes) -> Image.Image:
+    """Décode un JPEG/PNG brut (entrée ``octet-stream`` de ``POST /live``) en RGB."""
+    if not isinstance(raw, (bytes, bytearray)) or not raw:
+        raise ImageDecodeError("empty image body")
+    try:
+        with Image.open(io.BytesIO(bytes(raw))) as opened:
+            return opened.convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise ImageDecodeError(f"unreadable image: {exc}") from exc
+
+
 def resize_max_edge(image: Image.Image, max_edge: int) -> Image.Image:
     """Return the image scaled down so its longest edge is at most ``max_edge``."""
     width, height = image.size
@@ -149,6 +160,107 @@ def decode_mask_bits_b64(payload: str) -> np.ndarray:
         raise MaskFormatError(f"payload holds {bits.size} bytes, expected {row_bytes * height}")
     unpacked = np.unpackbits(bits).reshape(height, row_bytes * 8)
     return (unpacked[:, :width] * 255).astype(np.uint8)
+
+
+# Format « rle » (codec compact) : runs LEB128, sans perte, sur une grille réduite.
+#   runs   : alternance 0/255 en commençant par 0, chaque run = varint LEB128 non
+#            signé (7 bits/octet, MSB = suite) ; la somme des runs vaut w*h ; un masque
+#            commençant par 1 s'ouvre donc par un run 0 (éventuellement nul).
+#   grille : côté long = ``mask_edge`` (défaut 256), ratio porté par ``mask_scale``.
+# Miroir exact du décodeur Kotlin (``MaskRle.kt`` + ``maskGrid``) : la grille est
+# calculée ici avec la même arithmétique float32 que le client, donc le client
+# retrouve octet pour octet les dimensions annoncées — un run RLE ne porte aucune
+# dimension, la moindre divergence rendrait le masque illisible.
+RLE_DEFAULT_EDGE = 256
+RLE_MIN_EDGE = 64
+RLE_MAX_EDGE = 1024
+
+
+def _java_round(value: float) -> int:
+    """``Math.round(float)`` : plancher de x+0,5 (jamais le ``round`` banquier de Python)."""
+    return int(np.floor(np.float32(value) + np.float32(0.5)))
+
+
+def rle_grid(image_size: tuple[int, int], mask_edge: int) -> tuple[tuple[int, int], float]:
+    """Grille RLE pour une frame ``image_size`` : ((largeur, hauteur), ``mask_scale``).
+
+    ``mask_edge`` est borné à [64, 1024] (jamais rejeté, comme ``work_edge``) et la
+    grille est dérivée en float32 exactement comme le client la redérivera.
+    """
+    width, height = image_size
+    edge = max(RLE_MIN_EDGE, min(int(mask_edge or RLE_DEFAULT_EDGE), RLE_MAX_EDGE))
+    scale = edge / max(max(width, height), 1)
+    grid_w = max(1, _java_round(np.float32(width) * np.float32(scale)))
+    grid_h = max(1, _java_round(np.float32(height) * np.float32(scale)))
+    return (grid_w, grid_h), scale
+
+
+def _encode_varint(value: int) -> bytes:
+    """Entier non signé en LEB128 (miroir de ``readVarint`` côté Kotlin)."""
+    out = bytearray()
+    remaining = int(value)
+    while True:
+        chunk = remaining & 0x7F
+        remaining >>= 7
+        if remaining:
+            out.append(chunk | 0x80)
+        else:
+            out.append(chunk)
+            return bytes(out)
+
+
+def encode_mask_rle_b64(mask, grid: tuple[int, int]) -> str:
+    """Encode un masque en runs LEB128 sur ``grid`` (w, h), base64, sans perte."""
+    cells = (mask_to_uint8(mask, grid) > 0).reshape(-1)
+    runs = bytearray()
+    level = False
+    count = 0
+    for filled in cells:
+        if bool(filled) == level:
+            count += 1
+        else:
+            runs += _encode_varint(count)
+            level = not level
+            count = 1
+    runs += _encode_varint(count)
+    return base64.b64encode(bytes(runs)).decode("ascii")
+
+
+def decode_mask_rle_b64(payload: str, grid: tuple[int, int]) -> np.ndarray:
+    """Inverse de :func:`encode_mask_rle_b64` : tableau uint8 0/255 de forme (h, w).
+
+    Miroir du décodeur Kotlin (mêmes refus : varint tronqué, dépassement, total
+    inexact) : les tests l'utilisent comme oracle du format servi.
+    """
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError, TypeError) as exc:
+        raise MaskFormatError(f"invalid base64 payload: {exc}") from exc
+    width, height = grid
+    total = width * height
+    pixels = np.zeros(total, dtype=np.uint8)
+    at, level, index = 0, 0, 0
+    size = len(raw)
+    while index < size:
+        value, shift = 0, 0
+        while True:
+            if index >= size:
+                raise MaskFormatError("truncated varint in RLE payload")
+            chunk = raw[index]
+            index += 1
+            value |= (chunk & 0x7F) << shift
+            shift += 7
+            if not chunk & 0x80 or shift > 35:
+                break
+        if value > total - at:
+            raise MaskFormatError(f"RLE run overflows the {width}x{height} grid")
+        if level:
+            pixels[at:at + value] = 255
+        at += value
+        level = 255 - level
+    if at != total:
+        raise MaskFormatError(f"RLE holds {at} pixels, expected {total}")
+    return pixels.reshape(height, width)
 
 
 def check_mask_encoding(mask_encoding) -> str:
