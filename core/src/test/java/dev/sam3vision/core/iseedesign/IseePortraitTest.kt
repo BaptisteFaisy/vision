@@ -101,4 +101,13 @@ class IseePortraitTest {
         assertEquals(0.20f, IseePortrait.CAM_R, 0f)
         assertEquals(0.34f, IseePortrait.FADE, 0f)
     }
+
+    @Test
+    fun `l'enveloppe de voix est figee echantillon par echantillon`() {
+        assertEquals(0f, voiceEnvelope(0f), 0f)
+        assertEquals(0.138603f, voiceEnvelope(1f), 1e-4f)
+        assertEquals(0.482936f, voiceEnvelope(2.5f), 1e-4f)
+        assertEquals(0.345615f, voiceEnvelope(1f, 3), 1e-4f)
+        assertEquals(0.319674f, voiceEnvelope(0.5f, 3), 1e-4f)
+    }
 }

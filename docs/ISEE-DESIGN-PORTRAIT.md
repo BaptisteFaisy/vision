@@ -79,3 +79,19 @@ texte multi-pages ; ne pas modifier palettes, géométrie ni constantes
 (`REST_*`, `CAM_*`, `PICTURE_H`, `FADE`) sans demande explicite du user ;
 tout nouvel écran iSee reprend ce design. En cas de doute : le code
 `IseePortrait.kt` + ses tests font foi, pas la maquette d'origine.
+
+## 6. Boule gelée : le rendu ne change plus sans le user
+
+Le code qui dessine la boule est figé à l'octet près :
+`tools/orb-frozen-baseline.json` garde les empreintes de `IseePortraitOrb.kt`
+(entier : shader AGSL, repli dégradés, peintre) et des 5 unités d'animation de
+`IseeScenePane.kt` (`rememberSceneTime`, `OrbLayer`, `orbLookOf`,
+`drawOrbShadow`, `drawVoiceCrown`). Le garde `tools/check-isee-design.py` (CI,
+job `ci`) refuse toute dérive ; en complément, `IseePortraitTest` fige
+l'enveloppe de voix échantillon par échantillon et `IseeSceneTest` le mapping
+scène → look.
+
+Changement volontaire (demande explicite du user uniquement) : modifier le
+code, régénérer avec `python3 tools/freeze-orb-baseline.py`, relire le diff
+(baseline et code voyagent ensemble), déclarer les deux fichiers dans
+`## Scope`.
