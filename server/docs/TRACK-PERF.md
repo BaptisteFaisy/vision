@@ -137,3 +137,35 @@ pour 169 ms de serveur). Donc, budget 200 ms tenu avec :
 (`TRACK_APP_NAME=sam3-direct-h200 TRACK_GPU=H200 TRACK_REGION=eu TRACK_ROUTING_REGION=eu-west`),
 URL `https://baptiste-faisy--sam3-direct-h200-sam3track-web.eu-west.modal.run`. C'est elle que
 `sam.base.url` doit viser pour le mode Direct.
+
+## Où passent les millisecondes — et ce qui ne dépend pas du GPU (13:45)
+
+Décomposition instrumentée (`ms` de chaque `/frame`), H200 eu-west, 512×288 q65, 1 concept :
+
+| Poste | Coût médian | Nature |
+|---|---:|---|
+| Décodage JPEG | 1 ms | CPU |
+| Normalisation (GPU depuis 11:xx) | 1 ms | CPU→GPU |
+| Masques PNG + base64 | 1–2 ms | CPU |
+| **Total non-GPU serveur** | **3–4 ms** | rien à gagner |
+| **Propagation (modèle)** | **116 ms** | GPU + dispatch Python |
+| Écart A/R − serveur (téléphone) | **36 ms** | TLS + gateway + upload |
+| Écart A/R − serveur (PC de dev) | 140–150 ms | **réseau du poste** : `/health` sans calcul met déjà 140 ms, et `modal.com` 237 ms |
+
+Autrement dit : le non-GPU côté serveur est déjà quasi nul (3–4 ms), et le trajet réseau
+depuis le téléphone est de 36 ms. **Les 116 ms restants sont le calcul du modèle.**
+
+### Leviers testés
+
+| Levier | Résultat |
+|---|---|
+| `torch.compile` (`TRACK_COMPILE=1`) | conteneur tué par signal au premier `/frame` — abandonné |
+| `multiplex_count`/`max_num_objects` à 4 | **impossible** : le checkpoint est figé à 16 (`size mismatch` sur `no_obj_embed_spatial`, `mask_tokens`, …) |
+| `batched_grounding_batch_size` = 4 (`TRACK_GROUNDING_BATCH`) | médiane **84 ms** (p95 164) contre 116 ms (p95 120) en chunk=1 : le 1er frame de chaque lot paie tout (série mesurée : 158, 21, 20, 87, 161, 23, 24, 99…) |
+| Baisser la résolution d'envoi (320×180 au lieu de 512×288) | aucun effet : le processeur rameute à 1008² de toute façon |
+
+**Conclusion** : sous 200 ms, c'est le *chunk de 1* qui donne la latence la plus **régulière**
+(116 ms constants, p95 120). Le chunk de 4 abaisse la moyenne (84 ms, ≈14 fps) au prix d'un
+p95 à 164 ms. Le seul vrai levier restant pour descendre sous ~100 ms serait de **pipelines
+plusieurs frames en vol** (le GPU est inactif ~25 % du temps entre deux réponses) — cela
+demande de changer la porte côté app et l'ordre d'arrivée des frames côté serveur.
