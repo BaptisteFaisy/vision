@@ -52,6 +52,16 @@ class TempWavStoreTest {
     }
 
     @Test
+    fun `le prefixe distingue les dictées du téléphone et des lunettes`() {
+        val store = TempWavStore(dir, prefix = "lunettes")
+
+        val file = store.write(ByteArray(320)).getOrThrow()
+
+        assertTrue(file.name.startsWith("lunettes-"))
+        assertEquals(file.name, store.latest()?.name)
+    }
+
+    @Test
     fun `un dossier impossible rend un echec sans exception`() {
         val blocker = dir.resolve("fichier")
         blocker.writeText("pas un dossier")
