@@ -13,13 +13,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 
 /**
- * Les trois permissions runtime d'iSee, demandées ensemble au premier lancement :
- * caméra (bulle iSee), micro (dictée, annonces), Bluetooth (lunettes Ray-Ban Meta).
+ * Les quatre permissions runtime d'iSee, demandées ensemble au premier lancement :
+ * caméra (bulle iSee), micro (dictée, annonces, micro verrouillé), Bluetooth (lunettes
+ * Ray-Ban Meta) et notifications — sans elles, la notification du service de premier plan
+ * reste invisible et le micro de l'écran verrouillé n'aurait aucun bouton.
  */
 val IseePermissions = listOf(
     Manifest.permission.CAMERA,
     Manifest.permission.RECORD_AUDIO,
     Manifest.permission.BLUETOOTH_CONNECT,
+    Manifest.permission.POST_NOTIFICATIONS,
 )
 
 /** Parmi cette liste, celles qui ne figurent pas dans l'ensemble accordé (pur, test JVM). */
@@ -35,7 +38,7 @@ fun missingPermissions(context: Context): List<String> =
 object IseePermissionFlow {    /** La demande groupée de permissions s'est jouée au moins une fois. */
 val handled = mutableStateOf(false)
 }/**
- * Au premier lancement, les trois dialogues système s'enchaînent seuls — Android ne
+ * Au premier lancement, les quatre dialogues système s'enchaînent seuls — Android ne
  * permet pas d'octroyer une permission autrement, aucune question de l'app ne s'ajoute.
  * Tant que le groupe n'a pas répondu (« handled » faux), la bulle caméra patiente.
  * Un refus du micro est annoncé à la voix, comme avant ; un refus de la série n'est pas

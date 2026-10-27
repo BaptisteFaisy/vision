@@ -3,7 +3,7 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-27 (3) — une seule app : le banc lunettes entre dans iSee
+## 2026-10-27 (5) — une seule app : le banc lunettes entre dans iSee
 
 - **Le module `:glasses-spike` est supprimé et son banc d'essai lunettes vit désormais dans
   `:app`**, paquet `dev.sam3vision.app.glasses.bench`, ouvert depuis l'écran Lunettes
@@ -25,8 +25,40 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   Les entrées **antérieures** de ce journal gardent `:glasses-spike` : c'était le nom du module
   aux dates où elles ont été écrites.
 - **Non mesuré** : aucun `gradlew` lancé ici (l'intégration est faite par l'orchestrateur) ; le
-  banc n'a pas été exécuté sur des lunettes, et `frame-64.jpg` manque encore dans
-  `app/src/test/resources/` alors que `ChaineCompleteTest` l'exige.
+  banc n'a pas été exécuté sur des lunettes, ; `ChaineCompleteTest` embarque son JPEG 64×64 en base64, faute d'asset dans `app/src/test/resources/`.
+
+## 2026-10-27 (3) — le build du téléphone rattrape un cache KSP corrompu
+
+- **Constat** : vers 11 h, le cron `vision-phone-latest` échouait **en boucle** sur
+  `[ksp] Storage corrupted …/app/build/kspCaches/debug/symbolLookups/id-to-file.tab_i`, puis sur
+  `Storage … file-to-id.tab is already registered`. Le téléphone est resté ~15 min sur un `master`
+  périmé, **sans alerte** — la panne la plus invisible possible pour « le banc suit master ».
+- **Correctif** : `scripts/install-phone-latest.sh` fait un **second essai** quand le log du build
+  contient l'un de ces deux messages, via `./gradlew --no-daemon clean assembleDebug --offline` :
+  `clean` est exécuté par le démon lui-même (son registre de caches reste cohérent) et
+  `--no-daemon` évite de tuer celui des autres agents qui compilent en parallèle. Un seul essai
+  supplémentaire, jamais de boucle ; le JDK est retrouvé comme dans `scripts/build.sh`.
+- **Preuves** : `bash scripts/test_scripts.sh` → **80 assertions, 80 ok** (dont les gardes
+  statiques : aucun `rm -rf` brut, `set -euo pipefail`, zéro chemin `/home/` en dur) ; `bash -n` OK ;
+  `python3 tools/check-kotlin-limits.py` OK.
+## 2026-10-27 (4) — le micro répond écran verrouillé
+
+- **La panne** : `MainActivity.onPause()` annule la tenue du doigt et Android 11+ coupe de toute
+  façon le micro d'une app en arrière-plan ; l'app n'avait **aucun** service de premier plan.
+  Écran verrouillé, « activer le micro » ne pouvait donc rien donner.
+- **Le service** (`app/locked/LockedMicService.kt`) : premier plan type `microphone`, armé par
+  l'activité **visible** (`onResume` — seul démarrage autorisé depuis Android 12), piloté ensuite
+  par l'action de la notification (visibilité publique) ou la tuile des réglages rapides. Réveil
+  partiel pendant la capture seulement ; plafond de 20 s, faute de relâchement possible.
+- **La réponse** : `LockedMicAnswer` enchaîne PCM → transcription (Meta, repli Scribe) → question
+  **sans image** → voix ElevenLabs. `LlmClient.askText` + `LlmPrompts.askVoiceSystem` disent au
+  modèle qu'il n'a aucune image : il l'annonce au lieu de décrire une photo absente.
+- **Les règles** : `core/speech/LockedMic.kt` (6 phases, plafond, textes affichés et prononcés),
+  11 tests ; `LockedMicAnswerTest` 5 ; `LlmContractTest` +2 (aucune image dans le corps, échec
+  explicite d'un client qui ne sait pas répondre sans photo).
+- **Permissions** : `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS`,
+  `WAKE_LOCK` ; `POST_NOTIFICATIONS` entre dans la demande groupée du premier lancement.
+- **Doc** : `docs/MICRO-VERROUILLE.md` (séquence légale, recette téléphone, limites assumées).
 
 ## 2026-10-27 (2) — le téléphone suit `master` tout seul
 

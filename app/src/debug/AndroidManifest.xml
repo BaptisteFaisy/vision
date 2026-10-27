@@ -7,6 +7,17 @@
 
     <application
         android:usesCleartextTraffic="true"
-        tools:replace="android:usesCleartextTraffic" />
+        tools:replace="android:usesCleartextTraffic">
+
+        <!-- Debug uniquement : geste du micro verrouillé scriptable, l'écran de verrouillage
+             n'étant pas exposé à `uiautomator` (fenêtre sécurisée). Absent du build release. -->
+        <receiver
+            android:name=".locked.LockedMicDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.sam3vision.app.locked.DEBUG_TOGGLE" />
+            </intent-filter>
+        </receiver>
+    </application>
 
 </manifest>

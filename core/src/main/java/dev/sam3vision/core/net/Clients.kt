@@ -20,6 +20,17 @@ interface LlmClient {
         history: List<ChatTurn>,
         context: String? = null,
     ): Result<String>
+
+    /**
+     * Question **sans image** : écran verrouillé, la caméra est fermée (le direct et la sonde
+     * iSee s'arrêtent en arrière-plan), il ne reste que la voix. Un client qui ne sait pas
+     * répondre sans photo échoue **explicitement** au lieu de faire semblant.
+     */
+    suspend fun askText(
+        question: String,
+        history: List<ChatTurn>,
+        context: String? = null,
+    ): Result<String> = Result.failure(ApiError.NotSupported("ce client ne répond pas sans image"))
 }
 
 /** Client de segmentation SAM 3.1 (endpoint HTTP optionnel, contrat de l'ancien backend Modal). */

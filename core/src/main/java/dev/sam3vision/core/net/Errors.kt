@@ -43,4 +43,7 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
 
     /** Le moteur principal et son repli ont tous deux échoué (messages déjà rédigés). */
     class AllProviders(detail: String) : ApiError("dictée impossible : $detail")
+
+    /** Opération que ce client ne sait pas rendre (ex. question sans image) : rien à réessayer. */
+    class NotSupported(message: String) : ApiError(message)
 }

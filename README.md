@@ -71,9 +71,10 @@ proportions non.
 
 1. **Une clé LLM** exposant une API `chat/completions` (base URL + modèle) — saisie dans **Réglages**, stockée
    chiffrée (Keystore), ou fournie au build par `local.properties` (gitignoré). Sans clé,
-   l'app le dit et n'appelle pas. Les défauts du code : base `https://api.inferhub.dev/v1`,
-   modèle `ali/qwen3.8-omni-flash` (`Settings.DEFAULT_LLM_BASE_URL` / `DEFAULT_LLM_MODEL`,
-   `core/…/settings/Settings.kt:63-64`).
+   l'app le dit et n'appelle pas. Les défauts du code, **identiques pour toutes les clés** :
+   base `https://inference.baseten.co/v1`, modèle `meta-models/muse-spark-open-1026`
+   (`Settings.DEFAULT_LLM_BASE_URL` / `DEFAULT_LLM_MODEL`,
+   `core/…/settings/Settings.kt:87-88`).
 2. **Un endpoint de segmentation** SAM 3.1 — champ *Base URL* dans Réglages, vide = pas
    d'envoi (la photo part directement au LLM). À défaut de saisie, la **région** choisie aux
    Réglages (Europe ou États-Unis) fournit l'URL de l'app déployée dans cette région ; une

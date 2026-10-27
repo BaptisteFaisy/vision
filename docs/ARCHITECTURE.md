@@ -218,7 +218,7 @@ bien la seule porte d'entrée d'une clé sans saisie manuelle, désormais pour l
 ## 5. Réglages par défaut et endpoint SAM
 
 `Settings.Default` (`core/settings/Settings.kt:84-102`) : base LLM
-`https://api.inferhub.dev/v1` (`:63`), modèle `ali/qwen3.8-omni-flash` (`:64`), clé LLM vide,
+`https://inference.baseten.co/v1` (`:87`), modèle `meta-models/muse-spark-open-1026` (`:88`), clé LLM vide,
 voix ElevenLabs = voix « premade » Sarah (`DEFAULT_TTS_VOICE_ID`, `Settings.kt:69` ; les voix
 de bibliothèque répondent 402 sans crédits, commentaire `Settings.kt:67-70`), langue de la voix = **anglais** (`SpeechLanguage.DEFAULT = En`,
 `core/speech/SpeechLanguage.kt:32`), ASR = base `https://api.meta.ai/v1` (`:81`), modèle

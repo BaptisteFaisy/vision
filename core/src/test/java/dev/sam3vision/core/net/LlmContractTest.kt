@@ -1,6 +1,7 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.model.Analysis
+import dev.sam3vision.core.model.ChatTurn
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -103,6 +104,37 @@ class LlmContractTest {
             assertEquals(USER_AGENT, request.headers["user-agent"])
             assertTrue(request.headers["content-type"].orEmpty().startsWith("application/json"))
         }
+    }
+
+    @Test
+    fun `askText n envoie aucune image et rend le texte du modele`() = runBlocking {
+        NetContract.server(body = NetContract.chatReply("  la porte est a droite  ")).use { server ->
+            val answer = client(server.baseUrl).askText("ou est la porte ?", emptyList()).getOrThrow()
+            assertEquals("la porte est a droite", answer)
+
+            val body = server.requests.single().body
+            assertFalse("aucune image dans la question orale", body.contains("image_url"))
+            assertFalse(body.contains("data:image"))
+            assertTrue("la question part bien au modèle", body.contains("ou est la porte ?"))
+        }
+    }
+
+    @Test
+    fun `un client sans reponse texte echoue explicitement au lieu de faire semblant`() = runBlocking {
+        val muet = object : LlmClient {
+            override suspend fun describe(jpegB64: String, labels: List<String>): Result<Analysis> =
+                Result.failure(ApiError.BadResponse("jamais appelé"))
+
+            override suspend fun ask(
+                jpegB64: String,
+                question: String,
+                history: List<ChatTurn>,
+                context: String?,
+            ): Result<String> = Result.failure(ApiError.BadResponse("jamais appelé"))
+        }
+
+        val error = muet.askText("et la ?", emptyList()).exceptionOrNull()
+        assertTrue("attendu NotSupported, obtenu $error", error is ApiError.NotSupported)
     }
 
     @Test
