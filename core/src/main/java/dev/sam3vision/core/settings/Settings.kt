@@ -14,6 +14,14 @@ data class Settings(
     val samBaseUrl: String,
     val ttsApiKey: String = "",
     val ttsVoiceId: String = DEFAULT_TTS_VOICE_ID,
+    /**
+     * Vitesse de lecture des voix, de [MIN_TTS_SPEED] à [MAX_TTS_SPEED]
+     * ([DEFAULT_TTS_SPEED] par défaut). Appliquée **en lecture locale**
+     * (`MediaPlayer` pour ElevenLabs) : le modèle runtime (`eleven_v4_turbo`)
+     * ignore le réglage `speed` du cloud, donc l'envoyer ne changerait rien —
+     * ici tout l'audio, frais ou en cache, parle à la vitesse choisie, même hors ligne.
+     */
+    val ttsSpeed: Float = DEFAULT_TTS_SPEED,
     /** Lecture automatique des réponses du chat (désactivable dans Réglages). */
     val ttsAutoplay: Boolean = true,
     /** Dictée : base URL / clé / modèle du moteur principal (Meta Muse). */
@@ -30,13 +38,13 @@ data class Settings(
     val liveLlmApiKey: String = "",
     /**
      * Annonce vocale des **positions** dès qu'un objet est détecté (mode Direct et
-     * analyse photo) : « Personne à gauche, chien à droite. » Via ElevenLabs, jamais
+     * analyse photo) : « Personne à 9 heures, chien à 3 heures. » Via ElevenLabs, jamais
      * le TTS système. `true` par défaut : c'est la fonction d'assistance attendue.
      */
     val ttsAnnouncePositions: Boolean = true,
     /**
      * Guidage « tout droit » de la page caméra iSee : la voix dit la consigne de
-     * marche (« Continue tout droit. », « Personne à 2 mètres devant, va à gauche. »)
+     * marche (« Continue tout droit. », « Personne à 2 mètres à midi, va à gauche. »)
      * au lieu de la position des objets. `true` par défaut : c'est l'intention de
      * marche attendue. Via ElevenLabs, jamais le TTS système, et sans aucun appel LLM.
      */
@@ -71,10 +79,34 @@ data class Settings(
      */
     val localOverlayEnabled: Boolean = true,
     /**
+     * Guidage GPS : la destination confirmée (« emmène-moi à X ») part en guidage
+     * Google Maps (`google.navigation:` puis repli URL universelle). Éteint : seule
+     * la fiche du lieu s'affiche, sans lancer de guidage. `true` par défaut.
+     */
+    val navigationGuidanceEnabled: Boolean = true,
+    /**
      * Champ de vision horizontal imposé à la caméra, en degrés : 0 = lu sur le
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
     val cameraFovDeg: Float = 0f,
+    /**
+     * Rôle de ce téléphone : [CaregiverRole.Blind] (défaut, iSee) ou
+     * [CaregiverRole.Caregiver] (page de suivi du proche). Persisté : l'app
+     * rouvre sur la page du rôle choisi.
+     */
+    val caregiverRole: CaregiverRole = CaregiverRole.Blind,
+    /**
+     * Lien du site de suivi parent envoyé par le bouton « Partager le suivi »
+     * du Direct (message WhatsApp). Lien générique : pas de cloisonnement par
+     * proche, à affiner avec des tokens côté backend si besoin.
+     */
+    val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
+    /** Envoi de la position + objets au relais pendant le Direct (site parent). */
+    val shareEnabled: Boolean = true,
+    /** Identifiant du flux de partage (relais `suivi-<shareId>`, lien générique). */
+    val shareId: String = DEFAULT_SHARE_ID,
+    /** Clé d'écriture vérifiée par le relais (jamais exposée côté site). */
+    val shareWriteKey: String = "",
     /** Plafond d'objets affichés à l'écran, commun au direct et à la photo. */
     val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
     /**
@@ -102,12 +134,35 @@ data class Settings(
         const val DEFAULT_LLM_BASE_URL = "https://inference.baseten.co/v1"
         const val DEFAULT_LLM_MODEL = "meta-models/muse-spark-open-1026"
 
+        /** Laure, voix par défaut de l'app (compte ElevenLabs du projet). */
+        const val LAURE_VOICE_ID = "3b8fXc91YHS1i2DYAlBQ"
+
         /**
-         * Voix ElevenLabs de départ : Sarah, voix « premade » utilisable en compte free.
-         * Les voix de bibliothèque (ex. Rachel `21m00Tcm4TlvDq8ikWAM`) répondent 402 sans
-         * crédits payants — choisies exprès ici pour qu'une installation fraîche parle.
+         * Voix ElevenLabs de départ : **Laure**, la voix de l'app. Les installations
+         * d'avant migraient sur Sarah (voir [SARAH_VOICE_ID]) : la migration vit dans
+         * `seeded()` côté `:app`, jamais ici.
          */
-        const val DEFAULT_TTS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+        const val DEFAULT_TTS_VOICE_ID = LAURE_VOICE_ID
+
+        /**
+         * Sarah, voix « premade » utilisable en compte free. Ancien défaut de l'app
+         * (les voix de bibliothèque comme Rachel `21m00Tcm4TlvDq8ikWAM` répondent
+         * 402 sans crédits payants) : conservée comme repli documenté dans les
+         * Réglages et comme marqueur de migration.
+         */
+        const val SARAH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+
+        /** Vitesse de lecture de départ : ×1,9, proche du plafond ElevenLabs (×2). */
+        const val DEFAULT_TTS_SPEED = 1.9f
+
+        /** Plancher de la vitesse (celui d'ElevenLabs) : en dessous, on n'articule plus. */
+        const val MIN_TTS_SPEED = 0.5f
+
+        /** Plafond de la vitesse (celui d'ElevenLabs). */
+        const val MAX_TTS_SPEED = 2.0f
+
+        /** Vitesse ramenée dans [MIN_TTS_SPEED]..[MAX_TTS_SPEED] (réglage hors bornes). */
+        fun clampTtsSpeed(value: Float): Float = value.coerceIn(MIN_TTS_SPEED, MAX_TTS_SPEED)
 
         /**
          * Voix « Jade US » du compte ElevenLabs, celle de l'intro embarquée
@@ -126,6 +181,12 @@ data class Settings(
         /** API Meta (non compatible OpenAI) : la route est `{base}/asr/transcribe`. */
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
         const val DEFAULT_ASR_MODEL = "muse-voice-transcribe-1.0"
+
+        /** Site de suivi parent ouvert par le bouton « Partager le suivi » du Direct. */
+        const val DEFAULT_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
+
+        /** Identifiant de partage par défaut (lien générique, un seul proche suivi). */
+        const val DEFAULT_SHARE_ID = "leo"
 
         val Default = Settings(
             llmBaseUrl = DEFAULT_LLM_BASE_URL,
@@ -147,7 +208,13 @@ data class Settings(
             liveSamEnabled = true,
             boxPredictionEnabled = false,
             localOverlayEnabled = true,
+            navigationGuidanceEnabled = true,
             cameraFovDeg = 0f,
+            caregiverRole = CaregiverRole.Blind,
+            parentSiteUrl = DEFAULT_PARENT_SITE_URL,
+            shareEnabled = true,
+            shareId = DEFAULT_SHARE_ID,
+            shareWriteKey = "",
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
         )
     }
@@ -205,7 +272,7 @@ data class Settings(
     override fun toString(): String = "Settings(" +
         "llmBaseUrl=$llmBaseUrl, llmApiKey=${maskSecret(llmApiKey)}, llmModel=$llmModel, " +
         "samBaseUrl=$samBaseUrl, samRegion=$samRegion, speechLanguage=$speechLanguage, " +
-        "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, " +
+        "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, ttsSpeed=$ttsSpeed, " +
         "ttsAutoplay=$ttsAutoplay, ttsAnnouncePositions=$ttsAnnouncePositions, " +
         "ttsGuidanceStraight=$ttsGuidanceStraight, " +
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
@@ -213,7 +280,8 @@ data class Settings(
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
-        "cameraFovDeg=$cameraFovDeg, maxObjects=$maxObjects)"
+        "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
+        "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, maxObjects=$maxObjects)"
 }
 
 /** Marqueur de substitution d'une secret masqué (voir [maskSecret]). */

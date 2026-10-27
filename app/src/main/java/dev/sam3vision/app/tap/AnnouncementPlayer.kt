@@ -5,6 +5,9 @@ import dev.sam3vision.core.net.TtsClient
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -23,7 +26,7 @@ data class PrewarmReport(val ready: Int, val generated: Int, val missing: List<S
  *    trop lente → le mot est tu **cette fois** (aucun son qui arrive après coup et couvre
  *    la piste audio) et la génération continue en arrière-plan pour le prochain tap.
  *
- * Les clips vivent dans `filesDir/announcements` (stockage privé), relus par
+ * Les clips vivent dans un dossier privé par voix ([TapConfig.clipDir]), relus par
  * [SpeechPlayer.playFile] : le moteur est partagé, la liste blanche et le dossier ne le sont pas.
  */
 class AnnouncementPlayer(
@@ -36,15 +39,26 @@ class AnnouncementPlayer(
 ) {
     /** Génère à l'avance les clips manquants : appelé à l'ouverture de l'écran tap. */
     suspend fun prewarm(words: List<Announcement> = TapConfig.words): PrewarmReport = withContext(Dispatchers.IO) {
+        // Synthèses en parallèle (3 mots max) : 3×RTT → 1×RTT quand le cache est vide.
+        // L'ordre du bilan suit l'ordre d'entrée, comme en série.
+        val outcomes = coroutineScope {
+            words.map { word ->
+                async {
+                    when {
+                        freshClip(word) != null -> Triple(1, 0, null as String?)
+                        writeClip(word, synthesize(word)) != null -> Triple(0, 1, null)
+                        else -> Triple(0, 0, word.spoken)
+                    }
+                }
+            }.awaitAll()
+        }
         var ready = 0
         var generated = 0
         val missing = mutableListOf<String>()
-        words.forEach { word ->
-            when {
-                freshClip(word) != null -> ready++
-                writeClip(word, synthesize(word)) != null -> generated++
-                else -> missing += word.spoken
-            }
+        outcomes.forEach { (r, g, m) ->
+            ready += r
+            generated += g
+            if (m != null) missing += m
         }
         PrewarmReport(ready, generated, missing)
     }

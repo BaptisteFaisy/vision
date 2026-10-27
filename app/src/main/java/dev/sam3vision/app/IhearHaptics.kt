@@ -40,6 +40,16 @@ class IhearHaptics(context: Context) {
         motor.stop()
     }
 
+    /** Traversée : le nouvel état du feu se sent (vert = double salve). */
+    fun crossing(state: dev.sam3vision.core.crossing.CrossingState) {
+        val wave = when (state) {
+            dev.sam3vision.core.crossing.CrossingState.Green -> HapticPattern.crossingGreen()
+            dev.sam3vision.core.crossing.CrossingState.Red -> HapticPattern.crossingRed()
+            dev.sam3vision.core.crossing.CrossingState.Unknown -> return
+        }
+        motor.play(wave)
+    }
+
     /** Coupe tout motif en cours, tenue comprise (arrêt de l'app, geste perdu). */
     fun cancelAll() {
         swiping = false

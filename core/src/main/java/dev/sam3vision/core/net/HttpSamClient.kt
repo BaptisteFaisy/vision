@@ -2,7 +2,6 @@ package dev.sam3vision.core.net
 
 import dev.sam3vision.core.model.SegmentResult
 import okhttp3.OkHttpClient
-import org.json.JSONObject
 
 /**
  * Client de l'endpoint SAM 3.1 (contrat de l'ancien backend Modal, sans clé).
@@ -14,12 +13,11 @@ class HttpSamClient(
 ) : SamClient {
 
     override suspend fun segment(pngOrJpegB64: String, prompts: List<String>?): Result<SegmentResult> {
-        val body = JSONObject()
-            .put("image_b64", pngOrJpegB64)
-            .put("prompts", if (prompts == null) JSONObject.NULL else jsonArrayOf(prompts))
-            .toString()
-        val request = requestTo(baseUrl, "/segment", "POST", jsonBody(body))
-        return client.execute(request)
+        // Corps assemblé dans Dispatchers.IO (base64 ~100 Ko jamais scanné sur l'appelant)
+        // et non rejouable : pas de 2e inférence GPU sur keep-alive mort.
+        return client.executeBuilt {
+            requestTo(baseUrl, "/segment", "POST", OneShotJsonBody(segmentJson(pngOrJpegB64, prompts)))
+        }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseSegment(raw) } }
     }
@@ -38,4 +36,22 @@ private fun parseSegment(raw: String): SegmentResult {
     // `mask_poly` sont lus ici comme là-bas, avec le défaut PNG de cet endpoint.
     val objects = json.objects("objects").map { obj -> obj.segObject() }
     return SegmentResult(width = json.intOr("width"), height = json.intOr("height"), objects = objects)
+}
+
+/** Corps `/segment` manuel : base64 brut (alphabet sans échappement), prompts échappés. */
+internal fun segmentJson(imageB64: String, prompts: List<String>?): String {
+    val out = StringBuilder(imageB64.length + 128)
+    out.append("{\"image_b64\":\"").append(imageB64).append("\",\"prompts\":")
+    if (prompts == null) {
+        out.append("null")
+    } else {
+        out.append('[')
+        prompts.forEachIndexed { index, prompt ->
+            if (index > 0) out.append(',')
+            out.append('"').append(jsonEscape(prompt)).append('"')
+        }
+        out.append(']')
+    }
+    out.append('}')
+    return out.toString()
 }

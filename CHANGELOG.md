@@ -3,6 +3,82 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (11) — positions et consignes au cadran horaire (9 h … midi … 3 h)
+
+- **Vocabulaire unique au cadran** (`PositionText.clockHour`/`clockLabel`, sept bandes
+  égales) : « Personne à 9 heures, à 1,4 mètre. », « Personne à 2 mètres à midi, va
+  à gauche. » (en : « at 9 o'clock » … « at 12 o'clock »). « à midi » pour 12 h,
+  « à 1 heure » au singulier — la convention des déplacements sans voir.
+- **Remplace les secteurs** « à gauche / au centre / à droite » et le repère vertical
+  partout où l'app met des positions en mots : annonces (Direct, iSee, photo),
+  journal caméra (`TimelineText`, mêmes mots dans les deux langues), consignes du
+  couloir (heure de l'obstacle dans la phrase et dans la clé `b|label|côté|mètre|heure`).
+- `horizontal()`, `vertical()`, `positionLabel()` supprimés (remplacés, sans autre
+  usage) ; `SIDE_EDGE` gardé pour le seul couloir du guidage. Aide des Réglages et
+  fiches `VOIX-POSITIONS`, `VOIX-ANGLAIS`, `GUIDAGE-TOUT-DROIT`, `ELEVENLABS-TTS`,
+  `DISTANCES`, `MASQUES-DEBUG` alignées.
+- **Preuves** : `PositionTextTest` (cadran, libellés), `PositionTextEnglishTest` (5),
+  `PositionAnnouncerTest`, `GuidanceTest` (+1 : heure dans la clé), `GuidanceAnnouncerTest`,
+  `TimelineTextTest`, `LiveProbeGuidanceTest` ; `:core:testDebugUnitTest` 1098/1098,
+  `:app:testDebugUnitTest` 551/551, `check-kotlin-limits.py` OK, `:app:assembleDebug` OK.
+  Non mesuré sur téléphone (phrases à l'oreille non vérifiées ici).
+
+## 2026-10-27 (10) — voix Laure par défaut, vitesse ×1,9 réglable à la voix
+
+- **Voix par défaut : Laure** (`3b8fXc91YHS1i2DYAlBQ`) au lieu de Sarah :
+  `Settings.DEFAULT_TTS_VOICE_ID`, migration silencieuse des réglages restés sur
+  Sarah (`migrateLegacyVoice`, comme le LLM : seul l'ancien défaut migre, un choix
+  manuel n'est jamais touché). Les clips du mode tap sont régénérés (dossier par voix).
+- **Vitesse `ttsSpeed`, ×1,9 par défaut (×0,5..×2)**, persistée dans les deux stores :
+  boutons −/+ des Réglages **ou ordre vocal** sur iSee (« vitesse 1,5 », « parle plus
+  vite », « ralentis », « faster », « vitesse normale »), avant l'envoi au LLM comme
+  la coupe d'intro — « décris vite » ne déclenche pas. Confirmation dite à la
+  nouvelle vitesse (ElevenLabs, affichée aussi en statut).
+- **Vitesse appliquée en lecture locale** (`MediaPlayer.playbackParams`) :
+  `eleven_v4_turbo` ignore le `speed` cloud (un non-défaut peut être rejeté), donc
+  le client n'en envoie aucun — frais ou en cache, tout parle à la vitesse choisie,
+  même hors ligne.
+- **Preuves** : `TtsSpeedCommandTest` 11/11, `ElevenLabsTtsClientTest` +1 (absence de
+  `speed` envoyée), `SettingsStoreParityTest` (vitesse non par défaut), `SettingsSeedTest`
+  +3 (migration Sarah→voix du build/Laure, choix manuel intact), `TtsLogicTest` +3
+  (Laure par défaut, crans, affichage) ; `:core:testDebugUnitTest` 1033/1033,
+  `:app:testDebugUnitTest` 541/541, `check-kotlin-limits.py` OK, `assembleDebug` OK.
+  Non mesuré sur téléphone (rendu ×1,9 à l'oreille non vérifié ici).
+
+## 2026-10-27 (9) — retour de mission : la base médias se recrée au lieu de crasher
+
+- **Crash au lancement sur le téléphone** (`IllegalStateException: A migration from
+  2 to 1 was required but not found`, vu sur `2c6852ac`) : l'appareil portait une
+  base `ihear-media.db` v2 (build mission) et master est en v1 sans stratégie de
+  migration. `MediaDatabase.build()` déclare désormais
+  `fallbackToDestructiveMigrationOnDowngrade()` : en downgrade la base est recréée
+  vide, l'app démarre. Perte acceptée : le ViewModel purge cette table à chaque
+  démarrage (`IhearViewModel.kt:141`) ; les montées de version sans migration
+  restent des crashs volontaires.
+- **Non-régression instrumentée** (`MediaDowngradeTest`, exige l'appareil, la CI ne
+  l'exécute pas) : base v1 tamponnée en v2 + une ligne, ouverture via `build()`,
+  table vide sans crash. Ne touche jamais la vraie base (fichier de test effacé).
+- **Preuves** : suites JVM `:core` + `:app` vertes, `assembleDebug` vert,
+  `check-kotlin-limits.py` vert, test instrumenté vert sur `2c6852ac`, lancement
+  `master` sans crash vérifié sur l'appareil.
+
+## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
+
+- **Ouverture → réveil** : `MainActivity.onResume` appelle `AppViewModel.warmGpu()` →
+  `AppDiagnostics.warmGpu()` = un `GET /health` **silencieux** (best-effort, aucun
+  verdict, aucune écriture UI) sur l'endpoint actif (région EU/US). Carte endormie :
+  réveil via le snapshot Modal ; carte chaude : requête quasi gratuite.
+- **Hors plein écran → extinction** (`POST /release`, existant, étendu) : `onPause`
+  (déjà là : home, changement d'app, écran éteint) + nouveau
+  `onMultiWindowModeChanged` (split-screen) + `onDestroy` (fermeture). Au retour en
+  plein écran, `onResume` (ou la première frame) réveille.
+- **Limite connue** : le réveil ne **déploie** rien — si l'app Modal n'est pas
+  déployée, `/health` répond `BackendStopped` et il faut un `sam3-gpu on` manuel,
+  une fois (`docs/MODE-US.md` § « Déploiement manuel, réveil auto »).
+- **Preuves** : `AppDiagnosticsTest` +3 (`warmGpu` : appel unique, silence UI,
+  sans URL = aucun appel, échec = silence) ; `:core` 955 + `:app` 516, 0 échec ;
+  `assembleDebug` et `check-kotlin-limits.py` verts.
+
 ## 2026-10-27 (7) — la question porte sur ce qu'on filme, et l'échec se voit
 
 - **Cause trouvée (10 agents, rapports `isee-diag-2026-10-27/`)** : le « gel » d'une photo du

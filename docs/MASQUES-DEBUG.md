@@ -166,7 +166,7 @@ La page caméra porte les trois choses au même endroit, pendant le REC :
 | distance du plus proche | ligne d'état `… · plus proche ≈ 1,1 m` | idem |
 | latences + transport | détail du panneau (`latence : … · p95 … · serveur … ms`, `transport :`) | `/live/ws` |
 | ~~GPU~~ | la ligne `gpu :` du détail **n'est pas alimentée** ici : `LiveProbeState.gpu` n'est que recopié d'un état à l'autre (`LiveProbe.kt:152`, `:178`, `:192`) — à rebrancher ou à retirer | — |
-| voix « Personne à gauche, à 1,4 mètre » | ElevenLabs, une annonce par scène (`dit :` garde la dernière en mémoire) | `PositionAnnouncer` + `DistanceText.spoken` |
+| voix « Personne à 9 heures, à 1,4 mètre » | ElevenLabs, une annonce par scène (`dit :` garde la dernière en mémoire) | `PositionAnnouncer` + `DistanceText.spoken` |
 
 Exemple relevé sur téléphone : `SAM · 1,5 ips · 622 ms · 7 objets · plus proche ≈ 1,1 m · A100`
 — **le tronçon `· A100` de la ligne d'état n'existe plus** (le GPU est passé dans le détail) ; garde

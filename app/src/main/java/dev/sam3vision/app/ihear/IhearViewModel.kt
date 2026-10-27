@@ -9,7 +9,9 @@ import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MediaDatabase
+import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.seededFromBuild
+import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.ihear.vm.IhearAnswers
 import dev.sam3vision.app.ihear.vm.IhearCameraCoordinator
@@ -19,7 +21,12 @@ import dev.sam3vision.app.ihear.vm.IhearPhotoShot
 import dev.sam3vision.app.ihear.vm.IhearStatusText
 import dev.sam3vision.app.ihear.vm.IhearTranscript
 import dev.sam3vision.app.ihear.vm.IhearVoice
+import dev.sam3vision.app.ihear.vm.NavigationHook
+import dev.sam3vision.core.crossing.CrossingText
+import dev.sam3vision.core.crossing.CrossingVoiceAction
+import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import java.io.File
@@ -122,6 +129,14 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         prune = ::enforceFifo,
     )
 
+    /** Ordre vocal « je veux aller à X » : Google Maps + annonce, avant le LLM. */
+    private val navigation = NavigationHook(
+        launcher = AndroidNavigationLauncher(getApplication()),
+        guidanceEnabled = { settings.navigationGuidanceEnabled },
+        announcer = NavigationAnnouncer({ settings }) { _, text -> speakNavigation(text) },
+        update = ::update,
+    )
+
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile
     var active: Boolean = false
@@ -145,6 +160,27 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             intro.playIfPending()
         }
         probe.observeSpoken(viewModelScope, proximity) { playerIdle() }
+        probe.observeCrossing(viewModelScope, haptics)
+    }
+
+    /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
+    fun toggleCrossing() {
+        probe.setCrossingActive(settings, !probe.state.value.crossingActive)
+    }
+
+    /**
+     * Ordre vocal « traverser » : consommé ici, jamais une question LLM.
+     * Confirmation parlée par le même chemin que la navigation. Sans effet si
+     * le mode est déjà dans l'état demandé (reconfigurer coûte une session GPU).
+     */
+    private suspend fun runCrossingCommand(text: String): Boolean {
+        val command = CrossingVoiceCommand.parse(text) ?: return false
+        val wantActive = command == CrossingVoiceAction.Activate
+        if (probe.state.value.crossingActive != wantActive) {
+            probe.setCrossingActive(settings, wantActive)
+        }
+        speakNavigation(CrossingText.mode(wantActive, settings.speechLanguage))
+        return true
     }
 
     override fun onCleared() {
@@ -168,8 +204,11 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         transcript.refresh()
     }
 
-    /** Les Réglages pilotent la sonde SAM (endpoint, voix, focale, distances). */
-    private fun syncProbe() = probe.configureFrom(settings)
+    /** Les Réglages pilotent la sonde SAM (mode Traversée préservé) et la vitesse de lecture. */
+    private fun syncProbe() {
+        probe.setCrossingActive(settings, probe.state.value.crossingActive)
+        player.speed = settings.ttsSpeed
+    }
 
     // ————— Gestes —————
 
@@ -279,7 +318,32 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             intro.disable()
             return
         }
+        if (runSpeedCommand(heard.text)) return
         handleDictated(heard.text, heard.audio)
+    }
+
+    /**
+     * Ordre vocal de vitesse (« vitesse 1,5 », « parle plus vite ») : réglage
+     * persisté, lecteur à jour, confirmation dite à la nouvelle vitesse.
+     * Vrai si [text] portait un ordre (la dictée ne part pas au LLM).
+     */
+    private fun runSpeedCommand(text: String): Boolean {
+        val speed = TtsSpeedCommand.parse(text, settings.ttsSpeed) ?: return false
+        settings = settings.copy(ttsSpeed = speed)
+        viewModelScope.launch { runCatching { prefs.save(settings) } }
+        player.speed = speed
+        val confirmation = TtsSpeedCommand.spoken(speed, settings.speechLanguage)
+        dropHeard(confirmation)
+        // Sans clé ElevenLabs, le texte reste affiché et la vitesse s'applique
+        // aux prochaines lectures : un ordre vocal n'échoue jamais à voix haute.
+        viewModelScope.launch {
+            val bytes = voice.synthesize(confirmation)
+            if (bytes.isNotEmpty()) {
+                update { it.copy(speakingEntryId = SPEED_BUBBLE_ID, status = confirmation) }
+                player.play(bytes)
+            }
+        }
+        return true
     }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */
@@ -294,6 +358,10 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IhearStatusText.ANSWER_PENDING)
             return
         }
+        // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
+        if (navigation.onTranscript(text)) return
+        // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
+        if (runCrossingCommand(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
@@ -312,6 +380,11 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
     private fun update(fn: (IhearUiState) -> IhearUiState) = _state.update(fn)
 
     private fun playerIdle(): Boolean = _state.value.speakingEntryId == null
+
+    /** Annonce de navigation : même chemin audio que les bulles (ElevenLabs + lecteur partagé). */
+    private suspend fun speakNavigation(text: String): Unit {
+        player.play(voice.synthesize(text))
+    }
 
     /** Sécurité FIFO silencieuse après chaque écriture de fichier multimédia. */
     private suspend fun enforceFifo() {

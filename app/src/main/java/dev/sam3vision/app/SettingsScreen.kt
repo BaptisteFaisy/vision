@@ -28,14 +28,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSection
+import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Réglages : LLM (base URL, clé, modèle) + endpoint SAM + région de la GPU
- * (mode Europe / **mode US**) + section
- * « Distances » (overlay du direct, champ de vision) + section « Voix ElevenLabs »
- * (clé, voix, lecture automatique, test) + section « Dictée Meta » (base URL, clé,
- * modèle ASR, test) + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
+ * Réglages : rôle du téléphone (**Caregiver** : « Blind person » par défaut, ou la
+ * page de suivi du proche) + LLM (base URL, clé, modèle) + endpoint SAM + région de la GPU
+ * (mode Europe / **mode US**) + section « Distances » (overlay du direct, champ
+ * de vision) + section « Voix ElevenLabs » (clé, voix, lecture automatique,
+ * test) + section « Dictée Meta » (base URL, clé, modèle ASR, test) + section
+ * « Suivi parent » (lien du site, boutons Partager / Arrêter le suivi
+ * permanent) + bloc « Lunettes Ray-Ban Meta » (enregistrement auprès de
  * Meta AI, session, capture photo, lunettes simulées en build debug).
  * Chaque moteur a son bouton de test.
  */
@@ -55,21 +58,23 @@ fun SettingsScreen(
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
+    onPickRole: (Settings) -> Unit,
+    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStopTracking: () -> Unit,
     onBack: () -> Unit,
 ) {
     var draft by remember { mutableStateOf(settings) }
     Column(settingsScroll()) {
         ScreenHeader("Réglages du backend", "Aucune clé n'est écrite dans le code.", onBack, null)
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CaregiverSettings(draft, onPickRole) { draft = it }
             BackendFields(draft) { draft = it }
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
             DistanceSettings(draft) { draft = it }
             PredictionSettings(draft) { draft = it }
             LocalOverlaySettings(draft) { draft = it }
+            NavigationToggle(draft) { draft = it }
             TtsSettings(
                 draft = draft,
                 speaking = speaking,
@@ -78,6 +83,7 @@ fun SettingsScreen(
                 onStop = onStopVoice,
             )
             DictationSettings(draft) { draft = it }
+            ParentShareSettings(draft, onStartTracking, onStopTracking) { draft = it }
             SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
             GestureHelp(onOpenGestures)
             ClassicScreens(onOpenLive, onOpenClassic)
@@ -124,6 +130,58 @@ private fun GlassesBlock(glasses: GlassesController) {
     )
 }
 
+/**
+ * Section « Caregiver » : le rôle de ce téléphone. « Blind person » (défaut) ouvre
+ * iSee ; « Caregiver » ouvre la carte du proche — la page du site partagée par
+ * « Partager le suivi ». Le choix est enregistré immédiatement (il survit au
+ * redémarrage) et ouvre la page quand c'est Caregiver.
+ */
+@Composable
+private fun CaregiverSettings(
+    draft: Settings,
+    onPickRole: (Settings) -> Unit,
+    onChange: (Settings) -> Unit,
+) {
+    // Le brouillon local suit le clic : le bouton choisi passe en bleu immédiatement,
+    // même quand le rôle n'ouvre pas d'écran (Blind person).
+    val pick = { role: CaregiverRole ->
+        val next = draft.copy(caregiverRole = role)
+        onChange(next)
+        onPickRole(next)
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Caregiver", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Rôle de ce téléphone : « Blind person » (défaut) garde iSee à l'ouverture, " +
+                "« Caregiver » ouvre la carte du proche — la même page que le lien partagé.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+        BigButton(
+            "Blind person (défaut)",
+            true,
+            roleColor(draft, CaregiverRole.Blind),
+            onClick = { pick(CaregiverRole.Blind) },
+        )
+        BigButton(
+            "Caregiver",
+            true,
+            roleColor(draft, CaregiverRole.Caregiver),
+            onClick = { pick(CaregiverRole.Caregiver) },
+        )
+        Text(
+            "Le rôle est enregistré tout de suite, sans passer par « Enregistrer » : " +
+                "Caregiver ouvre la carte du proche, Blind person revient à iSee.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+/** Couleur du bouton de rôle : bleu pour le rôle actif, gris pour l'autre. */
+private fun roleColor(draft: Settings, role: CaregiverRole) =
+    if (draft.caregiverRole == role) AppColors.primary else AppColors.surfaceHigh
+
 /** Section « Backend » : LLM (base URL, clé, modèle) et endpoint SAM 3.1 optionnel. */
 @Composable
 private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
@@ -135,6 +193,56 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     }
     LabeledField("Base URL SAM 3.1 (vide = région choisie ci-dessous)", draft.samBaseUrl, false) {
         onChange(draft.copy(samBaseUrl = it))
+    }
+}
+
+/**
+ * Section « Suivi parent » : lien du site envoyé par « Partager le suivi »
+ * (message WhatsApp) + démarrage/arrêt du suivi permanent. Lien générique tant
+ * qu'un seul proche est suivi (pas de cloisonnement par utilisateur pour l'instant).
+ */
+@Composable
+private fun ParentShareSettings(
+    draft: Settings,
+    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStopTracking: () -> Unit,
+    onChange: (Settings) -> Unit,
+) {
+    // L'état du service est lu ici : l'écran qui appelle reste sous la garde des 50 lignes.
+    val trackingActive by ShareTracking.running.collectAsState()
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Suivi parent", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        LabeledField("Lien du site de suivi", draft.parentSiteUrl, false) {
+            onChange(draft.copy(parentSiteUrl = it))
+        }
+        SwitchRow("Envoyer la position + objets au site pendant le Direct", draft.shareEnabled) {
+            onChange(draft.copy(shareEnabled = it))
+        }
+        LabeledField("Identifiant du flux (?share=, un par proche suivi)", draft.shareId, false) {
+            onChange(draft.copy(shareId = it))
+        }
+        LabeledField("Clé d'écriture du relais (vide = relais sans clé)", draft.shareWriteKey, true) {
+            onChange(draft.copy(shareWriteKey = it))
+        }
+        Text(
+            "Partager envoie le lien du site à un proche par WhatsApp, puis démarre le suivi " +
+                "permanent (notification en haut de l'écran). Le bouton « Arrêter le suivi », " +
+                "ci-dessous ou dans la notification, le coupe.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+        if (trackingActive) {
+            BigButton("Arrêter le suivi", true, AppColors.danger, onStopTracking)
+        } else {
+            BigButton("📤 Partager le suivi", true, AppColors.primary, onClick = { onStartTracking(draft.parentSiteUrl, draft.shareId) })
+        }
+        Text(
+            "En poche (écran éteint), la position seule continue d'être envoyée toutes les " +
+                "15 s pour la batterie ; écran allumé, le partage complet reste à la cadence " +
+                "de 2 s. Les objets entourés réapparaissent dès que le Direct rouvre.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
     }
 }
 

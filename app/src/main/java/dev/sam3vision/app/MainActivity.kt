@@ -1,16 +1,22 @@
 package dev.sam3vision.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import dev.sam3vision.app.glasses.GlassesController
@@ -52,6 +58,27 @@ class MainActivity : ComponentActivity() {
     /** Racine des gestes : annulée si l'app passe en arrière-plan en pleine tenue. */
     private lateinit var root: IhearRootLayout
 
+    /** Permission demandée au premier lancement ; un refus est annoncé à la voix. */
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) viewModel.onMicDenied()
+    }
+
+    /** Géolocalisation demandée au premier lancement (suivi parent) ; optionnelle. */
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
+
+    /** Notification (Android 13+) demandée par le bouton « Partager » (Réglages). */
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
+    /**
+     * Localisation d'arrière-plan du suivi permanent, demandée seule : Android
+     * ignore silencieusement une demande groupée avec d'autres permissions,
+     * passée par le bouton « Partager » (Réglages).
+     */
+    private val backgroundLocationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         glasses = GlassesController(applicationContext).also {
@@ -62,6 +89,8 @@ class MainActivity : ComponentActivity() {
         ihear = ViewModelProvider(this)[IhearViewModel::class.java]
         applyDarkSystemBars()
         setContentView(buildRoot())
+        requestMicIfNeeded()
+        requestLocationIfNeeded()
         routeIntent(intent)
     }
 
@@ -140,9 +169,22 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ihear.onForeground()
+        // App ouverte (ou de retour au premier plan) : on réveille la GPU Modal
+        // (`/health` silencieux) pour qu'iSee réponde sans cold start.
+        viewModel.warmGpu()
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
+    }
+
+    /**
+     * Split-screen : l'app n'est plus en plein écran, on éteint la GPU comme à
+     * `onPause`. Au retour en plein écran, `onResume` (ou la première frame du
+     * Direct / de la sonde) la réveillera.
+     */
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        if (isInMultiWindowMode) viewModel.releaseGpu()
     }
 
     /**
@@ -159,6 +201,44 @@ class MainActivity : ComponentActivity() {
         // App fermée pour de bon : le service du micro verrouillé n'a plus de raison de vivre.
         if (isFinishing) LockedMicBridge.disarm(this)
         super.onDestroy()
+    }
+
+    private fun requestMicIfNeeded() {
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) micPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun requestLocationIfNeeded() {
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!fine || !coarse) {
+            locationPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Demandes manquantes pour le suivi permanent (bouton « Partager » de la
+     * section Suivi parent) : notification, puis localisation d'arrière-plan,
+     * une boîte de dialogue par appui (la demande groupée est ignorée).
+     */
+    fun ensureSharePermissions() {
+        val granted = { permission: String ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+        }
+        if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (!granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
     }
 }
 

@@ -97,6 +97,28 @@ class SettingsSeedTest {
     }
 
     @Test
+    fun `une voix restee sur Sarah migre vers la voix du build`() {
+        val sarah = Settings.Default.copy(ttsVoiceId = Settings.SARAH_VOICE_ID)
+
+        assertEquals("voix-du-build", seeded(sarah, build).ttsVoiceId)
+    }
+
+    @Test
+    fun `une voix restee sur Sarah migre vers Laure sans voix de build`() {
+        val sarah = Settings.Default.copy(ttsVoiceId = Settings.SARAH_VOICE_ID)
+        val sansVoix = build.copy(ttsVoiceId = "")
+
+        assertEquals(Settings.LAURE_VOICE_ID, seeded(sarah, sansVoix).ttsVoiceId)
+    }
+
+    @Test
+    fun `une voix saisie a la main n est jamais migree`() {
+        val choisie = Settings.Default.copy(ttsVoiceId = "ma-voix")
+
+        assertEquals("ma-voix", seeded(choisie, build).ttsVoiceId)
+    }
+
+    @Test
     fun `une base URL saisie a la main n est jamais migree`() {
         val choisi = ancienne.copy(llmBaseUrl = "https://mon-propre-endpoint/v1", llmApiKey = "ma-cle")
 

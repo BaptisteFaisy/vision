@@ -23,15 +23,23 @@ Deux sujets distincts, souvent mélangés :
 | **Modèle runtime** | **`eleven_v4_turbo`** | `DEFAULT_TTS_MODEL`, `ElevenLabsTtsClient.kt:80` + test `ElevenLabsTtsClientTest` qui asserte `model_id` |
 | Clé | en-tête **`xi-api-key`** (pas `Authorization: Bearer`) | `buildRequest()` |
 | Sortie | MP3 `mp3_44100_128` | `OUTPUT_FORMAT` |
-| **Voix par défaut** | **Sarah `EXAVITQu4vr4xnSDxMaL`** (premade, marche en compte free) | `Settings.DEFAULT_TTS_VOICE_ID`, `core/settings/Settings.kt:71` |
-| Voix « Jade US » | `TOXPlnYC7z5SQSV2Zgc5`, optionnelle (bibliothèque → 402 sans crédits) | `Settings.JADE_US_VOICE_ID`, `core/settings/Settings.kt:78` |
+| **Voix par défaut** | **Laure `3b8fXc91YHS1i2DYAlBQ`** (voix du projet) | `Settings.DEFAULT_TTS_VOICE_ID` |
+| Sarah (ancien défaut) | `EXAVITQu4vr4xnSDxMaL` (premade, marche en compte free) : un réglage resté dessus migre vers la voix du build, sinon Laure | `Settings.SARAH_VOICE_ID`, `app/SettingsSeed.kt` (`migrateLegacyVoice`) |
+| Voix « Jade US » | `TOXPlnYC7z5SQSV2Zgc5`, optionnelle (bibliothèque → 402 sans crédits) | `Settings.JADE_US_VOICE_ID` |
+| **Vitesse** | **`ttsSpeed`, ×1,9 par défaut, ×0,5..×2** — boutons des Réglages ou ordre vocal (« vitesse 1,5 », « parle plus vite », « ralentis ») | `Settings.ttsSpeed`, `core/speech/TtsSpeedCommand.kt`, `app/TtsSettings.kt` |
 | Origine de la clé | `Settings.ttsApiKey`, complétée par `local.properties` (`tts.api.key`) via `seededFromBuild()` | `app/SettingsSeed.kt:34`, `:66-72` |
 
 ⚠️ **Correction** — l'ancienne note « modèle `eleven_v3`, voix par défaut » ne décrit **pas**
 ce que l'app envoie. `git grep eleven_v3` dans le code Kotlin ne donne qu'**une** occurrence :
 un préfixe de clé de cache dans `SpeechUseCaseTest.kt:42` (§ à ne pas confondre avec le modèle des appels) : `eleven_v3` est le modèle qui a servi à **fabriquer** le
 MP3 de l'intro embarquée, pas le modèle des appels. Tout appel runtime part en
-`eleven_v4_turbo`, avec Sarah si l'utilisateur n'a rien choisi.
+`eleven_v4_turbo`, avec Laure si l'utilisateur n'a rien choisi.
+
+⚠️ **Vitesse = lecture locale, jamais cloud.** `eleven_v4_turbo` ignore le réglage
+`speed` (un non-défaut peut même être rejeté) : le client n'envoie **aucun** `speed`
+(test `ElevenLabsTtsClientTest` qui asserte son absence) et la vitesse s'applique en
+lecture (`MediaPlayer.playbackParams`). Tout l'audio parle donc à la vitesse choisie,
+frais ou en cache, même hors ligne.
 
 ## Réponses vérifiées au curl (relevé de recette, conservé, non rejoué ici)
 
@@ -117,22 +125,22 @@ Aucune de ces étapes ne passe par un POST de frames : le direct est en **WebSoc
 
 ## Ce que la voix dit, et comment les distances entrent
 
-- **Forme** : labels + secteur, sans article (donc sans faute de genre sur des labels
-  libres) : `Personne à gauche, chaise en bas à droite.`
+- **Forme** : labels + heure, sans article (donc sans faute de genre sur des labels
+  libres) : `Personne à 9 heures, chien à 3 heures.`
 - **Ordre** : gauche → droite (`centerX` croissant) ; un label répété **à la même
-  position** n'est cité qu'une fois ; **3 objets au plus** puis « et N autres objets ».
-- **Secteurs** : `centerX < 0,34` → à gauche, `> 0,66` → à droite, sinon au centre ;
-  même découpage en vertical (`en haut` / au milieu / `en bas`).
+  heure** n'est cité qu'une fois ; **3 objets au plus** puis « et N autres objets ».
+- **Cadran** : sept bandes égales (`PositionText.clockHour`), 9 h tout à gauche,
+  midi au centre, 3 h tout à droite ; plus de repère vertical.
 - **Distance** : `PlacedLabel.meters` est rempli depuis `DistanceReading`
   (`readings.associate { it.box to it.meters }`), puis mis en mots par
   **`DistanceText.spoken`** (`core/distance/DistanceText.kt`) :
   `85 centimètres`, `1,4 mètre` (singulier jusqu'à 2), `12 mètres`, `distance inconnue`.
   Dès qu'une distance est présente, `PositionText.phrase` sépare les objets par ` ; `
   (la virgule sert déjà à la position) :
-  `Personne à gauche, à 1,4 mètre ; chien au centre, à 3 mètres.`
-- **Signature de scène** : `PositionText.key` = `label|secteur|distance arrondie au
+  `Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.`
+- **Signature de scène** : `PositionText.key` = `label|heure|distance arrondie au
   mètre`. C'est ce qui fait reparler un objet **qui s'approche** (3 m → 2 m → 1 m)
-  sans le faire bavarder à chaque frame.
+  ou **qui glisse** (10 h → 11 h) sans le faire bavarder à chaque frame.
 
 ## Anti-bavardage et « cache » de l'énoncé
 

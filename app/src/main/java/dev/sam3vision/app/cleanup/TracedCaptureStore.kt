@@ -22,6 +22,11 @@ interface TracedCaptureStore {
 
     /** Retire la trace de la table, qu'elle ait été supprimée ou non. */
     suspend fun forget(entry: TracedCapture)
+
+    /** Retire un lot de traces en une seule écriture (défaut : une par une). */
+    suspend fun forgetAll(entries: List<TracedCapture>) {
+        entries.forEach { forget(it) }
+    }
 }
 
 /**
@@ -41,24 +46,18 @@ class RoomTracedCaptureStore(
         val collection = collectionFor(entry.kind) ?: return true // trace orpheline : à oublier
         val selection = selection(entry.mediaStoreId)
         return runCatching {
-            // Dé-sync : l'entrée n'existe plus côté MediaStore → rien à supprimer, pas d'erreur.
-            if (!exists(collection, selection)) return@runCatching true
+            // Pas de `query` préalable : `delete` est idempotent — 0 ligne supprimée
+            // (dé-sync) vaut succès, ce qui divise par deux les IPC MediaStore par trace.
             resolver.delete(ContentUris.withAppendedId(collection, entry.mediaStoreId), selection.first, selection.second) >= 0
         }.getOrElse { it is IllegalArgumentException } // URL/_ID invalide = déjà disparu
     }
 
-    /** Vrai si l'entrée tracée existe encore (même `_ID`, même propriétaire). */
-    private fun exists(collection: Uri, selection: Pair<String, Array<String>>): Boolean =
-        resolver.query(
-            collection,
-            arrayOf(MediaStore.MediaColumns._ID),
-            selection.first,
-            selection.second,
-            null,
-        )?.use { it.count > 0 } ?: false
-
     override suspend fun forget(entry: TracedCapture) {
         dao.deleteById(entry.id)
+    }
+
+    override suspend fun forgetAll(entries: List<TracedCapture>) {
+        if (entries.isNotEmpty()) dao.deleteByIds(entries.map { it.id })
     }
 
     /** Collection MediaStore selon le type, `null` si le type est inconnu. */

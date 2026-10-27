@@ -137,6 +137,9 @@ interface IhearCameraActions {
 /** ID de la bulle d'intro : en dehors du domaine des lignes Room. */
 const val INTRO_BUBBLE_ID = -2L
 
+/** ID de la confirmation de vitesse : pas une bulle, mais une lecture à part entière. */
+const val SPEED_BUBBLE_ID = -3L
+
 /** Sélection de l'intro : elle occupe toujours la première bulle du chat. */
 const val INTRO_SELECTION = 0
 

@@ -1,0 +1,76 @@
+# pr-auto-merge — file de merge automatique : chaque PR interne prête est
+# mise à jour si en retard (BEHIND) puis mergée (rebase) dès que les 6 checks
+# requis sont verts. La seule porte reste la CI ; pas de gate humaine.
+# v2 (2026-10-27) : merge direct, pas d'API auto-merge — GITHUB_TOKEN ne peut
+# pas l'armer (« Resource not accessible », run 40558390933), et on ne veut
+# pas de PAT à faire tourner. Brouillons et forks exclus. Conflits (DIRTY) :
+# on saute, l'auteur rebase à la main. Toute PR mergée par un humain entre
+# deux passages est simplement trouvée fermée (erreur ignorée).
+name: pr-auto-merge
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened, synchronize]
+  push:
+    branches: [master]
+  schedule:
+    - cron: '*/10 * * * *'
+
+concurrency:
+  group: pr-auto-merge-queue
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sweep:
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - name: Balayer la file (update + merge)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
+            gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
+              ["ci","apk","apk-release","lint","ci-budget","couche0"] as $req |
+              [ .[] | select(.name as $n | $req | index($n)) ] as $got |
+              ($got | length == 6) and
+              ([$got[] | select(.state == "SUCCESS")] | length == 6)
+            ' >/dev/null
+          }
+          if [ "$EVENT" = push ]; then
+            sleep 60 # laisse GitHub recalculer les états après l'atterrissage
+          fi
+          gh pr list --base master --state open \
+            --json number,headRefOid,mergeStateStatus,isDraft,headRepository \
+            --jq '.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
+              | select(.isDraft == false)
+              | "\(.number) \(.headRefOid) \(.mergeStateStatus)"' \
+          | while read -r pr sha state; do
+            [ -n "$pr" ] || continue
+            case "$state" in
+              BEHIND)
+                if gh pr update-branch "$pr" >/dev/null 2>&1; then
+                  echo "PR #$pr mise à jour"
+                else
+                  echo "PR #$pr sautée (conflit probable, à l'auteur de rebaser)"
+                fi
+                ;;
+              CLEAN)
+                if green "$pr"; then
+                  if gh pr merge --rebase --match-head-commit "$sha" "$pr" >/dev/null 2>&1; then
+                    echo "PR #$pr mergée"
+                  else
+                    echo "PR #$pr : merge refusé (base bougée ?), prochain passage"
+                  fi
+                else
+                  echo "PR #$pr : CI pas encore verte"
+                fi
+                ;;
+              *) echo "PR #$pr : état $state, rien à faire" ;;
+            esac
+          done

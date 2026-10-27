@@ -15,6 +15,8 @@ import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.app.live.LivePositionVoice
+import dev.sam3vision.app.live.LiveTrackFallback
+import dev.sam3vision.app.live.LiveTransportLog
 import dev.sam3vision.app.live.LiveWakeGuard
 import dev.sam3vision.app.live.MaskPainter
 import dev.sam3vision.core.distance.DistanceMeter
@@ -40,15 +42,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Orchestration du direct : une frame à la fois (gate + cadence adaptative), masques
- * recolorés, statistiques — et **mémoire** des objets vus ([LiveTimeline]), qui permet de
- * poser des questions sur ce qui est passé il y a quelques secondes.
- *
- * Le ViewModel ne garde que l'orchestration : le réveil du GPU ([LiveWakeGuard]), les ips
- * ([LiveFpsMeter]), la cadence ([LiveFrameCadence]), le décodage des masques
- * ([LiveMaskDecoder]), la narration ([LiveNarration]), les annonces de position
- * ([LivePositionVoice]) et les questions ([LiveAskSession]) vivent dans `live/`, sans
- * Android pour l'essentiel — donc testables en JVM. L'API publique ne change pas.
+ * Orchestration du direct : une frame à la fois, masques recolorés, stats, mémoire [LiveTimeline]. Briques `live/` testables en JVM, API inchangée.
  */
 class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -65,13 +59,12 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Session du tracker (`/session` + `/frame`), `null` quand le direct est sur `/live`. */
     private var tracker: TrackRunner? = null
 
-    /** Transport choisi dans le bandeau : tracker à ids stables, ou `/live` en WebSocket. */
-    private var trackerEnabled = false
+    /** Tracker à ids stables par défaut (~30 ms serveur) ; `/live` WS en repli via le bandeau. */
+    private var trackerEnabled = true
 
-    /**
-     * Pipeline actif, quel que soit le transport : la cadence, l'époque de la séance et la
-     * latence mesurée passent par lui — l'écran ne connaît pas le client utilisé.
-     */
+    private val trackFallback = LiveTrackFallback()
+
+    /** Pipeline actif, tout transport : cadence, époque, latence — l'écran ignore le client. */
     internal val pipeline: FramePipeline? get() = tracker ?: session
 
     /** Dernière frame gardée pour les questions (indépendant de SAM). */
@@ -187,20 +180,20 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // Deux transports pour les frames, et **aucun `/health`** dans les deux cas : la
-        // première frame réveille le conteneur (Modal met la requête en file pendant le
-        // démarrage, mesuré 8-35 s). Le tracker ouvre une session et suit des ids stables ;
-        // `/live` en WebSocket est le défaut, avec les knobs de transport des masques.
+        // Deux transports, aucun `/health` : la 1re frame réveille le conteneur (file Modal, 8-35 s).
+        // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
         session = null
         client = null
         tracker = null
         if (trackerEnabled) {
             tracker = TrackRunner(HttpTrackClient(base))
+            LiveTransportLog.info("session track ouverte base=" + base)
         } else {
             val live = LiveMaskTransport.clientFor(base, marks = chronology)
             client = live
             session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
         }
+        LiveTransportLog.info("start transport=" + if (trackerEnabled) TRANSPORT_TRACK else TRANSPORT_WS)
         _state.update {
             it.copy(
                 running = true,
@@ -226,6 +219,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Remise à zéro commune aux deux démarrages : journal, distances, cadence, concepts. */
     private fun resetForStart(prompts: List<String>) {
+        trackFallback.reset()
         val chosen = LivePrompts.normalize(prompts)
         // Journal et historique de questions : vidés par `asker.reset()` (une seule
         // implémentation de « la mémoire du direct s'efface », partagée avec `stop()`).
@@ -266,11 +260,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun restart(prompts: List<String>) = viewModelScope.launch { start(store.load(), prompts) }
 
-    /**
-     * Bascule le transport du direct depuis le bandeau : `/live` en WebSocket ↔ tracker
-     * par sessions (ids stables). Le choix vit le temps de l'app (non persisté) ; la
-     * séance est relancée dans le nouveau mode.
-     */
+    /** Bascule WS ↔ tracker depuis le bandeau (choix non persisté, séance relancée). */
     fun toggleTracker() {
         trackerEnabled = !trackerEnabled
         restartActive()
@@ -314,20 +304,33 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             }
             result.fold(
                 onSuccess = { frame -> publish(frame) },
-                onFailure = { error ->
-                    publishStages(null)
-                    val waking = _state.value.starting && wake.isWaking()
-                    _state.update {
-                        it.copy(
-                            objectsCount = 0,
-                            transport = transportLabel(),
-                            starting = waking,
-                            error = if (waking) null else samUnreachableLine(error.message ?: "GPU injoignable"),
-                        )
-                    }
-                },
+                onFailure = { error -> if (publishFailure(active, error)) return@launch },
             )
         }
+    }
+
+    /** Échec : repli `/live` au démarrage (vrai = relancé), sinon erreur hors réveil. */
+    private fun publishFailure(active: FramePipeline, error: Throwable): Boolean {
+        publishStages(null)
+        // Tracker muet au démarrage (backend non déployé) : on relance en `/live`
+        // plutôt que d'afficher « injoignable ». Une seule fois par séance.
+        if (trackFallback.shouldFallBack(_state.value.starting, active is TrackRunner)) {
+            trackerEnabled = false
+            LiveTransportLog.info("repli tracker->/live raison=" + (error.message ?: "GPU injoignable"))
+            restartActive()
+            return true
+        }
+        val waking = _state.value.starting && wake.isWaking()
+        LiveTransportLog.failure("frame echec transport=" + transportLabel() + " " + (error.message ?: "GPU injoignable"))
+        _state.update {
+            it.copy(
+                objectsCount = 0,
+                transport = transportLabel(),
+                starting = waking,
+                error = if (waking) null else samUnreachableLine(error.message ?: "GPU injoignable"),
+            )
+        }
+        return false
     }
 
     /**
@@ -379,12 +382,13 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 frame = frame,
                 overlays = overlays,
                 objectsCount = frame.objects.size,
+                transport = transportLabel(),
                 latencyMs = pipeline?.stats?.averageMs ?: 0L,
                 fps = LiveFpsMeter.fpsFor(gap, current.fps),
                 error = null,
                 starting = false,
                 memory = current.memory.copy(tracks = recent.tracks),
-                distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings),
+                distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
             )
         }
@@ -439,16 +443,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Bouton « Stop » : fin de la parole, transcription puis question automatique. */
     fun stopVoice() = liveVoice.stop()
 
-    /**
-     * Bouton « Stop » : le direct s'arrête **pour de vrai**.
-     *
-     * - la frame en vol est révoquée ([LiveSession.reset]) : sa réponse tardive est jetée,
-     *   elle ne réécrit pas l'état « arrêté » et ne vole pas le créneau de la séance
-     *   suivante ;
-     * - la mémoire du direct (journal des objets et historique des questions) disparaît
-     *   maintenant, pas au démarrage suivant : un direct arrêté ne montre plus — et ne
-     *   répond plus sur — ce qu'il a vu.
-     */
+    /** Bouton « Stop » : vol révoqué, mémoire effacée — un direct arrêté ne répond plus. */
     fun stop() {
         narration.close()
         liveVoice.cancel()
@@ -461,6 +456,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         client?.close()
         client = null
         // Fermeture de session côté backend, sans bloquer l'arrêt de l'écran.
+        LiveTransportLog.info("stop session track fermee tracker=" + (closing != null))
         viewModelScope.launch { closing?.stop() }
         distances.reset()
         prediction.reset()

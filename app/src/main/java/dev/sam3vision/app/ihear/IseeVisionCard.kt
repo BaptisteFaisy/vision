@@ -14,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
@@ -102,6 +103,7 @@ internal fun BoxWithConstraintsScope.VisionCard(
         }
         PixelMosaic(grid, veil.value, circle = false, modifier = Modifier.fillMaxSize())
         if (state.recordingVideo) RecordingChip()
+        CrossingChip(probe, Modifier.align(Alignment.BottomCenter)) { viewModel.toggleCrossing() }
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         ProbeNoticeCard(probe)
     }
@@ -157,7 +159,7 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
 /** Aperçu vivant : masques SAM et notice « pourquoi la caméra ne voit rien ». */
 @Composable
 internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: IhearViewModel, modifier: Modifier) {
-    // SAM ne tourne que pendant l'enregistrement : le câblage vit avec la carte.
+    // SAM tourne pendant l'enregistrement et en mode Traversée : le câblage vit avec la carte.
     IhearCameraWiring(glue, viewModel, probe.frames)
     if (!glue.granted) {
         Text(
@@ -217,6 +219,37 @@ private fun RecordingChip() {
         )
         Spacer(Modifier.size(5.dp))
         Text("REC", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * Bouton du mode Traversée : pastille d'état (grise = coupé ou doute, rouge,
+ * verte) et libellé. Posé en bas de carte, à côté du REC.
+ */
+@Composable
+private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
+    val dot = when {
+        !probe.crossingActive -> Color(0xFF808080)
+        probe.crossing == dev.sam3vision.core.crossing.CrossingState.Green -> Color(0xFF2ECC71)
+        probe.crossing == dev.sam3vision.core.crossing.CrossingState.Red -> Color(0xFFE74C3C)
+        else -> Color(0xFFF1C40F)
+    }
+    Row(
+        modifier
+            .padding(8.dp)
+            .background(Color(0x99000000), RoundedCornerShape(8.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).background(dot, CircleShape))
+        Spacer(Modifier.size(5.dp))
+        Text(
+            crossingButtonLabel(probe.crossingActive, probe.crossing),
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -285,14 +318,19 @@ internal fun rememberCameraGlue(viewModel: IhearViewModel): CameraGlue {
 @Composable
 private fun IhearCameraWiring(glue: CameraGlue, viewModel: IhearViewModel, frames: Int) {
     LaunchedEffect(glue.host, viewModel) {
-        // SAM ne voit que l'enregistrement : hors REC, aucune frame n'est même convertie.
-        glue.host.wantsFrame = { viewModel.state.value.recordingVideo && viewModel.probe.wantsFrame() }
+        // SAM ne voit que l'enregistrement — sauf en mode Traversée, qui analyse
+        // sans enregistrer : hors ces deux cas, aucune frame n'est même convertie.
+        glue.host.wantsFrame = { sending(viewModel) && viewModel.probe.wantsFrame() }
         glue.host.onFrame = { jpeg, captureAtNs ->
-            if (viewModel.state.value.recordingVideo) viewModel.probe.onFrame(jpeg, captureAtNs)
+            if (sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
         }
     }
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
 }
+
+/** Vrai quand les frames partent vers SAM : enregistrement ou mode Traversée. */
+private fun sending(viewModel: IhearViewModel): Boolean =
+    viewModel.state.value.recordingVideo || viewModel.probe.state.value.crossingActive
 
 /** Vrai si la permission caméra est déjà accordée. */
 fun cameraGranted(context: Context): Boolean {

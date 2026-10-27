@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,12 +38,14 @@ fun TtsSettings(
         LabeledField("Clé API ElevenLabs", draft.ttsApiKey, true) { onChange(draft.copy(ttsApiKey = it)) }
         LabeledField("ID de voix ElevenLabs", draft.ttsVoiceId, false) { onChange(draft.copy(ttsVoiceId = it)) }
         Text(
-            "Voix premade : Sarah EXAVITQu4vr4xnSDxMaL · George JBFqnCBsd6RMkjVDRZzb. " +
-                "Jade US ${Settings.JADE_US_VOICE_ID} (celle de l'intro) est une voix de " +
-                "bibliothèque : elle répond 402 sans crédits.",
+            "Voix par défaut : Laure ${Settings.LAURE_VOICE_ID}. Replis : Sarah " +
+                "${Settings.SARAH_VOICE_ID} (premade, compte free) · George " +
+                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} (celle de " +
+                "l'intro) est une voix de bibliothèque : elle répond 402 sans crédits.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
+        SpeedSetting(draft, onChange)
         SpeakRow(
             state = speaking,
             text = testVoiceText(draft.speechLanguage),
@@ -53,6 +56,36 @@ fun TtsSettings(
         VoiceSwitches(draft, onChange)
         IntroSetting(draft) { onChange(draft.copy(introEnabled = it)) }
     }
+}
+
+/**
+ * Vitesse des voix (×0,5 à ×2, ×1,9 par défaut) : crans de ±0,1 au bouton,
+ * appliqués en lecture locale — même l'audio en cache parle à la vitesse choisie.
+ */
+@Composable
+private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Vitesse de la voix", color = AppColors.text, fontSize = 13.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, -0.1f))) }) {
+                Text("−", fontSize = 18.sp)
+            }
+            Text(formatTtsSpeed(draft.ttsSpeed), color = AppColors.text, fontSize = 15.sp)
+            TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, 0.1f))) }) {
+                Text("+", fontSize = 18.sp)
+            }
+        }
+    }
+    Text(
+        "Aussi réglable à la voix sur iSee : « vitesse 1,5 », « parle plus vite », " +
+            "« ralentis », « vitesse normale ».",
+        color = AppColors.textMuted,
+        fontSize = 11.sp,
+    )
 }
 
 /**
@@ -76,8 +109,8 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
     ) { onChange(draft.copy(ttsAnnouncePositions = it)) }
     Text(
         "Activé : en mode Direct (et après l'analyse d'une photo), la voix dit où sont les " +
-            "objets et à quelle distance — « Personne à gauche, à 1,4 mètre ; chien au " +
-            "centre, à 3 mètres ». Une annonce toutes les 4 s au plus, et seulement si la " +
+            "objets et à quelle distance — « Personne à 9 heures, à 1,4 mètre ; chien à " +
+            "midi, à 3 mètres ». Une annonce toutes les 4 s au plus, et seulement si la " +
             "scène change : un objet qui s'approche d'un mètre est ré-annoncé.",
         color = AppColors.textMuted,
         fontSize = 11.sp,
@@ -88,7 +121,7 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
     ) { onChange(draft.copy(ttsGuidanceStraight = it)) }
     Text(
         "Activé : la page caméra dit la consigne de marche au lieu des positions — " +
-            "« Continue tout droit. » ou « Personne à 2 mètres devant, va à gauche. ». " +
+            "« Continue tout droit. » ou « Personne à 2 mètres à midi, va à gauche. ». " +
             "Calculé sur le téléphone depuis SAM, sans appel LLM ; un obstacle qui entre " +
             "dans le couloir parle aussitôt, même avant les 4 s.",
         color = AppColors.textMuted,
@@ -103,7 +136,7 @@ private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     Text(
         "Intro embarquée (voix Jade US, hors ligne) : jouée une seule fois à la première " +
             "ouverture, comme premier message du chat. On la coupe à l'appui long en " +
-            "dictant : « Disable iSee intro ».",
+            "dictant : « Désactive iSee intro » (ou « Disable iSee intro »).",
         color = AppColors.textMuted,
         fontSize = 11.sp,
     )

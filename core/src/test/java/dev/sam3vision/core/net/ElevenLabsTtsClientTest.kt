@@ -29,6 +29,20 @@ class ElevenLabsTtsClientTest {
     }
 
     @Test
+    fun `aucun speed envoye au cloud, eleven v4 turbo l ignore`() = runBlocking {
+        NetContract.audioServer().use { server ->
+            val client = ElevenLabsTtsClient(NetContract.KEY, NetContract.VOICE, baseUrl = server.baseUrl)
+            client.synthesize("Bonjour SAM Vision.").getOrThrow()
+
+            val body = JSONObject(server.requests.single().body)
+            // La vitesse vit en lecture locale (MediaPlayer) : le modèle runtime
+            // ignore `speed`, et un non-défaut peut être rejeté — ne pas l'envoyer.
+            assertTrue(!body.has("speed"))
+            assertTrue(!body.getJSONObject("voice_settings").has("speed"))
+        }
+    }
+
+    @Test
     fun `402 sans credits remonte PaymentRequired avec un message clair`() = runBlocking {
         NetContract.server(code = 402).use { server ->
             val client = ElevenLabsTtsClient(NetContract.KEY, NetContract.VOICE, baseUrl = server.baseUrl)

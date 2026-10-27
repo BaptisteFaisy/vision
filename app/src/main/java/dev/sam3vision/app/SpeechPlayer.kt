@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.media.MediaPlayer
+import dev.sam3vision.core.settings.Settings
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,13 +17,23 @@ import kotlinx.coroutines.withContext
  *   clips « Launched »/« Sent »/« Failed » persistent donc entre deux lectures.
  *
  * Une seule lecture à la fois : chaque entrée arrête la précédente.
+ * La vitesse ([speed], réglage `ttsSpeed`, ×1,9 par défaut) est appliquée en lecture
+ * locale : le modèle ElevenLabs runtime ignore le réglage `speed` du cloud.
  */
 class SpeechPlayer(
     private val dir: File,
     private val onComplete: () -> Unit = {},
     private val onPlaybackError: (String) -> Unit = {},
+    speed: Float = Settings.DEFAULT_TTS_SPEED,
 ) {
     private var player: MediaPlayer? = null
+
+    /** Vitesse appliquée à chaque lecture, bornée 0,5..2 (les ViewModels la tiennent à jour). */
+    @Volatile
+    var speed: Float = Settings.clampTtsSpeed(speed)
+        set(value) {
+            field = Settings.clampTtsSpeed(value)
+        }
 
     /** Joue [bytes] ; renvoie l'échec au lieu de le lever (l'UI affiche le message). */
     suspend fun play(bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
@@ -49,6 +60,9 @@ class SpeechPlayer(
             true
         }
         mp.prepare()
+        // Vitesse locale (PlaybackParams, API 23+ ; minSdk 29) : le MP3 ElevenLabs
+        // est synthétisé à vitesse naturelle, la lecture l'accélère — pitch conservé.
+        runCatching { mp.playbackParams = mp.playbackParams.setSpeed(speed) }
         mp.start()
     }
 

@@ -97,6 +97,7 @@ internal object SettingsCodec {
     private const val K_SPEECH_LANGUAGE = "speechLanguage"
     private const val K_TTS_API_KEY = "ttsApiKey"
     private const val K_TTS_VOICE_ID = "ttsVoiceId"
+    private const val K_TTS_SPEED = "ttsSpeed"
     private const val K_TTS_AUTOPLAY = "ttsAutoplay"
     private const val K_TTS_ANNOUNCE_POSITIONS = "ttsAnnouncePositions"
     private const val K_TTS_GUIDANCE_STRAIGHT = "ttsGuidanceStraight"
@@ -110,7 +111,13 @@ internal object SettingsCodec {
     private const val K_LIVE_SAM = "liveSamEnabled"
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
+    private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
     private const val K_CAMERA_FOV = "cameraFovDeg"
+    private const val K_CAREGIVER_ROLE = "caregiverRole"
+    private const val K_PARENT_SITE_URL = "parentSiteUrl"
+    private const val K_SHARE_ENABLED = "shareEnabled"
+    private const val K_SHARE_ID = "shareId"
+    private const val K_SHARE_WRITE_KEY = "shareWriteKey"
     private const val K_MAX_OBJECTS = "maxObjects"
 
     fun encode(s: Settings): String = buildString {
@@ -122,6 +129,7 @@ internal object SettingsCodec {
         appendLine("$K_SPEECH_LANGUAGE=${s.speechLanguage.name}")
         appendLine("$K_TTS_API_KEY=${s.ttsApiKey}")
         appendLine("$K_TTS_VOICE_ID=${s.ttsVoiceId}")
+        appendLine("$K_TTS_SPEED=${s.ttsSpeed}")
         appendLine("$K_TTS_AUTOPLAY=${s.ttsAutoplay}")
         appendLine("$K_TTS_ANNOUNCE_POSITIONS=${s.ttsAnnouncePositions}")
         appendLine("$K_TTS_GUIDANCE_STRAIGHT=${s.ttsGuidanceStraight}")
@@ -135,7 +143,13 @@ internal object SettingsCodec {
         appendLine("$K_LIVE_SAM=${s.liveSamEnabled}")
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
+        appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
+        appendLine("$K_CAREGIVER_ROLE=${s.caregiverRole.name}")
+        appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
+        appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
+        appendLine("$K_SHARE_ID=${s.shareId}")
+        appendLine("$K_SHARE_WRITE_KEY=${s.shareWriteKey}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
     }
 
@@ -154,6 +168,8 @@ internal object SettingsCodec {
             speechLanguage = SpeechLanguage.fromName(values[K_SPEECH_LANGUAGE]),
             ttsApiKey = values[K_TTS_API_KEY].orEmpty(),
             ttsVoiceId = values[K_TTS_VOICE_ID].orEmpty().ifBlank { default.ttsVoiceId },
+            ttsSpeed = values[K_TTS_SPEED]?.toFloatOrNull()?.let(Settings::clampTtsSpeed)
+                ?: default.ttsSpeed,
             ttsAutoplay = values[K_TTS_AUTOPLAY]?.toBooleanStrictOrNull() ?: default.ttsAutoplay,
             ttsAnnouncePositions = values[K_TTS_ANNOUNCE_POSITIONS]?.toBooleanStrictOrNull()
                 ?: default.ttsAnnouncePositions,
@@ -172,8 +188,15 @@ internal object SettingsCodec {
                 ?: default.boxPredictionEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
+            navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()
+                ?: default.navigationGuidanceEnabled,
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
+            caregiverRole = CaregiverRole.fromName(values[K_CAREGIVER_ROLE]),
+            parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
+            shareEnabled = values[K_SHARE_ENABLED]?.toBooleanStrictOrNull() ?: default.shareEnabled,
+            shareId = values[K_SHARE_ID].orEmpty().ifBlank { default.shareId },
+            shareWriteKey = values[K_SHARE_WRITE_KEY].orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),

@@ -20,15 +20,21 @@ import kotlinx.coroutines.launch
  * vocale des objets et de leur distance, focale de la caméra, distances on/off,
  * plafond d'objets.
  */
-internal fun LiveProbe.configureFrom(settings: Settings) {
+internal fun LiveProbe.configureFrom(
+    settings: Settings,
+    prompts: List<String> = dev.sam3vision.core.live.LivePrompts.Default,
+    crossingActive: Boolean = false,
+) {
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
+        prompts = prompts,
         announce = settings.announcePositions,
         guide = settings.guideStraight,
         lens = LensSpec.fromSettings(settings.cameraFovDeg),
         distancesOn = settings.distanceOverlayEnabled,
         maxObjects = settings.objectsOnScreen,
         language = settings.speechLanguage,
+        crossingActive = crossingActive,
     )
 }
 

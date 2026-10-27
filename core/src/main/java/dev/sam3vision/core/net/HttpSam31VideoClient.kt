@@ -36,11 +36,13 @@ class HttpSam31VideoClient(
         if (onDeviceMode) return Result.failure(ApiError.BadResponse(INFERRED_ON_DEVICE))
         if (baseUrl.isBlank()) return Result.failure(ApiError.InvalidKey("endpoint SAM 3.1 vide"))
         if (!video.isFile || video.length() == 0L) return Result.failure(ApiError.BadResponse("vidéo absente ou vide"))
-        val request = runCatching { buildRequest(video, prompt) }.fold(
-            onSuccess = { it },
-            onFailure = { return Result.failure(ApiError.BadResponse("vidéo illisible : ${it.message}")) },
-        )
-        return client.execute(request)
+        // Multipart assemblé en IO : pas de stat fichier sur l'appelant.
+        // L'échec de construction reste un BadResponse (contrat historique), pas un Network.
+        return client.executeBuilt {
+            runCatching { buildRequest(video, prompt) }.getOrElse {
+                throw ApiError.BadResponse("vidéo illisible : ${it.message}")
+            }
+        }
             .then { outcome -> outcome.requireSuccess() }
             .then(::summarize)
     }

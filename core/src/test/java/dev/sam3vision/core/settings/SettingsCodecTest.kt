@@ -67,6 +67,61 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le lien du suivi parent survit a un aller-retour`() {
+        val custom = Settings.Default.copy(parentSiteUrl = "https://exemple.invalid/suivi/")
+        assertEquals(
+            "https://exemple.invalid/suivi/",
+            SettingsCodec.decode(SettingsCodec.encode(custom)).parentSiteUrl,
+        )
+        // Un fichier écrit avant ce champ reprend le site de prod par défaut.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("parentSiteUrl=") }
+        assertEquals(
+            Settings.DEFAULT_PARENT_SITE_URL,
+            SettingsCodec.decode(legacy.joinToString("\n")).parentSiteUrl,
+        )
+        // Une valeur vide (ancien défaut) retombe aussi sur le site de prod.
+        val blank = SettingsCodec.encode(Settings.Default)
+            .replace("parentSiteUrl=${Settings.DEFAULT_PARENT_SITE_URL}", "parentSiteUrl=")
+        assertEquals(
+            Settings.DEFAULT_PARENT_SITE_URL,
+            SettingsCodec.decode(blank).parentSiteUrl,
+        )
+    }
+
+    @Test
+    fun `le partage survit a un aller-retour`() {
+        val custom = Settings.Default.copy(shareEnabled = false, shareId = "mia", shareWriteKey = "k")
+        val round = SettingsCodec.decode(SettingsCodec.encode(custom))
+        assertEquals(false, round.shareEnabled)
+        assertEquals("mia", round.shareId)
+        assertEquals("k", round.shareWriteKey)
+        // Un fichier écrit avant ces champs reprend les défauts (partage actif, flux « leo »).
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("shareEnabled=") || it.startsWith("shareId=") }
+        val back = SettingsCodec.decode(legacy.joinToString("\n"))
+        assertEquals(Settings.Default.shareEnabled, back.shareEnabled)
+        assertEquals(Settings.DEFAULT_SHARE_ID, back.shareId)
+    }
+
+    @Test
+    fun `le role caregiver survit a un aller-retour et reste aveugle par defaut`() {
+        // Défaut « Blind person » : une installation neuve ouvre iSee, pas la page suivi.
+        assertEquals(CaregiverRole.Blind, Settings.Default.caregiverRole)
+        assertEquals(CaregiverRole.Blind, SettingsCodec.decode("").caregiverRole)
+
+        val caregiver = Settings.Default.copy(caregiverRole = CaregiverRole.Caregiver)
+        assertEquals(
+            CaregiverRole.Caregiver,
+            SettingsCodec.decode(SettingsCodec.encode(caregiver)).caregiverRole,
+        )
+        // Un fichier écrit avant ce champ reprend le rôle aveugle, jamais le suivi.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("caregiverRole=") }
+        assertEquals(CaregiverRole.Blind, SettingsCodec.decode(legacy.joinToString("\n")).caregiverRole)
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)
