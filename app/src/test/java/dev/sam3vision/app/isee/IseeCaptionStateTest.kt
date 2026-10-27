@@ -26,6 +26,7 @@ class IseeCaptionStateTest {
         assertEquals("a chair near you", currentCaption(state.copy(speakingEntryId = 42), playing)?.text)
         val announcement = state.copy(speakingEntryId = ANNOUNCEMENT_BUBBLE_ID, speakingText = "Turn left")
         assertEquals("Turn left", currentCaption(announcement, playing)?.text)
+        assertEquals("Turn left", currentCaption(announcement.copy(holding = true), playing)?.text)
         assertEquals(IseeScene.VOICE, iseeSceneOf(announcement.copy(recordingVideo = true), null))
     }
 

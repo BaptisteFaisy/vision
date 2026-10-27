@@ -79,7 +79,9 @@ private fun BoxWithConstraintsScope.PortraitScene(
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp()) }
     OrbLayer(view.scene, geo, time, open)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
-    with(density) { SpokenLine(currentCaption(state, position), state.holding, geo.textTop.toDp(), compact = open > 0.5f) }
+    with(density) {
+        SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
+    }
     BottomScrim()
 }
 

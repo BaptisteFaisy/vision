@@ -7,7 +7,7 @@ import dev.sam3vision.core.iseedesign.spokenCaption
 
 /** Le texte est celui de la voix en cours, jamais celui d'une sélection périmée. */
 internal fun currentCaption(state: IseeUiState, position: SpeechPosition?): SpokenCaption? = when {
-    state.holding -> if (state.userSpeaking) spokenCaption(state.liveTranscript, null, live = true) else null
+    state.holding && state.userSpeaking -> spokenCaption(state.liveTranscript, null, live = true)
     state.speakingEntryId == null -> null
     else -> spokenCaption(currentSpeechText(state), position)
 }

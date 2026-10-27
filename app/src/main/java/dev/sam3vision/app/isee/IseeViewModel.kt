@@ -140,6 +140,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile
     var active: Boolean = false
+        set(value) {
+            field = value
+            if (!value) onHoldCancel()
+        }
 
     /** Caméra de la fenêtre flottante, câblée par le composable à l'attachement. */
     var camera: IseeCameraActions? = null
