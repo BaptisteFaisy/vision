@@ -48,8 +48,8 @@ quand la mesure fait un bond de plus de **50 %** (l'objet a réellement bougé, 
 piste muette plus de **2 s** est oubliée : l'objet qui revient est mesuré à neuf. Valeurs aux défauts du
 constructeur (`DistanceSmoother.kt:17-22`), testées dans `DistanceMeterTest`.
 
-Sur la page caméra iSee (REC) et sur la photo du double tap : **pas de journal de pistes, mesure brute**
-(`LiveProbe.readingsOf` n'appelle jamais `record` ; `IseePhotoDistances.layerOf`) — la pastille y bouge donc
+Sur la page caméra iSee (REC) : **pas de journal de pistes, mesure brute**
+(`LiveProbe.readingsOf` n'appelle jamais `record`) — la pastille y bouge donc
 un peu plus qu'en Direct.
 
 ## Précision — ce que le chiffre vaut
@@ -82,21 +82,6 @@ placement, donc la pastille a exactement la largeur de son contenu ; tout est de
 fils dessous, pastilles dessus. `PillPlacement.leadY()` choisit le bord que le fil touche — le plus proche de
 la boîte, donc le bas quand la pastille est au-dessus, le haut quand l'empilement l'a poussée dessous.
 Testé dans `DistanceLayoutTest` ; l'aperçu avant/après qui a servi à choisir cette forme était une maquette canvas hors dépôt.
-
-## iSee : les pastilles sur la photo du double tap
-
-L'accueil iSee (chat + fenêtre caméra) ne suit aucun flux `/live` pendant la navigation : ni masques, ni
-pistes, donc aucun objet à étiqueter en continu. Le **double tap** (`IseeViewModel.onDoubleTap`, `:254`)
-prend une photo, l'affiche dans la fenêtre flottante et l'envoie au `/segment` de SAM (`HttpSamClient.segment`,
-`IseePhotoDistances.kt:45-47` ; le segment est **resté en HTTP** — seul le direct est en WS) ; chaque objet dont
-le concept a une hauteur connue reçoit sa pastille **avec son nom** (`personne ≈ 3,9 m` — `withLabel = true`,
-`IseeVisionCard.kt:104`) — sans masque sur une photo, c'est le seul moyen de savoir de quel objet parle la
-pastille. Une photo ne bouge pas : pas de lissage, une mesure brute.
-
-La photo reste 2,6 s (`PHOTO_SHOW_MS`, `IseeViewModel.kt:323` ; valeur 2,6 s dans `IseePhotoShot.kt:102`) ; dès que des pastilles arrivent, elle est
-**maintenue 6 s** (`PHOTO_MEASURED_MS`, `:326` ; 6 s, `IseePhotoShot.kt:105`) le temps de lire. Échec de mesure expliqué au chat, pas muet :
-`PhotoMeasure` distingue bascule coupée, endpoint absent, image illisible, SAM injoignable, rien de mesurable
-(`IseePhotoDistances.kt:62-69`). Rien de mesurable : la photo s'évapore comme avant, sans pastille.
 
 ## À voix haute
 

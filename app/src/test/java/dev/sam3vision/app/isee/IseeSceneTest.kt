@@ -86,7 +86,6 @@ class IseeSceneTest {
     fun `l'etat direct a priorite sur la bulle affichee`() {
         val state = exchange()
         assertEquals(IseeScene.VISION, iseeSceneView(state.copy(recordingVideo = true), user(1L, "q")).scene)
-        assertEquals(IseeScene.VISION, iseeSceneView(state.copy(photoPath = "/tmp/p.jpg"), user(1L, "q")).scene)
         assertEquals(IseeScene.THINKING, iseeSceneView(state.copy(thinking = true), user(1L, "q")).scene)
         assertEquals(IseeScene.VOICE, iseeSceneView(state.copy(speakingEntryId = 2L), user(1L, "q")).scene)
         // L'écoute passe avant tout le reste : micro ouvert, on ne montre pas l'analyse.
@@ -141,8 +140,8 @@ class IseeSceneTest {
     }
 
     @Test
-    fun `la carte camera reste visible pendant la reflexion sur une photo`() {
-        val state = exchange().copy(photoPath = "/tmp/p.jpg", thinking = true)
+    fun `la carte camera reste visible pendant la reflexion en enregistrement`() {
+        val state = exchange().copy(recordingVideo = true, thinking = true)
         assertEquals(IseeScene.THINKING, iseeSceneView(state, selectedEntry(state)).scene)
         val layers = iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = true)
         assertTrue(layers.cameraCard)

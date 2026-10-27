@@ -260,8 +260,8 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Photo immédiate du double tap ; `true` = demande acceptée (écriture asynchrone).
-     * [onSaved] est rappelé plus tard : `true` si la photo est écrite, `false` sinon.
+     * Photo de la frame filmée (appui long) ; `true` = demande acceptée (écriture
+     * asynchrone). [onSaved] est rappelé plus tard : `true` si écrite, `false` sinon.
      */
     fun takePhotoNow(target: File, onSaved: (Boolean) -> Unit): Boolean {
         val capture = imageCapture ?: return false

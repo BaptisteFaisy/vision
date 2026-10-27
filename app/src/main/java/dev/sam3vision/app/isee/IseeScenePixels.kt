@@ -61,7 +61,7 @@ internal fun samplePreviewGrid(bitmap: Bitmap?): PixelGrid {
     return PixelGrid(pixels, GRID_COLS, GRID_ROWS)
 }
 
-/** Échantillonne la photo du double tap à partir de son fichier (IO léger, 22×22). */
+/** Échantillonne une photo à partir de son fichier (IO léger, 22×22). */
 internal suspend fun samplePhotoGrid(path: String?): PixelGrid {
     if (path == null) return PixelGrid(IntArray(0), GRID_COLS, GRID_ROWS)
     return withContext(Dispatchers.IO) {

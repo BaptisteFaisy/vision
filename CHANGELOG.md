@@ -40,6 +40,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   vierge** (permissions POSIX non supportées sur Windows) ;
   `tools/check-kotlin-limits.py` vert ; `assembleDebug` vert.
 
+## 2026-10-27 (15) — film + parole : la photo est jointe, le double tap n'existe plus
+
+- **Course capture/lecture réparée** (`IseePhotoShot`) : la lecture attend le rappel
+  CameraX (borné, `CAPTURE_TIMEOUT_MS = 4 s`) et retente une capture si rien n'avait
+  démarré (caméra froide refusant au début de la tenue). Avant : une tenue courte
+  lisait un contexte encore vide et partait en texte seul — le modèle répondait
+  « aucune image transmise » (vu dans `isee-media.db` sur le téléphone : une
+  question avec image, la suivante sans).
+- **Double tap supprimé** (décision produit) : détection retirée du cerveau des
+  gestes (le tap simple part dès le relâchement, plus de fenêtre 450 ms),
+  `onDoubleTap`, photo gelée/évaporation/pastilles, `photoPath`/`distanceLayer`
+  isee et leurs branches d'affichage (carte + Portrait). L'appui long reste la
+  seule prise de photo, silencieuse, jointe à la question. Onboarding et aide
+  Réglages réduits aux deux gestes.
+- **Preuves** : `IseePhotoShotTest` (10, dont attente du rappel et retentative),
+  `IseeGestureBrainTest` (5), `IseeAnswersTest`, `OnboardingGesturesTest`,
+  `IseeSceneTest` adaptés ; `:core:testDebugUnitTest` 1126/1126,
+  `:app:testDebugUnitTest` 529/529 sur r630 (après rebase sur le master
+  renommé `isee`) ; `check-kotlin-limits.py` OK. Recette téléphone (photo
+  jointe à la question en filmant) après merge.
+
 ## 2026-10-27 (13) — cap vocal : le guidage marche vers la direction demandée
 
 - **Ordre vocal de cap** (`SteeringCommand`, avant Maps et le LLM) : « va à gauche »,

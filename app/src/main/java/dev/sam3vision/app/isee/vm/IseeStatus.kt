@@ -1,7 +1,6 @@
 package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.isee.IseeUiState
-import dev.sam3vision.app.isee.PhotoMeasure
 
 /** La seule façon dont les collaborateurs du ViewModel touchent l'état de l'écran. */
 typealias StateUpdate = ((IseeUiState) -> IseeUiState) -> Unit
@@ -35,17 +34,4 @@ object IseeStatusText {
 
     /** Échec de la question au LLM, tel qu'affiché. */
     fun questionFailed(error: Throwable): String = "Question failed: ${error.message ?: "error"}"
-}
-
-/**
- * Motif affiché quand la photo du double tap reste sans pastilles, `null` quand elle
- * en a : chaque échec est dit dans le chat au lieu de rester muet.
- */
-fun photoMeasureMessage(outcome: PhotoMeasure): String? = when (outcome) {
-    is PhotoMeasure.Measured -> null
-    PhotoMeasure.OverlayOff -> "Photo: distance overlay off (Settings)"
-    PhotoMeasure.NoEndpoint -> "Photo: SAM endpoint missing (Settings → Region)"
-    PhotoMeasure.Unreadable -> "Photo: image unreadable"
-    is PhotoMeasure.Failed -> "Photo analysis failed: ${outcome.reason}"
-    PhotoMeasure.NoObjects -> "Photo: no measurable objects"
 }

@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Décision pure de l'onboarding des trois gestes : la pose du doigt est calculée
+ * Décision pure de l'onboarding des deux gestes : la pose du doigt est calculée
  * sans Android, donc vérifiable en JVM. Ce qui dépend du moteur Compose (rendu réel
  * du Canvas, antialiasing) reste hors de portée : c'est dit dans la PR.
  */
@@ -47,24 +47,6 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `double tap, deux contacts separes par une pause`() {
-        assertEquals("premier tap", 1f, onboardingPose(OnboardingGesture.DoubleTap, 0.25f).press, delta)
-        val pause = onboardingPose(OnboardingGesture.DoubleTap, 0.39f)
-        assertEquals("doigt relevé entre les deux", 0f, pause.press, delta)
-        assertFalse("aucun éclat pendant la pause", pause.cameraFlash)
-        assertEquals("second tap", 1f, onboardingPose(OnboardingGesture.DoubleTap, 0.5f).press, delta)
-    }
-
-    @Test
-    fun `double tap, la photo s'allume juste apres le deuxieme contact`() {
-        val apres = onboardingPose(OnboardingGesture.DoubleTap, 0.5f)
-        assertTrue("icône photo allumée", apres.cameraFlash)
-        assertTrue("éclat en cours", apres.flash in 0f..1f)
-        assertTrue("anneau du second tap", apres.ripple in 0f..1f)
-        assertFalse("pas de vidéo pour une photo", apres.recOn)
-    }
-
-    @Test
     fun `appui long, le doigt reste pose et les ondes pulsent`() {
         val debut = onboardingPose(OnboardingGesture.Hold, 0.3f)
         val fin = onboardingPose(OnboardingGesture.Hold, 0.9f)
@@ -93,26 +75,22 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `les trois cartes ne pulsent pas ensemble`() {
+    fun `les deux cartes ne pulsent pas ensemble`() {
         val periods = kinds.map(::onboardingPeriodMs)
         assertEquals(kinds.size, periods.distinct().size)
         assertTrue("boucle du tap la plus courte", periods[0] < periods[1])
-        assertTrue("boucle de l'appui long la plus longue", periods[1] < periods[2])
     }
 
     @Test
     fun `chaque geste se distingue par ce qu'il allume`() {
         val tap = onboardingPose(OnboardingGesture.Tap, 0.4f)
-        val doubleTap = onboardingPose(OnboardingGesture.DoubleTap, 0.5f)
         val hold = onboardingPose(OnboardingGesture.Hold, 0.5f)
-        assertTrue("la vidéo n'est allumée que par le tap", tap.recOn && !doubleTap.recOn && !hold.recOn)
-        assertTrue("la photo n'est allumée que par le double tap", doubleTap.cameraFlash)
+        assertTrue("la vidéo n'est allumée que par le tap", tap.recOn && !hold.recOn)
         assertFalse("le tap ne déclenche pas la photo", tap.cameraFlash)
         assertTrue(
             "l'appui long ne montre ni anneau ni éclat de photo",
             hold.ripple == ONBOARDING_OFF && hold.flash == ONBOARDING_OFF,
         )
-        assertTrue("le double tap ne montre pas d'onde de voix", doubleTap.wavePhase == ONBOARDING_OFF)
         assertTrue("seules les ondes apparaissent pour l'appui long", hold.wavePhase >= 0f)
     }
 }

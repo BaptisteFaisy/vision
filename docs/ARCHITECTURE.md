@@ -63,30 +63,30 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 | Geste | Effet | Code |
 |---|---|---|
 | tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:248`) |
-| double tap | photo immédiate | `IseeViewModel.onDoubleTap` (`:254`) |
-| appui long (300 ms, tolérance 24 px) | dictée micro maintenu | `core/gesture/LongPressTrigger.kt:102,105` |
+| appui long (300 ms, tolérance 24 px) | dictée micro maintenu + photo filmée jointe | `core/gesture/LongPressTrigger.kt:102,105`, `IseePhotoShot` |
 | balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IseeRootLayout.kt` |
 
-Le **glissement vertical** (changement de bulle) a été supprimé : `IseeViewModel`
-n'a plus `onVerticalDrag*`, le rail vertical de `core/gesture/IseeGestureBrain.kt`
-verrouille le geste **sans rien émettre** (un glissement ne peut donc jamais passer
-pour un tap), et il n'y a aucun moyen de revenir à un message antérieur.
+Le **glissement vertical** (changement de bulle) et le **double tap** (photo) ont
+été supprimés : `IseeViewModel` n'a plus `onVerticalDrag*` ni `onDoubleTap`, le
+rail vertical de `core/gesture/IseeGestureBrain.kt` verrouille le geste **sans
+rien émettre** (un glissement ne peut donc jamais passer pour un tap), et il n'y
+a aucun moyen de revenir à un message antérieur.
 
-### 2.1 Photo (double tap sur l'accueil)
+### 2.1 Photo-contexte (appui long pendant qu'on filme)
 
-1. `IseeViewModel.onDoubleTap` → `shots.takePhoto()` (`app/isee/vm/IseePhotoShot.kt`) :
-   `media.newPhotoFile()` puis `camera().takePhoto(target)` — c'est `IseeCameraHost`
+1. `IseeViewModel.onHoldStart` → `shots.captureForHold()`
+   (`app/isee/vm/IseePhotoShot.kt`) : `media.newPhotoFile()` puis
+   `camera().takePhoto(target)` — c'est `IseeCameraHost`
    (`app/isee/IseeCameraPane.kt`), le pilote CameraX d'iSee (`ImageCapture` +
-   `VideoCapture<Recorder>` + `ImageAnalysis`, liés ensemble).
-2. Photo écrite → `onSaved` : elle **gèle** le contexte de question (`IseePhotoContext`),
-   s'affiche dans la fenêtre, puis s'évapore après un minuteur (`SHOW_MS`, allongé en
-   `MEASURED_MS` si des pastilles sont posées).
-3. **Pastilles de distance** : `IseePhotoDistances.measureOutcome` envoie la photo au
-   `POST {sam}/segment` de `core/net/HttpSamClient` (`prompts = null`), puis le sténopé
-   convertit les boîtes en mètres. Un échec est **dit** (`PhotoMeasure.Failed`,
-   `NoEndpoint`, `NoObjects`, `Unreadable`), pas avalé.
-4. **Aucun appel LLM au double tap** : la photo ne déclenche ni description ni synthèse.
-   Le LLM n'intervient qu'à la question suivante (§2.3).
+   `VideoCapture<Recorder>` + `ImageAnalysis`, liés ensemble). Muet : ni
+   affichage, ni pastilles (le double tap n'existe plus).
+2. **La lecture attend la capture** : `imageBase64()` attend le rappel CameraX
+   (borné, `CAPTURE_TIMEOUT_MS = 4 s`) au lieu de lire un contexte encore vide —
+   sans ça, une tenue courte partait en texte seul (« aucune image transmise »).
+   Si rien n'avait démarré (caméra froide refusant la capture du début de
+   tenue), la lecture retente une fois, la caméra étant chaude à ce moment-là.
+3. `IseeAnswers` joint l'image (§2.3) ; la fin de réponse relâche le contexte
+   (`releaseContext`), succès comme échec.
 
 ### 2.2 Enregistrement (tap simple) — le direct de la page caméra
 
@@ -120,8 +120,9 @@ pour un tap), et il n'y a aucun moyen de revenir à un message antérieur.
    (`core/net/MetaAsrClient`), repli `core/net/ElevenLabsSttClient` dès qu'une clé de voix
    existe (`FallbackSpeechClient` quand les deux sont configurés).
 4. `IseeAnswers` (`app/isee/vm/IseeAnswers.kt`) → `AskUseCase` (`core/usecase/UseCases.kt`)
-   → `core/net/InferHubLlmClient.ask` → `POST {llm}/chat/completions`, image = dernière photo
-   en data-URL, et **historique toujours vide** : iSee joint `emptyList()` (`IseeAnswers`),
+   → `core/net/InferHubLlmClient.ask` → `POST {llm}/chat/completions`, image = frame
+   captée à l'appui long en data-URL (attendue, §2.1 ; texte seul sinon), et
+   **historique toujours vide** : iSee joint `emptyList()` (`IseeAnswers`),
    aucune ligne de la base n'est reconstruite en tour de conversation. Le plafond de
    **20 tours** (`AskUseCase.MAX_HISTORY_TURNS`) ne vaut plus que pour l'écran Direct.
 5. Réponse : ligne Room + MP3 (`IseeVoice` → `ElevenLabsTtsClient`), puis lecture

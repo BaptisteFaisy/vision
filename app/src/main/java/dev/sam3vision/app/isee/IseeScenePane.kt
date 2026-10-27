@@ -65,7 +65,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     width: Dp,
     height: Dp,
 ) {
-    val captureLive = state.recordingVideo || state.photoPath != null
+    val captureLive = state.recordingVideo
     val layers = iseeSceneLayers(bubbleCount(state.entries.size), dissolving = false, captureLive = captureLive)
     val open = rememberCameraOpen(layers.cameraCard)
     val density = LocalDensity.current
