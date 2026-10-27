@@ -236,6 +236,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Extinction volontaire du conteneur GPU à la fermeture de l'app. */
     fun releaseGpu() = diagnostics.releaseGpu()
 
+    /** Réveil silencieux de la GPU à l'ouverture de l'app (`GET /health`). */
+    fun warmGpu() = viewModelScope.launch { diagnostics.warmGpu() }
+
     fun testSam() = viewModelScope.launch { diagnostics.testSam() }
 
     // ————— Dictée (appui long partout, bouton « Dicter » dans le chat) —————
