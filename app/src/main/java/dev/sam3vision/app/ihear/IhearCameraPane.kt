@@ -16,6 +16,7 @@ import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.lensSpecOf
+import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
@@ -62,6 +63,9 @@ class IhearCameraHost(private val context: Context) {
 
     /** Frames converties depuis la liaison caméra (le log de coût ne tire qu'un coup sur 20). */
     private var conversionFrames = 0
+
+    /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
+    private val encoder = Nv21JpegEncoder()
 
     /** L'implémentation [IhearCameraActions] exposée au ViewModel. */
     val actions: IhearCameraActions = object : IhearCameraActions {
@@ -168,10 +172,12 @@ class IhearCameraHost(private val context: Context) {
         .also { it.setAnalyzer(executor, ::analyse) }
 
     /**
-     * ImageProxy → bitmap redressé et réduit en **une** passe → JPEG base64 ; la frame est
-     * fermée quoi qu'il arrive. L'instant d'exposition du capteur accompagne le JPEG
-     * (poste « capture » de la chronologie), validé par [captureStamp] : certains HAL
-     * n'incluent pas la veille dans leur horloge (27 s de dérive mesurés sur le Redmi).
+     * ImageProxy → JPEG base64 **directement depuis le NV21** de la caméra : la copie
+     * des plans embarque la rotation et la réduction, donc **aucun bitmap** n'est créé.
+     * La frame est fermée quoi qu'il arrive, et l'instant d'exposition du capteur
+     * accompagne le JPEG (poste « capture » de la chronologie), validé par
+     * [captureStamp] : certains HAL n'incluent pas la veille dans leur horloge (27 s de
+     * dérive mesurés sur le Redmi).
      *
      * Chronométré (tous les [LOG_EVERY_FRAMES] frames) : ce coût-là n'est **pas** dans la
      * latence affichée par la sonde, qui ne mesure que l'appel réseau. Or c'est du temps
@@ -184,11 +190,7 @@ class IhearCameraHost(private val context: Context) {
         }
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            // Rotation **et** réduction dans la même matrice : un seul rééchantillonnage et
-            // un seul bitmap, là où `scaleToEdge` puis `rotateBitmap` en faisaient deux
-            // (≈ 2,7 ms et une allocation par frame, mesurés).
-            val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, IHEAR_FRAME_EDGE)
-            val jpeg = bitmapToJpegBase64(upright, IHEAR_FRAME_QUALITY)
+            val jpeg = encodeFrame(proxy)
             onFrame?.invoke(
                 jpeg,
                 captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()),
@@ -205,6 +207,18 @@ class IhearCameraHost(private val context: Context) {
             proxy.close()
         }
     }
+
+    /**
+     * Frame JPEG base64 : **NV21 direct** (rotation et réduction dans la copie, zéro
+     * bitmap) ; repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV 4:2:0 —
+     * une seule passe de matrice y remplace les deux rééchantillonnages d'avant.
+     */
+    private fun encodeFrame(proxy: ImageProxy): String =
+        encoder.encodeBase64(proxy, IHEAR_FRAME_EDGE, IHEAR_FRAME_QUALITY)
+            ?: bitmapToJpegBase64(
+                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, IHEAR_FRAME_EDGE),
+                IHEAR_FRAME_QUALITY,
+            )
 
     /** Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames. */
     private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int) {
