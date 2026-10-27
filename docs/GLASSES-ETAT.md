@@ -12,6 +12,11 @@
 > [`glasses-dat-spike.md`](glasses-dat-spike.md) porte l'audit du **bytecode** des AAR
 > `mwdat-*` 1.0.1 (`javap`, relevé du 26/10/2026) : ce relevé n'a **pas** été rejoué le 27/10 et
 > n'est donc pas recopié ici.
+>
+> **Pin du 27/10/2026** : le build utilise `mwdat = "1.0.0"`, pas 1.0.1 — c'est la seule version
+> que Meta AI installe sur la paire, et 1.0.1 fait couper chaque session par les lunettes
+> (« Your glasses need an update »). Raison écrite dans `gradle/libs.versions.toml`, garde dans
+> `core/…/DatPinTest.kt`, constats dans `docs/META-GLASSES.md` §13.
 
 ## 1. Où vit le banc (compté le 27/10/2026)
 

@@ -8,7 +8,8 @@ propres conclusions : **rien ici ne se déduit du banc** (§10). Le module `:gla
 supprimé le 2026-10-27 — décision et chemins dans `docs/GLASSES-DECISION.md`.
 
 Méthode, le 26/10/2026 : lecture intégrale des fichiers cités, et relevé des signatures du
-SDK au `javap` **sur les AAR en cache Gradle** (`com.meta.wearable:mwdat-*:1.0.1`) — pas sur
+SDK au `javap` **sur les AAR en cache Gradle** (`com.meta.wearable:mwdat-*:1.0.1`, relevé du
+26/10 ; le pin du build est **1.0.0** depuis le 27/10, voir §13) — pas sur
 une doc. Tout ce qui exige une paire physique est marqué **jamais essayé** : il n'y a ici ni
 lunettes, ni téléphone, ni émulateur, ni `adb`. Aucun chiffre de terrain n'est repris comme
 s'il était mesuré.
