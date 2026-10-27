@@ -115,15 +115,20 @@ internal fun BoxWithConstraintsScope.VisionCard(
  * Avant : la mosaïque restait opaque pendant tout l'enregistrement — la carte
  * n'était que 26×16 = 416 gros blocs (~39×32 px), et l'aperçu CameraX comme les
  * masques SAM affichés dans la même surface native étaient cachés dessous.
+ *
+ * Le voile est une **entrée**, jamais un état : il part de 1 et ne va que vers 0.
+ * Il remontait à 1 dès que l'enregistrement s'arrêtait, et la carte redevenait la
+ * mosaïque de gros blocs au lieu de montrer l'aperçu net — c'est ce que voyait
+ * l'utilisateur en stoppant la vidéo pour poser une question.
  */
 @Composable
 private fun rememberPixelVeil(state: IhearUiState): Animatable<Float, AnimationVector1D> {
     val veil = remember { Animatable(1f) }
     LaunchedEffect(state.recordingVideo, state.photoPath) {
-        when {
-            state.photoPath != null -> veil.snapTo(0f)
-            state.recordingVideo -> veil.animateTo(0f, tween(PIXEL_VEIL_MS))
-            else -> veil.snapTo(1f)
+        if (state.recordingVideo && state.photoPath == null) {
+            veil.animateTo(0f, tween(PIXEL_VEIL_MS))
+        } else {
+            veil.snapTo(0f)
         }
     }
     return veil
