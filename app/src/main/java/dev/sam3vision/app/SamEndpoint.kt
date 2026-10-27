@@ -4,8 +4,8 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.resolveSamEndpoint
 
 /**
- * Endpoint SAM réellement appelé par l'app : saisie manuelle > preset de la région
- * (mode EU ou **mode US**) > URL injectée au build pour cette région.
+ * Endpoint SAM réellement appelé par l'app : saisie manuelle > URL injectée au build
+ * pour cette région > preset de la région (mode EU ou **mode US**).
  *
  * Une seule carte tourne à la fois côté Modal : ici on choisit seulement *laquelle*
  * des deux apps déployées on interroge.

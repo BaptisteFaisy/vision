@@ -13,8 +13,9 @@ import dev.sam3vision.core.net.WsLiveClient
  * - [targetMs] : entre les deux.
  *
  * Le Direct garde la cadence prudente (350/500/900 ms) ; la page caméra d'iSee
- * part sur [Cadence.Fast] (100 ms) : le GPU répond en ~115 ms, la limite réelle est
- * alors l'aller-retour réseau, pas la carte.
+ * part sur [Cadence.Fast] (pas de plancher : `fastMs = 0`, on repart dès qu'un
+ * créneau se libère, budget 150 ms) : le GPU répond en ~115 ms, la limite réelle
+ * est alors l'aller-retour réseau, pas la carte.
  */
 data class Cadence(
     val fastMs: Long,

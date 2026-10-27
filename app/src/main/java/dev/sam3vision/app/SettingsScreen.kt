@@ -291,7 +291,7 @@ private fun GestureHelp(onOpenGestures: () -> Unit) {
  * Accès aux écrans hérités, absents de l'accueil iSee (gestes seulement, sans bouton) :
  * le **Direct** (flux SAM en continu, annonces de position) et l'**accueil classique**
  * (photo → analyse avec masques). Sans cette porte, ces écrans n'étaient atteignables
- * par aucun chemin depuis la refonte ihear.
+ * par aucun chemin depuis la refonte isee.
  */
 @Composable
 private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {

@@ -3,9 +3,12 @@ package dev.sam3vision.core.motion
 import dev.sam3vision.core.mask.GrayMask
 
 /**
- * Source du mouvement inter-frame du calque local : c'est la **couture** de la lane L13
- * (`docs/L13-FUSION.md` §3). Le calque (u13) décide *quand* propager et *quoi* dessiner ;
- * il ne fait aucune estimation, il appelle cette interface.
+ * Source du mouvement inter-frame : c'est la **couture produite** de la lane L13
+ * (`docs/L13-FUSION.md` §3), implémentée par [BlockMotionSource]. Le calque (u13)
+ * décidera *quand* propager et *quoi* dessiner ; il ne fera aucune estimation, il
+ * appellera cette interface — **ce branchement n'est pas fait** : `LocalOverlayEngine`
+ * consomme encore `core.local.MotionSource` (`ByteArray` → `MaskMotion`), et l'écran
+ * reste inerte en production.
  *
  * Les deux images arrivent dans le conteneur 8 bits des masques ([GrayMask]) : la luminance
  * du direct est un plan d'octets comme un masque, un type neuf ne servirait qu'à recopier

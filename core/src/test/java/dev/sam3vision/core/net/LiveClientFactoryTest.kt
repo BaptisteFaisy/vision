@@ -51,7 +51,7 @@ class LiveClientFactoryTest {
         // Le handshake d'un conteneur endormi garde 60 s de lecture, même si la frame est
         // budgétée à 10 s côté client.
         assertEquals(60_000, transport.client.readTimeoutMillis)
-        // Une demande plus longue que 60 s est respectée (le client « froid » d'iHear).
+        // Une demande plus longue que 60 s est respectée (le client « froid » d'iSee).
         assertEquals(120_000, liveWsClient(120L).readTimeoutMillis)
     }
 }

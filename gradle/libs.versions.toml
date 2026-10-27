@@ -19,6 +19,7 @@ junit = "4.13.2"
 jump3r = "1.0.4"
 json = "20240303"
 mwdat = "1.0.1"
+guava = "33.3.1-android"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -54,6 +55,7 @@ mwdat-core = { module = "com.meta.wearable:mwdat-core", version.ref = "mwdat" }
 mwdat-camera = { module = "com.meta.wearable:mwdat-camera", version.ref = "mwdat" }
 mwdat-inputs = { module = "com.meta.wearable:mwdat-inputs", version.ref = "mwdat" }
 mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "mwdat" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

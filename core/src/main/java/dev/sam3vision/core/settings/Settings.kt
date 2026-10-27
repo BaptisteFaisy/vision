@@ -166,7 +166,7 @@ data class Settings(
 
         /**
          * Voix « Jade US » du compte ElevenLabs, celle de l'intro embarquée
-         * (`res/raw/intro_ihear.mp3`). Proposée dans les Réglages, mais pas par défaut :
+         * (`res/raw/intro_isee.mp3`). Proposée dans les Réglages, mais pas par défaut :
          * voix de bibliothèque, elle répond 402 sur un compte free, là où Sarah est premade.
          */
         const val JADE_US_VOICE_ID = "TOXPlnYC7z5SQSV2Zgc5"

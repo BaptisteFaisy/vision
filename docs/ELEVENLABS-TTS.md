@@ -101,7 +101,7 @@ C'est le piège de diagnostic :
 
 - `VoiceAnnouncer.say()` sort immédiatement si `settings.ttsApiKey.isBlank()`
   (`app/VoiceAnnouncer.kt:23-29`, garde `:25`) ;
-- `ProximityVoice.onPhrase()` sort si `!current.ttsConfigured` (`app/ihear/ProximityVoice.kt:29-38`, garde `:33`)
+- `ProximityVoice.onPhrase()` sort si `!current.ttsConfigured` (`app/isee/ProximityVoice.kt:29-38`, garde `:33`)
   et, sur échec de synthèse, fait `getOrElse { return }` : l'erreur n'est pas remontée
   à l'écran.
 
@@ -117,7 +117,7 @@ frame /live/ws  →  LiveProbe.phraseOf()            (null si bascule coupée)
                 →  LiveProbe.observeSpoken()        (ProbeWiring.kt)
                 →  ProximityVoice.onPhrase(phrase, playerIdle())
                 →  ElevenLabsTtsClient.synthesize()  (eleven_v4_turbo, voix des Réglages)
-                →  SpeechPlayer(cacheDir/ihear-play).play()
+                →  SpeechPlayer(cacheDir/isee-play).play()
 ```
 
 Aucune de ces étapes ne passe par un POST de frames : le direct est en **WebSocket
@@ -163,8 +163,8 @@ Trois mémoires différentes, à ne pas confondre :
 ## « Sans couper le chat » : ce que ça veut dire exactement
 
 - **iSee (chemin réel)** : chat et positions partagent **le même** `SpeechPlayer`
-  (`cacheDir/ihear-play`, `IhearViewModel.kt`) et `ProximityVoice` reçoit
-  `playerIdle()` = `speakingEntryId == null` (`IhearViewModel.playerIdle()`). Si la
+  (`cacheDir/isee-play`, `IseeViewModel.kt`) et `ProximityVoice` reçoit
+  `playerIdle()` = `speakingEntryId == null` (`IseeViewModel.playerIdle()`). Si la
   réponse du chat est en cours, l'annonce **n'est pas jouée du tout** : elle ne coupe
   rien, elle est abandonnée. C'est la seule garantie « une source sonore à la fois ».
 - **Écran Direct historique (`LiveViewModel`)** : `VoiceAnnouncer(app, "positions")`
@@ -197,10 +197,10 @@ annonce muette n'est donc jamais une raison de redéployer.
 | Réglages (clé, voix, bascule) | `core/settings/Settings.kt` (`ttsApiKey`, `ttsVoiceId`, `ttsAnnouncePositions`, `announcePositions`) |
 | Clé de build | `app/SettingsSeed.kt` (`seededFromBuild`) |
 | Découpage + cache d'énoncés | `core/audio/SentenceChunker.kt`, `core/usecase/SpeechUseCase.kt` — **pas branchés** |
-| Lecture MP3 | `app/SpeechPlayer.kt` (`MediaPlayer`) ; `voice` (bandeaux), `ihear-play` (iSee), `positions` (Direct) |
+| Lecture MP3 | `app/SpeechPlayer.kt` (`MediaPlayer`) ; `voice` (bandeaux), `isee-play` (iSee), `positions` (Direct) |
 | Bandeaux de dictée | `app/VoiceAnnouncer.kt` |
 | Positions (mots) | `core/live/PositionText.kt`, `core/live/PositionAnnouncer.kt` |
-| Positions (câblage iSee) | `app/ihear/LiveProbe.kt` (`phraseOf`), `app/ihear/ProbeWiring.kt` (`observeSpoken`), `app/ihear/ProximityVoice.kt`, `app/ihear/IhearViewModel.kt` |
+| Positions (câblage iSee) | `app/isee/LiveProbe.kt` (`phraseOf`), `app/isee/ProbeWiring.kt` (`observeSpoken`), `app/isee/ProximityVoice.kt`, `app/isee/IseeViewModel.kt` |
 | Positions (écran Direct) | `app/LiveViewModel.kt` (`announcePositions`, `sayPositions`) |
 | Boutons « 🔊 / ⏹ » | `app/TtsState.kt`, `app/TtsSettings.kt`, `app/SharedUi.kt` |
 
@@ -211,23 +211,23 @@ annonce muette n'est donc jamais une raison de redéployer.
   effective seulement si `ttsConfigured`).
 - **iSee, bulles** : chaque bulle garde son MP3 dans Room ; la réponse la plus récente
   est lue dès son arrivée (`speakLatestAnswer`). Une seule lecture à la fois.
-- **Intro embarquée** : `app/src/main/res/raw/intro_ihear.mp3` — voix Jade US
+- **Intro embarquée** : `app/src/main/res/raw/intro_isee.mp3` — voix Jade US
   (`TOXPlnYC7z5SQSV2Zgc5`), rendu **une fois** en `eleven_v3`, MP3 44,1 kHz mono 128 kb/s,
   386 237 octets (`ls -l` de cet arbre, 2026-10-26). La **durée** (24,08 s relevée) n'est pas
   revérifiée ici : pas de `ffprobe` sur cette machine. Aucun réseau pour la jouer.
-  Le texte (`IHEAR_INTRO_TEXT`, `IntroLogic.kt`) — **307 caractères** depuis le retrait du
+  Le texte (`ISEE_INTRO_TEXT`, `IntroLogic.kt`) — **307 caractères** depuis le retrait du
   swipe (27/10) — dit « Welcome to iSee… », puis la phrase
   de coupe « Disable iSee intro. » — dans cet ordre, et `app.UiLogicTest` le vérifie.
   ⚠️ **Désaligné** : la phrase « To listen to previous messages, swipe down » a été retirée
   du texte avec la suppression du balayage (27/10), mais elle est **encore dans le MP3** :
-  il faut régénérer `intro_ihear.mp3` (même voix, même réglages) pour réaligner la voix.
+  il faut régénérer `intro_isee.mp3` (même voix, même réglages) pour réaligner la voix.
   **Non écouté ici** (pas de sortie audio sur le poste de
   travail) : contrôle par `ffprobe` et par le texte seulement.
   ⚠️ **Périmé** : l'ancienne note « lue **une seule fois**, `introPlayed` posé avant lecture »
   ne décrit plus le comportement. Aujourd'hui l'intro est **rejouée à chaque ouverture
   complète** tant qu'elle est autorisée : `Settings.introPending` vaut `introEnabled`
   (`Settings.kt:110`) et `introPlayed` n'est conservé que pour le format de fichier
-  (`Settings.kt:29-33` ; `IhearIntro.playIfPending` : « aucun marqueur persisté »). Une mise en arrière-plan
+  (`Settings.kt:29-33` ; `IseeIntro.playIfPending` : « aucun marqueur persisté »). Une mise en arrière-plan
   puis retour ne la rejoue pas (le ViewModel survit), une fermeture complète si.
 - **Mode tap** : trois mots anglais pré-générés via ElevenLabs (`app/tap/AnnouncementPlayer.kt`).
 

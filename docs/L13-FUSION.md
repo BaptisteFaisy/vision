@@ -22,14 +22,14 @@ $ ls docs/MASK-DECODE.md app/src/main/java/dev/sam3vision/app/LiveMaskTransport.
 Aucun fichier de ce type
 ```
 
-| dépendance | mission | artefact attendu | état |
+| dépendance | mission | artefact attendu | état au 27/10 |
 |---|---|---|---|
-| A motion (`u10`) | M52 | `core/…/motion/` + `MotionSource`/`NoMotion` | absent |
-| B warp (`u11`) | M53 | `core/…/mask/{MaskMotion,WarpPlan,MaskPropagator}` | absent |
-| C scheduler (`u12`) | M54 | `core/…/keyframe/` (`KeyframeScheduler`, `KeyframeConfig`) | absent |
-| D calque (`u13`) | M55 | `core/…/local/` + `LiveLocalOverlay` + câblage app | absent |
-| E budget (`u09`) | M56 | `docs/LATENCE-BUDGET.md` + `scripts/budget_latence.py` | absent |
-| L11 décodage | M46 | `core/…/mask/` RLE/poly + `docs/MASK-DECODE.md` | absent |
+| A motion (`u10`) | M52 | `core/…/motion/` + `MotionSource`/`NoMotion` | **présent, non branché** (`BlockMotionSource`, testé, jamais appelé en prod) |
+| B warp (`u11`) | M53 | `core/…/mask/{MaskMotion,WarpPlan,MaskPropagator}` | **présent, non branché** (`MaskPropagator` sans appelant en prod) |
+| C scheduler (`u12`) | M54 | `core/…/keyframe/` (`KeyframeScheduler`, `KeyframeConfig`) | **présent** |
+| D calque (`u13`) | M55 | `core/…/local/` + `LiveLocalOverlay` + câblage app | **présent**, inerte (`NoMotion` par défaut) |
+| E budget (`u09`) | M56 | `docs/LATENCE-BUDGET.md` + `scripts/budget_latence.py` | **présent** |
+| L11 décodage | M46 | `core/…/mask/` RLE/poly + `docs/MASK-DECODE.md` | **présent** |
 
 Sans A et B, il n'y a **pas d'erreur de reprojection réelle** : le recalage de
 `errorThreshold` (§4) ne peut pas être fait et la valeur reste celle de `u12`.
@@ -139,7 +139,7 @@ branches, sinon la fusion devient une réécriture) :
 | A | `MotionSource.estimateSince(prevLuma, curLuma): MotionSample?`, `object NoMotion : MotionSource` |
 | B | `MaskPropagator.warpInto(src: GrayMask, plan: WarpPlan, dst: GrayMask)`, `WarpPlan` à tables réallouées |
 | C | `KeyframeScheduler.onKeyframeResult(atMs)`, `decision.atMs`, `requestAtMs = decision.atMs` pour une réponse tardive |
-| D | `LocalOverlayEngine.tick(frameAtMs, luma, keyframeAgeMs, confidence): LocalTick`, `LocalReason` (dont `NO_ESTIMATOR`), `setMotion(MotionSource)` |
+| D | `LocalOverlayEngine.tick(frameAtMs, luma, keyframeAgeMs, confidence): LocalTick`, `LocalReason` (dont `NO_ESTIMATOR`), `setMotion(MotionSource)` — aujourd'hui `core.local.MotionSource`, à faire consommer la couture A à la fusion |
 
 Tous les types traversant la couture sont **purs JVM**. `LiveStats`
 (`core/…/live/LiveStats.kt:17`) est réutilisé pour la mesure de peinture (`notePaint`) et
@@ -223,5 +223,5 @@ corrigé, toute PR de la lane écrit **« non vérifié (compile) »** et la CI 
 - pas de luminance depuis le plan Y du NV21 : il n'est **pas tourné**, convertir exige de
   permuter `dx`/`dy` selon `rotationDegrees` — garder le passage par `Bitmap` (non fait) ;
 - pas de deuxième décodeur de masque : `LiveMaskDecoder`
-  (`app/…/live/LiveMaskDecoder.kt`) et `MaskPainter` (`app/…/ihear/MaskPainter.kt`) sont les
+  (`app/…/live/LiveMaskDecoder.kt`) et `MaskPainter` (`app/…/isee/MaskPainter.kt`) sont les
   deux consommateurs existants ; L11 étend `decodeMaskAny`, il n'en crée pas un troisième.

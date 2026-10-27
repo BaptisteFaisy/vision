@@ -7,7 +7,7 @@ virage dans l'app — tout le guidage vit chez Google Maps.
 ## Déclenchement vocal
 
 Chaîne : appui long iSee → dictée (`DictationFeature`, Meta puis repli
-ElevenLabs) → `IhearViewModel.handleDictated` → `NavigationHook.onTranscript`,
+ElevenLabs) → `IseeViewModel.handleDictated` → `NavigationHook.onTranscript`,
 **avant** le chemin question → Room → LLM. La commande est détectée en
 déterministe sur le texte transcrit (insensible casse/accents, zéro appel LLM) :
 
@@ -20,7 +20,7 @@ local). « Où est _X_ » reste une question pour le LLM, pas un ordre.
 Destination vide ou incomprise → le texte suit le chemin question normal.
 
 Fichiers : `core/.../nav/` (parseur, normalisation, URIs),
-`core/.../usecase/NavigationRouter.kt`, `app/.../ihear/vm/NavigationHook.kt`.
+`core/.../usecase/NavigationRouter.kt`, `app/.../isee/vm/NavigationHook.kt`.
 
 ## Formats d'URI
 

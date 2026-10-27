@@ -9,7 +9,7 @@ téléphone sur cette machine, et aucune commande `adb` n'a été lancée. Ce qu
 
 | Chemin | Geste | Ce qui se passe | Où va le texte |
 |---|---|---|---|
-| **iSee** (page d'accueil) | appui long **n'importe où** sur la surface ≥ **300 ms** | `IhearRootLayout` → `LongPressTrigger` → `IhearViewModel.onHoldStart/onHoldEnd` (`:177`, `:191`) → `transcribeAndAnswer()` (`:262`) | devient une **question du chat** (iSee n'a pas de champ de saisie) |
+| **iSee** (page d'accueil) | appui long **n'importe où** sur la surface ≥ **300 ms** | `IseeRootLayout` → `LongPressTrigger` → `IseeViewModel.onHoldStart/onHoldEnd` (`:177`, `:191`) → `transcribeAndAnswer()` (`:262`) | devient une **question du chat** (iSee n'a pas de champ de saisie) |
 | **Chat** (route `Route.Chat`, écran d'origine) | **tap** sur « Dicter » → le libellé passe à « Stop » → **tap** à nouveau | `AppViewModel.startDictation/stopDictation` (`hold = false`) → `DictationFeature` | **inséré dans le champ de question** (`LaunchedEffect(state.dictation.seq)` + `mergeDraft`) |
 
 ### ⚠️ Pas d'appui long sur le bouton « Dicter »
@@ -20,10 +20,10 @@ Preuves, dans cet arbre :
   **aucun** gestionnaire de clic long n'est attaché ;
 - `git grep -n "onLongClick\|combinedClickable\|performLongClick" app/src core/src`
   → **aucun résultat** ; il n'existe donc ni handler, ni test instrumenté de ce geste ;
-- la racine d'appui long, `IhearRootLayout`, ne pilote les gestes que quand iSee est
-  à l'écran : `gesturesEnabled = { ihear.active }` (`MainActivity.kt:95`), et
-  `active` n'est vrai que pendant que `IhearHome` est composé
-  (`IhearHome.kt:26-29` : `active = true` au `DisposableEffect`, `false` au `onDispose`).
+- la racine d'appui long, `IseeRootLayout`, ne pilote les gestes que quand iSee est
+  à l'écran : `gesturesEnabled = { isee.active }` (`MainActivity.kt:95`), et
+  `active` n'est vrai que pendant que `IseeHome` est composé
+  (`IseeHome.kt:26-29` : `active = true` au `DisposableEffect`, `false` au `onDispose`).
   Sur la route Chat, la racine **n'intercepte rien**.
 
 Conséquence pour la recette : `performLongClick()` (ou `performTouchInput { longClick() }`)
@@ -67,18 +67,18 @@ vient d'un **tap**, pas d'un appui long.
 2. Poser le doigt et tenir ≥ **300 ms** (`LongPressTrigger.DEFAULT_LONG_PRESS_MS`, `:102`),
    sans glisser de plus de **24 px** (`DEFAULT_SLOP_PX`, `:105`) et sans second doigt : un
    glissement ou un second doigt avant le seuil **annulent** sans rien déclencher.
-3. Seuil atteint → `onHoldStart` : vibration (`IhearHaptics.holdStart`),
+3. Seuil atteint → `onHoldStart` : vibration (`IseeHaptics.holdStart`),
    `holding = true`, micro ouvert (`HoldTranscript` → `AudioRecord` 16 kHz mono).
-   Micro indisponible ⇒ ligne d'état `Microphone unavailable` (`IhearStatus.kt:16`).
+   Micro indisponible ⇒ ligne d'état `Microphone unavailable` (`IseeStatus.kt:16`).
 4. Relâcher → `onHoldEnd` → `transcribeAndAnswer()` :
    - si une bulle du chat est en cours de lecture : la capture est **jetée** et
-     l'état affiche `Busy speaking — try again` (`IhearViewModel.kt:263-267`,
-     `IhearStatus.kt:18`) ;
+     l'état affiche `Busy speaking — try again` (`IseeViewModel.kt:263-267`,
+     `IseeStatus.kt:18`) ;
    - sinon : `DictationUseCase` (min 400 ms) → Meta puis Scribe ; `transcribing` vrai
      pendant l'appel ;
    - la phrase « Disable iSee intro » (`isIntroDisablePhrase`) coupe l'intro **sans**
      être envoyée comme question ;
-   - texte transcrit vide ⇒ `Nothing heard` (`IhearStatus.kt:19`) ;
+   - texte transcrit vide ⇒ `Nothing heard` (`IseeStatus.kt:19`) ;
    - succès ⇒ ligne Room (`saveUserMessage(pcm, text)`, le PCM est gardé en MP3 ici,
      contrairement au trajet chat) puis **question posée au LLM**, réponse lue par
      ElevenLabs ;
