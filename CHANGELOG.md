@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (3) — le build du téléphone rattrape un cache KSP corrompu
+
+- **Constat** : vers 11 h, le cron `vision-phone-latest` échouait **en boucle** sur
+  `[ksp] Storage corrupted …/app/build/kspCaches/debug/symbolLookups/id-to-file.tab_i`, puis sur
+  `Storage … file-to-id.tab is already registered`. Le téléphone est resté ~15 min sur un `master`
+  périmé, **sans alerte** — la panne la plus invisible possible pour « le banc suit master ».
+- **Correctif** : `scripts/install-phone-latest.sh` fait un **second essai** quand le log du build
+  contient l'un de ces deux messages, via `./gradlew --no-daemon clean assembleDebug --offline` :
+  `clean` est exécuté par le démon lui-même (son registre de caches reste cohérent) et
+  `--no-daemon` évite de tuer celui des autres agents qui compilent en parallèle. Un seul essai
+  supplémentaire, jamais de boucle ; le JDK est retrouvé comme dans `scripts/build.sh`.
+- **Preuves** : `bash scripts/test_scripts.sh` → **80 assertions, 80 ok** (dont les gardes
+  statiques : aucun `rm -rf` brut, `set -euo pipefail`, zéro chemin `/home/` en dur) ; `bash -n` OK ;
+  `python3 tools/check-kotlin-limits.py` OK.
+
 ## 2026-10-27 (2) — le téléphone suit `master` tout seul
 
 - **`scripts/install-phone-latest.sh`** : le téléphone de test ne peut plus rester sur une build
