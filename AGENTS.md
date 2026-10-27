@@ -133,6 +133,20 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
   budget 150 ms (`LiveSession.kt:42-47`).
 - Langue du projet : **français** (code commenté, commits `feat(ihear): …`, docs).
 
+## 4 bis. Arbre de travail — partir d'un état vérifié, jamais d'un arbre sale
+
+- Avant la première écriture : `git worktree list`, `git branch --show-current`,
+  `git status --short`. Ne jamais empiler du travail sur un arbre sale, une
+  branche périmée (upstream disparu) ou un tip en retard sur `origin/master` :
+  partir de `origin/master` dans une branche (ou un worktree) dédiée.
+- Ne jamais recopier des fichiers d'une branche à l'autre **à la main** : une
+  copie manuelle diverge en silence (fichiers oubliés, doublons sous un autre
+  nom) et la CI ne la voit pas. Passer par `git merge`, `git cherry-pick` ou
+  `git checkout <branche> -- <chemin>`, qui gardent la traçabilité.
+- Un worktree partagé qui sert de référence (miroir de build, arbre
+  d'orchestration) n'est jamais un arbre d'édition : il reste sur `master`
+  propre, tout le reste vit dans des worktrees dédiés.
+
 ## 5. À la livraison
 
 Vérifier réellement ce qui est demandé : tests qui couvrent le changement, build vert, rapport
