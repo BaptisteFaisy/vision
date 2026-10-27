@@ -33,9 +33,9 @@ def test_fusion_live_app(live_app_fast) -> None:
     check("fusion: entrée snapshottée load_weights", "def load_weights" in source)
     check("fusion: snapshot mémoire piloté par FAST_SNAPSHOT",
           "enable_memory_snapshot=SNAPSHOT" in source)
-    check("fusion: deux entrées par conteneur", "@modal.concurrent(max_inputs=2)" in source)
+    check("fusion: quatre slots par conteneur", "@modal.concurrent(max_inputs=4)" in source)
     check("fusion: _live_sync accepte mask_encoding",
           "mask_encoding" in inspect.signature(live_app_fast.Sam3Live._live_sync).parameters)
     check("fusion: /live passe par run_frame (verrou fin)",
-          "run_frame(self.ctx" in inspect.getsource(live_app_fast.Sam3Live._live_sync))
+          "run_frame(self.ctx" in inspect.getsource(live_app_fast.Sam3Live._live_from_image))
     check("fusion: chronos exposés (Server-Timing)", "Server-Timing" in source)
