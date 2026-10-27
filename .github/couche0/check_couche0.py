@@ -35,16 +35,18 @@ GUARD_FLAG = "SAMVISION_ALLOW_GUARD_BUMP"
 EXEMPT_SUBSTR = ("/build/", "gradle/wrapper/", ".gradle/")
 EXEMPT_SUFFIX = (".lock", ".png", ".webp", ".jpg", ".xml.bak")
 
+# Troisième élément : sous-chaîne qui exempte la ligne (faux positif documenté).
 FORBIDDEN_PATTERNS = [
-    (r"-X\s+(ours|theirs)\b", "prise de côté forcée (-X ours/theirs)"),
-    (r"--force(?!-with-lease)\b", "push forcé sans --force-with-lease"),
-    (r"pull_request_target", "déclencheur à privilèges pull_request_target"),
-    (r"sk-[A-Za-z0-9_\-]{24,}", "clé API sk-… en clair"),
-    (r"sk_[a-f0-9]{32}", "clé API sk_… en clair"),
-    (r"ghp_[A-Za-z0-9]{36}", "jeton GitHub ghp_… en clair"),
-    (r"^sdk\.dir=", "sdk.dir en dur (local.properties ne se versionne pas)"),
+    (r"-X\s+(ours|theirs)\b", "prise de côté forcée (-X ours/theirs)", None),
+    (r"--force(?!-with-lease)\b", "push forcé sans --force-with-lease",
+     "modal secret create"),  # faux positif : écrasement idempotent du secret Modal
+    (r"pull_request_target", "déclencheur à privilèges pull_request_target", None),
+    (r"sk-[A-Za-z0-9_\-]{24,}", "clé API sk-… en clair", None),
+    (r"sk_[a-f0-9]{32}", "clé API sk_… en clair", None),
+    (r"ghp_[A-Za-z0-9]{36}", "jeton GitHub ghp_… en clair", None),
+    (r"^sdk\.dir=", "sdk.dir en dur (local.properties ne se versionne pas)", None),
     (r"2026-10-2[0-5]\b|\b2[0-5]/10\b",
-     "date antérieure au 26/10 19 h (citer « relevé antérieur, hors de cet arbre »)"),
+     "date antérieure au 26/10 19 h (citer « relevé antérieur, hors de cet arbre »)", None),
 ]
 
 
@@ -137,13 +139,15 @@ def added_lines(files):
 
 def check_forbidden(files, body, errors):
     """Motifs interdits dans les lignes ajoutées + fichiers de garde gelés."""
-    compiled = [(re.compile(p, re.M), m) for p, m in FORBIDDEN_PATTERNS]
+    compiled = [(re.compile(p, re.M), m, x) for p, m, x in FORBIDDEN_PATTERNS]
     for path, line in added_lines(files):
         # Le garde se cite lui-même (motifs, exemples) : il est déjà gelé
         # plus bas (GUARD_FLAG), donc hors du scan de motifs.
         if path.startswith(".github/couche0/"):
             continue
-        for rx, message in compiled:
+        for rx, message, exempt in compiled:
+            if exempt and exempt in line:
+                continue
             if rx.search(line):
                 errors.append("forbidden : %s — `%s` dans %s" % (message, line.strip()[:90], path))
     frozen = [f["filename"] for f in files if f["filename"].startswith(GUARD_FILES)]
