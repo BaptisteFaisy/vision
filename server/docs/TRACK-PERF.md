@@ -108,3 +108,32 @@ Ce qu'il faut retenir pour l'app : le p95 est à 224 ms, mais **la toute premiè
 réveil et la première requête d'une connexion neuve dépassent 300 ms** (~430 ms). Si l'app
 doit garantir < 300 ms « tout le temps », elle doit garder sa connexion ouverte et préchauffer
 le conteneur (`/health`) avant d'afficher la mesure.
+
+## Budget de 200 ms — ce qui coûte quoi (2026-10-25 13:20)
+
+Le levier n'est **ni le réseau ni la carte** : c'est le **nombre de concepts**. Chaque
+concept ajoute une passe de détection *par frame* (le multiplex fait une grounding par
+concept), sur une seule frame en vol.
+
+| Carte | Concepts | Serveur méd. | Serveur p95 | A/R (PC) |
+|---|---:|---:|---:|---:|
+| A100-40GB eu-west | 1 | 171 ms | 181 ms | 261 ms |
+| A100-40GB eu-west | 8 (défaut historique de l'app) | ~370 ms | — | ~522 ms (vu à l'écran) |
+| **H200 eu-west** | **1** | **87–92 ms** | **98–121 ms** | 198–217 ms |
+| H200 eu-west | 8 | 158 ms | — | 205 ms (vu à l'écran) |
+
+Sur le téléphone l'aller-retour ajoute **~36 ms** au temps serveur (mesuré : 205 ms d'A/R
+pour 169 ms de serveur). Donc, budget 200 ms tenu avec :
+
+- **H200** (4,54 $/h) au lieu d'A100-40GB (2,415 $/h) — le GPU reste éteint 60 s après la
+  dernière frame, le surcoût ne porte que sur les sessions de direct ;
+- **1 à 2 concepts** : `TrackRunner.MAX_PROMPTS = 2` le garantit côté client ;
+- `capacity = 300` par session au lieu de 900 (tampon GPU pré-alloué).
+
+À 1 concept sur H200, l'aller-retour attendu sur le téléphone est **~130 ms médian,
+~160 ms p95** — soit 40 ms de marge sur l'objectif.
+
+**Instance dédiée** : `sam3-direct-h200`
+(`TRACK_APP_NAME=sam3-direct-h200 TRACK_GPU=H200 TRACK_REGION=eu TRACK_ROUTING_REGION=eu-west`),
+URL `https://baptiste-faisy--sam3-direct-h200-sam3track-web.eu-west.modal.run`. C'est elle que
+`sam.base.url` doit viser pour le mode Direct.
