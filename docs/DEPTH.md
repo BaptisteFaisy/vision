@@ -33,11 +33,13 @@ proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
   pas de sélection de propriété sur ressource fermable (lire l'asset en
   `ByteArray`, comme le moteur ONNX).
 
-## Banc et recette (téléphone réel `2c6852ac`, jamais d'émulateur)
+## Banc et recette (téléphone réel, jamais d'émulateur)
 
-1. `build-serveur <worktree>` puis installation sur `2c6852ac`.
+1. `build-serveur <worktree>` puis installation sur le téléphone du créneau
+   (`PHONE_SERIAL` : Redmi `2c6852ac` ou Samsung `RF8T11NBMCV` — créneau via
+   le manager tests, cron `vision-phone-latest` gelé pendant le run).
 2. Réglages → Profondeur → moteur → « Tester la profondeur (5 inférences) ».
-3. Verdict : bas de page + `phone-adb -s 2c6852ac logcat -d | grep DepthBench`
+3. Verdict : bas de page + `phone-adb -s $PHONE_SERIAL logcat -d | grep DepthBench`
    (`backend=DA2 medianMs=… runs=5 map=252x252`).
 4. Seuil : médiane < 200 ms pour activer par défaut ; sinon le repli MiDaS
    est mesuré, puis câblage aux pastilles (phase 2, hors périmètre ici).
