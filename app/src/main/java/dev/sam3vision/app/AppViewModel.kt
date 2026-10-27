@@ -110,7 +110,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settings = { _state.value.settings },
         update = stateUpdate,
         scope = viewModelScope,
-        play = { bytes -> speech.play(bytes) },
+        play = { bytes ->
+            speech.speed = _state.value.settings.ttsSpeed
+            speech.play(bytes)
+        },
         stopPlayback = { speech.stop() },
     )
 

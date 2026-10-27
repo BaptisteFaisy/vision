@@ -32,6 +32,21 @@ class SettingsTtsTest {
     }
 
     @Test
+    fun `vitesse conservee par le codec, hors bornes bornee`() {
+        val rapide = Settings.Default.copy(ttsSpeed = 1.2f)
+
+        assertEquals(1.2f, SettingsCodec.decode(SettingsCodec.encode(rapide)).ttsSpeed, 0.001f)
+        assertEquals(2.0f, SettingsCodec.decode(SettingsCodec.encode(rapide.copy(ttsSpeed = 9f))).ttsSpeed, 0.001f)
+    }
+
+    @Test
+    fun `ancien fichier sans vitesse reprend 1 9`() {
+        val legacy = "llmBaseUrl=https://x\nllmApiKey=y\nllmModel=m\nsamBaseUrl=\n"
+
+        assertEquals(Settings.DEFAULT_TTS_SPEED, SettingsCodec.decode(legacy).ttsSpeed, 0.001f)
+    }
+
+    @Test
     fun `lecture automatique conservee par le codec`() {
         val coupe = Settings.Default.copy(ttsApiKey = "sk_test", ttsAutoplay = false)
 

@@ -3,6 +3,28 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (10) — voix Laure par défaut, vitesse ×1,9 réglable à la voix
+
+- **Voix par défaut : Laure** (`3b8fXc91YHS1i2DYAlBQ`) au lieu de Sarah :
+  `Settings.DEFAULT_TTS_VOICE_ID`, migration silencieuse des réglages restés sur
+  Sarah (`migrateLegacyVoice`, comme le LLM : seul l'ancien défaut migre, un choix
+  manuel n'est jamais touché). Les clips du mode tap sont régénérés (dossier par voix).
+- **Vitesse `ttsSpeed`, ×1,9 par défaut (×0,5..×2)**, persistée dans les deux stores :
+  boutons −/+ des Réglages **ou ordre vocal** sur iSee (« vitesse 1,5 », « parle plus
+  vite », « ralentis », « faster », « vitesse normale »), avant l'envoi au LLM comme
+  la coupe d'intro — « décris vite » ne déclenche pas. Confirmation dite à la
+  nouvelle vitesse (ElevenLabs, affichée aussi en statut).
+- **Vitesse appliquée en lecture locale** (`MediaPlayer.playbackParams`) :
+  `eleven_v4_turbo` ignore le `speed` cloud (un non-défaut peut être rejeté), donc
+  le client n'en envoie aucun — frais ou en cache, tout parle à la vitesse choisie,
+  même hors ligne.
+- **Preuves** : `TtsSpeedCommandTest` 11/11, `ElevenLabsTtsClientTest` +1 (absence de
+  `speed` envoyée), `SettingsStoreParityTest` (vitesse non par défaut), `SettingsSeedTest`
+  +3 (migration Sarah→voix du build/Laure, choix manuel intact), `TtsLogicTest` +3
+  (Laure par défaut, crans, affichage) ; `:core:testDebugUnitTest` 1033/1033,
+  `:app:testDebugUnitTest` 541/541, `check-kotlin-limits.py` OK, `assembleDebug` OK.
+  Non mesuré sur téléphone (rendu ×1,9 à l'oreille non vérifié ici).
+
 ## 2026-10-27 (9) — retour de mission : la base médias se recrée au lieu de crasher
 
 - **Crash au lancement sur le téléphone** (`IllegalStateException: A migration from

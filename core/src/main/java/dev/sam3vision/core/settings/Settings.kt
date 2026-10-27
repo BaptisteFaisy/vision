@@ -14,6 +14,14 @@ data class Settings(
     val samBaseUrl: String,
     val ttsApiKey: String = "",
     val ttsVoiceId: String = DEFAULT_TTS_VOICE_ID,
+    /**
+     * Vitesse de lecture des voix, de [MIN_TTS_SPEED] à [MAX_TTS_SPEED]
+     * ([DEFAULT_TTS_SPEED] par défaut). Appliquée **en lecture locale**
+     * (`MediaPlayer` pour ElevenLabs) : le modèle runtime (`eleven_v4_turbo`)
+     * ignore le réglage `speed` du cloud, donc l'envoyer ne changerait rien —
+     * ici tout l'audio, frais ou en cache, parle à la vitesse choisie, même hors ligne.
+     */
+    val ttsSpeed: Float = DEFAULT_TTS_SPEED,
     /** Lecture automatique des réponses du chat (désactivable dans Réglages). */
     val ttsAutoplay: Boolean = true,
     /** Dictée : base URL / clé / modèle du moteur principal (Meta Muse). */
@@ -120,12 +128,35 @@ data class Settings(
         const val DEFAULT_LLM_BASE_URL = "https://inference.baseten.co/v1"
         const val DEFAULT_LLM_MODEL = "meta-models/muse-spark-open-1026"
 
+        /** Laure, voix par défaut de l'app (compte ElevenLabs du projet). */
+        const val LAURE_VOICE_ID = "3b8fXc91YHS1i2DYAlBQ"
+
         /**
-         * Voix ElevenLabs de départ : Sarah, voix « premade » utilisable en compte free.
-         * Les voix de bibliothèque (ex. Rachel `21m00Tcm4TlvDq8ikWAM`) répondent 402 sans
-         * crédits payants — choisies exprès ici pour qu'une installation fraîche parle.
+         * Voix ElevenLabs de départ : **Laure**, la voix de l'app. Les installations
+         * d'avant migraient sur Sarah (voir [SARAH_VOICE_ID]) : la migration vit dans
+         * `seeded()` côté `:app`, jamais ici.
          */
-        const val DEFAULT_TTS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+        const val DEFAULT_TTS_VOICE_ID = LAURE_VOICE_ID
+
+        /**
+         * Sarah, voix « premade » utilisable en compte free. Ancien défaut de l'app
+         * (les voix de bibliothèque comme Rachel `21m00Tcm4TlvDq8ikWAM` répondent
+         * 402 sans crédits payants) : conservée comme repli documenté dans les
+         * Réglages et comme marqueur de migration.
+         */
+        const val SARAH_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"
+
+        /** Vitesse de lecture de départ : ×1,9, proche du plafond ElevenLabs (×2). */
+        const val DEFAULT_TTS_SPEED = 1.9f
+
+        /** Plancher de la vitesse (celui d'ElevenLabs) : en dessous, on n'articule plus. */
+        const val MIN_TTS_SPEED = 0.5f
+
+        /** Plafond de la vitesse (celui d'ElevenLabs). */
+        const val MAX_TTS_SPEED = 2.0f
+
+        /** Vitesse ramenée dans [MIN_TTS_SPEED]..[MAX_TTS_SPEED] (réglage hors bornes). */
+        fun clampTtsSpeed(value: Float): Float = value.coerceIn(MIN_TTS_SPEED, MAX_TTS_SPEED)
 
         /**
          * Voix « Jade US » du compte ElevenLabs, celle de l'intro embarquée
@@ -234,7 +265,7 @@ data class Settings(
     override fun toString(): String = "Settings(" +
         "llmBaseUrl=$llmBaseUrl, llmApiKey=${maskSecret(llmApiKey)}, llmModel=$llmModel, " +
         "samBaseUrl=$samBaseUrl, samRegion=$samRegion, speechLanguage=$speechLanguage, " +
-        "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, " +
+        "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, ttsSpeed=$ttsSpeed, " +
         "ttsAutoplay=$ttsAutoplay, ttsAnnouncePositions=$ttsAnnouncePositions, " +
         "ttsGuidanceStraight=$ttsGuidanceStraight, " +
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
