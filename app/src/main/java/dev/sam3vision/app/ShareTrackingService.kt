@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.ShareTrackingPolicy
@@ -42,13 +43,21 @@ class ShareTrackingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val reporter = ShareReporter()
-    private val positions = SharePosition(applicationContext)
-    private val store = SettingsStoreFactory.create(applicationContext)
+
+    /** Attachés dans onCreate : un Service n'a pas de Context avant attach(). */
+    private lateinit var positions: SharePosition
+    private lateinit var store: SettingsStore
 
     /** Une seule boucle d'envoi, relancée jamais (les start répétés sont no-op). */
     private var loop: kotlinx.coroutines.Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        positions = SharePosition(applicationContext)
+        store = SettingsStoreFactory.create(applicationContext)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
