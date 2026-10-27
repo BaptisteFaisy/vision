@@ -25,6 +25,11 @@
   40 % de la hauteur (`REST_Y`), rayon 33,5 % de la largeur (`REST_R`).
   Caméra ouverte : elle rétrécit et **se pose sur la jointure** de la rue
   (`CAM_Y` 55,5 %, `CAM_R` 20 %).
+  Son ombre superpose une pénombre large, une ombre portée et un cœur de
+  contact fin. Chaque dégradé radial est comprimé en ellipse, sans découpe
+  nette en haut ou en bas ; le léger décalage vers la droite suit la lumière
+  venant du haut-gauche. L'ombre accompagne la respiration et s'efface à
+  l'ouverture de la caméra comme auparavant.
 - **Seule la phrase en cours**, en gros, **sous la boule** (`IseeSpokenLine`,
   4 lignes max + ellipsis, label YOU/ISEE au-dessus). Elle **s'allume mot à
   mot** : mot en cours dans la couleur de qui parle, mots dits en noir, mots
