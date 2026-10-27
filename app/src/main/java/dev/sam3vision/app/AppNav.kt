@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sam3vision.app.glasses.GlassesController
+import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
@@ -38,6 +39,12 @@ sealed interface Route {
     data object Chat : Route
     data object Live : Route
     data object Settings : Route
+
+    /**
+     * Page du proche qui suit la position partagée (rôle `Caregiver` des Réglages) :
+     * la carte du site, tenue dans une WebView, avec la barre de retour.
+     */
+    data object Caregiver : Route
 
     /** Onboarding des trois gestes : ouvert depuis les Réglages, rejouable à volonté. */
     data object Onboarding : Route
@@ -89,42 +96,68 @@ fun AppNav(
     val route = stack.first()
     val push: (Route) -> Unit = { stack = listOf(it) + stack }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.drop(1) }
+    StartRouteEffect(state.settings, state.settingsReady) { stack = listOf(Route.Caregiver) }
     BenchRequestEffect(push)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
         // Les lunettes poussent leurs photos directement dans la navigation.
         GlassesBridge(glasses = glasses, viewModel = viewModel, push = push)
-
-        when (route) {
-            Route.Ihear -> IhearHome(
-                viewModel = ihear,
-                onOpenSettings = { push(Route.Settings) },
-            )
-            Route.Capture -> CaptureRoute(viewModel, push)
-            Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)
-            Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop, state.settings)
-            Route.Chat -> ChatRoute(state, viewModel, pop)
-            is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
-            Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
-            Route.Bench -> BenchScreen(onBack = pop)
-            // `remember` : la valeur du CompositionLocal ne doit pas changer à chaque recomposition.
-            Route.Settings -> CompositionLocalProvider(LocalBenchOpener provides remember { { push(Route.Bench) } }) {
-                SettingsRoute(
-                    viewModel = viewModel,
-                    state = state,
-                    glasses = glasses,
-                    pop = pop,
-                    onOpenLive = { push(Route.Live) },
-                    onOpenClassic = { push(Route.Capture) },
-                    onOpenGestures = { push(Route.Onboarding) },
-                )
-            }
+        RouteHost(route, state, viewModel, ihear, glasses, liveViewModel, push, pop) {
+            // Page du proche à la racine (rôle Caregiver au lancement) : « Retour » ouvre
+            // les Réglages, sinon le bouton ne ferait rien du tout.
+            if (stack.size > 1) pop() else push(Route.Settings)
         }
-
         state.dictation.overlay?.let { overlay ->
             DictationOverlay(overlay = overlay, onDismiss = viewModel::dismissOverlay)
         }
+    }
+}
+
+/**
+ * Le rôle enregistré choisit la page d'accueil, une seule fois au lancement :
+ * iSee pour la personne accompagnée (défaut), la carte du proche pour Caregiver.
+ */
+@Composable
+private fun StartRouteEffect(settings: Settings, ready: Boolean, onCaregiverHome: () -> Unit) {
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(ready) {
+        if (started || !ready) return@LaunchedEffect
+        started = true
+        if (settings.caregiverRole == CaregiverRole.Caregiver) onCaregiverHome()
+    }
+}
+
+/** L'écran de la route courante : une entrée par [Route]. */
+@Composable
+private fun RouteHost(
+    route: Route,
+    state: UiState,
+    viewModel: AppViewModel,
+    ihear: IhearViewModel,
+    glasses: GlassesController,
+    liveViewModel: LiveViewModel,
+    push: (Route) -> Unit,
+    pop: () -> Unit,
+    onCaregiverBack: () -> Unit,
+) {
+    when (route) {
+        Route.Ihear -> IhearHome(
+            viewModel = ihear,
+            onOpenSettings = { push(Route.Settings) },
+        )
+        Route.Capture -> CaptureRoute(viewModel, push)
+        Route.Analysis -> AnalysisRoute(state, viewModel, push, pop)
+        Route.Live -> LiveRoute(viewModel, liveViewModel, push, pop, state.settings)
+        Route.Chat -> ChatRoute(state, viewModel, pop)
+        is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
+        Route.Caregiver -> CaregiverScreen(
+            link = shareLink(state.settings.parentSiteUrl, state.settings.shareId),
+            onBack = onCaregiverBack,
+        )
+        Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
+        Route.Bench -> BenchScreen(onBack = pop)
+        Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop)
     }
 }
 
@@ -238,7 +271,37 @@ private fun ChatRoute(state: UiState, viewModel: AppViewModel, pop: () -> Unit) 
     )
 }
 
-/** Réglages : délègue au ViewModel et ferme l'écran après enregistrement. */
+/**
+ * Réglages : le banc des lunettes est fourni par un `CompositionLocal` (`remember` :
+ * la valeur ne doit pas changer à chaque recomposition). Choisir le rôle Caregiver
+ * enregistre le rôle **et** ouvre la carte du proche.
+ */
+@Composable
+private fun SettingsEntry(
+    state: UiState,
+    viewModel: AppViewModel,
+    glasses: GlassesController,
+    push: (Route) -> Unit,
+    pop: () -> Unit,
+) {
+    CompositionLocalProvider(LocalBenchOpener provides remember { { push(Route.Bench) } }) {
+        SettingsRoute(
+            viewModel = viewModel,
+            state = state,
+            glasses = glasses,
+            pop = pop,
+            onOpenLive = { push(Route.Live) },
+            onOpenClassic = { push(Route.Capture) },
+            onOpenGestures = { push(Route.Onboarding) },
+            onPickRole = { next ->
+                viewModel.saveSettings(next)
+                if (next.caregiverRole == CaregiverRole.Caregiver) push(Route.Caregiver)
+            },
+        )
+    }
+}
+
+/** Réglages : délègue au ViewModel et ouvre le banc des lunettes. */
 @Composable
 private fun SettingsRoute(
     viewModel: AppViewModel,
@@ -248,6 +311,7 @@ private fun SettingsRoute(
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
+    onPickRole: (Settings) -> Unit,
 ) {
     val context = LocalContext.current
     SettingsScreen(
@@ -265,6 +329,7 @@ private fun SettingsRoute(
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
         onOpenGestures = onOpenGestures,
+        onPickRole = onPickRole,
         onStartTracking = { siteUrl, shareId ->
             (context as? MainActivity)?.ensureSharePermissions()
             ShareTrackingService.start(context)

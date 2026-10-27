@@ -28,10 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSection
+import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Réglages : LLM (base URL, clé, modèle) + endpoint SAM + région de la GPU
+ * Réglages : rôle du téléphone (**Caregiver** : « Blind person » par défaut, ou la
+ * page de suivi du proche) + LLM (base URL, clé, modèle) + endpoint SAM + région de la GPU
  * (mode Europe / **mode US**) + section « Distances » (overlay du direct, champ
  * de vision) + section « Voix ElevenLabs » (clé, voix, lecture automatique,
  * test) + section « Dictée Meta » (base URL, clé, modèle ASR, test) + section
@@ -56,15 +58,16 @@ fun SettingsScreen(
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
+    onPickRole: (Settings) -> Unit,
     onStartTracking: (siteUrl: String, shareId: String) -> Unit,
     onStopTracking: () -> Unit,
     onBack: () -> Unit,
 ) {
     var draft by remember { mutableStateOf(settings) }
-    val trackingActive by ShareTracking.running.collectAsState()
     Column(settingsScroll()) {
         ScreenHeader("Réglages du backend", "Aucune clé n'est écrite dans le code.", onBack, null)
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CaregiverSettings(draft, onPickRole)
             BackendFields(draft) { draft = it }
             ObjectsSettings(draft) { draft = it }
             GpuRegionSettings(draft) { draft = it }
@@ -80,7 +83,7 @@ fun SettingsScreen(
                 onStop = onStopVoice,
             )
             DictationSettings(draft) { draft = it }
-            ParentShareSettings(draft, trackingActive, onStartTracking, onStopTracking) { draft = it }
+            ParentShareSettings(draft, onStartTracking, onStopTracking) { draft = it }
             SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
             GestureHelp(onOpenGestures)
             ClassicScreens(onOpenLive, onOpenClassic)
@@ -127,6 +130,47 @@ private fun GlassesBlock(glasses: GlassesController) {
     )
 }
 
+/**
+ * Section « Caregiver » : le rôle de ce téléphone. « Blind person » (défaut) ouvre
+ * iSee ; « Caregiver » ouvre la carte du proche — la page du site partagée par
+ * « Partager le suivi ». Le choix est enregistré immédiatement (il survit au
+ * redémarrage) et ouvre la page quand c'est Caregiver.
+ */
+@Composable
+private fun CaregiverSettings(draft: Settings, onPickRole: (Settings) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Caregiver", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Rôle de ce téléphone : « Blind person » (défaut) garde iSee à l'ouverture, " +
+                "« Caregiver » ouvre la carte du proche — la même page que le lien partagé.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+        BigButton(
+            "Blind person (défaut)",
+            true,
+            roleColor(draft, CaregiverRole.Blind),
+            onClick = { onPickRole(draft.copy(caregiverRole = CaregiverRole.Blind)) },
+        )
+        BigButton(
+            "Caregiver",
+            true,
+            roleColor(draft, CaregiverRole.Caregiver),
+            onClick = { onPickRole(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
+        )
+        Text(
+            "Le rôle est enregistré tout de suite, sans passer par « Enregistrer » ; " +
+                "choisir Caregiver ouvre la carte du proche.",
+            color = AppColors.textMuted,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+/** Couleur du bouton de rôle : bleu pour le rôle actif, gris pour l'autre. */
+private fun roleColor(draft: Settings, role: CaregiverRole) =
+    if (draft.caregiverRole == role) AppColors.primary else AppColors.surfaceHigh
+
 /** Section « Backend » : LLM (base URL, clé, modèle) et endpoint SAM 3.1 optionnel. */
 @Composable
 private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
@@ -149,11 +193,12 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
 @Composable
 private fun ParentShareSettings(
     draft: Settings,
-    trackingActive: Boolean,
     onStartTracking: (siteUrl: String, shareId: String) -> Unit,
     onStopTracking: () -> Unit,
     onChange: (Settings) -> Unit,
 ) {
+    // L'état du service est lu ici : l'écran qui appelle reste sous la garde des 50 lignes.
+    val trackingActive by ShareTracking.running.collectAsState()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Suivi parent", color = AppColors.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         LabeledField("Lien du site de suivi", draft.parentSiteUrl, false) {

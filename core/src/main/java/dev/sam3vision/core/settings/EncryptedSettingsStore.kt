@@ -62,6 +62,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
+            caregiverRole = roleOf(prefs, default),
             parentSiteUrl = prefs.getString(KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
                 .ifBlank { default.parentSiteUrl },
             shareEnabled = prefs.getBoolean(KEY_SHARE_ENABLED, default.shareEnabled),
@@ -100,6 +101,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
             .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
+            .putString(KEY_CAREGIVER_ROLE, s.caregiverRole.name)
             .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
             .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
             .putString(KEY_SHARE_ID, s.shareId)
@@ -134,6 +136,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LOCAL_OVERLAY = "local_overlay"
         const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
+        const val KEY_CAREGIVER_ROLE = "caregiver_role"
         const val KEY_PARENT_SITE_URL = "parent_site_url"
         const val KEY_SHARE_ENABLED = "share_enabled"
         const val KEY_SHARE_ID = "share_id"
@@ -154,3 +157,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         }
     }
 }
+
+/** Rôle persisté ; clé absente (version antérieure) ou inconnue ⇒ [CaregiverRole.Blind]. */
+private fun roleOf(prefs: SharedPreferences, default: Settings): CaregiverRole =
+    CaregiverRole.fromName(prefs.getString(EncryptedSettingsStore.KEY_CAREGIVER_ROLE, default.caregiverRole.name))
