@@ -52,7 +52,7 @@ class InferHubLlmClient(
     ): Result<String> {
         val messages = JSONArray()
             .put(system(LlmPrompts.liveSystem(language)))
-            .put(userWithImage(LlmPrompts.liveUser(labels, previous, language), jpegB64))
+            .put(userMessage(LlmPrompts.liveUser(labels, previous, language), jpegB64))
         return postChat(messages, MAX_LIVE_TOKENS).map { it.trim().take(MAX_LIVE_CHARS) }
     }
 
@@ -60,7 +60,7 @@ class InferHubLlmClient(
         val prompt = LlmPrompts.describeUser(labels, language)
         val messages = JSONArray()
             .put(system(LlmPrompts.describeSystem(language)))
-            .put(userWithImage(prompt, jpegB64))
+            .put(userMessage(prompt, jpegB64))
         return postChat(messages).mapCatching { content -> parseAnalysis(content, labels) }
     }
 
@@ -75,7 +75,7 @@ class InferHubLlmClient(
             systemText = if (withContext) LlmPrompts.askMemorySystem(language) else LlmPrompts.askSystem(language),
             context = context,
             history = history,
-            last = userWithImage(LlmPrompts.askQuestion(question), jpegB64),
+            last = userMessage(LlmPrompts.askQuestion(question), jpegB64),
         )
         return postChat(messages).map { it.trim() }
     }
@@ -150,18 +150,24 @@ private fun system(text: String): JSONObject =
 private fun role(role: Role, text: String): JSONObject =
     JSONObject().put("role", if (role == Role.USER) "user" else "assistant").put("content", text)
 
-private fun userWithImage(text: String, jpegB64: String): JSONObject = JSONObject()
-    .put("role", "user")
-    .put(
-        "content",
-        JSONArray()
-            .put(JSONObject().put("type", "text").put("text", text))
-            .put(
-                JSONObject()
-                    .put("type", "image_url")
-                    .put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$jpegB64")),
-            ),
-    )
+/**
+ * Le message `user` de tous les appels : texte, plus la photo quand [jpegB64] en porte une.
+ *
+ * Sans image utilisable le message part **texte seul** : une image vide expédiée en
+ * `data:image/jpeg;base64,` faisait répondre 400 au backend, et la question restait
+ * sans réponse. Une seule fabrique pour les trois appels, aucun JSON dupliqué.
+ */
+private fun userMessage(text: String, jpegB64: String): JSONObject {
+    val content = JSONArray().put(JSONObject().put("type", "text").put("text", text))
+    if (jpegB64.isNotBlank()) {
+        content.put(
+            JSONObject()
+                .put("type", "image_url")
+                .put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$jpegB64")),
+        )
+    }
+    return JSONObject().put("role", "user").put("content", content)
+}
 
 internal fun parse(raw: String): JSONObject? = try {
     JSONObject(raw)

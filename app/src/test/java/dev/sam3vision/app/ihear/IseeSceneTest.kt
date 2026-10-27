@@ -121,7 +121,7 @@ class IseeSceneTest {
 
     @Test
     fun `la carte camera remplace la bulle pendant VISION`() {
-        val layers = iseeSceneLayers(IseeScene.VISION, bubbles = 2, dissolving = false)
+        val layers = iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = true)
         assertTrue(layers.cameraCard)
         assertFalse(layers.bubble)
         // Les dots sont réservés aux scènes de bulle.
@@ -129,16 +129,37 @@ class IseeSceneTest {
     }
 
     @Test
+    fun `la carte camera reste visible pendant une tenue sous video`() {
+        // Tenir le micro pendant que la vidéo tourne : la pill passe en LISTENING,
+        // mais on doit continuer de voir ce qu'on filme.
+        val state = exchange().copy(recordingVideo = true, holding = true)
+        assertEquals(IseeScene.LISTENING, iseeSceneView(state, selectedEntry(state)).scene)
+        val layers = iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = true)
+        assertTrue(layers.cameraCard)
+        assertFalse(layers.bubble)
+        assertFalse(layers.pageDots)
+    }
+
+    @Test
+    fun `la carte camera reste visible pendant la reflexion sur une photo`() {
+        val state = exchange().copy(photoPath = "/tmp/p.jpg", thinking = true)
+        assertEquals(IseeScene.THINKING, iseeSceneView(state, selectedEntry(state)).scene)
+        val layers = iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = true)
+        assertTrue(layers.cameraCard)
+        assertFalse(layers.bubble)
+    }
+
+    @Test
     fun `la dissolution rend la bulle et retire la carte`() {
-        val layers = iseeSceneLayers(IseeScene.VISION, bubbles = 2, dissolving = true)
+        val layers = iseeSceneLayers(bubbles = 2, dissolving = true, captureLive = true)
         assertFalse(layers.cameraCard)
         assertTrue(layers.bubble)
     }
 
     @Test
-    fun `les dots n'apparaissent qu'avec plusieurs bulles hors VISION`() {
-        assertFalse(iseeSceneLayers(IseeScene.READY, bubbles = 1, dissolving = false).pageDots)
-        assertTrue(iseeSceneLayers(IseeScene.READY, bubbles = 2, dissolving = false).pageDots)
-        assertFalse(iseeSceneLayers(IseeScene.VISION, bubbles = 3, dissolving = false).pageDots)
+    fun `les dots n'apparaissent qu'avec plusieurs bulles hors capture`() {
+        assertFalse(iseeSceneLayers(bubbles = 1, dissolving = false, captureLive = false).pageDots)
+        assertTrue(iseeSceneLayers(bubbles = 2, dissolving = false, captureLive = false).pageDots)
+        assertFalse(iseeSceneLayers(bubbles = 3, dissolving = false, captureLive = true).pageDots)
     }
 }
