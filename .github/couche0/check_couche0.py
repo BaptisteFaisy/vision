@@ -43,6 +43,8 @@ FORBIDDEN_PATTERNS = [
     (r"sk_[a-f0-9]{32}", "clé API sk_… en clair"),
     (r"ghp_[A-Za-z0-9]{36}", "jeton GitHub ghp_… en clair"),
     (r"^sdk\.dir=", "sdk.dir en dur (local.properties ne se versionne pas)"),
+    (r"2026-10-2[0-5]\b|\b2[0-5]/10\b",
+     "date antérieure au 26/10 19 h (citer « relevé antérieur, hors de cet arbre »)"),
 ]
 
 
