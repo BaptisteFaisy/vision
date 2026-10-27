@@ -135,7 +135,7 @@ PLANCHERS_DOC = (
     ("Aller-retour HTTP cloud, hôte filaire", f"{dix_str(RESEAU_FILAIRE)} ms",
      "12 appels keep-alive, frame 512×206 (20,7 Ko → 27 Ko en base64) — **le plus petit observé**"),
     ("Aller-retour HTTP cloud, téléphone", "150–250 ms",
-     "mesures terrain 24/10 (Xiaomi, Wi-Fi 192 Mbps) ; ~200 ms aussi depuis un PC"),
+     "mesures terrain antérieures (Xiaomi, Wi-Fi 192 Mbps) ; ~200 ms aussi depuis un PC"),
     ("Coût marginal montant", COUT_MONTANT,
      "calculé sur 2 points mesurés : 27 Ko → 93 ms, 2 437 Ko → 381 ms (soit ≈ 68 Mbit/s utiles)"),
     ("Inférence serveur, 1 concept", "41 ms (B200) · 30,7 ms (tracker 720p)",

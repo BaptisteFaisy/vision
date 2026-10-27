@@ -13,7 +13,7 @@ import org.junit.Test
  * fenêtre mesurée gonfle la moyenne d'une passe — elle ne doit pas décider d'un budget.
  * Le tableau imprimé garde les essais bruts, l'assertion retient le meilleur.
  *
- * Relevé r630 du 24/10 pour comparaison : 1–2 µs/frame, 39–70 µs/résumé.
+ * Relevé r630 antérieur (hors de cet arbre) pour comparaison : 1–2 µs/frame, 39–70 µs/résumé.
  */
 class LatencyBenchTest {
 

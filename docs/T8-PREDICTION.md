@@ -89,6 +89,6 @@ objet masqué une seconde doit être prédit puis oublié (`COAST`/`DROP`, § 3)
 |---|---|---|
 | Appareil de recette | 2312DRA50G, Android 15, écran 1220 × 2712, modes 60/90/120 Hz (mode courant 60 Hz, mode par défaut 120 Hz) | mesuré le 26/10 par `~/bin/phone run … dumpsys display` (M95) |
 | **T8 perçue avant/après** | **non mesuré** | pas de build « après » (§ 4) et backend Modal/GPU requis pour le direct — hors mandat |
-| Latence serveur, RTT, encodage JPEG | **non mesuré ici** | relevés du 25/10 (fiches `18-latence-200ms.md`, `20-latence-predict.md`) : 0,5–1,1 s serveur, ~213 ms aller-retour, 1,2 ms d'encodage — **valeurs d'un autre jour, pas de cet arbre** |
+| Latence serveur, RTT, encodage JPEG | **non mesuré ici** | relevés antérieurs, hors de cet arbre (fiches `18-latence-200ms.md`, `20-latence-predict.md`) : 0,5–1,1 s serveur, ~213 ms aller-retour, 1,2 ms d'encodage — **valeurs d'un autre jour, pas de cet arbre** |
 | 417 ms à deux frames en vol contre 185 ms à un seul | lu dans le commentaire de `Cadence.Fast` | `LiveSession.kt:36-41` (relevé téléphone cité par le code) |
 | `@Test` de `core/src/test/…/predict/` | 39 | `grep -rho '@Test' core/src/test/java/dev/sam3vision/core/predict \| wc -l` |

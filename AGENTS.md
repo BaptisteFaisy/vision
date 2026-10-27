@@ -5,7 +5,14 @@
 > docs cités avant d'utiliser ce qu'ils documentent. Ne rien deviner à partir du seul code
 > quand une règle est écrite ici.
 
-## 0. Docs à lire avant d'agir (contrats détaillés)
+## 0. Règle de datation (opposable)
+
+Aucune date antérieure au **26/10/2026, 19 h** ne doit apparaître dans ce dépôt : ni dans le
+code, ni dans les docs, ni dans les messages de commit. Un relevé plus ancien se cite
+« relevé antérieur, hors de cet arbre », sans date ni sha. Le dépôt repart de son commit
+unique du 26/10.
+
+## 0 bis. Docs à lire avant d'agir (contrats détaillés)
 
 - `README.md` — fonctionnalités réelles, transport du direct, endpoints, sécurité (clé debug).
 - `NOTES.md` — versions épinglées et décisions techniques.

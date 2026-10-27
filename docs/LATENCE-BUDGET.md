@@ -87,7 +87,7 @@ soustraction** (328 − 234 − 7) : un `breakdown_ms` sur un appel réel doit l
 | grandeur | valeur | comment elle est obtenue |
 |---|---:|---|
 | Aller-retour HTTP cloud, hôte filaire | 93 ms | 12 appels keep-alive, frame 512×206 (20,7 Ko → 27 Ko en base64) — **le plus petit observé** |
-| Aller-retour HTTP cloud, téléphone | 150–250 ms | mesures terrain 24/10 (Xiaomi, Wi-Fi 192 Mbps) ; ~200 ms aussi depuis un PC |
+| Aller-retour HTTP cloud, téléphone | 150–250 ms | mesures terrain antérieures (Xiaomi, Wi-Fi 192 Mbps) ; ~200 ms aussi depuis un PC |
 | Coût marginal montant | ≈ 0,12 ms/Ko | calculé sur 2 points mesurés : 27 Ko → 93 ms, 2 437 Ko → 381 ms (soit ≈ 68 Mbit/s utiles) |
 | Inférence serveur, 1 concept | 41 ms (B200) · 30,7 ms (tracker 720p) | mesuré ; A100 4 concepts 328 ms, H200 8 concepts 245 ms |
 | Période caméra | 33,3 ms (30 fps) · 16,7 ms (60 fps) | physique : une frame fraîche ne peut pas exister plus souvent |
