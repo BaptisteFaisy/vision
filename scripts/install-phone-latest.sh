@@ -181,8 +181,11 @@ jdk_home() {  # même ordre que select_jdk de scripts/build.sh, en une ligne
 retry_build() {
     local jdk
     jdk="$(jdk_home)" || jdk="${JAVA_HOME:-}"
-    ( cd "$MIRROR" && JAVA_HOME="$jdk" timeout "$BUILD_TIMEOUT" \
-        ./gradlew --no-daemon clean assembleDebug --offline )
+    # ANDROID_HOME : `scripts/build.sh` le pose pour lui-même ; ici on appelle
+    # Gradle en direct, donc le défaut doit être reposé (sans lui : « SDK
+    # location not found » dans un cron, qui n'a aucune variable d'environnement).
+    ( cd "$MIRROR" && JAVA_HOME="$jdk" ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
+        timeout "$BUILD_TIMEOUT" ./gradlew --no-daemon clean assembleDebug --offline )
 }
 
 set +e
