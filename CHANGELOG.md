@@ -12,12 +12,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Arrêt immédiat si backend stoppé** : sur `ApiError.BackendStopped` (404 Modal
   « invalid function call », app plus déployée), aucune nouvelle tentative —
   réessayer est inutile, seul un redéploiement (`deploy-live-fast.sh`) rallume.
+- **Pas de rallumage derrière l'extinction** : `releaseGpu` périme la génération du
+  réveil (`warmGeneration`) — passer en arrière-plan en pleine série d'essais
+  arrête les essais suivants. Un nouveau réveil périme le précédent (pas de séries
+  empilées après deux `onResume` rapprochés).
 - **Rappel d'architecture** : le téléphone ne peut pas `modal deploy` ; l'état stable
   est « app déployée + conteneur à zéro » (0 $ au repos), le premier plan réveille,
   l'arrière-plan éteint (`POST /release` + `scaledown=300` en garde). Un `app stop`
   manuel casse le réveil jusqu'au prochain déploiement.
-- **Preuves** : `AppDiagnosticsTest` +2 (succès au 2e essai, `BackendStopped` sans
-  retentative), test d'échec passé à 3 essais ; `FakeSam.onHealthSeq` scripté.
+- **Preuves** : `AppDiagnosticsTest` +3 (succès au 2e essai, `BackendStopped` sans
+  retentative, nouveau réveil annule le précédent), test d'échec passé à 3 essais ;
+  `FakeSam.onHealthSeq` scripté. Sur téléphone : fond → `released:true` (logcat),
+  aucun appelant SAM hors couche UI (suivi = positions seules).
 
 ## 2026-10-27 (11) — positions et consignes au cadran horaire (9 h … midi … 3 h)
 
