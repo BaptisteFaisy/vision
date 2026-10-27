@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
+
+- **Ouverture → réveil** : `MainActivity.onResume` appelle `AppViewModel.warmGpu()` →
+  `AppDiagnostics.warmGpu()` = un `GET /health` **silencieux** (best-effort, aucun
+  verdict, aucune écriture UI) sur l'endpoint actif (région EU/US). Carte endormie :
+  réveil via le snapshot Modal ; carte chaude : requête quasi gratuite.
+- **Hors plein écran → extinction** (`POST /release`, existant, étendu) : `onPause`
+  (déjà là : home, changement d'app, écran éteint) + nouveau
+  `onMultiWindowModeChanged` (split-screen) + `onDestroy` (fermeture). Au retour en
+  plein écran, `onResume` (ou la première frame) réveille.
+- **Limite connue** : le réveil ne **déploie** rien — si l'app Modal n'est pas
+  déployée, `/health` répond `BackendStopped` et il faut un `sam3-gpu on` manuel,
+  une fois (`docs/MODE-US.md` § « Déploiement manuel, réveil auto »).
+- **Preuves** : `AppDiagnosticsTest` +3 (`warmGpu` : appel unique, silence UI,
+  sans URL = aucun appel, échec = silence) ; `:core` 955 + `:app` 516, 0 échec ;
+  `assembleDebug` et `check-kotlin-limits.py` verts.
+
 ## 2026-10-27 (7) — la question porte sur ce qu'on filme, et l'échec se voit
 
 - **Cause trouvée (10 agents, rapports `isee-diag-2026-10-27/`)** : le « gel » d'une photo du
