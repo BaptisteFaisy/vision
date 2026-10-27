@@ -5,7 +5,7 @@ import java.io.File
 /**
  * Le contexte image des questions vocales : une seule photo retenue, deux origines.
  * L'appui long capte en silence la frame vivante et la rafraîchit à chaque tenue ;
- * le double tap **gèle** sa photo, qui reste prioritaire jusqu'à la question suivante.
+ * le double tap **gèle** sa photo, qui reste prioritaire tant que son fichier vit.
  * Décision pure (aucun import Android) : la caméra est injectée par l'appelant.
  */
 class IhearPhotoContext {
@@ -29,14 +29,26 @@ class IhearPhotoContext {
         if (!frozen) file = target
     }
 
-    /** Question envoyée : le gel est consommé, l'appui long reprend la frame vivante. */
-    fun releaseFreeze() {
+    /**
+     * Fin de vie du contexte : plus de photo et plus de gel. Appelée quand la photo
+     * quitte l'écran, au démarrage d'une vidéo et à la sortie précoce du ViewModel —
+     * sans elle, le gel d'un double tap restait armé à vie.
+     */
+    fun release() {
         frozen = false
+        file = null
     }
 
-    /** Appui long : capte la frame courante s'il n'y a pas de photo gelée. Muet : ni bulle ni flash. */
+    /**
+     * Appui long : capte la frame courante, sauf si une photo gelée vit encore sur
+     * disque (elle reste prioritaire). Un gel dont le fichier a été purgé est mort :
+     * on le relâche, et la frame filmée redevient le contexte de la question.
+     * Muet : ni bulle ni flash.
+     */
     fun captureForHold(camera: IhearCameraActions?, newTarget: () -> File) {
-        if (frozen || camera == null) return
+        if (camera == null) return
+        if (frozen && file?.isFile == true) return
+        if (frozen) release()
         val target = newTarget()
         camera.takePhoto(target) { saved -> if (saved) setLiveIfStillLive(target) }
     }
