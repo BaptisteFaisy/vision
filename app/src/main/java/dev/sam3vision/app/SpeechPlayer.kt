@@ -2,6 +2,7 @@ package dev.sam3vision.app
 
 import android.media.MediaPlayer
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.iseedesign.SpeechPosition
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,7 +27,14 @@ class SpeechPlayer(
     private val onPlaybackError: (String) -> Unit = {},
     speed: Float = Settings.DEFAULT_TTS_SPEED,
 ) {
+    @Volatile
     private var player: MediaPlayer? = null
+
+    /** Horloge du MP3 réellement joué ; null avant le démarrage et après la fin. */
+    fun position(): SpeechPosition? = runCatching {
+        val mp = player ?: return null
+        if (!mp.isPlaying) null else SpeechPosition(mp.currentPosition.toLong(), mp.duration.toLong())
+    }.getOrNull()
 
     /** Vitesse appliquée à chaque lecture, bornée 0,5..2 (les ViewModels la tiennent à jour). */
     @Volatile

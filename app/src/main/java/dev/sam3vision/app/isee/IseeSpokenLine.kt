@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,61 +18,50 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.iseedesign.IseePortrait
-import dev.sam3vision.core.iseedesign.IseeScene
-import dev.sam3vision.core.iseedesign.wordsSpoken
+import dev.sam3vision.core.iseedesign.SpokenCaption
 
 /**
  * Seulement ce qui est dit maintenant, en gros, sous la boule. Les mots s'allument au fil de la
- * voix : le mot en cours dans la couleur de qui parle (bleu le user, ambre iSee), les mots déjà
- * dits en noir, ceux à venir en gris très clair. Hors parole, toute la phrase est en noir.
+ * voix : cinq mots au plus, deux lignes, puis le passage suivant. Hors parole : rien.
  */
 @Composable
-internal fun BoxWithConstraintsScope.SpokenLine(view: IseeSceneView, state: IseeUiState, top: Dp, compact: Boolean) {
-    val speaking = view.scene == IseeScene.VOICE || view.scene == IseeScene.LISTENING
-    val shown = rememberWordsShown(view.heading, speaking)
+internal fun BoxWithConstraintsScope.SpokenLine(caption: SpokenCaption?, fromUser: Boolean, top: Dp, compact: Boolean) {
+    if (caption == null) return
     Column(
         Modifier.align(Alignment.TopCenter).offset(y = top).padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        view.label?.let {
-            Text(
-                it,
-                color = Color(if (view.fromUser) IseePortrait.YOU_INK else IseePortrait.SEE_INK),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
         Text(
-            spokenText(view.heading, if (speaking) shown else Int.MAX_VALUE, view.fromUser),
-            fontSize = if (compact) 34.sp else 42.sp,
-            lineHeight = if (compact) 36.sp else 44.sp,
+            if (fromUser) "YOU" else "ISEE",
+            color = Color(if (fromUser) IseePortrait.YOU_INK else IseePortrait.SEE_INK),
+            fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-1.2).sp,
-            textAlign = TextAlign.Center,
-            maxLines = 4,
-            overflow = TextOverflow.Ellipsis,
+            letterSpacing = 2.sp,
+            modifier = Modifier.padding(bottom = 6.dp),
         )
+        CaptionText(caption, fromUser, compact)
     }
 }
 
-/** Combien de mots sont dits : l'horloge démarre quand la phrase commence à être parlée. */
+/** Ajustement pour un mot très long ou une grande police système : aucune ellipse. */
 @Composable
-private fun rememberWordsShown(text: String, speaking: Boolean): Int {
-    var elapsed by remember(text) { mutableLongStateOf(0L) }
-    LaunchedEffect(text, speaking) {
-        if (!speaking) return@LaunchedEffect
-        val start = withFrameMillis { it }
-        while (true) withFrameMillis { elapsed = it - start }
-    }
-    return wordsSpoken(text, elapsed, null)
+private fun CaptionText(caption: SpokenCaption, fromUser: Boolean, compact: Boolean) {
+    var fontSize by remember(caption.text, compact) { mutableStateOf(if (compact) 30f else 38f) }
+    Text(
+        spokenText(caption.text, caption.shown, fromUser),
+        fontSize = fontSize.sp,
+        lineHeight = (fontSize + 3f).sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = (-0.7).sp,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        onTextLayout = { if (it.hasVisualOverflow && fontSize > 12f) fontSize -= 2f },
+    )
 }
 
 /**

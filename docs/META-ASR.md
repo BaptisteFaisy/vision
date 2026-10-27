@@ -12,6 +12,23 @@ lors d'un appui long iSee, voir plus bas).
 
 ## Contrat HTTP
 
+### Aperçu pendant l'appui long iSee (2026-10-27)
+
+Le même `AudioRecord` alimente un tampon circulaire de six secondes.
+`IseeLiveDictation` demande un aperçu au moteur Meta/Scribe configuré toutes
+les 1,5 s au plus (une seule requête en vol, délai de 4 s, pause après échec).
+Ce sont des transcriptions partielles périodiques : ces clients HTTP ne
+fournissent pas de flux de mots. Leur délai dépend du réseau et du moteur ;
+les aperçus consomment des requêtes ASR supplémentaires.
+
+Le texte récent se montre sous la boule tant que l'énergie du PCM indique
+de la parole (seuil RMS 300, tolérance de silence 550 ms). Le silence, le
+relâchement, l'annulation et l'arrière-plan effacent l'aperçu ; une réponse
+tardive est ignorée. Cette détection d'énergie ne distingue pas parfaitement
+la voix des bruits ambiants. Au relâchement, la transcription complète
+existante reste la seule question envoyée au modèle ; aucun aperçu n'entre
+dans l'historique. Le son récent n'est écrit dans aucun fichier.
+
 ```
 POST {asrBaseUrl}/asr/transcribe          (MetaAsrClient.kt:31-47)
 Authorization: Bearer <clé Meta>

@@ -5,6 +5,8 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import dev.sam3vision.core.audio.Wav
+import dev.sam3vision.core.audio.PcmPreviewBuffer
+import dev.sam3vision.core.audio.PcmPreview
 import java.io.ByteArrayOutputStream
 import kotlin.concurrent.thread
 
@@ -22,6 +24,10 @@ class DictationRecorder(
     private var worker: Thread? = null
     private var startedAt = 0L
     private val captured = ByteArrayOutputStream()
+    private val preview = PcmPreviewBuffer()
+
+    /** Copie bornée du son récent, sans arrêter l'enregistrement principal. */
+    fun preview(): PcmPreview = preview.snapshot()
 
     @SuppressLint("MissingPermission") // la permission RECORD_AUDIO est demandée par l'écran
     override fun start(): Boolean {
@@ -41,6 +47,7 @@ class DictationRecorder(
                 false
             } else {
                 captured.reset()
+                preview.reset()
                 startedAt = System.currentTimeMillis()
                 rec.startRecording()
                 record = rec
@@ -72,6 +79,7 @@ class DictationRecorder(
             if (read <= 0) break
             // Flux continu : chaque chunk part dans le tampon mémoire, jamais sur disque.
             synchronized(captured) { captured.write(chunk, 0, read) }
+            preview.append(chunk, read)
         }
         // Plafond atteint : on coupe la source, les données restent récupérables.
         if (record === rec) runCatching { rec.stop() }
