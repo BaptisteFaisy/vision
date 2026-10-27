@@ -217,7 +217,8 @@ class TrackRunnerTest {
 
     @Test
     fun `stats enregistrent la latence bout en bout`() = runBlocking {
-        val times = longArrayOf(1_000L, 1_250L)
+        // start horodate la session (rekey), puis la frame : début et fin.
+        val times = longArrayOf(1_000L, 1_000L, 1_250L)
         var tick = 0
         fun clock(): Long = times[tick.coerceAtMost(times.size - 1)].also { tick += 1 }
         val runner = TrackRunner(FakeTrackClient(), clock = ::clock)
@@ -240,6 +241,43 @@ class TrackRunnerTest {
 
         assertFalse("la réponse en vol est périmée", runner.isCurrent(era))
         assertEquals(0, runner.stats.samples)
+    }
+
+    @Test
+    fun `submit rouvre une session quand l age depasse le rekey`() = runBlocking {
+        val client = FakeTrackClient()
+        var now = 0L
+        val runner = TrackRunner(client, clock = { now }, rekeyMs = 3_000L)
+        runner.start(listOf("person"), "SUVL").getOrThrow()
+
+        now = 1_000L
+        runner.frameOf("QUJD")
+        assertEquals(listOf("start:person", "frame:s1"), client.calls)
+
+        now = 4_000L
+        client.startResult = Result.success(TrackSessionStart("s2", 640, 480, listOf(tracked(2))))
+        val frame = runner.frameOf("QUJD")
+
+        assertEquals("s2", runner.sessionId)
+        assertEquals(2, frame.objects.single().id)
+        assertEquals(listOf("start:person", "frame:s1", "start:person", "close:s1"), client.calls)
+    }
+
+    @Test
+    fun `rekey en echec replie sur l ancienne session`() = runBlocking {
+        val client = FakeTrackClient()
+        var now = 0L
+        val runner = TrackRunner(client, clock = { now }, rekeyMs = 3_000L)
+        runner.start(listOf("person"), "SUVL").getOrThrow()
+
+        now = 5_000L
+        client.startResult = Result.failure(ApiError.Network("backend mort"))
+        val frame = runner.frameOf("QUJD")
+
+        assertEquals("s1", runner.sessionId)
+        assertEquals(1, frame.objects.single().id)
+        assertTrue(client.calls.contains("frame:s1"))
+        assertFalse(client.calls.any { it.startsWith("close") })
     }
 
     @Test

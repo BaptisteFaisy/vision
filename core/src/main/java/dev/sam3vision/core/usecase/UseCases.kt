@@ -7,6 +7,7 @@ import dev.sam3vision.core.model.Role
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.text.stripMarkdown
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Pipeline photo → (segmentation si un endpoint SAM est configuré) → description LLM.
@@ -17,10 +18,18 @@ class AnalyzeUseCase(
     private val sam: SamClient? = null,
     private val maxLabels: Int = 20,
     private val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
+    /** Budget SAM : au-delà, on décrit sans labels plutôt que faire attendre la photo. */
+    private val samBudgetMs: Long = SAM_BUDGET_MS,
 ) {
+    companion object {
+        /** 10 s : un GPU chaud répond en < 2 s ; au-delà, la photo n'attend pas. */
+        const val SAM_BUDGET_MS = 10_000L
+    }
+
     suspend fun invoke(jpegB64: String, prompts: List<String>? = null): Result<Analysis> {
         val cap = ObjectLimits.clamp(maxObjects)
-        val objects = sam?.segment(jpegB64, prompts)?.getOrNull()?.objects.orEmpty().take(cap)
+        val segmented = sam?.let { withTimeoutOrNull(samBudgetMs) { it.segment(jpegB64, prompts) } }
+        val objects = segmented?.getOrNull()?.objects.orEmpty().take(cap)
         val labels = objects.map { it.label }.filter { it.isNotBlank() }.distinct().take(maxLabels)
         return llm.describe(jpegB64, labels).map { analysis ->
             analysis.copy(

@@ -50,18 +50,27 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_POST(self) -> None:  # noqa: N802 (nom imposé par BaseHTTPRequestHandler)
-        taille = int(self.headers.get("Content-Length") or 0)
-        corps = self.rfile.read(taille).decode("utf-8", "replace")
+        try:
+            taille = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            taille = 0
+        if taille > 1024 * 1024:  # corps borné à 1 Mo : un client fautif ne mange pas la mémoire
+            self.send_response(413)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        corps = self.rfile.read(max(0, taille)).decode("utf-8", "replace")
         try:
             demande = json.loads(corps)
             question = texte_des_messages(demande.get("messages", []))
         except json.JSONDecodeError:
             question = corps
+        texte = description(question)  # calculé une fois (réponse + journal)
         reponse = {
             "id": "chatcmpl-mock",
             "object": "chat.completion",
             "model": "mock-llm",
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": description(question)},
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": texte},
                          "finish_reason": "stop"}],
         }
         charge = json.dumps(reponse, ensure_ascii=False).encode()
@@ -70,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(charge)))
         self.end_headers()
         self.wfile.write(charge)
-        print(f"POST /v1/chat/completions {taille} octets → {description(question)[:70]}", flush=True)
+        print(f"POST /v1/chat/completions {taille} octets → {texte[:70]}", flush=True)
 
     def do_GET(self) -> None:  # noqa: N802
         charge = json.dumps({"ok": True, "model": "mock-llm"}).encode()

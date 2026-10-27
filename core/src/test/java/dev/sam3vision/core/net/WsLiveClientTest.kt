@@ -1,7 +1,13 @@
 package dev.sam3vision.core.net
 
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -378,6 +384,67 @@ class WsLiveClientTest {
 
         val frame = client.live("QQ==", null, 640, 4).getOrThrow()
         assertEquals("la trame périmée ne doit pas être prise pour la nouvelle", 512, frame.width)
+    }
+
+    /**
+     * Transport dont le **premier** envoi dort jusqu'à [release] : prouve que l'envoi
+     * (~28 Ko) ne tient pas le verrou du client — la seconde frame s'enregistre et
+     * reçoit sa réponse pendant ce sommeil, au lieu de se figer derrière l'envoi.
+     */
+    private class BlockingSendTransport : WsTransport {
+        private var onText: ((String) -> Unit)? = null
+        private val sends = AtomicInteger(0)
+        private val released = CountDownLatch(1)
+
+        override fun open(
+            url: String,
+            onText: (String) -> Unit,
+            onClosed: (Throwable?) -> Unit,
+            onOpen: () -> Unit,
+        ): Boolean {
+            this.onText = onText
+            onOpen()
+            return true
+        }
+
+        override fun send(text: String): Boolean {
+            if (sends.incrementAndGet() == 1) released.await(10, TimeUnit.SECONDS)
+            return true
+        }
+
+        override fun close() {}
+
+        fun deliver(message: String) {
+            onText?.invoke(message)
+        }
+
+        fun awaitSends(count: Int, seconds: Long): Boolean {
+            val deadline = System.currentTimeMillis() + seconds * 1000
+            while (sends.get() < count && System.currentTimeMillis() < deadline) Thread.sleep(10)
+            return sends.get() >= count
+        }
+
+        fun release() = released.countDown()
+    }
+
+    @Test
+    fun `l envoi d une frame ne bloque pas la reception des autres`() = runBlocking {
+        val transport = BlockingSendTransport()
+        val client = WsLiveClient(base, transport, 5_000, RecordingLiveClient())
+
+        val first = async(Dispatchers.IO) { client.live("QQ==", null, 640, 4) }
+        assertTrue("le premier envoi doit partir", transport.awaitSends(1, 5))
+        val second = async(Dispatchers.IO) { client.live("QQ==", null, 640, 4) }
+        assertTrue("le second envoi ne doit pas attendre le premier", transport.awaitSends(2, 5))
+
+        transport.deliver(NetContract.frameReply(2))
+        val frame = withTimeout(5_000) { second.await() }.getOrThrow()
+        assertEquals(512, frame.width)
+
+        transport.release()
+        transport.deliver(NetContract.frameReply(1))
+        val frame1 = withTimeout(5_000) { first.await() }.getOrThrow()
+        assertEquals(512, frame1.width)
     }
 
     @Test

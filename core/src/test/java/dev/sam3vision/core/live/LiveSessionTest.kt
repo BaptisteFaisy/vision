@@ -85,7 +85,8 @@ class LiveSessionTest {
         )
         session.runFrame("QQ==")
         assertEquals(listOf("person", "tree"), client.lastPrompts)
-        assertEquals(640, client.lastWorkEdge)
+        assertEquals(LiveSession.DEFAULT_WORK_EDGE, client.lastWorkEdge)
+        assertEquals(512, client.lastWorkEdge)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, client.lastMaxObjects)
     }
 

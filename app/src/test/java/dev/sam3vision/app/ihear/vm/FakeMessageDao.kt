@@ -38,6 +38,24 @@ class FakeMessageDao : MessageMultimediaDao {
 
     override suspend fun oldest(): MessageMultimedia? = rows.minByOrNull { it.id }
 
+    override suspend fun oldestBatch(limit: Int): List<MessageMultimedia> =
+        rows.sortedBy { it.id }.take(limit)
+
+    override suspend fun latestAnswered(): MessageMultimedia? =
+        rows.filter { !it.texteIA.isNullOrBlank() }.maxByOrNull { it.id }
+
+    override suspend fun recent(limit: Int): List<MessageMultimedia> =
+        rows.sortedBy { it.id }.takeLast(limit)
+
+    override suspend fun recentChatted(limit: Int): List<MessageMultimedia> =
+        rows.filter { !it.texteUtilisateur.isNullOrBlank() || !it.texteIA.isNullOrBlank() }
+            .sortedBy { it.id }.takeLast(limit)
+
+    override suspend fun updateAnswer(id: Long, texte: String, cheminAudio: String?) {
+        val index = rows.indexOfFirst { it.id == id }
+        if (index >= 0) rows[index] = rows[index].copy(texteIA = texte, cheminAudioElevenLabs = cheminAudio)
+    }
+
     override suspend fun byId(id: Long): MessageMultimedia? = rows.firstOrNull { it.id == id }
 
     override suspend fun update(message: MessageMultimedia) {
@@ -47,6 +65,10 @@ class FakeMessageDao : MessageMultimediaDao {
 
     override suspend fun deleteById(id: Long) {
         rows.removeAll { it.id == id }
+    }
+
+    override suspend fun deleteByIds(ids: List<Long>) {
+        rows.removeAll { it.id in ids }
     }
 
     override suspend fun purgeAll() = rows.clear()

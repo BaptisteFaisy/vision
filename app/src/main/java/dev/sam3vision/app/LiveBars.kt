@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,7 +42,7 @@ fun LiveTopBar(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), Arrangement.spacedBy(8.dp)) {
             Chip("Arrêter", AppColors.danger, onBack)
             Chip("Réglages", AppColors.surfaceHigh, onOpenSettings)
             SamModeChip(state.samEnabled, onToggleSam)
