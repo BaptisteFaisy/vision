@@ -29,7 +29,7 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | JUnit / androidx.test | **4.13.2** / ext-junit **1.3.0**, core **1.7.0**, runner+rules **1.7.0** | `libs.versions.toml:15,16,17,18` |
 | org.json (test only) | **20240303** | `libs.versions.toml:20`, `core/build.gradle.kts:40` |
 | jump3r (MP3 pur Java) | **1.0.4** | `libs.versions.toml:19` |
-| mwdat (lunettes Meta) | **1.0.1** (core, camera, inputs, mockdevice) | `libs.versions.toml:21` |
+| mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:21-25` |
 
 **Le JDK n'est pas dans le dépôt.** `gradle.properties` (15-24) ne contient que
 `org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, parallel, caching, useAndroidX,
