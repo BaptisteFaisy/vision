@@ -35,7 +35,7 @@ class GuidanceAnnouncerTest {
         // le danger arrive 1 s après : stabilité d'abord, mais pas d'attente du délai
         assertNull(announcer.onFrame(1_500L, listOf(personne(2f))))
         assertEquals(
-            "Personne à 2 mètres devant, va à gauche.",
+            "Personne à 2 mètres à midi, va à gauche.",
             announcer.onFrame(2_000L, listOf(personne(2f))),
         )
     }
@@ -58,12 +58,12 @@ class GuidanceAnnouncerTest {
 
         announcer.onFrame(0L, listOf(personne(3.4f)))
         assertEquals(
-            "Personne à 3,4 mètres devant, va à gauche.",
+            "Personne à 3,4 mètres à midi, va à gauche.",
             announcer.onFrame(500L, listOf(personne(3.4f))),
         )
         assertNull(announcer.onFrame(2_000L, listOf(personne(2.4f))))
         assertEquals(
-            "Personne à 2,4 mètres devant, va à gauche.",
+            "Personne à 2,4 mètres à midi, va à gauche.",
             announcer.onFrame(2_500L, listOf(personne(2.4f))),
         )
     }

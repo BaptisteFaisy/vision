@@ -70,7 +70,7 @@ class LiveProbeGuidanceTest {
 
         val spoken = probe.state.value.spoken.orEmpty()
         assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Person"))
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("devant, va à"))
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("à midi, va à"))
     }
 
     @Test

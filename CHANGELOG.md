@@ -3,6 +3,26 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-27 (11) — positions et consignes au cadran horaire (9 h … midi … 3 h)
+
+- **Vocabulaire unique au cadran** (`PositionText.clockHour`/`clockLabel`, sept bandes
+  égales) : « Personne à 9 heures, à 1,4 mètre. », « Personne à 2 mètres à midi, va
+  à gauche. » (en : « at 9 o'clock » … « at 12 o'clock »). « à midi » pour 12 h,
+  « à 1 heure » au singulier — la convention des déplacements sans voir.
+- **Remplace les secteurs** « à gauche / au centre / à droite » et le repère vertical
+  partout où l'app met des positions en mots : annonces (Direct, iSee, photo),
+  journal caméra (`TimelineText`, mêmes mots dans les deux langues), consignes du
+  couloir (heure de l'obstacle dans la phrase et dans la clé `b|label|côté|mètre|heure`).
+- `horizontal()`, `vertical()`, `positionLabel()` supprimés (remplacés, sans autre
+  usage) ; `SIDE_EDGE` gardé pour le seul couloir du guidage. Aide des Réglages et
+  fiches `VOIX-POSITIONS`, `VOIX-ANGLAIS`, `GUIDAGE-TOUT-DROIT`, `ELEVENLABS-TTS`,
+  `DISTANCES`, `MASQUES-DEBUG` alignées.
+- **Preuves** : `PositionTextTest` (cadran, libellés), `PositionTextEnglishTest` (5),
+  `PositionAnnouncerTest`, `GuidanceTest` (+1 : heure dans la clé), `GuidanceAnnouncerTest`,
+  `TimelineTextTest`, `LiveProbeGuidanceTest` ; `:core:testDebugUnitTest` 1098/1098,
+  `:app:testDebugUnitTest` 551/551, `check-kotlin-limits.py` OK, `:app:assembleDebug` OK.
+  Non mesuré sur téléphone (phrases à l'oreille non vérifiées ici).
+
 ## 2026-10-27 (10) — voix Laure par défaut, vitesse ×1,9 réglable à la voix
 
 - **Voix par défaut : Laure** (`3b8fXc91YHS1i2DYAlBQ`) au lieu de Sarah :

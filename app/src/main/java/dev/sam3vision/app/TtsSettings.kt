@@ -109,8 +109,8 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
     ) { onChange(draft.copy(ttsAnnouncePositions = it)) }
     Text(
         "Activé : en mode Direct (et après l'analyse d'une photo), la voix dit où sont les " +
-            "objets et à quelle distance — « Personne à gauche, à 1,4 mètre ; chien au " +
-            "centre, à 3 mètres ». Une annonce toutes les 4 s au plus, et seulement si la " +
+            "objets et à quelle distance — « Personne à 9 heures, à 1,4 mètre ; chien à " +
+            "midi, à 3 mètres ». Une annonce toutes les 4 s au plus, et seulement si la " +
             "scène change : un objet qui s'approche d'un mètre est ré-annoncé.",
         color = AppColors.textMuted,
         fontSize = 11.sp,
@@ -121,7 +121,7 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
     ) { onChange(draft.copy(ttsGuidanceStraight = it)) }
     Text(
         "Activé : la page caméra dit la consigne de marche au lieu des positions — " +
-            "« Continue tout droit. » ou « Personne à 2 mètres devant, va à gauche. ». " +
+            "« Continue tout droit. » ou « Personne à 2 mètres à midi, va à gauche. ». " +
             "Calculé sur le téléphone depuis SAM, sans appel LLM ; un obstacle qui entre " +
             "dans le couloir parle aussitôt, même avant les 4 s.",
         color = AppColors.textMuted,

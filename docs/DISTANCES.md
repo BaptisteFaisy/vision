@@ -104,7 +104,7 @@ La voix (ElevenLabs, bascule « Annoncer les objets et leur distance » — coup
 sans erreur visible, cf. piège (b) de `docs/TESTING.md`) dit la scène **avec les distances** :
 
 ```
-Personne à gauche, à 1,4 mètre ; chien au centre, à 3 mètres.
+Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.
 ```
 
 Exact, dans le code : au-delà de 3 objets cités (`PositionText.MAX_OBJECTS`), le reste est résumé (« , et 2
