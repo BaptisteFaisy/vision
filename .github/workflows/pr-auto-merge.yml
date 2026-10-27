@@ -1,0 +1,35 @@
+# pr-auto-merge — toute PR du dépôt part en auto-merge (rebase) dès sa
+# création : la seule porte reste la CI (les 6 checks requis sur master).
+# Brouillons exclus (armé à ready_for_review), forks exclus (sécurité :
+# pull_request_target + token d'écriture, PR internes seules). Pas de
+# déclencheur sur synchronize : un humain qui coupe l'auto-merge reste coupé.
+# Posé le 2026-10-27 sur demande : « toutes les modifs passent en PR + merge
+# auto ». Repli si GITHUB_TOKEN ne suffit plus : PAT dans un secret.
+name: pr-auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  arm:
+    runs-on: [self-hosted, linux, x64, vision]
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    steps:
+      - name: Armer l'auto-merge (rebase)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          armed="$(gh pr view "$PR_URL" --json autoMergeRequest -q '.autoMergeRequest.mergeMethod // empty')"
+          if [ -n "$armed" ]; then
+            echo "déjà armé ($armed), rien à faire"
+          else
+            gh pr merge --auto --rebase "$PR_URL"
+            echo "auto-merge armé (rebase) sur $PR_URL"
+          fi
