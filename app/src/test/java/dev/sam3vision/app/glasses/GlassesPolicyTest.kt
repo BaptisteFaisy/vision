@@ -68,4 +68,18 @@ class GlassesPolicyTest {
             photoHint(state(phase = SessionPhase.STARTED, streaming = false)),
         )
     }
+
+    @Test
+    fun `la perte d'enregistrement se dit une fois, et pas quand elle est voulue`() {
+        // Démarrage : on n'a jamais été enregistré, rien à annoncer.
+        assertNull(registrationLostMessage(wasRegistered = false, registered = false, wanted = false))
+        // Toujours enregistré : rien non plus.
+        assertNull(registrationLostMessage(wasRegistered = true, registered = true, wanted = false))
+        // Enregistré puis perdu (mise à jour, réinstallation) : l'écran doit dire pourquoi.
+        val lost = registrationLostMessage(wasRegistered = true, registered = false, wanted = false)
+        assertEquals(MessageKind.WARNING, lost?.kind)
+        assertTrue(lost?.text.orEmpty().contains("Enregistrer auprès de Meta AI"))
+        // Désenregistrement demandé par l'utilisateur : pas une perte, on se tait.
+        assertNull(registrationLostMessage(wasRegistered = true, registered = false, wanted = true))
+    }
 }

@@ -63,6 +63,12 @@ class GlassesController(
     private var deviceJob: Job? = null
     private var started = false
 
+    /** Dernier enregistrement connu, pour ne dire la perte qu'une fois (transition). */
+    private var wasRegistered = false
+
+    /** `true` entre `unregister()` et l'état suivant : la perte est voulue, on n'alerte pas. */
+    private var unregisterWanted = false
+
     /** Appelé depuis [android.app.Activity.onCreate] et `onNewIntent`. */
     fun bind(activity: Activity) {
         this.activity = activity
@@ -98,7 +104,7 @@ class GlassesController(
     private fun watchRegistration() {
         scope.launch {
             Wearables.registrationState.collect { state ->
-                _state.update { it.copy(registered = state == RegistrationState.REGISTERED) }
+                onRegistrationState(state == RegistrationState.REGISTERED)
             }
         }
         scope.launch {
@@ -106,6 +112,18 @@ class GlassesController(
                 .filter { error -> registrationErrorWorthTelling(error) }
                 .collect { error -> note(GlassesMessages.registrationFailed(error.description)) }
         }
+    }
+
+    /**
+     * Enregistrement reçu du SDK : l'état suit, et **une perte se dit** (mise à jour de
+     * l'app ou de Meta AI, réinstallation) — sinon l'écran affichait « non enregistrée »
+     * sans cause, et la session grisée restait un mystère.
+     */
+    private fun onRegistrationState(registered: Boolean) {
+        _state.update { it.copy(registered = registered) }
+        registrationLostMessage(wasRegistered, registered, unregisterWanted)?.let(::note)
+        wasRegistered = registered
+        if (registered) unregisterWanted = false
     }
 
     private fun watchDevices() {
@@ -140,11 +158,19 @@ class GlassesController(
     fun register() {
         initialize()
         val host = activity ?: return note(GlassesMessages.noActivity())
-        Wearables.startRegistration(host)
-        note(GlassesMessages.registrationStarted())
+        // L'app Meta AI peut être absente ou refuser l'ouverture : le SDK lève, il ne rend
+        // pas de résultat (`startRegistration` est `void` en 1.0.1) — on ne laisse pas
+        // l'exception emporter le fil principal, et l'écran dit ce qui s'est passé.
+        runCatching { Wearables.startRegistration(host) }
+            .onSuccess { note(GlassesMessages.registrationStarted()) }
+            .onFailure { error ->
+                note(GlassesMessages.registrationFailed(error.message ?: "app Meta AI injoignable"))
+            }
     }
 
     fun unregister() {
+        // Désenregistrement **voulu** : ne pas l'annoncer comme une perte subie.
+        unregisterWanted = true
         activity?.let { Wearables.startUnregistration(it) }
     }
 

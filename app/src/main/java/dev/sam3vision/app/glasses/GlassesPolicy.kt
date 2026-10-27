@@ -104,6 +104,17 @@ object GlassesMessages {
 
     fun noActivity() = GlassesMessage(MessageKind.ERROR, "Reviens dans l'app, puis relance l'enregistrement.")
 
+    /**
+     * L'enregistrement a existé puis a disparu : le SDK ne le dit pas, et l'écran se
+     * contenterait d'afficher « non enregistrée » sans cause. Cas réel : mise à jour de
+     * l'app (chaque build master) ou de Meta AI, réinstallation, `pm clear`.
+     */
+    fun registrationLost() = GlassesMessage(
+        MessageKind.WARNING,
+        "Enregistrement Meta AI perdu (mise à jour ou réinstallation) : " +
+            "touche « Enregistrer auprès de Meta AI ».",
+    )
+
     fun mockUnavailable() =
         GlassesMessage(MessageKind.ERROR, "Appareil simulé indisponible sur ce téléphone.")
 
@@ -119,6 +130,21 @@ object GlassesMessages {
  */
 fun registrationErrorWorthTelling(error: RegistrationError): Boolean =
     error != RegistrationError.ALREADY_REGISTERED && error != RegistrationError.ALREADY_UNREGISTERED
+
+/**
+ * Ce que la **perte** d'enregistrement doit dire, et quand se taire : rien au premier état
+ * (au démarrage, `wasRegistered` est faux), rien quand c'est l'utilisateur qui s'est
+ * désenregistré (`wanted`), sinon l'avertissement. Pur, donc testé en JVM.
+ */
+fun registrationLostMessage(
+    wasRegistered: Boolean,
+    registered: Boolean,
+    wanted: Boolean,
+): GlassesMessage? = when {
+    !wasRegistered || registered -> null
+    wanted -> null
+    else -> GlassesMessages.registrationLost()
+}
 
 /** Une session terminée n'est pas une session : il faut pouvoir en rouvrir une. */
 fun SessionPhase.isFinished(): Boolean = this == SessionPhase.STOPPED
