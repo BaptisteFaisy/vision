@@ -23,12 +23,14 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Le remplissage de la bulle par les pixels de l'image montrée : la même image est
+ * Le remplissage de la carte par les pixels de l'image montrée : la même image est
  * échantillonnée en [GRID_COLS]×[GRID_ROWS] cellules (moyennes, pas de gros carré
  * pixellisé brut), puis chaque cellule **vole** de sa case vers sa place finale —
  * décalée depuis le bord par [pixelTrip] — au fil d'un front de remplissage.
- * Sous la mosaïque, l'image vive reste visible dans ses trous : la bulle « se
- * remplit » visuellement sans jamais se figer.
+ *
+ * Ce n'est pas un état permanent : c'est le **voile d'entrée** de la carte
+ * (`IseeVisionCard`), effacé en ~1 s pour que l'aperçu caméra redevienne net. Son
+ * opacité vient de l'extérieur (`alpha`) ; sous le voile, l'image vive reste visible.
  *
  * Les couleurs viennent d'un [Bitmap] source (aperçu caméra ou photo) échantillonné
  * dehors : le composable ne connaît que des Int ARGB, la routine `sampleGrid` de `:core` est
@@ -78,14 +80,18 @@ internal suspend fun samplePhotoGrid(path: String?): PixelGrid {
 }
 
 /**
- * Mosaïque de la bulle : dessine chaque cellule à sa spot, celle du front courant
- * volant de son bord originel vers sa place. La bulle est un cercle (ou un angle
- * arrondi quand [circle] est faux) — le clip fait le reste.
+ * Mosaïque de la carte : dessine chaque cellule à sa spot, celle du front courant
+ * volant de son bord originel vers sa place. La carte est un angle arrondi (ou un
+ * cercle quand [circle] est vrai) — le clip fait le reste.
+ *
+ * [alpha] est l'opacité du voile entier : c'est lui qui rend l'aperçu caméra lisible
+ * dessous. La mosaïque n'est pas un état permanent mais une **entrée** (voir
+ * `IseeVisionCard`) ; à 0, rien n'est dessiné.
  */
 @Composable
 internal fun PixelMosaic(
     grid: PixelGrid,
-    fill: Float,
+    alpha: Float,
     circle: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -97,7 +103,7 @@ internal fun PixelMosaic(
     }
     val colors = grid.colors
     Canvas(modifier) {
-        if (colors.isEmpty() || fill <= 0f) return@Canvas
+        if (colors.isEmpty() || alpha <= 0f) return@Canvas
         val path = if (circle) {
             val r = size.minDimension / 2f
             Path().apply {
@@ -122,7 +128,7 @@ internal fun PixelMosaic(
             for (row in 0 until rows) {
                 for (col in 0 until cols) {
                     if (i >= colors.size) break
-                    drawCell(col, row, cols, cellW, cellH, colors[i], route.value)
+                    drawCell(col, row, cols, cellW, cellH, colors[i], route.value, alpha)
                     i++
                 }
             }
@@ -131,8 +137,9 @@ internal fun PixelMosaic(
 }
 
 /** Une cellule : posée pleine une fois son vol fini, en vol sinon (décalage +
- * opacité par [pixelTrip]). Le front commence du bord supérieur-gauche vers le
- * centre, l'image vivante remplit les trous sous la mosaïque. */
+ * taille par [pixelTrip]). Le front commence du bord supérieur-gauche vers le
+ * centre ; [veil] est l'opacité du voile entier, ce qui laisse l'image vivante
+ * visible à travers la mosaïque. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCell(
     col: Int,
     row: Int,
@@ -141,6 +148,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCell(
     cellH: Float,
     color: Int,
     route: Float,
+    veil: Float,
 ) {
     // Temps propre de la cellule : dispersé dans le front, le même arbitraire d'un
     // rendu à l'autre (pur : seed = index de cellule).
@@ -163,8 +171,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCell(
     val scale = if (local >= 1f) 1f else trip.size.coerceAtLeast(0.35f)
     val w = cellW * scale
     val h = cellH * scale
+    val argb = Color(color)
     drawRect(
-        color = Color(color),
+        color = argb.copy(alpha = argb.alpha * veil),
         topLeft = androidx.compose.ui.geometry.Offset(trip.x + cellW * (1f - scale) / 2f, trip.y + cellH * (1f - scale) / 2f),
         size = androidx.compose.ui.geometry.Size(w, h),
     )
