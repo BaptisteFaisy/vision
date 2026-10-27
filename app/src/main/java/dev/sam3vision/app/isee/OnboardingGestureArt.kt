@@ -107,7 +107,7 @@ private fun DrawScope.drawRecDot(on: Boolean, left: Float, top: Float, right: Fl
     )
 }
 
-/** Petit boîtier photo (rect + objectif) allumé par l'éclat du double tap. */
+/** Petit boîtier photo (rect + objectif), allumé par l'éclat quand il y en a un. */
 private fun DrawScope.drawPhotoIcon(left: Float, top: Float, right: Float, bottom: Float) {
     val w = (right - left) * 0.16f
     val h = w * 0.72f

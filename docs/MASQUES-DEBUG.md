@@ -162,7 +162,7 @@ La page caméra porte les trois choses au même endroit, pendant le REC :
 | Élément | Où | Source |
 |---|---|---|
 | masques SAM | sur l'aperçu (`CameraSurface`, z-order ci-dessus) | `/live/ws` |
-| pastilles « ≈ 1,1 m » | par objet, `LiveDistanceLayer` composé **après** l'`AndroidView` (`IseeVisionCard.kt:144-149`) ; **sans nom de concept** en REC (les masques disent déjà de quel objet il s'agit) ; avec concept sur la photo du double tap (`withLabel = true`, `:104`) | `DistanceMeter` (100 % téléphone) |
+| pastilles « ≈ 1,1 m » | par objet, `LiveDistanceLayer` composé **après** l'`AndroidView` (`IseeVisionCard.kt:144-149`) ; **sans nom de concept** en REC (les masques disent déjà de quel objet il s'agit) | `DistanceMeter` (100 % téléphone) |
 | distance du plus proche | ligne d'état `… · plus proche ≈ 1,1 m` | idem |
 | latences + transport | détail du panneau (`latence : … · p95 … · serveur … ms`, `transport :`) | `/live/ws` |
 | ~~GPU~~ | la ligne `gpu :` du détail **n'est pas alimentée** ici : `LiveProbeState.gpu` n'est que recopié d'un état à l'autre (`LiveProbe.kt:152`, `:178`, `:192`) — à rebrancher ou à retirer | — |
