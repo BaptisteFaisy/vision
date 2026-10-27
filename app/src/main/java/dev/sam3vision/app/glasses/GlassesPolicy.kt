@@ -33,6 +33,16 @@ data class GlassesMessage(val kind: MessageKind, val text: String)
  * Tous les textes des lunettes, écrits une seule fois, avec leur gravité. Aucun d'eux ne
  * contient de clé ni de token : les erreurs du SDK sont résumées par leur description.
  */
+/**
+ * Où se donne vraiment une permission des lunettes : **par paquet**, dans Meta AI, sur la page
+ * de l'app. Mesuré le 27/10/2026 : en Developer Mode l'entrée vit sous « Applications du mode
+ * développeur(se) » — et cette page n'expose alors que « Déconnecter », sans réglage caméra.
+ */
+internal fun permissionPath(refusal: String): String =
+    "$refusal : Meta AI → ☰ → Lunettes → la paire → Paramètres → Applications → " +
+        "« Applications du mode développeur(se) » → cette app → Toujours autoriser " +
+        "(cette page peut manquer en Developer Mode)."
+
 object GlassesMessages {
 
     fun sdkUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "SDK lunettes indisponible : $reason")
@@ -52,17 +62,11 @@ object GlassesMessages {
         "Caméra lunettes inactive : démarre la session, ou autorise la caméra dans l'app Meta AI.",
     )
 
-    fun cameraPermissionMissing() = GlassesMessage(
-        MessageKind.ERROR,
-        "Caméra non autorisée : app Meta AI → App connections → SAM Vision → Always allow.",
-    )
+    fun cameraPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Caméra non autorisée"))
 
     fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Caméra indisponible : $reason")
 
-    fun micPermissionMissing() = GlassesMessage(
-        MessageKind.ERROR,
-        "Micro non autorisé : app Meta AI → App connections → SAM Vision → Always allow (micro).",
-    )
+    fun micPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Micro non autorisé"))
 
     fun audioRefused(hertz: Int, reason: String) = GlassesMessage(
         MessageKind.WARNING,
