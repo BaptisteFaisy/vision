@@ -112,11 +112,9 @@ internal object LlmPrompts {
     /** Question simple sur la photo courante. */
     fun askSystem(language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr ->
-            "Tu réponds en français, en deux phrases maximum, à partir de la photo fournie, " +
-                "sans liste et sans markdown." + DATA_RULE_FR
+            "Tu réponds en français, en quelques phrases, à partir de la photo fournie." + DATA_RULE_FR
         SpeechLanguage.En ->
-            "You answer in English, in two sentences at most, based on the photo provided, " +
-                "no lists, no markdown." + DATA_RULE_EN
+            "You answer in English, in a few sentences, based on the photo provided." + DATA_RULE_EN
     }
 
     /**
