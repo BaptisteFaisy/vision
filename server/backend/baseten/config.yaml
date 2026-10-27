@@ -1,0 +1,37 @@
+# Baseten (Truss, custom server) — le MÊME service que sam3-live sur Modal.
+#
+# Pas d'A100 40 Go chez Baseten : le SKU le plus proche est l'A100 80 Go
+# (A100:12x144, 0,06667 $/min = 4,00 $/h). L'alternative « 40 Go » est H100MIG
+# (0,0625 $/min = 3,75 $/h, H100 fractionnaire 3/7 de calcul).
+#
+# Les sources ne sont pas versionnées dans data/ : `python3 scripts/baseten_sync.py`
+# copie backend/live_fast/*.py + requirements.txt + src/server.py dans data/ avant le push.
+base_image:
+  image: python:3.12-slim
+
+build_commands:
+  - pip install --no-cache-dir --upgrade pip
+  - pip install --no-cache-dir -r /app/data/requirements.txt
+
+docker_server:
+  start_command: sh -c "cd /app/data && uvicorn server:app --host 0.0.0.0 --port 8000"
+  server_port: 8000
+  predict_endpoint: /live
+  readiness_endpoint: /health
+  liveness_endpoint: /health
+
+resources:
+  instance_type: A100:12x144
+
+runtime:
+  # Deux entrées en vol (comme @modal.concurrent(max_inputs=2)), une seule inférence GPU :
+  # le service garde son verrou, la 2e frame prépare son décodage pendant l'inférence.
+  predict_concurrency: 2
+
+environment_variables:
+  BACKEND_PLATFORM: baseten
+  FAST_TIMING: "1"
+  FAST_DTYPE: bf16
+  PYTHONPATH: /app/data
+
+model_name: sam3-live
