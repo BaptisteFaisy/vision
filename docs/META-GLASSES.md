@@ -135,7 +135,8 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
 
 - Dépendances : `mwdat-core`, `-camera`, `-inputs` en `implementation` et `-mockdevice` en
   `debugImplementation` (`app/build.gradle.kts:177-181`) : l'artefact de simulation n'entre plus
-  dans l'APK public (voir §12). Version `1.0.1`
+  dans l'APK public (voir §12). Version `1.0.0` — la seule que Meta AI installe
+  sur la paire (voir §13)
   (`gradle/libs.versions.toml:21,53-56`), depuis Maven
   Central. Le Toolkit est en **developer preview** : c'est une donnée du vendeur
   (« Meta Platforms, Inc. », POM des artefacts), à considérer comme instable.
@@ -210,6 +211,9 @@ Ne marche pas, et c'est écrit dans le code :
 
 ## 9. Ce qui n'a jamais été essayé sur des lunettes réelles
 
+> **Mise à jour du 27/10/2026** : les six premiers points de cette liste ont depuis été
+> exercés sur une paire réelle. Constats, chemins et blocages restants : **§13**.
+
 Rien de cette liste n'a été exécuté ici : **jamais essayé**, à vérifier avant d'affirmer.
 
 - l'appairage réel app Meta AI ↔ iSee, la confirmation, l'apparition dans
@@ -271,3 +275,18 @@ isole dans des fichiers courts et on met la décision dans `GlassesPolicy.kt`.
 | `DonState.UNKNOWN` est affiché « non portées » (`GlassesStatus.kt:22-27`) : l'état inconnu et l'état « retirées » se ressemblent | ouvert, sans risque |
 | Qualité d'image à 15 i/s, décodage HEIC, latences | **non mesuré** |
 | Aucun test d'instrumentation des lunettes | assumé : il n'y a pas de matériel |
+## 13. Mesuré sur une paire réelle (27/10/2026)
+
+Paire `RB Meta 01TK`, téléphone `2c6852ac`, app en **Developer Mode** (`APPLICATION_ID` et
+`CLIENT_TOKEN` à `"0"`), app Meta AI 295.0.0.37.164. Rien ici n'est déduit : chaque ligne a
+été lue dans le journal du banc sur le téléphone.
+
+| Constat | Preuve / conséquence |
+|---|---|
+| Le runtime DAT des lunettes est **1.0.0.0.0**, seule version que Meta sert | Meta AI → ☰ → Paramètres → Informations sur l'application → « Version du SDK DAT » ; repasse à « non installée » si le Developer Mode est désactivé (5 taps sur le numéro de version) |
+| **SDK 1.0.1 refuse la paire** | session `STARTING → STARTED` puis coupée en ~70 ms, « Your glasses need an update » (`START_ERROR_DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED`, constante absente du 1.0.0). D'où `mwdat = "1.0.0"` et la garde `DatPinTest` |
+| Avec 1.0.0, la session **reste ouverte** | `session démarrée`, `caméra ajoutée`, `flux démarré` ; seul refus restant : `CAPABILITY_DENIED` (permission caméra) |
+| Le lien se monte en ~2 à 10 s après l'allumage | `linkState` = `CONNECTING` puis `CONNECTED` ; une session créée avant rend `NO_ELIGIBLE_DEVICE` (déjà géré : `hasLinkedDevice`) |
+| Le SDK publie son verdict de compatibilité | `Device.compatibility` = `COMPATIBLE` / `DEVICE_UPDATE_REQUIRED` / `SDK_UPDATE_REQUIRED`, déjà affiché par `GlassesRealCheck` |
+| En Developer Mode, la page de permission caméra **n'existe pas** | ☰ → Lunettes → paire → Paramètres → Applications → « Applications du mode développeur(se) » → app : une seule ligne « Déconnecter » ; les libellés « Always allow » n'existent pas dans l'APK 295. Texte de `GlassesMessages` aligné sur ce chemin réel |
+| Pas de canal public | Meta ne propose que le Developer Mode (sans invitation) et un canal privé « Beta », **sur invitation par e-mail du compte Meta** (wearables.meta.com) |
