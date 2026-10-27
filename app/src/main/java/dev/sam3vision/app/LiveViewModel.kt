@@ -12,6 +12,8 @@ import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.app.live.LiveMaskDecoder
 import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
+import dev.sam3vision.app.live.chosenLens
+import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveWakeGuard
 import dev.sam3vision.app.live.MaskPainter
@@ -25,8 +27,6 @@ import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.core.mask.colorizedObjectBitmap
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.model.TrackFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
@@ -232,7 +232,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         distances.enabled = settings.distanceOverlayEnabled
         distances.reset()
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
-        distances.setLens(chosenLens())
+        distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
         wake.reset()
         cadence.reset()
         fps.reset()
@@ -334,31 +334,10 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun sendFrame(active: FramePipeline, jpegB64: String): Result<LiveFrame>? =
         when (active) {
-            is TrackRunner -> sendTrackFrame(active, jpegB64)
+            is TrackRunner -> active.runAsFrame(_state.value.prompts, jpegB64)
             is LiveSession -> active.runFrame(jpegB64)
             else -> null
         }
-
-    /**
-     * Tracker : la **première** frame ouvre la session (le backend analyse cette image, ses
-     * objets deviennent la frame d'ouverture) ; les suivantes partent à `/frame`, et les
-     * `id` ne changent plus tant que la session vit.
-     */
-    private suspend fun sendTrackFrame(active: TrackRunner, jpegB64: String): Result<LiveFrame>? {
-        if (active.sessionId == null) {
-            return active.start(_state.value.prompts, jpegB64).map { it.asLiveFrame() }
-        }
-        return active.submit(jpegB64)?.map { it.asLiveFrame() }
-    }
-
-    /** Le tracker a ses propres objets ; le rendu du direct attend un [LiveFrame]. */
-    private fun TrackFrame.asLiveFrame(): LiveFrame = LiveFrame(
-        width = width,
-        height = height,
-        // La latence affichée vient du pipeline, mesurée côté téléphone (pas de durée serveur).
-        elapsedMs = 0L,
-        objects = objects.map { SegObject(it.label, it.score, it.box, it.maskPngB64) },
-    )
 
     /** Garde la frame courante pour les questions : au plus une par [FRAME_KEEP_MS]. */
     private fun keepFrame(jpegB64: String) {
@@ -434,14 +413,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun applyLens(spec: LensSpec?) {
         if (spec != null && spec.usable) sensorLens = spec
-        distances.setLens(chosenLens())
-    }
-
-    /** Calibrage retenu : réglage utilisateur, puis capteur, puis [LensSpec.Default]. */
-    private fun chosenLens(): LensSpec {
-        val forced = settings.cameraFovDeg
-        if (forced > 0f) return LensSpec.fromHorizontalFov(forced)
-        return sensorLens ?: LensSpec.Default
+        distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
     }
 
     /** Instant demandé dans l'UI : « il y a N s » (0 = maintenant). */
