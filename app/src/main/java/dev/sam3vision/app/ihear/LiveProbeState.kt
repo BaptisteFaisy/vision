@@ -37,6 +37,10 @@ data class LiveProbeState(
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     val spoken: String? = null,
+    /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */
+    val crossingActive: Boolean = false,
+    /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
+    val crossing: dev.sam3vision.core.crossing.CrossingState? = null,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,

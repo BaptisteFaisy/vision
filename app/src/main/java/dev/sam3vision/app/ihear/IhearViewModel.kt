@@ -22,6 +22,9 @@ import dev.sam3vision.app.ihear.vm.IhearStatusText
 import dev.sam3vision.app.ihear.vm.IhearTranscript
 import dev.sam3vision.app.ihear.vm.IhearVoice
 import dev.sam3vision.app.ihear.vm.NavigationHook
+import dev.sam3vision.core.crossing.CrossingText
+import dev.sam3vision.core.crossing.CrossingVoiceAction
+import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
@@ -157,6 +160,27 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
             intro.playIfPending()
         }
         probe.observeSpoken(viewModelScope, proximity) { playerIdle() }
+        probe.observeCrossing(viewModelScope, haptics)
+    }
+
+    /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
+    fun toggleCrossing() {
+        probe.setCrossingActive(settings, !probe.state.value.crossingActive)
+    }
+
+    /**
+     * Ordre vocal « traverser » : consommé ici, jamais une question LLM.
+     * Confirmation parlée par le même chemin que la navigation. Sans effet si
+     * le mode est déjà dans l'état demandé (reconfigurer coûte une session GPU).
+     */
+    private suspend fun runCrossingCommand(text: String): Boolean {
+        val command = CrossingVoiceCommand.parse(text) ?: return false
+        val wantActive = command == CrossingVoiceAction.Activate
+        if (probe.state.value.crossingActive != wantActive) {
+            probe.setCrossingActive(settings, wantActive)
+        }
+        speakNavigation(CrossingText.mode(wantActive, settings.speechLanguage))
+        return true
     }
 
     override fun onCleared() {
@@ -180,10 +204,9 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         transcript.refresh()
     }
 
-    /** Les Réglages pilotent la sonde SAM (endpoint, voix, focale, distances). */
-    /** Les Réglages pilotent la sonde SAM et la vitesse de lecture. */
+    /** Les Réglages pilotent la sonde SAM (mode Traversée préservé) et la vitesse de lecture. */
     private fun syncProbe() {
-        probe.configureFrom(settings)
+        probe.setCrossingActive(settings, probe.state.value.crossingActive)
         player.speed = settings.ttsSpeed
     }
 
@@ -337,6 +360,8 @@ class IhearViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return
+        // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
+        if (runCrossingCommand(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
