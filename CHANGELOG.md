@@ -17,6 +17,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuves** : `bash scripts/test_scripts.sh` → **80 assertions, 80 ok** (dont les gardes
   statiques : aucun `rm -rf` brut, `set -euo pipefail`, zéro chemin `/home/` en dur) ; `bash -n` OK ;
   `python3 tools/check-kotlin-limits.py` OK.
+## 2026-10-27 (4) — le micro répond écran verrouillé
+
+- **La panne** : `MainActivity.onPause()` annule la tenue du doigt et Android 11+ coupe de toute
+  façon le micro d'une app en arrière-plan ; l'app n'avait **aucun** service de premier plan.
+  Écran verrouillé, « activer le micro » ne pouvait donc rien donner.
+- **Le service** (`app/locked/LockedMicService.kt`) : premier plan type `microphone`, armé par
+  l'activité **visible** (`onResume` — seul démarrage autorisé depuis Android 12), piloté ensuite
+  par l'action de la notification (visibilité publique) ou la tuile des réglages rapides. Réveil
+  partiel pendant la capture seulement ; plafond de 20 s, faute de relâchement possible.
+- **La réponse** : `LockedMicAnswer` enchaîne PCM → transcription (Meta, repli Scribe) → question
+  **sans image** → voix ElevenLabs. `LlmClient.askText` + `LlmPrompts.askVoiceSystem` disent au
+  modèle qu'il n'a aucune image : il l'annonce au lieu de décrire une photo absente.
+- **Les règles** : `core/speech/LockedMic.kt` (6 phases, plafond, textes affichés et prononcés),
+  11 tests ; `LockedMicAnswerTest` 5 ; `LlmContractTest` +2 (aucune image dans le corps, échec
+  explicite d'un client qui ne sait pas répondre sans photo).
+- **Permissions** : `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS`,
+  `WAKE_LOCK` ; `POST_NOTIFICATIONS` entre dans la demande groupée du premier lancement.
+- **Doc** : `docs/MICRO-VERROUILLE.md` (séquence légale, recette téléphone, limites assumées).
 
 ## 2026-10-27 (2) — le téléphone suit `master` tout seul
 
