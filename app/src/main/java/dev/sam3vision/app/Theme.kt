@@ -3,6 +3,18 @@ package dev.sam3vision.app
 import androidx.compose.ui.graphics.Color
 
 /** Palette sombre de l'app (cohérente avec l'ancienne app Expo). */
+/**
+ * Palette claire, réservée à la page Settings (fond blanc, texte noir).
+ * Le reste de l'app garde [AppColors] (thème sombre) : rien d'autre ne change.
+ */
+object SettingsLight {
+    val background = Color.White
+    val text = Color.Black
+    val muted = Color(0xFF5B6472)
+    val border = Color(0xFFE2E8F0)
+    val primary = Color(0xFF1D4ED8)
+}
+
 object AppColors {
     val background = Color(0xFF0B0D12)
     val surface = Color(0xFF151A23)

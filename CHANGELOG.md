@@ -13,6 +13,32 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   déplacement GPS est décrit seulement au-delà de son incertitude ; les
   repères se figent à la perte du signal et disparaissent après deux minutes.
 
+## 2026-10-27 (15) — réglages en anglais : fond blanc, chevron, verre, THE USER / META GLASSES / TECHNICAL SETTINGS
+
+- **Dire « settings » ouvre les Réglages** : `SettingsVoiceCommand` (pur, `:core`)
+  reconnaît « settings », « open settings », « réglages », « paramètres » avant
+  l'envoi au LLM ; `IseeViewModel` lève `IseeUiState.openSettings`, consommé par
+  `IseeHome` qui pousse `Route.Settings`.
+- **Page blanche, texte noir, tout en anglais** : palette locale `SettingsLight`,
+  en-tête « Settings » + **chevron** dessiné au trait (plus de bouton « Retour »),
+  boutons **verre** (`GlassButton` : fond translucide, bordure claire, ombre légère).
+- **Trois sections** : THE USER (rôle Blind person / Caregiver + **lien ou code
+  d'invitation** que l'aveugle envoie, bouton « Save & open caregiver map » désactivé
+  tant que l'invitation est vide) ; META GLASSES (bloc lunettes sur carte sombre,
+  ses textes testés en français inchangés) ; TECHNICAL SETTINGS (tout le reste,
+  traduit). L'ancien titre « Réglages du backend » disparaît.
+- **L'invitation ouvre le bon suivi** : `Settings.caregiverInvite` persisté dans les
+  deux stores (parité `SettingsStoreParityTest` OK) ; `parseCaregiverInvite` accepte
+  le code nu, « ?share= » ou le lien complet ; `caregiverShareLink` gagne sur les
+  champs historiques pour la page Caregiver.
+- **Vérifié** : `:app:testDebugUnitTest` vert (562 tests, dont `CaregiverShareLinkTest`)
+  ; `:core:testDebugUnitTest` 1137 tests avec les 5 échecs connus
+  `PrivateFileSettingsStoreTest` (préexistants, POSIX sur Windows), plus
+  `MotionBenchTest` (budget µs/frame, machine lente — même flaque à froid déjà vu
+  sans ce changement) et `LivePipelineTest` (passé au re-run isolé) ;
+  `tools/check-kotlin-limits.py` OK ; `assembleDebug` vert.
+
+
 ## 2026-10-27 (14) — zéro mémoire des anciens messages + balayage supprimé
 
 - **L'IA n'a plus aucune mémoire** : `IhearTranscript` perd `questionTurns()` /

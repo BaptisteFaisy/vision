@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.settings.parseCaregiverInvite
 import java.net.URLEncoder
 
 /**
@@ -34,6 +35,19 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
         "Partager le suivi",
     )
     startShare(context, chooser)
+}
+
+/**
+ * Lien ouvert par la page Caregiver : l'invitation collée dans les réglages gagne
+ * sur les champs historiques — lien complet (tel quel), code nu (greffé sur le
+ * site enregistré), site seul (avec l'identifiant enregistré). Sans invitation,
+ * le site et l'identifiant enregistrés s'appliquent comme avant.
+ */
+fun caregiverShareLink(settings: Settings): String {
+    val invite = parseCaregiverInvite(settings.caregiverInvite) ?: return shareLink(settings.parentSiteUrl, settings.shareId)
+    if (invite.shareId.isBlank()) return shareLink(invite.siteUrl, settings.shareId)
+    if (invite.siteUrl.isBlank()) return shareLink(settings.parentSiteUrl, invite.shareId)
+    return shareLink(invite.siteUrl, invite.shareId)
 }
 
 /**

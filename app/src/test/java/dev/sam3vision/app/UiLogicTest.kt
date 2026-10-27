@@ -36,8 +36,8 @@ class UiLogicTest {
 
     @Test
     fun `la bascule d'intro dit l'etat qu'elle porte`() {
-        assertEquals("Intro à chaque ouverture : on", introToggleLabel(true))
-        assertEquals("Intro à chaque ouverture : off", introToggleLabel(false))
+        assertEquals("Intro on every opening: on", introToggleLabel(true))
+        assertEquals("Intro on every opening: off", introToggleLabel(false))
         assertNotEquals(introToggleLabel(true), introToggleLabel(false))
     }
 

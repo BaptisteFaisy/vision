@@ -41,6 +41,7 @@ class SettingsStoreParityTest {
         navigationGuidanceEnabled = false,
         cameraFovDeg = 63.5f,
         caregiverRole = CaregiverRole.Caregiver,
+        caregiverInvite = "https://suivi-parent.vercel.app/?share=marie",
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
         speechLanguage = SpeechLanguage.Fr,
