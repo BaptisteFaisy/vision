@@ -1,6 +1,6 @@
 # TRACK-PERF — latences réelles du tracker vidéo `/session` + `/frame`
 
-Mesures 2026-10-25 · app `sam3-track-eu` · URL
+Mesures 25 octobre 2026 · app `sam3-track-eu` · URL
 `https://baptiste-faisy--sam3-track-eu-sam3track-web.eu-west.modal.run` ·
 GPU réellement alloué (`/health`) : **NVIDIA A100-SXM4-40GB**, `region=eu-west`, `model=sam3.1-tracker`.
 Classe `Sam3Track` : `max_containers=1`, `scaledown_window=60`, démarrage à froid **51–63 s**
@@ -84,7 +84,7 @@ TRACK_APP_NAME=sam3-track-eu TRACK_GPU=A100-40GB TRACK_REGION=eu TRACK_ROUTING_R
 Banc : `python3 scripts/bench_track.py --url <url> --frames 240 --sizes 640x360 --capacity 300`
 (garde-fou : `KEEP=sam3-track-eu bash scripts/modal-one-gpu.sh`).
 
-## Mesure sur le téléphone (2026-10-25 12:03) — le vrai juge
+## Mesure sur le téléphone (25 octobre 2026 12:03) — le vrai juge
 
 Xiaomi **2312DRA50G** (Android 15), Wi-Fi 5 GHz *Wifirst*, RSSI −39 dBm, 173 Mbps.
 Protocole `scripts/phone_bench.py` : payloads poussés en **un tar**, puis **une seule
@@ -109,7 +109,7 @@ réveil et la première requête d'une connexion neuve dépassent 300 ms** (~430
 doit garantir < 300 ms « tout le temps », elle doit garder sa connexion ouverte et préchauffer
 le conteneur (`/health`) avant d'afficher la mesure.
 
-## Budget de 200 ms — ce qui coûte quoi (2026-10-25 13:20)
+## Budget de 200 ms — ce qui coûte quoi (25 octobre 2026 13:20)
 
 Le levier n'est **ni le réseau ni la carte** : c'est le **nombre de concepts**. Chaque
 concept ajoute une passe de détection *par frame* (le multiplex fait une grounding par
@@ -170,7 +170,7 @@ p95 à 164 ms. Le seul vrai levier restant pour descendre sous ~100 ms serait de
 plusieurs frames en vol** (le GPU est inactif ~25 % du temps entre deux réponses) — cela
 demande de changer la porte côté app et l'ordre d'arrivée des frames côté serveur.
 
-## Cible 100 ms — verdict mesuré (2026-10-25 14:30)
+## Cible 100 ms — verdict mesuré (25 octobre 2026 14:30)
 
 Toutes les mesures : 512×288 q65, **1 concept**, une frame en vol, chunk de grounding = 1.
 

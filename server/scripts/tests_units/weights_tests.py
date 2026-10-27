@@ -1,4 +1,4 @@
-"""Tests des **poids embarqués dans l'image** (apport du 25/10 20:30, `FAST_MODEL_DIR`).
+"""Tests des **poids embarqués dans l'image** (apport du 25 octobre 20:30, `FAST_MODEL_DIR`).
 
 Ces tests figent ce que la fusion doit préserver : sans `FAST_MODEL_DIR`, `fast_core`
 garde le comportement historique (Hub, `unsloth/sam3.1`) ; avec, toutes les lectures
