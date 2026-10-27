@@ -38,17 +38,20 @@ private val INTRO_VERBS = setOf("disable", "desactive", "desactiver")
 /**
  * Vrai si la dictée demande la coupe de l'intro : « Disable iSee intro » en
  * anglais, « Désactive iSee intro » en français (l'interface est en français).
- * La reconnaissance vocale écrit « iSee » en deux mots (« I see »), garde
- * l'accent de « désactive » et colle la ponctuation : la comparaison passe
- * par la forme canonique (minuscules, sans accents ni ponctuation) et exige
- * un verbe de coupe **et** la mention « iSee intro » — une question sur
- * l'intro (« Que dit l'intro iSee ? ») ne coupe donc rien.
+ * La reconnaissance vocale écrit « iSee » en deux mots (« I see »), en lettres
+ * (« IC », « I.C. », « I C »), garde l'accent de « désactive » et colle la
+ * ponctuation : la comparaison passe par la forme canonique (minuscules, sans
+ * accents, ponctuation coupée en mots) et exige un verbe de coupe **et** la
+ * mention « iSee intro » — une question sur l'intro (« Que dit l'intro
+ * iSee ? ») ne coupe donc rien.
  */
 fun isIntroDisablePhrase(text: String): Boolean {
     val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
     val introMention = words.indices.any { i ->
         (words[i] == "isee" && words.getOrNull(i + 1) == "intro") ||
-            (words[i] == "i" && words.getOrNull(i + 1) == "see" && words.getOrNull(i + 2) == "intro")
+            (words[i] == "i" && words.getOrNull(i + 1) == "see" && words.getOrNull(i + 2) == "intro") ||
+            (words[i] == "ic" && words.getOrNull(i + 1) == "intro") ||
+            (words[i] == "i" && words.getOrNull(i + 1) == "c" && words.getOrNull(i + 2) == "intro")
     }
     return introMention && words.any { it in INTRO_VERBS }
 }
