@@ -9,8 +9,8 @@ import java.util.Locale
  * Mise en forme du journal caméra pour le LLM et pour l'UI.
  *
  * Les temps sont **relatifs** (« il y a 3 s ») : le modèle n'a pas l'horloge,
- * et l'utilisateur non plus. Les positions sont des repères simples
- * (« à gauche », « au centre », « à droite »).
+ * et l'utilisateur non plus. Les positions suivent le cadran horaire
+ * (« à 9 heures », « à midi », « à 3 heures »), exactement comme la voix.
  *
  * Le contexte envoyé au LLM suit la **langue de la voix** ([SpeechLanguage]) : un
  * journal français dans une consigne anglaise fait dériver la réponse. Les étiquettes
@@ -84,23 +84,9 @@ object TimelineText {
     fun chipLabel(nowMs: Long, track: SeenTrack): String =
         "${track.label} · ${ago(nowMs, track.lastAtMs)}"
 
-    /** Repère de position lisible : « en haut à gauche », « au centre », « à droite ». */
-    fun position(track: SeenTrack, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
-        SpeechLanguage.Fr -> {
-            val horizontal = when {
-                track.centerX < 0.34f -> "à gauche"
-                track.centerX > 0.66f -> "à droite"
-                else -> "au centre"
-            }
-            val vertical = when {
-                track.centerY < 0.34f -> "en haut"
-                track.centerY > 0.66f -> "en bas"
-                else -> null
-            }
-            listOfNotNull(vertical, horizontal).joinToString(" ")
-        }
-        SpeechLanguage.En -> PositionText.positionLabel(track.centerX, track.centerY, language)
-    }
+    /** Repère de position au cadran, comme la voix : « à 9 heures », « à midi ». */
+    fun position(track: SeenTrack, language: SpeechLanguage = SpeechLanguage.Fr): String =
+        PositionText.clockLabel(track.centerX, language)
 
     /** Durée relative : « il y a 3 s », « il y a 1 min 05 s », « à l'instant ». */
     fun ago(nowMs: Long, atMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): String {

@@ -16,65 +16,63 @@ data class PlacedLabel(
     val centerY: Float = 0.5f,
     val meters: Float? = null,
 ) {
-    /** Repère lisible **français** (interface et signature de scène) : « en haut à gauche ». */
-    val position: String get() = PositionText.positionLabel(centerX, centerY)
+    /** Repère lisible **français** (interface et signature de scène) : « à 9 heures ». */
+    val position: String get() = PositionText.clockLabel(centerX)
 }
 
 /**
  * Mise en mots des positions détectées, pour l'annonce vocale ElevenLabs.
  *
- * Tout est **pur et testé en JVM** : les seuils de secteur, l'ordre de lecture
+ * Tout est **pur et testé en JVM** : le cadran horaire, l'ordre de lecture
  * (gauche → droite), le dédoublonnage et la troncature à [MAX_OBJECTS] objets.
  *
- * Deux langues, mêmes secteurs : la langue ne change que les mots ([SpeechLanguage]),
+ * Deux langues, même cadran : la langue ne change que les mots ([SpeechLanguage]),
  * jamais la géométrie. Français par défaut — les Réglages choisissent la voix.
  *
- * Forme produite (fr) : `Personne à gauche, chien en bas à droite.` — sans article, donc
+ * Forme produite (fr) : `Personne à 9 heures, chien à 3 heures.` — sans article, donc
  * sans faute de genre sur des labels libres (« table », « livre », « personne »…).
- * Avec distance : `Personne à gauche, à 1,4 mètre ; chien au centre, à 3 mètres.`
- * Forme produite (en) : `Person on the left, chair in the bottom right.`
- * Avec distance : `Person on the left, 1.4 meters away; chair in the middle, 3 meters away.`
+ * Avec distance : `Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.`
+ * Forme produite (en) : `Person at 9 o'clock, chair at 3 o'clock.`
+ * Avec distance : `Person at 9 o'clock, 1.4 meters away; chair at 12 o'clock, 3 meters away.`
  */
 object PositionText {
 
-    /** Frontière de secteur : en deçà de 0,34 → gauche/haut, au-delà de 0,66 → droite/bas. */
+    /**
+     * Frontière du couloir central : en deçà → côté gauche, au-delà de 0,66 →
+     * côté droit. Ne sert plus qu'au couloir de [Guidance] — le parlé est au
+     * cadran ([clockLabel]), sans repère vertical : la hauteur dans l'image
+     * dépend du tangage de la caméra, elle n'oriente pas quelqu'un qui marche.
+     */
     const val SIDE_EDGE = 0.34f
 
     /** Objets cités au plus dans une annonce (le reste est résumé par un compte). */
     const val MAX_OBJECTS = 3
 
-    /** Repère horizontal : « à gauche » / « on the left ». */
-    fun horizontal(centerX: Float, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
-        SpeechLanguage.Fr -> when (side(centerX)) {
-            Side.Left -> "à gauche"
-            Side.Right -> "à droite"
-            Side.Middle -> "au centre"
-        }
-        SpeechLanguage.En -> when (side(centerX)) {
-            Side.Left -> "on the left"
-            Side.Right -> "on the right"
-            Side.Middle -> "in the middle"
-        }
+    /** Heures du cadran, de gauche à droite : 9 h … midi … 3 h. */
+    private val clockHours = intArrayOf(9, 10, 11, 12, 1, 2, 3)
+
+    /**
+     * Heure du cadran pour [centerX] (0..1) : 9 tout à gauche, 12 (midi) au centre,
+     * 3 tout à droite. Sept bandes égales ; un bord tombe dans la bande du dessus,
+     * et 1.0 reste à 3 h.
+     */
+    fun clockHour(centerX: Float): Int {
+        val index = (centerX * clockHours.size).toInt().coerceIn(0, clockHours.size - 1)
+        return clockHours[index]
     }
 
-    /** Repère vertical : « en haut » / « top », ou `null` dans la bande centrale. */
-    fun vertical(centerY: Float, language: SpeechLanguage = SpeechLanguage.Fr): String? {
-        val band = band(centerY) ?: return null
+    /**
+     * Direction parlée au cadran : « à 11 heures », « à midi », « à 3 heures »
+     * (ou « at 11 o'clock », « at 12 o'clock ») — la convention des déplacements
+     * sans voir, plus précise que « à gauche / au centre / à droite ».
+     */
+    fun clockLabel(centerX: Float, language: SpeechLanguage = SpeechLanguage.Fr): String {
+        val hour = clockHour(centerX)
         return when (language) {
-            SpeechLanguage.Fr -> if (band == Band.Top) "en haut" else "en bas"
-            SpeechLanguage.En -> if (band == Band.Top) "top" else "bottom"
+            SpeechLanguage.Fr ->
+                if (hour == 12) "à midi" else "à $hour ${if (hour == 1) "heure" else "heures"}"
+            SpeechLanguage.En -> "at $hour o'clock"
         }
-    }
-
-    /** Position complète : « en haut à gauche » / « in the top left », « au centre » / « in the middle ». */
-    fun positionLabel(
-        centerX: Float,
-        centerY: Float,
-        language: SpeechLanguage = SpeechLanguage.Fr,
-    ): String = when (language) {
-        SpeechLanguage.Fr -> listOfNotNull(vertical(centerY, language), horizontal(centerX, language))
-            .joinToString(" ")
-        SpeechLanguage.En -> englishPosition(centerX, centerY)
     }
 
     /** Détection (boîte en pixels) → label placé ; `null` si la géométrie est inutilisable. */
@@ -95,7 +93,7 @@ object PositionText {
 
     /**
      * Phrase annoncée, ou `null` s'il n'y a rien à dire. Un label répété à la même
-     * position n'est cité qu'une fois ; au-delà de [maxObjects] objets cités, le reste
+     * heure n'est cité qu'une fois ; au-delà de [maxObjects] objets cités, le reste
      * est résumé (« et 2 autres objets » / « and 2 other objects »).
      */
     fun phrase(
@@ -112,7 +110,7 @@ object PositionText {
         if (cleaned.isEmpty()) return null
         val shown = cleaned.take(maxObjects.coerceAtLeast(1))
         // Des distances dans la phrase imposent le point-virgule : la virgule sert
-        // déjà à séparer la position de la distance (« à gauche, à 1,4 mètre »).
+        // déjà à séparer la position de la distance (« à 9 heures, à 1,4 mètre »).
         val separator = if (shown.any { it.meters != null }) semicolon(language) else ", "
         val body = shown.joinToString(separator) { item(it, language) }
         val hidden = cleaned.size - shown.size
@@ -120,9 +118,9 @@ object PositionText {
         return text.replaceFirstChar { it.uppercaseChar() }
     }
 
-    /** Un objet en mots : « personne à gauche, à 1,4 mètre » / « person on the left, 1.4 meters away ». */
+    /** Un objet en mots : « personne à 9 heures, à 1,4 mètre » / « person at 9 o'clock, 1.4 meters away ». */
     fun item(label: PlacedLabel, language: SpeechLanguage = SpeechLanguage.Fr): String {
-        val place = "${label.label} ${positionLabel(label.centerX, label.centerY, language)}"
+        val place = "${label.label} ${clockLabel(label.centerX, language)}"
         val meters = label.meters ?: return place
         val distance = when (language) {
             SpeechLanguage.Fr -> "à ${DistanceText.spoken(meters, language)}"
@@ -132,7 +130,7 @@ object PositionText {
     }
 
     /**
-     * Signature de scène (labels + secteurs + distance **arrondie au mètre**),
+     * Signature de scène (labels + heures + distance **arrondie au mètre**),
      * insensible à l'ordre : sert à ne pas répéter la même scène. Arrondir est ce
      * qui fait parler un objet qui s'approche (3 m → 2 m → 1 m) sans le faire
      * bavarder à chaque frame. Indépendante de la langue de la voix.
@@ -156,41 +154,7 @@ object PositionText {
         SpeechLanguage.En -> "; "
     }
 
-    /** Position anglaise composée : « in the top left », « at the bottom », « on the left ». */
-    private fun englishPosition(centerX: Float, centerY: Float): String {
-        val word = when (side(centerX)) {
-            Side.Left -> "left"
-            Side.Right -> "right"
-            Side.Middle -> null
-        }
-        val height = band(centerY)?.let { if (it == Band.Top) "top" else "bottom" }
-        return when {
-            height == null && word == null -> "in the middle"
-            height == null -> "on the $word"
-            word == null -> "at the $height"
-            else -> "in the $height $word"
-        }
-    }
-
-    /** Secteur horizontal (géométrie pure, indépendante de la langue). */
-    private fun side(centerX: Float): Side = when {
-        centerX < SIDE_EDGE -> Side.Left
-        centerX > 1f - SIDE_EDGE -> Side.Right
-        else -> Side.Middle
-    }
-
-    /** Bande verticale, `null` dans la bande centrale. */
-    private fun band(centerY: Float): Band? = when {
-        centerY < SIDE_EDGE -> Band.Top
-        centerY > 1f - SIDE_EDGE -> Band.Bottom
-        else -> null
-    }
-
     /** Distance au mètre près pour la signature ; « ? » quand elle est inconnue. */
     private fun bucket(meters: Float?): String =
         if (meters == null || !meters.isFinite()) "?" else meters.roundToInt().toString()
-
-    private enum class Side { Left, Middle, Right }
-
-    private enum class Band { Top, Bottom }
 }
