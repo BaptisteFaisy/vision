@@ -35,6 +35,13 @@ class InferHubLlmClient(
     private val language: SpeechLanguage = SpeechLanguage.DEFAULT,
     private val client: OkHttpClient = defaultHttpClient(),
     private val maxHistoryTurns: Int = 20,
+    /**
+     * Raisonnement interne du modèle. **Éteint par défaut** : `muse-spark` écrit ses pensées
+     * dans `reasoning_content` avant la réponse, ce qui coûte 0,7 à 1,2 s et ~35 % de jetons
+     * pour la même phrase (mesuré sur la vraie clé, image comprise). Et quand le budget est
+     * trop court, `content` revient `null` — donc **aucune réponse**.
+     */
+    private val thinking: Boolean = false,
 ) : LlmClient, LiveLlmClient {
 
     /** Narration d'une frame du direct : courte, contextualisée, bornée en longueur. */
@@ -113,6 +120,7 @@ class InferHubLlmClient(
             .put("messages", messages)
             .put("temperature", TEMPERATURE)
             .put("max_tokens", maxTokens)
+            .apply { if (!thinking) put("chat_template_kwargs", JSONObject().put("enable_thinking", false)) }
             .toString()
         val request = requestTo(
             baseUrl,
