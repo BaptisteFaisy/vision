@@ -58,12 +58,18 @@ float fbm(float2 p) {
   for (int i = 0; i < 5; i++) { s += a * n2(p); p = p * 2.03 + float2(1.7, 9.2); a *= 0.5; }
   return s;
 }
-half3 cyc(int which, float s) {
-  float x = fract(s) * 5.0; float k = smoothstep(0.15, 0.85, fract(x)); int i = int(floor(x)); int j = i == 4 ? 0 : i + 1;
-  half3 a; half3 b;
-  if (which == 0) { a = uIdle[i].rgb; b = uIdle[j].rgb; } else if (which == 1) { a = uPalYou[i].rgb; b = uPalYou[j].rgb; } else { a = uPalSee[i].rgb; b = uPalSee[j].rgb; }
-  return mix(a, b, half(k));
+// SkSL n'accepte que des indices constants : on choisit donc la teinte par comparaisons,
+// jamais `palette[i]` — sinon le shader refuse de se construire sur l'appareil.
+half3 pick5(half4 c0, half4 c1, half4 c2, half4 c3, half4 c4, int i) {
+  return i == 0 ? c0.rgb : i == 1 ? c1.rgb : i == 2 ? c2.rgb : i == 3 ? c3.rgb : c4.rgb;
 }
+half3 cyc(half4 c0, half4 c1, half4 c2, half4 c3, half4 c4, float s) {
+  float x = fract(s) * 5.0; float k = smoothstep(0.15, 0.85, fract(x)); int i = int(floor(x)); int j = i == 4 ? 0 : i + 1;
+  return mix(pick5(c0, c1, c2, c3, c4, i), pick5(c0, c1, c2, c3, c4, j), half(k));
+}
+half3 cycIdle(float s) { return cyc(uIdle[0], uIdle[1], uIdle[2], uIdle[3], uIdle[4], s); }
+half3 cycYou(float s) { return cyc(uPalYou[0], uPalYou[1], uPalYou[2], uPalYou[3], uPalYou[4], s); }
+half3 cycSee(float s) { return cyc(uPalSee[0], uPalSee[1], uPalSee[2], uPalSee[3], uPalSee[4], s); }
 half3 film(float d) {
   float3 I = 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / float3(650.0, 540.0, 450.0));
   float m = (I.r + I.g + I.b) / 3.0;
@@ -91,7 +97,7 @@ half4 main(float2 fc) {
     float w = fbm(m + 1.3 * float2(fbm(m + uTime * 0.06), fbm(m + float2(5.2, 1.3) - uTime * 0.05)));
     float s = w * 1.6 + p.y * 0.18 + uTime * 0.02;
     float y = clamp(uYou, 0.0, 1.0); float ee = clamp(uSee, 0.0, 1.0) * (1.0 - y);
-    half3 c = cyc(0, s) * half(1.0 - y - ee) + cyc(1, s) * half(y) + cyc(2, s) * half(ee);
+    half3 c = cycIdle(s) * half(1.0 - y - ee) + cycYou(s) * half(y) + cycSee(s) * half(ee);
     c = mix(c, half3(1.0), half(0.2 * smoothstep(0.025, 0.0, abs(fract(s * 2.0) - 0.5))));
     float lz = sqrt(max(0.0, 1.0 - dot(p, p)));
     c *= half(0.74 + 0.34 * lz); c += half(0.14 * pow(lz, 3.0));
