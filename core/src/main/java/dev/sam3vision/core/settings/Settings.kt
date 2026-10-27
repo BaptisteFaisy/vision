@@ -75,8 +75,17 @@ data class Settings(
     val speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT,
 ) {
     companion object {
-        const val DEFAULT_LLM_BASE_URL = "https://api.inferhub.dev/v1"
-        const val DEFAULT_LLM_MODEL = "ali/qwen3.8-omni-flash"
+        /**
+         * Défaut LLM : **Baseten, muse-spark-open-1026** — le seul modèle vision que la clé
+         * du workspace sert (les autres Model APIs répondent « please check the api-key »).
+         * Ces deux valeurs sont indépendantes de la clé : elle seule change d'un poste à
+         * l'autre, l'endpoint et le modèle restent les mêmes par défaut.
+         *
+         * Modèle à raisonnement : il remplit `reasoning_content` avant `content`, donc le
+         * budget de sortie compte — voir `InferHubLlmClient.MAX_TOKENS`.
+         */
+        const val DEFAULT_LLM_BASE_URL = "https://inference.baseten.co/v1"
+        const val DEFAULT_LLM_MODEL = "meta-models/muse-spark-open-1026"
 
         /**
          * Voix ElevenLabs de départ : Sarah, voix « premade » utilisable en compte free.
