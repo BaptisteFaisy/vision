@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Recette du port appui long : vibration continue pendant la tenue, queue de 200 ms au
-# relâchement, WAV de dictée rangé à l'arrêt, exclusions système respectées, et le tap
-# court toujours intact. Env : EMULATOR_SERIAL (défaut emulator-5554), APK, ADB (--help).
+# Recette du port appui long : salve brève au seuil puis silence pendant la tenue,
+# queue de 200 ms au relâchement, WAV de dictée rangé à l'arrêt, exclusions système
+# respectées, et le tap court toujours intact. Env : EMULATOR_SERIAL (défaut
+# emulator-5554), APK, ADB (--help).
 set -euo pipefail
 export LC_ALL=C.UTF-8 LANG=C.UTF-8
 . "$(dirname -- "${BASH_SOURCE[0]}")/lib/common.sh" ||
@@ -136,7 +137,7 @@ main() {
   echo "### 1. Repos : aucune vibration, écran d'accueil"
   echo "  vibreur : $(vib) | WAV rangés : $(wav_count) | écran : $(ui | cut -c1-120)"
 
-  echo "### 2. Appui long 3 s au centre : nappe pendant la tenue, queue de 200 ms après"
+  echo "### 2. Appui long 3 s au centre : salve au seuil, silence pendant, queue de 200 ms après"
   press 540 900 3000 "appui long"
   echo "  écran : $(ui | cut -c1-160)"
 
