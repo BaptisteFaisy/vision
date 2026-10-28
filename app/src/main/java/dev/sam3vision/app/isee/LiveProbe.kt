@@ -62,13 +62,16 @@ class LiveProbe(
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
     private val background: CoroutineDispatcher = Dispatchers.Default,
+    /** Moteur de profondeur (Réglages, OFF = sténopé seul, zéro coût). Avant
+     * [clientFor] : le lambda lit sa valeur à l'ouverture de la session. */
+    private var depthEngine: DepthBackend = DepthBackend.OFF,
     /**
      * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
      * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
      * réduite demandée au serveur est alors celle que le client sait relire.
      */
     private val clientFor: (String, Long, WireMarks?) -> LiveClient = { base, timeout, marks ->
-        LiveMaskTransport.clientFor(base, timeout, marks)
+        LiveMaskTransport.clientFor(base, timeout, marks, depthEngine != DepthBackend.OFF)
     },
     /** Contexte app (moteur de profondeur) ; `null` = profondeur désactivée (tests). */
     appContext: Context? = null,
@@ -101,8 +104,6 @@ class LiveProbe(
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()
 
-    /** Moteur de profondeur (Réglages, OFF = sténopé seul, zéro coût). */
-    private var depthEngine: DepthBackend = DepthBackend.OFF
     private val depthMeter = appContext?.let { LiveDepthMeter(scope, it, background) { depthEngine } }
 
     /** Déclencheur des annonces vocales : stabilité, non-répétition, 4 s d'écart. */

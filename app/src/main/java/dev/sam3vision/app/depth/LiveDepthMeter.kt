@@ -45,12 +45,20 @@ class LiveDepthMeter(
         scope.launch(background) { pump() }
     }
 
-    /** Lectures affinées, ou le sténopé si la carte manque ou a plus d'une seconde. */
+    /**
+     * Lectures affinées : les médianes du serveur (`with_depth`) d'abord — alignées
+     * aux boîtes SAM de la frame, fraîches à chaque réponse —, la carte embarquée
+     * sinon, ou le sténopé si elle manque ou a plus d'une seconde.
+     */
     fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> {
-        val map = freshMap()
-        if (map == null) return pinhole
         return try {
             val detections = frame.objects.toDetections(frame.width, frame.height)
+            val server = DepthReadings.serverCloseness(frame.objects)
+            if (server.isNotEmpty()) {
+                return DepthReadings.refineWithCloseness(detections, pinhole, server)
+            }
+            val map = freshMap()
+            if (map == null) return pinhole
             DepthReadings.refine(frame.width, frame.height, detections, pinhole, map)
         } catch (e: Exception) {
             Log.w(TAG, "affinage: " + e.message)
