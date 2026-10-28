@@ -76,6 +76,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Clé Google Maps injectée au build, préremplie et active depuis l'installation,
   champ déplacé dans les paramètres, sans clé en clair versionnée.
 
+## 2026-10-28 — GPU : la carte ne démarre qu'en filmant
+
+- **Réveil à l'ouverture supprimé** : `MainActivity.onResume` n'appelle plus
+  `warmGpu()` (3 `GET /health` silencieux qui démarraient la carte sans filmer) ;
+  `AppViewModel.warmGpu()`, `AppDiagnostics.warmGpu()`, `warmGeneration`,
+  `WARM_ATTEMPTS` / `WARM_RETRY_DELAY_MS` et leurs 6 tests supprimés.
+- **Pré-chauffe du Direct supprimée** : `LiveViewModel.start()` n'appelle plus
+  `prewarmSam()` à l'entrée de l'écran ; `SamPrewarm.kt` et son test supprimés.
+  La première frame réveille la carte (`LiveWakeGuard`, « Réveil du GPU… », 60 s max).
+- **Extinction inchangée** : `onPause`, split-screen, fermeture → `POST /release`.
+- Preuve : `grep warmGpu|prewarmSam app/src core/src` → vide ; suites JVM `:core`
+  + `:app` vertes (porte CI de la PR) ; `tools/check-kotlin-limits.py` vert.
+- Docs : `docs/MODE-US.md` (fin du réveil à l'ouverture).
+
 ## 2026-10-27 — caregiver : Portrait gris et session distante
 
 - Fond blanc, boule Portrait grise, phrase courante puis carte en bas, sur le
