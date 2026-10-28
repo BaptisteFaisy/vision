@@ -79,6 +79,25 @@ class ValhallaRouteTest {
     }
 
     @Test
+    fun `passage protege sans rue devient traversee`() {
+        val json = trip(
+            shape,
+            listOf(
+                maneuver(1, 0, "Rue du depart"),
+                """{"type":8,"begin_shape_index":1,"instruction":"Continuez sur le passage protégé.","verbal_pre_transition_instruction":"Continuez sur le passage protégé."}""",
+                maneuver(4, 2, "Avenue d'arrivee"),
+            ).joinToString(","),
+        )
+
+        val route = ValhallaRoute.parse(json).getOrThrow()
+
+        assertEquals(false, route.maneuvers[0].crossing)
+        assertEquals(true, route.maneuvers[1].crossing)
+        assertEquals(null, route.maneuvers[1].street)
+        assertEquals(false, route.maneuvers[2].crossing)
+    }
+
+    @Test
     fun `type inconnu replie sur tout droit`() {
         assertEquals(ManeuverAction.Continue, ValhallaRoute.mapType(99))
         assertEquals(ManeuverAction.UTurn, ValhallaRoute.mapType(12))

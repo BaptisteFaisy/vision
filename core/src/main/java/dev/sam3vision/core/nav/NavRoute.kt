@@ -36,13 +36,16 @@ enum class ManeuverAction {
 /**
  * Une manœuvre de l'itinéraire : [action] à annoncer au point ([lat], [lon]),
  * [street] portant le nom de la voie visée (`null` si Valhalla n'en donne
- * pas — l'annonce omet alors la rue au lieu d'inventer).
+ * pas — l'annonce omet alors la rue au lieu d'inventer). [crossing] vraie =
+ * traversée de chaussée (passage protégé) : le moteur y suspend la consigne
+ * de progression et y émet les événements traversée (voir [NavEvent]).
  */
 data class NavManeuver(
     val action: ManeuverAction,
     val lat: Double,
     val lon: Double,
     val street: String? = null,
+    val crossing: Boolean = false,
 )
 
 /**
