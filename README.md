@@ -47,9 +47,10 @@ la frame est jetée, jamais mise en attente (`core/live/LiveSession.kt`). Seul `
 HTTP, délégué par `WsLiveClient.health()` (`core/net/WsLiveClient.kt:82`) ; `HttpLiveClient`
 garde `POST /live` (`core/net/HttpLiveClient.kt:60`) **pour les tests JVM uniquement**.
 
-Les concepts suivis sont **deux** par défaut — `person` et `door` —, et `LivePrompts.MAX = 2`
-borne toute liste saisie dans le champ « Suivre » (`core/live/LivePrompts.kt:20,28`) : le
-backend tronque de toute façon à `PROMPT_LIMIT = 2`.
+Les concepts suivis sont **six** par défaut — `person`, `door`, `bicycle`, `car`, `truck`,
+`electric scooter` —, et `LivePrompts.MAX = 6` borne toute liste saisie dans le champ
+« Suivre » (`core/live/LivePrompts.kt:27,34`) : le backend tronque de toute façon à
+`PROMPT_LIMIT = 6`.
 
 ## Taille de l'arbre (mesurée le 2026-10-27)
 
