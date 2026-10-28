@@ -26,12 +26,32 @@ object IseeStatusText {
     /** Aucun moteur de dictée réglé : le message exact affiché après « Dictation: ». */
     const val NO_DICTATION_ENGINE = "No dictation engine configured (Settings)"
 
+    /**
+     * Étapes affichées pendant une tenue : l'écran dit où il en est au lieu d'un
+     * « … » muet — transcription, question au LLM, puis lecture de la réponse.
+     */
+    const val STEP_TRANSCRIBING = "Transcribing"
+    const val STEP_ASKING = "Asking"
+    const val STEP_SPEAKING = "Speaking"
+
+    /** Une étape a dépassé son plafond : le réseau est coincé, pas l'app. */
+    fun timedOut(step: String): String = "$step timed out — try again"
+
     /** Échec de transcription, tel qu'affiché. */
-    fun dictationFailed(error: Throwable): String = "Dictation: ${error.message ?: "failed"}"
+    fun dictationFailed(error: Throwable): String =
+        if (error is StepTimeout) timedOut(error.step) else "Dictation: ${error.message ?: "failed"}"
 
     /** Échec de synthèse vocale, tel qu'affiché. */
-    fun voiceFailed(error: Throwable): String = "Voice: ${error.message ?: "unavailable"}"
+    fun voiceFailed(error: Throwable): String =
+        if (error is StepTimeout) timedOut(error.step) else "Voice: ${error.message ?: "unavailable"}"
 
     /** Échec de la question au LLM, tel qu'affiché. */
-    fun questionFailed(error: Throwable): String = "Question failed: ${error.message ?: "error"}"
+    fun questionFailed(error: Throwable): String =
+        if (error is StepTimeout) timedOut(error.step) else "Question failed: ${error.message ?: "error"}"
 }
+
+/**
+ * Une étape réseau a dépassé son plafond ([step] = le texte affiché pendant
+ * l'attente). Les motifs ci-dessus le traduisent en phrase pour l'écran.
+ */
+class StepTimeout(val step: String) : Exception(step)

@@ -122,12 +122,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Question dictée → réponse du LLM → texte et voix. */
     private val answers = IseeAnswers(
-        dao = dao,
         media = media,
         settings = { settings },
         update = ::update,
         transcript = transcript,
-        synthesize = { text -> voice.synthesize(text) },
         playback = playback,
         photo = shots,
         prune = ::enforceFifo,

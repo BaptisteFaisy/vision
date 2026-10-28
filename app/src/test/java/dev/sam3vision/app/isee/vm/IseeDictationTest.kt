@@ -4,8 +4,12 @@ import dev.sam3vision.app.isee.ChatEntry
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -127,10 +131,47 @@ class IseeDictationTest {
         assertEquals("micro jamais coupé", 0, mic.stopCount)
     }
 
+    @Test
+    fun `pendant la transcription — l'etape est affichee`() = runBlocking {
+        mic.gate = CompletableDeferred()
+        dictation.start()
+        val job = launch { dictation.finish(Settings.Default) }
+        withTimeout(2_000) { while (!state.value.transcribing) delay(5) }
+
+        assertEquals(IseeStatusText.STEP_TRANSCRIBING, state.value.status)
+
+        mic.gate?.complete(Unit)
+        job.join()
+    }
+
+    @Test
+    fun `transcription reussie — l'etape s'efface`() = runBlocking {
+        dictation.start()
+
+        dictation.finish(Settings.Default)
+
+        assertNull("aucune étape résiduelle", state.value.status)
+    }
+
+    @Test
+    fun `transcription qui depasse le plafond — motif d'etape, micro rendu`() = runBlocking {
+        mic.gate = CompletableDeferred()
+        val slow = IseeDictation(mic, { engine }, { fn -> state.value = fn(state.value) }, transcribeTimeoutMs = 50)
+        slow.start()
+
+        val heard = slow.finish(Settings.Default)
+
+        assertNull("rien de transcrit", heard)
+        assertEquals("Transcribing timed out — try again", state.value.status)
+        assertEquals("le micro est rendu", 1, mic.abortCount)
+        assertFalse("plus de transcription en cours", state.value.transcribing)
+    }
+
     /** Micro simulé : compte les appels et rend le texte ou l'échec demandé. */
     private class FakeMic : IseeMic {
         var available = true
         var failure: Throwable? = null
+        var gate: CompletableDeferred<Unit>? = null
         var startCount = 0
         var stopCount = 0
         var abortCount = 0
@@ -142,6 +183,7 @@ class IseeDictationTest {
 
         override suspend fun stop(client: SpeechClient): Result<Pair<String, ByteArray>> {
             stopCount++
+            gate?.await()
             val error = failure
             return if (error != null) {
                 Result.failure(error)
