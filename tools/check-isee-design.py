@@ -60,6 +60,9 @@ PANE_NEEDS = (
     "SpokenLine",
     "PortraitCamera",
     "IseePortrait",
+    # Ligne de statut + pill : décâblée une fois par la refonte Portrait
+    # (580b2e5), tous les échecs devenaient invisibles (écran figé READY).
+    "SceneBottomBar",
 )
 
 PORTRAIT = "core/src/main/java/dev/sam3vision/core/iseedesign/IseePortrait.kt"

@@ -102,6 +102,13 @@ private fun BoxWithConstraintsScope.PortraitScene(
         SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
     }
     BottomScrim()
+    // Ligne de statut + pill d'instructions : sans elle, `IseeUiState.status`
+    // (échecs de dictée, LLM, micro) n'est lu par aucun composable et l'écran
+    // reste figé sur l'attente. Câblage d'origine (0db26f2), perdu par 580b2e5.
+    SceneBottomBar(
+        state,
+        Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
+    )
 }
 
 /** Boucle du temps de la scène : 10 minutes, comme l'ancienne transition infinie. */
