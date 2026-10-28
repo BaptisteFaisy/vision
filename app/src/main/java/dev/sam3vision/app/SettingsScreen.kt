@@ -58,6 +58,7 @@ fun SettingsScreen(
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenSegment: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
     onStartTracking: (Settings) -> Unit,
@@ -85,7 +86,7 @@ fun SettingsScreen(
                 onTestDepth = onTestDepth,
                 onStartTracking = onStartTracking,
                 onStopTracking = onStopTracking,
-                nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenGestures),
+                nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenSegment, onOpenGestures),
                 statusLine = statusLine,
             )
         }
@@ -302,6 +303,7 @@ private fun GlassesBlock(glasses: GlassesController) {
 private data class NavCallbacks(
     val onOpenLive: () -> Unit,
     val onOpenClassic: () -> Unit,
+    val onOpenSegment: () -> Unit,
     val onOpenGestures: () -> Unit,
 )
 
@@ -345,7 +347,7 @@ private fun TechnicalSection(
         ParentShareSettings(draft, onStartTracking, onStopTracking) { onChange(it) }
         SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
         GestureHelp(nav.onOpenGestures)
-        ClassicScreens(nav.onOpenLive, nav.onOpenClassic)
+        ClassicScreens(nav.onOpenLive, nav.onOpenClassic, nav.onOpenSegment)
         Diagnostics(statusLine)
     }
 }
@@ -442,7 +444,11 @@ private fun GestureHelp(onOpenGestures: () -> Unit) {
 
 /** Door to the legacy screens (**Direct**, **classic home**), unreachable from the gesture-only iSee home. */
 @Composable
-private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {
+private fun ClassicScreens(
+    onOpenLive: () -> Unit,
+    onOpenClassic: () -> Unit,
+    onOpenSegment: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Other screens",
@@ -452,6 +458,7 @@ private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {
         )
         GlassButton("Direct mode (continuous video)", true, false, onOpenLive)
         GlassButton("Classic home (photo + analysis)", true, false, onOpenClassic)
+        GlassButton("Segment demo (walkable area)", true, false, onOpenSegment)
     }
 }
 
