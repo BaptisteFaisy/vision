@@ -32,6 +32,7 @@ import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.voicenav.VoiceNavRoute
 import dev.sam3vision.app.voicenav.VoiceNavUiState
+import dev.sam3vision.app.detect.NanoDetScreen
 import dev.sam3vision.app.segment.SegmentScreen
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
@@ -104,6 +105,9 @@ sealed interface Route {
      * guidage, poussée par l'état de session — jamais ouverte à la main.
      */
     data object VoiceNav : Route
+
+    /** Démo NanoDet : détection locale temps réel, complément on-device de SAM 3.1. */
+    data object NanoDet : Route
 
     /** Démo segmentation : zone praticable locale, complément on-device de SAM 3.1. */
     data object Segment : Route
@@ -242,6 +246,7 @@ private fun RouteHost(
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
         Route.VoiceNav -> VoiceNavRoute(isee, onClose = pop)
+        Route.NanoDet -> NanoDetScreen(onBack = pop)
         Route.Segment -> SegmentScreen(onBack = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
@@ -259,6 +264,7 @@ internal fun routeToName(route: Route): String = when (route) {
     Route.Onboarding -> "onboarding"
     Route.Bench -> "bench"
     Route.VoiceNav -> "voicenav"
+    Route.NanoDet -> "nanodet"
     Route.Segment -> "segment"
     is Route.Tap -> "tap:${route.autoStart}"
 }
@@ -275,6 +281,7 @@ internal fun routeFromName(name: String): Route = when {
     name == "onboarding" -> Route.Onboarding
     name == "bench" -> Route.Bench
     name == "voicenav" -> Route.VoiceNav
+    name == "nanodet" -> Route.NanoDet
     name == "segment" -> Route.Segment
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
@@ -386,6 +393,7 @@ private fun SettingsEntry(
             pop = pop,
             onOpenLive = { push(Route.Live) },
             onOpenClassic = { push(Route.Capture) },
+            onOpenNanoDet = { push(Route.NanoDet) },
             onOpenSegment = { push(Route.Segment) },
             onOpenGestures = { push(Route.Onboarding) },
             onPickRole = { next ->
@@ -417,6 +425,7 @@ private fun SettingsRoute(
     pop: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenNanoDet: () -> Unit,
     onOpenSegment: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
@@ -440,6 +449,7 @@ private fun SettingsRoute(
         onStopVoice = viewModel::stopSpeaking,
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
+        onOpenNanoDet = onOpenNanoDet,
         onOpenSegment = onOpenSegment,
         onOpenGestures = onOpenGestures,
         onPickRole = onPickRole,
