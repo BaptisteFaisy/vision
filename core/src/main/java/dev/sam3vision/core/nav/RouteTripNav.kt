@@ -29,7 +29,8 @@ fun RouteTrip.toNavRoute(destinationName: String?): Result<NavRoute> {
 
 /**
  * Une manœuvre client → manœuvre guidable : type Valhalla réduit au piéton
- * ([ValhallaRoute.mapType]), point sur le tracé, rue ou rien (jamais inventée).
+ * ([ValhallaRoute.mapType]), point sur le tracé, rue ou rien (jamais inventée),
+ * traversée lue dans les consignes ([CrossingManeuver]).
  */
 private fun RouteManeuver.toNav(leg: RouteLeg, index: Int): Result<NavManeuver> {
     if (beginShapeIndex < 0 || beginShapeIndex >= leg.shape.size) {
@@ -38,6 +39,12 @@ private fun RouteManeuver.toNav(leg: RouteLeg, index: Int): Result<NavManeuver> 
     val point = leg.shape[beginShapeIndex]
     val street = streetNames.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
     return Result.success(
-        NavManeuver(action = ValhallaRoute.mapType(type), lat = point.lat, lon = point.lon, street = street),
+        NavManeuver(
+            action = ValhallaRoute.mapType(type),
+            lat = point.lat,
+            lon = point.lon,
+            street = street,
+            crossing = CrossingManeuver.matches(instruction, verbalInstruction),
+        ),
     )
 }

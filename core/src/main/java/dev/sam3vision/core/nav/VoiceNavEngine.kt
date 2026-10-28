@@ -28,8 +28,9 @@ enum class NavState { Idle, Guiding, OffRoute, Finished }
 
 /**
  * Événements de guidage, dans l'ordre d'émission : annonce d'une manœuvre
- * ([ManeuverAhead], une fois de loin puis une fois de près), écart
- * ([OffRoute] — **déclencheur de recalcul** : l'appelant recharge un
+ * ([ManeuverAhead], une fois de loin puis une fois de près), traversée
+ * ([CrossingAhead] au lieu de l'annonce, [CrossingPassed] une fois passé),
+ * écart ([OffRoute] — **déclencheur de recalcul** : l'appelant recharge un
  * itinéraire via [VoiceNavEngine.reroute]), retour ([BackOnRoute]) et
  * arrivée ([Arrived], une seule fois).
  */
@@ -41,6 +42,20 @@ sealed interface NavEvent {
         val distM: Double,
         val near: Boolean,
     ) : NavEvent
+
+    /**
+     * Traversée de chaussée dans [distM] mètres ([near] = rappel proche) :
+     * remplace [ManeuverAhead] quand la manœuvre visée est une traversée —
+     * l'appelant y suspend la consigne de progression et y active le mode
+     * traversée (au rappel proche), au lieu d'annoncer un « tout droit ».
+     */
+    data class CrossingAhead(
+        val distM: Double,
+        val near: Boolean,
+    ) : NavEvent
+
+    /** Traversée passée : l'appelant coupe le mode et reprend le guidage. */
+    object CrossingPassed : NavEvent
 
     /** Écarté de [crossTrackM] mètres : l'appelant doit recalculer. */
     data class OffRoute(val crossTrackM: Double) : NavEvent
@@ -117,9 +132,10 @@ class VoiceNavEngine(private val tuning: NavTuning = NavTuning()) {
     }
 
     /**
-     * Avance le guidage d'un fix GPS : arrivée, passage de manœuvres,
-     * écart éventuel, annonce éventuelle — dans cet ordre. Fix inexploitable,
-     * trop grossier ou plus vieux que le précédent ⇒ liste vide.
+     * Avance le guidage d'un fix GPS : arrivée, passage de manœuvres
+     * (traversée passée éventuelle), écart éventuel, annonce éventuelle —
+     * dans cet ordre. Fix inexploitable, trop grossier ou plus vieux que
+     * le précédent ⇒ liste vide.
      */
     fun onFix(fix: NavFix): List<NavEvent> {
         val maneuvers = route?.maneuvers ?: return emptyList()
@@ -130,9 +146,12 @@ class VoiceNavEngine(private val tuning: NavTuning = NavTuning()) {
             finished = true
             return listOf(NavEvent.Arrived)
         }
-        advanceThrough(fix, maneuvers)
-        offRouteEvent(fix, maneuvers)?.let { return listOf(it) }
-        return announceAhead(fix, maneuvers)
+        val passed = advanceThrough(fix, maneuvers)
+        val offRoute = offRouteEvent(fix, maneuvers)
+        if (offRoute != null) {
+            return listOfNotNull(passed, offRoute)
+        }
+        return listOfNotNull(passed) + announceAhead(fix, maneuvers)
     }
 
     /** À portée d'arrivée (point de la dernière manœuvre) ? */
@@ -141,17 +160,24 @@ class VoiceNavEngine(private val tuning: NavTuning = NavTuning()) {
         return NavGeo.haversineMeters(fix.lat, fix.lon, dest.lat, dest.lon) <= tuning.arrivalRadiusM
     }
 
-    /** Valide les manœuvres traversées (saut de tunnel : plusieurs d'un coup). */
-    private fun advanceThrough(fix: NavFix, maneuvers: List<NavManeuver>) {
+    /**
+     * Valide les manœuvres traversées (saut de tunnel : plusieurs d'un
+     * coup). Renvoie [NavEvent.CrossingPassed] si une traversée vient
+     * d'être passée, `null` sinon.
+     */
+    private fun advanceThrough(fix: NavFix, maneuvers: List<NavManeuver>): NavEvent? {
+        var passed: NavEvent? = null
         while (nextIndex < maneuvers.lastIndex) {
             val target = maneuvers[nextIndex]
             val dist = NavGeo.haversineMeters(fix.lat, fix.lon, target.lat, target.lon)
             if (dist > tuning.advanceRadiusM) break
+            if (target.crossing) passed = NavEvent.CrossingPassed
             nextIndex++
             announcedFar = false
             announcedNext = false
             suspectFixes = 0
         }
+        return passed
     }
 
     /**
@@ -196,6 +222,8 @@ class VoiceNavEngine(private val tuning: NavTuning = NavTuning()) {
     /**
      * Annonce la prochaine manœuvre sur front : une fois de loin
      * ([NavTuning.announceFarM]), une fois de près ([NavTuning.announceNearM]).
+     * Une traversée visée s'annonce en [NavEvent.CrossingAhead], jamais en
+     * [NavEvent.ManeuverAhead] (pas de « tout droit » au bord du trottoir).
      */
     private fun announceAhead(fix: NavFix, maneuvers: List<NavManeuver>): List<NavEvent> {
         val target = maneuvers[nextIndex]
@@ -203,12 +231,18 @@ class VoiceNavEngine(private val tuning: NavTuning = NavTuning()) {
         if (!announcedNext && dist <= tuning.announceNearM) {
             announcedFar = true
             announcedNext = true
-            return listOf(NavEvent.ManeuverAhead(target.action, target.street, dist, near = true))
+            return listOf(aheadOf(target, dist, near = true))
         }
         if (!announcedFar && dist <= tuning.announceFarM) {
             announcedFar = true
-            return listOf(NavEvent.ManeuverAhead(target.action, target.street, dist, near = false))
+            return listOf(aheadOf(target, dist, near = false))
         }
         return emptyList()
+    }
+
+    /** Annonce d'une cible : traversée ou manœuvre, selon [NavManeuver.crossing]. */
+    private fun aheadOf(target: NavManeuver, dist: Double, near: Boolean): NavEvent {
+        if (target.crossing) return NavEvent.CrossingAhead(dist, near)
+        return NavEvent.ManeuverAhead(target.action, target.street, dist, near)
     }
 }
