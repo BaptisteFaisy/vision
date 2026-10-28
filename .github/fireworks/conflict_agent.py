@@ -319,6 +319,14 @@ def preflight(repo, pr, sha, dry_run, now):
     return key, model, api_url, files
 
 
+def push_url(repo):
+    """URL push authentifiée (GH_TOKEN) ; "origin" en repli local."""
+    token = os.environ.get("GH_TOKEN", "")
+    if not token:
+        return "origin"
+    return "https://x-access-token:%s@github.com/%s.git" % (token, repo)
+
+
 def finish(repo, pr, branch, sha, files):
     """Termine le rebase, pousse avec bail, rend compte. Rend 0 ou 1."""
     env = dict(os.environ, GIT_EDITOR="true")
@@ -329,7 +337,7 @@ def finish(repo, pr, branch, sha, files):
                     % ((cont.stderr or "").strip()[:200]))
     push = subprocess.run(["git", "push",
                            "--force-with-lease=%s:%s" % (branch, sha),
-                           "origin", "HEAD:%s" % branch],
+                           push_url(repo), "HEAD:%s" % branch],
                           capture_output=True, text=True, timeout=120)
     if push.returncode != 0:
         log("push refusé (bail, prochain passage) : %s"
