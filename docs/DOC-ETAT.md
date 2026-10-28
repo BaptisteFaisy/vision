@@ -57,9 +57,10 @@ une affirmation fausse pour cet arbre — corrigée ou encadrée).
   désormais `IseeHome` → `IseeScenePane` : `IseeChatPane` et `IseeCameraWindow` sont
   supprimés. Reste à confirmer visuellement sur appareil (jamais regardé sur écran).
 - **« 8 objets par défaut »** — **vrai pour les objets affichés** (`ObjectLimits.DEFAULT_ON_SCREEN = 8`,
-  borné 1–12), **faux pour les concepts suivis** : `LivePrompts.Default` en contient **2**
-  (`person`, `door`) et `LivePrompts.MAX = 2`. Le commentaire d'en-tête de
-  `LivePrompts.kt`, qui parlait encore de « huit » concepts, a été **corrigé le 27/10**.
+  borné 1–12), **faux pour les concepts suivis** : `LivePrompts.Default` en contient **6**
+  (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`) et `LivePrompts.MAX = 6`.
+  Le commentaire d'en-tête de `LivePrompts.kt`, qui parlait encore de « huit » concepts,
+  a été **corrigé le 27/10**.
 
 ## Hors périmètre de cette passe (à reprendre)
 

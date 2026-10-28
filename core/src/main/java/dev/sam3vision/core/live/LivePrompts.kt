@@ -7,31 +7,31 @@ package dev.sam3vision.core.live
  * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
  * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
  * pas par un concept suivi ni par le LLM. Ces prompts sont des noms de concepts SAM 3.1
- * (2 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
+ * (6 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
  * aucun sens et volerait un slot de suivi.
  */
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **2** (« person », « door »), les plus utiles au guidage
-     * à l'intérieur, modifiables à chaud dans le direct (champ « Suivre »).
+     * Concepts par défaut : **6** — « person », « door » (guidage intérieur) plus
+     * « bicycle », « car », « truck », « electric scooter » (rue), modifiables à
+     * chaud dans le direct (champ « Suivre »).
      *
-     * Huit concepts avaient été envisagés : l'app déployée batche les prompts
-     * (`/health` → `levers.batch_prompts = true`) et la mesure du 2026-10-26 sur
-     * `/live` (5 tirs par point, même image, 4 objets max) donnait 2 concepts =
-     * 118 ms médian, 8 concepts = 118 ms médian. Mais le tracker backend tronque à
-     * `PROMPT_LIMIT = 2` : envoyer davantage afficherait des concepts jamais
-     * détectés — d'où [MAX] = 2, décision du 26/10.
+     * Le plafond était à 2 (décision du 26/10) parce que le tracker backend
+     * tronquait à `PROMPT_LIMIT = 2`. Décision user du 28/10 : suivre aussi les
+     * véhicules — [MAX] et `PROMPT_LIMIT` passent à 6 ensemble. Sur `/live` les
+     * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts =
+     * 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
+     * `/frame`, d'où un coût ×3 assumé sur ce chemin.
      */
-    val default: List<String> = listOf("person", "door")
+    val default: List<String> = listOf("person", "door", "bicycle", "car", "truck", "electric scooter")
 
     /**
-     * Nombre maximal de concepts : **2**, décision user du 26/10 (« 2 concepts maximum,
-     * jamais plus »). Le backend tronque déjà à `PROMPT_LIMIT = 2` côté tracker ; le
-     * client ne doit donc pas en envoyer davantage — sinon l'app affiche des concepts
-     * qui ne sont jamais détectés.
+     * Nombre maximal de concepts : **6**, décision user du 28/10 (rue + intérieur).
+     * Le backend tronque à `PROMPT_LIMIT = 6` côté tracker ; le client ne doit pas
+     * en envoyer davantage — sinon l'app affiche des concepts jamais détectés.
      */
-    const val MAX = 2
+    const val MAX = 6
 
     /** Longueur maximale d'un prompt : au-delà, ce n'est plus un concept. */
     const val MAX_LENGTH = 32

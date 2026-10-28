@@ -39,6 +39,19 @@ class KnownSizesTest {
     }
 
     @Test
+    fun `les vehicules suivis sont calibres en francais et en anglais`() {
+        assertEquals(1.10f, KnownSizes.heightMeters("bicycle")!!, 0.001f)
+        assertEquals(1.10f, KnownSizes.heightMeters("Vélo")!!, 0.001f)
+        assertEquals(1.45f, KnownSizes.heightMeters("car")!!, 0.001f)
+        assertEquals(1.45f, KnownSizes.heightMeters("voiture")!!, 0.001f)
+        assertEquals(2.80f, KnownSizes.heightMeters("truck")!!, 0.001f)
+        assertEquals(2.80f, KnownSizes.heightMeters("camion")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("electric scooter")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("Trottinette électrique")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("scooter")!!, 0.001f)
+    }
+
+    @Test
     fun `concept inconnu reste inconnu`() {
         assertNull(KnownSizes.heightMeters("licorne"))
         assertNull(KnownSizes.heightMeters(""))

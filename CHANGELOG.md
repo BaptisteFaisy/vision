@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — direct : 6 concepts suivis (rue + intérieur)
+
+- Décision user : le direct suit aussi les vélos, voitures, camions et trottinettes
+  électriques — `LivePrompts.default` passe à 6 concepts (`person`, `door`, `bicycle`,
+  `car`, `truck`, `electric scooter`) et `MAX` 2 → 6 (`core/live/LivePrompts.kt:27,34`).
+- `PROMPT_LIMIT` 2 → 6 côté tracker (`server/backend/tracking.py:53`) : sans ça le backend
+  tronquerait les 6 concepts à 2. Coût ×3 assumé sur le chemin tracker (une inférence par
+  concept et par `/frame`) ; sur `/live` les prompts sont batchés (un seul forward).
+  Aucun workflow ne redéploie le tracker : effet au prochain déploiement manuel.
+- `KnownSizes` calibre les nouveaux libellés (`electric scooter`, `scooter`,
+  `trottinette electrique` → 1,00 m) ; la Traversée garde ses 2 prompts (feu + voitures).
+- 4 tests JVM : `LivePromptsTest` (défauts + borne à 6), `LivePromptsNavigationTest`
+  (pas de concept ajouté), `KnownSizesTest` (véhicules calibrés FR/EN). Docs alignées
+  (`README`, `AGENTS.md`, `LIVE-SPEC`, `PERF`, `ARCHITECTURE`, `DISTANCES`, `DOC-ETAT`).
+
 ## 2026-10-28 — isee : la caméra active allume la carte, coupée elle s'éteint
 
 - La porte d'envoi vers SAM devient `cameraActive || recordingVideo || crossingActive`
