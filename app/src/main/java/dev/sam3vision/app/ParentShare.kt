@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.parseCaregiverInvite
+import dev.sam3vision.core.share.validatedShareLink
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLEncoder
 
 /**
@@ -38,16 +40,18 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
 }
 
 /**
- * Lien ouvert par la page Caregiver : l'invitation collée dans les réglages gagne
- * sur les champs historiques — lien complet (tel quel), code nu (greffé sur le
- * site enregistré), site seul (avec l'identifiant enregistré). Sans invitation,
- * le site et l'identifiant enregistrés s'appliquent comme avant.
+ * Seul un lien ou code reçu choisit le suivi ; l'identifiant de ce téléphone
+ * ne doit jamais servir à deviner celui du proche. Un ancien lien complet
+ * enregistré dans parentSiteUrl reste utilisable après mise à jour.
  */
 fun caregiverShareLink(settings: Settings): String {
-    val invite = parseCaregiverInvite(settings.caregiverInvite) ?: return shareLink(settings.parentSiteUrl, settings.shareId)
-    if (invite.shareId.isBlank()) return shareLink(invite.siteUrl, settings.shareId)
-    if (invite.siteUrl.isBlank()) return shareLink(settings.parentSiteUrl, invite.shareId)
-    return shareLink(invite.siteUrl, invite.shareId)
+    val raw = settings.caregiverInvite.trim()
+    validatedShareLink(raw)?.let { return it }
+    val invite = parseCaregiverInvite(raw)
+        ?: return validatedShareLink(settings.parentSiteUrl).orEmpty()
+    if (invite.siteUrl.isNotBlank() || invite.shareId.isBlank()) return ""
+    val site = settings.parentSiteUrl.toHttpUrlOrNull() ?: return ""
+    return validatedShareLink(site.newBuilder().setQueryParameter("share", invite.shareId).build().toString()).orEmpty()
 }
 
 /**

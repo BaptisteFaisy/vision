@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>iSee · Caregiver</title>
-  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <title>iSee</title>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
   <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -15,47 +13,34 @@
 <body>
   <div class="app">
     <header>
-      <div class="brand">iSee<span class="role">CAREGIVER</span></div>
-      <div class="topline" role="status"><span class="live-dot" id="dot"></span><span class="pill grey" id="live-badge">OFFLINE</span></div>
+      <button id="settings-button" type="button" aria-label="Paramètres">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.7 2.1-2 .9-2-.5-2 3.5 1.5 1.6v2.8L2.8 15l2 3.5 2-.5 2 .9.7 2.1h5l.7-2.1 2-.9 2 .5 2-3.5-1.5-1.6v-2.8L21.2 9l-2-3.5-2 .5-2-.9-.7-2.1z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <div class="topline" role="status"><span class="live-dot offline" id="dot"></span><span class="pill grey" id="live-badge">OFFLINE</span></div>
     </header>
     <main>
       <section class="scene" aria-label="Description de la session partagée">
         <div class="orb-frame" aria-hidden="true"><canvas id="orb"></canvas></div>
-        <div class="spoken">
-          <div id="speaker">ISEE</div>
-          <p id="spoken-line" aria-live="polite" aria-atomic="true">En attente du téléphone de ton proche.</p>
-        </div>
+        <div class="spoken" hidden><div id="speaker">ISEE</div><p id="spoken-line" aria-live="polite" aria-atomic="true"></p></div>
       </section>
-      <section class="map-card" aria-label="Carte des objets détectés">
-        <div class="map-heading"><h2>Autour de ton proche</h2><button id="recenter" type="button">↗ Recentrer</button></div>
-        <div id="map-wrap"><div id="map" role="region" aria-label="Position et objets du téléphone partagé" aria-busy="true"></div><p id="map-loading" role="status">Chargement de la carte…</p></div>
-        <div class="map-footer">
-          <div><p id="session-note">La carte se remplira quand le téléphone enverra sa position.</p><p id="indoor"></p></div>
-          <details id="link-settings">
-            <summary>Lien de suivi</summary>
-          </details>
-        </div>
-        <div id="link-panel" class="settings-content" hidden>
-          <form id="shared-link-form">
-            <label for="shared-link">Lien reçu depuis le téléphone de ton proche</label>
-            <div class="input-row"><input id="shared-link" type="url" required placeholder="Colle le lien partagé" autocomplete="off"><button type="submit">Suivre</button></div>
-          </form>
-        </div>
-        <details class="map-options">
-          <summary>Options de la carte</summary>
-          <div class="styles"><button data-s="hybrid">Hybride</button><button data-s="satellite">Satellite</button><button data-s="plan" class="on">Plan</button><button data-s="terrain">Terrain</button></div>
-          <div class="input-row" id="keybox"><input id="gkey" aria-label="Clé Google Maps facultative" placeholder="Clé Google Maps (facultative)"><button type="button" id="savekey">OK</button><button type="button" id="clearkey" aria-label="Oublier la clé" style="display:none">×</button></div>
-          <div id="gerr" role="status"></div>
-          <p class="legend">Pince pour zoomer. Les icônes représentent les objets détectés ; le halo indique la précision du GPS.</p>
-        </details>
-        <p class="credit" id="credit">© OpenStreetMap contributors · OpenFreeMap · Esri, Maxar, Earthstar Geographics</p>
+      <section id="map-wrap" aria-label="Carte des objets détectés">
+        <div id="map" role="region" aria-label="Position et objets du téléphone partagé" aria-busy="true"></div>
+        <p id="map-loading" role="status">Chargement de la carte…</p>
+        <button id="recenter" type="button" aria-label="Recentrer la carte">↗</button>
+        <p id="credit">© OpenStreetMap contributors · OpenFreeMap · Esri</p>
       </section>
     </main>
   </div>
-  <script>
-    document.getElementById('link-settings').addEventListener('toggle', event => {
-      document.getElementById('link-panel').hidden = !event.target.open;
-    });
-  </script>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-heading"><h1 id="settings-title">Paramètres</h1><button id="close-settings" type="button" aria-label="Fermer les paramètres">×</button></div>
+    <form id="shared-link-form">
+      <label for="shared-link">Lien reçu de ton proche</label>
+      <div class="input-row"><input id="shared-link" type="url" required autocomplete="off" placeholder="Colle le lien partagé"><button type="submit">Suivre</button></div>
+    </form>
+    <label for="gkey">Clé API Google Maps</label>
+    <div class="input-row" id="keybox"><input id="gkey" type="password" autocomplete="off"><button id="savekey" type="button">Enregistrer</button><button id="clearkey" type="button" aria-label="Oublier la clé" hidden>×</button></div>
+    <p id="map-provider" role="status"></p><p id="gerr" role="status" hidden></p>
+    <div class="styles"><button data-s="hybrid" type="button">Hybride</button><button data-s="satellite" type="button">Satellite</button><button data-s="plan" type="button" class="on">Plan</button><button data-s="terrain" type="button">Terrain</button></div>
+  </dialog>
 </body>
 </html>

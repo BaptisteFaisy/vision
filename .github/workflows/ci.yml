@@ -21,6 +21,10 @@ permissions:
   # La détection « PR sans code » lit la liste des fichiers via l'API.
   pull-requests: read
 
+# Présente dans chaque variante de l'APK, sans clé en clair dans Git.
+env:
+  GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
 jobs:
   # ── 1. le check exigé par la file : les tests JVM ────────────────────────────
   ci:
