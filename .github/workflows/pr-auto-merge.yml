@@ -10,7 +10,7 @@
 # et réconciliés mais jamais mergés.
 # Conflits (v5, 2026-10-28) : l'agent Fireworks tente de les résoudre
 # (.github/fireworks/conflict_agent.py, modèle MiniMax M3.1 Flash) : résolution
-# fichier par fichier, fin du rebase, push avec bail, compte rendu sur la PR.
+# conflit par conflit, fin du rebase, push avec bail, compte rendu sur la PR.
 # Sans le secret FIREWORKS_API_KEY, on saute comme avant et l'auteur rebase à
 # la main. Coupe-circuit : variable de dépôt FIREWORKS_AGENT_RESOLVE=0.
 # Conflits brouillons (v6, 2026-10-28) : le sweep traite aussi les brouillons
@@ -18,6 +18,10 @@
 # BEHIND — la CI est la seule voie de résolution (plus de janitor local).
 # Auth push (v7, 2026-10-28) : PAT dans l'URL (x-access-token) au lieu du
 # helper gh, qui rend 403 « denied » sur les runners alors que l'API écrit.
+# Parallèle (v8, 2026-10-28) : matrice — un job par PR (8 max), chacun avec
+# son clone. Les runs restent sérialisés (groupe concurrency) ; dans un run,
+# rebase + résolutions + merges avancent en parallèle. Échecs isolés
+# (fail-fast: false), pushes toujours avec bail.
 name: pr-auto-merge
 
 on:
@@ -37,17 +41,58 @@ permissions:
   pull-requests: write
 
 jobs:
-  sweep:
+  discover:
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
     steps:
-      - name: Balayer la file (rebase + merge)
+      - name: Lister les PR internes ouvertes
+        id: build
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
+        run: |
+          export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
+          if [ -z "$GH_TOKEN" ]; then
+            echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" = push ]; then
+            sleep 60 # laisse GitHub recalculer les états après l'atterrissage
+          fi
+          MATRIX=$(gh pr list --base master --state open \
+            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
+            --jq -c '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
+              | {pr: .number, sha: .headRefOid, branch: .headRefName,
+                 state: .mergeStateStatus, draft: (.isDraft | tostring)}]')
+          [ -n "$MATRIX" ] || MATRIX="[]"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state)"'
+
+  sweep:
+    needs: discover
+    if: ${{ needs.discover.outputs.matrix != '[]' && needs.discover.outputs.matrix != '' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - name: Rebase / résout / merge la PR ${{ matrix.pr }}
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
           FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
           FIREWORKS_AGENT_RESOLVE: ${{ vars.FIREWORKS_AGENT_RESOLVE }}
+          PR: ${{ matrix.pr }}
+          SHA: ${{ matrix.sha }}
+          BRANCH: ${{ matrix.branch }}
+          STATE: ${{ matrix.state }}
+          DRAFT: ${{ matrix.draft }}
         run: |
           export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
           green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
@@ -58,13 +103,6 @@ jobs:
               ([$got[] | select(.state == "SUCCESS")] | length == 6)
             ' >/dev/null
           }
-          if [ -z "$GH_TOKEN" ]; then
-            echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
-            exit 0
-          fi
-          if [ "$EVENT" = push ]; then
-            sleep 60 # laisse GitHub recalculer les états après l'atterrissage
-          fi
           rm -rf repo
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —
           # rien n'est persisté dans la conf git du runner. Le helper gh
@@ -75,55 +113,47 @@ jobs:
           git config user.name "isee-automerge"
           git config user.email "isee-automerge@users.noreply.github.com"
           export GIT_EDITOR=true
-          gh pr list --base master --state open \
-            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
-            --jq '.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
-              | "\(.number) \(.headRefOid) \(.headRefName) \(.mergeStateStatus) \(.isDraft)"' \
-          | while read -r pr sha branch state draft; do
-            [ -n "$pr" ] || continue
-            case "$state" in
-              DIRTY|BEHIND)
-                if git fetch -q "$AUTH_URL" "pull/$pr/head:pr-$pr" 2>/dev/null \
-                  && git checkout -q "pr-$pr" 2>/dev/null \
-                  && git rebase -q origin/master >/dev/null 2>&1; then
-                  if git push -q --force-with-lease="$branch:$sha" "$AUTH_URL" "HEAD:$branch" 2>&1; then
-                    echo "PR #$pr rebasée sur master"
-                  else
-                    echo "PR #$pr : a bougé entre-temps, prochain passage"
-                  fi
+          case "$STATE" in
+            DIRTY|BEHIND)
+              if git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null \
+                && git checkout -q "pr-$PR" 2>/dev/null \
+                && git rebase -q origin/master >/dev/null 2>&1; then
+                if git push -q --force-with-lease="$BRANCH:$SHA" "$AUTH_URL" "HEAD:$BRANCH" 2>&1; then
+                  echo "PR #$PR rebasée sur master"
                 else
-                  # Rebase en conflit : l'agent lit le script sur master (la
-                  # branche de la PR peut être antérieure), résout, termine
-                  # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
-                  # compte rendu, 2 = rien à faire : on saute sans bruit.
-                  rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
-                  # un exit != 0 de l'agent tuerait tout le sweep.
-                  git show origin/master:.github/fireworks/conflict_agent.py \
-                    > /tmp/fw-agent.py 2>/dev/null \
-                    && python3 /tmp/fw-agent.py resolve --repo BaptisteFaisy/vision \
-                      --pr "$pr" --branch "$branch" --sha "$sha" || rc=$?
-                  git rebase --abort >/dev/null 2>&1 || true
-                  git checkout -q master 2>/dev/null || true
-                  case "$rc" in
-                    0) echo "PR #$pr : conflit résolu par l'agent Fireworks" ;;
-                    *) echo "PR #$pr sautée (conflit, à l'auteur de rebaser)" ;;
-                  esac
+                  echo "PR #$PR : a bougé entre-temps, prochain passage"
                 fi
-                git branch -q -D "pr-$pr" >/dev/null 2>&1 || true
-                ;;
-              CLEAN)
-                if [ "$draft" = "true" ]; then
-                  echo "PR #$pr : brouillon à jour, pas de merge"
-                elif green "$pr"; then
-                  if gh pr merge --rebase --match-head-commit "$sha" "$pr" >/dev/null 2>&1; then
-                    echo "PR #$pr mergée"
-                  else
-                    echo "PR #$pr : merge refusé (base bougée ?), prochain passage"
-                  fi
+              else
+                # Rebase en conflit : l'agent lit le script sur master (la
+                # branche de la PR peut être antérieure), résout, termine
+                # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
+                # compte rendu, 2 = rien à faire : on saute sans bruit.
+                rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
+                # un exit != 0 de l'agent tuerait tout le sweep.
+                git show origin/master:.github/fireworks/conflict_agent.py \
+                  > /tmp/fw-agent.py 2>/dev/null \
+                  && python3 /tmp/fw-agent.py resolve --repo BaptisteFaisy/vision \
+                    --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc=$?
+                git rebase --abort >/dev/null 2>&1 || true
+                git checkout -q master 2>/dev/null || true
+                case "$rc" in
+                  0) echo "PR #$PR : conflit résolu par l'agent Fireworks" ;;
+                  *) echo "PR #$PR sautée (conflit, à l'auteur de rebaser)" ;;
+                esac
+              fi
+              ;;
+            CLEAN)
+              if [ "$DRAFT" = "true" ]; then
+                echo "PR #$PR : brouillon à jour, pas de merge"
+              elif green "$PR"; then
+                if gh pr merge --rebase --match-head-commit "$SHA" "$PR" >/dev/null 2>&1; then
+                  echo "PR #$PR mergée"
                 else
-                  echo "PR #$pr : CI pas encore verte"
+                  echo "PR #$PR : merge refusé (base bougée ?), prochain passage"
                 fi
-                ;;
-              *) echo "PR #$pr : état $state, rien à faire" ;;
-            esac
-          done
+              else
+                echo "PR #$PR : CI pas encore verte"
+              fi
+              ;;
+            *) echo "PR #$PR : état $STATE, rien à faire" ;;
+          esac
