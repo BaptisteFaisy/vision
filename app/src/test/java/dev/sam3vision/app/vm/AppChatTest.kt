@@ -1,5 +1,6 @@
 package dev.sam3vision.app.vm
 
+import dev.sam3vision.app.LLM_ABSENT_LINE
 import dev.sam3vision.app.UiState
 import dev.sam3vision.core.model.Role
 import dev.sam3vision.core.net.ApiError
@@ -8,7 +9,6 @@ import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,7 +34,7 @@ class AppChatTest {
     )
 
     @Test
-    fun `sans photo — aucun appel au LLM`() = runTest {
+    fun `sans photo — refus explique, aucun appel au LLM`() = runTest {
         val screen = screen(photoB64 = "")
         val llm = FakeLlm()
 
@@ -42,19 +42,19 @@ class AppChatTest {
 
         assertEquals(0, llm.askCalls)
         assertFalse(screen.value.asking)
-        assertNull(screen.value.statusLine)
+        assertEquals(AppStatusText.ASK_NO_PHOTO, screen.value.statusLine)
     }
 
     @Test
-    fun `sans cle LLM — refus local, aucun appel reseau`() = runTest {
+    fun `sans cle LLM — refus local explique, aucun appel reseau`() = runTest {
         val screen = screen(settings = Settings.Default)
         val llm = FakeLlm()
 
         chat(screen, llm).ask("où est la porte ?")
 
         assertEquals(0, llm.askCalls)
-        assertFalse("rien ne s'affiche puisque rien n'est demandé", screen.value.asking)
-        assertNull(screen.value.statusLine)
+        assertFalse("pas de « … » sur un refus", screen.value.asking)
+        assertEquals(LLM_ABSENT_LINE, screen.value.statusLine)
         assertTrue(screen.value.chat.isEmpty())
     }
 

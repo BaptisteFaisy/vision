@@ -45,6 +45,9 @@ object AppStatusText {
     /** Question restée sans réponse : le motif du LLM, jamais un écran figé. */
     fun questionFailed(error: Throwable): String = "Question sans réponse : ${error.message ?: "erreur"}"
 
+    /** Question sans photo : le refus local dit quoi faire, comme le direct. */
+    const val ASK_NO_PHOTO = "Aucune photo — prends une photo avant de poser ta question"
+
     /** Motif d'une synthèse échouée sans message. */
     const val VOICE_UNAVAILABLE = "voix indisponible"
 
