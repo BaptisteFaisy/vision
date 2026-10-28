@@ -19,9 +19,9 @@ import dev.sam3vision.core.haptics.Waveform
  * ([HapticPattern]) : testables en JVM, partagés par les deux gestes.
  *
  * Les trois temps de l'appui long :
- * - [startHold] : la salve franche de [HapticPattern.holdLoop] au seuil, puis une
- *   **nappe légère** tant que le doigt reste posé — un retour continu, pas un « tick » ;
- * - [release] : la nappe est coupée et la **queue de 200 ms** marque le relâchement ;
+ * - [startHold] : la salve franche de [HapticPattern.holdTick] au seuil, **une seule
+ *   fois**, puis silence pendant toute la dictée (aucune vibration pendant la parole) ;
+ * - [release] : tout motif en cours est coupé et la **queue de 200 ms** marque le relâchement ;
  * - [cue] : bip bref de fin de dictée, à jouer **micro fermé** — le micro reste ouvert
  *   le temps que la fin du dernier mot arrive, un bip joué avant entrerait dans la
  *   transcription (c'est pour ça que la dictée l'appelle après `stop()`, pas ici).
@@ -45,10 +45,10 @@ class HapticLoop(context: Context) {
         }
     }
 
-    /** Appui long : salve franche au seuil, puis nappe pendant toute la tenue. */
-    fun startHold() = play(HapticPattern.holdLoop())
+    /** Appui long : salve franche unique au seuil, puis silence pendant la dictée. */
+    fun startHold() = play(HapticPattern.holdTick())
 
-    /** Relâchement : la nappe est coupée, la queue de 200 ms est posée. */
+    /** Relâchement : la queue de 200 ms est posée. */
     fun release() {
         stop()
         play(HapticPattern.releaseTail())
@@ -59,7 +59,7 @@ class HapticLoop(context: Context) {
         runCatching { vibrator?.cancel() }
     }
 
-    /** Bip de fin de dictée : bref, discret, jamais chevauché par une nappe. */
+    /** Bip de fin de dictée : bref, discret, joué micro fermé. */
     fun cue() {
         runCatching {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, CUE_VOLUME)
