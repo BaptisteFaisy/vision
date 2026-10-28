@@ -6,6 +6,7 @@ import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.AndroidTtsDriver
 import dev.sam3vision.app.speech.VoiceNavPhrases
 import dev.sam3vision.app.speech.VoiceNavSpeaker
+import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.GeocodedPlace
@@ -33,7 +34,9 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * - [geocode] résout la destination (chaîne GMS puis BAN) ;
  * - [originNow] donne la position du départ (`null` = repli Maps) ;
  * - [routeClient] joint Valhalla (`POST /route` sur l'URL des Réglages) ;
- * - [onUpdate] reçoit l'état instantané (→ `session.onGuidanceUpdate`).
+ * - [onUpdate] reçoit l'état instantané (→ `session.onGuidanceUpdate`) ;
+ * - [onAutoCrossing] bascule le mode traversée (`true` = le rappel proche
+ *   d'une traversée l'arme, `false` = traversée passée ou guidage coupé).
  *
  * Voix : virages francs par [VoiceNavSpeaker.onTurn] (« Dans 100 mètres,
  * tournez à gauche, rue X »), le reste en phrase littérale du moteur
@@ -41,6 +44,14 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * juste en caps, et une mauvaise consigne vaut moins que la phrase exacte.
  * L'arrivée ne passe PAS par le haut-parleur : [onUpdate] la signale et la
  * session annonce (« Arrivée à destination », une seule voix).
+ *
+ * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
+ * quand la cible est un passage protégé — de loin, simple préavis parlé ;
+ * de près, le mode traversée s'active ([onAutoCrossing]) et sa voix prend
+ * le relais (vert + veto véhicules) pendant que la progression se tait.
+ * [NavEvent.CrossingPassed] (ou [onTraverseModeChanged]`(false)`, coupe
+ * manuelle) rend la parole au guidage. Seul le mode activé ici est coupé
+ * ici : un mode manuel survit au passage ([autoCrossing]).
  *
  * Ne lève jamais après construction : tout échec de démarrage rend `false`,
  * tout échec en guidage est avalé (le moteur réémettra).
@@ -53,6 +64,7 @@ class VoiceNavEngineDriver(
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val scope: CoroutineScope,
     private val onUpdate: (GuidanceUpdate) -> Unit,
+    private val onAutoCrossing: (Boolean) -> Unit = {},
 ) {
 
     private val app = appContext.applicationContext
@@ -63,6 +75,9 @@ class VoiceNavEngineDriver(
 
     private var legs: GuidingLegs? = null
     private var rerouting = false
+
+    /** Mode traversée activé par le guidage (lui seul est coupé ici). */
+    @Volatile private var autoCrossing = false
 
     /**
      * Démarre le guidage vers [destination] : `true` si le moteur tourne
@@ -96,11 +111,21 @@ class VoiceNavEngineDriver(
     fun stop() {
         legs = null
         rerouting = false
+        clearAutoCrossing()
         runCatching { tracker.stop() }
         if (speakerLazy.isInitialized()) {
             runCatching { speaker.stop() }
             runCatching { speaker.reset() }
         }
+    }
+
+    /**
+     * La sonde signale l'état du mode traversée : coupé manuellement, le
+     * guidage reprend la parole (le mode auto ne se réarmera pas — le front
+     * proche est consommé). Activé manuellement : sans effet ici.
+     */
+    fun onTraverseModeChanged(active: Boolean) {
+        if (!active) autoCrossing = false
     }
 
     /** Libération finale : le canal vocal n'accepte plus rien ensuite. */
@@ -117,6 +142,11 @@ class VoiceNavEngineDriver(
                     speakManeuver(event)
                     onUpdate(updateFor(event))
                 }
+                is NavEvent.CrossingAhead -> {
+                    speakCrossing(event)
+                    onUpdate(updateForCrossing(event.distM))
+                }
+                NavEvent.CrossingPassed -> onCrossingPassed()
                 is NavEvent.Arrived -> {
                     onUpdate(GuidanceUpdate(VoiceNavPhrases.ARRIVED, 0, 0, 0, arrived = true))
                     stop()
@@ -140,24 +170,65 @@ class VoiceNavEngineDriver(
         }
     }
 
+    /**
+     * Traversée en vue : de loin, simple préavis ; de près, le mode
+     * traversée s'arme (une seule fois) et sa voix prend le relais.
+     */
+    private fun speakCrossing(event: NavEvent.CrossingAhead) {
+        if (!event.near) {
+            speaker.onLiteral(VoiceNavPhrases.crossingAhead(event.distM))
+            return
+        }
+        if (autoCrossing) return
+        autoCrossing = true
+        runCatching { speaker.onLiteral(CrossingText.mode(true, settings().speechLanguage)) }
+        runCatching { onAutoCrossing(true) }
+    }
+
+    /** Traversée passée : le mode auto se coupe, le guidage reprend. */
+    private fun onCrossingPassed() {
+        if (!autoCrossing) return
+        autoCrossing = false
+        runCatching { speaker.onLiteral(VoiceNavPhrases.CROSSING_DONE) }
+        runCatching { onAutoCrossing(false) }
+    }
+
+    /** Fin du guidage : le mode auto éventuel se coupe, sans annonce. */
+    private fun clearAutoCrossing() {
+        if (!autoCrossing) return
+        autoCrossing = false
+        runCatching { onAutoCrossing(false) }
+    }
+
     /** État écran : instruction + « dans X » + reste estimé du trajet. */
-    private fun updateFor(event: NavEvent.ManeuverAhead): GuidanceUpdate {
-        val distM = event.distM.toLong().coerceAtLeast(0)
-        val remaining = remainingMeters(event)
+    private fun updateFor(event: NavEvent.ManeuverAhead): GuidanceUpdate =
+        buildUpdate(
+            VoiceNavPhrases.ahead(event.action, event.street, event.distM),
+            event.distM,
+        )
+
+    /** État écran d'une traversée : préavis + « dans X » + reste estimé. */
+    private fun updateForCrossing(distM: Double): GuidanceUpdate =
+        buildUpdate(VoiceNavPhrases.crossingAhead(distM), distM)
+
+    /** État écran : instruction + « dans X » + reste estimé du trajet. */
+    private fun buildUpdate(instruction: String, distM: Double): GuidanceUpdate {
+        val near = distM.toLong().coerceAtLeast(0)
+        val remaining = remainingMeters(distM)
         return GuidanceUpdate(
-            instruction = VoiceNavPhrases.ahead(event.action, event.street, event.distM),
-            distanceToManeuverMeters = distM,
+            instruction = instruction,
+            distanceToManeuverMeters = near,
             remainingDistanceMeters = remaining,
             remainingDurationSeconds = walkSeconds(remaining),
         )
     }
 
     /** Reste estimé : « dans X » + queue des manœuvres suivantes. */
-    private fun remainingMeters(event: NavEvent.ManeuverAhead): Long {
-        val legs = legs ?: return event.distM.toLong().coerceAtLeast(0)
+    private fun remainingMeters(distM: Double): Long {
+        val legs = legs ?: return distM.toLong().coerceAtLeast(0)
         val index = legs.route.maneuvers.indexOf(runCatching { tracker.nextManeuver() }.getOrNull())
-        if (index < 0) return event.distM.toLong().coerceAtLeast(0)
-        return (event.distM + legs.tails[index]).toLong().coerceAtLeast(0)
+        if (index < 0) return distM.toLong().coerceAtLeast(0)
+        return (distM + legs.tails[index]).toLong().coerceAtLeast(0)
     }
 
     /** Recalcul sérialisé : un seul à la fois, le moteur réémettra sinon. */
