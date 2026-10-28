@@ -21,6 +21,7 @@ import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseePhotoShot
+import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
@@ -32,6 +33,7 @@ import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.live.SteeringCommand
 import dev.sam3vision.core.live.SteeringText
+import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
 import dev.sam3vision.core.speech.TtsSpeedCommand
@@ -78,6 +80,17 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
+
+    /** Repères visuels : photo → picto Muse (même clé que l'ASR) → overlay temps réel. */
+    val picto = IseePicto(
+        media = media,
+        camera = { camera },
+        settings = { settings },
+        store = PictoStore(File(app.filesDir, "pictos")),
+        clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) },
+        update = ::update,
+        scope = viewModelScope,
+    )
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
@@ -182,6 +195,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             settings = seededFromBuild(prefs.load())
             syncProbe()
             transcript.refresh()
+            picto.refresh()
             intro.playIfPending()
         }
         probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }

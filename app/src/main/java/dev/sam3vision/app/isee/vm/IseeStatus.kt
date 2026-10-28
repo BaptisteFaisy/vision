@@ -20,6 +20,12 @@ object IseeStatusText {
     const val NO_LLM_KEY = "No LLM key configured (Settings)"
     const val RECORDING_LOST = "Recording lost"
 
+    /** La photo du bouton « Picto » a raté : caméra pas prête ou fichier vide. */
+    const val PICTO_PHOTO_FAILED = "Photo failed — try again"
+
+    /** Un repère vient d'être validé : la détection le cherche déjà sur la vidéo. */
+    const val PICTO_SAVED = "Picto saved"
+
     /** Micro jamais ouvert pour cette tenue (relâchement sans début d'enregistrement). */
     const val NOT_RECORDING = "Nothing was recorded"
 
@@ -48,6 +54,10 @@ object IseeStatusText {
     /** Échec de la question au LLM, tel qu'affiché. */
     fun questionFailed(error: Throwable): String =
         if (error is StepTimeout) timedOut(error.step) else "Question failed: ${error.message ?: "error"}"
+
+    /** Échec de génération du pictogramme, tel qu'affiché (message du client). */
+    fun pictoFailed(error: Throwable): String =
+        if (error is StepTimeout) timedOut(error.step) else "Picto: ${error.message ?: "failed"}"
 }
 
 /**
