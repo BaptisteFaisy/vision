@@ -49,19 +49,23 @@ class PrivateFileSettingsStore(
      * disque ne contient jamais la clé en clair ni hors du fichier, ni en travers.
      */
     private fun write(s: Settings) {
-        val bytes = cipher.encrypt(SettingsCodec.encode(s).toByteArray(Charsets.UTF_8))
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        try {
-            tmp.writeBytes(bytes)
-            restrictToOwner(tmp)
-            if (!tmp.renameTo(file)) {
-                file.writeBytes(bytes)
+        // Dernier maillon : un échec ici (Keystore en panne) ne doit pas planter
+        // l'appelant — les réglages restent en mémoire pour la session.
+        runCatching {
+            val bytes = cipher.encrypt(SettingsCodec.encode(s).toByteArray(Charsets.UTF_8))
+            file.parentFile?.mkdirs()
+            val tmp = File(file.parentFile, "${file.name}.tmp")
+            try {
+                tmp.writeBytes(bytes)
+                restrictToOwner(tmp)
+                if (!tmp.renameTo(file)) {
+                    file.writeBytes(bytes)
+                }
+            } finally {
+                tmp.delete()
             }
-        } finally {
-            tmp.delete()
-        }
-        restrictToOwner(file)
+            restrictToOwner(file)
+        }.onFailure { android.util.Log.w("sam3vision", "réglages non persistés : ${it.message}") }
     }
 }
 
