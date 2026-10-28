@@ -5,7 +5,7 @@ superposés + objets + description → chat via `POST /ask`.
 
 ## Ce qui reste à brancher
 
-- **URL du backend** : ✅ branchée le 24 octobre 2026 — `app.json` → `expo.extra.apiUrl` =
+- **URL du backend** : ✅ branchée (relevé antérieur, hors de cet arbre) — `app.json` → `expo.extra.apiUrl` =
   `https://baptiste-faisy--sam3-vision-sam3service-web.us-east.modal.run`, APK reconstruit
   (prébuild + `assembleRelease`) et vérifié : l'URL est compilée dans `assets/app.config`
   de l'APK, et « Tester la connexion » renvoie *Backend joignable : sam3.1 sur cuda* sur

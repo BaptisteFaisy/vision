@@ -1,3 +1,8 @@
+> **Spec historique** (phase `sam3-live`, relevé antérieur, hors de cet arbre) : l'app
+> déployée est aujourd'hui `sam3-eu-a100` (`../backend/live_fast/`), les concepts par défaut
+> et les fournisseurs ont changé. Contrat client actuel :
+> [`docs/LIVE-SPEC.md`](../../docs/LIVE-SPEC.md). Corps conservé comme trace.
+
 # SPEC LIVE — flux vidéo analysé par SAM 3.1 (Modal A100) + questions InferHub
 
 Objectif : le téléphone **filme en continu**, chaque frame est segmentée par SAM 3.1 hébergé sur Modal

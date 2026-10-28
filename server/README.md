@@ -3,6 +3,10 @@
 > ⚠️ **L'app Android est native Kotlin (à la racine du dépôt : `app/`, `core/`).
 > Ce dossier garde le backend Modal SAM 3.1 et l'ancienne app Expo (legacy).**
 > Fermeture Modal, relance en une commande et preuve de l'état : [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).
+>
+> Backend déployé aujourd'hui : `backend/live_fast/` (app `sam3-eu-a100`, voir
+> [`docs/LIVE-FAST.md`](docs/LIVE-FAST.md)) ; `modal_app.py` est l'ère `sam3-vision`
+> (`/analyze`, `/ask`). Le reste de cette page décrit l'époque Expo/legacy.
 
 Photo → segmentation SAM 3.1 sur Modal → description et questions/réponses par un LLM vision, dans une app Android (Expo / React Native).
 

@@ -11,7 +11,7 @@ du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret
 |---|---|---|
 | `test_units.py` | tests unitaires backend sans GPU ni token (imagerie, masques PNG, prompts, app FastAPI pilotée en ASGI) ; sort ≠ 0 si échec | `python3 scripts/test_units.py` |
 | `test_api.py` | test E2E du contrat contre le backend déployé (stdlib seule) ; groupes `health`, `segment`, `segment-prompts`, `analyze`, `ask`, `bad-image`, `contract-errors` ; sort ≠ 0 si échec | `python3 scripts/test_api.py --url https://…modal.run --only contract-errors` |
-| `../app/tools/test-client.mjs` | tests du client Expo hors RN : parsing des 4 réponses, `api.ts` contre un serveur HTTP local, colorisation de masque pixel à pixel | `node legacy-expo-app/tools/test-client.mjs` |
+| `legacy-expo-app/tools/test-client.mjs` | tests du client Expo hors RN : parsing des 4 réponses, `api.ts` contre un serveur HTTP local, colorisation de masque pixel à pixel | `node legacy-expo-app/tools/test-client.mjs` |
 
 ## Déploiement Modal
 
@@ -24,6 +24,17 @@ Options utiles : `deploy_backend.sh --skip-smoke` (pas de `/health`), `--help`, 
 `DRY_RUN=1` pour les deux scripts (valide l'environnement et les fichiers **sans appeler
 Modal** : ni secret, ni déploiement). `MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAME`,
 `APP_NAME`, `API_URL` sont surchargeables (`lib-env.sh` donne les défauts).
+
+## Direct et mesures
+
+| Script | Rôle | Exemple |
+|---|---|---|
+| `deploy-live-fast.sh` | **seule** commande de déploiement du direct (app `sam3-eu-a100`, leviers `FAST_*`, attente de la nouvelle version, vérification `/health`) ; `--no-deploy` vérifie sans déployer | `bash scripts/deploy-live-fast.sh` |
+| `modal-one-gpu.sh` | garde-fou « une seule GPU » (enveloppe de `sam3-gpu guard`) | `bash scripts/modal-one-gpu.sh --status` |
+| `bench_live.py` / `bench_live_ws.py` / `bench_track.py` / `phone_bench.py` | bancs de mesure HTTP / WebSocket / tracker / téléphone (réveillent un GPU : jamais en routine) | `python3 scripts/bench_live_ws.py --url wss://… --image … --runs 6` |
+| `test_live_ws.py` | contrat WS sans GPU ni réseau (24 vérifications) | `python3 scripts/test_live_ws.py` |
+| `test_units.py` + `tests_units/` | tests unitaires sans GPU (latence, fusion, poids, plomberie) | `python3 scripts/test_units.py` |
+| `probe_*.py`, `local_segment.py`, `baseten_sync.py` | sondes de mesure, segmentation locale, synchro Baseten | — |
 
 ## App Android / Expo
 

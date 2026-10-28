@@ -1,7 +1,7 @@
 """Graphe CUDA de la **passe DETR** (têtes de détection), mise en forme fixe.
 
 L'encodeur vision est déjà graphé (`fast_core.graph_vision`) : après lui, le poste dominant
-de `/live` est `detr_ms` — 53-58 ms mesurés le 25 octobre 2026 pour ~1,5 ms de vrai calcul GPU.
+de `/live` est `detr_ms` — 53-58 ms mesurés (relevé antérieur, hors de cet arbre) pour ~1,5 ms de vrai calcul GPU.
 C'est du lancement de kernels : un graphe CUDA le paie une fois.
 
 Un forward de `Sam3Model` prend deux structures imbriquées (embeddings vision + tokens).
