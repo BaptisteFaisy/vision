@@ -59,7 +59,9 @@ fun ChatScreen(
         val question = draft.trim()
         if (question.isNotEmpty() && !state.asking) {
             onAsk(question)
-            draft = ""
+            // Question refusée (pas de photo, LLM absent) : le brouillon est gardé,
+            // le bandeau du ViewModel dit pourquoi.
+            if (state.canAsk) draft = ""
         }
     }
     Column(Modifier.fillMaxSize().background(AppColors.background).statusBarsPadding().navigationBarsPadding()) {
