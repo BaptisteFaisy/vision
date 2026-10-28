@@ -83,7 +83,7 @@ class LiveStats(maxSamples: Int = 20) {
 /** Prompts du direct : liste courte, modifiable depuis l'UI. */
 object LivePrompts {
     val Default: List<String>   // ["person", "car", "dog", "chair"]
-    const val MAX = 8
+    const val MAX = 6
     fun normalize(prompts: List<String>): List<String>   // vide -> Default, borne à MAX, bornes de longueur
 }
 ```

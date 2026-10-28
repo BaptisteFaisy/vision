@@ -46,7 +46,7 @@ là, atteignables par « Autres écrans » des Réglages (`app/AppNav.kt:63-81`,
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:84`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
-| Concepts du direct | **2** (`person`, `door`), `LivePrompts.MAX = 2` (`core/live/LivePrompts.kt:20,28`) |
+| Concepts du direct | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), `LivePrompts.MAX = 6` (`core/live/LivePrompts.kt:27,34`) |
 | Tests | **1 462 `@Test`** JVM (`:core` 947, `:app` 515, mesure du 27/10/2026 : 194 classes, 0 échec) + 7 instrumentés (`:app` : 6 `CaptureCleanupTest`, 1 `MockGlassesTest`) |
 | Taille | **492** fichiers `.kt`, **30 289** lignes de prod (`:core` 11 654, `:app` 18 635, mesure du 27/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
@@ -138,7 +138,7 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
   de file externe, et pas de gate IA : la seule porte est la CI (`docs/CI-QUEUE.md`).
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
-  **2 concepts** (`core/live/LivePrompts.kt:20,28`) et **deux cadences** — Direct
+  **6 concepts** (`core/live/LivePrompts.kt:27,34`) et **deux cadences** — Direct
   350/500/900 ms (`core/live/LiveSession.kt:33`), sonde iSee `fastMs = 0`, `concurrency = 1`,
   budget 150 ms (`LiveSession.kt:42-47`).
 - Langue du projet : **français** (code commenté, commits `feat(isee): …`, docs).

@@ -139,6 +139,8 @@ lancé sur cette machine pour ce comptage.
   à `PROMPT_LIMIT = 2`. Le KDoc de `LivePrompts.kt:9-19` raconte encore une liste longue et une
   mesure de latence qui la justifiait : **il contredit le code trois lignes plus bas** et reste
   à corriger (hors du périmètre de cette relecture).
+  (État au 27/10 — **dépassé le 28/10** : décision user « suivre aussi les véhicules »,
+  6 concepts par défaut et `MAX = PROMPT_LIMIT = 6`.)
 - **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:33`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
   (`app/isee/LiveProbe.kt:128,137`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
@@ -174,6 +176,7 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
 - Deux commentaires de code ont été corrigés le 27/10 : `HttpLiveClient.kt:30` cite
   `docs/LIVE-SPEC.md`, qui **existe** (310 lignes, contrat du direct), et le KDoc de
   `LivePrompts.kt:9-19` dit désormais « 2 concepts », comme le code (`Default`, `MAX = 2`).
+  (6 concepts depuis la décision user du 28/10.)
 
 ## Non mesuré ici
 
