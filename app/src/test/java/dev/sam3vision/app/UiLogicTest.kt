@@ -88,6 +88,16 @@ class UiLogicTest {
     }
 
     @Test
+    fun `le cache de l'intro perime quand l'asset change de taille`() {
+        // Cache absent : première ouverture, on recopie.
+        assertTrue(introCacheStale(0L, 401701))
+        // Ancienne voix en cache (Jade, 386 237 o), nouvel asset (Laure) : on recopie.
+        assertTrue(introCacheStale(386237L, 401701))
+        // Même taille : rien à recopier.
+        assertFalse(introCacheStale(401701L, 401701))
+    }
+
+    @Test
     fun `la taille cible echange largeur et hauteur sur un quart de tour`() {
         // Capteur 640×480 livré à l'horizontale, redressé à 90° : 480×640, réduit à 512.
         assertEquals(384 to 512, targetSize(640, 480, 90, LIVE_EDGE))

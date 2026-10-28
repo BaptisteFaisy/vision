@@ -14,6 +14,9 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (27/10), seule la voix le disait encore. Jade US reste proposée dans Réglages.
 - Commentaires et docs réalignés (`IntroAudio`, `IntroLogic`, `Settings`,
   `SpeechLanguage`, `TtsSettings`, `ELEVENLABS-TTS.md`, `VOIX-ANGLAIS.md`).
+- Le cache de l'intro s'invalide quand l'asset change (`introCacheStale`,
+  comparaison des tailles) : sans ça, une mise à jour rejouerait l'ancienne
+  voix jusqu'au vidage du cache par Android. 1 test JVM (`UiLogicTest`).
   Preuve d'écoute : à confirmer à l'oreille sur le téléphone (pas de sortie
   audio sur le poste de travail).
 - La narration du Direct parle au même endpoint et au même modèle Meta que les
