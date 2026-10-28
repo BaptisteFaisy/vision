@@ -96,11 +96,14 @@ Donc la voix des positions parle seulement si **les deux** sont vraies :
 - une **clé ElevenLabs** non vide (et un ID de voix non vide) — saisie à l'écran
   Réglages ou venue du build (`tts.api.key`).
 
-**Si l'une manque : rien n'est dit, aucune erreur visible, aucun appel réseau.**
-C'est le piège de diagnostic :
+**Si l'une manque : rien n'est dit, aucun appel réseau.** L'erreur typée remonte à
+l'appelant (`VoiceAnnouncer.say()` rend `Result<Unit>` : succès si le texte est vide,
+`ApiError.InvalidKey` si la clé manque, sinon l'erreur de synthèse ou de lecture) —
+les bandeaux l'ignorent (l'info y est déjà affichée), le micro verrouillé la publie
+dans sa notification au lieu d'un succès muet. C'est le piège de diagnostic :
 
-- `VoiceAnnouncer.say()` sort immédiatement si `settings.ttsApiKey.isBlank()`
-  (`app/VoiceAnnouncer.kt:23-29`, garde `:25`) ;
+- `VoiceAnnouncer.say()` ne dit rien sans clé, mais rend l'échec au lieu de sortir
+  en silence (`app/VoiceAnnouncer.kt`) ;
 - `ProximityVoice.onPhrase()` sort si `!current.ttsConfigured` (`app/isee/ProximityVoice.kt:29-38`, garde `:33`)
   et, sur échec de synthèse, fait `getOrElse { return }` : l'erreur n'est pas remontée
   à l'écran.

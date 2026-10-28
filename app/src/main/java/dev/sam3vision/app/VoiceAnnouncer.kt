@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.content.Context
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import java.io.File
@@ -12,21 +13,29 @@ import java.io.File
  * [SpeechPlayer]. Le texte à lire est passé tel quel : c'est l'appelant qui décide
  * quoi annoncer (bandeau « J'écoute », résultat, erreurs).
  *
- * Un échec (clé absente, 402, réseau) reste silencieux côté audio : l'information
- * est déjà affichée en gros caractères et exposée à TalkBack par le bandeau.
+ * Un échec (clé absente, 402, réseau, lecture) est rendu à l'appelant, jamais avalé :
+ * écran verrouillé, personne ne lit le bandeau — un succès mensonger y serait un
+ * silence total. Les appelants « bandeau » ignorent le résultat (l'info est déjà
+ * affichée en gros caractères et exposée à TalkBack) ; le micro verrouillé le publie.
  */
 class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
 
     private val player = SpeechPlayer(File(context.cacheDir, dirName))
 
-    /** Synthétise puis lit [text] ; sans effet si le texte ou la clé sont vides. */
-    suspend fun say(settings: Settings, text: String) {
+    /**
+     * Synthétise puis lit [text]. Rien à dire (texte vide) = succès ; clé absente,
+     * synthèse ou lecture en échec = l'erreur typée du réseau ou du lecteur.
+     */
+    suspend fun say(settings: Settings, text: String): Result<Unit> {
         val clean = text.trim()
-        if (clean.isEmpty() || settings.ttsApiKey.isBlank()) return
-        player.speed = settings.ttsSpeed
-        ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId).synthesize(clean).onSuccess { audio ->
-            player.play(audio)
+        if (clean.isEmpty()) return Result.success(Unit)
+        if (settings.ttsApiKey.isBlank()) {
+            return Result.failure(ApiError.InvalidKey("clé ElevenLabs absente — renseigne-la dans Réglages"))
         }
+        player.speed = settings.ttsSpeed
+        val audio = ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId)
+            .synthesize(clean).getOrElse { return Result.failure(it) }
+        return player.play(audio)
     }
 
     fun stop() = player.stop()
