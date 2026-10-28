@@ -34,16 +34,16 @@ internal fun LabeledField(label: String, value: String, secret: Boolean, onChang
             trailingIcon = if (!secret) null else {
                 {
                     TextButton(onClick = { shown = !shown }) {
-                        Text(if (shown) "Hide" else "Show", fontSize = 11.sp)
+                        Text(if (shown) "Hide" else "Show", fontSize = 11.sp, color = SettingsLight.text)
                     }
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = SettingsLight.text,
                 unfocusedTextColor = SettingsLight.text,
-                cursorColor = SettingsLight.primary,
-                focusedBorderColor = SettingsLight.primary,
-                unfocusedBorderColor = SettingsLight.border,
+                cursorColor = SettingsLight.text,
+                focusedBorderColor = SettingsLight.text,
+                unfocusedBorderColor = SettingsLight.text,
             ),
             modifier = Modifier.fillMaxWidth(),
         )

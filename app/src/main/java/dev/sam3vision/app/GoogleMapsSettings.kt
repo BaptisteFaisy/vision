@@ -17,10 +17,5 @@ internal fun GoogleMapsSettings(draft: Settings, onChange: (Settings) -> Unit) {
         LabeledField("Google Maps API key", draft.googleMapsApiKey, true) {
             onChange(draft.copy(googleMapsApiKey = it.trim()))
         }
-        Text(
-            if (draft.googleMapsApiKey.isBlank()) "The build key is filled in at installation."
-            else "Key filled in: Google Maps is selected for the caregiver map.",
-            color = SettingsLight.muted, fontSize = 11.sp,
-        )
     }
 }
