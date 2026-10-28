@@ -3,6 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — suppression NanoDet (test escaliers SAM uniquement, ordre user)
+
+- Supprimés : écran démo `app/.../detect/` (5 fichiers : écran, hôte caméra,
+  préprocesseur, détecteur ORT, spec modèle), `core/.../detect/` (interface +
+  décodage, 80 labels COCO), 3 tests (2 JVM + 1 instrumenté),
+  `docs/NANODET-SAM31.md`, route `Route.NanoDet` + bouton Réglages + callbacks
+  (`AppNav`, `SettingsScreen`, `SettingsClassicScreens`, `UiLogicTest` adaptés).
+- Motif : carrés rouges NanoDet confondus avec SAM au test téléphone ; COCO
+  sans classe escaliers → le test escaliers se fait en Direct/SAM uniquement.
+  Release `detect-models-v1` conservée côté GitHub (restaurable par revert).
+- Preuves : `grep -ri nanodet` = 0 occurrence, `:core` + `:app`
+  `testDebugUnitTest` verts sur r630, `check-kotlin-limits` OK.
+
 ## 2026-10-28 — traversée : veto TTC sur boîtes SAM suivies
 
 - `VehicleApproach` (`core/.../traverse/`) : association IoU inter-frames,
