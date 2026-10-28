@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
-import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.MASK_ALPHA
@@ -19,13 +18,10 @@ import dev.sam3vision.core.live.Cadence
 import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.FramePayload
 import dev.sam3vision.core.live.FrameRate
-import dev.sam3vision.core.live.Guidance
 import dev.sam3vision.core.live.LatestFrameSlot
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimings
-import dev.sam3vision.core.live.PlacedLabel
-import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.app.LiveMaskTransport
@@ -108,11 +104,8 @@ class LiveProbe(
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()
 
-    /** Déclencheur des annonces vocales : stabilité, non-répétition, 4 s d'écart. */
-    private val announcer = PositionAnnouncer()
-
-    /** Déclencheur des consignes de guidage : même rythme, mais le danger parle aussitôt. */
-    private val guidance = GuidanceAnnouncer()
+    /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
+    private val voice = ProbeVoice()
     /** Déclencheur du mode Traversée : vert confirmé, rouge vite, doute une fois. */
     private val crossing = CrossingAnnouncer()
 
@@ -126,12 +119,6 @@ class LiveProbe(
      * tout à chaque image.
      */
     private val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
-
-    /** Vrai si les Réglages autorisent l'annonce (« Annoncer les objets et leur distance »). */
-    private var announcePositions = false
-
-    /** Vrai si les Réglages demandent le guidage (« Guider tout droit ») : il prime sur l'annonce. */
-    private var guideStraight = false
 
     /** Langue de la voix (Réglages) : le français reste le défaut des fonctions pures. */
     private var speechLanguage: SpeechLanguage = SpeechLanguage.Fr
@@ -166,8 +153,9 @@ class LiveProbe(
         // conteneur qui parle, pas la frame. Une fois la première analyse passée, on
         // repart sur la session normale à délai court (10 s).
         coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
-        announcePositions = announce
-        guideStraight = guide
+        voice.guide = guide
+        voice.announce = announce
+        voice.language = language
         speechLanguage = language
         depthEngine = depth
         distances.enabled = distancesOn
@@ -231,8 +219,7 @@ _state.update { it.cleared() }
         reserve.clear()
         chronology.reset()
         rate.reset()
-        announcer.reset()
-        guidance.reset()
+        voice.reset()
         crossing.reset()
         liveMeter?.reset()
     }
@@ -253,8 +240,18 @@ _state.update { it.cleared() }
      */
     fun setSteering(cap: SteeringCap) {
         if (_state.value.steeringCap == cap) return
-        guidance.reset()
+        voice.reset()
         _state.update { it.copy(steeringCap = cap) }
+    }
+
+    /** Cap de l'itinéraire : tant qu'il est posé, la sonde marche son couloir. */
+    fun setRouteCap(cap: SteeringCap) {
+        voice.routeCap = cap
+    }
+
+    /** Fin du guidage route : le cap manuel reprend. */
+    fun clearRouteCap() {
+        voice.routeCap = null
     }
 
     /**
@@ -404,8 +401,12 @@ _state.update { it.cleared() }
         val readings = liveMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
-        val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(placed, at)
-        val steering = steeringCueOf(placed)
+        val phrase = if (_state.value.crossingActive) {
+            cross?.phrase
+        } else {
+            voice.phrase(at, placed, _state.value.steeringCap)
+        }
+        val steering = steeringCueOf()
         _state.update { current ->
             current.copy(
                 masks = overlays,
@@ -440,24 +441,13 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Phrase à dire, ou `null` pour rester muet : bascules des Réglages coupées, ou scène
-     * déjà dite. Le guidage prime sur l'annonce des positions : une seule voix à la fois.
-     * Les objets arrivent déjà placés (la vidéo dessine le même chemin).
+     * Chemin dessiné sur la vidéo : lu dans la décision parlée à cette frame
+     * (la vidéo est en direct, la voix seule est débouncée). `null` en
+     * Traversée (ses prompts feu+voitures ne disent pas où marcher).
      */
-    private fun phraseOf(placed: List<PlacedLabel>, at: Long): String? {
-        if (guideStraight) return guidance.onFrame(at, placed, speechLanguage, _state.value.steeringCap)
-        if (!announcePositions) return null
-        return announcer.onFrame(at, placed, speechLanguage)
-    }
-
-    /**
-     * Chemin dessiné sur la vidéo : recalculé à chaque frame (la vidéo est en
-     * direct, la voix seule est débouncée). `null` en Traversée (ses prompts
-     * feu+voitures ne disent pas où marcher) ou guidage coupé.
-     */
-    private fun steeringCueOf(placed: List<PlacedLabel>): SteeringCue? {
-        if (_state.value.crossingActive || !guideStraight) return null
-        return SteeringCue.from(Guidance.decide(placed, _state.value.steeringCap))
+    private fun steeringCueOf(): SteeringCue? {
+        if (_state.value.crossingActive) return null
+        return voice.cue()
     }
 
     /**
