@@ -8,6 +8,7 @@ import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.DepthEstimator
 import dev.sam3vision.core.depth.DepthMap
 import dev.sam3vision.core.depth.DepthResult
+import dev.sam3vision.core.depth.SerialRunGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -22,6 +23,7 @@ import kotlinx.coroutines.withContext
 class OnnxDepthEstimator private constructor(
     private val session: OrtSession,
     private val inputName: String,
+    private val guard: SerialRunGuard = SerialRunGuard(),
 ) : DepthEstimator {
 
     override val backend: DepthBackend = DepthBackend.DA2
@@ -36,7 +38,9 @@ class OnnxDepthEstimator private constructor(
                     resized, DepthPreprocess.INPUT_SIZE, IMAGE_MEAN, IMAGE_STD,
                 )
                 val started = android.os.SystemClock.elapsedRealtime()
-                val map = runSession(input)
+                // Sérialisé : `OrtSession.run` n'est pas thread-safe (SIGABRT
+                // Scudo du 2026-10-28 sur runs concurrents / close en vol).
+                val map = guard.run { runSession(input) }.getOrThrow()
                 val elapsed = android.os.SystemClock.elapsedRealtime() - started
                 DepthResult(map, DepthBackend.DA2, elapsed)
             }
@@ -55,7 +59,8 @@ class OnnxDepthEstimator private constructor(
     }
 
     override fun close() {
-        session.close()
+        // Reportée si un run est en vol : jamais de `close()` pendant `run()`.
+        guard.close { session.close() }
     }
 
     companion object {

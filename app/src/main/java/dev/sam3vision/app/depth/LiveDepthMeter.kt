@@ -60,12 +60,17 @@ class LiveDepthMeter(
 
     /** Moteur fermé, carte oubliée (rouvert à la prochaine frame si actif). */
     fun reset() {
+        val stale: DepthEstimator?
         synchronized(lock) {
             pendingJpeg = null
             latest = null
+            stale = estimator
+            estimator = null
         }
-        estimator?.close()
-        estimator = null
+        // Hors verrou : `close()` ne bloque pas (libération reportée si run).
+        if (stale != null) {
+            stale.close()
+        }
     }
 
     private fun freshMap(): DepthMap? {
@@ -108,7 +113,7 @@ class LiveDepthMeter(
     }
 
     private suspend fun ensureEngine(): DepthEstimator? {
-        estimator?.let { return it }
+        synchronized(lock) { estimator }?.let { return it }
         val target = backend()
         if (target == DepthBackend.OFF) return null
         if (nowMs() - engineTriedMs < RETRY_MS) return null
@@ -124,7 +129,9 @@ class LiveDepthMeter(
             return null
         }
         Log.i(TAG, "moteur " + opened.backend.code + " prêt")
-        estimator = opened
+        synchronized(lock) {
+            estimator = opened
+        }
         return opened
     }
 
