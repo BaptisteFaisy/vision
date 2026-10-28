@@ -5,6 +5,8 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.SharedScene
 import dev.sam3vision.core.share.canPublishShare
+import dev.sam3vision.core.share.normalizeShareId
+import dev.sam3vision.core.share.relayBaseOf
 import dev.sam3vision.core.share.shareEndpoint
 import dev.sam3vision.core.share.shareJson
 import dev.sam3vision.core.share.sharedObjectsOf
@@ -45,11 +47,14 @@ class ShareBroadcaster(context: Context) {
         if (!canPublishShare(settings)) return
         val id = normalizeShareId(settings.shareId)
         if (id.isBlank()) return
-        val fix = positions.lastFix ?: return
+        val fix = positions.lastFix
+        if (fix == null) {
+            ShareHealth.noFix()
+            return
+        }
         val objects = layer?.let { sharedObjectsOf(it.readings, it.width, it.height, it.fovDeg, fix.headingDeg) }.orEmpty()
-        val site = settings.parentSiteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
-        val url = shareEndpoint(site) ?: return
-        reporter.maybeSend(nowMs, url, shareJson(id, settings.shareWriteKey, fix, objects, scene))
+        val url = shareEndpoint(relayBaseOf(settings.parentSiteUrl)) ?: return
+        ShareHealth.note(reporter.maybeSend(nowMs, url, shareJson(id, settings.shareWriteKey, fix, objects, scene)))
     }
 
 }

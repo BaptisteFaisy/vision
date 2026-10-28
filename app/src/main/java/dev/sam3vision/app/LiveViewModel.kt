@@ -147,7 +147,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         state = _state,
         timeline = timeline,
         latestJpeg = { latestFrame.jpegB64 },
-        refreshSettings = { settings = seededFromBuild(store.load()) },
+        refreshSettings = { settings = loadedSettings(store) },
         settings = { settings },
         llm = { llmClient(it) },
         windowMs = MEMORY_WINDOW_MS,

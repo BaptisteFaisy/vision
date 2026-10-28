@@ -14,6 +14,9 @@ object SettingsLight {
     val muted = Color(0xFF5B6472)
     val border = Color(0xFFE2E8F0)
     val primary = Color(0xFF1D4ED8)
+
+    /** Erreur lisible sur fond blanc (page des Réglages). */
+    val danger = Color(0xFFB42318)
 }
 
 object AppColors {

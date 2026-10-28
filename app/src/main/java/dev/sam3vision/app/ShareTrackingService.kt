@@ -19,6 +19,8 @@ import dev.sam3vision.core.share.ShareTrackingPolicy
 import dev.sam3vision.core.share.shareJson
 import dev.sam3vision.core.share.shareEndpoint
 import dev.sam3vision.core.share.canPublishShare
+import dev.sam3vision.core.share.normalizeShareId
+import dev.sam3vision.core.share.relayBaseOf
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,13 +114,18 @@ class ShareTrackingService : Service() {
         val id = normalizeShareId(settings.shareId)
         if (id.isBlank()) return false
         if (ShareGate.screenPublishing) return true // le Direct publie déjà son état complet
-        val fix = positions.lastFix ?: return true // pas encore de position : on patiente
-        val site = settings.parentSiteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
-        val url = shareEndpoint(site) ?: return false
-        reporter.maybeSend(
-            System.currentTimeMillis(),
-            url,
-            shareJson(id, settings.shareWriteKey, fix, emptyList()),
+        val fix = positions.lastFix
+        if (fix == null) { // pas encore de position : on patiente en le disant
+            ShareHealth.noFix()
+            return true
+        }
+        val url = shareEndpoint(relayBaseOf(settings.parentSiteUrl)) ?: return false
+        ShareHealth.note(
+            reporter.maybeSend(
+                System.currentTimeMillis(),
+                url,
+                shareJson(id, settings.shareWriteKey, fix, emptyList()),
+            ),
         )
         return true
     }

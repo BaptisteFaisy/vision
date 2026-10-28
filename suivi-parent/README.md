@@ -1,5 +1,11 @@
 # Suivi caregiver — session iSee partagée
 
+> **Site abandonné (2026-10-28).** Le relais que l'app utilise par défaut est
+> `../suivi-relais/` (Worker + D1) ; ce déploiement Vercel est resté figé au
+> 27/10 21 h 03 et refusait les écritures des installations neuves (403). Ce
+> dossier ne sert plus que de source de la page embarquée dans l'APK (tâche
+> Gradle `caregiverAssets`) et de référence pour l'ancien contrat.
+
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
 Android : fond blanc, petite boule Portrait bleue et verte, phrase courante
 et carte haute en bas.
