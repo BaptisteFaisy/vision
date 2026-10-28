@@ -57,7 +57,7 @@ class OnnxDepthEstimator private constructor(
     }
 
     companion object {
-        const val ASSET_NAME = "da2_small_uint8.onnx"
+        const val ASSET_NAME = "da2_small_uint8.ort"
 
         private const val INPUT_SIZE = 256
 

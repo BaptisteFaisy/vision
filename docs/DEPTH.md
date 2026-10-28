@@ -7,8 +7,12 @@ proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
 ## Choix du modèle
 
 - **Primaire : Depth Anything V2 Small** (24,8 M, Apache-2.0, commercial OK),
-  ONNX uint8 26 Mo, 256×256 → carte 252×252. Export prouvé
-  (`onnx-community/depth-anything-v2-small`, `onnx/model_uint8.onnx`).
+  256×256 → carte 252×252. Embarqué en **`.ort` 27 Mo** (pré-optimisé ;
+  le paquet `-mobile` est exclu : il refuse le `.onnx` et ne sait pas
+  exécuter le `ConvInteger` quantifié — prouvé sur Redmi) : `onnx/model_uint8.onnx`
+  (`onnx-community/depth-anything-v2-small`) converti par
+  `onnxruntime.tools.convert_onnx_models_to_ort` 1.18.1, sortie vérifiée
+  bit-identique (voir `NOTICE-depth.txt`).
 - **Repli : MiDaS v2.1 small** (21 M, MIT Intel ISL), TFLite fp32 64 Mo,
   256×256 → 256×256, via LiteRT `Interpreter` CPU (4 fils).
 - Exclus : DA-V2 Base/Large/Giant + UniDepth (CC-BY-NC), ZoeDepth/Marigold/
