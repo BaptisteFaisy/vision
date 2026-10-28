@@ -232,6 +232,18 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        // Sans position d'avant-plan, le service démarre mais n'envoie jamais rien
+        // (pas de fix GPS) : on la redemande ici, même refusée au premier lancement.
+        if (!granted(Manifest.permission.ACCESS_FINE_LOCATION) ||
+            !granted(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ) {
+            locationPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
         if (!granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
             backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }

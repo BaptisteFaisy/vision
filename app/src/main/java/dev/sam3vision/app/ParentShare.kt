@@ -51,7 +51,8 @@ fun caregiverShareLink(settings: Settings): String {
         ?: return validatedShareLink(settings.parentSiteUrl).orEmpty()
     if (invite.siteUrl.isNotBlank() || invite.shareId.isBlank()) return ""
     val site = settings.parentSiteUrl.toHttpUrlOrNull() ?: return ""
-    return validatedShareLink(site.newBuilder().setQueryParameter("share", invite.shareId).build().toString()).orEmpty()
+    val id = normalizeShareId(invite.shareId)
+    return validatedShareLink(site.newBuilder().setQueryParameter("share", id).build().toString()).orEmpty()
 }
 
 /**
@@ -60,10 +61,21 @@ fun caregiverShareLink(settings: Settings): String {
  */
 fun shareLink(siteUrl: String, shareId: String): String {
     val base = siteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
-    val id = shareId.ifBlank { Settings.DEFAULT_SHARE_ID }
+    val id = normalizeShareId(shareId).ifBlank { Settings.DEFAULT_SHARE_ID }
     if (base.contains("?share=") || base.contains("&share=")) return base
     val sep = if (base.contains("?")) "&" else "?"
-    return base.trim().trimEnd('/') + sep + "share=" + id.trim()
+    return base.trim().trimEnd('/') + sep + "share=" + id
+}
+
+/**
+ * Identifiant de flux assaini : le relais n'accepte que `[a-z0-9-]{1,32}`
+ * (`validatedShareLink` côté lecture) et lit `?share=` tel quel. Sans ça,
+ * « Léo » partait en POST mais répondait 400, pendant que la page lisait un
+ * autre flux — suivi noir des deux côtés, sans un mot d'erreur.
+ */
+fun normalizeShareId(raw: String): String {
+    val ascii = java.text.Normalizer.normalize(raw.trim().lowercase(), java.text.Normalizer.Form.NFD)
+    return ascii.replace(Regex("[\u0300-\u036f]"), "")
 }
 
 /** Lance un partage ; `false` si aucune app ne le prend en charge. */

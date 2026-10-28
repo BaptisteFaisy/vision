@@ -53,7 +53,7 @@ fun SettingsScreen(
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
-    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -236,7 +236,7 @@ private fun TechnicalSection(
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
-    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
@@ -294,7 +294,7 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
 @Composable
 private fun ParentShareSettings(
     draft: Settings,
-    onStartTracking: (siteUrl: String, shareId: String) -> Unit,
+    onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     onChange: (Settings) -> Unit,
 ) {
@@ -328,7 +328,7 @@ private fun ParentShareSettings(
         if (trackingActive) {
             GlassButton("Stop tracking", true, false, onStopTracking)
         } else {
-            GlassButton("\uD83D\uDCE4 Share tracking", true, true, onClick = { onStartTracking(draft.parentSiteUrl, draft.shareId) })
+            GlassButton("\uD83D\uDCE4 Share tracking", true, true, onClick = { onStartTracking(draft) })
         }
         Text(
             "In a pocket (screen off), only the position keeps being sent every 15 s " +
