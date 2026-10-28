@@ -50,7 +50,7 @@ GROUNDING_BATCH = _env_int("TRACK_GROUNDING_BATCH", 1)  # frames par chunk du d�
 # torch.compile : supprime une partie du surcoût Python/dispatch par frame (le modèle est
 # appelé une frame à la fois en direct, là où le mode batch amortit ces coûts).
 COMPILE = os.environ.get("TRACK_COMPILE") == "1"
-PROMPT_LIMIT = 6        # concepts par session : chacun coûte une inférence de frame par /frame (6 = décision user du 28/10)
+PROMPT_LIMIT = 16       # concepts par session : chacun coûte une inférence de frame par /frame (16 = décision user du 28/10)
 SESSIONS_ROOT = "/tmp/sessions"
 OUTPUT_PROB_THRESH = 0.5
 
