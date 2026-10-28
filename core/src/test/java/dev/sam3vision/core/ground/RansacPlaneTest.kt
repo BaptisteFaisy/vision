@@ -66,27 +66,33 @@ class RansacPlaneTest {
     @Test
     fun `fit redresse un pique de telephone via pitchRad`() {
         val pitch = 0.5
-        val side = 12
-        val n = side * side
+        val n = 200
         val xs = FloatArray(n)
         val ys = FloatArray(n)
         val zs = FloatArray(n)
         val rows = IntArray(n)
         val cosP = cos(pitch)
         val sinP = kotlin.math.sin(pitch)
+        // Points aléatoires seedés, pas une grille : une grille régulière
+        // contient des triples colinéaires aux normales dominées par le bruit
+        // float, qui passent la contrainte par accident (vérifié : 1612/487344
+        // sur grille 12×12, 0/1313400 ici).
+        val random = java.util.Random(7)
         for (i in 0 until n) {
-            val wx = -2f + (i % side) * (4f / (side - 1))
-            val wz = 1f + (i / side) * (4f / (side - 1))
+            val wx = -2f + random.nextFloat() * 4f
+            val wz = 1f + random.nextFloat() * 4f
             xs[i] = wx
             ys[i] = (-SyntheticScene.CAM_HEIGHT * cosP + wz * sinP).toFloat()
             zs[i] = (SyntheticScene.CAM_HEIGHT * sinP + wz * cosP).toFloat()
-            rows[i] = i / side
+            rows[i] = i % 48
         }
 
         val tilted = RansacPlane.fit(xs, ys, zs, rows, pitch.toFloat())
         assertNotNull(tilted.plane)
         assertTrue(tilted.highConfidence)
-        assertEquals(cos(pitch).toFloat(), tilted.plane!!.b, 1e-4f)
+        assertEquals(0f, tilted.plane!!.a, 1e-3f)
+        assertEquals(cos(pitch).toFloat(), tilted.plane!!.b, 1e-3f)
+        assertEquals(-sinP.toFloat(), tilted.plane!!.c, 1e-3f)
 
         val flat = RansacPlane.fit(xs, ys, zs, rows, 0f)
         assertNull(flat.plane)
