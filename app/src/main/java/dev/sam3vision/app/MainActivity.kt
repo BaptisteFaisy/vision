@@ -27,6 +27,7 @@ import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
 import dev.sam3vision.app.glasses.bench.SpikeLaunch
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.locked.LockedMicBridge
+import dev.sam3vision.app.perms.canAskBackground
 
 private val SamColorScheme = darkColorScheme(
     primary = AppColors.primary,
@@ -232,8 +233,9 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Demandes manquantes pour le suivi permanent (bouton « Partager » de la
-     * section Suivi parent) : notification, puis localisation d'arrière-plan,
-     * une boîte de dialogue par appui (la demande groupée est ignorée).
+     * section Suivi parent) : notification, puis localisation d'avant-plan,
+     * puis d'arrière-plan — une boîte de dialogue par appui, et l'arrière-plan
+     * seulement si l'avant-plan est déjà accordé (sinon Android l'ignore).
      */
     fun ensureSharePermissions() {
         val granted = { permission: String ->
@@ -244,9 +246,9 @@ class MainActivity : ComponentActivity() {
         }
         // Sans position d'avant-plan, le service démarre mais n'envoie jamais rien
         // (pas de fix GPS) : on la redemande ici, même refusée au premier lancement.
-        if (!granted(Manifest.permission.ACCESS_FINE_LOCATION) ||
-            !granted(Manifest.permission.ACCESS_COARSE_LOCATION)
-        ) {
+        val fg = granted(Manifest.permission.ACCESS_FINE_LOCATION) ||
+            granted(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (!fg) {
             locationPermission.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -254,7 +256,7 @@ class MainActivity : ComponentActivity() {
                 ),
             )
         }
-        if (!granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+        if (canAskBackground(fg) && !granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
             backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }

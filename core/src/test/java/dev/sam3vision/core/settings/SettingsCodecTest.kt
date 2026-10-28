@@ -148,4 +148,15 @@ class SettingsCodecTest {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)
     }
+
+    @Test
+    fun `l'endpoint d'itineraire survit a un aller-retour`() {
+        val custom = Settings.Default.copy(routeBaseUrl = "https://route.test")
+        assertEquals("https://route.test", SettingsCodec.decode(SettingsCodec.encode(custom)).routeBaseUrl)
+        assertEquals(true, custom.routeConfigured)
+        // Un fichier écrit avant ce champ : Valhalla désactivé, Maps reste le guidage.
+        val legacy = SettingsCodec.encode(Settings.Default).lines().filterNot { it.startsWith("routeBaseUrl=") }
+        assertEquals("", SettingsCodec.decode(legacy.joinToString("\n")).routeBaseUrl)
+        assertEquals(false, Settings.Default.routeConfigured)
+    }
 }

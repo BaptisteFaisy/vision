@@ -42,6 +42,8 @@ une affirmation fausse pour cet arbre — corrigée ou encadrée).
 | `docs/chat-voix.png` | ressource | Capture d'écran, pas une affirmation |
 | `NOTES.md` | **périmée → corrigée** (27/10, deux passes) | Passe 1 : comptages de tests, « 53 entrées » dans `app/…/app/`, `DistanceMeter` = classe de `DistanceEstimator.kt`. Passe 2 : `TrackClient`/`TrackRunner` **sont** appelés (`LiveViewModel`, `TrackFrameBridge`), `docs/LIVE-SPEC.md` **existe**, KDoc `SamRegion` corrigé ; versions épinglées justes |
 | `CHANGELOG.md` | **à jour** | Le journal des faits livrés depuis le 26/10 ; `docs/PERF.md` reste le seul endroit où chercher un chiffre tenu |
+| `docs/NAVIGATION.md` | **à jour** (relu 28/10) | Contrat technique du handoff Maps : 9 motifs GO, 4 formats d'URI, 4 replis, `navigationGuidanceEnabled = true` — relus à l'identique ; pointe vers `docs/NAVIGATION-VOCALE.md` pour le fonctionnel |
+| `docs/NAVIGATION-VOCALE.md` | **nouveau** (28/10) | Spécification fonctionnelle navigation vocale : parcours MVP, 7 annonces, 9 cas limites, recette 10 points, catalogue 7 chaînes (3 en place, 4 à venir), géocodage + ingress Valhalla cadrés hors MVP ; porte `tools/check-voice-nav-doc.py` |
 
 ## Trois affirmations qui circulaient, et ce qu'il en est dans cet arbre
 

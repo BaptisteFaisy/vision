@@ -1,0 +1,52 @@
+package dev.sam3vision.core.nav
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class GuidanceUpdateTest {
+
+    @Test
+    fun `formats francais de la manoeuvre et du reste`() {
+        val update = GuidanceUpdate("Tournez à droite", 150, 2450, 900)
+
+        assertEquals("Dans 150 m", update.maneuverFr())
+        assertEquals("Encore 2,4 km · 15 min", update.remainingFr())
+    }
+
+    @Test
+    fun `etat initial pointe la destination entiere`() {
+        val summary = RouteSummary("Gare de Lyon", null, 2450, 900)
+
+        val first = initialGuidance(summary)
+
+        assertEquals("Direction Gare de Lyon", first.instruction)
+        assertEquals(2450, first.remainingDistanceMeters)
+        assertEquals(900, first.remainingDurationSeconds)
+    }
+
+    @Test
+    fun `progression de zero a un`() {
+        assertEquals(0f, progressOf(2450, 2450), 0f)
+        assertEquals(0.5f, progressOf(1225, 2450), 0.001f)
+        assertEquals(1f, progressOf(0, 2450), 0f)
+    }
+
+    @Test
+    fun `progression bornee sans lever`() {
+        assertEquals(0f, progressOf(3000, 2450), 0f)
+        assertEquals(0f, progressOf(100, 0), 0f)
+        assertEquals(0f, progressOf(-5, -5), 0f)
+        assertTrue(progressOf(100, 2450) in 0f..1f)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `instruction blanche refusee`() {
+        GuidanceUpdate("  ", 10, 100, 60)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `distance restante negative refusee`() {
+        GuidanceUpdate("Tout droit", 10, -1, 60)
+    }
+}
