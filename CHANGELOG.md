@@ -3,6 +3,20 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — narration Direct : Baseten partout, InferHub retiré
+
+- La narration du Direct parle au même endpoint et au même modèle Meta que les
+  questions (`https://inference.baseten.co/v1`, `meta-models/muse-spark-open-1026`,
+  `Settings.DEFAULT_LIVE_LLM_*`) : un seul fournisseur LLM dans l'app.
+- Le budget de 200 tokens reste suffisant : le client coupe déjà le raisonnement
+  interne (`enable_thinking=false`), la phrase ne paie plus les pensées. Clé de
+  narration toujours dédiée (`liveLlmApiKey`, désormais Baseten) ; sans elle, muet.
+- `InferHubLlmClient` renommé `HttpLlmClient` (plus aucun chemin d'exécution ne
+  touche InferHub) ; `LlmFactory.inferHub` devient `httpLlm`. La migration des
+  réglages d'avant (`migrateLegacyLlm`, InferHub + qwen → build) est conservée.
+- Preuves : `ModelPinTest` (lignes questions + direct citées séparément),
+  `LlmClientTest`, `HttpLlmClientTest`, CI verte exigée au merge.
+
 ## 2026-10-28 — lunettes : l'enregistrement du banc ne bloque plus le main thread
 
 - ANR du 27/10 (`executing service …ACDCRegistrationService`) : `requestRegistration`
