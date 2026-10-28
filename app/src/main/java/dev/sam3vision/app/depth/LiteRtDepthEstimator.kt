@@ -38,7 +38,7 @@ class LiteRtDepthEstimator private constructor(
                 val input = DepthPreprocess.normalizeHWC(resized, DepthPreprocess.INPUT_SIZE)
                 val floats = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
                 input.rewind()
-                input.asFloatBuffer().get(floats)
+                input.get(floats)
                 val started = android.os.SystemClock.elapsedRealtime()
                 // Sérialisé : runs concurrents interdits (même garde qu'avant).
                 guard.run {
