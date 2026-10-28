@@ -5,6 +5,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 ## 2026-10-28 — caregiver : écran réellement livré dans l'APK
 
+- WebView explicitement en MATCH_PARENT : évite un viewport CSS de hauteur nulle
+  et l'écran blanc constaté sur le Samsung, notamment après rotation.
 - Suppression de Retour, du titre Caregiver et d'Actualiser ; état du flux en
   haut à droite, paramètres par la roue dentée.
 - Interface embarquée dans l'APK : fond blanc, même boule Portrait en gris,
