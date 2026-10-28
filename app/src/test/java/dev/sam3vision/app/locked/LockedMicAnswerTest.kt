@@ -57,7 +57,7 @@ class LockedMicAnswerTest {
         val llm = Llm(Result.success("la porte est à droite"))
         val dits = mutableListOf<String>()
 
-        val done = LockedMicAnswer(speech, llm, speak = { dits += it }).run(pcm).getOrThrow()
+        val done = LockedMicAnswer(speech, llm, speak = { dits += it; Result.success(Unit) }).run(pcm).getOrThrow()
 
         assertEquals("où est la porte", done.transcript)
         assertEquals("la porte est à droite", done.answer)
@@ -71,7 +71,7 @@ class LockedMicAnswerTest {
         val llm = Llm(Result.success("jamais"))
         val dits = mutableListOf<String>()
 
-        val error = LockedMicAnswer(null, llm, speak = { dits += it }).run(pcm).exceptionOrNull()
+        val error = LockedMicAnswer(null, llm, speak = { dits += it; Result.success(Unit) }).run(pcm).exceptionOrNull()
 
         assertTrue("attendu InvalidKey, obtenu $error", error is ApiError.InvalidKey)
         assertTrue(error!!.message.orEmpty().contains("Réglages"))
@@ -84,7 +84,7 @@ class LockedMicAnswerTest {
         val speech = Speech(Result.success("jamais"))
         val llm = Llm(Result.success("jamais"))
 
-        val error = LockedMicAnswer(speech, llm, speak = {}).run(ByteArray(64)).exceptionOrNull()
+        val error = LockedMicAnswer(speech, llm, speak = { Result.success(Unit) }).run(ByteArray(64)).exceptionOrNull()
 
         assertTrue("attendu BadResponse, obtenu $error", error is ApiError.BadResponse)
         assertEquals("aucun appel réseau : le seuil est local", 0, speech.calls)
@@ -96,7 +96,7 @@ class LockedMicAnswerTest {
         val speech = Speech(Result.failure(ApiError.PaymentRequired("paiement requis (402)")))
         val llm = Llm(Result.success("jamais"))
 
-        val error = LockedMicAnswer(speech, llm, speak = {}).run(pcm).exceptionOrNull()
+        val error = LockedMicAnswer(speech, llm, speak = { Result.success(Unit) }).run(pcm).exceptionOrNull()
 
         assertEquals("paiement requis (402)", error?.message)
         assertEquals(0, llm.texts)
@@ -108,9 +108,27 @@ class LockedMicAnswerTest {
         val llm = Llm(Result.failure(ApiError.Network("réseau")))
         val dits = mutableListOf<String>()
 
-        val error = LockedMicAnswer(speech, llm, speak = { dits += it }).run(pcm).exceptionOrNull()
+        val error = LockedMicAnswer(speech, llm, speak = { dits += it; Result.success(Unit) }).run(pcm).exceptionOrNull()
 
         assertTrue(error is ApiError.Network)
         assertTrue("rien à dire quand il n'y a pas de réponse", dits.isEmpty())
+    }
+
+    /**
+     * Non-régression : la voix rendait `Unit` et avalait l'échec TTS (402, réseau,
+     * lecture) — le trajet répondait « succès », la notification affichait la réponse,
+     * et l'utilisateur verrouillé n'entendait rien. L'échec remonte désormais tel quel.
+     */
+    @Test
+    fun `un echec de la voix remonte au lieu d un succes muet`() = runBlocking {
+        val speech = Speech(Result.success("où est la porte"))
+        val llm = Llm(Result.success("la porte est à droite"))
+        val ttsDown = ApiError.PaymentRequired("paiement requis (402)")
+
+        val error = LockedMicAnswer(speech, llm, speak = { Result.failure(ttsDown) })
+            .run(pcm).exceptionOrNull()
+
+        assertTrue("attendu PaymentRequired, obtenu $error", error is ApiError.PaymentRequired)
+        assertEquals("paiement requis (402)", error?.message)
     }
 }
