@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Sam3Vision" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Thème plateforme SOMBRE (l'app est 100 % sombre côté Compose) : le parent
+         Light précédent affichait un flash blanc à chaque cold start. -->
+    <style name="Theme.Sam3Vision" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

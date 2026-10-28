@@ -126,8 +126,8 @@ class MainActivity : ComponentActivity() {
      * Les deux bandeaux système (heure/batterie en haut, 3 boutons en bas) posés sur la
      * page noir d'iSee. Les barres sont **transparentes** et la fenêtre passe sous elles
      * (edge-to-edge) : le chat descend jusque sous les 3 boutons, où il est masqué en
-     * noir par le chat lui-même (`NavBarScrim`). Le thème de l'app est clair
-     * (`Theme.Material.Light`), d'où les icônes système en clair et le contraste désactivé.
+     * noir par le chat lui-même (`NavBarScrim`). Le thème de l'app est sombre
+     * (`Theme.Sam3Vision`), d'où les icônes système en clair et le contraste désactivé.
      */
     private fun applyDarkSystemBars() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
