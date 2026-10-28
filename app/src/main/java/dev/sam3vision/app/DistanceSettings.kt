@@ -28,13 +28,6 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
         SwitchRow("Distances on Direct", draft.distanceOverlayEnabled) {
             onChange(draft.copy(distanceOverlayEnabled = it))
         }
-        Text(
-            "One distance per tracked object, estimated by pinhole from its known real " +
-                "height (person 1.70 m, car 1.45 m…). ±15-20% accuracy, computed on the " +
-                "phone: no GPU, no request.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
         LabeledField(
             label = "Camera field of view (°, 0 = sensor reading)",
             value = fovText(draft.cameraFovDeg),

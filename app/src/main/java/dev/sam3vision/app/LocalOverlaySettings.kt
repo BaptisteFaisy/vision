@@ -30,12 +30,5 @@ internal fun LocalOverlaySettings(draft: Settings, onChange: (Settings) -> Unit)
         SwitchRow("Local mask propagation", draft.localOverlayEnabled) {
             onChange(draft.copy(localOverlayEnabled = it))
         }
-        Text(
-            "Between two server keyframes, the mask is redrawn on the phone at " +
-                "30 fps. With no motion estimator, the overlay stays inert and the screen " +
-                "does not change.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }

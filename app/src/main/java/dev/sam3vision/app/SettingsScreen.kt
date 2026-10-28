@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,8 +58,8 @@ fun SettingsScreen(
     var draft by remember { mutableStateOf(settings) }
     Column(settingsLightScroll()) {
         SettingsHeader(onBack = onBack)
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            UserSection(draft = draft, onPickRole = onPickRole, onChange = { draft = it })
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            UserSection(draft, onPickRole, onStartTracking, onStopTracking) { draft = it }
             MetaGlassesSection(glasses = glasses)
             TechnicalSection(
                 draft = draft,
@@ -124,12 +126,6 @@ private fun SettingsHeader(onBack: () -> Unit) {
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        Text(
-            "No key is ever written into the code.",
-            color = SettingsLight.muted,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
     }
 }
 
@@ -139,11 +135,14 @@ private fun SectionTitle(text: String) {
     Text(text, color = SettingsLight.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
 }
 
-/** THE USER: who holds this phone. Role + invite, then one glass button saves and opens the right home. */
+/** THE USER: who holds this phone. On/off role toggle, then the invite field
+ * (caregiver) or the share button (blind person), then save opens the right home. */
 @Composable
 private fun UserSection(
     draft: Settings,
     onPickRole: (Settings) -> Unit,
+    onStartTracking: (Settings) -> Unit,
+    onStopTracking: () -> Unit,
     onChange: (Settings) -> Unit,
 ) {
     val isCaregiver = draft.caregiverRole == CaregiverRole.Caregiver
@@ -155,19 +154,27 @@ private fun UserSection(
             color = SettingsLight.muted,
             fontSize = 12.sp,
         )
-        GlassButton(
-            label = "Blind person (default)",
-            enabled = true,
-            primary = !isCaregiver,
-            onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Blind)) },
-        )
-        GlassButton(
-            label = "Caregiver",
-            enabled = true,
-            primary = isCaregiver,
-            onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
-        )
-        if (isCaregiver) CaregiverInviteBlock(draft, onChange)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassButton(
+                label = "Blind person",
+                enabled = true,
+                primary = !isCaregiver,
+                modifier = Modifier.weight(1f),
+                onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Blind)) },
+            )
+            GlassButton(
+                label = "Caregiver",
+                enabled = true,
+                primary = isCaregiver,
+                modifier = Modifier.weight(1f),
+                onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
+            )
+        }
+        if (isCaregiver) {
+            CaregiverInviteBlock(draft, onChange)
+        } else {
+            BlindShareBlock(draft, onStartTracking, onStopTracking)
+        }
         GlassButton(
             label = if (isCaregiver) "Save & open caregiver map" else "Save & back to iSee",
             enabled = !isCaregiver || draft.caregiverInvite.isNotBlank(),
@@ -177,7 +184,7 @@ private fun UserSection(
     }
 }
 
-/** META GLASSES: the Ray-Ban Meta block (its tested French strings stay, only the frame is English). */
+/** META GLASSES: the Ray-Ban Meta block on a white card (its tested French strings stay). */
 @Composable
 private fun MetaGlassesSection(glasses: GlassesController) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -189,11 +196,32 @@ private fun MetaGlassesSection(glasses: GlassesController) {
         )
         Column(
             Modifier.fillMaxWidth()
-                .background(AppColors.surface, RoundedCornerShape(16.dp))
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .border(1.dp, SettingsLight.border, RoundedCornerShape(16.dp))
                 .padding(12.dp),
         ) {
             GlassesBlock(glasses)
         }
+    }
+}
+
+/** Blind person: the WhatsApp share + start/stop of the permanent tracking. */
+@Composable
+private fun BlindShareBlock(
+    draft: Settings,
+    onStartTracking: (Settings) -> Unit,
+    onStopTracking: () -> Unit,
+) {
+    val trackingActive by ShareTracking.running.collectAsState()
+    if (trackingActive) {
+        GlassButton("Stop tracking", true, false, onStopTracking)
+    } else {
+        GlassButton(
+            "\uD83D\uDCE4 Share tracking",
+            true,
+            true,
+            onClick = { onStartTracking(draft) },
+        )
     }
 }
 
@@ -203,20 +231,6 @@ private fun CaregiverInviteBlock(draft: Settings, onChange: (Settings) -> Unit) 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LabeledField("Invite link or code", draft.caregiverInvite, false) {
             onChange(draft.copy(caregiverInvite = it))
-        }
-        Text(
-            "Paste the link or the code the blind person sent you — " +
-                "the caregiver map needs it to open the right tracking.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
-        if (draft.caregiverInvite.isBlank()) {
-            Text(
-                "Add the invite first: without it the map cannot open.",
-                color = SettingsLight.primary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }
@@ -345,13 +359,6 @@ private fun ParentShareSettings(
         } else {
             GlassButton("\uD83D\uDCE4 Share tracking", true, true, onClick = { onStartTracking(draft) })
         }
-        Text(
-            "In a pocket (screen off), only the position keeps being sent every 15 s " +
-                "for the battery; screen on, the full sharing stays at the 2 s pace. " +
-                "Circled objects reappear as soon as Direct reopens.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 
@@ -382,12 +389,6 @@ private fun GestureHelp(onOpenGestures: () -> Unit) {
             fontWeight = FontWeight.SemiBold,
         )
         GlassButton("Replay gestures", true, false, onOpenGestures)
-        Text(
-            "Tap = video, long press = speak (the filmed photo goes with it). " +
-                "On the iSee home, these gestures work anywhere on the screen.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 
@@ -403,12 +404,6 @@ private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {
         )
         GlassButton("Direct mode (continuous video)", true, true, onOpenLive)
         GlassButton("Classic home (photo + analysis)", true, false, onOpenClassic)
-        Text(
-            "Direct speaks aloud the position of detected objects; the classic home " +
-                "keeps the photo, the SAM masks and the per-image chat.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 
@@ -426,12 +421,6 @@ private fun PredictionSettings(draft: Settings, onChange: (Settings) -> Unit) {
             "Boxes predicted between inferences (experimental, unmeasured)",
             draft.boxPredictionEnabled,
         ) { onChange(draft.copy(boxPredictionEnabled = it)) }
-        Text(
-            "Off by default: the perceived-latency measurement decides, not the " +
-                "other way round. The displayed distance is never predicted.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 
