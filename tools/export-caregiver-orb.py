@@ -17,7 +17,10 @@ def split_liquid(shader):
 
 
 def web_shader(source):
-    shader = source.split('private const val ORB_AGSL = """', 1)[1].split('"""', 1)[0]
+    match = re.search(r'\bconst\s+val\s+ORB_AGSL\s*=\s*"""(.*?)"""', source, re.S)
+    if not match:
+        raise ValueError('Déclaration ORB_AGSL introuvable dans le shader Portrait')
+    shader = match.group(1)
     shader = re.sub(r'\b(?:half|float)([234])\b', r'vec\1', shader)
     shader = re.sub(r'\bhalf\b', 'float', shader)
     shader, helper = split_liquid(shader)
