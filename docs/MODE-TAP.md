@@ -2,7 +2,7 @@
 
 Conçu pour un usage sans regard. Ce mode est l'**écran `Route.Tap`** (`AppNav.kt:37`, `:68`),
 atteint depuis les Réglages (« Other screens » → « Classic home (photo + analysis) »,
-`SettingsScreen.kt:400-409`). ⚠️ L'accueil par défaut de l'app est **iSee**, qui a son
+`SettingsScreen.kt:407-416`). ⚠️ L'accueil par défaut de l'app est **iSee**, qui a son
 propre geste de tap (voir la dernière section) : ce ne sont pas les mêmes chemins de code.
 
 **Un tap sur l'aperçu de Capture ouvre le mode vidéo et démarre l'enregistrement**

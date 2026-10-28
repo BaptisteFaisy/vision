@@ -42,7 +42,7 @@ dictée Meta ASR (repli ElevenLabs Scribe), voix ElevenLabs (TTS), segmentation 
 endpoint Modal ; **iSee en écran d'accueil** (bulle de verre plein écran, caméra fondue en
 haut, gestes, masques, distances, voix). Les anciens écrans (Capture/Analyse/Chat/Direct/Tap) restent
 là, atteignables depuis les Réglages, section « Other screens »
-(`app/SettingsScreen.kt:400-409`, routes `app/AppNav.kt:37-75`).
+(`app/SettingsScreen.kt:407-416`, routes `app/AppNav.kt:37-75`).
 **Backend dans `server/`** (Modal : direct déployé, Valhalla CPU, tracker, legacy) ;
 **aucune clé dans le dépôt.**
 
@@ -52,8 +52,8 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), `LivePrompts.MAX = 6` (`core/live/LivePrompts.kt:27,34`) |
-| Tests | **2 180 `@Test`** JVM (`:core` 1 403, `:app` 777, mesure statique du 28/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
-| Taille | **730** fichiers `.kt`, **43 219** lignes de prod (`:core` 16 516, `:app` 26 703, mesure du 28/10/2026) |
+| Tests | **2 202 `@Test`** JVM (`:core` 1 418, `:app` 784, mesure statique du 28/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
+| Taille | **733** fichiers `.kt`, **43 457** lignes de prod (`:core` 16 654, `:app` 26 803, mesure du 28/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
