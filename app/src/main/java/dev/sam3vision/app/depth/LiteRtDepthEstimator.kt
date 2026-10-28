@@ -1,6 +1,9 @@
 package dev.sam3vision.app.depth
 
 import android.content.Context
+import com.google.ai.edge.litert.CompiledModel
+import com.google.ai.edge.litert.TensorBuffer
+import dev.sam3vision.app.litert.openCompiledModel
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.DepthEstimator
 import dev.sam3vision.core.depth.DepthMap
@@ -8,25 +11,19 @@ import dev.sam3vision.core.depth.DepthResult
 import dev.sam3vision.core.depth.SerialRunGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.tensorflow.lite.Interpreter
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.io.File
 
 /**
- * MiDaS v2.1 small (repli) via LiteRT (`Interpreter` CPU, 4 fils), 100 % sur
- * le téléphone. Poids fp32 (`.tflite` 63 Mo, MIT Intel ISL), téléchargés une
- * fois à l'exécution (fichier vérifié d'abord, asset embarqué en repli dev),
- * entrée 256×256 → carte 256×256. Modèle absent ou inférence tombée ⇒
+ * MiDaS v2.1 small (repli) via LiteRT neuf (`CompiledModel` GPU→CPU), 100 %
+ * sur le téléphone. Poids fp32 (`.tflite` 63 Mo, MIT Intel ISL), téléchargés
+ * une fois à l'exécution (fichier vérifié d'abord, asset embarqué en repli
+ * dev), entrée 256×256 → carte 256×256. Modèle absent ou inférence tombée ⇒
  * `Result.failure` avec un message explicite (lu par le banc embarqué).
- *
- * CPU seul : délégués mesurés le 2026-10-28 (NNAPI 578/574 ms contre 490/568 ms
- * CPU en dos-à-dos — aucun gain ; GPU : classes Java absentes de l'artefact
- * 2.17 à l'exécution). Artefact `org.tensorflow:tensorflow-lite` (le
- * `com.google.ai.edge.litert:litert:2.3.x` est en metadata Kotlin 2.4,
- * illisible par le Kotlin 2.2 du projet).
  */
 class LiteRtDepthEstimator private constructor(
-    private val interpreter: Interpreter,
+    private val model: CompiledModel,
+    private val inBufs: List<TensorBuffer>,
+    private val outBufs: List<TensorBuffer>,
     private val guard: SerialRunGuard = SerialRunGuard(),
 ) : DepthEstimator {
 
@@ -39,21 +36,25 @@ class LiteRtDepthEstimator private constructor(
                     argb, width, height, DepthPreprocess.INPUT_SIZE,
                 )
                 val input = DepthPreprocess.normalizeHWC(resized, DepthPreprocess.INPUT_SIZE)
-                val output = directBytes(INPUT_SIZE * INPUT_SIZE * 4)
+                val floats = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
+                input.rewind()
+                input.asFloatBuffer().get(floats)
                 val started = android.os.SystemClock.elapsedRealtime()
-                // Sérialisé : `Interpreter` non thread-safe (même garde ONNX).
-                guard.run { interpreter.run(input, output) }.getOrThrow()
+                // Sérialisé : runs concurrents interdits (même garde qu'avant).
+                guard.run {
+                    inBufs[0].writeFloat(floats)
+                    model.run(inBufs, outBufs)
+                }.getOrThrow()
                 val elapsed = android.os.SystemClock.elapsedRealtime() - started
-                val values = FloatArray(INPUT_SIZE * INPUT_SIZE)
-                output.rewind()
-                output.asFloatBuffer().get(values)
+                val values = outBufs[0].readFloat()
+                require(values.size == INPUT_SIZE * INPUT_SIZE) { "sortie inattendue" }
                 DepthResult(DepthMap(INPUT_SIZE, INPUT_SIZE, values), DepthBackend.MIDAS, elapsed)
             }
         }
 
     override fun close() {
         // Reportée si un run est en vol : jamais de `close()` pendant `run()`.
-        guard.close { interpreter.close() }
+        guard.close { model.close() }
     }
 
     companion object {
@@ -62,30 +63,29 @@ class LiteRtDepthEstimator private constructor(
         private const val INPUT_SIZE = 256
 
         /**
-         * Interpréteur CPU ouvert sur le fichier téléchargé (puis l'asset en
-         * repli dev), `null` si le modèle est absent : le sélecteur rend alors
-         * un estimateur « modèle manquant » explicite.
+         * Modèle ouvert sur le fichier téléchargé (puis l'asset en repli
+         * dev, recopié en cache car `create` veut un chemin), `null` si le
+         * modèle est absent : le sélecteur rend alors un estimateur « modèle
+         * manquant » explicite.
          */
         fun open(context: Context): DepthEstimator? {
-            val model = modelBuffer(context, ASSET_NAME) ?: return null
-            val options = Interpreter.Options()
-            options.setNumThreads(4)
-            return LiteRtDepthEstimator(Interpreter(model, options))
+            val file = modelFile(context, ASSET_NAME) ?: return null
+            return try {
+                val model = openCompiledModel(file.absolutePath)
+                LiteRtDepthEstimator(model, model.createInputBuffers(), model.createOutputBuffers())
+            } catch (_: Throwable) {
+                null
+            }
         }
 
-        /**
-         * Asset lu en mémoire (comme le moteur ONNX) puis copié en tampon
-         * direct : ni `openFd` ni propriété sur ressource fermable — le
-         * parseur du scanner UBS ne suit pas ces sélections.
-         */
-        private fun modelBuffer(context: Context, name: String): ByteBuffer? {
-            val bytes = readStoreFile(context) ?: readAsset(context, name) ?: return null
+        private fun modelFile(context: Context, name: String): File? {
+            DepthModelStore.fileFor(context, DepthBackend.MIDAS)
+                ?.takeIf { it.isFile }?.let { return it }
+            val bytes = readAsset(context, name) ?: return null
             return try {
-                val buffer = ByteBuffer.allocateDirect(bytes.size)
-                buffer.order(ByteOrder.nativeOrder())
-                buffer.put(bytes)
-                buffer.rewind()
-                buffer
+                val out = File(context.cacheDir, name)
+                if (!out.isFile) out.writeBytes(bytes)
+                out
             } catch (e: Exception) {
                 null
             }
@@ -97,21 +97,6 @@ class LiteRtDepthEstimator private constructor(
             } catch (e: Exception) {
                 null
             }
-        }
-
-        private fun readStoreFile(context: Context): ByteArray? {
-            return try {
-                DepthModelStore.fileFor(context, DepthBackend.MIDAS)
-                    ?.takeIf { it.isFile }?.readBytes()
-            } catch (e: Exception) {
-                null
-            }
-        }
-
-        private fun directBytes(count: Int): ByteBuffer {
-            val buffer = ByteBuffer.allocateDirect(count)
-            buffer.order(ByteOrder.nativeOrder())
-            return buffer
         }
     }
 }
