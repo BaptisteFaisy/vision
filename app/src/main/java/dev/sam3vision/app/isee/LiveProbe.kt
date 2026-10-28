@@ -144,6 +144,7 @@ class LiveProbe(
         maxObjects: Int = 0,
         language: SpeechLanguage = SpeechLanguage.Fr,
         crossingActive: Boolean = false,
+        modelsLine: String = "",
     ) {
         val clean = baseUrl.trim()
         session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
@@ -161,6 +162,7 @@ resetPipeline()
             LiveProbeState(
                 endpoint = clean,
                 gpu = it.gpu,
+                modelsLine = modelsLine,
                 conceptsSent = LivePrompts.normalize(prompts),
                 transport = TRANSPORT_WS,
                 error = if (clean.isBlank()) "aucun endpoint (Réglages)" else null,

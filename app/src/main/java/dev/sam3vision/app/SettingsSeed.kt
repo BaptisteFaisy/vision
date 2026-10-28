@@ -70,9 +70,13 @@ private fun Settings.onLegacyLlm(): Boolean =
  * clé, sinon la clé InferHub partirait chez Baseten et répondrait 401. Une base URL saisie
  * à la main n'est jamais touchée : seule la valeur d'usine est reconnue.
  *
+ * Garde d'épinglage : un modèle déjà épinglé (le défaut Meta) n'est **jamais** réécrit,
+ * même si sa base ressemble à l'ancienne — la migration ne défait pas l'épinglage.
+ *
  * C'est ce qui évite toute manipulation après une mise à jour de l'APK.
  */
 internal fun migrateLegacyLlm(loaded: Settings, build: BuildDefaults): Settings {
+    if (isPinnedLlmModel(loaded.llmModel)) return loaded
     if (!loaded.onLegacyLlm()) return loaded
     return loaded.copy(
         llmBaseUrl = build.llmBaseUrl.ifBlank { Settings.DEFAULT_LLM_BASE_URL },
