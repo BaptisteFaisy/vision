@@ -3,12 +3,29 @@
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
 Android : fond blanc, boule Portrait grise, phrase courante et carte en bas.
 
+L'interface Android est embarquée dans chaque APK depuis ce dossier (tâche
+Gradle `caregiverAssets`). La WebView intercepte uniquement ces fichiers locaux
+sous `/.isee-caregiver/` ; les appels `/api/state` restent sur l'origine du lien
+partagé. Une ancienne version du site ne peut donc plus remplacer le design
+de l'app installée.
+
+L'écran tient dans la hauteur du téléphone, avec une carte réduite en bas,
+sans défilement, barre de retour ni titre Caregiver. L'état LIVE / SIGNAL LOST /
+OFFLINE occupe le coin supérieur droit. La roue dentée ouvre les paramètres
+Android, où se trouve la clé Google Maps préremplie par le build.
+
+La clé vient de `GOOGLE_MAPS_API_KEY` (secret CI, toutes les variantes) ou de
+`google.maps.api.key` dans `local.properties` gitignoré. Elle est ajoutée aux
+réglages vides à l'installation et conservée dans les deux stores chiffrés.
+Une clé personnalisée enregistrée dans les paramètres reste prioritaire.
+
 ## Ouvrir la bonne session sur un autre téléphone
 
 1. Sur le téléphone accompagné : configurer un identifiant de flux par proche
    dans Réglages → Suivi parent, puis « Partager le suivi ».
 2. Le caregiver ouvre le lien reçu (`https://…/?share=<identifiant>`) dans son
-   navigateur, ou le colle via **Lien** dans son app en rôle Caregiver.
+   navigateur, ou le colle dans **Settings → THE USER → Invite link or code**
+   dans son app en rôle Caregiver.
 3. La page lit uniquement ce flux. Sans lien valide, aucune session implicite
    n'est choisie. Aucune position du téléphone caregiver n'est demandée.
 
@@ -73,5 +90,6 @@ Racine Vercel : `suivi-parent/`, framework « Other », build vide. Les modules
   `KV_REST_API_URL` + `KV_REST_API_TOKEN` : stockage partagé entre instances.
   Le repli mémoire est réservé au développement.
 
-Carte OpenFreeMap par défaut ; clé Google Maps facultative dans **Options de la
-carte**, conservée uniquement dans le navigateur concerné.
+Google Maps est utilisé dès qu'une clé est fournie par l'app ou les paramètres
+web. Sans clé, le navigateur peut utiliser OpenFreeMap. Le formulaire Google
+et le lien reçu sont uniquement dans les paramètres, pas sous la carte.

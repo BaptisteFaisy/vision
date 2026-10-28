@@ -101,6 +101,8 @@ data class Settings(
      * proche, à affiner avec des tokens côté backend si besoin.
      */
     val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
+    /** Clé du fond de carte Google, préremplie par le build ; modifiable dans Réglages. */
+    val googleMapsApiKey: String = "",
     /** Envoi de la position + objets au relais pendant le Direct (site parent). */
     val shareEnabled: Boolean = true,
     /**
