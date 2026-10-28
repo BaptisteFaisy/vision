@@ -46,6 +46,12 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.framesOnSpeaker().kind)
+    }
+
+    @Test
+    fun `la collecte active annonce la voix sur haut-parleur`() {
+        assertTrue(GlassesMessages.framesOnSpeaker().text.contains("haut-parleur"))
     }
 
     @Test
@@ -86,6 +92,7 @@ class GlassesMessagesTest {
             GlassesMessages.registrationStarted(),
             GlassesMessages.mockReady(),
             GlassesMessages.noMockPress(),
+            GlassesMessages.framesOnSpeaker(),
         )
         all.forEach { message ->
             listOf("sk-", "sk_", "ghp_", "Bearer").forEach { secret ->
