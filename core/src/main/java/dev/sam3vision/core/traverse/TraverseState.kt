@@ -62,9 +62,8 @@ class TraverseState {
         val best = bestByLabel(detections)
         for ((label, track) in tracks.toList()) {
             val detection = best[label]
-            val score = detection?.score
-            if (detection != null && score != null && score >= aliveBar(track)) {
-                see(track, detection, score)
+            if (detection != null && detection.score >= aliveBar(track)) {
+                see(track, detection, detection.score)
             } else if (track.confirmed) {
                 track.missing += 1
                 if (track.missing > TraverseThresholds.MAX_MISSING_FRAMES) tracks.remove(label)
