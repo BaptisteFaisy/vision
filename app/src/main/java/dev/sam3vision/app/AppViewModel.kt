@@ -13,7 +13,7 @@ import dev.sam3vision.app.vm.AppStatusText
 import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
 import dev.sam3vision.core.live.PositionText
-import dev.sam3vision.core.mask.colorizedMaskBitmap
+import dev.sam3vision.core.mask.colorizedOverlays
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.Detection
@@ -206,14 +206,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun buildOverlays(objects: List<SegObject>): List<Bitmap> {
         if (_state.value.photo == null) return emptyList()
         return withContext(Dispatchers.Default) {
-            // Même helper que le direct : décodage selon l'encodage, coloriage par table.
-            objects.mapIndexedNotNull { index, obj ->
-                colorizedMaskBitmap(obj.maskPngB64, MASK_ENCODING_PNG, maskArgb(index), MASK_ALPHA)
+            colorizedOverlays(objects.map { it.maskPngB64 }, MASK_ENCODING_PNG, MASK_ALPHA) {
+                maskColorAt(it).toArgb()
             }
         }
     }
-
-    private fun maskArgb(index: Int): Int = maskColorAt(index).toArgb()
 
     fun ask(question: String) = viewModelScope.launch { chat.ask(question) }
 

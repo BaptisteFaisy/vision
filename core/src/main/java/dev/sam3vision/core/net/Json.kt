@@ -179,6 +179,13 @@ internal const val DEFAULT_LABEL = "objet"
 internal fun parseBytes(bytes: ByteArray): JSONObject? =
     runCatching { JSONObject(bytes.toString(Charsets.UTF_8)) }.getOrNull()
 
+/** JSON texte → objet, `null` si illisible (jamais d'exception). */
+internal fun parse(raw: String): JSONObject? = try {
+    JSONObject(raw)
+} catch (e: Exception) {
+    null
+}
+
 /**
  * Une frame du direct, lue depuis les octets de la réponse (aucune `String` intermédiaire) :
  * `POST /live` et le message WebSocket de `/live/ws` ont **exactement la même forme**, donc un
