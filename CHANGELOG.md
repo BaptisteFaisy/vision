@@ -3,8 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-28 — narration Direct : Baseten partout, InferHub retiré
+## 2026-10-28 — intro : voix Laure et fin de la phrase du balayage ; narration Direct : Baseten partout, InferHub retiré
 
+- `intro_isee.mp3` régénéré en voix Laure (`3b8fXc91YHS1i2DYAlBQ`, `eleven_v3`,
+  réglages du runtime) : 401 701 octets, 25,08 s (`ffprobe`), voix réelle
+  (mean −19,3 dB, max −0,4 dB, `volumedetect`), 135 caractères (creator,
+  28 078 → 28 213 / 130 005). Texte `ISEE_INTRO_TEXT` mot pour mot (307 caractères).
+- La phrase « To listen to previous messages, swipe down » n'est plus ni dans le
+  texte ni dans le MP3 : le balayage entre messages était déjà supprimé du code
+  (27/10), seule la voix le disait encore. Jade US reste proposée dans Réglages.
+- Commentaires et docs réalignés (`IntroAudio`, `IntroLogic`, `Settings`,
+  `SpeechLanguage`, `TtsSettings`, `ELEVENLABS-TTS.md`, `VOIX-ANGLAIS.md`).
+  Preuve d'écoute : à confirmer à l'oreille sur le téléphone (pas de sortie
+  audio sur le poste de travail).
 - La narration du Direct parle au même endpoint et au même modèle Meta que les
   questions (`https://inference.baseten.co/v1`, `meta-models/muse-spark-open-1026`,
   `Settings.DEFAULT_LIVE_LLM_*`) : un seul fournisseur LLM dans l'app.

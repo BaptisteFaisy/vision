@@ -40,8 +40,8 @@ fun TtsSettings(
         Text(
             "Default voice: Laure ${Settings.LAURE_VOICE_ID}. Fallbacks: Sarah " +
                 "${Settings.SARAH_VOICE_ID} (premade, free tier) · George " +
-                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} (the intro " +
-                "voice) is a library voice: it answers 402 without credits.",
+                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} " +
+                "is a library voice: it answers 402 without credits.",
             color = SettingsLight.muted,
             fontSize = 11.sp,
         )
@@ -109,6 +109,13 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
 @Composable
 private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     SwitchRow(label = introToggleLabel(draft.introEnabled), checked = draft.introEnabled, onChange = onChange)
+    Text(
+        "Built-in intro (Laure voice, offline): played once at the first opening, " +
+            "as the first chat message. It is cut with a long press by dictating " +
+            "« Disable iSee intro ».",
+        color = SettingsLight.muted,
+        fontSize = 11.sp,
+    )
 }
 
 /** "Label + switch" row: a single implementation for all switches. */

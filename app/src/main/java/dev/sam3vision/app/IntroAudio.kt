@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 /**
- * Intro vocale embarquée (`res/raw/intro_isee.mp3`, voix Jade US d'ElevenLabs,
+ * Intro vocale embarquée (`res/raw/intro_isee.mp3`, voix Laure d'ElevenLabs,
  * rendue hors ligne). [SpeechPlayer] lit un chemin de fichier et non une ressource :
  * on recopie l'asset dans le cache une seule fois (le cache peut être vidé par
  * Android, la copie est refaite au besoin).
