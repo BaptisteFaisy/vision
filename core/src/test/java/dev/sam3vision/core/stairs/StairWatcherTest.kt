@@ -1,0 +1,84 @@
+package dev.sam3vision.core.stairs
+
+import dev.sam3vision.core.speech.SpeechLanguage
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
+import org.junit.Test
+
+class StairWatcherTest {
+
+    private fun positive(lineCount: Int = 5) =
+        StairSignal(detected = true, confidence = 0.66f, lineCount = lineCount, roiTop = 24, roiBottom = 60)
+
+    private val negative = StairSignal.none()
+
+    @Test
+    fun `trois positifs consecutifs = annonce`() {
+        val watcher = StairWatcher()
+
+        assertNull(watcher.onSignal(positive(), 1000L))
+        assertNull(watcher.onSignal(positive(), 2000L))
+        val cue = watcher.onSignal(positive(), 3000L)
+
+        assertNotNull(cue)
+        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals(5, cue.lineCount)
+    }
+
+    @Test
+    fun `negatif remet le compte a zero`() {
+        val watcher = StairWatcher()
+
+        watcher.onSignal(positive(), 1000L)
+        watcher.onSignal(positive(), 2000L)
+        watcher.onSignal(negative, 3000L)
+        assertNull(watcher.onSignal(positive(), 4000L))
+        assertNull(watcher.onSignal(positive(), 5000L))
+        assertNotNull(watcher.onSignal(positive(), 6000L))
+    }
+
+    @Test
+    fun `cooldown tait la repetition puis relache`() {
+        val watcher = StairWatcher(cooldownMs = 10_000L)
+
+        watcher.onSignal(positive(), 1000L)
+        watcher.onSignal(positive(), 2000L)
+        assertNotNull(watcher.onSignal(positive(), 3000L))
+        watcher.onSignal(positive(), 4000L)
+        watcher.onSignal(positive(), 5000L)
+        assertNull(watcher.onSignal(positive(), 6000L))
+        watcher.onSignal(positive(), 13_001L)
+        watcher.onSignal(positive(), 13_002L)
+        assertNotNull(watcher.onSignal(positive(), 13_003L))
+    }
+
+    @Test
+    fun `phrase anglaise sur demande`() {
+        val watcher = StairWatcher()
+
+        watcher.onSignal(positive(), 1000L, SpeechLanguage.En)
+        watcher.onSignal(positive(), 2000L, SpeechLanguage.En)
+        val cue = watcher.onSignal(positive(), 3000L, SpeechLanguage.En)
+
+        assertEquals("Stairs ahead.", cue!!.phrase)
+    }
+
+    @Test
+    fun `reset oublie compte et annonce`() {
+        val watcher = StairWatcher()
+
+        watcher.onSignal(positive(), 1000L)
+        watcher.onSignal(positive(), 2000L)
+        watcher.reset()
+        assertNull(watcher.onSignal(positive(), 3000L))
+        assertNull(watcher.onSignal(positive(), 4000L))
+        assertNotNull(watcher.onSignal(positive(), 5000L))
+    }
+
+    @Test
+    fun `phrases FR et EN`() {
+        assertEquals("Escalier devant.", StairText.phrase(SpeechLanguage.Fr))
+        assertEquals("Stairs ahead.", StairText.phrase(SpeechLanguage.En))
+    }
+}
