@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Déclencheur du guidage : stabilité, non-répétition, danger prioritaire sur le délai. */
@@ -88,5 +89,39 @@ class GuidanceAnnouncerTest {
         announcer.onFrame(500L, libre)
 
         assertEquals("Continue tout droit.", announcer.lastPhrase)
+    }
+
+    @Test
+    fun `cap route prime sur le cap manuel`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertNull(announcer.onFrame(0L, libre, cap = SteeringCap.Left, routeCap = SteeringCap.Right))
+        assertEquals(
+            "Va à droite.",
+            announcer.onFrame(1_000L, libre, cap = SteeringCap.Left, routeCap = SteeringCap.Right),
+        )
+    }
+
+    @Test
+    fun `derniere decision exposee pour la video`() {
+        val announcer = GuidanceAnnouncer()
+        assertNull(announcer.lastDecision)
+
+        announcer.onFrame(0L, listOf(personne(2f)))
+
+        val decision = announcer.lastDecision
+        assertTrue("décision attendue", decision != null)
+        assertEquals(true, decision?.blocked)
+        assertEquals(SteeringCap.Left, decision?.passage)
+    }
+
+    @Test
+    fun `reset oublie la decision`() {
+        val announcer = GuidanceAnnouncer()
+        announcer.onFrame(0L, listOf(personne(2f)))
+
+        announcer.reset()
+
+        assertNull(announcer.lastDecision)
     }
 }

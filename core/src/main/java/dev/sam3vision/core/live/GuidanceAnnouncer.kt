@@ -27,21 +27,32 @@ class GuidanceAnnouncer(
     val lastPhrase: String? get() = gate.lastPhrase
 
     /**
+     * Décision de la dernière frame (`null` avant la première) : la vidéo y
+     * lit le chemin à dessiner, en direct même quand la voix reste muette.
+     */
+    var lastDecision: GuidanceDecision? = null
+        private set
+
+    /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
      * change ni les seuils, ni la mémoire de décision. [cap] est la direction
      * demandée à la voix : il change le couloir marché, et sa signature fait
-     * reparler dès que le cap change. [hfovDeg] calibre le décalage chiffré
-     * (défaut 67° : l'appelant qui connaît la focale la passe).
+     * reparler dès que le cap change. [routeCap] (cap de l'itinéraire, guidage
+     * route actif) prime sur [cap] quand il est renseigné. [hfovDeg] calibre le
+     * décalage chiffré (défaut 67° : l'appelant qui connaît la focale la passe).
      */
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
         language: SpeechLanguage = SpeechLanguage.Fr,
         cap: SteeringCap = SteeringCap.Straight,
+        routeCap: SteeringCap? = null,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): String? {
-        val decision = Guidance.decide(labels, cap, rangeMeters, hfovDeg)
+        val effective = routeCap ?: cap
+        val decision = Guidance.decide(labels, effective, rangeMeters, hfovDeg)
+        lastDecision = decision
         val key = Guidance.key(decision)
         if (!gate.admit(atMs, key, urgent = decision.blocked)) return null
         val phrase = Guidance.phrase(decision, language)
@@ -50,5 +61,8 @@ class GuidanceAnnouncer(
     }
 
     /** Nouvelle session : tout est oublié (la première consigne sera dite). */
-    fun reset() = gate.reset()
+    fun reset() {
+        gate.reset()
+        lastDecision = null
+    }
 }
