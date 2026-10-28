@@ -81,7 +81,11 @@ class LiteRtTwinLiteSegmenter private constructor(
         fun open(context: Context): Segmenter? {
             val file = SegmentModelStore.fileFor(context).takeIf { it.isFile } ?: return null
             return try {
-                val model = openCompiledModel(file.absolutePath)
+                // EXPÉRIENCE TEMPORAIRE : CPU seul (le read GPU prend 90 ms).
+                val model = openCompiledModel(
+                    file.absolutePath,
+                    com.google.ai.edge.litert.Accelerator.CPU,
+                )
                 LiteRtTwinLiteSegmenter(model, model.createInputBuffers(), model.createOutputBuffers())
             } catch (_: Throwable) {
                 null
