@@ -3,6 +3,7 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.model.Detection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -189,5 +190,18 @@ class TraverseVetoTest {
         assertFalse(VehicleConcepts.isVehicle("person"))
         assertFalse(VehicleConcepts.isVehicle("door"))
         assertFalse(VehicleConcepts.isVehicle(""))
+    }
+
+    @Test
+    fun `approche suivie - le TTC remonte dans la decision`() {
+        val veto = TraverseVeto()
+        val first = veto.update(true, listOf(detection("car", 0.9f, listOf(270f, 210f, 370f, 270f))), focalPx, 0L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(265f, 207f, 375f, 273f))), focalPx, 100L)
+        val third = veto.update(true, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
+
+        assertFalse("piste jeune : pas de TTC", first.veto)
+        assertNull(first.approachTtcSeconds)
+        assertTrue(third.veto)
+        assertNotNull("rapprochement confirmé suivi", third.approachTtcSeconds)
     }
 }
