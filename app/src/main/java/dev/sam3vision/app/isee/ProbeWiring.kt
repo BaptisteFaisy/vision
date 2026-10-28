@@ -26,6 +26,7 @@ internal fun LiveProbe.configureFrom(
     prompts: List<String> = dev.sam3vision.core.live.LivePrompts.default,
     crossingActive: Boolean = false,
 ) {
+    android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
         prompts = prompts,
