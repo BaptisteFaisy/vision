@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — isee : la caméra active allume la carte, coupée elle s'éteint
+
+- La porte d'envoi vers SAM devient `cameraActive || recordingVideo || crossingActive`
+  (`sendingToSam`, `IseeVisionCard.kt`, pure et testée) : dès que la caméra est liée
+  (permission + aperçu), les frames partent et la première réveille la carte ; avant,
+  seul l'enregistrement (ou la Traversée) envoyait.
+- `LiveProbe.stop` (nouveau `LiveProbeStop.kt`, la sonde étant au plafond des 500 lignes)
+  ferme les deux sessions WebSocket et efface masques et chiffres : sans socket ouvert,
+  le conteneur Modal retombe à zéro. Appelé à la coupure caméra (`setCameraActive(false)`),
+  au passage en arrière-plan et à la destruction du ViewModel ; les sessions rouvrent au
+  retour (`onForeground`) et à la liaison caméra. `configure` referme les anciennes
+  sessions au lieu de les orpheliner ; `LiveSession.close` (révocation + `client.close`).
+- 9 tests JVM : `LiveSessionCloseTest` (2), `LiveProbeStopTest` (3), `SendingGateTest` (4).
+  Coût assumé (demande user) : chaque ouverture de la page caméra avec permission réveille
+  la carte (~17-40 s de froid facturées), comme un enregistrement avant.
+
 ## 2026-10-28 — caregiver : bleu et vert, proportions et badge Portrait
 
 - Roue dentée noire, état dans une pastille arrondie comme sur la page blind person.

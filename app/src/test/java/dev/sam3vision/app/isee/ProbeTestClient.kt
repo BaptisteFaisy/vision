@@ -22,6 +22,10 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
     var sent = 0
         private set
 
+    /** Sessions fermées (`stop`, `configure`) : le socket rendu, la carte peut s'éteindre. */
+    var closed = 0
+        private set
+
     private val waiting = mutableMapOf<String, CompletableDeferred<Result<LiveFrame>>>()
 
     override suspend fun live(
@@ -47,4 +51,8 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
 
     override suspend fun health(): Result<LiveHealth> =
         Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+
+    override fun close() {
+        closed += 1
+    }
 }

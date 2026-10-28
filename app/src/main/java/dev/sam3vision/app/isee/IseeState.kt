@@ -39,6 +39,11 @@ data class IseeUiState(
     val liveTranscript: String = "",
     val userSpeaking: Boolean = false,
     val recordingVideo: Boolean = false,
+    /**
+     * Caméra liée (permission accordée, aperçu actif) : les frames partent à SAM et
+     * la carte travaille. Faux = carte éteinte, rien ne part, rien n'est facturé.
+     */
+    val cameraActive: Boolean = false,
     val status: String? = null,
     /**
      * Ordre vocal « settings » entendu : la navigation ouvre les Réglages une fois
