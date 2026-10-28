@@ -12,9 +12,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Depth Anything V2 Small (primaire) via ONNX Runtime Mobile, 100 % sur le
- * téléphone. Poids quantifiés uint8 (`da2_small_uint8.onnx`, 26 Mo, Apache-2.0),
- * entrée 256×256 → carte 252×252 (multiple de 14 du ViT). Asset absent ou
+ * Depth Anything V2 Small (primaire) via ONNX Runtime (paquet Android complet —
+ * le `-mobile` ne sait pas exécuter le `ConvInteger` quantifié), 100 % sur le
+ * téléphone. Poids quantifiés uint8 (`.ort` 27 Mo, Apache-2.0), téléchargés une
+ * fois à l'exécution (fichier vérifié d'abord, asset embarqué en repli dev),
+ * entrée 256×256 → carte 252×252 (multiple de 14 du ViT). Modèle absent ou
  * inférence tombée ⇒ `Result.failure` (le sélecteur AUTO bascule sur MiDaS).
  */
 class OnnxDepthEstimator private constructor(
@@ -66,11 +68,12 @@ class OnnxDepthEstimator private constructor(
         private val IMAGE_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
 
         /**
-         * Session ouverte sur l'asset, `null` si l'asset manque (l'APK ne
-         * l'embarque pas) : le sélecteur essaie alors le moteur suivant.
+         * Session ouverte sur le fichier téléchargé (puis l'asset embarqué en
+         * repli dev), `null` si le modèle est absent : le sélecteur essaie
+         * alors le moteur suivant.
          */
         fun open(context: Context): DepthEstimator? {
-            val weights = readAsset(context, ASSET_NAME) ?: return null
+            val weights = readStoreFile(context) ?: readAsset(context, ASSET_NAME) ?: return null
             val options = OrtSession.SessionOptions()
             options.setIntraOpNumThreads(4)
             return try {
@@ -85,6 +88,15 @@ class OnnxDepthEstimator private constructor(
         private fun readAsset(context: Context, name: String): ByteArray? {
             return try {
                 context.assets.open(name).use { it.readBytes() }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        private fun readStoreFile(context: Context): ByteArray? {
+            return try {
+                DepthModelStore.fileFor(context, DepthBackend.DA2)
+                    ?.takeIf { it.isFile }?.readBytes()
             } catch (e: Exception) {
                 null
             }
