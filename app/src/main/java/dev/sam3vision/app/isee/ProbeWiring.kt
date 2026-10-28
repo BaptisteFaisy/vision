@@ -37,6 +37,7 @@ internal fun LiveProbe.configureFrom(
         language = settings.speechLanguage,
         crossingActive = crossingActive,
         modelsLine = debugModelsLine(settings),
+        depth = settings.depthBackend,
     )
 }
 
