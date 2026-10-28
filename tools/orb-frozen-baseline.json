@@ -4,7 +4,7 @@
     "app/src/main/java/dev/sam3vision/app/isee/IseePortraitOrb.kt": "f1465c44422d78b3ab776e1cc74d878b4439dd06c97489d51db00112bac0da1a"
   },
   "regions": {
-    "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt::rememberSceneTime": "697162a901acfe7a10a8023df478968b698a1268f29a396a1c694e670b70dd92",
+    "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt::rememberSceneTime": "04d54af15f375886360b0f98939e39325aa20406eac66a3cdc5c5dc262b08ac5",
     "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt::OrbLayer": "cdc7a5a7ffdf18539e5444e0ac72064d260a666b73ad6b1814ce0868269210c1",
     "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt::orbLookOf": "5a06535f42856a9245f8a9943aecb2ffe3765f1ef179cdef678a03d226a5f74c",
     "app/src/main/java/dev/sam3vision/app/isee/IseeScenePane.kt::drawOrbShadow": "40c1279b9c10155b4ec1c625473ac4a8c1288c2d72a789b7395db7a6a91f692c",
