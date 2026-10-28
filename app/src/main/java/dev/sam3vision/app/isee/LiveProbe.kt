@@ -29,6 +29,7 @@ import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.app.LiveMaskTransport
+import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.depth.LiveDepthMeter
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.core.live.placedLabels
@@ -75,6 +76,8 @@ class LiveProbe(
     },
     /** Contexte app (moteur de profondeur) ; `null` = profondeur désactivée (tests). */
     appContext: Context? = null,
+    /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
+    private val depthMeter: DepthMeter? = appContext?.let { LiveDepthMeter(scope, it, background) { depthEngine } },
 ) {
 
     private val _state = MutableStateFlow(LiveProbeState())
@@ -100,8 +103,6 @@ class LiveProbe(
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()
-
-    private val depthMeter = appContext?.let { LiveDepthMeter(scope, it, background) { depthEngine } }
 
     /** Déclencheur des annonces vocales : stabilité, non-répétition, 4 s d'écart. */
     private val announcer = PositionAnnouncer()
@@ -294,6 +295,8 @@ _state.update { it.cleared() }
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
+        // Profondeur à chaque frame capturée, même sans session ni réponse SAM.
+        depthMeter?.offer(jpegB64)
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -394,7 +397,6 @@ _state.update { it.cleared() }
     ) {
         val overlays = overlaysFor(frame, shown)
         val pinhole = readingsOf(distances, frame)
-        depthMeter?.offer(jpegB64)
         val readings = depthMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
