@@ -227,6 +227,7 @@ dependencies {
     implementation(libs.litert)
     // Segmentation TwinLiteNet : GPU d'abord (graphe délégable), CPU en repli.
     implementation(libs.litert.gpu)
+    implementation(libs.litert.gpu.api)
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
