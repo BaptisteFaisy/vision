@@ -73,7 +73,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val session = IseeSession(cleaner, player, ::update)
 
     /** SAM pendant l'enregistrement : masques, distances, latence et phrase à dire. */
-    val probe = LiveProbe(viewModelScope)
+    val probe = LiveProbe(viewModelScope, appContext = getApplication())
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
