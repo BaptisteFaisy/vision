@@ -113,6 +113,10 @@ private data class FrameDone(
     val masks: Pair<SegmentMask, SegmentMask>?,
     val advice: WalkAdvice,
     val ms: Long,
+    /** Phases (diagnostic perf) : pixels, segmentation, overlay+conseil. */
+    val phasePx: Long,
+    val phaseSeg: Long,
+    val phaseOvl: Long,
 )
 
 /** Une frame caméra → segmentation (jetée si une inférence est en vol). */
@@ -198,21 +202,30 @@ private suspend fun runFrame(
     bitmap: Bitmap,
     onDone: (FrameDone) -> Unit,
 ) {
+    val t0 = SystemClock.elapsedRealtime()
     val argb = IntArray(bitmap.width * bitmap.height)
     bitmap.getPixels(argb, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-    val started = SystemClock.elapsedRealtime()
+    val t1 = SystemClock.elapsedRealtime()
     val result = engine.segment(argb, bitmap.width, bitmap.height).getOrNull()
-    val ms = SystemClock.elapsedRealtime() - started
+    val t2 = SystemClock.elapsedRealtime()
+    val ms = t2 - t0
     // Overlay (230 kpx) et conseil calculés ici : le fil principal ne fait
     // qu'afficher, il ne calcule plus.
     val done = if (result == null) {
-        FrameDone(null, null, WalkAdvice(WalkDirection.STOP, 0f, 0f, 0f), ms)
+        FrameDone(null, null, WalkAdvice(WalkDirection.STOP, 0f, 0f, 0f), ms, 0, 0, 0)
     } else {
+        val t3 = SystemClock.elapsedRealtime()
+        val overlay = masksToBitmap(result.driveable, result.lanes).asImageBitmap()
+        val advice = WalkGuide.directionFor(result.driveable)
+        val t4 = SystemClock.elapsedRealtime()
         FrameDone(
-            masksToBitmap(result.driveable, result.lanes).asImageBitmap(),
+            overlay,
             result.driveable to result.lanes,
-            WalkGuide.directionFor(result.driveable),
+            advice,
             result.inferenceMs,
+            t1 - t0,
+            t2 - t1,
+            t4 - t3,
         )
     }
     withContext(Dispatchers.Main) { onDone(done) }
@@ -249,7 +262,8 @@ private fun logRun(runs: Int, done: FrameDone, fps: Float, delegate: String) {
         done.advice.center,
         done.advice.right,
     )
-    Log.i("sam3vision", "twinlite: $cover, ${done.ms} ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate] $walk")
+    val phases = "pipe=${done.phasePx}+${done.phaseSeg}+${done.phaseOvl}"
+    Log.i("sam3vision", "twinlite: $cover, ${done.ms} ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate] $walk $phases")
 }
 
 /** Overlay précalculé en fond : le canevas ne fait que l'étirer. */
