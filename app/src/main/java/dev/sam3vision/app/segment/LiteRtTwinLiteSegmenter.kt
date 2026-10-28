@@ -26,6 +26,8 @@ class LiteRtTwinLiteSegmenter private constructor(
     private val guard: SerialRunGuard = SerialRunGuard(),
 ) : Segmenter {
 
+    @Volatile private var phaseN = 0
+
     override val backend: SegmentBackend = SegmentBackend.TWINLITE
 
     /** Cascade interne : le runtime ne dit pas l'élu — les ms parlent. */
@@ -34,20 +36,34 @@ class LiteRtTwinLiteSegmenter private constructor(
     override suspend fun segment(argb: IntArray, width: Int, height: Int): Result<SegmentResult> =
         withContext(Dispatchers.Default) {
             runCatching {
+                // DIAG TEMPORAIRE : phases internes (à retirer avant merge).
+                val d0 = android.os.SystemClock.elapsedRealtime()
                 val resized = SegmentPreprocess.resizeLandscape(argb, width, height)
                 val floats = SegmentPreprocess.normalizeNCHWArray(resized)
-                val started = android.os.SystemClock.elapsedRealtime()
+                val d1 = android.os.SystemClock.elapsedRealtime()
+                val started = d1
                 // Sérialisé : runs concurrents interdits (même garde qu'avant).
                 guard.run {
                     inBufs[0].writeFloat(floats)
                     model.run(inBufs, outBufs)
                 }.getOrThrow()
                 val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                val d2 = android.os.SystemClock.elapsedRealtime()
+                val out0 = outBufs[TwinLiteDecode.HEAD_DRIVEABLE].readFloat()
+                val out1 = outBufs[TwinLiteDecode.HEAD_LANES].readFloat()
+                val d3 = android.os.SystemClock.elapsedRealtime()
                 val (drive, lanes) = TwinLiteDecode.decode(
-                    listOf(outBufs[TwinLiteDecode.HEAD_DRIVEABLE].readFloat(), outBufs[TwinLiteDecode.HEAD_LANES].readFloat()),
+                    listOf(out0, out1),
                     TwinLiteDecode.INPUT_WIDTH,
                     TwinLiteDecode.INPUT_HEIGHT,
                 ) ?: throw IllegalStateException("sortie inattendue")
+                val d4 = android.os.SystemClock.elapsedRealtime()
+                if ((phaseN++ % 20) == 0) {
+                    android.util.Log.i(
+                        "sam3vision",
+                        "segphase: pre=${d1 - d0} run=$elapsed read=${d3 - d2} dec=${d4 - d3}",
+                    )
+                }
                 SegmentResult(drive, lanes, SegmentBackend.TWINLITE, elapsed)
             }
         }
