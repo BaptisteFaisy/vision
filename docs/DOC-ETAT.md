@@ -8,6 +8,7 @@ plus l'arbre — bandeau ajouté).
 
 | Document | Verdict | Ce qui a été vérifié / corrigé ici |
 |---|---|---|
+| `docs/TRAVERSEE.md` | **nouveau** (28/10) | Bilan traversée : recherche 10 angles, PR #163-167 + #174, dépendances in-app vs `/live`, preuves JVM, 4 restes bloquants listés |
 | `README.md` | **réécrit** (28/10) | Problème, solution, 4 blocs, stack complète ; chiffres remesurés (733 `.kt`, 43 457 lignes de prod, 2 202 `@Test` JVM + 10 instrumentés) ; backend dans `server/`, gestes sans double tap |
 | `docs/ARCHITECTURE.md` | **recompté** (28/10, §1 + §8) | Comptes §1 refaits, §8 réécrit (backend dans `server/`, `LIVE-SPEC` existe, tracker et `/video` câblés) ; §2-7 : valeurs vraies, lignes non recalées |
 | `docs/PERF.md` | **recompté** (28/10) | §1.1 refait (733 / 76 990 / 2 202 / 10), §2 ancres recalées (dont `work_edge` 512), §4 réécrit (mesures backend dans `server/docs/`) |

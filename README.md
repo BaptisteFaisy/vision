@@ -89,6 +89,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   router built into the app and CPU backend (`docs/NAVIGATION-VOCALE.md`).
 - **Walking guidance** — "tout droit" instructions, obstacles and crossings announced
   by voice (`docs/GUIDAGE-TOUT-DROIT.md`).
+- **Crossing mode** — reads the pedestrian light on-device, vetoes approaching
+  vehicles, and speaks when to cross (`docs/TRAVERSEE.md`).
 - **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.0), test bench built
   into the app (`docs/META-GLASSES.md`).
 - **Companion follow-up** — a share link to a real-time page: current sentence, nearby
@@ -218,8 +220,9 @@ Detail: `docs/CI-QUEUE.md`.
 - **Glasses**: `docs/META-GLASSES.md`, `docs/GLASSES-ETAT.md`,
   `docs/GLASSES-DECISION.md`, `docs/LUNETTES-LANCEMENT.md`.
 - **Product**: `docs/MODE-TAP.md`, `docs/MODE-US.md`, `docs/ISEE-DESIGN-PORTRAIT.md`,
-  `docs/GUIDAGE-TOUT-DROIT.md`, `docs/MICRO-VERROUILLE.md`, `docs/NETTOYAGE.md`,
-  `docs/OPTIMISATIONS.md`, `docs/CLES-DU-BUILD.md`, `docs/CI-QUEUE.md`.
+  `docs/GUIDAGE-TOUT-DROIT.md`, `docs/TRAVERSEE.md`, `docs/MICRO-VERROUILLE.md`,
+  `docs/NETTOYAGE.md`, `docs/OPTIMISATIONS.md`, `docs/CLES-DU-BUILD.md`,
+  `docs/CI-QUEUE.md`.
 - **Server**: `server/README.md`, `server/backend/README.md`, `server/docs/`
   (contracts, latency, deployment).
 - **Companion**: `suivi-parent/README.md`.

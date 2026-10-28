@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — traversée : le direct décide (PR #163-167, #174)
+
+- Paquet `traverse/` : hystérésis (`TraverseState`), veto trafic
+  (`TraverseVeto`, machine ATTENDRE/PRÊT/TRAVERSER/ALERTE), voix sûre
+  (`TraverseVoice`, préemption urgente + clips hors-ligne), pipeline et
+  câblage `LiveViewModel` ; le vert est lu par le classifieur embarqué
+  (`TrainedLightColor`), seules les boîtes viennent de SAM via `/live`.
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630 (2 264
+  tests), UBS 0 finding nouveau, `check-kotlin-limits` OK.
+- Doc : `docs/TRAVERSEE.md` (bilan, dépendances, 4 restes bloquants avant
+  usage réel : calibration FR, terrain, anti-confusion, rappel SAM).
+
 ## 2026-10-28 — haptique : la nappe de l'appui long est supprimée
 
 - Décision user : aucune vibration pendant que l'utilisateur parle. L'appui long
