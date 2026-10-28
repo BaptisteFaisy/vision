@@ -318,10 +318,14 @@ private fun SettingsRoute(
         onOpenClassic = onOpenClassic,
         onOpenGestures = onOpenGestures,
         onPickRole = onPickRole,
-        onStartTracking = { siteUrl, shareId ->
+        onStartTracking = { draft ->
+            // Le brouillon des champs est enregistré avant de partir : le service
+            // relit les réglages sauvegardés, et un lien ou un flux modifié sans
+            // « Enregistrer » partait dans le vide (400/403 silencieux).
+            viewModel.saveSettings(draft)
             (context as? MainActivity)?.ensureSharePermissions()
             ShareTrackingService.start(context)
-            shareParentSite(context, siteUrl, shareId)
+            shareParentSite(context, draft.parentSiteUrl, draft.shareId)
         },
         onStopTracking = {
             context.stopService(Intent(context, ShareTrackingService::class.java))
