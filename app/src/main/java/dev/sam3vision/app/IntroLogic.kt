@@ -14,11 +14,11 @@ fun introToggleLabel(enabled: Boolean): String =
 
 /**
  * Le texte de l'intro, écrit mot pour mot comme le MP3 embarqué (`intro_isee.mp3`,
- * voix Jade US) : la bulle du chat affiche les phrases que la voix dit.
+ * voix Laure) : la bulle du chat affiche les phrases que la voix dit.
  *
  * La phrase du balayage (« To listen to previous messages, swipe down ») a été retirée
- * avec la navigation entre messages. ⚠️ L'MP3 embarqué la contient encore : il faut le
- * régénérer (procédure `docs/ELEVENLABS-TTS.md`) pour réaligner la voix sur ce texte.
+ * avec la navigation entre messages, et le MP3 a été régénéré le 2026-10-28 en voix
+ * Laure sans elle : voix et texte sont réalignés (procédure `docs/ELEVENLABS-TTS.md`).
  */
 val ISEE_INTRO_TEXT = "Welcome to iSee. To record your surroundings, tap anywhere on " +
     "the screen to start the video, and tap again to stop and analyze it. To ask a " +

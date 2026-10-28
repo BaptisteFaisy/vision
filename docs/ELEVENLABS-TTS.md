@@ -214,18 +214,19 @@ annonce muette n'est donc jamais une raison de redéployer.
   effective seulement si `ttsConfigured`).
 - **iSee, bulles** : chaque bulle garde son MP3 dans Room ; la réponse la plus récente
   est lue dès son arrivée (`speakLatestAnswer`). Une seule lecture à la fois.
-- **Intro embarquée** : `app/src/main/res/raw/intro_isee.mp3` — voix Jade US
-  (`TOXPlnYC7z5SQSV2Zgc5`), rendu **une fois** en `eleven_v3`, MP3 44,1 kHz mono 128 kb/s,
-  386 237 octets (`ls -l` de cet arbre, 2026-10-26). La **durée** (24,08 s relevée) n'est pas
-  revérifiée ici : pas de `ffprobe` sur cette machine. Aucun réseau pour la jouer.
-  Le texte (`ISEE_INTRO_TEXT`, `IntroLogic.kt`) — **307 caractères** depuis le retrait du
-  swipe (27/10) — dit « Welcome to iSee… », puis la phrase
-  de coupe « Disable iSee intro. » — dans cet ordre, et `app.UiLogicTest` le vérifie.
-  ⚠️ **Désaligné** : la phrase « To listen to previous messages, swipe down » a été retirée
-  du texte avec la suppression du balayage (27/10), mais elle est **encore dans le MP3** :
-  il faut régénérer `intro_isee.mp3` (même voix, même réglages) pour réaligner la voix.
+- **Intro embarquée** : `app/src/main/res/raw/intro_isee.mp3` — voix Laure
+  (`3b8fXc91YHS1i2DYAlBQ`), rendue le 2026-10-28 en `eleven_v3` (stability 0,5,
+  similarity 0,75, style 0, speaker boost : les réglages du runtime), MP3 44,1 kHz
+  mono 128 kb/s, **401 701 octets, 25,08 s** (`ffprobe`), voix réelle
+  (mean −19,3 dB, max −0,4 dB, `volumedetect`). Coût : **135 caractères**
+  (compte creator, 28 078 → 28 213 / 130 005). Aucun réseau pour la jouer.
+  Le texte (`ISEE_INTRO_TEXT`, `IntroLogic.kt`, **307 caractères**) dit « Welcome to iSee… »,
+  puis la phrase de coupe « Disable iSee intro. » — dans cet ordre, et `app.UiLogicTest`
+  le vérifie. Voix et texte **réalignés** : la phrase « To listen to previous messages,
+  swipe down » n'est plus ni dans le texte ni dans le MP3 (balayage supprimé le 27/10).
   **Non écouté ici** (pas de sortie audio sur le poste de
-  travail) : contrôle par `ffprobe` et par le texte seulement.
+  travail) : contrôle par `ffprobe`/`volumedetect` et par le texte seulement, à confirmer
+  à l'oreille sur le téléphone.
   ⚠️ **Périmé** : l'ancienne note « lue **une seule fois**, `introPlayed` posé avant lecture »
   ne décrit plus le comportement. Aujourd'hui l'intro est **rejouée à chaque ouverture
   complète** tant qu'elle est autorisée : `Settings.introPending` vaut `introEnabled`
