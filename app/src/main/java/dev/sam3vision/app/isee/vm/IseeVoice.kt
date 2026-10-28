@@ -8,7 +8,8 @@ import dev.sam3vision.core.settings.Settings
  * implémentation du client dans `:core`, jamais réécrite ici.
  *
  * Les octets vides signifient « rien à dire » : texte non synthétisable (marqueurs
- * audio seuls) ou clé absente — l'appelant affiche alors le texte sans audio.
+ * audio seuls) ou clé absente — le design Portrait ne montre aucun texte hors
+ * parole, donc l'échec ne se lit que dans le statut porté par la ligne du bas.
  */
 class IseeVoice(
     private val settings: () -> Settings,

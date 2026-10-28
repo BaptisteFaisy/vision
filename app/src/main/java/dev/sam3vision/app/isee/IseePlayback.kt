@@ -18,12 +18,31 @@ class IseePlayback(
     private val player: SpeechPlayer,
     private val update: ((IseeUiState) -> IseeUiState) -> Unit,
     private val synthesize: suspend (String) -> ByteArray,
+    private val playBytes: suspend (ByteArray) -> Result<Unit> = { bytes -> player.play(bytes) },
 ) {
 
     /** La réponse la plus récente est jouée à voix haute dès son arrivée. */
     suspend fun speakLatestAnswer() {
         val row = dao.all().lastOrNull { !it.texteIA.isNullOrBlank() } ?: return
         playFromRow(row, preferAi = true)
+    }
+
+    /**
+     * Lecture d'octets déjà synthétisés (confirmation vocale hors bulle) : l'état
+     * parlant est posé avant la lecture et rendu sur échec — un `Result` ignoré
+     * ici laisserait `speakingEntryId` à vie et ferait jeter les tenues suivantes.
+     */
+    suspend fun speakBytes(id: Long, text: String, bytes: ByteArray) {
+        update { it.copy(speakingEntryId = id, speakingText = text, status = text) }
+        playBytes(bytes).onFailure { cause ->
+            update { st ->
+                st.copy(
+                    speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId,
+                    speakingText = if (st.speakingEntryId == id) "" else st.speakingText,
+                    status = playbackFailed(cause),
+                )
+            }
+        }
     }
 
     /** Décide du fichier à lire : audio du user, réponse ElevenLabs, ou synthèse. */
@@ -51,7 +70,7 @@ class IseePlayback(
             update { st ->
                 st.copy(
                     speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId,
-                    status = "audio playback failed: $cause",
+                    status = playbackFailed(cause),
                 )
             }
         }
@@ -59,3 +78,6 @@ class IseePlayback(
 
     private fun existingFile(path: String): File? = File(path).takeIf { it.isFile }
 }
+
+/** Motif unique d'échec de lecture, fichier comme octets : une seule phrase à l'écran. */
+internal fun playbackFailed(cause: Throwable): String = "audio playback failed: $cause"
