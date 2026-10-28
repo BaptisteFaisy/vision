@@ -35,6 +35,7 @@ internal fun LiveProbe.configureFrom(
         maxObjects = settings.objectsOnScreen,
         language = settings.speechLanguage,
         crossingActive = crossingActive,
+        depth = settings.depthBackend,
     )
 }
 

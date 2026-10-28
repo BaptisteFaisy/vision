@@ -1,9 +1,11 @@
 package dev.sam3vision.app.isee
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.ScreenTimings
@@ -27,6 +29,7 @@ import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.app.LiveMaskTransport
+import dev.sam3vision.app.depth.LiveDepthMeter
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
@@ -67,6 +70,8 @@ class LiveProbe(
     private val clientFor: (String, Long, WireMarks?) -> LiveClient = { base, timeout, marks ->
         LiveMaskTransport.clientFor(base, timeout, marks)
     },
+    /** Contexte app (moteur de profondeur) ; `null` = profondeur désactivée (tests). */
+    appContext: Context? = null,
 ) {
 
     private val _state = MutableStateFlow(LiveProbeState())
@@ -95,6 +100,10 @@ class LiveProbe(
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()
+
+    /** Moteur de profondeur (Réglages, OFF = sténopé seul, zéro coût). */
+    private var depthEngine: DepthBackend = DepthBackend.OFF
+    private val depthMeter = appContext?.let { LiveDepthMeter(scope, it, background) { depthEngine } }
 
     /** Déclencheur des annonces vocales : stabilité, non-répétition, 4 s d'écart. */
     private val announcer = PositionAnnouncer()
@@ -144,6 +153,7 @@ class LiveProbe(
         maxObjects: Int = 0,
         language: SpeechLanguage = SpeechLanguage.Fr,
         crossingActive: Boolean = false,
+        depth: DepthBackend = DepthBackend.OFF,
     ) {
         val clean = baseUrl.trim()
         session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
@@ -154,6 +164,7 @@ class LiveProbe(
         announcePositions = announce
         guideStraight = guide
         speechLanguage = language
+        depthEngine = depth
         distances.enabled = distancesOn
         distances.setLens(lens)
 resetPipeline()
@@ -217,6 +228,7 @@ _state.update { it.cleared() }
         announcer.reset()
         guidance.reset()
         crossing.reset()
+        depthMeter?.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
@@ -380,7 +392,9 @@ _state.update { it.cleared() }
         active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
         val overlays = overlaysFor(frame, shown)
-        val readings = readingsOf(distances, frame)
+        val pinhole = readingsOf(distances, frame)
+        depthMeter?.offer(jpegB64)
+        val readings = depthMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
         val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(placed, at)
