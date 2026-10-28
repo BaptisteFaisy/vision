@@ -37,10 +37,9 @@ class GeocodeChainFailureTest {
         timeoutMs: Long = 5_000L,
     ) = GeocodeChain(primary, fallback, GeocodeCache.fresh(), timeoutMs, timeoutMs)
 
-    private fun assertFailsWith(result: Result<*>, type: Class<out GeocodeError>): GeocodeError {
+    private fun assertFailsWith(result: Result<*>, type: Class<out GeocodeError>) {
         val error = result.exceptionOrNull()
         assertTrue("échec ${type.simpleName} attendu, obtenu $error", type.isInstance(error))
-        return error as GeocodeError
     }
 
     @Test
@@ -89,21 +88,17 @@ class GeocodeChainFailureTest {
     fun `des exceptions brutes sont re-typees Network cause conservee`() = runBlocking {
         val primary = FakeSource(Result.failure(IOException("connexion coupée")))
         val fallback = FakeSource(Result.failure(IllegalStateException("réponse illisible")))
-        val error = assertFailsWith(
-            chain(primary, fallback).geocode("gare"),
-            GeocodeError.Network::class.java,
-        )
-        assertTrue(error.cause is IllegalStateException)
+        val result = chain(primary, fallback).geocode("gare")
+        assertFailsWith(result, GeocodeError.Network::class.java)
+        assertTrue((result.exceptionOrNull() as GeocodeError).cause is IllegalStateException)
     }
 
     @Test
     fun `une erreur typee du repli est conservee telle quelle`() = runBlocking {
         val primary = FakeSource(Result.success(emptyList()))
         val fallback = FakeSource(Result.failure(GeocodeError.ServiceUnavailable("backend ko")))
-        val error = assertFailsWith(
-            chain(primary, fallback).geocode("gare"),
-            GeocodeError.ServiceUnavailable::class.java,
-        )
-        assertEquals("backend ko", error.message)
+        val result = chain(primary, fallback).geocode("gare")
+        assertFailsWith(result, GeocodeError.ServiceUnavailable::class.java)
+        assertEquals("backend ko", (result.exceptionOrNull() as GeocodeError).message)
     }
 }
