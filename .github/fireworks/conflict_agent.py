@@ -3,8 +3,10 @@
 
 Quand le sweep de pr-auto-merge échoue à rebaser une PR (conflit), il appelle
 ce script DANS son clone, rebase en cours (fichiers non fusionnés présents).
-Le script demande à un modèle Fireworks la résolution de chaque fichier,
-termine le rebase, pousse sur la branche de la PR et rend compte.
+Le script demande à un modèle Fireworks la résolution de chaque conflit
+élémentaire, recopie le reste du fichier à l'identique (jamais de
+réécriture complète : un gros fichier serait tronqué), termine le rebase,
+pousse sur la branche de la PR et rend compte.
 
 Bibliothèque standard uniquement. Usage :
 
@@ -31,7 +33,8 @@ MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
 API_DEFAULT = "https://api.fireworks.ai/inference/v1/chat/completions"
 MAX_FILES = 8
 MAX_FILE_BYTES = 200_000
-MAX_SIDE_CHARS = 12_000
+MAX_HUNKS = 20
+HUNK_MAX_CHARS = 12_000
 COOLDOWN_S = 20 * 60
 SPAWN_WINDOW_S = 3_600
 SPAWN_CAP = 3
@@ -158,39 +161,61 @@ def unmerged_files():
     return [line for line in out.splitlines() if line]
 
 
-def file_version(path, stage):
-    """Contenu d'un bord (:1: base, :2:, :3:) ou None."""
-    proc = subprocess.run(["git", "show", ":%d:%s" % (stage, path)],
-                          capture_output=True, timeout=60)
-    if proc.returncode != 0:
-        return None
-    return proc.stdout
+def split_hunks(text):
+    """Découpe un fichier marqué : ("clean", txt) / ("hunk", dict).
+
+    Gère diff et diff3 (avec ou sans base). En rebase, le premier bloc
+    ("head") est master (destination) et le second ("saved") la branche.
+    """
+    segments, buf = [], []
+    lines = text.split("\n")
+    n, i = len(lines), 0
+    while i < n:
+        if not lines[i].startswith("<<<<<<<"):
+            buf.append(lines[i])
+            i += 1
+            continue
+        if buf:
+            segments.append(("clean", "\n".join(buf)))
+            del buf[:]
+        head, base, saved = [], None, []
+        i += 1
+        while (i < n and lines[i] != "======="
+               and not lines[i].startswith("|||||||")):
+            head.append(lines[i])
+            i += 1
+        if i < n and lines[i].startswith("|||||||"):
+            base = []
+            i += 1
+            while i < n and lines[i] != "=======":
+                base.append(lines[i])
+                i += 1
+        if i < n and lines[i] == "=======":
+            i += 1
+        while i < n and not lines[i].startswith(">>>>>>>"):
+            saved.append(lines[i])
+            i += 1
+        i += 1
+        segments.append(("hunk", {"head": head, "base": base, "saved": saved}))
+    if buf:
+        segments.append(("clean", "\n".join(buf)))
+    return segments
 
 
-def is_text(data):
-    return b"\x00" not in data[:8_000]
-
-
-def clip(text):
-    if len(text) <= MAX_SIDE_CHARS:
-        return text
-    return text[:MAX_SIDE_CHARS] + "\n[... tronqué ...]"
-
-
-def build_messages(path, base, ours, theirs):
-    """Prompt de résolution pour un fichier."""
-    system = ("Tu es un agent qui résout des conflits de fusion git. "
-              "Tu rends le fichier ENTIER résolu, sans aucun marqueur de "
-              "conflit, en gardant les deux intentions (jamais un bord "
-              "choisi à l'aveugle). Tu ne réponds que par le fichier, "
+def build_hunk_messages(path, hunk):
+    """Prompt de résolution pour UN conflit élémentaire (rebase)."""
+    system = ("Tu résous UN conflit de fusion git (un seul morceau de "
+              "fichier). Tu rends UNIQUEMENT le texte résolu de ce morceau, "
+              "sans aucun marqueur, en gardant les deux intentions (jamais "
+              "un bord choisi à l'aveugle). Tu ne réponds que par le texte, "
               "dans un seul bloc de code.")
-    parts = ["Fichier : %s" % path,
+    parts = ["Fichier : %s (extrait)" % path,
              "--- Version de la branche (à garder en priorité en cas de doute) ---",
-             clip(ours)]
-    if base is not None:
-        parts += ["--- Version ancêtre commun ---", clip(base)]
-    parts += ["--- Version de master ---", clip(theirs),
-              "Rends le fichier complet résolu, dans un seul bloc de code."]
+             "\n".join(hunk["saved"])]
+    if hunk["base"] is not None:
+        parts += ["--- Version ancêtre commun ---", "\n".join(hunk["base"])]
+    parts += ["--- Version de master ---", "\n".join(hunk["head"]),
+              "Rends le morceau résolu, dans un seul bloc de code."]
     return [{"role": "system", "content": system},
             {"role": "user", "content": "\n".join(parts)}]
 
@@ -234,17 +259,8 @@ def still_marked(content):
     return False
 
 
-def rebase_sides(path):
-    """Bords (branche, master) pendant un rebase : :3: = branche rejouée.
-
-    En merge, :2: = branche et :3: = master ; en rebase c'est l'inverse
-    (:2: = destination = master). L'agent ne tourne qu'en rebase.
-    """
-    return file_version(path, 3), file_version(path, 2)
-
-
 def resolve_one(api_url, key, model, path, deadline, dry_run):
-    """Résout un fichier en conflit et l'ajoute à l'index."""
+    """Résout un fichier conflit par conflit, le reste recopié intact."""
     if time.time() > deadline:
         raise AgentError("budget de %d s dépassé" % BUDGET_S)
     try:
@@ -253,26 +269,43 @@ def resolve_one(api_url, key, model, path, deadline, dry_run):
         raise AgentError("fichier illisible : %s" % path)
     if size > MAX_FILE_BYTES:
         raise AgentError("fichier trop gros : %s (%d o)" % (path, size))
-    ours, theirs = rebase_sides(path)
-    if ours is None or theirs is None or not is_text(ours + theirs):
-        raise AgentError("binaire ou bord manquant : %s" % path)
-    base = file_version(path, 1)
-    if base is not None and not is_text(base):
-        base = None
-    decode = lambda b: b.decode("utf-8", errors="replace")   # noqa: E731
-    messages = build_messages(path,
-                              decode(base) if base is not None else None,
-                              decode(ours), decode(theirs))
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    if "\x00" in text[:8_000]:
+        raise AgentError("binaire : %s" % path)
+    segments = split_hunks(text)
+    hunks = [seg for kind, seg in segments if kind == "hunk"]
+    if not hunks:
+        raise AgentError("conflit sans marqueurs (suppression ?) : %s" % path)
+    if len(hunks) > MAX_HUNKS:
+        raise AgentError("%d conflits élémentaires (plafond %d) : %s"
+                         % (len(hunks), MAX_HUNKS, path))
     if dry_run:
-        print("===== %s (%d messages) =====" % (path, len(messages)))
-        print(messages[1]["content"][:4_000])
+        for seg in hunks:
+            messages = build_hunk_messages(path, seg)
+            print("===== %s =====" % path)
+            print(messages[1]["content"][:4_000])
         return
-    log("résolution de %s (%d o)" % (path, size))
-    resolved = extract_file(fw_complete(api_url, key, model, messages))
-    if still_marked(resolved):
-        raise AgentError("le modèle a rendu des marqueurs : %s" % path)
+    log("résolution de %s (%d conflits)" % (path, len(hunks)))
+    out = []
+    for kind, seg in segments:
+        if kind == "clean":
+            out.append(seg)
+            continue
+        if time.time() > deadline:
+            raise AgentError("budget de %d s dépassé" % BUDGET_S)
+        total = sum(len("\n".join(seg[k])) for k in ("head", "saved"))
+        if seg["base"] is not None:
+            total += len("\n".join(seg["base"]))
+        if total > HUNK_MAX_CHARS:
+            raise AgentError("conflit élémentaire trop gros : %s" % path)
+        messages = build_hunk_messages(path, seg)
+        resolved = extract_file(fw_complete(api_url, key, model, messages))
+        if still_marked(resolved):
+            raise AgentError("le modèle a rendu des marqueurs : %s" % path)
+        out.append(resolved.rstrip("\n"))
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(resolved)
+        fh.write("\n".join(out))
     sh(["git", "add", "--", path])
 
 
