@@ -9,6 +9,7 @@ import dev.sam3vision.app.localOverlayFlag
 import dev.sam3vision.app.localReasonNote
 import dev.sam3vision.core.local.LocalReason
 import dev.sam3vision.core.settings.SettingsStore
+import dev.sam3vision.core.stairs.StairsFeed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -35,6 +36,9 @@ class LiveLocalOverlayWiring(
 ) {
 
     private val session = LiveLocalOverlaySession()
+
+    /** Détecteur escaliers : indépendant du calque (luma déjà là, seuils MIT). */
+    private val stairs = StairsFeed()
 
     /** Dernière liste d'overlays vue : son identité annonce un nouveau keyframe. */
     private var seenOverlays: List<Bitmap>? = null
@@ -74,10 +78,23 @@ class LiveLocalOverlayWiring(
         }
         val tick = session.tick(nowMs, luma)
         publishState(tick.fps, tick.reason, nowMs)
+        publishStairs(luma, nowMs)
+    }
+
+    /**
+     * Escalier confirmé → ligne d'état (changement seul : pas de recomposition
+     * à 30 ips). La voix viendra par la synthèse existante (ni scope ni
+     * annonceur à ce niveau — TODO câblage voix).
+     */
+    private fun publishStairs(luma: ByteArray?, nowMs: Long) {
+        val line = stairs.tick(luma, nowMs)
+        if (line != state.value.stairsLine) state.update { it.copy(stairsLine = line) }
     }
 
     /** Fin de session : plus de keyframe, plus d'image peinte (l'état est remis à zéro). */
     fun reset() {
+        stairs.reset()
+        state.update { it.copy(stairsLine = "") }
         session.reset()
         seenOverlays = null
     }
