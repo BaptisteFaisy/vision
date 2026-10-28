@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -30,15 +31,17 @@ class GuidanceAnnouncer(
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
      * change ni les seuils, ni la mémoire de décision. [cap] est la direction
      * demandée à la voix : il change le couloir marché, et sa signature fait
-     * reparler dès que le cap change.
+     * reparler dès que le cap change. [hfovDeg] calibre le décalage chiffré
+     * (défaut 67° : l'appelant qui connaît la focale la passe).
      */
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
         language: SpeechLanguage = SpeechLanguage.Fr,
         cap: SteeringCap = SteeringCap.Straight,
+        hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): String? {
-        val decision = Guidance.decide(labels, cap, rangeMeters)
+        val decision = Guidance.decide(labels, cap, rangeMeters, hfovDeg)
         val key = Guidance.key(decision)
         if (!gate.admit(atMs, key, urgent = decision.blocked)) return null
         val phrase = Guidance.phrase(decision, language)

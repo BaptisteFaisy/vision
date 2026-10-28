@@ -70,7 +70,8 @@ class LiveProbeSteeringTest {
 
         val spoken = probe.state.value.spoken.orEmpty()
         assertTrue("passage attendu, reçu : $spoken", spoken.startsWith("Person"))
-        assertTrue("passage attendu, reçu : $spoken", spoken.contains("10 heures, passe au centre"))
+        assertTrue("passage attendu, reçu : $spoken", spoken.contains("décalez-vous de"))
+        assertTrue("passage attendu, reçu : $spoken", spoken.contains("vers le centre"))
     }
 
     @Test
