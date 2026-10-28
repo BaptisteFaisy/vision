@@ -59,6 +59,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Roue dentée noire, état dans une pastille arrondie comme sur la page blind person.
 - Carte plus haute et remontée, sans défilement ; boule plus petite au liquide bleu et vert.
 - Couleurs du verre préservées dans le port WebGL ; le shader natif blind person reste inchangé.
+- Concurrence Gradle plafonnée à deux workers par build sur les runners partagés,
+  sans relever les délais de CI ni retirer de contrôle.
 
 ## 2026-10-28 — caregiver : écran réellement livré dans l'APK
 
