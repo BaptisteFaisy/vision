@@ -1,5 +1,6 @@
 package dev.sam3vision.core.traverse
 
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -166,11 +167,18 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `prompts de traversee bornes a six vehicules en tete`() {
+    fun `prompts de traversee bornes a seize vehicules en tete`() {
         val prompts = VehicleConcepts.promptsFor(listOf("traffic light", "person", "door", "zebra"))
-        assertEquals(6, prompts.size)
-        assertEquals(VehicleConcepts.PROMPTS, prompts.take(5))
-        assertEquals("traffic light", prompts[5])
+        assertEquals(
+            listOf(
+                "car", "bus", "truck", "motorcycle", "bicycle",
+                "traffic light", "person", "door", "zebra",
+            ),
+            prompts,
+        )
+        val full = VehicleConcepts.promptsFor((1..20).map { "objet$it" })
+        assertEquals(LivePrompts.MAX, full.size)
+        assertEquals(VehicleConcepts.PROMPTS, full.take(5))
         assertEquals(VehicleConcepts.PROMPTS, VehicleConcepts.promptsFor())
     }
 
