@@ -1,7 +1,8 @@
 # CI et file de merge
 
-Relu le **2026-10-27** sur cet arbre. Chaque affirmation ci-dessous vient d'un fichier du
-dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`.
+Relu le **2026-10-28** sur cet arbre (découpe v8 : natif hors PR). Chaque affirmation
+ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-budget/`,
+`.github/couche0/`.
 
 ## 1. La règle : un verdict en 5 minutes
 
@@ -14,22 +15,25 @@ dépôt : `.github/workflows/`, `.github/ci-budget/`, `.github/couche0/`.
 - Il tourne sur chaque PR pour que le check `ci-budget` existe toujours : c'est une condition
   d'entrée de la file. Sans lui, une PR pourrait entrer dans la file avec un job de 30 minutes.
 
-## 2. Les quatre jobs de `ci.yml`
+## 2. Le job `ci` de `ci.yml` (et le natif hors PR)
 
-Déclencheurs : `pull_request` et `push`. Runners **auto-hébergés** —
-`runs-on: [self-hosted, linux, x64, vision]` (`ci.yml:28`) sur les quatre jobs, pas
-`ubuntu-latest` —, cache Gradle via `gradle/actions/setup-gradle@v4`, mise en cache avec
-`cache-read-only: false`. Chaque job porte `timeout-minutes: 5`.
+Déclencheurs : `pull_request` et `push`. La PR ne porte qu'**un seul job**,
+`ci` (`ci.yml:30`) : périmètre, chaîne d'outils, gardes, tests JVM `:core` +
+`:app`, rapport de tests. Runner **auto-hébergé** —
+`runs-on: [self-hosted, linux, x64, vision]` —, cache Gradle via
+`gradle/actions/setup-gradle@v4` avec `cache-read-only: false`,
+`timeout-minutes: 5`.
 
-| Job | Ce qu'il fait |
-|---|---|
-| `ci` | périmètre, chaîne d'outils, quatre gardes, tests JVM `:core` + `:app`, rapport de tests |
-| `apk` | `:app:assembleDebug` ; artefact publié seulement sur `master` |
-| `apk-release` | `:app:assembleRelease` |
-| `lint` | `:app:lintDebug` + rapport |
+Les builds natifs (`apk` = `:app:assembleDebug` + artefact sur `master`,
+`apk-release` = `:app:assembleRelease`, `lint` = `:app:lintDebug` + rapport)
+vivaient dans `ci.yml` jusqu'au 2026-10-28 : 4 jobs × N PRs saturaient les
+runners (file jusqu'à 10 min, budget wall-clock cassé). Ils ont déménagé
+dans `ci-native.yml`, vérifiés à chaque push sur `master`, à chaque tag et
+sur demande manuelle — même `timeout-minutes: 5`, mêmes commandes.
 
 Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et testé avec `:app`
-(`:app:assembleDebug` au job `apk`, ses tests JVM dans `:app:testDebugUnitTest` au job `ci`).
+(`:app:assembleDebug` au job `apk` de `ci-native.yml`, ses tests JVM dans
+`:app:testDebugUnitTest` au job `ci`).
 Détail : la page « Le banc lunettes dans la CI » sous `docs/` (nom de fichier inchangé pour ne
 pas casser les liens).
 
@@ -71,13 +75,16 @@ assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml
 (`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
 sans bloquer : seul un vrai conflit s'oppose à un rebase.
 
-## 5. Protection de `master` et file de merge (balayeur v4)
+## 5. Protection de `master` et file de merge (balayeur v8)
 
 `master` est protégé (PR obligatoire, historique linéaire, pas de push direct) et les
-PR sont fusionnées par le workflow `pr-auto-merge` (job `sweep`, toutes les 10 min
-et à chaque push sur `master` ou événement de PR). La seule porte reste la CI : les
-6 checks `ci`, `apk`, `apk-release`, `lint`, `ci-budget`, `couche0` verts, puis merge
-en rebase. Pas de gate humaine, pas de merge à la main.
+PR sont fusionnées par le workflow `pr-auto-merge` (job `sweep` : à chaque fin de CI,
+toutes les 10 min en filet, et à chaque push sur `master` ou événement de PR).
+La seule porte reste la CI : les 3 checks `ci`, `ci-budget`, `couche0` verts, puis
+merge en rebase. Le natif (`apk`, `apk-release`, `lint`) est vérifié sur `master`
+par `ci-native.yml` après chaque atterrissage. Pas de gate humaine, pas de merge
+à la main (sauf amorçage unique de la découpe v8, qui change le contrat du
+balayeur lui-même).
 
 Concrètement, à chaque passage, pour chaque PR interne non-brouillon :
 
