@@ -229,11 +229,12 @@ fun objectChips(state: LiveUiState, max: Int = 5): List<String> {
 fun Chip(label: String, color: Color, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(12.dp)
     val decorated = Modifier.background(color.copy(alpha = 0.9f), shape).padding(horizontal = 12.dp, vertical = 7.dp)
+    val ink = contentOn(color)
     if (onClick == null) {
-        Box(decorated) { Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1) }
+        Box(decorated) { Text(label, color = ink, fontSize = 13.sp, maxLines = 1) }
     } else {
         TextButton(onClick = onClick, modifier = decorated) {
-            Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1)
+            Text(label, color = ink, fontSize = 13.sp, maxLines = 1)
         }
     }
 }

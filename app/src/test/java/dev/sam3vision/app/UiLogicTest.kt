@@ -134,4 +134,14 @@ class UiLogicTest {
         assertNotEquals(AppColors.background, AppColors.surface)
         assertTrue(MASK_ALPHA in 1..255)
     }
+
+    @Test
+    fun `l'encre est sombre sur fond clair et claire sur fond sombre`() {
+        assertEquals(AppColors.background, contentOn(AppColors.warning))
+        assertEquals(AppColors.background, contentOn(AppColors.success))
+        assertEquals(AppColors.text, contentOn(AppColors.primary))
+        assertEquals(AppColors.text, contentOn(AppColors.danger))
+        assertEquals(AppColors.text, contentOn(AppColors.surfaceHigh))
+        assertEquals(AppColors.text, contentOn(AppColors.background))
+    }
 }
