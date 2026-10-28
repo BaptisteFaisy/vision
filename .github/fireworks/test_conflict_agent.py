@@ -32,5 +32,20 @@ class EnvOrTest(unittest.TestCase):
                 conflict_agent.env_or("FIREWORKS_MODEL", "DEFAUT"), "M")
 
 
+class PushUrlTest(unittest.TestCase):
+    """URL push : PAT du CI, repli "origin" en local."""
+
+    def test_avec_token_rend_url_authentifiee(self):
+        with mock.patch.dict(os.environ, {"GH_TOKEN": "T"}):
+            url = conflict_agent.push_url("O/R")
+            self.assertEqual(
+                url, "https://x-access-token:T@github.com/O/R.git")
+
+    def test_sans_token_rend_origin(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("GH_TOKEN", None)
+            self.assertEqual(conflict_agent.push_url("O/R"), "origin")
+
+
 if __name__ == "__main__":
     unittest.main()
