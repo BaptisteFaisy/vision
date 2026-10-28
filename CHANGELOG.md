@@ -303,7 +303,11 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   n'en garde aucune ligne.)
 - **A/B émulateur** (GPU A100, 60 s chacun, 0 FATAL) : témoin 399a512 = 2,19 ips
   (logcat) / 177-188 ms ; branche 7cd1a4b = 5,53 ips / 158-166 ms — débit ×2,5,
-  latence en baisse (~-12 %). Chiffres téléphone à venir.
+  latence en baisse (~-12 %).
+- **Téléphone Redmi 2c6852ac** (build 05389ff, 2×60 s, GPU A100) : 6,1-6,8 ips
+  écran, 153-166 ms, srv 91 ms, 0 FATAL — le créneau unique est saturé
+  (6,5 × 155 ms ≈ 1,0) : le client ne peut plus attendre moins, seuls un RTT
+  plus court (serveur/réseau) ou N vols (serveur) monteraient au-delà de 7.
 
 ## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
 
