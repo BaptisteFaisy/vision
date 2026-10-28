@@ -5,7 +5,7 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
-import dev.sam3vision.core.crossing.TrainedLightColor
+import dev.sam3vision.core.crossing.PedLightGate
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.settings.Settings
@@ -50,8 +50,9 @@ internal fun crossingCueOf(
 
 /**
  * État du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
- * en local ([TrainedLightColor], 100 % embarqué, aucun réseau). Pas de feu en
- * vue ou image illisible ⇒ [CrossingState.Unknown] (le doute vaut « attendez »).
+ * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
+ * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
+ * [CrossingState.Unknown] (le doute vaut « attendez »).
  *
  * Partagé entre la sonde ([crossingCueOf]) et le direct (`TraverseWiring`) :
  * une seule lecture du feu, jamais de doublon.
@@ -61,7 +62,7 @@ internal fun crossingStateOf(frame: LiveFrame, jpegB64: String): CrossingState {
     if (box == null) return CrossingState.Unknown
     val crop = CrossingPixels.frame(jpegB64, box)
     if (crop == null) return CrossingState.Unknown
-    return TrainedLightColor.classify(crop.argb, crop.width, crop.height)
+    return PedLightGate.verdict(crop.argb, crop.width, crop.height)
 }
 
 /**

@@ -49,6 +49,10 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 - `TraverseWiring` relit le vert à chaque frame **active** et demande le
   concept `traffic light` dans les prompts (5 véhicules + feu = plafond 6) ;
 - `LiveViewModel` transmet le JPEG (1 ligne, fichier maintenu à 498 lignes).
+- Porte anti-confusion (`PedLightGate`) : le vert classifié ne passe que
+  s'il est en bas du cadre, élancé comme un bonhomme, sans rouge franc —
+  méthode sans données (priors structurels + 12 tests synthétiques JVM),
+  direction sûre (tout rejet vaut « attendez »).
 
 ## 4. Ce qui tourne où (dépendances extérieures)
 
@@ -75,6 +79,7 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
    jour/nuit/pluie. Corpus téléphone + seuil bloquant sur les faux verts.
 2. **Terrain** : aucun test téléphone — crop réel, voix sur appareil, veto
    avec vraies distances, à valider sur build du HEAD.
-3. **Anti-confusion feu voiture / feu piéton** : non implémentée — un feu
-   vert voiture dans le champ peut dire « traversez ».
+3. **Anti-confusion feu voiture / feu piéton** : porte structurelle en
+   place (`PedLightGate`, prouvée sur pixels synthétiques) — validation sur
+   feux réels et crops serrés reste due avec le corpus.
 4. **Rappel SAM** sur feux piétons FR jamais mesuré (inconnue n° 1).
