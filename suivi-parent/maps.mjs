@@ -5,6 +5,8 @@ const DETAIL_ZOOM=20;
 function mapReady(){
  document.getElementById('map').setAttribute('aria-busy','false');
  document.getElementById('map-loading').hidden=true;
+ document.getElementById('map').dataset.provider=mode;
+ document.getElementById('map-provider').textContent=mode==='google'?'Google Maps actif':'Carte OpenFreeMap';
 }
 let live=null,lastPos=null,status='offline';
 function state(){return status;}
@@ -31,7 +33,7 @@ function mlStyle(s){return s==='satellite'?mapStyle('sat'):s==='terrain'?mapStyl
 function setModeButtons(s){document.querySelectorAll('.styles button').forEach(x=>x.classList.toggle('on',x.dataset.s===s));}
 let gAuthError='';window.gm_authFailure=()=>{gAuthError='key refused by Google (HTTP referrer restriction, API not enabled, or billing).';};
 function loadGoogle(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();gAuthError='';const sc=document.createElement('script');sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&callback=__ginit';sc.async=true;sc.onerror=()=>rej(new Error('script_error'));window.__ginit=()=>{setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));else res();},400);};document.head.appendChild(sc);setTimeout(()=>{if(gAuthError)rej(new Error(gAuthError));},6000);});}
-function showGerr(msg){const e=document.getElementById('gerr');if(!e)return;e.style.display='block';e.innerHTML=msg;}
+function showGerr(msg){const e=document.getElementById('gerr');if(!e)return;e.hidden=false;e.textContent=msg;}
 function pxPerMeter(lat,zoom){return 156543.03*Math.cos(lat*Math.PI/180)/Math.pow(2,zoom);}
 export async function bootMap(){
  document.querySelectorAll('.styles button').forEach(b=>b.onclick=()=>{const s=b.dataset.s;setModeButtons(s);if(mode==='google'&&gmap)gmap.setMapTypeId(gType(s));else if(map){map.setStyle(mlStyle(s));map.once('styledata',syncPins);}lastMapType=s;});
@@ -39,16 +41,16 @@ export async function bootMap(){
   try{
    await loadGoogle(G_KEY);
    document.getElementById('keybox').style.display='flex';
-   document.getElementById('clearkey').style.display='';
+   document.getElementById('clearkey').hidden=false;
    document.getElementById('gkey').value=G_KEY;
    document.getElementById('gkey').title='Google key active — paste a new key and press OK to replace it, ✕ to forget it';
    mode='google';
    document.getElementById('credit').style.display='none'; // Google draws its own attribution on the map
-   gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'hybrid'),zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false});
+   gmap=new google.maps.Map(document.getElementById('map'),{center:{lat:HOME.lat,lng:HOME.lon},zoom:3,mapTypeId:gType(lastMapType||'plan'),mapTypeControl:false,zoomControl:true,gestureHandling:'greedy',streetViewControl:false,fullscreenControl:false,keyboardShortcuts:false});
    google.maps.event.addListenerOnce(gmap,'tilesloaded',mapReady);
    syncGoogle();return;
   }catch(e){
-   showGerr('Google refused this key: '+String((e&&e.message)||e)+'<br>1) HTTP referrers of the key: add <code>https://suivi-parent.vercel.app/*</code> and <code>https://*.vercel.app/*</code>.<br>2) <code>Maps JavaScript API</code> must be <b>enabled</b> on the project.<br>3) Billing must be active, otherwise tiles stay in error even with a valid key.<br>The browser console (F12) also shows Google\'s exact message.');
+   showGerr('Google Maps n’a pas accepté la clé ou ne répond pas. '+String((e&&e.message)||e));
   }
  }
  try{
@@ -64,7 +66,7 @@ export async function bootMap(){
 }
 document.getElementById('savekey').onclick=()=>{const v=document.getElementById('gkey').value.trim();if(!v)return;localStorage.setItem('gmaps_key',v);const u=new URL(location.href);u.searchParams.set('key',v);location.href=u.toString();};
 document.getElementById('clearkey').onclick=()=>{localStorage.removeItem('gmaps_key');const u=new URL(location.href);u.searchParams.delete('key');location.href=u.toString();};
-if(G_KEY){document.getElementById('clearkey').style.display='';}
+if(G_KEY){document.getElementById('clearkey').hidden=false;}
 function syncPins(){
  if(!map)return;markers.forEach(m=>m.remove());markers=[];
  if(!live||!live.fix||state()==='offline'){return;}

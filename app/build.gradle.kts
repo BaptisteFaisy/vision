@@ -107,6 +107,9 @@ android {
         buildConfigField("String", "ASR_API_KEY", "\"${localProp("asr.api.key")}\"")
         // Narration du Direct : clé dédiée (le modèle des questions ne narre pas).
         buildConfigField("String", "LIVE_LLM_API_KEY", "\"${localProp("llm.live.api.key")}\"")
+        // Clé Google transmise au build par secret CI ou local.properties gitignoré.
+        val mapsKey = localProp("google.maps.api.key").ifBlank { System.getenv("GOOGLE_MAPS_API_KEY").orEmpty() }
+        buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$mapsKey\"")
         // Tap court : endpoint vidéo SAM 3.1 (laisser vide → annonce « Failed », aucun envoi).
         buildConfigField("String", "SAM31_ENDPOINT", "\"${localProp("sam31.endpoint")}\"")
         // Direct : base de l'app Modal sam3-eu-a100 (/live).
@@ -149,6 +152,17 @@ kotlin {
         jvmTarget.set(JvmTarget.JVM_17)
     }
 }
+
+// La WebView utilise la même interface que le site, livrée avec chaque APK.
+val caregiverAssets = tasks.register<Sync>("caregiverAssets") {
+    from(rootProject.file("suivi-parent")) {
+        include("*.html", "*.css", "*.mjs", "*.png")
+        into("caregiver")
+    }
+    into(layout.buildDirectory.dir("generated/caregiver-assets"))
+}
+android.sourceSets.getByName("main").assets.srcDir(caregiverAssets)
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(caregiverAssets) }
 
 // Room : le schéma JSON est exporté (artifact du module de nettoyage), jamais régénéré à la main.
 ksp {
