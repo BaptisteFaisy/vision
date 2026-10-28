@@ -65,7 +65,11 @@ fun SettingsScreen(
     onStopTracking: () -> Unit,
     onBack: () -> Unit,
 ) {
-    var draft by remember { mutableStateOf(settings) }
+    // Resynchronisé sur les réglages : le seed est async, donc la première
+    // composition voit des réglages vierges — sans clé, le brouillon garderait
+    // une clé vide (« clé LLM : absente » sur un build keyed). Sûr : pendant cet
+    // écran, seul le seed change les réglages (la sauvegarde le quitte).
+    var draft by remember(settings) { mutableStateOf(settings) }
     Column(settingsLightScroll()) {
         SettingsHeader(onBack = onBack)
         SettingsBody(
