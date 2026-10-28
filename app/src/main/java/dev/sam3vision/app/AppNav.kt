@@ -94,15 +94,13 @@ fun AppNav(
 ) {
     val state by viewModel.state.collectAsState()
     // Pile sauvegardée sous forme de noms : une rotation ne renvoie plus à l'accueil.
-    // `stack` reste l'interface unique (push, pop, effets) ; seuls les noms persistent.
+    // `stack` est dérivée à chaque composition ; toute écriture passe par `names`.
     var names by rememberSaveable { mutableStateOf(listOf("isee")) }
-    var stack: List<Route>
-        get() = names.map(::routeFromName)
-        set(value) { names = value.map(::routeToName) }
+    val stack: List<Route> = names.map(::routeFromName).ifEmpty { listOf(Route.Isee) }
     val route = stack.first()
-    val push: (Route) -> Unit = { stack = listOf(it) + stack }
-    val pop: () -> Unit = { if (stack.size > 1) stack = stack.drop(1) }
-    StartRouteEffect(state.settings, state.settingsReady) { stack = listOf(Route.Caregiver) }
+    val push: (Route) -> Unit = { names = listOf(routeToName(it)) + names }
+    val pop: () -> Unit = { if (names.size > 1) names = names.drop(1) }
+    StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     BackHandler(enabled = stack.size > 1) { pop() }
 
@@ -119,7 +117,7 @@ fun AppNav(
             push = push,
             pop = pop,
             // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
-            onHome = { stack = listOf(Route.Isee) },
+            onHome = { names = listOf(routeToName(Route.Isee)) },
             // À la racine, la roue dentée et le retour système ouvrent les Réglages.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
         )
