@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — haptique : la nappe de l'appui long est supprimée
+
+- Décision user : aucune vibration pendant que l'utilisateur parle. L'appui long
+  garde sa salve franche au seuil (`HapticPattern.holdTick`, deux temps forts,
+  jouée une seule fois) puis silence pendant toute la dictée ; le relâchement
+  garde sa queue de 200 ms, la traversée ses motifs ponctuels (inchangés).
+- `core/.../haptics/Waveform.kt` : `holdLoop()` (bouclé) remplacé par `holdTick()`
+  (non bouclé) ; consts `LOOP_MS`/`LOOP_OFF_MS`/`LIGHT_AMPLITUDE` et
+  `FIRST_LOOP_INDEX` supprimées. `app/.../HapticLoop.kt` (`startHold`) et
+  `app/.../IseeHaptics.kt` (KDoc) suivent ; `scripts/verify-longpress-port.sh`
+  raconte le nouveau comportement (salve, silence, queue).
+- Preuves : `WaveformTest` (`:core`, JVM) — salve historique intacte,
+  `looped == false`, `repeatIndex == NO_REPEAT` ; `:core` + `:app`
+  `testDebugUnitTest` verts sur r630.
+
 ## 2026-10-28 — concepts : murs, escaliers et vocabulaire extérieur FR→EN
 
 - `server/backend/concepts.py` (nouveau, 269 lignes, copié à l'identique dans
