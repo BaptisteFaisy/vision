@@ -66,7 +66,7 @@ class TraversePipeline(
     ): TraverseOutput {
         val filtered = state.update(objects)
         val detections = filtered.toDetections(width, height)
-        val decision = veto.update(lightGreen, detections, focalPx)
+        val decision = veto.update(lightGreen, detections, focalPx, atMs)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)
         return TraverseOutput(filtered, detections, decision, cue, outcome)
