@@ -57,41 +57,10 @@ class SamLifecycleTest {
     }
 
     @Test
-    fun `un 500 de demarrage est retente une fois`() = runBlocking {
-        // Le conteneur peut répondre 500 s'il démarre au moment exact de l'appel :
-        // un seul nouvel essai, puis le verdict du second appel fait foi.
-        var calls = 0
-        val server = TestHttpServer {
-            calls++
-            if (calls == 1) TestHttpServer.Response(500, """{"detail":"démarrage"}""")
-            else TestHttpServer.Response(200, """{"released":true,"in_seconds":1}""")
-        }
-        try {
-            assertTrue(releaseSam(server.baseUrl).getOrThrow().released)
-            assertEquals(2, server.requests.size)
-            assertTrue(server.requests.all { it.method == "POST" && it.path == "/release" })
-        } finally {
-            server.close()
-        }
-    }
-
-    @Test
-    fun `un 500 persistant ne retente qu une fois`() = runBlocking {
-        val server = TestHttpServer { TestHttpServer.Response(500, """{"detail":"démarrage"}""") }
-        try {
-            val outcome = releaseSam(server.baseUrl).getOrThrow()
-            assertFalse(outcome.released)
-            assertEquals(500, outcome.code)
-            assertEquals(2, server.requests.size)
-        } finally {
-            server.close()
-        }
-    }
-
-    @Test
-    fun `un refus 400 n est pas retente`() = runBlocking {
-        // Divergence volontaire d'avec traverse-perf : rejouer un refus doublait
-        // l'extinction — le 5xx de démarrage est le seul cas retenté.
+    fun `un refus 400 persistant part une seule fois`() = runBlocking {
+        // Réponse vision au cas traverse-perf : aucun rejeu, même persistant —
+        // le contrat une-seule-requete (LifecycleContractTest) couvre 500, 404,
+        // 401/402/429 et timeout ; ici le 400, sans doublon.
         val server = TestHttpServer { TestHttpServer.Response(400, """{"detail":"refusé"}""") }
         try {
             val outcome = releaseSam(server.baseUrl).getOrThrow()
