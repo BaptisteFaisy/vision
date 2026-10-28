@@ -280,6 +280,12 @@ class Skip(Exception):
     """Rien à faire : l'appelant saute la PR sans bruit (exit 2)."""
 
 
+def env_or(name, default):
+    """Variable d'env ou défaut. GitHub injecte une var absente comme ""
+    (et non unset) : `os.environ.get(n, d)` rendrait "" → 400 Fireworks."""
+    return os.environ.get(name) or default
+
+
 def preflight(repo, pr, sha, dry_run, now):
     """Garde-fous et lecture des fichiers en conflit. Rend (clé, modèle, url, fichiers)."""
     if os.environ.get("FIREWORKS_AGENT_RESOLVE", "1") == "0":
@@ -308,8 +314,8 @@ def preflight(repo, pr, sha, dry_run, now):
     if len(files) > MAX_FILES:
         raise AgentError("%d fichiers en conflit (plafond %d)"
                          % (len(files), MAX_FILES))
-    model = os.environ.get("FIREWORKS_MODEL", MODEL_DEFAULT)
-    api_url = os.environ.get("FIREWORKS_BASE_URL", API_DEFAULT)
+    model = env_or("FIREWORKS_MODEL", MODEL_DEFAULT)
+    api_url = env_or("FIREWORKS_BASE_URL", API_DEFAULT)
     return key, model, api_url, files
 
 
