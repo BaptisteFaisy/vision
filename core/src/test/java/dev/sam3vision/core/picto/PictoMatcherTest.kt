@@ -15,6 +15,35 @@ private fun textured(size: Int, seed: Int = 0): GrayImage {
     return GrayImage(gray, size, size)
 }
 
+/**
+ * Carré blanc troué sur fond noir : motif unique et non périodique — une rampe
+ * ou une texture périodique s'auto-corrèle partout et rend tout test ambigu.
+ */
+private fun geometric(size: Int, squareAt: Int, square: Int, hole: Int): GrayImage {
+    val gray = IntArray(size * size)
+    for (y in squareAt until squareAt + square) {
+        for (x in squareAt until squareAt + square) gray[y * size + x] = 255
+    }
+    val h0 = squareAt + (square - hole) / 2
+    for (y in h0 until h0 + hole) {
+        for (x in h0 until h0 + hole) gray[y * size + x] = 0
+    }
+    return GrayImage(gray, size, size)
+}
+
+/** Bruit LCG déterministe : décorrélé de tout motif, le vrai cas « rien ». */
+private fun noise(size: Int, seed: Long): GrayImage {
+    var s = seed
+    return GrayImage(
+        IntArray(size * size) {
+            s = s * 6364136223846793005L + 1442695040888963407L
+            ((s ushr 33) % 256).toInt()
+        },
+        size,
+        size,
+    )
+}
+
 /** Découpe 24×24 à (20,20) : gabarit à l'échelle exacte de la frame. */
 private fun directTemplate(frame: GrayImage): PictoTemplate {
     val crop = IntArray(24 * 24) { i -> frame.gray[(20 + i / 24) * frame.width + 20 + i % 24] }
@@ -35,7 +64,7 @@ class PictoMatcherTest {
 
     @Test
     fun `chaine complete - gabarit construit puis reconnu sur la photo`() {
-        val photo = textured(64)
+        val photo = geometric(64, 22, 20, 8)
         val hit = matchTemplate(photo, buildTemplate(photo), "p1", "objet")
         assertTrue(hit != null)
         val cx = (hit!!.x + hit.w / 2) * 64
@@ -45,10 +74,9 @@ class PictoMatcherTest {
     }
 
     @Test
-    fun `ne trouve rien dans une autre texture`() {
-        val template = buildTemplate(textured(64, seed = 1))
-        val other = textured(64, seed = 2)
-        assertNull(matchTemplate(other, template, "p1", "objet"))
+    fun `ne trouve rien dans du bruit`() {
+        val template = buildTemplate(geometric(64, 22, 20, 8))
+        assertNull(matchTemplate(noise(64, 12345L), template, "p1", "objet"))
     }
 
     @Test
@@ -59,7 +87,7 @@ class PictoMatcherTest {
 
     @Test
     fun `retrouve a l'echelle 1_4 quand la frame grandit`() {
-        val frame = textured(64)
+        val frame = geometric(64, 22, 20, 8)
         val big = GrayImage(resizeGray(frame.gray, 64, 90), 90, 90)
         val hit = matchTemplate(big, directTemplate(frame), "p1", "objet")
         assertTrue(hit != null)
