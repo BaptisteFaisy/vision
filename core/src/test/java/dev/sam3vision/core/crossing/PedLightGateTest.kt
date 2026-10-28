@@ -112,31 +112,31 @@ class PedLightGateTest {
 
     @Test
     fun `feux fr - rouges sombres jamais verts`() {
-        assertNotEquals(CrossingState.Green, verdictOf("fr_red_dim_138.png"))
-        assertNotEquals(CrossingState.Green, verdictOf("fr_red_noise_732.png"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_red_dim_138.ppm"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_red_noise_732.ppm"))
     }
 
     @Test
     fun `feux fr - bonhomme rouge reste rouge`() {
-        assertEquals(CrossingState.Red, verdictOf("fr_red_fig_548.png"))
+        assertEquals(CrossingState.Red, verdictOf("fr_red_fig_548.ppm"))
     }
 
     @Test
     fun `feux fr - bonhommes verts acceptes`() {
-        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_21.png"))
-        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_302.png"))
-        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_243.png"))
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_21.ppm"))
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_302.ppm"))
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_243.ppm"))
     }
 
     @Test
     fun `feux fr - disques voiture refuses`() {
-        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.png"))
-        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_367.png"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.ppm"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_367.ppm"))
     }
 
     @Test
     fun `feux fr - pose large doute documente`() {
-        assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.png"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.ppm"))
     }
 
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
@@ -175,14 +175,36 @@ class PedLightGateTest {
         return pixels
     }
 
-    /** Verdict sur un crop réel `feuxfr/` (PNG ≤ 48 px, voir ATTRIBUTION.md). */
+    /** Verdict sur un crop réel `feuxfr/` (PPM ≤ 48 px, voir ATTRIBUTION.md). */
     private fun verdictOf(name: String): CrossingState {
-        val stream = javaClass.classLoader.getResourceAsStream("feuxfr/$name")
+        val bytes = javaClass.classLoader.getResourceAsStream("feuxfr/$name")?.readBytes()
             ?: error("ressource manquante : feuxfr/$name")
-        val image = javax.imageio.ImageIO.read(stream)
-        val pixels = IntArray(image.width * image.height)
-        image.getRGB(0, 0, image.width, image.height, pixels, 0, image.width)
-        return PedLightGate.verdict(pixels, image.width, image.height)
+        val (pixels, width, height) = ppmPixels(bytes)
+        return PedLightGate.verdict(pixels, width, height)
+    }
+
+    /** Pixels ARGB d'un PPM P6 brut (pas d'ImageIO sur le classpath des tests). */
+    private fun ppmPixels(bytes: ByteArray): Triple<IntArray, Int, Int> {
+        var pos = 0
+        fun token(): String {
+            while (pos < bytes.size && bytes[pos] in SPACES) pos++
+            val start = pos
+            while (pos < bytes.size && bytes[pos] !in SPACES) pos++
+            return String(bytes, start, pos - start, Charsets.US_ASCII)
+        }
+        require(token() == "P6") { "PPM attendu" }
+        val width = token().toInt()
+        val height = token().toInt()
+        require(token() == "255") { "PPM 255 attendu" }
+        pos++
+        val pixels = IntArray(width * height)
+        for (i in pixels.indices) {
+            val r = bytes[pos++].toInt() and 0xFF
+            val g = bytes[pos++].toInt() and 0xFF
+            val b = bytes[pos++].toInt() and 0xFF
+            pixels[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+        }
+        return Triple(pixels, width, height)
     }
 
     /** Disque de couleur sur fond noir. */
@@ -220,5 +242,6 @@ class PedLightGateTest {
         private const val CYAN_GREEN = 0xFF00FFAA.toInt()
         private const val BLACK = 0xFF000000.toInt()
         private const val GRAY = 0xFF808080.toInt()
+        private val SPACES = byteArrayOf(' '.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte())
     }
 }
