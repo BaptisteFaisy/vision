@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -92,7 +93,12 @@ fun AppNav(
     liveViewModel: LiveViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    var stack by remember { mutableStateOf(listOf<Route>(Route.Isee)) }
+    // Pile sauvegardée sous forme de noms : une rotation ne renvoie plus à l'accueil.
+    // `stack` reste l'interface unique (push, pop, effets) ; seuls les noms persistent.
+    var names by rememberSaveable { mutableStateOf(listOf("isee")) }
+    var stack: List<Route>
+        get() = names.map(::routeFromName)
+        set(value) { names = value.map(::routeToName) }
     val route = stack.first()
     val push: (Route) -> Unit = { stack = listOf(it) + stack }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.drop(1) }
@@ -172,6 +178,35 @@ private fun RouteHost(
         Route.Bench -> BenchScreen(onBack = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
+}
+
+/** Nom stable d'une route, pour la sauvegarde d'état (rotation, process death). */
+internal fun routeToName(route: Route): String = when (route) {
+    Route.Isee -> "isee"
+    Route.Capture -> "capture"
+    Route.Analysis -> "analysis"
+    Route.Chat -> "chat"
+    Route.Live -> "live"
+    Route.Settings -> "settings"
+    Route.Caregiver -> "caregiver"
+    Route.Onboarding -> "onboarding"
+    Route.Bench -> "bench"
+    is Route.Tap -> "tap:${route.autoStart}"
+}
+
+/** Route depuis son nom ; inconnue = accueil (jamais d'écran vide). */
+internal fun routeFromName(name: String): Route = when {
+    name == "isee" -> Route.Isee
+    name == "capture" -> Route.Capture
+    name == "analysis" -> Route.Analysis
+    name == "chat" -> Route.Chat
+    name == "live" -> Route.Live
+    name == "settings" -> Route.Settings
+    name == "caregiver" -> Route.Caregiver
+    name == "onboarding" -> Route.Onboarding
+    name == "bench" -> Route.Bench
+    name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
+    else -> Route.Isee
 }
 
 /** Une photo prise sur les lunettes s'analyse comme une photo prise à la main. */

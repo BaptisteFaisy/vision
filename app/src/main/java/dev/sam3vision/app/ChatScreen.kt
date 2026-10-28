@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +51,7 @@ fun ChatScreen(
     onStartDictation: () -> Unit,
     onStopDictation: () -> Unit,
 ) {
-    var draft by remember { mutableStateOf("") }
+    var draft by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(state.dictation.seq) {
         if (state.dictation.text.isNotBlank()) draft = mergeDraft(draft, state.dictation.text)
     }
