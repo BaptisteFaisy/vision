@@ -2,9 +2,11 @@ package dev.sam3vision.app.locked
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.ContextCompat
+import android.util.Log
+import dev.sam3vision.core.speech.LockedMic
 import dev.sam3vision.core.speech.LockedMicPhase
 import dev.sam3vision.core.speech.LockedMicState
+import dev.sam3vision.core.speech.MicStartActions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,13 +22,13 @@ import kotlinx.coroutines.flow.StateFlow
 object LockedMicBridge {
 
     /** Armer : service de premier plan, micro fermé, notification prête. */
-    const val ACTION_ARM = "dev.sam3vision.app.locked.ARM"
+    const val ACTION_ARM = MicStartActions.ARM
 
     /** Un seul geste : fermé → écoute ; en écoute → envoie. */
-    const val ACTION_TOGGLE = "dev.sam3vision.app.locked.TOGGLE"
+    const val ACTION_TOGGLE = MicStartActions.TOGGLE
 
     /** Tout arrêter (notification « Arrêter », app fermée). */
-    const val ACTION_STOP = "dev.sam3vision.app.locked.STOP"
+    const val ACTION_STOP = MicStartActions.STOP
 
     private val _state = MutableStateFlow(LockedMicState())
     val state: StateFlow<LockedMicState> = _state
@@ -40,10 +42,19 @@ object LockedMicBridge {
 
     /**
      * Arme le service. À n'appeler que depuis le premier plan (`MainActivity.onResume`) :
-     * ailleurs, Android lève `ForegroundServiceStartNotAllowedException`.
+     * ailleurs, Android refuse le démarrage en arrière-plan.
+     *
+     * Démarrage **simple** (`startService`), pas `startForegroundService` : le service prend
+     * lui-même le premier plan en quelques millisecondes (ou s'arrête, arrêt parlé), et sans
+     * promesse de premier plan au démarrage, le FATAL `...DidNotStartInTime` est
+     * structurellement impossible (2× au relevé du 28/10/2026 sur un démarrage à froid, où la
+     * livraison d'`onStartCommand` avait manqué le délai système).
+     *
+     * Meilleur effort : un appel manqué se rejoue à la prochaine reprise — jamais un FATAL.
      */
     fun arm(context: Context) {
-        ContextCompat.startForegroundService(context, intent(context, ACTION_ARM))
+        runCatching { context.startService(intent(context, ACTION_ARM)) }
+            .onFailure { Log.w(LockedMic.TAG, "armement manqué : ${it.javaClass.simpleName} — ${it.message}") }
     }
 
     /** Bascule le micro d'un seul geste ; rend l'échec au lieu de le lever (tuile). */
