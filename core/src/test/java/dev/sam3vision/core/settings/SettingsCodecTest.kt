@@ -3,6 +3,8 @@ package dev.sam3vision.core.settings
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsCodecTest {
@@ -119,6 +121,16 @@ class SettingsCodecTest {
         val legacy = SettingsCodec.encode(Settings.Default).lines()
             .filterNot { it.startsWith("caregiverRole=") }
         assertEquals(CaregiverRole.Blind, SettingsCodec.decode(legacy.joinToString("\n")).caregiverRole)
+
+    @Test
+    fun `les distances et le fov survivent a un aller-retour`() {
+        val custom = Settings.Default.copy(distanceOverlayEnabled = false, cameraFovDeg = 71.5f)
+        val roundTrip = SettingsCodec.decode(SettingsCodec.encode(custom))
+        assertFalse(roundTrip.distanceOverlayEnabled)
+        assertEquals(71.5f, roundTrip.cameraFovDeg, 0.001f)
+        // Un fichier écrit avant ces clés reprend les défauts.
+        assertTrue(SettingsCodec.decode("").distanceOverlayEnabled)
+        assertEquals(0f, SettingsCodec.decode("").cameraFovDeg, 0f)
     }
 
     @Test
