@@ -64,9 +64,10 @@ jobs:
           fi
           MATRIX=$(gh pr list --base master --state open \
             --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
-            --jq -c '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
+            --jq '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
               | {pr: .number, sha: .headRefOid, branch: .headRefName,
-                 state: .mergeStateStatus, draft: (.isDraft | tostring)}]')
+                 state: .mergeStateStatus, draft: (.isDraft | tostring)}]' \
+            | jq -c .)
           [ -n "$MATRIX" ] || MATRIX="[]"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state)"'
