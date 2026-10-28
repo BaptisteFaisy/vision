@@ -1,6 +1,6 @@
 iSee / SAM Vision — mentions de licence des composants réutilisés.
 
-Détecteur d'escaliers classique (`core/.../stairs`, `app/detect/StairFrame.kt`)
+Détecteur d'escaliers classique (`core/.../stairs`)
 : adapté de `stair_detector.py` et des seuils `config.py` (§5) du projet
 https://github.com/agrimbillowria/blind-project, sous licence MIT.
 Le port remplace le Hough probabiliste par une projection horizontale
