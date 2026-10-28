@@ -132,6 +132,22 @@ class LiveStateTest {
     }
 
     @Test
+    fun `ligne escaliers vide par defaut, statut inchange`() {
+        val state = LiveUiState(running = true)
+        assertEquals("", state.stairsLine)
+        assertEquals("", state.stairsPart)
+        assertFalse(state.statusLine.contains("Escalier"))
+    }
+
+    @Test
+    fun `ligne escaliers ajoutee au statut`() {
+        val plain = LiveUiState(running = true).statusLine
+        val state = LiveUiState(running = true, stairsLine = "Escalier devant.")
+        assertEquals(" · Escalier devant.", state.stairsPart)
+        assertEquals(plain + " · Escalier devant.", state.statusLine)
+    }
+
+    @Test
     fun `libelle de transport suit le mode et le socket`() {
         assertEquals("Tracker", transportLabel(trackerEnabled = true, wsConnected = false))
         assertEquals("WebSocket", transportLabel(trackerEnabled = false, wsConnected = true))

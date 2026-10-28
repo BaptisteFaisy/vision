@@ -104,6 +104,8 @@ data class LiveUiState(
     val localFps: Float = 0f,
     /** Motif court du dernier refus (« sans estimateur », « keyframe périmé »…). */
     val localNote: String = "",
+    /** Escalier confirmé devant (phrase), vide = rien. */
+    val stairsLine: String = "",
 ) {
     /** Une frame a-t-elle déjà été gardée ? (bouton « Analyser la frame », questions). */
     val hasFrame: Boolean get() = latestFrame.present
@@ -115,7 +117,7 @@ data class LiveUiState(
         get() = if (running && starting) {
             WAKING_LINE
         } else {
-            formatLiveStatus(running, fps, latencyMs, gpu, objectsCount, nearestMeters, samEnabled) + localPart
+            formatLiveStatus(running, fps, latencyMs, gpu, objectsCount, nearestMeters, samEnabled) + localPart + stairsPart
         }
 
     /**
@@ -123,6 +125,9 @@ data class LiveUiState(
      * [formatLiveStatus] ne change pas (son contrat est testé tel quel).
      */
     val localPart: String get() = localStatusPart(localEnabled, localActive, localFps, localNote)
+
+    /** Part escaliers : rien tant qu'aucun n'est confirmé (ligne inchangée). */
+    val stairsPart: String get() = if (stairsLine.isEmpty()) "" else " · $stairsLine"
 
     /** Distance de l'objet le plus proche de la frame, `null` si rien n'est mesuré. */
     val nearestMeters: Float?

@@ -103,4 +103,37 @@ object PointClouds {
         }
         return PointCloud(width, height, xs, ys, zs, valid)
     }
+
+    /**
+     * Rassemble les points valides du [mask] en tableaux candidats (+ leur
+     * ligne image pour le tirage pondéré). Indices hors nuage = ignorés.
+     */
+    fun gathered(cloud: PointCloud, mask: BooleanArray): SeededPoints {
+        var count = 0
+        for (i in mask.indices) {
+            if (i < cloud.size && mask[i] && cloud.valid[i]) count++
+        }
+        val xs = FloatArray(count)
+        val ys = FloatArray(count)
+        val zs = FloatArray(count)
+        val rows = IntArray(count)
+        var k = 0
+        for (i in mask.indices) {
+            if (i >= cloud.size || !mask[i] || !cloud.valid[i]) continue
+            xs[k] = cloud.xs[i]
+            ys[k] = cloud.ys[i]
+            zs[k] = cloud.zs[i]
+            rows[k] = i / cloud.width
+            k++
+        }
+        return SeededPoints(xs, ys, zs, rows)
+    }
 }
+
+/** Points candidats RANSAC : coordonnées + ligne image d'origine. */
+data class SeededPoints(
+    val xs: FloatArray,
+    val ys: FloatArray,
+    val zs: FloatArray,
+    val rows: IntArray,
+)
