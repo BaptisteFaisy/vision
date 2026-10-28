@@ -56,14 +56,17 @@ ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac logcat -d' 
 (`-d` : la build tarball a `versionCode = 1`, inférieur à la build git
 installée — `INSTALL_FAILED_VERSION_DOWNGRADE` sinon.)
 
-## Mesure (Redmi 2c6852ac)
+## Mesure (Samsung RF8T11NBMCV, 2026-10-28, runtime LiteRT neuf 2.2.0)
 
 Historique : `Interpreter` CPU 1885 ms / 0,4 ips, puis délégué GPU
 classique 455 ms mais masques NCHW corrompus (bandes) — d'où la migration
-vers le runtime neuf. Mesures du runtime neuf :
+vers le runtime neuf.
 
 | run | ms inférence (médiane) | ips effectifs | scène |
 | --- | --- | --- | --- |
-| 1 | … | … | … |
+| démo `route segment` | 2-4 | 4,9-5,6 | intérieur, 0 % praticable, overlay propre (screencap) |
+| banc `SegmentBenchDeviceTest` (11 runs, 1 warmup) | 2 | — | gradient synthétique 640×360, OK |
+| banc `DepthBenchDeviceTest` MiDaS (5 runs) | 2 | — | gradient synthétique 256×256, OK (non-régression migration) |
+| banc `DepthBenchDeviceTest` DA2 (5 runs) | 216 | — | gradient synthétique 256×256, OK |
 
 (`ms` = LiteRT seul, `ips` = bout en bout caméra → affichage.)
