@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.findViewTreeLifecycleOwner
+import dev.sam3vision.app.live.setFocus
 import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.core.distance.LensSpec
 import java.util.concurrent.ExecutorService
