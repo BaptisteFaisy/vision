@@ -145,6 +145,25 @@ def test_alias_dedup(segmentation) -> None:
           segmentation.model_concept("  Mon Kayak ") == "mon kayak")
     check("alias: dédup des inconnus sur la casse",
           segmentation.normalize_prompts(["Kayak", "kayak"]) == ["Kayak"])
+    check("alias: mur/escalier → wall/stairs",
+          segmentation.model_concept("mur") == "wall"
+          and segmentation.model_concept("les escaliers") == "stairs")
+    check("alias: extérieur (barrière, rambarde, poteau, trottoir)",
+          segmentation.model_concept("barrière") == "barrier"
+          and segmentation.model_concept("une rambarde") == "railing"
+          and segmentation.model_concept("POTEAUX") == "pole"
+          and segmentation.model_concept("trottoir") == "sidewalk")
+    check("alias: accents optionnels (barriere, fenetre, passage pieton)",
+          segmentation.model_concept("barriere") == "barrier"
+          and segmentation.model_concept("fenetre") == "window"
+          and segmentation.model_concept("passage pieton") == "crosswalk")
+    check("alias: dédup accentué/non accentué",
+          segmentation.normalize_prompts(["barrière", "barriere"]) == ["barrière"])
+    check("alias: dédup mur/wall et escalier/stairs",
+          segmentation.normalize_prompts(["mur", "wall"]) == ["mur"]
+          and segmentation.normalize_prompts(["escalier", "stairs"]) == ["escalier"])
+    check("alias: mur + escalier distincts conservés",
+          segmentation.normalize_prompts(["mur", "escalier"]) == ["mur", "escalier"])
     check("alias: plafond MAX_PROMPTS toujours appliqué",
           raises(lambda: segmentation.normalize_prompts([f"c{i}" for i in range(segmentation.MAX_PROMPTS + 1)]),
                  segmentation.PromptError))

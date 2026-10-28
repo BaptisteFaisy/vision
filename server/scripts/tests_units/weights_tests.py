@@ -210,6 +210,20 @@ def test_no_cudagraph_typo(_module) -> None:
     check("graphe : pas de CUDGraph", "CUDGraph" not in src, "faute présente")
 
 
+def test_concepts_sync(_module) -> None:
+    """La table FR→EN déployée (live_fast) est la même qu'à la racine."""
+    from test_units import check
+
+    import concepts as root
+
+    deployed = _fresh_live_fast("concepts")
+    check("concepts : table déployée == racine",
+          deployed.CONCEPT_ALIASES == root.CONCEPT_ALIASES, "divergence live_fast/concepts.py")
+    check("concepts : aucune collision après désaccentuation",
+          len(deployed._ALIASES_NORM) == len(deployed.CONCEPT_ALIASES),
+          "deux clés perdent leur distinction sans accents")
+
+
 def _fresh_live_fast(module_name: str, model_dir: str | None = "/opt/models/sam3.1",
                      snapshot: str | None = "1"):
     """Module de `live_fast` importé à neuf (déployé), env + path maîtrisés."""
