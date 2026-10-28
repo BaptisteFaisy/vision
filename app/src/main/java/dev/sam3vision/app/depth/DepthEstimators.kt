@@ -7,8 +7,9 @@ import dev.sam3vision.core.depth.DepthEstimator
 import dev.sam3vision.core.depth.NoOpDepthEstimator
 
 /**
- * Sélecteur du moteur de profondeur : n'échoue jamais — un moteur sans asset
- * rend un estimateur « asset manquant » explicite (le banc l'affiche tel quel).
+ * Sélecteur du moteur de profondeur : n'échoue jamais — un moteur sans modèle
+ * (ni fichier téléchargé, ni asset embarqué) rend un estimateur explicite
+ * qui dit comment le télécharger (le banc l'affiche tel quel).
  */
 object DepthEstimators {
 
@@ -17,13 +18,12 @@ object DepthEstimators {
         if (backend == DepthBackend.DA2) return openDa2(context)
         if (backend == DepthBackend.MIDAS) return openMidas(context)
         val da2 = openDa2(context)
-        if (da2.backend == DepthBackend.DA2) return da2
+        if (da2 !is MissingAssetEstimator) return da2
         val midas = openMidas(context)
-        if (midas.backend == DepthBackend.MIDAS) return midas
+        if (midas !is MissingAssetEstimator) return midas
         return MissingAssetEstimator(
             DepthBackend.AUTO,
-            "aucun asset embarqué (${OnnxDepthEstimator.ASSET_NAME}, " +
-                "${LiteRtDepthEstimator.ASSET_NAME})",
+            "aucun modèle téléchargé — bouton Tester pour télécharger",
         )
     }
 
@@ -32,7 +32,7 @@ object DepthEstimators {
         val estimator = outcome.getOrNull()
         if (estimator != null) return estimator
         val failure = outcome.exceptionOrNull()
-        var reason = "asset manquant : ${OnnxDepthEstimator.ASSET_NAME}"
+        var reason = "modèle DA2 absent — bouton Tester pour le télécharger"
         if (failure != null) {
             Log.i(DepthBench.TAG, "DA2-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
             val detail = failure.message
@@ -48,7 +48,7 @@ object DepthEstimators {
         val estimator = outcome.getOrNull()
         if (estimator != null) return estimator
         val failure = outcome.exceptionOrNull()
-        var reason = "asset manquant : ${LiteRtDepthEstimator.ASSET_NAME}"
+        var reason = "modèle MiDaS absent — bouton Tester pour le télécharger"
         if (failure != null) {
             Log.i(DepthBench.TAG, "MIDAS-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
             val detail = failure.message
