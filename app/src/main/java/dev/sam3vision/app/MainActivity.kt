@@ -107,10 +107,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Deux entrées par `Intent` : les callbacks de l'app Meta AI (enregistrement,
+     * Trois entrées par `Intent` : les callbacks de l'app Meta AI (enregistrement,
      * invocation vocale) vont au SDK ; `--ez mock` / `--ez analyze` ouvrent le banc
-     * d'essai. Le banc n'étant plus une `Activity`, c'est la seule façon de le
-     * lancer depuis adb (voir `tools/phone-lunettes.sh`).
+     * d'essai ; `--es route <nom>` ouvre l'écran nommé. Ni le banc ni les écrans
+     * n'étant des `Activity`, c'est la seule façon de les lancer depuis adb.
      */
     private fun routeIntent(intent: Intent) {
         glasses.handleIntent(intent)
@@ -127,6 +127,8 @@ class MainActivity : ComponentActivity() {
                 ),
             )
         }
+        // Recette adb générique : `--es route segment` ouvre l'écran nommé.
+        intent.getStringExtra(EXTRA_ROUTE)?.let { RouteRequest.push(it) }
     }
 
     /**

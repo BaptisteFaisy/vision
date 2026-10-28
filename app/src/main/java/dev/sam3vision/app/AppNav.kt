@@ -18,6 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
@@ -30,8 +32,38 @@ import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.voicenav.VoiceNavRoute
 import dev.sam3vision.app.voicenav.VoiceNavUiState
+import dev.sam3vision.app.segment.SegmentScreen
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
+
+/** Extra adb `--es route <nom>` : ouvre l'écran nommé (recettes, comme le banc). */
+const val EXTRA_ROUTE = "route"
+
+/**
+ * Demande d'écran posée de l'extérieur : `MainActivity` y dépose le nom,
+ * `AppNav` la consomme et pousse la route (inconnue = accueil, jamais vide).
+ */
+object RouteRequest {
+    private val _pending = MutableStateFlow<String?>(null)
+    val pending: StateFlow<String?> = _pending
+    fun push(name: String) {
+        _pending.value = name
+    }
+    fun consume(): String? = _pending.value.also { _pending.value = null }
+}
+
+/**
+ * Ouvre l'écran demandé de l'extérieur — la recette adb (`--es route segment`)
+ * arrive avant la composition de la pile. La demande est consommée ici : un
+ * seul push, même si l'effet rejoue sur la remise à `null`.
+ */
+@Composable
+private fun RouteRequestEffect(push: (Route) -> Unit) {
+    val request by RouteRequest.pending.collectAsState()
+    LaunchedEffect(request) {
+        RouteRequest.consume()?.let { push(routeFromName(it)) }
+    }
+}
 
 /** Routes de l'app (navigation par état, sans dépendance navigation-compose). */
 sealed interface Route {
@@ -72,6 +104,9 @@ sealed interface Route {
      * guidage, poussée par l'état de session — jamais ouverte à la main.
      */
     data object VoiceNav : Route
+
+    /** Démo segmentation : zone praticable locale, complément on-device de SAM 3.1. */
+    data object Segment : Route
 }
 
 /**
@@ -132,6 +167,7 @@ fun AppNav(
     val pop: () -> Unit = { if (names.size > 1) names = names.drop(1) }
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
+    RouteRequestEffect(push)
     VoiceNavStateEffect(isee, route, push, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
 
@@ -206,6 +242,7 @@ private fun RouteHost(
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
         Route.VoiceNav -> VoiceNavRoute(isee, onClose = pop)
+        Route.Segment -> SegmentScreen(onBack = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
 }
@@ -222,6 +259,7 @@ internal fun routeToName(route: Route): String = when (route) {
     Route.Onboarding -> "onboarding"
     Route.Bench -> "bench"
     Route.VoiceNav -> "voicenav"
+    Route.Segment -> "segment"
     is Route.Tap -> "tap:${route.autoStart}"
 }
 
@@ -237,6 +275,7 @@ internal fun routeFromName(name: String): Route = when {
     name == "onboarding" -> Route.Onboarding
     name == "bench" -> Route.Bench
     name == "voicenav" -> Route.VoiceNav
+    name == "segment" -> Route.Segment
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
 }
@@ -347,6 +386,7 @@ private fun SettingsEntry(
             pop = pop,
             onOpenLive = { push(Route.Live) },
             onOpenClassic = { push(Route.Capture) },
+            onOpenSegment = { push(Route.Segment) },
             onOpenGestures = { push(Route.Onboarding) },
             onPickRole = { next ->
                 viewModel.saveSettings(next)
@@ -377,6 +417,7 @@ private fun SettingsRoute(
     pop: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenSegment: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
 ) {
@@ -399,6 +440,7 @@ private fun SettingsRoute(
         onStopVoice = viewModel::stopSpeaking,
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
+        onOpenSegment = onOpenSegment,
         onOpenGestures = onOpenGestures,
         onPickRole = onPickRole,
         onStartTracking = { draft ->
