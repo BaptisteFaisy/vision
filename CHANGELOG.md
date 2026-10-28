@@ -291,20 +291,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (moitié de la latence, 33-900 ms) avec une frame de réserve renvoyée sans attendre
   à la réponse ; tracker inchangé (cadence adaptative, pas de réserve). Le tracker
   restant le transport par défaut, le gain ne s'applique qu'au chemin `/live` (bandeau).
-- **`LiveViewModel` : 498 → 486 lignes** (plafond 500) : le cycle offre/envoi/drain est
-  extrait (`onFrame` délègue, `sendFrame` déménage dans le dispatcher, `handleResult`
-  garde l'époque + la publication).
+- **`LiveViewModel` : 493 lignes** (plafond 500 ; 494 sur `master`) : le cycle
+  offre/envoi/drain est extrait (`onFrame` délègue, l'envoi déménage dans le
+  dispatcher, `handleResult` garde l'époque + la publication, zéro duplication).
 - **Contrat serveur inchangé** : toujours une seule frame en vol (drain refusé si le
   créneau est pris), époque vérifiée avant publication comme avant.
-- **`WsLiveClient` : l'envoi (~28 Ko) sort du `synchronized`** (attente + ouverture
-  restent sous verrou) : un envoi lent ne fige plus les réceptions des autres frames.
-  Si le socket meurt entre l'ouverture et l'envoi, échec réseau des deux côtés, jamais
-  de succès fantôme.
 - **Preuves** : `LiveFrameDispatcherTest` 7/7 (réserve drainée sans attendre, tick
-  continu, tracker adaptatif, séance close = pas de drain, reset) ; `WsLiveClientTest`
-  +1 (envoi bloqué, réception libre — échouait avant) ; `:core:testDebugUnitTest`
-  956/956, `:app:testDebugUnitTest` 523/523, `check-kotlin-limits.py` OK. Recette
-  téléphone : § ci-dessous.
+  continu, tracker adaptatif, séance close = pas de drain, reset) ;
+  `:core` + `:app` 1678/1678, `check-kotlin-limits.py` OK. (Le `send` WS hors
+  verrou, d'abord porté par cette branche, a été mergé par #79 : cette branche
+  n'en garde aucune ligne.)
+- **A/B émulateur** (GPU A100, 60 s chacun, 0 FATAL) : témoin 399a512 = 2,19 ips
+  (logcat) / 177-188 ms ; branche 7cd1a4b = 5,53 ips / 158-166 ms — débit ×2,5,
+  latence en baisse (~-12 %). Chiffres téléphone à venir.
 
 ## 2026-10-27 (8) — la GPU se réveille à l'ouverture, s'éteint hors plein écran
 
