@@ -5,8 +5,9 @@ Quand le sweep de pr-auto-merge échoue à rebaser une PR (conflit), il appelle
 ce script DANS son clone, rebase en cours (fichiers non fusionnés présents).
 Le script demande à un modèle Fireworks la résolution de chaque conflit
 élémentaire, recopie le reste du fichier à l'identique (jamais de
-réécriture complète : un gros fichier serait tronqué), termine le rebase,
-pousse sur la branche de la PR et rend compte.
+réécriture complète : un gros fichier serait tronqué), puis boucle sur les
+arrêts du rebase (multi-passes : chaque nouveau conflit est résolu, chaque
+commit vidé est sauté), pousse sur la branche de la PR et rend compte.
 
 Bibliothèque standard uniquement. Usage :
 
@@ -35,6 +36,7 @@ MAX_FILES = 8
 MAX_FILE_BYTES = 200_000
 MAX_HUNKS = 20
 HUNK_MAX_CHARS = 12_000
+MAX_ROUNDS = 10
 COOLDOWN_S = 20 * 60
 SPAWN_WINDOW_S = 3_600
 SPAWN_CAP = 3
@@ -349,13 +351,7 @@ def preflight(repo, pr, sha, dry_run, now):
         raise Skip("git illisible : %s" % exc)
     if not files:
         raise Skip("aucun fichier en conflit")
-    refused = [p for p in files if p.startswith(REFUSED_PREFIXES)]
-    if refused:
-        raise AgentError("conflit dans %s (main humaine requise)"
-                         % ", ".join(refused))
-    if len(files) > MAX_FILES:
-        raise AgentError("%d fichiers en conflit (plafond %d)"
-                         % (len(files), MAX_FILES))
+    check_round_files(files)
     model = env_or("FIREWORKS_MODEL", MODEL_DEFAULT)
     api_url = env_or("FIREWORKS_BASE_URL", API_DEFAULT)
     return key, model, api_url, files
@@ -369,14 +365,78 @@ def push_url(repo):
     return "https://x-access-token:%s@github.com/%s.git" % (token, repo)
 
 
-def finish(repo, pr, branch, sha, files):
-    """Termine le rebase, pousse avec bail, rend compte. Rend 0 ou 1."""
-    env = dict(os.environ, GIT_EDITOR="true")
+def rebase_in_progress():
+    """Vrai si un rebase est en cours (répertoire d'état présent)."""
+    try:
+        gitdir = sh(["git", "rev-parse", "--absolute-git-dir"])
+    except AgentError:
+        return False
+    return os.path.isdir(os.path.join(gitdir, "rebase-merge")) or \
+        os.path.isdir(os.path.join(gitdir, "rebase-apply"))
+
+
+def continue_or_skip(env):
+    """Un pas de rebase : --continue, --skip si commit vidé. Rend (ok, erreur)."""
     cont = subprocess.run(["git", "rebase", "--continue"], env=env,
                           capture_output=True, text=True, timeout=120)
-    if cont.returncode != 0:
-        return fail(repo, pr, "rebase --continue refusé : %s"
-                    % ((cont.stderr or "").strip()[:200]))
+    if cont.returncode == 0:
+        return True, ""
+    err = (((cont.stderr or "") + "\n" + (cont.stdout or "")).strip())[:200]
+    if "empty" in err.lower():
+        try:
+            leftover = unmerged_files()
+        except AgentError:
+            leftover = ["?"]
+        if not leftover:
+            skip = subprocess.run(["git", "rebase", "--skip"], env=env,
+                                  capture_output=True, text=True, timeout=120)
+            if skip.returncode == 0:
+                log("commit vidé par la résolution, --skip")
+                return True, ""
+    return False, err
+
+
+def check_round_files(files):
+    """Garde-fous d'une passe : chemins refusés et plafond de fichiers."""
+    refused = [p for p in files if p.startswith(REFUSED_PREFIXES)]
+    if refused:
+        raise AgentError("conflit dans %s (main humaine requise)"
+                         % ", ".join(refused))
+    if len(files) > MAX_FILES:
+        raise AgentError("%d fichiers en conflit (plafond %d)"
+                         % (len(files), MAX_FILES))
+
+
+def finish_loop(api_url, key, model, deadline):
+    """Boucle multi-passes : résout chaque arrêt, continue/skip. Rend fichiers."""
+    resolved = []
+    env = dict(os.environ, GIT_EDITOR="true")
+    for round_no in range(1, MAX_ROUNDS + 1):
+        if time.time() > deadline:
+            raise AgentError("budget de %d s dépassé" % BUDGET_S)
+        files = unmerged_files()
+        if files:
+            check_round_files(files)
+            log("passe %d : %d fichier(s)" % (round_no, len(files)))
+            for path in files:
+                resolve_one(api_url, key, model, path, deadline, False)
+            resolved.extend(files)
+        done, err = continue_or_skip(env)
+        if not rebase_in_progress():
+            if done:
+                return resolved
+            raise AgentError("rebase interrompu : %s" % err)
+        if not unmerged_files():
+            raise AgentError("rebase bloqué sans conflit : %s" % err)
+    raise AgentError("rebase à plus de %d arrêts, main humaine" % MAX_ROUNDS)
+
+
+def finish(repo, pr, branch, sha, files):
+    """Pousse le rebase terminé avec bail, rend compte. Rend 0 ou 1."""
+    push = subprocess.run(["git", "push",
+                           "--force-with-lease=%s:%s" % (branch, sha),
+                           push_url(repo), "HEAD:%s" % branch],
+                          capture_output=True, text=True, timeout=120)
     push = subprocess.run(["git", "push",
                            "--force-with-lease=%s:%s" % (branch, sha),
                            push_url(repo), "HEAD:%s" % branch],
@@ -385,11 +445,12 @@ def finish(repo, pr, branch, sha, files):
         log("push refusé (bail, prochain passage) : %s"
             % push.stderr.strip()[:150])
         return 1
+    unique = sorted(set(files))
     comment(repo, pr, "Conflit réconcilié par l'agent : %d fichier(s) "
             "(%s), rebase poussé sur `%s`. La file reprend."
-            % (len(files), ", ".join(files), branch))
+            % (len(unique), ", ".join(unique), branch))
     add_label(repo, pr, LABEL_OK)
-    log("PR #%s rebasée et poussée (%d fichiers)" % (pr, len(files)))
+    log("PR #%s rebasée et poussée (%d fichiers)" % (pr, len(unique)))
     return 0
 
 
@@ -406,14 +467,18 @@ def cmd_resolve(args):
         return fail(repo, pr, str(exc))
     touch_stamp(pr, args.sha)
     deadline = now + BUDGET_S
+    if args.dry_run:
+        try:
+            for path in files:
+                resolve_one(api_url, key, model, path, deadline, True)
+        except AgentError as exc:
+            return fail(repo, pr, str(exc))
+        return 0
     try:
-        for path in files:
-            resolve_one(api_url, key, model, path, deadline, args.dry_run)
+        resolved = finish_loop(api_url, key, model, deadline)
     except AgentError as exc:
         return fail(repo, pr, str(exc))
-    if args.dry_run:
-        return 0
-    return finish(repo, pr, args.branch, args.sha, files)
+    return finish(repo, pr, args.branch, args.sha, resolved)
 
 
 def main(argv=None):
