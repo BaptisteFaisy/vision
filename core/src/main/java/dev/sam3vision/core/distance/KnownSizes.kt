@@ -10,6 +10,13 @@ import java.text.Normalizer
  * concept absent reste **inconnu** — mieux vaut ne rien afficher qu'un chiffre
  * faux. Les valeurs sont des ordres de grandeur (un humain adulte, une voiture
  * de tourisme), pas des mesures : l'estimation monocular reste à ±15-20 %.
+ *
+ * Pas d'entrée escalier, volontairement : SAM segmente l'escalier **entier**
+ * (« stairs »), haut d'un mètre à plusieurs étages selon la volée — aucune
+ * hauteur typique n'est défendable, et la marche de 0,17 m ne vaut que pour
+ * une marche isolée, jamais produite par ce concept. La distance d'un
+ * escalier vient de la branche profondeur (`DepthReadings`) ou du plan de
+ * sol, jamais du sténopé (voir `StairConcepts`).
  */
 object KnownSizes {
 
