@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -33,6 +34,9 @@ import dev.sam3vision.app.depth.ModelDownloader
 import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.core.segment.SegmentMask
 import dev.sam3vision.core.segment.Segmenter
+import dev.sam3vision.core.segment.WalkAdvice
+import dev.sam3vision.core.segment.WalkDirection
+import dev.sam3vision.core.segment.WalkGuide
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -41,10 +45,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Démo segmentation : aperçu caméra + zone praticable (vert) et voies (rouge)
- * + cadence. La couche rapide on-device qui complète SAM 3.1 : mêmes frames
- * que le direct, 0 GPU Modal, et chaque masque s'exporte en prompt
- * ([SegmentMask.toPrompt]).
+ * Démo segmentation : aperçu caméra + conseil de marche (flèche) + cadence.
+ * Vert = on marche, rouge = on ne marche pas, voies jaunes. La couche rapide
+ * on-device qui complète SAM 3.1 : mêmes frames que le direct, 0 GPU Modal,
+ * et chaque masque s'exporte en prompt ([SegmentMask.toPrompt]).
  *
  * Mesure : une ligne `twinlite:` dans logcat toutes les 20 segmentations
  * (couverture, `ms` d'inférence, `ips` effectifs) + ligne d'état à l'écran.
@@ -60,6 +64,7 @@ fun SegmentScreen(onBack: () -> Unit) {
     val meter = remember { LiveFpsMeter() }
     val busy = remember { AtomicBoolean(false) }
     var masks by remember { mutableStateOf<Pair<SegmentMask, SegmentMask>?>(null) }
+    var advice by remember { mutableStateOf(WalkAdvice(WalkDirection.STOP, 0f, 0f, 0f)) }
     var frameSize by remember { mutableStateOf(640 to 360) }
     var status by remember { mutableStateOf("chargement du modèle…") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -74,11 +79,12 @@ fun SegmentScreen(onBack: () -> Unit) {
                 val gap = meter.gapAt(SystemClock.elapsedRealtime())
                 fps = LiveFpsMeter.fpsFor(gap, fps)
                 masks = result
+                advice = result?.let { WalkGuide.directionFor(it.first) } ?: advice
                 frameSize = bitmap.width to bitmap.height
                 runs += 1
                 val delegate = segmenter.value?.delegateName ?: "?"
-                status = statusLine(result, ms, fps, delegate)
-                logRun(runs, result, ms, fps, delegate)
+                status = statusLine(result, advice, ms, fps, delegate)
+                logRun(runs, result, advice, ms, fps, delegate)
                 busy.set(false)
             }
         }
@@ -94,7 +100,7 @@ fun SegmentScreen(onBack: () -> Unit) {
         segmenter.value = prepareSegment(context, host, view, owner, onStatus = { status = it })
         if (segmenter.value == null) error = status
     }
-    SegmentLayout(view, masks, frameSize, error ?: status, onBack)
+    SegmentLayout(view, masks, advice, frameSize, error ?: status, onBack)
 }
 
 /** Une frame caméra → segmentation (jetée si une inférence est en vol). */
@@ -146,11 +152,12 @@ private suspend fun prepareSegment(
     return engine
 }
 
-/** Aperçu + surcouche de masques + ligne d'état : une entrée par état. */
+/** Aperçu + surcouche de masques + flèche de marche + ligne d'état. */
 @Composable
 private fun SegmentLayout(
     view: PreviewView,
     masks: Pair<SegmentMask, SegmentMask>?,
+    advice: WalkAdvice,
     frameSize: Pair<Int, Int>,
     status: String,
     onBack: () -> Unit,
@@ -163,6 +170,12 @@ private fun SegmentLayout(
         Box(Modifier.fillMaxSize()) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
             MaskOverlay(masks)
+            Text(
+                text = advice.direction.arrow,
+                fontSize = 96.sp,
+                color = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier.padding(16.dp),
+            )
         }
     }
 }
@@ -184,9 +197,10 @@ private suspend fun runFrame(
     }
 }
 
-/** Ligne d'état : couvertures, inférence, cadence effective, délégué. */
+/** Ligne d'état : conseil de marche, couvertures, inférence, cadence, délégué. */
 private fun statusLine(
     masks: Pair<SegmentMask, SegmentMask>?,
+    advice: WalkAdvice,
     ms: Long,
     fps: Float,
     delegate: String,
@@ -194,9 +208,10 @@ private fun statusLine(
     if (masks == null) return String.format(Locale.FRANCE, "échec · %d ms · %.1f ips", ms, fps)
     return String.format(
         Locale.FRANCE,
-        "praticable %.0f %% · voies %.1f %% · %d ms · %.1f ips · %s",
+        "%s %s · praticable %.0f %% · %d ms · %.1f ips · %s",
+        advice.direction.arrow,
+        advice.direction.label,
         masks.first.coverage() * 100,
-        masks.second.coverage() * 100,
         ms,
         fps,
         delegate,
@@ -204,15 +219,30 @@ private fun statusLine(
 }
 
 /** Une ligne de mesure toutes les 20 segmentations (pas une trace complète). */
-private fun logRun(runs: Int, masks: Pair<SegmentMask, SegmentMask>?, ms: Long, fps: Float, delegate: String) {
+private fun logRun(
+    runs: Int,
+    masks: Pair<SegmentMask, SegmentMask>?,
+    advice: WalkAdvice,
+    ms: Long,
+    fps: Float,
+    delegate: String,
+) {
     if (runs % 20 != 0) return
     val cover = masks?.let {
         String.format(Locale.US, "drive=%.0f%% lanes=%.1f%%", it.first.coverage() * 100, it.second.coverage() * 100)
     } ?: "échec"
-    Log.i("sam3vision", "twinlite: $cover, $ms ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate]")
+    val walk = String.format(
+        Locale.US,
+        "walk=%s L=%.2f C=%.2f R=%.2f",
+        advice.direction.name,
+        advice.left,
+        advice.center,
+        advice.right,
+    )
+    Log.i("sam3vision", "twinlite: $cover, $ms ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate] $walk")
 }
 
-/** Masques remis à l'échelle du canevas : praticable vert, voies rouge. */
+/** Masques remis à l'échelle du canevas : vert on marche, rouge on ne marche pas. */
 @Composable
 private fun MaskOverlay(masks: Pair<SegmentMask, SegmentMask>?) {
     val image = remember(masks) { masks?.let { masksToBitmap(it.first, it.second) }?.asImageBitmap() }
@@ -222,14 +252,17 @@ private fun MaskOverlay(masks: Pair<SegmentMask, SegmentMask>?) {
     }
 }
 
-/** Les deux masques → un bitmap ARGB (voies par-dessus le praticable). */
+/**
+ * Les deux masques → un bitmap ARGB : vert = on marche, rouge = on ne marche
+ * pas (translucide, la scène reste lisible), voies jaunes par-dessus.
+ */
 private fun masksToBitmap(drive: SegmentMask, lanes: SegmentMask): Bitmap {
     val pixels = IntArray(drive.width * drive.height)
     for (i in pixels.indices) {
         pixels[i] = when {
-            lanes.bytes.getOrElse(i) { 0 }.toInt() != 0 -> 0xC8FF0000.toInt()
+            lanes.bytes.getOrElse(i) { 0 }.toInt() != 0 -> 0xE6FFFF00.toInt()
             drive.bytes.getOrElse(i) { 0 }.toInt() != 0 -> 0x6E00FF00.toInt()
-            else -> 0x00000000
+            else -> 0x66FF0000.toInt()
         }
     }
     return Bitmap.createBitmap(pixels, drive.width, drive.height, Bitmap.Config.ARGB_8888)
