@@ -2,11 +2,12 @@ package dev.sam3vision.core.settings
 
 /**
  * Endpoint Valhalla réellement appelé, dans cet ordre : saisie manuelle des
- * Réglages → URL injectée au build (`route.base.url`) → vide (= routage in-app
- * désactivé, le guidage reste celui de Google Maps).
+ * Réglages → URL injectée au build (`route.base.url`, défaut : backend Modal
+ * CPU `valhalla-idf-cpu`) → vide (= routage in-app désactivé, le guidage
+ * reste celui de Google Maps).
  *
- * Pas de preset en dur : l'URL publique du tunnel n'est connue qu'après
- * `tailscale funnel --bg 8002` sur le r630 (voir `docs/VOICE_NAV_PROXY.md`).
+ * Le preset est une URL publique non secrète (voir
+ * `server/backend/valhalla_cpu.py` et `docs/VOICE_NAV_PROXY.md`).
  */
 fun Settings.resolveRouteEndpoint(buildDefault: String = ""): String {
     val manual = routeBaseUrl.trim()

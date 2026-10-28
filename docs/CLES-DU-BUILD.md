@@ -15,7 +15,7 @@ de clé pour que le chat réponde et que la voix parle ; les clés sont dans le 
 | Voix ElevenLabs | `tts.voice.id` | `TTS_VOICE_ID` |
 | Clé dictée Meta | `asr.api.key` | `ASR_API_KEY` |
 | Endpoint SAM | `sam.base.url`, `sam.us.base.url` | `SAM_BASE_URL`, `SAM_US_BASE_URL` |
-| URL routeur Valhalla | `route.base.url` | `ROUTE_BASE_URL` |
+| URL routeur Valhalla | `route.base.url` (défaut : backend Modal CPU) | `ROUTE_BASE_URL` |
 
 `app/build.gradle.kts` lit le fichier, `app/SettingsSeed.kt` remplit les champs vides au
 démarrage (`seededFromBuild`, utilisé par iSee, le Direct et l'écran photo). L'intro et
