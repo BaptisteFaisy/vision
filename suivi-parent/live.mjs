@@ -15,11 +15,12 @@ function render() {
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
-  document.getElementById('dot').className = 'live-dot ' + status;
   document.getElementById('recenter').disabled = status === 'offline';
   const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
   showWords(narrationOf(live, status, motion, !!shareId), status === 'live' && live?.scene?.speaking);
-  document.querySelector('.spoken').hidden = status === 'offline' || !shareId;
+  const spoken = document.querySelector('.spoken');
+  spoken.hidden = status === 'offline' || !shareId;
+  spoken.parentElement.classList.toggle('with-text', !spoken.hidden);
   const fromUser = status === 'live' && live?.scene?.fromUser;
   document.getElementById('speaker').textContent = fromUser ? 'YOU' : 'ISEE';
   document.querySelector('.spoken').dataset.speaker = fromUser ? 'you' : 'isee';
