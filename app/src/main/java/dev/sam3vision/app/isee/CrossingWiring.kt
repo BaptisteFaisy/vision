@@ -45,11 +45,23 @@ internal fun crossingCueOf(
     atMs: Long,
     language: SpeechLanguage,
 ): CrossingCue? {
+    return announcer.onFrame(atMs, crossingStateOf(frame, jpegB64), language)
+}
+
+/**
+ * État du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
+ * en local ([TrainedLightColor], 100 % embarqué, aucun réseau). Pas de feu en
+ * vue ou image illisible ⇒ [CrossingState.Unknown] (le doute vaut « attendez »).
+ *
+ * Partagé entre la sonde ([crossingCueOf]) et le direct (`TraverseWiring`) :
+ * une seule lecture du feu, jamais de doublon.
+ */
+internal fun crossingStateOf(frame: LiveFrame, jpegB64: String): CrossingState {
     val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-    val crop = if (box == null) null else CrossingPixels.frame(jpegB64, box)
-    val state = if (crop == null) CrossingState.Unknown
-    else TrainedLightColor.classify(crop.argb, crop.width, crop.height)
-    return announcer.onFrame(atMs, state, language)
+    if (box == null) return CrossingState.Unknown
+    val crop = CrossingPixels.frame(jpegB64, box)
+    if (crop == null) return CrossingState.Unknown
+    return TrainedLightColor.classify(crop.argb, crop.width, crop.height)
 }
 
 /**
