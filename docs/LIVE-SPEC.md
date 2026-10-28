@@ -78,7 +78,7 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 **Requête** (un message texte par frame) — `Json.kt:298-318` :
 
 ```json
-{"id":7,"image_b64":"<JPEG base64>","prompts":["person","door"],
+{"id":7,"image_b64":"<JPEG base64>","prompts":["person","door","bicycle","car","truck","electric scooter"],
  "work_edge":640,"max_objects":8,"mask_encoding":"bits"}
 ```
 
@@ -237,16 +237,17 @@ mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 2
+## 5. Concepts suivis : 6
 
-- Liste par défaut : `["person", "door"]` — `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt:20`.
-- Plafond : `LivePrompts.MAX = 2` — `LivePrompts.kt:28`. Le client n'en envoie jamais plus,
-  le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 2`
-  (`LivePrompts.kt:24-26`).
-- Longueur maximale d'un concept : 32 caractères (`LivePrompts.kt:31`).
+- Liste par défaut : `["person", "door", "bicycle", "car", "truck", "electric scooter"]` —
+  `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt:27`.
+- Plafond : `LivePrompts.MAX = 6` — `LivePrompts.kt:34`. Le client n'en envoie jamais plus,
+  le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 6`
+  (`LivePrompts.kt:30-33`, `server/backend/tracking.py:53`).
+- Longueur maximale d'un concept : 32 caractères (`LivePrompts.kt:37`).
 - `normalize()` retire les espaces, les vides et les doublons, rejette les concepts trop
   longs, borne à `MAX`, et retombe sur la liste par défaut si le résultat est vide
-  (`LivePrompts.kt:38-46`). La liste est normalisée **une fois** par session
+  (`LivePrompts.kt:44-52`). La liste est normalisée **une fois** par session
   (`LiveSession.kt:83`).
 
 ## 6. Les identités stables sont reconstruites sur le téléphone

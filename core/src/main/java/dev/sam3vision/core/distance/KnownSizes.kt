@@ -48,6 +48,7 @@ object KnownSizes {
         "voiture" to 1.45f, "car" to 1.45f, "camion" to 2.80f, "truck" to 2.80f,
         "bus" to 3.00f, "moto" to 1.40f, "motorcycle" to 1.40f,
         "velo" to 1.10f, "bicycle" to 1.10f, "bike" to 1.10f, "trottinette" to 1.00f,
+        "trottinette electrique" to 1.00f, "scooter" to 1.00f, "electric scooter" to 1.00f,
         // Mobilier
         "chaise" to 0.90f, "chair" to 0.90f, "table" to 0.75f,
         "canape" to 0.80f, "sofa" to 0.80f, "couch" to 0.80f, "lit" to 0.60f, "bed" to 0.60f,

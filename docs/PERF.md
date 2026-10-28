@@ -99,7 +99,7 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Côté long de la frame du Direct | **512 px** | `app/LiveScreen.kt:45` (`LIVE_EDGE`) |
 | `work_edge` par défaut du direct | **640 px** | `core/live/LiveSession.kt:173` (`DEFAULT_WORK_EDGE`) |
 | Objets affichés par défaut | **8** (bornes 1–12) | `core/model/ObjectLimits.kt:16-18` |
-| Concepts suivis par défaut | **2** (`person`, `door`), max 2, 32 caractères | `core/live/LivePrompts.kt:20,28,31` |
+| Concepts suivis par défaut | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), max 6, 32 caractères | `core/live/LivePrompts.kt:27,34,37` |
 | Budget de tokens du LLM | **1200** (photo/chat, le défaut raisonne avant de répondre), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/HttpLlmClient.kt:11-21` |
 | Modèle de narration | **même** modèle Meta que les questions : `meta-models/muse-spark-open-1026` (Baseten, raisonnement coupé), clé dédiée (`liveLlmApiKey`) ; sans clé, le Direct se tait | `core/settings/Settings.kt` (`DEFAULT_LIVE_LLM_MODEL`), `app/LlmFactory.kt` (`liveNarration`) |
 | Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:60` (`MAX_HISTORY_TURNS`) |

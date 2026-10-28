@@ -17,8 +17,8 @@ enum class CrossingState { Red, Green, Unknown }
 
 /**
  * Prompts du **mode Traversée** : le feu et les voitures, rien d'autre.
- * Deux concepts exactement, comme l'exige [LivePrompts.MAX] (décision user :
- * « 2 concepts maximum, jamais plus »).
+ * Deux concepts exactement, bien sous le plafond [LivePrompts.MAX] : la Traversée
+ * n'a besoin que du feu et des voitures.
  */
 object CrossingPrompts {
 

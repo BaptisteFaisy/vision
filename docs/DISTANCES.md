@@ -124,10 +124,10 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 ## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-26, par `grep -c '@Test'`)
 
 - `core.distance.LensSpecTest` (**7**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical.
-- `core.distance.KnownSizesTest` (**5**) : **tous** les concepts par défaut du direct sont calibrés — ils sont
-  **deux** (`person`, `door` — `LivePrompts.kt:20`, `MAX = 2` `:28`), et la table couvre bien plus large (animaux,
-  véhicules, mobilier, rue — `KnownSizes.TABLE`) ; synonymes FR/EN, accents, concept inconnu. Le KDoc de
-  `LivePrompts.Default` annonce encore « huit concepts » : **commentaire périmé**, la valeur est bien une liste de deux.
+- `core.distance.KnownSizesTest` (**6**) : **tous** les concepts par défaut du direct sont calibrés — ils sont
+  **six** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter` — `LivePrompts.kt:27`, `MAX = 6` `:34`),
+  et la table couvre bien plus large (animaux, véhicules, mobilier, rue — `KnownSizes.TABLE`) ; synonymes FR/EN,
+  accents, concept inconnu.
 - `core.distance.DistanceMeterTest` (**12**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
   deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes.
