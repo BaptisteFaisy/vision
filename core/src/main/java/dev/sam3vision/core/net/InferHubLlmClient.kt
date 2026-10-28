@@ -171,12 +171,6 @@ private fun userMessage(text: String, jpegB64: String): JSONObject {
     return JSONObject().put("role", "user").put("content", content)
 }
 
-internal fun parse(raw: String): JSONObject? = try {
-    JSONObject(raw)
-} catch (e: Exception) {
-    null
-}
-
 /**
  * Tolérant : JSON attendu `{"description","tags"}` ; si le modèle renvoie du texte
  * libre, on garde ce texte en description et les labels segmentés en tags.
