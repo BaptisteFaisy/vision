@@ -7,12 +7,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Porte anti-confusion du vert piéton, sur pixels synthétiques : un vert
- * classifié ne devient un ordre de traverser que s'il est en bas du cadre,
- * élancé comme un bonhomme, sans rouge franc mélangé.
- *
- * Ces tests prouvent une propriété de sûreté (jamais de vert inventé), pas
- * une justesse terrain : aucune donnée réelle n'est requise ni utilisée.
+ * Porte anti-confusion du vert piéton : pixels synthétiques (frontières des
+ * seuils) + échantillon réel `feuxfr/` (9 crops Panoramax ≤ 48 px, voir
+ * ATTRIBUTION.md). Les seuils sont calibrés sur feux français (10/2026) :
+ * ces tests verrouillent 0 vert sur rouge et le rappel bonhomme.
  */
 class PedLightGateTest {
 
@@ -32,7 +30,7 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `barre verte haute - refusee (le vert est en bas)`() {
+    fun `barre verte haute - refusee (vert confine en haut)`() {
         assertFalse(PedLightGate.acceptGreen(barTop(), 20, 20))
     }
 
@@ -72,7 +70,7 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - cadre tout vert doute (crop serre, pas de position)`() {
+    fun `verdict - cadre tout vert doute (pas elance, pas bonhomme)`() {
         assertEquals(
             CrossingState.Unknown,
             PedLightGate.verdict(IntArray(100) { CYAN_GREEN }, 10, 10),
@@ -93,6 +91,54 @@ class PedLightGateTest {
         assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
     }
 
+    @Test
+    fun `seuil fraction - 3px elances passent, 1px refuse`() {
+        assertTrue(PedLightGate.acceptGreen(bar(1, 3), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(bar(1, 2), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(bar(1, 1), 20, 20))
+    }
+
+    @Test
+    fun `seuil elancement - 1,67 accepte, 1,43 refuse`() {
+        assertTrue(PedLightGate.acceptGreen(bar(6, 10), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(bar(7, 10), 20, 20))
+    }
+
+    @Test
+    fun `seuil bas - 50 pourcent accepte, 20 pourcent refuse`() {
+        assertTrue(PedLightGate.acceptGreen(barAt(5), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(barAt(2), 20, 20))
+    }
+
+    @Test
+    fun `feux fr - rouges sombres jamais verts`() {
+        assertNotEquals(CrossingState.Green, verdictOf("fr_red_dim_138.png"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_red_noise_732.png"))
+    }
+
+    @Test
+    fun `feux fr - bonhomme rouge reste rouge`() {
+        assertEquals(CrossingState.Red, verdictOf("fr_red_fig_548.png"))
+    }
+
+    @Test
+    fun `feux fr - bonhommes verts acceptes`() {
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_21.png"))
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_302.png"))
+        assertEquals(CrossingState.Green, verdictOf("fr_green_fig_243.png"))
+    }
+
+    @Test
+    fun `feux fr - disques voiture refuses`() {
+        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.png"))
+        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_367.png"))
+    }
+
+    @Test
+    fun `feux fr - pose large doute documente`() {
+        assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.png"))
+    }
+
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
     private fun barBottom(x0: Int = 8, x1: Int = 11): IntArray {
         val pixels = IntArray(20 * 20) { BLACK }
@@ -109,6 +155,34 @@ class PedLightGateTest {
             for (x in 8..11) pixels[y * 20 + x] = GREEN
         }
         return pixels
+    }
+
+    /** Barre `w` x `h` calée en bas (fraction et élancement réglables). */
+    private fun bar(w: Int, h: Int): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in 20 - h until 20) {
+            for (x in 10 - w / 2 until 10 - w / 2 + w) pixels[y * 20 + x] = GREEN
+        }
+        return pixels
+    }
+
+    /** Barre 4 x 10 placée en [y0] (part basse réglable). */
+    private fun barAt(y0: Int): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in y0 until y0 + 10) {
+            for (x in 8..11) pixels[y * 20 + x] = GREEN
+        }
+        return pixels
+    }
+
+    /** Verdict sur un crop réel `feuxfr/` (PNG ≤ 48 px, voir ATTRIBUTION.md). */
+    private fun verdictOf(name: String): CrossingState {
+        val stream = javaClass.classLoader.getResourceAsStream("feuxfr/$name")
+            ?: error("ressource manquante : feuxfr/$name")
+        val image = javax.imageio.ImageIO.read(stream)
+        val pixels = IntArray(image.width * image.height)
+        image.getRGB(0, 0, image.width, image.height, pixels, 0, image.width)
+        return PedLightGate.verdict(pixels, image.width, image.height)
     }
 
     /** Disque de couleur sur fond noir. */
