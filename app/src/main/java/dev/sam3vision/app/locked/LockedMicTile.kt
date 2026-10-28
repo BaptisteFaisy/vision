@@ -3,6 +3,7 @@ package dev.sam3vision.app.locked
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.widget.Toast
+import dev.sam3vision.core.speech.MicStartRefus
 
 /**
  * La tuile des réglages rapides : elle reste **atteignable depuis l'écran de verrouillage**,
@@ -22,7 +23,7 @@ class LockedMicTile : TileService() {
             return
         }
         if (!LockedMicBridge.toggle(this)) {
-            Toast.makeText(this, "micro verrouillé indisponible", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, MicStartRefus.UNAVAILABLE, Toast.LENGTH_SHORT).show()
             return
         }
         refresh()

@@ -8,9 +8,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dev.sam3vision.core.speech.LockedMic
 import dev.sam3vision.core.speech.LockedMicState
 
 /**
@@ -79,11 +81,17 @@ object LockedMicNotifications {
     /**
      * Publie la notification. Sans la permission `POST_NOTIFICATIONS` (Android 13+), la
      * notification reste invisible mais le service tourne : on n'échoue pas, on n'affiche rien.
+     * Ne lève jamais : une publication manquée (permission retirée entre le test et l'appel,
+     * système saturé) est notée, le service décide sans elle.
      */
     @SuppressLint("MissingPermission") // garde juste au-dessus : `canNotify` lit POST_NOTIFICATIONS
     fun show(context: Context, state: LockedMicState) {
         if (!canNotify(context)) return
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, build(context, state))
+        runCatching {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, build(context, state))
+        }.onFailure {
+            Log.w(LockedMic.TAG, "notification : ${it.javaClass.simpleName} — ${it.message}")
+        }
     }
 
     /** Vrai si l'app a le droit d'afficher une notification sur cette version d'Android. */
