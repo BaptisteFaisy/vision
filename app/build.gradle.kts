@@ -110,7 +110,11 @@ android {
         // Clé Google transmise au build par secret CI ou local.properties gitignoré.
         val mapsKey = localProp("google.maps.api.key").ifBlank { System.getenv("GOOGLE_MAPS_API_KEY").orEmpty() }
         buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$mapsKey\"")
-        // Tap court : endpoint vidéo SAM 3.1 (laisser vide → annonce « Failed », aucun envoi).
+        // Tap court : endpoint vidéo SAM 3.1. Vide → écran « Envoi désactivé » + tap refusé
+        // avec la raison explicite (TapConfig.sendBlockedReason), aucun enregistrement inutile.
+        // Renseigner : sam31.endpoint=https://<app sam3-eu-a100>. Si le serveur n'expose pas
+        // POST /video (404 de route manquante), l'envoi bascule sur POST /segment avec la
+        // première frame du clip (TapPhotoFallback) au lieu d'échouer.
         buildConfigField("String", "SAM31_ENDPOINT", "\"${localProp("sam31.endpoint")}\"")
         // Direct : base de l'app Modal sam3-eu-a100 (/live).
         buildConfigField("String", "SAM_BASE_URL", "\"${localProp("sam.base.url")}\"")
