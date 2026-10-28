@@ -93,7 +93,8 @@ class LiveProbeStopTest {
      */
     @Test
     fun `stop eteint le conteneur une fois avec l endpoint`() {
-        val probe = runTest { probeHarness(this).first }
+        lateinit var probe: LiveProbe
+        runTest { probe = probeHarness(this).first }
         val calls = mutableListOf<String>()
         val done = CompletableDeferred<Unit>()
         releaseOnStop = { endpoint ->
