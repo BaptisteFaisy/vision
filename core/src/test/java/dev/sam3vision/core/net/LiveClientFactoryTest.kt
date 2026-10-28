@@ -1,5 +1,6 @@
 package dev.sam3vision.core.net
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -32,6 +33,24 @@ class LiveClientFactoryTest {
         val client = liveClient("https://exemple.invalid")
         assertTrue(client is WsLiveClient)
         client.close()
+    }
+
+    @Test
+    fun `la fabrique transmet withDepth au message envoye`() = runBlocking {
+        val transport = ContractWsTransport { json ->
+            listOf(NetContract.frameReply(json.getInt("id")))
+        }
+        val client = liveClientWith(
+            baseUrl = "https://exemple.invalid",
+            timeoutSeconds = 10L,
+            withDepth = true,
+            transportFor = { transport },
+        )
+
+        client.live("QQ==", null, 640, 4)
+
+        val sent = org.json.JSONObject(transport.sent.single())
+        assertTrue("with_depth dans la trame", sent.getBoolean("with_depth"))
     }
 
     /**

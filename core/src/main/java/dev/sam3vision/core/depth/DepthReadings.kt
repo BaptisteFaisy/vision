@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.model.SegObject
 
 /** Ancre de calibration : mesure sténopé et sa proximité médiane. */
 data class DepthAnchor(val meters: Float, val closeness: Float)
@@ -73,7 +74,6 @@ object DepthReadings {
         pinhole: List<DistanceReading>,
         depth: DepthMap,
     ): List<DistanceReading> {
-        val byBox = pinhole.associateBy { it.box }
         val closeByBox = HashMap<List<Float>, Float>()
         for (detection in detections) {
             val closeness = boxCloseness(depth, detection.box, frameW, frameH)
@@ -81,6 +81,34 @@ object DepthReadings {
                 closeByBox[detection.box] = closeness
             }
         }
+        return refineWithCloseness(detections, pinhole, closeByBox)
+    }
+
+    /**
+     * Proximités mesurées par le serveur (`with_depth`) : médiane par boîte,
+     * finies seulement — une valeur absente ou non finie ne mesure rien.
+     */
+    fun serverCloseness(objects: List<SegObject>): Map<List<Float>, Float> {
+        val closeByBox = HashMap<List<Float>, Float>()
+        for (obj in objects) {
+            val closeness = obj.depth?.takeIf { it.isFinite() } ?: continue
+            closeByBox[obj.box] = closeness
+        }
+        return closeByBox
+    }
+
+    /**
+     * Même affinage que [refine], sur des proximités déjà mesurées (serveur) :
+     * calibration par les ancres sténopé de la frame, puis remplace/ajoute/garde.
+     * L'échelle restant calibrée par frame, la normalisation serveur (0..1) et la
+     * carte brute embarquée se valent ici.
+     */
+    fun refineWithCloseness(
+        detections: List<Detection>,
+        pinhole: List<DistanceReading>,
+        closeByBox: Map<List<Float>, Float>,
+    ): List<DistanceReading> {
+        val byBox = pinhole.associateBy { it.box }
         val anchors = ArrayList<DepthAnchor>(pinhole.size)
         for (reading in pinhole) {
             val closeness = closeByBox[reading.box]

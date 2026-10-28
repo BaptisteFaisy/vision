@@ -70,6 +70,18 @@ class LiveWireGuardTest {
         assertEquals(12, ws.getInt("max_objects"))
     }
 
+    @Test
+    fun `with_depth demande ajoute le champ, muet ne change rien`() {
+        val asked = org.json.JSONObject(
+            liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12, id = 7, withDepth = true),
+        )
+        assertTrue("with_depth demandé", asked.getBoolean("with_depth"))
+        val mutePost = org.json.JSONObject(liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12))
+        val muteWs = org.json.JSONObject(liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12, id = 7))
+        assertFalse("POST muet : pas de with_depth", mutePost.has("with_depth"))
+        assertFalse("WS muette : pas de with_depth", muteWs.has("with_depth"))
+    }
+
     private companion object {
         val PROMPTS = listOf("personne", "chien")
     }

@@ -43,6 +43,8 @@ class WsLiveClient(
     private val maskFormat: String? = null,
     /** Côté long de la grille réduite (`mask_edge`) ; 0 = pleine résolution. */
     private val maskEdge: Int = 0,
+    /** Profondeur fusionnée (`with_depth`) : médiane de proximité par objet en réponse. */
+    private val withDepth: Boolean = false,
 ) : LiveClient {
 
     private val lock = Any()
@@ -118,7 +120,8 @@ class WsLiveClient(
     /**
      * Message de requête : **exactement** le corps de `POST /live` (mêmes champs, mêmes
      * défauts, `mask_encoding` compris — voir [liveFrameJson]), plus l'`id` de corrélation et,
-     * quand ils sont demandés, les knobs du codec masques (`mask_format`, `mask_edge`).
+     * quand ils sont demandés, les knobs du codec masques (`mask_format`, `mask_edge`) et
+     * la profondeur fusionnée (`with_depth`).
      */
     private fun frameMessage(
         id: Int,
@@ -126,7 +129,7 @@ class WsLiveClient(
         prompts: List<String>?,
         workEdge: Int,
         maxObjects: Int,
-    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge)
+    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth)
 
     /**
      * Réponse du serveur : même forme que `POST /live`, ou `error` (connexion maintenue).

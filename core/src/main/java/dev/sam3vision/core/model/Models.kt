@@ -27,6 +27,12 @@ data class SegObject(
      * implicitement. Vide hors `poly`.
      */
     val maskPoly: List<List<Int>> = emptyList(),
+    /**
+     * Médiane de proximité mesurée par le serveur (`with_depth`, 0..1, grand =
+     * proche — même convention que [dev.sam3vision.core.depth.DepthMap]).
+     * `null` = le serveur ne l'a pas envoyée (ancien backend, repli gracieux).
+     */
+    val depth: Float? = null,
 )
 
 /** Résultat brut d'un appel /segment. */
