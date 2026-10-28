@@ -208,6 +208,18 @@ def test_segmentation_logic(segmentation) -> None:
     check("box bornée dans l'image", box == [0.0, 10.0, 100.0, 40.0], str(box))
 
 
+def test_tracking(tracking) -> None:
+    check("tracker : plafond 16 (décision user 28/10)",
+          tracking.PROMPT_LIMIT == 16, str(tracking.PROMPT_LIMIT))
+    many = [f"c{i}" for i in range(20)]
+    check("tracker : troncature au plafond",
+          tracking.clean_prompts(many) == many[:tracking.PROMPT_LIMIT])
+    check("tracker : dédupliqués",
+          tracking.clean_prompts(["car", "car", "pole"]) == ["car", "pole"])
+    check("tracker : vides → PromptTooLong",
+          raises(lambda: tracking.clean_prompts([]), tracking.PromptTooLong))
+
+
 def test_llm_logic(llm) -> None:
     check("extract_json: objet simple", llm.extract_json('{"description": "a", "tags": ["x"]}')["tags"] == ["x"])
     check("extract_json: fence markdown", llm.extract_json('```json\n{"description": "a"}\n```') is not None)
@@ -390,6 +402,7 @@ RUNNERS = (
     ("contrat HTTP (app FastAPI)", "modal_app", test_http_contract),
     ("live_app (contrat /live)", "live_app", test_live_contract),
     ("live_app (pipeline /live)", "live_app", test_live_pipeline),
+    ("tracker (plafond PROMPT_LIMIT)", "tracking", test_tracking),
     # Portage latence (mission 23) — codecs, cap, dédup, chronos, conteneur de prod.
     ("latence : codec bits", "imaging", latency_tests.test_mask_bits),
     ("latence : négociation mask_encoding", "imaging", latency_tests.test_mask_negotiation),
