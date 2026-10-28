@@ -3,6 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — micro : le démarrage verrouillé ne tue plus le processus
+
+- Le FATAL `ForegroundServiceDidNotStartInTime` (2× au relevé du jour, démarrage à froid,
+  livraison d'`onStartCommand` hors délai) est structurellement impossible : l'armement
+  passe par `startService`, et le service prend lui-même le premier plan en millisecondes
+  (ou s'arrête, arrêt parlé).
+- La décision de démarrage vit dans `:core` (`LockedMicStartRunner`, pur, chaque effet
+  gardé) : premier plan ou arrêt, sans jamais lever — y compris si la notification, la
+  publication d'état, la voix ou le premier plan (`SecurityException` micro, Android 14+)
+  lèvent. 15 tests JVM verrouillent les chemins, dont l'injection d'effets qui lèvent.
+- Comportement produit inchangé : mêmes états parlés, mêmes notifications, `START_STICKY`
+  quand armé, service toujours debout après retrait des récentes (HyperOS).
+
 ## 2026-10-28 — caregiver : écran réellement livré dans l'APK
 
 - WebView explicitement en MATCH_PARENT : évite un viewport CSS de hauteur nulle
