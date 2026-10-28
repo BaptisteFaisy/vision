@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,35 +81,24 @@ fun CaptureScreen(
     var attached by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var bindToken by remember { mutableStateOf(0) }
-    var bound by remember { mutableStateOf(false) }
+    val bound = remember { mutableStateOf(false) }
     val previewView = rememberPreviewView { attached = it }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     val executor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        // Copie potentiellement lourde (image cloud) : hors du thread principal.
-        if (uri != null) scope.launch { pickFromGallery(context, uri, onPhoto)?.let { error = it } }
-    }
-
-    // Écran affiché : on lance le réveil du GPU tout de suite (le temps de cadrer).
-    LaunchedEffect(Unit) { onShown() }
-
-    LaunchedEffect(granted, attached, bindToken) {
-        if (!granted || !attached) return@LaunchedEffect
-        bindCamera(context, previewView.findViewTreeLifecycleOwner(), previewView, imageCapture)
-            .onSuccess { bound = true }
-            .onFailure { error = it.message }
-    }
-
-    // Sortie de l'écran : la caméra est rendue (`bound` = `.get()` immédiat, jamais
-    // d'initialisation bloquante ici) et le fil d'exécution est arrêté (fuite sinon).
-    DisposableEffect(Unit) {
-        onDispose {
-            if (bound) runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
-            executor.shutdown()
-        }
-    }
-
+    val galleryLauncher = rememberGalleryLauncher(context, scope, onPhoto) { error = it }
+    CaptureCameraBinding(
+        context = context,
+        granted = granted,
+        attached = attached,
+        bindToken = bindToken,
+        bound = bound,
+        previewView = previewView,
+        imageCapture = imageCapture,
+        executor = executor,
+        onShown = onShown,
+        onError = { error = it },
+    )
     CameraSurface(
         granted = granted,
         attached = attached,
@@ -125,6 +116,51 @@ fun CaptureScreen(
         onOpenTap = onOpenTap,
         onLive = onOpenLive,
     )
+}
+
+/**
+ * Vie de la caméra pendant l'affichage : réveil GPU à l'ouverture, liaison à
+ * l'attachement, caméra rendue + fil arrêté à la sortie. `bound` évite
+ * d'initialiser le fournisseur juste pour le quitter (`.get()` bloquant).
+ */
+@Composable
+private fun CaptureCameraBinding(
+    context: Context,
+    granted: Boolean,
+    attached: Boolean,
+    bindToken: Int,
+    bound: MutableState<Boolean>,
+    previewView: PreviewView,
+    imageCapture: ImageCapture,
+    executor: ExecutorService,
+    onShown: () -> Unit,
+    onError: (String?) -> Unit,
+) {
+    // Écran affiché : on lance le réveil du GPU tout de suite (le temps de cadrer).
+    LaunchedEffect(Unit) { onShown() }
+    LaunchedEffect(granted, attached, bindToken) {
+        if (!granted || !attached) return@LaunchedEffect
+        bindCamera(context, previewView.findViewTreeLifecycleOwner(), previewView, imageCapture)
+            .onSuccess { bound.value = true }
+            .onFailure { onError(it.message) }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (bound.value) runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
+            executor.shutdown()
+        }
+    }
+}
+
+/** Galerie : copie disque potentiellement lourde (image cloud), hors thread principal. */
+@Composable
+private fun rememberGalleryLauncher(
+    context: Context,
+    scope: CoroutineScope,
+    onPhoto: (File) -> Unit,
+    onError: (String) -> Unit,
+) = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    if (uri != null) scope.launch { pickFromGallery(context, uri, onPhoto)?.let { onError(it) } }
 }
 
 /** Aperçu + bandeau d'erreur + commandes (les trois boutons). */
