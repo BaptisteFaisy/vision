@@ -39,6 +39,17 @@ class VoiceNavTracker(
 
     private val listener = FixListener()
 
+    @Volatile
+    private var listening = false
+
+    /**
+     * Dernier fix poussé au moteur (`null` avant la première position) :
+     * point de reprise après une coupure d'écoute (fond, perte de focus).
+     */
+    @Volatile
+    var lastFix: NavFix? = null
+        private set
+
     /** État courant du moteur (repos, guidage, écart, arrivé). */
     val state: NavState get() = engine.state
 
@@ -54,37 +65,47 @@ class VoiceNavTracker(
     /** Recharge un itinéraire après [NavEvent.OffRoute] (recalcul). */
     fun reroute(route: NavRoute): Result<Unit> = engine.reroute(route)
 
-    /** Démarre l'écoute GPS + réseau ; sans permission, ne fait rien. */
+    /**
+     * Démarre l'écoute GPS + réseau ; sans permission, ne fait rien.
+     * Idempotent : un second appel pendant l'écoute est no-op (pas de
+     * double abonnement après un retour de fond).
+     */
     @SuppressLint("MissingPermission")
     fun start() {
-        try {
-            locations?.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                NAV_GPS_MS,
-                0f,
-                listener,
-                Looper.getMainLooper(),
-            )
+        if (listening) return
+        listening = listen(LocationManager.GPS_PROVIDER) or listen(LocationManager.NETWORK_PROVIDER)
+    }
+
+    /**
+     * Reprend l'écoute après une coupure (fond, perte de focus) quand un
+     * itinéraire est en cours ; au repos ou après l'arrivée, ne fait rien.
+     * L'itinéraire chargé est conservé : seul le flux GPS reprend.
+     */
+    @SuppressLint("MissingPermission")
+    fun resume() {
+        if (shouldResume(listening, state)) start()
+    }
+
+    /**
+     * Abonne un fournisseur (`true` si accepté) ; provider absent, refusé
+     * ou gestionnaire manquant = `false` (l'autre peut suffire à guider).
+     */
+    private fun listen(provider: String): Boolean {
+        val manager = locations ?: return false
+        return try {
+            manager.requestLocationUpdates(provider, NAV_GPS_MS, 0f, listener, Looper.getMainLooper())
+            true
         } catch (_: SecurityException) {
-            return
+            false
         } catch (_: IllegalArgumentException) {
-            // Pas de GPS sur l'appareil : le réseau suffit pour guider grossièrement.
-        }
-        try {
-            locations?.requestLocationUpdates(
-                LocationManager.NETWORK_PROVIDER,
-                NAV_GPS_MS,
-                0f,
-                listener,
-                Looper.getMainLooper(),
-            )
-        } catch (_: SecurityException) {
-        } catch (_: IllegalArgumentException) {
+            false
         }
     }
 
     /** Coupe l'écoute et oublie l'itinéraire (fin du guidage). */
     fun stop() {
+        listening = false
+        lastFix = null
         try {
             locations?.removeUpdates(listener)
         } catch (_: SecurityException) {
@@ -101,6 +122,7 @@ class VoiceNavTracker(
             hasAccuracy = location.hasAccuracy(),
             atMs = location.time,
         )
+        lastFix = fix
         engine.onFix(fix).forEach(onEvent)
     }
 
@@ -115,6 +137,14 @@ class VoiceNavTracker(
         const val NAV_GPS_MS = 2_000L
     }
 }
+
+/**
+ * Reprise d'écoute après une coupure : seulement si le flux est coupé
+ * alors qu'un itinéraire est en cours (guidage ou écart) — au repos ou
+ * après l'arrivée, rouvrir le GPS ne servirait à rien. Pure, testée en JVM.
+ */
+fun shouldResume(listening: Boolean, state: NavState): Boolean =
+    !listening && (state == NavState.Guiding || state == NavState.OffRoute)
 
 /**
  * Fix moteur depuis une position brute : sans précision annoncée, repli
