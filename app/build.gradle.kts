@@ -8,6 +8,9 @@ val localProps = Properties().apply {
 }
 fun localProp(key: String): String = localProps.getProperty(key) ?: ""
 
+/** Backend Valhalla public (Modal CPU, tuiles IdF) — pas un secret. */
+val routeBaseUrlDefault = "https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
+
 /** Caractères admis dans une valeur venue de git : le manifeste reste sûr. */
 val gitTokenChars = Regex("[^A-Za-z0-9._-]")
 
@@ -120,10 +123,11 @@ android {
         buildConfigField("String", "SAM_BASE_URL", "\"${localProp("sam.base.url")}\"")
         // Endpoint de la région US (mode US des Réglages) : app Modal déployée en us-east.
         buildConfigField("String", "SAM_US_BASE_URL", "\"${localProp("sam.us.base.url")}\"")
-        // Routeur Valhalla (guidage vocal piéton) : URL publique du tunnel Funnel
-        // servi par le r630 (ou du proxy devant). Vide = routage in-app désactivé,
-        // Google Maps reste le guidage. Réglages prime sur le build.
-        buildConfigField("String", "ROUTE_BASE_URL", "\"${localProp("route.base.url")}\"")
+        // Routeur Valhalla (guidage vocal piéton) : backend Modal CPU (tuiles
+        // IdF), public, sans Tailscale. `route.base.url` prime ; sinon le
+        // défaut ci-dessous. Réglages prime sur le build ; sans URL
+        // joignable, Google Maps reste le guidage.
+        buildConfigField("String", "ROUTE_BASE_URL", "\"${localProp("route.base.url").ifBlank { routeBaseUrlDefault }}\"")
         // Calque local (propagation entre deux keyframes) : vide = le réglage des Réglages
         // décide ; « true »/« false » = drapeau de build prioritaire (démo, tests).
         buildConfigField("String", "LOCAL_OVERLAY", "\"${localProp("live.local.overlay")}\"")
