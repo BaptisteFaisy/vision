@@ -20,6 +20,7 @@ unique du 26/10.
 - `docs/CI-QUEUE.md` — CI, budget 5 min par job, gardes `couche0` / `stale-base-guard`, contrat `## Scope`.
 - `docs/NETTOYAGE.md` — purge horaire (Room + WorkManager).
 - `docs/META-ASR.md` — contrat dictée Meta Muse (facturation 402, pièges).
+- `docs/META-IMAGE.md` — contrat pictogrammes Meta Muse Image (même clé, `/images/edits`).
 - `docs/ELEVENLABS-TTS.md` — contrat voix (voix premade vs bibliothèque, 402).
 - `docs/MODE-TAP.md` — mode tap (vidéo → SAM 3.1) · `docs/MODE-US.md` — région US.
 - `docs/DISTANCES.md` — distances sténopé sur le téléphone.

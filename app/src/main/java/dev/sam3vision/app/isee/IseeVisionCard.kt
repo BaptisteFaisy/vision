@@ -289,9 +289,15 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
         // GlassesProbeWiring) : mélanger les deux vues brouillerait le guidage.
         // (Lu au fil de l'eau : l'effet ne redémarre pas, une valeur collectée
         // une fois resterait gelée.)
-        glue.host.wantsFrame = { !GlassesVideoLink.live.value && sending(viewModel) && viewModel.probe.wantsFrame() }
+        glue.host.wantsFrame = {
+            if (GlassesVideoLink.live.value) false
+            else (sending(viewModel) && viewModel.probe.wantsFrame()) || picturing(viewModel)
+        }
         glue.host.onFrame = { jpeg, captureAtNs ->
-            if (!GlassesVideoLink.live.value && sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
+            if (!GlassesVideoLink.live.value) {
+                if (sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
+                if (picturing(viewModel)) viewModel.picto.onFrame(jpeg)
+            }
         }
     }
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
@@ -303,6 +309,13 @@ private fun sending(viewModel: IseeViewModel): Boolean = sendingToSam(
     recordingVideo = viewModel.state.value.recordingVideo,
     crossingActive = viewModel.probe.state.value.crossingActive,
 )
+
+/**
+ * Vrai quand les frames partent au matcher picto : des repères sont armés et
+ * la vidéo tourne — le téléphone seul, jamais les lunettes ni le réseau.
+ */
+private fun picturing(viewModel: IseeViewModel): Boolean =
+    viewModel.picto.armed() && viewModel.state.value.recordingVideo
 
 /**
  * Porte d'envoi vers SAM, pure et testée : la caméra active allume la carte, et
