@@ -3,6 +3,16 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — lunettes : l'enregistrement du banc ne bloque plus le main thread
+
+- ANR du 27/10 (`executing service …ACDCRegistrationService`) : `requestRegistration`
+  appelait `Wearables.startRegistration` en ligne dans le collecteur `registrationState`,
+  sur le main, pendant que le SDK tenait son verrou d'enregistrement — interblocage
+  AB-BA avec un thread binder (traces `data_app_anr` du 27/10 11:22).
+- L'étape `REQUEST_REGISTRATION` quitte désormais le thread de l'émetteur
+  (`runsOffEmitter`, `GlassesSessionPolicy`, verrouillé par 3 tests JVM) et l'appel
+  bloquant part sur IO, comme tous les autres appels DAT du cycle.
+
 ## 2026-10-28 — micro : le démarrage verrouillé ne tue plus le processus
 
 - Le FATAL `ForegroundServiceDidNotStartInTime` (2× au relevé du jour, démarrage à froid,

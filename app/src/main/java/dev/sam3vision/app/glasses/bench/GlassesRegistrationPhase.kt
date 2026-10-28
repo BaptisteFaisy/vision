@@ -31,7 +31,17 @@ internal fun GlassesRuntime.observeRegistration() {
 private suspend fun GlassesRuntime.onRegistrationState(state: RegistrationState) {
     val decision = registrationDecision(state)
     onLog(decision.message)
-    when (decision.step) {
+    if (runsOffEmitter(decision.step)) {
+        // L'étape part après `emit` : le SDK a relâché son verrou d'enregistrement
+        // avant que l'appel bloquant ne le reprenne (ANR du 27/10/2026).
+        launchSafe { executeRegistrationStep(decision.step) }
+    } else {
+        executeRegistrationStep(decision.step)
+    }
+}
+
+private suspend fun GlassesRuntime.executeRegistrationStep(step: RegistrationStep) {
+    when (step) {
         RegistrationStep.REQUEST_REGISTRATION -> requestRegistration()
         RegistrationStep.OPEN_SESSION -> openSession()
         RegistrationStep.LOG_ONLY -> Unit
@@ -41,8 +51,11 @@ private suspend fun GlassesRuntime.onRegistrationState(state: RegistrationState)
 /**
  * Un seul lancement par cycle : `startRegistration` ouvre une UI, la relancer à
  * chaque émission de l'état serait agressif.
+ *
+ * L'appel SDK est synchrone et bloque (clés, négociation) : il part sur IO,
+ * jamais sur le main thread — le seul appel DAT du cycle qui ne le faisait pas.
  */
-private fun GlassesRuntime.requestRegistration() {
+private suspend fun GlassesRuntime.requestRegistration() {
     if (!registrationLatch.arm()) return
     val activity = activity.get()
     if (activity == null) {
@@ -51,7 +64,7 @@ private fun GlassesRuntime.requestRegistration() {
     }
     onLog("ouverture de l'enregistrement des lunettes")
     // L'app du compagnon peut être absente : on log sans emporter le collecteur.
-    runCatching { Wearables.startRegistration(activity) }
+    runCatching { io { Wearables.startRegistration(activity) } }
         .onFailure { error -> onLog("enregistrement impossible : ${error.message}") }
 }
 
