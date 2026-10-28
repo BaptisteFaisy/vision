@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — docs : clean + README réécrit
+
+- `README.md` réécrit : problème, solution, 4 blocs (`:core`, `:app`, `server/`,
+  `suivi-parent/`), stack complète (Android, Modal, page proche, voix/LLM, CI) ; chiffres
+  remesurés le 28/10 (730 `.kt`, 43 219 lignes de prod, 2 180 `@Test` JVM + 10 instrumentés).
+- Recomptages 28/10 : `docs/PERF.md` (§1.1, §2, §4), `NOTES.md` (versions, taille, direct),
+  `docs/ARCHITECTURE.md` (§1, §8), `docs/TESTING.md` (§1, §2, §5, §6), `AGENTS.md` (§1, §3, §4),
+  `docs/DOC-ETAT.md` (+ `server/*`, `suivi-parent`, `scripts`, `DEPS`, `fireworks`).
+- Backend présent : fausses affirmations corrigées (« pas de backend ici », double tap =
+  photo, « Autres écrans », `PROMPT_LIMIT = 2`, `work_edge` 640, `CHANGELOG.md:269`).
+- Datation (§0) : 14 fichiers purgés des dates < 26/10 (forme « relevé antérieur, hors de
+  cet arbre ») ; specs historiques signalées (`KOTLIN-SPEC`, `LIVE-SPEC` serveur).
+- Gardes rejouées : kotlin-limits, isee-design, budget-derive, voice-nav-doc, ci-budget
+  (8 workflows), budget_latence (6 + 14/14), test_scripts (117), goldens (11/11), node
+  suivi (10/10), unittest outils (58) — tout vert, aucun `gradlew` lancé.
 ## 2026-10-28 — gpu : l'app détecte quand la carte est branchée
 
 - `GpuMonitor` (`core/net/GpuMonitor.kt`, testé) : présence observée (`Unknown` /
