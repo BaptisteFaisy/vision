@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.camera.view.PreviewView
+import androidx.compose.ui.graphics.toArgb
 
 /**
  * Aperçu caméra **et** masques dans la même surface native.
@@ -30,6 +31,8 @@ class CameraSurface(context: Context, private val preview: PreviewView) : FrameL
     private var shown: List<Bitmap> = emptyList()
 
     init {
+        // Fond sombre : sans flux ni masque, aucun blanc système ne transparaît.
+        setBackgroundColor(AppColors.background.toArgb())
         // Les masques d'abord ; l'aperçu vient **dessous**, posé à l'attachement.
         addView(maskView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
