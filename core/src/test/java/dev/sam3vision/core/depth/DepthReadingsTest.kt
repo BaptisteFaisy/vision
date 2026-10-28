@@ -2,6 +2,7 @@ package dev.sam3vision.core.depth
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -69,5 +70,31 @@ class DepthReadingsTest {
         val broken = DepthMap(100, 100, FloatArray(100 * 100) { Float.NaN })
         val out = DepthReadings.refine(100, 100, listOf(person), pinhole, broken)
         assertEquals(pinhole, out)
+    }
+
+    @Test
+    fun `proximites serveur - finies seulement, par boite`() {
+        val person = SegObject("personne", 0.9f, listOf(0f, 0f, 49f, 99f), "", depth = 0.8f)
+        val ghost = SegObject("reflet", 0.4f, listOf(1f, 1f, 2f, 2f), "", depth = null)
+        val noise = SegObject("bruit", 0.3f, listOf(3f, 3f, 4f, 4f), "", depth = Float.NaN)
+        val close = DepthReadings.serverCloseness(listOf(person, ghost, noise))
+        assertEquals(mapOf(person.box to 0.8f), close)
+    }
+
+    @Test
+    fun `affine avec proximites - remplace ajoute et garde`() {
+        val person = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val sidewalk = Detection("trottoir", 0.7f, listOf(50f, 0f, 99f, 99f), 100, 100)
+        val ghost = Detection("reflet", 0.4f, listOf(200f, 200f, 300f, 300f), 100, 100)
+        val pinhole = listOf(DistanceReading(7, "personne", 2f, 2f, person.box))
+        val close = mapOf(person.box to 0.8f, sidewalk.box to 0.2f)
+        val out = DepthReadings.refineWithCloseness(listOf(person, sidewalk, ghost), pinhole, close)
+        assertEquals(2, out.size)
+        val p = out.first { it.label == "personne" }
+        assertEquals(7, p.trackId)
+        assertEquals(2f, p.meters, 0.01f)
+        val s = out.first { it.label == "trottoir" }
+        assertEquals(8f, s.meters, 0.01f)
+        assertTrue(out.none { it.label == "reflet" })
     }
 }

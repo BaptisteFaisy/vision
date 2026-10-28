@@ -83,6 +83,7 @@ internal fun JSONObject.segObject(frameEncoding: String = MASK_ENCODING_PNG): Se
         maskEncoding = str("mask_encoding", frameEncoding).lowercase(),
         maskScale = floatOr("mask_scale", 1f),
         maskPoly = polyRings("mask_poly"),
+        depth = if (has("depth") && !isNull("depth")) optDouble("depth", Double.NaN).toFloat() else null,
     )
 }
 
@@ -301,6 +302,10 @@ private fun intAt(text: String, from: Int): Int? {
  * `mask_edge`) : `rle`/`poly` sur une grille réduite, que seul un backend à jour sait
  * servir. `maskFormat = null` restaure exactement le corps d'avant ; un serveur qui ne
  * connaît pas ces champs les ignore et répond son défaut (`png`).
+ *
+ * [withDepth] ajoute `"with_depth":true` (médiane de proximité par objet en réponse).
+ * `false` = octet pour octet le corps d'avant : un serveur qui ne connaît pas ce champ
+ * l'ignore et répond sans clé `depth`.
  */
 internal fun liveFrameJson(
     jpegB64: String,
@@ -310,6 +315,7 @@ internal fun liveFrameJson(
     id: Int? = null,
     maskFormat: String? = null,
     maskEdge: Int = 0,
+    withDepth: Boolean = false,
 ): String {
     // Concaténation manuelle : `JSONObject` rescanne et échappe les ~28 Ko de base64 à
     // chaque frame, alors que l'alphabet base64 (A-Za-z0-9+/=) n'a rien à échapper.
@@ -336,6 +342,7 @@ internal fun liveFrameJson(
         out.append(",\"mask_format\":\"").append(jsonEscape(maskFormat)).append('"')
         if (maskEdge > 0) out.append(",\"mask_edge\":").append(maskEdge)
     }
+    if (withDepth) out.append(",\"with_depth\":true")
     out.append('}')
     return out.toString()
 }

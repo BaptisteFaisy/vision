@@ -33,8 +33,13 @@ object LiveMaskTransport {
     /**
      * Fabrique unique du client `/live` **avec** les knobs ci-dessus : les deux écrans
      * qui parlent à SAM (Direct, mode vidéo iSee) passent par là, donc un format demandé
-     * est toujours un format que le client sait relire.
+     * est toujours un format que le client sait relire. [withDepth] demande en plus la
+     * médiane de proximité par objet (`false` = corps historique, octet pour octet).
      */
-    fun clientFor(base: String, timeout: Long = LIVE_TIMEOUT_SECONDS, marks: WireMarks? = null): LiveClient =
-        liveClient(base, timeout, marks, MASK_FORMAT, MASK_EDGE)
+    fun clientFor(
+        base: String,
+        timeout: Long = LIVE_TIMEOUT_SECONDS,
+        marks: WireMarks? = null,
+        withDepth: Boolean = false,
+    ): LiveClient = liveClient(base, timeout, marks, MASK_FORMAT, MASK_EDGE, withDepth)
 }

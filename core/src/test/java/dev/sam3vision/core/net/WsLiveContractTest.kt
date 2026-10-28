@@ -6,6 +6,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -144,6 +145,43 @@ class WsLiveContractTest {
 
         assertEquals(listOf(100, 200, 300), frames.map { it.getOrThrow().width }.sorted())
         assertEquals(3, transport.sent.size)
+    }
+
+    @Test
+    fun `le client avec withDepth envoie le champ dans la trame`() = runBlocking {
+        val transport = ContractWsTransport { json ->
+            listOf(NetContract.frameReply(json.getInt("id")))
+        }
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), withDepth = true)
+
+        client.live("QQ==", null, 640, 4)
+
+        val sent = org.json.JSONObject(transport.sent.single())
+        assertTrue("with_depth dans la trame", sent.getBoolean("with_depth"))
+    }
+
+    @Test
+    fun `une mediane depth dans la reponse est lue sur l objet`() = runBlocking {
+        val transport = ContractWsTransport { json ->
+            listOf(NetContract.frameReply(json.getInt("id"), depth = 0.75f))
+        }
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+
+        val frame = client.live("QQ==", null, 640, 4).getOrThrow()
+
+        assertEquals(0.75f, frame.objects.single().depth!!, 0.001f)
+    }
+
+    @Test
+    fun `sans cle depth la mediane est nulle (ancien backend)`() = runBlocking {
+        val transport = ContractWsTransport { json ->
+            listOf(NetContract.frameReply(json.getInt("id")))
+        }
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+
+        val frame = client.live("QQ==", null, 640, 4).getOrThrow()
+
+        assertNull(frame.objects.single().depth)
     }
 
     /** Attend que [expected] frames soient réellement en vol, sans sommeil fixe. */
