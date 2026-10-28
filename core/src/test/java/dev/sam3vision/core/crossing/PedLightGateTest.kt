@@ -1,0 +1,150 @@
+package dev.sam3vision.core.crossing
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Porte anti-confusion du vert piéton, sur pixels synthétiques : un vert
+ * classifié ne devient un ordre de traverser que s'il est en bas du cadre,
+ * élancé comme un bonhomme, sans rouge franc mélangé.
+ *
+ * Ces tests prouvent une propriété de sûreté (jamais de vert inventé), pas
+ * une justesse terrain : aucune donnée réelle n'est requise ni utilisée.
+ */
+class PedLightGateTest {
+
+    @Test
+    fun `barre verte basse elancee - acceptee`() {
+        assertTrue(PedLightGate.acceptGreen(barBottom(), 20, 20))
+    }
+
+    @Test
+    fun `disque vert centre - refuse (feu rond, pas bonhomme)`() {
+        assertFalse(PedLightGate.acceptGreen(disc(10, 10, 5), 20, 20))
+    }
+
+    @Test
+    fun `disque vert bas - refuse malgre la position`() {
+        assertFalse(PedLightGate.acceptGreen(disc(10, 14, 5), 20, 20))
+    }
+
+    @Test
+    fun `barre verte haute - refusee (le vert est en bas)`() {
+        assertFalse(PedLightGate.acceptGreen(barTop(), 20, 20))
+    }
+
+    @Test
+    fun `vert melange de rouge franc - refuse`() {
+        val pixels = barBottom()
+        paintDisc(pixels, 20, 20, 10, 5, 3, RED)
+        assertFalse(PedLightGate.acceptGreen(pixels, 20, 20))
+    }
+
+    @Test
+    fun `cadres vides ou incoherents - refuses`() {
+        assertFalse(PedLightGate.acceptGreen(IntArray(100) { BLACK }, 10, 10))
+        assertFalse(PedLightGate.acceptGreen(IntArray(100) { GRAY }, 10, 10))
+        assertFalse(PedLightGate.acceptGreen(IntArray(0), 0, 0))
+        assertFalse(PedLightGate.acceptGreen(IntArray(10), 10, 10))
+    }
+
+    @Test
+    fun `reflet vert minuscule - refuse`() {
+        val pixels = IntArray(400) { BLACK }
+        pixels[15 * 20 + 10] = GREEN
+        pixels[15 * 20 + 11] = GREEN
+        assertFalse(PedLightGate.acceptGreen(pixels, 20, 20))
+    }
+
+    @Test
+    fun `barre decalee a gauche ou droite - acceptee (translation)`() {
+        assertTrue(PedLightGate.acceptGreen(barBottom(x0 = 2, x1 = 5), 20, 20))
+        assertTrue(PedLightGate.acceptGreen(barBottom(x0 = 14, x1 = 17), 20, 20))
+    }
+
+    @Test
+    fun `barre sous-exposee - acceptee puis doute, jamais d invention`() {
+        assertTrue(PedLightGate.acceptGreen(dim(barBottom(), 0.5f), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(dim(barBottom(), 0.25f), 20, 20))
+    }
+
+    @Test
+    fun `verdict - cadre tout vert doute (crop serre, pas de position)`() {
+        assertEquals(
+            CrossingState.Unknown,
+            PedLightGate.verdict(IntArray(100) { CYAN_GREEN }, 10, 10),
+        )
+    }
+
+    @Test
+    fun `verdict - le rouge ne devient jamais vert`() {
+        assertNotEquals(
+            CrossingState.Green,
+            PedLightGate.verdict(disc(10, 10, 5, RED), 20, 20),
+        )
+    }
+
+    @Test
+    fun `verdict - noir et gris restent un doute`() {
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
+    }
+
+    /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
+    private fun barBottom(x0: Int = 8, x1: Int = 11): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in 10 until 20) {
+            for (x in x0..x1) pixels[y * 20 + x] = GREEN
+        }
+        return pixels
+    }
+
+    /** Même barre dans la moitié haute (mauvaise position). */
+    private fun barTop(): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in 0 until 10) {
+            for (x in 8..11) pixels[y * 20 + x] = GREEN
+        }
+        return pixels
+    }
+
+    /** Disque de couleur sur fond noir. */
+    private fun disc(cx: Int, cy: Int, radius: Int, color: Int = GREEN): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        paintDisc(pixels, 20, 20, cx, cy, radius, color)
+        return pixels
+    }
+
+    private fun paintDisc(pixels: IntArray, w: Int, h: Int, cx: Int, cy: Int, radius: Int, color: Int) {
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val dx = x - cx
+                val dy = y - cy
+                if (dx * dx + dy * dy <= radius * radius) pixels[y * w + x] = color
+            }
+        }
+    }
+
+    /** Sous-exposition : canaux multipliés, teinte et saturation conservées. */
+    private fun dim(pixels: IntArray, factor: Float): IntArray {
+        return IntArray(pixels.size) { index ->
+            val pixel = pixels[index]
+            if (pixel == BLACK) return@IntArray BLACK
+            val r = (((pixel shr 16) and 0xFF) * factor).toInt()
+            val g = (((pixel shr 8) and 0xFF) * factor).toInt()
+            val b = ((pixel and 0xFF) * factor).toInt()
+            (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+        }
+    }
+
+    companion object {
+        private const val RED = 0xFFFF0000.toInt()
+        private const val GREEN = 0xFF00FF00.toInt()
+        private const val CYAN_GREEN = 0xFF00FFAA.toInt()
+        private const val BLACK = 0xFF000000.toInt()
+        private const val GRAY = 0xFF808080.toInt()
+    }
+}
