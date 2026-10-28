@@ -356,6 +356,18 @@ private fun SettingsEntry(
     }
 }
 
+/**
+ * Veille GPU de la page Réglages : le téléphone remarque tout seul quand on branche
+ * la carte ; en partant, la veille s'annule (jamais de sonde hors de cette page).
+ */
+@Composable
+private fun GpuWatchEffect(viewModel: AppViewModel) {
+    DisposableEffect(Unit) {
+        viewModel.setGpuWatching(true)
+        onDispose { viewModel.setGpuWatching(false) }
+    }
+}
+
 /** Réglages : délègue au ViewModel et ouvre le banc des lunettes. */
 @Composable
 private fun SettingsRoute(
@@ -369,12 +381,15 @@ private fun SettingsRoute(
     onPickRole: (Settings) -> Unit,
 ) {
     val context = LocalContext.current
+    val gpu by viewModel.gpu.collectAsState()
+    GpuWatchEffect(viewModel)
     SettingsScreen(
         settings = state.settings,
         statusLine = state.statusLine,
         llmConfigured = state.settings.llmConfigured,
         glasses = glasses,
         speaking = state.speak,
+        gpu = gpu,
         onSave = { viewModel.saveSettings(it); pop() },
         onTestLlm = viewModel::testLlm,
         onTestSam = viewModel::testSam,

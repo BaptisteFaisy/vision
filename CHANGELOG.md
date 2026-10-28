@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — gpu : l'app détecte quand la carte est branchée
+
+- `GpuMonitor` (`core/net/GpuMonitor.kt`, testé) : présence observée (`Unknown` /
+  `Checking` / `Up` / `Down`) alimentée par les vrais appels SAM (zéro requête ajoutée)
+  et par une veille bornée (12 sondes `/health` × 10 s) qui ne sonde que sur `Down` et
+  s'arrête au premier succès — jamais de sonde sur `Up` (l'extinction est préservée),
+  sur `Unknown` (pas de réveil surprise) ni sans endpoint.
+- `AnalyzeUseCase` expose l'issue SAM (`onSamOutcome`, `Timeout` si budget dépassé,
+  `null` sans client) : la photo affiche « Détecteur SAM injoignable (…) » au lieu de
+  « aucun objet » (`AppStatusText.samDownNote`, même motif que le direct).
+- Réglages : pastille de présence dans la section GPU (`gpuStatusLine`, testée) ;
+  la veille démarre à l'ouverture de la page et s'annule en partant (`setGpuWatching`).
+- 22 tests JVM : `GpuMonitorTest` (11), `UseCasesTest` (+4), `AppAnalysisTest` (+3,
+  1 attente mise à jour : la note nomme la GPU), `AppDiagnosticsTest` (+3),
+  `GpuStatusLineTest` (1).
+
 ## 2026-10-28 — direct : 6 concepts suivis (rue + intérieur)
 
 - Décision user : le direct suit aussi les vélos, voitures, camions et trottinettes

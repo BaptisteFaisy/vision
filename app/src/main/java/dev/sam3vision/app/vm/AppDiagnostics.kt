@@ -35,6 +35,8 @@ class AppDiagnostics(
     private val probeImage: () -> String = { bitmapToJpegBase64(testBitmap()) },
     private val samUrl: (Settings) -> String = { it.samEndpoint() },
     private val samClient: (String) -> SamClient = { HttpSamClient(it) },
+    /** Issue du « Tester SAM » vers le moniteur GPU (endpoint testé + verdict). */
+    private val noteHealth: (String, Result<Boolean>) -> Unit = { _, _ -> },
     private val releaseScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
 
@@ -61,6 +63,7 @@ class AppDiagnostics(
         }
         update { it.copy(statusLine = AppStatusText.samTesting(settings.samRegion.code)) }
         val outcome = samClient(url).health()
+        noteHealth(url, outcome)
         update {
             it.copy(statusLine = outcome.fold(
                 onSuccess = { ok -> if (ok) AppStatusText.SAM_OK else AppStatusText.SAM_HEALTH_FALSE },
