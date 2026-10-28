@@ -13,7 +13,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.previewResolutionSelector
-import dev.sam3vision.app.uprightScaled
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +28,7 @@ class SegmentCameraHost(private val context: Context) {
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
-    /** Bitmap redressé, bord long 640 : consommé par le segmenteur. */
+    /** Bitmap redressé pile 640×360 : consommé par le segmenteur. */
     var onFrame: ((Bitmap) -> Unit)? = null
 
     /** Faux = une inférence est déjà en vol : on jette la frame sans convertir. */
@@ -74,11 +73,7 @@ class SegmentCameraHost(private val context: Context) {
             if (wantsFrame?.invoke() == false) return
             val bitmap = proxy.toBitmap() ?: return
             onFrame?.invoke(
-                uprightScaled(
-                    bitmap,
-                    proxy.imageInfo.rotationDegrees,
-                    SegmentPreprocess.INPUT_WIDTH,
-                ),
+                SegmentPreprocess.rotateAndFit(bitmap, proxy.imageInfo.rotationDegrees),
             )
         } catch (_: Throwable) {
             // frame illisible : la suivante arrive tout de suite
