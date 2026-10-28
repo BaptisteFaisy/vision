@@ -47,7 +47,7 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 - `crossingStateOf()` (extrait de `crossingCueOf`, sonde inchangée) :
   boîte SAM au meilleur score → crop JPEG → `TrainedLightColor` ;
 - `TraverseWiring` relit le vert à chaque frame **active** et demande le
-  concept `traffic light` dans les prompts (5 véhicules + feu = plafond 6) ;
+  concept `traffic light` dans les prompts (5 véhicules + feu, plafond 16) ;
 - `LiveViewModel` transmet le JPEG (1 ligne, fichier maintenu à 498 lignes).
 - Porte anti-confusion (`PedLightGate`) : le vert classifié ne passe que
   s'il est en bas du cadre, élancé comme un bonhomme, sans rouge franc —

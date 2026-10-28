@@ -3,6 +3,24 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — direct : 10 dangers extérieurs par défaut, plafond 16 (ordre user)
+
+- `LivePrompts.default` : `person, car, bicycle, electric scooter, pole, sidewalk,
+  crosswalk, wall, window, stairs` (remplace `person, door, bicycle, car, truck,
+  electric scooter` ; `door`/`truck` restent saisissables dans « Suivre »).
+- `LivePrompts.MAX` 6 → 16 + `tracking.py PROMPT_LIMIT` 6 → 16 ensemble (contrat
+  client/serveur). Backend FR→EN déjà complet (213 alias : poteau, trottoir,
+  passage piéton, mur, vitre, escalier…) — aucun alias ajouté.
+- `KnownSizes.DEPTH_ONLY` : `stairs`/`sidewalk`/`crosswalk`/`pole` sans hauteur
+  sténopé (plans au sol ou hauteur indéfendable) — distance par profondeur/plan
+  de sol ; `StairConcepts` désormais câblé dans les défauts.
+- Effet traversée : `VehicleConcepts.promptsFor` (5 véhicules + base) tient sous
+  le plafond 16 au lieu de tronquer à 6.
+- Preuves : `:core:test` + `:app:testDebugUnitTest` verts sur r630,
+  `test_units.py` 247/247 (dont `test_tracking`), `check-kotlin-limits` OK.
+  Test téléphone + déploiement tracker dus (PROMPT_LIMIT actif au prochain
+  `deploy_backend.sh`).
+
 ## 2026-10-28 — suppression NanoDet (test escaliers SAM uniquement, ordre user)
 
 - Supprimés : écran démo `app/.../detect/` (5 fichiers : écran, hôte caméra,

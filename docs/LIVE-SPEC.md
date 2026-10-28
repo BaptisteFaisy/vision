@@ -237,13 +237,14 @@ mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 6
+## 5. Concepts suivis : 10 (plafond 16)
 
-- Liste par défaut : `["person", "door", "bicycle", "car", "truck", "electric scooter"]` —
-  `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt:27`.
-- Plafond : `LivePrompts.MAX = 6` — `LivePrompts.kt:34`. Le client n'en envoie jamais plus,
-  le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 6`
-  (`LivePrompts.kt:30-33`, `server/backend/tracking.py:53`).
+- Liste par défaut : `["person", "car", "bicycle", "electric scooter", "pole", "sidewalk",
+  "crosswalk", "wall", "window", "stairs"]` (dangers extérieurs, ordre user du 28/10) —
+  `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
+- Plafond : `LivePrompts.MAX = 16`. Le client n'en envoie jamais plus,
+  le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 16`
+  (`server/backend/tracking.py:53`).
 - Longueur maximale d'un concept : 32 caractères (`LivePrompts.kt:37`).
 - `normalize()` retire les espaces, les vides et les doublons, rejette les concepts trop
   longs, borne à `MAX`, et retombe sur la liste par défaut si le résultat est vide
@@ -304,6 +305,6 @@ identités dans le cas courant, et le serveur seulement quand le tracker est act
   (`git grep -n '"/video"' server/backend` vide) : aucun contrat de réponse n'est écrit,
   seulement la lecture tolérante du client (`HttpSam31VideoClient.kt:89-95`). La question
   « cloud ou on-device ? » reste ouverte (`TapConfig.kt:48`).
-- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 6`, affirmé par le commentaire
-  (`LivePrompts.kt:30-33`) **et** le code du tracker (`server/backend/tracking.py:53`) — mais
+- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 16`, affirmé par le commentaire
+  (`LivePrompts.kt`) **et** le code du tracker (`server/backend/tracking.py:53`) — mais
   le plafond du déploiement `/live` ne se lit que sur le serveur.
