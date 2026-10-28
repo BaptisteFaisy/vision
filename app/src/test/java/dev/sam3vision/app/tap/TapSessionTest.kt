@@ -112,9 +112,12 @@ class TapSessionTest {
      * elle ne sert qu'à construire la session.
      */
     private fun blankContext(): Context {
-        val field = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe")
+        // Réflexion pure : `sun.misc.Unsafe` n'est pas au classpath de compilation
+        // des tests unitaires, mais présent sur la JVM qui les exécute.
+        val unsafeClass = Class.forName("sun.misc.Unsafe")
+        val field = unsafeClass.getDeclaredField("theUnsafe")
         field.isAccessible = true
-        val unsafe = field.get(null) as sun.misc.Unsafe
-        return unsafe.allocateInstance(Context::class.java) as Context
+        val allocate = unsafeClass.getMethod("allocateInstance", Class::class.java)
+        return allocate.invoke(field.get(null), Context::class.java) as Context
     }
 }
