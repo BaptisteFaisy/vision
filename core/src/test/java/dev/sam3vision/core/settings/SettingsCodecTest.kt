@@ -121,6 +121,7 @@ class SettingsCodecTest {
         val legacy = SettingsCodec.encode(Settings.Default).lines()
             .filterNot { it.startsWith("caregiverRole=") }
         assertEquals(CaregiverRole.Blind, SettingsCodec.decode(legacy.joinToString("\n")).caregiverRole)
+    }
 
     @Test
     fun `les distances et le fov survivent a un aller-retour`() {
