@@ -89,7 +89,6 @@ vec4 orb(vec2 fc) {
   float edge = smoothstep(1.0, 1.006, d) * smoothstep(1.03, 1.0, d);
   col = mix(col, col * 0.86, float(edge));
   float alpha = 1.0 - smoothstep(1.0 - aa, 1.0 + aa, d);
-  col = vec3(dot(col, vec3(0.2126, 0.7152, 0.0722)));
   return vec4(col * float(alpha), float(alpha));
 }
 
