@@ -16,6 +16,16 @@ dans un écran démo (Réglages → « Segment demo » ou
 - Le direct actuel n'est pas touché : l'intégration Live (masques vers
   `/live`) est l'étape suivante, pas celle-ci.
 
+## Couleurs et guidage (écran démo)
+
+- Overlay : **vert = on marche** (zone praticable), **rouge translucide = on
+  ne marche pas** (la scène reste lisible dessous), **voies jaunes** (visibles
+  sur le rouge comme sur le vert).
+- `WalkGuide` (core, pur) découpe la moitié basse du masque en tiers
+  gauche/centre/droite : le tiers le plus praticable donne la flèche (↑ → ←),
+  sous 25 % partout = ■ obstacle. La démo affiche la flèche en grand, le
+  conseil dans la ligne d'état et `walk=` dans la ligne `twinlite:` logcat.
+
 ## Contrat du modèle (vérifié le 2026-10-28, LiteRT sur image route)
 
 - Fichier : `twinlite.tflite` (3 084 552 o, fp32), release
