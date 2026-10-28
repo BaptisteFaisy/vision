@@ -68,9 +68,10 @@ class OnnxDepthEstimator private constructor(
         private val IMAGE_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
 
         /**
-         * Session ouverte sur le fichier téléchargé (puis l'asset embarqué en
-         * repli dev), `null` si le modèle est absent : le sélecteur essaie
-         * alors le moteur suivant.
+         * Session CPU ouverte sur le fichier téléchargé (puis l'asset embarqué
+         * en repli dev), `null` si le modèle est absent : le sélecteur essaie
+         * alors le moteur suivant. NNAPI essayé le 2026-10-28 : session OK et
+         * bit-identique au CPU, mais jamais plus rapide en dos-à-dos — CPU seul.
          */
         fun open(context: Context): DepthEstimator? {
             val weights = readStoreFile(context) ?: readAsset(context, ASSET_NAME) ?: return null
