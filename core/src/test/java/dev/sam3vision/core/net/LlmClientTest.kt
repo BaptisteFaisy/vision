@@ -66,7 +66,7 @@ class LlmClientTest {
             assertEquals("/chat/completions", request.path)
             assertEquals("Bearer $TEST_KEY", request.headers["authorization"])
             val body = JSONObject(request.body)
-            assertEquals("meta-models/muse-spark-open-1026", body.getString("model"))
+            assertEquals("ali/qwen3.8-omni-flash", body.getString("model"))
             assertEquals(0.2, body.getDouble("temperature"), 0.001)
             val parts = body.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
             assertEquals("data:image/jpeg;base64,QUJD", parts.getJSONObject(1).getJSONObject("image_url").getString("url"))
