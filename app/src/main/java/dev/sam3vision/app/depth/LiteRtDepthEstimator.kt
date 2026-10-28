@@ -18,8 +18,9 @@ import java.nio.ByteOrder
  * entrée 256×256 → carte 256×256. Modèle absent ou inférence tombée ⇒
  * `Result.failure` avec un message explicite (lu par le banc embarqué).
  *
- * Pas de délégué GPU en phase 1 (le CPU suffit au budget du direct, 350-900 ms
- * — le banc tranche) ; artefact `org.tensorflow:tensorflow-lite` (le
+ * CPU seul : délégués mesurés le 2026-10-28 (NNAPI 578/574 ms contre 490/568 ms
+ * CPU en dos-à-dos — aucun gain ; GPU : classes Java absentes de l'artefact
+ * 2.17 à l'exécution). Artefact `org.tensorflow:tensorflow-lite` (le
  * `com.google.ai.edge.litert:litert:2.3.x` est en metadata Kotlin 2.4,
  * illisible par le Kotlin 2.2 du projet).
  */
@@ -57,16 +58,15 @@ class LiteRtDepthEstimator private constructor(
         private const val INPUT_SIZE = 256
 
         /**
-         * Interpréteur ouvert sur le fichier téléchargé (puis l'asset en repli
-         * dev), `null` si le modèle est absent : le sélecteur rend alors un
-         * estimateur « modèle manquant » explicite.
+         * Interpréteur CPU ouvert sur le fichier téléchargé (puis l'asset en
+         * repli dev), `null` si le modèle est absent : le sélecteur rend alors
+         * un estimateur « modèle manquant » explicite.
          */
         fun open(context: Context): DepthEstimator? {
             val model = modelBuffer(context, ASSET_NAME) ?: return null
             val options = Interpreter.Options()
             options.setNumThreads(4)
-            val interpreter = Interpreter(model, options)
-            return LiteRtDepthEstimator(interpreter)
+            return LiteRtDepthEstimator(Interpreter(model, options))
         }
 
         /**
