@@ -28,21 +28,35 @@ object DepthEstimators {
     }
 
     private fun openDa2(context: Context): DepthEstimator {
-        val estimator = runCatching { OnnxDepthEstimator.open(context) }.getOrNull()
+        val outcome = runCatching { OnnxDepthEstimator.open(context) }
+        val estimator = outcome.getOrNull()
         if (estimator != null) return estimator
-        return MissingAssetEstimator(
-            DepthBackend.DA2,
-            "asset manquant : ${OnnxDepthEstimator.ASSET_NAME}",
-        )
+        val failure = outcome.exceptionOrNull()
+        var reason = "asset manquant : ${OnnxDepthEstimator.ASSET_NAME}"
+        if (failure != null) {
+            Log.i(DepthBench.TAG, "DA2-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
+            val detail = failure.message
+            if (detail != null) {
+                reason = "ouverture DA2 : $detail"
+            }
+        }
+        return MissingAssetEstimator(DepthBackend.DA2, reason)
     }
 
     private fun openMidas(context: Context): DepthEstimator {
-        val estimator = runCatching { LiteRtDepthEstimator.open(context) }.getOrNull()
+        val outcome = runCatching { LiteRtDepthEstimator.open(context) }
+        val estimator = outcome.getOrNull()
         if (estimator != null) return estimator
-        return MissingAssetEstimator(
-            DepthBackend.MIDAS,
-            "asset manquant : ${LiteRtDepthEstimator.ASSET_NAME}",
-        )
+        val failure = outcome.exceptionOrNull()
+        var reason = "asset manquant : ${LiteRtDepthEstimator.ASSET_NAME}"
+        if (failure != null) {
+            Log.i(DepthBench.TAG, "MIDAS-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
+            val detail = failure.message
+            if (detail != null) {
+                reason = "ouverture MiDaS : $detail"
+            }
+        }
+        return MissingAssetEstimator(DepthBackend.MIDAS, reason)
     }
 }
 

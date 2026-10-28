@@ -144,6 +144,16 @@ android {
         buildConfig = true
     }
 
+    // Profondeur : DA2 embarqué en .ort (prouvé sur Redmi : le paquet -mobile
+    // refuse le .onnx par ORT_INVALID_ARGUMENT et ne sait pas exécuter le
+    // ConvInteger quantifié — ORT_NOT_IMPLEMENTED — d'où le paquet ORT
+    // complet). Les deux modèles restent stockés bruts (lecture fiable des
+    // gros assets + mmap).
+    androidResources {
+        noCompress.add("onnx")
+        noCompress.add("ort")
+    }
+
     // Tests JVM du module app : `Log`, `SystemClock` et `Bitmap` rendent leur valeur par
     // défaut au lieu de lever « not mocked » — les sondes iSee se testent sans appareil.
     testOptions {
@@ -205,7 +215,7 @@ dependencies {
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
     // Profondeur embarquée : DA2 Small (ONNX, primaire) + MiDaS small (LiteRT, repli).
-    implementation(libs.onnxruntime.mobile)
+    implementation(libs.onnxruntime.android)
     implementation(libs.litert)
 
     testImplementation(libs.junit)
