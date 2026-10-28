@@ -151,7 +151,7 @@ class UiLogicTest {
             Route.Isee, Route.Capture, Route.Analysis, Route.Chat,
             Route.Live, Route.Settings, Route.Caregiver, Route.Onboarding,
             Route.Bench, Route.Tap(true), Route.Tap(false), Route.VoiceNav,
-            Route.Segment,
+            Route.NanoDet, Route.Segment,
         )
         routes.forEach { assertEquals(it, routeFromName(routeToName(it))) }
         assertEquals(Route.Isee, routeFromName("inconnue"))

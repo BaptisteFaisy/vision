@@ -19,6 +19,7 @@ import dev.sam3vision.core.settings.Settings
 internal fun ClassicScreens(
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenNanoDet: () -> Unit,
     onOpenSegment: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -30,6 +31,7 @@ internal fun ClassicScreens(
         )
         GlassButton("Direct mode (continuous video)", true, false, onOpenLive)
         GlassButton("Classic home (photo + analysis)", true, false, onOpenClassic)
+        GlassButton("NanoDet demo (on-device detection)", true, false, onOpenNanoDet)
         GlassButton("Segment demo (walkable area)", true, false, onOpenSegment)
     }
 }
