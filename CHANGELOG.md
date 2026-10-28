@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — direct : escaliers câblés à la ligne d'état + façade sol (ordre user)
+
+- `StairsFeed` (`core/.../stairs/`, pur JVM) : luma 256×103 → `StairDetector` +
+  `StairWatcher` → phrase tenue 3 s ; branché dans `LiveLocalOverlayWiring.tick`
+  (0 ligne dans `LiveViewModel`, déjà à 498/500), publié dans
+  `LiveUiState.stairsLine` → ligne d'état (changement seul, pas de recompo 30 ips).
+- `GroundPipeline` (`core/.../ground/`) : façade d'une frame (nuage → RANSAC →
+  labels → régions → risque → rapport) + `PointClouds.gathered` (prod, le helper
+  de test délègue) ; non branchée au direct (pas de profondeur dans la boucle
+  live — TODO cadence `LiveDepthMeter`).
+- Voix escaliers : TODO (ni scope ni annonceur dans le câblage overlay).
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630
+  (`StairsFeedTest` 5/5, `GroundPipelineTest` 3/3, `LiveStateTest` +2),
+  `check-kotlin-limits` OK. Seuils MIT à recalibrer sur captures téléphone.
+
 ## 2026-10-28 — direct : 10 dangers extérieurs par défaut, plafond 16 (ordre user)
 
 - `LivePrompts.default` : `person, car, bicycle, electric scooter, pole, sidewalk,

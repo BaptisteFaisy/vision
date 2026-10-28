@@ -87,23 +87,7 @@ object SyntheticScene {
 
     /** Rassemble les points valides du [mask] en tableaux candidats. */
     fun gather(cloud: PointCloud, mask: BooleanArray): Candidates {
-        var count = 0
-        for (i in mask.indices) {
-            if (mask[i] && cloud.valid[i]) count++
-        }
-        val xs = FloatArray(count)
-        val ys = FloatArray(count)
-        val zs = FloatArray(count)
-        val rows = IntArray(count)
-        var k = 0
-        for (i in mask.indices) {
-            if (!mask[i] || !cloud.valid[i]) continue
-            xs[k] = cloud.xs[i]
-            ys[k] = cloud.ys[i]
-            zs[k] = cloud.zs[i]
-            rows[k] = i / cloud.width
-            k++
-        }
-        return Candidates(xs, ys, zs, rows)
+        val got = PointClouds.gathered(cloud, mask)
+        return Candidates(got.xs, got.ys, got.zs, got.rows)
     }
 }
