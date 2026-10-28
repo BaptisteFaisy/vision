@@ -203,4 +203,16 @@ class IseeSceneTest {
         assertEquals(0f, ready.amp, 0f)
         assertEquals(0.34f, ready.level, 1e-4f)
     }
+
+    @Test
+    fun `l'horloge de scene avance en secondes et boucle a 10 min`() {
+        assertEquals(0f, sceneTimeSeconds(1000L, 1000L), 0f)
+        assertEquals(1.5f, sceneTimeSeconds(1000L, 2500L), 0f)
+        assertEquals(300f, sceneTimeSeconds(100L, 300_100L), 0f)
+        assertEquals(0f, sceneTimeSeconds(0L, SCENE_LOOP_MS), 0f)
+        assertEquals(0.016f, sceneTimeSeconds(0L, SCENE_LOOP_MS + 16L), 1e-6f)
+        val ticks = (0..600).map { sceneTimeSeconds(0L, it * 1000L) }
+        assertTrue(ticks.all { it in 0f..600f })
+        assertTrue(ticks.zipWithNext().all { (a, b) -> b > a || b == 0f })
+    }
 }
