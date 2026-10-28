@@ -34,7 +34,8 @@ proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
   (téléchargement + vérification sha256), `DepthSettings.kt`
   (Réglages → Profondeur). Modèle absent ⇒ message + téléchargement au
   premier test, jamais de crash.
-- Réglage `depthBackend` (défaut **coupé**), persisté dans les deux stores.
+- Réglage `depthBackend` (défaut **AUTO** = DA2 puis MiDaS, seuil < 200 ms
+  tenu : 174 ms mesurés sur Redmi), persisté dans les deux stores.
 - Contrainte d'écriture (parseur UBS, exit 2 sinon) : pas de `while`
   (`for` bornés + `break`), pas de `if`-expression (instructions + retours),
   pas de sélection de propriété sur ressource fermable (lire le modèle en
@@ -50,6 +51,22 @@ depuis `<filesDir>/depth-models`. Hors-ligne ⇒ message « réseau indisponible
 le banc ne tourne pas dans le vide. Dev hors-ligne : poser les fichiers en
 assets (mêmes noms) — le fichier téléchargé gagne, l'asset suit en repli.
 
+## Guidage (direct)
+
+Les mètres profondeur alimentent le direct existant (pastilles, voix,
+consignes « personne à 2 mètres à midi, va à gauche », flèches) :
+- `:core` `depth/DepthReadings.kt` (pur, testé) : médiane de proximité par
+  boîte, échelle calibrée par les ancres sténopé (médiane des
+  mètres × proximité), remplace le sténopé quand elle mesure (même sans
+  hauteur connue : trottoirs, murs), l'ajoute quand il est muet, le garde
+  sinon. Mètres bornés [0,3 m, 60 m].
+- `:app` `depth/LiveDepthMeter.kt` : infère la dernière frame JPEG en fond
+  (~5 Hz), moteur paresseux (téléchargement puis ouverture), carte de plus
+  d'une seconde = repli sténopé. OFF = zéro coût.
+- `LiveProbe.publish` : `offer(jpegB64)` puis `readingsFor` avant
+  pastilles/voix/consignes (3 lignes) ; voix et flèches inchangées (une
+  seule voix, le danger parle d'abord).
+
 ## Banc et recette (téléphone réel, jamais d'émulateur)
 
 1. `build-serveur <worktree>` puis installation sur le téléphone du créneau
@@ -59,5 +76,6 @@ assets (mêmes noms) — le fichier téléchargé gagne, l'asset suit en repli.
    (télécharge le modèle au premier appui : ~26 Mo DA2, ~63 Mo MiDaS).
 3. Verdict : bas de page + `phone-adb -s $PHONE_SERIAL logcat -d | grep DepthBench`
    (`backend=DA2 medianMs=… runs=5 map=252x252`).
-4. Seuil : médiane < 200 ms pour activer par défaut ; sinon le repli MiDaS
-   est mesuré, puis câblage aux pastilles (phase 2, hors périmètre ici).
+4. Seuil < 200 ms tenu (DA2 : 174 ms) : actif par défaut (AUTO) depuis le
+   câblage guidage — pastilles, voix et consignes reçoivent les mètres
+   affinés, OFF reste disponible dans les Réglages.
