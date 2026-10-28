@@ -3,6 +3,8 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## DRILL multipass 28/10 (commit 1) : ligne volontairement en conflit
+
 ## 2026-10-28 — caregiver : bleu et vert, proportions et badge Portrait
 
 - Roue dentée noire, état dans une pastille arrondie comme sur la page blind person.
