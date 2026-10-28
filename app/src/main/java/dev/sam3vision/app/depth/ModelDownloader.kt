@@ -99,7 +99,6 @@ object ModelDownloader {
         spec: DepthModelSpec,
         dir: String = DepthModelStore.DIR,
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
-        dir: String = DepthModelStore.DIR,
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             val store = File(appDir, dir)
