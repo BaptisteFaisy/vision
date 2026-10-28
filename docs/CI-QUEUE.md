@@ -29,7 +29,8 @@ Les builds natifs (`apk` = `:app:assembleDebug` + artefact sur `master`,
 vivaient dans `ci.yml` jusqu'au 2026-10-28 : 4 jobs × N PRs saturaient les
 runners (file jusqu'à 10 min, budget wall-clock cassé). Ils ont déménagé
 dans `ci-native.yml`, vérifiés à chaque push sur `master`, à chaque tag et
-sur demande manuelle — même `timeout-minutes: 5`, mêmes commandes.
+sur demande manuelle — `timeout-minutes: 10` (hors PR : cache froid possible),
+mêmes commandes.
 
 Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et testé avec `:app`
 (`:app:assembleDebug` au job `apk` de `ci-native.yml`, ses tests JVM dans
