@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -113,6 +114,122 @@ class SplitHunksTest(unittest.TestCase):
         self.assertEqual(len(hunks), 1)
         self.assertEqual(hunks[0]["saved"], ["BRANCHE"])
         self.assertEqual(hunks[0]["head"], ["MASTER"])
+
+
+def _scratch_repo(test):
+    """Dépôt git réel en temp, cwd dedans, nettoyé après. Rend run()."""
+    repo = tempfile.mkdtemp(prefix="fw-loop-")
+    test.addCleanup(shutil.rmtree, repo, True)
+    old = os.getcwd()
+    test.addCleanup(os.chdir, old)
+    os.chdir(repo)
+    def run(*args):
+        return subprocess.run(["git", *args], capture_output=True, text=True)
+    run("init", "-q")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    run("config", "commit.gpgsign", "false")
+    return run
+
+
+def _commit(run, files, message):
+    for path, content in files.items():
+        with open(path, "w") as fh:
+            fh.write(content)
+    run("add", ".")
+    assert run("commit", "-qm", message).returncode == 0
+
+
+class RebaseLoopTest(unittest.TestCase):
+    """Boucle multi-passes : chaque arrêt est résolu, puis poussé."""
+
+    def test_rebase_in_progress_suit_le_rebase(self):
+        run = _scratch_repo(self)
+        _commit(run, {"f.txt": "base\n"}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        self.assertFalse(conflict_agent.rebase_in_progress())
+        run("checkout", "-qb", "br")
+        _commit(run, {"f.txt": "BR\n"}, "br")
+        run("checkout", "-q", base_branch)
+        _commit(run, {"f.txt": "M\n"}, "m")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertTrue(conflict_agent.rebase_in_progress())
+        run("rebase", "--abort")
+        self.assertFalse(conflict_agent.rebase_in_progress())
+
+    def test_boucle_deux_arrets(self):
+        # Non-régression 28/10 : #125 a deux commits en conflit, l'ancien
+        # code échouait au premier --continue ("Resolve all conflicts").
+        run = _scratch_repo(self)
+        _commit(run, {"f.txt": "base\n", "g.txt": "base\n"}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        run("checkout", "-qb", "br")
+        _commit(run, {"f.txt": "BR-F\n"}, "br1")
+        _commit(run, {"g.txt": "BR-G\n"}, "br2")
+        run("checkout", "-q", base_branch)
+        _commit(run, {"f.txt": "M-F\n"}, "m1")
+        _commit(run, {"g.txt": "M-G\n"}, "m2")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        with mock.patch.object(conflict_agent, "fw_complete",
+                               return_value="```\nRESOLU\n```"):
+            resolved = conflict_agent.finish_loop(
+                "http://x", "K", "M", time.time() + 60)
+        self.assertEqual(sorted(resolved), ["f.txt", "g.txt"])
+        self.assertFalse(conflict_agent.rebase_in_progress())
+        log = run("log", "--format=%s").stdout
+        self.assertIn("br1", log)
+        self.assertIn("br2", log)
+
+    def test_commit_vide_skip(self):
+        # La résolution reprend le bord master : le commit rejoué est vide,
+        # --continue échoue ("empty") et la boucle le saute.
+        run = _scratch_repo(self)
+        _commit(run, {"f.txt": "X\n"}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        run("checkout", "-qb", "br")
+        _commit(run, {"f.txt": "Y\n"}, "br")
+        run("checkout", "-q", base_branch)
+        _commit(run, {"f.txt": "Z\n"}, "m")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        with mock.patch.object(conflict_agent, "fw_complete",
+                               return_value="```\nZ\n```"):
+            conflict_agent.finish_loop("http://x", "K", "M",
+                                       time.time() + 60)
+        self.assertFalse(conflict_agent.rebase_in_progress())
+        log = run("log", "--format=%s").stdout
+        self.assertNotIn("br", log.splitlines())
+        with open("f.txt") as fh:
+            self.assertEqual(fh.read().strip(), "Z")
+
+    def test_borne_max_rounds(self):
+        # Un conflit qui ne part pas (résolution sans effet) abandonne
+        # après MAX_ROUNDS au lieu de boucler.
+        run = _scratch_repo(self)
+        _commit(run, {"f.txt": "base\n"}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        run("checkout", "-qb", "br")
+        _commit(run, {"f.txt": "BR\n"}, "br")
+        run("checkout", "-q", base_branch)
+        _commit(run, {"f.txt": "M\n"}, "m")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        with mock.patch.object(conflict_agent, "resolve_one",
+                               return_value=None):
+            with self.assertRaises(conflict_agent.AgentError) as ctx:
+                conflict_agent.finish_loop("http://x", "K", "M",
+                                           time.time() + 60)
+        self.assertIn("arrêts", str(ctx.exception))
 
 
 if __name__ == "__main__":
