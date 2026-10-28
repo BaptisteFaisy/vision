@@ -5,6 +5,7 @@ import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.DepthEstimator
 import dev.sam3vision.core.depth.DepthMap
 import dev.sam3vision.core.depth.DepthResult
+import dev.sam3vision.core.depth.SerialRunGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.Interpreter
@@ -26,6 +27,7 @@ import java.nio.ByteOrder
  */
 class LiteRtDepthEstimator private constructor(
     private val interpreter: Interpreter,
+    private val guard: SerialRunGuard = SerialRunGuard(),
 ) : DepthEstimator {
 
     override val backend: DepthBackend = DepthBackend.MIDAS
@@ -39,7 +41,8 @@ class LiteRtDepthEstimator private constructor(
                 val input = DepthPreprocess.normalizeHWC(resized, DepthPreprocess.INPUT_SIZE)
                 val output = directBytes(INPUT_SIZE * INPUT_SIZE * 4)
                 val started = android.os.SystemClock.elapsedRealtime()
-                interpreter.run(input, output)
+                // Sérialisé : `Interpreter` non thread-safe (même garde ONNX).
+                guard.run { interpreter.run(input, output) }.getOrThrow()
                 val elapsed = android.os.SystemClock.elapsedRealtime() - started
                 val values = FloatArray(INPUT_SIZE * INPUT_SIZE)
                 output.rewind()
@@ -49,7 +52,8 @@ class LiteRtDepthEstimator private constructor(
         }
 
     override fun close() {
-        interpreter.close()
+        // Reportée si un run est en vol : jamais de `close()` pendant `run()`.
+        guard.close { interpreter.close() }
     }
 
     companion object {
