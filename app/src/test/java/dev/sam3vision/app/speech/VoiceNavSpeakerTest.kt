@@ -158,6 +158,34 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
+    fun `danger coupe la consigne en cours`() {
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 100f)
+
+        val phrase = voice.onHazard("Personne à 2 mètres à midi, va à gauche.")
+
+        assertEquals("Personne à 2 mètres à midi, va à gauche.", phrase)
+        assertEquals(2, driver.calls.size)
+        assertTrue(driver.calls[1].flush)
+    }
+
+    @Test
+    fun `danger blanc silencieux`() {
+        val driver = FakeSpeakerDriver()
+
+        assertNull(speaker(driver).onHazard("   "))
+        assertTrue(driver.calls.isEmpty())
+    }
+
+    @Test
+    fun `danger refuse par le moteur vaut silence`() {
+        val voice = speaker(FakeSpeakerDriver(fail = true))
+
+        assertNull(voice.onHazard("Personne à 2 mètres à midi, va à gauche."))
+    }
+
+    @Test
     fun `arret et liberation delegues au moteur`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
