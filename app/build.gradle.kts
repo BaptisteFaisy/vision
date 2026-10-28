@@ -225,6 +225,8 @@ dependencies {
     // Profondeur embarquée : DA2 Small (ONNX, primaire) + MiDaS small (LiteRT, repli).
     implementation(libs.onnxruntime.android)
     implementation(libs.litert)
+    // Segmentation TwinLiteNet : GPU d'abord (graphe délégable), CPU en repli.
+    implementation(libs.litert.gpu)
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
