@@ -8,6 +8,7 @@ import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.perms.hasPerm
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
+import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.ValhallaRouteLoader
 import dev.sam3vision.app.voicenav.VoiceNavEngineDriver
 import dev.sam3vision.app.voicenav.VoiceNavSession
@@ -83,8 +84,13 @@ class IseeVoiceNav(
     /**
      * Quitter l'écran navigation : confirmation annulée ou guidage arrêté
      * (annonce « Guidage arrêté » + moteur coupé via le repos de session).
+     * Le service de fond est toujours coupé aussi : après une rotation, la
+     * mise en fond l'a démarré et la sortie d'écran suit aussitôt — sans ça
+     * il resterait orphelin. En fond maintenu, le tracker et la voix du
+     * pilote continuent seuls (rien ne les coupe) jusqu'à ce retour.
      */
     fun dismiss() {
+        GuidanceLifecycle.stopBackground(context)
         session.cancelConfirmation()
         scope.launch { session.stopGuidance() }
     }
