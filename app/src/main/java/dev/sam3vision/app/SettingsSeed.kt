@@ -2,6 +2,10 @@ package dev.sam3vision.app
 
 import dev.sam3vision.core.settings.SamRegion
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.settings.SettingsStore
+import dev.sam3vision.core.share.isLegacyRelayUrl
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Valeurs injectées au build (LLM, voix ElevenLabs, dictée Meta), lues dans le
@@ -37,9 +41,61 @@ internal data class BuildDefaults(
 fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.FromBuild)
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
-internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
-    seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build),
-), build), build)
+internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShareRelay(
+    seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
+        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build),
+    ), build), build),
+)
+
+/**
+ * Le suivi passe du site abandonné au relais de l'app, et l'identité du flux naît avec
+ * l'installation : identifiant unique par téléphone (sinon deux proches partageraient
+ * « leo » et le premier écraserait le second) et clé d'écriture liée à ce flux. Plus
+ * rien à saisir après l'installation ; une valeur choisie à la main est conservée.
+ */
+internal fun seedShareRelay(
+    loaded: Settings,
+    newKey: () -> String = ::defaultShareKey,
+    newId: () -> String = ::defaultShareId,
+): Settings {
+    val base = loaded.parentSiteUrl
+    val migrated = if (base.isBlank() || isLegacyRelayUrl(base)) {
+        loaded.copy(parentSiteUrl = Settings.DEFAULT_PARENT_SITE_URL)
+    } else {
+        loaded
+    }
+    val unique = if (migrated.shareId.trim().lowercase() == Settings.DEFAULT_SHARE_ID) {
+        migrated.copy(shareId = newId())
+    } else {
+        migrated
+    }
+    if (unique.shareWriteKey.isNotBlank()) return unique
+    return unique.copy(shareWriteKey = newKey())
+}
+
+/** Sérialise le scellement : deux écrans peuvent charger les réglages en même temps. */
+private val sealLock = Mutex()
+
+/**
+ * Charge les réglages et **scelle l'identité de partage** : l'identifiant du flux et la
+ * clé d'écriture naissent une seule fois, puis sont enregistrés. `seededFromBuild` seul
+ * en fabriquait de nouveaux à chaque lancement — le relais liait alors la clé du premier
+ * envoi et refusait tous les suivants (403), le symptôme même qu'on répare ici.
+ */
+suspend fun loadedSettings(store: SettingsStore): Settings = sealLock.withLock {
+    val loaded = store.load()
+    val seeded = seededFromBuild(loaded)
+    val identityChanged = seeded.shareId != loaded.shareId || seeded.shareWriteKey != loaded.shareWriteKey
+    if (identityChanged) store.save(seeded)
+    seeded
+}
+
+/** Clé d'écriture de ce téléphone : 32 hexadécimaux, liés au flux au premier envoi. */
+internal fun defaultShareKey(): String = java.util.UUID.randomUUID().toString().replace("-", "")
+
+/** Identifiant de flux de ce téléphone : 12 hexadécimaux, un par installation. */
+internal fun defaultShareId(): String =
+    java.util.UUID.randomUUID().toString().replace("-", "").take(12)
 
 /** L'installation et la mise à jour remplissent la clé de carte tant qu'elle est vide. */
 internal fun seedGoogleMaps(loaded: Settings, build: BuildDefaults): Settings =

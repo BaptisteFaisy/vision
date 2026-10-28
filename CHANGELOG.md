@@ -3,6 +3,34 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — suivi : la carte caregiver de l'app reçoit enfin le proche
+
+- **Cause mesurée** : le relais du site (`suivi-parent.vercel.app`, déploiement figé
+  au 27/10 21 h 03) répondait `403 clé invalide` à chaque `POST /api/share` d'une
+  installation neuve (`shareWriteKey` vide par défaut) : aucun état stocké, donc
+  carte vide, sans message ni côté proche ni côté caregiver.
+- `suivi-relais/` : relais dédié à l'app (Worker + D1), **un état par identifiant
+  de flux**, contrat inchangé (`POST /api/share`, `GET /api/state`) pour la page
+  embarquée. La clé d'écriture est liée au flux au premier envoi (403 pour une
+  autre clé) ; `SHARE_WRITE_KEY` reste un verrou global optionnel.
+- `Settings.DEFAULT_PARENT_SITE_URL` pointe sur ce relais ; `seedShareRelay`
+  migre l'ancienne URL Vercel et génère à l'installation un **identifiant de flux
+  unique** (sinon deux proches partageaient « leo ») et la clé d'écriture liée à
+  ce flux — plus rien à saisir. `loadedSettings` les **enregistre** au premier
+  chargement (`seededFromBuild` seul en fabriquait de nouveaux à chaque lancement,
+  donc le relais aurait refusé tout envoi après le premier). Conséquence : l'ancien
+  lien « leo » ne suit plus rien, le proche doit renvoyer son lien une fois.
+- Lien caregiver : l'identifiant d'un ancien lien (`?share=`) est reconstruit sur
+  le relais (`shareIdOf` / `relayShareLink`) ; une URL sans identifiant ne
+  sélectionne jamais le flux local.
+- `ShareReporter` rend un résultat (`Sent` / `Skipped` / `Refused(code)` /
+  `Unreachable`) au lieu d'un booléen avalé : Réglages affiche le refus, le relais
+  injoignable ou la localisation coupée (`ShareHealth`).
+- Preuves : `node --test suivi-relais/test/relais.test.mjs` 8/8 ; en production
+  (`site-1607fe95049a481989380f019f9067f3.freebuff.page`) deux flux isolés, écriture
+  sans clé 200, clé étrangère 403, flux inconnu `live:false`.
+- Limite connue : le relais ne sert pas la page HTML, donc un lien ouvert dans un
+  navigateur ne montre pas la carte (l'app, elle, l'affiche).
 ## 2026-10-28 — direct : escaliers câblés à la ligne d'état + façade sol (ordre user)
 
 - `StairsFeed` (`core/.../stairs/`, pur JVM) : luma 256×103 → `StairDetector` +

@@ -23,14 +23,6 @@ const val MAX_SHARED_TEXT = 2_000
 fun canPublishShare(settings: Settings): Boolean =
     settings.shareEnabled && settings.caregiverRole == CaregiverRole.Blind
 
-/** Un caregiver choisit le flux du lien reçu, jamais l'identifiant local de son téléphone. */
-fun validatedShareLink(value: String): String? {
-    val url = value.trim().toHttpUrlOrNull() ?: return null
-    val id = url.queryParameter("share") ?: return null
-    if (!Regex("[a-z0-9-]{1,32}").matches(id)) return null
-    return url.toString()
-}
-
 /** Le lien partagé peut avoir une query ; le relais reste à la racine de son origine. */
 fun shareEndpoint(siteUrl: String): String? = siteUrl.trim().toHttpUrlOrNull()
     ?.newBuilder()?.encodedPath("/api/share")?.query(null)?.fragment(null)?.build()?.toString()

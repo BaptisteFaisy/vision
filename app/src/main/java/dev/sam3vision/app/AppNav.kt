@@ -237,7 +237,7 @@ private fun RouteHost(
         Route.Chat -> ChatRoute(state, viewModel, pop)
         is Route.Tap -> TapCaptureScreen(state.settings, pop, route.autoStart)
         Route.Caregiver -> CaregiverScreen(
-            link = dev.sam3vision.core.share.validatedShareLink(caregiverShareLink(state.settings)).orEmpty(),
+            link = caregiverShareLink(state.settings),
             onBack = onCaregiverBack,
             mapsKey = state.settings.googleMapsApiKey,
         )

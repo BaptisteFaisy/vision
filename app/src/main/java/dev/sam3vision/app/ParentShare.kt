@@ -6,9 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.settings.parseCaregiverInvite
-import dev.sam3vision.core.share.validatedShareLink
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import dev.sam3vision.core.share.relayShareLink
+import dev.sam3vision.core.share.shareIdOf
 import java.net.URLEncoder
 
 /**
@@ -40,42 +39,23 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
 }
 
 /**
- * Seul un lien ou code reçu choisit le suivi ; l'identifiant de ce téléphone
- * ne doit jamais servir à deviner celui du proche. Un ancien lien complet
- * enregistré dans parentSiteUrl reste utilisable après mise à jour.
+ * Seul l'identifiant reçu choisit le suivi : ni le flux local de ce téléphone, ni
+ * l'origine du lien ne décident quoi afficher. Le lien est reconstruit sur le relais
+ * de l'app, donc un ancien lien `suivi-parent.vercel.app` désigne encore le bon
+ * proche alors que ce site ne sert plus la carte.
  */
-fun caregiverShareLink(settings: Settings): String {
-    val raw = settings.caregiverInvite.trim()
-    validatedShareLink(raw)?.let { return it }
-    val invite = parseCaregiverInvite(raw)
-        ?: return validatedShareLink(settings.parentSiteUrl).orEmpty()
-    if (invite.siteUrl.isNotBlank() || invite.shareId.isBlank()) return ""
-    val site = settings.parentSiteUrl.toHttpUrlOrNull() ?: return ""
-    val id = normalizeShareId(invite.shareId)
-    return validatedShareLink(site.newBuilder().setQueryParameter("share", id).build().toString()).orEmpty()
-}
+fun caregiverShareLink(settings: Settings): String =
+    shareIdOf(settings.caregiverInvite)?.let { relayShareLink(it) }
+        ?: shareIdOf(settings.parentSiteUrl)?.let { relayShareLink(it) }
+        ?: ""
 
 /**
- * Lien envoyé au proche : le site lit `?share=` pour ouvrir le bon flux.
- * Un lien déjà paramétré (token manuel) est conservé tel quel.
+ * Lien envoyé au proche : le relais lit `?share=` pour ouvrir le bon flux, sur la
+ * base des réglages (relais de l'app par défaut).
  */
 fun shareLink(siteUrl: String, shareId: String): String {
-    val base = siteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
-    val id = normalizeShareId(shareId).ifBlank { Settings.DEFAULT_SHARE_ID }
-    if (base.contains("?share=") || base.contains("&share=")) return base
-    val sep = if (base.contains("?")) "&" else "?"
-    return base.trim().trimEnd('/') + sep + "share=" + id
-}
-
-/**
- * Identifiant de flux assaini : le relais n'accepte que `[a-z0-9-]{1,32}`
- * (`validatedShareLink` côté lecture) et lit `?share=` tel quel. Sans ça,
- * « Léo » partait en POST mais répondait 400, pendant que la page lisait un
- * autre flux — suivi noir des deux côtés, sans un mot d'erreur.
- */
-fun normalizeShareId(raw: String): String {
-    val ascii = java.text.Normalizer.normalize(raw.trim().lowercase(), java.text.Normalizer.Form.NFD)
-    return ascii.replace(Regex("[\u0300-\u036f]"), "")
+    val id = shareId.ifBlank { Settings.DEFAULT_SHARE_ID }
+    return relayShareLink(id, siteUrl) ?: relayShareLink(id) ?: Settings.DEFAULT_PARENT_SITE_URL
 }
 
 /** Lance un partage ; `false` si aucune app ne le prend en charge. */
