@@ -83,12 +83,6 @@ private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
             }
         }
     }
-    Text(
-        "Also adjustable by voice on iSee: « speed 1.5 », « speak faster », " +
-            "« slow down », « normal speed ».",
-        color = SettingsLight.muted,
-        fontSize = 11.sp,
-    )
 }
 
 /**
@@ -101,48 +95,20 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
         label = "Read replies automatically",
         checked = draft.ttsAutoplay,
     ) { onChange(draft.copy(ttsAutoplay = it)) }
-    Text(
-        "On: every chat reply is read as soon as it arrives. Off: 🔊 button only.",
-        color = SettingsLight.muted,
-        fontSize = 11.sp,
-    )
     SwitchRow(
         label = "Announce objects and their distance",
         checked = draft.ttsAnnouncePositions,
     ) { onChange(draft.copy(ttsAnnouncePositions = it)) }
-    Text(
-        "On: in Direct mode (and after a photo analysis), the voice says where " +
-            "objects are and how far — « Person at 9 o'clock, 1.4 meters; dog at " +
-            "noon, 3 meters ». At most one announcement every 4 s, and only when the " +
-            "scene changes: an object coming one meter closer is re-announced.",
-        color = SettingsLight.muted,
-        fontSize = 11.sp,
-    )
     SwitchRow(
         label = "Guide straight ahead (iSee camera)",
         checked = draft.ttsGuidanceStraight,
     ) { onChange(draft.copy(ttsGuidanceStraight = it)) }
-    Text(
-        "On: the camera page speaks the walking instruction instead of positions — " +
-            "« Keep going straight. » or « Person 2 meters away at noon, go left. ». " +
-            "Computed on the phone from SAM, no LLM call; an obstacle entering the " +
-            "corridor speaks up at once, even before the 4 s.",
-        color = SettingsLight.muted,
-        fontSize = 11.sp,
-    )
 }
 
 /** "Intro" switch + its explanation: the first message of the iSee chat. */
 @Composable
 private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     SwitchRow(label = introToggleLabel(draft.introEnabled), checked = draft.introEnabled, onChange = onChange)
-    Text(
-        "Built-in intro (Jade US voice, offline): played once at the first opening, " +
-            "as the first chat message. It is cut with a long press by dictating " +
-            "« Disable iSee intro ».",
-        color = SettingsLight.muted,
-        fontSize = 11.sp,
-    )
 }
 
 /** "Label + switch" row: a single implementation for all switches. */

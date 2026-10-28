@@ -37,12 +37,6 @@ fun VoiceLanguageSettings(draft: Settings, onChange: (Settings) -> Unit) {
                 onClick = { onChange(pickVoiceLanguage(draft, language)) },
             )
         }
-        Text(
-            "The person speaks in this language: object and distance announcements, " +
-                "chat replies read aloud.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 

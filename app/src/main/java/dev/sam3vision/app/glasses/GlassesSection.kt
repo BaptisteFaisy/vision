@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.BigButton
+import dev.sam3vision.app.SettingsLight
 import dev.sam3vision.app.StatusBanner
 
 /**
@@ -44,7 +45,7 @@ fun GlassesSection(
         Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Lunettes Ray-Ban Meta", color = AppColors.text, fontSize = 15.sp)
+        Text("Lunettes Ray-Ban Meta", color = SettingsLight.text, fontSize = 15.sp)
         GlassesStatusLines(state)
         state.message?.let { StatusBanner(it.text, bannerColor(it.kind)) }
         ProductionActions(state, onRegister, onConnect, onCapture, onDisconnect)
@@ -91,7 +92,7 @@ private fun BenchEntry() {
     val openBench = LocalBenchOpener.current ?: return
     Text(
         "Banc d'essai : session réelle ou simulée, journal, voix seule.",
-        color = AppColors.textMuted,
+        color = SettingsLight.muted,
         fontSize = 12.sp,
     )
     BigButton("Banc d'essai lunettes", true, AppColors.surfaceHigh, openBench)
@@ -107,7 +108,7 @@ private fun bannerColor(kind: MessageKind): Color = when (kind) {
 /** État technique en quatre lignes, en français lisible. */
 @Composable
 private fun GlassesStatusLines(state: GlassesUiState) {
-    statusLines(state).forEach { Text(it, color = AppColors.textMuted, fontSize = 12.sp) }
+    statusLines(state).forEach { Text(it, color = SettingsLight.muted, fontSize = 12.sp) }
 }
 
 /** Commandes de simulation, visibles uniquement en debug. */
@@ -118,7 +119,7 @@ private fun MockControls(
     onMockPress: () -> Unit,
     onStopMock: () -> Unit,
 ) {
-    Text("Démo sans matériel", color = AppColors.text, fontSize = 13.sp)
+    Text("Démo sans matériel", color = SettingsLight.text, fontSize = 13.sp)
     if (!state.mockActive) {
         BigButton("Simuler des lunettes", true, AppColors.surfaceHigh, onStartMock)
     } else {

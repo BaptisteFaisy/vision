@@ -91,9 +91,8 @@ fun BigButton(
 }
 
 /**
- * Bouton « verre » de la page Settings : fond translucide, bordure claire et ombre
- * légère — l'effet dépoli, sans dépendance de flou. [primary] teinte le bouton en
- * bleu (action principale, choix actif) ; sinon verre neutre, texte noir.
+ * Bouton de la page Settings : blanc entouré de noir au repos, noir plein
+ * (texte blanc) quand il est sélectionné ou validé ([primary]).
  */
 @Composable
 fun GlassButton(
@@ -102,10 +101,11 @@ fun GlassButton(
     primary: Boolean,
     onClick: () -> Unit,
     widthFactor: Float = 1f,
+    modifier: Modifier = Modifier,
 ) {
-    val container = if (primary) SettingsLight.primary.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.65f)
-    val content = if (primary) SettingsLight.primary else SettingsLight.text
-    val border = if (primary) SettingsLight.primary.copy(alpha = 0.45f) else SettingsLight.border
+    val container = if (primary) SettingsLight.text else Color.White
+    val content = if (primary) Color.White else SettingsLight.text
+    val border = if (enabled) SettingsLight.text else SettingsLight.border
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -118,7 +118,7 @@ fun GlassButton(
         ),
         border = BorderStroke(1.dp, border),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
-        modifier = Modifier.fillMaxWidth(widthFactor).height(54.dp),
+        modifier = modifier.fillMaxWidth(widthFactor).height(54.dp),
     ) {
         Text(
             label,

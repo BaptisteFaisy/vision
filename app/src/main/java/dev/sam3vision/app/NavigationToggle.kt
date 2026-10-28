@@ -31,11 +31,5 @@ internal fun NavigationToggle(draft: Settings, onChange: (Settings) -> Unit) {
         SwitchRow("Guide to the confirmed destination", draft.navigationGuidanceEnabled) {
             onChange(draft.copy(navigationGuidanceEnabled = it))
         }
-        Text(
-            "« Take me to the station » opens Google Maps in guidance. Off, only " +
-                "the place card shows, with no guidance started.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }

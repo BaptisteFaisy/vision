@@ -29,12 +29,6 @@ fun ObjectsSettings(draft: Settings, onChange: (Settings) -> Unit) {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            "At most $current object${if (current > 1) "s" else ""} — Direct and photo. " +
-                "Fewer objects = fewer masks, smoother Direct.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
