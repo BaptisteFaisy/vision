@@ -47,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.CameraSurface
 import dev.sam3vision.app.FirstPixelWatcher
+import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.IseePermissionFlow
 import dev.sam3vision.app.LiveDistanceLayer
 import dev.sam3vision.app.missingPermissions
@@ -280,9 +281,13 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
     LaunchedEffect(glue.host, viewModel) {
         // SAM ne voit que l'enregistrement — sauf en mode Traversée, qui analyse
         // sans enregistrer : hors ces deux cas, aucune frame n'est même convertie.
-        glue.host.wantsFrame = { sending(viewModel) && viewModel.probe.wantsFrame() }
+        // Quand les lunettes vivent, elles nourrissent seules la sonde (pont
+        // GlassesProbeWiring) : mélanger les deux vues brouillerait le guidage.
+        // (Lu au fil de l'eau : l'effet ne redémarre pas, une valeur collectée
+        // une fois resterait gelée.)
+        glue.host.wantsFrame = { !GlassesVideoLink.live.value && sending(viewModel) && viewModel.probe.wantsFrame() }
         glue.host.onFrame = { jpeg, captureAtNs ->
-            if (sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
+            if (!GlassesVideoLink.live.value && sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
         }
     }
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }

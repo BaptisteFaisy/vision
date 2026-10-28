@@ -135,6 +135,16 @@ object GlassesMessages {
         MessageKind.INFO,
         "Direct lunettes : les descriptions sont lues sur le haut-parleur.",
     )
+
+    fun videoUndecodable() = GlassesMessage(
+        MessageKind.WARNING,
+        "Vidéo des lunettes illisible : ce format n'est pas décodé, photo seule.",
+    )
+
+    fun mockConnectTimeout() = GlassesMessage(
+        MessageKind.ERROR,
+        "Lunettes simulées : enregistrement trop lent, relance la connexion.",
+    )
 }
 
 /**

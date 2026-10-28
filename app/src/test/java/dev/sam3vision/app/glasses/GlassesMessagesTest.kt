@@ -26,6 +26,7 @@ class GlassesMessagesTest {
         GlassesMessages.inputsUnavailable("source"),
         GlassesMessages.noActivity(),
         GlassesMessages.mockUnavailable(),
+        GlassesMessages.mockConnectTimeout(),
     )
 
     @Test
@@ -43,6 +44,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.WARNING, GlassesMessages.streamError("gel").kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.streamStopped().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
+        assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
@@ -93,6 +95,7 @@ class GlassesMessagesTest {
             GlassesMessages.mockReady(),
             GlassesMessages.noMockPress(),
             GlassesMessages.framesOnSpeaker(),
+            GlassesMessages.videoUndecodable(),
         )
         all.forEach { message ->
             listOf("sk-", "sk_", "ghp_", "Bearer").forEach { secret ->
