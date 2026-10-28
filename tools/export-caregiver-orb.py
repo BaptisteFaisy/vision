@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Porte le shader Portrait gelé vers WebGL ; seul le rendu caregiver devient gris."""
+"""Porte le shader Portrait gelé vers WebGL ; la palette caregiver est injectée en JS."""
 from pathlib import Path
 import re
 
@@ -22,8 +22,6 @@ def web_shader(source):
     shader = re.sub(r'\bhalf\b', 'float', shader)
     shader, helper = split_liquid(shader)
     shader = shader.replace('vec4 main(vec2 fc)', helper + '\nvec4 orb(vec2 fc)')
-    # Les teintes uniformes sont grises ; désaturer aussi le verre et son irisation.
-    shader = shader.replace('  return vec4(col *', '  col = vec3(dot(col, vec3(0.2126, 0.7152, 0.0722)));\n  return vec4(col *')
     prefix = 'precision highp float;\nuniform vec2 uSize;\n'
     main = '\nvoid main() { gl_FragColor = orb(vec2(gl_FragCoord.x, uSize.y - gl_FragCoord.y)); }\n'
     return prefix + shader + main

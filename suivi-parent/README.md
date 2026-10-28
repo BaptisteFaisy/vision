@@ -1,7 +1,8 @@
 # Suivi caregiver — session iSee partagée
 
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
-Android : fond blanc, boule Portrait grise, phrase courante et carte en bas.
+Android : fond blanc, petite boule Portrait bleue et verte, phrase courante
+et carte haute en bas.
 
 L'interface Android est embarquée dans chaque APK depuis ce dossier (tâche
 Gradle `caregiverAssets`). La WebView intercepte uniquement ces fichiers locaux
@@ -9,9 +10,10 @@ sous `/.isee-caregiver/` ; les appels `/api/state` restent sur l'origine du lien
 partagé. Une ancienne version du site ne peut donc plus remplacer le design
 de l'app installée.
 
-L'écran tient dans la hauteur du téléphone, avec une carte réduite en bas,
+L'écran tient dans la hauteur du téléphone, avec une carte plus haute en bas,
 sans défilement, barre de retour ni titre Caregiver. L'état LIVE / SIGNAL LOST /
-OFFLINE occupe le coin supérieur droit. La roue dentée ouvre les paramètres
+OFFLINE est dans une pastille arrondie en haut à droite, aux dimensions du
+badge Portrait. La roue dentée noire ouvre les paramètres
 Android, où se trouve la clé Google Maps préremplie par le build.
 
 La clé vient de `GOOGLE_MAPS_API_KEY` (secret CI, toutes les variantes) ou de
@@ -34,9 +36,10 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
 
 ## Rendu et données
 
-- La boule reprend le shader Portrait Android, désaturé. À la racine,
+- La boule reprend le shader Portrait Android, avec un liquide bleu et vert,
+  un rayon de 24 % de la largeur et un plafond de 100 px CSS. À la racine,
   `python tools/export-caregiver-orb.py` régénère son port WebGL. Le shader
-  Android gelé reste inchangé. Repli en verre gris si WebGL est indisponible.
+  Android gelé reste inchangé. Repli en verre bleu et vert si WebGL est indisponible.
 - Texte Portrait, quatre lignes maximum, même cadence d'éclairage mot à mot
   quand le téléphone indique qu'il parle. La dernière phrase est transmise
   sans historique ; sinon le site décrit les deux objets reçus les plus proches.
