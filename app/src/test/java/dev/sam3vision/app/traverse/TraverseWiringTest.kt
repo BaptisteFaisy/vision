@@ -1,6 +1,5 @@
 package dev.sam3vision.app.traverse
 
-import android.app.Application
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
@@ -62,7 +61,7 @@ class TraverseWiringTest {
         var relaunches = 0
         var quiets = 0
         // L'app est inutilisée sur le chemin sans effet : `null` suffit en JVM.
-        wiring.setActive(false, null as Application, Settings.Default, scope(), listOf("car"), { relaunches++ }, { quiets++ })
+        wiring.setActive(false, null, Settings.Default, scope(), listOf("car"), { relaunches++ }, { quiets++ })
 
         assertFalse(wiring.active)
         assertEquals(0, relaunches)
