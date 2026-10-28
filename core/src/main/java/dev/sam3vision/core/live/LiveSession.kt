@@ -181,6 +181,15 @@ class LiveSession(
         serverStats.reset()
     }
 
+    /**
+     * Arrêt net : [reset] plus fermeture du transport (le conteneur Modal peut
+     * retomber à zéro). Irréversible : la séance suivante rouvre une session neuve.
+     */
+    fun close() {
+        reset()
+        client.close()
+    }
+
     companion object {
         /** Marge de réouverture : on ne rouvre un créneau que sous la moitié du budget. */
         const val RELAX_RATIO = 0.5

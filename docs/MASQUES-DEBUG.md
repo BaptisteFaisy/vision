@@ -33,16 +33,18 @@ Avant la première frame analysée, un message central s'affiche (`liveProbeNoti
 puis `en attente de la première analyse…` ; dès la première frame, il disparaît (les masques parlent
 d'eux-mêmes).
 
-Après l'arrêt, les derniers masques **restent affichés** jusqu'au prochain enregistrement ou à la sortie
-d'écran ; une erreur sur une frame ne remet **pas** le compte d'objets à zéro (`LiveProbe.kt:302-309` :
-seul `error` change, `objects` et `masks` sont conservés).
+Après l'arrêt de l'enregistrement, les derniers masques **restent affichés** jusqu'à la prochaine
+analyse ; à la coupure caméra (ou au passage en arrière-plan), `stop` efface masques et chiffres.
+Une erreur sur une frame ne remet **pas** le compte d'objets à zéro (`LiveProbe.kt` : seul `error`
+change, `objects` et `masks` sont conservés).
 
 ## Coût GPU
 
-Rien ne part à SAM hors enregistrement : l'analyseur caméra livre du JPEG base64 en continu, mais la frame
-n'est **même pas convertie** hors REC (`IseeVisionCard.kt:259-266` : `wantsFrame` et `onFrame` sont
-conditionnés à `recordingVideo`) et `LiveProbe.onFrame` jette tout si aucune session n'existe. Le GPU ne
-se réveille donc pas parce qu'on regarde la page caméra.
+Les frames partent à SAM dès que la caméra est active (`sendingToSam` dans
+`IseeVisionCard.kt` : `cameraActive || recordingVideo || crossingActive`) : l'analyseur livre du JPEG
+base64 en continu, et hors ces cas la frame n'est **même pas convertie** (`wantsFrame` répond non).
+Caméra coupée ou app en arrière-plan, `LiveProbe.stop` ferme les sessions WebSocket : sans socket ouvert,
+le conteneur Modal retombe à zéro et rien n'est facturé.
 
 Pendant l'enregistrement, la session tourne en `Cadence.Fast` (`core/live/LiveSession.kt:42-48`) :
 **pas de plancher artificiel**, **un seul créneau** (`concurrency = 1`) et un **budget de latence de

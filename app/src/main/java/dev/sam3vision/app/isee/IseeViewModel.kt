@@ -75,7 +75,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Fermeture / arrière-plan : purge et minuteur, hors de la vie du ViewModel. */
     private val session = IseeSession(cleaner, player, ::update)
 
-    /** SAM pendant l'enregistrement : masques, distances, latence et phrase à dire. */
+    /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
@@ -225,6 +225,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
+        probe.stop()
         super.onCleared()
     }
 
@@ -234,6 +235,17 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun detachCamera() {
         camera = null
+    }
+
+    /**
+     * Caméra liée ou coupée (remonté par la liaison) : coupée, la sonde est arrêtée
+     * net (sessions fermées, la carte peut retomber à zéro) ; liée, les sessions
+     * rouvrent et la première frame réveille la carte.
+     */
+    fun setCameraActive(active: Boolean) {
+        if (_state.value.cameraActive == active) return
+        update { it.copy(cameraActive = active) }
+        if (active) syncProbe() else probe.stop()
     }
 
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */
@@ -431,17 +443,19 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         session.onClosed()
     }
 
-    /** L'app part derrière : minuteur armé (option C) et envoi SAM de la sonde coupé. */
+    /** L'app part derrière : minuteur armé (option C), sonde arrêtée net (carte éteinte). */
     fun onBackground() {
         onHoldCancel()
         session.onBackground()
         probe.onBackground()
+        probe.stop()
     }
 
-    /** L'app revient au premier plan : minuteur annulé (option C), sonde réarmée. */
+    /** L'app revient au premier plan : minuteur annulé (option C), sessions rouvertes. */
     fun onForeground() {
         session.onForeground()
         probe.onForeground()
+        syncProbe()
     }
 
 }

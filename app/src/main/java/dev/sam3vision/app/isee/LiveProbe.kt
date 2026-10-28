@@ -48,9 +48,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
 /**
- * Analyse SAM du mode vidéo d'iSee : pendant l'enregistrement, chaque frame part à
+ * Analyse SAM de la caméra d'iSee : quand la caméra est active, chaque frame part à
  * `/live` (une à la fois, cadence adaptative) et revient en masques, distances et
- * statistiques.
+ * statistiques. Caméra coupée, `stop` ferme les sessions : la carte s'éteint.
  *
  * Même brique que le Direct ([LiveSession], [HttpLiveClient], [DistanceMeter],
  * [PositionAnnouncer]) : une seule implémentation de l'appel SAM et de la mesure par
@@ -80,16 +80,13 @@ class LiveProbe(
     private val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
 
-    private var session: LiveSession? = null
+    internal var session: LiveSession? = null
 
-    /**
-     * Session du **premier** appel : un conteneur Modal endormi met 30-50 s à démarrer,
-     * alors que la cadence du direct abandonne à 10 s. Le premier `/live` a donc un
-     * délai long, puis on repasse à la session normale dès qu'une frame est passée.
-     */
-    private var coldSession: LiveSession? = null
+    /** Session du **premier** appel (délai long : le conteneur Modal endormi met 30-50 s
+     * à démarrer) ; on repasse à la session normale dès qu'une frame est passée. */
+    internal var coldSession: LiveSession? = null
 
-    /** Une frame a-t-elle abouti depuis le début de l'enregistrement ? */
+    /** Une frame a-t-elle abouti depuis l'activation de la caméra ? */
     private var warmed = false
 
     /** Cadence affichée : moyenne sur les 8 dernières frames, pas l'écart deux frames. */
@@ -158,6 +155,7 @@ class LiveProbe(
         depth: DepthBackend = DepthBackend.OFF,
     ) {
         val clean = baseUrl.trim()
+        closeSessions()
         session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
         // Session « froide » : même transport, délai long (60 s) — c'est le réveil du
         // conteneur qui parle, pas la frame. Une fois la première analyse passée, on
@@ -222,7 +220,7 @@ _state.update { it.cleared() }
      * Remet le pipeline à zéro (cadence, réserve, chronologie, compteurs, voix) :
      * partagé par [configure] et [begin], qui n'ajoutent que leur propre état.
      */
-    private fun resetPipeline() {
+    internal fun resetPipeline() {
         warmed = false
         cadence.reset()
         reserve.clear()
