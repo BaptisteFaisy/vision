@@ -82,7 +82,7 @@ manuelle gagne donc toujours — c'est voulu, et c'est le seul moyen de viser un
 | « Tester SAM » | `AppDiagnostics.kt:36-37`, `AppViewModel.kt:260` |
 | `segmentationEnabled` = `resolveSamEndpoint().isNotBlank()` | `Settings.kt:119` — appelé **sans** argument de build, donc c'est le preset qui décide ici |
 | ❌ **Mode tap** : `BuildConfig.SAM31_ENDPOINT` en direct, aucune région | `TapConfig.kt:35`, `TapCaptureScreen.kt:171` (voir `docs/MODE-TAP.md`) |
-| ✅ **Réveil à l'ouverture** : `warmGpu()` = `GET /health` silencieux, 3 essais, arrêt immédiat si backend stoppé | `MainActivity.kt:174` (`onResume`) → `AppViewModel.kt:240` → `AppDiagnostics.kt:99` ; la carte endormie se réveille, la carte chaude répond quasi gratis. Un trou de réseau n'éteint plus le réveil (2e et 3e essais) ; un backend stoppé (`BackendStopped`) ne boucle pas dans le vide — il faut redéployer (`deploy-live-fast.sh`) ; passer en fond périme les essais en cours (`warmGeneration`, pas de rallumage derrière `releaseGpu`). La **première frame** du Direct ou de la sonde iSee reste un réveil de secours. En sens inverse, quitter le plein écran éteint la carte : `onPause` (`MainActivity.kt:164`), split-screen (`MainActivity.kt:185-187`), fermeture (`MainActivity.kt:198`) |
+| ✅ **Pas de réveil à l'ouverture** : la carte ne démarre que quand ça filme | `MainActivity.onResume` ne fait aucun appel réseau ; la **première frame** du Direct ou de la sonde iSee réveille la carte (`LiveWakeGuard`, « Réveil du GPU… » affiché jusqu'à 60 s). Quitter le plein écran éteint la carte : `onPause`, split-screen, fermeture (`releaseGpu` → `POST /release`) |
 | ❌ **Banc d'essai lunettes** (écran `Route.Bench` d'iSee, plus d'app séparée) : `Settings(...)` construit depuis `BuildConfig`, SAM = `SAM31_ENDPOINT` en direct, aucune région | `BenchScreen.kt:309-322` (`samBaseUrl = BuildConfig.SAM31_ENDPOINT`, `:315`) |
 
 ## Transport depuis iSee : WebSocket uniquement
@@ -111,12 +111,12 @@ C'est un enrobage `SAM3_APP=sam3-us-a100 SAM3_REGION=us SAM3_ROUTING=us-east` au
   avant d'allumer l'autre (`sam3-gpu busy` → exit 0 = une carte tourne déjà, on la réutilise au
   lieu d'en allumer une seconde). Côté machine, `modal-one-gpu-watch` (r630, toutes les 15 s)
   ramène à une carte et arrête l'app qui revient.
-- **Déploiement manuel, réveil auto** : le réglage EU/US des Réglages **n'allume rien**
+- **Déploiement manuel, réveil au premier film** : le réglage EU/US des Réglages **n'allume rien**
   (`SamRegion.kt:6-8`), et un agent ne lance pas `sam3-gpu on` / `sam3-gpu-us on` sans demande
-  explicite de l'utilisateur — le bail est de 30 min, à 2,415 $/h. En revanche, **l'app
-  réveille la carte déployée à chaque ouverture** (`warmGpu`, `/health` silencieux) et
+  explicite de l'utilisateur — le bail est de 30 min, à 2,415 $/h. L'app ne réveille
+  la carte déployée que quand ça filme (première frame du Direct / de la sonde) et
   l'éteint dès qu'elle quitte le plein écran (`onPause`, split-screen, fermeture). Si
-  l'app Modal n'est pas déployée, le réveil ne rallume rien (`BackendStopped`) : il faut
+  l'app Modal n'est pas déployée, la première frame échoue sans rallumer : il faut
   un `on` manuel, une fois.
 - Coût et cold start (constat hors dépôt, **non remesuré ici**) : A100-40GB 2,415 $/h ;
   `region=us` est une région large (×1,15 ; `us-west` serait ×1,75) ; premier `on` = déploiement

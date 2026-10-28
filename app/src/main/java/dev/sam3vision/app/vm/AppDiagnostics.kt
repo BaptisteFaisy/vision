@@ -7,7 +7,6 @@ import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.samEndpoint
 import dev.sam3vision.app.testBitmap
 import dev.sam3vision.core.audio.Wav
-import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.HttpSamClient
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
@@ -18,7 +17,6 @@ import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -39,15 +37,6 @@ class AppDiagnostics(
     private val samClient: (String) -> SamClient = { HttpSamClient(it) },
     private val releaseScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-
-    /**
-     * Génération du réveil : chaque `warmGpu` et chaque `releaseGpu` l'incrémente — un
-     * réveil dont la génération est dépassée s'arrête avant l'essai suivant. Passer en
-     * arrière-plan en pleine série d'essais n'éteint donc pas pour rien : la carte ne
-     * se rallume pas derrière l'extinction. (Confiné au thread de l'appelant : Main en
-     * prod via `viewModelScope` et les rappels de cycle de vie, test seul en JVM.)
-     */
-    private var warmGeneration = 0
 
     /** « Tester le LLM » : une mini image verte, pour ne pas consommer de crédit. */
     suspend fun testLlm() {
@@ -99,33 +88,6 @@ class AppDiagnostics(
     }
 
     /**
-     * Activation de la GPU à l'ouverture de l'app (`GET /health`, silencieux).
-     *
-     * Sur un conteneur endormi, `/health` le réveille (snapshot Modal) ; sur un
-     * conteneur chaud, c'est une requête quasi gratuite. Jusqu'à [WARM_ATTEMPTS]
-     * essais espacés de [WARM_RETRY_DELAY_MS] : une ouverture dans un trou de réseau
-     * ne doit pas laisser la carte éteinte. Arrêt immédiat sur
-     * [ApiError.BackendStopped] — l'app Modal n'est plus déployée, réessayer est
-     * inutile, seul un redéploiement (`deploy-live-fast.sh`) la rallume — et dès que
-     * [releaseGpu] (ou un nouveau réveil) périme la génération : la carte ne se
-     * rallume pas derrière l'extinction. Aucune écriture dans `statusLine`, aucun
-     * `Log` — l'ouverture ne doit ni clignoter ni dépendre d'Android (tests JVM).
-     */
-    suspend fun warmGpu() {
-        val url = samUrl(state().settings)
-        if (url.isBlank()) return
-        val client = samClient(url)
-        val generation = ++warmGeneration
-        repeat(WARM_ATTEMPTS) { attempt ->
-            if (generation != warmGeneration) return
-            val outcome = client.health()
-            if (outcome.getOrNull() == true) return
-            if (outcome.exceptionOrNull() is ApiError.BackendStopped) return
-            if (attempt < WARM_ATTEMPTS - 1) delay(WARM_RETRY_DELAY_MS)
-        }
-    }
-
-    /**
      * Extinction volontaire du conteneur GPU à la fermeture de l'app.
      *
      * Hors du scope du ViewModel **exprès** : à `onDestroy`, le scope du ViewModel est
@@ -133,9 +95,6 @@ class AppDiagnostics(
      * requête.
      */
     fun releaseGpu() {
-        // Un réveil en cours est périmé dès qu'on éteint : sa génération dépassée
-        // l'arrête avant l'essai suivant (pas de rallumage derrière l'extinction).
-        warmGeneration++
         val endpoint = state().settings
             .resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL)
         if (endpoint.isBlank()) return
@@ -153,11 +112,5 @@ class AppDiagnostics(
     private companion object {
         /** Étiquette de la mini image de test LLM. */
         const val PROBE_LABEL = "vert"
-
-        /** Essais de réveil à l'ouverture : assez pour un trou de réseau, borné. */
-        const val WARM_ATTEMPTS = 3
-
-        /** Pause entre deux essais de réveil (annulable si l'app repart en fond). */
-        const val WARM_RETRY_DELAY_MS = 2_000L
     }
 }
