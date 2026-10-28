@@ -14,6 +14,8 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
+import androidx.compose.ui.graphics.toArgb
+import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.lensSpecOf
 import dev.sam3vision.app.media.Nv21JpegEncoder
@@ -101,7 +103,11 @@ class IseeCameraHost(private val context: Context) {
 
     /** Fabrique la `PreviewView` de la fenêtre (une seule fois, conservée côté host). */
     fun newPreviewView(context: Context): PreviewView {
-        val created = PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
+        val created = PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            // Sans flux, la surface montre ce fond sombre au lieu du blanc système.
+            setBackgroundColor(AppColors.background.toArgb())
+        }
         boundPreview = created
         return created
     }
