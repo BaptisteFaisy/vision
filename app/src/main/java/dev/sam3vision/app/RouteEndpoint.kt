@@ -5,7 +5,8 @@ import dev.sam3vision.core.settings.resolveRouteEndpoint
 
 /**
  * Endpoint Valhalla réellement appelé par l'app : saisie manuelle des Réglages >
- * URL injectée au build (`route.base.url`) > vide (= routage in-app désactivé).
+ * URL injectée au build (`route.base.url`, défaut backend Modal CPU) > vide
+ * (= routage in-app désactivé).
  */
 fun Settings.routeEndpoint(): String =
     resolveRouteEndpoint(buildDefault = BuildConfig.ROUTE_BASE_URL)
