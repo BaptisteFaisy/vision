@@ -76,8 +76,9 @@ fun SegmentScreen(onBack: () -> Unit) {
                 masks = result
                 frameSize = bitmap.width to bitmap.height
                 runs += 1
-                status = statusLine(result, ms, fps)
-                logRun(runs, result, ms, fps)
+                val delegate = segmenter.value?.delegateName ?: "?"
+                status = statusLine(result, ms, fps, delegate)
+                logRun(runs, result, ms, fps, delegate)
                 busy.set(false)
             }
         }
@@ -183,26 +184,32 @@ private suspend fun runFrame(
     }
 }
 
-/** Ligne d'état : couvertures, inférence, cadence effective. */
-private fun statusLine(masks: Pair<SegmentMask, SegmentMask>?, ms: Long, fps: Float): String {
+/** Ligne d'état : couvertures, inférence, cadence effective, délégué. */
+private fun statusLine(
+    masks: Pair<SegmentMask, SegmentMask>?,
+    ms: Long,
+    fps: Float,
+    delegate: String,
+): String {
     if (masks == null) return String.format(Locale.FRANCE, "échec · %d ms · %.1f ips", ms, fps)
     return String.format(
         Locale.FRANCE,
-        "praticable %.0f %% · voies %.1f %% · %d ms · %.1f ips",
+        "praticable %.0f %% · voies %.1f %% · %d ms · %.1f ips · %s",
         masks.first.coverage() * 100,
         masks.second.coverage() * 100,
         ms,
         fps,
+        delegate,
     )
 }
 
 /** Une ligne de mesure toutes les 20 segmentations (pas une trace complète). */
-private fun logRun(runs: Int, masks: Pair<SegmentMask, SegmentMask>?, ms: Long, fps: Float) {
+private fun logRun(runs: Int, masks: Pair<SegmentMask, SegmentMask>?, ms: Long, fps: Float, delegate: String) {
     if (runs % 20 != 0) return
     val cover = masks?.let {
         String.format(Locale.US, "drive=%.0f%% lanes=%.1f%%", it.first.coverage() * 100, it.second.coverage() * 100)
     } ?: "échec"
-    Log.i("sam3vision", "twinlite: $cover, $ms ms, " + String.format(Locale.US, "%.1f", fps) + " ips")
+    Log.i("sam3vision", "twinlite: $cover, $ms ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate]")
 }
 
 /** Masques remis à l'échelle du canevas : praticable vert, voies rouge. */

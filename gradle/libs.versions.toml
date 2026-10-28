@@ -67,6 +67,8 @@ onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android"
 # en metadata Kotlin 2.4, illisible par le Kotlin 2.2 du projet). Même API
 # org.tensorflow.lite.Interpreter, Java pur.
 litert = { module = "org.tensorflow:tensorflow-lite", version.ref = "litert" }
+# Délégué GPU classique (TwinLiteNet : graphe taillé GPU, 270/270 nœuds délégués).
+litert-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.ref = "litert" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
