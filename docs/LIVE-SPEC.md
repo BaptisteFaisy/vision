@@ -3,8 +3,8 @@
 > **Dépôt** : `BaptisteFaisy/vision` — **date** : 26/10/2026.
 > **Nature du document** : ce n'est pas la spécification du serveur, c'est **le contrat
 > déduit du client**. Chaque affirmation porte un `chemin:ligne` lu dans cet arbre ; le code
-> est l'autorité, `docs/` n'est qu'une piste. Tout ce qui est serveur est hors dépôt : voir
-> la section 8.
+> est l'autorité, `docs/` n'est qu'une piste. Le serveur de référence est dans `server/`
+> (`backend/live_fast/`) : voir la section 8.
 
 Le direct « iSee » envoie des images JPEG à un endpoint SAM 3.1 (GPU Modal) et reçoit, pour
 chaque image, des objets segmentés (label, score, boîte, masque). Il y a **un seul transport
@@ -79,7 +79,7 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 
 ```json
 {"id":7,"image_b64":"<JPEG base64>","prompts":["person","door","bicycle","car","truck","electric scooter"],
- "work_edge":640,"max_objects":8,"mask_encoding":"bits"}
+ "work_edge":512,"max_objects":8,"mask_encoding":"bits"}
 ```
 
 | Champ | Type | Sens |
@@ -87,7 +87,7 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 | `id` | entier | corrélation ; absent de `POST /live`, présent sur chaque trame WS |
 | `image_b64` | chaîne | JPEG encodé en base64, sans bourrage de ligne |
 | `prompts` | tableau ou `null` | concepts suivis ; `null` accepté (`Json.kt:309`) |
-| `work_edge` | entier | côté long de travail côté serveur (`640`, voir §4) |
+| `work_edge` | entier | côté long de travail (`512` envoyé par le client, `768` côté serveur si absent ; voir §4) |
 | `max_objects` | entier | plafond d'objets demandé au serveur |
 | `mask_encoding` | chaîne | `"bits"` demandé ; le serveur peut répondre autre chose |
 
@@ -141,7 +141,7 @@ endpoint distinct injecté au build (`BuildConfig.SAM31_ENDPOINT`,
 |---|---|---|---|---|
 | `GET` | `/health` | — | 180 s (client de réveil) | `{ok, model, device, gpu}` |
 | `POST` | `/segment` | `{"image_b64","prompts"}` | 60 s | `{width, height, objects[]}` |
-| `POST` | `/video` | multipart `model`,`video`,`prompt` | 120 s | texte ou `{text|description|answer|caption}` |
+| `POST` | `/video` | multipart `model`,`video`,`prompt` | 120 s | texte ou `{text\|description\|answer\|caption}` |
 | `POST` | `/release` | `{}` + en-tête `x-sam-release: confirm` | 45 s | `{released: bool}` |
 | `POST` | `/live` | idem trame WS **sans** `id` | pas de plafond global (read 60 s) | idem réponse WS **sans** `id` |
 
@@ -208,7 +208,7 @@ Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au
 | Palier lent | 900 ms | `LiveSession.kt:34` |
 | Intervalle appliqué | `> 900 ms` → 900, `< 350 ms` → 350, sinon 500 | `LiveSession.kt:153-157` |
 | Image envoyée | côté long **512 px**, JPEG **q65** | `app/src/main/java/dev/sam3vision/app/LiveScreen.kt:50-51`, `:308`, `:331` |
-| `work_edge` | **640** | `LiveSession.kt:197` |
+| `work_edge` | **512** (**768** côté serveur si absent) | `LiveSession.kt:211`, `server/backend/live_fast/service.py:36` |
 | `max_objects` | 8 par défaut, borné 1..12 | `LiveSession.kt:199`, `core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt:16-18` |
 | Budget de frame | 10 s (`withTimeoutOrNull`) | `WsLiveClient.kt:27`, `:156` |
 
@@ -289,23 +289,21 @@ identités dans le cas courant, et le serveur seulement quand le tracker est act
 
 ## 8. Ce que ce document ne peut pas prouver
 
-- **Le comportement du serveur.** Aucun code de backend n'est dans ce dépôt : le service
-  Modal (`/health`, `/segment`, `/live`, `/live/ws`, `/release`) vit dans un autre dépôt,
-  privé, non publié ici (`README.md:28-32`). Ce document décrit ce que le client **envoie et
-  sait lire**, pas ce que le serveur fait de ces octets.
-- **Le conteneur réellement déployé.** Son source n'existe nulle part et le dépôt backend,
-  privé et non publié ici (`README.md:28-32`), n'est pas vérifiable : rien de ce qui est
-  serveur ne l'est depuis cet arbre.
+- **Le conteneur réellement déployé.** Le source de référence est dans `server/`
+  (`backend/live_fast/` : `service.py`, `live_ws.py`), mais la version qui sert, ses leviers
+  (`FAST_*`) et sa région ne se lisent que sur son `/health` (champs `levers`/`applied`) —
+  voir `server/docs/LIVE-FAST.md`. Ce document décrit ce que le client **envoie et sait
+  lire**, pas ce qui sert au moment d'un test.
 - **Les débits.** Aucun débit n'est mesuré ici. Les chiffres cités dans les commentaires du
-  code (50,3 ms en WebSocket contre 81,4 ms en POST, `WsLiveClient.kt:9-12` ; 71,3 ms de
-  DNS/TCP/TLS, `Http.kt:41-44` ; réveil 20-27 s, `Http.kt:49`) sont des mesures **rapportées
-  par le commentaire**, non reproduites pour ce document.
-- **Les coûts GPU.** Le 2,415 $/h d'une A100-40GB vient de `CHANGELOG.md:269` et
+  code (WebSocket contre POST, DNS/TCP/TLS, réveil) sont des mesures **rapportées par le
+  commentaire**, non reproduites pour ce document.
+- **Les coûts GPU.** Le 2,415 $/h d'une A100-40GB vient de `CHANGELOG.md:623` et
   `docs/MODE-US.md:116-117` ; ce n'est pas une mesure faite ici, et le tarif peut changer.
 - **Le mode tap.** La route qu'il utilise, `POST {endpoint}/video` en multipart
-  (`docs/MODE-TAP.md:146-158`), n'a **aucune implémentation connue côté serveur** : aucun
-  contrat de réponse n'est écrit, seulement la lecture tolérante du client
-  (`HttpSam31VideoClient.kt:74-97`). La question « cloud ou on-device ? » reste ouverte
-  (`TapConfig.kt:48`).
-- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 2` est affirmé par un
-  commentaire (`LivePrompts.kt:24-26`), pas par du code de ce dépôt.
+  (`docs/MODE-TAP.md:146-158`), n'a **aucune implémentation connue côté serveur**
+  (`git grep -n '"/video"' server/backend` vide) : aucun contrat de réponse n'est écrit,
+  seulement la lecture tolérante du client (`HttpSam31VideoClient.kt:89-95`). La question
+  « cloud ou on-device ? » reste ouverte (`TapConfig.kt:48`).
+- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 6`, affirmé par le commentaire
+  (`LivePrompts.kt:30-33`) **et** le code du tracker (`server/backend/tracking.py:53`) — mais
+  le plafond du déploiement `/live` ne se lit que sur le serveur.
