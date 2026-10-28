@@ -1,16 +1,21 @@
-# pr-auto-merge — file de merge automatique : chaque PR interne prête est
-# rebasée sur master si en retard (BEHIND) puis mergée (rebase) dès que les
-# 6 checks requis sont verts. La seule porte reste la CI ; pas de gate humaine.
+# pr-auto-merge — file de merge automatique : chaque PR interne est
+# rebasée sur master si en retard (BEHIND) ou en conflit (DIRTY) ; les PR
+# prêtes sont mergées (rebase) dès que les 6 checks requis sont verts.
+# La seule porte reste la CI ; pas de gate humaine.
 # v4 (2026-10-27) : vrai rebase (pas de bulle de merge) via PAT (secret
 # AUTOMERGE_PAT) — GITHUB_TOKEN ne suffit pas (ni auto-merge, ni pushes qui
 # relancent la CI : runs fantômes « action_required »). Sans le secret, pause
 # propre au lieu d'échouer. Poussée avec bail (lease) : jamais d'écrasement
-# d'un push d'auteur arrivé entre-temps. Brouillons et forks exclus.
+# d'un push d'auteur arrivé entre-temps. Forks exclus ; brouillons rebasés
+# et réconciliés mais jamais mergés.
 # Conflits (v5, 2026-10-28) : l'agent Fireworks tente de les résoudre
 # (.github/fireworks/conflict_agent.py, modèle MiniMax M3.1 Flash) : résolution
 # fichier par fichier, fin du rebase, push avec bail, compte rendu sur la PR.
 # Sans le secret FIREWORKS_API_KEY, on saute comme avant et l'auteur rebase à
 # la main. Coupe-circuit : variable de dépôt FIREWORKS_AGENT_RESOLVE=0.
+# Conflits brouillons (v6, 2026-10-28) : le sweep traite aussi les brouillons
+# (rebase + agent Fireworks) sans jamais les merger, et les DIRTY comme les
+# BEHIND — la CI est la seule voie de résolution (plus de janitor local).
 name: pr-auto-merge
 
 on:
@@ -71,12 +76,11 @@ jobs:
           gh pr list --base master --state open \
             --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
             --jq '.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
-              | select(.isDraft == false)
-              | "\(.number) \(.headRefOid) \(.headRefName) \(.mergeStateStatus)"' \
-          | while read -r pr sha branch state; do
+              | "\(.number) \(.headRefOid) \(.headRefName) \(.mergeStateStatus) \(.isDraft)"' \
+          | while read -r pr sha branch state draft; do
             [ -n "$pr" ] || continue
             case "$state" in
-              BEHIND)
+              DIRTY|BEHIND)
                 if git -c credential.helper='!gh auth git-credential' fetch -q origin "pull/$pr/head:pr-$pr" 2>/dev/null \
                   && git checkout -q "pr-$pr" 2>/dev/null \
                   && git rebase -q origin/master >/dev/null 2>&1; then
@@ -104,7 +108,9 @@ jobs:
                 git branch -q -D "pr-$pr" >/dev/null 2>&1 || true
                 ;;
               CLEAN)
-                if green "$pr"; then
+                if [ "$draft" = "true" ]; then
+                  echo "PR #$pr : brouillon à jour, pas de merge"
+                elif green "$pr"; then
                   if gh pr merge --rebase --match-head-commit "$sha" "$pr" >/dev/null 2>&1; then
                     echo "PR #$pr mergée"
                   else
