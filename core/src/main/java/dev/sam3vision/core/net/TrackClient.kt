@@ -52,12 +52,12 @@ class HttpTrackClient(
     }
 
     override suspend fun close(sessionId: String): Result<Unit> =
-        client.execute(requestTo(baseUrl, "/session/" + sessionId.trim(), "DELETE", userAgent = TRACK_USER_AGENT))
+        client.executeBuilt { requestTo(baseUrl, "/session/" + sessionId.trim(), "DELETE", userAgent = TRACK_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .map { Unit }
 
     override suspend fun health(): Result<TrackHealth> =
-        client.execute(requestTo(baseUrl, "/health", userAgent = TRACK_USER_AGENT))
+        client.executeBuilt { requestTo(baseUrl, "/health", userAgent = TRACK_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseTrackHealth(raw) } }
 

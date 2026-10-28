@@ -97,8 +97,8 @@ class HttpLiveClient(
     }
 
     override suspend fun health(): Result<LiveHealth> {
-        val request = requestTo(baseUrl, "/health", userAgent = LIVE_USER_AGENT)
-        return wakeClient.execute(request)
+        // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
+        return wakeClient.executeBuilt { requestTo(baseUrl, "/health", userAgent = LIVE_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseHealth(raw) } }
     }

@@ -173,6 +173,9 @@ internal fun joinUrl(baseUrl: String, path: String): String =
  * champs de noms différents n'est pas significatif) ; `User-Agent` passe donc en tête.
  *
  * @param body `null` = requête sans corps (GET, DELETE).
+ *
+ * Lève sur URL malformée (`Request.Builder.url()`) : toujours construire DANS
+ * `executeBuilt` / `catchingResult`, jamais en argument direct de `execute`.
  */
 internal fun request(
     url: String,

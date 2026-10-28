@@ -122,14 +122,16 @@ class InferHubLlmClient(
             .put("max_tokens", maxTokens)
             .apply { if (!thinking) put("chat_template_kwargs", JSONObject().put("enable_thinking", false)) }
             .toString()
-        val request = requestTo(
-            baseUrl,
-            "/chat/completions",
-            "POST",
-            jsonBody(body),
-            headers = mapOf("Authorization" to "Bearer $apiKey"),
-        )
-        return client.execute(request)
+        // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
+        return client.executeBuilt {
+            requestTo(
+                baseUrl,
+                "/chat/completions",
+                "POST",
+                jsonBody(body),
+                headers = mapOf("Authorization" to "Bearer $apiKey"),
+            )
+        }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { extractContent(raw) } }
     }
