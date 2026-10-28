@@ -27,6 +27,14 @@ val ISEE_INTRO_TEXT = "Welcome to iSee. To record your surroundings, tap anywher
     "screen long enough to say, \"Disable iSee intro.\""
 
 /**
+ * Vrai si le cache de l'intro est périmé : sa taille ne correspond plus à l'asset
+ * embarqué. Une mise à jour qui change `intro_isee.mp3` doit rejouer la nouvelle
+ * voix, pas l'ancien fichier resté en cache jusqu'au vidage par Android.
+ */
+fun introCacheStale(cachedBytes: Long, assetBytes: Int): Boolean =
+    cachedBytes != assetBytes.toLong()
+
+/**
  * La bulle d'intro (premier message du chat) est posée à chaque ouverture complète
  * quand les réglages sont lus et que l'intro est autorisée : seule sa coupure par
  * la voix (« Disable iSee intro ») la fait taire définitivement.

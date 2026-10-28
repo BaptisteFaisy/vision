@@ -6,8 +6,8 @@ import java.io.File
 /**
  * Intro vocale embarquée (`res/raw/intro_isee.mp3`, voix Laure d'ElevenLabs,
  * rendue hors ligne). [SpeechPlayer] lit un chemin de fichier et non une ressource :
- * on recopie l'asset dans le cache une seule fois (le cache peut être vidé par
- * Android, la copie est refaite au besoin).
+ * on recopie l'asset dans le cache, et à nouveau quand il change ([introCacheStale]),
+ * sinon l'ancienne voix survivrait aux mises à jour.
  */
 object IntroAudio {
 
@@ -17,8 +17,8 @@ object IntroAudio {
     fun ensure(context: Context): File {
         val app = context.applicationContext
         val file = File(File(app.cacheDir, CACHE_DIR).apply { mkdirs() }, ASSET_NAME)
-        if (file.length() == 0L) {
-            app.resources.openRawResource(R.raw.intro_isee).use { input ->
+        app.resources.openRawResource(R.raw.intro_isee).use { input ->
+            if (introCacheStale(file.length(), input.available())) {
                 file.outputStream().use { output -> input.copyTo(output) }
             }
         }
