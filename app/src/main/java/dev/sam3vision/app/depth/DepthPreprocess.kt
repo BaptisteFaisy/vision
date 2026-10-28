@@ -33,6 +33,31 @@ internal object DepthPreprocess {
         return out
     }
 
+    /**
+     * Redimensionnement bilinéaire vers un rectangle [dstWidth]×[dstHeight]
+     * (écrasement d'aspect assumé, comme la sample app TwinLiteNet 640×360).
+     */
+    fun resizeArgbBilinearRect(
+        src: IntArray,
+        srcWidth: Int,
+        srcHeight: Int,
+        dstWidth: Int,
+        dstHeight: Int,
+    ): IntArray {
+        require(srcWidth > 0 && srcHeight > 0 && dstWidth > 0 && dstHeight > 0) { "dimensions vides" }
+        require(src.size >= srcWidth * srcHeight) { "tampon trop petit" }
+        if (srcWidth == dstWidth && srcHeight == dstHeight) return src.copyOf(dstWidth * dstHeight)
+        val out = IntArray(dstWidth * dstHeight)
+        val scaleX = (srcWidth - 1f) / (dstWidth - 1f)
+        val scaleY = (srcHeight - 1f) / (dstHeight - 1f)
+        for (y in 0 until dstHeight) {
+            for (x in 0 until dstWidth) {
+                out[y * dstWidth + x] = sampleBilinear(src, srcWidth, srcHeight, x * scaleX, y * scaleY)
+            }
+        }
+        return out
+    }
+
     private fun sampleBilinear(
         src: IntArray,
         srcWidth: Int,

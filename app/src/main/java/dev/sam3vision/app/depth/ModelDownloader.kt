@@ -85,19 +85,24 @@ object ModelDownloader {
         if (spec == null) {
             return Result.failure(IllegalArgumentException("moteur sans modèle : " + backend.code))
         }
-        return ensureSpec(appDir, spec, onProgress)
+        return ensureSpec(appDir, spec, onProgress = onProgress)
     }
 
-    /** Même garantie sur une fiche explicite (les tests JVM injectent un serveur local). */
+    /**
+     * Même garantie sur une fiche explicite (les tests JVM injectent un serveur
+     * local). [dir] = sous-dossier du store (`depth-models` par défaut, la
+     * segmentation range les siens dans `segment-models`).
+     */
     suspend fun ensureSpec(
         appDir: File,
         spec: DepthModelSpec,
+        dir: String = DepthModelStore.DIR,
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
-            val dir = File(appDir, DepthModelStore.DIR)
-            dir.mkdirs()
-            val target = File(dir, spec.fileName)
+            val store = File(appDir, dir)
+            store.mkdirs()
+            val target = File(store, spec.fileName)
             if (target.isFile && sha256Of(target) == spec.sha256) {
                 return@withContext Result.success(target)
             }
