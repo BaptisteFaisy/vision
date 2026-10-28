@@ -2,7 +2,10 @@ package dev.sam3vision.app.traverse
 
 import android.app.Application
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.isee.crossingStateOf
 import dev.sam3vision.app.ttsClient
+import dev.sam3vision.core.crossing.CrossingPrompts
+import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
@@ -36,13 +39,14 @@ data class ShownFrame(
  *
  * Le pipeline tourne sur chaque frame publiée ([filter]) ; la voix n'est
  * attachée qu'en mode actif ([setActive]) : au repos, filtrage et veto
- * seuls, aucun ordre parlé. [lightGreen] est le vert confirmé du module
- * feu (`false` par défaut : sans vert, « attendez »).
+ * seuls, aucun ordre parlé. [lightGreen] est le vert du module feu, relu
+ * à chaque frame active (`false` par défaut : sans vert, « attendez »).
  *
- * [filter], [reset], [close], [deactivate] et [setActive] hors activation
- * sont purs et testés en JVM (aucun Android retenu) ; seule l'activation
- * touche Android (moteur TTS, cache, `filesDir`) et n'est couverte que sur
- * appareil.
+ * [filter] hors activation, [updateLight], [reset], [close], [deactivate] et
+ * [setActive] hors activation sont purs et testés en JVM (aucun Android
+ * retenu) ; l'activation touche Android (moteur TTS, cache, `filesDir`) et
+ * le décodage du feu ne tourne qu'en mode actif — ces deux chemins ne sont
+ * couverts que sur appareil.
  */
 class TraverseWiring(
     private val pipeline: TraversePipeline,
@@ -55,12 +59,13 @@ class TraverseWiring(
     var active: Boolean = false
         private set
 
-    /** Vert confirmé du module feu, positionné par le classifieur (futur câblage). */
+    /** Vert du module feu, relu à chaque frame active (défaut sûr : `false`). */
     @Volatile var lightGreen: Boolean = false
 
     /**
      * Filtre une frame publiée : hystérésis, conversion, veto, annonce et
-     * voix éventuelle — voir [TraversePipeline.onFrame].
+     * voix éventuelle — voir [TraversePipeline.onFrame]. En mode actif, le
+     * vert est relu dans [jpegB64] (classifieur embarqué) avant la décision.
      */
     suspend fun filter(
         frame: LiveFrame,
@@ -69,9 +74,16 @@ class TraverseWiring(
         focalPx: Float,
         atMs: Long,
         language: SpeechLanguage,
+        jpegB64: String = "",
     ): ShownFrame {
+        if (active) updateLight(crossingStateOf(frame, jpegB64))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
+    }
+
+    /** Seul un vert tranché autorise la traversée ; rouge et doute attendent. */
+    fun updateLight(state: CrossingState) {
+        lightGreen = state == CrossingState.Green
     }
 
     /**
@@ -112,12 +124,14 @@ class TraverseWiring(
         tts?.close()
         tts = null
         pipeline.reset()
+        lightGreen = false
         quiet()
     }
 
-    /** Oublie pistes, veto et annonces (nouvelle séance). */
+    /** Oublie pistes, veto, vert et annonces (nouvelle séance). */
     fun reset() {
         pipeline.reset()
+        lightGreen = false
     }
 
     /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */
@@ -138,6 +152,7 @@ class TraverseWiring(
         tts = engine
         pipeline.voice = voice
         scope.launch { voice.prewarm() }
-        return TraversePipeline.promptsFor(prompts)
+        // Véhicules + feu : sans le concept feu, aucun vert ne serait jamais lu.
+        return TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT) + prompts)
     }
 }
