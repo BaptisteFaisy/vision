@@ -5,6 +5,8 @@ import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.model.RouteTrip
 import dev.sam3vision.core.nav.GeocodedPlace
 import dev.sam3vision.core.net.RouteClient
+import java.io.IOException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,6 +23,7 @@ class ValhallaRouteLoaderTest {
         originNow: () -> RoutePoint? = { origin },
         route: suspend (RoutePoint, RoutePoint) -> Result<RouteTrip> = { _, _ -> Result.success(trip) },
         baseUrl: () -> String = { "https://route.test" },
+        routeTimeoutMs: Long = 15_000,
     ) = ValhallaRouteLoader(
         geocode = geocode,
         originNow = originNow,
@@ -31,6 +34,7 @@ class ValhallaRouteLoaderTest {
             }
         },
         baseUrl = baseUrl,
+        routeTimeoutMs = routeTimeoutMs,
     )
 
     @Test
@@ -71,5 +75,69 @@ class ValhallaRouteLoaderTest {
         val throwing = loader(geocode = { throw IllegalStateException("panne") })
 
         assertTrue(throwing("la gare").isFailure)
+    }
+
+    @Test
+    fun `echec route isole repris une fois puis resume`() = runBlocking {
+        var attempts = 0
+        val flaky = loader(
+            route = { _, _ ->
+                attempts++
+                if (attempts == 1) Result.failure(IOException("connexion perdue")) else Result.success(trip)
+            },
+        )
+
+        val summary = flaky("la gare").getOrThrow()
+
+        assertEquals(830L, summary.distanceMeters)
+        assertEquals(2, attempts)
+    }
+
+    @Test
+    fun `route qui jette puis reussit donne le resume`() = runBlocking {
+        var attempts = 0
+        val throwing = loader(
+            route = { _, _ ->
+                attempts++
+                if (attempts == 1) throw IOException("panne") else Result.success(trip)
+            },
+        )
+
+        assertTrue(throwing("la gare").isSuccess)
+        assertEquals(2, attempts)
+    }
+
+    @Test
+    fun `double echec route donne un motif francais`() = runBlocking {
+        var attempts = 0
+        val down = loader(
+            route = { _, _ ->
+                attempts++
+                Result.failure(IOException("serveur injoignable"))
+            },
+        )
+
+        val failure = down("la gare").exceptionOrNull()
+
+        assertEquals(2, attempts)
+        assertEquals("itinéraire indisponible (serveur injoignable)", failure?.message)
+    }
+
+    @Test
+    fun `route trop lente echoue sur delai borne`() = runBlocking {
+        var attempts = 0
+        val slow = loader(
+            route = { _, _ ->
+                attempts++
+                delay(30_000)
+                Result.success(trip)
+            },
+            routeTimeoutMs = 50,
+        )
+
+        val failure = slow("la gare").exceptionOrNull()
+
+        assertEquals(2, attempts)
+        assertEquals("itinéraire indisponible (délai dépassé)", failure?.message)
     }
 }
