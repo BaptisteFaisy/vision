@@ -79,12 +79,14 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 
 ## 6. Reste à prouver (bloquant pour un usage réel)
 
-1. **Calibration FR** : l'arbre est entraîné sur feux allemands (Ampel),
-   jamais validé sur feux français ni sur appareil ; seuils non calibrés
-   jour/nuit/pluie. Corpus téléphone + seuil bloquant sur les faux verts.
+1. **Calibration FR** (lot 1 sans terrain, fait 10/2026) : arbre validé
+   sur 235 lampes FR (Panoramax, jour) — couleur 97,9 %, 0 vert sur
+   90 rouges ; porte recalibrée (fraction 0,004, élancement 1,5,
+   bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. Reste :
+   nuit/pluie, poses larges, corpus téléphone + seuil bloquant faux verts.
 2. **Terrain** : aucun test téléphone — crop réel, voix sur appareil, veto
    avec vraies distances, à valider sur build du HEAD.
-3. **Anti-confusion feu voiture / feu piéton** : porte structurelle en
-   place (`PedLightGate`, prouvée sur pixels synthétiques) — validation sur
-   feux réels et crops serrés reste due avec le corpus.
+3. **Anti-confusion feu voiture / feu piéton** : porte recalibrée sur
+   feux réels (2 disques de profil passent, cas frontal couvert) —
+   reste la preuve sur crops SAM réels (cadrage exact inconnu).
 4. **Rappel SAM** sur feux piétons FR jamais mesuré (inconnue n° 1).
