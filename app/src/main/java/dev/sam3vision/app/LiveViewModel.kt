@@ -32,7 +32,6 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
-import dev.sam3vision.core.net.prewarmSam
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.Dispatchers
@@ -160,7 +159,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Ouvre une session de direct. Par défaut (`liveSamEnabled = false`), l'image part
      * **directement au LLM** : aucun client HTTP SAM, aucune session, aucun réveil GPU.
-     * Avec `liveSamEnabled`, la session `/live` est ouverte et le GPU réveillé comme avant.
+     * Avec `liveSamEnabled`, la session `/live` est ouverte et la première frame
+     * réveille le GPU — aucun réveil avant de filmer.
      * Dans les deux cas, la clé LLM est indispensable.
      */
     fun start(settings: Settings, prompts: List<String> = LivePrompts.default) {
@@ -184,8 +184,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // Pré-chauffe single-shot : le réveil chevauche l'arrivée de la caméra.
-        viewModelScope.launch { prewarmSam(base) }
+        // Pas de pré-chauffe : la carte ne démarre que quand ça filme, la première
+        // frame la réveille (`LiveWakeGuard` couvre l'attente côté UI).
         // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
         session = null
         client = null

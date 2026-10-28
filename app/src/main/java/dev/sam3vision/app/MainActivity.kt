@@ -176,9 +176,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isee.onForeground()
-        // App ouverte (ou de retour au premier plan) : on réveille la GPU Modal
-        // (`/health` silencieux) pour qu'iSee réponde sans cold start.
-        viewModel.warmGpu()
+        // Pas de réveil GPU à l'ouverture : la carte ne démarre que quand ça filme,
+        // réveillée par la première frame du Direct / de la sonde iSee.
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
@@ -186,8 +185,8 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Split-screen : l'app n'est plus en plein écran, on éteint la GPU comme à
-     * `onPause`. Au retour en plein écran, `onResume` (ou la première frame du
-     * Direct / de la sonde) la réveillera.
+     * `onPause`. Au retour en plein écran, la première frame du Direct / de la
+     * sonde la réveillera.
      */
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
         super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
