@@ -104,6 +104,15 @@ interface SpeechClient {
 }
 
 /**
+ * Pictogramme (Meta Muse Image) : la photo JPEG d'un objet -> son picto PNG.
+ * [hint] est le nom donné par l'aidant (`""` = objet principal centré).
+ * [Result.failure] avec une [ApiError] typée sur échec (clé, 402, réseau, parsing).
+ */
+interface PictoImageClient {
+    suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray>
+}
+
+/**
  * Tracker vidéo `sam3-track` : une session garde les identités des objets,
  * chaque frame renvoie les mêmes `id` tant que l'objet est suivi.
  */

@@ -141,6 +141,25 @@ internal fun extractTranscript(raw: String): String? {
     return segments.joinToString(" ").takeIf { it.isNotBlank() }
 }
 
+/**
+ * Image d'une réponse de génération : **JSON uniquement**, `data[0].b64_json`
+ * (compatible OpenAI) puis replis (`images[0]`, `output[0].b64_json`, `b64_json`
+ * racine). `null` si rien d'exploitable — une page d'erreur en 200 ne devient
+ * jamais un pictogramme. Une réponse `url` seule n'est pas prise en charge.
+ */
+internal fun extractImageB64(raw: String): String? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+    val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: return null
+    json.objects("data").firstOrNull()?.imageB64()?.let { return it }
+    json.strings("images").firstOrNull()?.let { return it }
+    json.objects("output").firstOrNull()?.imageB64()?.let { return it }
+    return json.str("b64_json").takeIf { it.isNotEmpty() }
+}
+
+/** Champ image d'un élément de réponse (`b64_json`, jamais `url`). */
+private fun JSONObject.imageB64(): String? = str("b64_json").takeIf { it.isNotEmpty() }
+
 /** Valeur texte à un chemin pointé (`result.text`), `null` si absente ou nulle. */
 internal fun JSONObject.textAt(path: String): String? {
     val parent = path.substringBeforeLast('.', "")

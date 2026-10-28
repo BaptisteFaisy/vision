@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.isee.vm.PictoUiState
 import dev.sam3vision.core.distance.LensSpec
 import java.io.File
 
@@ -50,6 +51,8 @@ data class IseeUiState(
      * ([IseeHome] consomme le drapeau via `settingsOpened`).
      */
     val openSettings: Boolean = false,
+    /** Repères visuels : génération en cours, relecture aidant, objets reconnus. */
+    val picto: PictoUiState = PictoUiState(),
 )
 
 // ————— Sélection : toujours la dernière bulle (aucune navigation entre messages) —————
