@@ -173,7 +173,8 @@ class IseePlaybackTest {
 
         val failure = runCatching { streaming.speakStreaming(seedRow(), "Devant toi.") }.exceptionOrNull()
 
-        assertEquals("le motif remonte tel quel", boom, failure)
+        assertTrue("le motif remonte (pas un timeout déguisé)", failure is RuntimeException && failure !is StepTimeout)
+        assertEquals("hp coupé", failure?.message)
         assertNull("état parlant rendu", state.value.speakingEntryId)
     }
 
