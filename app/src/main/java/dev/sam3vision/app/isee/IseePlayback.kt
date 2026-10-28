@@ -43,6 +43,7 @@ class IseePlayback(
      * la concaténation des tranches (les lecteurs MP3 resynchronisent aux frontières).
      * Couper ([SpeechPlayer.stop] extérieur) arrête proprement sans erreur ; une synthèse
      * qui dépasse son plafond lève [StepTimeout], une lecture en échec remonte son motif.
+     * L'étape posée par l'appelant reste affichée pendant tout le flux.
      */
     suspend fun speakStreaming(row: MessageMultimedia, text: String, synthTimeoutMs: Long = SYNTH_SLICE_TIMEOUT_MS) {
         val parts = SentenceChunker.chunk(text)
@@ -51,15 +52,17 @@ class IseePlayback(
             return
         }
         val id = bubbleId(row.id, true)
-        update { it.copy(speakingEntryId = id, status = null) }
+        update { it.copy(speakingEntryId = id) }
         try {
             val bytes = streamSlices(parts, synthTimeoutMs)
             if (bytes.isNotEmpty()) saveStreamed(row, bytes)
         } finally {
-            // Comme le `onComplete` d'une lecture simple : l'état parlant ne survit
-            // ni au succès, ni à l'échec, ni à l'annulation — gardé par l'ID, une
-            // lecture plus récente ne perd pas le sien.
-            update { st -> st.copy(speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId) }
+            // Comme le `onComplete` d'une lecture simple : l'état parlant et l'étape
+            // ne survivent ni au succès, ni à l'échec, ni à l'annulation — gardés par
+            // l'ID, une lecture plus récente ne perd ni le sien ni sa phrase.
+            update { st ->
+                if (st.speakingEntryId == id) st.copy(speakingEntryId = null, status = null) else st
+            }
         }
     }
 
