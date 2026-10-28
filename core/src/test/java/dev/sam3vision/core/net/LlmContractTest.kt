@@ -21,7 +21,7 @@ import org.junit.Test
  */
 class LlmContractTest {
 
-    private fun client(url: String) = InferHubLlmClient(url, NetContract.KEY, NetContract.MODEL, retryDelayMs = 5)
+    private fun client(url: String) = HttpLlmClient(url, NetContract.KEY, NetContract.MODEL, retryDelayMs = 5)
 
     private suspend fun call(url: String): Result<Analysis> = client(url).describe("QUJD", emptyList())
 
@@ -190,7 +190,7 @@ class LlmContractTest {
             TestHttpServer.Response(404, """{"error":{"message":"unknown model: x","type":"model_not_found"}}"""),
             TestHttpServer.Response(200, NetContract.chatReply("réponse")),
         ).use { server ->
-            val answer = InferHubLlmClient(server.baseUrl, NetContract.KEY, "modele-fantome", retryDelayMs = 5)
+            val answer = HttpLlmClient(server.baseUrl, NetContract.KEY, "modele-fantome", retryDelayMs = 5)
                 .askText("et la ?", emptyList()).getOrThrow()
 
             assertEquals("réponse", answer)
@@ -248,7 +248,7 @@ class LlmContractTest {
             TestHttpServer.Response(200, NetContract.chatReply("tardive"), delayMs = 2_000),
             TestHttpServer.Response(200, NetContract.chatReply("ok")),
         ).use { server ->
-            val answer = InferHubLlmClient(
+            val answer = HttpLlmClient(
                 server.baseUrl,
                 NetContract.KEY,
                 NetContract.MODEL,
