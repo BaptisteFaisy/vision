@@ -1,3 +1,8 @@
+> **Spéc historique** (transition Expo → Kotlin) : ne décrit plus l'arbre — fournisseurs,
+> versions, API et écrans ont changé depuis. L'état actuel :
+> [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (racine du dépôt). Le corps ci-dessous
+> est conservé comme trace de conception.
+
 # SPEC — app Android native Kotlin (sam3-vision)
 
 Remplace l'app Expo (conservée en legacy dans `legacy-expo-app/`). L'app Kotlin vit désormais à la racine du dépôt vision (`app/`, `core/`).

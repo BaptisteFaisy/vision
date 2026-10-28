@@ -1,4 +1,4 @@
-# NOTES — vérifications API SAM 3.1 (24 octobre 2026)
+# NOTES — vérifications API SAM 3.1 (relevé antérieur, hors de cet arbre)
 
 - Source de vérité : `transformers` **v5.20.2** (tag `v5.20.2`, dernière version publiée) — `src/transformers/models/sam3/`.
 - Il n'existe **aucune** classe `Sam3_1` / `Sam3_1Model` : `__all__` = `Sam3Model`, `Sam3VisionModel`, `Sam3ViTModel`, `Sam3PreTrainedModel` (+ `Sam3Processor`). `config.json` de `unsloth/sam3.1` ⇒ `architectures = ["Sam3Model"]`. Les variantes « 3.1 » ne sont que des poids.

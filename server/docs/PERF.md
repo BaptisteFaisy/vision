@@ -1,4 +1,4 @@
-# PERF — latence mesurée (24 octobre 2026, backend déployé, GPU A10G)
+# PERF — latence mesurée (relevé antérieur, hors de cet arbre ; backend déployé, GPU A10G)
 
 `POST /segment` vers le backend déployé avec `/tmp/street.png` (2048×824, ~2,4 Mo de base64), chronos aller-retour depuis la machine locale, réseau inclus.
 

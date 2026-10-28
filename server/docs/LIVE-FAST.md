@@ -7,7 +7,7 @@ Source réellement déployée : `backend/live_fast/` (app Modal `sam3-eu-a100`, 
 
 ## Les leviers, et pourquoi ils sont dans le script
 
-| levier | effet mesuré (25 octobre, A100 eu-west) |
+| levier | effet mesuré (relevé antérieur, hors de cet arbre ; A100 eu-west) |
 |---|---|
 | `FAST_CUDA_GRAPH=1` | encodeur vision **45 ms → 1,4 ms** |
 | `FAST_SCALEDOWN=60` | fuite max ~0,04 $ si `/release` raté (60 s au lieu de 300) |
@@ -21,8 +21,8 @@ backend rapide vivait dans `~/builds/prod-backend`, **hors dépôt**. D'où :
 - `sam3-gpu` (l'arbitre « une seule GPU ») déploie maintenant `live_fast` **avec** les leviers ;
 - aucun contrôle périodique : un ping `/health` réveillerait la carte (règle du
   workflow : déploiement au push uniquement, jamais de `schedule:`) ;
-- `.github/workflows/deploy-live-fast.yml` ferait la même chose côté GitHub — mais il faut
-  pour cela un dépôt **avec remote** et un jeton Modal dans les secrets : non fait, à décider.
+- `.github/workflows/deploy-live-fast.yml` fait la même chose côté GitHub : tout push sur
+  `master` qui touche `live_fast/` redéploie (secrets `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`).
 
 ## Où va le temps (télémétrie par étage, `FAST_TIMING=1`)
 

@@ -1,4 +1,4 @@
-# AUDIT — sam3-vision-app (24 octobre 2026)
+# AUDIT — sam3-vision-app (relevé antérieur, hors de cet arbre)
 
 Périmètre : backend Modal SAM 3.1 + app Expo. Audit statique, tests unitaires, tests E2E contre le
 backend déployé (`…sam3service-web.us-east.modal.run`), cas d'erreur du contrat, latence.
@@ -162,7 +162,7 @@ Restent à faire (hors périmètre ou nécessitant une action extérieure) :
 400 de validation **0,30 s**. Le décodage d'entrée coûte ~1 s, l'encodeur vision une seule fois pour
 tous les prompts : c'est ce qui explique que 8 concepts et 2 concepts soient à ~0,3 s d'écart.
 
-## 9. Finitions (24 octobre 2026, après audit)
+## 9. Finitions (relevé antérieur, hors de cet arbre)
 
 Points §4 et §5 traités sans déploiement, sans modification de secret, sans toucher à
 `legacy-expo-app/app.json` ni `legacy-expo-app/android/`.
