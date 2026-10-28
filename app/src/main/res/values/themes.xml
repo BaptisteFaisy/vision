@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Thème plateforme SOMBRE (l'app est 100 % sombre côté Compose) : le parent
-         Light précédent affichait un flash blanc à chaque cold start. -->
+    <!-- Fond de fenêtre SOMBRE : évite tout flash blanc au cold start, avant que
+         Compose ne dessine. (L'accueil Portrait iSee lui-même est blanc voulu.) -->
     <style name="Theme.Sam3Vision" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
