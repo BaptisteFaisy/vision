@@ -160,6 +160,9 @@ class UiLogicTest {
 
     @Test
     fun `la demande de route exterieure se pousse et se consomme une fois`() {
+        RouteRequest.push("nanodet")
+        assertEquals("nanodet", RouteRequest.pending.value)
+        assertEquals("nanodet", RouteRequest.consume())
         RouteRequest.push("segment")
         assertEquals("segment", RouteRequest.pending.value)
         assertEquals("segment", RouteRequest.consume())
