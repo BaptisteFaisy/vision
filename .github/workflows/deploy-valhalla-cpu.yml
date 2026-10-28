@@ -1,0 +1,66 @@
+name: deploy-valhalla-cpu
+
+# Backend routage Valhalla (tuiles IdF) sur Modal CPU — AUCUN GPU.
+# L'app iSee l'appelle en HTTPS direct (plus de dépendance Tailscale/Funnel).
+# Les tuiles vivent sur le Volume Modal `valhalla-idf-tiles` (upload unique,
+# manuel : `modal volume put valhalla-idf-tiles <dir> /`) — ce workflow ne
+# redéploie que le code, jamais les tuiles.
+#
+# ACTIF : tout push sur master qui touche l'app ou ce fichier redéploie.
+# Pas de `schedule:`, jamais de ping périodique (règle apprise sur live-fast).
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'server/backend/valhalla_cpu.py'
+      - '.github/workflows/deploy-valhalla-cpu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-valhalla-cpu
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Nouveau job : verdict ≤ 5 min (règle CI-BUDGET-5MIN).
+    timeout-minutes: 5
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      MODAL_PROFILE: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Installer la CLI Modal
+        run: python3 -m pip install --quiet "modal==1.6.2"
+
+      - name: Vérifier que les jetons sont présents (sans les afficher)
+        run: |
+          set -euo pipefail
+          [ -n "${MODAL_TOKEN_ID:-}" ] || { echo "::error::MODAL_TOKEN_ID manquant"; exit 1; }
+          [ -n "${MODAL_TOKEN_SECRET:-}" ] || { echo "::error::MODAL_TOKEN_SECRET manquant"; exit 1; }
+          echo "jetons présents (valeurs masquées par GitHub)"
+
+      - name: Déployer l'app CPU
+        run: |
+          set -euo pipefail
+          python3 -m modal deploy server/backend/valhalla_cpu.py 2>&1 | tee deploy.log
+          grep -o 'https://[^ ]*modal.run[^ "]*' deploy.log | head -1 > app_url.txt || true
+          echo "URL capturée : $(cat app_url.txt)"
+
+      - name: Fumée /health puis /route (attente bornée)
+        run: |
+          set -euo pipefail
+          BASE="$(cat app_url.txt | sed 's|/health$||; s|/$||')"
+          [ -n "$BASE" ] || { echo "::error::URL app introuvable dans deploy.log"; exit 1; }
+          echo "BASE=$BASE"
+          timeout 240 bash -c "until curl -sf -m 10 $BASE/health; do sleep 5; done"
+          curl -sf -m 30 -X POST "$BASE/route" \
+            -d '{"locations":[{"lat":48.8566,"lon":2.3522},{"lat":48.86,"lon":2.34}],"costing":"pedestrian"}' \
+            | python3 -c "import json,sys; print('trip km:', json.load(sys.stdin)['trip']['summary']['length'])"
