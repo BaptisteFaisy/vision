@@ -41,6 +41,10 @@ class TapSession(
     private val onStatus: (TapStatus) -> Unit,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
     private val owner: () -> LifecycleOwner? = { null },
+    /** Raison de blocage d'envoi (`null` = envoi possible). Testé avec un lambda fixe. */
+    private val sendBlocked: () -> String? = TapConfig::sendBlockedReason,
+    /** Permissions déjà vérifiées par l'écran ; injectable pour les tests JVM. */
+    private val permissionsGranted: () -> Boolean = { tapPermissionsGranted(context) },
 ) {
     private var phase: TapPhase = TapPhase.IDLE
     private var startedAt: Long = 0L
@@ -60,6 +64,13 @@ class TapSession(
             return
         }
         val command = tapCommand(snapshot())
+        // Envoi impossible (endpoint vide, on-device) : échec explicite immédiat,
+        // sans enregistrer un clip qui ne partirait jamais.
+        val blocked = sendBlocked()
+        if (command == TapCommand.START && blocked != null) {
+            fail(blocked, Announcement.FAILED)
+            return
+        }
         if (command == TapCommand.NONE && phase == TapPhase.RECORDING) stopRequested = true
         dispatch(command)
     }
@@ -98,7 +109,7 @@ class TapSession(
         starting = true
         scope.launch {
             try {
-                if (!tapPermissionsGranted(context)) {
+                if (!permissionsGranted()) {
                     fail("permission caméra ou micro refusée", Announcement.FAILED)
                     return@launch
                 }
