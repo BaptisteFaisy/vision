@@ -19,6 +19,30 @@ class IseeStatusTextTest {
     }
 
     @Test
+    fun `etapes — textes affiches pendant une tenue`() {
+        assertEquals("Transcribing", IseeStatusText.STEP_TRANSCRIBING)
+        assertEquals("Asking", IseeStatusText.STEP_ASKING)
+        assertEquals("Speaking", IseeStatusText.STEP_SPEAKING)
+        assertEquals("Asking timed out — try again", IseeStatusText.timedOut(IseeStatusText.STEP_ASKING))
+    }
+
+    @Test
+    fun `timeout d'etape — chaque motif nomme l'etape au lieu du prefixe`() {
+        assertEquals(
+            "Transcribing timed out — try again",
+            IseeStatusText.dictationFailed(StepTimeout(IseeStatusText.STEP_TRANSCRIBING)),
+        )
+        assertEquals(
+            "Speaking timed out — try again",
+            IseeStatusText.voiceFailed(StepTimeout(IseeStatusText.STEP_SPEAKING)),
+        )
+        assertEquals(
+            "Asking timed out — try again",
+            IseeStatusText.questionFailed(StepTimeout(IseeStatusText.STEP_ASKING)),
+        )
+    }
+
+    @Test
     fun `motifs deja vus sur le telephone — identiques apres decoupe`() {
         assertEquals("Microphone unavailable", IseeStatusText.MIC_UNAVAILABLE)
         assertEquals("Camera not ready — try again", IseeStatusText.CAMERA_NOT_READY)
