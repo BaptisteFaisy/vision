@@ -22,6 +22,19 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Carré blanc troué sur fond noir : motif unique, reconnu sans ambiguïté. */
+private fun geometricFrame(size: Int, squareAt: Int, square: Int, hole: Int): GrayImage {
+    val gray = IntArray(size * size)
+    for (y in squareAt until squareAt + square) {
+        for (x in squareAt until squareAt + square) gray[y * size + x] = 255
+    }
+    val h0 = squareAt + (square - hole) / 2
+    for (y in h0 until h0 + hole) {
+        for (x in h0 until h0 + hole) gray[y * size + x] = 0
+    }
+    return GrayImage(gray, size, size)
+}
+
 /**
  * Les repères : bouton → photo → génération → relecture → stockage → overlay.
  * Caméra, client Muse et décodages sont factices : seul l'enchaînement est
@@ -174,8 +187,8 @@ class IseePictoTest {
         val PHOTO_JPEG = ByteArray(16) { it.toByte() }
         val PNG = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3)
 
-        /** Frame texturée : son propre gabarit central y est reconnu. */
-        val FRAME: GrayImage = GrayImage(IntArray(64 * 64) { i -> (i * 7 + i / 64 * 13) % 256 }, 64, 64)
+        /** Frame à motif unique : son propre gabarit central y est reconnu. */
+        val FRAME: GrayImage = geometricFrame(64, 22, 20, 8)
 
         /** Gabarit réel de la frame : la détection le retrouve (chaîne prouvée en core). */
         val PHOTO_TEMPLATE: PictoTemplate = buildTemplate(FRAME)
