@@ -68,28 +68,26 @@ fun SettingsScreen(
     var draft by remember { mutableStateOf(settings) }
     Column(settingsLightScroll()) {
         SettingsHeader(onBack = onBack)
-        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-            UserSection(draft, onPickRole, onStartTracking, onStopTracking) { draft = it }
-            MetaGlassesSection(glasses = glasses)
-            TechnicalSection(
-                draft = draft,
-                onChange = { draft = it },
-                llmConfigured = llmConfigured,
-                speaking = speaking,
-                gpu = gpu,
-                onSpeak = onSpeak,
-                onStopVoice = onStopVoice,
-                onSave = onSave,
-                onTestLlm = onTestLlm,
-                onTestSam = onTestSam,
-                onTestAsr = onTestAsr,
-                onTestDepth = onTestDepth,
-                onStartTracking = onStartTracking,
-                onStopTracking = onStopTracking,
-                nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenSegment, onOpenGestures),
-                statusLine = statusLine,
-            )
-        }
+        SettingsBody(
+            draft = draft,
+            onDraft = { draft = it },
+            glasses = glasses,
+            llmConfigured = llmConfigured,
+            speaking = speaking,
+            gpu = gpu,
+            onSpeak = onSpeak,
+            onStopVoice = onStopVoice,
+            onSave = onSave,
+            onTestLlm = onTestLlm,
+            onTestSam = onTestSam,
+            onTestAsr = onTestAsr,
+            onTestDepth = onTestDepth,
+            onPickRole = onPickRole,
+            onStartTracking = onStartTracking,
+            onStopTracking = onStopTracking,
+            nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenSegment, onOpenGestures),
+            statusLine = statusLine,
+        )
     }
 }
 
@@ -147,7 +145,7 @@ private fun SectionTitle(text: String) {
 /** THE USER: who holds this phone. On/off role toggle, then the invite field
  * (caregiver) or the share button (blind person), then save opens the right home. */
 @Composable
-private fun UserSection(
+internal fun UserSection(
     draft: Settings,
     onPickRole: (Settings) -> Unit,
     onStartTracking: (Settings) -> Unit,
@@ -238,7 +236,7 @@ private fun RoleSegmentCell(label: String, selected: Boolean, onClick: () -> Uni
 
 /** META GLASSES: the Ray-Ban Meta block on a white card (its tested French strings stay). */
 @Composable
-private fun MetaGlassesSection(glasses: GlassesController) {
+internal fun MetaGlassesSection(glasses: GlassesController) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("META GLASSES")
         Column(
@@ -300,7 +298,7 @@ private fun GlassesBlock(glasses: GlassesController) {
 }
 
 /** Navigation sortante de la page, groupée pour la garde des 50 lignes. */
-private data class NavCallbacks(
+internal data class NavCallbacks(
     val onOpenLive: () -> Unit,
     val onOpenClassic: () -> Unit,
     val onOpenSegment: () -> Unit,
@@ -309,7 +307,7 @@ private data class NavCallbacks(
 
 /** Section TECHNICAL SETTINGS: everything the blind user never touches. */
 @Composable
-private fun TechnicalSection(
+internal fun TechnicalSection(
     draft: Settings,
     onChange: (Settings) -> Unit,
     llmConfigured: Boolean,
@@ -439,26 +437,6 @@ private fun GestureHelp(onOpenGestures: () -> Unit) {
             fontWeight = FontWeight.SemiBold,
         )
         GlassButton("Replay gestures", true, false, onOpenGestures)
-    }
-}
-
-/** Door to the legacy screens (**Direct**, **classic home**), unreachable from the gesture-only iSee home. */
-@Composable
-private fun ClassicScreens(
-    onOpenLive: () -> Unit,
-    onOpenClassic: () -> Unit,
-    onOpenSegment: () -> Unit,
-) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Other screens",
-            color = SettingsLight.text,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        GlassButton("Direct mode (continuous video)", true, false, onOpenLive)
-        GlassButton("Classic home (photo + analysis)", true, false, onOpenClassic)
-        GlassButton("Segment demo (walkable area)", true, false, onOpenSegment)
     }
 }
 
