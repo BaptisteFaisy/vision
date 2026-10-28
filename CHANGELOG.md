@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — concepts : murs, escaliers et vocabulaire extérieur FR→EN
+
+- `server/backend/concepts.py` (nouveau, 269 lignes, copié à l'identique dans
+  `live_fast/`) : table FR→EN passée de 48 à 213 entrées — murs, escaliers,
+  barrières, rambardes, poteaux, trottoirs, passages piétons, feux, mobilier
+  urbain, bâtiments, nature ; `segmentation.py` (les 2 copies) importe au lieu
+  de porter la table (326 → 262 lignes).
+- Recherche insensible aux accents : « barriere », « fenetre », « passage
+  pieton » matchent ; l'inconnu est remis désaccentué au CLIP anglais.
+- Taper « mur, escalier » dans le champ « Suivre » du direct fonctionne sans
+  changer les défauts (`person`, `door`, décision 2 concepts max inchangée) ;
+  `KnownSizes` couvrait déjà mur/wall (2,50 m) — la distance s'affiche.
+- Preuves : `python3 scripts/test_units.py` → 243 OK, 0 KO (+8 : 6 alias, 2 sync
+  racine/déployé) ; `cmp` des 2 copies OK ; aucun Kotlin touché.
+
 ## 2026-10-28 — docs : clean + README réécrit
 
 - `README.md` réécrit : problème, solution, 4 blocs (`:core`, `:app`, `server/`,
