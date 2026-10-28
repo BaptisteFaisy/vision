@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.view.View
+import android.view.ViewGroup.LayoutParams
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
@@ -44,6 +45,8 @@ fun CaregiverScreen(link: String, onBack: () -> Unit, mapsKey: String) {
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun caregiverWeb(context: Context, pageUrl: String, onSettings: () -> Unit): WebView = WebView(context).apply {
+    // WRAP_CONTENT laisse le viewport CSS à 0, même si Compose mesure la vue plein écran.
+    layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     setBackgroundColor(Color.WHITE)
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
