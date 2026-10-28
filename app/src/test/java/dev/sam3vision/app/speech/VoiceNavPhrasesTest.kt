@@ -55,6 +55,22 @@ class VoiceNavPhrasesTest {
     }
 
     @Test
+    fun `traversee a venir`() {
+        assertEquals(
+            "Passage protégé dans 50 mètres",
+            VoiceNavPhrases.crossingAhead(50.0),
+        )
+        assertEquals(
+            "Passage protégé dans 50 mètres",
+            VoiceNavPhrases.event(NavEvent.CrossingAhead(50.0, near = false), null),
+        )
+        assertEquals(
+            VoiceNavPhrases.CROSSING_DONE,
+            VoiceNavPhrases.event(NavEvent.CrossingPassed, null),
+        )
+    }
+
+    @Test
     fun `evenements moteur`() {
         assertEquals(
             VoiceNavPhrases.OFF_ROUTE,
