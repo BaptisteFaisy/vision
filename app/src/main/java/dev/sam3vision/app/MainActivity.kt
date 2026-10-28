@@ -81,7 +81,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        glasses = GlassesController(applicationContext).also {
+        glasses = GlassesController(
+            applicationContext,
+            // Lus paresseusement à chaque frame : `viewModel` est prêt bien avant.
+            frameSettings = { viewModel.state.value.settings },
+        ).also {
             it.bind(this)
             it.initialize()
         }

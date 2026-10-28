@@ -3,6 +3,7 @@ package dev.sam3vision.app.glasses
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.session.DeviceSession
@@ -16,7 +17,12 @@ import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
 import com.meta.wearable.dat.inputs.types.CapturePressType
 import dev.sam3vision.app.PcmSource
+import dev.sam3vision.app.VoiceAnnouncer
+import dev.sam3vision.app.llmClient
+import dev.sam3vision.app.samClientOrNull
 import dev.sam3vision.core.glasses.CaptureAction
+import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.usecase.AnalyzeUseCase
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +40,12 @@ import kotlinx.coroutines.launch
 /** WAV des dictées prises avec le micro des lunettes, sous `filesDir`. */
 private const val AUDIO_DIR = "glasses-audio"
 
+/** Journal logcat de la collecte des frames (`adb logcat -s GlassesDirect`). */
+private const val FRAME_LOG_TAG = "GlassesDirect"
+
+/** Dossier des MP3 des descriptions lues sur le haut-parleur. */
+private const val FRAMES_VOICE_DIR = "glasses-frames"
+
 /**
  * Chef d'orchestre des lunettes Ray-Ban Meta : enregistrement auprès de l'app Meta AI,
  * session Device Access Toolkit, caméra et bouton capture.
@@ -44,10 +56,37 @@ private const val AUDIO_DIR = "glasses-audio"
 class GlassesController(
     private val context: Context,
     private val clock: () -> Long = { System.currentTimeMillis() },
+    /**
+     * Collecte des frames vidéo (décodage H.265 + SAM/LLM + voix). **Éteinte par
+     * défaut** : le décodeur n'a jamais vu de matériel. Voir `GlassesCamera`.
+     */
+    private val collectVideoFrames: Boolean = false,
+    /** Réglages courants (clés LLM/SAM/TTS) : lus à chaque frame analysée. */
+    private val frameSettings: () -> Settings = { Settings.Default },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(GlassesUiState())
     private val _events = MutableSharedFlow<GlassesEvent>(extraBufferCapacity = 8)
+
+    /** Voix des descriptions collectées : le haut-parleur, comme le reste de l'app. */
+    private val frameVoice = VoiceAnnouncer(context.applicationContext, FRAMES_VOICE_DIR)
+
+    /**
+     * Maillon « frame → analyse → voix », le même objet que le banc : clients
+     * uniques de l'app ([llmClient], [samClientOrNull]), réglages relus à
+     * chaque frame pour suivre les clés saisies en cours de session.
+     */
+    private val frameStep = GlassesAnalysisStep(
+        analyze = { base64 ->
+            val settings = frameSettings()
+            AnalyzeUseCase(llmClient(settings), samClientOrNull(settings)).invoke(base64)
+        },
+        say = { text ->
+            val settings = frameSettings()
+            frameVoice.say(settings, text)
+            if (settings.ttsApiKey.isBlank()) "voix coupée (clé TTS absente)" else "haut-parleur"
+        },
+    )
 
     val state: StateFlow<GlassesUiState> = _state
     val events: SharedFlow<GlassesEvent> = _events
@@ -241,6 +280,9 @@ class GlassesController(
             onNote = ::note,
             onStreaming = { streaming -> _state.update { it.copy(streaming = streaming) } },
             onMicActive = { active -> _state.update { it.copy(micActive = active) } },
+            collectFrames = collectVideoFrames,
+            onFrame = ::onGlassesFrame,
+            onFrameLog = ::frameLog,
         )
         // Une caméra qui n'a pas démarré n'est pas retenue : elle bloquerait toute reprise.
         if (cam.start()) {
@@ -249,6 +291,16 @@ class GlassesController(
             GlassesMicLink.attach { currentAudio() }
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
+    }
+
+    /** Frame collectée → analyse partagée (SAM/LLM) → voix ; le sort est en journal. */
+    private suspend fun onGlassesFrame(frame: JpegFrame) {
+        frameStep.onFrame(frame, ::frameLog)
+    }
+
+    /** Journal de la collecte : logcat, pas le bandeau (une ligne par frame noierait l'écran). */
+    private fun frameLog(line: String) {
+        Log.d(FRAME_LOG_TAG, line)
     }
 
     /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
@@ -313,6 +365,7 @@ class GlassesController(
         inputs = null
         camera?.stop()
         camera = null
+        frameVoice.stop()
         _state.update { it.copy(streaming = false, micActive = false) }
     }
 
@@ -341,6 +394,7 @@ class GlassesController(
         session?.stop()
         dropSession()
         mock.stop()
+        frameVoice.release()
         scope.cancel()
     }
 
