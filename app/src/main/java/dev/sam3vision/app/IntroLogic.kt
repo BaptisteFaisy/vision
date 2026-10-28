@@ -14,6 +14,7 @@ fun introToggleLabel(enabled: Boolean): String =
 
 /**
  * Le texte de l'intro, écrit mot pour mot comme le MP3 embarqué (`intro_isee.mp3`,
+ * voix DRILL multipass 28/10 (commit 2, conflit volontaire).
  * voix Laure) : la bulle du chat affiche les phrases que la voix dit.
  *
  * La phrase du balayage (« To listen to previous messages, swipe down ») a été retirée
