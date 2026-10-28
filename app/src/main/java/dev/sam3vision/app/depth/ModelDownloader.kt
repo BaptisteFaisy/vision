@@ -91,13 +91,15 @@ object ModelDownloader {
     /**
      * Même garantie sur une fiche explicite (les tests JVM injectent un serveur
      * local). [dir] = sous-dossier du store (`depth-models` par défaut, la
-     * segmentation range les siens dans `segment-models`).
+     * segmentation et détection rangent les leurs dans `segment-models` et
+     * `detect-models`).
      */
     suspend fun ensureSpec(
         appDir: File,
         spec: DepthModelSpec,
         dir: String = DepthModelStore.DIR,
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
+        dir: String = DepthModelStore.DIR,
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             val store = File(appDir, dir)

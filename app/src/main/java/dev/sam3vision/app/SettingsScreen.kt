@@ -58,6 +58,7 @@ fun SettingsScreen(
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
+    onOpenNanoDet: () -> Unit,
     onOpenSegment: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
@@ -85,7 +86,7 @@ fun SettingsScreen(
             onPickRole = onPickRole,
             onStartTracking = onStartTracking,
             onStopTracking = onStopTracking,
-            nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenSegment, onOpenGestures),
+            nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenNanoDet, onOpenSegment, onOpenGestures),
             statusLine = statusLine,
         )
     }
@@ -301,6 +302,7 @@ private fun GlassesBlock(glasses: GlassesController) {
 internal data class NavCallbacks(
     val onOpenLive: () -> Unit,
     val onOpenClassic: () -> Unit,
+    val onOpenNanoDet: () -> Unit,
     val onOpenSegment: () -> Unit,
     val onOpenGestures: () -> Unit,
 )
@@ -345,7 +347,7 @@ internal fun TechnicalSection(
         ParentShareSettings(draft, onStartTracking, onStopTracking) { onChange(it) }
         SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
         GestureHelp(nav.onOpenGestures)
-        ClassicScreens(nav.onOpenLive, nav.onOpenClassic, nav.onOpenSegment)
+        ClassicScreens(nav.onOpenLive, nav.onOpenClassic, nav.onOpenNanoDet, nav.onOpenSegment)
         Diagnostics(statusLine)
     }
 }
