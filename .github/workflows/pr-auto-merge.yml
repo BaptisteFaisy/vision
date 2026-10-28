@@ -1,6 +1,6 @@
 # pr-auto-merge — file de merge automatique : chaque PR interne est
 # rebasée sur master si en retard (BEHIND) ou en conflit (DIRTY) ; les PR
-# prêtes sont mergées (rebase) dès que les 6 checks requis sont verts.
+# prêtes sont mergées (rebase) dès que les 3 checks requis sont verts.
 # La seule porte reste la CI ; pas de gate humaine.
 # v4 (2026-10-27) : vrai rebase (pas de bulle de merge) via PAT (secret
 # AUTOMERGE_PAT) — GITHUB_TOKEN ne suffit pas (ni auto-merge, ni pushes qui
@@ -22,6 +22,11 @@
 # son clone. Les runs restent sérialisés (groupe concurrency) ; dans un run,
 # rebase + résolutions + merges avancent en parallèle. Échecs isolés
 # (fail-fast: false), pushes toujours avec bail.
+# Latence (v9, 2026-10-28) : le sweep part aussi à chaque fin de CI
+# (`workflow_run` sur `CI`) au lieu d'attendre le cron 10 min (gardé en
+# filet) ; le `sleep 60` devient un sondage borné 6 × 5 s ; `green()`
+# n'exige plus que `ci`, `ci-budget` et `couche0` (le natif est vérifié sur
+# master par `ci-native.yml`, protection réduite à ces 3 checks).
 name: pr-auto-merge
 
 on:
@@ -31,6 +36,9 @@ on:
     branches: [master]
   schedule:
     - cron: '*/10 * * * *'
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 concurrency:
   group: pr-auto-merge-queue
@@ -60,7 +68,17 @@ jobs:
             exit 0
           fi
           if [ "$EVENT" = push ]; then
-            sleep 60 # laisse GitHub recalculer les états après l'atterrissage
+            # Laisse GitHub recalculer les états après l'atterrissage :
+            # sondage borné (6 × 5 s max, jamais de sleep fixe > 30 s).
+            # On part dès que plus aucune PR n'est en état transitoire.
+            for _ in 1 2 3 4 5 6; do
+              inconnus="$(gh pr list --base master --state open \
+                --json mergeStateStatus \
+                --jq '[.[].mergeStateStatus] | map(select(. == "UNKNOWN")) | length' \
+                2>/dev/null || echo 1)"
+              [ "${inconnus:-1}" = "0" ] && break
+              sleep 5
+            done
           fi
           MATRIX=$(gh pr list --base master --state open \
             --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
@@ -96,12 +114,12 @@ jobs:
           DRAFT: ${{ matrix.draft }}
         run: |
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
-          green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
+          green() { # 0 si les 3 checks requis de la PR $1 sont SUCCESS
             gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
-              ["ci","apk","apk-release","lint","ci-budget","couche0"] as $req |
+              ["ci","ci-budget","couche0"] as $req |
               [ .[] | select(.name as $n | $req | index($n)) ] as $got |
-              ($got | length == 6) and
-              ([$got[] | select(.state == "SUCCESS")] | length == 6)
+              ($got | length == 3) and
+              ([$got[] | select(.state == "SUCCESS")] | length == 3)
             ' >/dev/null
           }
           rm -rf repo
