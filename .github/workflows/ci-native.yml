@@ -5,10 +5,12 @@ name: CI native (hors PR)
 # par PR — file jusqu'à 10 min, budget wall-clock cassé alors que chaque job
 # tenait ses 5 min (mesuré le 28/10). La PR ne porte plus que le job `ci`
 # (gardes + tests JVM) ; ce workflow vérifie le natif à chaque push sur
-# master, à chaque tag et sur demande manuelle, avec le même timeout de
-# 5 min par job (mesuré ≤ 4m45).
-# Hors PR : pas de budget 5 min imposé, mais timeout explicite partout et ce
-# commentaire qui justifie le déclenchement (clause CI-BUDGET-5MIN).
+# master, à chaque tag et sur demande manuelle.
+# Timeout 10 min par job (clause CI-BUDGET-5MIN « job réellement plus long
+# hors PR », justification exigée — la voici) : à cache Gradle froid, le
+# setup + lintDebug/assemble dépassent 5 min (vu le 28/10 : 1er run sur
+# master tué à 5 min, cache du nouveau workflow vide) ; à chaud, mesuré
+# ≤ 4m45. Pas de budget 5 min imposé hors PR, mais timeout explicite.
 on:
   push:
     branches: [master]
@@ -33,7 +35,7 @@ jobs:
   apk:
     name: apk
     runs-on: [self-hosted, linux, x64, vision]
-    timeout-minutes: 5
+    timeout-minutes: 10 # hors PR : cache froid possible (voir en-tête)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,7 +57,7 @@ jobs:
   apk-release:
     name: apk-release
     runs-on: [self-hosted, linux, x64, vision]
-    timeout-minutes: 5
+    timeout-minutes: 10 # hors PR : cache froid possible (voir en-tête)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,7 +70,7 @@ jobs:
   lint:
     name: lint
     runs-on: [self-hosted, linux, x64, vision]
-    timeout-minutes: 5
+    timeout-minutes: 10 # hors PR : cache froid possible (voir en-tête)
     steps:
       - uses: actions/checkout@v4
         with:
