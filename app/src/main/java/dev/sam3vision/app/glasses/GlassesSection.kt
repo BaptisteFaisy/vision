@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
-import dev.sam3vision.app.BigButton
+import dev.sam3vision.app.GlassButton
 import dev.sam3vision.app.SettingsLight
 import dev.sam3vision.app.StatusBanner
 
@@ -66,22 +66,22 @@ private fun ProductionActions(
     onCapture: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
-    BigButton(
+    GlassButton(
         label = if (state.registered) "Ré-enregistrer auprès de Meta AI" else "Enregistrer auprès de Meta AI",
         enabled = state.sdkReady,
-        color = AppColors.primary,
+        primary = false,
         onClick = onRegister,
     )
-    BigButton(
+    GlassButton(
         label = connectLabel(state),
         enabled = state.connected || state.canConnect,
-        color = AppColors.surfaceHigh,
+        primary = false,
         onClick = { if (state.connected) onDisconnect() else onConnect() },
     )
-    BigButton(
+    GlassButton(
         label = "Prendre une photo",
         enabled = state.connected,
-        color = AppColors.surfaceHigh,
+        primary = false,
         onClick = onCapture,
     )
 }
@@ -90,12 +90,7 @@ private fun ProductionActions(
 @Composable
 private fun BenchEntry() {
     val openBench = LocalBenchOpener.current ?: return
-    Text(
-        "Banc d'essai : session réelle ou simulée, journal, voix seule.",
-        color = SettingsLight.muted,
-        fontSize = 12.sp,
-    )
-    BigButton("Banc d'essai lunettes", true, AppColors.surfaceHigh, openBench)
+    GlassButton("Banc d'essai lunettes", true, false, openBench)
 }
 
 /** La gravité colore le bandeau : un échec ne se lit pas comme un simple conseil. */
@@ -121,9 +116,9 @@ private fun MockControls(
 ) {
     Text("Démo sans matériel", color = SettingsLight.text, fontSize = 13.sp)
     if (!state.mockActive) {
-        BigButton("Simuler des lunettes", true, AppColors.surfaceHigh, onStartMock)
+        GlassButton("Simuler des lunettes", true, false, onStartMock)
     } else {
-        BigButton("Simuler un appui sur le bouton capture", state.connected, AppColors.surfaceHigh, onMockPress)
-        BigButton("Retirer les lunettes simulées", true, AppColors.surfaceHigh, onStopMock)
+        GlassButton("Simuler un appui sur le bouton capture", state.connected, false, onMockPress)
+        GlassButton("Retirer les lunettes simulées", true, false, onStopMock)
     }
 }

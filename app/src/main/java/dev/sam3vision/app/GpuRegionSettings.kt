@@ -41,18 +41,6 @@ fun GpuRegionSettings(draft: Settings, gpu: GpuStatus, onChange: (Settings) -> U
         if (down != null) {
             Text(down.reason, color = SettingsLight.muted, fontSize = 11.sp)
         }
-        Text(
-            "US mode: the card runs in the United States (us-east) instead of Europe. " +
-                "Only one GPU is allowed at a time: power the app of the chosen region " +
-                "(~/bin/sam3-gpu on · ~/bin/sam3-gpu-us on) and switch the other off.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
-        Text(
-            "Active endpoint: ${draft.samEndpoint()}",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
 

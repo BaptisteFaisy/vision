@@ -2,18 +2,25 @@ package dev.sam3vision.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -60,7 +67,7 @@ fun SettingsScreen(
     var draft by remember { mutableStateOf(settings) }
     Column(settingsLightScroll()) {
         SettingsHeader(onBack = onBack)
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
             UserSection(draft, onPickRole, onStartTracking, onStopTracking) { draft = it }
             MetaGlassesSection(glasses = glasses)
             TechnicalSection(
@@ -149,28 +156,11 @@ private fun UserSection(
     val isCaregiver = draft.caregiverRole == CaregiverRole.Caregiver
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("THE USER")
-        Text(
-            "This phone is held by a blind person (iSee opens at launch), " +
-                "or by a caregiver (the tracking map opens).",
-            color = SettingsLight.muted,
-            fontSize = 12.sp,
+        RoleSegmentedControl(
+            isCaregiver = isCaregiver,
+            onBlind = { onChange(draft.copy(caregiverRole = CaregiverRole.Blind)) },
+            onCaregiver = { onChange(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GlassButton(
-                label = "Blind person",
-                enabled = true,
-                primary = !isCaregiver,
-                modifier = Modifier.weight(1f),
-                onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Blind)) },
-            )
-            GlassButton(
-                label = "Caregiver",
-                enabled = true,
-                primary = isCaregiver,
-                modifier = Modifier.weight(1f),
-                onClick = { onChange(draft.copy(caregiverRole = CaregiverRole.Caregiver)) },
-            )
-        }
         if (isCaregiver) {
             CaregiverInviteBlock(draft, onChange)
         } else {
@@ -179,8 +169,68 @@ private fun UserSection(
         GlassButton(
             label = if (isCaregiver) "Save & open caregiver map" else "Save & back to iSee",
             enabled = !isCaregiver || draft.caregiverInvite.isNotBlank(),
-            primary = true,
+            primary = false,
             onClick = { onPickRole(draft) },
+        )
+    }
+}
+
+/** Blind / Caregiver reliés : un seul segment blanc à contour noir, pastille à coche sur le choix actif. */
+@Composable
+private fun RoleSegmentedControl(isCaregiver: Boolean, onBlind: () -> Unit, onCaregiver: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .border(1.dp, SettingsLight.text, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RoleSegmentCell(
+            label = "Blind person",
+            selected = !isCaregiver,
+            onClick = onBlind,
+            modifier = Modifier.weight(1f),
+        )
+        Box(Modifier.size(width = 1.dp, height = 24.dp).background(SettingsLight.text))
+        RoleSegmentCell(
+            label = "Caregiver",
+            selected = isCaregiver,
+            onClick = onCaregiver,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun RoleSegmentCell(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (selected) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(18.dp)
+                    .border(1.5.dp, SettingsLight.text, CircleShape)
+                    .padding(1.dp),
+            ) {
+                Text("\u2713", color = SettingsLight.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.size(8.dp))
+        }
+        Text(
+            label,
+            color = SettingsLight.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }
@@ -190,11 +240,6 @@ private fun UserSection(
 private fun MetaGlassesSection(glasses: GlassesController) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("META GLASSES")
-        Text(
-            "Ray-Ban Meta glasses, paired through the Meta AI app.",
-            color = SettingsLight.muted,
-            fontSize = 12.sp,
-        )
         Column(
             Modifier.fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(16.dp))
@@ -220,7 +265,7 @@ private fun BlindShareBlock(
         GlassButton(
             "\uD83D\uDCE4 Share tracking",
             true,
-            true,
+            false,
             onClick = { onStartTracking(draft) },
         )
     }
@@ -357,17 +402,10 @@ private fun ParentShareSettings(
         LabeledField("Relay write key (empty = keyless relay)", draft.shareWriteKey, true) {
             onChange(draft.copy(shareWriteKey = it))
         }
-        Text(
-            "Share sends the site link to a relative over WhatsApp, then starts the " +
-                "permanent tracking (a notification at the top of the screen). The " +
-                "« Stop tracking » button, below or in the notification, stops it.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
         if (trackingActive) {
             GlassButton("Stop tracking", true, false, onStopTracking)
         } else {
-            GlassButton("\uD83D\uDCE4 Share tracking", true, true, onClick = { onStartTracking(draft) })
+            GlassButton("\uD83D\uDCE4 Share tracking", true, false, onClick = { onStartTracking(draft) })
         }
     }
 }
@@ -382,7 +420,7 @@ private fun SettingsActions(
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
 ) {
-    GlassButton("Save", true, true, onClick = { onSave(draft) })
+    GlassButton("Save", true, false, onClick = { onSave(draft) })
     GlassButton("Test LLM", llmConfigured, false, onTestLlm)
     GlassButton("Test SAM", draft.samConfigured(), false, onTestSam)
     GlassButton("Test Meta dictation", draft.asrConfigured, false, onTestAsr)
@@ -412,7 +450,7 @@ private fun ClassicScreens(onOpenLive: () -> Unit, onOpenClassic: () -> Unit) {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        GlassButton("Direct mode (continuous video)", true, true, onOpenLive)
+        GlassButton("Direct mode (continuous video)", true, false, onOpenLive)
         GlassButton("Classic home (photo + analysis)", true, false, onOpenClassic)
     }
 }
@@ -451,11 +489,5 @@ private fun DictationSettings(draft: Settings, onChange: (Settings) -> Unit) {
             onChange(draft.copy(asrApiKey = it))
         }
         LabeledField("Meta dictation — model", draft.asrModel, false) { onChange(draft.copy(asrModel = it)) }
-        Text(
-            "Without a Meta key, dictation uses the ElevenLabs key above (Scribe). " +
-                "Long press anywhere = dictation announced in big characters.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
     }
 }
