@@ -1,13 +1,23 @@
 package dev.sam3vision.app.glasses.bench
 
+import dev.sam3vision.app.glasses.CropRect
+import dev.sam3vision.app.glasses.FRAME_THROTTLE_MS
+import dev.sam3vision.app.glasses.FrameVerdict
+import dev.sam3vision.app.glasses.cropTo16x9
+import dev.sam3vision.app.glasses.frameTimestampMs
+import dev.sam3vision.app.glasses.frameVerdict
+import dev.sam3vision.app.glasses.scaledDimensions
+import dev.sam3vision.app.glasses.throttleDelayMs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Politique de frame ([frameTimestampMs], [scaledDimensions], [cropTo16x9])
- * testée sur JVM : ces décisions étaient enfouies dans [GlassesFrameEncoder],
- * où les appeler demandait un `Bitmap` et `SystemClock`.
+ * Politique de frame partagée (horodatage, réduction, recadrage, étranglement,
+ * verdict) testée sur JVM : ces décisions étaient enfouies dans
+ * [GlassesFrameEncoder] ou le cycle du banc, où les appeler demandait un
+ * `Bitmap` et `SystemClock` — le collecteur de production les réutilise telles
+ * quelles.
  */
 class GlassesFramePolicyTest {
 
@@ -89,5 +99,85 @@ class GlassesFramePolicyTest {
         assertNull(cropTo16x9(0, 480))
         assertNull(cropTo16x9(640, 0))
         assertNull("1 px de large ne fait pas un 16:9", cropTo16x9(1, 100))
+    }
+
+    // ---- Étranglement du flux ----------------------------------------------
+
+    @Test
+    fun `la premiere frame part sans attendre`() {
+        // lastSentAtMs = 0 : l'horloge a déjà dépassé la fenêtre depuis longtemps.
+        assertEquals(0L, throttleDelayMs(lastSentAtMs = 0L, nowMs = 100_000L))
+    }
+
+    @Test
+    fun `deux frames au meme instant gardent toute la fenetre`() {
+        assertEquals(
+            FRAME_THROTTLE_MS,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L),
+        )
+    }
+
+    @Test
+    fun `une frame juste avant la fin de fenetre attend le reste`() {
+        assertEquals(
+            1L,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L + FRAME_THROTTLE_MS - 1),
+        )
+    }
+
+    @Test
+    fun `une frame apres la fenetre n attend plus`() {
+        assertEquals(
+            0L,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L + FRAME_THROTTLE_MS),
+        )
+        assertEquals(
+            0L,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L + 10 * FRAME_THROTTLE_MS),
+        )
+    }
+
+    @Test
+    fun `une horloge qui recule ne rapproche pas l envoi`() {
+        // nowMs < lastSentAtMs : l'attente dépasse la fenêtre, elle n'est pas bornée
+        // vers le haut (mieux vaut attendre que d'envoyer deux frames d'un coup).
+        assertEquals(FRAME_THROTTLE_MS + 1_000L, throttleDelayMs(lastSentAtMs = 11_000L, nowMs = 10_000L))
+    }
+
+    @Test
+    fun `la fenetre par defaut est celle du LLM`() {
+        assertEquals(1_500L, FRAME_THROTTLE_MS)
+        assertEquals(FRAME_THROTTLE_MS, throttleDelayMs(lastSentAtMs = 5L, nowMs = 5L))
+    }
+
+    // ---- Verdict sur une frame brute ---------------------------------------
+
+    @Test
+    fun `une frame brute exploitable est encodee`() {
+        assertEquals(FrameVerdict.ENCODE, frameVerdict(false, false, 640, 480))
+        // Cas dégénéré mais valide : 1x1 ne doit pas être jeté pour ses dimensions.
+        assertEquals(FrameVerdict.ENCODE, frameVerdict(false, false, 1, 1))
+    }
+
+    @Test
+    fun `une frame compressee est ecartee avant tout decodage`() {
+        assertEquals(FrameVerdict.DROP_COMPRESSED, frameVerdict(true, false, 640, 480))
+    }
+
+    @Test
+    fun `la compression prime sur le drapeau de configuration`() {
+        assertEquals(FrameVerdict.DROP_COMPRESSED, frameVerdict(true, true, 640, 480))
+    }
+
+    @Test
+    fun `une frame de configuration codec est ecartee`() {
+        assertEquals(FrameVerdict.DROP_CODEC_CONFIG, frameVerdict(false, true, 640, 480))
+    }
+
+    @Test
+    fun `des dimensions nulles ou negatives ecartent la frame`() {
+        assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, 0, 480))
+        assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, 640, 0))
+        assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, -2, -2))
     }
 }

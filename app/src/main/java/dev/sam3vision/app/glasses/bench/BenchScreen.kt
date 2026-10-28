@@ -38,6 +38,9 @@ import dev.sam3vision.app.BigButton
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.BuildDefaults
 import dev.sam3vision.app.ScreenHeader
+import dev.sam3vision.app.glasses.FrameOutcome
+import dev.sam3vision.app.glasses.GlassesAnalysisStep
+import dev.sam3vision.app.glasses.JpegFrame
 import dev.sam3vision.app.llmClient
 import dev.sam3vision.app.tap.findLifecycleOwner
 import dev.sam3vision.core.net.HttpSamClient

@@ -1,5 +1,9 @@
 package dev.sam3vision.app.glasses.bench
 
+import dev.sam3vision.app.glasses.FrameOutcome
+import dev.sam3vision.app.glasses.GlassesAnalysisStep
+import dev.sam3vision.app.glasses.JpegFrame
+import dev.sam3vision.app.glasses.logCause
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.net.HttpSamClient
 import dev.sam3vision.core.net.InferHubLlmClient
