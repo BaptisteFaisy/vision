@@ -35,6 +35,7 @@ import dev.sam3vision.app.BigButton
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.net.HttpSam31VideoClient
+import dev.sam3vision.core.net.HttpSamClient
 import dev.sam3vision.core.settings.Settings
 import java.io.File
 
@@ -65,7 +66,7 @@ fun TapCaptureScreen(
             update = { view -> view.setSystemInsets(insets.getTop(density), insets.getBottom(density)) },
             modifier = Modifier.fillMaxSize(),
         )
-        TapOverlay(status, onBack)
+        TapOverlay(status, onBack, TapConfig.sendConfigured)
     }
 }
 
@@ -86,7 +87,8 @@ private fun rememberTapSession(
             scope = dependencies.scope,
             video = dependencies.video,
             announcements = dependencies.announcements,
-            sender = { file -> dependencies.videoClient.sendVideo(file, TapConfig.UPLOAD_PROMPT) },
+            // `POST /video` d'abord, repli photo vers `/segment` sur 404 de route manquante.
+            sender = senderWithFallback(dependencies.videoClient, dependencies.segmentClient),
             onStatus = onStatus,
             owner = { context.findLifecycleOwner() },
         )
@@ -116,8 +118,8 @@ private fun rememberTapSession(
 
 /** Textes à l'écran : l'annonce vocale reste seule sur la piste audio, l'écrit la complète. */
 @Composable
-private fun TapOverlay(status: TapStatus, onBack: () -> Unit) {
-    val (title, detail, color) = statusText(status)
+private fun TapOverlay(status: TapStatus, onBack: () -> Unit, sendReady: Boolean) {
+    val (title, detail, color) = statusText(status, sendReady)
     Column(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(20.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -131,7 +133,12 @@ private fun TapOverlay(status: TapStatus, onBack: () -> Unit) {
 }
 
 /** Libellé + couleur par état, sans dépendre du son (accessible aux malvoyants). */
-private fun statusText(status: TapStatus): Triple<String, String, Color> = when (status) {
+private fun statusText(status: TapStatus, sendReady: Boolean): Triple<String, String, Color> = when (status) {
+    TapStatus.Idle if (!sendReady) -> Triple(
+        "Envoi désactivé",
+        TapConfig.sendBlockedReason() ?: "endpoint SAM 3.1 non configuré.",
+        AppColors.warning,
+    )
     TapStatus.Idle -> Triple("Touchez l'écran", "Un tap lance la vidéo ; un second tap l'envoie à SAM 3.1.", AppColors.text)
     TapStatus.Recording -> Triple("Enregistrement", "Touchez l'écran pour arrêter et envoyer.", AppColors.danger)
     TapStatus.Sending -> Triple("Envoi…", "La vidéo part à SAM 3.1.", AppColors.warning)
@@ -146,6 +153,8 @@ private class TapDependencies(
     val announcements: AnnouncementPlayer,
     val speech: SpeechPlayer,
     val videoClient: HttpSam31VideoClient,
+    /** Repli photo (`/segment`) quand le serveur n'expose pas `/video`. */
+    val segmentClient: HttpSamClient,
 )
 
 @Composable
@@ -169,6 +178,7 @@ private fun rememberTapDependencies(
             ),
             speech = speech,
             videoClient = HttpSam31VideoClient(TapConfig.sam31Endpoint, TapConfig.ON_DEVICE_INFERENCE),
+            segmentClient = HttpSamClient(TapConfig.sam31Endpoint),
         )
     }
 }
