@@ -3,6 +3,17 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — traversée : veto TTC sur boîtes SAM suivies
+
+- `VehicleApproach` (`core/.../traverse/`) : association IoU inter-frames,
+  `MotionModel` réutilisé, tau = largeur / vitesse < 3 s → veto, en OU avec
+  le veto instantané (surface/distance) ; `TraverseDecision` porte le TTC.
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630
+  (`VehicleApproachTest` 8/8, `TraverseVetoTest` 14/14 inchangés + 1),
+  UBS 0 finding, `check-kotlin-limits` OK.
+- Seuils (3 s, IoU 0,3, planchers) = priors à recaler sur téléphone ;
+  test live derrière `sam3-eu-a100` encore dû.
+
 ## 2026-10-28 — traversée : porte anti-confusion sans données
 
 - `PedLightGate` (`core/.../crossing/`) : le vert classifié ne passe que

@@ -53,6 +53,11 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
   s'il est en bas du cadre, élancé comme un bonhomme, sans rouge franc —
   méthode sans données (priors structurels + 12 tests synthétiques JVM),
   direction sûre (tout rejet vaut « attendez »).
+- Veto TTC sur boîtes SAM (`VehicleApproach`) : association IoU entre frames
+  `/live` (pas d'ids serveur), vitesse lissée (`MotionModel` réutilisé),
+  tau = largeur / vitesse < 3 s force le veto — en OU avec le veto
+  instantané. Pas de tracking serveur (app `sam3-track` non déployée, 2e
+  GPU interdite) : suivi 100 % client, zéro déploiement backend.
 
 ## 4. Ce qui tourne où (dépendances extérieures)
 
