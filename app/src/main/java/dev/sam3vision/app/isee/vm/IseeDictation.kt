@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee.vm
 import dev.sam3vision.app.media.HoldTranscript
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Texte transcrit et PCM capté pendant une tenue du doigt. */
 class Dictated(val text: String, val audio: ByteArray)
@@ -40,6 +41,7 @@ class IseeDictation(
     private val mic: IseeMic,
     private val engine: (Settings) -> SpeechClient?,
     private val update: StateUpdate,
+    private val transcribeTimeoutMs: Long = TRANSCRIBE_TIMEOUT_MS,
 ) {
 
     /** Vrai entre le début d'une tenue et son relâchement (ou son rejet). */
@@ -68,14 +70,17 @@ class IseeDictation(
     suspend fun finish(settings: Settings): Dictated? {
         if (!armed) return null
         armed = false
-        update { it.copy(transcribing = true) }
+        update { it.copy(transcribing = true, status = IseeStatusText.STEP_TRANSCRIBING) }
         try {
             val client = engine(settings)
             val outcome = if (client == null) {
                 Result.failure<Dictated>(IllegalStateException(IseeStatusText.NO_DICTATION_ENGINE))
             } else {
-                mic.stop(client).map { (text, pcm) -> Dictated(text, pcm) }
+                transcribe(client).map { (text, pcm) -> Dictated(text, pcm) }
             }
+            // Succès : l'étape s'efface (la question ou l'ordre vocal pose la sienne) ;
+            // échec : `failed` pose le motif, jamais écrasé ici.
+            if (outcome.isSuccess) update { it.copy(status = null) }
             return outcome.getOrElse(::failed)
         } finally {
             // Garanti aussi sur annulation : le « … » ne reste jamais affiché.
@@ -89,10 +94,28 @@ class IseeDictation(
         mic.abort()
     }
 
+    /**
+     * Coupe le micro et transcrit, borné ([transcribeTimeoutMs]) : l'échéance nomme
+     * l'étape au lieu d'attendre en silence. Une annulation extérieure passe telle
+     * quelle, jamais convertie en timeout.
+     */
+    private suspend fun transcribe(client: SpeechClient): Result<Pair<String, ByteArray>> =
+        withTimeoutOrNull(transcribeTimeoutMs) { mic.stop(client) }
+            ?: Result.failure(StepTimeout(IseeStatusText.STEP_TRANSCRIBING))
+
     /** Échec de transcription : micro rendu, motif affiché, conversation intacte. */
     private fun failed(error: Throwable): Dictated? {
         discard()
         update { it.copy(status = IseeStatusText.dictationFailed(error)) }
         return null
+    }
+
+    companion object {
+        /**
+         * Plafond de la transcription (Meta puis Scribe : 60 s chacun en pire cas).
+         * Une double attente complète est coupée avant son terme : cette chaîne-là
+         * n'aboutit de toute façon plus à une réponse utile.
+         */
+        const val TRANSCRIBE_TIMEOUT_MS = 75_000L
     }
 }

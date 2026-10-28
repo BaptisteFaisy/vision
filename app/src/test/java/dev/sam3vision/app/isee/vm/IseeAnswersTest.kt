@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee.vm
 
+import dev.sam3vision.app.PlaybackEnd
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isee.IseeCameraActions
 import dev.sam3vision.app.isee.IseePlayback
@@ -45,17 +46,17 @@ class IseeAnswersTest {
         ask: suspend (String, String, List<ChatTurn>) -> Result<String>,
         synthesize: suspend (String) -> ByteArray = { ByteArray(0) },
         photo: IseePhotoShot = shots,
+        askTimeoutMs: Long = IseeAnswers.ASK_TIMEOUT_MS,
     ): IseeAnswers = IseeAnswers(
-        dao = dao,
         media = media,
         settings = { settings },
         update = ::update,
         transcript = transcript,
-        synthesize = synthesize,
-        playback = playback(),
+        playback = playback(synthesize),
         photo = photo,
         prune = {},
         ask = ask,
+        askTimeoutMs = askTimeoutMs,
     )
 
     /** Réponses branchées sur une clé LLM absente : le contexte photo doit partir aussi. */
@@ -63,12 +64,10 @@ class IseeAnswersTest {
         photo: IseePhotoShot = shots,
         ask: suspend (String, String, List<ChatTurn>) -> Result<String> = { _, _, _ -> Result.success("ok") },
     ): IseeAnswers = IseeAnswers(
-        dao = dao,
         media = media,
         settings = { Settings.Default },
         update = ::update,
         transcript = transcript,
-        synthesize = { ByteArray(0) },
         playback = playback(),
         photo = photo,
         prune = {},
@@ -228,6 +227,66 @@ class IseeAnswersTest {
     }
 
     @Test
+    fun `pendant la question — l'etape Asking est affichee`() = runBlocking {
+        val gate = CompletableDeferred<Result<String>>()
+        val answers = answers({ _, _, _ -> gate.await() })
+        val job = launch { answers.answer(seedRow(), "question") }
+        withTimeout(2_000) { while (state.value.status != IseeStatusText.STEP_ASKING) delay(5) }
+
+        assertTrue("le « … » est affiché pendant l'étape", state.value.thinking)
+
+        gate.complete(Result.success("ok"))
+        job.join()
+    }
+
+    @Test
+    fun `question qui depasse le plafond — motif d'etape, puis la suivante passe`() = runBlocking {
+        val gate = CompletableDeferred<Result<String>>()
+        var calls = 0
+        val answers = answers(
+            ask = { _, _, _ -> calls++; if (calls == 1) gate.await() else Result.success("reprise") },
+            askTimeoutMs = 50,
+        )
+        val row = seedRow()
+
+        answers.answer(row, "question")
+
+        assertEquals("Asking timed out — try again", state.value.status)
+        assertFalse("le « … » est retiré", state.value.thinking)
+
+        answers.answer(row, "question")
+
+        assertEquals("la question suivante passe", "reprise", dao.byId(row.id)?.texteIA)
+    }
+
+    @Test
+    fun `pendant la voix — l'etape Speaking est affichee`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val streaming = playback(
+            synthesize = { byteArrayOf(1, 2) },
+            playSlice = { entered.complete(Unit); release.await(); Result.success(PlaybackEnd.Done) },
+        )
+        val answers = IseeAnswers(
+            media = media,
+            settings = { settings },
+            update = ::update,
+            transcript = transcript,
+            playback = streaming,
+            photo = shots,
+            prune = {},
+            ask = { _, _, _ -> Result.success("Devant toi") },
+        )
+        val job = launch { answers.answer(seedRow(), "question") }
+        withTimeout(2_000) { entered.await() }
+
+        assertEquals(IseeStatusText.STEP_SPEAKING, state.value.status)
+
+        release.complete(Unit)
+        job.join()
+    }
+
+    @Test
     fun `deux questions en meme temps — un seul appel au modele`() = runBlocking {
         val calls = AtomicInteger()
         val inFlight = CompletableDeferred<Unit>()
@@ -264,12 +323,16 @@ class IseeAnswersTest {
         state.value = fn(state.value)
     }
 
-    private fun playback(): IseePlayback = IseePlayback(
+    private fun playback(
+        synthesize: suspend (String) -> ByteArray = { ByteArray(0) },
+        playSlice: suspend (ByteArray) -> Result<PlaybackEnd> = { Result.success(PlaybackEnd.Done) },
+    ): IseePlayback = IseePlayback(
         dao = dao,
         media = media,
         player = SpeechPlayer(File(tempDir(), "play")),
         update = ::update,
-        synthesize = { ByteArray(0) },
+        synthesize = synthesize,
+        playSlice = playSlice,
     )
 
     /** Contexte photo de test : [encode] simule le décodage JPEG, absent sur JVM. */

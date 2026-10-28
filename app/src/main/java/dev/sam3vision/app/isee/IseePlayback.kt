@@ -1,10 +1,18 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.PlaybackEnd
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.isee.vm.IseeStatusText
+import dev.sam3vision.app.isee.vm.StepTimeout
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
 import dev.sam3vision.app.media.MessageMultimediaDao
+import dev.sam3vision.core.audio.SentenceChunker
 import java.io.File
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * La lecture du chat iSee, extraite du ViewModel (limite de 500 lignes, même motif
@@ -19,12 +27,40 @@ class IseePlayback(
     private val update: ((IseeUiState) -> IseeUiState) -> Unit,
     private val synthesize: suspend (String) -> ByteArray,
     private val playBytes: suspend (ByteArray) -> Result<Unit> = { bytes -> player.play(bytes) },
+    private val playSlice: suspend (ByteArray) -> Result<PlaybackEnd> = { bytes -> player.playQueued(bytes) },
 ) {
 
     /** La réponse la plus récente est jouée à voix haute dès son arrivée. */
     suspend fun speakLatestAnswer() {
         val row = dao.all().lastOrNull { !it.texteIA.isNullOrBlank() } ?: return
         playFromRow(row, preferAi = true)
+    }
+
+    /**
+     * Réponse lue en continu : découpée en phrases ([SentenceChunker]), chaque tranche
+     * est synthétisée pendant la lecture de la précédente — la première part dès
+     * qu'elle est prête au lieu d'attendre la synthèse entière. Le MP3 rejouable est
+     * la concaténation des tranches (les lecteurs MP3 resynchronisent aux frontières).
+     * Couper ([SpeechPlayer.stop] extérieur) arrête proprement sans erreur ; une synthèse
+     * qui dépasse son plafond lève [StepTimeout], une lecture en échec remonte son motif.
+     */
+    suspend fun speakStreaming(row: MessageMultimedia, text: String, synthTimeoutMs: Long = SYNTH_SLICE_TIMEOUT_MS) {
+        val parts = SentenceChunker.chunk(text)
+        if (parts.isEmpty()) {
+            update { it.copy(status = null) }
+            return
+        }
+        val id = bubbleId(row.id, true)
+        update { it.copy(speakingEntryId = id, status = null) }
+        try {
+            val bytes = streamSlices(parts, synthTimeoutMs)
+            if (bytes.isNotEmpty()) saveStreamed(row, bytes)
+        } finally {
+            // Comme le `onComplete` d'une lecture simple : l'état parlant ne survit
+            // ni au succès, ni à l'échec, ni à l'annulation — gardé par l'ID, une
+            // lecture plus récente ne perd pas le sien.
+            update { st -> st.copy(speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId) }
+        }
     }
 
     /**
@@ -76,7 +112,60 @@ class IseePlayback(
         }
     }
 
+    /**
+     * Tranches jouées dans l'ordre, la synthèse suivante tournant pendant la lecture
+     * en cours : un cran d'avance suffit, la lecture est le goulot. Rend les octets
+     * joués, partiels si un [SpeechPlayer.stop] extérieur a coupé entre deux tranches.
+     */
+    private suspend fun streamSlices(parts: List<String>, synthTimeoutMs: Long): ByteArray = coroutineScope {
+        val played = mutableListOf<ByteArray>()
+        var prefetch: Deferred<ByteArray?>? = null
+        for ((index, part) in parts.withIndex()) {
+            // `await` puis test, jamais `?:` : une tranche pré-chargée vide est un
+            // résultat (on passe à la suivante), pas une raison de re-synthétiser.
+            val pending = prefetch
+            prefetch = null
+            val bytes = if (pending != null) pending.await() else synthSlice(part, synthTimeoutMs)
+            if (index + 1 < parts.size) prefetch = async { synthSlice(parts[index + 1], synthTimeoutMs) }
+            if (bytes == null) continue
+            when (playSlice(bytes).getOrThrow()) {
+                PlaybackEnd.Done -> played += bytes
+                PlaybackEnd.Stopped -> {
+                    prefetch?.cancel()
+                    break
+                }
+            }
+        }
+        prefetch?.cancel()
+        played.fold(ByteArray(0)) { acc, slice -> acc + slice }
+    }
+
+    /**
+     * Une tranche, bornée : `null` = rien à dire (bénin, la synthèse a déjà posé son
+     * motif s'il y a lieu), l'échéance lève [StepTimeout]. Une annulation extérieure
+     * passe telle quelle, jamais convertie en timeout.
+     */
+    private suspend fun synthSlice(part: String, timeoutMs: Long): ByteArray? {
+        val bytes = withTimeoutOrNull(timeoutMs) { synthesize(part) }
+            ?: throw StepTimeout(IseeStatusText.STEP_SPEAKING)
+        return bytes.takeIf { it.isNotEmpty() }
+    }
+
+    /** Concaténation rejouable : les tranches entendues, dans l'ordre. */
+    private suspend fun saveStreamed(row: MessageMultimedia, bytes: ByteArray) {
+        val updated = dao.byId(row.id) ?: row
+        media.saveReplyAudio(updated, bytes)
+    }
+
     private fun existingFile(path: String): File? = File(path).takeIf { it.isFile }
+
+    companion object {
+        /**
+         * Plafond d'une tranche (synthèse normale : 1 à 5 s). Au-delà, le flux
+         * s'interrompt avec son motif au lieu d'attendre les 60 s du client HTTP.
+         */
+        const val SYNTH_SLICE_TIMEOUT_MS = 25_000L
+    }
 }
 
 /** Motif unique d'échec de lecture, fichier comme octets : une seule phrase à l'écran. */

@@ -4,36 +4,39 @@ import dev.sam3vision.app.isee.IseePlayback
 import dev.sam3vision.app.llmClient
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
-import dev.sam3vision.app.media.MessageMultimediaDao
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Le chemin de la réponse : question écrite en base, image = photo-contexte, texte
- * rendu par le LLM, puis voix et relecture de la dernière réponse.
+ * rendu par le LLM, puis voix lue en continu, tranche par tranche.
  *
  * **Aucune mémoire** : la question part avec une liste d'historique **toujours vide**
  * (`emptyList()`) — le LLM ne reçoit jamais les messages précédents, même dans la
  * même session. Les tours ne sont plus jamais lus de la base.
  *
+ * L'écran dit l'étape en cours ([IseeStatusText.STEP_ASKING], puis
+ * [IseeStatusText.STEP_SPEAKING]) et la question au LLM est plafonnée : au-delà,
+ * le motif nomme l'étape au lieu d'un « … » muet.
+ *
  * Les clients (LLM, ElevenLabs) viennent de `:core` et des fabriques de l'app
  * (`llmClient`) : aucune implémentation réseau ici.
  */
 class IseeAnswers(
-    private val dao: MessageMultimediaDao,
     private val media: MediaCacheStore,
     private val settings: () -> Settings,
     private val update: StateUpdate,
     private val transcript: IseeTranscript,
-    private val synthesize: suspend (String) -> ByteArray,
     private val playback: IseePlayback,
     private val photo: IseePhotoShot,
     private val prune: suspend () -> Unit,
     private val ask: suspend (image: String, question: String, history: List<ChatTurn>) -> Result<String> =
         { image, question, history -> AskUseCase(llmClient(settings())).invoke(image, question, history) },
+    private val askTimeoutMs: Long = ASK_TIMEOUT_MS,
 ) {
 
     /**
@@ -73,6 +76,7 @@ class IseeAnswers(
             val image = runCatching { photo.imageBase64() }
                 .onFailure { it.rethrowIfCancelled() }
                 .getOrNull()
+            update { it.copy(status = IseeStatusText.STEP_ASKING) }
             outcome(row, image.orEmpty(), question).onFailure { error ->
                 error.rethrowIfCancelled()
                 update { it.copy(status = IseeStatusText.questionFailed(error)) }
@@ -89,6 +93,7 @@ class IseeAnswers(
     /**
      * Question → texte et voix. Aucune sortie anormale ne laisse l'écran muet : un échec
      * du LLM comme une exception d'écriture ou de synthèse revient en [Result] avec son motif.
+     * La question au LLM est plafonnée ([askTimeoutMs]) : l'échéance nomme l'étape.
      */
     private suspend fun outcome(
         row: MessageMultimedia,
@@ -96,22 +101,32 @@ class IseeAnswers(
         question: String,
     ): Result<Unit> =
         // Zéro mémoire : la liste est vide, quoi que la base garde encore.
-        runCatching { ask(image, question, emptyList()) }
+        runCatching {
+            withTimeoutOrNull(askTimeoutMs) { ask(image, question, emptyList()) }
+                ?: throw StepTimeout(IseeStatusText.STEP_ASKING)
+        }
             .getOrElse { Result.failure(it) }
             .fold(
                 onSuccess = { answer -> runCatching { spoken(row, answer) } },
                 onFailure = { error -> Result.failure(error) },
             )
 
-    /** Réponse reçue : texte affiché même si la voix échoue, puis MP3 en cache et lecture. */
+    /** Réponse reçue : texte affiché même si la voix échoue, puis lecture en continu. */
     private suspend fun spoken(row: MessageMultimedia, answer: String) {
         media.setAnswerText(row, answer)
         transcript.refresh()
-        val bytes = synthesize(answer)
-        if (bytes.isEmpty()) return
-        media.saveReplyAudio(dao.byId(row.id) ?: row, bytes)
+        update { it.copy(status = IseeStatusText.STEP_SPEAKING) }
+        playback.speakStreaming(row, answer)
         prune()
-        playback.speakLatestAnswer()
+    }
+
+    companion object {
+        /**
+         * Plafond de la question au LLM (client HTTP : 60 s). Au-delà, l'écran nomme
+         * l'étape au lieu d'attendre en silence ; une annulation extérieure passe
+         * telle quelle, jamais convertie en timeout.
+         */
+        const val ASK_TIMEOUT_MS = 65_000L
     }
 }
 
