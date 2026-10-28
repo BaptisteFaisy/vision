@@ -16,15 +16,15 @@ package dev.sam3vision.core.crossing
 object PedLightColor {
 
     /** Teinte rouge : en dessous (côté 0°) ou au dessus (côté 360°). */
-    private const val RED_HUE_DEG = 15f
+    internal const val RED_HUE_DEG = 15f
 
     /** Plage de teinte du vert piéton (le vert français tire vers le bleu). */
-    private const val GREEN_HUE_MIN_DEG = 80f
-    private const val GREEN_HUE_MAX_DEG = 175f
+    internal const val GREEN_HUE_MIN_DEG = 80f
+    internal const val GREEN_HUE_MAX_DEG = 175f
 
     /** Saturation et valeur minimales : un feu allumé est franc, pas pastel. */
-    private const val MIN_SATURATION = 0.45f
-    private const val MIN_VALUE = 0.35f
+    internal const val MIN_SATURATION = 0.45f
+    internal const val MIN_VALUE = 0.35f
 
     /** Fraction de pixels colorés exigée pour trancher (un bonhomme dans sa boîte). */
     private const val MIN_FRACTION = 0.06f

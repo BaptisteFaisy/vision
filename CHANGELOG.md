@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — traversée : porte anti-confusion sans données
+
+- `PedLightGate` (`core/.../crossing/`) : le vert classifié ne passe que
+  s'il est en bas du cadre (≥ 70 %), élancé (hauteur ≥ 1,15 × largeur),
+  sans rouge franc (≤ 2 %) — feu de voiture rond, reflet et crop serré
+  retombent en doute ; `crossingStateOf` l'applique (sonde + direct).
+- Méthode sans données : priors structurels + 12 tests synthétiques JVM
+  (`PedLightGateTest`) prouvant la sûreté (jamais de vert inventé), pas la
+  justesse terrain — calibration FR toujours due.
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630, UBS 0
+  finding nouveau, `check-kotlin-limits` OK.
+
 ## 2026-10-28 — traversée : le direct décide (PR #163-167, #174)
 
 - Paquet `traverse/` : hystérésis (`TraverseState`), veto trafic
