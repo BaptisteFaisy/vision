@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
                 ),
             )
         }
-        // Recette adb générique : `--es route segment` ouvre l'écran nommé.
+        // Recette adb générique : `--es route <nom>` ouvre l'écran nommé.
         intent.getStringExtra(EXTRA_ROUTE)?.let { RouteRequest.push(it) }
     }
 

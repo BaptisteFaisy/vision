@@ -54,7 +54,7 @@ object RouteRequest {
 }
 
 /**
- * Ouvre l'écran demandé de l'extérieur — la recette adb (`--es route segment`)
+ * Ouvre l'écran demandé de l'extérieur — la recette adb (`--es route ...`)
  * arrive avant la composition de la pile. La demande est consommée ici : un
  * seul push, même si l'effet rejoue sur la remise à `null`.
  */
@@ -130,6 +130,19 @@ sealed interface Route {
 private fun BenchRequestEffect(push: (Route) -> Unit) {
     val request by BenchEntryPoint.pending.collectAsState()
     LaunchedEffect(request) { if (request != null) push(Route.Bench) }
+}
+
+/**
+ * Ouvre l'écran demandé de l'extérieur — la recette adb (`--es route nanodet`)
+ * arrive avant la composition de la pile. La demande est consommée ici : un
+ * seul push, même si l'effet rejoue sur la remise à `null`.
+ */
+@Composable
+private fun RouteRequestEffect(push: (Route) -> Unit) {
+    val request by RouteRequest.pending.collectAsState()
+    LaunchedEffect(request) {
+        RouteRequest.consume()?.let { push(routeFromName(it)) }
+    }
 }
 
 /**
