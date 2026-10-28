@@ -16,6 +16,7 @@ unique du 26/10.
 
 - `README.md` — fonctionnalités réelles, transport du direct, endpoints, sécurité (clé debug).
 - `NOTES.md` — versions épinglées et décisions techniques.
+- `docs/ARCHITECTURE.md` + `docs/PERF.md` — état du produit et chiffres tenus.
 - `docs/CI-QUEUE.md` — CI, budget 5 min par job, gardes `couche0` / `stale-base-guard`, contrat `## Scope`.
 - `docs/NETTOYAGE.md` — purge horaire (Room + WorkManager).
 - `docs/META-ASR.md` — contrat dictée Meta Muse (facturation 402, pièges).
@@ -29,26 +30,30 @@ unique du 26/10.
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
 - `docs/ISEE-DESIGN-PORTRAIT.md` — design Portrait de l'écran iSee, obligatoire (§3.12).
+- `server/README.md` + `server/docs/` — backend Modal (direct déployé, Valhalla CPU,
+  tracker, legacy) : lire avant de toucher `server/` ou un endpoint.
+- `suivi-parent/README.md` — page du proche, embarquée dans l'APK.
 - `CHANGELOG.md` — historique.
 
 ## 1. C'est quoi ce dépôt
 
 App Android native **Kotlin/Compose** : photo → description par un LLM vision → questions/réponses ;
 dictée Meta ASR (repli ElevenLabs Scribe), voix ElevenLabs (TTS), segmentation **SAM 3.1** sur
-endpoint Modal ; **iSee en écran d'accueil** (chat plein écran + fenêtre caméra flottante,
-gestes, masques, distances, voix). Les anciens écrans (Capture/Analyse/Chat/Direct/Tap) restent
-là, atteignables par « Autres écrans » des Réglages (`app/AppNav.kt:63-81`,
-`app/SettingsScreen.kt:151-160`).
-**Aucun code de backend ici, aucune clé dans le dépôt.**
+endpoint Modal ; **iSee en écran d'accueil** (bulle de verre plein écran, caméra fondue en
+haut, gestes, masques, distances, voix). Les anciens écrans (Capture/Analyse/Chat/Direct/Tap) restent
+là, atteignables depuis les Réglages, section « Other screens »
+(`app/SettingsScreen.kt:400-409`, routes `app/AppNav.kt:37-75`).
+**Backend dans `server/`** (Modal : direct déployé, Valhalla CPU, tracker, legacy) ;
+**aucune clé dans le dépôt.**
 
 | Élément | Valeur |
 |---|---|
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
-| `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:84`) |
+| `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), `LivePrompts.MAX = 6` (`core/live/LivePrompts.kt:27,34`) |
-| Tests | **1 462 `@Test`** JVM (`:core` 947, `:app` 515, mesure du 27/10/2026 : 194 classes, 0 échec) + 7 instrumentés (`:app` : 6 `CaptureCleanupTest`, 1 `MockGlassesTest`) |
-| Taille | **492** fichiers `.kt`, **30 289** lignes de prod (`:core` 11 654, `:app` 18 635, mesure du 27/10/2026) |
+| Tests | **2 180 `@Test`** JVM (`:core` 1 403, `:app` 777, mesure statique du 28/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
+| Taille | **730** fichiers `.kt`, **43 219** lignes de prod (`:core` 16 516, `:app` 26 703, mesure du 28/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
@@ -68,18 +73,19 @@ vient de `JAVA_HOME` / `ANDROID_HOME` (§3.3).
 Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle passe sous
 `timeout 280` : un build bloqué ne doit jamais manger la session. Tests JVM uniquement
 (`TestHttpServer` maison, pas de MockWebServer) ; pas d'instrumentation sans demande explicite
-(les 7 tests `androidTest` exigent un appareil).
+(les 10 tests `androidTest` exigent un appareil).
 
 ## 3. Règles strictes — la CI échoue si elles sont violées
 
 1. **Tailles Kotlin** : fichier `.kt` < 500 lignes, fonction/composable < 50 lignes
-   (`tools/check-kotlin-limits.py`, `ci.yml:129-131`). **Zéro duplication** : paramétrer et
-   extraire un helper plutôt que copier. Le garde-fou passe sans exception sur cet arbre ; le
-   plus gros fichier est `app/LiveViewModel.kt` (**492** lignes) — ne pas le faire
-   grossir, extraire comme ça a été fait pour `app/isee/IseeScenePane.kt` (487 → 222 lignes,
-   en-tête/dissolution/couches sortis), `app/isee/LiveProbe.kt` (489 → 471 lignes,
-   `cleared()`/`probeFailureText()` sortis et testés) et `app/LiveViewModel.kt` lui-même
-   (498 → 492, `frameErrorState()`/`transportLabel()` purs et testés).
+   (`tools/check-kotlin-limits.py`, `ci.yml:139-140`). **Zéro duplication** : paramétrer et
+   extraire un helper plutôt que copier. Le garde-fou passe sans exception sur cet arbre ; les
+   plus gros fichiers sont `app/isee/LiveProbe.kt` (**495** lignes) et `app/LiveViewModel.kt`
+   (**493**) — ne pas les faire grossir, extraire comme ça a été fait pour
+   `app/isee/IseeScenePane.kt` (487 → 222 lignes, en-tête/dissolution/couches sortis),
+   `app/isee/LiveProbe.kt` (489 → 471, `cleared()`/`probeFailureText()` sortis et testés,
+   remonté à 495 depuis — au plafond) et `app/LiveViewModel.kt` lui-même
+   (498 → 492, `frameErrorState()`/`transportLabel()` purs et testés, remonté à 493).
 2. **Aucune clé ni secret versionné** (`sk-…`, `sk_…`, `ghp_…`), jamais de `local.properties`.
    Les clés vivent dans Réglages (chiffré, Keystore, repli `PrivateFileSettingsStore`) ou
    `local.properties` (gitignoré) → `BuildConfig`. **Par défaut** (demande 2026-10-26) l'APK
@@ -87,7 +93,7 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
    (`docs/CLES-DU-BUILD.md`) : un APK est donc extractible, ne le distribuer qu'aux personnes à
    qui on prête ces clés, jamais en public.
 3. **Jamais de ligne `org.gradle.java.home=`** dans le `gradle.properties` versionné —
-   portabilité par `JAVA_HOME` (`gradle.properties:21-24`, garde CI `ci.yml:95-100`). Le JDK se
+   portabilité par `JAVA_HOME` (`gradle.properties:25-27`, garde CI `ci.yml:103-110`). Le JDK se
    règle dans `~/.gradle/gradle.properties` du poste.
 4. **Dépendances** : toute dépendance Gradle nouvelle se déclare dans `app/DEPS.txt` **avant**
    usage (budget CI 5 min ; un artefact hors cache = téléchargement froid = échec).
@@ -98,17 +104,17 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
    défaut), **une seule fabrique pour le direct** (`core/net/LiveClientFactory.kt` →
    `liveClient()`, WebSocket ; `LiveProbe` et `LiveViewModel` partagent cette fabrique), un seul
    mapper JSON (`org.json`, `net/Json.kt`). Pas de Retrofit, pas de kotlinx-serialization, pas
-   de MockWebServer. `Result.flatMap` n'existe pas → helper `Result.then` (`net/Http.kt:256`).
+   de MockWebServer. `Result.flatMap` n'existe pas → helper `Result.then` (`net/Http.kt:306`).
 7. **Direct = WebSocket, pas de repli HTTP sur les frames.** `POST /live` **n'est plus appelé**
-   en production : le seul appel de `LiveClient.live(…)` en prod part de `LiveSession.kt:134`,
+   en production : le seul appel de `LiveClient.live(…)` en prod part de `LiveSession.kt:138`,
    et le client vient toujours de `liveClient()` → `WsLiveClient`. `HttpLiveClient` ne garde
    `POST /live` que pour les tests JVM, et n'est monté dans la fabrique que pour déléguer
-   `GET /health` (`LiveClientFactory.kt:37-38`, `WsLiveClient.kt:82`). Ne pas le réintroduire.
+   `GET /health` (`LiveClientFactory.kt:47`, `WsLiveClient.kt:98`). Ne pas le réintroduire.
    `POST /segment` (photo) et `POST /video` (mode tap) restent HTTP — **`/video` n'a aucune
    implémentation backend connue** : le client est écrit, la route serveur n'est pas
-   vérifiable ici. Toute frame WS porte un `id` et se corrélie par **file par `id`**
-   (`core/net/WsLiveClient.kt`) ; le transport s'injecte via `WsTransport` pour rester
-   testable sans réseau.
+   vérifiable ici (`git grep -n '"/video"' server/backend` vide). Toute frame WS porte un `id`
+   et se corrèle par **file par `id`** (`core/net/WsLiveClient.kt`) ; le transport s'injecte
+   via `WsTransport` pour rester testable sans réseau.
 8. **Architecture JVM** : la logique testable vit dans `:core` ; les wrappers plateforme
    (Bitmap, MediaPlayer, Compose) restent fins, dans `:app`.
 9. **GPU Modal — une seule carte à la fois**, toutes régions confondues (`docs/MODE-US.md`).
@@ -139,8 +145,8 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
   **6 concepts** (`core/live/LivePrompts.kt:27,34`) et **deux cadences** — Direct
-  350/500/900 ms (`core/live/LiveSession.kt:33`), sonde iSee `fastMs = 0`, `concurrency = 1`,
-  budget 150 ms (`LiveSession.kt:42-47`).
+  350/500/900 ms (`core/live/LiveSession.kt:34`), sonde iSee `fastMs = 0`, `concurrency = 1`,
+  budget 150 ms (`LiveSession.kt:43-50`).
 - Langue du projet : **français** (code commenté, commits `feat(isee): …`, docs).
 
 ## 4 bis. Arbre de travail — partir d'un état vérifié, jamais d'un arbre sale

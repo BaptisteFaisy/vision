@@ -12,23 +12,23 @@ chiffres ci-dessous ont été obtenus est **r630** (serveur Debian, JDK 17), pas
 Un chiffre de téléphone lu dans un commentaire de code reste un commentaire, pas une mesure de
 cet arbre.
 
-## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté le 27/10/2026 après le retrait du module lunettes)
+## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté le 27/10/2026 après le retrait du module lunettes ; recompté le 28/10/2026)
 
 ### 1.1 Taille de l'arbre
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **503** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **54 551** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **197** (126 `:core` + 71 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **907** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
-| `@Test` JVM `:app` | **466** | idem sur `app/src/test` (dont **84** dans `glasses/bench`) |
-| **Total JVM** | **1 373** | somme des deux lignes |
-| Tests instrumentés | **7** (6 purge des captures + 1 banc lunettes) | idem sur `src/androidTest` et `src/androidTestDebug` |
-| Garde de taille | **522** fichiers `.kt`/`.kts`/`.py` inspectés, **1** dépassement (`app/AppNav.kt:64`, fonction de 54 l.) | `python3 tools/check-kotlin-limits.py` |
-| Gardes de scripts | **53** assertions, 53 ok | `bash scripts/test_scripts.sh` |
-| Tests de l'outillage | **28** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py` |
-| Budget CI | 4 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
+| Fichiers Kotlin | **730** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **76 370** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **315** (193 `:core` + 122 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **1 403** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| `@Test` JVM `:app` | **777** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
+| **Total JVM** | **2 180** | somme des deux lignes |
+| Tests instrumentés | **10** (9 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
+| Garde de taille | **807** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
+| Gardes de scripts | **117** assertions, 117 ok | `bash scripts/test_scripts.sh` |
+| Tests de l'outillage | **58** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py` |
+| Budget CI | 8 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
 
 ### 1.2 Tests réellement exécutés par Gradle
 
@@ -40,10 +40,11 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 
 Relevé du 26/10 après 19 h, sur r630 : **`:core` 663 tests / 0 échec / 0 ignoré** (86 classes),
 **`:app` 305 / 0 / 0** (50 classes) et **36 / 0 / 0** (3 classes) pour le module lunettes, supprimé
-depuis : ses tests vivent maintenant dans `:app` (`glasses/bench`, **84** `@Test`). Ce relevé n'a
-**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (907 + 466,
-recomptés le 27/10) disent combien de tests **existent**, pas combien ont **tourné** ce jour-là.
-Les 7 tests instrumentés ne sont **pas** dans ces chiffres (aucun appareil n'a été utilisé).
+depuis : ses tests vivent maintenant dans `:app` (`glasses/bench`, **95** `@Test`). Ce relevé n'a
+**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (1 403 + 777,
+recomptés le 28/10) disent combien de tests **existent**, pas combien ont **tourné** ce jour-là.
+Recomptage du 28/10 : statique (`grep`), aucun `gradlew` relancé.
+Les 10 tests instrumentés ne sont **pas** dans ces chiffres (aucun appareil n'a été utilisé).
 
 ### 1.3 Mesures JVM du chemin chaud (imprimées par les tests)
 
@@ -84,27 +85,27 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Constante | Valeur | Fichier:ligne |
 |---|---|---|
 | Délai HTTP générique | **60 s** | `core/net/Http.kt:28` (`DEFAULT_TIMEOUT_SECONDS`) |
-| Délai d'une frame (compatibilité) | **10 s** | `core/net/HttpLiveClient.kt:13` (`LIVE_TIMEOUT_SECONDS`) |
-| Délai du réveil `/health` | **180 s** | `core/net/HttpLiveClient.kt:21` (`WAKE_TIMEOUT_SECONDS`) |
+| Délai d'une frame (compatibilité) | **10 s** | `core/net/HttpLiveClient.kt:14` (`LIVE_TIMEOUT_SECONDS`) |
+| Délai du réveil `/health` | **180 s** | `core/net/HttpLiveClient.kt:22` (`WAKE_TIMEOUT_SECONDS`) |
 | Délai d'extinction `/release` | **45 s** | `core/net/SamLifecycle.kt:10` (`RELEASE_TIMEOUT_SECONDS`) |
-| Délai d'envoi vidéo (mode tap) | **120 s** | `core/net/HttpSam31VideoClient.kt:69` (`UPLOAD_TIMEOUT_SECONDS`) |
+| Délai d'envoi vidéo (mode tap) | **120 s** | `core/net/HttpSam31VideoClient.kt:71` (`UPLOAD_TIMEOUT_SECONDS`) |
 | Délai du tracker | **15 s** | `core/net/TrackClient.kt:11` (`TRACK_TIMEOUT_SECONDS`) |
-| Cadence du tracker | plancher **33 ms** (30 fps), plafond **500 ms**, **1** frame en vol | `core/live/TrackRunner.kt:153-159` (`TARGET_FPS`, `MIN_INTERVAL_MS`, `MAX_INTERVAL_MS`) |
-| Client du direct | connexion 3 s, écriture 5 s, lecture 60 s, `callTimeout` 0 | `core/net/Http.kt:86-88` |
-| Pool du direct | 8 connexions inactives, 5 min | `core/net/Http.kt:65` |
-| Cadence Direct (plancher / cible / lent) | **350 / 500 / 900 ms** | `core/live/LiveSession.kt:33` (`Cadence.Direct`) |
-| Cadence iSee | pas de plancher, **1 créneau**, budget **150 ms**, hystérésis **3** mesures, réouverture sous **0,5 ×** budget | `core/live/LiveSession.kt:42-47,168,171` |
+| Cadence du tracker | plancher **33 ms** (30 fps), plafond **500 ms**, **1** frame en vol | `core/live/TrackRunner.kt:232-238` (`TARGET_FPS`, `MIN_INTERVAL_MS`, `MAX_INTERVAL_MS`), créneau unique (`submit`, `:120`) |
+| Client du direct | connexion 3 s, écriture 5 s, lecture 60 s, `callTimeout` 0 | `core/net/Http.kt:85-88,110-115` |
+| Pool du direct | 8 connexions inactives, 5 min | `core/net/Http.kt:43` |
+| Cadence Direct (plancher / cible / lent) | **350 / 500 / 900 ms** | `core/live/LiveSession.kt:34` (`Cadence.Direct`) |
+| Cadence iSee | pas de plancher, **1 créneau**, budget **150 ms**, hystérésis **3** mesures, réouverture sous **0,5 ×** budget | `core/live/LiveSession.kt:43-50,195,198` |
 | Fenêtre de réveil du Direct | **60 s** | `app/live/LiveWakeGuard.kt` (`WAKE_TIMEOUT_MS`) |
-| Côté long de la frame iSee | **320 px** (qualité 55) | `app/isee/IseeCameraPane.kt:39,42` |
-| Côté long de la frame du Direct | **512 px** | `app/LiveScreen.kt:45` (`LIVE_EDGE`) |
-| `work_edge` par défaut du direct | **640 px** | `core/live/LiveSession.kt:173` (`DEFAULT_WORK_EDGE`) |
+| Côté long de la frame iSee | **320 px** (qualité 55) | `app/isee/IseeCameraPane.kt:43,46` |
+| Côté long de la frame du Direct | **512 px** | `app/LiveScreen.kt:55` (`LIVE_EDGE`) |
+| `work_edge` par défaut du direct | **512 px** | `core/live/LiveSession.kt:211` (`DEFAULT_WORK_EDGE`) |
 | Objets affichés par défaut | **8** (bornes 1–12) | `core/model/ObjectLimits.kt:16-18` |
 | Concepts suivis par défaut | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), max 6, 32 caractères | `core/live/LivePrompts.kt:27,34,37` |
-| Budget de tokens du LLM | **1200** (photo/chat, le défaut raisonne avant de répondre), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/HttpLlmClient.kt:11-21` |
+| Budget de tokens du LLM | **1200** (photo/chat, le défaut raisonne avant de répondre), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/HttpLlmClient.kt:21-24` |
 | Modèle de narration | **même** modèle Meta que les questions : `meta-models/muse-spark-open-1026` (Baseten, raisonnement coupé), clé dédiée (`liveLlmApiKey`) ; sans clé, le Direct se tait | `core/settings/Settings.kt` (`DEFAULT_LIVE_LLM_MODEL`), `app/LlmFactory.kt` (`liveNarration`) |
-| Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:60` (`MAX_HISTORY_TURNS`) |
+| Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:69` (`MAX_HISTORY_TURNS`) |
 | Champ de vision de repli | **67°**, bornes **15–130°** | `core/distance/LensSpec.kt:43,46,49` |
-| Lissage des distances | **0,35** (suivi), **0,85** (saut) | `core/distance/DistanceSmoother.kt:18-19` |
+| Lissage des distances | **0,35** (suivi), **0,85** (saut) | `core/distance/DistanceSmoother.kt:19-20` |
 | Appui long | **300 ms**, tolérance **24 px** | `core/gesture/LongPressTrigger.kt:102,105` |
 | Durée minimale de dictée | **400 ms** | `core/usecase/DictationUseCase.kt` (`MIN_DURATION_MS`) |
 | Purge des captures | toutes les **1 h** | `app/cleanup/CleanupConfig.kt:25` (`PERIOD_HOURS`) |
@@ -126,7 +127,7 @@ mesurable depuis cet arbre**, donc aucun n'est repris comme chiffre :
 - **Coût de la capture et de l'encodage JPEG** sur le téléphone (`Bitmap.compress`), coût
   radio de l'upload, coût de décodage et de rendu Compose à l'écran. **Non mesuré ici.**
 - **Gains d'un encodage de masque `bits` + LUT côté serveur** : le client sait lire `bits`
-  (`core/model/Models.kt:36`), mais le backend déployé peut servir `png` — le gain réel
+  (`core/model/Models.kt:65`), mais le backend déployé peut servir `png` — le gain réel
   dépend de ce qu'il envoie (`mask_encoding`). **Non mesuré ici.**
 - **Comparaison WebSocket / POST** : le code ne garde qu'un transport (WS). Aucune mesure des
   deux dans cet arbre. **Non mesuré ici.**
@@ -136,8 +137,19 @@ conteneur, durée serveur d'une frame, coût d'un client neuf, latence de deux c
 Ils documentent **pourquoi** une constante a été choisie ; ils ne sont pas des mesures de cet
 arbre et ne sont pas recopiés ici.
 
-## 4. Fichiers de mesures d'un autre dépôt
+## 4. Mesures du backend (`server/docs/`, relevés antérieurs)
 
-Les documents de latence du **backend** (dépôt séparé) ne sont pas dans cet arbre : ni
-`LATENCE.md`, ni `LIVE-PERF.md`, ni les chiffres de graphe CUDA ou de temps d'inférence du
-modèle. Rien à citer, donc rien n'est affirmé.
+Le backend est dans cet arbre depuis le 27/10 (`server/`) : ses documents de latence aussi.
+Ce sont des **relevés antérieurs, hors de cet arbre** — cités sans date ni sha (règle
+`AGENTS.md` §0), jamais rejoués ici :
+
+| Document | Contenu |
+|---|---|
+| `server/docs/LIVE-FAST.md` | Source déployée (`live_fast/`, `sam3-eu-a100`), leviers et télémétrie par étage |
+| `server/docs/LIVE-PERF.md` | Campagnes `/live` : froid, A100/H200, Europe, WebSocket |
+| `server/docs/TRACK-PERF.md` | Campagne tracker : sessions, téléphone, budgets 200/100 ms |
+| `server/docs/PERF.md` | Latences `/segment` sur A10G |
+| `server/docs/LATENCE-PROD.md` | Note de déploiement : leviers, contrat client, vérification |
+
+Rien de tout cela n'est une mesure de cet arbre : pour un chiffre tenu, voir les §1–2
+ci-dessus.
