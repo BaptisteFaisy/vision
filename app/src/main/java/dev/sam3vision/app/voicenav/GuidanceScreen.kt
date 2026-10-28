@@ -39,6 +39,7 @@ fun GuidanceScreen(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        OffRouteBanner(state.update.offRoute)
         Text("Prochaine instruction", color = AppColors.textMuted, fontSize = 18.sp)
         Text(
             state.update.instruction,
