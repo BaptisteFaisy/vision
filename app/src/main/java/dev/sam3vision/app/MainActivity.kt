@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
+import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
@@ -112,6 +113,11 @@ class MainActivity : ComponentActivity() {
      */
     private fun routeIntent(intent: Intent) {
         glasses.handleIntent(intent)
+        // Recette du direct lunettes : `--ez glasses_mock_connect true` simule la paire et
+        // connecte, sans passer par les Réglages. Sans l'extra, rien ne change.
+        if (intent.getBooleanExtra(EXTRA_GLASSES_MOCK_CONNECT, false)) {
+            glasses.debugMockConnect()
+        }
         if (intent.hasExtra(EXTRA_MOCK) || intent.hasExtra(EXTRA_ANALYZE)) {
             BenchEntryPoint.request(
                 SpikeLaunch.fromExtras(

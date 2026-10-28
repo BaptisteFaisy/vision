@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -45,6 +46,15 @@ private const val FRAME_LOG_TAG = "GlassesDirect"
 
 /** Dossier des MP3 des descriptions lues sur le haut-parleur. */
 private const val FRAMES_VOICE_DIR = "glasses-frames"
+
+/** Extra adb de recette : lunettes simulées + connexion (`am start --ez glasses_mock_connect true`). */
+const val EXTRA_GLASSES_MOCK_CONNECT = "glasses_mock_connect"
+
+/** La connexion auto attend l'enregistrement jusque-là, puis explique au lieu d'insister. */
+private const val MOCK_CONNECT_TIMEOUT_MS = 10_000L
+
+/** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
+private const val TAG = "GlassesChain"
 
 /**
  * Chef d'orchestre des lunettes Ray-Ban Meta : enregistrement auprès de l'app Meta AI,
@@ -229,8 +239,12 @@ class GlassesController(
         dropSession()
         _state.update { it.copy(phase = SessionPhase.STARTING) }
         Wearables.createSession(AutoDeviceSelector()).fold(
-            onSuccess = ::startSession,
+            onSuccess = { created ->
+                Log.i(TAG, "session créée, démarrage")
+                startSession(created)
+            },
             onFailure = { error, _ ->
+                Log.w(TAG, "session refusée : ${error.description}")
                 _state.update { it.copy(phase = SessionPhase.IDLE) }
                 note(GlassesMessages.sessionRefused(error.description))
             },
@@ -260,6 +274,7 @@ class GlassesController(
     private fun onSessionState(created: DeviceSession, state: DeviceSessionState) {
         // Une session oubliée ne parle plus : sinon elle réécrit l'état de la nouvelle.
         if (created !== session) return
+        Log.i(TAG, "session : $state")
         _state.update { it.copy(phase = state.toPhase()) }
         when (state) {
             DeviceSessionState.STARTED -> scope.launch { attachCapabilities(created) }
@@ -278,17 +293,24 @@ class GlassesController(
             audioDir = File(context.filesDir, AUDIO_DIR),
             audioAllowed = micAllowed,
             onNote = ::note,
-            onStreaming = { streaming -> _state.update { it.copy(streaming = streaming) } },
+            onStreaming = { streaming ->
+                Log.i(TAG, "flux lunettes streaming=$streaming")
+                _state.update { it.copy(streaming = streaming) }
+                GlassesVideoLink.setStreaming(streaming)
+            },
             onMicActive = { active -> _state.update { it.copy(micActive = active) } },
             collectFrames = collectVideoFrames,
             onFrame = ::onGlassesFrame,
             onFrameLog = ::frameLog,
         )
         // Une caméra qui n'a pas démarré n'est pas retenue : elle bloquerait toute reprise.
-        if (cam.start()) {
+        val started = cam.start()
+        Log.i(TAG, "caméra lunettes démarrée : $started")
+        if (started) {
             camera = cam
             // La dictée peut prendre le micro des lunettes tant que le flux tourne.
             GlassesMicLink.attach { currentAudio() }
+            GlassesVideoLink.attachNotes(::note)
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
     }
@@ -359,8 +381,10 @@ class GlassesController(
     }
 
     private fun releaseCapabilities() {
-        // Plus de flux, donc plus de micro à prêter à la dictée.
+        // Plus de flux, donc plus de micro à prêter à la dictée, ni d'image à l'accueil.
         GlassesMicLink.detach()
+        GlassesVideoLink.detachNotes()
+        GlassesVideoLink.clear()
         inputs?.stop()
         inputs = null
         camera?.stop()
@@ -372,7 +396,11 @@ class GlassesController(
     /** Lunettes simulées : démo sans matériel, et plan B si l'appairage coince. */
     fun startMockDevice() {
         initialize()
-        if (!mock.start()) return note(GlassesMessages.mockUnavailable())
+        if (!mock.start()) {
+            Log.w(TAG, "recette : mock indisponible")
+            return note(GlassesMessages.mockUnavailable())
+        }
+        Log.i(TAG, "recette : mock actif")
         _state.update {
             it.copy(mockActive = true, deviceName = it.deviceName ?: "Ray-Ban Meta (simulées)", registered = true)
         }
@@ -388,6 +416,34 @@ class GlassesController(
         _state.update { it.copy(mockActive = false) }
     }
 
+    /**
+     * Raccourci de recette : lunettes simulées, puis connexion dès que l'enregistrement le
+     * permet (extra adb [EXTRA_GLASSES_MOCK_CONNECT]). Inerte en release — le mock y est
+     * indisponible (`mockUnavailable`) et rien ne se connecte tout seul.
+     */
+    fun debugMockConnect() {
+        initialize()
+        startMockDevice()
+        scope.launch {
+            val deadline = clock() + MOCK_CONNECT_TIMEOUT_MS
+            while (clock() < deadline) {
+                val snapshot = _state.value
+                // Une session vit déjà (ou naît) : rien à faire, surtout pas un doublon.
+                if (snapshot.connected || snapshot.phase == SessionPhase.STARTING) {
+                    Log.i(TAG, "recette : session déjà là (${snapshot.phase}), rien à faire")
+                    return@launch
+                }
+                if (snapshot.canConnect) {
+                    Log.i(TAG, "recette : connexion")
+                    connect()
+                    return@launch
+                }
+                delay(250)
+            }
+            note(GlassesMessages.mockConnectTimeout())
+        }
+    }
+
     /** Libère session, capacités et coroutines (activité détruite). */
     fun close() {
         releaseCapabilities()
@@ -400,6 +456,7 @@ class GlassesController(
 
     /** Affiche le message (teinté par sa gravité) et le pousse aux abonnés. */
     private fun note(message: GlassesMessage) {
+        Log.i(TAG, "note ${message.kind} : ${message.text}")
         _state.update { it.copy(message = message) }
         _events.tryEmit(GlassesEvent.Note(message))
     }

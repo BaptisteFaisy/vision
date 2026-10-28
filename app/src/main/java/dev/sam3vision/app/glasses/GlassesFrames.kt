@@ -18,6 +18,22 @@ private fun ByteBuffer.bytes(): ByteArray {
     return ByteArray(view.remaining()).also { view.get(it) }
 }
 
+/**
+ * Copie les octets encore lisibles du buffer, sans déplacer la position du buffer
+ * d'origine (le SDK peut le réutiliser). `null` si le buffer est vide. Partagé avec le
+ * banc (`GlassesFrameEncoder`) et le direct (`GlassesLiveDecoder`) : une seule lecture
+ * des buffers du SDK.
+ */
+internal fun ByteBuffer.readRemainingBytes(): ByteArray? {
+    val view = duplicate()
+    view.rewind()
+    val size = view.remaining()
+    if (size <= 0) return null
+    val bytes = ByteArray(size)
+    view.get(bytes)
+    return bytes
+}
+
 /** Frame du flux vidéo → Bitmap, ou null si le format n'est pas décodable ici. */
 fun VideoFrame.toBitmapOrNull(): Bitmap? {
     if (isCodecConfig) return null

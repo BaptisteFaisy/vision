@@ -9,10 +9,13 @@ import android.net.Uri
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.inputs.types.CapturePressType
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.util.Log
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
-import com.meta.wearable.dat.mockdevice.api.GlassesModel
 import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
 import com.meta.wearable.dat.mockdevice.api.MockGlasses
+import dev.sam3vision.app.glasses.bench.MockGlassesHarness
 import java.io.File
 import java.io.FileOutputStream
 
@@ -28,16 +31,27 @@ internal class GlassesMock(private val context: Context) : GlassesMockDevice {
     private var glasses: MockGlasses? = null
 
     override fun start(): Boolean {
-        val kit = MockDeviceKit.getInstance(context)
+        val appContext = context.applicationContext
+        val kit = MockDeviceKit.getInstance(appContext)
         if (!kit.isEnabled) {
             kit.enable(MockDeviceKitConfig(initiallyRegistered = true, initialPermissionsGranted = true))
         }
         kit.permissions.set(Permission.CAMERA, PermissionStatus.Granted)
-        val paired = kit.pairGlasses(GlassesModel.RAYBAN_META).getOrNull() ?: return false
+        // Le harnais du banc : réutilise la paire déjà appariée (un run précédent en laisse
+        // une, et un second appariement direct est refusé), puis allume, porte et déplie —
+        // le mock refuse de streamer sans ça. Sans ces deux étapes, le direct restait noir.
+        if (!MockGlassesHarness.enable(appContext, ::logLine)) return false
+        val paired = kit.pairedDevices.filterIsInstance<MockGlasses>().firstOrNull()
+        if (paired == null) {
+            Log.w(TAG, "mock lunettes : harnais prêt mais aucune paire simulée visible")
+            return false
+        }
         feedScene(paired)
         glasses = paired
         return true
     }
+
+    private fun logLine(line: String) = Log.i(TAG, "mock lunettes : $line")
 
     /** Injecte un appui sur le bouton capture, comme le ferait un vrai porteur. */
     override fun press(type: CapturePressType): Boolean {
@@ -52,11 +66,51 @@ internal class GlassesMock(private val context: Context) : GlassesMockDevice {
         glasses = null
     }
 
-    /** Scène synthétique : des formes franches, la segmentation a de quoi travailler. */
+    /**
+     * Le flux simulé exige une vraie vidéo (le banc le prouve avec `mock_feed.mp4`) : nourri
+     * d'une image fixe, le streamer meurt en erreur critique. La photo capturée reste la
+     * scène synthétique (formes franches, la segmentation a de quoi travailler).
+     */
     private fun feedScene(device: MockGlasses) {
-        val uri = Uri.fromFile(sceneFile())
-        device.services.camera.setCameraFeed(uri)
-        device.services.cameraCapture.setCapturedPhoto(uri)
+        val feed = runCatching { videoFile() }.getOrNull()
+        if (feed == null) Log.w(TAG, "mock lunettes : vidéo $VIDEO_ASSET introuvable, repli image fixe")
+        device.services.camera.setCameraFeed(Uri.fromFile(feed ?: sceneFile()))
+        device.services.cameraCapture.setCapturedPhoto(Uri.fromFile(sceneFile()))
+        if (feed != null) {
+            val csd = runCatching { extractCsd(feed) }.getOrNull()
+            GlassesVideoLink.fallbackCsd = csd
+            Log.i(TAG, "mock lunettes : csd-0 ${csd?.size ?: 0} o extrait de $VIDEO_ASSET")
+        }
+    }
+
+    /**
+     * Paramètres H.265 de la vidéo (boîte hvcC du mp4) : le flux simulé n'envoie que des
+     * tranches (constaté : NAL 0/1, jamais 32/33/34), le décodeur les prend en repli.
+     */
+    private fun extractCsd(video: File): ByteArray? {
+        val extractor = MediaExtractor()
+        try {
+            extractor.setDataSource(video.absolutePath)
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                if (format.getString(MediaFormat.KEY_MIME) != MediaFormat.MIMETYPE_VIDEO_HEVC) continue
+                val csd = format.getByteBuffer("csd-0") ?: return null
+                return ByteArray(csd.remaining()).also { csd.get(it) }
+            }
+            return null
+        } finally {
+            runCatching { extractor.release() }
+        }
+    }
+
+    /** La vidéo h.265 des assets debug, recopiée dans le cache (comme le banc). */
+    private fun videoFile(): File {
+        val file = File(context.cacheDir, VIDEO_ASSET)
+        if (file.exists()) return file
+        context.assets.open(VIDEO_ASSET).use { input ->
+            FileOutputStream(file).use { output -> input.copyTo(output) }
+        }
+        return file
     }
 
     private fun sceneFile(): File {
@@ -83,6 +137,8 @@ internal class GlassesMock(private val context: Context) : GlassesMockDevice {
     }
 
     private companion object {
+        const val TAG = "GlassesMock"
+        const val VIDEO_ASSET = "mock_feed.mp4"
         const val WIDTH = 640
         const val HEIGHT = 480
     }
