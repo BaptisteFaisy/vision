@@ -80,7 +80,21 @@ object TapConfig {
     }
 
     /** Vrai si l'endpoint vidéo est joignable tel que configuré. */
-    val sendConfigured: Boolean get() = !ON_DEVICE_INFERENCE && sam31Endpoint.isNotBlank()
+    val sendConfigured: Boolean get() = sendBlockedReason() == null
+
+    /**
+     * `null` quand l'envoi est possible, sinon la raison explicite affichée à l'écran
+     * (jamais un « Failed » silencieux). Paramètres injectables : les tests unitaires
+     * passent leurs valeurs, la prod lit le [BuildConfig].
+     */
+    fun sendBlockedReason(
+        endpoint: String = sam31Endpoint,
+        onDevice: Boolean = ON_DEVICE_INFERENCE,
+    ): String? = when {
+        onDevice -> "SAM 3.1 configuré pour l'inférence locale : envoi cloud désactivé"
+        endpoint.isBlank() -> "endpoint SAM 3.1 vide : renseigne sam31.endpoint dans local.properties"
+        else -> null
+    }
 
     /**
      * Dossier privé des clips, un par voix : un changement de voix (Sarah hier,
