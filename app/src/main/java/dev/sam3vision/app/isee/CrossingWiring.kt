@@ -82,6 +82,23 @@ internal fun LiveProbe.observeCrossing(scope: CoroutineScope, haptics: IseeHapti
 }
 
 /**
+ * Chaque bascule du mode Traversée (bouton, ordre vocal, guidage auto)
+ * est signalée à [onChanged] : le guidage y reprend la parole après une
+ * coupe manuelle. Sans répétition (front seul).
+ */
+internal fun LiveProbe.observeCrossingActive(scope: CoroutineScope, onChanged: (Boolean) -> Unit) {
+    var last: Boolean? = null
+    scope.launch {
+        state.collect { st ->
+            val active = st.crossingActive
+            if (active == last) return@collect
+            last = active
+            runCatching { onChanged(active) }
+        }
+    }
+}
+
+/**
  * Libellé du bouton Traversée : l'état du mode et, quand il est actif, le
  * dernier état connu du feu. Pur, testé en JVM.
  */

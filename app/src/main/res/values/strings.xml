@@ -19,6 +19,10 @@
     <string name="nav_voice_back_on_route">De retour sur l\'itinéraire.</string>
     <!-- Guidage vocal : manœuvre à venir, verbe + distance (cf. VoiceNavPhrases.ahead). -->
     <string name="nav_voice_maneuver">%1$s dans %2$s</string>
+    <!-- Guidage vocal : traversée à venir (cf. VoiceNavPhrases.crossingAhead). -->
+    <string name="nav_voice_crossing">Passage protégé dans %1$s</string>
+    <!-- Guidage vocal : traversée passée, reprise (cf. VoiceNavPhrases.CROSSING_DONE). -->
+    <string name="nav_voice_crossing_done">Traversée terminée.</string>
 
     <!-- Guidage vocal embarqué : voix système française (cf. VoiceNavPhrases). -->
     <!-- Arrivée : « Vous êtes arrivé à X » (destination vide = sans nom). -->
