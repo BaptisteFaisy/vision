@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Garde du design Portrait (obligatoire, docs/ISEE-DESIGN-PORTRAIT.md).
 
-Trois contrôles, sans compilation :
+Quatre contrôles, sans compilation :
 
 1. Quarantaine : les symboles de l'ancien design (satellites, grille de
    pixels, looks de bulles, pagination) ne sont utilisables que par les
@@ -15,6 +15,9 @@ Trois contrôles, sans compilation :
    à `tools/orb-frozen-baseline.json`. Changement voulu (demande explicite
    du user uniquement) : `python3 tools/freeze-orb-baseline.py`, puis
    relire le diff — docs/ISEE-DESIGN-PORTRAIT.md §6.
+4. Horloge : le pane n'utilise jamais `rememberInfiniteTransition`
+   (`animator_duration_scale=0` la fige — Redmi, 2026-10-28) ; le temps de
+   scène vient d'une boucle coroutine sur horloge monotone.
 
 Usage : python3 tools/check-isee-design.py [racine]
 Sortie : 0 si conforme, 1 sinon (2 si la racine n'existe pas).
@@ -96,6 +99,14 @@ ORB_REGIONS = (
     "drawVoiceCrown",
 )
 ORB_BASELINE = "tools/orb-frozen-baseline.json"
+
+# Horloge de la scène : la transition infinie est figée par
+# `animator_duration_scale=0` (Redmi, 2026-10-28 : boule pixel-identique à
+# 4 s d'intervalle) — le pane utilise `sceneTimeSeconds` sur horloge monotone.
+CLOCK_BANNED = (
+    "rememberInfiniteTransition",
+    "infiniteRepeatable",
+)
 
 SKIP_DIRS = {".git", ".gradle", "build", ".idea", "tmp", "node_modules",
              "__pycache__", ".venv", "venv"}
@@ -207,6 +218,21 @@ def check_frozen_orb(root, limits):
     return errors
 
 
+def check_scene_clock(root, limits):
+    """Pas de transition infinie dans le pane : figée par les échelles anim à 0.
+
+    Commentaires et chaînes neutralisés : la citer en commentaire (pour dire
+    pourquoi elle est bannie) ne déclenche pas le garde.
+    """
+    path = os.path.join(root, PANE)
+    if not os.path.isfile(path):
+        return []
+    code = limits.strip_strings_comments(_read(path))
+    return ["%s — `%s` interdit (figé par animator_duration_scale=0 ; "
+            "horloge : `sceneTimeSeconds`)" % (PANE, symbol)
+            for symbol in CLOCK_BANNED if symbol in code]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Garde : design Portrait obligatoire, ancien design en quarantaine, boule gelée.")
@@ -221,9 +247,10 @@ def main(argv=None):
         print("check-isee-design : %s" % exc, file=sys.stderr)
         return 1
     errors = (check_quarantine(args.root) + check_wiring(args.root, limits)
-              + check_frozen_orb(args.root, limits))
+              + check_frozen_orb(args.root, limits)
+              + check_scene_clock(args.root, limits))
     if not errors:
-        print("check-isee-design : OK — Portrait câblé, boule gelée, ancien design en quarantaine.")
+        print("check-isee-design : OK — Portrait câblé, boule gelée, horloge monotone, ancien design en quarantaine.")
         return 0
     print("check-isee-design : %d erreur(s) :" % len(errors))
     for error in errors:
