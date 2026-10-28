@@ -13,6 +13,7 @@ import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** Caméra des lunettes : un flux (image **et** micro), une photo à la demande, aucun état global. */
@@ -24,9 +25,22 @@ internal class GlassesCamera(
     private val onNote: (GlassesMessage) -> Unit,
     private val onStreaming: (Boolean) -> Unit,
     private val onMicActive: (Boolean) -> Unit,
+    /**
+     * Collecte des frames vidéo vers [onFrame] (décodage H.265 + analyse + voix).
+     * **Éteinte par défaut** : le décodeur n'a jamais vu de matériel, et chaque
+     * frame collectée coûte un appel SAM/LLM. Éteinte, le flux n'est pas lu
+     * ([frameCollectionIdleReason] en est la raison écrite).
+     */
+    private val collectFrames: Boolean = false,
+    /** Consommateur des frames collectées ; `null` = personne, donc pas de collecte. */
+    private val onFrame: (suspend (JpegFrame) -> Unit)? = null,
+    /** Journal du collecteur (logcat côté contrôleur, rien par défaut). */
+    private val onFrameLog: (String) -> Unit = {},
 ) {
     private var camera: Camera? = null
     private var stream: Stream? = null
+    private var collectorJob: Job? = null
+    private var collector: GlassesFrameCollector? = null
 
     /** Micro des lunettes, créé avec le flux : `null` tant que rien n'est attaché. */
     var audio: GlassesAudio? = null
@@ -82,8 +96,22 @@ internal class GlassesCamera(
         audio = GlassesAudio(attached.stream.audioStream, choice, audioDir, scope, onMicActive)
         if (choice.silent && audioAllowed) onNote(GlassesMessages.audioUnavailable())
         watch(attached)
+        startFrameCollector(attached.stream)
         attached.stream.start()
             .onFailure { error, _ -> onNote(GlassesMessages.streamRefused(error.description)) }
+    }
+
+    /**
+     * Démarre la pompe vidéo si le drapeau et le consommateur sont là ; sinon
+     * le flux n'est pas lu, et c'est documenté ([frameCollectionIdleReason]).
+     */
+    private fun startFrameCollector(active: Stream) {
+        val consumer = onFrame ?: return
+        if (frameCollectionIdleReason(collectFrames, hasConsumer = true) != null) return
+        val pump = GlassesFrameCollector(onFrame = consumer, onLog = onFrameLog)
+        collector = pump
+        collectorJob = scope.launch { pump.run(active.videoStream) }
+        onNote(GlassesMessages.framesOnSpeaker())
     }
 
     private fun watch(attached: Camera) {
@@ -118,6 +146,10 @@ internal class GlassesCamera(
         audio?.abort()
         audio = null
         onMicActive(false)
+        collectorJob?.cancel()
+        collectorJob = null
+        collector?.close()
+        collector = null
         stream?.stop()
         if (camera != null) session.removeCamera()
         camera = null

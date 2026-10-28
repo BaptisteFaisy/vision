@@ -1,5 +1,7 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.net.HttpSamClient
+import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.resolveSamEndpoint
 
@@ -15,3 +17,10 @@ fun Settings.samEndpoint(): String =
 
 /** Vrai si un endpoint SAM est disponible (les presets de région en fournissent un). */
 fun Settings.samConfigured(): Boolean = samEndpoint().isNotBlank()
+
+/**
+ * Client SAM de l'app, ou `null` sans endpoint : une seule façon de le
+ * construire (photo, direct lunettes), au lieu d'un test recopié par appelant.
+ */
+fun samClientOrNull(settings: Settings): SamClient? =
+    if (!settings.samConfigured()) null else HttpSamClient(settings.samEndpoint())

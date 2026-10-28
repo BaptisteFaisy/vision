@@ -70,6 +70,27 @@ class GlassesPolicyTest {
     }
 
     @Test
+    fun `drapeau eteint, la non-collecte est un silence documente`() {
+        // Éteinte, la collecte ne lit pas le flux : pas d'analyse, pas de voix,
+        // et cette phrase en est la raison écrite.
+        val reason = frameCollectionIdleReason(enabled = false, hasConsumer = true)
+        assertTrue(reason.orEmpty().contains("désactivée"))
+        assertTrue(reason.orEmpty().contains("n'est pas lu"))
+    }
+
+    @Test
+    fun `sans consommateur, la non-collecte est un silence documente`() {
+        val reason = frameCollectionIdleReason(enabled = true, hasConsumer = false)
+        assertTrue(reason.orEmpty().contains("sans consommateur"))
+        assertTrue(reason.orEmpty().contains("n'est pas lu"))
+    }
+
+    @Test
+    fun `drapeau allume et consommateur present, la collecte tourne`() {
+        assertNull(frameCollectionIdleReason(enabled = true, hasConsumer = true))
+    }
+
+    @Test
     fun `la perte d'enregistrement se dit une fois, et pas quand elle est voulue`() {
         // Démarrage : on n'a jamais été enregistré, rien à annoncer.
         assertNull(registrationLostMessage(wasRegistered = false, registered = false, wanted = false))
