@@ -6,17 +6,20 @@ import java.text.Normalizer
  * Hauteurs réelles typiques, en mètres, par concept.
  *
  * Le direct suit des concepts **saisis par l'utilisateur** : la table couvre les
- * concepts par défaut de `LivePrompts` et leurs synonymes français/anglais. Un
- * concept absent reste **inconnu** — mieux vaut ne rien afficher qu'un chiffre
- * faux. Les valeurs sont des ordres de grandeur (un humain adulte, une voiture
- * de tourisme), pas des mesures : l'estimation monocular reste à ±15-20 %.
+ * concepts par défaut calibrables au sténopé et leurs synonymes
+ * français/anglais. Un concept absent reste **inconnu** — mieux vaut ne rien
+ * afficher qu'un chiffre faux. Les valeurs sont des ordres de grandeur (un
+ * humain adulte, une voiture de tourisme), pas des mesures : l'estimation
+ * monoculaire reste à ±15-20 %.
  *
  * Pas d'entrée escalier, volontairement : SAM segmente l'escalier **entier**
  * (« stairs »), haut d'un mètre à plusieurs étages selon la volée — aucune
  * hauteur typique n'est défendable, et la marche de 0,17 m ne vaut que pour
- * une marche isolée, jamais produite par ce concept. La distance d'un
- * escalier vient de la branche profondeur (`DepthReadings`) ou du plan de
- * sol, jamais du sténopé (voir `StairConcepts`).
+ * une marche isolée, jamais produite par ce concept. Même traitement pour
+ * « sidewalk » et « crosswalk » (plans au sol, pas de hauteur) et « pole »
+ * (de la borne de 1 m au pylône de 10 m selon le mobilier). La distance de
+ * ces défauts vient de la branche profondeur (`DepthReadings`) ou du plan
+ * de sol, jamais du sténopé (voir [DEPTH_ONLY] et `StairConcepts`).
  */
 object KnownSizes {
 
@@ -76,6 +79,13 @@ object KnownSizes {
         // Végétation
         "arbre" to 4.00f, "tree" to 4.00f, "plante" to 0.50f, "plant" to 0.50f,
     )
+
+    /**
+     * Défauts du direct volontairement sans hauteur (voir le KDoc de classe) :
+     * leur distance vient de la profondeur ou du plan de sol. Clés canoniques
+     * anglaises (voir [canonical]).
+     */
+    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole")
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
     private val FIRST_WORD: Map<String, Float> = TABLE

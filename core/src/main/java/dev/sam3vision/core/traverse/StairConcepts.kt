@@ -6,14 +6,13 @@ import dev.sam3vision.core.live.LivePrompts
 /**
  * Concept escalier : ce que SAM doit suivre pour signaler des marches.
  *
- * Un seul prompt, en anglais (la forme que SAM segmente le mieux) : le mode
- * traversée n'a qu'un slot libre sur six, « stairs » le remplit (reco R1).
+ * Un seul prompt, en anglais (la forme que SAM segmente le mieux), câblé dans
+ * les défauts du direct (dangers extérieurs, ordre user du 28/10).
  * Le français reste reconnu côté client ([isStairs]) : un label « escalier »
  * compte comme un « stairs ».
  *
- * Non câblé dans les défauts : ni [LivePrompts.default] ni
- * [VehicleConcepts.promptsFor] n'y font appel — disponible et testé pour un
- * usage futur (6e slot traversée, guidage obstacles).
+ * [promptsFor] reste disponible pour composer une base traversée ou un
+ * guidage obstacles (miroir de [VehicleConcepts.promptsFor]).
  *
  * Distance : volontairement **absente** de [KnownSizes] — un escalier
  * segmenté entier mesure d'un mètre à plusieurs étages, aucune hauteur
@@ -47,7 +46,7 @@ object StairConcepts {
 
     /**
      * Prompts escalier : « stairs » d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — miroir de [VehicleConcepts.promptsFor], non câblé.
+     * [LivePrompts.MAX] — miroir de [VehicleConcepts.promptsFor].
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
         LivePrompts.normalize(PROMPTS + base)
