@@ -38,6 +38,8 @@ data class LiveProbeState(
     val width: Int = 0,
     val height: Int = 0,
     val gpu: String = "",
+    /** Les deux modèles LLM effectifs (`debugModelsLine`) : vide = non renseigné. */
+    val modelsLine: String = "",
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     val spoken: String? = null,
@@ -63,6 +65,7 @@ data class LiveProbeState(
     fun cleared(): LiveProbeState = LiveProbeState(
         endpoint = endpoint,
         gpu = gpu,
+        modelsLine = modelsLine,
         conceptsSent = conceptsSent,
         crossingActive = crossingActive,
     )

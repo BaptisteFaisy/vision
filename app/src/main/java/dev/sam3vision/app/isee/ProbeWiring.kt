@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
+import dev.sam3vision.app.debugModelsLine
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.resolveSamEndpoint
@@ -35,6 +36,7 @@ internal fun LiveProbe.configureFrom(
         maxObjects = settings.objectsOnScreen,
         language = settings.speechLanguage,
         crossingActive = crossingActive,
+        modelsLine = debugModelsLine(settings),
     )
 }
 

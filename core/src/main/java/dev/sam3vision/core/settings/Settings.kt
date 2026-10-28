@@ -181,7 +181,10 @@ data class Settings(
 
         /**
          * Narration du Direct : modèle rapide, volontairement **différent** du défaut des
-         * questions. Seule la clé est réglable (Réglages) ; base et modèle sont figés ici.
+         * questions. **Repli documenté** (démo) : `muse-spark` raisonne ~600 tokens avant sa
+         * première phrase, le budget narration est de 200 — un modèle Meta y perdrait chaque
+         * frame, et aucun modèle Meta rapide+vision n'est servi par nos clés. Seule la clé
+         * est réglable (Réglages / build) ; base et modèle sont figés ici.
          */
         const val DEFAULT_LIVE_LLM_BASE_URL = "https://api.inferhub.dev/v1"
         const val DEFAULT_LIVE_LLM_MODEL = "ali/qwen3.8-omni-flash"

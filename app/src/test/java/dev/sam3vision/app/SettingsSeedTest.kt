@@ -127,4 +127,23 @@ class SettingsSeedTest {
         assertEquals("https://mon-propre-endpoint/v1", seed.llmBaseUrl)
         assertEquals("ma-cle", seed.llmApiKey)
     }
+
+    @Test
+    fun `le defaut reste Meta meme apres seed`() {
+        val seed = seeded(Settings.Default, build)
+
+        assertEquals("meta-models/muse-spark-open-1026", seed.llmModel)
+        assertEquals(Settings.DEFAULT_LLM_MODEL, seed.llmModel)
+        assertEquals("https://inference.baseten.co/v1", seed.llmBaseUrl)
+    }
+
+    @Test
+    fun `la migration ne re-ecrit jamais un modele epingle`() {
+        val pinned = Settings.Default.copy(llmBaseUrl = "https://api.inferhub.dev/v1")
+
+        val seed = migrateLegacyLlm(pinned, build)
+
+        assertEquals(Settings.DEFAULT_LLM_MODEL, seed.llmModel)
+        assertEquals("https://api.inferhub.dev/v1", seed.llmBaseUrl)
+    }
 }
