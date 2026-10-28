@@ -68,9 +68,10 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
         onClosed: (Throwable?) -> Unit,
         onOpen: () -> Unit,
     ): Boolean {
-        val handshake = request(url, userAgent = LIVE_USER_AGENT)
+        // Poignée construite DANS le `try` : une URL malformée refuse l'ouverture
+        // (`false`, bascule HTTP par l'appelant) au lieu de planter.
         socket = try {
-            client.newWebSocket(handshake, Listener(onText, onClosed, onOpen))
+            client.newWebSocket(request(url, userAgent = LIVE_USER_AGENT), Listener(onText, onClosed, onOpen))
         } catch (e: IllegalArgumentException) {
             return false
         }

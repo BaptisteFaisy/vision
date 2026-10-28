@@ -37,14 +37,16 @@ suspend fun releaseSam(
     client: OkHttpClient = defaultHttpClient(RELEASE_TIMEOUT_SECONDS),
 ): Result<ReleaseOutcome> {
     if (baseUrl.isBlank()) return Result.success(ReleaseOutcome(false, 0, "base vide"))
-    val request = requestTo(
-        baseUrl,
-        "/release",
-        "POST",
-        jsonBody(EMPTY_JSON),
-        headers = mapOf(RELEASE_HEADER to "confirm"),
-    )
-    return client.execute(request).then { outcome -> outcome.toRelease() }
+    // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
+    return client.executeBuilt {
+        requestTo(
+            baseUrl,
+            "/release",
+            "POST",
+            jsonBody(EMPTY_JSON),
+            headers = mapOf(RELEASE_HEADER to "confirm"),
+        )
+    }.then { outcome -> outcome.toRelease() }
 }
 
 /** Réponse de `/release` : le verdict, le code HTTP et le corps (pour le diagnostic). */

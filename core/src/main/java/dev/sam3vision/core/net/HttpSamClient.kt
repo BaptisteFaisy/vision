@@ -23,8 +23,8 @@ class HttpSamClient(
     }
 
     override suspend fun health(): Result<Boolean> {
-        val request = requestTo(baseUrl, "/health")
-        return client.execute(request).map { outcome ->
+        // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
+        return client.executeBuilt { requestTo(baseUrl, "/health") }.map { outcome ->
             outcome.code in 200..299 && parse(outcome.body)?.optBoolean("ok", false) == true
         }
     }
