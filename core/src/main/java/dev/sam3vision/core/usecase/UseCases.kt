@@ -4,6 +4,8 @@ import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.model.Role
+import dev.sam3vision.core.model.SegmentResult
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.text.stripMarkdown
@@ -20,6 +22,12 @@ class AnalyzeUseCase(
     private val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
     /** Budget SAM : au-delà, on décrit sans labels plutôt que faire attendre la photo. */
     private val samBudgetMs: Long = SAM_BUDGET_MS,
+    /**
+     * Issue de l'appel SAM, `null` si SAM n'a pas été appelé (pas de client) : la photo
+     * sait dire « GPU injoignable » au lieu de « aucun objet ». Un budget dépassé vaut
+     * `failure(Timeout)` — la photo n'attend pas, mais l'issue reste un échec daté.
+     */
+    private val onSamOutcome: ((Result<SegmentResult>?) -> Unit)? = null,
 ) {
     companion object {
         /** 10 s : un GPU chaud répond en < 2 s ; au-delà, la photo n'attend pas. */
@@ -28,7 +36,11 @@ class AnalyzeUseCase(
 
     suspend fun invoke(jpegB64: String, prompts: List<String>? = null): Result<Analysis> {
         val cap = ObjectLimits.clamp(maxObjects)
-        val segmented = sam?.let { withTimeoutOrNull(samBudgetMs) { it.segment(jpegB64, prompts) } }
+        val segmented = sam?.let {
+            withTimeoutOrNull(samBudgetMs) { it.segment(jpegB64, prompts) }
+                ?: Result.failure(ApiError.Timeout())
+        }
+        onSamOutcome?.invoke(segmented)
         val objects = segmented?.getOrNull()?.objects.orEmpty().take(cap)
         val labels = objects.map { it.label }.filter { it.isNotBlank() }.distinct().take(maxLabels)
         return llm.describe(jpegB64, labels).map { analysis ->
