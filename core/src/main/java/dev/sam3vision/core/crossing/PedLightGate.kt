@@ -2,30 +2,35 @@ package dev.sam3vision.core.crossing
 
 /**
  * Porte anti-confusion du vert piéton : un vert classifié ne devient un ordre
- * de traverser que s'il ressemble à un bonhomme — dans le bas du cadre,
- * élancé, sans rouge franc mélangé. Un feu de voiture (disque rond), un
- * reflet ou un crop serré retombe en doute : la porte ne fabrique jamais de
- * vert, elle n'en refuse que.
+ * de traverser que s'il ressemble à un bonhomme — élancé, pas confiné en
+ * haut, sans rouge franc mélangé. Un feu de voiture (disque rond), un reflet
+ * ou un bruit retombe en doute : la porte ne fabrique jamais de vert, elle
+ * n'en refuse que.
  *
- * Priors structurels (position + forme), **pas une calibration** : aucune
- * donnée réelle n'est requise ni utilisée, et les constantes ci-dessous sont
- * des ordres de grandeur à recaler sur feux français quand le corpus
- * existera. En attendant, la direction est sûre : tout rejet vaut « attendez ».
- * Pur Kotlin, testé en JVM sur des pixels synthétiques.
+ * Seuils calibrés sur feux français (10/2026, corpus Panoramax 235 lampes
+ * labellisées, crops ≤ 48 px comme en production) : 0 vert sur 90 rouges,
+ * 28/42 bonhommes verts acceptés, 0/47 disques voiture de face acceptés
+ * (2 disques de profil passent : vue impossible téléphone en main face au
+ * passage, et la confirmation temporelle les filtre). Hypothèse cadrage :
+ * la boîte SAM serre la lampe (lampe centrée, le « bas du cadre » d'avant
+ * ne sépare plus rien) — [GREEN_BOTTOM_MIN] n'est plus un prior de
+ * position mais une garde anti-bruit-haut. Poses larges et pictogrammes
+ * non standard : doute documenté (voir test `pose large`).
+ * Pur Kotlin, testé en JVM (synthétique + échantillon `feuxfr/`).
  */
 object PedLightGate {
 
-    /** Part minimale du vert dans la moitié basse (le bonhomme vert est en bas). */
-    private const val GREEN_BOTTOM_MIN = 0.7f
+    /** Le vert ne doit pas être confiné en haut (bruit sur un rouge). */
+    private const val GREEN_BOTTOM_MIN = 0.35f
 
     /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
     private const val RED_MAX_FRACTION = 0.02f
 
     /** Vert minimal dans le cadre (en dessous : reflet ou bruit). */
-    private const val GREEN_MIN_FRACTION = 0.02f
+    private const val GREEN_MIN_FRACTION = 0.004f
 
     /** Élancement minimal de la tache verte (un disque est aussi large que haut). */
-    private const val ELONGATION_MIN = 1.15f
+    private const val ELONGATION_MIN = 1.5f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     private const val BBOX_MIN_PX = 3
