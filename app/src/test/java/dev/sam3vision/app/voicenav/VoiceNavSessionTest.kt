@@ -255,8 +255,13 @@ class VoiceNavSessionTest {
 
         session.onGuidanceUpdate(GuidanceUpdate("Arrivée", 0, 0, 0, arrived = true))
 
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        val arrived = session.state.value as VoiceNavUiState.Arrived
+        assertEquals("la gare", arrived.destination)
         assertEquals(listOf("Arrivée à destination"), spoken)
+
+        session.dismissArrived()
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
     }
 
     @Test
