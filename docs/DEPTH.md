@@ -7,15 +7,19 @@ proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
 ## Choix du modèle
 
 - **Primaire : Depth Anything V2 Small** (24,8 M, Apache-2.0, commercial OK),
-  256×256 → carte 252×252. Distribué en **`.ort` 27 Mo** (pré-optimisé,
-  téléchargé une fois ; le paquet `-mobile` est exclu : il refuse le `.onnx`
-  et ne sait pas exécuter le `ConvInteger` quantifié — prouvé sur Redmi) :
+  256×256 → carte 252×252, CPU seul (NNAPI essayé le 2026-10-28 : session OK
+  bit-identique mais jamais plus rapide en dos-à-dos, abandonné).
+  Distribué en **`.ort` 27 Mo** (pré-optimisé, téléchargé une fois ; le paquet
+  `-mobile` est exclu : il refuse le `.onnx` et ne sait pas exécuter le
+  `ConvInteger` quantifié — prouvé sur Redmi) :
   `onnx/model_uint8.onnx` (`onnx-community/depth-anything-v2-small`) converti
   par `onnxruntime.tools.convert_onnx_models_to_ort` 1.18.1, sortie vérifiée
   bit-identique (voir `NOTICE-depth.txt`).
 - **Repli : MiDaS v2.1 small** (21 M, MIT Intel ISL), TFLite fp32 63 Mo
-  (téléchargé une fois), 256×256 → 256×256, via LiteRT `Interpreter` CPU
-  (4 fils).
+  (téléchargé une fois), 256×256 → 256×256, via LiteRT `Interpreter`
+  CPU 4 fils (NNAPI essayé le 2026-10-28 : 578/574 ms contre 490/568 ms CPU
+  en dos-à-dos — aucun gain ; pas de délégué GPU : l'artefact 2.17
+  ne livre pas ses classes Java — `NoClassDefFoundError` prouvé).
 - Exclus : DA-V2 Base/Large/Giant + UniDepth (CC-BY-NC), ZoeDepth/Marigold/
   DepthFM/Metric3D/DepthPro (poids ou licence). Les deux retenus sont
   **relatifs** (grand = proche) : l'échelle métrique vient du sténopé
