@@ -32,7 +32,12 @@ val UnavailableRouteLoader: RouteLoader = {
 
 /**
  * Écrans de la navigation vocale : repos, confirmation (adresse + résumé),
- * guidage actif (instruction, distances, progression).
+ * guidage actif (instruction, distances, progression), arrivée.
+ *
+ * Contrat d'état (lot reprise-fond) : la route ajoute la branche
+ * `is VoiceNavUiState.Arrived -> ArrivedScreen(state, onNewDestination,
+ * onClose)` — `onClose` appelle `session().dismissArrived()`, sans détour
+ * par le ViewModel.
  */
 sealed interface VoiceNavUiState {
     data object Idle : VoiceNavUiState
@@ -48,6 +53,11 @@ sealed interface VoiceNavUiState {
         val destination: String,
         val summary: RouteSummary?,
         val update: GuidanceUpdate,
+    ) : VoiceNavUiState
+
+    data class Arrived(
+        val destination: String,
+        val summary: RouteSummary?,
     ) : VoiceNavUiState
 }
 
@@ -75,11 +85,18 @@ sealed interface VoiceNavUiState {
  *   [VoiceNavUiState.Guiding] : iSee ne montre jamais un faux guidage quand
  *   c'est Maps qui guide ;
  * - ordre stop en session ([Confirming] ou [Guiding]) → retour au repos +
- *   annonce « Guidage arrêté », `true` ; hors session → `false` ;
- * - [confirmDestination] : moteur embarqué ([engineStart]) puis repli Maps ;
- *   guidage éteint → fiche lieu + annonce « Voici la fiche de X » + repos ;
+ *   annonce « Guidage arrêté », `true` ; sur [Arrived] → fermé sans annonce
+ *   (l'arrivée est déjà dite), `true` ; hors session → `false` ;
+ * - [confirmDestination] : guidage actif → moteur embarqué ([engineStart])
+ *   puis repli Maps ; écran de guidage + annonce « Navigation vers X » dans
+ *   les deux cas ; guidage éteint → fiche lieu + annonce « Voici la fiche
+ *   de X » + repos ; échec → motif affiché + annonce ; hors [Confirming]
+ *   (dont [Arrived]) → rien ;
  * - [onGuidanceUpdate] : l'intégrateur pousse l'état du moteur ; arrivée
- *   signalée → annonce « Arrivée à destination » + repos.
+ *   signalée → écran [Arrived] + annonce « Arrivée à destination » (unique :
+ *   un second `arrived` est ignoré, on n'est plus en [Guiding]) ;
+ *   [dismissArrived] referme l'arrivée vers le repos (le pilote coupe le
+ *   moteur à ce moment-là, pas à l'arrivée).
  *
  * Ne lève jamais : un collaborateur qui jetterait est replié (routeur qui
  * jette = pas d'intention, chargeur/lanceur qui jette = échec annoncé).
@@ -115,7 +132,7 @@ class VoiceNavSession(
 
     private val _state = MutableStateFlow<VoiceNavUiState>(VoiceNavUiState.Idle)
 
-    /** État courant des écrans (repos, confirmation, guidage). */
+    /** État courant des écrans (repos, confirmation, guidage, arrivée). */
     val state: StateFlow<VoiceNavUiState> = _state
 
     /**
@@ -328,6 +345,11 @@ class VoiceNavSession(
 
     /** Ordre stop dicté : ne consomme que si une session est ouverte. */
     private suspend fun stopFromVoice(): Boolean {
+        if (_state.value is VoiceNavUiState.Arrived) {
+            // Guidage déjà terminé : on referme, sans « Guidage arrêté ».
+            goIdle()
+            return true
+        }
         if (_state.value !is VoiceNavUiState.Guiding &&
             _state.value !is VoiceNavUiState.Confirming
         ) {
@@ -338,14 +360,21 @@ class VoiceNavSession(
         return true
     }
 
+    /** Bouton « Fermer » : referme l'écran d'arrivée, retour au repos. */
+    fun dismissArrived() {
+        if (_state.value is VoiceNavUiState.Arrived) {
+            goIdle()
+        }
+    }
+
     /**
      * L'intégrateur pousse ici l'état du moteur d'itinéraire (instruction,
-     * distances, progression). Arrivée signalée → annonce + repos.
+     * distances, progression). Arrivée signalée → écran d'arrivée + annonce.
      */
     suspend fun onGuidanceUpdate(update: GuidanceUpdate) {
         val current = _state.value as? VoiceNavUiState.Guiding ?: return
         if (update.arrived) {
-            goIdle()
+            _state.value = VoiceNavUiState.Arrived(current.destination, current.summary)
             voice.announceArrived()
         } else {
             _state.value = current.copy(update = update)
