@@ -98,6 +98,22 @@ fun colorizeGrayBitmap(mask: GrayMask, argb: Int, alpha: Int): Bitmap =
     Bitmap.createBitmap(colorizeGray(mask, argb, alpha), mask.width, mask.height, Bitmap.Config.ARGB_8888)
 
 /**
+ * Overlays coloriés d'une liste de masques (chemin froid : analyse photo,
+ * snapshot du direct) : décodage selon [encoding], coloriage par [colorAt],
+ * un masque illisible est sauté. Un seul endroit au lieu d'un
+ * `mapIndexedNotNull` recopié par appelant (le chemin chaud garde son
+ * peintre à tampons réutilisés côté app).
+ */
+fun colorizedOverlays(
+    masks: List<String>,
+    encoding: String,
+    alpha: Int,
+    colorAt: (Int) -> Int,
+): List<Bitmap> = masks.mapIndexedNotNull { index, maskB64 ->
+    colorizedMaskBitmap(maskB64, encoding, colorAt(index), alpha)
+}
+
+/**
  * Niveaux 0-255 d'un bitmap ALPHA_8 (1 octet/pixel), `null` s'il faut passer par le repli.
  * `copyPixelsToBuffer` écrit directement dans le tableau : pas de copie intermédiaire.
  */
