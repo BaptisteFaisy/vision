@@ -15,7 +15,7 @@ deux boutons pleine largeur dans Réglages → section « Voix ElevenLabs (lectu
 | journal caméra joint comme contexte d'une question de mémoire (`TimelineText.context`) | |
 | phrase du bouton « Tester la voix » (`testVoiceText`) | |
 
-L'intro embarquée (`res/raw/intro_isee.mp3`, « Welcome to iSee… », voix Jade US) était
+L'intro embarquée (`res/raw/intro_isee.mp3`, « Welcome to iSee… », voix Laure) était
 **déjà** en anglais :
 c'est elle qui a donné le sens de la demande, tout le reste la rejoint.
 
