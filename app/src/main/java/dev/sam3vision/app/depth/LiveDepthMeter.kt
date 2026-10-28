@@ -33,6 +33,7 @@ class LiveDepthMeter(
     private var latestAtMs = 0L
     private var estimator: DepthEstimator? = null
     private var engineTriedMs = 0L
+    private var offLogged = false
 
     override fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
@@ -122,7 +123,15 @@ class LiveDepthMeter(
     private suspend fun ensureEngine(): DepthEstimator? {
         synchronized(lock) { estimator }?.let { return it }
         val target = backend()
-        if (target == DepthBackend.OFF) return null
+        if (target == DepthBackend.OFF) {
+            synchronized(lock) {
+                if (!offLogged) {
+                    offLogged = true
+                    Log.i(TAG, "profondeur coupée à la frame (backend=OFF)")
+                }
+            }
+            return null
+        }
         if (nowMs() - engineTriedMs < RETRY_MS) return null
         engineTriedMs = nowMs()
         val ensured = ModelDownloader.ensure(appContext, target)
