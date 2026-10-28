@@ -4,6 +4,7 @@ import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.Role
 import dev.sam3vision.core.speech.SpeechLanguage
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,10 +23,25 @@ private const val MAX_TOKENS = 1200
 private const val MAX_LIVE_TOKENS = 200
 private const val MAX_LIVE_CHARS = 400
 private const val TEMPERATURE = 0.2
+private const val RETRY_DELAY_MS = 1_500L
+
+/**
+ * Modèle de repli quand le défaut est inconnu du fournisseur (404 `model_not_found`).
+ * Mesuré le 2026-10-28 : `meta-models/muse-spark-open-1026` répond 404 sur le fournisseur
+ * par défaut quand qwen répond 200 (texte en ~5 s, `image_url` acceptée) — une clé qui ne
+ * sert pas le défaut obtient donc quand même sa réponse, sans toucher aux réglages.
+ */
+internal const val FALLBACK_LLM_MODEL = "ali/qwen3.8-omni-flash"
+
+/** 402 côté LLM : budget du fournisseur, jamais la voix ElevenLabs. */
+private const val LLM_PAYMENT_LINE =
+    "IA refusée (402) : aucun fournisseur dans ton budget — augmente le plafond ou change de modèle"
 
 /**
  * Implémentation OkHttp d'un endpoint compatible OpenAI (`POST {baseUrl}/chat/completions`).
  * Aucune clé en dur : [apiKey] vient des réglages. Erreurs typées : 401 / 429 / timeout / réseau.
+ * Un 404 « modèle inconnu » rejoue la question sur [FALLBACK_LLM_MODEL] ; un échec transitoire
+ * (délai, cadence, 5xx) est rejoué une fois après [RETRY_DELAY_MS] — jamais plus de 3 appels.
  */
 class HttpLlmClient(
     private val baseUrl: String,
@@ -42,6 +58,8 @@ class HttpLlmClient(
      * trop court, `content` revient `null` — donc **aucune réponse**.
      */
     private val thinking: Boolean = false,
+    /** Attente avant le nouvel essai (transitoire) : injectée pour les tests. */
+    private val retryDelayMs: Long = RETRY_DELAY_MS,
 ) : LlmClient, LiveLlmClient {
 
     /** Narration d'une frame du direct : courte, contextualisée, bornée en longueur. */
@@ -110,20 +128,38 @@ class HttpLlmClient(
         return messages.put(last)
     }
 
-    /** Un seul point de sortie HTTP pour les deux méthodes : corps, en-têtes, extraction du texte. */
+    /**
+     * Un seul point de sortie HTTP : repli modèle sur 404 `model_not_found`, puis un nouvel
+     * essai sur transitoire — 3 appels au plus, dans cet ordre, puis l'échec remonte tel quel.
+     */
     private suspend fun postChat(messages: JSONArray, maxTokens: Int = MAX_TOKENS): Result<String> {
         if (apiKey.isBlank()) {
             return Result.failure(ApiError.InvalidKey("clé API absente — renseigne-la dans Réglages"))
         }
+        var current = model
+        var result = postOnce(messages, maxTokens, current)
+        var error = result.exceptionOrNull() ?: return result
+        if (isUnknownModel(error) && current != FALLBACK_LLM_MODEL) {
+            current = FALLBACK_LLM_MODEL
+            result = postOnce(messages, maxTokens, current)
+            error = result.exceptionOrNull() ?: return result
+        }
+        if (!error.isTransient) return result
+        delay(retryDelayMs)
+        return postOnce(messages, maxTokens, current)
+    }
+
+    /** Une tentative : corps, en-têtes, extraction du texte — l'orchestreur décide du reste. */
+    private suspend fun postOnce(messages: JSONArray, maxTokens: Int, usingModel: String): Result<String> {
         val body = JSONObject()
-            .put("model", model)
+            .put("model", usingModel)
             .put("messages", messages)
             .put("temperature", TEMPERATURE)
             .put("max_tokens", maxTokens)
             .apply { if (!thinking) put("chat_template_kwargs", JSONObject().put("enable_thinking", false)) }
             .toString()
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
-        return client.executeBuilt {
+        val result = client.executeBuilt {
             requestTo(
                 baseUrl,
                 "/chat/completions",
@@ -134,16 +170,52 @@ class HttpLlmClient(
         }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { extractContent(raw) } }
+        if (result.exceptionOrNull() is ApiError.PaymentRequired) {
+            return Result.failure(ApiError.PaymentRequired(LLM_PAYMENT_LINE))
+        }
+        return result
     }
 
     private fun extractContent(raw: String): String {
         val json = parse(raw) ?: throw ApiError.BadResponse("corps de réponse illisible")
+        json.optJSONObject("error")?.let { refused ->
+            val message = refused.optString("message").ifBlank { "erreur" }.take(160)
+            throw ApiError.BadResponse("le fournisseur a refusé : $message")
+        }
         val choices = json.optJSONArray("choices") ?: throw ApiError.BadResponse("pas de choices")
         val first = choices.optJSONObject(0) ?: throw ApiError.BadResponse("choices vide")
-        val content = first.optJSONObject("message").str("content")
+        val message = first.optJSONObject("message") ?: throw ApiError.BadResponse("pas de message")
+        val content = messageContent(message)
         if (content.isBlank()) throw ApiError.BadResponse("contenu vide")
         return content
     }
+}
+
+/** 404 « modèle inconnu » du fournisseur : le seul 404 qui mérite le repli. */
+private fun isUnknownModel(error: Throwable): Boolean =
+    error is ApiError.Http && error.code == 404 &&
+        (error.body.contains("model_not_found", ignoreCase = true) ||
+            error.body.contains("unknown model", ignoreCase = true))
+
+/** Échec qui mérite un nouvel essai : délai, cadence, ou panne côté fournisseur. */
+private val Throwable.isTransient: Boolean
+    get() = when (this) {
+        is ApiError.Timeout, is ApiError.RateLimited -> true
+        is ApiError.Http -> code >= 500
+        else -> false
+    }
+
+/**
+ * Texte du message : chaîne (cas nominal) ou morceaux `[{"text": ...}]` recollés
+ * (certains modèles multimodaux répondent en parties, pas en chaîne).
+ */
+private fun messageContent(message: JSONObject): String {
+    message.optJSONArray("content")?.let { parts ->
+        return (0 until parts.length()).mapNotNull { index ->
+            parts.optJSONObject(index)?.optString("text")?.takeIf { it.isNotBlank() }
+        }.joinToString("")
+    }
+    return message.str("content")
 }
 
 private fun system(text: String): JSONObject =
