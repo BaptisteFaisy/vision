@@ -27,7 +27,7 @@ class HttpRequestsTest {
     fun `les appels metiers refusent une base malformee sans lever`() = runBlocking {
         val close = HttpTrackClient("ht!tp://[::1").close("sess-1")
         assertTrue(close.exceptionOrNull() is ApiError.Network)
-        val chat = InferHubLlmClient("::::", apiKey = "cle", model = "modele")
+        val chat = HttpLlmClient("::::", apiKey = "cle", model = "modele")
             .describe("", emptyList())
         assertTrue(chat.exceptionOrNull() is ApiError.Network)
         val release = releaseSam("pas une url", OkHttpClient())
