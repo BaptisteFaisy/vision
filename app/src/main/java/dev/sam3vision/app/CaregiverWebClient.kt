@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.content.res.AssetManager
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -13,7 +14,32 @@ internal class CaregiverWebClient(
     private val assets: AssetManager,
     private val pageUrl: String,
     private val onOpenSettings: () -> Unit,
+    private val onLoading: (Boolean) -> Unit = {},
+    private val onError: (String?) -> Unit = {},
 ) : WebViewClient() {
+    override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+        onError(null)
+        onLoading(true)
+    }
+
+    override fun onPageFinished(view: WebView, url: String) {
+        onLoading(false)
+    }
+
+    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+        if (request.isForMainFrame) {
+            onLoading(false)
+            onError("La page n'a pas chargé (${error.errorCode}) : vérifie la connexion, puis rouvre la page.")
+        }
+    }
+
+    override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+        if (request.isForMainFrame) {
+            onLoading(false)
+            onError("Le site répond ${response.statusCode} : le lien de suivi est peut-être faux, puis rouvre la page.")
+        }
+    }
+
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val name = caregiverAssetName(request.url.toString(), pageUrl) ?: return null
         return try {
