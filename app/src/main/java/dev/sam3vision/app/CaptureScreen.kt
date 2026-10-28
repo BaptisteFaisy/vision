@@ -27,14 +27,17 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,6 +50,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Vrai si la permission CAMERA est déjà accordée. */
@@ -70,16 +74,19 @@ fun CaptureScreen(
     onShown: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var granted by remember { mutableStateOf(hasCameraPermission(context)) }
     var attached by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var bindToken by remember { mutableStateOf(0) }
+    var bound by remember { mutableStateOf(false) }
     val previewView = rememberPreviewView { attached = it }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     val executor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) pickFromGallery(context, uri, onPhoto) { error = it }
+        // Copie potentiellement lourde (image cloud) : hors du thread principal.
+        if (uri != null) scope.launch { pickFromGallery(context, uri, onPhoto)?.let { error = it } }
     }
 
     // Écran affiché : on lance le réveil du GPU tout de suite (le temps de cadrer).
@@ -88,7 +95,17 @@ fun CaptureScreen(
     LaunchedEffect(granted, attached, bindToken) {
         if (!granted || !attached) return@LaunchedEffect
         bindCamera(context, previewView.findViewTreeLifecycleOwner(), previewView, imageCapture)
+            .onSuccess { bound = true }
             .onFailure { error = it.message }
+    }
+
+    // Sortie de l'écran : la caméra est rendue (`bound` = `.get()` immédiat, jamais
+    // d'initialisation bloquante ici) et le fil d'exécution est arrêté (fuite sinon).
+    DisposableEffect(Unit) {
+        onDispose {
+            if (bound) runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
+            executor.shutdown()
+        }
     }
 
     CameraSurface(
@@ -158,6 +175,8 @@ private fun rememberPreviewView(onAttached: (Boolean) -> Unit): PreviewView {
     return remember(context) {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            // Sans flux, la surface montre ce fond sombre au lieu du blanc système.
+            setBackgroundColor(AppColors.background.toArgb())
             addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(view: android.view.View) = onAttached(true)
                 override fun onViewDetachedFromWindow(view: android.view.View) = onAttached(false)
@@ -166,9 +185,15 @@ private fun rememberPreviewView(onAttached: (Boolean) -> Unit): PreviewView {
     }
 }
 
-private fun pickFromGallery(context: Context, uri: android.net.Uri, onPhoto: (File) -> Unit, onError: (String) -> Unit) {
+/** Copie l'image choisie puis l'analyse ; la copie disque se fait hors du thread principal. */
+private suspend fun pickFromGallery(context: Context, uri: android.net.Uri, onPhoto: (File) -> Unit): String? {
     val target = newCacheFile(context)
-    if (copyUriToCache(context, uri, target)) onPhoto(target) else onError("Impossible de copier l'image choisie.")
+    val copied = withContext(Dispatchers.IO) { copyUriToCache(context, uri, target) }
+    if (copied) {
+        onPhoto(target)
+        return null
+    }
+    return "Impossible de copier l'image choisie."
 }
 
 private suspend fun bindCamera(
