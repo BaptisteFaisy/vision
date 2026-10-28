@@ -60,7 +60,8 @@ object ValhallaRoute {
 
     /**
      * Une manœuvre : point = `shape[begin_shape_index]`, rue = premier
-     * nom Valhalla. `null` si l'objet manque ou si l'index sort du tracé.
+     * nom Valhalla, traversée lue dans les consignes ([CrossingManeuver]).
+     * `null` si l'objet manque ou si l'index sort du tracé.
      */
     private fun maneuverAt(node: JSONObject?, points: List<Pair<Double, Double>>): NavManeuver? {
         node ?: return null
@@ -73,7 +74,16 @@ object ValhallaRoute {
         } else {
             null
         }
-        return NavManeuver(action = mapType(node.optInt("type", 8)), lat = lat, lon = lon, street = street)
+        val verbal = node.optString("verbal_pre_transition_instruction", "")
+            .ifBlank { node.optString("verbal_post_transition_instruction", "") }
+        val crossing = CrossingManeuver.matches(node.optString("instruction", ""), verbal)
+        return NavManeuver(
+            action = mapType(node.optInt("type", 8)),
+            lat = lat,
+            lon = lon,
+            street = street,
+            crossing = crossing,
+        )
     }
 
     /**
