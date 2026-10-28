@@ -101,8 +101,11 @@ class LiteRtTwinLiteSegmenter private constructor(
                 LiteRtTwinLiteSegmenter(Interpreter(model, options), delegate).also {
                     Log.i("sam3vision", "twinlite: délégué " + it.delegateName)
                 }
-            } catch (e: Exception) {
-                delegate?.close()
+                // Tout échec GPU (classe ou .so manquant, GPU refusé) ⇒ repli CPU :
+                // le GPU n'est qu'une accélération, jamais un crash (NoClassDefFoundError
+                // constaté sans `-gpu-api` — d'où le `Throwable`, pas `Exception`).
+            } catch (_: Throwable) {
+                runCatching { delegate?.close() }
                 null
             }
         }

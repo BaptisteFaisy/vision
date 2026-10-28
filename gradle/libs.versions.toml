@@ -68,7 +68,9 @@ onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android"
 # org.tensorflow.lite.Interpreter, Java pur.
 litert = { module = "org.tensorflow:tensorflow-lite", version.ref = "litert" }
 # Délégué GPU classique (TwinLiteNet : graphe taillé GPU, 270/270 nœuds délégués).
+# Les deux artefacts : `-gpu` seul ne tire pas les classes `GpuDelegateFactory`.
 litert-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.ref = "litert" }
+litert-gpu-api = { module = "org.tensorflow:tensorflow-lite-gpu-api", version.ref = "litert" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
