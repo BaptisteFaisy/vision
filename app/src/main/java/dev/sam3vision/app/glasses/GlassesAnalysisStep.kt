@@ -1,4 +1,4 @@
-package dev.sam3vision.app.glasses.bench
+package dev.sam3vision.app.glasses
 
 import dev.sam3vision.core.model.Analysis
 import kotlinx.coroutines.Dispatchers
@@ -18,13 +18,15 @@ sealed interface FrameOutcome {
 }
 
 /**
- * Maillon « frame → analyse → voix » du spike, sorti de l'activité pour être
- * jouable sur JVM : la frame part au pipeline de `:core` (`AnalyzeUseCase`, donc
- * SAM puis LLM), et seule une description non vide atteint [say].
+ * Maillon « frame → analyse → voix », partagé par le banc et le collecteur de
+ * production ([GlassesFrameCollector]), sorti de l'activité pour être jouable
+ * sur JVM : la frame part au pipeline de `:core` (`AnalyzeUseCase`, donc SAM
+ * puis LLM), et seule une description non vide atteint [say].
  *
  * `analyze` est passé en fonction (et non en `AnalyzeUseCase` concret) pour que le
- * test puisse aussi éprouver la branche « description vide » sans réseau ; en
- * production l'appelant branche `AnalyzeUseCase::invoke`.
+ * test puisse aussi éprouver la branche « description vide » sans réseau ; les
+ * appelants branchent `AnalyzeUseCase::invoke` (banc : voix lunettes, production :
+ * haut-parleur).
  */
 class GlassesAnalysisStep(
     private val analyze: suspend (String) -> Result<Analysis>,

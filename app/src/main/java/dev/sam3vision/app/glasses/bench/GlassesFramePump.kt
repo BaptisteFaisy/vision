@@ -3,6 +3,7 @@ package dev.sam3vision.app.glasses.bench
 import android.os.SystemClock
 import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.types.StreamError
+import dev.sam3vision.app.glasses.throttleDelayMs
 import kotlinx.coroutines.delay
 
 /**
@@ -35,7 +36,7 @@ internal fun GlassesRuntime.onStreamError(error: StreamError) {
 }
 
 /**
- * Étranglement : au plus une frame toutes les [FRAME_THROTTLE_MS] vers [onFrame].
+ * Étranglement : au plus une frame toutes les 1,5 s vers [onFrame].
  * L'appel réseau SAM + LLM est cher, ~0,7 image/s suffit.
  */
 internal suspend fun GlassesRuntime.consumeFrames() {

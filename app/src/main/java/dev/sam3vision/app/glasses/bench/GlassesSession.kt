@@ -2,6 +2,7 @@ package dev.sam3vision.app.glasses.bench
 
 import android.app.Activity
 import android.content.Context
+import dev.sam3vision.app.glasses.JpegFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
