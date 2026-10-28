@@ -3,6 +3,7 @@ package dev.sam3vision.app.glasses.bench
 import com.meta.wearable.dat.camera.types.StreamError
 import com.meta.wearable.dat.core.types.RegistrationState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -140,6 +141,27 @@ class SessionPolicyTest {
         )
     }
 
+    // ---- ANR enregistrement (27/10/2026) -------------------------------------
+
+    @Test
+    fun `REQUEST_REGISTRATION quitte le thread de l emetteur avant l appel bloquant`() {
+        assertTrue(runsOffEmitter(RegistrationStep.REQUEST_REGISTRATION))
+    }
+
+    @Test
+    fun `OPEN_SESSION et LOG_ONLY restent sur place, ils ne font que suspendre`() {
+        assertFalse(runsOffEmitter(RegistrationStep.OPEN_SESSION))
+        assertFalse(runsOffEmitter(RegistrationStep.LOG_ONLY))
+    }
+
+    @Test
+    fun `une seule etape quitte l emetteur`() {
+        assertEquals(
+            "seule REQUEST_REGISTRATION quitte le thread de l'émetteur",
+            1,
+            RegistrationStep.entries.count(::runsOffEmitter),
+        )
+    }
     // ---- Erreurs de flux ---------------------------------------------------
 
     @Test
