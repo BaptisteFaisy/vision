@@ -16,7 +16,7 @@ import dev.sam3vision.core.settings.Settings
  * Section « Profondeur (bêta) » des Réglages : moteur embarqué (DA2 Small par
  * ONNX, MiDaS small par LiteRT — 100 % sur le téléphone, 0 GPU Modal) + bouton
  * de banc (5 inférences sur image synthétique, verdict en bas de page et dans
- * logcat `DepthBench`). Coupée par défaut : le banc valide la latence d'abord.
+ * logcat `DepthBench`). Active par défaut (AUTO, seuil < 200 ms tenu).
  */
 @Composable
 fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: () -> Unit) {
