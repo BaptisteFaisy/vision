@@ -27,9 +27,11 @@ private val TYPED_REFUSALS = setOf(401, 402, 403, 429)
  * processus après avoir répondu ; `min_containers=0` fait que Modal ne le relance pas,
  * et le prochain réveil repart d'un snapshot restauré (2 à 7 s mesurées).
  *
- * **Une seule requête par appel** : le rejeu d'un refus doublait l'extinction (un 401 ou un
- * 429 partait deux fois). `Result.success(false)` = le serveur a refusé (400, 404, 5xx) ;
- * `failure` = réseau, délai dépassé, ou refus typé ([ApiError.InvalidKey],
+ * **Un seul nouvel essai, sur 5xx uniquement** : un conteneur qui démarre au moment exact
+ * de l'appel peut répondre 500 — le verdict du second appel fait alors foi. Les refus
+ * (4xx) ne sont jamais rejoués : le rejeu d'un refus doublait l'extinction (un 401 ou un
+ * 429 partait deux fois). `Result.success(false)` = le serveur a refusé (400, 404, 5xx
+ * persistant) ; `failure` = réseau, délai dépassé, ou refus typé ([ApiError.InvalidKey],
  * [ApiError.PaymentRequired], [ApiError.RateLimited]).
  */
 suspend fun releaseSam(
@@ -37,8 +39,15 @@ suspend fun releaseSam(
     client: OkHttpClient = defaultHttpClient(RELEASE_TIMEOUT_SECONDS),
 ): Result<ReleaseOutcome> {
     if (baseUrl.isBlank()) return Result.success(ReleaseOutcome(false, 0, "base vide"))
-    // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
-    return client.executeBuilt {
+    val once = postRelease(baseUrl, client)
+    val first = once.getOrNull()
+    if (first == null || first.released || first.code !in 500..599) return once
+    return postRelease(baseUrl, client)
+}
+
+/** Un tir `POST /release` ; construite dans `executeBuilt` : URL malformée = erreur, pas crash. */
+private suspend fun postRelease(baseUrl: String, client: OkHttpClient): Result<ReleaseOutcome> =
+    client.executeBuilt {
         requestTo(
             baseUrl,
             "/release",
@@ -47,7 +56,6 @@ suspend fun releaseSam(
             headers = mapOf(RELEASE_HEADER to "confirm"),
         )
     }.then { outcome -> outcome.toRelease() }
-}
 
 /** Réponse de `/release` : le verdict, le code HTTP et le corps (pour le diagnostic). */
 data class ReleaseOutcome(val released: Boolean, val code: Int, val body: String)
