@@ -1,6 +1,6 @@
 package dev.sam3vision.app.tap
 
-import android.test.mock.MockContext
+import android.content.Context
 import dev.sam3vision.app.MicBus
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.core.net.ApiError
@@ -17,7 +17,7 @@ import org.junit.Test
 
 /**
  * Gate d'envoi et raisons de « Failed » de la session tap. Zéro caméra, zéro réseau :
- * le contexte est un [MockContext] jamais touché (permissions et blocage injectés),
+ * le contexte est une instance vide jamais touchée (permissions et blocage injectés),
  * le TTS est un faux (aucun clip, mot tu) et l'expéditeur compte ses appels.
  */
 class TapSessionTest {
@@ -79,12 +79,14 @@ class TapSessionTest {
         var senderCalls = 0
         val player = SpeechPlayer(File(tmp, "clips"))
         val session = TapSession(
-            context = MockContext(),
+            context = blankContext(),
             scope = scope,
-            video = TapVideoSession(MockContext()),
+            video = TapVideoSession(blankContext()),
             announcements = AnnouncementPlayer(
                 dir = File(tmp, "announcements"),
-                tts = TtsClient { Result.failure(ApiError.Network()) },
+                tts = object : TtsClient {
+                    override suspend fun synthesize(text: String) = Result.failure<ByteArray>(ApiError.Network())
+                },
                 player = player,
                 scope = scope,
             ),
@@ -102,4 +104,17 @@ class TapSessionTest {
         val statuses: List<TapStatus>,
         val calls: () -> Int,
     )
+
+    /**
+     * Instance de [Context] sans constructeur : `Context` est abstrait, `MockContext`
+     * n'est pas au classpath des tests unitaires, et aucun framework de mocks n'est
+     * en dépendances. L'instance n'est jamais touchée (jamais de méthode appelée),
+     * elle ne sert qu'à construire la session.
+     */
+    private fun blankContext(): Context {
+        val field = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe")
+        field.isAccessible = true
+        val unsafe = field.get(null) as sun.misc.Unsafe
+        return unsafe.allocateInstance(Context::class.java) as Context
+    }
 }
