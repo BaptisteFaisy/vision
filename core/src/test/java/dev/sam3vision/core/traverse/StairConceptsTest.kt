@@ -46,7 +46,7 @@ class StairConceptsTest {
         assertEquals(listOf("stairs"), StairConcepts.promptsFor())
         val prompts = StairConcepts.promptsFor(listOf("person", "door"))
         assertEquals(listOf("stairs", "person", "door"), prompts)
-        val full = StairConcepts.promptsFor(listOf("a", "b", "c", "d", "e", "f"))
+        val full = StairConcepts.promptsFor((1..20).map { "objet$it" })
         assertEquals(LivePrompts.MAX, full.size)
         assertEquals("stairs", full.first())
     }
