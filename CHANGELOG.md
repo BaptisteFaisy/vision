@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — suivi : plus de « Léo », le lien porte le flux du téléphone
+
+- **Cause du lien « leo »** : le message WhatsApp était écrit en dur « Suivi de Léo
+  en direct » et `shareLink` retombait sur l'ancien défaut commun (`shareId` « leo »)
+  dès que l'identifiant manquait. Deux téléphones publiaient donc le même flux, et
+  il fallait renommer à la main le champ « Stream id » avant chaque partage.
+- Message neutre : « Suivi en direct : … », aucun prénom dans le partage.
+- `shareLink` ne devine plus aucun flux : identifiant vide → lien du relais sans
+  `?share=`, jamais l'ancien « leo » qui ferait suivre le téléphone d'un autre.
+- `Settings.shareId` vide par défaut ; `DEFAULT_SHARE_ID` devient `LEGACY_SHARE_ID`,
+  seulement reconnu par `seedShareRelay`, qui en attribue un aussi à un champ vide :
+  une installation neuve n'attend plus une visite des Réglages pour avoir son lien.
+- Réglages : le champ « Stream id » disparaît, il n'y a plus rien à renommer.
+- Preuves : `SettingsSeedTest` (dont « installation neuve » et « ancien défaut
+  commun »), `ParentShareTest`, `SettingsCodecTest` verts ; `:app`
+  `testDebugUnitTest` et `assembleDebug` verts ; `check-kotlin-limits` OK.
+  (`PrivateFileSettingsStoreTest` échoue sous Windows, permissions POSIX : même
+  échec sur `master`, hors de ce changement.)
+
 ## 2026-10-28 — suivi : la carte caregiver de l'app reçoit enfin le proche
 
 - **Cause mesurée** : le relais du site (`suivi-parent.vercel.app`, déploiement figé
@@ -325,7 +344,6 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `MotionBenchTest` (budget µs/frame, machine lente — même flaque à froid déjà vu
   sans ce changement) et `LivePipelineTest` (passé au re-run isolé) ;
   `tools/check-kotlin-limits.py` OK ; `assembleDebug` vert.
-
 
 ## 2026-10-27 (14) — zéro mémoire des anciens messages + balayage supprimé
 

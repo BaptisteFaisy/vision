@@ -24,10 +24,11 @@ class ParentShareTest {
     }
 
     @Test
-    fun `le lien vide retombe sur le relais par defaut`() {
+    fun `sans identifiant le lien ne devine aucun flux`() {
         val link = shareLink("", "")
-        assertTrue(link.startsWith(Settings.DEFAULT_PARENT_SITE_URL))
-        assertTrue(link.contains("?share=leo"))
+
+        assertTrue(link.startsWith(Settings.DEFAULT_PARENT_SITE_URL.trimEnd('/')))
+        assertTrue("aucun flux ne doit être deviné", !link.contains("share="))
     }
 
     @Test

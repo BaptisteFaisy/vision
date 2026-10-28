@@ -375,7 +375,11 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     }
 }
 
-/** « Parent tracking »: the site link sent by WhatsApp + start/stop of the permanent tracking. */
+/**
+ * « Parent tracking »: the site link sent by WhatsApp + start/stop of the permanent
+ * tracking. The stream id is not editable: every phone gets its own at first load,
+ * so nobody has to rename a link before sharing it with a relative.
+ */
 @Composable
 private fun ParentShareSettings(
     draft: Settings,
@@ -397,9 +401,6 @@ private fun ParentShareSettings(
         }
         SwitchRow("Send position + objects to the site during Direct", draft.shareEnabled) {
             onChange(draft.copy(shareEnabled = it))
-        }
-        LabeledField("Stream id (?share=, one per tracked relative)", draft.shareId, false) {
-            onChange(draft.copy(shareId = it))
         }
         LabeledField("Relay write key (generated, never shared)", draft.shareWriteKey, true) {
             onChange(draft.copy(shareWriteKey = it))

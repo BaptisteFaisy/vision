@@ -52,6 +52,8 @@ internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShar
  * l'installation : identifiant unique par téléphone (sinon deux proches partageraient
  * « leo » et le premier écraserait le second) et clé d'écriture liée à ce flux. Plus
  * rien à saisir après l'installation ; une valeur choisie à la main est conservée.
+ * Un champ vide (installation neuve, réglages d'avant le partage) en reçoit un ici :
+ * aucun lien ne part avec l'ancien flux commun en attendant.
  */
 internal fun seedShareRelay(
     loaded: Settings,
@@ -64,7 +66,8 @@ internal fun seedShareRelay(
     } else {
         loaded
     }
-    val unique = if (migrated.shareId.trim().lowercase() == Settings.DEFAULT_SHARE_ID) {
+    val id = migrated.shareId.trim().lowercase()
+    val unique = if (id.isEmpty() || id == Settings.LEGACY_SHARE_ID) {
         migrated.copy(shareId = newId())
     } else {
         migrated

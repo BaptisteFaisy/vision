@@ -175,6 +175,22 @@ class SettingsSeedTest {
     }
 
     @Test
+    fun `une installation neuve recoit son identifiant sans rien saisir`() {
+        val seed = seedShareRelay(Settings.Default.copy(shareId = ""), newId = { "flux-neuf" })
+
+        assertEquals("flux-neuf", seed.shareId)
+    }
+
+    @Test
+    fun `l ancien defaut commun cede la place a un identifiant unique`() {
+        val ancien = Settings.Default.copy(shareId = Settings.LEGACY_SHARE_ID)
+
+        val seed = seedShareRelay(ancien, newId = { "flux-unique" })
+
+        assertEquals("flux-unique", seed.shareId)
+    }
+
+    @Test
     fun `un identifiant choisi a la main n est jamais remplace`() {
         val choisi = Settings.Default.copy(shareId = "maman")
 
@@ -211,6 +227,6 @@ class SettingsSeedTest {
         assertEquals(premiere.shareId, seconde.shareId)
         assertEquals(premiere.shareWriteKey, seconde.shareWriteKey)
         assertEquals(premiere.shareId, store.load().shareId)
-        assertNotEquals(Settings.DEFAULT_SHARE_ID, premiere.shareId)
+        assertNotEquals(Settings.LEGACY_SHARE_ID, premiere.shareId)
     }
 }
