@@ -7,6 +7,7 @@ import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.types.VideoFrame
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DatError
+import dev.sam3vision.app.glasses.JpegFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
