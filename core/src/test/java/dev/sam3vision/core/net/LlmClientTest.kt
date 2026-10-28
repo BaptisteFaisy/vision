@@ -18,8 +18,7 @@ private fun serverReplying(content: String) = TestHttpServer {
 class LlmClientTest {
 
     private fun client(server: TestHttpServer) =
-        val client = InferHubLlmClient(server.baseUrl, TEST_KEY, "ali/qwen3.8-omni-flash", retryDelayMs = 5)
-        val httpClient = HttpLlmClient(server.baseUrl, TEST_KEY, "meta-models/muse-spark-open-1026")
+        HttpLlmClient(server.baseUrl, TEST_KEY, "ali/qwen3.8-omni-flash", retryDelayMs = 5)
 
     @Test
     fun `describe accepte une reponse JSON`() {
