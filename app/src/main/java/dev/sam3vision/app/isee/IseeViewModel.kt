@@ -160,7 +160,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * Navigation vocale in-app (confirmée, moteur embarqué) : câblage paresseux
      * et éteint par défaut ([IseeVoiceNav]) — coût nul sans URL Valhalla.
      */
-    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation)
+    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing)
 
     /** État de la navigation vocale (repos, confirmation, guidage) pour l'écran. */
     val voiceNavState: StateFlow<VoiceNavUiState> get() = voiceNav.state
@@ -200,12 +200,25 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         }
         probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }
         probe.observeCrossing(viewModelScope, haptics)
+        probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         curbWatcher = probe.observeCurb(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
     }
 
     /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
     fun toggleCrossing() {
         probe.setCrossingActive(settings, !probe.state.value.crossingActive)
+    }
+
+    /**
+     * Guidage auto : le rappel proche d'une traversée arme le mode, le
+     * passage le coupe (la voix du mode parle, pas d'annonce ici). Sans
+     * effet si le mode est déjà dans l'état demandé (reconfigurer coûte
+     * une session GPU).
+     */
+    private fun setAutoCrossing(wantActive: Boolean) {
+        if (probe.state.value.crossingActive != wantActive) {
+            probe.setCrossingActive(settings, wantActive)
+        }
     }
 
     /**

@@ -35,6 +35,8 @@ class IseeVoiceNav(
     private val settings: () -> Settings,
     private val scope: CoroutineScope,
     private val speak: suspend (String) -> Unit,
+    /** Le pilote y arme/coupe le mode traversée (rappel proche / passage). */
+    private val onAutoCrossing: (Boolean) -> Unit = {},
 ) {
 
     private val context = app.applicationContext
@@ -43,7 +45,7 @@ class IseeVoiceNav(
         GeocodeChain(AndroidGeocoderSource(context), BanGeocoder())
     }
 
-    private val driver: VoiceNavEngineDriver by lazy {
+    private val driverLazy = lazy {
         VoiceNavEngineDriver(
             appContext = context,
             settings = settings,
@@ -51,8 +53,10 @@ class IseeVoiceNav(
             originNow = ::lastKnownOrigin,
             scope = scope,
             onUpdate = ::pushGuidanceUpdate,
+            onAutoCrossing = onAutoCrossing,
         )
     }
+    private val driver: VoiceNavEngineDriver by driverLazy
 
     /** Session de navigation (entrée vocale, confirmation, guidage). */
     val session: VoiceNavSession by lazy {
@@ -88,6 +92,17 @@ class IseeVoiceNav(
     /** Libération finale (moteur TTS système). */
     fun shutdown() {
         runCatching { driver.shutdown() }
+    }
+
+    /**
+     * La sonde signale l'état du mode traversée (coupe manuelle : le
+     * guidage reprend). Sans effet si le pilote n'a jamais démarré (il ne
+     * s'initialise pas pour une bascule hors guidage).
+     */
+    fun onTraverseModeChanged(active: Boolean) {
+        if (driverLazy.isInitialized()) {
+            runCatching { driver.onTraverseModeChanged(active) }
+        }
     }
 
     /** Le pilote pousse ici l'état du moteur (instruction, distances, arrivée). */

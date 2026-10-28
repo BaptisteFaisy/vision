@@ -201,11 +201,14 @@ object VoiceNavPhrases {
     const val ARRIVED_PLAIN = "Vous êtes arrivé à destination"
 
     /**
-     * Phrase d'un événement moteur [event] : annonce de manœuvre, arrivée
-     * (habillée de [destinationName] quand il est connu), écart ou retour.
+     * Phrase d'un événement moteur [event] : annonce de manœuvre, traversée,
+     * arrivée (habillée de [destinationName] quand il est connu), écart ou
+     * retour.
      */
     fun event(event: NavEvent, destinationName: String?): String = when (event) {
         is NavEvent.ManeuverAhead -> ahead(event.action, event.street, event.distM)
+        is NavEvent.CrossingAhead -> crossingAhead(event.distM)
+        NavEvent.CrossingPassed -> CROSSING_DONE
         is NavEvent.Arrived -> arrived(destinationName)
         is NavEvent.OffRoute -> OFF_ROUTE
         is NavEvent.BackOnRoute -> BACK_ON_ROUTE
@@ -229,6 +232,19 @@ object VoiceNavPhrases {
         val name = destinationName?.trim()?.takeIf { it.isNotEmpty() } ?: return ARRIVED_PLAIN
         return "Vous êtes arrivé à $name"
     }
+
+    /**
+     * « Passage protégé dans X » : préavis de traversée (miroir
+     * `nav_voice_crossing` dans `strings.xml`). Sans rue : Valhalla ne
+     * donne pas de nom aux traversées.
+     */
+    fun crossingAhead(distM: Double): String {
+        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.Fr)
+        return "Passage protégé dans $distance"
+    }
+
+    /** Traversée passée : le guidage reprend (miroir `nav_voice_crossing_done`). */
+    const val CROSSING_DONE = "Traversée terminée."
 
     // ── Confirmation (session) : complètent NavigationPhrases ──
     // « Destination : X », « Voici la fiche de X », « Guidage arrêté »,
