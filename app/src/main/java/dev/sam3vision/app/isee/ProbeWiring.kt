@@ -2,8 +2,11 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
+import dev.sam3vision.core.curb.CurbSignal
+import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -57,4 +60,30 @@ internal fun LiveProbe.observeSpoken(
             voice.onPhrase(phrase, playerIdle())
         }
     }
+}
+
+/**
+ * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
+ * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
+ * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
+ * guetteur pour le `reset()` de début de séance. Coupé en mode Traversée (sa
+ * voix rouge/vert est propriétaire du son) ; l'alerte est urgente (coupe).
+ */
+internal fun LiveProbe.observeCurb(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): CurbWatcher {
+    val watcher = CurbWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val signal = CurbSignal.of(readings, st.width, st.height)
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
+        }
+    }
+    return watcher
 }

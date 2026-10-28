@@ -4,6 +4,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,7 +41,7 @@ class GuidanceTest {
 
         assertTrue(decision.blocked)
         assertEquals(GuidanceSide.Right, decision.side)
-        assertEquals("Personne à 2 mètres à midi, va à droite.", Guidance.phrase(decision))
+        assertEquals("Personne à 2 mètres à midi, décalez-vous de 1 mètre vers la droite.", Guidance.phrase(decision))
     }
 
     @Test
@@ -63,7 +64,7 @@ class GuidanceTest {
     fun `phrase anglaise avec distance`() {
         val decision = Guidance.decide(listOf(placed("person", 0.5f, 2f)))
 
-        assertEquals("Person 2 meters at 12 o'clock, go left.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Person 2 meters at 12 o'clock, move 1 meter to the left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
@@ -88,7 +89,7 @@ class GuidanceTest {
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
 
-        assertEquals("b|personne|Left|2|12h", Guidance.key(bloque))
+        assertEquals("b|personne|Left|2|12h|1", Guidance.key(bloque))
     }
 
     @Test
@@ -106,8 +107,26 @@ class GuidanceTest {
         val onze = Guidance.decide(listOf(placed("personne", 0.36f, 2f)))
         val midi = Guidance.decide(listOf(placed("personne", 0.44f, 2f)))
 
-        assertEquals("b|personne|Right|2|11h", Guidance.key(onze))
-        assertEquals("b|personne|Right|2|12h", Guidance.key(midi))
-        assertEquals("Personne à 2 mètres à 11 heures, va à droite.", Guidance.phrase(onze))
+        assertEquals("b|personne|Right|2|11h|1", Guidance.key(onze))
+        assertEquals("b|personne|Right|2|12h|1", Guidance.key(midi))
+        assertEquals("Personne à 2 mètres à 11 heures, décalez-vous de 1 mètre vers la droite.", Guidance.phrase(onze))
+    }
+
+    @Test
+    fun `decalage nul sans distance, signature point d interrogation`() {
+        val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
+
+        assertNull(decision.shiftMeters)
+        assertEquals("b|personne|Left|?|12h|?", Guidance.key(decision))
+    }
+
+    @Test
+    fun `decalage grandit avec la distance et fait reparler`() {
+        val pres = Guidance.decide(listOf(placed("personne", 0.5f, 2f)))
+        val loin = Guidance.decide(listOf(placed("personne", 0.5f, 3.4f)))
+
+        assertEquals(1f, pres.shiftMeters!!, 0.001f)
+        assertEquals(1.5f, loin.shiftMeters!!, 0.001f)
+        assertNotEquals(Guidance.key(pres), Guidance.key(loin))
     }
 }
