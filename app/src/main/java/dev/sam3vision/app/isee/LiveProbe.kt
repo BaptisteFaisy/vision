@@ -65,6 +65,7 @@ class LiveProbe(
     private val background: CoroutineDispatcher = Dispatchers.Default,
     /** Moteur de profondeur (Réglages, OFF = sténopé seul, zéro coût). Avant
      * [clientFor] : le lambda lit sa valeur à l'ouverture de la session. */
+    @Volatile
     private var depthEngine: DepthBackend = DepthBackend.OFF,
     /**
      * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
