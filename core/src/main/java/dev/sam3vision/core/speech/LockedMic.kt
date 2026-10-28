@@ -141,6 +141,9 @@ data class LockedMicState(
 /** Les constantes et libellés du micro mains libres, en un seul endroit. */
 object LockedMic {
 
+    /** Étiquette des traces : `adb logcat -s LockedMic`. */
+    const val TAG = "LockedMic"
+
     /** Plafond de capture : personne ne relâchera le doigt, donc on borne la mémoire. */
     const val MAX_RECORD_MS = 20_000L
 
