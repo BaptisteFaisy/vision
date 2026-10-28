@@ -132,18 +132,6 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
     LaunchedEffect(request) { if (request != null) push(Route.Bench) }
 }
 
-/**
- * Ouvre l'écran demandé de l'extérieur — la recette adb (`--es route nanodet`)
- * arrive avant la composition de la pile. La demande est consommée ici : un
- * seul push, même si l'effet rejoue sur la remise à `null`.
- */
-@Composable
-private fun RouteRequestEffect(push: (Route) -> Unit) {
-    val request by RouteRequest.pending.collectAsState()
-    LaunchedEffect(request) {
-        RouteRequest.consume()?.let { push(routeFromName(it)) }
-    }
-}
 
 /**
  * L'état de session pilote l'écran navigation : confirmation ou guidage =
@@ -429,6 +417,18 @@ private fun GpuWatchEffect(viewModel: AppViewModel) {
     }
 }
 
+/**
+ * Enregistre le brouillon avant de partir : le service relit les réglages
+ * sauvegardés, et un lien ou flux modifié sans « Enregistrer » partait
+ * dans le vide (400/403 silencieux).
+ */
+private fun startParentTracking(viewModel: AppViewModel, context: Context, draft: Settings) {
+    viewModel.saveSettings(draft)
+    (context as? MainActivity)?.ensureSharePermissions()
+    ShareTrackingService.start(context)
+    shareParentSite(context, draft.parentSiteUrl, draft.shareId)
+}
+
 /** Réglages : délègue au ViewModel et ouvre le banc des lunettes. */
 @Composable
 private fun SettingsRoute(
@@ -466,15 +466,7 @@ private fun SettingsRoute(
         onOpenSegment = onOpenSegment,
         onOpenGestures = onOpenGestures,
         onPickRole = onPickRole,
-        onStartTracking = { draft ->
-            // Le brouillon des champs est enregistré avant de partir : le service
-            // relit les réglages sauvegardés, et un lien ou un flux modifié sans
-            // « Enregistrer » partait dans le vide (400/403 silencieux).
-            viewModel.saveSettings(draft)
-            (context as? MainActivity)?.ensureSharePermissions()
-            ShareTrackingService.start(context)
-            shareParentSite(context, draft.parentSiteUrl, draft.shareId)
-        },
+        onStartTracking = { draft -> startParentTracking(viewModel, context, draft) },
         onStopTracking = {
             context.stopService(Intent(context, ShareTrackingService::class.java))
         },
