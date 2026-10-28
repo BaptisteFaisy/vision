@@ -6,9 +6,6 @@ import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -76,82 +73,6 @@ class AppDiagnosticsTest {
         diagnostics(sam = sam).testSam()
 
         assertEquals("SAM KO — réseau", screen.value.statusLine)
-    }
-
-    @Test
-    fun `warmGpu — un health silencieux sur l endpoint des reglages`() = runTest {
-        val sam = FakeSam(onHealth = Result.success(true))
-        val before = screen.value.statusLine
-
-        diagnostics(sam = sam).warmGpu()
-
-        assertEquals("https://sam.test", samUrlCalled)
-        assertEquals(1, sam.healthCalls)
-        assertEquals("aucune écriture UI à l'ouverture", before, screen.value.statusLine)
-    }
-
-    @Test
-    fun `warmGpu sans URL — aucun appel reseau`() = runTest {
-        val sam = FakeSam()
-
-        diagnostics(samUrl = { "" }, sam = sam).warmGpu()
-
-        assertEquals(0, sam.healthCalls)
-    }
-
-    @Test
-    fun `warmGpu en echec — 3 essais puis silence, aucun verdict`() = runTest {
-        val sam = FakeSam(onHealth = Result.failure(ApiError.Network("réseau")))
-        val before = screen.value.statusLine
-
-        diagnostics(sam = sam).warmGpu()
-
-        assertEquals("3 essais bornés", 3, sam.healthCalls)
-        assertEquals(before, screen.value.statusLine)
-    }
-
-    @Test
-    fun `warmGpu — succes au 2e essai, arret immediat`() = runTest {
-        val sam = FakeSam(
-            onHealthSeq = listOf(
-                Result.failure(ApiError.Network("trou de réseau")),
-                Result.success(true),
-                Result.success(true),
-            ),
-        )
-        val before = screen.value.statusLine
-
-        diagnostics(sam = sam).warmGpu()
-
-        assertEquals("arrêt au premier succès", 2, sam.healthCalls)
-        assertEquals(before, screen.value.statusLine)
-    }
-
-    @Test
-    fun `warmGpu — backend arrete, aucune nouvelle tentative`() = runTest {
-        val sam = FakeSam(onHealth = Result.failure(ApiError.BackendStopped()))
-        val before = screen.value.statusLine
-
-        diagnostics(sam = sam).warmGpu()
-
-        assertEquals("inutile de réessayer, il faut redéployer", 1, sam.healthCalls)
-        assertEquals(before, screen.value.statusLine)
-    }
-
-    @Test
-    fun `warmGpu — nouveau réveil annule les essais du précédent`() = runTest {
-        // Même mécanisme que `releaseGpu` en arrière-plan (génération périmée) : pas de
-        // rallumage derrière l'extinction. `releaseGpu` n'est pas appelable ici, il
-        // logue via `android.util.Log`, absent des tests JVM (constat, pas de Robolectric).
-        val sam = FakeSam(onHealth = Result.failure(ApiError.Network("trou de réseau")))
-        val d = diagnostics(sam = sam)
-
-        launch { d.warmGpu() }
-        runCurrent()
-        launch { d.warmGpu() }
-        advanceUntilIdle()
-
-        assertEquals("1 essai du premier + 3 du second", 4, sam.healthCalls)
     }
 
     @Test

@@ -482,13 +482,9 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Réveil du conteneur Modal : **un seul appel** à `/health`.
-     *
-     * Avant, on réessayait 6 fois toutes les 10 s : c'est ce qui remplissait les
-     * journaux de `/health` et, surtout, qui **gardait la carte A100 allumée en boucle**
-     * (une carte qui répond reste un conteneur actif, facturé). Un seul appel suffit :
-     * le client `/health` a un délai long (il attend le démarrage du conteneur), et si le
-     * réveil échoue, la première frame `/live` réessaiera d'elle-même.
+     * Marqueur d'attente du premier retour : posé dès que l'endpoint est connu,
+     * effacé à l'arrivée des premières frames. Aucun appel réseau ici — la première
+     * frame réveille le conteneur Modal d'elle-même.
      */
     private fun markWarming() {
         if (_state.value.endpoint.isBlank() || warming) return
