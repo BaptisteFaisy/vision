@@ -13,8 +13,8 @@ une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est a
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1403
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 777
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1418
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 784
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 95
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 9
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
@@ -22,13 +22,13 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 193 (dont 12 aides) | 181 | **1 403** |
-| `:app` | 122 (dont 3 aides) | 119 | **777** |
-| **Total JVM** | **315** | **300** | **2 180** |
+| `:core` | 194 (dont 12 aides) | 182 | **1 418** |
+| `:app` | 123 (dont 3 aides) | 120 | **784** |
+| **Total JVM** | **317** | **302** | **2 202** |
 | `:app` `androidTest` | 3 | 3 | **9** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **2 180 tests JVM** au total, dont **1 403** dans `:core` et **777** dans `:app`. Dans `:app`, le
+- **2 202 tests JVM** au total, dont **1 418** dans `:core` et **784** dans `:app`. Dans `:app`, le
   banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
   **10 tests instrumentés** (9 + 1) sont hors de ce total.
 - Le banc lunettes **n'est plus un module** : ses tests JVM sont dans
@@ -52,7 +52,7 @@ Relevé du 26/10 après 19 h, sur r630 : **`:core` 663 / 0 échec / 0 ignoré**,
 et, à l'époque, **le banc lunettes 36 / 0 / 0** — **1 004 exécutés** au total. Ce relevé décrit
 l'arbre **d'avant** la fusion du banc dans `:app` : il **n'est plus comparable** aux comptages du
 §1. Aucune exécution Gradle n'a été refaite dans cette passe (aucun `gradlew` appelé ici), donc les
-**2 180** sont des comptages statiques d'annotations, pas le résultat d'un run.
+**2 202** sont des comptages statiques d'annotations, pas le résultat d'un run.
 
 ## 2. Commandes exactes
 
@@ -184,7 +184,7 @@ périmètre limité au stockage privé de l'app · job horaire unique et sans r�
 
 Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un seul fichier porte deux classes : `TapZonesTest.kt`).
 
-### `:core` — 1403
+### `:core` — 1418
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **crossing** (48) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, TrainedLightColorTest 4
@@ -202,18 +202,18 @@ Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un se
 - **motion** (9) : MotionBenchTest 1, MotionSourceTest 8
 - **nav** (133) : BanGeocoderTest 7, DestinationQueryTest 10, GeocodeCacheTest 4, GeocodeChainTest 10, GuidanceUpdateTest 6, MapsUriTest 13, NavGeoTest 9, NavRouteTest 6, NavigationFlowTest 4, NavigationIntentTest 21, RouteSummaryTest 10, RouteTripNavTest 4, StopGuidanceTest 4, ValhallaRouteTest 7, ValhallaShapeTest 6, VoiceNavEngineTest 6, VoiceNavScriptTest 6
 - **navcore** (50) : NavErrorTest 10, NavMessagesTest 12, NavResultsTest 7, NavStopTest 6, NavUiStateTest 8, RetryPolicyTest 7
-- **net** (271) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 22, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 4, TrackClientTest 12, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
+- **net** (282) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, GpuMonitorTest 11, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 22, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 4, TrackClientTest 12, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
 - **settings** (95) : CaregiverInviteTest 7, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
 - **share** (15) : CaregiverPageTest 3, SharePayloadTest 7, SharedSceneTest 5
 - **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
 - **text** (14) : PromptShieldTest 10, TextSanitizerTest 4
-- **usecase** (36) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 10
+- **usecase** (40) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 14
 - **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 777
+### `:app` — 784
 
-- **(racine)** (146) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 19, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 4, RouteBaseUrlSeedTest 3, RouteSeedTest 3, SettingsSeedTest 11, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 17, VoiceLanguageSettingsTest 4
+- **(racine)** (147) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 19, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 4, RouteBaseUrlSeedTest 3, RouteSeedTest 3, SettingsSeedTest 11, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 17, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
 - **depth** (10) : DepthPreprocessTest 5, ModelDownloaderTest 5
 - **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
@@ -227,7 +227,7 @@ Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un se
 - **perms** (11) : PermDecisionTest 11
 - **speech** (56) : SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 6, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 11
 - **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapSessionTest 6, TapZonesTest 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)
-- **vm** (33) : AppAnalysisTest 6, AppChatTest 6, AppDiagnosticsTest 7, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
+- **vm** (39) : AppAnalysisTest 9, AppChatTest 6, AppDiagnosticsTest 10, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
 - **voicenav** (26) : ValhallaRouteLoaderTest 4, VoiceNavEngineDriverTest 3, VoiceNavSessionTest 14, VoiceNavSessionWiringTest 5
 
 Le banc lunettes (`glasses.bench`) n'a plus de section à part : il est dans `:app` depuis la
@@ -243,7 +243,7 @@ simulés (`core/src/test/…/TestHttpServer.kt`, `net/TestLiveClients.kt`, `net/
 ## 7. Gardes et limites connues
 
 - `tools/check-kotlin-limits.py` (heuristique accolades, faux positifs possibles) : **vert le
-  28/10** sur cet arbre (807 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
+  28/10** sur cet arbre (810 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
 - `bash scripts/test_scripts.sh` : **117 assertions, 117 ok**.
 - GPU Modal : **une seule carte à la fois**, toutes apps confondues ; sur cette machine,
   `~/bin/sam3-gpu status|busy` avant toute manœuvre, et ne rien redéployer.

@@ -110,7 +110,7 @@ Un téléphone ordinaire, une carte GPU distante, et la voix comme seule interfa
 | Déployé | `sam3-eu-a100` (A100-40GB, `eu-west`) depuis `server/backend/live_fast/` — `/health`, `/segment`, `/live`, `/live/ws`, `/release` ; redéployé par la CI à chaque push qui le touche, avec ses leviers (graphe CUDA, snapshot, `scaledown_window=60`) |
 | Routage | `valhalla-idf-cpu` (CPU, zéro GPU, tuiles Île-de-France) — `/health`, `/route` ; déployé par la CI |
 | Autres | `modal_app.py` (legacy photo `/analyze`, `/ask`), `track_app.py` (tracker `/session`, `/frame` — déploiement manuel), `probe_*.py` (sondes de mesure, jamais déployées en routine) |
-| Règle d'or | **une seule GPU à la fois** : la caméra active allume la carte, coupée elle s'éteint (`POST /release`) ; jamais de sonde périodique |
+| Règle d'or | **une seule GPU à la fois** : la caméra active allume la carte, coupée elle s'éteint (`POST /release`) ; aucune tâche planifiée ne garde la carte allumée |
 
 ### Suivi proche (`suivi-parent/`)
 
@@ -145,7 +145,7 @@ Prérequis : JDK 17 + SDK Android (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (garde
 Node (page du proche, sans `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # tests JVM (2 180 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # tests JVM (2 202 @Test)
 ./gradlew :app:assembleDebug                               # APK debug
 python3 tools/check-kotlin-limits.py                       # fichier < 500 l., fonction < 50 l.
 python3 tools/check-isee-design.py                         # design Portrait obligatoire
@@ -158,10 +158,10 @@ bash scripts/build.sh                                      # assembleDebug --off
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **730** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **76 370** | même `find`, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **43 219** — `:core` 166 f. / 16 516 l. · `:app` 240 f. / 26 703 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **2 180** — `:core` 1 403 · `:app` 777 (dont banc lunettes 95) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **733** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **76 990** | même `find`, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **43 457** — `:core` 167 f. / 16 654 l. · `:app` 240 f. / 26 803 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **2 202** — `:core` 1 418 · `:app` 784 (dont banc lunettes 95) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
 | Tests instrumentés | **10** (appareil requis) | idem sur `app/src/androidTest*` |
 | Backend Python | **31** fichiers, **6 094** lignes | `find server/backend -name '*.py' …` |
 | Gardes | toutes vertes (tailles, Portrait, budget, voix, ci-budget, scripts, goldens, relais) | voir `docs/TESTING.md` §2 |

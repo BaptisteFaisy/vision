@@ -7,7 +7,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 - `README.md` réécrit : problème, solution, 4 blocs (`:core`, `:app`, `server/`,
   `suivi-parent/`), stack complète (Android, Modal, page proche, voix/LLM, CI) ; chiffres
-  remesurés le 28/10 (730 `.kt`, 43 219 lignes de prod, 2 180 `@Test` JVM + 10 instrumentés).
+  remesurés le 28/10 (733 `.kt`, 43 457 lignes de prod, 2 202 `@Test` JVM + 10 instrumentés).
 - Recomptages 28/10 : `docs/PERF.md` (§1.1, §2, §4), `NOTES.md` (versions, taille, direct),
   `docs/ARCHITECTURE.md` (§1, §8), `docs/TESTING.md` (§1, §2, §5, §6), `AGENTS.md` (§1, §3, §4),
   `docs/DOC-ETAT.md` (+ `server/*`, `suivi-parent`, `scripts`, `DEPS`, `fireworks`).
