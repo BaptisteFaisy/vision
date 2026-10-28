@@ -65,6 +65,32 @@ class VideoClientTest {
     }
 
     @Test
+    fun `un 404 de route manquante est une erreur Http 404 interrogeable`() = runBlocking {
+        responseCode = 404
+        responseBody = """{"detail":"Not Found"}"""
+        val failure = HttpSam31VideoClient(server.baseUrl).sendVideo(video, null).exceptionOrNull()
+        assertTrue(failure is ApiError.Http)
+        assertEquals(404, (failure as ApiError.Http).code)
+        assertTrue(ApiError.isRouteMissing(failure))
+    }
+
+    @Test
+    fun `un 404 invalid function call reste un BackendStopped sans repli photo`() = runBlocking {
+        responseCode = 404
+        responseBody = "modal-http: invalid function call"
+        val failure = HttpSam31VideoClient(server.baseUrl).sendVideo(video, null).exceptionOrNull()
+        assertTrue(failure is ApiError.BackendStopped)
+        assertTrue(failure?.let { !ApiError.isRouteMissing(it) } == true)
+    }
+
+    @Test
+    fun `isRouteMissing refuse les autres echecs`() {
+        assertFalse(ApiError.isRouteMissing(ApiError.Http(500, "boom")))
+        assertFalse(ApiError.isRouteMissing(ApiError.RateLimited()))
+        assertFalse(ApiError.isRouteMissing(ApiError.InvalidKey("endpoint SAM 3.1 vide")))
+    }
+
+    @Test
     fun `un endpoint vide echoue sans appel reseau`() = runBlocking {
         val failure = HttpSam31VideoClient("").sendVideo(video, null).exceptionOrNull()
         assertTrue(failure is ApiError.InvalidKey)
