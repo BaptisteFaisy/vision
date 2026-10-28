@@ -55,29 +55,23 @@ object HapticPattern {
     const val HOLD_OFF_MS = 90L
     const val HOLD_AMPLITUDE = 255
 
-    /** Nappe de la tenue : longue, douce, ce n'est pas un « tick » de notification. */
-    const val LOOP_MS = 300L
-    const val LOOP_OFF_MS = 60L
-    const val LIGHT_AMPLITUDE = 80
-
     /** Queue du relâchement : la tension retombe, elle ne s'arrête pas net. */
     const val TAIL_MS = 200L
     const val TAIL_AMPLITUDE = 120
 
     /**
-     * Appui long : la salve part au seuil, puis la nappe **boucle** depuis son premier
-     * temps fort jusqu'à l'arrêt — le doigt posé vibre tant qu'il reste posé.
+     * Appui long : la salve part au seuil, **une seule fois**, puis silence pendant
+     * toute la dictée — il n'y a plus de nappe bouclée (décision user 28/10 : aucune
+     * vibration pendant que l'utilisateur parle).
      *
      * Les creux portent leur `0` : chaque timing a son amplitude, sinon l'effet est
      * refusé par le moteur.
      */
-    fun holdLoop(
+    fun holdTick(
         salveAmplitude: Int = HOLD_AMPLITUDE,
-        loopAmplitude: Int = LIGHT_AMPLITUDE,
     ): Waveform = Waveform(
-        timings = listOf(0L, HOLD_MS, HOLD_OFF_MS, HOLD_MS, HOLD_OFF_MS, LOOP_MS, LOOP_OFF_MS),
-        amplitudes = listOf(0, salveAmplitude, 0, salveAmplitude, 0, loopAmplitude, 0),
-        repeatIndex = FIRST_LOOP_INDEX,
+        timings = listOf(0L, HOLD_MS, HOLD_OFF_MS, HOLD_MS),
+        amplitudes = listOf(0, salveAmplitude, 0, salveAmplitude),
     )
 
     /** Relâchement : une seule salve de [ms], non bouclée. */
@@ -106,7 +100,4 @@ object HapticPattern {
         timings = listOf(0L, CROSSING_RED_MS),
         amplitudes = listOf(0, CROSSING_RED_AMPLITUDE),
     )
-
-    /** Index de la nappe dans [holdLoop] : juste après les deux salves. */
-    private const val FIRST_LOOP_INDEX = 5
 }

@@ -2,35 +2,30 @@ package dev.sam3vision.core.haptics
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WaveformTest {
 
     @Test
-    fun `l'appui long commence par la salve puis boucle la nappe`() {
-        val wave = HapticPattern.holdLoop()
+    fun `l'appui long est une salve unique puis silence`() {
+        val wave = HapticPattern.holdTick()
 
         // La salve historique est intacte : deux temps forts séparés d'un creux.
-        assertEquals(listOf(0L, 70L, 90L, 70L), wave.timings.take(4))
-        assertEquals(listOf(0, 255, 0, 255), wave.amplitudes.take(4))
-        // Puis un creux, et la nappe bouclée depuis son premier temps fort.
-        assertEquals(0, wave.amplitudes[4])
-        assertEquals(HapticPattern.LOOP_MS, wave.timings[5])
-        assertEquals(5, wave.repeatIndex)
-        assertTrue(wave.looped)
+        assertEquals(listOf(0L, 70L, 90L, 70L), wave.timings)
+        assertEquals(listOf(0, 255, 0, 255), wave.amplitudes)
+        // Puis silence : le motif n'est plus bouclé (aucune vibration pendant la parole).
+        assertFalse(wave.looped)
+        assertEquals(Waveform.NO_REPEAT, wave.repeatIndex)
     }
 
     @Test
-    fun `chaque timing de l'appui long porte son amplitude`() {
-        val wave = HapticPattern.holdLoop()
+    fun `chaque timing de la salve porte son amplitude`() {
+        val wave = HapticPattern.holdTick()
 
         assertEquals(wave.timings.size, wave.amplitudes.size)
         // Le creux porte son 0 : sans lui, le moteur refuse le motif d'un bloc.
+        assertEquals(0, wave.amplitudes[0])
         assertEquals(0, wave.amplitudes[2])
-        assertEquals(0, wave.amplitudes[4])
-        assertEquals(0, wave.amplitudes.last())
-        assertEquals(HapticPattern.LIGHT_AMPLITUDE, wave.amplitudes[5])
     }
 
     @Test
@@ -45,10 +40,10 @@ class WaveformTest {
 
     @Test
     fun `un moteur sans controle de force utilise l'amplitude par defaut`() {
-        val wave = HapticPattern.holdLoop(salveAmplitude = Waveform.DEFAULT_AMPLITUDE, loopAmplitude = -1)
+        val wave = HapticPattern.holdTick(salveAmplitude = Waveform.DEFAULT_AMPLITUDE)
 
-        assertEquals(listOf(0, -1, 0, -1, 0, -1, 0), wave.amplitudes)
-        assertEquals(7, wave.timings.size)
+        assertEquals(listOf(0, -1, 0, -1), wave.amplitudes)
+        assertEquals(4, wave.timings.size)
     }
 
     @Test(expected = IllegalArgumentException::class)
