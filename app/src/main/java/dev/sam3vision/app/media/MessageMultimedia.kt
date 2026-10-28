@@ -12,6 +12,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Room
+import dev.sam3vision.app.room.RepliDowngrade
 
 /**
  * Une ligne = un échange iSee (ou un évènement média du Direct) : horodatage, texte
@@ -133,12 +134,12 @@ abstract class MediaDatabase : RoomDatabase() {
          * démarrage de toute façon (`IseeViewModel.kt`). Les montées de version
          * sans migration restent des crashs volontaires (vraie migration exigée).
          * Journal WAL : les lectures ne bloquent plus les écritures (purge FIFO).
+         * Repli partagé avec la base de nettoyage (`RepliDowngrade`).
          */
         internal fun build(context: Context, name: String): MediaDatabase =
-            Room.databaseBuilder(context, MediaDatabase::class.java, name)
-                .fallbackToDestructiveMigrationOnDowngrade()
-                .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                .build()
+            RepliDowngrade.appliquer(
+                Room.databaseBuilder(context, MediaDatabase::class.java, name),
+            ).build()
 
         private const val DB_NAME = "isee-media.db"
     }
