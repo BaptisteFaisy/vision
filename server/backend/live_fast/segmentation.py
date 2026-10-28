@@ -36,78 +36,14 @@ SCORE_THRESHOLD = 0.35
 MASK_THRESHOLD = 0.5
 
 
-# SAM 3.1's text encoder is an English CLIP: French concepts are mapped to their
-# English counterpart for the model, while the label stays as the user typed it.
-CONCEPT_ALIASES = {
-    "personne": "person",
-    "personnes": "person",
-    "gens": "person",
-    "homme": "man",
-    "femme": "woman",
-    "enfant": "child",
-    "voiture": "car",
-    "voitures": "car",
-    "véhicule": "vehicle",
-    "camion": "truck",
-    "vélo": "bicycle",
-    "moto": "motorcycle",
-    "animal": "animal",
-    "animaux": "animal",
-    "chien": "dog",
-    "chat": "cat",
-    "oiseau": "bird",
-    "cheval": "horse",
-    "arbre": "tree",
-    "plante": "plant",
-    "fleur": "flower",
-    "maison": "house",
-    "immeuble": "building",
-    "bâtiment": "building",
-    "rue": "street",
-    "route": "road",
-    "table": "table",
-    "chaise": "chair",
-    "canapé": "sofa",
-    "lit": "bed",
-    "ordinateur": "computer",
-    "téléphone": "phone",
-    "nourriture": "food",
-    "repas": "meal",
-    "fruit": "fruit",
-    "légume": "vegetable",
-    "vêtement": "clothing",
-    "chaussure": "shoe",
-    "sac": "bag",
-    "objet": "object",
-    "chose": "thing",
-    "texte": "text",
-    "panneau": "sign",
-    "ciel": "sky",
-    "mer": "sea",
-    "montagne": "mountain",
-    "eau": "water",
-}
-_ARTICLES = ("un ", "une ", "le ", "la ", "les ", "des ", "du ", "l'", "the ", "a ", "an ")
+# Concepts FR→EN : table et normalisation dans concepts.py (l'encodeur texte de
+# SAM 3.1 est un CLIP anglais). Réexportés ici : `fast_core` et les sondes font
+# `from segmentation import model_concept`.
+from concepts import CONCEPT_ALIASES, model_concept
 
 
 class PromptError(ValueError):
     """Raised when the requested concept prompts cannot be used (HTTP 400)."""
-
-
-def model_concept(prompt: str) -> str:
-    """Concept anglais remis au modèle.
-
-    Les alias FR/EN sont traduits ; un prompt inconnu est remis **normalisé** (minuscules,
-    articles retirés, espaces pliés) au lieu d'être recopié tel quel : c'est aussi la clé
-    de dédoublonnage de ``normalize_prompts``, donc « chaise », « Chair » et « une chaise »
-    ne peuvent plus désigner deux concepts différents pour le serveur.
-    """
-    key = prompt.strip().lower()
-    for article in _ARTICLES:
-        if key.startswith(article):
-            key = key[len(article) :].strip()
-            break
-    return CONCEPT_ALIASES.get(key, key)
 
 
 def _torch():

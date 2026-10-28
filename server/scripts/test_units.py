@@ -422,6 +422,7 @@ RUNNERS = (
     ("live_fast : image (poids + snapshot déployés)", "timing", weights_tests.test_live_fast_image),
     ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
+    ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
 )
 
 
