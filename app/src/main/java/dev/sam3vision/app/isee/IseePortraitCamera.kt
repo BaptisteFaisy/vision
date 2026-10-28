@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sam3vision.app.LiveDistanceLayer
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.iseedesign.pictureAlpha
 
@@ -29,6 +30,12 @@ import dev.sam3vision.core.iseedesign.pictureAlpha
  * le blanc par le bas ; pas de cadre, pas de carte. À l'ouverture la rue arrive floue et un peu
  * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les
  * distances.
+ *
+ * Lunettes connectées ([showGlasses]) : la même rue montre le direct des lunettes à la
+ * place de la caméra du téléphone — avec les mêmes masques, pastilles, flèche et debug,
+ * car la sonde analyse alors la rue des lunettes (pont [GlassesProbeWiring]). Entre le
+ * démarrage du flux et la première image, la rue existe en fantôme ([ghost], alpha nul) :
+ * sa surface reçoit les frames, sans elle le direct ne démarrerait jamais.
  */
 @Composable
 internal fun BoxWithConstraintsScope.PortraitCamera(
@@ -38,8 +45,10 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
     viewModel: IseeViewModel,
     open: Float,
     height: Dp,
+    showGlasses: Boolean,
+    ghost: Boolean,
 ) {
-    if (open <= 0.001f) return
+    if (open <= 0.001f && !ghost) return
     val focus = focusPull(open)
     Box(
         Modifier
@@ -55,7 +64,14 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
                 .graphicsLayer { scaleX = focus.scale; scaleY = focus.scale }
                 .blur(focus.blur.dp),
         ) {
-            CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
+            if (showGlasses) {
+                GlassesLive(Modifier.fillMaxSize())
+                GlassesMaskLayer(probe.masks, probe.width, probe.height)
+                LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
+                SteeringLayer(probe.steering)
+            } else {
+                CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
+            }
         }
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         ProbeNoticeCard(probe)

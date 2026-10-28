@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.PortraitGeometry
@@ -49,10 +53,12 @@ import dev.sam3vision.core.iseedesign.voiceEnvelope
 fun IseeScenePane(state: IseeUiState, viewModel: IseeViewModel, modifier: Modifier = Modifier) {
     val glue = rememberCameraGlue(viewModel)
     val probe by viewModel.probe.state.collectAsState()
+    val glassesLive by GlassesVideoLink.live.collectAsState()
+    val glassesStreaming by GlassesVideoLink.streaming.collectAsState()
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight)
+        PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }
 }
 
@@ -66,17 +72,31 @@ private fun BoxWithConstraintsScope.PortraitScene(
     view: IseeSceneView,
     width: Dp,
     height: Dp,
+    glassesLive: Boolean,
+    glassesStreaming: Boolean,
 ) {
     val captureLive = state.recordingVideo
-    val layers = iseeSceneLayers(bubbleCount(state.entries.size), dissolving = false, captureLive = captureLive)
-    val open = rememberCameraOpen(layers.cameraCard)
+    val layers = iseeSceneLayers(
+        bubbleCount(state.entries.size),
+        dissolving = false,
+        captureLive = captureLive,
+        glassesLive = glassesLive,
+        glassesStreaming = glassesStreaming,
+    )
+    val open = rememberCameraOpen(layers.cameraCard || layers.glassesFeed)
     val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
     val talking = position != null || (state.holding && state.userSpeaking)
     val speech by animateFloatAsState(if (talking) 1f else 0f, tween(420), label = "camera-speech")
+    // Source affichée, avec mémoire : la dernière image des lunettes reste figée pendant
+    // le fondu de fermeture (`showGlassesFeed`). L'affectation est un point fixe stable.
+    var lastGlasses by remember { mutableStateOf(false) }
+    val showGlasses = showGlassesFeed(layers.glassesFeed, layers.glassesGhost, layers.cameraCard, open, lastGlasses)
+    lastGlasses = showGlasses
     val density = LocalDensity.current
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
     val time = rememberSceneTime()
-    with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp()) }
+    with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
+    GlassesProbeWiring(viewModel.probe, glassesLive)
     OrbLayer(view.scene, geo, time, open)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     with(density) {
