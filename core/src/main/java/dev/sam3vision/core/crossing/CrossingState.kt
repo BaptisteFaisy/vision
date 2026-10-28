@@ -22,8 +22,11 @@ enum class CrossingState { Red, Green, Unknown }
  */
 object CrossingPrompts {
 
+    /** Concept feu, demandé aussi par le mode traversée du direct. */
+    const val LIGHT = "traffic light"
+
     /** Concepts envoyés à SAM en mode Traversée (anglais, comme les défauts). */
-    val PROMPTS: List<String> = listOf("traffic light", "car")
+    val PROMPTS: List<String> = listOf(LIGHT, "car")
 
     /** Étiquettes (canoniques, voir [KnownSizes.canonical]) qui désignent un feu. */
     private val LIGHT_LABELS = setOf(

@@ -366,7 +366,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             lastKnownWidth = width
             lastKnownHeight = height
         }
-        val shown = traverse.filter(frame, width, height, distances.lensSpec.focalPx(width, height), now, settings.speechLanguage)
+        val shown = traverse.filter(frame, width, height, distances.lensSpec.focalPx(width, height), now, settings.speechLanguage, latestFrame.jpegB64)
         val seen = timeline.record(now, shown.detections)
         // Réponse serveur absorbée par la prédiction : elle sert d'ancre aux boîtes
         // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
