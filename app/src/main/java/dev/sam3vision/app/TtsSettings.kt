@@ -37,14 +37,6 @@ fun TtsSettings(
         VoiceLanguageSettings(draft, onChange)
         LabeledField("ElevenLabs API key", draft.ttsApiKey, true) { onChange(draft.copy(ttsApiKey = it)) }
         LabeledField("ElevenLabs voice ID", draft.ttsVoiceId, false) { onChange(draft.copy(ttsVoiceId = it)) }
-        Text(
-            "Default voice: Laure ${Settings.LAURE_VOICE_ID}. Fallbacks: Sarah " +
-                "${Settings.SARAH_VOICE_ID} (premade, free tier) · George " +
-                "JBFqnCBsd6RMkjVDRZzb. Jade US ${Settings.JADE_US_VOICE_ID} " +
-                "is a library voice: it answers 402 without credits.",
-            color = SettingsLight.muted,
-            fontSize = 11.sp,
-        )
         SpeedSetting(draft, onChange)
         SpeakRow(
             state = speaking,
@@ -54,7 +46,7 @@ fun TtsSettings(
             actionLabel = "Test voice",
             labelColor = SettingsLight.muted,
             buttonTextColor = SettingsLight.text,
-            buttonBorderColor = SettingsLight.border,
+            buttonBorderColor = SettingsLight.text,
         )
         VoiceSwitches(draft, onChange)
         IntroSetting(draft) { onChange(draft.copy(introEnabled = it)) }
@@ -75,11 +67,11 @@ private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
         Text("Voice speed", color = SettingsLight.text, fontSize = 13.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, -0.1f))) }) {
-                Text("−", fontSize = 18.sp)
+                Text("−", fontSize = 16.sp, color = SettingsLight.text)
             }
-            Text(formatTtsSpeed(draft.ttsSpeed), color = SettingsLight.text, fontSize = 15.sp)
+            Text(formatTtsSpeed(draft.ttsSpeed), color = SettingsLight.text, fontSize = 13.sp)
             TextButton(onClick = { onChange(draft.copy(ttsSpeed = bumpTtsSpeed(draft.ttsSpeed, 0.1f))) }) {
-                Text("+", fontSize = 18.sp)
+                Text("+", fontSize = 16.sp, color = SettingsLight.text)
             }
         }
     }
@@ -118,7 +110,7 @@ private fun IntroSetting(draft: Settings, onChange: (Boolean) -> Unit) {
     )
 }
 
-/** "Label + switch" row: a single implementation for all switches. */
+/** "Label + switch" row: a single implementation for all switches (black/white, no blue). */
 @Composable
 internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
@@ -127,6 +119,17 @@ internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> U
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, color = SettingsLight.text, fontSize = 13.sp)
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = androidx.compose.material3.SwitchDefaults.colors(
+                checkedThumbColor = androidx.compose.ui.graphics.Color.White,
+                checkedTrackColor = SettingsLight.text,
+                checkedBorderColor = SettingsLight.text,
+                uncheckedThumbColor = androidx.compose.ui.graphics.Color.White,
+                uncheckedTrackColor = SettingsLight.border,
+                uncheckedBorderColor = SettingsLight.text,
+            ),
+        )
     }
 }

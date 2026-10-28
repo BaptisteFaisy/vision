@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -91,8 +92,9 @@ fun BigButton(
 }
 
 /**
- * Bouton de la page Settings : blanc entouré de noir au repos, noir plein
- * (texte blanc) quand il est sélectionné ou validé ([primary]).
+ * Bouton de la page Settings : toujours fond blanc, contour noir, texte noir.
+ * [primary] = sélectionné : une pastille blanche à coche noire précède le libellé.
+ * Taille réduite (46 dp, 13 sp) sur toute la page, sans bleu.
  */
 @Composable
 fun GlassButton(
@@ -103,32 +105,47 @@ fun GlassButton(
     widthFactor: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
-    val container = if (primary) SettingsLight.text else Color.White
-    val content = if (primary) Color.White else SettingsLight.text
     val border = if (enabled) SettingsLight.text else SettingsLight.border
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = container,
-            contentColor = content,
-            disabledContainerColor = SettingsLight.border.copy(alpha = 0.5f),
+            containerColor = Color.White,
+            contentColor = SettingsLight.text,
+            disabledContainerColor = Color.White,
             disabledContentColor = SettingsLight.muted,
         ),
-        border = BorderStroke(1.dp, border),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
-        modifier = modifier.fillMaxWidth(widthFactor).height(54.dp),
+        border = BorderStroke(if (primary && enabled) 1.5.dp else 1.dp, border),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+        modifier = modifier.fillMaxWidth(widthFactor).height(46.dp),
     ) {
-        Text(
-            label,
-            fontSize = if (widthFactor >= 1f) 16.sp else 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = if (widthFactor >= 1f) 1 else 2,
-            overflow = TextOverflow.Visible,
-            textAlign = TextAlign.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth(),
-        )
+        ) {
+            if (primary && enabled) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .border(1.5.dp, SettingsLight.text, CircleShape)
+                        .padding(1.dp),
+                ) {
+                    Text("\u2713", color = SettingsLight.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.size(8.dp))
+            }
+            Text(
+                label,
+                fontSize = if (widthFactor >= 1f) 13.sp else 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -280,12 +297,12 @@ fun SpeakRow(
     ) {
         OutlinedButton(
             onClick = { if (active) onStop() else onSpeak(text) },
-            border = buttonBorderColor?.let { BorderStroke(1.dp, it) },
+            border = BorderStroke(1.dp, buttonBorderColor ?: SettingsLight.text),
         ) {
             Text(
                 glyphWithLabel(active, actionLabel),
-                fontSize = 13.sp,
-                color = buttonTextColor ?: Color.Unspecified,
+                fontSize = 12.sp,
+                color = buttonTextColor ?: SettingsLight.text,
             )
         }
         if (label != null) {
