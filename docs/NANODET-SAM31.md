@@ -54,10 +54,11 @@ ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac logcat -d' 
 (`-d` : la build tarball a `versionCode = 1`, inférieur à la build git
 installée — `INSTALL_FAILED_VERSION_DOWNGRADE` sinon.)
 
-## Mesure (Redmi 2c6852ac, CPU 4 threads)
+## Mesure (Redmi 2c6852ac, 2026-10-28, après rebase master)
 
 | run | ms inférence (médiane) | ips effectifs | scène |
 | --- | --- | --- | --- |
-| 1 | … | … | … |
+| démo `route nanodet` | 64-212 | 2,6-7,3 | pièce (person 0,81, tv 0,70, 2-4 obj) |
+| banc `NanoDetBenchDeviceTest` (11 runs, 1 warmup) | 40 | — | gradient synthétique 320×320, OK, 0 boîte |
 
 (`ms` = ORT seul, `ips` = bout en bout caméra → affichage.)
