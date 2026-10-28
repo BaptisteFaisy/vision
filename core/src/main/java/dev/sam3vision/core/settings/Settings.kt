@@ -134,7 +134,7 @@ data class Settings(
      * Coupé par défaut : le banc embarqué (Réglages → Profondeur) valide la
      * latence sur l'appareil avant toute activation.
      */
-    val depthBackend: DepthBackend = DepthBackend.OFF,
+    val depthBackend: DepthBackend = DepthBackend.AUTO,
 ) {
     companion object {
         /**
