@@ -86,6 +86,25 @@ internal fun registrationDecision(state: RegistrationState): RegistrationDecisio
 private fun logOnly(message: String) =
     RegistrationDecision(RegistrationStep.LOG_ONLY, message)
 
+/**
+ * Étapes qui quittent le thread de l'émetteur `registrationState` avant d'agir
+ * (`true` = exécutées dans un `launchSafe`, pas en ligne dans `emit`).
+ *
+ * ANR du 27/10/2026 (`data_app_anr` du banc lunettes) : l'émetteur du SDK tourne
+ * sur le main thread **en tenant son verrou d'enregistrement**, et
+ * `REQUEST_REGISTRATION` appelait `Wearables.startRegistration` en ligne depuis
+ * `emit`. Cet appel synchrone prend le même verrou puis attend celui du registre
+ * ACDC, tenu par un thread binder qui attend le premier — interblocage AB-BA sur
+ * le main, service ACDC jamais exécuté, ANR « executing service
+ * …ACDCRegistrationService ». Seule cette étape émet un appel DAT synchrone
+ * bloquant depuis le collecteur : `OPEN_SESSION` ne fait que suspendre (`delay`,
+ * `io`), ce qui rend la main au SDK au lieu de le bloquer.
+ */
+internal fun runsOffEmitter(step: RegistrationStep): Boolean = when (step) {
+    RegistrationStep.REQUEST_REGISTRATION -> true
+    RegistrationStep.OPEN_SESSION, RegistrationStep.LOG_ONLY -> false
+}
+
 /** Suite à donner à une erreur du flux vidéo. */
 internal enum class StreamErrorDisposition {
     /** Le flux peut repartir seul : on journalise et on continue. */
