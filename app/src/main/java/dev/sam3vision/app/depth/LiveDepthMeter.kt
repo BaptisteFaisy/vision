@@ -25,7 +25,7 @@ class LiveDepthMeter(
     private val appContext: Context,
     private val background: CoroutineDispatcher = Dispatchers.Default,
     private val backend: () -> DepthBackend = { DepthBackend.OFF },
-) {
+) : DepthMeter {
     private val lock = Any()
     private var pendingJpeg: String? = null
     private var running = false
@@ -34,8 +34,7 @@ class LiveDepthMeter(
     private var estimator: DepthEstimator? = null
     private var engineTriedMs = 0L
 
-    /** Dernière frame à inférer (les intermédiaires sont jetées, pas empilées). */
-    fun offer(jpegB64: String) {
+    override fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
         synchronized(lock) {
             pendingJpeg = jpegB64
@@ -50,7 +49,7 @@ class LiveDepthMeter(
      * aux boîtes SAM de la frame, fraîches à chaque réponse —, la carte embarquée
      * sinon, ou le sténopé si elle manque ou a plus d'une seconde.
      */
-    fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> {
+    override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> {
         return try {
             val detections = frame.objects.toDetections(frame.width, frame.height)
             val server = DepthReadings.serverCloseness(frame.objects)
@@ -67,7 +66,7 @@ class LiveDepthMeter(
     }
 
     /** Moteur fermé, carte oubliée (rouvert à la prochaine frame si actif). */
-    fun reset() {
+    override fun reset() {
         val stale: DepthEstimator?
         synchronized(lock) {
             pendingJpeg = null
