@@ -221,6 +221,7 @@ internal fun routeToName(route: Route): String = when (route) {
     Route.Caregiver -> "caregiver"
     Route.Onboarding -> "onboarding"
     Route.Bench -> "bench"
+    Route.VoiceNav -> "voicenav"
     is Route.Tap -> "tap:${route.autoStart}"
 }
 
@@ -235,6 +236,7 @@ internal fun routeFromName(name: String): Route = when {
     name == "caregiver" -> Route.Caregiver
     name == "onboarding" -> Route.Onboarding
     name == "bench" -> Route.Bench
+    name == "voicenav" -> Route.VoiceNav
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
 }
