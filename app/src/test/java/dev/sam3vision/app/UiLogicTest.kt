@@ -136,6 +136,18 @@ class UiLogicTest {
     }
 
     @Test
+    fun `les routes survivent a la sauvegarde par leur nom`() {
+        val routes = listOf(
+            Route.Isee, Route.Capture, Route.Analysis, Route.Chat,
+            Route.Live, Route.Settings, Route.Caregiver, Route.Onboarding,
+            Route.Bench, Route.Tap(true), Route.Tap(false),
+        )
+        routes.forEach { assertEquals(it, routeFromName(routeToName(it))) }
+        assertEquals(Route.Isee, routeFromName("inconnue"))
+        assertEquals(Route.Isee, routeFromName(""))
+    }
+
+    @Test
     fun `l'encre est sombre sur fond clair et claire sur fond sombre`() {
         assertEquals(AppColors.background, contentOn(AppColors.warning))
         assertEquals(AppColors.background, contentOn(AppColors.success))

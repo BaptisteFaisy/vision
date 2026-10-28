@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,7 +70,7 @@ fun LiveScreen(
     val state by viewModel.state.collectAsState()
     var attached by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<String?>(null) }
-    var draft by remember { mutableStateOf("") }
+    var draft by rememberSaveable { mutableStateOf("") }
     var memoryOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val previewView = rememberLivePreview(context) { attached = it }
