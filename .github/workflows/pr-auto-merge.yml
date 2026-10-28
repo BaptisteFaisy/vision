@@ -6,7 +6,11 @@
 # relancent la CI : runs fantômes « action_required »). Sans le secret, pause
 # propre au lieu d'échouer. Poussée avec bail (lease) : jamais d'écrasement
 # d'un push d'auteur arrivé entre-temps. Brouillons et forks exclus.
-# Conflits : on saute, l'auteur rebase à la main.
+# Conflits (v5, 2026-10-28) : l'agent Fireworks tente de les résoudre
+# (.github/fireworks/conflict_agent.py, modèle MiniMax M3.1 Flash) : résolution
+# fichier par fichier, fin du rebase, push avec bail, compte rendu sur la PR.
+# Sans le secret FIREWORKS_API_KEY, on saute comme avant et l'auteur rebase à
+# la main. Coupe-circuit : variable de dépôt FIREWORKS_AGENT_RESOLVE=0.
 name: pr-auto-merge
 
 on:
@@ -34,6 +38,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+          FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
+          FIREWORKS_AGENT_RESOLVE: ${{ vars.FIREWORKS_AGENT_RESOLVE }}
         run: |
           export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
           green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
@@ -79,9 +86,20 @@ jobs:
                     echo "PR #$pr : a bougé entre-temps, prochain passage"
                   fi
                 else
+                  # Rebase en conflit : l'agent lit le script sur master (la
+                  # branche de la PR peut être antérieure), résout, termine
+                  # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
+                  # compte rendu, 2 = rien à faire : on saute sans bruit.
+                  git show origin/master:.github/fireworks/conflict_agent.py \
+                    > /tmp/fw-agent.py 2>/dev/null \
+                    && python3 /tmp/fw-agent.py resolve --repo BaptisteFaisy/vision \
+                      --pr "$pr" --branch "$branch" --sha "$sha"; rc=$?
                   git rebase --abort >/dev/null 2>&1 || true
                   git checkout -q master 2>/dev/null || true
-                  echo "PR #$pr sautée (conflit, à l'auteur de rebaser)"
+                  case "$rc" in
+                    0) echo "PR #$pr : conflit résolu par l'agent Fireworks" ;;
+                    *) echo "PR #$pr sautée (conflit, à l'auteur de rebaser)" ;;
+                  esac
                 fi
                 git branch -q -D "pr-$pr" >/dev/null 2>&1 || true
                 ;;
