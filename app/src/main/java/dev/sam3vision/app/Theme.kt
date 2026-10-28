@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 /** Palette sombre de l'app (cohérente avec l'ancienne app Expo). */
 /**
@@ -46,3 +47,14 @@ val MASK_COLORS: List<Color> = listOf(
 const val MASK_ALPHA = 115
 
 fun maskColorAt(index: Int): Color = MASK_COLORS[index % MASK_COLORS.size]
+
+/** Seuil de bascule clair/sombre (success ≈ 0,51 ; primary ≈ 0,28 ; danger ≈ 0,26). */
+private const val CONTENT_ON_THRESHOLD = 0.45f
+
+/**
+ * Encre lisible sur un fond [color] : sombre sur fond clair (warning, success),
+ * claire sinon. Un seul endroit décide — bandeaux, boutons et pastilles partagent
+ * la même règle au lieu de coder « blanc sauf… » chacun de leur côté.
+ */
+fun contentOn(color: Color): Color =
+    if (color.luminance() > CONTENT_ON_THRESHOLD) AppColors.background else AppColors.text
