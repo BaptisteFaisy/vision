@@ -21,7 +21,7 @@ import org.junit.Test
 class LlmInjectionTest {
 
     private fun client(server: TestHttpServer, language: SpeechLanguage = SpeechLanguage.En) =
-        InferHubLlmClient(server.baseUrl, "cle-de-test", "modele-de-test", language)
+        HttpLlmClient(server.baseUrl, "cle-de-test", "modele-de-test", language)
 
     /** Texte du premier bloc `text` du message d'indice [index]. */
     private fun textAt(body: String, index: Int): String =

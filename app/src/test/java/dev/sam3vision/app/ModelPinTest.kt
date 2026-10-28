@@ -76,10 +76,13 @@ class ModelPinTest {
             "LLM OK — « ok »",
         )
 
-        assertTrue(lines.any { it.contains("meta-models/muse-spark-open-1026") })
-        assertTrue(lines.any { it.contains("https://inference.baseten.co/v1") })
-        assertTrue(lines.any { it.contains("ali/qwen3.8-omni-flash") })
-        assertTrue(lines.any { it.contains("https://api.inferhub.dev/v1") })
+        val questions = lines.single { it.startsWith("questions :") }
+        val direct = lines.single { it.startsWith("direct :") }
+
+        assertTrue(questions.contains("meta-models/muse-spark-open-1026"))
+        assertTrue(questions.contains("https://inference.baseten.co/v1"))
+        assertTrue(direct.contains("meta-models/muse-spark-open-1026"))
+        assertTrue(direct.contains("https://inference.baseten.co/v1"))
         assertTrue(lines.any { it.contains("chauffée") })
         assertTrue(lines.none { it.startsWith("⚠") })
     }
@@ -89,7 +92,7 @@ class ModelPinTest {
         val line = debugModelsLine(Settings.Default.copy(liveLlmApiKey = "cle-live"))
 
         assertTrue(line.contains("meta-models/muse-spark-open-1026"))
-        assertTrue(line.contains("ali/qwen3.8-omni-flash"))
+        assertTrue(line.contains("live : meta-models/muse-spark-open-1026"))
         assertTrue(line.contains("clé OK"))
         assertTrue(debugModelsLine(Settings.Default).contains("sans clé"))
     }

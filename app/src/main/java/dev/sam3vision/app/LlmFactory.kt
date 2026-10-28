@@ -1,6 +1,6 @@
 package dev.sam3vision.app
 
-import dev.sam3vision.core.net.InferHubLlmClient
+import dev.sam3vision.core.net.HttpLlmClient
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.settings.Settings
 
@@ -11,13 +11,13 @@ import dev.sam3vision.core.settings.Settings
  * La réponse du modèle est lue telle quelle par ElevenLabs : si le modèle répond en
  * français pendant que la voix est anglaise, on l'entend tout de suite.
  */
-fun llmClient(settings: Settings): LlmClient = inferHub(settings)
+fun llmClient(settings: Settings): LlmClient = httpLlm(settings)
 
 /**
  * Même client, type concret : le Direct s'en sert pour la **narration continue**
  * (`LiveLlmClient`), qui n'est pas dans l'interface [LlmClient].
  */
-fun inferHub(settings: Settings): InferHubLlmClient = InferHubLlmClient(
+fun httpLlm(settings: Settings): HttpLlmClient = HttpLlmClient(
     settings.llmBaseUrl,
     settings.llmApiKey,
     settings.llmModel,
@@ -25,16 +25,15 @@ fun inferHub(settings: Settings): InferHubLlmClient = InferHubLlmClient(
 )
 
 /**
- * Client de la **narration du Direct** : modèle rapide ([Settings.DEFAULT_LIVE_LLM_MODEL]),
- * jamais celui des questions — un modèle à raisonnement dépenserait la totalité du budget
- * de narration (200 tokens) avant sa première phrase, donc une frame sur deux serait perdue.
+ * Client de la **narration du Direct** : même modèle Meta que les questions
+ * ([Settings.DEFAULT_LIVE_LLM_MODEL], Baseten), avec la clé dédiée. Le raisonnement
+ * interne est coupé (`enable_thinking=false`) : le budget de 200 tokens va à la phrase.
  *
- * `null` quand la clé de narration manque : le Direct se tait, plutôt que d'appeler le
- * modèle des questions à chaque frame.
+ * `null` quand la clé de narration manque : le Direct se tait.
  */
-fun liveNarration(settings: Settings): InferHubLlmClient? {
+fun liveNarration(settings: Settings): HttpLlmClient? {
     if (!settings.liveLlmConfigured) return null
-    return InferHubLlmClient(
+    return HttpLlmClient(
         Settings.DEFAULT_LIVE_LLM_BASE_URL,
         settings.liveLlmApiKey,
         Settings.DEFAULT_LIVE_LLM_MODEL,
