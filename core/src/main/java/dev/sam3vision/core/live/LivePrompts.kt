@@ -7,31 +7,36 @@ package dev.sam3vision.core.live
  * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
  * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
  * pas par un concept suivi ni par le LLM. Ces prompts sont des noms de concepts SAM 3.1
- * (6 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
+ * (16 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
  * aucun sens et volerait un slot de suivi.
  */
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **6** — « person », « door » (guidage intérieur) plus
-     * « bicycle », « car », « truck », « electric scooter » (rue), modifiables à
-     * chaud dans le direct (champ « Suivre »).
+     * Concepts par défaut : **10** dangers extérieurs pour un piéton aveugle —
+     * mobiles (« person », « car », « bicycle », « electric scooter ») puis
+     * statiques (« pole », « sidewalk », « crosswalk », « wall », « window »,
+     * « stairs »), modifiables à chaud dans le direct (champ « Suivre »).
      *
-     * Le plafond était à 2 (décision du 26/10) parce que le tracker backend
-     * tronquait à `PROMPT_LIMIT = 2`. Décision user du 28/10 : suivre aussi les
-     * véhicules — [MAX] et `PROMPT_LIMIT` passent à 6 ensemble. Sur `/live` les
-     * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts =
-     * 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
-     * `/frame`, d'où un coût ×3 assumé sur ce chemin.
+     * Historique des plafonds : 2 (26/10, le tracker tronquait à
+     * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
+     * tous les dangers extérieurs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
+     * Sur `/live` les prompts sont batchés (un seul forward, mesure du 26/10 :
+     * 2 ou 8 concepts = 118 ms médian) ; sur le tracker chaque concept coûte
+     * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
      */
-    val default: List<String> = listOf("person", "door", "bicycle", "car", "truck", "electric scooter")
+    val default: List<String> = listOf(
+        "person", "car", "bicycle", "electric scooter", "pole",
+        "sidewalk", "crosswalk", "wall", "window", "stairs",
+    )
 
     /**
-     * Nombre maximal de concepts : **6**, décision user du 28/10 (rue + intérieur).
-     * Le backend tronque à `PROMPT_LIMIT = 6` côté tracker ; le client ne doit pas
-     * en envoyer davantage — sinon l'app affiche des concepts jamais détectés.
+     * Nombre maximal de concepts : **16**, décision user du 28/10 (dangers
+     * extérieurs + marge pour le champ « Suivre »). Le backend tronque à
+     * `PROMPT_LIMIT = 16` côté tracker ; le client ne doit pas en envoyer
+     * davantage — sinon l'app affiche des concepts jamais détectés.
      */
-    const val MAX = 6
+    const val MAX = 16
 
     /** Longueur maximale d'un prompt : au-delà, ce n'est plus un concept. */
     const val MAX_LENGTH = 32

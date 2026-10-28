@@ -33,8 +33,8 @@ object VehicleConcepts {
 
     /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — six concepts, donc les cinq véhicules plus un seul
-     * concept (feu, passage…).
+     * [LivePrompts.MAX] — seize concepts, donc les cinq véhicules plus toute
+     * la base du direct (dangers, feu, passage…).
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
         LivePrompts.normalize(PROMPTS + base)
