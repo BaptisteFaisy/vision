@@ -7,13 +7,16 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `six concepts par defaut, plafond client a six`() {
-        assertEquals(6, LivePrompts.default.size)
+    fun `dix dangers exterieur par defaut, plafond client a seize`() {
+        assertEquals(10, LivePrompts.default.size)
         assertEquals(
-            listOf("person", "door", "bicycle", "car", "truck", "electric scooter"),
+            listOf(
+                "person", "car", "bicycle", "electric scooter", "pole",
+                "sidewalk", "crosswalk", "wall", "window", "stairs",
+            ),
             LivePrompts.default,
         )
-        assertEquals(6, LivePrompts.MAX)
+        assertEquals(16, LivePrompts.MAX)
         assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
     }
 
@@ -33,12 +36,12 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `la liste est bornee a six prompts`() {
-        val many = (1..12).map { "objet$it" }
+    fun `la liste est bornee a seize prompts`() {
+        val many = (1..20).map { "objet$it" }
         val normalized = LivePrompts.normalize(many)
         assertEquals(LivePrompts.MAX, normalized.size)
         assertEquals("objet1", normalized.first())
-        assertEquals("objet6", normalized.last())
+        assertEquals("objet16", normalized.last())
     }
 
     @Test

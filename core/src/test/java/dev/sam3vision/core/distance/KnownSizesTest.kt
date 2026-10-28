@@ -2,17 +2,26 @@ package dev.sam3vision.core.distance
 
 import dev.sam3vision.core.live.LivePrompts
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Table des hauteurs réelles : tout ce que le direct suit par défaut doit être calibré. */
+/** Table des hauteurs réelles : chaque défaut est calibré ou explicitement profondeur. */
 class KnownSizesTest {
 
     @Test
-    fun `concepts par defaut du direct sont tous connus`() {
+    fun `concepts par defaut calibres ou profondeur documentee`() {
         LivePrompts.default.forEach { concept ->
-            assertNotNull("concept non calibré : $concept", KnownSizes.heightMeters(concept))
+            val ok = KnownSizes.heightMeters(concept) != null || concept in KnownSizes.DEPTH_ONLY
+            assertTrue("concept ni calibré ni profondeur : $concept", ok)
+        }
+    }
+
+    @Test
+    fun `defauts profondeur sans hauteur stenope`() {
+        listOf("stairs", "sidewalk", "crosswalk", "pole").forEach { concept ->
+            assertNull(KnownSizes.heightMeters(concept))
+            assertTrue(concept in KnownSizes.DEPTH_ONLY)
         }
     }
 
