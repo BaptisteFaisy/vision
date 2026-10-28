@@ -63,8 +63,7 @@ class LiveProbe(
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
     private val background: CoroutineDispatcher = Dispatchers.Default,
-    /** Moteur de profondeur (Réglages, OFF = sténopé seul, zéro coût). Avant
-     * [clientFor] : le lambda lit sa valeur à l'ouverture de la session. */
+    /** Moteur (Réglages) : lu via this@LiveProbe (un défaut y verrait le paramètre OFF). */
     @Volatile
     private var depthEngine: DepthBackend = DepthBackend.OFF,
     /**
@@ -72,14 +71,18 @@ class LiveProbe(
      * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
      * réduite demandée au serveur est alors celle que le client sait relire.
      */
-    private val clientFor: (String, Long, WireMarks?) -> LiveClient = { base, timeout, marks ->
-        LiveMaskTransport.clientFor(base, timeout, marks, depthEngine != DepthBackend.OFF)
-    },
+    clientFor: ((String, Long, WireMarks?) -> LiveClient)? = null,
     /** Contexte app (moteur de profondeur) ; `null` = profondeur désactivée (tests). */
     appContext: Context? = null,
     /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
-    private val depthMeter: DepthMeter? = appContext?.let { LiveDepthMeter(scope, it, background) { depthEngine } },
+    depthMeter: DepthMeter? = null,
 ) {
+
+    private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
+        LiveMaskTransport.clientFor(base, timeout, marks, this@LiveProbe.depthEngine != DepthBackend.OFF)
+    }
+    private val liveMeter = depthMeter
+        ?: appContext?.let { ctx -> LiveDepthMeter(scope, ctx, background) { this@LiveProbe.depthEngine } }
 
     private val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
@@ -194,7 +197,7 @@ resetPipeline()
         maxObjects: Int,
         timeoutSeconds: Long,
     ): LiveSession? = if (clean.isBlank()) null else LiveSession(
-        clientFor(clean, timeoutSeconds, chronology),
+        openClient(clean, timeoutSeconds, chronology),
         prompts = prompts,
         maxObjects = if (maxObjects > 0) maxObjects else DEFAULT_MAX_OBJECTS,
         cadence = Cadence.Fast,
@@ -231,7 +234,7 @@ _state.update { it.cleared() }
         announcer.reset()
         guidance.reset()
         crossing.reset()
-        depthMeter?.reset()
+        liveMeter?.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
@@ -297,7 +300,7 @@ _state.update { it.cleared() }
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
         // Profondeur à chaque frame capturée, même sans session ni réponse SAM.
-        depthMeter?.offer(jpegB64)
+        liveMeter?.offer(jpegB64)
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -398,7 +401,7 @@ _state.update { it.cleared() }
     ) {
         val overlays = overlaysFor(frame, shown)
         val pinhole = readingsOf(distances, frame)
-        val readings = depthMeter?.readingsFor(frame, pinhole) ?: pinhole
+        val readings = liveMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
         val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
         val phrase = if (_state.value.crossingActive) cross?.phrase else phraseOf(placed, at)
