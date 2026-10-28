@@ -24,3 +24,6 @@ fun Settings.samConfigured(): Boolean = samEndpoint().isNotBlank()
  */
 fun samClientOrNull(settings: Settings): SamClient? =
     if (!settings.samConfigured()) null else HttpSamClient(settings.samEndpoint())
+
+/** Endpoint du direct : le même que SAM (saisie manuelle, région, ou build). */
+fun Settings.liveBaseUrl(): String = samEndpoint()

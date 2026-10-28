@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
-    prompts: List<String> = dev.sam3vision.core.live.LivePrompts.Default,
+    prompts: List<String> = dev.sam3vision.core.live.LivePrompts.default,
     crossingActive: Boolean = false,
 ) {
     configure(

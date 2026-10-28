@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * actif : « Stop, mur » et « Vert, traversez » ne doivent jamais se mélanger.
  */
 internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean) {
-    val prompts = if (active) CrossingPrompts.PROMPTS else LivePrompts.Default
+    val prompts = if (active) CrossingPrompts.PROMPTS else LivePrompts.default
     configureFrom(settings, prompts, active)
 }
 

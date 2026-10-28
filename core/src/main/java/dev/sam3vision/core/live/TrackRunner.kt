@@ -178,7 +178,7 @@ class TrackRunner(
      * d'ouverture (le backend vient d'analyser cette image : inutile de la renvoyer).
      */
     private suspend fun recover(jpegB64: String): Result<TrackFrame> {
-        val prompts = current?.prompts ?: LivePrompts.Default
+        val prompts = current?.prompts ?: LivePrompts.default
         val opened = client.start(jpegB64, prompts).getOrElse { error ->
             current = null
             return Result.failure(error)

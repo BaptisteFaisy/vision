@@ -66,7 +66,7 @@ class LiveSession(
     gate: FrameGate? = null,
     override val stats: LiveStats = LiveStats(),
     val serverStats: LiveStats = LiveStats(),
-    val prompts: List<String> = LivePrompts.Default,
+    val prompts: List<String> = LivePrompts.default,
     private val workEdge: Int = DEFAULT_WORK_EDGE,
     private val maxObjects: Int = DEFAULT_MAX_OBJECTS,
     private val cadence: Cadence = Cadence.Direct,

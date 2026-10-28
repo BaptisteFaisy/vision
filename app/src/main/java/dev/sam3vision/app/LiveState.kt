@@ -14,7 +14,6 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SeenTrack
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.util.Locale
 
@@ -201,9 +200,6 @@ fun frameErrorState(current: LiveUiState, waking: Boolean, transport: String, me
 
 /** Cadence du prochain tick, bornée par les constantes de [LiveSession]. */
 fun nextIntervalMs(session: LiveSession?): Long = session?.intervalMsAdaptive() ?: Cadence.Direct.targetMs
-
-/** Endpoint du direct : saisie manuelle, sinon région des Réglages (EU/US), sinon build. */
-fun Settings.liveBaseUrl(): String = samEndpoint()
 
 /** Demi-largeur de la fenêtre demandée autour de « il y a N s » : ±2,5 s. */
 const val FOCUS_HALF_SPAN_MS = 2_500L
