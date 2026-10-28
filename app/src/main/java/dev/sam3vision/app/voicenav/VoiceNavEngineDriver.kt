@@ -35,6 +35,9 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * - [originNow] donne la position du départ (`null` = repli Maps) ;
  * - [routeClient] joint Valhalla (`POST /route` sur l'URL des Réglages) ;
  * - [onUpdate] reçoit l'état instantané (→ `session.onGuidanceUpdate`) ;
+ * - [onRouteCap] reçoit le cap de chaque manœuvre (`null` en fin de guidage),
+ *   pour la sonde SAM (`LiveProbe.setRouteCap`) : tant qu'il est posé, la
+ *   sonde marche le couloir de la route (fusion itinéraire × obstacle).
  * - [onAutoCrossing] bascule le mode traversée (`true` = le rappel proche
  *   d'une traversée l'arme, `false` = traversée passée ou guidage coupé).
  *
@@ -64,6 +67,7 @@ class VoiceNavEngineDriver(
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val scope: CoroutineScope,
     private val onUpdate: (GuidanceUpdate) -> Unit,
+    private val onRouteCap: (SteeringCap?) -> Unit = {},
     private val onAutoCrossing: (Boolean) -> Unit = {},
 ) {
 
@@ -112,6 +116,7 @@ class VoiceNavEngineDriver(
         legs = null
         rerouting = false
         clearAutoCrossing()
+        runCatching { onRouteCap(null) }
         runCatching { tracker.stop() }
         if (speakerLazy.isInitialized()) {
             runCatching { speaker.stop() }
@@ -139,6 +144,7 @@ class VoiceNavEngineDriver(
         runCatching {
             when (event) {
                 is NavEvent.ManeuverAhead -> {
+                    runCatching { onRouteCap(routeCapFor(event.action)) }
                     speakManeuver(event)
                     onUpdate(updateFor(event))
                 }
@@ -282,6 +288,15 @@ internal fun ManeuverAction.toSteeringCap(): SteeringCap? = when (this) {
     ManeuverAction.UTurn, ManeuverAction.Roundabout,
     ManeuverAction.Arrive -> null
 }
+
+/**
+ * Cap marché pour [action] : le virage franc, sinon tout droit (demi-tour,
+ * giratoire et départ se marchent au centre, la phrase dit le reste).
+ * Total, contrairement à [toSteeringCap] : la sonde veut un couloir, jamais
+ * `null`. Pur, testé en JVM.
+ */
+internal fun routeCapFor(action: ManeuverAction): SteeringCap =
+    action.toSteeringCap() ?: SteeringCap.Straight
 
 /**
  * Queues de manœuvres : `tails[i]` = distance à vol d'oiseau de la manœuvre

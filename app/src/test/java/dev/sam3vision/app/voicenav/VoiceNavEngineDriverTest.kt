@@ -41,6 +41,19 @@ class VoiceNavEngineDriverTest {
     }
 
     @Test
+    fun `le cap route totalise les virages francs`() {
+        assertEquals(SteeringCap.Left, routeCapFor(ManeuverAction.TurnLeft))
+        assertEquals(SteeringCap.Left, routeCapFor(ManeuverAction.SlightLeft))
+        assertEquals(SteeringCap.Right, routeCapFor(ManeuverAction.TurnRight))
+        assertEquals(SteeringCap.Right, routeCapFor(ManeuverAction.SlightRight))
+        assertEquals(SteeringCap.Straight, routeCapFor(ManeuverAction.Start))
+        assertEquals(SteeringCap.Straight, routeCapFor(ManeuverAction.Continue))
+        assertEquals(SteeringCap.Straight, routeCapFor(ManeuverAction.UTurn))
+        assertEquals(SteeringCap.Straight, routeCapFor(ManeuverAction.Roundabout))
+        assertEquals(SteeringCap.Straight, routeCapFor(ManeuverAction.Arrive))
+    }
+
+    @Test
     fun `la duree restante suit l'allure pietonne`() {
         assertEquals(100L, walkSeconds(130))
         assertEquals(0L, walkSeconds(0))
