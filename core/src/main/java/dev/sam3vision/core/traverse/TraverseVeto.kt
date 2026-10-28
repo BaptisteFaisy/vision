@@ -69,6 +69,8 @@ data class TraverseDecision(
     val blockingLabel: String?,
     /** Distance sténopé du bloquant (m), `null` si non mesurable. */
     val blockingMeters: Float?,
+    /** Temps-avant-collision du plus dangereux (`null` sans approche suivie). */
+    val approachTtcSeconds: Float? = null,
     /**
      * Vrai quand un objet proche (véhicule ou non) est mesuré : le guidage
      * obstacles doit rester actif malgré le mode traversée — on ne coupe jamais
@@ -104,25 +106,32 @@ class TraverseVeto {
     /** Surface max par véhicule à la frame précédente (clé : label singulier canonique). */
     private var previousAreas: Map<String, Float> = emptyMap()
 
-    /** Oublie la phase et la frame précédente (nouvelle traversée). */
+    /** Suivi temporel des véhicules (IoU + TTC) — ceinture et bretelles du veto. */
+    private val approach = VehicleApproach()
+
+    /** Oublie la phase, la frame précédente et les pistes (nouvelle traversée). */
     fun reset() {
         currentState = TraversePhase.ATTENDRE
         previousAreas = emptyMap()
+        approach.reset()
     }
 
     /**
      * Décision pour une frame. [lightGreen] dit si le vert est confirmé,
      * [detections] porte les boîtes SAM, [focalPx] la focale en pixels de l'image
-     * analysée (≤ 0 : distance indisponible, seule l'approche compte).
+     * analysée (≤ 0 : distance indisponible, seule l'approche compte), [atMs]
+     * la date de la frame (< 0 : suivi temporel désactivé, veto instantané seul).
      */
     fun update(
         lightGreen: Boolean,
         detections: List<Detection>,
         focalPx: Float,
+        atMs: Long = -1L,
     ): TraverseDecision {
         val blocking = findBlocking(detections, focalPx)
         previousAreas = vehicleAreas(detections)
-        val veto = blocking != null
+        val tracked = approachVerdict(detections, atMs)
+        val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
             state = currentState,
@@ -130,8 +139,15 @@ class TraverseVeto {
             veto = veto,
             blockingLabel = blocking?.label,
             blockingMeters = blocking?.meters,
+            approachTtcSeconds = tracked.ttcSeconds,
             keepObstacleGuidance = hasNearObject(detections, focalPx),
         )
+    }
+
+    /** Approche suivie, ou silence si la frame n'est pas datée. */
+    private fun approachVerdict(detections: List<Detection>, atMs: Long): ApproachVerdict {
+        if (atMs < 0L) return ApproachVerdict(false, null, null)
+        return approach.update(detections, atMs)
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */
