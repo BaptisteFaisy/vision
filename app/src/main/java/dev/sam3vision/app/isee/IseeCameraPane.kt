@@ -52,8 +52,7 @@ const val ISEE_FRAME_QUALITY = 55
  * micro (le dictaphone reste libre, comme le mode tap).
  *
  * L'analyseur ne sert qu'à SAM : [onFrame] est branché par la fenêtre, et l'appelant
- * décide quand envoyer (pendant l'enregistrement seulement — sinon le GPU se
- * réveillerait pour rien).
+ * décide quand envoyer (caméra active — sinon le GPU se réveillerait pour rien).
  */
 class IseeCameraHost(private val context: Context) {
 

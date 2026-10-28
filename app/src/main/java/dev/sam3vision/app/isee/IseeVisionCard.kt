@@ -145,7 +145,7 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
 /** Aperçu vivant : masques SAM et notice « pourquoi la caméra ne voit rien ». */
 @Composable
 internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: IseeViewModel, modifier: Modifier) {
-    // SAM tourne pendant l'enregistrement et en mode Traversée : le câblage vit avec la carte.
+    // SAM tourne quand la caméra est active (enregistrement et Traversée aussi) : le câblage vit avec la carte.
     IseeCameraWiring(glue, viewModel, probe.frames)
     if (!glue.granted) {
         Text(
@@ -259,11 +259,15 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
         if (granted) {
             failure = host.bind(owner)
             if (failure == null) viewModel.attachCamera(host.actions)
+            viewModel.setCameraActive(failure == null)
+        } else {
+            viewModel.setCameraActive(false)
         }
     }
     DisposableEffect(Unit) {
         viewModel.attachCamera(host.actions)
         onDispose {
+            viewModel.setCameraActive(false)
             host.release()
             viewModel.detachCamera()
         }
@@ -279,8 +283,8 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
 @Composable
 private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames: Int) {
     LaunchedEffect(glue.host, viewModel) {
-        // SAM ne voit que l'enregistrement — sauf en mode Traversée, qui analyse
-        // sans enregistrer : hors ces deux cas, aucune frame n'est même convertie.
+        // SAM voit la caméra dès qu'elle est active (l'enregistrement et la Traversée
+        // envoient aussi) : hors ces cas, aucune frame n'est même convertie.
         // Quand les lunettes vivent, elles nourrissent seules la sonde (pont
         // GlassesProbeWiring) : mélanger les deux vues brouillerait le guidage.
         // (Lu au fil de l'eau : l'effet ne redémarre pas, une valeur collectée
@@ -293,9 +297,19 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
 }
 
-/** Vrai quand les frames partent vers SAM : enregistrement ou mode Traversée. */
-private fun sending(viewModel: IseeViewModel): Boolean =
-    viewModel.state.value.recordingVideo || viewModel.probe.state.value.crossingActive
+/** Vrai quand les frames partent vers SAM : caméra active, enregistrement ou Traversée. */
+private fun sending(viewModel: IseeViewModel): Boolean = sendingToSam(
+    cameraActive = viewModel.state.value.cameraActive,
+    recordingVideo = viewModel.state.value.recordingVideo,
+    crossingActive = viewModel.probe.state.value.crossingActive,
+)
+
+/**
+ * Porte d'envoi vers SAM, pure et testée : la caméra active allume la carte, et
+ * sans caméra ni enregistrement ni Traversée, rien ne part (carte éteinte).
+ */
+internal fun sendingToSam(cameraActive: Boolean, recordingVideo: Boolean, crossingActive: Boolean): Boolean =
+    cameraActive || recordingVideo || crossingActive
 
 /** Vrai si la permission caméra est déjà accordée. */
 fun cameraGranted(context: Context): Boolean {
