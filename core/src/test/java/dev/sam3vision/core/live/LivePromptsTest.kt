@@ -8,20 +8,20 @@ class LivePromptsTest {
 
     @Test
     fun `deux concepts par defaut, plafond client a deux`() {
-        assertEquals(2, LivePrompts.Default.size)
-        assertEquals(listOf("person", "door"), LivePrompts.Default)
+        assertEquals(2, LivePrompts.default.size)
+        assertEquals(listOf("person", "door"), LivePrompts.default)
         assertEquals(2, LivePrompts.MAX)
-        assertEquals(LivePrompts.Default, LivePrompts.normalize(LivePrompts.Default))
+        assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
     }
 
     @Test
     fun `une liste vide retombe sur les defauts`() {
-        assertEquals(LivePrompts.Default, LivePrompts.normalize(emptyList()))
+        assertEquals(LivePrompts.default, LivePrompts.normalize(emptyList()))
     }
 
     @Test
     fun `une liste uniquement blanche retombe sur les defauts`() {
-        assertEquals(LivePrompts.Default, LivePrompts.normalize(listOf("", "   ", "\t")))
+        assertEquals(LivePrompts.default, LivePrompts.normalize(listOf("", "   ", "\t")))
     }
 
     @Test
@@ -48,7 +48,7 @@ class LivePromptsTest {
     @Test
     fun `une liste entierement rejetee retombe sur les defauts`() {
         val tooLong = "y".repeat(LivePrompts.MAX_LENGTH + 1)
-        assertEquals(LivePrompts.Default, LivePrompts.normalize(listOf(tooLong)))
+        assertEquals(LivePrompts.default, LivePrompts.normalize(listOf(tooLong)))
     }
 
     @Test
@@ -61,6 +61,6 @@ class LivePromptsTest {
     fun `le champ suit accepte virgules points virgules et retours ligne`() {
         assertEquals(listOf("a", "b", "c"), LivePrompts.field(" a , b;c "))
         assertEquals(listOf("x", "y"), LivePrompts.field("x\ny"))
-        assertEquals(LivePrompts.Default, LivePrompts.field(" , ;\n"))
+        assertEquals(LivePrompts.default, LivePrompts.field(" , ;\n"))
     }
 }
