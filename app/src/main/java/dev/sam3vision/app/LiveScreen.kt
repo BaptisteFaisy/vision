@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -111,6 +112,9 @@ private fun rememberLivePreview(context: Context, onAttached: (Boolean) -> Unit)
     remember(context) {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            // Sans flux (liaison en cours, caméra coupée), la surface montre ce fond
+            // sombre au lieu du blanc de la fenêtre système.
+            setBackgroundColor(AppColors.background.toArgb())
             addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(view: android.view.View) = onAttached(true)
                 override fun onViewDetachedFromWindow(view: android.view.View) = onAttached(false)
@@ -153,19 +157,23 @@ private fun LiveCameraHost(
     val context = LocalContext.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     val encoder = remember { Nv21JpegEncoder() }
+    var bound by remember { mutableStateOf(false) }
     LaunchedEffect(attached) {
         if (!attached) return@LaunchedEffect
         runCatching {
             bindLiveCamera(context, previewView, executor, viewModel::applyLens) { proxy ->
                 pushFrame(proxy, viewModel, encoder)
             }
-        }.onFailure { onFailure("Caméra indisponible : ${it.message}") }
+        }.onSuccess { bound = true }
+            .onFailure { onFailure("Caméra indisponible : ${it.message}") }
     }
     DisposableEffect(Unit) {
         onDispose {
             viewModel.stop()
             viewModel.local.reset()
-            runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
+            // Le fournisseur est déjà initialisé si on a lié : `.get()` est immédiat.
+            // Sans liaison, l'initialiser ici bloquerait le thread principal pour rien.
+            if (bound) runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
             executor.shutdown()
         }
     }
