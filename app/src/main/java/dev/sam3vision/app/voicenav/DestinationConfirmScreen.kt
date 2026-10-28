@@ -30,6 +30,9 @@ import dev.sam3vision.core.nav.RouteSummary
  * à voix haute à l'ouverture (« Destination : X »), l'écran sert de
  * contrôle visuel avant le départ. [onVoiceEntry] redonne la main à la
  * dictée existante (l'intégrateur déclenche le pipeline habituel).
+ * [onSubmitText] reçoit le texte saisi au clavier ([DestinationTextField],
+ * câblé par l'intégrateur vers `submitTypedDestination`) ; défaut vide =
+ * champ inopérant, l'appelant historique compile inchangé.
  */
 @Composable
 fun DestinationConfirmScreen(
@@ -37,6 +40,7 @@ fun DestinationConfirmScreen(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     onVoiceEntry: () -> Unit,
+    onSubmitText: (String) -> Unit = {},
 ) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -64,6 +68,7 @@ fun DestinationConfirmScreen(
             Text("Annuler", fontSize = 20.sp)
         }
         RedictateButton(onVoiceEntry)
+        DestinationTextField(onSubmitText)
     }
 }
 
