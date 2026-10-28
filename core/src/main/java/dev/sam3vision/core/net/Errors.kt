@@ -39,6 +39,16 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
     class Http(val code: Int, val body: String) :
         ApiError("erreur HTTP $code" + if (body.isBlank()) "" else " : ${body.take(160)}")
 
+    companion object {
+        /**
+         * Vrai si l'erreur est un 404 de **route manquante** sur un backend vivant
+         * (ex. `POST /video` quand le serveur ne l'expose pas) : le repli photo vers
+         * `/segment` est alors pertinent. Faux pour [BackendStopped] (GPU éteint :
+         * `/segment` serait éteint aussi) et pour tout autre échec.
+         */
+        fun isRouteMissing(error: Throwable): Boolean = error is Http && error.code == 404
+    }
+
     class BadResponse(detail: String) : ApiError("réponse inattendue : $detail")
 
     /** Le moteur principal et son repli ont tous deux échoué (messages déjà rédigés). */
