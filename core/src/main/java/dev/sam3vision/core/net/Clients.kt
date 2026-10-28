@@ -5,6 +5,9 @@ import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.SegmentResult
+import dev.sam3vision.core.model.TrackFrame
+import dev.sam3vision.core.model.TrackHealth
+import dev.sam3vision.core.model.TrackSessionStart
 
 /** Client LLM vision (InferHub, API compatible OpenAI). */
 interface LlmClient {
@@ -98,4 +101,18 @@ interface LiveLlmClient {
  */
 interface SpeechClient {
     suspend fun transcribe(wav: ByteArray): Result<String>
+}
+
+/**
+ * Tracker vidéo `sam3-track` : une session garde les identités des objets,
+ * chaque frame renvoie les mêmes `id` tant que l'objet est suivi.
+ */
+interface TrackClient {
+    suspend fun start(imageB64: String, prompts: List<String>): Result<TrackSessionStart>
+
+    suspend fun frame(sessionId: String, imageB64: String): Result<TrackFrame>
+
+    suspend fun close(sessionId: String): Result<Unit>
+
+    suspend fun health(): Result<TrackHealth>
 }

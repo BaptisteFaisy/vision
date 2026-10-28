@@ -11,7 +11,7 @@ class KnownSizesTest {
 
     @Test
     fun `concepts par defaut du direct sont tous connus`() {
-        LivePrompts.Default.forEach { concept ->
+        LivePrompts.default.forEach { concept ->
             assertNotNull("concept non calibré : $concept", KnownSizes.heightMeters(concept))
         }
     }

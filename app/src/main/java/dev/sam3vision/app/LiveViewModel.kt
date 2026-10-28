@@ -163,7 +163,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * Avec `liveSamEnabled`, la session `/live` est ouverte et le GPU réveillé comme avant.
      * Dans les deux cas, la clé LLM est indispensable.
      */
-    fun start(settings: Settings, prompts: List<String> = LivePrompts.Default) {
+    fun start(settings: Settings, prompts: List<String> = LivePrompts.default) {
         this.settings = seededFromBuild(settings)
         foregroundGate.reset()
         if (!this.settings.llmConfigured) {
@@ -248,7 +248,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Relance la session avec les concepts déjà actifs (flux arrêté ou en erreur). */
-    fun restartActive() = restart(_state.value.prompts.ifEmpty { LivePrompts.Default })
+    fun restartActive() = restart(_state.value.prompts.ifEmpty { LivePrompts.default })
 
     /**
      * Bascule « Vision seule ↔ SAM » depuis le bandeau du direct : le réglage est
@@ -258,7 +258,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val next = store.load().let { it.copy(liveSamEnabled = !it.liveSamEnabled) }
             store.save(next)
-            start(next, _state.value.prompts.ifEmpty { LivePrompts.Default })
+            start(next, _state.value.prompts.ifEmpty { LivePrompts.default })
         }
     }
 

@@ -12,7 +12,7 @@ class LivePromptsNavigationTest {
 
     @Test
     fun `la navigation n'ajoute aucun concept suivi`() {
-        assertEquals(listOf("person", "door"), LivePrompts.Default)
+        assertEquals(listOf("person", "door"), LivePrompts.default)
         assertEquals(2, LivePrompts.MAX)
     }
 
