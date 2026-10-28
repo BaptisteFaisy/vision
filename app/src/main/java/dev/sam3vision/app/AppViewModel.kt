@@ -17,6 +17,7 @@ import dev.sam3vision.core.depth.syntheticGradientArgb
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.app.depth.DepthBench
 import dev.sam3vision.app.depth.DepthEstimators
+import dev.sam3vision.app.depth.ModelDownloader
 import dev.sam3vision.core.mask.colorizedMaskBitmap
 import dev.sam3vision.core.mask.colorizedOverlays
 import dev.sam3vision.core.model.Analysis
@@ -260,6 +261,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val backend = _state.value.settings.depthBackend
         if (backend == DepthBackend.OFF) {
             _state.update { it.copy(statusLine = "Profondeur coupée — choisis un moteur.") }
+            return@launch
+        }
+        val target = if (backend == DepthBackend.AUTO) DepthBackend.DA2 else backend
+        _state.update { it.copy(statusLine = "Modèle ${target.code} : vérification…") }
+        val ensured = ModelDownloader.ensure(getApplication(), target) { done, total ->
+            val pct = (done * 100 / total.coerceAtLeast(1)).toInt()
+            _state.update { it.copy(statusLine = "Téléchargement ${target.code}… $pct %") }
+        }
+        if (ensured.isFailure) {
+            val cause = ensured.exceptionOrNull()?.message ?: "échec inconnu"
+            _state.update { it.copy(statusLine = "Profondeur : téléchargement impossible — $cause") }
             return@launch
         }
         _state.update { it.copy(statusLine = "Test profondeur en cours… (${backend.code})") }

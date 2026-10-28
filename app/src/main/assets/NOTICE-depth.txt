@@ -1,7 +1,9 @@
-Modèles de profondeur embarqués (inférence 100 % sur le téléphone).
-Voir docs/DEPTH.md pour le choix, le banc et les recettes.
+Modèles de profondeur (téléchargés une fois à l'exécution, inférence 100 %
+sur le téléphone ensuite). Voir docs/DEPTH.md pour le choix, le banc et les
+recettes. Release hébergeant les fichiers (vérifiés par sha256 au téléchargement) :
+https://github.com/BaptisteFaisy/vision/releases/tag/depth-models-v1
 
-1) da2_small_uint8.ort (27 Mo)
+1) da2_small_uint8.ort (27 516 544 octets)
    Depth Anything V2 Small : onnx/model_uint8.onnx converti au format ORT
    (pré-optimisé ; le paquet ORT -mobile est exclu — il refuse le .onnx par
    ORT_INVALID_ARGUMENT et le ConvInteger quantifié par ORT_NOT_IMPLEMENTED).
@@ -14,10 +16,10 @@ Voir docs/DEPTH.md pour le choix, le banc et les recettes.
    Licence : Apache-2.0 (le variant Small est Apache-2.0 ; Base/Large/Giant
    sont CC-BY-NC-4.0 et donc exclus). Texte complet :
    https://www.apache.org/licenses/LICENSE-2.0
-   sha256 (.ort embarqué) : 116d71add3e7ed7ba1a9046e32b01d1ae41fc83e41b260a7b7b3eb37176aa0a7
+   sha256 (.ort téléchargé) : 116d71add3e7ed7ba1a9046e32b01d1ae41fc83e41b260a7b7b3eb37176aa0a7
    sha256 (.onnx source) : fcf51f1b230362b28690bb9d1809bf0431f29cad20534e3f589bd7285547f20d
 
-2) midas_v21_small.tflite (64 Mo)
+2) midas_v21_small.tflite (66 338 288 octets)
    MiDaS v2.1 small, conversion TensorFlow Lite float32.
    Source : https://huggingface.co/foodforever/midas_v21_small.tflite
    Entrée fixe 1x256x256x3 NHWC, sortie 1x256x256x1 (profondeur inverse).
