@@ -1,5 +1,8 @@
 # Architecture — sam3-vision
 
+> Périmètre : ère Expo + `sam3-vision` (legacy). Le backend déployé aujourd'hui est
+> `../backend/live_fast/` (voir `LIVE-FAST.md`).
+
 ```
  App Expo (Android)                    Modal — app `sam3-vision` (GPU A10G)
  ──────────────────                    ─────────────────────────────────────
