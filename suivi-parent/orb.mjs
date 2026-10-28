@@ -1,7 +1,10 @@
 import { fragmentShader } from './orb-shader.mjs';
 
 const VERTEX = 'attribute vec2 position; void main() { gl_Position = vec4(position, 0., 1.); }';
-const GRAYS = [0.18, 0.42, 0.72, 0.32, 0.86].flatMap(value => [value, value, value, 1]);
+const BLUE_GREEN = [
+  [0.03, 0.28, 0.9, 1], [0.05, 0.55, 1, 1], [0.08, 0.78, 0.85, 1],
+  [0.02, 0.62, 0.48, 1], [0.5, 0.92, 0.72, 1],
+].flat();
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -25,7 +28,7 @@ function programFor(gl) {
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   for (const name of ['uIdle', 'uPalYou', 'uPalSee']) {
-    gl.uniform4fv(gl.getUniformLocation(program, name + '[0]'), GRAYS);
+    gl.uniform4fv(gl.getUniformLocation(program, name + '[0]'), BLUE_GREEN);
   }
   return program;
 }
@@ -34,7 +37,7 @@ function paint(gl, program, canvas, time) {
   const ratio = Math.min(devicePixelRatio || 1, 1.5);
   const width = Math.round(canvas.clientWidth * ratio);
   const height = Math.round(canvas.clientHeight * ratio);
-  const radius = Math.min(width * 0.335, height * 0.42);
+  const radius = Math.min(width * 0.24, height * 0.38, 100 * ratio);
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width; canvas.height = height;
     canvas.parentElement.style.setProperty('--orb-radius', `${radius / ratio}px`);
