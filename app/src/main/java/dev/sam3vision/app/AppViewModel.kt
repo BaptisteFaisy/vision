@@ -25,11 +25,14 @@ import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.GpuMonitor
+import dev.sam3vision.core.net.GpuStatus
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -89,6 +92,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
+    /**
+     * Présence de la GPU SAM : chaque appel SAM/photo l'actualise, l'écran Réglages
+     * la surveille tant qu'elle est injoignable (voir [setGpuWatching]).
+     */
+    private val gpuMonitor = GpuMonitor()
+    val gpu: StateFlow<GpuStatus> = gpuMonitor.status
+    private var gpuWatch: Job? = null
+
     /** Mise à jour d'état vue par les collaborateurs (`StateUpdate`, comme côté iSee). */
     private fun update(block: (UiState) -> UiState) = _state.update(block)
     private val stateUpdate: StateUpdate = ::update
@@ -136,6 +147,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         sam = ::samClientOrNull,
         overlays = ::buildOverlays,
         announce = ::announcePositions,
+        noteSam = { endpoint, result -> gpuMonitor.noteSamResult(endpoint, result) },
     )
 
     /** Chat sur la photo courante. */
@@ -152,10 +164,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         update = stateUpdate,
         llm = { settings -> llmClient(settings) },
         speech = { settings -> speechClient(settings) },
+        noteHealth = { endpoint, result -> gpuMonitor.noteHealthResult(endpoint, result) },
     )
 
     init {
-        viewModelScope.launch { _state.update { it.copy(settings = seededFromBuild(store.load()), settingsReady = true) } }
+        viewModelScope.launch {
+            val seeded = seededFromBuild(store.load())
+            gpuMonitor.track(seeded.samEndpoint())
+            _state.update { it.copy(settings = seeded, settingsReady = true) }
+        }
         // Une seule règle : chaque nouveau bandeau est lu à voix haute (ElevenLabs).
         viewModelScope.launch {
             _state
@@ -239,7 +256,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun saveSettings(next: Settings) = viewModelScope.launch {
         val cleaned = withTtsDefaults(next).copy(maxObjects = next.objectsOnScreen)
         store.save(cleaned)
+        gpuMonitor.track(cleaned.samEndpoint())
         _state.update { it.copy(settings = cleaned, statusLine = AppStatusText.SETTINGS_SAVED) }
+    }
+
+    /**
+     * Veille GPU de l'écran Réglages : à l'ouverture, une veille bornée sonde
+     * `/health` tant que la carte est injoignable (le téléphone remarque tout seul
+     * quand on la branche) ; en partant, la veille s'annule. Sans effet sur `Up`.
+     */
+    fun setGpuWatching(active: Boolean) {
+        gpuWatch?.cancel()
+        gpuWatch = if (active) viewModelScope.launch { gpuMonitor.watch() } else null
     }
 
     fun testLlm() = viewModelScope.launch { diagnostics.testLlm() }

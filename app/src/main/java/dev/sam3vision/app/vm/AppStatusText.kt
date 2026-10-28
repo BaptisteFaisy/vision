@@ -55,11 +55,17 @@ object AppStatusText {
 
     /**
      * Note affichée sous la photo, `null` quand la segmentation a donné ses masques.
-     * Les deux motifs disent quoi faire, pas seulement que c'est vide.
+     * Les trois motifs disent quoi faire, pas seulement que c'est vide : un échec SAM
+     * nomme la GPU injoignable au lieu de « aucun objet » (même motif que le direct).
      */
-    fun segmentationNote(settings: Settings, analysis: Analysis): String? = when {
+    fun segmentationNote(settings: Settings, analysis: Analysis, samFailure: Throwable? = null): String? = when {
         !settings.segmentationEnabled -> "Segmentation désactivée — renseigne un endpoint SAM dans Réglages."
+        samFailure != null -> samDownNote(samFailure.message ?: "échec inconnu")
         analysis.objects.isEmpty() -> "Aucun objet segmenté sur cette image."
         else -> null
     }
+
+    /** Photo décrite sans masques parce que SAM n'a pas répondu : le motif, et la suite. */
+    fun samDownNote(reason: String): String =
+        "Détecteur SAM injoignable ($reason) — photo décrite sans segmentation"
 }

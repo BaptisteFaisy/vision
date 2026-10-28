@@ -8,6 +8,7 @@ import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -25,6 +26,7 @@ class AppDiagnosticsTest {
         speech: (Settings) -> SpeechClient? = { null },
         samUrl: (Settings) -> String = { "https://sam.test" },
         sam: SamClient = FakeSam(),
+        noteHealth: (String, Result<Boolean>) -> Unit = { _, _ -> },
     ): AppDiagnostics = AppDiagnostics(
         state = { screen.value },
         update = screen.update,
@@ -33,6 +35,7 @@ class AppDiagnosticsTest {
         probeImage = { "mini-image" },
         samUrl = samUrl,
         samClient = { url -> samUrlCalled = url; sam },
+        noteHealth = noteHealth,
     )
 
     @Test
@@ -73,6 +76,37 @@ class AppDiagnosticsTest {
         diagnostics(sam = sam).testSam()
 
         assertEquals("SAM KO — réseau", screen.value.statusLine)
+    }
+
+    @Test
+    fun `SAM teste — issue notee pour le moniteur`() = runTest {
+        val noted = mutableListOf<Pair<String, Result<Boolean>>>()
+        val sam = FakeSam(onHealth = Result.success(true))
+
+        diagnostics(sam = sam, noteHealth = { url, result -> noted += url to result }).testSam()
+
+        assertEquals(listOf("https://sam.test"), noted.map { it.first })
+        assertEquals(true, noted.single().second.getOrNull())
+    }
+
+    @Test
+    fun `SAM injoignable — echec note pour le moniteur`() = runTest {
+        val noted = mutableListOf<Pair<String, Result<Boolean>>>()
+        val sam = FakeSam(onHealth = Result.failure(ApiError.Network("réseau")))
+
+        diagnostics(sam = sam, noteHealth = { url, result -> noted += url to result }).testSam()
+
+        assertEquals("https://sam.test", noted.single().first)
+        assertEquals("réseau", noted.single().second.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `SAM sans URL — rien n est note`() = runTest {
+        val noted = mutableListOf<Pair<String, Result<Boolean>>>()
+
+        diagnostics(samUrl = { "" }, noteHealth = { url, result -> noted += url to result }).testSam()
+
+        assertTrue("aucun appel : rien à noter", noted.isEmpty())
     }
 
     @Test

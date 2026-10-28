@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSection
+import dev.sam3vision.core.net.GpuStatus
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 
@@ -40,6 +41,7 @@ fun SettingsScreen(
     llmConfigured: Boolean,
     glasses: GlassesController,
     speaking: SpeakState,
+    gpu: GpuStatus,
     onSave: (Settings) -> Unit,
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
@@ -66,6 +68,7 @@ fun SettingsScreen(
                 onChange = { draft = it },
                 llmConfigured = llmConfigured,
                 speaking = speaking,
+                gpu = gpu,
                 onSpeak = onSpeak,
                 onStopVoice = onStopVoice,
                 onSave = onSave,
@@ -75,9 +78,7 @@ fun SettingsScreen(
                 onTestDepth = onTestDepth,
                 onStartTracking = onStartTracking,
                 onStopTracking = onStopTracking,
-                onOpenLive = onOpenLive,
-                onOpenClassic = onOpenClassic,
-                onOpenGestures = onOpenGestures,
+                nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenGestures),
                 statusLine = statusLine,
             )
         }
@@ -252,6 +253,13 @@ private fun GlassesBlock(glasses: GlassesController) {
     )
 }
 
+/** Navigation sortante de la page, groupée pour la garde des 50 lignes. */
+private data class NavCallbacks(
+    val onOpenLive: () -> Unit,
+    val onOpenClassic: () -> Unit,
+    val onOpenGestures: () -> Unit,
+)
+
 /** Section TECHNICAL SETTINGS: everything the blind user never touches. */
 @Composable
 private fun TechnicalSection(
@@ -268,17 +276,16 @@ private fun TechnicalSection(
     onTestDepth: () -> Unit,
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
-    onOpenLive: () -> Unit,
-    onOpenClassic: () -> Unit,
-    onOpenGestures: () -> Unit,
+    nav: NavCallbacks,
     statusLine: String?,
+    gpu: GpuStatus,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("TECHNICAL SETTINGS")
         BackendFields(draft) { onChange(it) }
         ModelPinBlock(draft, statusLine)
         ObjectsSettings(draft) { onChange(it) }
-        GpuRegionSettings(draft) { onChange(it) }
+        GpuRegionSettings(draft, gpu) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
         PerceptionSettings(draft, onTestDepth) { onChange(it) }
         TtsSettings(
@@ -292,8 +299,8 @@ private fun TechnicalSection(
         GoogleMapsSettings(draft, onChange)
         ParentShareSettings(draft, onStartTracking, onStopTracking) { onChange(it) }
         SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
-        GestureHelp(onOpenGestures)
-        ClassicScreens(onOpenLive, onOpenClassic)
+        GestureHelp(nav.onOpenGestures)
+        ClassicScreens(nav.onOpenLive, nav.onOpenClassic)
         Diagnostics(statusLine)
     }
 }
