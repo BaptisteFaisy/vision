@@ -94,10 +94,12 @@ jobs:
                   # branche de la PR peut être antérieure), résout, termine
                   # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
                   # compte rendu, 2 = rien à faire : on saute sans bruit.
+                  rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
+                  # un exit != 0 de l'agent tuerait tout le sweep.
                   git show origin/master:.github/fireworks/conflict_agent.py \
                     > /tmp/fw-agent.py 2>/dev/null \
                     && python3 /tmp/fw-agent.py resolve --repo BaptisteFaisy/vision \
-                      --pr "$pr" --branch "$branch" --sha "$sha"; rc=$?
+                      --pr "$pr" --branch "$branch" --sha "$sha" || rc=$?
                   git rebase --abort >/dev/null 2>&1 || true
                   git checkout -q master 2>/dev/null || true
                   case "$rc" in
