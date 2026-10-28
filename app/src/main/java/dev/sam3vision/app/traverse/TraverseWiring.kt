@@ -79,11 +79,12 @@ class TraverseWiring(
      * clé des réglages, préchauffage dans [scope]) et renvoie les prompts
      * véhicules ; `false` détache tout. Dans les deux cas, [relaunch] relance
      * la session avec les prompts renvoyés — sans effet si le mode est déjà
-     * celui demandé.
+     * celui demandé. [app] n'est exigée qu'à l'activation (`null` suffit pour
+     * couper ou pour le chemin sans effet).
      */
     fun setActive(
         active: Boolean,
-        app: Application,
+        app: Application?,
         settings: Settings,
         scope: CoroutineScope,
         prompts: List<String>,
@@ -94,7 +95,7 @@ class TraverseWiring(
         if (active) {
             this.active = true
             quiet()
-            relaunch(attach(app, settings, scope, prompts))
+            relaunch(attach(requireNotNull(app), settings, scope, prompts))
         } else {
             deactivate(quiet)
             relaunch(LivePrompts.default)
