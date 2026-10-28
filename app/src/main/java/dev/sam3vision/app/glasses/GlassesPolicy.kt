@@ -126,6 +126,29 @@ object GlassesMessages {
         GlassesMessage(MessageKind.INFO, "Lunettes simulées prêtes : démarre la session, puis simule un appui.")
 
     fun noMockPress() = GlassesMessage(MessageKind.WARNING, "Aucun appareil simulé actif.")
+
+    /**
+     * Collecte des frames vidéo active : les descriptions partent sur le
+     * haut-parleur du téléphone (le routage vers les lunettes reste au banc).
+     */
+    fun framesOnSpeaker() = GlassesMessage(
+        MessageKind.INFO,
+        "Direct lunettes : les descriptions sont lues sur le haut-parleur.",
+    )
+}
+
+/**
+ * Pourquoi la collecte des frames vidéo ne tourne pas — `null` quand elle tourne.
+ *
+ * La collecte éteinte est un **silence documenté** : pas de frames, donc pas
+ * d'analyse ni de voix, et cette phrase en est la raison écrite (testée en JVM).
+ * `enabled` est le drapeau de `GlassesCamera`, `hasConsumer` dit si quelqu'un
+ * consomme les frames (sans consommateur, collecter paierait le décodage pour rien).
+ */
+fun frameCollectionIdleReason(enabled: Boolean, hasConsumer: Boolean): String? = when {
+    !enabled -> "Collecte des frames lunettes désactivée : le flux n'est pas lu."
+    !hasConsumer -> "Collecte des frames lunettes sans consommateur : le flux n'est pas lu."
+    else -> null
 }
 
 /**

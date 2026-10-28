@@ -18,15 +18,21 @@ s'il était mesuré.
 
 | Fichier | Rôle |
 |---|---|
-| `GlassesController.kt` (298 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes |
-| `GlassesPolicy.kt` (147 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés — testée en JVM |
-| `GlassesStatus.kt` (32 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
-| `GlassesCamera.kt` (90 l.) | flux 15 i/s `MEDIUM` `compressVideo = true`, photo à la demande |
+| `GlassesController.kt` (414 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées |
+| `GlassesPolicy.kt` (215 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
+| `GlassesStatus.kt` (44 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
+| `GlassesCamera.kt` (165 l.) | flux 15 i/s `MEDIUM` `compressVideo = true`, photo à la demande, pompe vidéo derrière flag |
+| `GlassesFrameCollector.kt` (83 l.) | pompe de production : `videoStream` → `JpegFrame`, 1 frame / 1,5 s, testée sur JVM |
+| `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec`, **jamais essayé** |
+| `GlassesFrameConvert.kt` (98 l.) | conversions partagées banc + production (YUV → ARGB → JPEG 85 → base64) |
+| `GlassesFramePolicy.kt` (144 l.) | politique de frame partagée (étranglement, verdict, recadrage, horodatage), pure, testée en JVM |
+| `GlassesAnalysisStep.kt` (67 l.) | maillon partagé « frame → `AnalyzeUseCase` → voix », testé en JVM |
+| `FrameTypes.kt` (158 l.) | `JpegFrame`, `Yuv420Layout`, `YuvConverter` partagés, testés en JVM |
 | `GlassesInputs.kt` (95 l.) | bouton capture → `CaptureAction`, tick 80 ms |
 | `GlassesFrames.kt` (52 l.) | `PhotoData`/`VideoFrame` → `Bitmap` → JPEG du cache |
 | `GlassesMock.kt` (90 l.) | Mock Device Kit + scène 640×480 |
-| `GlassesSection.kt` (94 l.) | bloc « Lunettes » des Réglages (Compose) |
-| `GlassesState.kt` (38 l.) | `GlassesUiState`, `GlassesEvent`, `SessionPhase` |
+| `GlassesSection.kt` (127 l.) | bloc « Lunettes » des Réglages (Compose) |
+| `GlassesState.kt` (42 l.) | `GlassesUiState`, `GlassesEvent`, `SessionPhase` |
 | `core/…/glasses/CaptureGesture.kt` (71 l.) | lissage des appuis, pur, dans `:core` avec son test |
 
 Branchements hors du dossier : `MainActivity.kt:52-55` (création + `initialize`),
@@ -118,9 +124,11 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
   (`:43-54`), en annonçant chaque refus (`GlassesMessages.audioRefused`). Un refus de micro
   laisse donc la caméra seule, sans code mort. Ce qui reste **absent**, c'est le **routage de la
   voix vers les lunettes** : il n'existe que dans le banc (`bench/GlassesVoice.kt`).
-- Le flux vidéo est **démarré mais jamais consommé** : l'app n'appelle nulle part
-  `stream.videoStream` (mesuré : zéro occurrence dans `app/src/main`). `compressVideo = true`
-  est donc un choix de lien, pas un chemin d'image.
+- Le flux vidéo est consommé par le collecteur de production (`GlassesFrameCollector.kt` :
+  `videoStream` → décodage H.265 ou YUV → `JpegFrame` → `AnalyzeUseCase` → voix
+  haut-parleur), derrière un flag **éteint par défaut** (`GlassesCamera.kt`, drapeau
+  `collectFrames`) : éteint, le flux n'est pas lu et la raison est écrite
+  (`frameCollectionIdleReason`, testée en JVM).
 - Conséquence assumée : `VideoFrame.toBitmapOrNull()` et son `rawToBitmap`
   (`GlassesFrames.kt:22-37`) **ne sont appelés par personne** — code mort côté app : le banc a
   sa propre conversion (`bench/FrameTypes.kt:76`, `bench/GlassesFrameEncoder.kt:42`, mesuré :
@@ -200,11 +208,13 @@ lunettes simulées en debug.
 
 Ne marche pas, et c'est écrit dans le code :
 
-- pas de trames vidéo consommées par l'app (donc pas de mode Direct sur lunettes) ;
+- pas de trames vidéo consommées **par défaut** : le collecteur existe
+  (`GlassesFrameCollector.kt`) mais son flag est éteint, et son décodeur H.265 n'a
+  jamais vu de matériel — donc pas de mode Direct sur lunettes sans geste explicite ;
 - pas de routage de la voix vers les lunettes : le micro des lunettes est demandé (palier
-  `GlassesAudioPlan`), mais la sortie audio reste celle du téléphone ; la permission
-  `MODIFY_AUDIO_SETTINGS` est déclarée (`AndroidManifest.xml:15`), pour le banc et non pour
-  l'app ;
+  `GlassesAudioPlan`), mais la sortie audio reste le haut-parleur du téléphone (annoncé
+  comme tel quand la collecte tourne) ; la permission `MODIFY_AUDIO_SETTINGS` est déclarée
+  (`AndroidManifest.xml:15`), pour le banc et non pour l'app ;
 - pas de tap ni tap-long du pavé : l'app ne s'abonne qu'à `InputSource.CAPTURE_BUTTON`
   (`GlassesInputs.kt:39-43`), ces gestes étant réservés par le système (pause/arrêt) ;
 - pas d'invocation vocale par mot-clé : exigerait un projet Developer Center et une version
@@ -231,15 +241,17 @@ Rien de cette liste n'a été exécuté ici : **jamais essayé**, à vérifier a
 ## 10. Frontière avec le banc (`glasses/bench/`)
 
 Le banc d'essai est dans **le même module** que cette page depuis le 2026-10-27, mais dans un
-autre paquet : `app/src/main/java/dev/sam3vision/app/glasses/bench/`. Un paquet commun ne crée
-pas de dépendance — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune occurrence de
+autre paquet : `app/src/main/java/dev/sam3vision/app/glasses/bench/`. Les helpers de frames
+sont partagés dans le paquet parent (`FrameTypes.kt`, `GlassesFramePolicy.kt`,
+`GlassesFrameConvert.kt`, `GlassesAnalysisStep.kt`) : le banc importe le parent, jamais
+l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune occurrence de
 `glasses.bench` hors du paquet), et **aucune conclusion du banc ne vaut pour l'app** :
 
 | | production (`glasses/`, ici) | banc (`glasses/bench/`) |
 |---|---|---|
-| Cadence | 15 i/s (`GlassesCamera.kt:129`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
-| Compression | `compressVideo = true` (`:63`) | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
-| Trames vidéo | jamais consommées (0 occurrence de `videoStream`) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
+| Cadence | 15 i/s (`GlassesCamera.kt`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
+| Compression | `compressVideo = true` : bitstream H.265 | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
+| Trames vidéo | collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
 | Audio | piste PCM demandée par palier (`GlassesAudioPlan`), pas de routage de sortie | routage de la voix vers les lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
 | Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |
@@ -249,14 +261,16 @@ chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autr
 
 ## 11. Tests JVM : ce qui est couvert, ce qui ne peut pas l'être
 
-18 tests, aucun matériel requis (`app/src/test/java/dev/sam3vision/app/glasses/`) :
+41 tests, aucun matériel requis (`app/src/test/java/dev/sam3vision/app/glasses/`) :
 
 | Fichier | Couvre |
 |---|---|
-| `GlassesPolicyTest.kt` | phases joignables (`STOPPED` redevient joignable), libellés, phrases d'état, `photoHint` |
-| `GlassesMessagesTest.kt` | gravité de chaque message, aucun échec en `INFO`, filtrage des faux positifs d'enregistrement, aucun secret recopié |
+| `GlassesPolicyTest.kt` | phases joignables (`STOPPED` redevient joignable), libellés, phrases d'état, `photoHint`, raison de non-collecte documentée |
+| `GlassesMessagesTest.kt` | gravité de chaque message, aucun échec en `INFO`, filtrage des faux positifs d'enregistrement, aucun secret recopié, voix HP annoncée |
 | `GlassesUiStateTest.kt` | `connected`/`canConnect`/`hasDevice`, les 4 lignes d'état en français |
 | `GlassesPhaseMappingTest.kt` | `DeviceSessionState` → phase affichée, dont `PAUSED` |
+| `GlassesFrameCollectorTest.kt` | étranglement par rejet, routage compressé/brut/config, silences journalisés, libération |
+| `GlassesVideoDecoderTest.kt` | pas de chroma et disposition de sortie du décodeur (partie pure) |
 
 Reste dans `:core`, déjà testé là-bas : `CaptureGestureBuffer` (appui court retenu 350 ms,
 double appui prioritaire, `reset`).

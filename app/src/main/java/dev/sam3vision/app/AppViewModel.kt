@@ -19,7 +19,6 @@ import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.net.HttpSamClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -128,7 +127,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         state = { _state.value },
         update = stateUpdate,
         llm = { settings -> llmClient(settings) },
-        sam = { settings -> if (!settings.samConfigured()) null else HttpSamClient(settings.samEndpoint()) },
+        sam = ::samClientOrNull,
         overlays = ::buildOverlays,
         announce = ::announcePositions,
     )
