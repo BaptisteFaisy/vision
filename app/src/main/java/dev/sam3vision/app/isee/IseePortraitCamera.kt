@@ -71,9 +71,13 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
                 SteeringLayer(probe.steering)
             } else {
                 CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
+                PictoLayer(state.picto.hits, viewModel.picto::pngOf)
             }
         }
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
+        if (state.recordingVideo && !showGlasses) {
+            PictoChip(state.picto, Modifier.align(Alignment.BottomEnd)) { viewModel.picto.onPictoButton() }
+        }
         ProbeNoticeCard(probe)
         PictureFade(Modifier.fillMaxSize())
     }
