@@ -92,7 +92,7 @@ class TrackRunnerTest {
     fun `start sans prompts retombe sur les prompts par defaut`() = runBlocking {
         val client = FakeTrackClient()
         TrackRunner(client).start(emptyList(), "SUVL").getOrThrow()
-        assertEquals("start:${LivePrompts.Default.joinToString(",")}", client.calls.single())
+        assertEquals("start:${LivePrompts.default.joinToString(",")}", client.calls.single())
     }
 
     @Test

@@ -136,7 +136,7 @@ class LiveProbe(
      */
     fun configure(
         baseUrl: String,
-        prompts: List<String> = LivePrompts.Default,
+        prompts: List<String> = LivePrompts.default,
         announce: Boolean = false,
         guide: Boolean = false,
         lens: LensSpec = LensSpec.Default,

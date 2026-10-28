@@ -23,7 +23,7 @@ object LivePrompts {
      * `PROMPT_LIMIT = 2` : envoyer davantage afficherait des concepts jamais
      * détectés — d'où [MAX] = 2, décision du 26/10.
      */
-    val Default: List<String> = listOf("person", "door")
+    val default: List<String> = listOf("person", "door")
 
     /**
      * Nombre maximal de concepts : **2**, décision user du 26/10 (« 2 concepts maximum,
@@ -39,7 +39,7 @@ object LivePrompts {
     /**
      * Nettoie une liste de prompts : espaces retirés, vides et doublons éliminés,
      * prompts trop longs rejetés, liste bornée à [MAX]. Une liste qui devient vide
-     * retombe sur [Default].
+     * retombe sur [default].
      */
     fun normalize(prompts: List<String>): List<String> {
         val cleaned = prompts.asSequence()
@@ -48,14 +48,14 @@ object LivePrompts {
             .distinct()
             .take(MAX)
             .toList()
-        return cleaned.ifEmpty { Default }
+        return cleaned.ifEmpty { default }
     }
 
     /**
      * Champ « Suivre » saisi par l'utilisateur : découpé sur les virgules,
-     * points-virgules et retours ligne, nettoyé des vides — vide = [Default].
+     * points-virgules et retours ligne, nettoyé des vides — vide = [default].
      * La session borne et normalise ensuite (voir [normalize]).
      */
     fun field(text: String): List<String> =
-        text.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { Default }
+        text.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { default }
 }

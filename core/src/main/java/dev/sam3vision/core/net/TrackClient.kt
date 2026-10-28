@@ -14,27 +14,12 @@ const val TRACK_TIMEOUT_SECONDS: Long = 15L
 internal const val TRACK_USER_AGENT = "$USER_AGENT track"
 
 /**
- * Client du tracker vidéo `sam3-track` : une session garde les identités des objets,
- * chaque frame renvoie les mêmes `id` tant que l'objet est suivi.
+ * Implémentation HTTP réelle ([TrackClient]), contrat `docs/LIVE-SPEC.md` du backend
+ * `sam3-track` : `POST /session`, `POST /frame`, `DELETE /session/{id}`, `GET /health`.
+ * Réutilise le client HTTP unique de `:core` (délai 15 s), `Json.kt` et `Errors.kt`.
  *
  * Un 404 sur `/frame` signifie « session inconnue » (backend redémarré, session
  * expirée) : c'est à l'appelant de recréer une session — voir `TrackRunner`.
- */
-interface TrackClient {
-    suspend fun start(imageB64: String, prompts: List<String>): Result<TrackSessionStart>
-
-    suspend fun frame(sessionId: String, imageB64: String): Result<TrackFrame>
-
-    suspend fun close(sessionId: String): Result<Unit>
-
-    suspend fun health(): Result<TrackHealth>
-}
-
-/**
- * Implémentation HTTP réelle, contrat du backend `sam3-track` :
- * `POST /session`, `POST /frame`, `DELETE /session/{id}`, `GET /health`.
- * Réutilise le client HTTP unique de `:core`, [requestTo] (URL + User-Agent) et [Json.kt]
- * comme tout autre client : aucune requête n'est construite à la main ici.
  */
 class HttpTrackClient(
     private val baseUrl: String,
