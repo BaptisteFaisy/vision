@@ -1,6 +1,7 @@
 package dev.sam3vision.core.nav
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,5 +49,22 @@ class GuidanceUpdateTest {
     @Test(expected = IllegalArgumentException::class)
     fun `distance restante negative refusee`() {
         GuidanceUpdate("Tout droit", 10, -1, 60)
+    }
+
+    @Test
+    fun `ecart faux par defaut y compris a l etat initial`() {
+        val update = GuidanceUpdate("Tout droit", 10, 100, 60)
+        val first = initialGuidance(RouteSummary("Gare de Lyon", null, 2450, 900))
+
+        assertFalse(update.offRoute)
+        assertFalse(first.offRoute)
+    }
+
+    @Test
+    fun `ecart explicite leve et rabaisse par copy`() {
+        val update = GuidanceUpdate("Tout droit", 10, 100, 60)
+
+        assertTrue(update.copy(offRoute = true).offRoute)
+        assertFalse(update.copy(offRoute = true).copy(offRoute = false).offRoute)
     }
 }
