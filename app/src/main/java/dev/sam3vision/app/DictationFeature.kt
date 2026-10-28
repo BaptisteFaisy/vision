@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import dev.sam3vision.app.glasses.GlassesMicLink
+import dev.sam3vision.app.perms.PermTexts
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
@@ -149,7 +150,7 @@ class DictationFeature(
     }
 
     /** Permission micro refusée : bandeau d'erreur, lu à la voix. */
-    fun onMicDenied() = report(hold = true, message = "Micro non autorisé")
+    fun onMicDenied() = report(hold = true, message = PermTexts.MIC_DENIED)
 
     fun dismissOverlay() = state.update { it.copy(dictation = it.dictation.copy(overlay = null)) }
 
@@ -164,7 +165,7 @@ class DictationFeature(
     /** Motif de refus, ou `null` quand la dictée peut démarrer. */
     private fun blocker(settings: Settings, glasses: Boolean): String? = when {
         // Le micro des lunettes ne passe pas par `AudioRecord` : sa permission ne sert à rien.
-        !glasses && !micGranted() -> "Micro non autorisé"
+        !glasses && !micGranted() -> PermTexts.MIC_DENIED
         !settings.sttConfigured -> "aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"
         else -> null
     }

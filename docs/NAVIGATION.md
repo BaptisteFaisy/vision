@@ -4,6 +4,10 @@ iSee ne guide pas : sur ordre vocal, il ouvre **Google Maps** avec la
 destination. Pas de GPS, pas de carte, pas d'instructions virage par
 virage dans l'app — tout le guidage vit chez Google Maps.
 
+Le fonctionnel (parcours, annonces, cas limites, recette, catalogue de
+chaînes) vit dans `docs/NAVIGATION-VOCALE.md` ; ce document reste le contrat
+technique (URIs, replis, permissions).
+
 ## Déclenchement vocal
 
 Chaîne : appui long iSee → dictée (`DictationFeature`, Meta puis repli
@@ -57,6 +61,23 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 
 - `Settings.navigationGuidanceEnabled: Boolean = true`
 - Section Réglages « Navigation — guidage GPS » (`NavigationToggle.kt`)
+
+## Écrans de navigation vocale (API intégrateur)
+
+En plus du handoff direct ci-dessus, `app/.../voicenav/` expose une session
+avec confirmation : dictée → écran « Destination » (adresse + résumé
+distance · durée) → bouton « Démarrer » → écran de guidage (prochaine
+instruction, distances, progression, « Arrêter »). La voix reste le chemin
+TTS existant (`VoiceNavAnnouncer`, clés `nav_*`) ; l'ordre « arrête le
+guidage » (`core/.../nav/StopGuidance.kt`, déterministe) ferme la session.
+
+Le résumé est fourni par `ValhallaRouteLoader` (géocodage GMS puis BAN +
+`POST /route` piéton, adresse seule sans position ni URL) et l'état du moteur
+par `VoiceNavEngineDriver` (`VoiceNavViewModel.onGuidanceUpdate`, voix système
++ écran). Ces écrans ne s'ouvrent que si `Settings.routeBaseUrl` est renseignée
+(URL du tunnel Valhalla, Réglages ou build) : sinon, `IseeViewModel` garde le
+handoff direct ci-dessus, à l'identique — et « Démarrer » y rebascule si un
+maillon manque (adresse, position, réseau, itinéraire).
 
 ## Limites
 

@@ -116,3 +116,10 @@ interface TrackClient {
 
     suspend fun health(): Result<TrackHealth>
 }
+
+/**
+ * Routeur Valhalla du r630 (`POST /route`, piéton par défaut), joint par le
+ * tunnel Tailscale Funnel : contrat [RouteClient], requêtes [HttpRouteClient].
+ * Valhalla ne géocode pas : l'appelant fournit des coordonnées (GPS du
+ * téléphone, Geocoder Android, BAN).
+ */

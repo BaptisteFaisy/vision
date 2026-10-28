@@ -13,6 +13,8 @@ import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.seededFromBuild
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speechClient
+import dev.sam3vision.app.voicenav.VoiceNavSession
+import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.isee.vm.IseeAnswers
 import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
@@ -22,6 +24,7 @@ import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
+import dev.sam3vision.app.isee.vm.IseeVoiceNav
 import dev.sam3vision.app.isee.vm.NavigationHook
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
@@ -138,6 +141,21 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
     )
 
+    /**
+     * Navigation vocale in-app (confirmée, moteur embarqué) : câblage paresseux
+     * et éteint par défaut ([IseeVoiceNav]) — coût nul sans URL Valhalla.
+     */
+    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation)
+
+    /** État de la navigation vocale (repos, confirmation, guidage) pour l'écran. */
+    val voiceNavState: StateFlow<VoiceNavUiState> get() = voiceNav.state
+
+    /** La session sous-jacente (boutons de l'écran navigation). */
+    fun voiceNav(): VoiceNavSession = voiceNav.session
+
+    /** Quitter l'écran navigation : confirmation annulée ou guidage arrêté. */
+    fun dismissVoiceNav() = voiceNav.dismiss()
+
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile
     var active: Boolean = false
@@ -206,6 +224,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         liveDictation.stop()
         dictation.discard()
         player.release()
+        voiceNav.shutdown()
         super.onCleared()
     }
 
@@ -356,6 +375,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Ordre de cap (« va à gauche ») : consommé ici AVANT la navigation Maps
         // (« va à gauche » matche aussi « va à X ») — guidage + voix, jamais LLM.
         if (runSteeringCommand(text)) return
+        // Navigation vocale in-app (URL Valhalla configurée) : écrans + moteur,
+        // avant le handoff Maps — éteinte par défaut (comportement inchangé).
+        if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
         // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.

@@ -31,5 +31,8 @@ internal fun NavigationToggle(draft: Settings, onChange: (Settings) -> Unit) {
         SwitchRow("Guide to the confirmed destination", draft.navigationGuidanceEnabled) {
             onChange(draft.copy(navigationGuidanceEnabled = it))
         }
+        LabeledField("Route base URL (Valhalla, empty = Maps guidance only)", draft.routeBaseUrl, false) {
+            onChange(draft.copy(routeBaseUrl = it.trim()))
+        }
     }
 }

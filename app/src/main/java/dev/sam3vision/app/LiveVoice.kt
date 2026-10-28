@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import dev.sam3vision.app.perms.PermTexts
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +32,7 @@ data class LiveVoiceState(
  * Fonction pure : testée en JVM, sans Android.
  */
 fun voiceBlocker(settings: Settings, micGranted: Boolean, micBusy: Boolean): String? = when {
-    !micGranted -> "Micro non autorisé"
+    !micGranted -> PermTexts.MIC_DENIED
     !settings.sttConfigured -> "aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"
     micBusy -> "micro déjà occupé"
     else -> null
