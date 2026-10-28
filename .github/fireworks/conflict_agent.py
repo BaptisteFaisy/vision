@@ -159,7 +159,7 @@ def unmerged_files():
 
 
 def file_version(path, stage):
-    """Contenu d'un bord (:1: base, :2: branche, :3: master) ou None."""
+    """Contenu d'un bord (:1: base, :2:, :3:) ou None."""
     proc = subprocess.run(["git", "show", ":%d:%s" % (stage, path)],
                           capture_output=True, timeout=60)
     if proc.returncode != 0:
@@ -234,6 +234,15 @@ def still_marked(content):
     return False
 
 
+def rebase_sides(path):
+    """Bords (branche, master) pendant un rebase : :3: = branche rejouée.
+
+    En merge, :2: = branche et :3: = master ; en rebase c'est l'inverse
+    (:2: = destination = master). L'agent ne tourne qu'en rebase.
+    """
+    return file_version(path, 3), file_version(path, 2)
+
+
 def resolve_one(api_url, key, model, path, deadline, dry_run):
     """Résout un fichier en conflit et l'ajoute à l'index."""
     if time.time() > deadline:
@@ -244,7 +253,7 @@ def resolve_one(api_url, key, model, path, deadline, dry_run):
         raise AgentError("fichier illisible : %s" % path)
     if size > MAX_FILE_BYTES:
         raise AgentError("fichier trop gros : %s (%d o)" % (path, size))
-    ours, theirs = file_version(path, 2), file_version(path, 3)
+    ours, theirs = rebase_sides(path)
     if ours is None or theirs is None or not is_text(ours + theirs):
         raise AgentError("binaire ou bord manquant : %s" % path)
     base = file_version(path, 1)
