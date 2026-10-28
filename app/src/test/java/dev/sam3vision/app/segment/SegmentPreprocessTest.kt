@@ -13,13 +13,13 @@ class SegmentPreprocessTest {
     }
 
     @Test
-    fun `normalizeNCHW ecrit RGB divise par 255 en NCHW`() {
+    fun `normalizeNCHWArray ecrit RGB divise par 255 en NCHW`() {
         val px = (0xFF shl 24) or (200 shl 16) or (100 shl 8) or 50
-        val buf = SegmentPreprocess.normalizeNCHW(IntArray(640 * 360) { px })
+        val buf = SegmentPreprocess.normalizeNCHWArray(IntArray(640 * 360) { px })
         val plane = 640 * 360
         // Ordre des plans : R = 200, G = 100, B = 50.
-        assertEquals(200f / 255f, buf.get(0), 1e-6f)
-        assertEquals(100f / 255f, buf.get(plane), 1e-6f)
-        assertEquals(50f / 255f, buf.get(2 * plane), 1e-6f)
+        assertEquals(200f / 255f, buf[0], 1e-6f)
+        assertEquals(100f / 255f, buf[plane], 1e-6f)
+        assertEquals(50f / 255f, buf[2 * plane], 1e-6f)
     }
 }
