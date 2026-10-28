@@ -1,10 +1,7 @@
 package dev.sam3vision.app.isee
 
-import androidx.compose.animation.core.LinearEasing
+import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -18,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +36,7 @@ import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.PortraitGeometry
 import dev.sam3vision.core.iseedesign.portraitGeometry
 import dev.sam3vision.core.iseedesign.voiceEnvelope
+import kotlinx.coroutines.delay
 
 /**
  * L'écran iSee au design « Portrait » : fond blanc, une seule boule de verre au liquide marbré
@@ -105,11 +104,30 @@ private fun BoxWithConstraintsScope.PortraitScene(
     BottomScrim()
 }
 
+/** Boucle du temps de la scène : 10 minutes, comme l'ancienne transition infinie. */
+internal const val SCENE_LOOP_MS = 600_000L
+
+/**
+ * Temps de la scène en secondes entre deux lectures d'une horloge monotone (ms) : avance
+ * toujours, même quand les animations système sont coupées (`animator_duration_scale=0`
+ * fige `rememberInfiniteTransition` — constaté sur le Redmi le 2026-10-28 : la boule
+ * restait pixel-identique à 4 s d'intervalle). Pure : testée sur JVM.
+ */
+internal fun sceneTimeSeconds(startMs: Long, nowMs: Long): Float =
+    ((nowMs - startMs) % SCENE_LOOP_MS).toFloat() / 1000f
+
 /** Le temps de la scène en secondes, pour le marbre et la voix (boucle de 10 min). */
 @Composable
 private fun rememberSceneTime(): Float {
-    val t = rememberInfiniteTransition(label = "isee-time")
-    return t.animateFloat(0f, 600f, infiniteRepeatable(tween(600_000, easing = LinearEasing)), label = "t").value
+    var time by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = SystemClock.elapsedRealtime()
+        while (true) {
+            time = sceneTimeSeconds(start, SystemClock.elapsedRealtime())
+            delay(16)
+        }
+    }
+    return time
 }
 
 /** La boule, et la couronne de barres ambre quand iSee parle. */
