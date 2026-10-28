@@ -11,7 +11,7 @@ plan** dans l'app.
 | Pièce | Fichier | Rôle |
 |---|---|---|
 | Règles pures | `core/speech/LockedMic.kt` | 6 phases (`OFF`, `READY`, `LISTENING`, `THINKING`, `ANSWERED`, `FAILED`), plafond `MAX_RECORD_MS = 20 s`, textes affichés **et** prononcés |
-| Question sans image | `core/net/Clients.kt` (`askText`), `InferHubLlmClient`, `LlmPrompts.askVoiceSystem` | écran verrouillé : la caméra est fermée, la consigne dit au modèle qu'il n'a **aucune** image |
+| Question sans image | `core/net/Clients.kt` (`askText`), `HttpLlmClient`, `LlmPrompts.askVoiceSystem` | écran verrouillé : la caméra est fermée, la consigne dit au modèle qu'il n'a **aucune** image |
 | Trajet complet | `app/locked/LockedMicAnswer.kt` | PCM → texte (Meta/Scribe) → réponse → voix (ElevenLabs) |
 | Service | `app/locked/LockedMicService.kt` | premier plan type `microphone`, réveil partiel **pendant la capture seulement** |
 | Interface | `app/locked/LockedMicNotifications.kt`, `LockedMicTile.kt` | notification publique + tuile des réglages rapides |

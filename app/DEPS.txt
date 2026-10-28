@@ -20,7 +20,7 @@
 # API :core a utiliser directement (ne rien reimplementer)
 # ─────────────────────────────────────────────────────────────────────────────
 # dev.sam3vision.core.model.{SegObject, SegmentResult, Analysis, ChatTurn, Role}
-# dev.sam3vision.core.net.{LlmClient, SamClient, InferHubLlmClient, HttpSamClient,
+# dev.sam3vision.core.net.{LlmClient, SamClient, HttpLlmClient, HttpSamClient,
 #                           defaultHttpClient, ApiError}
 # dev.sam3vision.core.mask.{decodeMaskPng, colorizeMask}
 # dev.sam3vision.core.settings.{Settings, SettingsStore, SettingsStoreFactory,
@@ -47,7 +47,7 @@
 # - Image -> JPEG q85, bord max 1024, base64 SANS prefixe data: (les clients ajoutent le prefixe).
 # - SettingsStore : SettingsStoreFactory.create(context) (chiffre, repli fichier).
 # - LlmClient/HttpSamClient : reconstruire a chaque changement de Settings
-#   (InferHubLlmClient(settings.llmBaseUrl, settings.llmApiKey, settings.llmModel)).
+#   (HttpLlmClient(settings.llmBaseUrl, settings.llmApiKey, settings.llmModel)).
 # - ApiError.message est deja en francais et affichable tel quel.
 # - Si settings.samBaseUrl est vide : AnalyzeUseCase(llm, sam = null) -> bandeau
 #   "Segmentation desactivee - renseigne un endpoint SAM dans Reglages".

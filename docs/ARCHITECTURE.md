@@ -120,7 +120,7 @@ a aucun moyen de revenir à un message antérieur.
    (`core/net/MetaAsrClient`), repli `core/net/ElevenLabsSttClient` dès qu'une clé de voix
    existe (`FallbackSpeechClient` quand les deux sont configurés).
 4. `IseeAnswers` (`app/isee/vm/IseeAnswers.kt`) → `AskUseCase` (`core/usecase/UseCases.kt`)
-   → `core/net/InferHubLlmClient.ask` → `POST {llm}/chat/completions`, image = frame
+   → `core/net/HttpLlmClient.ask` → `POST {llm}/chat/completions`, image = frame
    captée à l'appui long en data-URL (attendue, §2.1 ; texte seul sinon), et
    **historique toujours vide** : iSee joint `emptyList()` (`IseeAnswers`),
    aucune ligne de la base n'est reconstruite en tour de conversation. Le plafond de
@@ -136,7 +136,7 @@ l'écran **Direct** (`app/live/LiveAskSession.kt:82`, `timelineContextOrNull` de
 
 C'est ici que segmentation et description LLM s'enchaînent : `CaptureScreen` →
 `AppViewModel.onPhoto` → `app/vm/AppAnalysis.kt` → `AnalyzeUseCase` (`core/usecase/UseCases.kt`)
-→ `HttpSamClient.segment` (facultatif) puis `InferHubLlmClient.describe`. Un échec SAM ne
+→ `HttpSamClient.segment` (facultatif) puis `HttpLlmClient.describe`. Un échec SAM ne
 bloque rien : `AnalyzeUseCase` décrit quand même l'image, sans objets (`sam?.segment(...)` →
 `getOrNull()`, `UseCases.kt:23`). Écrans : `AnalysisScreen`, `ChatScreen`.
 
@@ -169,7 +169,7 @@ des Réglages, d'un preset de région (`core/settings/SamRegion.kt:21,26`) ou de
 | `WS {sam}/live/ws` | `core/net/WsLiveClient.kt` (`LIVE_WS_PATH`, `WsTransport.kt:35`) | `{"id","image_b64","prompts","work_edge","max_objects","mask_encoding":"bits"}` | même forme que `/live`, **même `id`** ; erreur `{"error":{"status","detail"}}` |
 | `POST {sam}/release` | `core/net/SamLifecycle.kt:42` | corps `{}`, en-tête `x-sam-release: confirm` | `{"released":true}` → `ReleaseOutcome` |
 | `POST {sam31}/video` | `core/net/HttpSam31VideoClient.kt:67` | multipart : `model=sam3.1-video`, `video` (video/mp4), `prompt` | premier champ trouvé de `text`, `description`, `answer`, `caption` (tronqué à 600 caractères) |
-| `POST {llm}/chat/completions` | `core/net/InferHubLlmClient.kt:78` | `{model, messages, temperature 0.2, max_tokens 800\|200}` ; image en `image_url` data-URL | `choices[0].message.content` |
+| `POST {llm}/chat/completions` | `core/net/HttpLlmClient.kt:78` | `{model, messages, temperature 0.2, max_tokens 800\|200}` ; image en `image_url` data-URL | `choices[0].message.content` |
 | `POST {elevenlabs}/text-to-speech/{voiceId}?output_format=mp3_44100_128` | `core/net/ElevenLabsTtsClient.kt:55-62` | `{text, model_id, voice_settings}`, en-tête `xi-api-key` | octets MP3 (un corps texte en 2xx = échec) |
 | `POST {elevenlabs}/speech-to-text` | `core/net/ElevenLabsSttClient.kt:42` | multipart `model_id` + `file` (audio/wav), en-tête `xi-api-key` | texte de transcription |
 | `POST {meta}/asr/transcribe` | `core/net/MetaAsrClient.kt:40` | multipart **2 parts** : `request` (JSON `{"model","audioEncoding":"WAV"}`) + `audio` (audio/wav), en-tête `Authorization: Bearer` | texte de transcription |
@@ -204,7 +204,7 @@ Précisions qui comptent :
 
 **Aucune valeur de clé n'est écrite dans ce dépôt**, ni en clair ni par défaut : `Settings`
 les porte vides, l'app refuse d'appeler et le dit (`ApiError.InvalidKey` — LLM
-`InferHubLlmClient.kt:68`, Meta ASR `MetaAsrClient.kt:33`, ElevenLabs STT
+`HttpLlmClient.kt:68`, Meta ASR `MetaAsrClient.kt:33`, ElevenLabs STT
 `ElevenLabsSttClient.kt:26`, ElevenLabs TTS `ElevenLabsTtsClient.kt:42`).
 
 | Étape | Emplacement | Noms (jamais de valeurs) |
@@ -283,7 +283,7 @@ foi.
 | Carte caméra de la scène | `app/…/isee/IseeVisionCard.kt` (`VisionCard`, `CameraLive`, `CameraGlue`, `rememberCameraGlue`) |
 | Gestes | `app/…/IseeRootLayout.kt` (surface), `core/…/gesture/IseeGestureBrain.kt`, `TapOrHold.kt`, `LongPressTrigger.kt` |
 | Caméra | `app/…/isee/IseeCameraPane.kt` (`IseeCameraHost`, pilote CameraX), `app/…/CameraSurface.kt` (aperçu + masques), `app/…/CameraLens.kt` |
-| Client LLM | `core/…/net/InferHubLlmClient.kt`, prompts `core/…/net/LlmPrompts.kt` |
+| Client LLM | `core/…/net/HttpLlmClient.kt`, prompts `core/…/net/LlmPrompts.kt` |
 | Client SAM | `core/…/net/HttpSamClient.kt` (photo), `core/…/net/WsLiveClient.kt` (direct), `core/…/net/WsTransport.kt` (transport), `core/…/net/LiveClientFactory.kt` (fabrique unique) |
 | Cycle de vie du GPU | `core/…/net/SamLifecycle.kt` (`/release`), `app/…/vm/AppDiagnostics.kt` (`releaseGpu`, `testSam`) |
 | Cadence et régulation | `core/…/live/LiveSession.kt`, `core/…/live/FrameGate.kt`, `core/…/live/PipelineGate.kt`, `core/…/live/LatestFrameSlot.kt` |
