@@ -17,13 +17,13 @@ private const val IMAGE_PREFIX = "data:image/jpeg;base64,"
  * seul** : une image vide expédiée en `data:image/jpeg;base64,` faisait répondre 400 au
  * backend, et la question restait sans réponse (bug « aucune réponse sur la photo »).
  */
-class InferHubLlmClientTest {
+class HttpLlmClientTest {
 
     private fun server() = TestHttpServer {
         TestHttpServer.Response(200, NetContract.chatReply("Devant toi"))
     }
 
-    private fun client(server: TestHttpServer) = InferHubLlmClient(server.baseUrl, TEST_KEY, "modele")
+    private fun client(server: TestHttpServer) = HttpLlmClient(server.baseUrl, TEST_KEY, "modele")
 
     private fun ask(server: TestHttpServer, image: String) {
         runBlocking { client(server).ask(image, "où est la porte ?", emptyList()) }.getOrThrow()

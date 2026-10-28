@@ -217,7 +217,7 @@ class LiveProbeTextTest {
 
     @Test
     fun `les modeles effectifs apparaissent dans le detail`() {
-        val line = "llm : meta-models/muse-spark-open-1026 · live : ali/qwen3.8-omni-flash (clé OK)"
+        val line = "llm : meta-models/muse-spark-open-1026 · live : meta-models/muse-spark-open-1026 (clé OK)"
         assertTrue(liveProbeDetails(LiveProbeState(modelsLine = line)).contains(line))
         assertTrue(liveProbeDetails(LiveProbeState()).none { it.startsWith("llm :") })
     }

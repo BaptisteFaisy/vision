@@ -27,7 +27,7 @@ private const val TEMPERATURE = 0.2
  * Implémentation OkHttp d'un endpoint compatible OpenAI (`POST {baseUrl}/chat/completions`).
  * Aucune clé en dur : [apiKey] vient des réglages. Erreurs typées : 401 / 429 / timeout / réseau.
  */
-class InferHubLlmClient(
+class HttpLlmClient(
     private val baseUrl: String,
     private val apiKey: String,
     private val model: String,

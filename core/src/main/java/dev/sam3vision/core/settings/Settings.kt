@@ -29,11 +29,11 @@ data class Settings(
     val asrApiKey: String = "",
     val asrModel: String = DEFAULT_ASR_MODEL,
     /**
-     * Narration continue du **Direct** : modèle distinct de celui des questions.
-     * Le défaut LLM (`muse-spark-open-1026`) raisonne ~600 tokens avant sa première phrase
-     * alors que la narration est plafonnée à 200 : la frame serait perdue, à chaque frame.
-     * La narration garde donc [DEFAULT_LIVE_LLM_MODEL] et ne part **que** si cette clé est
-     * renseignée — vide = aucune narration, donc aucun appel au modèle des questions.
+     * Narration continue du **Direct** : même modèle Meta que les questions
+     * ([DEFAULT_LIVE_LLM_MODEL]), mais avec sa **propre clé** — la narration ne part
+     * **que** si cette clé est renseignée (vide = Direct muet, aucune narration).
+     * Le raisonnement interne est coupé côté client (`enable_thinking=false`), donc le
+     * budget de 200 tokens va à la phrase, pas aux pensées.
      */
     val liveLlmApiKey: String = "",
     /**
@@ -137,7 +137,7 @@ data class Settings(
          * l'autre, l'endpoint et le modèle restent les mêmes par défaut.
          *
          * Modèle à raisonnement : il remplit `reasoning_content` avant `content`, donc le
-         * budget de sortie compte — voir `InferHubLlmClient.MAX_TOKENS`.
+         * budget de sortie compte — voir `HttpLlmClient.MAX_TOKENS`.
          */
         const val DEFAULT_LLM_BASE_URL = "https://inference.baseten.co/v1"
         const val DEFAULT_LLM_MODEL = "meta-models/muse-spark-open-1026"
@@ -180,14 +180,13 @@ data class Settings(
         const val JADE_US_VOICE_ID = "TOXPlnYC7z5SQSV2Zgc5"
 
         /**
-         * Narration du Direct : modèle rapide, volontairement **différent** du défaut des
-         * questions. **Repli documenté** (démo) : `muse-spark` raisonne ~600 tokens avant sa
-         * première phrase, le budget narration est de 200 — un modèle Meta y perdrait chaque
-         * frame, et aucun modèle Meta rapide+vision n'est servi par nos clés. Seule la clé
-         * est réglable (Réglages / build) ; base et modèle sont figés ici.
+         * Narration du Direct : **même endpoint et même modèle Meta** que les questions
+         * (Baseten, `muse-spark-open-1026`) — tout le LLM de l'app parle à un seul
+         * fournisseur. Seule la clé diffère (`liveLlmApiKey`, Réglages / build) : sans
+         * elle, le Direct se tait. Base et modèle sont figés ici.
          */
-        const val DEFAULT_LIVE_LLM_BASE_URL = "https://api.inferhub.dev/v1"
-        const val DEFAULT_LIVE_LLM_MODEL = "ali/qwen3.8-omni-flash"
+        const val DEFAULT_LIVE_LLM_BASE_URL = "https://inference.baseten.co/v1"
+        const val DEFAULT_LIVE_LLM_MODEL = "meta-models/muse-spark-open-1026"
 
         /** API Meta (non compatible OpenAI) : la route est `{base}/asr/transcribe`. */
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
