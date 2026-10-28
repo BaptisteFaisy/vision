@@ -8,18 +8,18 @@ plus l'arbre — bandeau ajouté).
 
 | Document | Verdict | Ce qui a été vérifié / corrigé ici |
 |---|---|---|
-| `README.md` | **réécrit** (28/10) | Problème, solution, 4 blocs, stack complète ; chiffres remesurés (730 `.kt`, 43 219 lignes de prod, 2 180 `@Test` JVM + 10 instrumentés) ; backend dans `server/`, gestes sans double tap |
+| `README.md` | **réécrit** (28/10) | Problème, solution, 4 blocs, stack complète ; chiffres remesurés (733 `.kt`, 43 457 lignes de prod, 2 202 `@Test` JVM + 10 instrumentés) ; backend dans `server/`, gestes sans double tap |
 | `docs/ARCHITECTURE.md` | **recompté** (28/10, §1 + §8) | Comptes §1 refaits, §8 réécrit (backend dans `server/`, `LIVE-SPEC` existe, tracker et `/video` câblés) ; §2-7 : valeurs vraies, lignes non recalées |
-| `docs/PERF.md` | **recompté** (28/10) | §1.1 refait (730 / 76 370 / 2 180 / 10), §2 ancres recalées (dont `work_edge` 512), §4 réécrit (mesures backend dans `server/docs/`) |
+| `docs/PERF.md` | **recompté** (28/10) | §1.1 refait (733 / 76 990 / 2 202 / 10), §2 ancres recalées (dont `work_edge` 512), §4 réécrit (mesures backend dans `server/docs/`) |
 | `docs/DOC-ETAT.md` | **nouveau** (26/10) | Ce tableau |
-| `docs/TESTING.md` | **recompté** (28/10) | §1 (1 403 + 777 = 2 180, 9 + 1 instrumentés), §2 (117 assertions, 58 tests, 8 workflows), §5 (4 fichiers), §6 régénéré par paquet |
+| `docs/TESTING.md` | **recompté** (28/10) | §1 (1 418 + 784 = 2 202, 9 + 1 instrumentés), §2 (117 assertions, 58 tests, 8 workflows), §5 (4 fichiers), §6 régénéré par paquet |
 | `docs/MASQUES-DEBUG.md` | **inexacte → corrigée** | Cadence iSee : « 2 requêtes en vol, budget 200 ms » alors que `Cadence.Fast` est à **1 créneau / 150 ms** ; « cadre 448 px » alors que `ISEE_FRAME_EDGE = 320` |
 | `docs/CI-QUEUE.md` | **périmée → recorrigée** (28/10, découpe v9) | **Un** job dans `ci.yml` (`ci`) + natif (`apk`, `apk-release`, `lint`) dans `ci-native.yml` hors PR, runners **auto-hébergés** `[self-hosted, linux, x64, vision]` ; `couche0` (scope + forbidden, juge pris sur `master`), `stale-base-guard` informatif, budget 5 min par job, `master` protégé (PR obligatoire, 3 checks requis, file de merge native) |
 | `docs/NETTOYAGE.md` | **à jour** | 12 fichiers, 599 lignes, purge horaire (`PERIOD_HOURS = 1`), Room + WorkManager — vérifié à l'identique le 26/10 |
 | `docs/DISTANCES.md` | **à jour**, une correction | Formule et constantes justes (lissage 0,35 / 0,85 ; `KnownSizes` ; `LensSpec` 67° borné 15–130°). Concepts par défaut du direct : **6** depuis le 28/10 (le doc reste générique, sans chiffre en dur) |
 | `docs/ELEVENLABS-TTS.md` | **à jour** | En-tête `xi-api-key`, base `https://api.elevenlabs.io/v1`, modèle `eleven_v4_turbo`, voix premade vs bibliothèque (402) |
 | `docs/META-ASR.md` | **à jour** | Chemin `{base}/asr/transcribe`, `Authorization: Bearer`, modèle `muse-voice-transcribe-1.0` |
-| `docs/MODE-TAP.md` | **recalé** (28/10) | Chemin Réglages (« Other screens » → « Classic home », `SettingsScreen.kt:400-409`), `Route.Tap` (`AppNav.kt:37,68`), cites `/video` recalées (`:69-72`, `:77`, `:89-95`, `Http.kt:248-251`, `TapSession.kt:176-191`) |
+| `docs/MODE-TAP.md` | **recalé** (28/10) | Chemin Réglages (« Other screens » → « Classic home », `SettingsScreen.kt:407-416`), `Route.Tap` (`AppNav.kt:37,68`), cites `/video` recalées (`:69-72`, `:77`, `:89-95`, `Http.kt:248-251`, `TapSession.kt:176-191`) |
 | `docs/MODE-US.md` | **à jour**, chiffres à lire comme historique | Le choix de région n'allume rien et n'élit que l'URL (`SamRegion.kt`, `SamEndpoint.kt`). Les durées eu/us (472–503 ms / 1107–1115 ms) sont des relevés du 26/10 **hors de ce dépôt**, antérieurs au WebSocket |
 | `docs/META-GLASSES.md` | **à jour** | Placeholders `mwdat_*` injectés par Gradle (pas des « 0 » en dur), minSdk 29, SDK en developer preview |
 | `docs/glasses-dat-spike.md` | **à jour** (relevé d'API, daté) | Reste vrai comme relevé d'API, mais **le module n'existe plus** : `settings.gradle.kts` n'inclut que `:core` et `:app`, et le dossier de l'ancien module a disparu du disque. Le doc dit lui-même qu'il ne décrit pas `:app` |

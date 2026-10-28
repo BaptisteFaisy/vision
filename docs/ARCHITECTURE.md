@@ -11,8 +11,8 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **166** fichiers | 193 fichiers / **1 403** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **240** fichiers | 122 fichiers / **777** `@Test` | 4 fichiers / **10** tests |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **167** fichiers | 194 fichiers / **1 418** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **240** fichiers | 123 fichiers / **784** `@Test` | 4 fichiers / **10** tests |
 | `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
@@ -24,15 +24,15 @@ dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus a
 `glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 166
-find core/src/test -name '*.kt' | wc -l            # 193
+find core/src/main -name '*.kt' | wc -l            # 167
+find core/src/test -name '*.kt' | wc -l            # 194
 find app/src/main -name '*.kt' | wc -l             # 240
-find app/src/test -name '*.kt' | wc -l             # 122
+find app/src/test -name '*.kt' | wc -l             # 123
 find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 15
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 730
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 76 370
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 733
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 76 990
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un

@@ -48,11 +48,11 @@ les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **730** |
-| Lignes de prod (`*/src/main`) | **43 219** — `:core` 166 f./16 516 l. · `:app` 240 f./26 703 l. (dont banc 15 f./1 640 l.) |
-| `@Test` | **2 190** = **2 180 JVM** + **10 instrumentés** |
-| dont `core/src/test` | **1 403** |
-| dont `app/src/test` | **777** (dont banc **95**) |
+| Fichiers `.kt` | **733** |
+| Lignes de prod (`*/src/main`) | **43 457** — `:core` 167 f./16 654 l. · `:app` 240 f./26 803 l. (dont banc 15 f./1 640 l.) |
+| `@Test` | **2 212** = **2 202 JVM** + **10 instrumentés** |
+| dont `core/src/test` | **1 418** |
+| dont `app/src/test` | **784** (dont banc **95**) |
 | dont `app/src/androidTest` (nettoyage, profondeur, média) | **9** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
@@ -82,8 +82,8 @@ lancé sur cette machine pour ce comptage.
   sur des en-têtes PNG synthétiques et des `IntArray` (`core/mask/MaskCore.kt`), les wrappers
   `Bitmap` (`core/mask/Masks.kt`) restent fins et ne sont pas testables en JVM.
 - **Segmentation non bloquante** : `AnalyzeUseCase` borne SAM à 10 s puis décrit quand même
-  l'image (`withTimeoutOrNull(samBudgetMs) { it.segment(..) }`, `core/usecase/UseCases.kt:31`,
-  `SAM_BUDGET_MS`, `:26`).
+  l'image (`withTimeoutOrNull(samBudgetMs) { it.segment(..) }`, `core/usecase/UseCases.kt:40`,
+  `SAM_BUDGET_MS`, `:34`).
 - **Réglages chiffrés, avec repli silencieux** : `security-crypto` en priorité, sinon
   `PrivateFileSettingsStore` (fichier privé chiffré, clé Keystore non exportable) —
   `core/settings/SettingsStoreFactory.kt:13-17`. `EncryptedSharedPreferences` est marqué
