@@ -5,6 +5,8 @@ import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 
 /**
  * Client de test sans transport : chaque `live` consigne son envoi — avec le nombre de
@@ -55,4 +57,25 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
     override fun close() {
         closed += 1
     }
+}
+
+/** Endpoint factice partagé par les tests de la sonde. */
+internal const val PROBE_TEST_ENDPOINT = "https://sam.test"
+
+/**
+ * Sonde branchée sur le faux client partagé, sans réseau ni GPU : configurée et
+ * commencée, prête à recevoir des frames. Factorisé ici pour ne pas dupliquer le
+ * montage dans chaque test de la sonde.
+ */
+internal fun probeHarness(scope: TestScope): Pair<LiveProbe, ProbeTestClient> {
+    val fake = ProbeTestClient(mutableListOf())
+    val probe = LiveProbe(
+        scope = scope,
+        clock = { 0L },
+        background = StandardTestDispatcher(scope.testScheduler),
+        clientFor = { _, _, _ -> fake },
+    )
+    probe.configure(PROBE_TEST_ENDPOINT)
+    probe.begin()
+    return probe to fake
 }
