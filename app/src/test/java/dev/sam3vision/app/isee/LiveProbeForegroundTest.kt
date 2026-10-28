@@ -1,8 +1,6 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.model.LiveFrame
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -19,7 +17,7 @@ class LiveProbeForegroundTest {
 
     @Test
     fun `en arriere-plan aucune frame ne part`() = runTest {
-        val (probe, fake) = harness(this)
+        val (probe, fake) = probeHarness(this)
         probe.onBackground()
 
         assertFalse(probe.wantsFrame())
@@ -31,7 +29,7 @@ class LiveProbeForegroundTest {
 
     @Test
     fun `au retour au premier plan les frames repartent`() = runTest {
-        val (probe, fake) = harness(this)
+        val (probe, fake) = probeHarness(this)
         probe.onBackground()
         probe.onForeground()
 
@@ -45,21 +43,4 @@ class LiveProbeForegroundTest {
         assertEquals(1, probe.state.value.frames)
     }
 
-    /** Sonde branchée sur le faux client partagé, sans réseau ni GPU. */
-    private fun harness(scope: TestScope): Pair<LiveProbe, ProbeTestClient> {
-        val fake = ProbeTestClient(mutableListOf())
-        val probe = LiveProbe(
-            scope = scope,
-            clock = { 0L },
-            background = StandardTestDispatcher(scope.testScheduler),
-            clientFor = { _, _, _ -> fake },
-        )
-        probe.configure(ENDPOINT)
-        probe.begin()
-        return probe to fake
-    }
-
-    private companion object {
-        const val ENDPOINT = "https://sam.test"
-    }
 }
