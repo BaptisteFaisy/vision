@@ -1,10 +1,8 @@
 package dev.sam3vision.app.tap
 
-import android.content.Context
 import android.os.SystemClock
 import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.MicBus
-import dev.sam3vision.app.cleanup.CapturePaths
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -22,7 +20,7 @@ sealed interface TapStatus {
 }
 
 /**
- * Chef d'orchestre du mode tap : tap court → [TapVideoSession] démarre → annonce
+ * Chef d'orchestre du mode tap : tap court → [TapVideoRecorder] démarre → annonce
  * « Launched » ; second tap → arrêt, envoi à SAM 3.1, annonce « Sent » (ou « Failed »).
  *
  * Aucun autre son n'est produit ici : [AnnouncementPlayer] ne connaît que les trois mots,
@@ -33,18 +31,19 @@ sealed interface TapStatus {
  * câblage (fichier, caméra, réseau) — d'où des fonctions courtes et testables.
  */
 class TapSession(
-    private val context: Context,
     private val scope: CoroutineScope,
-    private val video: TapVideoSession,
+    private val video: TapVideoRecorder,
     private val announcements: AnnouncementPlayer,
     private val sender: suspend (File) -> Result<String>,
     private val onStatus: (TapStatus) -> Unit,
+    /** Fichier de la prise, fourni par l'écran (jamais de `Context` ici : testable sur JVM). */
+    private val newVideoFile: () -> File,
+    /** Permissions déjà vérifiées par l'écran ; injectées pour les tests JVM. */
+    private val permissionsGranted: () -> Boolean,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
     private val owner: () -> LifecycleOwner? = { null },
     /** Raison de blocage d'envoi (`null` = envoi possible). Testé avec un lambda fixe. */
     private val sendBlocked: () -> String? = TapConfig::sendBlockedReason,
-    /** Permissions déjà vérifiées par l'écran ; injectable pour les tests JVM. */
-    private val permissionsGranted: () -> Boolean = { tapPermissionsGranted(context) },
 ) {
     private var phase: TapPhase = TapPhase.IDLE
     private var startedAt: Long = 0L
@@ -131,7 +130,7 @@ class TapSession(
             fail("micro occupé par la dictée", Announcement.FAILED)
             return
         }
-        val file = CapturePaths.newVideoFile(context)
+        val file = newVideoFile()
         val started = video.start(file, withAudio = needsMic)
         if (started.isFailure) {
             if (needsMic) MicBus.release(MicBus.Owner.TAP_VIDEO)

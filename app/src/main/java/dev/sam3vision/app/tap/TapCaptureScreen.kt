@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.systemBars
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.BigButton
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.cleanup.CapturePaths
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.net.HttpSam31VideoClient
 import dev.sam3vision.core.net.HttpSamClient
@@ -83,13 +84,14 @@ private fun rememberTapSession(
     val context = LocalContext.current
     val session = remember(dependencies) {
         TapSession(
-            context = context,
             scope = dependencies.scope,
             video = dependencies.video,
             announcements = dependencies.announcements,
             // `POST /video` d'abord, repli photo vers `/segment` sur 404 de route manquante.
             sender = senderWithFallback(dependencies.videoClient, dependencies.segmentClient),
             onStatus = onStatus,
+            newVideoFile = { CapturePaths.newVideoFile(context) },
+            permissionsGranted = { tapPermissionsGranted(context) },
             owner = { context.findLifecycleOwner() },
         )
     }

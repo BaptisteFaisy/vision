@@ -30,7 +30,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * l'enregistrement continue en vidéo muette — sinon l'utilisateur qui refuse le micro
  * perdait toute la capture (`SecurityException` au démarrage, `lintDebug` : MissingPermission).
  */
-class TapVideoSession(private val context: Context) {
+class TapVideoSession(private val context: Context) : TapVideoRecorder {
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -38,10 +38,10 @@ class TapVideoSession(private val context: Context) {
     private var finalizing: CompletableDeferred<File>? = null
 
     /** Vrai quand la caméra vidéo est liée et prête à démarrer. */
-    val ready: Boolean get() = videoCapture != null
+    override val ready: Boolean get() = videoCapture != null
 
     /** Lie `VideoCapture` au cycle de vie de l'écran. Sans aperçu : la capture seule suffit. */
-    suspend fun bind(owner: LifecycleOwner?): Result<Unit> {
+    override suspend fun bind(owner: LifecycleOwner?): Result<Unit> {
         if (owner == null) return Result.failure(IllegalStateException("cycle de vie indisponible"))
         val provider = runCatching {
             withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
@@ -60,7 +60,7 @@ class TapVideoSession(private val context: Context) {
      * Démarre l'enregistrement vers [file] ; [withAudio] ajoute la piste micro **seulement si
      * l'autorisation `RECORD_AUDIO` est accordée** (sinon la capture est muette, jamais perdue).
      */
-    fun start(file: File, withAudio: Boolean = TapConfig.VIDEO_WITH_AUDIO): Result<Unit> {
+    override fun start(file: File, withAudio: Boolean): Result<Unit> {
         val capture = videoCapture ?: return Result.failure(IllegalStateException("caméra non liée"))
         if (recording != null) return Result.failure(IllegalStateException("enregistrement déjà en cours"))
         return runCatching {
@@ -96,7 +96,7 @@ class TapVideoSession(private val context: Context) {
     }
 
     /** Stoppe l'enregistrement ; la finalisation du fichier est attendue par [stopAndAwait]. */
-    fun stop() {
+    override fun stop() {
         recording?.let { runCatching { it.stop() } }
         recording = null
     }
@@ -106,7 +106,7 @@ class TapVideoSession(private val context: Context) {
      * 0 octet au moment où l'on vérifie — la vidéo était déclarée « à envoyer » puis jetée.
      * Renvoie le fichier dès qu'il est non vide, ou `null` après [timeoutMs].
      */
-    suspend fun stopAndAwait(file: File, timeoutMs: Long = FINALIZE_TIMEOUT_MS): File? {
+    override suspend fun stopAndAwait(file: File, timeoutMs: Long): File? {
         val done = finalizing
         stop()
         withTimeoutOrNull(timeoutMs) { done?.await() }
@@ -116,7 +116,7 @@ class TapVideoSession(private val context: Context) {
     /** Vrai si un enregistrement est actif à cet instant. */
     val isRecording: Boolean get() = recording != null
 
-    fun release() {
+    override fun release() {
         stop()
         executor.shutdown()
     }
@@ -129,6 +129,3 @@ class TapVideoSession(private val context: Context) {
     /** Branché par l'écran : erreur de finalisation détectée hors du fil UI. */
     var onVideoError: ((String) -> Unit)? = null
 }
-
-/** Délai d'attente de l'événement `Finalize` de CameraX avant de considérer la vidéo perdue. */
-private const val FINALIZE_TIMEOUT_MS = 4_000L
