@@ -169,7 +169,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            val seeded = seededFromBuild(store.load())
+            val seeded = loadedSettings(store)
             gpuMonitor.track(seeded.samEndpoint())
             _state.update { it.copy(settings = seeded, settingsReady = true) }
         }

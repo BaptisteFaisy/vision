@@ -97,9 +97,10 @@ data class Settings(
      */
     val caregiverRole: CaregiverRole = CaregiverRole.Blind,
     /**
-     * Lien du site de suivi parent envoyé par le bouton « Partager le suivi »
-     * du Direct (message WhatsApp). Lien générique : pas de cloisonnement par
-     * proche, à affiner avec des tokens côté backend si besoin.
+     * Base du relais de suivi (Worker `suivi-relais/`) : c'est l'origine de la page
+     * caregiver embarquée dans l'APK et de ses appels `/api/state`. Une base par
+     * flux est construite à partir de [shareId] ; vider le champ retombe sur le
+     * relais par défaut.
      */
     val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
     /** Clé du fond de carte Google, préremplie par le build ; modifiable dans Réglages. */
@@ -207,8 +208,20 @@ data class Settings(
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
         const val DEFAULT_ASR_MODEL = "muse-voice-transcribe-1.0"
 
-        /** Site de suivi parent ouvert par le bouton « Partager le suivi » du Direct. */
-        const val DEFAULT_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
+        /**
+         * Relais de suivi de l'app (`suivi-relais/`, Worker + D1) : un état par
+         * identifiant de flux. C'est lui qui reçoit la position et que lit la page
+         * caregiver — plus aucun site web à maintenir.
+         */
+        const val DEFAULT_PARENT_SITE_URL =
+            "https://site-1607fe95049a481989380f019f9067f3.freebuff.page/"
+
+        /**
+         * Ancien relais du site Vercel, abandonné (déploiement figé, écritures
+         * refusées). Reconnu à la lecture pour que les installations d'avant la
+         * bascule repointent sur [DEFAULT_PARENT_SITE_URL] sans rien saisir.
+         */
+        const val LEGACY_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
 
         /** Identifiant de partage par défaut (lien générique, un seul proche suivi). */
         const val DEFAULT_SHARE_ID = "leo"

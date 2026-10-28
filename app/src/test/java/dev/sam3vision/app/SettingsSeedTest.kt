@@ -1,8 +1,11 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.settings.MemorySettingsStore
 import dev.sam3vision.core.settings.SamRegion
 import dev.sam3vision.core.settings.Settings
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -145,5 +148,69 @@ class SettingsSeedTest {
 
         assertEquals(Settings.DEFAULT_LLM_MODEL, seed.llmModel)
         assertEquals("https://api.inferhub.dev/v1", seed.llmBaseUrl)
+    }
+
+    @Test
+    fun `l ancien site de suivi cede la place au relais de l app`() {
+        val seed = seedShareRelay(Settings.Default.copy(parentSiteUrl = "https://suivi-parent.vercel.app/?share=ancien"))
+
+        assertEquals(Settings.DEFAULT_PARENT_SITE_URL, seed.parentSiteUrl)
+    }
+
+    @Test
+    fun `la cle d ecriture nait avec l installation, sans etre demandee`() {
+        val seed = seedShareRelay(Settings.Default.copy(shareWriteKey = ""), newKey = { "cle-generee" })
+
+        assertEquals("cle-generee", seed.shareWriteKey)
+    }
+
+    @Test
+    fun `chaque installation recoit son propre identifiant de flux`() {
+        val premier = seedShareRelay(Settings.Default, newKey = { "cle-1" }, newId = { "flux-a1b2c3d4e5f6" })
+        val second = seedShareRelay(Settings.Default, newKey = { "cle-2" }, newId = { "flux-9876543210ab" })
+
+        assertEquals("flux-a1b2c3d4e5f6", premier.shareId)
+        assertEquals("flux-9876543210ab", second.shareId)
+        assertNotEquals(premier.shareId, second.shareId)
+    }
+
+    @Test
+    fun `un identifiant choisi a la main n est jamais remplace`() {
+        val choisi = Settings.Default.copy(shareId = "maman")
+
+        val seed = seedShareRelay(choisi, newKey = { "cle" }, newId = { "flux-genere" })
+
+        assertEquals("maman", seed.shareId)
+    }
+
+    @Test
+    fun `une base ou une cle choisie a la main n est jamais ecrasee`() {
+        val choisi = Settings.Default.copy(parentSiteUrl = "https://relais.exemple/", shareWriteKey = "la-mienne")
+
+        val seed = seedShareRelay(choisi, newKey = { "autre" })
+
+        assertEquals("https://relais.exemple/", seed.parentSiteUrl)
+        assertEquals("la-mienne", seed.shareWriteKey)
+    }
+
+    @Test
+    fun `un relais migre ne fabrique pas une nouvelle cle a chaque demarrage`() {
+        val premiere = seedShareRelay(Settings.Default.copy(shareWriteKey = ""), newKey = { "clé-1" })
+        val seconde = seedShareRelay(premiere, newKey = { "clé-2" })
+
+        assertEquals("clé-1", seconde.shareWriteKey)
+    }
+
+    @Test
+    fun `l identite de partage est scellee une fois pour toutes dans le store`() = runTest {
+        val store = MemorySettingsStore(Settings.Default)
+
+        val premiere = loadedSettings(store)
+        val seconde = loadedSettings(store)
+
+        assertEquals(premiere.shareId, seconde.shareId)
+        assertEquals(premiere.shareWriteKey, seconde.shareWriteKey)
+        assertEquals(premiere.shareId, store.load().shareId)
+        assertNotEquals(Settings.DEFAULT_SHARE_ID, premiere.shareId)
     }
 }
