@@ -7,6 +7,7 @@ import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.TtsClient
 import java.io.File
 import java.nio.file.Files
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -21,6 +22,7 @@ import org.junit.Test
  * zéro `Context` : l'enregistreur est un faux, le TTS est un faux (aucun clip, mot tu),
  * l'expéditeur rejoue une issue fixée et l'horloge est pilotée à la main.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class TapSessionTest {
 
     private val tmp: File = Files.createTempDirectory("tap-session-test").toFile()
