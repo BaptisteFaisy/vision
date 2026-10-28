@@ -1,3 +1,23 @@
+## Hackathon notice — read this first
+
+> **Built during the Meta hackathon.** Everything in this repository — the Android app,
+> the GPU backend, and the companion page — was designed and built during the Meta
+> hackathon, **except** the open-source projects below, which are reused as-is
+> (models, libraries, and services):
+>
+> - **SAM 3.1** (`facebook/sam3.1`, via the `unsloth/sam3.1` mirror) — segmentation
+>   model, loaded with Hugging Face `transformers`
+> - **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small`, Apache-2.0) —
+>   on-device depth model, via `onnx-community/depth-anything-v2-small`
+> - **MiDaS v2.1 small** (`isl-org/MiDaS`, MIT) — fallback depth model
+> - **Valhalla** — open-source routing engine (CPU backend)
+> - Standard open-source libraries: AndroidX (Compose, CameraX, Room, WorkManager),
+>   OkHttp, ONNX Runtime, TensorFlow Lite, PyTorch, FastAPI
+> - **Meta Wearable Device Access SDK** — camera and microphone access on Ray-Ban Meta
+>   glasses
+>
+> Full model attributions and licences: `app/src/main/assets/NOTICE-depth.txt`.
+
 # iSee — les yeux qui parlent
 
 iSee est une application Android qui aide une **personne aveugle ou malvoyante** à
