@@ -35,14 +35,16 @@ class MetaAsrClient(
         if (wav.size <= WAV_HEADER_BYTES) {
             return Result.failure(ApiError.BadResponse("audio vide"))
         }
-        val request = requestTo(
-            baseUrl,
-            TRANSCRIBE_PATH,
-            "POST",
-            multipart(wav),
-            headers = mapOf("Authorization" to "Bearer $apiKey"),
-        )
-        return http.execute(request)
+        // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
+        return http.executeBuilt {
+            requestTo(
+                baseUrl,
+                TRANSCRIBE_PATH,
+                "POST",
+                multipart(wav),
+                headers = mapOf("Authorization" to "Bearer $apiKey"),
+            )
+        }
             .then { it.requireSuccess() }
             .then { body -> catchingResult { parseTranscript(body) } }
     }
