@@ -6,7 +6,7 @@ import dev.sam3vision.app.glasses.JpegFrame
 import dev.sam3vision.app.glasses.logCause
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.net.HttpSamClient
-import dev.sam3vision.core.net.InferHubLlmClient
+import dev.sam3vision.core.net.HttpLlmClient
 import dev.sam3vision.core.usecase.AnalyzeUseCase
 import java.io.InputStream
 import java.net.ConnectException
@@ -166,7 +166,7 @@ class ChaineCompleteTest {
     /** Le vrai pipeline de `:core` branché sur [backend], la voix capturée dans [dits]. */
     private fun step(backend: FauxBackend, dits: MutableList<String>): GlassesAnalysisStep {
         val analyser = AnalyzeUseCase(
-            InferHubLlmClient(backend.baseUrl, API_KEY_DE_TEST, "modele-de-test"),
+            HttpLlmClient(backend.baseUrl, API_KEY_DE_TEST, "modele-de-test"),
             HttpSamClient(backend.baseUrl),
         )
         return GlassesAnalysisStep(analyze = { analyser.invoke(it) }, say = { dits += it; null })

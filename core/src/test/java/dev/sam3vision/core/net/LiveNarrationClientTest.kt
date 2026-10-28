@@ -12,7 +12,7 @@ import org.junit.Test
 class LiveNarrationClientTest {
 
     private fun client(server: TestHttpServer, language: SpeechLanguage = SpeechLanguage.Fr) =
-        InferHubLlmClient(server.baseUrl, "cle", "modele-omni", language)
+        HttpLlmClient(server.baseUrl, "cle", "modele-omni", language)
 
     @Test
     fun `describeFrame envoie la frame et la description precedente`() {
@@ -72,7 +72,7 @@ class LiveNarrationClientTest {
     fun `describeFrame sans cle echoue sans appel reseau`() {
         val server = TestHttpServer { TestHttpServer.Response(200, NetContract.chatReply("jamais lu")) }
         try {
-            val noKey = InferHubLlmClient(server.baseUrl, "", "modele")
+            val noKey = HttpLlmClient(server.baseUrl, "", "modele")
             val failure = runBlocking { noKey.describeFrame("QUJD", emptyList(), "") }.exceptionOrNull()
             assertTrue(failure is ApiError.InvalidKey)
             assertTrue(server.requests.isEmpty())

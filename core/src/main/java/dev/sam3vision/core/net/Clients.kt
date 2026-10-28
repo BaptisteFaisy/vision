@@ -9,7 +9,7 @@ import dev.sam3vision.core.model.TrackFrame
 import dev.sam3vision.core.model.TrackHealth
 import dev.sam3vision.core.model.TrackSessionStart
 
-/** Client LLM vision (InferHub, API compatible OpenAI). */
+/** Client LLM vision (HTTP, API compatible OpenAI). */
 interface LlmClient {
     suspend fun describe(jpegB64: String, labels: List<String>): Result<Analysis>
 

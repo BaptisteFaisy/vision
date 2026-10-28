@@ -46,9 +46,8 @@ internal fun seedGoogleMaps(loaded: Settings, build: BuildDefaults): Settings =
     else loaded.copy(googleMapsApiKey = build.googleMapsApiKey)
 
 /**
- * Clé de **narration du Direct** (modèle rapide, distinct de celui des questions) : elle
- * ne sert qu'à la narration. Sans elle, le Direct se tait mais n'appelle jamais le modèle
- * des questions frame par frame — c'est le sens du réglage.
+ * Clé de **narration du Direct** (même modèle Meta que les questions, clé dédiée) : elle
+ * ne sert qu'à la narration. Sans elle, le Direct se tait — c'est le sens du réglage.
  */
 internal fun seedLiveLlm(loaded: Settings, build: BuildDefaults): Settings {
     if (loaded.liveLlmApiKey.isNotBlank() || build.liveLlmApiKey.isBlank()) return loaded

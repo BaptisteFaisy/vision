@@ -3,9 +3,8 @@ package dev.sam3vision.app
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Épinglage démo des modèles : le défaut des questions est Meta
- * ([Settings.DEFAULT_LLM_MODEL]), la narration du Direct garde son modèle rapide figé
- * ([Settings.DEFAULT_LIVE_LLM_MODEL], repli documenté dans `Settings`).
+ * Épinglage démo des modèles : questions ([Settings.DEFAULT_LLM_MODEL]) et narration du
+ * Direct ([Settings.DEFAULT_LIVE_LLM_MODEL]) sont Meta (Baseten) — un seul fournisseur.
  *
  * Fonctions pures (aucun Android) : la garde anti-override (`seeded`), l'indicateur des
  * Réglages et la ligne du panneau debug partagent cette seule implémentation.
