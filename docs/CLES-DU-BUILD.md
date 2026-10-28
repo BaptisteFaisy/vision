@@ -34,13 +34,12 @@ la garde. Pour repartir du build, vider le champ et enregistrer.
 | Rôle | Base | Modèle |
 | --- | --- | --- |
 | Questions / description | `https://inference.baseten.co/v1` | `meta-models/muse-spark-open-1026` (Meta) |
-| Narration du Direct | `https://api.inferhub.dev/v1` | `ali/qwen3.8-omni-flash` (**repli documenté**) |
+| Narration du Direct | `https://inference.baseten.co/v1` | `meta-models/muse-spark-open-1026` (Meta) |
 
-Le Direct garde qwen parce que `muse-spark` raisonne ~600 tokens avant sa première
-phrase alors que la narration est plafonnée à 200 : un modèle Meta y perdrait chaque
-frame, et aucun modèle Meta rapide+vision n'est servi par nos clés (Baseten : seul
-muse-spark ; InferHub : qwen). Seule la clé de narration est injectable
-(`llm.live.api.key`) ; base et modèle du Direct sont figés dans `Settings`.
+Questions et narration parlent au même fournisseur (Baseten) et au même modèle Meta :
+le raisonnement interne est coupé côté client (`enable_thinking=false`), donc le budget
+de 200 tokens de la narration va à la phrase. Seule la clé de narration est injectable
+(`llm.live.api.key`, une clé Baseten) ; base et modèle du Direct sont figés dans `Settings`.
 
 Gardes : un `llm.model` de build différent de l'épinglé affiche un avertissement
 visible dans Réglages (« Modèles effectifs ») au lieu de s'appliquer en silence ;
