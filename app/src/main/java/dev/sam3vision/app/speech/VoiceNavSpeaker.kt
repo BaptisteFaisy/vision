@@ -10,9 +10,14 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * Hooks appelés par le moteur de navigation : [onTurn], [onLiteral],
  * [onArrival], [onOffRoute], [onRerouted], [onBackOnRoute] — plus
- * [onStarted]/[onStopped] pour la session.
+ * [onStarted]/[onStopped] pour la session et [onHazard] pour le danger
+ * obstacle (sonde SAM, déjà débouncé en amont : parlé tel quel, en coupant).
  * Chaque hook renvoie la phrase dite, ou `null` si la politique a gardé le
  * silence (répétition, délai) ou si le moteur est fermé.
+ *
+ * Une seule voix : [SpeechArbitration] décide coupe ou file (danger >
+ * consigne > info) — le canal route et le canal obstacle partagent ce
+ * moteur, aucune phrase ne parle sur une autre.
  *
  * Comme [NavigationAnnouncer], les réglages ([settings], langue et débit) sont
  * lus à chaque annonce et rien ne lève jamais : un collaborateur qui jette
@@ -64,6 +69,16 @@ class VoiceNavSpeaker(
     /** Phrase littérale du moteur (demi-tour, giratoire, destination). */
     fun onLiteral(phrase: String): String? = announce(VoiceNavEvent.Literal(phrase))
 
+    /**
+     * Danger obstacle (« Personne à 2 mètres à midi, va à gauche ») : coupe
+     * la phrase en cours, même une consigne. Blanc = silence, comme [onStarted].
+     */
+    fun onHazard(phrase: String): String? {
+        val clean = phrase.trim()
+        if (clean.isEmpty()) return null
+        return runCatching { utter(clean, flush = true) }.getOrNull()
+    }
+
     /** Coupe la parole en cours (écran quitté, app en arrière-plan). */
     fun stop() = engine.stop()
 
@@ -78,15 +93,20 @@ class VoiceNavSpeaker(
         try {
             val language = settings().speechLanguage
             val phrase = announcer.onEvent(clock(), event, language) ?: return null
-            val rate = settings().ttsSpeed
-            val locale = SystemTtsEngine.localeOf(language)
-            val urgent = VoiceNavPolicy.isUrgent(event)
-            val spoken = engine.speak(phrase, urgent, locale, rate)
-            // Marquée dite même si le moteur a refusé (fermé) : la session est
-            // finie, le silence qui suit est voulu — cas documenté, pas une perte.
-            return phrase.takeIf { spoken }
+            val danger = SpeechArbitration.priorityOf(event) == SpeechPriority.Danger
+            return utter(phrase, danger)
         } catch (_: Exception) {
             return null
         }
+    }
+
+    /** Parole effective : langue et débit des réglages, puis moteur (l'appelant tait les pannes). */
+    private fun utter(phrase: String, flush: Boolean): String? {
+        val locale = SystemTtsEngine.localeOf(settings().speechLanguage)
+        val rate = settings().ttsSpeed
+        val spoken = engine.speak(phrase, flush, locale, rate)
+        // Marquée dite même si le moteur a refusé (fermé) : la session est
+        // finie, le silence qui suit est voulu — cas documenté, pas une perte.
+        return phrase.takeIf { spoken }
     }
 }
