@@ -12,9 +12,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Le concept escalier est reconnu (FR/EN) et disponible pour le 6e slot,
- * sans rien changer aux défauts ; sa distance vient de la profondeur, pas
- * du sténopé (aucune hauteur d'escalier n'est défendable).
+ * Le concept escalier est reconnu (FR/EN) et câblé dans les défauts du
+ * direct ; sa distance vient de la profondeur, pas du sténopé (aucune
+ * hauteur d'escalier n'est défendable).
  */
 class StairConceptsTest {
 
@@ -52,14 +52,17 @@ class StairConceptsTest {
     }
 
     @Test
-    fun `defauts existants inchanges person door et vehicules`() {
+    fun `defauts dangers exterieur dont stairs, plafond seize`() {
         assertEquals(
-            listOf("person", "door", "bicycle", "car", "truck", "electric scooter"),
+            listOf(
+                "person", "car", "bicycle", "electric scooter", "pole",
+                "sidewalk", "crosswalk", "wall", "window", "stairs",
+            ),
             LivePrompts.default,
         )
-        assertEquals(6, LivePrompts.MAX)
+        assertEquals(16, LivePrompts.MAX)
         assertEquals(listOf("car", "bus", "truck", "motorcycle", "bicycle"), VehicleConcepts.PROMPTS)
-        assertFalse("stairs" in LivePrompts.default)
+        assertTrue("stairs" in LivePrompts.default)
     }
 
     @Test

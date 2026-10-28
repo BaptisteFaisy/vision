@@ -13,10 +13,13 @@ class LivePromptsNavigationTest {
     @Test
     fun `la navigation n'ajoute aucun concept suivi`() {
         assertEquals(
-            listOf("person", "door", "bicycle", "car", "truck", "electric scooter"),
+            listOf(
+                "person", "car", "bicycle", "electric scooter", "pole",
+                "sidewalk", "crosswalk", "wall", "window", "stairs",
+            ),
             LivePrompts.default,
         )
-        assertEquals(6, LivePrompts.MAX)
+        assertEquals(16, LivePrompts.MAX)
     }
 
     @Test
