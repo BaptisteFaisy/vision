@@ -35,7 +35,7 @@ class LiteRtTwinLiteSegmenter private constructor(
         withContext(Dispatchers.Default) {
             runCatching {
                 val resized = SegmentPreprocess.resizeLandscape(argb, width, height)
-                val floats = toFloatArray(SegmentPreprocess.normalizeNCHW(resized))
+                val floats = SegmentPreprocess.normalizeNCHWArray(resized)
                 val started = android.os.SystemClock.elapsedRealtime()
                 // Sérialisé : runs concurrents interdits (même garde qu'avant).
                 guard.run {
@@ -70,12 +70,6 @@ class LiteRtTwinLiteSegmenter private constructor(
             } catch (_: Throwable) {
                 null
             }
-        }
-
-        private fun toFloatArray(buffer: java.nio.FloatBuffer): FloatArray {
-            val out = FloatArray(buffer.remaining())
-            buffer.get(out)
-            return out
         }
     }
 }

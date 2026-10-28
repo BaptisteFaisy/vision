@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -63,7 +64,7 @@ fun SegmentScreen(onBack: () -> Unit) {
     val segmenter = remember { mutableStateOf<Segmenter?>(null) }
     val meter = remember { LiveFpsMeter() }
     val busy = remember { AtomicBoolean(false) }
-    var masks by remember { mutableStateOf<Pair<SegmentMask, SegmentMask>?>(null) }
+    var overlay by remember { mutableStateOf<ImageBitmap?>(null) }
     var advice by remember { mutableStateOf(WalkAdvice(WalkDirection.STOP, 0f, 0f, 0f)) }
     var frameSize by remember { mutableStateOf(640 to 360) }
     var status by remember { mutableStateOf("chargement du modèle…") }
@@ -75,16 +76,16 @@ fun SegmentScreen(onBack: () -> Unit) {
     DisposableEffect(host) {
         host.wantsFrame = { !busy.get() && segmenter.value != null }
         host.onFrame = { bitmap ->
-            onCameraFrame(scope, segmenter.value, bitmap, busy) { result, ms ->
+            onCameraFrame(scope, segmenter.value, bitmap, busy) { done ->
                 val gap = meter.gapAt(SystemClock.elapsedRealtime())
                 fps = LiveFpsMeter.fpsFor(gap, fps)
-                masks = result
-                advice = result?.let { WalkGuide.directionFor(it.first) } ?: advice
+                overlay = done.overlay
+                advice = done.advice
                 frameSize = bitmap.width to bitmap.height
                 runs += 1
                 val delegate = segmenter.value?.delegateName ?: "?"
-                status = statusLine(result, advice, ms, fps, delegate)
-                logRun(runs, result, advice, ms, fps, delegate)
+                status = statusLine(done, fps, delegate)
+                logRun(runs, done, fps, delegate)
                 busy.set(false)
             }
         }
@@ -100,8 +101,19 @@ fun SegmentScreen(onBack: () -> Unit) {
         segmenter.value = prepareSegment(context, host, view, owner, onStatus = { status = it })
         if (segmenter.value == null) error = status
     }
-    SegmentLayout(view, masks, advice, frameSize, error ?: status, onBack)
+    SegmentLayout(view, overlay, advice, frameSize, error ?: status, onBack)
 }
+
+/**
+ * Frame traitée : overlay prêt à afficher + masques (couvertures) + conseil.
+ * Échec = tout `null`, conseil STOP (inconnu ⇒ on ne marche pas).
+ */
+private data class FrameDone(
+    val overlay: ImageBitmap?,
+    val masks: Pair<SegmentMask, SegmentMask>?,
+    val advice: WalkAdvice,
+    val ms: Long,
+)
 
 /** Une frame caméra → segmentation (jetée si une inférence est en vol). */
 private fun onCameraFrame(
@@ -109,7 +121,7 @@ private fun onCameraFrame(
     engine: Segmenter?,
     bitmap: Bitmap,
     busy: AtomicBoolean,
-    onDone: (Pair<SegmentMask, SegmentMask>?, Long) -> Unit,
+    onDone: (FrameDone) -> Unit,
 ) {
     if (engine == null || !busy.compareAndSet(false, true)) return
     scope.launch(Dispatchers.Default) { runFrame(engine, bitmap, onDone) }
@@ -156,7 +168,7 @@ private suspend fun prepareSegment(
 @Composable
 private fun SegmentLayout(
     view: PreviewView,
-    masks: Pair<SegmentMask, SegmentMask>?,
+    overlay: ImageBitmap?,
     advice: WalkAdvice,
     frameSize: Pair<Int, Int>,
     status: String,
@@ -169,7 +181,7 @@ private fun SegmentLayout(
         }
         Box(Modifier.fillMaxSize()) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
-            MaskOverlay(masks)
+            MaskOverlay(overlay)
             Text(
                 text = advice.direction.arrow,
                 fontSize = 96.sp,
@@ -184,68 +196,65 @@ private fun SegmentLayout(
 private suspend fun runFrame(
     engine: Segmenter,
     bitmap: Bitmap,
-    onDone: (Pair<SegmentMask, SegmentMask>?, Long) -> Unit,
+    onDone: (FrameDone) -> Unit,
 ) {
     val argb = IntArray(bitmap.width * bitmap.height)
     bitmap.getPixels(argb, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
     val started = SystemClock.elapsedRealtime()
     val result = engine.segment(argb, bitmap.width, bitmap.height).getOrNull()
     val ms = SystemClock.elapsedRealtime() - started
-    withContext(Dispatchers.Main) {
-        val masks = result?.let { it.driveable to it.lanes }
-        onDone(masks, result?.inferenceMs ?: ms)
+    // Overlay (230 kpx) et conseil calculés ici : le fil principal ne fait
+    // qu'afficher, il ne calcule plus.
+    val done = if (result == null) {
+        FrameDone(null, null, WalkAdvice(WalkDirection.STOP, 0f, 0f, 0f), ms)
+    } else {
+        FrameDone(
+            masksToBitmap(result.driveable, result.lanes).asImageBitmap(),
+            result.driveable to result.lanes,
+            WalkGuide.directionFor(result.driveable),
+            result.inferenceMs,
+        )
     }
+    withContext(Dispatchers.Main) { onDone(done) }
 }
 
 /** Ligne d'état : conseil de marche, couvertures, inférence, cadence, délégué. */
-private fun statusLine(
-    masks: Pair<SegmentMask, SegmentMask>?,
-    advice: WalkAdvice,
-    ms: Long,
-    fps: Float,
-    delegate: String,
-): String {
-    if (masks == null) return String.format(Locale.FRANCE, "échec · %d ms · %.1f ips", ms, fps)
+private fun statusLine(done: FrameDone, fps: Float, delegate: String): String {
+    val masks = done.masks
+    if (masks == null) return String.format(Locale.FRANCE, "échec · %d ms · %.1f ips", done.ms, fps)
     return String.format(
         Locale.FRANCE,
         "%s %s · praticable %.0f %% · %d ms · %.1f ips · %s",
-        advice.direction.arrow,
-        advice.direction.label,
+        done.advice.direction.arrow,
+        done.advice.direction.label,
         masks.first.coverage() * 100,
-        ms,
+        done.ms,
         fps,
         delegate,
     )
 }
 
 /** Une ligne de mesure toutes les 20 segmentations (pas une trace complète). */
-private fun logRun(
-    runs: Int,
-    masks: Pair<SegmentMask, SegmentMask>?,
-    advice: WalkAdvice,
-    ms: Long,
-    fps: Float,
-    delegate: String,
-) {
+private fun logRun(runs: Int, done: FrameDone, fps: Float, delegate: String) {
     if (runs % 20 != 0) return
+    val masks = done.masks
     val cover = masks?.let {
         String.format(Locale.US, "drive=%.0f%% lanes=%.1f%%", it.first.coverage() * 100, it.second.coverage() * 100)
     } ?: "échec"
     val walk = String.format(
         Locale.US,
         "walk=%s L=%.2f C=%.2f R=%.2f",
-        advice.direction.name,
-        advice.left,
-        advice.center,
-        advice.right,
+        done.advice.direction.name,
+        done.advice.left,
+        done.advice.center,
+        done.advice.right,
     )
-    Log.i("sam3vision", "twinlite: $cover, $ms ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate] $walk")
+    Log.i("sam3vision", "twinlite: $cover, ${done.ms} ms, " + String.format(Locale.US, "%.1f", fps) + " ips [$delegate] $walk")
 }
 
-/** Masques remis à l'échelle du canevas : vert on marche, rouge on ne marche pas. */
+/** Overlay précalculé en fond : le canevas ne fait que l'étirer. */
 @Composable
-private fun MaskOverlay(masks: Pair<SegmentMask, SegmentMask>?) {
-    val image = remember(masks) { masks?.let { masksToBitmap(it.first, it.second) }?.asImageBitmap() }
+private fun MaskOverlay(image: ImageBitmap?) {
     Canvas(Modifier.fillMaxSize()) {
         if (image == null) return@Canvas
         drawImage(image, dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()))
@@ -255,15 +264,22 @@ private fun MaskOverlay(masks: Pair<SegmentMask, SegmentMask>?) {
 /**
  * Les deux masques → un bitmap ARGB : vert = on marche, rouge = on ne marche
  * pas (translucide, la scène reste lisible), voies jaunes par-dessus.
+ * Boucle serrée sans lambda (230 kpx par frame) : mêmes pixels, ~10× moins
+ * cher que les `getOrElse` par pixel.
  */
 private fun masksToBitmap(drive: SegmentMask, lanes: SegmentMask): Bitmap {
-    val pixels = IntArray(drive.width * drive.height)
+    val w = drive.width
+    val h = drive.height
+    require(lanes.width == w && lanes.height == h) { "masques désalignés" }
+    val driveBytes = drive.bytes
+    val laneBytes = lanes.bytes
+    val pixels = IntArray(w * h)
     for (i in pixels.indices) {
         pixels[i] = when {
-            lanes.bytes.getOrElse(i) { 0 }.toInt() != 0 -> 0xE6FFFF00.toInt()
-            drive.bytes.getOrElse(i) { 0 }.toInt() != 0 -> 0x6E00FF00.toInt()
+            laneBytes[i].toInt() != 0 -> 0xE6FFFF00.toInt()
+            driveBytes[i].toInt() != 0 -> 0x6E00FF00.toInt()
             else -> 0x66FF0000.toInt()
         }
     }
-    return Bitmap.createBitmap(pixels, drive.width, drive.height, Bitmap.Config.ARGB_8888)
+    return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
 }
