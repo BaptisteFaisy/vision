@@ -7,8 +7,8 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePipeline
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.EmptyCoroutineContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
