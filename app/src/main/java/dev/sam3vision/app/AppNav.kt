@@ -42,7 +42,7 @@ sealed interface Route {
 
     /**
      * Page du proche qui suit la position partagée (rôle `Caregiver` des Réglages) :
-     * la carte du site, tenue dans une WebView, avec la barre de retour.
+     * le Portrait embarqué dans la WebView, alimenté par le lien reçu.
      */
     data object Caregiver : Route
 
@@ -114,8 +114,7 @@ fun AppNav(
             pop = pop,
             // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
             onHome = { stack = listOf(Route.Isee) },
-            // Page du proche à la racine (rôle Caregiver au lancement) : « Retour » ouvre
-            // les Réglages, sinon le bouton ne ferait rien du tout.
+            // À la racine, la roue dentée et le retour système ouvrent les Réglages.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
         )
         state.dictation.overlay?.let { overlay ->
@@ -167,7 +166,7 @@ private fun RouteHost(
         Route.Caregiver -> CaregiverScreen(
             link = dev.sam3vision.core.share.validatedShareLink(caregiverShareLink(state.settings)).orEmpty(),
             onBack = onCaregiverBack,
-            onLinkChanged = { viewModel.saveSettings(state.settings.copy(parentSiteUrl = it)) },
+            mapsKey = state.settings.googleMapsApiKey,
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)

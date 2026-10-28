@@ -3,6 +3,15 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-28 — caregiver : écran réellement livré dans l'APK
+
+- Suppression de Retour, du titre Caregiver et d'Actualiser ; état du flux en
+  haut à droite, paramètres par la roue dentée.
+- Interface embarquée dans l'APK : fond blanc, même boule Portrait en gris,
+  carte réduite en bas sans défilement, aucun bloc hors ligne ni légende dessous.
+- Clé Google Maps injectée au build, préremplie et active depuis l'installation,
+  champ déplacé dans les paramètres, sans clé en clair versionnée.
+
 ## 2026-10-27 — caregiver : Portrait gris et session distante
 
 - Fond blanc, boule Portrait grise, phrase courante puis carte en bas, sur le

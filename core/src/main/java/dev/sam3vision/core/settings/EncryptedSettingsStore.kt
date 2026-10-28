@@ -61,18 +61,10 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
-            caregiverRole = roleOf(prefs, default),
-            parentSiteUrl = prefs.getString(KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
-                .ifBlank { default.parentSiteUrl },
-            shareEnabled = prefs.getBoolean(KEY_SHARE_ENABLED, default.shareEnabled),
-            shareId = prefs.getString(KEY_SHARE_ID, default.shareId).orEmpty()
-                .ifBlank { default.shareId },
-            shareWriteKey = prefs.getString(KEY_SHARE_WRITE_KEY, default.shareWriteKey).orEmpty(),
-            caregiverInvite = prefs.getString(KEY_CAREGIVER_INVITE, default.caregiverInvite).orEmpty(),
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
-        )
+        ).let { readShareSettings(prefs, it) }
     }
 
     override suspend fun save(s: Settings) = withContext(Dispatchers.IO) {
@@ -104,6 +96,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putString(KEY_CAREGIVER_ROLE, s.caregiverRole.name)
             .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
             .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
+            .putString(KEY_GOOGLE_MAPS_API_KEY, s.googleMapsApiKey)
             .putString(KEY_SHARE_ID, s.shareId)
             .putString(KEY_SHARE_WRITE_KEY, s.shareWriteKey)
             .putString(KEY_CAREGIVER_INVITE, s.caregiverInvite)
@@ -140,6 +133,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_CAREGIVER_ROLE = "caregiver_role"
         const val KEY_PARENT_SITE_URL = "parent_site_url"
         const val KEY_SHARE_ENABLED = "share_enabled"
+        const val KEY_GOOGLE_MAPS_API_KEY = "google_maps_api_key"
         const val KEY_SHARE_ID = "share_id"
         const val KEY_SHARE_WRITE_KEY = "share_write_key"
         const val KEY_CAREGIVER_INVITE = "caregiver_invite"
@@ -163,3 +157,15 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
 /** Rôle persisté ; clé absente (version antérieure) ou inconnue ⇒ [CaregiverRole.Blind]. */
 private fun roleOf(prefs: SharedPreferences, default: Settings): CaregiverRole =
     CaregiverRole.fromName(prefs.getString(EncryptedSettingsStore.KEY_CAREGIVER_ROLE, default.caregiverRole.name))
+
+/** Les réglages du suivi ont leur propre lecture, commune aux deux rôles. */
+private fun readShareSettings(prefs: SharedPreferences, default: Settings): Settings = default.copy(
+    caregiverRole = roleOf(prefs, default),
+    parentSiteUrl = prefs.getString(EncryptedSettingsStore.KEY_PARENT_SITE_URL, default.parentSiteUrl).orEmpty()
+        .ifBlank { default.parentSiteUrl },
+    shareEnabled = prefs.getBoolean(EncryptedSettingsStore.KEY_SHARE_ENABLED, default.shareEnabled),
+    googleMapsApiKey = prefs.getString(EncryptedSettingsStore.KEY_GOOGLE_MAPS_API_KEY, default.googleMapsApiKey).orEmpty(),
+    shareId = prefs.getString(EncryptedSettingsStore.KEY_SHARE_ID, default.shareId).orEmpty().ifBlank { default.shareId },
+    shareWriteKey = prefs.getString(EncryptedSettingsStore.KEY_SHARE_WRITE_KEY, default.shareWriteKey).orEmpty(),
+    caregiverInvite = prefs.getString(EncryptedSettingsStore.KEY_CAREGIVER_INVITE, default.caregiverInvite).orEmpty(),
+)

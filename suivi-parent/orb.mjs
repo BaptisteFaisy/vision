@@ -34,9 +34,12 @@ function paint(gl, program, canvas, time) {
   const ratio = Math.min(devicePixelRatio || 1, 1.5);
   const width = Math.round(canvas.clientWidth * ratio);
   const height = Math.round(canvas.clientHeight * ratio);
-  if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-  gl.viewport(0, 0, width, height);
   const radius = Math.min(width * 0.335, height * 0.42);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width; canvas.height = height;
+    canvas.parentElement.style.setProperty('--orb-radius', `${radius / ratio}px`);
+  }
+  gl.viewport(0, 0, width, height);
   gl.uniform2f(gl.getUniformLocation(program, 'uSize'), width, height);
   gl.uniform2f(gl.getUniformLocation(program, 'uC'), width / 2, height / 2 + radius * 0.02 * Math.sin(time * 0.9));
   gl.uniform1f(gl.getUniformLocation(program, 'uR'), radius * (1 + 0.012 * Math.sin(time * 1.3)));
