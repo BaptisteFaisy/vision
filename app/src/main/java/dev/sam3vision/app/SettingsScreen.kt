@@ -246,6 +246,7 @@ private fun TechnicalSection(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle("TECHNICAL SETTINGS")
         BackendFields(draft) { onChange(it) }
+        ModelPinBlock(draft, statusLine)
         ObjectsSettings(draft) { onChange(it) }
         GpuRegionSettings(draft) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }

@@ -54,6 +54,7 @@ fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
     }
     if (state.labels.isNotEmpty()) add("reconnus : ${state.labels.joinToString(", ")}")
     if (state.gpu.isNotBlank()) add("gpu : ${state.gpu}")
+    if (state.modelsLine.isNotBlank()) add(state.modelsLine)
     distanceSummary(state.distanceLayer?.readings.orEmpty())?.let { add("distances : $it") }
     state.spoken?.let { add("dit : $it") }
     state.error?.let { add("erreur : $it") }
