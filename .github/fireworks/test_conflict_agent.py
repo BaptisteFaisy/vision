@@ -50,18 +50,43 @@ class PushUrlTest(unittest.TestCase):
             self.assertEqual(conflict_agent.push_url("O/R"), "origin")
 
 
-class RebaseSidesTest(unittest.TestCase):
-    """En rebase, :3: = branche rejouée (inverse du merge)."""
+class SplitHunksTest(unittest.TestCase):
+    """Découpage des marqueurs : le propre recopié, les bords nommés."""
 
-    def test_bords_rebase_branche_premiere(self):
-        # Non-régression 28/10 : bords inversés → l'agent gardait master seul.
+    def test_sans_marqueur_tout_propre(self):
+        segs = conflict_agent.split_hunks("a\nb\n")
+        self.assertEqual(segs, [("clean", "a\nb\n")])
+
+    def test_diff_simple(self):
+        text = ("A\n<<<<<<< HEAD\nm1\n=======\nb1\n>>>>>>> br\nZ\n")
+        segs = conflict_agent.split_hunks(text)
+        self.assertEqual(len(segs), 3)
+        self.assertEqual(segs[0], ("clean", "A"))
+        kind, hunk = segs[1]
+        self.assertEqual(kind, "hunk")
+        self.assertEqual(hunk["head"], ["m1"])
+        self.assertIsNone(hunk["base"])
+        self.assertEqual(hunk["saved"], ["b1"])
+        self.assertEqual(segs[2], ("clean", "Z\n"))
+
+    def test_diff3_avec_base(self):
+        text = ("<<<<<<< HEAD\nm\n||||||| base\nb\n=======\ns\n>>>>>>> br\n")
+        segs = conflict_agent.split_hunks(text)
+        self.assertEqual(len(segs), 2)
+        kind, hunk = segs[0]
+        self.assertEqual(hunk["head"], ["m"])
+        self.assertEqual(hunk["base"], ["b"])
+        self.assertEqual(hunk["saved"], ["s"])
+
+    def test_rebase_reel_second_bloc_est_branche(self):
+        # Non-régression 28/10 : en rebase, "saved" = branche rejouée.
         repo = tempfile.mkdtemp(prefix="fw-sides-")
         self.addCleanup(shutil.rmtree, repo, True)
         old = os.getcwd()
         self.addCleanup(os.chdir, old)
         os.chdir(repo)
-        run = lambda *a: subprocess.run(
-            ["git", *a], capture_output=True, text=True)  # noqa: E731
+        run = lambda *a: subprocess.run(  # noqa: E731
+            ["git", *a], capture_output=True, text=True)
         run("init", "-q")
         run("config", "user.email", "t@t")
         run("config", "user.name", "t")
@@ -82,9 +107,12 @@ class RebaseSidesTest(unittest.TestCase):
         failed = subprocess.run(["git", "rebase", main],
                                 capture_output=True)
         self.assertNotEqual(failed.returncode, 0)  # conflit attendu
-        ours, theirs = conflict_agent.rebase_sides("f.txt")
-        self.assertEqual(ours, b"BRANCHE\n")
-        self.assertEqual(theirs, b"MASTER\n")
+        with open("f.txt") as fh:
+            segs = conflict_agent.split_hunks(fh.read())
+        hunks = [s for k, s in segs if k == "hunk"]
+        self.assertEqual(len(hunks), 1)
+        self.assertEqual(hunks[0]["saved"], ["BRANCHE"])
+        self.assertEqual(hunks[0]["head"], ["MASTER"])
 
 
 if __name__ == "__main__":
