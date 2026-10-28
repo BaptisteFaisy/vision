@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
         run: |
-          export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
+          export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           if [ -z "$GH_TOKEN" ]; then
             echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
@@ -94,7 +94,7 @@ jobs:
           STATE: ${{ matrix.state }}
           DRAFT: ${{ matrix.draft }}
         run: |
-          export PATH="$HOME/bin:$PATH" # gh + jq en espace user sur r630 (vu le 27/10 : sans ça, `gh` introuvable et file muette)
+          export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           green() { # 0 si les 6 checks requis de la PR $1 sont SUCCESS
             gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
               ["ci","apk","apk-release","lint","ci-budget","couche0"] as $req |
