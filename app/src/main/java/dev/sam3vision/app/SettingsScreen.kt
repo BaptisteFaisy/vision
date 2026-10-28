@@ -317,6 +317,9 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     LabeledField("SAM 3.1 base URL (empty = chosen region below)", draft.samBaseUrl, false) {
         onChange(draft.copy(samBaseUrl = it))
     }
+    LabeledField("Valhalla route URL (empty = Maps guidance only)", draft.routeBaseUrl, false) {
+        onChange(draft.copy(routeBaseUrl = it))
+    }
 }
 
 /** « Parent tracking »: the site link sent by WhatsApp + start/stop of the permanent tracking. */
