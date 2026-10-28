@@ -103,12 +103,18 @@ internal object NetContract {
         .toString()
 
     /** Réponse de frame du direct (`/live` et `/live/ws` ont exactement la même forme). */
-    fun frameReply(id: Int? = null, width: Int = 512): String = buildString {
+    fun frameReply(id: Int? = null, width: Int = 512, depth: Float? = null): String = buildString {
         append('{')
         if (id != null) append("\"id\":").append(id).append(',')
         append("\"width\":").append(width)
         append(",\"height\":1138,\"elapsed_ms\":118,\"objects\":[")
-        append("""{"label":"person","score":0.91,"box":[1,2,30,40],"mask_b64":"QUJD"}""")
+        // Deux littéraux complets (jamais de guillemet accolé à la fin d'un raw string :
+        // `""""` vaut `"` + fin de chaîne, pas fin de chaîne — JSON invalide).
+        if (depth != null) {
+            append("""{"label":"person","score":0.91,"box":[1,2,30,40],"mask_b64":"QUJD","depth":$depth}""")
+        } else {
+            append("""{"label":"person","score":0.91,"box":[1,2,30,40],"mask_b64":"QUJD"}""")
+        }
         append("]}")
     }
 

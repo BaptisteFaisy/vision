@@ -3,6 +3,9 @@
 Estimation de profondeur **100 % sur le téléphone** (0 GPU Modal) : une carte
 de proximité par image, fusionnée aux masques SAM (médiane par masque, ordre
 proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
+En direct, les médianes fusionnées par le serveur (`with_depth`, même carte
+Modal que SAM, +10-30 ms) gagnent quand la frame les porte — l'embarqué reste
+le repli (hors-ligne, ancien backend, tracker).
 
 ## Choix du modèle
 
@@ -67,6 +70,11 @@ consignes « personne à 2 mètres à midi, va à gauche », flèches) :
 - `:app` `depth/LiveDepthMeter.kt` : infère la dernière frame JPEG en fond
   (~5 Hz), moteur paresseux (téléchargement puis ouverture), carte de plus
   d'une seconde = repli sténopé. OFF = zéro coût.
+- `with_depth` (même carte Modal, `WS /live/ws`) : la trame demande les
+  médianes quand le moteur n'est pas OFF (`LiveProbe`, via
+  `LiveMaskTransport`) ; `SegObject.depth` (0..1, grand = proche) ; le
+  mesureur préfère `refineWithCloseness` (serveur) à la carte embarquée.
+  Serveur muet ou ancien backend : repli embarqué puis sténopé, sans erreur.
 - `LiveProbe.publish` : `offer(jpegB64)` puis `readingsFor` avant
   pastilles/voix/consignes (3 lignes) ; voix et flèches inchangées (une
   seule voix, le danger parle d'abord).
