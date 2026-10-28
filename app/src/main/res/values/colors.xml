@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond de fenêtre = fond Compose (AppColors.background) : aucun flash blanc
+         entre le lancement et la première frame, ni sous les aperçus caméra. -->
+    <color name="window_background">#FF0B0D12</color>
+</resources>
