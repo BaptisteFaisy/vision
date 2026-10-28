@@ -50,15 +50,14 @@ jobs:
       - name: Déployer l'app CPU
         run: |
           set -euo pipefail
-          python3 -m modal deploy server/backend/valhalla_cpu.py 2>&1 | tee deploy.log
-          grep -o 'https://[^ ]*modal.run[^ "]*' deploy.log | head -1 > app_url.txt || true
-          echo "URL capturée : $(cat app_url.txt)"
+          python3 -m modal deploy server/backend/valhalla_cpu.py
 
       - name: Fumée /health puis /route (attente bornée)
         run: |
           set -euo pipefail
-          BASE="$(cat app_url.txt | sed 's|/health$||; s|/$||')"
-          [ -n "$BASE" ] || { echo "::error::URL app introuvable dans deploy.log"; exit 1; }
+          # URL déterministe : https://<workspace>--<app>-<classe>-<methode>.<region>.modal.run
+          # (vérifiée à la main le 2026-10-28 ; en cas de renommage cette fumée casse).
+          BASE="https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
           echo "BASE=$BASE"
           timeout 240 bash -c "until curl -sf -m 10 $BASE/health; do sleep 5; done"
           curl -sf -m 30 -X POST "$BASE/route" \
