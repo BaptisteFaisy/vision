@@ -53,6 +53,38 @@ class RouteTripNavTest {
     }
 
     @Test
+    fun `passage protege du client devient traversee`() {
+        val cross = maneuver(8, 1).copy(
+            instruction = "Continuez sur le passage protégé.",
+            verbalInstruction = "Continuez sur le passage protégé.",
+        )
+        val withCross = leg.copy(
+            maneuvers = listOf(maneuver(1, 0, "Rue A"), cross, maneuver(4, 1, "Rue B")),
+        )
+
+        val route = RouteTrip(listOf(withCross), 120.0, 86.0).toNavRoute(null).getOrThrow()
+
+        assertEquals(false, route.maneuvers[0].crossing)
+        assertEquals(true, route.maneuvers[1].crossing)
+        assertEquals(ManeuverAction.Continue, route.maneuvers[1].action)
+        assertEquals(false, route.maneuvers[2].crossing)
+    }
+
+    @Test
+    fun `rue en passage ne devient pas traversee`() {
+        val homage = maneuver(10, 1, "Passage du Souvenir").copy(
+            instruction = "Tournez à droite dans Passage du Souvenir.",
+        )
+        val withStreet = leg.copy(
+            maneuvers = listOf(maneuver(1, 0, "Rue A"), homage, maneuver(4, 1, "Rue B")),
+        )
+
+        val route = RouteTrip(listOf(withStreet), 120.0, 86.0).toNavRoute(null).getOrThrow()
+
+        assertEquals(false, route.maneuvers[1].crossing)
+    }
+
+    @Test
     fun `index hors trace refuse`() {
         val bad = leg.copy(maneuvers = listOf(maneuver(1, 0), maneuver(4, 9)))
 
