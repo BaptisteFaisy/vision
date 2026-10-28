@@ -36,7 +36,8 @@ data class OrbLook(
     val level: Float,
 )
 
-private const val ORB_AGSL = """
+/** Source AGSL de l'orbe. `internal` : le test JVM de non-régression la relit (OrbShaderTest). */
+internal const val ORB_AGSL = """
 uniform float2 uC;
 uniform float uR;
 uniform float uTime;
