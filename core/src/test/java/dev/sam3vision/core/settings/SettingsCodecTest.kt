@@ -122,6 +122,15 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `la cle de narration survit a un aller-retour`() {
+        val keyed = Settings.Default.copy(liveLlmApiKey = "cle-narration")
+        assertEquals("cle-narration", SettingsCodec.decode(SettingsCodec.encode(keyed)).liveLlmApiKey)
+        // Un fichier écrit avant le second modèle : narration muette, pas de crash.
+        val legacy = SettingsCodec.encode(Settings.Default).lines().filterNot { it.startsWith("liveLlmApiKey=") }
+        assertEquals("", SettingsCodec.decode(legacy.joinToString("\n")).liveLlmApiKey)
+    }
+
+    @Test
     fun `l'acces objectsOnScreen borne toujours le reglage`() {
         assertEquals(ObjectLimits.MAX_ON_SCREEN, Settings.Default.copy(maxObjects = 50).objectsOnScreen)
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, Settings.Default.objectsOnScreen)
