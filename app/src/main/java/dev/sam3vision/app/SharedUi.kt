@@ -120,32 +120,42 @@ fun GlassButton(
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
         modifier = modifier.fillMaxWidth(widthFactor).height(46.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (primary && enabled) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .border(1.5.dp, SettingsLight.text, CircleShape)
-                        .padding(1.dp),
-                ) {
-                    Text("\u2713", color = SettingsLight.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.size(8.dp))
+        GlassButtonContent(label = label, primary = primary && enabled, compact = widthFactor < 1f)
+    }
+}
+
+/**
+ * Contenu du bouton Settings : pastille à coche noire (si l'option est
+ * sélectionnée) puis libellé. Sorti de [GlassButton] pour tenir sous la
+ * limite de 50 lignes par fonction.
+ */
+@Composable
+private fun GlassButtonContent(label: String, primary: Boolean, compact: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (primary) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(18.dp)
+                    .border(1.5.dp, SettingsLight.text, CircleShape)
+                    .padding(1.dp),
+            ) {
+                Text("\u2713", color = SettingsLight.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
-            Text(
-                label,
-                fontSize = if (widthFactor >= 1f) 13.sp else 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
+            Spacer(Modifier.size(8.dp))
         }
+        Text(
+            label,
+            fontSize = if (compact) 12.sp else 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
