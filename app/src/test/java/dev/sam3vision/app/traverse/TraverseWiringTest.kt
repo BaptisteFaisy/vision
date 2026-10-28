@@ -1,10 +1,16 @@
 package dev.sam3vision.app.traverse
 
+import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.TtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraverseClipStore
 import dev.sam3vision.core.traverse.TraversePipeline
+import dev.sam3vision.core.traverse.TraversePlayer
+import dev.sam3vision.core.traverse.TraverseSystemTts
+import dev.sam3vision.core.traverse.TraverseVoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.EmptyCoroutineContext
@@ -17,6 +23,9 @@ import org.junit.Test
  * Câblage traversée sans voix (voix `null`) : le filtre publie objets et
  * détections, le veto remonte les objets proches, l'arrêt est muet.
  * L'activation touche Android (TTS, cache) : couverte sur appareil seul.
+ *
+ * Avec voix attachée (fakes) : le vert maintenu sans véhicule fait parler
+ * « Vert, traversez. », et sans vert ce mot d'ordre ne sort jamais.
  */
 class TraverseWiringTest {
 
@@ -73,11 +82,13 @@ class TraverseWiringTest {
         val wiring = wiring()
         wiring.at(listOf(seg()), 1)
         wiring.at(listOf(seg()), 2)
+        wiring.updateLight(CrossingState.Green)
         var quiets = 0
         wiring.deactivate { quiets++ }
 
         assertFalse(wiring.active)
         assertEquals(1, quiets)
+        assertFalse("vert oublie", wiring.lightGreen)
         assertTrue("pistes oubliees", wiring.at(listOf(seg()), 3).frame.objects.isEmpty())
     }
 
@@ -86,9 +97,11 @@ class TraverseWiringTest {
         val wiring = wiring()
         wiring.at(listOf(seg()), 1)
         wiring.at(listOf(seg()), 2)
+        wiring.updateLight(CrossingState.Green)
         wiring.reset()
 
         assertFalse(wiring.active)
+        assertFalse("vert oublie", wiring.lightGreen)
         assertTrue(wiring.at(listOf(seg()), 3).frame.objects.isEmpty())
     }
 
@@ -98,6 +111,70 @@ class TraverseWiringTest {
         wiring.close()
         wiring.close()
         assertFalse(wiring.active)
+    }
+
+    @Test
+    fun `updateLight - seul le vert autorise`() {
+        val wiring = wiring()
+
+        wiring.updateLight(CrossingState.Green)
+        assertTrue(wiring.lightGreen)
+        wiring.updateLight(CrossingState.Red)
+        assertFalse(wiring.lightGreen)
+        wiring.updateLight(CrossingState.Unknown)
+        assertFalse(wiring.lightGreen)
+    }
+
+    @Test
+    fun `vert maintenu sans vehicule - traversez parle une fois`() = runBlocking {
+        val tts = FakeTts()
+        val wiring = voicedWiring(tts)
+        wiring.updateLight(CrossingState.Green)
+        repeat(5) { wiring.at(emptyList(), it + 1) }
+
+        assertEquals(listOf("Vert, traversez."), tts.asked)
+    }
+
+    @Test
+    fun `sans vert - traversez jamais parle`() = runBlocking {
+        val tts = FakeTts()
+        val wiring = voicedWiring(tts)
+        repeat(5) { wiring.at(emptyList(), it + 1) }
+
+        assertFalse(tts.asked.contains("Vert, traversez."))
+    }
+
+    private fun voicedWiring(tts: FakeTts): TraverseWiring {
+        val pipeline = TraversePipeline()
+        pipeline.voice = TraverseVoice(tts, FakePlayer(), FakeSystemTts(), FakeStore())
+        return TraverseWiring(pipeline)
+    }
+
+    private class FakeTts : TtsClient {
+        val asked = mutableListOf<String>()
+        override suspend fun synthesize(text: String): Result<ByteArray> {
+            asked += text
+            return Result.success(byteArrayOf(1))
+        }
+    }
+
+    private class FakePlayer : TraversePlayer {
+        override val isBusy: Boolean = false
+        override fun stop() = Unit
+        override suspend fun play(bytes: ByteArray): Boolean = true
+        override suspend fun playFile(path: String): Boolean = false
+    }
+
+    private class FakeSystemTts : TraverseSystemTts {
+        override suspend fun renderToFile(phrase: String, path: String): Result<String> =
+            Result.failure(IllegalStateException("no tts"))
+
+        override fun effectiveLanguage(): String = "fr-FR"
+    }
+
+    private class FakeStore : TraverseClipStore {
+        override fun pathFor(phrase: String): String = "/tmp/clip.wav"
+        override fun clipFor(phrase: String): String? = null
     }
 
     private fun scope(): CoroutineScope = CoroutineScope(EmptyCoroutineContext)
