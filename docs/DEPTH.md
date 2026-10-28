@@ -19,10 +19,11 @@ le repli (hors-ligne, ancien backend, tracker).
   par `onnxruntime.tools.convert_onnx_models_to_ort` 1.18.1, sortie vérifiée
   bit-identique (voir `NOTICE-depth.txt`).
 - **Repli : MiDaS v2.1 small** (21 M, MIT Intel ISL), TFLite fp32 63 Mo
-  (téléchargé une fois), 256×256 → 256×256, via LiteRT `Interpreter`
-  CPU 4 fils (NNAPI essayé le 2026-10-28 : 578/574 ms contre 490/568 ms CPU
-  en dos-à-dos — aucun gain ; pas de délégué GPU : l'artefact 2.17
-  ne livre pas ses classes Java — `NoClassDefFoundError` prouvé).
+  (téléchargé une fois), 256×256 → 256×256, via LiteRT neuf
+  (`CompiledModel` 2.2.0, cascade GPU→CPU). Historique : `Interpreter` CPU
+  4 fils (NNAPI essayé le 2026-10-28 : 578/574 ms contre 490/568 ms CPU,
+  aucun gain) puis délégué GPU classique (classes `gpu-api` à ajouter à la
+  main, et sorties NCHW corrompues — prouvé sur TwinLiteNet le 2026-10-28).
 - Exclus : DA-V2 Base/Large/Giant + UniDepth (CC-BY-NC), ZoeDepth/Marigold/
   DepthFM/Metric3D/DepthPro (poids ou licence). Les deux retenus sont
   **relatifs** (grand = proche) : l'échelle métrique vient du sténopé
