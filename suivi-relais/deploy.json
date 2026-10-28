@@ -1,0 +1,9 @@
+{
+  "entrypoint": "src/worker.js",
+  "compatibilityDate": "2026-10-28",
+  "modules": [
+    { "name": "src/worker.js", "type": "esm", "path": "./src/worker.js" },
+    { "name": "src/contrat.js", "type": "esm", "path": "./src/contrat.js" },
+    { "name": "src/store.js", "type": "esm", "path": "./src/store.js" }
+  ]
+}

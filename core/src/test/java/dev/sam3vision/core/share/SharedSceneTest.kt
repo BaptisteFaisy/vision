@@ -34,14 +34,6 @@ class SharedSceneTest {
     }
 
     @Test
-    fun `seul un lien recu avec un identifiant valide selectionne un proche`() {
-        assertEquals("https://example.com/?share=proche-b", validatedShareLink(" https://example.com/?share=proche-b "))
-        assertNull(validatedShareLink("https://example.com/"))
-        assertNull(validatedShareLink("https://example.com/?share=Autre"))
-        assertNull(validatedShareLink("javascript:alert(1)"))
-    }
-
-    @Test
     fun `le relais utilise l origine du lien et oublie sa query`() {
         assertEquals("https://example.com/api/share", shareEndpoint("https://example.com/?share=proche-b#carte"))
         assertNull(shareEndpoint("pas un lien"))

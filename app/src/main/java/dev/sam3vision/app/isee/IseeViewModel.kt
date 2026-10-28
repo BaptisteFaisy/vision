@@ -10,7 +10,7 @@ import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MediaDatabase
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
-import dev.sam3vision.app.seededFromBuild
+import dev.sam3vision.app.loadedSettings
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.voicenav.VoiceNavSession
@@ -192,7 +192,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             // est aussi faite ici, car un force-stop ou un balayage des apps récentes
             // ne passe pas par onDestroy — le téléphone gardait alors les messages.
             runCatching { cleaner.purgeAll() }
-            settings = seededFromBuild(prefs.load())
+            settings = loadedSettings(prefs)
             syncProbe()
             transcript.refresh()
             picto.refresh()
@@ -280,7 +280,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */
     fun refreshSettings() = viewModelScope.launch {
-        settings = seededFromBuild(prefs.load())
+        settings = loadedSettings(prefs)
         syncProbe()
         transcript.refresh()
     }

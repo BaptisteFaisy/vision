@@ -384,6 +384,7 @@ private fun ParentShareSettings(
     onChange: (Settings) -> Unit,
 ) {
     val trackingActive by ShareTracking.running.collectAsState()
+    val shareProblem by ShareHealth.message.collectAsState()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Parent tracking",
@@ -391,7 +392,7 @@ private fun ParentShareSettings(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        LabeledField("Tracking site link", draft.parentSiteUrl, false) {
+        LabeledField("Tracking relay URL", draft.parentSiteUrl, false) {
             onChange(draft.copy(parentSiteUrl = it))
         }
         SwitchRow("Send position + objects to the site during Direct", draft.shareEnabled) {
@@ -400,8 +401,13 @@ private fun ParentShareSettings(
         LabeledField("Stream id (?share=, one per tracked relative)", draft.shareId, false) {
             onChange(draft.copy(shareId = it))
         }
-        LabeledField("Relay write key (empty = keyless relay)", draft.shareWriteKey, true) {
+        LabeledField("Relay write key (generated, never shared)", draft.shareWriteKey, true) {
             onChange(draft.copy(shareWriteKey = it))
+        }
+        // Le suivi échoue peut-être sans rien dire : refus du relais, relais
+        // injoignable ou localisation coupée se lisent ici, jamais dans le vide.
+        shareProblem?.let {
+            Text(it, color = SettingsLight.danger, fontSize = 12.sp)
         }
         if (trackingActive) {
             GlassButton("Stop tracking", true, false, onStopTracking)
