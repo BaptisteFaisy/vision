@@ -140,7 +140,7 @@ class UiLogicTest {
         val routes = listOf(
             Route.Isee, Route.Capture, Route.Analysis, Route.Chat,
             Route.Live, Route.Settings, Route.Caregiver, Route.Onboarding,
-            Route.Bench, Route.Tap(true), Route.Tap(false),
+            Route.Bench, Route.Tap(true), Route.Tap(false), Route.VoiceNav,
         )
         routes.forEach { assertEquals(it, routeFromName(routeToName(it))) }
         assertEquals(Route.Isee, routeFromName("inconnue"))
