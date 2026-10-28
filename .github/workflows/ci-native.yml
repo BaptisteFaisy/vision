@@ -1,0 +1,92 @@
+name: CI native (hors PR)
+
+# Builds natifs sortis des PR (découpe v9, 2026-10-28) : `apk`, `apk-release`
+# et `lint` tournaient sur chaque PR et saturaient les 19 runners à 4 jobs
+# par PR — file jusqu'à 10 min, budget wall-clock cassé alors que chaque job
+# tenait ses 5 min (mesuré le 28/10). La PR ne porte plus que le job `ci`
+# (gardes + tests JVM) ; ce workflow vérifie le natif à chaque push sur
+# master, à chaque tag et sur demande manuelle, avec le même timeout de
+# 5 min par job (mesuré ≤ 4m45).
+# Hors PR : pas de budget 5 min imposé, mais timeout explicite partout et ce
+# commentaire qui justifie le déclenchement (clause CI-BUDGET-5MIN).
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-native-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Présente dans chaque variante de l'APK, sans clé en clair dans Git.
+env:
+  GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+jobs:
+  # ── APK debug ─────────────────────────────────────────────────────────────
+  # Un job par APK : les deux variantes dans le même job ne tenaient pas dans
+  # les 5 minutes (mesuré le 26/10 : coupé au budget). Deux VM = deux budgets.
+  apk:
+    name: apk
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: gradle/actions/setup-gradle@v4
+      - name: APK debug
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleDebug
+      # L'APK du téléphone, publié à chaque push sur master.
+      - name: APK debug sur master
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 2
+          if-no-files-found: error
+
+  # ── APK release — compile la variante release (R8 désactivé) ───────────────
+  apk-release:
+    name: apk-release
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: gradle/actions/setup-gradle@v4
+      - name: APK release
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleRelease
+
+  # ── lint — le poste le plus cher, donc sa propre VM ─────────────────────────
+  lint:
+    name: lint
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: gradle/actions/setup-gradle@v4
+      # C'est CE job qui porte le contrôle lint (abortOnError = true : une
+      # erreur échoue ici). Le job `apk-release` n'a plus à le refaire :
+      # `checkReleaseBuilds` est coupé en CI seulement (build.gradle.kts, racine),
+      # parce que ce lint-ci analyse déjà les mêmes sources avec les mêmes
+      # règles. Mesuré le 26/10 : 85 → 65 tâches sur `assembleRelease`,
+      # 17 s → 14 s, APK release toujours produit.
+      - name: lintDebug
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:lintDebug
+      - name: Rapport de lint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-lint
+          path: '**/build/reports/lint-results-*.html'
+          retention-days: 3
+          if-no-files-found: ignore
