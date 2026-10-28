@@ -1,6 +1,6 @@
 # CI et file de merge
 
-Relu le **2026-10-28** sur cet arbre (découpe v8 : natif hors PR). Chaque affirmation
+Relu le **2026-10-28** sur cet arbre (découpe v9 : natif hors PR). Chaque affirmation
 ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-budget/`,
 `.github/couche0/`.
 
@@ -75,15 +75,16 @@ assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml
 (`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
 sans bloquer : seul un vrai conflit s'oppose à un rebase.
 
-## 5. Protection de `master` et file de merge (balayeur v8)
+## 5. Protection de `master` et file de merge (balayeur v9)
 
 `master` est protégé (PR obligatoire, historique linéaire, pas de push direct) et les
-PR sont fusionnées par le workflow `pr-auto-merge` (job `sweep` : à chaque fin de CI,
-toutes les 10 min en filet, et à chaque push sur `master` ou événement de PR).
+PR sont fusionnées par le workflow `pr-auto-merge` (jobs `discover` + `sweep` en
+matrice, un job par PR : à chaque fin de CI, toutes les 10 min en filet, et à
+chaque push sur `master` ou événement de PR).
 La seule porte reste la CI : les 3 checks `ci`, `ci-budget`, `couche0` verts, puis
 merge en rebase. Le natif (`apk`, `apk-release`, `lint`) est vérifié sur `master`
 par `ci-native.yml` après chaque atterrissage. Pas de gate humaine, pas de merge
-à la main (sauf amorçage unique de la découpe v8, qui change le contrat du
+à la main (sauf amorçage unique de la découpe v9, qui change le contrat du
 balayeur lui-même).
 
 Concrètement, à chaque passage, pour chaque PR interne non-brouillon :
