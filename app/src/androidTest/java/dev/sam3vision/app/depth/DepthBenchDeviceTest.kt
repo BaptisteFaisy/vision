@@ -13,9 +13,10 @@ import org.junit.runner.RunWith
 
 /**
  * Banc profondeur SUR APPAREIL (téléphone réel, jamais d'émulateur) : prouve que
- * les deux moteurs embarqués chargent leurs assets et infèrent sur du vrai
- * matériel (CPU, NNAPI absent). Complémentaire des tests JVM (`app/src/test`) :
- * eux valident le prétraitement, ceux-ci valident l'inférence embarquée.
+ * les deux moteurs téléchargent leurs modèles (release GitHub, ~92 Mo au
+ * premier run) et infèrent sur du vrai matériel (CPU, NNAPI absent).
+ * Complémentaire des tests JVM (`app/src/test`) : eux valident le
+ * prétraitement, ceux-ci valident le téléchargement + l'inférence embarquée.
  *
  * **Aucun workflow ne les exécute** : la CI n'a pas d'appareil. Vert ici = vert
  * sur *cet* appareil, jamais « vert en CI ».
@@ -46,6 +47,8 @@ class DepthBenchDeviceTest {
     }
 
     private suspend fun runBench(backend: DepthBackend) {
+        val ensured = ModelDownloader.ensure(context, backend)
+        assertTrue("téléchargement ${backend.code} : ${ensured.exceptionOrNull()?.message}", ensured.isSuccess)
         val estimator = DepthEstimators.open(context, backend)
         try {
             val image = syntheticGradientArgb(256, 256)

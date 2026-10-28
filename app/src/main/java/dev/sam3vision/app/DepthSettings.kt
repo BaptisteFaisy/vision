@@ -32,8 +32,9 @@ fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: ()
         }
         Text(
             "Carte de profondeur monoculaire estimée sur le téléphone : " +
-                "Depth Anything V2 Small (26 Mo, le plus précis) ou MiDaS small " +
-                "(repli léger). Ni GPU Modal, ni réseau — le modèle tourne ici.",
+                "Depth Anything V2 Small (le plus précis) ou MiDaS small " +
+                "(repli). Modèle téléchargé une fois au premier test (~26/63 Mo), " +
+                "inférence 100 % locale ensuite — ni GPU Modal.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
