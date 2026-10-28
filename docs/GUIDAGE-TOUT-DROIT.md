@@ -104,8 +104,23 @@ silence sur voie libre).
 5. le couloir se dégage → « Continue tout droit. » après le délai ;
 6. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
-## 7. État des mesures (27/10/2026)
+## 7. État des mesures (28/10/2026, appareil Redmi 2312DRA50G)
 
-Comportement **lu dans le code et verrouillé par les tests JVM** (`:core` 1098 tests,
-`:app` 551 tests, 0 échec le 27/10 ; APK debug construit) : **non mesuré** sur
-appareil — exige un téléphone, un GPU SAM joignable et une clé ElevenLabs.
+Relevé du 28/10/2026 sur le build `1.0.179-399a512` (= `master` HEAD du moment,
+contenant le guidage) : Redmi 2312DRA50G, Android 15, écran 1220 × 2712, Clé
+ElevenLabs + voix renseignées, bascule « Guider tout droit (caméra iSee) »
+**activée** (captures d'écran des Réglages à l'appui).
+
+- Lancement à froid → tap central → enregistrement : `iSee` au premier plan,
+  aucune erreur fatale, aucun `live KO`.
+- SAM en direct : `première analyse : 3 objets, 671 ms`, puis `masques décodés`
+  en continu (2–17 ms) ; panneau debug `SAM · 7,1 ips · 138 ms · 3 objets`
+  avec pastilles de distance (capture à l'appui).
+- Consigne parlée : `cache/isee-play/voice.mp3`, **41 838 octets**, écrit pendant
+  l'enregistrement — donc synthétisé par ElevenLabs puis joué (le lecteur est
+  unique et l'intro passe par `playFile`, sans écrire ce fichier ; le guidage
+  prime sur les positions quand sa bascule est active, donc ce fichier est une
+  consigne de marche).
+- **Non mesuré** : le texte exact de la consigne prononcée (inaudible à distance ;
+  le libellé reste verrouillé par les tests JVM) et le comportement en marche
+  réelle (couloir qui se dégage, obstacle qui s'approche).
