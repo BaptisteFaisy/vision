@@ -18,7 +18,8 @@ private fun serverReplying(content: String) = TestHttpServer {
 class LlmClientTest {
 
     private fun client(server: TestHttpServer) =
-        HttpLlmClient(server.baseUrl, TEST_KEY, "meta-models/muse-spark-open-1026")
+        val client = InferHubLlmClient(server.baseUrl, TEST_KEY, "ali/qwen3.8-omni-flash", retryDelayMs = 5)
+        val httpClient = HttpLlmClient(server.baseUrl, TEST_KEY, "meta-models/muse-spark-open-1026")
 
     @Test
     fun `describe accepte une reponse JSON`() {
@@ -112,6 +113,7 @@ class LlmClientTest {
             val failure = runBlocking { client(server).describe("QUJD", emptyList()) }.exceptionOrNull()
             assertTrue(failure is ApiError.RateLimited)
             assertTrue(failure?.message?.contains("limite atteinte") == true)
+            assertEquals("un nouvel essai, pas plus", 2, server.requests.size)
         } finally {
             server.close()
         }
@@ -136,6 +138,48 @@ class LlmClientTest {
         try {
             val failure = runBlocking { client(server).describe("QUJD", emptyList()) }.exceptionOrNull()
             assertTrue(failure is ApiError.BadResponse)
+        } finally {
+            server.close()
+        }
+    }
+
+    @Test
+    fun `contenu en morceaux — textes recolles`() {
+        val server = TestHttpServer {
+            TestHttpServer.Response(
+                200,
+                """{"choices":[{"message":{"content":[{"type":"text","text":"la "},{"type":"text","text":"porte"}]}}]}""",
+            )
+        }
+        try {
+            val answer = runBlocking { client(server).ask("QUJD", "où ?", emptyList()) }.getOrThrow()
+            assertEquals("la porte", answer)
+        } finally {
+            server.close()
+        }
+    }
+
+    @Test
+    fun `message absent — BadResponse explicite sans plantage`() {
+        val server = TestHttpServer { TestHttpServer.Response(200, """{"choices":[{"finish_reason":"stop"}]}""") }
+        try {
+            val failure = runBlocking { client(server).ask("QUJD", "où ?", emptyList()) }.exceptionOrNull()
+            assertTrue("attendu BadResponse, obtenu $failure", failure is ApiError.BadResponse)
+            assertTrue(failure?.message?.contains("pas de message") == true)
+        } finally {
+            server.close()
+        }
+    }
+
+    @Test
+    fun `erreur fournisseur en 200 — message du fournisseur`() {
+        val server = TestHttpServer {
+            TestHttpServer.Response(200, """{"error":{"message":"too busy","type":"server_error"}}""")
+        }
+        try {
+            val failure = runBlocking { client(server).ask("QUJD", "où ?", emptyList()) }.exceptionOrNull()
+            assertTrue("attendu BadResponse, obtenu $failure", failure is ApiError.BadResponse)
+            assertTrue(failure?.message?.contains("too busy") == true)
         } finally {
             server.close()
         }
