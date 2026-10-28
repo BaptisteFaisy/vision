@@ -18,27 +18,31 @@ s'il était mesuré.
 
 | Fichier | Rôle |
 |---|---|
-| `GlassesController.kt` (414 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées |
-| `GlassesPolicy.kt` (215 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
+| `GlassesController.kt` (471 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées, connexion mock de recette |
+| `GlassesPolicy.kt` (225 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
 | `GlassesStatus.kt` (44 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
-| `GlassesCamera.kt` (165 l.) | flux 15 i/s `MEDIUM` `compressVideo = true`, photo à la demande, pompe vidéo derrière flag |
+| `GlassesCamera.kt` (203 l.) | flux 15 i/s `MEDIUM` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil + collecteur derrière flag |
 | `GlassesFrameCollector.kt` (83 l.) | pompe de production : `videoStream` → `JpegFrame`, 1 frame / 1,5 s, testée sur JVM |
-| `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec`, **jamais essayé** |
+| `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec` (collecte), **jamais essayé** |
+| `GlassesLiveDecoder.kt` (321 l.) | rendu du direct sur la surface de l'accueil (bitmap, sinon H.265 `MediaCodec` Annex B + `csd-0`), prouvé sur téléphone |
+| `GlassesVideoLink.kt` (169 l.) | passerelle frames + `streaming`/`live` + taille vidéo entre les lunettes et l'accueil iSee |
 | `GlassesFrameConvert.kt` (98 l.) | conversions partagées banc + production (YUV → ARGB → JPEG 85 → base64) |
 | `GlassesFramePolicy.kt` (144 l.) | politique de frame partagée (étranglement, verdict, recadrage, horodatage), pure, testée en JVM |
 | `GlassesAnalysisStep.kt` (67 l.) | maillon partagé « frame → `AnalyzeUseCase` → voix », testé en JVM |
 | `FrameTypes.kt` (158 l.) | `JpegFrame`, `Yuv420Layout`, `YuvConverter` partagés, testés en JVM |
 | `GlassesInputs.kt` (95 l.) | bouton capture → `CaptureAction`, tick 80 ms |
-| `GlassesFrames.kt` (52 l.) | `PhotoData`/`VideoFrame` → `Bitmap` → JPEG du cache |
-| `GlassesMock.kt` (90 l.) | Mock Device Kit + scène 640×480 |
+| `GlassesFrames.kt` (68 l.) | `PhotoData`/`VideoFrame` → `Bitmap` → JPEG du cache, lecture partagée des buffers |
+| `GlassesMock.kt` (144 l.) | Mock Device Kit via le harnais du banc (réutilise la paire, allume/porte/déplie) + vidéo mock |
 | `GlassesSection.kt` (127 l.) | bloc « Lunettes » des Réglages (Compose) |
 | `GlassesState.kt` (42 l.) | `GlassesUiState`, `GlassesEvent`, `SessionPhase` |
 | `core/…/glasses/CaptureGesture.kt` (71 l.) | lissage des appuis, pur, dans `:core` avec son test |
 
 Branchements hors du dossier : `MainActivity.kt:52-55` (création + `initialize`),
-`:71` (`handleIntent`), `:137` (`close()` si l'activité se termine),
+`:71` (`handleIntent`), `:137` (`close()` si l'activité se termine), extra de recette
+`--ez glasses_mock_connect` (`MainActivity.kt`, `GlassesController.debugMockConnect()`),
 `SettingsScreen.kt:103-106` (le bloc), `AppNav.kt:91-101` (`GlassesBridge` : photo → analyse
-ou chat).
+ou chat), accueil iSee (`isee/IseeGlassesLive.kt`, `IseeScenePane.kt`, `IseePortraitCamera.kt` :
+le direct occupe la rue du Portrait quand il est vivant).
 
 ## 2. Le parcours réel, bout en bout
 
@@ -124,15 +128,38 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
   (`:43-54`), en annonçant chaque refus (`GlassesMessages.audioRefused`). Un refus de micro
   laisse donc la caméra seule, sans code mort. Ce qui reste **absent**, c'est le **routage de la
   voix vers les lunettes** : il n'existe que dans le banc (`bench/GlassesVoice.kt`).
-- Le flux vidéo est consommé par le collecteur de production (`GlassesFrameCollector.kt` :
-  `videoStream` → décodage H.265 ou YUV → `JpegFrame` → `AnalyzeUseCase` → voix
-  haut-parleur), derrière un flag **éteint par défaut** (`GlassesCamera.kt`, drapeau
-  `collectFrames`) : éteint, le flux n'est pas lu et la raison est écrite
-  (`frameCollectionIdleReason`, testée en JVM).
-- Conséquence assumée : `VideoFrame.toBitmapOrNull()` et son `rawToBitmap`
-  (`GlassesFrames.kt:22-37`) **ne sont appelés par personne** — code mort côté app : le banc a
-  sa propre conversion (`bench/FrameTypes.kt:76`, `bench/GlassesFrameEncoder.kt:42`, mesuré :
-  zéro `toBitmapOrNull` sous `bench/`). Il n'est pas testé (il faudrait un `Bitmap` Android).
+- Le flux vidéo a **deux consommateurs** dans `GlassesCamera.kt` : le collecteur de production
+  (`GlassesFrameCollector.kt` : `videoStream` → décodage H.265 ou YUV → `JpegFrame` →
+  `AnalyzeUseCase` → voix haut-parleur), derrière un flag **éteint par défaut** (drapeau
+  `collectFrames` : éteint, le flux n'est pas lu et la raison est écrite,
+  `frameCollectionIdleReason`, testée en JVM) ; et la pompe vers l'accueil iSee, qui envoie
+  chaque frame en copie défensive (`GlassesFrame`, jamais de buffer SDK vivant) vers
+  `GlassesVideoLink`, rendue sur la surface de la rue.
+- Rendu (`GlassesLiveDecoder`) : config codec → nourrit le décodeur ; bitmap décodable
+  (JPEG compressé, ou brut ARGB_8888 via `VideoFrame.toBitmapOrNull()`, qui n'est donc plus
+  du code mort) → dessiné ; sinon bitstream H.265 → `MediaCodec` vers la même surface.
+  `live` ne passe à vrai qu'à la première image **rendue** : l'accueil n'ouvre jamais une
+  rue noire. Entre le démarrage du flux (`streaming`) et cette première image, la rue existe
+  en fantôme invisible (surface attachée, alpha nul) : sans elle aucun rendu ne serait
+  possible et `live` resterait faux — même pendant une capture téléphone (l'enregistrement
+  continue, la rue montre les lunettes). Chaque poussée est numérotée (le mock rejoue la
+  même image : sans compteur, une seule émission) et chaque poussée vaut un essai de rendu
+  (pas de boucle d'attente : elle affamait le décodeur, mesuré sur téléphone).
+  Le recadrage « remplit la vue » (`cropTransform`) est pur et testé en JVM ;
+  le reste (codec, surface, `Bitmap`) ne peut pas l'être, comme tout le dossier.
+- Guidage (parité téléphone) : quand le direct vit, `GlassesProbeWiring` photographie
+  la rue affichée (exactement ce que l'utilisateur voit), l'encode comme le téléphone
+  (JPEG 320 q55 redressé, `uprightScaled` + `bitmapToJpegBase64` partagés) et nourrit
+  `LiveProbe.onFrame` — masques, distances, consignes et voix suivent le même chemin.
+  Pendant ce temps la caméra du téléphone n'envoie plus rien (mélanger les deux vues
+  brouillerait le guidage). Config H.265 posée en `csd-0` (les décodeurs ignorent la
+  config en buffer) ; le flux simulé n'envoie que des tranches (NAL 0/1, jamais
+  32/33/34), donc le mock extrait les paramètres de `mock_feed.mp4` en repli.
+- La lecture des buffers (`readRemainingBytes`, `GlassesFrames.kt`) est partagée par la
+  pompe vers l'accueil : une seule copie des buffers.
+- Les deux décodeurs coexistent (`GlassesVideoDecoder` pour la collecte, jamais essayé ;
+  `GlassesLiveDecoder` pour le direct, prouvé sur téléphone) : les fusionner est un
+  chantier à part, quand le premier aura vu du matériel.
 - Seul `PhotoData.toBitmapOrNull()` sert (`GlassesFrames.kt:40`), appelé par
   `GlassesCamera.capture()` (`:66`) : `PhotoData.Bitmap` est utilisé tel quel, `PhotoData.HEIC`
   passe par `BitmapFactory.decodeByteArray`.
@@ -204,13 +231,15 @@ Le mode Direct n'est pas porté sur les lunettes : un double appui répond en cl
 
 Marche **par construction** (lu dans le code, pas constaté sur matériel) : enregistrement →
 session → caméra → photo → analyse, les trois gestes du bouton capture, l'arrêt propre, les
-lunettes simulées en debug.
+lunettes simulées en debug, et le direct affiché à l'accueil (la rue du Portrait montre les
+lunettes connectées, la boule dessous est inchangée).
 
 Ne marche pas, et c'est écrit dans le code :
 
-- pas de trames vidéo consommées **par défaut** : le collecteur existe
+- pas de collecte des trames vidéo **par défaut** : le collecteur existe
   (`GlassesFrameCollector.kt`) mais son flag est éteint, et son décodeur H.265 n'a
-  jamais vu de matériel — donc pas de mode Direct sur lunettes sans geste explicite ;
+  jamais vu de matériel — donc pas de descriptions automatiques sans geste explicite ;
+  le direct affiché et le guidage, eux, tournent dès que les lunettes streament ;
 - pas de routage de la voix vers les lunettes : le micro des lunettes est demandé (palier
   `GlassesAudioPlan`), mais la sortie audio reste le haut-parleur du téléphone (annoncé
   comme tel quand la collecte tourne) ; la permission `MODIFY_AUDIO_SETTINGS` est déclarée
@@ -251,7 +280,7 @@ l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune oc
 |---|---|---|
 | Cadence | 15 i/s (`GlassesCamera.kt`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
 | Compression | `compressVideo = true` : bitstream H.265 | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
-| Trames vidéo | collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
+| Trames vidéo | direct vers l'accueil + guidage (`GlassesLiveDecoder`), collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
 | Audio | piste PCM demandée par palier (`GlassesAudioPlan`), pas de routage de sortie | routage de la voix vers les lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
 | Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |

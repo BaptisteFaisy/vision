@@ -9,12 +9,17 @@ import com.meta.wearable.dat.camera.types.AudioCodec
 import com.meta.wearable.dat.camera.types.AudioSampleRate
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.StreamState
+import com.meta.wearable.dat.camera.types.VideoFrame
 import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
+import android.util.Log
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+/** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
+private const val TAG = "GlassesChain"
 
 /** Caméra des lunettes : un flux (image **et** micro), une photo à la demande, aucun état global. */
 internal class GlassesCamera(
@@ -41,6 +46,8 @@ internal class GlassesCamera(
     private var stream: Stream? = null
     private var collectorJob: Job? = null
     private var collector: GlassesFrameCollector? = null
+    private var framesJob: Job? = null
+    private var pushed = 0L
 
     /** Micro des lunettes, créé avec le flux : `null` tant que rien n'est attaché. */
     var audio: GlassesAudio? = null
@@ -97,6 +104,7 @@ internal class GlassesCamera(
         if (choice.silent && audioAllowed) onNote(GlassesMessages.audioUnavailable())
         watch(attached)
         startFrameCollector(attached.stream)
+        pumpFrames(attached.stream)
         attached.stream.start()
             .onFailure { error, _ -> onNote(GlassesMessages.streamRefused(error.description)) }
     }
@@ -112,6 +120,33 @@ internal class GlassesCamera(
         collector = pump
         collectorJob = scope.launch { pump.run(active.videoStream) }
         onNote(GlassesMessages.framesOnSpeaker())
+    }
+
+    /** Pompe vidéo : chaque frame part en copie vers l'accueil iSee (jamais de buffer vivant). */
+    private fun pumpFrames(stream: Stream) {
+        framesJob?.cancel()
+        framesJob = scope.launch {
+            stream.videoStream.collect { frame -> pushCopy(frame) }
+        }
+    }
+
+    /** Copie défensive vers l'accueil : le SDK peut réutiliser ses buffers, pas nos octets. */
+    private fun pushCopy(frame: VideoFrame) {
+        val bytes = runCatching { frame.buffer.readRemainingBytes() }.getOrNull() ?: return
+        pushed += 1
+        if (pushed == 1L || pushed % 150 == 0L) {
+            Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o)")
+        }
+        GlassesVideoLink.push(
+            GlassesFrame(
+                bytes = bytes,
+                width = frame.width,
+                height = frame.height,
+                presentationTimeUs = frame.presentationTimeUs,
+                compressed = frame.isCompressed,
+                codecConfig = frame.isCodecConfig,
+            ),
+        )
     }
 
     private fun watch(attached: Camera) {
@@ -150,6 +185,9 @@ internal class GlassesCamera(
         collectorJob = null
         collector?.close()
         collector = null
+        framesJob?.cancel()
+        framesJob = null
+        GlassesVideoLink.clear()
         stream?.stop()
         if (camera != null) session.removeCamera()
         camera = null
