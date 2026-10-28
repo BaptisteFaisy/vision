@@ -1,7 +1,8 @@
 # TwinLiteNet, complément on-device de SAM 3.1
 
 Segmentation temps réel **sur le téléphone** (0 GPU Modal) : TwinLiteNet
-(MIT, chequanghuy, converti litert-community) via LiteRT `Interpreter` CPU,
+(MIT, chequanghuy, converti litert-community) via LiteRT neuf
+(`CompiledModel` 2.2.0, cascade GPU→CPU),
 dans un écran démo (Réglages → « Segment demo » ou
 `adb … --es route segment`).
 
@@ -55,7 +56,11 @@ ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac logcat -d' 
 (`-d` : la build tarball a `versionCode = 1`, inférieur à la build git
 installée — `INSTALL_FAILED_VERSION_DOWNGRADE` sinon.)
 
-## Mesure (Redmi 2c6852ac, CPU 4 threads)
+## Mesure (Redmi 2c6852ac)
+
+Historique : `Interpreter` CPU 1885 ms / 0,4 ips, puis délégué GPU
+classique 455 ms mais masques NCHW corrompus (bandes) — d'où la migration
+vers le runtime neuf. Mesures du runtime neuf :
 
 | run | ms inférence (médiane) | ips effectifs | scène |
 | --- | --- | --- | --- |

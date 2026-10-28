@@ -223,11 +223,9 @@ dependencies {
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
     // Profondeur embarquée : DA2 Small (ONNX, primaire) + MiDaS small (LiteRT, repli).
+    // Segmentation TwinLiteNet : même runtime (CompiledModel GPU→CPU).
     implementation(libs.onnxruntime.android)
-    implementation(libs.litert)
-    // Segmentation TwinLiteNet : GPU d'abord (graphe délégable), CPU en repli.
-    implementation(libs.litert.gpu)
-    implementation(libs.litert.gpu.api)
+    implementation(libs.litert.edge)
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
