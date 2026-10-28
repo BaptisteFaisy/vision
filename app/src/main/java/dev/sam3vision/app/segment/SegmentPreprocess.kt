@@ -13,6 +13,7 @@ object SegmentPreprocess {
 
     const val INPUT_WIDTH = 640
     const val INPUT_HEIGHT = 360
+    private const val INV_255 = 1f / 255f
 
     /**
      * Rotation + mise à l'échelle en UNE passe native bilinéaire vers
@@ -49,7 +50,10 @@ object SegmentPreprocess {
             val shift = (2 - c) * 8 // R = 16, G = 8, B = 0
             val base = c * plane
             for (i in 0 until plane) {
-                out[base + i] = ((argb[i] shr shift) and 0xFF) / 255f
+                // Multiplication, pas division : 691 k divisions prenaient ~100 ms.
+                // Écart ≤ 1 ulp sur l'entrée (le délégué calcule en fp16 de toute
+                // façon) : indétectable en sortie.
+                out[base + i] = ((argb[i] shr shift) and 0xFF) * INV_255
             }
         }
         return out

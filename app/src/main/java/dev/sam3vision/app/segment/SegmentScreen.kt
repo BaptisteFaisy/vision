@@ -278,8 +278,8 @@ private fun MaskOverlay(image: ImageBitmap?) {
 /**
  * Les deux masques → un bitmap ARGB : vert = on marche, rouge = on ne marche
  * pas (translucide, la scène reste lisible), voies jaunes par-dessus.
- * Boucle serrée sans lambda (230 kpx par frame) : mêmes pixels, ~10× moins
- * cher que les `getOrElse` par pixel.
+ * Boucle serrée sans lambda (230 kpx par frame) : mêmes pixels, sans les
+ * `getOrElse` par pixel.
  */
 private fun masksToBitmap(drive: SegmentMask, lanes: SegmentMask): Bitmap {
     val w = drive.width
