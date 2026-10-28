@@ -41,13 +41,16 @@ data class StairSignal(
  * - faux positifs sur stores vénitiens, rayures et zébrures horizontales ;
  * - seuils calibrés webcam 640×480, à recalibrer sur captures du téléphone.
  *
- * Branché à la démo NanoDet on-device (`NanoDetScreen`, surcouche magenta +
- * `StairFrame`, 0 GPU) : NanoDet ne connaît aucune classe escalier (80 COCO),
- * ce détecteur la complète sur les mêmes pixels. Non branché au direct SAM ni
- * à la voix : [StairWatcher] (confirmation + cooldown) est l'API prête pour
- * ça. Bloqueurs produit avant la voix : phrase et cooldown à valider, et
- * surtout seuils à recalibrer sur captures réelles — une fausse annonce
- * « escalier » à un utilisateur aveugle est une décision de sécurité.
+ * Non branché au direct (ni overlay ni voix) : [StairWatcher] (confirmation +
+ * cooldown) est l'API prête pour ça. Point d'accroche prévu :
+ * `LiveViewModel.onFrame` — `frameLuma` y a la géométrie fixe de `LumaPlane`
+ * (256×103), donc `GrayMask(256, 103, frameLuma)` sans changer la signature.
+ * Bloqueurs avant branchement : `LiveViewModel` est à 498/500 lignes
+ * (extraire d'abord), phrase et cooldown à valider, et surtout seuils à
+ * recalibrer sur captures réelles — une fausse annonce « escalier » à un
+ * utilisateur aveugle est une décision de sécurité, pas un défaut.
+ * (NanoDet, un temps envisagé comme hôte on-device, est en cours de
+ * suppression de l'app : ne pas câbler vers `app/detect`.)
  *
  * Pur JVM, sans OpenCV (doctrine `:core`, comme `BlockMotionSource`).
  */

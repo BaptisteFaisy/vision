@@ -47,10 +47,10 @@ class StairWatcherTest {
         assertNotNull(watcher.onSignal(positive(), 3000L))
         watcher.onSignal(positive(), 4000L)
         watcher.onSignal(positive(), 5000L)
+        // Compte saturé (3) mais cooldown : tu, et le compte reste saturé —
+        // l'escalier toujours là se ré-annonce dès la fin du silence.
         assertNull(watcher.onSignal(positive(), 6000L))
-        watcher.onSignal(positive(), 13_001L)
-        watcher.onSignal(positive(), 13_002L)
-        assertNotNull(watcher.onSignal(positive(), 13_003L))
+        assertNotNull(watcher.onSignal(positive(), 13_001L))
     }
 
     @Test
