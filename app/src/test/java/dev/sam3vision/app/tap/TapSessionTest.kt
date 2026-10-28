@@ -1,6 +1,6 @@
 package dev.sam3vision.app.tap
 
-import android.content.Context
+import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.MicBus
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.core.net.ApiError
@@ -9,6 +9,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -16,9 +17,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Gate d'envoi et raisons de « Failed » de la session tap. Zéro caméra, zéro réseau :
- * le contexte est une instance vide jamais touchée (permissions et blocage injectés),
- * le TTS est un faux (aucun clip, mot tu) et l'expéditeur compte ses appels.
+ * Gate d'envoi et raisons de « Failed » de la session tap. Zéro caméra, zéro réseau,
+ * zéro `Context` : l'enregistreur est un faux, le TTS est un faux (aucun clip, mot tu),
+ * l'expéditeur rejoue une issue fixée et l'horloge est pilotée à la main.
  */
 class TapSessionTest {
 
@@ -43,20 +44,62 @@ class TapSessionTest {
         val failed = harness.statuses.single() as TapStatus.Failed
         assertTrue(failed.reason.contains("sam31.endpoint"))
         assertEquals(0, harness.calls())
+        assertTrue(harness.video.started == null)
     }
 
     @Test
     fun `permissions refusees echouent explicitement`() = runTest {
-        val harness = harness(scope = this, sendBlocked = { null }, permissionsGranted = { false })
+        val harness = harness(scope = this, permissionsGranted = { false })
 
         harness.session.onTap()
         advanceUntilIdle()
 
-        assertEquals(
-            TapStatus.Failed("permission caméra ou micro refusée"),
-            harness.statuses.single(),
-        )
+        assertEquals(TapStatus.Failed("permission caméra ou micro refusée"), harness.statuses.single())
         assertEquals(0, harness.calls())
+    }
+
+    @Test
+    fun `double tap heureux envoie le clip et affiche le resume`() = runTest {
+        val harness = harness(scope = this, outcome = Result.success("Un chat traverse."))
+
+        harness.session.onTap()
+        runCurrent()
+        harness.now = TapConfig.MIN_RECORDING_MS + 100
+        harness.session.onTap()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(TapStatus.Recording, TapStatus.Sending, TapStatus.Sent("Un chat traverse.")),
+            harness.statuses,
+        )
+        assertEquals(1, harness.calls())
+    }
+
+    @Test
+    fun `echec 404 remonte la raison http`() = runTest {
+        val harness = harness(scope = this, outcome = Result.failure(ApiError.Http(404, "Not Found")))
+
+        harness.session.onTap()
+        runCurrent()
+        harness.now = TapConfig.MIN_RECORDING_MS + 100
+        harness.session.onTap()
+        advanceUntilIdle()
+
+        val failed = harness.statuses.last() as TapStatus.Failed
+        assertTrue(failed.reason.contains("404"))
+    }
+
+    @Test
+    fun `echec 429 remonte la raison limite`() = runTest {
+        val harness = harness(scope = this, outcome = Result.failure(ApiError.RateLimited()))
+
+        harness.session.onTap()
+        runCurrent()
+        harness.now = TapConfig.MIN_RECORDING_MS + 100
+        harness.session.onTap()
+        advanceUntilIdle()
+
+        assertEquals(TapStatus.Failed("limite atteinte (429)"), harness.statuses.last())
     }
 
     @Test
@@ -72,16 +115,18 @@ class TapSessionTest {
 
     private fun harness(
         scope: TestScope,
-        sendBlocked: () -> String?,
+        outcome: Result<String> = Result.success("résumé"),
+        sendBlocked: () -> String? = { null },
         permissionsGranted: () -> Boolean = { true },
     ): Harness {
         val statuses = mutableListOf<TapStatus>()
-        var senderCalls = 0
+        val video = FakeVideoRecorder()
+        var calls = 0
+        var now = 0L
         val player = SpeechPlayer(File(tmp, "clips"))
         val session = TapSession(
-            context = blankContext(),
             scope = scope,
-            video = TapVideoSession(blankContext()),
+            video = video,
             announcements = AnnouncementPlayer(
                 dir = File(tmp, "announcements"),
                 tts = object : TtsClient {
@@ -90,34 +135,39 @@ class TapSessionTest {
                 player = player,
                 scope = scope,
             ),
-            sender = { senderCalls++.let { Result.success("résumé") } },
+            sender = { calls++.let { outcome } },
             onStatus = statuses::add,
-            clock = { 0L },
-            sendBlocked = sendBlocked,
+            newVideoFile = { File(tmp, "clip.mp4").apply { writeBytes(ByteArray(8)) } },
             permissionsGranted = permissionsGranted,
+            clock = { now },
+            sendBlocked = sendBlocked,
         )
-        return Harness(session, statuses) { senderCalls }
+        return Harness(session, statuses, video, { calls }, { value -> now = value }, { now })
     }
 
     private class Harness(
         val session: TapSession,
         val statuses: List<TapStatus>,
+        val video: FakeVideoRecorder,
         val calls: () -> Int,
-    )
+        private val setNow: (Long) -> Unit,
+        private val getNow: () -> Long,
+    ) {
+        var now: Long
+            get() = getNow()
+            set(value) = setNow(value)
+    }
 
-    /**
-     * Instance de [Context] sans constructeur : `Context` est abstrait, `MockContext`
-     * n'est pas au classpath des tests unitaires, et aucun framework de mocks n'est
-     * en dépendances. L'instance n'est jamais touchée (jamais de méthode appelée),
-     * elle ne sert qu'à construire la session.
-     */
-    private fun blankContext(): Context {
-        // Réflexion pure : `sun.misc.Unsafe` n'est pas au classpath de compilation
-        // des tests unitaires, mais présent sur la JVM qui les exécute.
-        val unsafeClass = Class.forName("sun.misc.Unsafe")
-        val field = unsafeClass.getDeclaredField("theUnsafe")
-        field.isAccessible = true
-        val allocate = unsafeClass.getMethod("allocateInstance", Class::class.java)
-        return allocate.invoke(field.get(null), Context::class.java) as Context
+    private class FakeVideoRecorder : TapVideoRecorder {
+        var started: File? = null
+        override val ready: Boolean get() = true
+        override suspend fun bind(owner: LifecycleOwner?): Result<Unit> = Result.success(Unit)
+        override fun start(file: File, withAudio: Boolean): Result<Unit> {
+            started = file
+            return Result.success(Unit)
+        }
+        override fun stop() = Unit
+        override suspend fun stopAndAwait(file: File, timeoutMs: Long): File? = file
+        override fun release() = Unit
     }
 }
