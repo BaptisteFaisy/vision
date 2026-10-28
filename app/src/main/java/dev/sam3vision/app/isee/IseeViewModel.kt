@@ -336,8 +336,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val bytes = voice.synthesize(confirmation)
             if (bytes.isNotEmpty()) {
-                update { it.copy(speakingEntryId = SPEED_BUBBLE_ID, speakingText = confirmation, status = confirmation) }
-                player.play(bytes)
+                playback.speakBytes(SPEED_BUBBLE_ID, confirmation, bytes)
             }
         }
         return true
