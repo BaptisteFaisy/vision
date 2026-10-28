@@ -2,7 +2,8 @@ name: deploy-live-fast
 
 # Le backend live (sam3-eu-a100) doit être déployé **avec ses leviers** : c'est ce qui
 # rend le graphe CUDA (vision 45 ms → 1,4 ms) et la fenêtre de 60 s persistants. Un
-# déploiement manuel sans eux les efface (vu le 25 octobre : cuda_graph repassé à false).
+# déploiement manuel sans eux les efface (relevé antérieur, hors de cet arbre :
+# cuda_graph repassé à false).
 #
 # Deux règles, apprises le 25-26/10 :
 #  1. **aucun contrôle périodique** : un ping /health réveille le conteneur (29 s de

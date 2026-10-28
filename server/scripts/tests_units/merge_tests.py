@@ -1,4 +1,4 @@
-"""Tests de la **fusion** du 25 octobre 20:30 : poids embarqués (son apport) + portage latence.
+"""Tests de la **fusion** (relevé antérieur, hors de cet arbre) : poids embarqués + portage latence.
 
 Ces cas ne mesurent rien : ils vérifient que les deux chantiers cohabitent dans l'arbre
 fusionné, sans perte d'un côté ni de l'autre. Ils lisent la signature et le source (aucun

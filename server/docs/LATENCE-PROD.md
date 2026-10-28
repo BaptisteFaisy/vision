@@ -1,20 +1,17 @@
-# Latence du direct — note de déploiement (app `sam3-eu-a100`, backend `live_app_fast.py`)
+# Latence du direct — note de déploiement (app `sam3-eu-a100`, backend `live_fast/`)
 
 Ce backend est celui **réellement en production** (modèle `sam3.1-fast`, `batch_prompts`,
-grille vision 518, 82-125 ms serveur). `server/backend/` du dépôt vision
+grille vision 518, 82-125 ms serveur). `server/backend/live_fast/` du dépôt vision
 est la copie de référence. **Ne jamais déployer
 `backend/live_app.py`** (205-241 ms, +235 ms de régression).
 
-## La commande, avec les leviers de cette salve
+## La commande, avec les leviers
 
-```bash
-LIVE_APP_NAME=sam3-eu-a100 FAST_GPU=A100-40GB FAST_REGION=eu FAST_ROUTING_REGION=eu-west \
-  FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_TIMING=1 FAST_SCALEDOWN=120 \
-  ~/.venv-modal/bin/modal deploy backend/live_app_fast.py --profile baptiste-faisy
-```
+Seule commande : `scripts/deploy-live-fast.sh` (déploie `backend/live_fast/live_app_fast.py`,
+attend la nouvelle version, vérifie `/health`). Les leviers posés :
 
-`scripts/deploy-live-fast.sh` ne pose aujourd'hui que `FAST_BATCH_PROMPTS` et `FAST_EDGE` :
-il faut lui ajouter `FAST_TIMING=1 FAST_SCALEDOWN=120` (les leviers sont **recuits dans
+`FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=60 FAST_SNAPSHOT=1
+FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1` (les leviers sont **recuits dans
 l'image** au déploiement — changer un levier = redéployer). `max_containers=1`,
 `min_containers=0`, la région et le GPU ne changent pas.
 
@@ -30,7 +27,7 @@ l'image** au déploiement — changer un levier = redéployer). `max_containers=
 | `@modal.concurrent(max_inputs=2)` | supprime l'attente de la 2ᵉ frame en vol au proxy (~90 ms mesurés) | `live_app_fast.py` |
 | dédup alias FR/EN | −14 ms et 5 masques inutiles sur « chaise » + « chair » | rapport `concepts` |
 
-Coût du `scaledown_window=120` : au pire 100 s de A100 en plus par session = **0,067 $**
+Coût du `scaledown_window=60` : au pire une minute de A100 en plus par session ≈ **0,04 $**
 (2,415 $/h), et le bail de `~/bin/sam3-gpu` éteint de toute façon l'app.
 
 ## Contrat client (rétro-compatible dans les deux sens)

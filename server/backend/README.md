@@ -3,6 +3,10 @@
 App Modal `sam3-vision` : SAM 3.1 (segmentation promptée) + LLM vision, exposée en FastAPI.
 Contrat HTTP exact : `../docs/SPEC.md`.
 
+Direct déployé : `live_fast/` (app `sam3-eu-a100`, voir `../docs/LIVE-FAST.md`) ; routage
+CPU : `valhalla_cpu.py` (app `valhalla-idf-cpu`) ; tracker : `track_app.py` (déploiement
+manuel). Cette page décrit l'ère `sam3-vision` (`/analyze`, `/ask`).
+
 ## Structure
 
 | Fichier | Rôle |
