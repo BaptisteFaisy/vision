@@ -9,7 +9,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Carte plus haute et remontée, sans défilement ; boule plus petite au liquide bleu et vert.
 - Couleurs du verre préservées dans le port WebGL ; le shader natif blind person reste inchangé.
 - Build plafonné à deux workers Gradle sur les runners partagés, après un relevé
-  à 80 workers ; délais et contrôles de CI conservés.
+  à 80 workers ; processus Gradle distinct par build après des arrêts de démons
+  réutilisés. Délais, caches et contrôles de CI conservés.
 
 ## 2026-10-28 — intro : voix Laure et fin de la phrase du balayage
 
