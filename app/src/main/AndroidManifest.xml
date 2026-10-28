@@ -103,6 +103,12 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- Guidage vocal : maintien en fond (GPS + annonces), bouton d'arrêt. -->
+        <service
+            android:name=".voicenav.GuidanceTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
     </application>
 
 </manifest>
