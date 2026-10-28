@@ -18,14 +18,14 @@ cet arbre.
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **730** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **76 370** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **315** (193 `:core` + 122 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **1 403** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
-| `@Test` JVM `:app` | **777** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
-| **Total JVM** | **2 180** | somme des deux lignes |
+| Fichiers Kotlin | **733** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **76 990** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **317** (194 `:core` + 123 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **1 418** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| `@Test` JVM `:app` | **784** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
+| **Total JVM** | **2 202** | somme des deux lignes |
 | Tests instrumentés | **10** (9 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
-| Garde de taille | **807** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
+| Garde de taille | **810** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
 | Gardes de scripts | **117** assertions, 117 ok | `bash scripts/test_scripts.sh` |
 | Tests de l'outillage | **58** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py` |
 | Budget CI | 8 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
@@ -41,7 +41,7 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 Relevé du 26/10 après 19 h, sur r630 : **`:core` 663 tests / 0 échec / 0 ignoré** (86 classes),
 **`:app` 305 / 0 / 0** (50 classes) et **36 / 0 / 0** (3 classes) pour le module lunettes, supprimé
 depuis : ses tests vivent maintenant dans `:app` (`glasses/bench`, **95** `@Test`). Ce relevé n'a
-**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (1 403 + 777,
+**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (1 418 + 784,
 recomptés le 28/10) disent combien de tests **existent**, pas combien ont **tourné** ce jour-là.
 Recomptage du 28/10 : statique (`grep`), aucun `gradlew` relancé.
 Les 10 tests instrumentés ne sont **pas** dans ces chiffres (aucun appareil n'a été utilisé).
@@ -103,7 +103,7 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Concepts suivis par défaut | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), max 6, 32 caractères | `core/live/LivePrompts.kt:27,34,37` |
 | Budget de tokens du LLM | **1200** (photo/chat, le défaut raisonne avant de répondre), **200** (narration de frame), réponse de direct tronquée à **400** caractères, température **0,2** | `core/net/HttpLlmClient.kt:21-24` |
 | Modèle de narration | **même** modèle Meta que les questions : `meta-models/muse-spark-open-1026` (Baseten, raisonnement coupé), clé dédiée (`liveLlmApiKey`) ; sans clé, le Direct se tait | `core/settings/Settings.kt` (`DEFAULT_LIVE_LLM_MODEL`), `app/LlmFactory.kt` (`liveNarration`) |
-| Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:69` (`MAX_HISTORY_TURNS`) |
+| Historique envoyé au LLM | **20** tours | `core/usecase/UseCases.kt:81` (`MAX_HISTORY_TURNS`) |
 | Champ de vision de repli | **67°**, bornes **15–130°** | `core/distance/LensSpec.kt:43,46,49` |
 | Lissage des distances | **0,35** (suivi), **0,85** (saut) | `core/distance/DistanceSmoother.kt:19-20` |
 | Appui long | **300 ms**, tolérance **24 px** | `core/gesture/LongPressTrigger.kt:102,105` |
