@@ -155,7 +155,7 @@ private fun CameraSurface(
                 .tapOnce { onOpenTap(true) },
         )
         GestureHint(Modifier.align(Alignment.TopCenter))
-        error?.let { StatusBanner(it, AppColors.danger, Modifier.align(Alignment.TopCenter)) }
+        error?.let { StatusBanner(it, AppColors.danger, Modifier.align(Alignment.TopCenter).statusBarsPadding()) }
         CaptureControls(
             modifier = Modifier.align(Alignment.BottomCenter),
             ready = granted && attached,

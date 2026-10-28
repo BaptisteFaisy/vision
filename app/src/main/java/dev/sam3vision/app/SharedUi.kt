@@ -1,6 +1,9 @@
 package dev.sam3vision.app
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +50,7 @@ import dev.sam3vision.core.model.SegObject
 fun StatusBanner(message: String, color: Color, modifier: Modifier = Modifier) {
     Text(
         text = message,
-        color = Color.White,
+        color = contentOn(color),
         fontSize = 13.sp,
         modifier = modifier
             .padding(12.dp)
@@ -69,7 +74,7 @@ fun BigButton(
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
-            contentColor = if (color == AppColors.surfaceHigh) AppColors.text else Color.White,
+            contentColor = contentOn(color),
         ),
         modifier = Modifier.fillMaxWidth(widthFactor).height(54.dp),
     ) {
@@ -149,6 +154,7 @@ fun ChevronBack(onBack: () -> Unit) {
 /** Écran d'absence de permission caméra. */
 @Composable
 fun PermissionGate(onAllow: () -> Unit) {
+    val context = LocalContext.current
     Box(Modifier.fillMaxSize().background(AppColors.background), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -163,8 +169,22 @@ fun PermissionGate(onAllow: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             BigButton("Autoriser", true, AppColors.primary, onAllow)
+            // Refus permanent (« Ne plus demander ») : redemander ne sert à rien,
+            // seuls les Réglages système peuvent réactiver la caméra.
+            OutlinedButton(onClick = { openAppSettings(context) }) {
+                Text("Ouvrir les Réglages", fontSize = 13.sp)
+            }
         }
     }
+}
+
+/** Fiche « infos sur l'appli » système, là où se réactive une permission refusée. */
+private fun openAppSettings(context: Context) {
+    val intent = Intent(
+        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null),
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
 }
 
 /** En-tête commun aux écrans. */
@@ -194,7 +214,10 @@ fun PhotoStage(
     showMasks: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier, contentAlignment = Alignment.Center) {
+    // Taille explicite au ratio réel de la photo : dans une colonne scrollable
+    // (hauteur infinie), un `fillMaxSize` nu se mesure à 0 et la photo disparaît.
+    val ratio = (bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)).coerceIn(0.25f, 4f)
+    Box(modifier.fillMaxWidth().aspectRatio(ratio), contentAlignment = Alignment.Center) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "Photo analysée",
