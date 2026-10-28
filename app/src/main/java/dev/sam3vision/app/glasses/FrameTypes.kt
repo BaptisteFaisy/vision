@@ -1,4 +1,8 @@
-package dev.sam3vision.app.glasses.bench
+package dev.sam3vision.app.glasses
+
+// Types de frames partagés par le banc (`bench/`) et le collecteur de
+// production ([GlassesFrameCollector]) : une seule définition du JPEG envoyé à
+// l'API et de la conversion YUV, prouvée sur JVM par `YuvConverterTest`.
 
 /**
  * Frame JPEG prête pour l'API (SAM / LLM).

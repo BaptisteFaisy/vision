@@ -40,8 +40,8 @@ des deux est sur le chemin de production.
 |---|---|---|
 | cadence demandée | **15** (`GlassesCamera.kt:129`, `:62`) | **24** (`GlassesDeviceSession.kt:12`, `:46`) |
 | `compressVideo` | **`true`** (`GlassesCamera.kt:63`) : bitstream H.265 | jamais passé → défaut SDK `false` : YUV brut |
-| flux vidéo | **aucun** abonnement à `videoStream` (0 occurrence hors `bench/`, mesuré) | `videoStream` collecté, étranglé à 1 frame / 1,5 s (`GlassesFramePump.kt:38-44`) |
-| image | photo à la demande `capturePhoto()` → `PhotoData` (`GlassesFrames.kt:40`) | convertisseur YUV propre (`FrameTypes.kt:76`, `:134`) puis encodage JPEG (`GlassesFrameEncoder.kt:42`) |
+| flux vidéo | collecteur prod `GlassesFrameCollector.kt` derrière flag **éteint par défaut** (décodage H.265, jamais essayé) | `videoStream` collecté, étranglé à 1 frame / 1,5 s (`GlassesFramePump.kt:38-44`) |
+| image | photo à la demande `capturePhoto()` → `PhotoData` (`GlassesFrames.kt:40`) | convertisseur YUV partagé (`glasses/FrameTypes.kt:80`, `:138`) puis encodage JPEG partagé (`glasses/GlassesFrameConvert.kt`) |
 | audio | piste PCM du flux (`GlassesAudioPlan`, `GlassesCamera.kt:43-44`), pas de routage Bluetooth | routage de la voix vers la sortie des lunettes (`GlassesVoice.kt:63`, `:97-110`) |
 | UI | bloc « Lunettes » des Réglages (`GlassesSection.kt`) | un écran, un journal, des boutons (`BenchScreen.kt`) |
 | point d'entrée | l'app elle-même (accueil, Réglages) | `Route.Bench` dans la navigation d'iSee (`AppNav.kt:45`, `:95`) |
@@ -66,33 +66,37 @@ Wearables (SDK DAT) → Stream.videoStream
 2. **Canal** — `Channel<VideoFrame>(Channel.CONFLATED)` (`GlassesSessionRuntime.kt:43`) : la
    frame la plus récente écrase l'attente, rien ne s'empile.
 3. **Étranglement** — `consumeFrames` (`GlassesFramePump.kt:38-44`) : attente calculée par
-   `throttleDelayMs` (`GlassesSessionPolicy.kt:100`), puis re-lecture non bloquante pour
-   préférer une frame plus fraîche à celle tenue pendant 1,5 s (`FRAME_THROTTLE_MS`,
-   `GlassesSessionPolicy.kt:22`).
-4. **Verdict** — `frameVerdict` (`GlassesSessionPolicy.kt:148`) écarte compressé, config codec
-   et dimensions nulles avant toute copie. La compression est testée **en premier**.
-5. **Copie** — `readRemainingBytes` (`GlassesFrameEncoder.kt:97`) duplique le `ByteBuffer` sans
-   déplacer la position du buffer du SDK (testé : `GlassesFrameEncoderTest`).
-6. **Disposition** — `inferYuv420Layout` (`FrameTypes.kt:134`) déduit les strides **de la seule
-   taille du buffer** : alignements de ligne 1 à 256 px, deux conventions de chroma, puis repli
-   « serré ». Le SDK n'expose aucun format.
-7. **Conversion** — `YuvConverter.yuv420ToArgb` (`FrameTypes.kt:76`) : BT.601 en arithmétique
-   entière, sans allocation dans la boucle, refus explicite des entrées incohérentes.
-8. **Encodage** — `encode` (`GlassesFrameEncoder.kt:65`) : `Bitmap` ARGB → recadrage
-   centré 16:9 (`cropTo16x9`, `GlassesFramePolicy.kt` : le 504×896 du SDK perd le haut et
-   le bas) → réduction sous `MAX_IMAGE_EDGE = 1024` (`:13`, via `scaleDown`, `:86`) →
-   JPEG qualité 85 (`:16`) → base64 sans préfixe `data:`.
-9. **Horodatage** — `frameTimestampMs` (`GlassesFramePolicy.kt`) : µs du SDK → ms, sinon
-   `SystemClock.elapsedRealtime()`. Les deux branches ne sont **pas** dans le même référentiel
-   (voir §5).
+   `throttleDelayMs` (partagé, `glasses/GlassesFramePolicy.kt:105`), puis re-lecture non
+   bloquante pour préférer une frame plus fraîche à celle tenue pendant 1,5 s
+   (`FRAME_THROTTLE_MS`, `:91`).
+4. **Verdict** — `frameVerdict` (partagé, `glasses/GlassesFramePolicy.kt:134`) écarte
+   compressé, config codec et dimensions nulles avant toute copie. La compression est
+   testée **en premier**.
+5. **Copie** — `payloadBytes` (partagé, `glasses/GlassesFrameConvert.kt`) duplique le
+   `ByteBuffer` sans déplacer la position du buffer du SDK (testé :
+   `GlassesFrameEncoderTest`).
+6. **Disposition** — `inferYuv420Layout` (partagé, `glasses/FrameTypes.kt:138`) déduit les
+   strides **de la seule taille du buffer** : alignements de ligne 1 à 256 px, deux
+   conventions de chroma, puis repli « serré ». Le SDK n'expose aucun format.
+7. **Conversion** — `YuvConverter.yuv420ToArgb` (partagé, `glasses/FrameTypes.kt:80`) :
+   BT.601 en arithmétique entière, sans allocation dans la boucle, refus explicite des
+   entrées incohérentes.
+8. **Encodage** — `argbToJpegFrame` (partagé, `glasses/GlassesFrameConvert.kt`) : `Bitmap`
+   ARGB → recadrage centré 16:9 (`cropTo16x9`, `glasses/GlassesFramePolicy.kt:70` : le
+   504×896 du SDK perd le haut et le bas) → réduction sous `MAX_IMAGE_EDGE = 1024`
+   (`scaledDimensions`, `:44`) → JPEG qualité 85 → base64 sans préfixe `data:`.
+9. **Horodatage** — `frameTimestampMs` (partagé, `glasses/GlassesFramePolicy.kt:29`) : µs
+   du SDK → ms, sinon `SystemClock.elapsedRealtime()`. Les deux branches ne sont **pas**
+   dans le même référentiel (voir §5).
 10. **Aval** — le contrôleur de l'écran (`BenchController.onFrame`, `BenchScreen.kt:290`) journalise
     toujours ; si « Analyser » est actif, il appelle `AnalyzeUseCase` (`:core`) puis
     `GlassesVoice.say`.
 
-Toute la décision vit hors Android : `GlassesSessionPolicy.kt` (états d'enregistrement, erreurs
-de flux, verdict de frame, étranglement, `CycleLatch`), `GlassesFramePolicy.kt` (horodatage,
-recadrage 16:9, réduction), `SpikeLog.kt` (journal, messages courts). C'est ce qui rend les tests
-JVM possibles sans stub du SDK.
+Toute la décision vit hors Android : `glasses/GlassesFramePolicy.kt` (partagé avec la
+production : horodatage, recadrage 16:9, réduction, étranglement, verdict de frame),
+`GlassesSessionPolicy.kt` (cycle du banc seul : états d'enregistrement, erreurs de flux,
+`CycleLatch`), `SpikeLog.kt` (journal, messages courts). C'est ce qui rend les tests JVM
+possibles sans stub du SDK.
 
 ## 3. Les 24 i/s : ce qui est demandé, ce qui est mesuré
 
@@ -105,7 +109,8 @@ JVM possibles sans stub du SDK.
   lunettes ici. 24 est une valeur **demandée**, pas une cadence constatée.
 - **Sortie bien plus lente que l'entrée** : même si le flux tient 24 i/s, le banc ne convertit
   et n'envoie qu'au plus une frame toutes les `FRAME_THROTTLE_MS = 1_500L`
-  (`GlassesSessionPolicy.kt:22`), soit ≈ **0,67 image/s**. Les frames intermédiaires sont jetées
+  (`glasses/GlassesFramePolicy.kt:91`, partagé avec la production), soit ≈ **0,67 image/s**.
+  Les frames intermédiaires sont jetées
   par le canal conflaté : « pipeline à 24 fps » désigne le flux d'entrée, pas la cadence utile.
 
 ## 4. Ce que le bytecode prouve (relevé du 26/10, `javap`)
@@ -179,7 +184,7 @@ Ces faits viennent des AAR du cache Gradle local, pas d'un téléchargement de c
 - `DatError` : `description` + `getLocalizedDescription(Context)` — ce dernier exige un
   `Context`, d'où le repli de `GlassesRuntime.describe` (`GlassesSessionRuntime.kt:76`).
 - `StreamError` : 8 valeurs. Seule `CRITICAL_STREAM_ERROR` arrête le cycle
-  (`streamErrorDisposition`, `GlassesSessionPolicy.kt:120`) ; batterie, charnière, thermique et
+  (`streamErrorDisposition`, `GlassesSessionPolicy.kt:103`) ; batterie, charnière, thermique et
   timeout sont transitoires côté DAT et ne coupent rien.
 - `DeviceSessionError`, `PermissionError`, `CaptureError` : jamais traités nommément ici — les
   `fold`/`onFailure` se contentent de `description`. Assumé pour un banc.
