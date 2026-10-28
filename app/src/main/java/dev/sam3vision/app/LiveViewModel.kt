@@ -18,6 +18,7 @@ import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
 import dev.sam3vision.app.live.LiveWakeGuard
 import dev.sam3vision.app.live.MaskPainter
+import dev.sam3vision.app.traverse.TraverseWiring
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.FramePipeline
@@ -28,11 +29,11 @@ import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.core.mask.colorizedObjectBitmap
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStoreFactory
+import dev.sam3vision.core.traverse.TraversePipeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -131,6 +132,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         asking = { _state.value.memory.asking },
         speak = { current, phrase -> voice.say(current, phrase) },
     )
+
+    /** Câblage traversée : pipeline + voix, branché dans [publish]. */
+    private val traverse = TraverseWiring(TraversePipeline())
 
     /** Narration continue : une frame sur deux secondes part au LLM vision. */
     private val narration = LiveNarration(viewModelScope, _state) {
@@ -231,6 +235,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Remise à zéro commune aux deux démarrages : journal, distances, cadence, concepts. */
     private fun resetForStart(prompts: List<String>) {
         trackFallback.reset()
+        traverse.reset()
         val chosen = LivePrompts.normalize(prompts)
         // Journal et historique de questions : vidés par `asker.reset()` (une seule
         // implémentation de « la mémoire du direct s'efface », partagée avec `stop()`).
@@ -275,6 +280,10 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         trackerEnabled = !trackerEnabled
         restartActive()
     }
+
+    /** Bascule le mode traversée : prompts véhicules + voix, ou retour au défaut. */
+    fun setTraverseActive(active: Boolean) =
+        traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) }, positions::reset)
 
     /**
      * Frame venue de l'analyseur caméra. Sans session SAM, elle est seulement **gardée
@@ -357,24 +366,24 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             lastKnownWidth = width
             lastKnownHeight = height
         }
-        val detections = frame.objects.toDetections(width, height)
-        val seen = timeline.record(now, detections)
+        val shown = traverse.filter(frame, width, height, distances.lensSpec.focalPx(width, height), now, settings.speechLanguage)
+        val seen = timeline.record(now, shown.detections)
         // Réponse serveur absorbée par la prédiction : elle sert d'ancre aux boîtes
         // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
-        prediction.absorb(frame, now, width, height)
-        val readings = distances.measure(width, height, detections, seen.map { it?.id })
-        positions.announce(frame, width, height, now, readings)
+        prediction.absorb(shown.frame, now, width, height)
+        val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
+        if (!traverse.active || shown.keepGuidance) positions.announce(shown.frame, width, height, now, readings)
         // Calcul hors thread principal (voir LiveMaskDecoder) ; le poste `overlays` est posé là-bas.
-        val overlays = masks.decode(frame)
+        val overlays = masks.decode(shown.frame)
         val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
-        publishStages(frame)
+        publishStages(shown.frame)
         _state.update { current ->
             current.copy(
-                frame = frame,
+                frame = shown.frame,
                 overlays = overlays,
-                objectsCount = frame.objects.size,
+                objectsCount = shown.frame.objects.size,
                 transport = transportLabel(trackerEnabled, client),
                 latencyMs = pipeline?.stats?.averageMs ?: 0L,
                 fps = LiveFpsMeter.fpsFor(gap, current.fps),
@@ -413,11 +422,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     fun applyLens(spec: LensSpec?) {
         if (spec != null && spec.usable) sensorLens = spec
         distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
-    }
-
-    /** Instant demandé dans l'UI : « il y a N s » (0 = maintenant). */
-    fun setFocus(seconds: Int) = _state.update {
-        it.copy(memory = it.memory.copy(focusSeconds = seconds.coerceAtLeast(0)))
     }
 
     /**
@@ -475,7 +479,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         distances.reset()
         prediction.reset()
         wake.reset()
-        positions.reset()
+        traverse.deactivate(positions::reset)
         voice.stop()
         latestFrame.clear()
         chronology.reset()
@@ -486,6 +490,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         client?.close()
         voice.release()
+        traverse.close()
         super.onCleared()
     }
 
