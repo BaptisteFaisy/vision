@@ -130,6 +130,13 @@ data class Settings(
      */
     val speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT,
     /**
+     * Base de l'itinéraire Valhalla (`POST /route`, mode piéton) : URL publique
+     * du tunnel (Funnel r630) ou du proxy devant — jamais un secret, jamais en
+     * dur. Vide = pas d'itinéraire in-app, le guidage reste celui de Google
+     * Maps. Remplie au build (`route.base.url`) ou dans Réglages.
+     */
+    val routeBaseUrl: String = "",
+    /**
      * Moteur de profondeur embarqué (100 % sur le téléphone, 0 GPU Modal).
      * Coupé par défaut : le banc embarqué (Réglages → Profondeur) valide la
      * latence sur l'appareil avant toute activation.
@@ -233,6 +240,7 @@ data class Settings(
             shareId = DEFAULT_SHARE_ID,
             shareWriteKey = "",
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
+            routeBaseUrl = "",
         )
     }
 
@@ -279,6 +287,9 @@ data class Settings(
     /** Vrai si un champ de vision de repli a été saisi (sinon : lecture capteur). */
     val cameraFovForced: Boolean get() = cameraFovDeg > 0f
 
+    /** Vrai si le guidage vocal Valhalla peut partir (endpoint renseigné). */
+    val routeConfigured: Boolean get() = routeBaseUrl.isNotBlank()
+
     /**
      * Affichage **sûr** : les trois clés d'API sont masquées, jamais imprimées. Un
      * `Settings` part dans un `Log`, dans le message d'une exception, dans une trace
@@ -299,7 +310,8 @@ data class Settings(
         "localOverlayEnabled=$localOverlayEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +
-        "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects)"
+        "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects, " +
+        "routeBaseUrl=$routeBaseUrl)"
 }
 
 /** Marqueur de substitution d'une secret masqué (voir [maskSecret]). */

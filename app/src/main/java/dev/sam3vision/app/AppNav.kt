@@ -28,6 +28,8 @@ import dev.sam3vision.app.glasses.bench.BenchScreen
 import dev.sam3vision.app.isee.IseeHome
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.OnboardingGesturesScreen
+import dev.sam3vision.app.voicenav.VoiceNavRoute
+import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
 
@@ -64,6 +66,12 @@ sealed interface Route {
      * d'elle-même, sans deuxième tap.
      */
     data class Tap(val autoStart: Boolean = false) : Route
+
+    /**
+     * Navigation vocale in-app (URL Valhalla configurée) : confirmation puis
+     * guidage, poussée par l'état de session — jamais ouverte à la main.
+     */
+    data object VoiceNav : Route
 }
 
 /**
@@ -85,6 +93,28 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
     LaunchedEffect(request) { if (request != null) push(Route.Bench) }
 }
 
+/**
+ * L'état de session pilote l'écran navigation : confirmation ou guidage =
+ * poussé (une fois), repos = dépilé (arrivée, arrêt, annulation). Le retour
+ * système dépile sans repousse : quitter l'écran arrête le guidage.
+ */
+@Composable
+private fun VoiceNavStateEffect(
+    isee: IseeViewModel,
+    route: Route,
+    push: (Route) -> Unit,
+    pop: () -> Unit,
+) {
+    val navState by isee.voiceNavState.collectAsState()
+    LaunchedEffect(navState) {
+        if (navState is VoiceNavUiState.Idle) {
+            if (route == Route.VoiceNav) pop()
+        } else if (route != Route.VoiceNav) {
+            push(Route.VoiceNav)
+        }
+    }
+}
+
 @Composable
 fun AppNav(
     viewModel: AppViewModel,
@@ -102,6 +132,7 @@ fun AppNav(
     val pop: () -> Unit = { if (names.size > 1) names = names.drop(1) }
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
+    VoiceNavStateEffect(isee, route, push, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
@@ -174,6 +205,7 @@ private fun RouteHost(
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
+        Route.VoiceNav -> VoiceNavRoute(isee, onClose = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
 }

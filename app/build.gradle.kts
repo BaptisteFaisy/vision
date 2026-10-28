@@ -120,6 +120,10 @@ android {
         buildConfigField("String", "SAM_BASE_URL", "\"${localProp("sam.base.url")}\"")
         // Endpoint de la région US (mode US des Réglages) : app Modal déployée en us-east.
         buildConfigField("String", "SAM_US_BASE_URL", "\"${localProp("sam.us.base.url")}\"")
+        // Routeur Valhalla (guidage vocal piéton) : URL publique du tunnel Funnel
+        // servi par le r630 (ou du proxy devant). Vide = routage in-app désactivé,
+        // Google Maps reste le guidage. Réglages prime sur le build.
+        buildConfigField("String", "ROUTE_BASE_URL", "\"${localProp("route.base.url")}\"")
         // Calque local (propagation entre deux keyframes) : vide = le réglage des Réglages
         // décide ; « true »/« false » = drapeau de build prioritaire (démo, tests).
         buildConfigField("String", "LOCAL_OVERLAY", "\"${localProp("live.local.overlay")}\"")

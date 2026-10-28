@@ -46,6 +46,7 @@ class SettingsStoreParityTest {
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
         speechLanguage = SpeechLanguage.Fr,
+        routeBaseUrl = "https://route.test",
     )
 
     @Test
@@ -63,6 +64,7 @@ class SettingsStoreParityTest {
         assertEquals(true, relu.boxPredictionEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.Fr, relu.speechLanguage)
+        assertEquals("https://route.test", relu.routeBaseUrl)
     }
 
     @Test

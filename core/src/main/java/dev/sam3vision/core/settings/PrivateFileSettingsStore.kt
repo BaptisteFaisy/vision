@@ -117,6 +117,7 @@ internal object SettingsCodec {
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
+    private const val K_ROUTE_BASE_URL = "routeBaseUrl"
     private const val K_CAMERA_FOV = "cameraFovDeg"
     private const val K_CAREGIVER_ROLE = "caregiverRole"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
@@ -152,6 +153,7 @@ internal object SettingsCodec {
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
+        appendLine("$K_ROUTE_BASE_URL=${s.routeBaseUrl}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
         appendLine("$K_CAREGIVER_ROLE=${s.caregiverRole.name}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
@@ -201,6 +203,7 @@ internal object SettingsCodec {
                 ?: default.localOverlayEnabled,
             navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()
                 ?: default.navigationGuidanceEnabled,
+            routeBaseUrl = values[K_ROUTE_BASE_URL].orEmpty(),
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
             maxObjects = ObjectLimits.clamp(

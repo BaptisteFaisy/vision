@@ -16,6 +16,7 @@ internal data class BuildDefaults(
     val asrApiKey: String = BuildConfig.ASR_API_KEY,
     val liveLlmApiKey: String = BuildConfig.LIVE_LLM_API_KEY,
     val googleMapsApiKey: String = BuildConfig.GOOGLE_MAPS_API_KEY,
+    val routeBaseUrl: String = BuildConfig.ROUTE_BASE_URL,
 ) {
     companion object {
         val FromBuild: BuildDefaults = BuildDefaults()
@@ -36,14 +37,19 @@ internal data class BuildDefaults(
 fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.FromBuild)
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
-internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedGoogleMaps(withTtsDefaults(
+internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
     seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build),
-), build)
+), build), build)
 
 /** L'installation et la mise à jour remplissent la clé de carte tant qu'elle est vide. */
 internal fun seedGoogleMaps(loaded: Settings, build: BuildDefaults): Settings =
     if (loaded.googleMapsApiKey.isNotBlank() || build.googleMapsApiKey.isBlank()) loaded
     else loaded.copy(googleMapsApiKey = build.googleMapsApiKey)
+
+/** L'installation et la mise à jour remplissent l'URL Valhalla tant qu'elle est vide. */
+internal fun seedRouteBaseUrl(loaded: Settings, build: BuildDefaults): Settings =
+    if (loaded.routeBaseUrl.isNotBlank() || build.routeBaseUrl.isBlank()) loaded
+    else loaded.copy(routeBaseUrl = build.routeBaseUrl)
 
 /**
  * Clé de **narration du Direct** (même modèle Meta que les questions, clé dédiée) : elle

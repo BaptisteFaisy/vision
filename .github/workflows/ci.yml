@@ -153,6 +153,15 @@ jobs:
           python3 tools/check-budget-derive.py
           python3 -m unittest tools/test_check_budget_derive.py
 
+      # Porte anti-dérive de la navigation vocale : les phrases, le catalogue
+      # « en place » et les chiffres de docs/NAVIGATION-VOCALE.md doivent être
+      # ceux du code. Quelques secondes, aucune compilation — même motif que
+      # la porte du budget ci-dessus, dans le même job (pas de job neuf).
+      - name: Porte anti-dérive navigation vocale (doc ↔ code)
+        run: |
+          python3 tools/check-voice-nav-doc.py
+          python3 -m unittest tools/test_check_voice_nav_doc.py
+
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
       - name: Tests JVM (:core + :app)

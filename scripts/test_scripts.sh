@@ -13,7 +13,9 @@ INSTALL="${HERE}/install-emulator.sh"
 VERIFY="${HERE}/verify-tap-voix.sh"
 VERIFY_PORT="${HERE}/verify-longpress-port.sh"
 LATEST="${HERE}/install-phone-latest.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST")
+FUNNEL="${HERE}/valhalla-funnel.sh"
+VERIFY_NAV="${HERE}/verify-voice-nav.sh"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$FUNNEL" "$VERIFY_NAV")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -132,6 +134,10 @@ run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY_PORT"
 expect_nonzero 'verify-longpress-port refuse un APK absent'
 expect_grep 'APK absent' 'verify-longpress-port nomme l APK manquant'
 
+run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY_NAV"
+expect_nonzero 'verify-voice-nav refuse un APK absent'
+expect_grep 'APK absent' 'verify-voice-nav nomme l APK manquant'
+
 # --- 5. safe_rm_rf ---------------------------------------------------------
 echo "== 5. safe_rm_rf : garde des suppressions =="
 run bash -c '. "$1"; safe_rm_rf ""' _ "$LIB"
@@ -169,6 +175,40 @@ expect_status 0 'install-phone-latest lie le fichier de cles de la machine'
 run grep -nE '(cat|echo|tee|printf|head|tail)[^#]*build-keys' "$LATEST"
 expect_nonzero 'le fichier de cles ne sort jamais du script'
 
+# --- 5 ter. valhalla-funnel.sh --------------------------------------------
+echo "== 5 ter. valhalla-funnel.sh : tunnel et sante =="
+cat >"${TMP}/bin/ssh" <<'STUB'
+#!/usr/bin/env bash
+# Faux ssh : rejoue la commande demandee (dernier argument) en local factice.
+case "${*: -1}" in
+  *funnel*status*) printf 'https://r630-debian.tailnet.ts.net (funnel)\n' ;;
+  *8002/status*) printf '{"version":"3.6.0"}\n' ;;
+  *funnel*--bg*) printf 'Available at https://r630-debian.tailnet.ts.net\n' ;;
+  *funnel*reset*) printf 'reset\n' ;;
+esac
+exit 0
+STUB
+chmod +x "${TMP}/bin/ssh"
+
+run env SSH_BIN="${TMP}/bin/ssh" bash "$FUNNEL" status
+expect_status 0 'valhalla-funnel status sort 0 (ssh factice)'
+expect_grep 'funnel' 'valhalla-funnel status montre le tunnel'
+
+run env SSH_BIN="${TMP}/bin/ssh" bash "$FUNNEL" up
+expect_status 0 'valhalla-funnel up sort 0 (ssh factice)'
+expect_grep 'OK' 'valhalla-funnel up conclut par OK'
+
+run env SSH_BIN="${TMP}/bin/ssh" bash "$FUNNEL" down
+expect_status 0 'valhalla-funnel down sort 0 (ssh factice)'
+expect_grep 'coupée' 'valhalla-funnel down confirme la coupure'
+
+run bash "$FUNNEL" check http://127.0.0.1:9
+expect_nonzero 'valhalla-funnel check refuse une URL morte'
+expect_grep 'injoignable' 'valhalla-funnel check dit injoignable'
+
+run bash "$FUNNEL" check
+expect_status 2 'valhalla-funnel check sans URL sort 2'
+
 # --- 6. garde-fous statiques ----------------------------------------------
 echo "== 6. garde-fous statiques =="
 run grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "${SCRIPTS[@]}" "$LIB"
@@ -194,6 +234,37 @@ for f in "${SCRIPTS[@]}" "$LIB" "${HERE}/test_scripts.sh"; do
     RC=$lines; OUT=""; ko "$(basename -- "$f") < 500 lignes ($lines)"
   fi
 done
+
+# --- 7. recette navigation vocale : phrases E2E verrouillées -----------------
+# Les phrases dictées sur le téléphone sont recopiées à l'identique dans le
+# script, la fiche et le verrou JVM : toute dérive casse ici.
+echo "== 7. recette navigation vocale : phrases E2E =="
+NAV_TEST="${ROOT}/core/src/test/java/dev/sam3vision/core/nav/VoiceNavScriptTest.kt"
+NAV_DOC="${HERE}/../docs/RECETTE-NAVIGATION-VOCALE.md"
+for f in "$NAV_TEST" "$NAV_DOC"; do
+  run test -f "$f"
+  expect_status 0 "$(basename -- "$f") existe"
+done
+run grep -q -F 'je veux aller à la gare de Lyon' "$VERIFY_NAV"
+expect_status 0 'le script dicte la gare de Lyon'
+run grep -q -F 'Emmène-moi à la tour Eiffel' "$VERIFY_NAV"
+expect_status 0 'le script cite la tour Eiffel'
+run grep -q -F 'je veux aller à la gare de Lyon' "$NAV_DOC"
+expect_status 0 'la fiche dicte la gare de Lyon'
+run grep -q -F 'Où est la pharmacie la plus proche' "$NAV_DOC"
+expect_status 0 'la fiche contre-éprouve la question'
+run grep -q -F 'Emmène-moi à »' "$NAV_DOC"
+expect_status 0 'la fiche cite la destination vide'
+run grep -q -F 'je veux aller à la gare de Lyon' "$NAV_TEST"
+expect_status 0 'le verrou JVM dicte la gare de Lyon'
+run grep -q -F 'Emmène-moi à la tour Eiffel' "$NAV_TEST"
+expect_status 0 'le verrou JVM dicte la tour Eiffel'
+run grep -q -F 'Où est la pharmacie la plus proche' "$NAV_TEST"
+expect_status 0 'le verrou JVM contre-éprouve la question'
+run grep -q -F '"Emmène-moi à"' "$NAV_TEST"
+expect_status 0 'le verrou JVM cite la destination vide'
+run grep -q -F '"va à gauche"' "$NAV_TEST"
+expect_status 0 'le verrou JVM documente le piège cap'
 
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"

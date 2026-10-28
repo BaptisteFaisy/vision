@@ -9,4 +9,35 @@
     <string name="nav_guidance_unavailable">Je ne peux pas ouvrir le guidage</string>
     <!-- Réglages : interrupteur « Guidage GPS » (cf. NavigationToggle). -->
     <string name="nav_guidance_toggle_label">Guider vers la destination confirmée</string>
+    <!-- Guidage vocal : arrivée nommée (cf. VoiceNavPhrases.arrived). -->
+    <string name="nav_voice_arrived">Vous êtes arrivé à %1$s</string>
+    <!-- Guidage vocal : arrivée sans nom (cf. VoiceNavPhrases.ARRIVED_PLAIN). -->
+    <string name="nav_voice_arrived_plain">Vous êtes arrivé à destination</string>
+    <!-- Guidage vocal : écart moteur, recalcul demandé (cf. VoiceNavPhrases.OFF_ROUTE). -->
+    <string name="nav_voice_left_route">Vous avez quitté l\'itinéraire. Recalcul en cours.</string>
+    <!-- Guidage vocal : retour sur le tracé (cf. VoiceNavPhrases.BACK_ON_ROUTE). -->
+    <string name="nav_voice_back_on_route">De retour sur l\'itinéraire.</string>
+    <!-- Guidage vocal : manœuvre à venir, verbe + distance (cf. VoiceNavPhrases.ahead). -->
+    <string name="nav_voice_maneuver">%1$s dans %2$s</string>
+
+    <!-- Guidage vocal embarqué : voix système française (cf. VoiceNavPhrases). -->
+    <!-- Arrivée : « Vous êtes arrivé à X » (destination vide = sans nom). -->
+    <string name="nav_voice_arrival">Vous êtes arrivé à %1$s.</string>
+    <!-- Hors-trace : phrase urgente, coupe la phrase en cours. -->
+    <string name="nav_voice_offroute">Vous vous êtes écarté de l\'itinéraire. Recalcul en cours.</string>
+    <!-- Nouvel itinéraire après recalcul. -->
+    <string name="nav_voice_rerouted">Nouvel itinéraire calculé.</string>
+    <!-- Fin de guidage sur ordre de l'utilisateur. -->
+    <string name="nav_voice_stopped">Guidage arrêté.</string>
+    <!-- Ligne droite, sans distance. -->
+    <string name="nav_voice_continue">Continuez tout droit.</string>
+
+    <!-- Confirmation : destination entendue (cf. VoiceNavPhrases.destinationHeard). -->
+    <string name="nav_confirm_heard">Destination : %1$s</string>
+    <!-- Guidage éteint : fiche lieu ouverte (cf. VoiceNavPhrases.placeOpened). -->
+    <string name="nav_place_opened">Voici la fiche de %1$s</string>
+    <!-- Ordre stop consommé (cf. VoiceNavPhrases.STOP_DONE). -->
+    <string name="nav_stop_done">Guidage arrêté</string>
+    <!-- Arrivée signalée par le moteur (cf. VoiceNavPhrases.ARRIVED). -->
+    <string name="nav_arrived">Arrivée à destination</string>
 </resources>
