@@ -113,8 +113,12 @@ data class Settings(
      * ou le lien complet) — voir `parseCaregiverInvite`. Vide = pas d'invitation.
      */
     val caregiverInvite: String = "",
-    /** Identifiant du flux de partage (relais `suivi-<shareId>`, lien générique). */
-    val shareId: String = DEFAULT_SHARE_ID,
+    /**
+     * Identifiant du flux de partage (relais `suivi-<shareId>`), **propre à ce
+     * téléphone** : attribué au chargement des réglages par `seedShareRelay`, vide
+     * tant qu'il ne l'a pas encore été. Jamais saisi à la main.
+     */
+    val shareId: String = "",
     /** Clé d'écriture vérifiée par le relais (jamais exposée côté site). */
     val shareWriteKey: String = "",
     /** Plafond d'objets affichés à l'écran, commun au direct et à la photo. */
@@ -223,8 +227,12 @@ data class Settings(
          */
         const val LEGACY_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
 
-        /** Identifiant de partage par défaut (lien générique, un seul proche suivi). */
-        const val DEFAULT_SHARE_ID = "leo"
+        /**
+         * Ancien identifiant d'usine, commun à **toutes** les installations (« un
+         * seul proche suivi ») : il n'est plus attribué, seulement reconnu pour
+         * qu'une installation d'avant reçoive enfin son identifiant unique.
+         */
+        const val LEGACY_SHARE_ID = "leo"
 
         val Default = Settings(
             llmBaseUrl = DEFAULT_LLM_BASE_URL,
@@ -251,7 +259,7 @@ data class Settings(
             caregiverRole = CaregiverRole.Blind,
             parentSiteUrl = DEFAULT_PARENT_SITE_URL,
             shareEnabled = true,
-            shareId = DEFAULT_SHARE_ID,
+            shareId = "",
             shareWriteKey = "",
             maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
             routeBaseUrl = "",

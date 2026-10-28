@@ -98,12 +98,14 @@ class SettingsCodecTest {
         assertEquals(false, round.shareEnabled)
         assertEquals("mia", round.shareId)
         assertEquals("k", round.shareWriteKey)
-        // Un fichier écrit avant ces champs reprend les défauts (partage actif, flux « leo »).
+        // Un fichier écrit avant ces champs reprend les défauts (partage actif).
+        // Vide : l'identifiant propre au téléphone est attribué au chargement
+        // suivant par `seedShareRelay`, jamais repris d'un ancien « leo » commun.
         val legacy = SettingsCodec.encode(Settings.Default).lines()
             .filterNot { it.startsWith("shareEnabled=") || it.startsWith("shareId=") }
         val back = SettingsCodec.decode(legacy.joinToString("\n"))
         assertEquals(Settings.Default.shareEnabled, back.shareEnabled)
-        assertEquals(Settings.DEFAULT_SHARE_ID, back.shareId)
+        assertEquals("", back.shareId)
     }
 
     @Test
