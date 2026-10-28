@@ -248,4 +248,25 @@ class TraverseVoiceTest {
         assertEquals(2, report.generated)
         assertEquals(listOf(TraversePhrases.RED), report.missing)
     }
+
+    @Test
+    fun `reponse elevenlabs vide - repli sur le clip hors-ligne`() = runBlocking {
+        clips[TraversePhrases.RED] = "/cache/rouge.wav"
+        val tts = FakeTts(Result.success(ByteArray(0)))
+        val outcome = voice(tts = tts).speak(TraversePhrases.RED, urgent = false)
+
+        assertEquals(TraverseVoiceOutcome.OFFLINE, outcome)
+    }
+
+    @Test
+    fun `langue systeme - espaces et casse toleres`() = runBlocking {
+        val spaced = mutableMapOf<String, String>()
+        val okSpaced = voice(systemTts = FakeSystemTts(language = " fra ", store = spaced)).prewarm()
+
+        assertTrue(okSpaced.languageOk)
+        val upper = mutableMapOf<String, String>()
+        val okUpper = voice(systemTts = FakeSystemTts(language = "FRA", store = upper)).prewarm()
+
+        assertTrue(okUpper.languageOk)
+    }
 }
