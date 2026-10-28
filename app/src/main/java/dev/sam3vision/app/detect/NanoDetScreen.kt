@@ -39,6 +39,9 @@ import dev.sam3vision.app.depth.ModelDownloader
 import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.core.detect.DetectBox
 import dev.sam3vision.core.detect.Detector
+import dev.sam3vision.core.mask.grayFromArgb
+import dev.sam3vision.core.stairs.StairDetector
+import dev.sam3vision.core.stairs.StairSignal
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +68,7 @@ fun NanoDetScreen(onBack: () -> Unit) {
     val meter = remember { LiveFpsMeter() }
     val busy = remember { AtomicBoolean(false) }
     var boxes by remember { mutableStateOf<List<DetectBox>>(emptyList()) }
+    var stairs by remember { mutableStateOf<StairSignal?>(null) }
     var frameSize by remember { mutableStateOf(320 to 320) }
     var status by remember { mutableStateOf("chargement du modèle…") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -75,13 +79,14 @@ fun NanoDetScreen(onBack: () -> Unit) {
     DisposableEffect(host) {
         host.wantsFrame = { !busy.get() && detector.value != null }
         host.onFrame = { bitmap ->
-            onCameraFrame(scope, detector.value, bitmap, busy) { result, ms ->
+            onCameraFrame(scope, detector.value, bitmap, busy) { result, signal, ms ->
                 val gap = meter.gapAt(SystemClock.elapsedRealtime())
                 fps = LiveFpsMeter.fpsFor(gap, fps)
                 boxes = result
+                stairs = signal
                 frameSize = bitmap.width to bitmap.height
                 runs += 1
-                status = statusLine(result.size, ms, fps)
+                status = statusLine(result.size, ms, fps, signal?.detected == true)
                 logRun(runs, result, ms, fps)
                 busy.set(false)
             }
@@ -98,7 +103,8 @@ fun NanoDetScreen(onBack: () -> Unit) {
         detector.value = prepareNanoDet(context, host, view, owner, onStatus = { status = it })
         if (detector.value == null) error = status
     }
-    NanoDetLayout(view, boxes, frameSize, error ?: status, onBack)
+    val stairFrame = stairFrameFor(stairs ?: StairSignal.none(), frameSize.first)
+    NanoDetLayout(view, boxes, stairFrame, frameSize, error ?: status, onBack)
 }
 
 /** Une frame caméra → détection (jetée si une inférence est en vol). */
@@ -107,7 +113,7 @@ private fun onCameraFrame(
     engine: Detector?,
     bitmap: Bitmap,
     busy: AtomicBoolean,
-    onDone: (List<DetectBox>, Long) -> Unit,
+    onDone: (List<DetectBox>, StairSignal?, Long) -> Unit,
 ) {
     if (engine == null || !busy.compareAndSet(false, true)) return
     scope.launch(Dispatchers.Default) { runFrame(engine, bitmap, onDone) }
@@ -150,11 +156,12 @@ private suspend fun prepareNanoDet(
     return engine
 }
 
-/** Aperçu + surcouche de boîtes + ligne d'état : une entrée par état. */
+/** Aperçu + surcouches (boîtes, escalier) + ligne d'état : une entrée par état. */
 @Composable
 private fun NanoDetLayout(
     view: PreviewView,
     boxes: List<DetectBox>,
+    stairs: StairFrame?,
     frameSize: Pair<Int, Int>,
     status: String,
     onBack: () -> Unit,
@@ -167,27 +174,34 @@ private fun NanoDetLayout(
         Box(Modifier.fillMaxSize()) {
             AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
             DetectionOverlay(boxes, frameSize.first, frameSize.second)
+            StairOverlay(stairs, frameSize.first, frameSize.second)
         }
     }
 }
 
-/** Une frame redressée → pixels → détection → rappel sur le fil principal. */
+/**
+ * Une frame redressée → pixels → NanoDet + escaliers → rappel sur le fil
+ * principal. Les escaliers (classique pur JVM, 0 GPU) tournent sur les mêmes
+ * pixels ARGB : NanoDet ne connaît pas la classe, le détecteur la complète.
+ */
 private suspend fun runFrame(
     engine: Detector,
     bitmap: Bitmap,
-    onDone: (List<DetectBox>, Long) -> Unit,
+    onDone: (List<DetectBox>, StairSignal?, Long) -> Unit,
 ) {
     val argb = IntArray(bitmap.width * bitmap.height)
     bitmap.getPixels(argb, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
     val started = SystemClock.elapsedRealtime()
     val result = engine.detect(argb, bitmap.width, bitmap.height).getOrNull()
+    val stairs = StairDetector.detect(grayFromArgb(argb, bitmap.width, bitmap.height))
     val ms = SystemClock.elapsedRealtime() - started
-    withContext(Dispatchers.Main) { onDone(result?.boxes.orEmpty(), result?.inferenceMs ?: ms) }
+    withContext(Dispatchers.Main) { onDone(result?.boxes.orEmpty(), stairs, result?.inferenceMs ?: ms) }
 }
 
-/** Ligne d'état : objets, inférence, cadence effective. */
-private fun statusLine(objects: Int, ms: Long, fps: Float): String =
-    String.format(Locale.FRANCE, "%d obj · %d ms · %.1f ips", objects, ms, fps)
+/** Ligne d'état : objets, inférence, cadence effective, escalier éventuel. */
+private fun statusLine(objects: Int, ms: Long, fps: Float, stairs: Boolean): String =
+    String.format(Locale.FRANCE, "%d obj · %d ms · %.1f ips", objects, ms, fps) +
+        if (stairs) " · ESCALIER" else ""
 
 /** Une ligne de mesure toutes les 20 détections (pas une trace complète). */
 private fun logRun(runs: Int, boxes: List<DetectBox>, ms: Long, fps: Float) {
@@ -233,4 +247,33 @@ private fun DrawScope.drawDetection(box: DetectBox, sx: Float, sy: Float) {
     val w = labelPaint.measureText(label)
     drawContext.canvas.nativeCanvas.drawRect(left, top - 44f, left + w + 16f, top, labelBackPaint)
     drawContext.canvas.nativeCanvas.drawText(label, left + 8f, top - 10f, labelPaint)
+}
+
+private val stairBackPaint = Paint().apply {
+    color = android.graphics.Color.argb(180, 180, 0, 180)
+}
+
+/**
+ * Bande « escalier » (magenta, comme l'aplat MIT) par-dessus l'aperçu, remise
+ * à l'échelle du canevas. Rien si [frame] est `null` (pas d'escalier).
+ */
+@Composable
+private fun StairOverlay(frame: StairFrame?, frameWidth: Int, frameHeight: Int) {
+    val stair = frame ?: return
+    Canvas(Modifier.fillMaxSize()) {
+        if (frameWidth <= 0 || frameHeight <= 0) return@Canvas
+        drawStairs(stair, size.width / frameWidth, size.height / frameHeight)
+    }
+}
+
+/** Le cadre ROI + son étiquette, dans l'échelle du canevas. */
+private fun DrawScope.drawStairs(frame: StairFrame, sx: Float, sy: Float) {
+    val left = frame.left * sx
+    val top = frame.top * sy
+    val width = (frame.right - frame.left) * sx
+    val height = (frame.bottom - frame.top) * sy
+    drawRect(Color.Magenta, Offset(left, top), Size(width, height), style = Stroke(4f))
+    val w = labelPaint.measureText(frame.label)
+    drawContext.canvas.nativeCanvas.drawRect(left, top - 44f, left + w + 16f, top, stairBackPaint)
+    drawContext.canvas.nativeCanvas.drawText(frame.label, left + 8f, top - 10f, labelPaint)
 }
