@@ -13,8 +13,9 @@ import java.nio.ByteOrder
 
 /**
  * MiDaS v2.1 small (repli) via LiteRT (`Interpreter` CPU, 4 fils), 100 % sur
- * le téléphone. Poids fp32 (`midas_v21_small.tflite`, 64 Mo, MIT Intel ISL),
- * entrée 256×256 → carte 256×256. Asset absent ou inférence tombée ⇒
+ * le téléphone. Poids fp32 (`.tflite` 63 Mo, MIT Intel ISL), téléchargés une
+ * fois à l'exécution (fichier vérifié d'abord, asset embarqué en repli dev),
+ * entrée 256×256 → carte 256×256. Modèle absent ou inférence tombée ⇒
  * `Result.failure` avec un message explicite (lu par le banc embarqué).
  *
  * Pas de délégué GPU en phase 1 (le CPU suffit au budget du direct, 350-900 ms
@@ -56,8 +57,9 @@ class LiteRtDepthEstimator private constructor(
         private const val INPUT_SIZE = 256
 
         /**
-         * Interpréteur ouvert sur l'asset, `null` si l'asset manque : le
-         * sélecteur rend alors un estimateur « asset manquant » explicite.
+         * Interpréteur ouvert sur le fichier téléchargé (puis l'asset en repli
+         * dev), `null` si le modèle est absent : le sélecteur rend alors un
+         * estimateur « modèle manquant » explicite.
          */
         fun open(context: Context): DepthEstimator? {
             val model = modelBuffer(context, ASSET_NAME) ?: return null
@@ -73,13 +75,30 @@ class LiteRtDepthEstimator private constructor(
          * parseur du scanner UBS ne suit pas ces sélections.
          */
         private fun modelBuffer(context: Context, name: String): ByteBuffer? {
+            val bytes = readStoreFile(context) ?: readAsset(context, name) ?: return null
             return try {
-                val bytes = context.assets.open(name).use { it.readBytes() }
                 val buffer = ByteBuffer.allocateDirect(bytes.size)
                 buffer.order(ByteOrder.nativeOrder())
                 buffer.put(bytes)
                 buffer.rewind()
                 buffer
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        private fun readAsset(context: Context, name: String): ByteArray? {
+            return try {
+                context.assets.open(name).use { it.readBytes() }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        private fun readStoreFile(context: Context): ByteArray? {
+            return try {
+                DepthModelStore.fileFor(context, DepthBackend.MIDAS)
+                    ?.takeIf { it.isFile }?.readBytes()
             } catch (e: Exception) {
                 null
             }
