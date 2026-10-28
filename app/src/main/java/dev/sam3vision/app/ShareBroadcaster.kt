@@ -34,13 +34,22 @@ class ShareBroadcaster(context: Context) {
         reporter.reset()
     }
 
-    /** Envoie l'état courant si complet, sinon ne fait rien. */
+    /**
+     * Envoie l'état courant si complet, sinon ne fait rien. Sans objet mesuré
+     * (couche nulle, calibrage inconnu, scène vide), la position part quand
+     * même : sinon la carte restait OFFLINE alors que le téléphone partageait.
+     * L'identifiant est normalisé (`normalizeShareId`) : brut, « Léo » répond
+     * 400 côté relais. Un champ site effacé retombe sur le site par défaut.
+     */
     suspend fun publish(nowMs: Long, settings: Settings, layer: DistanceLayer?, scene: SharedScene? = null) {
-        if (!canPublishShare(settings) || settings.shareId.isBlank()) return
+        if (!canPublishShare(settings)) return
+        val id = normalizeShareId(settings.shareId)
+        if (id.isBlank()) return
         val fix = positions.lastFix ?: return
         val objects = layer?.let { sharedObjectsOf(it.readings, it.width, it.height, it.fovDeg, fix.headingDeg) }.orEmpty()
-        val url = shareEndpoint(settings.parentSiteUrl) ?: return
-        reporter.maybeSend(nowMs, url, shareJson(settings.shareId, settings.shareWriteKey, fix, objects, scene))
+        val site = settings.parentSiteUrl.ifBlank { Settings.DEFAULT_PARENT_SITE_URL }
+        val url = shareEndpoint(site) ?: return
+        reporter.maybeSend(nowMs, url, shareJson(id, settings.shareWriteKey, fix, objects, scene))
     }
 
 }
