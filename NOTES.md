@@ -1,8 +1,8 @@
 # NOTES — versions épinglées et décisions techniques
 
 Relu le **26/10/2026**, puis recompté le **27/10/2026** après la suppression du module
-`:glasses-spike` (le banc lunettes vit maintenant dans `:app`, `docs/GLASSES-DECISION.md`). Les
-versions viennent
+`:glasses-spike` (le banc lunettes vit maintenant dans `:app`, `docs/GLASSES-DECISION.md`), puis
+recompté le **28/10/2026**. Les versions viennent
 des fichiers du dépôt, pas du souvenir d'un build : `gradle/libs.versions.toml`,
 `gradle/wrapper/gradle-wrapper.properties`, `app/build.gradle.kts`, `core/build.gradle.kts`.
 Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est marqué **non mesuré**.
@@ -15,9 +15,9 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | AGP | **8.11.1** | `gradle/libs.versions.toml:2` (`agp`) |
 | Kotlin | **2.2.21** (+ plugin compose 2.2.21, même référence) | `libs.versions.toml:3` |
 | KSP | **2.2.21-2.0.5** | `libs.versions.toml:14` |
-| JDK | **17 par `JAVA_HOME` — PAS épinglé dans le dépôt** | `gradle.properties:21-24` |
-| compileSdk / targetSdk | **36** partout | `app/build.gradle.kts:39,44`, `core/build.gradle.kts:10` |
-| minSdk | **29 (`:app`, banc lunettes compris)** · 26 (`:core`, lib) | `app/build.gradle.kts:84`, `core/build.gradle.kts` |
+| JDK | **17 par `JAVA_HOME` — PAS épinglé dans le dépôt** | `gradle.properties:25-27` |
+| compileSdk / targetSdk | **36** partout | `app/build.gradle.kts:83,88`, `core/build.gradle.kts:10` |
+| minSdk | **29 (`:app`, banc lunettes compris)** · 26 (`:core`, lib) | `app/build.gradle.kts:87`, `core/build.gradle.kts:13` |
 | Compose BOM | **2026.05.01** (activity-compose 1.13.0, lifecycle 2.10.0) | `libs.versions.toml:7,8,9` |
 | CameraX | **1.6.0** (core, camera2, lifecycle, view, **video**) | `libs.versions.toml:10` |
 | OkHttp | **4.12.0** | `libs.versions.toml:6` |
@@ -29,47 +29,48 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | JUnit / androidx.test | **4.13.2** / ext-junit **1.3.0**, core **1.7.0**, runner+rules **1.7.0** | `libs.versions.toml:15,16,17,18` |
 | org.json (test only) | **20240303** | `libs.versions.toml:20`, `core/build.gradle.kts:40` |
 | jump3r (MP3 pur Java) | **1.0.4** | `libs.versions.toml:19` |
-| mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:21-25` |
+| mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:25` |
+| guava | **33.3.1-android** | `libs.versions.toml:26` |
+| onnxruntime-android (profondeur) | **1.18.0** | `libs.versions.toml:27` |
+| tensorflow-lite (repli profondeur) | **2.17.0**, Java pur (le `litert` 2.3.x est en metadata Kotlin 2.4, illisible en 2.2) | `libs.versions.toml:28` |
 
-**Le JDK n'est pas dans le dépôt.** `gradle.properties` (15-24) ne contient que
-`org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, parallel, caching, useAndroidX,
-nonTransitiveRClass, code.style, plus un **commentaire** disant de mettre
-`org.gradle.java.home` dans `~/.gradle/gradle.properties` (perso, non versionné). La CI bloque
-le retour de cette ligne (`.github/workflows/ci.yml:95-100`). Sur cette machine (r630) :
+**Le JDK n'est pas dans le dépôt.** `gradle.properties` (15-22) ne contient que
+`org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, `daemon=false`, `parallel`, `workers.max=2`,
+`caching`, useAndroidX, nonTransitiveRClass, code.style, plus un **commentaire** (:25-27) disant
+de mettre `org.gradle.java.home` dans `~/.gradle/gradle.properties` (perso, non versionné). La CI
+bloque le retour de cette ligne (`.github/workflows/ci.yml:103-110`). Sur cette machine (r630) :
 `JAVA_HOME=~/toolchains/jdk17`, `ANDROID_HOME=$HOME/android-sdk`.
 
 ## Taille et tests : chiffres réels
 
-Relevé du 27/10/2026 à 11 h 10, **module `:glasses-spike` exclu** (supprimé ce jour-là), compté
-sur le disque : les fichiers du banc (`app/…/glasses/bench/`) n'étaient pas encore suivis par
-git. L'arbre reçoit du code en parallèle : les totaux bougent de quelques dizaines de lignes,
-les proportions non.
+Relevé du 28/10/2026, compté sur le disque (arbre propre). L'arbre reçoit du code en parallèle :
+les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **472** |
-| Lignes de prod (`*/src/main`) | **28 706** — `:core` 105 f./11 121 l. · `:app` 164 f./17 585 l. (dont banc 17 f./1 824 l.) |
-| `@Test` | **1 380** = **1 373 JVM** + **7 instrumentés** |
-| dont `core/src/test` | **907** |
-| dont `app/src/test` | **466** (dont banc **86**) |
-| dont `app/src/androidTest` (`cleanup/CaptureCleanupTest`) | **6** (appareil requis) |
+| Fichiers `.kt` | **730** |
+| Lignes de prod (`*/src/main`) | **43 219** — `:core` 166 f./16 516 l. · `:app` 240 f./26 703 l. (dont banc 15 f./1 640 l.) |
+| `@Test` | **2 190** = **2 180 JVM** + **10 instrumentés** |
+| dont `core/src/test` | **1 403** |
+| dont `app/src/test` | **777** (dont banc **95**) |
+| dont `app/src/androidTest` (nettoyage, profondeur, média) | **9** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **492** lignes |
+| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/isee/LiveProbe.kt` — **495** lignes |
 
 Le nombre de tests réellement **exécutés** est **non mesuré ici** : aucun `gradlew` n'a été
 lancé sur cette machine pour ce comptage.
 
 ## Décisions techniques toujours vraies
 
-- **Un seul client HTTP** : `defaultHttpClient(timeoutSeconds)` dans `core/net/Http.kt:31`,
+- **Un seul client HTTP** : `defaultHttpClient(timeoutSeconds)` dans `core/net/Http.kt:57`,
   60 s par défaut (`DEFAULT_TIMEOUT_SECONDS`, `Http.kt:28`). Un seul mapper JSON : `org.json`
   (`net/Json.kt:1-7`) — fourni par Android, donc **aucune dépendance de prod ajoutée pour le
   JSON**. Pas de Retrofit, pas de kotlinx-serialization, pas de MockWebServer.
 - **`Result.flatMap` n'existe pas** dans la stdlib → helper interne `Result.then`
-  (`net/Http.kt:256`).
-- **Erreurs typées et centralisées** : `Throwable.toApiError()` (`net/Http.kt:182`) et
-  `httpError(code, body)` (`net/Http.kt:191`) — 401/403 → clé invalide, 402 → facture,
+  (`net/Http.kt:306`).
+- **Erreurs typées et centralisées** : `Throwable.toApiError()` (`net/Http.kt:232`) et
+  `httpError(code, body)` (`net/Http.kt:241`) — 401/403 → clé invalide, 402 → facture,
   409 → une réponse LLM est encore en cours, 429 → limite, et un 404 Modal « invalid function
   call » → `BackendStopped` (pas de nouvelle tentative sur une app arrêtée).
 - **Tests JVM sans réseau** : serveur maison
@@ -80,9 +81,9 @@ lancé sur cette machine pour ce comptage.
 - **`javax.imageio` / `java.awt` masqués** par le mockable jar : les tests de masque travaillent
   sur des en-têtes PNG synthétiques et des `IntArray` (`core/mask/MaskCore.kt`), les wrappers
   `Bitmap` (`core/mask/Masks.kt`) restent fins et ne sont pas testables en JVM.
-- **Segmentation non bloquante** : `AnalyzeUseCase` avale l'échec de SAM —
-  `sam?.segment(..)?.getOrNull()…orEmpty()` (`core/usecase/UseCases.kt:23`) — et décrit quand
-  même l'image.
+- **Segmentation non bloquante** : `AnalyzeUseCase` borne SAM à 10 s puis décrit quand même
+  l'image (`withTimeoutOrNull(samBudgetMs) { it.segment(..) }`, `core/usecase/UseCases.kt:31`,
+  `SAM_BUDGET_MS`, `:26`).
 - **Réglages chiffrés, avec repli silencieux** : `security-crypto` en priorité, sinon
   `PrivateFileSettingsStore` (fichier privé chiffré, clé Keystore non exportable) —
   `core/settings/SettingsStoreFactory.kt:13-17`. `EncryptedSharedPreferences` est marqué
@@ -95,25 +96,25 @@ lancé sur cette machine pour ce comptage.
   `LongPressTrigger.kt`, `TapOrHold.kt`), distances (`distance/DistanceEstimator.kt`,
   `LensSpec.kt`) vivent dans `:core` et se testent sans Android.
 - **Distances sur le téléphone** : sténopé + hauteurs connues, 0 GPU et aucune requête
-  (`DistanceMeter`, `core/distance/DistanceEstimator.kt:70`, `docs/DISTANCES.md`). La précision
+  (`DistanceMeter`, `core/distance/DistanceEstimator.kt:105`, `docs/DISTANCES.md`). La précision
   « ±15-20 % » annoncée n'a **jamais** été confrontée à un mètre ruban (`docs/DISTANCES.md:56`).
 - **Masques dans la même surface que l'aperçu** (`app/CameraSurface.kt`) : un `AndroidView`
   est une `View` dessinée **après** le canevas Compose, donc les masques composés au-dessus
   passaient derrière l'aperçu — piège consigné dans `docs/MASQUES-DEBUG.md`.
 - **Intro sans marqueur persisté** : l'audio se rejoue à chaque ouverture complète et ne se
-  coupe que par la voix (`app/isee/IseeIntro.kt:29-38`) — choix assumé plutôt que « une
+  coupe que par la voix (`app/isee/IseeIntro.kt:25`) — choix assumé plutôt que « une
   seule fois à vie ».
 
 ## Direct : WebSocket `/live/ws`, une frame en vol
 
-- **Une seule fabrique** `liveClient()` (`core/net/LiveClientFactory.kt:19-25`) sert **les deux
+- **Une seule fabrique** `liveClient()` (`core/net/LiveClientFactory.kt:19-30`) sert **les deux
   écrans** (Direct et page caméra iSee) : point d'entrée unique, pas un `new` dispersé. Elle
   construit un `WsLiveClient` dont le transport est un `OkHttpWsTransport` sur
   `ws(s)://…/live/ws` (`core/net/WsTransport.kt:35`).
 - **`POST /live` n'est plus appelé en production.** Le seul appel de `LiveClient.live(…)` en
-  prod est `LiveSession.kt:134`, et le client vient toujours de `liveClient()` → WebSocket.
-  `HttpLiveClient` reste dans la fabrique pour **`/health` seulement** (`LiveClientFactory.kt:37-38`,
-  `WsLiveClient.kt:82`) ; son `POST /live` (`HttpLiveClient.kt:60`) ne sert qu'aux tests JVM
+  prod est `LiveSession.kt:138`, et le client vient toujours de `liveClient()` → WebSocket.
+  `HttpLiveClient` reste dans la fabrique pour **`/health` seulement** (`LiveClientFactory.kt:47`,
+  `WsLiveClient.kt:98`) ; son `POST /live` (`HttpLiveClient.kt:75`) ne sert qu'aux tests JVM
   (`core/src/test/…/LiveClientTest.kt`). Ne pas le reprendre pour des frames.
 - **Corrélation par `id`, une file par `id`** (`core/net/WsLiveClient.kt`) : le serveur peut
   répondre dans le désordre, un message dont l'`id` n'est pas en vol est ignoré ; l'attente est
@@ -122,40 +123,36 @@ lancé sur cette machine pour ce comptage.
 - **Transport injectable** : `WsTransport` (`core/net/WsTransport.kt`) avec
   `OkHttpWsTransport` en prod et un faux JVM en test — le WebSocket est testable sans réseau
   ni GPU. Le socket vit toute la session ; **chaque frame** est bornée par son propre
-  `withTimeoutOrNull` (`WsLiveClient.kt:151`).
+  `withTimeoutOrNull` (`WsLiveClient.kt:169`).
 - **Trois délais distincts, assumés** : frame 10 s (`LIVE_TIMEOUT_SECONDS`,
-  `HttpLiveClient.kt:13`), première frame / session froide 60 s (`COLD_TIMEOUT_SECONDS`,
-  `app/isee/LiveProbe.kt:458`), `/health` 180 s (`WAKE_TIMEOUT_SECONDS`,
-  `HttpLiveClient.kt:21`). Motif : un transport figé à 10 s échouait pendant les 26-50 s de
+  `HttpLiveClient.kt:14`), première frame / session froide 60 s (`COLD_TIMEOUT_SECONDS`,
+  `app/isee/ProbeFrame.kt:61`), `/health` 180 s (`WAKE_TIMEOUT_SECONDS`,
+  `HttpLiveClient.kt:22`). Motif : un transport figé à 10 s échouait pendant les 26-50 s de
   réveil du conteneur (`LiveClientFactory.kt:15-17`).
 - **Pastille de transport honnête** : « WebSocket » / « WebSocket KO », sans prétendre à un
   repli qui n'existe plus (`app/LiveMessages.kt`).
-- **`LiveMessages.kt`** (45 lignes) et **`app/isee/LiveProbeText.kt`** (94 lignes) : messages
+- **`LiveMessages.kt`** (61 lignes) et **`app/isee/LiveProbeText.kt`** (101 lignes) : messages
   d'état et libellés extraits des ViewModels pour tenir sous les 500 lignes et rester
   testables en JVM.
-- **Deux concepts par défaut, et deux au maximum** : `LivePrompts.Default =
-  listOf("person", "door")` et `LivePrompts.MAX = 2` (`core/live/LivePrompts.kt:20,28`) —
-  décision utilisateur « 2 concepts maximum, jamais plus » ; le backend tronque de toute façon
-  à `PROMPT_LIMIT = 2`. Le KDoc de `LivePrompts.kt:9-19` raconte encore une liste longue et une
-  mesure de latence qui la justifiait : **il contredit le code trois lignes plus bas** et reste
-  à corriger (hors du périmètre de cette relecture).
-  (État au 27/10 — **dépassé le 28/10** : décision user « suivre aussi les véhicules »,
-  6 concepts par défaut et `MAX = PROMPT_LIMIT = 6`.)
-- **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:33`), le
+- **Six concepts par défaut, et six au maximum** : `LivePrompts.default =
+  listOf("person", "door", "bicycle", "car", "truck", "electric scooter")` et `LivePrompts.MAX = 6`
+  (`core/live/LivePrompts.kt:27,34`) — décision utilisateur du 28/10 « suivre aussi les
+  véhicules » (rue + intérieur) ; le backend tronque de toute façon à `PROMPT_LIMIT = 6`
+  (`server/backend/tracking.py:53`). Le 27/10 n'en suivait que 2.
+- **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:34`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
-  (`app/isee/LiveProbe.kt:128,137`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
-  `latencyBudgetMs = 150` (`LiveSession.kt:42-47`). Le KDoc de `LiveSession.kt:16` annonce
-  « 100 ms » : c'est le commentaire qui est périmé, la valeur du code est 0 (pas de plancher).
-- **Régulation par hystérésis** (`LiveSession.kt:95-115`) : on ne rouvre un créneau que sous la
-  moitié du budget (`RELAX_RATIO = 0.5`, `:168`) et seulement après trois mesures
-  (`REGULATE_MIN_SAMPLES = 3`, `:171`), la première frame payant le démarrage du conteneur.
+  (`app/isee/LiveProbe.kt:199`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
+  `latencyBudgetMs = 150` (`LiveSession.kt:43-50`).
+- **Régulation par hystérésis** (`LiveSession.kt`, régulateur) : on ne rouvre un créneau que sous la
+  moitié du budget (`RELAX_RATIO = 0.5`, `:195`) et seulement après trois mesures
+  (`REGULATE_MIN_SAMPLES = 3`, `:198`), la première frame payant le démarrage du conteneur.
 - **Une frame en vol** : si le créneau est pris, `runFrame` renvoie `null` et la frame est
-  jetée — l'appelant caméra n'est jamais mis en attente (`LiveSession.kt:52-55,129`).
+  jetée — l'appelant caméra n'est jamais mis en attente (`LiveSession.kt:133-138`).
 
 ## Région = choix d'endpoint, jamais allumage de carte
 
-`resolveSamEndpoint()` (`core/settings/SamRegion.kt:50-55`, appelé par
-`app/SamEndpoint.kt:13-14`) applique l'ordre du code : **saisie manuelle hors preset** → **URL
+`resolveSamEndpoint()` (`core/settings/SamRegion.kt:50-56`, appelé par
+`app/SamEndpoint.kt:15-16`) applique l'ordre du code : **saisie manuelle hors preset** → **URL
 injectée au build** pour la région → **preset de la région**. (Le KDoc de
 `SamRegion.kt:46-49`, qui annonçait l'ordre inverse, a été corrigé le 27/10.) Choisir une région
 efface une
@@ -165,18 +162,20 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
 ## Écrit mais pas appelé (ne pas s'y fier)
 
 - **`POST /video` (mode tap)** : le client est complet et testé
-  (`core/net/HttpSam31VideoClient.kt`, `DEFAULT_PATH = "/video"` `:67`), l'écran l'utilise
-  (`app/tap/TapCaptureScreen.kt:171`), mais **aucune implémentation backend connue** de cette
-  route n'est vérifiable depuis ce dépôt. `TapConfig.ON_DEVICE_INFERENCE = false`
-  (`app/tap/TapConfig.kt:48`) : sans endpoint saisi, rien ne part
-  (`TapConfig.sendConfigured`, `:83`).
+  (`core/net/HttpSam31VideoClient.kt`, `DEFAULT_PATH = "/video"` `:69`), l'écran l'utilise
+  (`app/tap/TapCaptureScreen.kt:182`), mais **aucune implémentation backend connue** de cette
+  route n'est vérifiable depuis ce dépôt (`git grep -n '"/video"' server/backend` vide).
+  `TapConfig.ON_DEVICE_INFERENCE = false` (`app/tap/TapConfig.kt:48`) : sans endpoint saisi,
+  rien ne part (`TapConfig.sendConfigured`, `:83`).
+- **`core/live/LivePipeline.kt`** — pompe multi-frames du direct (`maxParallel` en vol) :
+  écrite et testée (`LivePipelineTest`), **sans appelant en production** (le Direct et iSee
+  passent par `LiveSession`, une frame en vol). Ne pas la présenter comme le chemin actuel.
 - **`core/predict/*`** — le Direct l'appelle depuis `app/…/live/LivePrediction.kt`, **derrière le flag
   `Settings.boxPredictionEnabled`, éteint par défaut** — le branchement (T8) n'est allumé
   qu'après la mesure de la latence perçue. Flag éteint, le direct est celui d'avant.
-- Deux commentaires de code ont été corrigés le 27/10 : `HttpLiveClient.kt:30` cite
-  `docs/LIVE-SPEC.md`, qui **existe** (310 lignes, contrat du direct), et le KDoc de
-  `LivePrompts.kt:9-19` dit désormais « 2 concepts », comme le code (`Default`, `MAX = 2`).
-  (6 concepts depuis la décision user du 28/10.)
+- Commentaires de code recalés le 28/10 : `HttpLiveClient.kt:42` cite
+  `docs/LIVE-SPEC.md`, qui **existe** (311 lignes, contrat du direct), et le KDoc de
+  `LivePrompts.kt:29-33` dit « 6 concepts », comme le code (`default`, `MAX = 6`).
 
 ## Non mesuré ici
 

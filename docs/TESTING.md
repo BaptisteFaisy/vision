@@ -1,45 +1,44 @@
 # TESTING — iSee (`:core`, `:app`)
 
-Relu le **27/10** dans cet arbre (`glasses-bench`, branche `glasses-bench`). Les comptages de
-tests ont été **refaits à la main le 27/10** ; ils sont **statiques** (annotations `@Test`), aucun
-`gradlew` n'a été lancé pour cette passe. Les chemins cités sont vérifiés un par un.
-**Aucun résultat d'exécution sur un appareil (téléphone ou émulateur) n'existe dans cet
-arbre** : tout ce qui est décrit comme recette est une *procédure*, pas une preuve. La liste de
-ce qui n'a pas été rejoué est au §4.
+Relu le **27/10/2026** dans cet arbre, recompté le **28/10/2026** (`grep`, aucun `gradlew`
+lancé pour cette passe). Les comptages de tests sont **statiques** (annotations `@Test`).
+Les chemins cités sont vérifiés un par un. **Aucun résultat d'exécution sur un appareil
+(téléphone ou émulateur) n'existe dans cet arbre** : tout ce qui est décrit comme recette est
+une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est au §4.
 
-## 1. Compter les tests (cet arbre, 27/10)
+## 1. Compter les tests (cet arbre, 28/10)
 
 `rg` n'est pas installé sur cette machine : le comptage se fait avec `grep`, à l'identique.
 `grep -rho '@Test' <dir> --include='*.kt' | wc -l` compte les **occurrences** de l'annotation
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1137
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 562
-grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 92
-grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 6
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1403
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 777
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 95
+grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 9
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 ```
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 154 (dont 12 aides) | 142 | **1137** |
-| `:app` | 86 (dont 3 aides) | 83 | **562** |
-| **Total JVM** | **240** | **225** | **1 699** |
-| `:app` `androidTest` | 1 | 1 | **6** (instrumentés) |
+| `:core` | 193 (dont 12 aides) | 181 | **1 403** |
+| `:app` | 122 (dont 3 aides) | 119 | **777** |
+| **Total JVM** | **315** | **300** | **2 180** |
+| `:app` `androidTest` | 3 | 3 | **9** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **1 699 tests JVM** au total, dont **1137** dans `:core` et **562** dans `:app`. Dans `:app`, le
-  banc lunettes pèse **92** (`glasses/bench/`) et le reste du paquet `glasses` **26**. Les
-  **7 tests instrumentés** (6 + 1) sont hors de ce total.
+- **2 180 tests JVM** au total, dont **1 403** dans `:core` et **777** dans `:app`. Dans `:app`, le
+  banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
+  **10 tests instrumentés** (9 + 1) sont hors de ce total.
 - Le banc lunettes **n'est plus un module** : ses tests JVM sont dans
   `app/src/test/…/glasses/bench/` et comptent donc dans `:app`, sans ligne à part.
 - Les fichiers d'aide (pas des classes de test) : `:core` — `TestHttpServer.kt`,
   `net/NetContractHarness.kt`, `net/TestLiveClients.kt`, `live/FrameBench.kt`,
   `mask/M1Fixtures.kt`, `mask/MaskCodecFixtures.kt`, `mask/MaskFixtures.kt`,
   `mask/MaskGoldenData.kt`, `mask/JvmAllocations.kt`, `keyframe/KeyframeScene.kt`,
-  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `isee/vm/FakeMessageDao.kt`,
-  `vm/Fakes.kt`.
+  `keyframe/KeyframeSim.kt`, `motion/MotionScenes.kt` ; `:app` — `isee/ProbeTestClient.kt`,
+  `isee/vm/FakeMessageDao.kt`, `vm/Fakes.kt`.
 
 ### Ce que Gradle exécute réellement
 
@@ -53,7 +52,7 @@ Relevé du 26/10 après 19 h, sur r630 : **`:core` 663 / 0 échec / 0 ignoré**,
 et, à l'époque, **le banc lunettes 36 / 0 / 0** — **1 004 exécutés** au total. Ce relevé décrit
 l'arbre **d'avant** la fusion du banc dans `:app` : il **n'est plus comparable** aux comptages du
 §1. Aucune exécution Gradle n'a été refaite dans cette passe (aucun `gradlew` appelé ici), donc les
-**1 373** sont des comptages statiques d'annotations, pas le résultat d'un run.
+**2 180** sont des comptages statiques d'annotations, pas le résultat d'un run.
 
 ## 2. Commandes exactes
 
@@ -63,9 +62,9 @@ export JAVA_HOME=<un JDK 17 qui a javac> ANDROID_HOME=$HOME/android-sdk
 ./gradlew :app:assembleDebug --offline          # l'APK, banc lunettes inclus (plus de module dédié)
 bash scripts/build.sh                            # assembleDebug --offline (GRADLE_TIMEOUT, 600 s par défaut)
 python3 tools/check-kotlin-limits.py             # fichier < 500 l, fonction < 50 l
-bash scripts/test_scripts.sh                     # 75 assertions
-python3 -m unittest tools/test_check_kotlin_limits.py    # 28 tests
-python3 .github/ci-budget/check_timeouts.py      # 4 workflows
+bash scripts/test_scripts.sh                     # 117 assertions
+python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py    # 58 tests
+python3 .github/ci-budget/check_timeouts.py      # 8 workflows
 ```
 
 Le dépôt **n'épingle aucun JDK** : `gradle.properties` ne porte que
@@ -131,7 +130,7 @@ occupé = sortie `2`, le tour suivant réessaie.
 Aucun des éléments suivants n'a d'exécution attestée dans cet arbre. Ils sont **à rejouer**
 avant d'être présentés comme validés :
 
-- les **7 tests instrumentés** (§5) — jamais lancés (aucun émulateur construit pour eux) ;
+- les **10 tests instrumentés** (§5) — jamais lancés (aucun émulateur construit pour eux) ;
 - la **recette manuelle du mode tap** (vidéo → SAM 3.1, écran « Envoyé / Échec ») ;
 - la **recette du direct WebSocket** (pastille « WebSocket » / « KO », `X ips`, question
   « qu'est-ce qui était à gauche il y a 5 s ? » avec le journal de pistes) ;
@@ -141,27 +140,36 @@ avant d'être présentés comme validés :
 - la **vérification de bascule de région EU/US** (« Tester SAM ») ;
 - les **recettes lunettes** (`app/…/glasses/` et le banc `app/…/glasses/bench/`, `Route.Bench`).
 
-## 5. Tests instrumentés (nettoyage 6, banc 1)
+## 5. Tests instrumentés (9 + 1 banc)
 
-`app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests) et
+`app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests),
+`app/src/androidTest/…/depth/DepthBenchDeviceTest.kt` (2 tests : DA2 et MiDaS tournent sur
+appareil) et `app/src/androidTest/…/media/MediaDowngradeTest.kt` (1 test : rétrogradation v2
+vers v1 recréée vide, sans crash) ;
 `app/src/androidTestDebug/…/glasses/bench/MockGlassesTest.kt` (1 test — source set
 `androidTestDebug`, compilé pour la variante debug seulement et lancé par la **même** tâche
 `:app:connectedDebugAndroidTest`). Commandes (émulateur) :
 
 ```bash
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --offline
-./gradlew :app:connectedDebugAndroidTest --offline               # les 7 tests instrumentés
+./gradlew :app:connectedDebugAndroidTest --offline               # les 10 tests instrumentés
 EMULATOR_SERIAL=emulator-5554 bash scripts/install-emulator.sh   # installe l'APK
 adb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s emulator-5554 shell am instrument -w \
   -e class dev.sam3vision.app.cleanup.CaptureCleanupTest \
   dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
 adb -s emulator-5554 shell am instrument -w \
+  -e class dev.sam3vision.app.depth.DepthBenchDeviceTest \
+  dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5554 shell am instrument -w \
+  -e class dev.sam3vision.app.media.MediaDowngradeTest \
+  dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5554 shell am instrument -w \
   -e class dev.sam3vision.app.glasses.bench.MockGlassesTest \
   dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-(Le runner est `androidx.test.runner.AndroidJUnitRunner`, `app/build.gradle.kts:118`.)
+(Le runner est `androidx.test.runner.AndroidJUnitRunner`, `app/build.gradle.kts:135`.)
 
 Le banc n'a plus d'écran ni d'`Activity` à lui : c'est `Route.Bench` d'iSee
 (Réglages → Lunettes → « Banc d'essai lunettes »), lançable par adb sans toucher l'écran —
@@ -172,49 +180,62 @@ trace MediaStore dé-synchronisée oubliée sans erreur · capture en cours d'é
 périmètre limité au stockage privé de l'app · job horaire unique et sans réseau.
 **Non exécutés ici** (voir §4).
 
-## 6. Tests JVM par domaine (comptage du 27/10)
+## 6. Tests JVM par domaine (comptage du 28/10)
 
 Une entrée par fichier `*Test.kt`, avec son nombre d'annotations `@Test` (un seul fichier porte deux classes : `TapZonesTest.kt`).
 
-### `:core` — 905
+### `:core` — 1403
 
-- **audio** (13) : SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
-- **distance** (87) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 6, DistanceTextTest 7, GroundPlaneTest 17, KnownSizesTest 5, LensSpecTest 7, OpticsTest 24
-- **gesture** (17) : IseeGestureBrainTest 3, LongPressTriggerTest 10, TapOrHoldTest 4
-- **glasses** (6) : CaptureGestureTest 6
-- **haptics** (8) : WaveformTest 8
-- **iseedesign** (19) : DissolveTest 10, IseeSceneTest 9
+- **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
+- **crossing** (48) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, TrainedLightColorTest 4
+- **depth** (29) : DepthEstimatorTest 3, DepthFusionTest 9, DepthMapTest 5, DepthReadingsTest 7, SerialRunGuardTest 5
+- **distance** (88) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 6, DistanceTextTest 7, GroundPlaneTest 17, KnownSizesTest 6, LensSpecTest 7, OpticsTest 24
+- **gesture** (19) : IseeGestureBrainTest 5, LongPressTriggerTest 10, TapOrHoldTest 4
+- **glasses** (7) : CaptureGestureTest 6, DatPinTest 1
+- **haptics** (10) : CrossingHapticsTest 2, WaveformTest 8
+- **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (208) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsTest 8, LivePumpTest 4, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 4, PositionAnnouncerTest 8, PositionTextEnglishTest 7, PositionTextTest 10, ScreenTimingsTest 4, TimelineTextTest 7, TrackRunnerTest 14, UploadLadderTest 19
+- **live** (262) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 7, GuidanceSteeringTest 13, GuidanceTest 11, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 9, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, PositionAnnouncerTest 8, PositionTextEnglishTest 5, PositionTextTest 10, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
 - **local** (27) : LocalOverlayEngineTest 24, LocalOverlaySimTest 3
 - **mask** (97) : MaskBenchTest 2, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
-- **model** (3) : ObjectLimitsTest 3
+- **model** (7) : GeometryTest 4, ObjectLimitsTest 3
 - **motion** (9) : MotionBenchTest 1, MotionSourceTest 8
-- **net** (225) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 7, FallbackSpeechClientTest 4, HttpErrorTest 4, HttpRequestBuilderTest 10, LifecycleContractTest 10, LiveClientFactoryTest 3, LiveClientTest 16, LiveContractTest 11, LiveNarrationClientTest 4, LlmClientTest 9, LlmContractTest 11, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, SamClientTest 6, SamContractTest 12, SamLifecycleTest 4, TrackClientTest 12, VideoClientTest 9, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 23, WsLiveContractTest 8
+- **nav** (133) : BanGeocoderTest 7, DestinationQueryTest 10, GeocodeCacheTest 4, GeocodeChainTest 10, GuidanceUpdateTest 6, MapsUriTest 13, NavGeoTest 9, NavRouteTest 6, NavigationFlowTest 4, NavigationIntentTest 21, RouteSummaryTest 10, RouteTripNavTest 4, StopGuidanceTest 4, ValhallaRouteTest 7, ValhallaShapeTest 6, VoiceNavEngineTest 6, VoiceNavScriptTest 6
+- **navcore** (50) : NavErrorTest 10, NavMessagesTest 12, NavResultsTest 7, NavStopTest 6, NavUiStateTest 8, RetryPolicyTest 7
+- **net** (271) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 22, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 4, TrackClientTest 12, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
-- **settings** (69) : PrivateFileSettingsStoreTest 17, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 7, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 3
-- **speech** (5) : SpeechLanguageTest 5
+- **settings** (95) : CaregiverInviteTest 7, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
+- **share** (15) : CaregiverPageTest 3, SharePayloadTest 7, SharedSceneTest 5
+- **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
 - **text** (14) : PromptShieldTest 10, TextSanitizerTest 4
-- **usecase** (22) : DictationUseCaseTest 4, SpeechUseCaseTest 8, UseCasesTest 10
+- **usecase** (36) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 10
+- **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 458
+### `:app` — 777
 
-- **(racine)** (100) : BuildInfoTest 2, DistanceLayoutTest 15, FirstRunPermissionsTest 3, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 16, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, SettingsSeedTest 4, SpeechClientsTest 6, TtsLogicTest 6, UiLogicTest 13, VoiceLanguageSettingsTest 4
-- **cleanup** (11) : CaptureCleanerTest 6, CaptureScannerTest 5
-- **glasses** (26) : GlassesAudioPlanTest 7, GlassesMessagesTest 6, GlassesPhaseMappingTest 2, GlassesPolicyTest 4, GlassesUiStateTest 7
-- **glasses.bench** (84) : ChaineCompleteTest 8, CycleLatchTest 5, FramePolicyTest 6, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, SessionPolicyTest 26, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
-- **isee** (86) : FramePolicyTest 6, IseeDistancesTest 5, IseePhotoContextTest 8, IseeRenderTest 12, IseeSceneTest 11, LiveProbeCadenceTest 4, LiveProbeSchedulingTest 2, LiveProbeTextTest 21, OnboardingGesturesTest 8, RevealShiftTest 4, SpeakableTextTest 3, BubbleCountTest 2
-- **isee.vm** (41) : IseeAnswersTest 6, IseeCameraCoordinatorTest 6, IseeDictationTest 9, IseePhotoShotTest 6, IseeStatusTextTest 9, IseeTranscriptTest 5
-- **live** (50) : LiveAskForgetTest 1, LiveAskSessionTest 7, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 5, LivePredictionTest 8, LiveWakeGuardTest 7
+- **(racine)** (146) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 19, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 4, RouteBaseUrlSeedTest 3, RouteSeedTest 3, SettingsSeedTest 11, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 17, VoiceLanguageSettingsTest 4
+- **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
+- **depth** (10) : DepthPreprocessTest 5, ModelDownloaderTest 5
+- **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
+- **glasses.bench** (95) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 22, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
+- **isee** (128) : BubbleCountTest 2, CrossingWiringTest 3, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 4, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 3, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 3, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 3, LiveProbeTextTest 23, OnboardingGesturesTest 6, OrbShaderTest 3, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3
+- **isee.vm** (55) : IseeAnswersTest 14, IseeCameraCoordinatorTest 6, IseeDictationTest 9, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseeStatusTextTest 2, IseeTranscriptTest 5, NavigationHookTest 6
+- **live** (60) : LiveAskForgetTest 1, LiveAskSessionTest 7, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 5, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
+- **locked** (6) : LockedMicAnswerTest 6
 - **media** (13) : MediaCacheStoreTest 3, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
-- **tap** (14) : TapMachineTest 8, TapZonesTest.kt 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)
+- **navigation** (18) : AndroidGeocoderLabelTest 4, NavigationLauncherTest 12, VoiceNavTrackerTest 2
+- **perms** (11) : PermDecisionTest 11
+- **speech** (56) : SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 6, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 11
+- **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapSessionTest 6, TapZonesTest 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)
 - **vm** (33) : AppAnalysisTest 6, AppChatTest 6, AppDiagnosticsTest 7, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
+- **voicenav** (26) : ValhallaRouteLoaderTest 4, VoiceNavEngineDriverTest 3, VoiceNavSessionTest 14, VoiceNavSessionWiringTest 5
 
 Le banc lunettes (`glasses.bench`) n'a plus de section à part : il est dans `:app` depuis la
-suppression du module dédié (décision : `docs/GLASSES-DECISION.md`). Ses neuf fichiers
+suppression du module dédié (décision : `docs/GLASSES-DECISION.md`). Ses dix fichiers
 mélangent l'ancien périmètre du spike (`GlassesFrameEncoderTest`, `SessionPolicyTest`,
 `YuvConverterTest`) et les pièces ajoutées depuis (`ChaineCompleteTest`, `CycleLatchTest`,
-`FramePolicyTest`, `GlassesAudioRouteTest`, `SpikeLaunchTest`, `SpikeLogTest`).
+`GlassesAudioRouteTest`, `GlassesFramePolicyTest`, `LinkGateTest`, `SpikeLaunchTest`,
+`SpikeLogTest`).
 
 Aucun test ne touche le GPU ni le réseau réel : `/live`, `/live/ws` et les autres endpoints sont
 simulés (`core/src/test/…/TestHttpServer.kt`, `net/TestLiveClients.kt`, `net/NetContractHarness.kt`).
@@ -222,8 +243,8 @@ simulés (`core/src/test/…/TestHttpServer.kt`, `net/TestLiveClients.kt`, `net/
 ## 7. Gardes et limites connues
 
 - `tools/check-kotlin-limits.py` (heuristique accolades, faux positifs possibles) : **vert le
-  26/10** sur cet arbre (373 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
-- `bash scripts/test_scripts.sh` : **53 assertions, 53 ok**.
+  28/10** sur cet arbre (807 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
+- `bash scripts/test_scripts.sh` : **117 assertions, 117 ok**.
 - GPU Modal : **une seule carte à la fois**, toutes apps confondues ; sur cette machine,
   `~/bin/sam3-gpu status|busy` avant toute manœuvre, et ne rien redéployer.
 - Coordonnées d'écran, seuils de gestes et textes d'affichage ne sont pas assertés par un test

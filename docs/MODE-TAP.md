@@ -1,8 +1,8 @@
 # Mode tap court — vidéo → SAM 3.1, annonces ElevenLabs
 
-Conçu pour un usage sans regard. Ce mode est l'**écran `Route.Tap`** (`AppNav.kt:37`, `:72`),
-atteint depuis l'**accueil classique** (Réglages → Autres écrans → « Accueil classique (photo +
-analyse) », `SettingsScreen.kt:160`). ⚠️ L'accueil par défaut de l'app est **iSee**, qui a son
+Conçu pour un usage sans regard. Ce mode est l'**écran `Route.Tap`** (`AppNav.kt:37`, `:68`),
+atteint depuis les Réglages (« Other screens » → « Classic home (photo + analysis) »,
+`SettingsScreen.kt:400-409`). ⚠️ L'accueil par défaut de l'app est **iSee**, qui a son
 propre geste de tap (voir la dernière section) : ce ne sont pas les mêmes chemins de code.
 
 **Un tap sur l'aperçu de Capture ouvre le mode vidéo et démarre l'enregistrement**
@@ -145,23 +145,22 @@ reste HTTPS.
 
 Le contrat **côté app** est l'**upload** : `POST {endpoint}/video` en `multipart/form-data`, champs
 `model=sam3.1-video`, `video`, et `prompt` quand il est non vide
-(`HttpSam31VideoClient.kt:18-21`, `:57-63` ; `DEFAULT_PATH = "/video"` `:67`, `DEFAULT_MODEL` `:68`) ;
+(`HttpSam31VideoClient.kt:18-21`, `:55-63` ; `DEFAULT_PATH = "/video"` `:69`, `DEFAULT_MODEL` `:70`) ;
 le multipart évite les +33 % du base64. La réponse est lue de façon tolérante (`text`, `description`,
-`answer`, `caption`, sinon corps brut — `SUMMARY_KEYS` `:75`), bornée à 600 caractères
-(`MAX_SUMMARY_CHARS` `:15`, `summarize` `:87-93`).
+`answer`, `caption`, sinon corps brut — `SUMMARY_KEYS` `:77`), bornée à 600 caractères
+(`MAX_SUMMARY_CHARS` `:15`, `summarize` `:89-95`).
 
 ⚠️ **La vérité, telle quelle : cette route n'existe dans aucune implémentation backend connue.**
-Vérifiable ici : `git grep -n '\"/video\"'` ne trouve que ce client et son test
-(`HttpSam31VideoClient.kt:67`, `VideoClientTest.kt:21` — aucun serveur dans ce dépôt : `:core` est
-une bibliothèque cliente), et les routes que l'arbre adresse à SAM sont `/live/ws`
-(`WsTransport.kt:35`), `/segment`, `/health` et `/release` — jamais `/video` en dehors de ce
-fichier. Côté déploiements connus (le dépôt backend, les apps Modal `sam3-eu-a100` /
-`sam3-us-a100`), aucune n'expose `POST /video`. Donc, sur un build où `sam31.endpoint` est
-renseigné, le second tap **part** et revient en erreur — 404 du proxy Modal, que `httpError`
-traduit en `BackendStopped` (`Http.kt:198-204`) ou en `ApiError.Http(404, …)` — puis
-`TapSession.upload` transforme l'échec en `TapStatus.Failed` et annonce **« Failed »**
-(`TapSession.kt:166-176`). Sans endpoint, l'échec est **local** et immédiat : « endpoint SAM 3.1
-vide » (`HttpSam31VideoClient.kt:37`).
+Vérifiable ici : `git grep -n '"/video"' server/backend` est vide, et le client ne trouve
+que son test (`HttpSam31VideoClient.kt:69`, `VideoClientTest.kt:21`) ; les routes que l'arbre
+adresse à SAM sont `/live/ws` (`WsTransport.kt:35`), `/segment`, `/health` et `/release` —
+jamais `/video` en dehors de ce fichier. Côté déploiements connus (`server/` de ce dépôt, les
+apps Modal `sam3-eu-a100` / `sam3-us-a100`), aucune n'expose `POST /video`. Donc, sur un build
+où `sam31.endpoint` est renseigné, le second tap **part** et revient en erreur — 404 du proxy
+Modal, que `httpError` traduit en `BackendStopped` (`Http.kt:248-251`) ou en
+`ApiError.Http(404, …)` — puis `TapSession.upload` transforme l'échec en `TapStatus.Failed` et
+annonce **« Failed »** (`TapSession.kt:176-191`). Sans endpoint, l'échec est **local** et
+immédiat : « endpoint SAM 3.1 vide » (`HttpSam31VideoClient.kt:37`).
 
 Autrement dit : **le mode tap enregistre, annonce et échoue proprement ; il ne produit aujourd'hui
 aucun résumé vidéo.** Ce n'est pas une fonction qui marche, c'est une fonction dont le client est
@@ -169,7 +168,7 @@ prêt et le serveur absent. Ne pas la présenter autrement.
 
 Si SAM 3.1 doit tourner **sur le téléphone**, on ne change qu'un endroit :
 `TapConfig.ON_DEVICE_INFERENCE = true` — le client refuse alors sans appel réseau
-(`INFERRED_ON_DEVICE`, `HttpSam31VideoClient.kt:36`, `:70`) et l'écran annonce `Failed`. Il
+(`INFERRED_ON_DEVICE`, `HttpSam31VideoClient.kt:36`, `:72`) et l'écran annonce `Failed`. Il
 faudra brancher le runtime local (TFLite/ONNX + modèle vidéo) à la place du client ; le geste, la
 file d'annonces et le nettoyage restent identiques.
 

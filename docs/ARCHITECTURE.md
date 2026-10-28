@@ -1,38 +1,38 @@
 # ARCHITECTURE — iSee
 
-Ce document décrit **l'arbre de ce dépôt**, relu dans le code le **27/10/2026** (comptes
-recomptés ce jour-là, après l'entrée du banc lunettes dans `:app` ; première rédaction le 26/10
-après 19 h). Le service SAM 3.1 (GPU) vit dans un dépôt séparé, non
-public : rien de ce qui est serveur n'est vérifiable d'ici. Chaque chiffre ci-dessous est soit
-une constante du code (fichier + ligne cités), soit un comptage reproductible (commande
+Ce document décrit **l'arbre de ce dépôt**, relu dans le code le **27/10/2026**, comptes
+recomptés le **28/10/2026** (première rédaction le 26/10 après 19 h). Le service SAM 3.1 (GPU)
+vit dans **`server/` de ce dépôt** : source déployée `server/backend/live_fast/` (app
+`sam3-eu-a100`), contrats et mesures dans `server/docs/` (voir §8). Chaque chiffre ci-dessous
+est soit une constante du code (fichier + ligne cités), soit un comptage reproductible (commande
 donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici.
 
 ## 1. Deux modules, leurs comptes réels
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **105** fichiers | 126 fichiers / **907** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **165** fichiers | 71 fichiers / **466** `@Test` | 2 fichiers / **7** tests |
-| `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **18** fichiers | 9 fichiers / **84** `@Test` | 1 fichier / **1** test |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **166** fichiers | 193 fichiers / **1 403** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **240** fichiers | 122 fichiers / **777** `@Test` | 4 fichiers / **10** tests |
+| `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
 d'essai lunettes (l'ancien module séparé) n'est plus un module, il vit dans l'APK d'iSee.
 
-Les déclarations sont dans `core/build.gradle.kts:9,10,13` et `app/build.gradle.kts:79,80,84` ;
+Les déclarations sont dans `core/build.gradle.kts:9,10,13` et `app/build.gradle.kts:82,83,87` ;
 `settings.gradle.kts` n'inclut que `:core` et `:app`, et `compileSdk = 36` pour les deux. Le
-dossier de l'ancien module (37 fichiers suivis, dont 30 `.kt`) est encore **sur le disque**, mais
-aucun build ne l'inclut : il ne sert plus que de référence en lecture.
+dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus aucun chemin
+`glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 105
-find core/src/test -name '*.kt' | wc -l            # 126
-find app/src/main -name '*.kt' | wc -l             # 165
-find app/src/test -name '*.kt' | wc -l             # 71
-find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 18
-find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 9
-grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 84
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 503
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 54 551
+find core/src/main -name '*.kt' | wc -l            # 166
+find core/src/test -name '*.kt' | wc -l            # 193
+find app/src/main -name '*.kt' | wc -l             # 240
+find app/src/test -name '*.kt' | wc -l             # 122
+find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 15
+find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 730
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 76 370
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
@@ -295,15 +295,19 @@ Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appel
 | Lunettes | `app/…/glasses/` (12 fichiers : état, contrôleur, caméra, audio, politique, section de réglages) et `app/…/glasses/bench/` (18 fichiers : banc d'essai, SDK DAT) — le dossier de l'ancien module n'est plus dans le build |
 | Gardes | `tools/check-kotlin-limits.py`, `.github/workflows/ci.yml`, `.github/couche0/check_couche0.py` |
 
-## 8. Ce que ce dépôt ne contient pas
+## 8. Ce que ce dépôt ne contient pas (et où est le reste)
 
-- Le **backend SAM 3.1** (GPU) : dépôt séparé, non public. Ni son code, ni son image, ni sa
-  configuration ne sont ici.
-- **`docs/LIVE-SPEC.md` : cité par le code, absent du dépôt.** `core/net/HttpLiveClient.kt:30`
-  et `core/net/TrackClient.kt:34` s'y réfèrent comme au contrat du backend ; `ls docs/` ne le
-  trouve pas. Une autre passe le crée ; il ne doit pas être inventé ici.
-- Le **protocole `/live/ws` côté serveur** : le client est ici, le serveur est ailleurs.
+- Le **conteneur réellement déployé** : le source de référence est dans `server/` (`live_fast/`
+  pour le direct, `modal_app.py` legacy, `track_app.py`, `valhalla_cpu.py`), mais la version qui
+  sert, ses leviers (`FAST_*`) et sa région ne se lisent que sur son `/health` (champs
+  `levers`/`applied`) — voir `server/docs/LIVE-FAST.md`.
+- **`docs/LIVE-SPEC.md` existe** : contrat du direct déduit du client (311 lignes).
+- Le **protocole `/live/ws` côté serveur** : implémenté dans `server/backend/live_fast/`
+  (`service.py`, `live_ws.py`) ; contrat dans `docs/LIVE-SPEC.md` §7.
 - Les **secrets** : aucune clé, aucun jeton, aucune URL signée.
-- Le **tracker** (`sam3-track`) côté serveur : le client existe (`core/net/TrackClient.kt`,
-  `core/live/TrackRunner.kt`) et l'écran Direct l'instancie à la demande (pastille
-  « Tracker ») ; le **serveur**, lui, est ailleurs (dépôt non public).
+- Le **tracker déployé** : le code est ici (`server/backend/track_app.py`), mais aucun workflow
+  ne le redéploie — déploiement manuel. Le client (`core/net/TrackClient.kt`,
+  `core/live/TrackRunner.kt`) parle `POST /session`, `POST /frame`, `DELETE /session/{id}`
+  (`TrackClient.kt:30-40`).
+- **`POST /video`** : toujours sans implémentation serveur connue
+  (`git grep -n '"/video"' server/backend` vide) — client écrit et testé, voir `docs/MODE-TAP.md`.
