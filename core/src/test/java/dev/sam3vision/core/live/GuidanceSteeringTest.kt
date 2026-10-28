@@ -110,7 +110,7 @@ class GuidanceSteeringTest {
     fun `phrase cap bouche avec obstacle et passage`() {
         val gauche = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
-        assertEquals("Personne à 2 mètres à 10 heures, passe au centre.", Guidance.phrase(gauche))
+        assertEquals("Personne à 2 mètres à 10 heures, décalez-vous de 1 mètre vers le centre.", Guidance.phrase(gauche))
     }
 
     @Test
@@ -118,7 +118,7 @@ class GuidanceSteeringTest {
         val droite = Guidance.decide(listOf(placed("person", 0.8f, 2f)), SteeringCap.Right)
 
         assertEquals(
-            "Person 2 meters at 2 o'clock, go straight.",
+            "Person 2 meters at 2 o'clock, move 1 meter to the center.",
             Guidance.phrase(droite, SpeechLanguage.En),
         )
         val sansDistance = Guidance.decide(listOf(placed("personne", 0.2f)), SteeringCap.Left)
@@ -132,6 +132,6 @@ class GuidanceSteeringTest {
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.2f, 2.4f)), SteeringCap.Left)
 
-        assertEquals("Left:b|personne|Straight|2|10h", Guidance.key(bloque))
+        assertEquals("Left:b|personne|Straight|2|10h|1.5", Guidance.key(bloque))
     }
 }

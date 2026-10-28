@@ -1,11 +1,11 @@
 # Voix danger — priorité, trottoir, décalage chiffré
 
 > **Dépôt** : `BaptisteFaisy/vision` — **décision user du 28/10/2026**.
-> **Nature du document** : décision produit + contrat à implémenter, pas un
-> relevé de code. Le § 1 rappelle l'existant (chaque affirmation porte un
-> `chemin:ligne` lu sur `master` = `611939f1`) ; les § 2 et § 3 sont
-> **nouveaux, non implémentés** — seuils et phrases à valider sur téléphone.
-> Tout ce qui n'a pas été mesuré s'écrit **non mesuré**.
+> **Nature du document** : décision produit + contrat. Le § 1 rappelle
+> l'existant (chaque affirmation porte un `chemin:ligne` lu sur `master` =
+> `611939f1`) ; les § 2 et § 3 sont **livrés le 28/10/2026** (branche
+> `feat/voix-danger-impl`) — seuils et phrases restant à valider sur
+> téléphone. Tout ce qui n'a pas été mesuré s'écrit **non mesuré**.
 
 ## 1. Priorité au danger (confirmé — déjà l'architecture)
 
@@ -34,7 +34,7 @@ Les classes rue demandées (humains, voitures, vélos, trottinettes
 (`core/.../live/LivePrompts.kt:28,39`,
 `server/backend/tracking.py:53`). Rien à changer ici.
 
-## 2. Trottoir et dénivelés — « levez la jambe » (nouveau)
+## 2. Trottoir et dénivelés — « levez la jambe » (livré le 28/10/2026)
 
 **Règle** : un bord de trottoir (ou une marche, une différence de terrain)
 détecté **dans le couloir marché à 1 m ou moins** déclenche une annonce
@@ -65,7 +65,7 @@ pas le bord), montée vs descente (deux phrases ?), fiabilité de la profondeur
 à moins d'1 m, et l'extension aux autres différences de terrain (pente,
 rampe, gravier — détection **non définie** à ce stade).
 
-## 3. Décalage latéral chiffré en mètres (nouveau)
+## 3. Décalage latéral chiffré en mètres (livré le 28/10/2026)
 
 **Règle** : une consigne de côté ne dit plus seulement le côté, elle dit
 **de combien se décaler**, pour être précis :
@@ -86,14 +86,18 @@ palier annoncé — si le décalage change, ça reparle.
 1 m ?), la marge d'épaule, et la géométrie latérale (centre + distance →
 mètres : à câbler sur `core/.../distance/`, pas à deviner dans la phrase).
 
-## 4. Coutures pressenties (pistes, pas un plan)
+## 4. Coutures livrées
 
-- § 2 : nouveau guetteur miroir de `StairWatcher` (confirmation + cooldown +
-  phrase urgente), câblé dans `TraverseWiring` / `LiveViewModel.publish`
-  comme le pipeline traversée ; clips hors-ligne pré-générés si la phrase
-  rejoint le mode traversée (miroir `TraversePhrases.ALL`).
-- § 3 : `Guidance.phrase` + `Guidance.key` (montant + palier), tests JVM
-  miroirs des existants, phrases EN dans `docs/VOIX-ANGLAIS.md`.
+- § 2 : `core/.../curb/` (`CurbConcepts`, `CurbWatcher`, miroir de
+  `StairWatcher` : 3 confirmations, cooldown 10 s, phrase urgente), signal lu
+  dans les lectures affinées (profondeur dès qu'une ancre fixe l'échelle) ;
+  câblé dans `ProbeWiring.observeCurb` (zéro ligne dans `LiveProbe`, 499/500),
+  voix via `ProximityVoice` urgent (coupe, miroir `TraverseVoice`) ; coupé en
+  mode Traversée.
+- § 3 : `Guidance.decide` calcule `shiftMeters` (demi-couloir + marge d'épaule
+  0,3 m, demi-mètre supérieur, focale 67° par défaut), `Guidance.phrase` dit
+  « décalez-vous de X vers … », `Guidance.key` porte le palier ; distance
+  inconnue = consigne legacy non chiffrée.
 - Recette téléphone : trottoir réel à 1 m → phrase urgente ≤ 1 s après
   confirmation ; obstacle latéral → décalage annoncé puis vérifié au pas —
   **non mesuré**, exige un APK de cet arbre sur appareil réel.

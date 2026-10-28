@@ -29,13 +29,17 @@ class ProximityVoice(
     /**
      * Nouvelle phrase de SAM. [playerIdle] vrai = aucune bulle du chat en cours de lecture ;
      * sinon on ne dit rien (et la phrase reste mémorisée comme déjà traitée, pour ne pas
-     * la dire en retard une fois le chat terminé).
+     * la dire en retard une fois le chat terminé). [urgent] = danger (trottoir…) : coupe
+     * la lecture en cours et parle quand même — la sécurité passe avant le sous-titre
+     * (miroir de `TraverseVoice`, qui préempte la verte par la rouge).
      */
-    suspend fun onPhrase(phrase: String, playerIdle: Boolean) {
+    suspend fun onPhrase(phrase: String, playerIdle: Boolean, urgent: Boolean = false) {
         if (phrase == lastPhrase) return
         lastPhrase = phrase
         val current = settings()
-        if (!playerIdle || !current.ttsConfigured) return
+        if (!current.ttsConfigured) return
+        if (!urgent && !playerIdle) return
+        if (urgent) player.stop()
         val bytes = ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
             .synthesize(phrase)
             .getOrElse { return }
