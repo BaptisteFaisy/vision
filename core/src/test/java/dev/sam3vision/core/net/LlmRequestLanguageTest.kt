@@ -21,7 +21,7 @@ class LlmRequestLanguageTest {
     }
 
     private fun client(server: TestHttpServer, language: SpeechLanguage) =
-        InferHubLlmClient(server.baseUrl, "cle-de-test", "modele", language)
+        HttpLlmClient(server.baseUrl, "cle-de-test", "modele", language)
 
     private fun firstSystem(body: String): String = JSONObject(body).getJSONArray("messages")
         .getJSONObject(0).getString("content")

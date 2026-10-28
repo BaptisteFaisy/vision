@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Contrat de transport du client LLM (`InferHubLlmClient`, API compatible OpenAI).
+ * Contrat de transport du client LLM (`HttpLlmClient`, API compatible OpenAI).
  *
  * Couvre ce que les tests historiques ne vérifiaient pas : méthode et en-têtes réels,
  * 400/402/500, 404 « app arrêtée », corps vide, corps illisible, JSON tronqué et délai
@@ -19,7 +19,7 @@ import org.junit.Test
  */
 class LlmContractTest {
 
-    private fun client(url: String) = InferHubLlmClient(url, NetContract.KEY, NetContract.MODEL)
+    private fun client(url: String) = HttpLlmClient(url, NetContract.KEY, NetContract.MODEL)
 
     private suspend fun call(url: String): Result<Analysis> = client(url).describe("QUJD", emptyList())
 
@@ -80,7 +80,7 @@ class LlmContractTest {
     @Test
     fun `un delai depasse devient Timeout`() = runBlocking {
         NetContract.slowServer().use { server ->
-            val result = InferHubLlmClient(
+            val result = HttpLlmClient(
                 server.baseUrl,
                 NetContract.KEY,
                 NetContract.MODEL,
@@ -153,7 +153,7 @@ class LlmContractTest {
     @Test
     fun `le raisonnement peut etre rallume explicitement`() = runBlocking {
         NetContract.server(body = NetContract.chatReply("ok")).use { server ->
-            InferHubLlmClient(server.baseUrl, NetContract.KEY, NetContract.MODEL, thinking = true)
+            HttpLlmClient(server.baseUrl, NetContract.KEY, NetContract.MODEL, thinking = true)
                 .askText("et la ?", emptyList()).getOrThrow()
 
             val sent = JSONObject(server.requests.single().body)

@@ -18,7 +18,7 @@ private fun serverReplying(content: String) = TestHttpServer {
 class LlmClientTest {
 
     private fun client(server: TestHttpServer) =
-        InferHubLlmClient(server.baseUrl, TEST_KEY, "ali/qwen3.8-omni-flash")
+        HttpLlmClient(server.baseUrl, TEST_KEY, "meta-models/muse-spark-open-1026")
 
     @Test
     fun `describe accepte une reponse JSON`() {
@@ -66,7 +66,7 @@ class LlmClientTest {
             assertEquals("/chat/completions", request.path)
             assertEquals("Bearer $TEST_KEY", request.headers["authorization"])
             val body = JSONObject(request.body)
-            assertEquals("ali/qwen3.8-omni-flash", body.getString("model"))
+            assertEquals("meta-models/muse-spark-open-1026", body.getString("model"))
             assertEquals(0.2, body.getDouble("temperature"), 0.001)
             val parts = body.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
             assertEquals("data:image/jpeg;base64,QUJD", parts.getJSONObject(1).getJSONObject("image_url").getString("url"))
@@ -121,7 +121,7 @@ class LlmClientTest {
     fun `cle absente echoue sans appel reseau`() {
         val server = serverReplying("devrait etre inutilise")
         try {
-            val noKey = InferHubLlmClient(server.baseUrl, "", "modele")
+            val noKey = HttpLlmClient(server.baseUrl, "", "modele")
             val failure = runBlocking { noKey.describe("QUJD", emptyList()) }.exceptionOrNull()
             assertTrue(failure is ApiError.InvalidKey)
             assertTrue(server.requests.isEmpty())
