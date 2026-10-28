@@ -9,6 +9,7 @@ import dev.sam3vision.core.model.SegmentResult
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SamClient
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -97,6 +98,59 @@ class UseCasesTest {
 
         assertTrue(analysis.objects.isEmpty())
         assertEquals("une pièce", analysis.description)
+    }
+
+    @Test
+    fun `onSamOutcome recoit le succes de segmentation`() = runBlocking {
+        val seen = mutableListOf<Result<SegmentResult>?>()
+        val sam = FakeSam(Result.success(SegmentResult(10, 10, listOf(CHAIR))))
+
+        AnalyzeUseCase(FakeLlm(), sam, onSamOutcome = { seen += it }).invoke("QUJD").getOrThrow()
+
+        assertEquals(listOf(CHAIR), seen.single()?.getOrNull()?.objects)
+    }
+
+    @Test
+    fun `onSamOutcome recoit l echec de segmentation`() = runBlocking {
+        val seen = mutableListOf<Result<SegmentResult>?>()
+        val sam = FakeSam(Result.failure(ApiError.Network("coupé")))
+
+        AnalyzeUseCase(FakeLlm(), sam, onSamOutcome = { seen += it }).invoke("QUJD").getOrThrow()
+
+        assertEquals("coupé", seen.single()?.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `onSamOutcome vaut Timeout quand le budget expire`() = runBlocking {
+        val seen = mutableListOf<Result<SegmentResult>?>()
+        val hang = CompletableDeferred<Result<SegmentResult>>()
+        val hanging = object : SamClient {
+            override suspend fun segment(
+                pngOrJpegB64: String,
+                prompts: List<String>?,
+            ): Result<SegmentResult> = hang.await()
+
+            override suspend fun health(): Result<Boolean> = Result.success(true)
+        }
+
+        val analysis = AnalyzeUseCase(
+            FakeLlm(),
+            hanging,
+            samBudgetMs = 20,
+            onSamOutcome = { seen += it },
+        ).invoke("QUJD").getOrThrow()
+
+        assertTrue(seen.single()?.exceptionOrNull() is ApiError.Timeout)
+        assertTrue("la photo n'attend pas", analysis.objects.isEmpty())
+    }
+
+    @Test
+    fun `onSamOutcome est null sans client SAM`() = runBlocking {
+        val seen = mutableListOf<Result<SegmentResult>?>()
+
+        AnalyzeUseCase(FakeLlm(), sam = null, onSamOutcome = { seen += it }).invoke("QUJD").getOrThrow()
+
+        assertEquals(listOf(null), seen)
     }
 
     @Test

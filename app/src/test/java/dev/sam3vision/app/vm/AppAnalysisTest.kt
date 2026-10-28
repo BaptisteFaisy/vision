@@ -29,13 +29,18 @@ class AppAnalysisTest {
     private val announced = mutableListOf<List<SegObject>>()
     private var overlayCalls = 0
 
-    private fun runner(llm: LlmClient, sam: SamClient? = null): AppAnalysis = AppAnalysis(
+    private fun runner(
+        llm: LlmClient,
+        sam: SamClient? = null,
+        noteSam: (String, Result<SegmentResult>) -> Unit = { _, _ -> },
+    ): AppAnalysis = AppAnalysis(
         state = { screen.value },
         update = screen.update,
         llm = { llm },
         sam = { sam },
         overlays = { overlayCalls++; emptyList<Bitmap>() },
         announce = { objects, _ -> announced += objects },
+        noteSam = noteSam,
     )
 
     private fun runner(settings: dev.sam3vision.core.settings.Settings, llm: LlmClient): AppAnalysis {
@@ -77,6 +82,49 @@ class AppAnalysisTest {
         assertEquals("un mur", screen.value.analysis?.description)
         assertTrue("aucun objet sans segmentation", screen.value.objects.isEmpty())
         assertFalse(screen.value.segmentationActive)
+        assertEquals(
+            "la note nomme la GPU injoignable",
+            AppStatusText.samDownNote("backend injoignable : réseau"),
+            screen.value.segmentationNote,
+        )
+    }
+
+    @Test
+    fun `issue SAM — notee avec l endpoint appele`() = runTest {
+        screen.state.update {
+            it.copy(settings = dev.sam3vision.core.settings.Settings.Default.copy(samBaseUrl = "https://sam.test"))
+        }
+        val noted = mutableListOf<Pair<String, Result<SegmentResult>>>()
+        val llm = FakeLlm(onDescribe = { Result.success(analysis("un mur")) })
+        val sam = FakeSam(onSegment = Result.failure(ApiError.Network("coupé")))
+
+        runner(llm, sam, noteSam = { endpoint, result -> noted += endpoint to result }).analyze("photo")
+
+        assertEquals(listOf("https://sam.test"), noted.map { it.first })
+        assertEquals("coupé", noted.single().second.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `succes SAM — note Up, aucune note GPU`() = runTest {
+        val chaise = SegObject("chaise", 0.9f, listOf(0f, 0f, 1f, 1f), "masque")
+        val noted = mutableListOf<Pair<String, Result<SegmentResult>>>()
+        val llm = FakeLlm(onDescribe = { Result.success(analysis("une chaise", listOf(chaise))) })
+        val sam = FakeSam(onSegment = Result.success(SegmentResult(10, 10, listOf(chaise))))
+
+        runner(llm, sam, noteSam = { endpoint, result -> noted += endpoint to result }).analyze("photo")
+
+        assertTrue("succès noté", noted.single().second.isSuccess)
+        assertNull("des objets : aucune note", screen.value.segmentationNote)
+    }
+
+    @Test
+    fun `sans client SAM — rien n est note, note generique`() = runTest {
+        val noted = mutableListOf<Pair<String, Result<SegmentResult>>>()
+        val llm = FakeLlm(onDescribe = { Result.success(analysis("un mur")) })
+
+        runner(llm, noteSam = { endpoint, result -> noted += endpoint to result }).analyze("photo")
+
+        assertTrue("SAM non appelé : rien à noter", noted.isEmpty())
         assertEquals("Aucun objet segmenté sur cette image.", screen.value.segmentationNote)
     }
 
