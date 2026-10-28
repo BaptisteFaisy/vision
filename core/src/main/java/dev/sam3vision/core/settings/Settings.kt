@@ -131,9 +131,9 @@ data class Settings(
     val speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT,
     /**
      * Base de l'itinéraire Valhalla (`POST /route`, mode piéton) : URL publique
-     * du tunnel (Funnel r630) ou du proxy devant — jamais un secret, jamais en
-     * dur. Vide = pas d'itinéraire in-app, le guidage reste celui de Google
-     * Maps. Remplie au build (`route.base.url`) ou dans Réglages.
+     * du backend Modal CPU (jamais un secret). Vide = pas d'itinéraire in-app,
+     * le guidage reste celui de Google Maps. Remplie au build (`route.base.url`,
+     * défaut Modal) ou dans Réglages.
      */
     val routeBaseUrl: String = "",
     /**
