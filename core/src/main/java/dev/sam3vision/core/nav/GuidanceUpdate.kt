@@ -8,7 +8,13 @@ package dev.sam3vision.core.nav
  * [instruction] est la prochaine manœuvre en français (« Tournez à droite
  * sur la rue de Rivoli »), [distanceToManeuverMeters] la distance avant de
  * l'exécuter, [remainingDistanceMeters] / [remainingDurationSeconds] le reste
- * du trajet, [arrived] l'arrivée signalée par le moteur.
+ * du trajet, [arrived] l'arrivée signalée par le moteur, [offRoute] l'écart
+ * de route en cours (recalcul, bandeau affiché).
+ *
+ * Contrat [offRoute] (driver → écran) : le driver le lève à `true` sur
+ * `NavEvent.OffRoute` et le rabaisse à `false` dès le premier état du nouvel
+ * itinéraire (ou sur `BackOnRoute`) ; l'écran n'affiche que le bandeau, il ne
+ * décide rien. Défaut `false` : les constructions existantes sont inchangées.
  *
  * Pur JVM : aucune dépendance Android ni coroutine.
  */
@@ -18,6 +24,7 @@ data class GuidanceUpdate(
     val remainingDistanceMeters: Long,
     val remainingDurationSeconds: Long,
     val arrived: Boolean = false,
+    val offRoute: Boolean = false,
 ) {
     init {
         require(instruction.isNotBlank()) { "instruction vide" }
