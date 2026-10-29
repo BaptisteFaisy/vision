@@ -190,8 +190,10 @@ def test_deploy_script(_module) -> None:
     # Scaledown 60 (fuite max ~0,04 $ si /release raté, règle user 27/10).
     for lever in ("FAST_TIMING=1", "FAST_SCALEDOWN=60", "FAST_BATCH_PROMPTS=1",
                   "FAST_EDGE=512", "FAST_SNAPSHOT=1", "FAST_MODEL_DIR=/opt/models/sam3.1",
-                  "FAST_DETR_GRAPH=1", "FAST_ATTN=sdpa"):
+                  "FAST_ATTN=sdpa"):
         check(f"déploiement : {lever} présent", lever in script, "absent du script")
+    check("déploiement : FAST_DETR_GRAPH éteint (rollback crash replay)",
+          "FAST_DETR_GRAPH=1" not in script, "levier réactivé sans diagnostic")
     # GPU et nom d'app passent par des variables (`${FAST_GPU:-...}`) : on fige
     # l'intention (variable + valeur déployée), pas une affectation littérale.
     check("déploiement : GPU A100-40GB par défaut",
