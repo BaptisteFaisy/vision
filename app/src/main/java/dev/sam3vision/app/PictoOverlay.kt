@@ -1,20 +1,33 @@
 package dev.sam3vision.app
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.picto.PictoHit
 
@@ -62,3 +75,36 @@ fun pictoRects(hits: List<PictoHit>, width: Int, height: Int, transform: CropTra
             label = it.label,
         )
     }
+
+/** Taille du pictogramme affiché en grand : lisible d'un coup d'œil, sans manger l'écran. */
+private val BIG_PICTO_SIZE = 176.dp
+
+/**
+ * Le premier objet vu, en grand sous les bandeaux : son dessin + son nom,
+ * sur fond opaque pour rester lisible sur la vidéo. Les cadres jaunes
+ * ([LivePictoOverlay]) gardent la localisation ; rien sans reconnaissance,
+ * et rien en démo (faux repères sans PNG).
+ */
+@Composable
+fun LivePictoBig(layer: PictoOverlay?, pngOf: (String) -> ByteArray?) {
+    if (layer == null || layer.empty) return
+    val hit = layer.hits.firstOrNull() ?: return
+    val bitmap = remember(hit.pictoId) {
+        runCatching {
+            pngOf(hit.pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+        }.getOrNull()?.asImageBitmap()
+    } ?: return
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier
+                .padding(top = 280.dp)
+                .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp))
+                .border(2.dp, Color.Yellow, RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(bitmap, contentDescription = hit.label, modifier = Modifier.size(BIG_PICTO_SIZE))
+            Text(hit.label, color = Color.Yellow, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}

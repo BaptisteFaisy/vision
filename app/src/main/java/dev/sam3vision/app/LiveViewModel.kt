@@ -142,7 +142,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Demandes sur le direct : questions LLM, chasses SAM, ordres picto. */
-    private val asker = LiveAskSession(
+    internal val asker = LiveAskSession(
         scope = viewModelScope,
         state = _state,
         timeline = timeline,

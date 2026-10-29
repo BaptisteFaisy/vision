@@ -6,7 +6,9 @@ import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LivePrompts
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -80,5 +82,15 @@ class LiveAskVoiceTest {
             listOf("Je crée le pictogramme.", "Pictogramme medics prêt. Dis son nom pour être guidé."),
             fakes.spoken,
         )
+    }
+
+    @Test
+    fun `pngOf rend le PNG armé et null pour un inconnu`() = runTest {
+        val fakes = pictoFakes()
+        val saved = fakes.store.save("medics", "png-medics".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        assertArrayEquals("png-medics".toByteArray(), fakes.session.pngOf(saved.id))
+        assertNull(fakes.session.pngOf("inconnu"))
     }
 }

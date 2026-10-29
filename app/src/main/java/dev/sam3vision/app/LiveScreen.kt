@@ -108,6 +108,7 @@ fun LiveScreen(
         onToggleTraverse = { viewModel.setTraverseActive(!state.traverseActive) },
         onToggleLocal = { scope.launch { viewModel.local.toggle() } },
         localFrame = viewModel.local.frame,
+        pictoPng = viewModel.asker::pngOf,
     )
 }
 
@@ -205,10 +206,10 @@ private fun LiveStage(
     onVoiceStop: () -> Unit,
     onToggleSam: () -> Unit,
     onToggleTracker: () -> Unit, onToggleTraverse: () -> Unit,
-    onToggleLocal: () -> Unit, localFrame: StateFlow<Bitmap?>,
+    onToggleLocal: () -> Unit, localFrame: StateFlow<Bitmap?>, pictoPng: (String) -> ByteArray?,
 ) {
     Box(Modifier.fillMaxSize()) {
-        LiveCameraStage(state, previewView, localFrame, onRecover)
+        LiveCameraStage(state, previewView, localFrame, onRecover, pictoPng)
         LiveTopBar(
             state = state,
             draft = draft,
@@ -253,6 +254,7 @@ private fun LiveCameraStage(
     previewView: PreviewView,
     localFrame: StateFlow<Bitmap?>,
     onRecover: () -> Unit,
+    pictoPng: (String) -> ByteArray?,
 ) {
     val local by localFrame.collectAsState()
     AndroidView(
@@ -269,8 +271,9 @@ private fun LiveCameraStage(
         frameWidth = state.frame?.width ?: 0,
         frameHeight = state.frame?.height ?: 0,
     )
-    // Repères reconnus : cadres jaunes + noms, vides tant que rien n'est armé ou vu.
+    // Repères reconnus : cadres jaunes + noms, et le premier en grand.
     LivePictoOverlay(state.pictoOverlay)
+    LivePictoBig(state.pictoOverlay, pictoPng)
     // Boîtes prédites (T8) : couche vide tant que la prédiction est éteinte — l'overlay
     // reste alors celui d'avant (les masques serveur seuls).
     LivePredictionOverlay(state.prediction)
