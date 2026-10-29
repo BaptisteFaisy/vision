@@ -9,13 +9,10 @@ réécriture complète : un gros fichier serait tronqué), puis boucle sur les
 arrêts du rebase (multi-passes : chaque nouveau conflit est résolu, chaque
 commit vidé est sauté), pousse sur la branche de la PR et rend compte.
 
-Ajouts purs (v2, 29/10) : `CHANGELOG.md` et consorts ne passent jamais par le
-modèle. Deux entrées de journal écrites en tête ne sont pas un désaccord : si
-la base ne portait rien dans un bloc de conflit, les deux côtés sont réunis
-(`union_sans_perte`). Gratuit, instantané, sans perte. Un bloc qui remplace une
-ligne commune reste au modèle. Plafond par PR (`SAISINES_PR_MAX` en 30 min) :
-une PR ne peut plus brûler tout le quota horaire à elle seule — au-delà, c'est
-un désaccord de fond, on le dit et on s'arrête.
+Ajouts purs (v2, 29/10) : les journaux (`CHANGELOG.md`) ne passent jamais par
+le modèle — deux entrées en tête ne sont pas un désaccord, elles sont réunies
+sans perte (`union_journal.py`). Quota dans `quota.py` : cooldown, plafond
+horaire et 3 saisines par PR en 30 min, qu'une seule PR ne peut plus épuiser.
 
 Bibliothèque standard uniquement. Usage :
 
@@ -35,9 +32,32 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
+import types
 import urllib.request
+
+
+def _charger(nom):
+    """Module voisin : import direct, sinon `origin/master` (branche antérieure)."""
+    try:
+        return __import__(nom)
+    except ImportError:
+        pass
+    try:
+        proc = subprocess.run(["git", "show", "origin/master:.github/fireworks/"
+                               "%s.py" % nom], capture_output=True, text=True,
+                              timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+    module = types.ModuleType(nom)
+    exec(compile(proc.stdout, "%s.py" % nom, "exec"), module.__dict__)
+    return module
+
+
+union_journal = _charger("union_journal")
+quota = _charger("quota")
 
 MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
 API_DEFAULT = "https://api.fireworks.ai/inference/v1/chat/completions"
@@ -46,9 +66,6 @@ MAX_FILE_BYTES = 200_000
 MAX_HUNKS = 20
 HUNK_MAX_CHARS = 12_000
 MAX_ROUNDS = 10
-COOLDOWN_S = 20 * 60
-SPAWN_WINDOW_S = 3_600
-SPAWN_CAP = 10
 BUDGET_S = 240
 CALL_TIMEOUT_S = 90
 MAX_TOKENS = 8_000
@@ -57,14 +74,6 @@ LABEL_OK = "agent-conflit"
 LABEL_HUMAN = "intervention-humaine"
 COMMENT_PREFIX = "_fireworks · agent de conflit (MiniMax M3.1 Flash)_"
 REFUSED_PREFIXES = (".github/", ".mergify.yml")
-# Journaux en ajout pur : deux entrées écrites en tête de fichier ne sont pas un
-# désaccord, c'est le même geste des deux côtés. On les réunit sans modèle.
-# (29/10 : #215 rebasée 6 fois sur CHANGELOG.md, une saisine LLM par rebase.)
-FICHIERS_AJOUTS = ("CHANGELOG.md", "CHANGELOG")
-# Une PR ne peut pas consommer tout le plafond horaire à elle seule : au-delà,
-# c'est un désaccord de fond, pas une panne de l'agent.
-SAISINES_PR_MAX = 3
-SAISINES_PR_FENETRE_S = 30 * 60
 
 
 class AgentError(Exception):
@@ -82,73 +91,6 @@ def sh(args, **kw):
 
 def log(message):
     print("fireworks-agent: %s" % message, flush=True)
-
-
-def cache_dir():
-    path = os.path.join(os.path.expanduser("~"), ".cache", "fireworks-agent")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-def gc_stamps(now):
-    """Purge les empreintes de plus d'un jour."""
-    day_ago = now - 86_400
-    for name in os.listdir(cache_dir()):
-        if not name.endswith(".stamp"):
-            continue
-        full = os.path.join(cache_dir(), name)
-        try:
-            if os.path.getmtime(full) < day_ago:
-                os.remove(full)
-        except OSError:
-            pass
-
-
-def recent_runs(now):
-    """Nombre de saisines dans la fenêtre glissante."""
-    cutoff = now - SPAWN_WINDOW_S
-    count = 0
-    for name in os.listdir(cache_dir()):
-        if not name.endswith(".stamp"):
-            continue
-        try:
-            if os.path.getmtime(os.path.join(cache_dir(), name)) >= cutoff:
-                count += 1
-        except OSError:
-            pass
-    return count
-
-
-def stamp_path(pr, sha):
-    return os.path.join(cache_dir(), "pr-%s-%s.stamp" % (pr, sha[:12]))
-
-
-def has_fresh_stamp(pr, sha, now):
-    try:
-        return os.path.getmtime(stamp_path(pr, sha)) >= now - COOLDOWN_S
-    except OSError:
-        return False
-
-
-def touch_stamp(pr, sha):
-    with open(stamp_path(pr, sha), "w") as fh:
-        fh.write(str(int(time.time())))
-
-
-def saisines_pr(pr, now):
-    """Saisines récentes pour CETTE PR, toutes têtes confondues (fenêtre)."""
-    prefixe = "pr-%s-" % pr
-    cutoff = now - SAISINES_PR_FENETRE_S
-    count = 0
-    for name in os.listdir(cache_dir()):
-        if not name.startswith(prefixe) or not name.endswith(".stamp"):
-            continue
-        try:
-            if os.path.getmtime(os.path.join(cache_dir(), name)) >= cutoff:
-                count += 1
-        except OSError:
-            continue
-    return count
 
 
 def pr_labels(repo, pr):
@@ -194,116 +136,6 @@ def abort_rebase():
 def unmerged_files():
     out = sh(["git", "diff", "--name-only", "--diff-filter=U"])
     return [line for line in out.splitlines() if line]
-
-
-def stages(path):
-    """Trois versions d'un fichier en conflit : (base, nous, eux), ou None."""
-    blobs = []
-    for stage in (1, 2, 3):
-        proc = subprocess.run(["git", "show", ":%d:%s" % (stage, path)],
-                              capture_output=True, text=True, timeout=60)
-        if proc.returncode != 0:
-            return None
-        blobs.append(proc.stdout)
-    return tuple(blobs)
-
-
-def union_sans_perte(texte):
-    """Réunit les deux côtés des conflits où la base ne portait rien.
-
-    Un bloc de conflit diff3 dont la section base est vide est un ajout des
-    deux côtés (le cas d'un journal : chacun écrit son entrée en tête). Le
-    réunir ne perd aucune ligne. Si UN bloc remplace une ligne commune, on
-    rend None : c'est un vrai désaccord, le modèle (ou un humain) tranche.
-    """
-    lignes = texte.splitlines(keepends=True)
-    sortie, i, blocs = [], 0, 0
-    while i < len(lignes):
-        if not lignes[i].startswith("<<<<<<<"):
-            sortie.append(lignes[i])
-            i += 1
-            continue
-        i += 1
-        nous = []
-        while i < len(lignes) and not lignes[i].startswith("|||||||"):
-            nous.append(lignes[i])
-            i += 1
-        if i >= len(lignes):
-            return None
-        i += 1
-        base = []
-        while i < len(lignes) and not lignes[i].startswith("======="):
-            base.append(lignes[i])
-            i += 1
-        if i >= len(lignes):
-            return None
-        i += 1
-        eux = []
-        while i < len(lignes) and not lignes[i].startswith(">>>>>>>"):
-            eux.append(lignes[i])
-            i += 1
-        if i >= len(lignes):
-            return None
-        i += 1
-        if any(ligne.strip() for ligne in base):
-            return None
-        sortie.extend(nous)
-        sortie.extend(eux)
-        blocs += 1
-    return "".join(sortie) if blocs else None
-
-
-def journal_ajout_pur(path):
-    """Chemin d'un journal en ajout pur (racine ou sous-dossier) ?"""
-    return any(path == nom or path.endswith("/" + nom) for nom in FICHIERS_AJOUTS)
-
-
-def resoudre_ajouts(path):
-    """Résout sans modèle un conflit d'ajouts purs. Rend True si écrit+indexé."""
-    if not journal_ajout_pur(path):
-        return False
-    blobs = stages(path)
-    if blobs is None:
-        return False
-    base, nous, eux = blobs
-    if max(len(base), len(nous), len(eux)) > MAX_FILE_BYTES:
-        return False
-    temporaires = []
-    try:
-        for contenu in (nous, base, eux):
-            with tempfile.NamedTemporaryFile("w", delete=False,
-                                             suffix=".txt") as fh:
-                fh.write(contenu)
-                temporaires.append(fh.name)
-        proc = subprocess.run(["git", "merge-file", "-p", "--diff3"]
-                              + temporaires, capture_output=True, text=True,
-                              timeout=60)
-    finally:
-        for nom in temporaires:
-            try:
-                os.unlink(nom)
-            except OSError:
-                pass
-    if proc.returncode <= 0 or not proc.stdout:
-        return False
-    resolu = union_sans_perte(proc.stdout)
-    if resolu is None:
-        return False
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(resolu)
-    indexe = subprocess.run(["git", "add", "--", path], capture_output=True,
-                            text=True, timeout=60)
-    return indexe.returncode == 0
-
-
-def resoudre_par_union(files):
-    """Union déterministe sur chaque fichier d'ajouts purs ; rend les résolus."""
-    faits = []
-    for path in files:
-        if resoudre_ajouts(path):
-            log("%s : ajouts des deux côtés — union sans modèle" % path)
-            faits.append(path)
-    return faits
 
 
 def split_hunks(text):
@@ -463,8 +295,11 @@ def fail(repo, pr, reason):
     return 1
 
 
-class Skip(Exception):
-    """Rien à faire : l'appelant saute la PR sans bruit (exit 2)."""
+class _SaisineLocale(Exception):
+    """Repli si `quota.py` n'est pas joignable (déploiement ancien)."""
+
+
+Skip = quota.Saisine if quota else _SaisineLocale
 
 
 def env_or(name, default):
@@ -480,7 +315,8 @@ def preflight(repo, pr, sha, dry_run, now):
     key = os.environ.get("FIREWORKS_API_KEY", "")
     if not key and not dry_run:
         raise Skip("pas de clé FIREWORKS_API_KEY")
-    gc_stamps(now)
+    if quota is not None:
+        quota.gc_stamps(now)
     labels = pr_labels(repo, pr)
     if "hold" in labels or LABEL_HUMAN in labels:
         raise Skip("labels %s : main humaine" % ",".join(labels))
@@ -550,20 +386,13 @@ def check_round_files(files):
 
 
 def autorisation_saisine(pr, sha):
-    """Garde-fous à l'instant d'appeler le modèle : cooldown, plafonds.
+    """Cooldown et plafonds, à l'instant d'appeler le modèle (quota.py).
 
-    Séparé de `preflight` pour que l'union déterministe (gratuite) ne soit
-    jamais bloquée par un plafond d'appels.
+    Séparé de `preflight` pour que l'union déterministe des journaux
+    (gratuite) ne soit jamais bloquée par un plafond d'appels.
     """
-    maintenant = time.time()
-    if has_fresh_stamp(pr, sha, maintenant):
-        raise Skip("saisine récente pour %s, cooldown" % sha[:12])
-    if recent_runs(maintenant) >= SPAWN_CAP:
-        raise Skip("plafond de %d saisines/h atteint" % SPAWN_CAP)
-    if saisines_pr(pr, maintenant) >= SAISINES_PR_MAX:
-        raise Skip("%d saisines en %d min pour cette PR : désaccord de fond, "
-                   "main humaine" % (SAISINES_PR_MAX, SAISINES_PR_FENETRE_S // 60))
-    touch_stamp(pr, sha)
+    if quota is not None:
+        quota.autoriser(pr, sha)
 
 
 def finish_loop(api_url, key, model, deadline, autorisation=None):
@@ -578,7 +407,8 @@ def finish_loop(api_url, key, model, deadline, autorisation=None):
         if files:
             check_round_files(files)
             log("passe %d : %d fichier(s)" % (round_no, len(files)))
-            faits = resoudre_par_union(files)
+            faits = (union_journal.resoudre_par_union(files)
+                     if union_journal else [])
             reste = [path for path in files if path not in faits]
             if reste:
                 if not autorise:

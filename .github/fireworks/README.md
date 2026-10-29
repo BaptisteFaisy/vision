@@ -15,9 +15,14 @@ au passage suivant ; seule la CI verte fait merger.
 
 Les journaux en ajout pur (`CHANGELOG.md`, `CHANGELOG`) ne passent jamais par le
 modèle : deux entrées écrites en tête de fichier ne sont pas un désaccord, elles
-sont réunies sans perte (`union_sans_perte`). Un bloc qui remplacerait une ligne
-commune, lui, reste au modèle. C'est ce qui a arrêté la boucle du 29/10 (#215
-rebasée six fois sur `CHANGELOG.md`, une saisine et un quota par rebase).
+sont réunies sans perte (`union_journal.py`, `union_sans_perte`). Un bloc qui
+remplacerait une ligne commune, lui, reste au modèle. C'est ce qui a arrêté la
+boucle du 29/10 (#215 rebasée six fois sur `CHANGELOG.md`, une saisine et un
+quota par rebase). Les empreintes et plafonds vivent dans `quota.py`.
+
+Les deux modules sont chargés par `conflict_agent.py` depuis `origin/master`
+(import direct d'abord) : le sweep ne copie que le script d'agent dans `/tmp`,
+et une branche de PR peut être antérieure à ce découpage.
 
 ## Contrat d'appel
 
@@ -85,5 +90,7 @@ du modèle est journalisée au moindre échec.
 ## Validation
 
 ```bash
-python3 -m unittest test_conflict_agent test_scope_agent -v
+cd .github/fireworks
+python3 -m unittest test_conflict_agent test_scope_agent \
+    test_union_journal test_quota -v
 ```
