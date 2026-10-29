@@ -107,6 +107,13 @@ private fun BoxScope.StreetFeed(
         SteeringLayer(probe.steering)
         val twinUi by viewModel.twinlite.ui.collectAsState()
         TwinLiteLayer(twinUi)
+        CrossingOverlayLayer(
+            active = probe.crossingActive,
+            box = probe.crossingBox,
+            state = probe.crossing,
+            frameWidth = probe.width,
+            frameHeight = probe.height,
+        )
     } else {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
         PictoLayer(state.picto.hits, viewModel.picto::pngOf)

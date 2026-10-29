@@ -34,36 +34,67 @@ internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean) {
 }
 
 /**
- * Signal traversée de la frame, ou `null` pour rester muet : pas de feu en
- * vue (doute annoncé une fois par [CrossingAnnouncer], puis silence), image
- * illisible, ou état déjà annoncé.
+ * Le feu d'une frame : **où** il est ([box], normalisée 0..1) et **ce qu'il dit**
+ * ([state]). Les deux viennent de la même lecture, donc l'étiquette posée sur la
+ * vidéo ne peut pas désigner un autre feu que celui qui a été classifié.
  */
-internal fun crossingCueOf(
-    announcer: CrossingAnnouncer,
-    frame: LiveFrame,
-    jpegB64: String,
-    atMs: Long,
-    language: SpeechLanguage,
-): CrossingCue? {
-    return announcer.onFrame(atMs, crossingStateOf(frame, jpegB64), language)
-}
+internal data class CrossingLight(
+    val box: List<Float>?,
+    val state: CrossingState,
+)
 
 /**
- * État du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
+ * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
  * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
  * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
  * [CrossingState.Unknown] (le doute vaut « attendez »).
  *
- * Partagé entre la sonde ([crossingCueOf]) et le direct (`TraverseWiring`) :
- * une seule lecture du feu, jamais de doublon.
+ * Appelée **une fois par frame** par la sonde : le décodage du crop est le poste
+ * coûteux, le refaire pour l'affichage doublerait le travail.
  */
-internal fun crossingStateOf(frame: LiveFrame, jpegB64: String): CrossingState {
+internal fun crossingLightOf(frame: LiveFrame, jpegB64: String): CrossingLight {
     val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-    if (box == null) return CrossingState.Unknown
+        ?: return CrossingLight(null, CrossingState.Unknown)
     val crop = CrossingPixels.frame(jpegB64, box)
-    if (crop == null) return CrossingState.Unknown
-    return PedLightGate.verdict(crop.argb, crop.width, crop.height)
+        ?: return CrossingLight(box, CrossingState.Unknown)
+    return CrossingLight(box, PedLightGate.verdict(crop.argb, crop.width, crop.height))
 }
+
+/**
+ * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
+ * ([cue], `null` = rester muet), l'état affiché et la boîte à marquer sur la
+ * vidéo. Un seul aller-retour, pour que l'étiquette ne désigne jamais un autre
+ * feu que celui qui vient d'être annoncé.
+ */
+internal data class CrossingPatch(
+    val cue: CrossingCue?,
+    val state: CrossingState,
+    val box: List<Float>?,
+)
+
+/**
+ * Signal traversée de la frame, ou `null` quand le mode est coupé : la sonde
+ * reste alors muette et ne marque aucun feu.
+ */
+internal fun crossingPatchOf(
+    announcer: CrossingAnnouncer,
+    active: Boolean,
+    frame: LiveFrame,
+    jpegB64: String,
+    atMs: Long,
+    language: SpeechLanguage,
+): CrossingPatch? {
+    if (!active) return null
+    val light = crossingLightOf(frame, jpegB64)
+    return CrossingPatch(announcer.onFrame(atMs, light.state, language), light.state, light.box)
+}
+
+/**
+ * État du feu sur une frame. Conservé pour le direct (`TraverseWiring`), qui n'a
+ * pas d'affichage à nourrir : il ne veut que la couleur.
+ */
+internal fun crossingStateOf(frame: LiveFrame, jpegB64: String): CrossingState =
+    crossingLightOf(frame, jpegB64).state
 
 /**
  * Chaque nouvel état du feu fait vibrer le téléphone (vert = double salve,

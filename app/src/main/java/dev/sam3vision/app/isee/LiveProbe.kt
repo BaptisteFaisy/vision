@@ -409,9 +409,9 @@ _state.update { it.cleared() }
         val pinhole = readingsOf(distances, frame)
         val readings = liveMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
-        val cross = if (_state.value.crossingActive) crossingCueOf(crossing, frame, jpegB64, at, speechLanguage) else null
+        val cross = crossingPatchOf(crossing, _state.value.crossingActive, frame, jpegB64, at, speechLanguage)
         val phrase = if (_state.value.crossingActive) {
-            cross?.phrase
+            cross?.cue?.phrase
         } else {
             voice.phrase(at, placed, _state.value.steeringCap)
         }
@@ -433,6 +433,7 @@ _state.update { it.cleared() }
                 spoken = phrase ?: current.spoken,
                 steering = steering,
                 crossing = cross?.state ?: current.crossing,
+                crossingBox = cross?.box,
                 transport = transportLabel(active),
                 error = null,
             )
