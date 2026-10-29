@@ -7,7 +7,7 @@ est la copie de référence. **Ne jamais déployer
 
 ## La commande, avec les leviers
 
-Seule commande : `scripts/deploy-live-fast.sh` (déploie `backend/live_fast/live_app_fast.py`,
+Seule commande : `server/scripts/deploy-live-fast.sh` (déploie `backend/live_fast/live_app_fast.py`,
 attend la nouvelle version, vérifie `/health`). Les leviers posés :
 
 `FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=60 FAST_SNAPSHOT=1
@@ -20,7 +20,7 @@ l'image** au déploiement — changer un levier = redéployer). `max_containers=
 | Levier | Gain | Source |
 |---|---|---|
 | `FAST_TIMING=1` | `timings_ms` par étage + en-tête `Server-Timing` : le chiffre seul devient diagnosticable | `timing.py`, `fast_core._decorate` |
-| `FAST_SCALEDOWN=120` | évite **23,6 s** de rechargement après une pause > 20 s (une fois par session) | rapport `modal-runtime` |
+| `FAST_SCALEDOWN=60` | évite **23,6 s** de rechargement après une pause > 20 s (une fois par session) | rapport `modal-runtime` |
 | `mask_encoding: "bits"` (sur demande client) | −16,5 ms de CPU d'encodage et −53 % d'octets de masques par frame (12 masques, 512×288) | `bench23/masks_bench.py` |
 | cap `max_objects` **avant** encodage | n'encode plus que les objets renvoyés (240 → 12 masques sur une frame à 8 concepts) | même banc |
 | préprocess + masques hors verrou GPU | rend le créneau GPU au frame suivant (~20 ms en PNG, ~4 ms en bits) | `fast_core.run_frame`, rapport `cpu-serveur` |

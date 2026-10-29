@@ -12,22 +12,23 @@ chiffres ci-dessous ont été obtenus est **r630** (serveur Debian, JDK 17), pas
 Un chiffre de téléphone lu dans un commentaire de code reste un commentaire, pas une mesure de
 cet arbre.
 
-## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté le 27/10/2026 après le retrait du module lunettes ; recompté le 28/10/2026)
+## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté le 27/10/2026 après le retrait du module lunettes ; recompté le 28/10/2026 puis le 29/10/2026)
 
 ### 1.1 Taille de l'arbre
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **733** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **76 990** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **317** (194 `:core` + 123 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **1 418** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
-| `@Test` JVM `:app` | **784** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
-| **Total JVM** | **2 202** | somme des deux lignes |
+| Fichiers Kotlin | **851** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **91 481** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **369** (233 `:core` + 136 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **1 715** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| `@Test` JVM `:app` | **919** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
+| **Total JVM** | **2 634** | somme des deux lignes |
 | Tests instrumentés | **10** (9 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
-| Garde de taille | **810** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
-| Gardes de scripts | **117** assertions, 117 ok | `bash scripts/test_scripts.sh` |
-| Tests de l'outillage | **58** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py` |
+| Garde de taille | **935** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
+| Gardes de scripts | **101** assertions, 101 ok | `bash scripts/test_scripts.sh` |
+| Tests de l'outillage | **118** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py tools/test_check_apk_keys.py tools/test_export_caregiver_orb.py` + `python3 .github/fireworks/test_conflict_agent.py` + `python3 .github/couche0/test_check_couche0.py` + `python3 .github/ci-budget/test_check_timeouts.py` (28 + 18 + 12 + 8 + 6 + 16 + 19 + 11) |
+| Tests backend | **254** tests, OK | `python3 server/scripts/test_units.py` (numpy, Pillow, fastapi) |
 | Budget CI | 8 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
 
 ### 1.2 Tests réellement exécutés par Gradle
@@ -41,9 +42,9 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 Relevé du 26/10 après 19 h, sur r630 : **`:core` 663 tests / 0 échec / 0 ignoré** (86 classes),
 **`:app` 305 / 0 / 0** (50 classes) et **36 / 0 / 0** (3 classes) pour le module lunettes, supprimé
 depuis : ses tests vivent maintenant dans `:app` (`glasses/bench`, **95** `@Test`). Ce relevé n'a
-**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (1 418 + 784,
-recomptés le 28/10) disent combien de tests **existent**, pas combien ont **tourné** ce jour-là.
-Recomptage du 28/10 : statique (`grep`), aucun `gradlew` relancé.
+**pas** été rejoué après le retrait du module — les comptes du tableau ci-dessus (1 715 + 919,
+recomptés le 29/10) disent combien de tests **existent**, pas combien ont **tourné** ce jour-là.
+Recomptage du 29/10 : statique (`grep`), aucun `gradlew` relancé.
 Les 10 tests instrumentés ne sont **pas** dans ces chiffres (aucun appareil n'a été utilisé).
 
 ### 1.3 Mesures JVM du chemin chaud (imprimées par les tests)

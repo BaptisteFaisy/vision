@@ -21,11 +21,11 @@ import org.junit.runner.RunWith
  *
  * Lancement manuel (r630, téléphone visible par le tunnel adb) :
  * ```bash
- * ~/bin/phone take --task "twinlite: banc instrumenté" --ttl 15m   # depuis le poste
+ * phone take --task "twinlite: banc instrumenté"   # depuis le poste
  * cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
  *   ./gradlew :app:connectedDebugAndroidTest \
  *   --tests "dev.sam3vision.app.segment.SegmentBenchDeviceTest"
- * ~/bin/phone release
+ * phone release
  * ```
  * Verdict aussi dans logcat (`DEVICE twinlite medianMs=…`).
  */

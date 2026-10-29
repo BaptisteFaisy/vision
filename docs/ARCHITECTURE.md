@@ -1,7 +1,7 @@
 # ARCHITECTURE — iSee
 
 Ce document décrit **l'arbre de ce dépôt**, relu dans le code le **27/10/2026**, comptes
-recomptés le **28/10/2026** (première rédaction le 26/10 après 19 h). Le service SAM 3.1 (GPU)
+recomptés le **28/10/2026** puis le **29/10/2026** (première rédaction le 26/10 après 19 h). Le service SAM 3.1 (GPU)
 vit dans **`server/` de ce dépôt** : source déployée `server/backend/live_fast/` (app
 `sam3-eu-a100`), contrats et mesures dans `server/docs/` (voir §8). Chaque chiffre ci-dessous
 est soit une constante du code (fichier + ligne cités), soit un comptage reproductible (commande
@@ -11,8 +11,8 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **167** fichiers | 194 fichiers / **1 418** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **240** fichiers | 123 fichiers / **784** `@Test` | 4 fichiers / **10** tests |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **204** fichiers | 233 fichiers / **1 715** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **268** fichiers | 136 fichiers / **919** `@Test` | 5 fichiers / **10** tests |
 | `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
@@ -24,25 +24,25 @@ dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus a
 `glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 167
-find core/src/test -name '*.kt' | wc -l            # 194
-find app/src/main -name '*.kt' | wc -l             # 240
-find app/src/test -name '*.kt' | wc -l             # 123
+find core/src/main -name '*.kt' | wc -l            # 204
+find core/src/test -name '*.kt' | wc -l            # 233
+find app/src/main -name '*.kt' | wc -l             # 268
+find app/src/test -name '*.kt' | wc -l             # 136
 find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 15
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 733
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 76 990
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 851
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 91 481
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
 `rg` absent rend **0** sans le dire (piège à connaître avant de conclure « aucun test »).
 
-- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 105 fichiers `main`,
+- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 204 fichiers `main`,
   **4** importent `android.*` : `mask/Masks.kt`, `settings/EncryptedSettingsStore.kt`,
   `settings/SettingsCipher.kt`, `settings/SettingsStoreFactory.kt`. Tout le reste — réseau,
   gestes, cadence, distances, masques, texte, prédiction — est du Kotlin pur, testé sur la JVM.
-- Les 165 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
+- Les 268 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
   `app/src/main/java/javax/sound/sampled/AudioFormat.kt`, surface minimale de
   `javax.sound.sampled` pour que le port Java de LAME (`jump3r`) encode du MP3 sur Android.
 - Le détail des tests (par module et par domaine) est dans `docs/TESTING.md`.

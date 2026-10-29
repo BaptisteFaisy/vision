@@ -28,7 +28,7 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. Every claim below is
 > re-checked against the code in this tree; every figure was measured on
-> **28/10/2026** (command given) on `master`. Figures held over time live in
+> **29/10/2026** (command given) on `master`. Figures held over time live in
 > `docs/PERF.md` — the only authoritative reference.
 
 ## The problem
@@ -116,10 +116,10 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Language / build | Kotlin 2.2.21, Gradle 8.14.1, AGP 8.11.1, KSP 2.2.21-2.0.5, JVM 17 bytecode (JDK 17 via `JAVA_HOME`, never pinned) |
 | SDK | compileSdk / targetSdk 36 ; minSdk **29** (`:app`), 26 (`:core`) |
 | UI / camera | Compose (BOM 2026.05.01, Material3), CameraX 1.6.0 (incl. `camera-video`), activity-compose 1.13.0, lifecycle 2.10.0 |
-| Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly purge), security-crypto 1.1.0, core-ktx 1.18.0 |
+| Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin, no direct import) |
 | Network | OkHttp 4.12.0 (a single client, a single pool), `org.json` (shipped with Android, zero dependencies), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (TTS + STT fallback), Meta ASR (dictation), jump3r 1.0.4 (pure-Java MP3) |
-| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0, LiteRT 2.17.0, Guava 33.3.1-android |
+| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0, LiteRT 2.2.0 (`litert-edge`, TwinLite segmentation) |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
 ### `server/` backend (Python, Modal)
@@ -145,17 +145,18 @@ dev), Google Maps if a key is provided (OpenFreeMap otherwise).
 |---|---|---|
 | Dictation | Meta ASR (`muse-voice-transcribe-1.0`), ElevenLabs Scribe fallback | `POST {meta}/asr/transcribe` (16 kHz mono WAV) |
 | Voice | ElevenLabs TTS (`eleven_v4_turbo`, Laure voice; US Jade offered) | `POST {elevenlabs}/text-to-speech/{voiceId}` → MP3 |
-| Description / questions | Baseten, `meta-models/muse-spark-open-1026` (defaults `Settings.kt:156-157`) | `POST {llm}/chat/completions` (OpenAI-compatible), temperature 0.2, budgets 1,200 / 200 tokens, 400 chars (`HttpLlmClient.kt:21-24`) |
+| Description / questions | Baseten, `meta-models/muse-spark-open-1026` (defaults `Settings.kt:167-168`) | `POST {llm}/chat/completions` (OpenAI-compatible), temperature 0.2, budgets 1,200 / 200 tokens, 400 chars (`HttpLlmClient.kt:21-24`) |
 
 ## Setup
 
 1. **An LLM key** exposing `chat/completions` (base URL + model) — entered in
    **Settings**, stored encrypted (Keystore), or provided at build time via
    `local.properties` (gitignored). Without a key, the app says so and makes no calls.
-2. **A SAM 3.1 segmentation endpoint** — *Base URL* field in Settings, empty = no
-   upload (the photo goes straight to the LLM). Otherwise the **region** (Europe,
-   `sam3-eu-a100` preset, or United States) provides the URL; a build-injected URL
-   wins over the preset (`SamRegion.kt:50-56`). Switching regions powers nothing on.
+2. **A SAM 3.1 segmentation endpoint** — *Base URL* field in Settings (empty = the
+   **region** preset below, Europe `sam3-eu-a100` or United States, provides the URL;
+   a build-injected URL wins over the preset — `SamRegion.kt:50-56`). Without any
+   reachable endpoint, the photo goes straight to the LLM. Switching regions powers
+   nothing on.
 3. **Optional**: ElevenLabs key (voice + dictation fallback), Meta ASR key (dictation),
    Google Maps key (companion map). Without a voice key, nothing is announced aloud
    and **no error is shown** — the documented gotcha in `docs/TESTING.md`.
@@ -166,25 +167,25 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,202 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,634 @Test)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
-bash scripts/test_scripts.sh                               # 117 shell assertions
+bash scripts/test_scripts.sh                               # 101 shell assertions
 node --test suivi-parent/test/session.test.mjs suivi-parent/test/relay.test.mjs
 bash scripts/build.sh                                      # assembleDebug --offline + APK check
 ```
 
-## Figures (measured 28/10/2026 on `master`)
+## Figures (measured 29/10/2026 on `master`)
 
 | Metric | Value | Command |
 |---|---|---|
-| `.kt` files | **733** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Kotlin lines | **76,990** | same `find`, `-exec cat {} + \| wc -l` |
-| Prod lines (`*/src/main`) | **43,457** — `:core` 167 files / 16,654 lines · `:app` 240 files / 26,803 lines | same under `core/src/main`, `app/src/main` |
-| JVM `@Test` | **2,202** — `:core` 1,418 · `:app` 784 (incl. 95 glasses bench) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
+| `.kt` files | **851** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Kotlin lines | **91,481** | same `find`, `-exec cat {} + \| wc -l` |
+| Prod lines (`*/src/main`) | **51,502** — `:core` 204 files / 21,314 lines · `:app` 268 files / 30,188 lines | same under `core/src/main`, `app/src/main` |
+| JVM `@Test` | **2,634** — `:core` 1,715 · `:app` 919 (incl. 95 glasses bench) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
 | Instrumented tests | **10** (device required) | same on `app/src/androidTest*` |
-| Python backend | **31** files, **6,094** lines | `find server/backend -name '*.py' …` |
+| Python backend | **33** files, **6,504** lines | `find server/backend -name '*.py' …` |
 | Guards | all green (sizes, Portrait, budget, voice, ci-budget, scripts, goldens, relay) | see `docs/TESTING.md` §2 |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in

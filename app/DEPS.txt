@@ -8,25 +8,36 @@
 # platform(androidx.compose:compose-bom:2026.05.01)
 # androidx.compose.ui:ui / ui-graphics / ui-tooling-preview
 # androidx.compose.material3:material3:1.4.0
-# androidx.camera:camera-core / camera-camera2 / camera-lifecycle / camera-view / camera-video : 1.6.0
+# androidx.camera:camera-core / camera-camera2 / camera-lifecycle / camera-view : 1.6.0
 # androidx.camera:camera-video:1.6.0            -> enregistrement vidéo du mode tap
 # androidx.work:work-runtime-ktx:2.12.0         -> purge horaire (CaptureCleanupWorker)
 # androidx.room:room-runtime / room-ktx:2.8.5   -> table traced_captures (traces MediaStore)
 # ksp(androidx.room:room-compiler:2.8.5) + plugin com.google.devtools.ksp:2.2.21-2.0.5
+# androidx.fragment:fragment-ktx:1.8.9          -> pinning (litert tire 1.1.0, lint exige >= 1.3.0)
+# com.google.guava:guava:33.3.1-android        -> pinning transitif Room, sans import direct
+# de.sciss:jump3r:1.0.4                        -> MP3 pur Java (PcmToMp3Encoder)
+# com.meta.wearable:mwdat-{core,camera,inputs}:1.0.0 + mockdevice (debug) -> lunettes Meta
+# org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2
+# com.microsoft.onnxruntime:onnxruntime-android:1.18.0 -> profondeur (Depth Anything V2)
+# com.google.ai.edge.litert:litert:2.2.0       -> segmentation embarquée TwinLite
 # androidx.test.ext:junit:1.3.0, androidx.test:{core,runner,rules}:1.7.0 -> tests instrumentés
 # kotlinx-coroutines-test:1.10.2
 # testImplementation(junit:junit:4.13.2)
+# testImplementation(org.json:json:20240303)   -> :app et :core (mockable jar Android)
 #
 # API :core a utiliser directement (ne rien reimplementer)
 # ─────────────────────────────────────────────────────────────────────────────
 # dev.sam3vision.core.model.{SegObject, SegmentResult, Analysis, ChatTurn, Role}
 # dev.sam3vision.core.net.{LlmClient, SamClient, HttpLlmClient, HttpSamClient,
 #                           defaultHttpClient, ApiError}
-# dev.sam3vision.core.mask.{decodeMaskPng, colorizeMask}
+# dev.sam3vision.core.net.{LiveClient, liveClient, WsLiveClient}   (direct WebSocket /live/ws)
+# dev.sam3vision.core.net.{HttpTrackClient, RouteClient, HttpRouteClient, GpuMonitor, MetaImageClient}
+# dev.sam3vision.core.mask.{decodeMaskAny, colorizeMask, colorizeGray}
 # dev.sam3vision.core.settings.{Settings, SettingsStore, SettingsStoreFactory,
 #                                EncryptedSettingsStore, MemorySettingsStore}
 # dev.sam3vision.core.net.{TtsClient, ElevenLabsTtsClient}   (TTS ElevenLabs, MP3)
-# dev.sam3vision.core.usecase.{AnalyzeUseCase, AskUseCase, DictationUseCase}
+# dev.sam3vision.core.usecase.{AnalyzeUseCase, AskUseCase, DictationUseCase,
+#                               SpeechUseCase, NavigationRouter}
 # dev.sam3vision.core.net.{VideoClient, HttpSam31VideoClient}   (SAM 3.1 vidéo, multipart)
 # dev.sam3vision.core.net.{SpeechClient, MetaAsrClient, FallbackSpeechClient, ElevenLabsSttClient}
 # dev.sam3vision.core.audio.Wav                                 (en-tête WAV 16 kHz mono)
@@ -49,5 +60,7 @@
 # - LlmClient/HttpSamClient : reconstruire a chaque changement de Settings
 #   (HttpLlmClient(settings.llmBaseUrl, settings.llmApiKey, settings.llmModel)).
 # - ApiError.message est deja en francais et affichable tel quel.
-# - Si settings.samBaseUrl est vide : AnalyzeUseCase(llm, sam = null) -> bandeau
-#   "Segmentation desactivee - renseigne un endpoint SAM dans Reglages".
+# - Endpoint SAM : saisie manuelle -> URL de build -> preset de region (SamRegion,
+#   toujours resolu) ; samClientOrNull(settings) est la seule construction.
+#   En cas d'echec SAM : note "Detecteur SAM injoignable - photo decrite sans
+#   segmentation", jamais de blocage.
