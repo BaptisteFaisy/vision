@@ -1,27 +1,28 @@
 package dev.sam3vision.app.isee
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.guidemap.GuidanceMapView
 import dev.sam3vision.app.voicenav.MapPositionWatcher
-import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.MapBounds
 import dev.sam3vision.core.nav.NavFix
@@ -30,6 +31,13 @@ import dev.sam3vision.core.nav.mapBoundsAround
 import dev.sam3vision.core.nav.mapModeMapStateOf
 import dev.sam3vision.core.net.HttpSignalsClient
 import kotlinx.coroutines.delay
+
+/** Part de l'écran occupée par la bande carte (le reste est la scène iSee). */
+internal const val NAV_MAP_BAND_RATIO = 0.26f
+
+/** Bornes de la bande : lisible sur un petit écran, discrète sur un grand. */
+private val BAND_MIN: Dp = 150.dp
+private val BAND_MAX: Dp = 260.dp
 
 /** Rayon du schéma de repli : 200 m autour de la position. */
 internal const val NAV_MAP_RADIUS_M = 200.0
@@ -45,11 +53,11 @@ private val MapPosition = Color(0xFF2F6FED)
 private val MapAccuracy = Color(0xFF2F6FED).copy(alpha = 0.18f)
 
 /**
- * Carte du **mode navigation**, posée **sous la caméra** : première couche de
- * la scène iSee, plein écran, elle apparaît dès que la session est en
- * [VoiceNavUiState.Map] (ordre vocal « navigation », « carte », « où suis-je »)
- * et **s'efface pendant que l'utilisateur parle** ([navigationMapHidden]) — la
- * voix reprend alors l'écran, sans bouton ni carte à lire.
+ * Bande carte du **mode navigation** : collée en bas de l'écran et **toujours
+ * affichée** tant que la session est en `VoiceNavUiState.Map` — elle ne
+ * s'efface ni quand l'utilisateur parle, ni quand iSee parle. La scène iSee
+ * garde le reste de l'écran, sa géométrie recalculée sans la bande (le texte
+ * ne passe donc jamais dessous).
  *
  * Fond OSM MapLibre, identique à l'écran de guidage ; tuiles en échec → schéma
  * maison (position, cercle de précision, feux), même contrat de repli. La
@@ -57,9 +65,7 @@ private val MapAccuracy = Color(0xFF2F6FED).copy(alpha = 0.18f)
  * pilote d'itinéraire : la carte n'a pas de destination à calculer.
  */
 @Composable
-fun NavigationMapLayer(viewModel: IseeViewModel, state: IseeUiState, modifier: Modifier = Modifier) {
-    val navState by viewModel.voiceNavState.collectAsState()
-    if (navState !is VoiceNavUiState.Map) return
+fun NavigationMapBand(viewModel: IseeViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var fix by remember { mutableStateOf<NavFix?>(null) }
     DisposableEffect(Unit) {
@@ -70,12 +76,11 @@ fun NavigationMapLayer(viewModel: IseeViewModel, state: IseeUiState, modifier: M
     val signals = rememberNavigationSignals(viewModel, fix)
     val mapState = remember(fix, signals) { mapModeMapStateOf(fix, signals) }
     var tilesOk by remember { mutableStateOf(true) }
-    val alpha by animateFloatAsState(
-        if (navigationMapHidden(state)) 0f else 1f,
-        tween(220),
-        label = "navigation-map",
-    )
-    Box(modifier.graphicsLayer { this.alpha = alpha }) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(AppColors.surfaceHigh),
+    ) {
         if (tilesOk) {
             GuidanceMapView(mapState, Modifier.fillMaxSize(), onTilesError = { tilesOk = false })
         } else {
@@ -85,12 +90,12 @@ fun NavigationMapLayer(viewModel: IseeViewModel, state: IseeUiState, modifier: M
 }
 
 /**
- * La carte s'efface pendant que l'utilisateur parle : tenue du micro (il
- * dicte) ou transcription en cours. iSee qui parle ne la masque pas — c'est
- * la voix de l'utilisateur qui veut l'écran. Pure, testée en JVM.
+ * Hauteur de la bande pour un écran de [screenHeight] : [NAV_MAP_BAND_RATIO] de
+ * la hauteur, bornée à [BAND_MIN]..[BAND_MAX] pour rester lisible partout.
+ * Pure, testée en JVM.
  */
-fun navigationMapHidden(state: IseeUiState): Boolean =
-    state.holding || state.transcribing
+fun navigationMapBandHeight(screenHeight: Dp): Dp =
+    (screenHeight * NAV_MAP_BAND_RATIO).coerceIn(BAND_MIN, BAND_MAX)
 
 /**
  * Feux du cadre affiché, rechargés quand la position sort d'une maille de

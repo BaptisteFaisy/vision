@@ -32,7 +32,7 @@ find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l    
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
 find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 913
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 98 209
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 98 242
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un

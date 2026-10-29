@@ -20,7 +20,7 @@ le relevé se rejoue avec `python3 tools/count-tree.py`, jamais à la main)
 | Grandeur | Valeur | Commande |
 |---|---|---|
 | Fichiers Kotlin | **913** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **98 209** | même `find`, `-exec cat {} + \| wc -l` |
+| Lignes Kotlin | **98 242** | même `find`, `-exec cat {} + \| wc -l` |
 | Fichiers de test JVM | **405** (244 `:core` + 161 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
 | `@Test` JVM `:core` | **1 804** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
 | `@Test` JVM `:app` | **1 071** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |

@@ -1,34 +1,33 @@
 package dev.sam3vision.app.isee
 
+import androidx.compose.ui.unit.dp
 import dev.sam3vision.core.nav.NavFix
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Carte du mode navigation : quand elle s'efface (l'utilisateur parle) et le
+ * Bande carte du mode navigation : sa hauteur sur trois tailles d'écran et le
  * cadre du schéma de repli.
  */
-class NavigationMapLayerTest {
+class NavigationMapBandTest {
 
     private val fix = NavFix(lat = 48.8606, lon = 2.3376, accM = 8f, atMs = 0L)
 
     @Test
-    fun `la carte reste visible au repos`() {
-        assertFalse(navigationMapHidden(IseeUiState()))
+    fun `un telephone courant garde 26 pour cent de la hauteur`() {
+        // 800 dp de haut → 208 dp de bande, dans les bornes.
+        assertEquals(208.dp, navigationMapBandHeight(800.dp))
     }
 
     @Test
-    fun `la carte s'efface pendant que l'utilisateur parle`() {
-        assertTrue(navigationMapHidden(IseeUiState(holding = true)))
-        assertTrue(navigationMapHidden(IseeUiState(transcribing = true)))
+    fun `un petit ecran est borne par le plancher`() {
+        assertEquals(150.dp, navigationMapBandHeight(400.dp))
     }
 
     @Test
-    fun `iSee qui parle ne masque pas la carte`() {
-        assertFalse(navigationMapHidden(IseeUiState(speakingEntryId = 1L, speakingText = "Bonjour")))
-        assertFalse(navigationMapHidden(IseeUiState(thinking = true)))
+    fun `un grand ecran est borne par le plafond`() {
+        assertEquals(260.dp, navigationMapBandHeight(1600.dp))
     }
 
     @Test

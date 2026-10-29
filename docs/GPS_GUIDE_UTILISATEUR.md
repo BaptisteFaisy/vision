@@ -46,21 +46,21 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
   actuelle, même destination, sans regéocoder).
 
-### Mode navigation (la carte sous la caméra)
+### Mode navigation (la carte en bas de l'écran)
 
 Dis **« navigation »**, **« carte »**, **« où suis-je »** (ou « ouvre la
-carte ») : la **carte** apparaît **sous la caméra**, en fond de l'accueil
-iSee — la rue, la boule et la phrase restent au-dessus. Aucune destination,
-aucun itinéraire : position GPS (cercle de précision) et feux connus autour.
+carte ») : une **bande carte** apparaît en bas de l'écran et y reste
+**en permanence** — la scène iSee (caméra, boule, phrase) garde tout le reste,
+au-dessus. Aucune destination, aucun itinéraire : position GPS (cercle de
+précision) et feux connus autour.
 
-- **Elle s'efface dès que tu parles** : pendant l'appui long du micro et la
-  transcription, la carte disparaît ; elle revient au relâchement. Tu gardes
-  donc l'écran libre quand tu dictes.
+- la bande ne s'efface **pas** pendant que tu parles : elle attend, la scène
+  reste utilisable au-dessus ;
 - « va à … » pendant le mode ouvre la confirmation d'itinéraire habituelle ;
 - « quitte la carte » ou « arrête la navigation » referment le mode
-  (« Mode navigation fermé. »). Il n'y a pas de bouton : la scène iSee n'en
-  a aucun ;
-- sans autorisation de localisation, la carte reste vide (le mode reste
+  (« Mode navigation fermé. ») et font disparaître la bande. Il n'y a pas de
+  bouton : la scène iSee n'en a aucun ;
+- sans autorisation de localisation, la bande reste vide (le mode reste
   ouvert) ;
 - le mode ne s'ouvre pas par-dessus un guidage : il n'y a jamais deux écrans
   de navigation empilés.

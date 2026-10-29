@@ -207,8 +207,8 @@ drifted three times in one day.
 | Mesure | Valeur | Commande |
 |---|---|---|
 | Fichiers `.kt` | **913** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **98 209** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **54 750** — `:core` 213 f. / 22 200 l. · `:app` 286 f. / 32 550 l. | idem sous `core/src/main`, `app/src/main` |
+| Lignes Kotlin | **98 242** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **54 784** — `:core` 213 f. / 22 200 l. · `:app` 286 f. / 32 584 l. | idem sous `core/src/main`, `app/src/main` |
 | `@Test` JVM | **2 875** — `:core` 1 804 · `:app` 1 071 (banc lunettes compris) | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |

@@ -21,7 +21,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   compagnon embarquée dans chaque APK ne se chargeait plus. `getElementById('recenter')`
   visait aussi un élément disparu. Les deux lignes partent ; `destPoint`, `objectsOf`,
   `iconFor` (exports de la carte) partent avec leurs assertions.
-- README réécrit sur des chiffres **re-mesurés** (913 `.kt` et non 876, 54 750 lignes de prod
+- README réécrit sur des chiffres **re-mesurés** (913 `.kt` et non 876, 54 784 lignes de prod
   et non 52 815, 2 875 `@Test` JVM + 9 instrumentés, 35 fichiers Python) : 12 concepts du
   direct par défaut et 16 au plus (et non 6), **LiteRT** et non « TensorFlow Lite », les
   écrans legacy réellement listés dans « Other screens » (Direct, Classic home, segment),
@@ -112,6 +112,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
   `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
 
+## 2026-10-29 — Mode navigation : la carte devient une bande permanente en bas (ordre user)
+
+- **Demande** : « non je veux que la map navigation soit en permanence affichée
+  en bas » (remplace le fond plein écran sous la caméra).
+- `NavigationMapBand` : bande collée en bas, 26 % de la hauteur bornée
+  150–260 dp (`navigationMapBandHeight`, pure et testée), fond OSM MapLibre +
+  repli schéma, position GPS 2 s, feux par maille de ~110 m.
+- **En permanence** : plus d'effacement pendant la parole
+  (`navigationMapHidden` supprimé) — la bande reste visible quand
+  l'utilisateur dicte et quand iSee parle.
+- `IseeScenePane` : la scène est composée dans un cadre réduit de la hauteur
+  de la bande, donc sa géométrie (boule, gros texte) se recalcule au-dessus —
+  le texte ne passe jamais sous la carte.
+- Preuves : `:core` 1 804 tests, `:app` 1 071, 0 échec (dont
+  `NavigationMapBandTest` 5 : hauteur sur trois écrans, cadre de repli),
+  `check-kotlin-limits` et `check-voice-nav-doc.py` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
+  `GPS_GUIDE_UTILISATEUR.md` §2.
+
 ## 2026-10-29 — Mode navigation : la carte s'ouvre à la voix (ordre user)
 
 - **Demande** : « un mode navigation dans iSee, accessible en lui parlant, avec
@@ -150,6 +169,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Docs : `NAVIGATION-VOCALE.md` §1 bis, `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
 - Recette téléphone (carte + vrai GPS) après merge.
 
+## 2026-10-29 — Démarrage : le favicon s'affiche sur fond blanc (ordre user)
+
+- **Demande** : à l'ouverture, l'écran de démarrage (favicon centré) doit être sur
+  fond blanc, pas noir.
+- `window_background` passe de `#FF0B0D12` à `#FFFFFFFF` : c'est la couleur de
+  fenêtre que le splash Android utilise derrière l'icône, avant la première frame
+  Compose. L'accueil Portrait iSee étant blanc, l'ouverture ne change plus de
+  couleur entre l'icône et l'accueil.
+- `AppColors.background` n'est pas touché : les écrans Compose sombres (Chat,
+  Direct) gardent leur fond.
+- Preuves : `:app:processDebugResources --offline` BUILD SUCCESSFUL (ressources
+  et manifeste compilés, 52 s). Rendu sur téléphone non vérifié ici : aucun APK
+  de ce commit n'a été construit ni installé.
+- Fichiers : `app/src/main/res/values/colors.xml`, `themes.xml`.
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
 - **Demande** : devant un obstacle, même au contact, iSee dit où passer
@@ -181,6 +214,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 2 à jour.
 - Fichiers : `CurbWatcher.kt` (+ test), `VOIX-DANGER.md`.
 
+## 2026-10-29 — Page du proche : la caméra ne s'affiche que si elle tourne (ordre user)
+
+- **Demande** : l'image ne s'affiche que lorsque le proche a démarré sa caméra.
+- **Cause** : `frameOf` rendait la dernière frame stockée par le relais pour tout
+  état sauf `offline`. Après une coupure du téléphone, le relais garde le paquet
+  jusqu'à 2 min : la page montrait une image (atténuée) alors que la caméra ne
+  tournait forcément plus, et une frame de plus de 8 s restait affichée en gris.
+- **Correctif** : `frameOf` exige `status === 'live'` **et** une frame de moins de
+  `PHOTO_FRESH_MS` (8 s) ; le champ `fresh` et la classe `.stale` de l'image
+  disparaissent. Sans image, `#view` perd son cadre sombre et la page affiche
+  « L'image apparaîtra quand ton proche ouvrira la caméra. » (lien absent :
+  message du lien). Aucun changement côté téléphone : il n'envoie déjà `photo`
+  que pendant que ses frames sont récentes.
+- Preuves : `node --test suivi-parent/test/*.test.mjs` vert ; page rechargée en
+  Chrome headless sur trois états (LIVE + frame récente, LIVE + frame de 20 s,
+  SIGNAL LOST + frame) → image seulement dans le premier, cadre sombre absent
+  dans les deux autres.
+- Fichiers : `suivi-parent/live-view.mjs`, `live.mjs`, `styles.css`, `README.md`
+  (+ `test/live-view.test.mjs`).
 ## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
 
 - `sidewalk` segmente le plan entier : marcher SUR le trottoir remplissait la
@@ -194,6 +246,33 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   seuils), `:core` + `:app` verts, `assembleDebug` vert, `check-kotlin-limits`
   OK. Rouge-avant-vérifié (2 échecs voulus).
 - Fichiers : `CurbWatcher.kt` (+ test).
+## 2026-10-29 — iSee : irisation bleu et jaune, très légère, sur le haut du verre
+
+- **Cause** : le verre lisait une seule teinte de la palette (`pal(0.45)`) puis la
+  multipliait par `film()`, trois longueurs d'onde fixes (650/540/450 nm) : c'est
+  ce qui produisait des **reflets rose et vert**. Au repos, la bulle blind person
+  (liquide bleu et ambre) n'avait donc jamais de reflet bleu.
+- `IseePortraitOrb` : `film()` devient `sheen()` (gris 0..1, lumière seulement).
+  L'irisation ne teinte plus rien : elle ne fait que les bandes claires et sombres.
+  La teinte vient de **deux couleurs opposées de la palette active** — `pal(0.04)`,
+  le bleu profond du début de palette, et `pal(0.34)`, l'or du milieu — séparées par
+  une frontière ondulée par le bruit (`q.x + 0.45 * (grain - 0.48)`).
+- Elle ne se pose que sur le **haut** du verre (`top = smoothstep(-0.15, 0.85, q.y)`) :
+  les 50 % restants sont blanc laiteux, et le dosage garde l'enveloppe d'origine
+  (`(0.03 + 0.62 * fres) * 0.45`). Le verre est donc aussi clair qu'avant, sans
+  lavis de couleur.
+- `suivi-parent/orb-shader.mjs` régénéré (`tools/export-caregiver-orb.py`) : le port
+  WebGL reste identique à la source AGSL ; `tools/orb-frozen-baseline.json` refigé
+  pour le changement demandé.
+- Preuves (Chrome headless, WebGL, couronne 0,80–1,02 R). Verre du **haut** de la
+  bulle, 90 points sondés, chroma ≥ 0,045 : **10 bleus, 16 jaunes, 64 neutres, 0 vert,
+  0 magenta** (master : 0 bleu, 52 jaunes — son rose/vert était plus pâle encore que
+  ce seuil). Couronne entière : au repos 600 pixels vifs dont **124 bleus** et 476
+  chauds (master : 80 bleus / 656 chauds), 0 hors palette ; user qui parle 858 bleus,
+  0 chaud ; iSee qui parle 926 chauds, 0 bleu ; page caregiver 436 chauds, 0 bleu,
+  saturation moyenne 0,214 contre 0,217 avant.
+- Docs alignées : `docs/ISEE-DESIGN-PORTRAIT.md` §1, `suivi-parent/README.md`.
+
 ## 2026-10-29 — iSee : trottoir/escaliers prioritaires sur la voix TwinLite (ordre user)
 
 - TwinLiteNet ne voit que le sol ; SAM nomme les dangers (trottoir, escaliers
