@@ -185,14 +185,22 @@ jobs:
           python3 tools/export-caregiver-orb.py --check
           python3 -m unittest tools/test_export_caregiver_orb.py
 
-      # Tests du backend Python, seulement quand `server/` est touché (les
-      # dépendances sont des tests seuls — numpy, Pillow, FastAPI — jamais le
-      # runtime lourd : torch reste sur les conteneurs Modal).
+      # Tests du backend Python, seulement quand `server/` est touché. Les runners
+      # self-hosted n'ont pas pip (ni numpy/Pillow) : `setup-python` fournit un
+      # interpréteur isolé (jamais le système) et le cache pip évite de
+      # retélécharger à chaque run.
+      - name: Python isolé (tests backend)
+        if: steps.perimetre.outputs.backend == '1'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: server/scripts/requirements-test.txt
       - name: Tests unitaires backend
         if: steps.perimetre.outputs.backend == '1'
         run: |
-          python3 -m pip install --quiet numpy pillow fastapi
-          python3 server/scripts/test_units.py
+          pip install --quiet -r server/scripts/requirements-test.txt
+          python server/scripts/test_units.py
 
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
