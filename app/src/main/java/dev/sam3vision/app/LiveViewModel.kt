@@ -195,7 +195,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // Pas de pré-chauffe : la carte démarre quand ça filme — la première frame la réveille (`LiveWakeGuard` couvre l'attente côté UI).
+        // Réveil explicite (ordre user 2026-10-29) : le boot recouvre la liaison caméra ; la 1re frame reste le signal de prêt (`LiveWakeGuard` couvre l'attente).
         // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
         session = null
         client = null
@@ -220,6 +220,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         wake.arm()
+        viewModelScope.launch { GpuWake.wake(base) }
     }
 
     /** Direct en vision LLM seule : ni session, ni client SAM, ni réveil GPU — juste l'image au LLM. */
