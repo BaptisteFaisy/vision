@@ -1,5 +1,9 @@
 package dev.sam3vision.app.guidemap
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +34,8 @@ import dev.sam3vision.core.nav.MapCamera
 import dev.sam3vision.core.nav.MapOverlays
 import dev.sam3vision.core.nav.mapBoundsOf
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.Polygon
@@ -45,10 +51,11 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
 /**
- * Carte de guidage : fond OSM France gratuit (sans clé), caméra pilotée ou
- * auto-cadrée sur le contenu (nulle), surcouches (tracé, arrivée, position
- * + précision, passages, feux, manœuvres). [onTilesError] est appelé une
- * fois si le style ou les tuiles sont injoignables. Ne lève jamais.
+ * Carte de guidage : fond vectoriel OpenFreeMap Liberty (sans clé), caméra
+ * pilotée ou auto-cadrée sur le contenu (nulle), surcouches (tracé,
+ * arrivée, position + précision, passages, manœuvres).
+ * [onTilesError] est appelé une fois si le style ou les tuiles sont
+ * injoignables. Ne lève jamais.
  *
  * Sans scintillement : le fond statique (tracé, pastilles) n'est redessiné
  * que quand il change ; à chaque tick, seule la position est rafraîchie et
@@ -67,6 +74,8 @@ fun GuidanceMapView(
     var styleReady by remember { mutableStateOf(false) }
     var applied by remember { mutableStateOf<GuidanceMapState?>(null) }
     val marks = remember { GuideMarks() }
+    val appContext = LocalContext.current.applicationContext
+    val pins = remember(appContext) { GuidePinIcons(appContext) }
     LaunchedEffect(mapView) {
         var sent = false
         fun report() {
@@ -79,7 +88,7 @@ fun GuidanceMapView(
         mapView.getMapAsync { ready ->
             map = ready
             runCatching {
-                ready.setStyle(Style.Builder().fromJson(GuideMapStyle.styleJson())) { styleReady = true }
+                ready.setStyle(Style.Builder().fromUrl(OPENFREEMAP_STYLE_URL)) { styleReady = true }
             }.onFailure { report() }
         }
     }
@@ -93,7 +102,7 @@ fun GuidanceMapView(
                 if (target != null && loaded && applied != state) {
                     val prev = applied
                     applied = state
-                    applyGuideState(target, view, prev, state, marks)
+                    applyGuideState(target, view, prev, state, marks, pins)
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -133,8 +142,8 @@ private fun GuideMapLifecycle(mapView: MapView) {
 }
 
 /**
- * Mention légale OSM France, toujours visible en bas à gauche (contrat des
- * tuiles gratuites : attribution obligatoire).
+ * Mention légale OpenFreeMap/OpenMapTiles/OSM, toujours visible en bas à
+ * gauche (contrat du fond gratuit : attribution obligatoire).
  */
 @Composable
 private fun GuideAttribution(modifier: Modifier = Modifier) {
@@ -152,6 +161,36 @@ private class GuideMarks(var position: Marker? = null, var ring: Polygon? = null
 /** Seuil de suivi : en dessous, la caméra ne bouge pas (pas de tremblement). */
 private const val CAMERA_MOVE_METERS = 10.0
 
+/** Pastille des punaises : diamètre du bitmap, épaisseur du liseré blanc. */
+private const val PIN_SIZE_PX = 48
+private const val PIN_RING_PX = 5f
+
+/**
+ * Pastilles de couleur des punaises : un bitmap par couleur, cachés
+ * (IconFactory + MarkerOptions, annotations classiques du SDK).
+ */
+private class GuidePinIcons(context: Context) {
+    private val factory = IconFactory.getInstance(context)
+    private val cache = mutableMapOf<Int, Icon>()
+
+    /** Pastille de la couleur [color] (créée une fois, réutilisée ensuite). */
+    fun icon(color: Color): Icon =
+        cache.getOrPut(color.toArgb()) { factory.fromBitmap(pinBitmap(color.toArgb())) }
+}
+
+/** Pastille : disque couleur cerclé de blanc, lisible sur tout fond. */
+private fun pinBitmap(colorArgb: Int): Bitmap {
+    val bitmap = Bitmap.createBitmap(PIN_SIZE_PX, PIN_SIZE_PX, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val radius = PIN_SIZE_PX / 2f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(radius, radius, radius, paint)
+    paint.color = colorArgb
+    canvas.drawCircle(radius, radius, radius - PIN_RING_PX, paint)
+    return bitmap
+}
+
 /** Caméra puis surcouches, sans jamais lever (jamais de crash carte). */
 private fun applyGuideState(
     map: MapLibreMap,
@@ -159,6 +198,7 @@ private fun applyGuideState(
     prev: GuidanceMapState?,
     state: GuidanceMapState,
     marks: GuideMarks,
+    pins: GuidePinIcons,
 ) {
     val staticChanged = prev == null || prev.overlays.staticPart() != state.overlays.staticPart()
     if (staticChanged || shouldMoveCamera(prev?.camera, state.camera)) {
@@ -169,12 +209,12 @@ private fun applyGuideState(
             map.clear()
             marks.position = null
             marks.ring = null
-            drawGuideStatic(map, state.overlays)
+            drawGuideStatic(map, state.overlays, pins)
         } else {
             marks.position?.let { runCatching { map.removeMarker(it) } }
             marks.ring?.let { runCatching { map.removePolygon(it) } }
         }
-        drawGuidePosition(map, state.overlays, marks)
+        drawGuidePosition(map, state.overlays, marks, pins)
     }
 }
 
@@ -244,32 +284,38 @@ private fun frameUpdate(overlays: MapOverlays, view: MapView): CameraUpdate? {
 }
 
 /**
- * Redessine le statique : tracé, arrivée, passages, feux, manœuvres.
- * Annotations classiques (dépréciées mais livrées) : fondation simple, le
- * plugin d'annotations viendra si besoin.
+ * Redessine le statique : tracé, arrivée (vert succès), passages et
+ * manœuvres (gris-bleu neutre). Annotations classiques (dépréciées mais
+ * livrées) : fondation simple, le plugin d'annotations viendra si besoin.
  */
 @Suppress("DEPRECATION")
-private fun drawGuideStatic(map: MapLibreMap, overlays: MapOverlays) {
+private fun drawGuideStatic(map: MapLibreMap, overlays: MapOverlays, pins: GuidePinIcons) {
     drawRoute(map, overlays.route)
-    overlays.destination?.let { drawPin(map, it, "Arrivée") }
-    overlays.crossings.forEach { drawPin(map, it, "Passage piéton") }
-    overlays.signals.forEach { drawPin(map, it, "Feu") }
-    overlays.maneuvers.forEach { drawPin(map, it.point, it.label) }
+    overlays.destination?.let { drawPin(map, it, "Arrivée", pins.icon(AppColors.success)) }
+    val neutral = pins.icon(AppColors.textMuted)
+    overlays.crossings.forEach { drawPin(map, it, "Passage piéton", neutral) }
+    overlays.maneuvers.forEach { drawPin(map, it.point, it.label, neutral) }
 }
 
 /**
- * Position vivante : punaise + disque de précision (rayon invalide =
- * punaise seule), références gardées pour le tick suivant.
+ * Position vivante : punaise bleue + disque de précision (rayon invalide
+ * = punaise seule), références gardées pour le tick suivant.
  */
 @Suppress("DEPRECATION")
-private fun drawGuidePosition(map: MapLibreMap, overlays: MapOverlays, marks: GuideMarks) {
+private fun drawGuidePosition(
+    map: MapLibreMap,
+    overlays: MapOverlays,
+    marks: GuideMarks,
+    pins: GuidePinIcons,
+) {
     val pos = overlays.position
     if (pos == null || !pos.isPlottable()) {
         marks.position = null
         marks.ring = null
         return
     }
-    marks.position = map.addMarker(MarkerOptions().position(pos.toLatLng()).title("Position"))
+    val blue = pins.icon(AppColors.primary)
+    marks.position = map.addMarker(MarkerOptions().position(pos.toLatLng()).title("Position").icon(blue))
     val accuracyM = overlays.accuracyM
     if (accuracyM == null || !accuracyM.isFinite() || accuracyM <= 0f) {
         marks.ring = null
@@ -294,11 +340,11 @@ private fun drawRoute(map: MapLibreMap, route: List<RoutePoint>) {
     map.addPolyline(PolylineOptions().addAll(line).color(AppColors.primary.toArgb()).width(5f))
 }
 
-/** Punaise titrée (point non traçable = rien, jamais de plantage). */
+/** Punaise titrée colorée (point non traçable = rien, jamais de plantage). */
 @Suppress("DEPRECATION")
-private fun drawPin(map: MapLibreMap, point: RoutePoint, title: String) {
+private fun drawPin(map: MapLibreMap, point: RoutePoint, title: String, icon: Icon) {
     if (!point.isPlottable()) return
-    map.addMarker(MarkerOptions().position(point.toLatLng()).title(title))
+    map.addMarker(MarkerOptions().position(point.toLatLng()).title(title).icon(icon))
 }
 
 /** Conversion WGS84 → SDK (n'appeler que sur point traçable). */

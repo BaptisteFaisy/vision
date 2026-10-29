@@ -17,8 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.guidemap.GuidanceMapCard
-import dev.sam3vision.core.model.RoutePoint
-import dev.sam3vision.core.nav.MapBounds
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.nav.progressOf
@@ -26,8 +24,9 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Guidage actif : prochaine instruction en très gros, distance avant la
- * manœuvre, reste du trajet, carte OSM (tracé + passages + feux, repli
- * schéma si les tuiles échouent), barre de progression, bouton « Arrêter ».
+ * manœuvre, reste du trajet, carte vectorielle (tracé + passages +
+ * position, repli schéma si les tuiles échouent), barre de progression,
+ * bouton « Arrêter ».
  *
  * Les valeurs viennent du moteur d'itinéraire via
  * [VoiceNavViewModel.onGuidanceUpdate] — cet écran n'en calcule aucune, il
@@ -35,8 +34,7 @@ import dev.sam3vision.core.settings.Settings
  * ([VoiceNavHoldButton], même moteur que l'accueil iSee) : ordre stop
  * (« arrête le guidage ») ou nouvelle destination — sans retour. Le micro
  * s'ouvre aussi par appui long n'importe où hors bouton ([HoldMicArea]).
- * La carte n'apparaît que si [navSnapshot] et [fetchSignals] sont
- * fournis.
+ * La carte n'apparaît que si [navSnapshot] est fourni.
  */
 @Composable
 fun GuidanceScreen(
@@ -46,7 +44,6 @@ fun GuidanceScreen(
     settings: Settings,
     onHoldTranscript: suspend (String) -> Boolean,
     navSnapshot: (() -> Pair<NavRoute?, NavFix?>)? = null,
-    fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)? = null,
 ) {
     val micUi = rememberHoldMicUiState()
     Column(
@@ -61,7 +58,7 @@ fun GuidanceScreen(
             ui = micUi,
             modifier = Modifier.weight(1f),
         ) {
-            GuidingHead(state, navSnapshot, fetchSignals)
+            GuidingHead(state, navSnapshot)
         }
         Button(
             onClick = onStop,
@@ -85,7 +82,6 @@ fun GuidanceScreen(
 private fun GuidingHead(
     state: VoiceNavUiState.Guiding,
     navSnapshot: (() -> Pair<NavRoute?, NavFix?>)?,
-    fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OffRouteBanner(state.update.offRoute)
@@ -98,9 +94,9 @@ private fun GuidingHead(
             lineHeight = 38.sp,
         )
         GuidanceSummary(state)
-        if (navSnapshot != null && fetchSignals != null) {
-            // Carte OSM : où le guidage m'emmène (rues + tracé + passages + feux).
-            GuidanceMapCard(navSnapshot, fetchSignals, state.update, Modifier.fillMaxWidth().height(170.dp))
+        if (navSnapshot != null) {
+            // Carte : où le guidage m'emmène (rues + tracé + passages + position).
+            GuidanceMapCard(navSnapshot, state.update, Modifier.fillMaxWidth().height(170.dp))
         }
         GuidanceProgress(state)
     }

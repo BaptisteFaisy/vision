@@ -3,13 +3,12 @@ package dev.sam3vision.app.guidemap
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.ManeuverMarker
 import dev.sam3vision.core.nav.MapOverlays
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Style local, gabarits et géométrie pure de la carte (JUnit seul, sans Android). */
+/** Style distant, gabarits et géométrie pure de la carte (JUnit seul, sans Android). */
 class GuideMapStyleTest {
 
     private val paris = RoutePoint(48.8566, 2.3522)
@@ -20,47 +19,24 @@ class GuideMapStyleTest {
         position: RoutePoint? = null,
         accuracyM: Float? = null,
         crossings: List<RoutePoint> = emptyList(),
-        signals: List<RoutePoint> = emptyList(),
         maneuvers: List<ManeuverMarker> = emptyList(),
-    ) = MapOverlays(route, destination, position, accuracyM, crossings, signals, maneuvers)
+    ) = MapOverlays(route, destination, position, accuracyM, crossings, maneuvers)
 
     @Test
-    fun `styleJson est un style v8 raster https sans cle`() {
-        val json = JSONObject(GuideMapStyle.styleJson())
-        assertEquals(8, json.getInt("version"))
-        val source = json.getJSONObject("sources").getJSONObject("osm")
-        assertEquals("raster", source.getString("type"))
-        assertEquals(OSM_MAX_ZOOM, source.getInt("maxzoom"))
-        val tiles = source.getJSONArray("tiles")
-        assertEquals(3, tiles.length())
-        for (i in 0 until tiles.length()) {
-            val url = tiles.getString(i)
-            assertTrue(url.startsWith("https://"))
-            assertTrue("{z}" in url && "{x}" in url && "{y}" in url)
-            assertFalse("{r}" in url)
-            assertFalse("key" in url.lowercase())
-            assertTrue("tile.openstreetmap.fr/osmfr" in url)
-        }
-        val layers = json.getJSONArray("layers")
-        assertEquals(1, layers.length())
-        assertEquals("osm", layers.getJSONObject(0).getString("source"))
+    fun `style OpenFreeMap Liberty par URL https sans cle`() {
+        assertEquals("https://tiles.openfreemap.org/styles/liberty", OPENFREEMAP_STYLE_URL)
+        assertTrue(OPENFREEMAP_STYLE_URL.startsWith("https://"))
+        assertFalse("key" in OPENFREEMAP_STYLE_URL.lowercase())
     }
 
     @Test
-    fun `styleJson porte la mention legale OSM et OSM France`() {
-        val json = JSONObject(GuideMapStyle.styleJson())
-        val attribution = json.getJSONObject("sources").getJSONObject("osm").getString("attribution")
-        assertTrue("OpenStreetMap" in attribution)
-        assertTrue("OpenStreetMap France" in attribution)
+    fun `mentions legales OpenFreeMap OpenMapTiles et OSM`() {
+        assertTrue("OpenFreeMap" in OSM_ATTRIBUTION_SHORT)
+        assertTrue("OpenMapTiles" in OSM_ATTRIBUTION_SHORT)
         assertTrue("OpenStreetMap" in OSM_ATTRIBUTION_SHORT)
-    }
-
-    @Test
-    fun `tileUrl formate z x y`() {
-        assertEquals(
-            "https://a.tile.openstreetmap.fr/osmfr/12/3/4.png",
-            GuideMapStyle.tileUrl(12, 3, 4),
-        )
+        assertTrue("OpenFreeMap" in OSM_ATTRIBUTION_LONG)
+        assertTrue("OpenMapTiles" in OSM_ATTRIBUTION_LONG)
+        assertTrue("OpenStreetMap" in OSM_ATTRIBUTION_LONG)
     }
 
     @Test
@@ -81,11 +57,10 @@ class GuideMapStyleTest {
                 route = listOf(paris, bad),
                 destination = dest,
                 crossings = listOf(bad),
-                signals = listOf(paris),
                 maneuvers = listOf(ManeuverMarker(dest, "Tournez", true)),
             ),
         )
-        assertEquals(listOf(paris, dest, paris, dest), points)
+        assertEquals(listOf(paris, dest, dest), points)
     }
 
     @Test
