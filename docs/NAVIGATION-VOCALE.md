@@ -53,15 +53,14 @@ Dire **« navigation »**, **« carte »**, **« plan »**, **« mode navigation
 **« ouvre la carte »**, **« affiche le plan »** ou **« où suis-je »** ouvre le
 mode carte — sans destination, sans itinéraire.
 
-- **La carte est sous la caméra** : première couche de la scène iSee
-  (`NavigationMapLayer`, avant la rue, la boule et les textes), plein écran ;
-  la caméra garde sa place au-dessus. Le mode carte **n'empile aucun écran** :
-  entrer depuis n'importe quelle page ramène à l'accueil iSee, où la carte
-  apparaît derrière la caméra.
-- **Elle s'efface quand l'utilisateur parle** : une tenue du micro (il dicte)
-  ou une transcription en cours la font disparaître en 220 ms
-  (`navigationMapHidden` = `holding || transcribing`) ; iSee qui parle ne la
-  masque pas. La voix reprend l'écran, la carte revient au relâchement.
+- **La carte est une bande permanente en bas de l'écran**
+  (`NavigationMapBand`, 26 % de la hauteur, bornée à 150–260 dp) : elle reste
+  affichée **en permanence** tant que le mode est ouvert — elle ne s'efface ni
+  quand l'utilisateur parle, ni quand iSee parle. La scène iSee garde le reste
+  et sa géométrie est recalculée sans la bande (`IseeScenePane`), donc le
+  texte ne passe jamais dessous.
+- **Aucun écran n'est empilé** : entrer en mode carte depuis n'importe quelle
+  page ramène à l'accueil iSee, où la bande apparaît en bas.
 - **Extraction** : `MapModeCommand` (pur, `:core`), essayé **avant** la
   navigation et **avant le LLM** — même place que `MaisonEnterCommand` ;
   casse, accents et ponctuation neutralisés (`KnownSizes.canonical`).
@@ -94,7 +93,7 @@ mode carte — sans destination, sans itinéraire.
 Fichiers : `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt`,
 `app/src/main/java/dev/sam3vision/app/isee/vm/MapModeOrder.kt`,
 `app/src/main/java/dev/sam3vision/app/isee/vm/IseeModeOrders.kt`,
-`app/src/main/java/dev/sam3vision/app/isee/NavigationMapLayer.kt`,
+`app/src/main/java/dev/sam3vision/app/isee/NavigationMapBand.kt`,
 `app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt`.
 
 ## 2. Politique d'annonces vocales (phrase exacte par événement)
@@ -215,7 +214,7 @@ annule (le/la) guidage / navigation » ; les 9 motifs GO restent inchangés.
 | Dictée : Meta puis repli Scribe, MicBus un seul AudioRecord | `core/src/main/java/dev/sam3vision/core/net/FallbackSpeechClient.kt` |
 | Voix : ElevenLabs-only, silencieuse en échec | `app/src/main/java/dev/sam3vision/app/VoiceAnnouncer.kt` |
 | Mode navigation : ordre vocal « navigation » / « carte » / « où suis-je » | `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt` |
-| Carte du mode navigation, sous la caméra (s'efface quand l'utilisateur parle) | `app/src/main/java/dev/sam3vision/app/isee/NavigationMapLayer.kt` |
+| Carte du mode navigation, bande permanente en bas de l'écran | `app/src/main/java/dev/sam3vision/app/isee/NavigationMapBand.kt` |
 | Position du mode navigation (GPS + réseau, 2 s) | `app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt` |
 
 ## 7. Chantiers liés, hors MVP (cadre, pas promesse)
