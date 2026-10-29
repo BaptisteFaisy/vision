@@ -129,10 +129,6 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
  * L'état de session pilote l'écran navigation : confirmation ou guidage =
  * poussé (une fois), repos = dépilé (arrivée, arrêt, annulation). Le retour
  * système dépile sans repousse : quitter l'écran arrête le guidage.
- *
- * Le **mode carte** ([VoiceNavUiState.Map]) n'empile rien : il vit sur
- * l'accueil iSee, en première couche sous la caméra (`NavigationMapLayer`) —
- * on y revient donc, d'où qu'on soit, plutôt que d'ouvrir un écran de plus.
  */
 @Composable
 private fun VoiceNavStateEffect(
@@ -140,12 +136,10 @@ private fun VoiceNavStateEffect(
     route: Route,
     push: (Route) -> Unit,
     pop: () -> Unit,
-    showScene: () -> Unit,
 ) {
     val navState by isee.voiceNavState.collectAsState()
     LaunchedEffect(navState) {
         when {
-            navState is VoiceNavUiState.Map -> if (route != Route.Isee) showScene()
             navState is VoiceNavUiState.Idle -> if (route == Route.VoiceNav) pop()
             route != Route.VoiceNav -> push(Route.VoiceNav)
         }
@@ -171,7 +165,7 @@ fun AppNav(
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     RouteRequestEffect(push)
-    VoiceNavStateEffect(isee, route, push, pop, home)
+    VoiceNavStateEffect(isee, route, push, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
