@@ -49,7 +49,12 @@ import kotlinx.coroutines.delay
  * En-tête et pastille dans `IseeSceneHeader.kt`, règles de couches dans `IseeSceneLayers.kt`.
  */
 @Composable
-fun IseeScenePane(state: IseeUiState, viewModel: IseeViewModel, modifier: Modifier = Modifier) {
+fun IseeScenePane(
+    state: IseeUiState,
+    viewModel: IseeViewModel,
+    debugMapEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val glue = rememberCameraGlue(viewModel)
     val probe by viewModel.probe.state.collectAsState()
     val glassesLive by GlassesVideoLink.live.collectAsState()
@@ -57,6 +62,8 @@ fun IseeScenePane(state: IseeUiState, viewModel: IseeViewModel, modifier: Modifi
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        // Carte de debug : première couche, derrière la rue, la boule et les textes.
+        DebugRouteMapLayer(debugMapEnabled, viewModel, Modifier.fillMaxSize())
         PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }
 }

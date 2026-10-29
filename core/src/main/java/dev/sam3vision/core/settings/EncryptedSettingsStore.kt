@@ -57,6 +57,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
+            debugRouteMapEnabled = prefs.getBoolean(KEY_DEBUG_ROUTE_MAP, default.debugRouteMapEnabled),
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             routeBaseUrl = prefs.getString(KEY_ROUTE_BASE_URL, default.routeBaseUrl).orEmpty(),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
@@ -98,6 +99,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
+            .putBoolean(KEY_DEBUG_ROUTE_MAP, s.debugRouteMapEnabled)
             .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putString(KEY_ROUTE_BASE_URL, s.routeBaseUrl)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
@@ -137,6 +139,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
+        const val KEY_DEBUG_ROUTE_MAP = "debug_route_map"
         const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_ROUTE_BASE_URL = "route_base_url"
         const val KEY_CAMERA_FOV = "camera_fov_deg"

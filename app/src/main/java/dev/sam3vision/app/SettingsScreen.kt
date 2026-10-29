@@ -106,6 +106,7 @@ private fun PerceptionSettings(
         PredictionSettings(draft) { onChange(it) }
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
+        DebugMapSettings(draft) { onChange(it) }
         DepthSettings(draft, onChange, onTestDepth)
     }
 }
