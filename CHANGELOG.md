@@ -3,6 +3,17 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : flèche TwinLite remontée + log voix (recette 92c5392)
+
+- `TwinLiteLayer` : 28 → 150 dp — la flèche et son libellé disparaissaient
+  sous le panneau statut SAM et le triangle du guidage (même zone bas-centrée) ;
+  empilée au-dessus des deux désormais.
+- `TwinLiteVoice.say` : `twinlite: dit « … » (urgent=…) : ok` — chaque consigne
+  parlée est traçable au logcat (recette voix + observabilité).
+- Preuves : `:app` `testDebugUnitTest` vert sur r630 (8/8 `TwinLiteWiringTest`
+  inchangés — voix `null` en test), `assembleDebug` vert, `check-kotlin-limits`
+  OK ; recette flèche + `dit` dues sur master après merge.
+
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 
 - `TwinLiteGuide` (`core/.../segment/`) : tiers de la moitié basse du masque
