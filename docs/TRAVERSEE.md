@@ -52,10 +52,10 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 - Porte anti-confusion (`PedLightGate`) : le vert classifié ne passe que
   s'il est en bas du cadre, élancé comme un bonhomme, sans rouge franc —
   méthode sans données (priors structurels + 12 tests synthétiques JVM),
-  direction sûre (tout rejet vaut « attendez »). R1b (29/10) : bonhomme
-  cadré haut récupéré par la forme du nuage (allongé, intérieur, masse non
-  entassée en haut) — rappel vert 81/183 → 95/183 sur lot FR jour, 0 fuite
-  rouge, seuils existants intacts.
+  direction sûre (tout rejet vaut « attendez »). R1b (29/10) : dans la
+  bande 20-35 % de vert en bas, la forme du nuage tranche (allongé,
+  intérieur, masse non entassée en haut) — rappel vert 81/183 → 90/183
+  sur lot FR jour, 0 fuite rouge, seuils existants intacts.
 - Veto TTC sur boîtes SAM (`VehicleApproach`) : association IoU entre frames
   `/live` (pas d'ids serveur), vitesse lissée (`MotionModel` réutilisé),
   tau = largeur / vitesse < 3 s force le veto — en OU avec le veto

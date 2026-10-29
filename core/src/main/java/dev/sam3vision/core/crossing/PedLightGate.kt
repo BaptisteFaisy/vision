@@ -18,10 +18,10 @@ package dev.sam3vision.core.crossing
  * non standard : doute documenté (voir test `pose large`).
  * Pur Kotlin, testé en JVM (synthétique + échantillons `feuxfr/`, `feuxfr2/`).
  *
- * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : quand le vert
- * passe tout sauf la garde bas (bonhomme cadré haut), la forme du nuage
+ * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : dans la
+ * bande 20-35 % de vert en bas (quasi-raté de la garde), la forme du nuage
  * tranche — allongé, avec de l'intérieur, masse non entassée en haut.
- * Mesuré : rappel vert 81/183 → 95/183, fuites inchangées (0 rouge,
+ * Mesuré : rappel vert 81/183 → 90/183, fuites inchangées (0 rouge,
  * 100 voiture, 6 éteints), seuils existants intacts.
  */
 object PedLightGate {
@@ -51,6 +51,13 @@ object PedLightGate {
     private const val CLOUD_ELONGATION_MIN = 1.5f
 
     /**
+     * R1b : plancher bas — à 20 % ou moins, rejet dur sans appel (contrat
+     * historique : la garde bas garde ses dents, la forme ne tranche que
+     * dans la bande 20-35 %, les quasi-ratés).
+     */
+    private const val R1B_BOTTOM_FLOOR = 0.20f
+
+    /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne
      * passe que la porte, le reste (rouge, doute) passe tel quel — ces deux-là
      * disent déjà « attendez ».
@@ -73,8 +80,10 @@ object PedLightGate {
         val boxHeight = scan.maxY - scan.minY + 1
         if (boxHeight < BBOX_MIN_PX) return false
         if (boxHeight.toFloat() < boxWidth * ELONGATION_MIN) return false
-        if (scan.greenBottom.toFloat() / scan.green >= GREEN_BOTTOM_MIN) return true
-        // R1b : bonhomme cadré haut — la forme du nuage tranche à la place.
+        val bottomFraction = scan.greenBottom.toFloat() / scan.green
+        if (bottomFraction >= GREEN_BOTTOM_MIN) return true
+        if (bottomFraction <= R1B_BOTTOM_FLOOR) return false
+        // R1b : quasi-raté de la garde bas — la forme du nuage tranche.
         return acceptShaped(argb, width, height)
     }
 
