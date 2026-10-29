@@ -177,9 +177,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Quitter l'écran navigation : confirmation annulée ou guidage arrêté. */
     fun dismissVoiceNav() = voiceNav.dismiss()
 
-    /** Itinéraire guidé + dernier fix GPS pour la carte de debug (`null` au repos). */
-    fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> =
-        runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
+    /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
+    fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
+    /** Base URL Valhalla pour les clients annexes (feux) ; `""` si non configurée. */
+    fun routeBaseUrl(): String = settings.routeBaseUrl
 
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile

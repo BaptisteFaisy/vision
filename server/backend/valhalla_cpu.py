@@ -1,6 +1,7 @@
 """Modal CPU backend: Valhalla pedestrian routing on IdF tiles.
 
-HTTP contract: GET /health, POST /route (Valhalla request JSON in, trip JSON out).
+HTTP contract: GET /health, POST /route (Valhalla request JSON in, trip JSON
+out), GET /signals (traffic lights in a bbox, proxied from OpenStreetMap).
 CPU-only: no GPU, no secrets, scales to zero (~0 idle cost).
 Tiles live on Modal Volume ``valhalla-idf-tiles`` (/vol).
 Only ``modal`` is imported at module level, so this file stays importable
@@ -8,8 +9,16 @@ locally (py_compile) without pyvalhalla/fastapi installed.
 """
 
 import asyncio
+import time
 
 import modal
+
+# Feux OSM : marge autour du cadre demandé (degrés ≈ 110 m) + cache conteneur.
+SIGNALS_MARGIN_DEG = 0.001
+SIGNALS_CACHE_TTL_SECONDS = 24 * 3600
+SIGNALS_MAX_NODES = 2000
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_TIMEOUT_SECONDS = 10
 
 APP_NAME = "valhalla-idf-cpu"
 VOLUME_NAME = "valhalla-idf-tiles"
@@ -59,17 +68,18 @@ class ValhallaRouter:
 
     @modal.asgi_app()
     def web(self):
-        """FastAPI application: /health + /route."""
+        """FastAPI application: /health + /route + /signals."""
         import json
 
         from fastapi import FastAPI, HTTPException, Request
         from fastapi.responses import JSONResponse
 
-        api = FastAPI(title=APP_NAME, version="1.0.0")
+        api = FastAPI(title=APP_NAME, version="1.1.0")
+        cache: dict = {}
 
         @api.get("/health")
         async def health():
-            return {"status": "ok", "tiles": "idf", "actions": ["route"]}
+            return {"status": "ok", "tiles": "idf", "actions": ["route", "signals"]}
 
         @api.post("/route")
         async def route(request: Request):
@@ -83,4 +93,50 @@ class ValhallaRouter:
                 raise HTTPException(status_code=500, detail=str(exc)[:2000])
             return JSONResponse(content=json.loads(out))
 
+        @api.get("/signals")
+        async def signals(s: float, w: float, n: float, e: float):
+            """Feux OSM dans le cadre (margé), via Overpass + cache 24 h.
+
+            Toujours 200 : ``{"signals": [...], "cached": bool}`` — liste vide
+            si Overpass est injoignable (l'app dégrade : carte sans feux).
+            """
+            key = (round(s, 5), round(w, 5), round(n, 5), round(e, 5))
+            hit = cache.get(key)
+            if hit is not None and time.time() - hit[1] < SIGNALS_CACHE_TTL_SECONDS:
+                return {"signals": hit[0], "cached": True}
+            points = await asyncio.to_thread(_fetch_signals, s, w, n, e)
+            cache[key] = (points, time.time())
+            return {"signals": points, "cached": False}
+
         return api
+
+
+def _fetch_signals(s: float, w: float, n: float, e: float) -> list:
+    """Interroge Overpass (nœuds highway=traffic_signals) : [] si échec."""
+    import json
+    import urllib.parse
+    import urllib.request
+
+    box = (
+        f"{s - SIGNALS_MARGIN_DEG:.5f},{w - SIGNALS_MARGIN_DEG:.5f},"
+        f"{n + SIGNALS_MARGIN_DEG:.5f},{e + SIGNALS_MARGIN_DEG:.5f}"
+    )
+    query = (
+        "[out:json][timeout:10];"
+        f'node["highway"="traffic_signals"]({box});out geom;'
+    )
+    url = OVERPASS_URL + "?data=" + urllib.parse.quote(query)
+    try:
+        with urllib.request.urlopen(url, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
+            payload = json.load(response)
+    except Exception as exc:
+        print(f"[signals] overpass indisponible : {exc}")
+        return []
+    points = []
+    for element in payload.get("elements", [])[:SIGNALS_MAX_NODES]:
+        if element.get("type", "node") != "node":
+            continue
+        lat, lon = element.get("lat"), element.get("lon")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            points.append({"lat": lat, "lon": lon})
+    return points
