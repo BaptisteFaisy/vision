@@ -19,6 +19,8 @@ import dev.sam3vision.core.distance.DistanceReading
 data class StairLabelSignal(
     val detected: Boolean,
     val direction: StairDirection = StairDirection.Unknown,
+    /** Centre normalisé de l'escalier retenu (l'heure du cadran, `null` = inconnu). */
+    val centerX: Float? = null,
 ) {
     companion object {
         /** Aucun escalier nommé dans les lectures. */
@@ -46,12 +48,18 @@ object StairLabelSignals {
             .sortedWith(compareBy({ distanceOf(it) }, { it.label }))
         if (stairs.isEmpty()) return StairLabelSignal.none()
         val labeled = stairs.firstOrNull { StairConcepts.direction(it.label) != StairDirection.Unknown }
-        if (labeled != null) return StairLabelSignal(true, StairConcepts.direction(labeled.label))
+        if (labeled != null) {
+            return StairLabelSignal(true, StairConcepts.direction(labeled.label), centerOf(labeled, width))
+        }
         val nearest = stairs.first()
         val bottom = (nearest.box[3] / height).coerceIn(0f, 1f)
-        if (bottom < UP_BOTTOM_EDGE) return StairLabelSignal(true, StairDirection.Up)
-        return StairLabelSignal(true, StairDirection.Unknown)
+        if (bottom < UP_BOTTOM_EDGE) return StairLabelSignal(true, StairDirection.Up, centerOf(nearest, width))
+        return StairLabelSignal(true, StairDirection.Unknown, centerOf(nearest, width))
     }
+
+    /** Centre normalisé de la boîte (l'heure du cadran). */
+    private fun centerOf(reading: DistanceReading, width: Int): Float =
+        (reading.box[0] + reading.box[2]) / 2f / width
 
     /** Distance de tri : l'inconnu passe après toutes les mesures. */
     private fun distanceOf(reading: DistanceReading): Float {
