@@ -183,4 +183,31 @@ class LlmClientTest {
             server.close()
         }
     }
+
+    @Test
+    fun `base sans scheme echoue en InvalidKey sans appel reseau`() {
+        val server = serverReplying("devrait etre inutilise")
+        try {
+            val noScheme = HttpLlmClient("inference.baseten.co/v1", TEST_KEY, "modele", retryDelayMs = 5)
+            val failure = runBlocking { noScheme.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
+            assertTrue("attendu InvalidKey, obtenu $failure", failure is ApiError.InvalidKey)
+            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Réglages") == true)
+            assertTrue(server.requests.isEmpty())
+        } finally {
+            server.close()
+        }
+    }
+
+    @Test
+    fun `base vide echoue en InvalidKey sans appel reseau`() {
+        val server = serverReplying("devrait etre inutilise")
+        try {
+            val noBase = HttpLlmClient("  ", TEST_KEY, "modele", retryDelayMs = 5)
+            val failure = runBlocking { noBase.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
+            assertTrue("attendu InvalidKey, obtenu $failure", failure is ApiError.InvalidKey)
+            assertTrue(server.requests.isEmpty())
+        } finally {
+            server.close()
+        }
+    }
 }
