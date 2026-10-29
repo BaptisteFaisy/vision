@@ -56,8 +56,10 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 
 `core/.../live/GuidanceAnnouncer.kt` — machine à états **pure** (l'horodatage est fourni) :
 
-1. **stabilité** — la même décision doit être vue **2 frames de suite**
-   (`DEFAULT_MIN_FRAMES = 2`) : un masque qui clignote ne fait pas changer de trottoir ;
+1. **stabilité** — une voie libre doit être vue **2 frames de suite**
+   (`DEFAULT_MIN_FRAMES = 2`) ; le bouché parle **dès la 1re frame** (`firstSight`) :
+   à 2 ips, attendre la deuxième, c'est une demi-seconde de marche en plus, et un
+   obstacle qui s'approche change de clé à chaque frame donc ne serait jamais stable ;
 2. **nouveauté** — une décision déjà dite reste muette. La signature est `free`, ou
    `b|label|côté|mètre arrondi|heure|stop?` (`Guidance.key`) : un obstacle qui
    s'approche (3 m → 2 m → 1 m) ou qui glisse dans le couloir (11 h → midi) reparle,
@@ -80,7 +82,7 @@ veille ; les positions décrivent ce qu'il y a.
 | Élément | Fichier |
 |---|---|
 | Décision, phrase, signature | `core/.../live/Guidance.kt` |
-| Machine 2 frames / 4 s / danger prioritaire | `core/.../live/GuidanceAnnouncer.kt` |
+| Machine 1re vue danger / 4 s / danger prioritaire | `core/.../live/GuidanceAnnouncer.kt` |
 | Sonde iSee : `guide` prime sur `announce` | `app/.../isee/LiveProbe.kt` (`phraseOf`), `ProbeWiring.kt` (`configureFrom`) |
 | Voix (inchangée) | `app/.../isee/ProximityVoice.kt` → ElevenLabs, jamais par-dessus le chat |
 | Réglage | `Settings.ttsGuidanceStraight` (défaut `true`), effectif `guideStraight = bascule && ttsConfigured` (`Settings.kt`), bascule « Guider tout droit (caméra iSee) » (`app/TtsSettings.kt`) |

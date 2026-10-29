@@ -12,9 +12,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * La machine anti-répétition (stabilité, nouveauté, délai) est [AnnouncementGate],
  * partagée avec les annonces de positions : ici, tout passage au bouché saute le
- * délai — un obstacle qui entre dans le couloir ne doit pas attendre la fin de la
- * phrase en cours (le lecteur audio coupe : une seule lecture à la fois). Le retour
- * au libre, lui, attend : la réassurance peut patienter, le danger non.
+ * délai **et la stabilité** — un obstacle qui entre dans le couloir parle dès la
+ * première frame (le lecteur audio coupe : une seule lecture à la fois), et un
+ * obstacle qui s'approche reparle à chaque seau de distance au lieu de se taire
+ * (sa clé change à chaque frame, elle ne serait jamais stable). Le retour au
+ * libre, lui, attend : la réassurance peut patienter, le danger non.
  *
  * Maintien trottoir ([sidewalk]) : sur voie libre, un trottoir sur un côté suspend
  * la consigne de cap (« Remonte sur le trottoir, à gauche. ») jusqu'au retour
@@ -81,7 +83,7 @@ class GuidanceAnnouncer(
     /** Consigne d'obstacle : urgente, elle saute le délai (le danger n'attend pas). */
     private fun speakBlocked(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
         val key = Guidance.key(decision)
-        if (!gate.admit(atMs, key, urgent = true)) return null
+        if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
         val phrase = Guidance.phrase(decision, language)
         gate.markSpoken(key, atMs, phrase)
         return phrase

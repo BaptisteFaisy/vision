@@ -7,7 +7,10 @@ package dev.sam3vision.core.live
  *
  * Trois garde-fous, dans cet ordre :
  * 1. **stabilité** — la même clé doit être vue [minFrames] fois de suite (une frame
- *    isolée, un masque qui clignote, ne déclenche rien) ;
+ *    isolée, un masque qui clignote, ne déclenche rien), sauf appel [firstSight] :
+ *    le danger parle dès la première frame — à 2 ips, attendre la deuxième, c'est
+ *    une demi-seconde de marche en plus, et un obstacle qui s'approche change de
+ *    clé à chaque frame (seau de distance) donc ne serait jamais stable ;
  * 2. **nouveauté** — une clé déjà annoncée reste muette, même si la scène est
  *    toujours là ;
  * 3. **délai** — jamais deux annonces à moins de [cooldownMs] (le temps de dire la
@@ -34,12 +37,14 @@ class AnnouncementGate(
     /**
      * Clé vue à [atMs] : vrai s'il faut parler (stable, nouvelle, délai écoulé).
      * [urgent] saute le délai — le danger n'attend pas la fin de la phrase en cours.
+     * [firstSight] saute la stabilité — une clé nouvelle parle dès la première
+     * frame (la nouveauté reste : une clé déjà dite ne reparle pas).
      * L'appelant qui obtient vrai doit appeler [markSpoken] une fois la phrase dite ;
      * s'il ne dit rien (phrase vide), il n'appelle rien et la mémoire est inchangée.
      */
-    fun admit(atMs: Long, key: String, urgent: Boolean = false): Boolean {
+    fun admit(atMs: Long, key: String, urgent: Boolean = false, firstSight: Boolean = false): Boolean {
         advance(key)
-        if (pendingCount < minFrames || key == spokenKey) return false
+        if ((!firstSight && pendingCount < minFrames) || key == spokenKey) return false
         val last = lastSpokenAtMs
         if (!urgent && last != null && atMs - last < cooldownMs) return false
         return true
