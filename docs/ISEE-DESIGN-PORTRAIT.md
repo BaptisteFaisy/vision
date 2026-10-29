@@ -14,9 +14,13 @@
   derrière les boutons système du bas.
 - **Une seule boule de verre** au liquide marbré (`IseePortraitOrb`) : reflet
   de boîte à lumière, irisation au bord, liseré. Le verre **n'a pas de couleur
-  propre** : bord, liseré et reflet prennent la teinte de la palette du liquide
-  (`pal`, teinte médiane de qui parle) — aucun arc-en-ciel fixe, donc pas de
-  rose, de vert ni de bleu sur une bulle cacao. Shader AGSL sur API 33+,
+  propre**, et son irisation reste **très légère et seulement sur le haut** :
+  deux teintes opposées de la palette du liquide s'y répondent, le **bleu
+  profond** (`pal(0.04)`) d'un côté et l'**or** (`pal(0.34)`) de l'autre — au
+  repos comme quand le user parle (deux bleus) ou quand iSee parle (deux
+  ambre), et deux cacao sur la page caregiver. Ni rose ni vert : `sheen()` ne
+  module que la lumière, il ne teinte plus rien. Le bas du verre et les 50 %
+  restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
   elle occupe 64 % du haut au repos (`PICTURE_IDLE_H`) et 50 % pendant la
