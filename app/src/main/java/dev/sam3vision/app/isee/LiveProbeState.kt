@@ -43,6 +43,13 @@ data class LiveProbeState(
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     val spoken: String? = null,
+    /**
+     * [spoken] est-elle un danger (couloir bouché) ? Publié avec la phrase,
+     * dans la même écriture : la voix coupe la lecture en cours pour la dire
+     * (chat compris), sans relire un état qui aurait déjà bougé. Faux pour
+     * la voie libre, les positions et la Traversée.
+     */
+    val spokenUrgent: Boolean = false,
     /** Cap demandé à la voix (tout droit par défaut) : le couloir que le guidage marche. */
     val steeringCap: SteeringCap = SteeringCap.Straight,
     /** Chemin de la dernière frame (`null` = guidage coupé ou mode Traversée). */

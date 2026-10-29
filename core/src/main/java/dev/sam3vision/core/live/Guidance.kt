@@ -2,7 +2,6 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.CurbConcepts
 import dev.sam3vision.core.distance.DistanceText
-import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -34,14 +33,6 @@ data class GuidanceDecision(
      * sur voie libre ou distance inconnue (la consigne reste alors non chiffrée).
      */
     val shiftMeters: Float? = null,
-    /**
-     * Vrai quand l'obstacle est à [Guidance.STOP_METERS] ou moins (mesuré) :
-     * trop près pour contourner, la consigne est « Stop. », urgente. Vrai
-     * aussi sans distance mesurée quand la matière remplit le champ
-     * ([Guidance.STOP_HEIGHT_FRAC], [Guidance.STOP_WIDTH_FRAC]) : au contact
-     * la boîte est coupée donc non mesurable, et il faut absolument le dire.
-     */
-    val stop: Boolean = false,
 )
 
 /**
@@ -62,26 +53,6 @@ object Guidance {
 
     /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
     const val RANGE_METERS = 4f
-
-    /**
-     * En deçà (mesuré), contourner n'est plus un pas : la consigne est « Stop. »,
-     * urgente (elle coupe la phrase en cours). À 1,2 m/s, 0,6 m c'est un pas
-     * avant le contact — et la frame parlée a déjà ~1 s de retard.
-     */
-    const val STOP_METERS = 0.6f
-
-    /**
-     * Sans mesure, la hauteur d'emprise qui dit le contact : une matière non
-     * mesurée qui remplit la moitié du champ en face, c'est un « Stop. » — au
-     * contact la boîte est coupée donc non mesurable, et elle remplit le cadre.
-     */
-    const val STOP_HEIGHT_FRAC = 0.5f
-
-    /** Sans mesure, la largeur d'emprise minimale du stop : un fil vertical lointain n'arrête pas. */
-    const val STOP_WIDTH_FRAC = 0.05f
-
-    /** Peinture au sol, pas de la matière : un passage piéton immense ne demande jamais l'arrêt. */
-    private val CROSSWALK_LABELS = setOf("crosswalk", "passage pieton")
 
     /** Demi-couloir marché normalisé, cap droit : bande centrale / 2. */
     const val STRAIGHT_HALF_CORRIDOR = (1f - 2f * PositionText.SIDE_EDGE) / 2f
@@ -117,17 +88,14 @@ object Guidance {
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
-        val measured = obstacle.meters?.takeIf { it.isFinite() }
-        val stop = measured?.let { it <= STOP_METERS } == true ||
-            (measured == null && isHuge(obstacle) && !isCrosswalk(obstacle.label))
         if (cap == SteeringCap.Straight) {
             val side = freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, stop)
+            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
         }
         val passage = bestPassage(cleaned, cap, rangeMeters)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift, stop)
+        return GuidanceDecision(true, obstacle, null, cap, passage, shift)
     }
 
     /**
@@ -146,21 +114,21 @@ object Guidance {
 
     /**
      * Consigne prononcée, jamais `null` : le guidage a toujours quelque chose à dire.
-     * Vocabulaire minimal (décision user du 29/10, remplace la consigne chiffrée
-     * « décalez-vous » du 28/10 : quand on fonce sur quelqu'un, chaque mot retarde
-     * le « stop »).
-     * Forme (fr) : `Continue.` ou `Va à gauche, 2 mètres.` ou `Stop.`
-     * Forme (en) : `Continue.` ou `Go left, 2 meters.` ou `Stop.`
-     * Ni nom d'obstacle, ni cadran, ni décalage latéral : côté + distance de
-     * l'obstacle au mètre entier, et « Stop. » sous [STOP_METERS]. Sans distance
-     * mesurée, la consigne reste non chiffrée (`Va à gauche.`, `Go left.`).
+     * Vocabulaire minimal (décisions user des 28-29/10, remplace la consigne
+     * chiffrée « décalez-vous » du 28/10 puis le « Stop. » du 29/10 : un
+     * obstacle, même au contact, se contourne — jamais d'ordre d'arrêt).
+     * Forme (fr) : `Continue.` ou `Va à gauche, 2 mètres.`
+     * Forme (en) : `Continue.` ou `Go left, 2 meters.`
+     * Ni nom d'obstacle, ni cadran, ni décalage latéral : côté + distance
+     * courte de l'obstacle ([DistanceText.spokenShort] : mètre entier,
+     * centimètres sous un mètre). Sans distance mesurée, la consigne reste non
+     * chiffrée (`Va à gauche.`, `Go left.`).
      */
     fun phrase(
         decision: GuidanceDecision,
         language: SpeechLanguage = SpeechLanguage.Fr,
     ): String {
         if (!decision.blocked || decision.obstacle == null) return free(decision.cap, language)
-        if (decision.stop) return "Stop."
         val meters = decision.obstacle.meters?.takeIf { it.isFinite() }
         if (decision.cap != SteeringCap.Straight) {
             val exit = decision.passage ?: SteeringCap.Straight
@@ -171,14 +139,13 @@ object Guidance {
     }
 
     /**
-     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure|stop?` —
-     * le mètre arrondi fait reparler un obstacle qui s'approche, comme
-     * [PositionText.key], et l'heure un obstacle qui glisse dans le couloir ;
-     * le marqueur stop fait reparler au passage en « Stop. » même dans le
-     * même seau de distance. Le cap droit garde ses signatures au caractère
-     * près ; les autres caps se préfixent (`Left:free`) — un changement de cap
-     * fait reparler. Toujours française, pour ne pas rebavarder au changement
-     * de langue de la voix.
+     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure` — le
+     * mètre arrondi fait reparler un obstacle qui s'approche, comme
+     * [PositionText.key], et l'heure un obstacle qui glisse dans le couloir.
+     * Le cap droit garde ses signatures au caractère près ; les autres caps
+     * se préfixent (`Left:free`) — un changement de cap fait reparler.
+     * Toujours française, pour ne pas rebavarder au changement de langue de
+     * la voix.
      */
     fun key(decision: GuidanceDecision): String {
         val prefix = if (decision.cap == SteeringCap.Straight) "" else "${decision.cap.name}:"
@@ -186,19 +153,8 @@ object Guidance {
         val exit = if (decision.cap == SteeringCap.Straight) decision.side?.name else decision.passage?.name
         val bucket = PositionText.sceneBucket(obstacle.meters)
         val hour = "${PositionText.clockHour(obstacle.centerX)}h"
-        val stop = if (decision.stop) "|stop" else ""
-        return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour$stop"
+        return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour"
     }
-
-    /** Matière qui remplit le champ : hauteur et largeur au-delà des seuils de stop. */
-    private fun isHuge(obstacle: PlacedLabel): Boolean {
-        val extent = obstacle.extent ?: return false
-        return extent.heightFrac >= STOP_HEIGHT_FRAC && extent.widthFrac >= STOP_WIDTH_FRAC
-    }
-
-    /** Passage piéton (canonique, voir [KnownSizes.canonical]) : de la peinture, pas un obstacle. */
-    private fun isCrosswalk(label: String): Boolean =
-        KnownSizes.canonical(label) in CROSSWALK_LABELS
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
     private fun inCorridor(centerX: Float, cap: SteeringCap): Boolean = when (cap) {

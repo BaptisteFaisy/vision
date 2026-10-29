@@ -431,6 +431,7 @@ _state.update { it.cleared() }
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
+                spokenUrgent = if (phrase != null) (steering?.blocked == true) else current.spokenUrgent,
                 steering = steering,
                 crossing = cross?.state ?: current.crossing,
                 crossingBox = cross?.box,
@@ -455,10 +456,8 @@ _state.update { it.cleared() }
      * (la vidéo est en direct, la voix seule est débouncée). `null` en
      * Traversée (ses prompts feu+voitures ne disent pas où marcher).
      */
-    private fun steeringCueOf(): SteeringCue? {
-        if (_state.value.crossingActive) return null
-        return voice.cue()
-    }
+    private fun steeringCueOf(): SteeringCue? =
+        if (_state.value.crossingActive) null else voice.cue()
 
     /**
      * Masques colorisés de la frame, calculés hors du thread principal : décodage selon
