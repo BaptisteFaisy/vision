@@ -3,6 +3,7 @@ package dev.sam3vision.app
 import dev.sam3vision.core.settings.MemorySettingsStore
 import dev.sam3vision.core.settings.SamRegion
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -249,5 +250,41 @@ class SettingsSeedTest {
         assertEquals(premiere.shareWriteKey, seconde.shareWriteKey)
         assertEquals(premiere.shareId, store.load().shareId)
         assertNotEquals(Settings.LEGACY_SHARE_ID, premiere.shareId)
+    }
+
+    @Test
+    fun `une URL SAM manuelle sans scheme retombe sur le preset de la region`() {
+        val cassee = Settings.Default.copy(samBaseUrl = "baptiste-faisy--sam3-eu-a100.web.modal.run")
+
+        val seed = seeded(cassee, build)
+
+        assertEquals("", seed.samBaseUrl)
+        assertEquals(SamRegion.Eu.presetBaseUrl, seed.resolveSamEndpoint())
+    }
+
+    @Test
+    fun `une URL SAM manuelle utilisable est conservee`() {
+        val manuelle = Settings.Default.copy(samBaseUrl = "https://mon-sam/v1")
+
+        assertEquals("https://mon-sam/v1", seeded(manuelle, build).samBaseUrl)
+    }
+
+    @Test
+    fun `une base itineraire sans scheme est reparee par le build, sinon Maps`() {
+        val cassee = Settings.Default.copy(routeBaseUrl = "valhalla.exemple/route")
+        val avecRoute = build.copy(routeBaseUrl = "https://route.build/v1")
+        val sansRoute = build.copy(routeBaseUrl = "")
+
+        assertEquals("https://route.build/v1", seeded(cassee, avecRoute).routeBaseUrl)
+        assertEquals("le vide rend le guidage a Maps", "", seeded(cassee, sansRoute).routeBaseUrl)
+    }
+
+    @Test
+    fun `une base dictee sans scheme retombe sur le defaut Meta, le vide garde Scribe`() {
+        val cassee = Settings.Default.copy(asrBaseUrl = "api.meta.ai/v1")
+        val vide = Settings.Default.copy(asrBaseUrl = "")
+
+        assertEquals(Settings.DEFAULT_ASR_BASE_URL, seeded(cassee, build).asrBaseUrl)
+        assertEquals("le vide garde le repli Scribe", "", seeded(vide, build).asrBaseUrl)
     }
 }
