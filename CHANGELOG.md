@@ -3,6 +3,37 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — direct caregiver : la caméra passe par un WebSocket, plus par une photo toutes les 2 s
+
+- **Demande** : « cela va bien restream la caméra ? je veux que ça le soit. »
+- **Constat** : D1 n'est pas un tuyau. À 6 im/s, il faudrait 345 000 écritures et
+  345 000 requêtes Worker par jour pour **2,5 h** de direct (quota gratuit :
+  100 000 de chaque). Une photo par 2 s reste donc la seule chose que l'état lent
+  pouvait porter.
+- **Salle temps réel** (`suivi-relais/src/room.js`, `src/durable.js`, route `/ws`) :
+  un Durable Object par flux, téléphone en `role=push`, aidants en `role=watch` ;
+  frames binaires relayées sans écriture, API d'hibernation (un aidant immobile ne
+  coûte pas de durée). Le téléphone ne pousse **que si un aidant regarde**
+  (`{"type":"audience","watch":n}`), une frame ne revient jamais à son émetteur,
+  au-delà de 256 Ko elle est ignorée, et `role=push` exige la clé du flux quand le
+  flux en a une.
+- **Page** (`suivi-parent/live-stream.mjs`, branchée dans `live.mjs`) : frames
+  affichées au fil de l'eau (fraîcheur 1,5 s), reconnexion à délai croissant, et
+  **repli sur la photo lente** si le WebSocket échoue ou si le relais déployé n'a
+  pas la salle (503 « diffusion non déployée »).
+- **Téléphone** (`core/.../share/ShareStream.kt`, `ShareStreamer.kt`,
+  `isee/IseeLiveStream.kt`) : URL `wss`, 6 im/s (≈ 1 Mbit/s), une frame par
+  séquence (`SharedCameraFrame.latest`), silence sans spectateur, réouverture
+  après 2 s de coupure. Séparé de `ShareRelay` : couper le direct ne coupe pas le
+  suivi, et l'inverse non plus.
+- Preuves : `node --test suivi-relais/test/*.mjs suivi-parent/test/*.mjs` 47/47
+  (dont `room.test.mjs` 10 et `live-stream.test.mjs` 7) ; `:core` 1 858 tests,
+  `:app` 1 081, 0 échec ; `check-kotlin-limits` OK (1 029 fichiers).
+- **Reste à faire pour que ça marche en vrai** : déployer le Worker avec la salle
+  (`deploy.json` porte le binding `RELAY_ROOM` et la migration `v1-relay-room` ;
+  le token wrangler local est expiré, donc **déploiement non fait**), puis un APK
+  neuf. Rien ne change tant que ce n'est pas déployé : la page garde la photo lente.
+
 ## 2026-10-29 — suivi caregiver : le relais par défaut est le Worker, plus l'hôte tombé
 
 - **Panne constatée** : `DEFAULT_PARENT_SITE_URL` pointait sur

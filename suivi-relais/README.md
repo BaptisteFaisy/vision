@@ -14,7 +14,41 @@ POST /api/share   {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor},
                    photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
 GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix, objects, scene, photo, trip, serverAt}
 GET  /health                          → {ok:true}
+GET  /ws?share=<id>&role=watch        → WebSocket : frames JPEG binaires du proche
+GET  /ws?share=<id>&role=push&key=<k> → WebSocket : le proche pousse ses frames
 ```
+
+## Direct : `/ws`, une salle par flux (`src/durable.js`)
+
+L'état lent (position, phrase, trajet) passe par D1 ; **l'image du direct ne
+passe pas par la base** — un Durable Object sert de salle, et les frames vont du
+téléphone aux aidants connectés sans être écrites nulle part. C'est la seule
+façon de tenir un vrai direct : à 6 im/s, D1 et son quota d'écritures ne suivraient
+pas (100 000 écritures/jour, soit **2,5 h** de direct, et 345 000 requêtes pour la
+même durée côté Worker).
+
+```text
+téléphone ──frames binaires──▶ RelayRoom (DO, un par identifiant) ──▶ aidants
+                                      │
+                                      └─▶ {"type":"audience","watch":n}  (au téléphone)
+```
+
+- **Le téléphone n'émet que s'il est regardé** : à chaque connexion ou départ
+  d'aidant, la salle envoie `{"type":"audience","watch":n}` aux téléphones ; à
+  `n = 0`, la caméra se tait (forfait, batterie).
+- **Une frame ne revient jamais à son émetteur** et n'est jamais relue en base ;
+  au-delà de 256 Ko (`MAX_FRAME_BYTES`), elle est ignorée.
+- **L'écriture reste protégée** : `role=push` exige la clé du flux quand le flux
+  en a une (même règle que `/api/share`, liée au premier envoi) — un identifiant
+  deviné ne suffit pas à diffuser une fausse caméra chez l'aidant.
+- **Hibernation** : la salle utilise l'API d'hibernation (`acceptWebSocket` avec
+  étiquette de rôle), donc un aidant immobile ne coûte pas de durée. Sur l'offre
+  gratuite (100 000 requêtes/jour, messages WebSocket comptés au 1/20), une heure
+  de direct coûte ~1 400 requêtes : très en dessous du plafond.
+- **Repli** : la page garde la photo lente (`/api/state`, une frame toutes les 2 s)
+  si le WebSocket est indisponible. Un déploiement sans binding `RELAY_ROOM`
+  répond `503 {"ok":false,"error":"diffusion non déployée"}` et la page continue
+  de fonctionner.
 
 - `photo` (JPEG base64 ≤ 120 000 caractères) et `trip` (progression 0..1) sont
   facultatifs : un appareil d'avant continue d'envoyer position, objets et
