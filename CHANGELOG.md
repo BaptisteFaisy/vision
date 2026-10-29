@@ -24,6 +24,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK.
 - Fichiers : `Settings.kt`, `CaregiverPage.kt`, `CaregiverPageTest.kt`,
   `suivi-relais/README.md`.
+## 2026-10-29 — fix(iSee) : « Question failed: Expected URL scheme… » réparé sans ressaisie
+
+- **Demande** : le user voit `Question failed: Expected URL scheme 'http' or 'https'
+  but no scheme was found` à la fin de la dictée, alors que « tout doit être déjà
+  configuré » (installer l'APK suffit, `CLES-DU-BUILD.md`).
+- **Cause** : une base LLM stockée sans scheme (vieille saisie, `https://` oublié)
+  passait `llmConfigured` (non-vide), et le message brut du parseur OkHttp remontait
+  jusqu'au statut affiché. Pire : « jamais écrasée », la valeur cassée restait à vie.
+- `net/Http.kt` : `isUsableHttpUrl()` partagé (le parseur OkHttp décide) ;
+  `HttpLlmClient.postChat` refuse en local (`Network` actionnable, zéro appel réseau,
+  type inchangé — contrat `HttpRequestsTest` gardé) ; `SettingsSeed.healLlmEndpoint`
+  traite une base inutilisable comme jamais choisie (build, à défaut le défaut du code).
+- Preuves : `:core` 1 854 + `:app` 1 083 tests, 0 échec, sur r630
+  (4 nouveaux : refus `LlmClientTest` 2/2, réparation `SettingsSeedTest` 2/2 —
+  vus rouges avant le fix, avec le message exact du téléphone),
+  `check-kotlin-limits` OK.
+- Fichiers : `Http.kt`, `HttpLlmClient.kt`, `SettingsSeed.kt`,
+  `LlmClientTest.kt`, `SettingsSeedTest.kt`.
 
 ## 2026-10-29 — iSee : arbitrage voix « obstacle → TwinLite, sinon SAM » (ordre user)
 
