@@ -35,8 +35,14 @@ vec3 cyc(vec4 c0, vec4 c1, vec4 c2, vec4 c3, vec4 c4, float s) {
 vec3 cycIdle(float s) { return cyc(uIdle[0], uIdle[1], uIdle[2], uIdle[3], uIdle[4], s); }
 vec3 cycYou(float s) { return cyc(uPalYou[0], uPalYou[1], uPalYou[2], uPalYou[3], uPalYou[4], s); }
 vec3 cycSee(float s) { return cyc(uPalSee[0], uPalSee[1], uPalSee[2], uPalSee[3], uPalSee[4], s); }
+// La teinte du verre : celle de la palette active (qui parle), prise entre les deux teintes
+// médianes — donc le reflet concorde toujours avec la couleur intérieure du liquide.
+vec3 pal(float s) {
+  float y = clamp(uYou, 0.0, 1.0); float ee = clamp(uSee, 0.0, 1.0) * (1.0 - y);
+  return cycIdle(s) * float(1.0 - y - ee) + cycYou(s) * float(y) + cycSee(s) * float(ee);
+}
 vec3 film(float d) {
-  vec3 I = 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / vec3(650.0, 540.0, 450.0));
+  vec3 I = vec3(0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0));
   float m = (I.r + I.g + I.b) / 3.0;
   return vec3(clamp(m + (I - m) * 1.15, 0.0, 1.0));
 }
@@ -70,21 +76,24 @@ vec4 orb(vec2 fc) {
   float aa = 1.4 / uR;
   if (d > 1.0 + aa) return vec4(0);
   float z = sqrt(max(0.0, 1.0 - min(d * d, 1.0)));
-  vec3 col = mix(vec3(0.95, 0.965, 0.985), vec3(1.0), float(z * 0.4));
-  vec3 accent = mix(mix(vec3(0.55, 0.62, 0.8), vec3(0.04, 0.37, 1.0), float(uYou)), vec3(0.96, 0.64, 0.0), float(uSee * (1.0 - uYou)));
+  // Le reflet vient de la palette, jamais d'une couleur fixe : plus de bleu au repos, et le
+  // bord du verre ne se teinte plus en rose/vert/bleu (l'ancien arc-en-ciel à trois longueurs
+  // d'onde de film()).
+  vec3 accent = pal(0.45);
+  vec3 col = mix(mix(vec3(0.96, 0.964, 0.968), accent, float(0.05)), vec3(1.0), float(z * 0.4));
   col = mix(col, accent, float((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(q - vec2(0.0, -0.2)))));
   col = liquid(col, q);
   col *= float(mix(1.0, 0.88, pow(1.0 - z, 3.0)));
   // Le verre : irisation au bord, boîte à lumière, point chaud, liseré.
   float fres = pow(1.0 - z, 2.6);
-  vec3 fcol = film(300.0 + 620.0 * fbm(q * 1.6 + vec2(0.0, uTime * 0.05) + z) + 180.0 * (0.5 - 0.5 * q.y));
+  vec3 fcol = mix(accent, vec3(1.0), float(0.42)) * film(300.0 + 620.0 * fbm(q * 1.6 + vec2(0.0, uTime * 0.05) + z) + 180.0 * (0.5 - 0.5 * q.y));
   col = mix(col, fcol, float((0.03 + 0.7 * fres) * 0.45)) + fcol * float(fres * 0.08);
   vec2 r = 2.0 * z * q;
   float box = smoothstep(0.035, -0.02, sdBox(r - vec2(-0.43, 0.5), vec2(0.2, 0.085), 0.07));
   float hot = pow(max(dot(vec3(q, z), normalize(vec3(-0.45, 0.55, 0.7))), 0.0), 220.0);
   col += float(box * 0.7 + hot);
   vec2 dq = d > 1e-4 ? q / d : vec2(0.0);
-  col += vec3(0.8, 0.88, 1.0) * float(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(vec2(0.6, -0.55)))) * 0.3);
+  col += mix(accent, vec3(1.0), float(0.5)) * float(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(vec2(0.6, -0.55)))) * 0.3);
   col += accent * float(0.12 * smoothstep(0.1, 1.0, -q.y) * smoothstep(1.0, 0.75, d));
   float edge = smoothstep(1.0, 1.006, d) * smoothstep(1.03, 1.0, d);
   col = mix(col, col * 0.86, float(edge));

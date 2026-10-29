@@ -1,10 +1,11 @@
 import { fragmentShader } from './orb-shader.mjs';
 
 const VERTEX = 'attribute vec2 position; void main() { gl_Position = vec4(position, 0., 1.); }';
-const BLUE_GREEN = [
-  [0.03, 0.28, 0.9, 1], [0.05, 0.55, 1, 1], [0.08, 0.78, 0.85, 1],
-  [0.02, 0.62, 0.48, 1], [0.5, 0.92, 0.72, 1],
-].flat();
+// Cacao & caramel : source unique du liquide, pour le rendu WebGL et pour
+// le repli sans WebGL (variables --orb-color-* lues par styles.css).
+const CACAO_CARAMEL = ['#48342F', '#7C5748', '#B88760', '#E1BE8B', '#B29C84'];
+const LIQUID_COLORS = CACAO_CARAMEL.flatMap(color =>
+  [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255).concat(1));
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -28,7 +29,7 @@ function programFor(gl) {
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   for (const name of ['uIdle', 'uPalYou', 'uPalSee']) {
-    gl.uniform4fv(gl.getUniformLocation(program, name + '[0]'), BLUE_GREEN);
+    gl.uniform4fv(gl.getUniformLocation(program, name + '[0]'), LIQUID_COLORS);
   }
   return program;
 }
@@ -52,6 +53,8 @@ function paint(gl, program, canvas, time) {
 }
 
 export function startOrb(canvas) {
+  CACAO_CARAMEL.forEach((color, index) =>
+    canvas.parentElement.style.setProperty(`--orb-color-${index}`, color));
   try {
     const gl = canvas.getContext('webgl', { alpha: true, antialias: true });
     if (!gl) throw new Error('WebGL unavailable');

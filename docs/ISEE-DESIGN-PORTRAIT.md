@@ -13,7 +13,10 @@
   sur la rue quand la caméra est ouverte, en encre sinon ; bandeau blanc
   derrière les boutons système du bas.
 - **Une seule boule de verre** au liquide marbré (`IseePortraitOrb`) : reflet
-  de boîte à lumière, irisation au bord, liseré. Shader AGSL sur API 33+,
+  de boîte à lumière, irisation au bord, liseré. Le verre **n'a pas de couleur
+  propre** : bord, liseré et reflet prennent la teinte de la palette du liquide
+  (`pal`, teinte médiane de qui parle) — aucun arc-en-ciel fixe, donc pas de
+  rose, de vert ni de bleu sur une bulle cacao. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
   elle occupe 64 % du haut au repos (`PICTURE_IDLE_H`) et 50 % pendant la

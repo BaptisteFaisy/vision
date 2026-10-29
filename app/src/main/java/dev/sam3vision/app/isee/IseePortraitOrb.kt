@@ -71,8 +71,14 @@ half3 cyc(half4 c0, half4 c1, half4 c2, half4 c3, half4 c4, float s) {
 half3 cycIdle(float s) { return cyc(uIdle[0], uIdle[1], uIdle[2], uIdle[3], uIdle[4], s); }
 half3 cycYou(float s) { return cyc(uPalYou[0], uPalYou[1], uPalYou[2], uPalYou[3], uPalYou[4], s); }
 half3 cycSee(float s) { return cyc(uPalSee[0], uPalSee[1], uPalSee[2], uPalSee[3], uPalSee[4], s); }
+// La teinte du verre : celle de la palette active (qui parle), prise entre les deux teintes
+// médianes — donc le reflet concorde toujours avec la couleur intérieure du liquide.
+half3 pal(float s) {
+  float y = clamp(uYou, 0.0, 1.0); float ee = clamp(uSee, 0.0, 1.0) * (1.0 - y);
+  return cycIdle(s) * half(1.0 - y - ee) + cycYou(s) * half(y) + cycSee(s) * half(ee);
+}
 half3 film(float d) {
-  float3 I = 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / float3(650.0, 540.0, 450.0));
+  float3 I = float3(0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0));
   float m = (I.r + I.g + I.b) / 3.0;
   return half3(clamp(m + (I - m) * 1.15, 0.0, 1.0));
 }
@@ -84,8 +90,11 @@ half4 main(float2 fc) {
   float aa = 1.4 / uR;
   if (d > 1.0 + aa) return half4(0);
   float z = sqrt(max(0.0, 1.0 - min(d * d, 1.0)));
-  half3 col = mix(half3(0.95, 0.965, 0.985), half3(1.0), half(z * 0.4));
-  half3 accent = mix(mix(half3(0.55, 0.62, 0.8), half3(0.04, 0.37, 1.0), half(uYou)), half3(0.96, 0.64, 0.0), half(uSee * (1.0 - uYou)));
+  // Le reflet vient de la palette, jamais d'une couleur fixe : plus de bleu au repos, et le
+  // bord du verre ne se teinte plus en rose/vert/bleu (l'ancien arc-en-ciel à trois longueurs
+  // d'onde de film()).
+  half3 accent = pal(0.45);
+  half3 col = mix(mix(half3(0.96, 0.964, 0.968), accent, half(0.05)), half3(1.0), half(z * 0.4));
   col = mix(col, accent, half((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(q - float2(0.0, -0.2)))));
   // Le liquide : surface ondulée, marbre en cinq teintes, ménisque blanc.
   float2 p = q / 0.93;
@@ -108,14 +117,14 @@ half4 main(float2 fc) {
   col *= half(mix(1.0, 0.88, pow(1.0 - z, 3.0)));
   // Le verre : irisation au bord, boîte à lumière, point chaud, liseré.
   float fres = pow(1.0 - z, 2.6);
-  half3 fcol = film(300.0 + 620.0 * fbm(q * 1.6 + float2(0.0, uTime * 0.05) + z) + 180.0 * (0.5 - 0.5 * q.y));
+  half3 fcol = mix(accent, half3(1.0), half(0.42)) * film(300.0 + 620.0 * fbm(q * 1.6 + float2(0.0, uTime * 0.05) + z) + 180.0 * (0.5 - 0.5 * q.y));
   col = mix(col, fcol, half((0.03 + 0.7 * fres) * 0.45)) + fcol * half(fres * 0.08);
   float2 r = 2.0 * z * q;
   float box = smoothstep(0.035, -0.02, sdBox(r - float2(-0.43, 0.5), float2(0.2, 0.085), 0.07));
   float hot = pow(max(dot(float3(q, z), normalize(float3(-0.45, 0.55, 0.7))), 0.0), 220.0);
   col += half(box * 0.7 + hot);
   float2 dq = d > 1e-4 ? q / d : float2(0.0);
-  col += half3(0.8, 0.88, 1.0) * half(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(float2(0.6, -0.55)))) * 0.3);
+  col += mix(accent, half3(1.0), half(0.5)) * half(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(float2(0.6, -0.55)))) * 0.3);
   col += accent * half(0.12 * smoothstep(0.1, 1.0, -q.y) * smoothstep(1.0, 0.75, d));
   float edge = smoothstep(1.0, 1.006, d) * smoothstep(1.03, 1.0, d);
   col = mix(col, col * 0.86, half(edge));
