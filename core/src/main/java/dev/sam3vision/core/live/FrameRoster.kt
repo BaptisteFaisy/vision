@@ -69,7 +69,7 @@ fun placedLabels(frame: LiveFrame, readings: List<DistanceReading>): List<Placed
         val detection = Detection(obj.label, obj.score, obj.box, frame.width, frame.height)
         val position = PositionText.fromDetection(detection)
         if (position != null) {
-            placed += PlacedLabel(position.label, position.centerX, position.centerY, meters[obj.box], position.extent)
+            placed += PlacedLabel(position.label, position.centerX, position.centerY, meters[obj.box])
         }
         i++
     }

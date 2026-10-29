@@ -21,8 +21,8 @@ import org.junit.Test
 
 /**
  * La voix de la sonde : une phrase ré-émise par les frames suivantes n'annule
- * pas sa synthèse (seule une phrase plus fraîche le fait), et le « Stop. »
- * parle même quand le chat lit (urgent, clip pré-synthétisé).
+ * pas sa synthèse (seule une phrase plus fraîche le fait), et le contournement
+ * parle même quand le chat lit (urgent, coupe).
  */
 class ProbeWiringSpokenTest {
 
@@ -49,7 +49,7 @@ class ProbeWiringSpokenTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Personne au contact, boîte coupée : non mesurée, immense → « Stop. » */
+    /** Personne au contact, boîte coupée : non mesurée → contournement non chiffré. */
     private fun contact() = SegObject(
         label = "person",
         score = 0.9f,
@@ -80,8 +80,8 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Va à gauche, 2 mètres."), attempts.filter { it != ProximityVoice.STOP_WORD })
-        assertEquals(listOf("Va à gauche, 2 mètres."), completions.filter { it != ProximityVoice.STOP_WORD })
+        assertEquals(listOf("Va à gauche, 2 mètres."), attempts)
+        assertEquals(listOf("Va à gauche, 2 mètres."), completions)
     }
 
     @Test
@@ -109,13 +109,13 @@ class ProbeWiringSpokenTest {
 
         assertEquals(
             listOf("Va à gauche, 2 mètres.", "Va à gauche, 4 mètres."),
-            attempts.filter { it != ProximityVoice.STOP_WORD },
+            attempts,
         )
-        assertEquals(listOf("Va à gauche, 4 mètres."), completions.filter { it != ProximityVoice.STOP_WORD })
+        assertEquals(listOf("Va à gauche, 4 mètres."), completions)
     }
 
     @Test
-    fun `stop parle meme quand le chat lit`() = runTest {
+    fun `contournement parle meme quand le chat lit`() = runTest {
         val spoken = mutableListOf<String>()
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
@@ -129,7 +129,7 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Stop."), spoken)
+        assertEquals(listOf("Va à gauche."), spoken)
     }
 
     /** Sonde guidée branchée sur le faux client partagé, prête à recevoir des frames. */

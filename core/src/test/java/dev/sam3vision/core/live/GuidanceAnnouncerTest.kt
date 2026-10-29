@@ -61,7 +61,7 @@ class GuidanceAnnouncerTest {
         assertEquals("Va à gauche, 3 mètres.", announcer.onFrame(0L, listOf(personne(3.4f))))
         assertEquals("Va à gauche, 2 mètres.", announcer.onFrame(500L, listOf(personne(2.4f))))
         assertEquals("Va à gauche, 1 mètre.", announcer.onFrame(1_000L, listOf(personne(1.4f))))
-        assertEquals("Stop.", announcer.onFrame(1_500L, listOf(personne(0.4f))))
+        assertEquals("Va à gauche, 40 centimètres.", announcer.onFrame(1_500L, listOf(personne(0.4f))))
     }
 
     @Test
@@ -111,12 +111,12 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `stop parle des la premiere frame`() {
+    fun `contournement proche parle des la premiere frame`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
         fun proche(meters: Float) = PlacedLabel("personne", 0.5f, 0.5f, meters)
 
-        assertEquals("Stop.", announcer.onFrame(0L, listOf(proche(0.4f))))
-        // même seau, toujours stop : rien de neuf
+        assertEquals("Va à gauche, 40 centimètres.", announcer.onFrame(0L, listOf(proche(0.4f))))
+        // même seau, même contournement : rien de neuf
         assertNull(announcer.onFrame(500L, listOf(proche(0.45f))))
     }
 
@@ -131,11 +131,11 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `matiere proche non mesuree dit stop des la premiere frame`() {
+    fun `matiere proche non mesuree guide des la premiere frame`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
-        fun matiere() = PlacedLabel("mur", 0.5f, 0.5f, null, LabelExtent(0.9f, 0.8f))
+        fun matiere() = PlacedLabel("mur", 0.5f, 0.5f, null)
 
-        assertEquals("Stop.", announcer.onFrame(0L, listOf(matiere())))
+        assertEquals("Va à gauche.", announcer.onFrame(0L, listOf(matiere())))
         assertNull(announcer.onFrame(500L, listOf(matiere())))
     }
 }
