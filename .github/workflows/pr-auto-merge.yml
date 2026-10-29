@@ -58,62 +58,38 @@
 #     suivant est un vrai travail ;
 #   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
 #     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
-# File de merge (v14/v15, 2026-10-29) — la v13 a montré le plafond : avec
-# `strict_required_status_checks_policy: true`, chaque merge invalide la CI de
-# toutes les autres PR, donc ~1 merge par cycle de CI (~40/h au mieux). Le seul
-# moyen de monter sans perdre la garantie est de **grouper**.
-# La file native de GitHub est indisponible sur ce dépôt (elle exige un dépôt
-# public possédé par une **organisation** ; celui-ci appartient à un compte
-# utilisateur) : c'est **Mergify** qui tient la file (`.mergify.yml`). Quand
-# elle est active (`QUEUE`), le balayeur ne merge plus et ne rebase plus : il
-# ne garde que les conflits (`DIRTY`) et les relances de panne (`BLOCKED`).
-#   - `QUEUE` est lu à la source (règle `merge_queue` du ruleset) : si la file
-#     est désactivée un jour, le balayeur reprend son ancien chemin tout seul.
-#   - Plus de rebase sur les PR `BEHIND` vertes : la file teste l'arbre
-#     fusionné, c'est exactement la garantie que `strict` cherchait — sans
-#     relancer la CI d'une PR à chaque mouvement de `master`.
-#   - Les conflits (`DIRTY`) restent traités par le rebase + agent Fireworks :
-#     une PR en conflit ne peut pas entrer dans la file.
-# Débit (v13, 2026-10-29) — la v12 a buté sur une règle du dépôt : le ruleset
-# `master — PR obligatoire, checks requis` porte
-# `strict_required_status_checks_policy: true`, donc GitHub **refuse** de merger
-# une branche en retard (la protection classique, elle, dit `strict: false` :
-# c'est le ruleset qui tranche). Conséquence : sous cette règle, chaque merge
-# déplace `master` et invalide la CI de toutes les autres PR — le débit est
-# plafonné à ~un merge par cycle de CI, quoi qu'on fasse. Deux corrections :
-#   - le balayeur **arrête de rebaser tout le monde**. Avant, chaque mouvement
-#     de `master` relançait un rebase + une CI pour *chaque* PR ouverte (O(N²)),
-#     et aucune ne finissait avant le mouvement suivant. Désormais : s'il y a
-#     une PR prête à être mergée, on merge et on ne rebase personne (ce serait
-#     invalidé aussitôt) ; sinon on prépare **une seule** PR, la plus ancienne.
-#   - le chemin « merge direct sans rebase » n'est armé que si le dépôt autorise
-#     les branches en retard (`strict` lu à la source) — sinon il ne peut pas
-#     aboutir et son échec ne servirait qu'à polluer le log.
-# Mesure de départ : 15 merges/h, p90 création→merge 70 min.
-# Débit (v12, 2026-10-29) — la demande est « plus de PR mergées par heure », pas
-# « moins de runs ». Mesuré : 15 merges/h au mieux, p90 création→merge 70 min.
-# La cause n'était pas la durée d'un balayage (17 s) mais le **rebase imposé** :
-# chaque merge déplace `master`, donc les autres PR passent `BEHIND`, et le
-# balayeur les rebasait une à une — chaque rebase poussait un commit, ce qui
-# **relançait la CI de la PR** (≈ 60-90 s) et invalidait `master` à nouveau.
-# Taxe en O(N²) sur le nombre de PR ouvertes.
-#   - **Merge direct d'une PR `BEHIND`** dont les checks requis sont verts et
-#     dont les fichiers ne croisent aucun fichier atterri depuis sa base : le
-#     serveur rebase (`merge --rebase`, `strict: false` est déjà la politique
-#     du dépôt), sans clone, sans push, **sans relancer la CI**. Si les
-#     fichiers se croisent — ou au moindre doute — on rebase comme avant.
-#   - Le groupe `concurrency` du workflow disparaît : il faisait « un run à la
-#     fois » et GitHub **annule le run en attente** quand un nouveau arrive,
-#     donc un « CI finie, merge-moi » pouvait être perdu et la PR attendait le
-#     cron (c'était la queue p90). L'empreinte v11 est le vrai garde-fou : deux
-#     runs qui prennent la même PR font la même chose, l'un des deux échoue
-#     proprement (`--match-head-commit`).
-#   - Cron de filet à 5 min (au lieu de 15) : avec `discover` seul (6 s) et la
-#     déduplication, un réveil coûte quelques secondes.
-# Journal (v11) : `CHANGELOG.md merge=union` — le journal est additif, la
-# fusion garde les deux entrées au lieu de lever un conflit que l'agent devait
-# résoudre à chaque mouvement de `master` (livelock observé : 6 réconciliations
-# sur la même PR, un push par commit de `master`).
+# File de merge — état au 29/10 (v15).
+#
+# Rôle : chaque PR interne est poussée vers la fusion sans main humaine. La
+# seule porte reste la CI ; les trois checks requis sont `ci`, `ci-budget` et
+# `couche0`.
+#
+# Deux régimes :
+#   1. **File active** (`MERGIFY_QUEUE=1` dans les variables du dépôt, ou règle
+#      `merge_queue` si un jour le dépôt en a le droit) : la file met les PR en
+#      file, les met à jour contre `master` et rejoue les checks sur l'arbre
+#      fusionné du lot. Le balayeur ne merge plus et ne rebase plus ; il ne
+#      garde que ce qu'une file ne sait pas faire — conflit (`DIRTY`, rebase +
+#      agent Fireworks) et panne d'infrastructure (`BLOCKED`, relance bornée).
+#   2. **Sans file** : ancien chemin complet — rebase des PR `BEHIND`, merge
+#      quand les trois checks sont verts, relance des échecs d'infrastructure.
+#
+# Pourquoi la file n'est pas celle de GitHub : elle exige un dépôt public
+# possédé par une **organisation** ; celui-ci appartient à un compte
+# utilisateur et l'API refuse la règle `merge_queue` (422). C'est Mergify qui
+# tient la file (`.mergify.yml`, lots de 3). `mergify queue status` et
+# `@mergifyio queue` répondent « produit à activer » tant que le tableau de
+# bord ne l'a pas fait — d'où l'interrupteur `MERGIFY_QUEUE`, posé ce jour-là
+# pour que le balayeur lâche la main sans redéploiement.
+#
+# Historique court :
+#   v11 déduplication par (tête, base, état, empreinte des checks) + cron 5 min ;
+#   v12 merge direct des PR `BEHIND` vertes quand le dépôt l'autorise ;
+#   v13 arrêt du rebase collectif (une seule PR préparée) — le ruleset porte
+#       `strict_required_status_checks_policy: true`, donc chaque merge
+#       invalidait la CI de toutes les autres PR (O(N²), 15 merges/h) ;
+#   v14 câblage de la file (merge_group, puis branche de file Mergify) ;
+#   v15 la file prend la main, le balayeur s'efface (`MERGIFY_QUEUE`).
 
 name: pr-auto-merge
 
@@ -161,6 +137,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
+          # Interrupteur de la file Mergify. Le ruleset ne peut pas porter la
+          # règle `merge_queue` (dépôt d'utilisateur, l'API la refuse), donc la
+          # présence de la file ne se lit pas dans le ruleset : c'est cette
+          # variable, posée le jour de l'activation du produit, qui la dit.
+          MERGIFY_QUEUE: ${{ vars.MERGIFY_QUEUE }}
         run: |
           set -euo pipefail
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
@@ -198,6 +179,7 @@ jobs:
             [ "${s_rs:-false}" = "true" ] && STRICT=true
             [ "${q_rs:-0}" -gt 0 ] && QUEUE=true
           done
+          if [ "${MERGIFY_QUEUE:-0}" = "1" ]; then QUEUE=true; fi
           echo "strict=$STRICT file_de_merge=$QUEUE"
           printf 'strict=%s\nqueue=%s\n' "$STRICT" "$QUEUE" >> "$GITHUB_OUTPUT"
           # Sélection (v13) : s'il existe une PR prête (CLEAN, non brouillon),
