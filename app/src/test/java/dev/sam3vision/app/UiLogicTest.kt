@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.model.ObjectLimits
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -15,7 +16,7 @@ class UiLogicTest {
         val second = maskColorAt(1)
         assertNotEquals(first, second)
         assertEquals(first, maskColorAt(MASK_COLORS.size))
-        assertTrue(MASK_COLORS.size >= 6)
+        assertTrue(MASK_COLORS.size >= ObjectLimits.MAX_ON_SCREEN)
         assertTrue(MASK_COLORS.distinct().size == MASK_COLORS.size)
     }
 

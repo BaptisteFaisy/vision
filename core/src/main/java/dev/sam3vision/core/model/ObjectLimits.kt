@@ -11,11 +11,12 @@ package dev.sam3vision.core.model
 object ObjectLimits {
     /**
      * Valeur par défaut : **8 objets** à l'écran (demande user du 26/10, confirmée le
-     * 26/10 soir : « j'avais dit 8 »). Réglable de 1 à 12 dans Réglages.
+     * 26/10 soir : « j'avais dit 8 »). Réglable de 1 à 32 dans Réglages
+     * (plafond 32 : demande user du 29/10).
      */
     const val DEFAULT_ON_SCREEN = 8
     const val MIN_ON_SCREEN = 1
-    const val MAX_ON_SCREEN = 12
+    const val MAX_ON_SCREEN = 32
 
     /** Ramène un réglage hors bornes (saisie, vieux fichier) dans l'intervalle. */
     fun clamp(value: Int): Int = value.coerceIn(MIN_ON_SCREEN, MAX_ON_SCREEN)

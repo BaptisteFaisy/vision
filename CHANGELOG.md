@@ -3,6 +3,36 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — direct : chemin central des objets suivis + plafond 32 objets
+
+- **Demandé** : afficher le chemin exact au milieu des objets trackés de SAM 3.1, et
+  monter le plafond à 32 objets (demande user du 29/10).
+- `live/TrackTrails.kt` (nouveau, pur JVM) : `CenterTrails` allonge le chemin de chaque
+  piste identifiée avec le centre de sa boîte (24 points, oubli à 2,5 s, 64 pistes max)
+  et rend un `TrailLayer` prêt à tracer.
+- `TrailOverlay.kt` (nouveau) : `LiveTrailOverlay` dessine chaque chemin dans la couleur
+  du masque de son objet + un point plein cerclé de blanc sur la position exacte ;
+  couche vide = rien de dessiné.
+- Câblage : `LiveUiState.trails`, `LiveViewModel.publish` (depuis le journal + les
+  détections, `null` si vide), `resetForStart`, `LiveScreen` après les boîtes prédites.
+- `LivePrediction.publishableLayer` : la règle « poser si changé » déménage du ViewModel
+  (498 lignes, plafond 499) vers `live/` — comportement identique, testé.
+- Plafond : `ObjectLimits.MAX_ON_SCREEN` 12 → 32 (défaut 8 inchangé) ; palette
+  `MASK_COLORS` 8 → 32 couleurs distinctes (les 8 historiques en tête) ; docs
+  (`LIVE-SPEC`, `ARCHITECTURE`) à jour.
+- Backend inchangé (aucun déploiement pendant la recette en cours) : `/live` borne encore
+  à 24 côté serveur, le tracker monte à 32 (16 × 2 concepts) — le suivi 32 est un
+  changement `server/` à part.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` → **BUILD SUCCESSFUL**,
+  3036 tests (dont `TrackTrailsTest` 6 nouveaux, `LivePredictionTest` +1,
+  `ObjectLimitsTest` +1, `UiLogicTest` : palette ≥ plafond) ; `check-kotlin-limits` OK ;
+  UBS 0 critique/0 warning (l'erreur module kotlin sur `LiveState.kt` est pré-existante,
+  vérifiée sans mes edits).
+- Fichiers : `TrackTrails.kt`, `TrailOverlay.kt`, `TrackTrailsTest.kt` (nouveaux),
+  `LiveViewModel.kt`, `LiveState.kt`, `LiveScreen.kt`, `LivePrediction.kt`,
+  `LivePredictionTest.kt`, `Theme.kt`, `UiLogicTest.kt`, `ObjectLimits.kt`,
+  `ObjectLimitsTest.kt`, `LivePrompts.kt`, `docs/LIVE-SPEC.md`, `docs/ARCHITECTURE.md`.
+
 ## 2026-10-29 — lunettes : la session attend le lien au lieu de refuser une paire appairée
 
 - **Panne vue à l'écran** : « SDK : prêt », « Enregistrement : enregistrée », mais
