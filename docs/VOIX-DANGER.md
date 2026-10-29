@@ -247,34 +247,38 @@ Verrouillé par `GuidanceTest` (18), `GuidanceAnnouncerTest` (12),
 
 Le user marche avec l'app : pas assez d'infos par seconde, il en veut 5
 minimum — et le contournement chiffré du § 9 (remplacé, gardé pour mémoire)
-est trop lent à dire. Nouveau contrat : la voix du guidage ne dit que quatre
-mots (`left`, `straight`, `right`, `stop`), un mot par changement de
-consigne, **en moins de 100 ms** (décision → premier son).
+est trop lent à dire. Nouveau contrat : la voix du guidage ne dit qu'un mot
+par changement de consigne, **en moins de 100 ms** (décision → premier son) —
+voix TwinLite quand c'est bouché, mots SAM sur voie libre (§ 12).
 
-- **mots** : `GuidanceWord` (core pur) — voie libre ⇒ cap, bouché ⇒ côté de
-  sortie, contact mesuré (≤ 0,6 m) ⇒ stop, décalage et retour trottoir ⇒
-  côté ; sans mesure, le mot reste le côté (on ne juge pas le contact sans
+- **mots** : `GuidanceWord` + `TwinLiteWord` (core pur) — voie libre ⇒ cap
+  SAM, bouché ⇒ côté de sortie TwinLite, contact mesuré (≤ 0,6 m) ⇒
+  « obstacle, arrêtez-vous. », décalage et retour trottoir ⇒ côté SAM ;
+  sans mesure, le mot reste le côté (on ne juge pas le contact sans
   distance). FR/EN, langue de la voix ;
 - **déclenchement** : mot nouveau ⇒ dit aussitôt, dès la 1re frame, sans
   délai ni stabilité (`GuidanceAnnouncer`, `firstSight` + urgent partout) ;
   même mot ⇒ silence (scène stable = pas de bégaiement). À 5 ips, un
   changement peut se dire à chaque frame ;
-- **< 100 ms** : clips pré-synthétisés `guide_*` (8 MP3 voix Laure,
-  `tools/voicepack-catalog.json`, gardés par `tools/check-voicepack.py`),
-  joués depuis le disque (`VoicePack` + `SpeechPlayer.playFile`, zéro
-  réseau) ; voix non-Laure ⇒ synthèse mise en cache à la première
-  occurrence (`ProximityVoice.speakWord`) ;
-- **voix unique** : TwinLiteNet est viré (SAM seul), les annonces de
-  positions gardent la synthèse réseau (vocabulaire infini), les alertes
-  trottoir/escaliers et la traversée (« Stop, mur ») sont inchangées.
+- **< 100 ms** : clips pré-synthétisés `guide_*` + `tl_*` (16 MP3 voix
+  Laure, `tools/voicepack-catalog.json`, gardés par
+  `tools/check-voicepack.py`), joués depuis le disque (`VoicePack` +
+  `SpeechPlayer.playFile`, zéro réseau) ; voix non-Laure ⇒ synthèse mise en
+  cache à la première occurrence (`ProximityVoice.speakWord`) ;
+- **voix unique** : un seul parle à la fois (arbitrage § 12, jamais de
+  doublon), les annonces de positions gardent la synthèse réseau
+  (vocabulaire infini), les alertes trottoir/escaliers et la traversée
+  (« Stop, mur ») sont inchangées.
 
 Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.
 
-Verrouillé par `GuidanceTest` (18), `GuidanceWordTest` (5),
-`GuidanceAnnouncerTest` (15), `LiveProbeGuidanceTest` (4, mots urgents +
-positions non urgentes), `ProbeWiringSpokenTest` (3) et
-`ProximityVoiceWordTest` (3 : clip sans synthèse, synthèse mise en cache,
-mot unique).
+Verrouillé par `GuidanceTest` (18), `GuidanceWordTest` (6, dont
+seul-stop-coupe), `TwinLiteWordTest` (9, dont stop-coupe FR/EN),
+`GuidanceAnnouncerTest` (18, dont l'arbitrage),
+`LiveProbeGuidanceTest` (5, mots doux + positions non urgents, stop interne
+TwinLite au contact mesuré = urgent), `ProbeWiringSpokenTest` (3, mot doux
+muet chat en lecture) et `ProximityVoiceWordTest` (4 : clip sans synthèse,
+synthèse mise en cache, mot unique, urgence externe coupe le chat en clip).
 
 ## 11. Guidage doux + « Attention à … », stop seul urgent (ordre user du 29/10)
 
@@ -284,21 +288,44 @@ qui remplace l'urgence du § 10 (gardée pour mémoire) :
 
 - **mots doux** : gauche/tout droit/droite ne coupent plus rien — dits aussitôt
   dès la 1re frame (clips < 100 ms inchangés), ils attendent le silence quand
-  le chat lit (`LiveProbeState.spokenUrgent` = `GuidanceWord.isStopPhrase`) ;
+  le chat lit (`LiveProbeState.spokenUrgent` = `GuidanceWord.isStopPhrase`,
+  + `TwinLiteWord.isStopPhrase` depuis § 12) ;
 - **« Attention à … »** : trottoir (« Attention à la marche. », ex-« levez la
   jambe »), escaliers (« Escalier montant. », inchangé) et mobilier suivi
   (« Attention à la barrière. », `HazardConcepts` : barrière, poteau, borne,
   clôture, portail — FR/EN, 3 m, 2 frames, 10 s de silence) parlent en douceur
   (`urgent = false`, synthèse réseau, jamais de coupure) ;
-- **stop gardé en attendant** : le stop interne (contact mesuré ≤ 0,6 m) reste
-  le seul urgent (coupe tout, chat compris) jusqu'au branchement du modèle
-  externe — même mot « Stop. », pas de conflit (`docs/URGENCE-EXTERNE.md`).
+- **stop gardé en attendant** : le stop interne (contact mesuré ≤ 0,6 m,
+  « obstacle, arrêtez-vous. » TwinLite depuis § 12) reste le seul urgent
+  (coupe tout, chat compris) jusqu'au branchement du modèle externe —
+  « Stop. » SAM pour l'urgence externe, pas de conflit
+  (`docs/URGENCE-EXTERNE.md`).
 
-Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md` (§ 4 : seul Stop coupe).
+Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md` (§ 4 : seul le stop coupe).
 
 Verrouillé par `GuidanceWordTest` (6, dont seul-stop-coupe),
 `HazardConceptsTest` (5), `HazardWatchTest` (8), `LiveProbeGuidanceTest` (5,
-mots doux + positions non urgents, stop interne au contact mesuré = urgent),
-`ProbeWiringSpokenTest` (3, mot doux muet chat en lecture),
+mots doux + positions non urgents, stop interne TwinLite au contact mesuré
+= urgent), `ProbeWiringSpokenTest` (3, mot doux muet chat en lecture),
 `ProximityVoiceWordTest` (4, dont urgence externe coupe le chat en clip) et
 `ProbeHazardsTest` (3, reset trottoir + escaliers + mobilier).
+
+## 12. Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user du 29/10)
+
+Le guidage SAM seul (§ 8 : TwinLiteNet viré) parlait le côté de sortie et
+« Stop. » d'une seule voix. Nouvel ordre : **si obstacle → voix TwinLite,
+sinon → mots SAM** — un seul parle à la fois, jamais de doublon. Le guidage
+doux (§ 11) s'applique aux deux voix : seul le stop coupe.
+
+- **bouché** : `TwinLiteWord` — contact mesuré (≤ 0,6 m) ⇒ « obstacle,
+  arrêtez-vous. » / « obstacle, stop. » (seul urgent : `isStopPhrase`, coupe
+  tout), sinon côté de sortie TwinLite (« gauche. », « droite. »,
+  « tout droit. », doux). Textes et clips `tl_*` restaurés du chemin
+  voix-obstacle viré (`d13ac26a`, PR #306 : `TwinLiteText` +
+  `TwinLiteVoice.idFor` lus dans `7d133f3f`) — sans la segmentation
+  (ni LiteRT, ni masque : la décision bouché/libre reste 100 % SAM) ;
+- **libre** : `GuidanceWord` inchangé (cap, décalage, retour trottoir, doux) ;
+- **arbitre** : `GuidanceAnnouncer` (une seule porte `AnnouncementGate`,
+  clés `tl|*` séparées des `w|*`) — scène stable = silence des deux côtés ;
+  le câblage (`ProbeWiring.observeSpoken`) route les phrases TwinLite vers
+  `speakWord` (clips < 100 ms) comme les mots SAM.
