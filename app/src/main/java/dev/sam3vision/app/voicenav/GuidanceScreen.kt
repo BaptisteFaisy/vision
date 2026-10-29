@@ -11,7 +11,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +22,7 @@ import dev.sam3vision.core.nav.MapBounds
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.nav.progressOf
+import dev.sam3vision.core.settings.Settings
 
 /**
  * Guidage actif : prochaine instruction en très gros, distance avant la
@@ -31,15 +31,18 @@ import dev.sam3vision.core.nav.progressOf
  *
  * Les valeurs viennent du moteur d'itinéraire via
  * [VoiceNavViewModel.onGuidanceUpdate] — cet écran n'en calcule aucune, il
- * ne fait qu'afficher. [onVoiceEntry] redonne la main à la dictée existante
- * (« arrête le guidage » y est consommé comme ordre stop). La mini-carte
- * n'apparaît que si [navSnapshot] et [fetchSignals] sont fournis.
+ * ne fait qu'afficher. Tout l'écran est faisable à la voix
+ * ([VoiceNavHoldButton], même moteur que l'accueil iSee) : ordre stop
+ * (« arrête le guidage ») ou nouvelle destination — sans retour. La
+ * mini-carte n'apparaît que si [navSnapshot] et [fetchSignals] sont fournis.
  */
 @Composable
 fun GuidanceScreen(
     state: VoiceNavUiState.Guiding,
     onStop: () -> Unit,
-    onVoiceEntry: () -> Unit,
+    hold: VoiceNavHold,
+    settings: Settings,
+    onHoldTranscript: suspend (String) -> Boolean,
     navSnapshot: (() -> Pair<NavRoute?, NavFix?>)? = null,
     fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)? = null,
 ) {
@@ -56,19 +59,7 @@ fun GuidanceScreen(
             fontWeight = FontWeight.Bold,
             lineHeight = 38.sp,
         )
-        if (state.summary == null && !state.update.arrived) {
-            // Résumé inconnu (chargeur en échec, moteur parti quand même) :
-            // « calcul en cours », jamais des zéros (« Dans 0 m »).
-            Text("Calcul de l'itinéraire…", color = AppColors.textMuted, fontSize = 20.sp)
-        } else {
-            Text(
-                state.update.maneuverFr(),
-                color = AppColors.primary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
-        }
+        GuidanceSummary(state)
         if (navSnapshot != null && fetchSignals != null) {
             // Petite carte : où le guidage m'emmène (tracé + feux).
             MiniRouteMap(navSnapshot, fetchSignals, Modifier.fillMaxWidth().height(170.dp))
@@ -82,7 +73,29 @@ fun GuidanceScreen(
         ) {
             Text("Arrêter", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
-        VoiceStopButton(onVoiceEntry)
+        VoiceNavHoldButton(
+            hold = hold,
+            settings = settings,
+            onTranscript = onHoldTranscript,
+            hint = VoiceNavHoldText.GUIDING_NOT_UNDERSTOOD,
+        )
+    }
+}
+
+/** Manœuvre + reste, ou « calcul en cours » (jamais des zéros). */
+@Composable
+private fun GuidanceSummary(state: VoiceNavUiState.Guiding) {
+    if (state.summary == null && !state.update.arrived) {
+        // Résumé inconnu (chargeur en échec, moteur parti quand même).
+        Text("Calcul de l'itinéraire…", color = AppColors.textMuted, fontSize = 20.sp)
+    } else {
+        Text(
+            state.update.maneuverFr(),
+            color = AppColors.primary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
     }
 }
 
@@ -100,10 +113,3 @@ private fun GuidanceProgress(state: VoiceNavUiState.Guiding) {
     )
 }
 
-/** « Dicter (“arrête le guidage”) » : retour à la dictée existante. */
-@Composable
-private fun VoiceStopButton(onVoiceEntry: () -> Unit) {
-    TextButton(onClick = onVoiceEntry, modifier = Modifier.fillMaxWidth()) {
-        Text("Dicter (« arrête le guidage »)", fontSize = 18.sp, color = AppColors.primary)
-    }
-}

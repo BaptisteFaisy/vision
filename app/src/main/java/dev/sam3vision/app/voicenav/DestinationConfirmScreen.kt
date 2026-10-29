@@ -12,7 +12,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,16 +20,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.core.nav.RouteSummary
+import dev.sam3vision.core.settings.Settings
 
 /**
  * Confirmation de destination : adresse entendue + résumé d'itinéraire
- * (distance · durée), boutons « Démarrer » / « Annuler » / dictée.
+ * (distance · durée), boutons « Démarrer » / « Annuler » / micro sur place.
  *
  * Gros texte malvoyant (thème sombre [AppColors]) : la question parlée est
- * posée à l'ouverture (« Do you really want to go to X? … », réponse vocale
- * « yes »/« no »), l'écran sert de contrôle visuel avant le départ.
- * [onVoiceEntry] redonne la main à la
- * dictée existante (l'intégrateur déclenche le pipeline habituel).
+ * posée à l'ouverture (« Do you really want to go to X? … »), et tout l'écran
+ * est faisable à la voix ([VoiceNavHoldButton], même moteur que l'accueil
+ * iSee) : « yes »/« no », nouvelle destination, ordre stop — sans retour.
  * [onSubmitText] reçoit le texte saisi au clavier ([DestinationTextField],
  * câblé par l'intégrateur vers `submitTypedDestination`) ; défaut vide =
  * champ inopérant, l'appelant historique compile inchangé.
@@ -40,7 +39,9 @@ fun DestinationConfirmScreen(
     state: VoiceNavUiState.Confirming,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    onVoiceEntry: () -> Unit,
+    hold: VoiceNavHold,
+    settings: Settings,
+    onHoldTranscript: suspend (String) -> Boolean,
     onSubmitText: (String) -> Unit = {},
 ) {
     Column(
@@ -68,7 +69,12 @@ fun DestinationConfirmScreen(
         OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().height(56.dp)) {
             Text("Annuler", fontSize = 20.sp)
         }
-        RedictateButton(onVoiceEntry)
+        VoiceNavHoldButton(
+            hold = hold,
+            settings = settings,
+            onTranscript = onHoldTranscript,
+            hint = VoiceNavHoldText.CONFIRM_NOT_UNDERSTOOD,
+        )
         DestinationTextField(onSubmitText)
     }
 }
@@ -112,10 +118,3 @@ private fun LoadingRow() {
     }
 }
 
-/** « Dicter une autre destination » : retour à la dictée existante. */
-@Composable
-private fun RedictateButton(onVoiceEntry: () -> Unit) {
-    TextButton(onClick = onVoiceEntry, modifier = Modifier.fillMaxWidth()) {
-        Text("Dicter une autre destination", fontSize = 18.sp, color = AppColors.primary)
-    }
-}

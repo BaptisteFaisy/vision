@@ -13,7 +13,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.isee.IseeViewModel
+import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.net.HttpSignalsClient
+import dev.sam3vision.core.settings.Settings
 
 /**
  * Écran navigation de la pile : guidage direct (ou confirmation si la
@@ -21,17 +23,18 @@ import dev.sam3vision.core.net.HttpSignalsClient
  * deux visages.
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
- * - dictée (« redicter », « arrête le guidage ») : retour à l'accueil iSee,
- *   où l'appui long habituel reprend (la session reste ouverte, l'ordre y
- *   est consommé et l'écran se rouvre) ;
+ * - dictée sur place ([VoiceNavHoldButton], même moteur que l'accueil iSee) :
+ *   « oui »/« non »/destination sur la confirmation, destination ou ordre
+ *   stop en guidage — tout l'écran est faisable à la voix, sans retour ;
  * - quitter l'écran (retour) = arrêter : pas de guidage invisible — le repos
  *   de session coupe le moteur ([IseeViewModel.dismissVoiceNav]) ;
  * - mise en fond (home, verrouillage) en guidage = maintien via le service
  *   W1 ([GuidanceLifecycle]) ; au retour, l'écran reprend sur l'état intact.
  */
 @Composable
-fun VoiceNavRoute(isee: IseeViewModel, onClose: () -> Unit) {
+fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
     val nav = remember { VoiceNavViewModel(isee.voiceNav()) }
+    val hold = remember { VoiceNavHold(engine = ::speechClient) }
     val state by nav.state.collectAsState()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -59,10 +62,19 @@ fun VoiceNavRoute(isee: IseeViewModel, onClose: () -> Unit) {
             state = current,
             onConfirm = nav::confirmDestination,
             onCancel = nav::cancelConfirmation,
-            onVoiceEntry = onClose,
+            hold = hold,
+            settings = settings,
+            onHoldTranscript = { nav.session().onVoiceTranscript(it) },
             // W3 : ajouter `onSubmitText = nav::submitTypedDestination` à son merge.
         )
-        is VoiceNavUiState.Guiding -> GuidingRoute(isee, current, nav::stopGuidance, onClose)
+        is VoiceNavUiState.Guiding -> GuidingRoute(
+            isee = isee,
+            state = current,
+            onStop = nav::stopGuidance,
+            hold = hold,
+            settings = settings,
+            onHoldTranscript = { nav.session().onVoiceTranscript(it) },
+        )
         // W5 : ajouter `is VoiceNavUiState.Arrived -> ArrivedScreen(...)` à son merge.
     }
 }
@@ -76,13 +88,17 @@ private fun GuidingRoute(
     isee: IseeViewModel,
     state: VoiceNavUiState.Guiding,
     onStop: () -> Unit,
-    onVoiceEntry: () -> Unit,
+    hold: VoiceNavHold,
+    settings: Settings,
+    onHoldTranscript: suspend (String) -> Boolean,
 ) {
     val signalsClient = remember { HttpSignalsClient(isee::routeBaseUrl) }
     GuidanceScreen(
         state = state,
         onStop = onStop,
-        onVoiceEntry = onVoiceEntry,
+        hold = hold,
+        settings = settings,
+        onHoldTranscript = onHoldTranscript,
         navSnapshot = isee::debugNavSnapshot,
         fetchSignals = { bounds ->
             if (isee.routeBaseUrl().isBlank()) {
