@@ -37,6 +37,9 @@ class VoiceNavSpeakerTest {
 
     private var now = 0L
 
+    /** Le user parle-t-il ? Muté par les tests de priorité. */
+    private var userSpeaking = false
+
     private fun speaker(
         driver: FakeSpeakerDriver = FakeSpeakerDriver(),
         settings: Settings = Settings.Default.copy(speechLanguage = SpeechLanguage.Fr),
@@ -44,6 +47,7 @@ class VoiceNavSpeakerTest {
         engine = SystemTtsEngine(driver),
         settings = { settings },
         clock = { now },
+        userSpeaking = { userSpeaking },
     )
 
     @Test
@@ -126,6 +130,68 @@ class VoiceNavSpeakerTest {
 
         assertNull(speaker(driver).onStarted("   "))
         assertTrue(driver.calls.isEmpty())
+    }
+
+    @Test
+    fun `user parle - les non urgings se taisent`() {
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        userSpeaking = true
+
+        assertNull(voice.onTurn(SteeringCap.Left, 100f))
+        assertNull(voice.onLiteral("Au giratoire, prenez la deuxième sortie."))
+        assertNull(voice.onBackOnRoute())
+        assertTrue(driver.calls.isEmpty())
+    }
+
+    @Test
+    fun `user parle - les urgences coupent et passent quand meme`() {
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        userSpeaking = true
+        voice.onTurn(SteeringCap.Left, 100f)
+
+        // Hors-trace : urgence, la voix IA a le droit de couvrir le user.
+        // (La consigne gardée sous le user n'a jamais atteint le moteur.)
+        assertEquals("Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", voice.onOffRoute())
+        assertEquals(1, driver.calls.size)
+        assertTrue(driver.calls[0].flush)
+
+        // Recalcul : urgence aussi.
+        assertEquals("Nouvel itinéraire calculé.", voice.onRerouted())
+        assertEquals(2, driver.calls.size)
+
+        // Arrivée : urgence.
+        assertEquals("Vous êtes arrivé à la gare de Lyon.", voice.onArrival("la gare de Lyon"))
+        assertEquals(3, driver.calls.size)
+    }
+
+    @Test
+    fun `user se tait - la voix IA reprend`() {
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        userSpeaking = true
+        voice.onTurn(SteeringCap.Left, 100f)
+        assertTrue(driver.calls.isEmpty())
+
+        userSpeaking = false
+
+        // La consigne retenue par la porte repart telle quelle : le silence
+        // n'a pas marqué la phrase comme dite.
+        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Left, 100f))
+        assertEquals(1, driver.calls.size)
+    }
+
+    @Test
+    fun `user parle - le danger obstacle passe quand meme`() {
+        // La sonde obstacle est déjà urgent par nature (coupe, flush).
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        userSpeaking = true
+
+        assertEquals("Va à gauche, 2 mètres.", voice.onHazard("Va à gauche, 2 mètres."))
+        assertEquals(1, driver.calls.size)
+        assertTrue(driver.calls[0].flush)
     }
 
     @Test

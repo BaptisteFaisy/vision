@@ -41,6 +41,9 @@ private class FakeLauncher(var fail: Boolean = false) : NavigationLauncher {
 class VoiceNavSessionTest {
 
     private val spoken = mutableListOf<String>()
+
+    /** Horodatage des ordres « désactive / active le GPS » (persistance). */
+    private val gpsFlags = mutableListOf<Boolean>()
     private val summary = RouteSummary("la gare", "Place Louis-Armand, Paris", 2450, 900)
     private val questionGare =
         "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no."
@@ -63,6 +66,8 @@ class VoiceNavSessionTest {
         router = NavigationRouter(),
         engineStart = engine,
         autoStartOnVoice = autoStart,
+        onGpsDisabled = { gpsFlags += false },
+        onGpsEnabled = { gpsFlags += true },
     )
 
     @Test
@@ -415,6 +420,55 @@ class VoiceNavSessionTest {
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
+    }
+
+    @Test
+    fun `ordre desactive gps ferme tout et persiste`() = runBlocking {
+        val session = session()
+        session.onVoiceTranscript("va à la gare")
+        session.confirmDestination()
+        spoken.clear()
+
+        assertTrue(session.onVoiceTranscript("désactive le GPS"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(false), gpsFlags)
+        assertEquals(listOf("GPS désactivé"), spoken)
+
+        // Même sans session ouverte : l'ordre demeure celui de la fonction.
+        assertTrue(session.onVoiceTranscript("coupe le gps"))
+        assertEquals(listOf(false, false), gpsFlags)
+    }
+
+    @Test
+    fun `ordre active gps rallume sans lancer de guidage`() = runBlocking {
+        val session = session()
+
+        assertTrue(session.onVoiceTranscript("active le GPS"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(true), gpsFlags)
+        assertEquals(listOf("GPS activé"), spoken)
+    }
+
+    @Test
+    fun `ordres gps hors reconnus lisibles a travers la session`() = runBlocking {
+        val session = session()
+
+        // Accents et casse sans importance, objet « guidage / navigation » accepté.
+        assertTrue(session.onVoiceTranscript("DÉSACTIVE LE GUIDAGE"))
+        assertTrue(session.onVoiceTranscript("réactive la navigation"))
+
+        assertEquals(listOf(false, true), gpsFlags)
+    }
+
+    @Test
+    fun `question parlée sans ordre GPS pas confondue`() = runBlocking {
+        val session = session()
+
+        assertFalse(session.onVoiceTranscript("où est le GPS le plus proche ?"))
+        assertTrue(gpsFlags.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test

@@ -90,6 +90,14 @@ class VoiceNavAnnouncer(
     suspend fun announceStopped(): Result<Unit> =
         said { speak(settings(), VoiceNavPhrases.STOP_DONE) }
 
+    /** Accusé « GPS désactivé » (ordre honoré). Ne lève jamais. */
+    suspend fun announceDisabled(): Result<Unit> =
+        said { speak(settings(), VoiceNavPhrases.GPS_DISABLED) }
+
+    /** Accusé « GPS activé » (ordre honoré). Ne lève jamais. */
+    suspend fun announceEnabled(): Result<Unit> =
+        said { speak(settings(), VoiceNavPhrases.GPS_ENABLED) }
+
     /** Annonce « Arrivée à destination ». Ne lève jamais. */
     suspend fun announceArrived(): Result<Unit> =
         said { speak(settings(), VoiceNavPhrases.ARRIVED) }

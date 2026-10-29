@@ -16,6 +16,8 @@ import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
+import dev.sam3vision.core.nav.GuidanceOrder
+import dev.sam3vision.core.nav.StopGuidanceParser
 import dev.sam3vision.core.nav.BanGeocoder
 import dev.sam3vision.core.nav.GeocodeChain
 import dev.sam3vision.core.nav.GuidanceUpdate
@@ -54,6 +56,10 @@ class IseeVoiceNav(
     private val stopRoute: () -> Unit = {},
     /** Cap route poussé à la sonde (`null` = fin, retour au cap manuel). */
     private val onRouteCap: (SteeringCap?) -> Unit = {},
+    /** L'utilisateur parle (dictée) : la voix ordinaire du guidage se tait. */
+    private val userSpeaking: () -> Boolean = { false },
+    /** Ordre « désactive / active le GPS » : persiste le réglage guidage. */
+    private val setGuidance: (Boolean) -> Unit = {},
 ) {
 
     private val context = app.applicationContext
@@ -74,9 +80,13 @@ class IseeVoiceNav(
             speakRoute = speakRoute,
             stopRoute = stopRoute,
             onRouteCap = onRouteCap,
+            userSpeaking = userSpeaking,
         )
     }
     private val driver: VoiceNavEngineDriver by driverLazy
+
+    /** Porte de la voix ambiante (annonces, voix du sol) : GPS désactivé = fermée. */
+    val voiceGate = IseeVoiceGate()
 
     /** Session de navigation (entrée vocale, confirmation, guidage). */
     val session: VoiceNavSession by lazy {
@@ -94,10 +104,51 @@ class IseeVoiceNav(
             extraParsers = listOf(VoiceDestinationParser::parse),
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
+            // Ordres « désactive / active le GPS » : la porte de voix suit.
+            onGpsDisabled = {
+                voiceGate.muteGps()
+                setGuidance(false)
+            },
+            onGpsEnabled = {
+                voiceGate.unmuteGps()
+                setGuidance(true)
+            },
             // Pas de départ surprise : la destination dictée ouvre l'écran de
             // confirmation (question vocale + bouton Démarrer) — le guidage
             // ne démarre qu'après un objectif explicite (autoStartOnVoice=false).
         )
+    }
+
+    /**
+     * Ordre GPS dicté (« arrête / désactive / active le GPS ») : routé tel
+     * quel à la session, sans exiger l'URL Valhalla — l'ordre est honoré
+     * même en guidage Maps. `true` si le transcript était un ordre (consommé).
+     */
+    suspend fun runOrder(text: String): Boolean {
+        val outcome = runCatching { StopGuidanceParser.parse(text) }.getOrDefault(GuidanceOrder.NONE)
+        if (outcome == GuidanceOrder.NONE) return false
+        return session.onVoiceTranscript(text)
+    }
+
+    /** L'utilisateur prend la parole : la voix du guidage en cours se tait. */
+    fun stopVoice() {
+        if (driverLazy.isInitialized()) runCatching { driver.stopVoice() }
+    }
+
+    /** Réglages « guidage GPS » rallumés hors ordre : la porte se rouvre. */
+    fun resumeGps() {
+        if (voiceGate.ambientAllowed()) return
+        runCatching { if (settings().navigationGuidanceEnabled) voiceGate.unmuteGps() }
+    }
+
+    /**
+     * Synchronise la porte avec les réglages persistés (au chargement de
+     * session) : guidage désactivé (par ordre vocal, réglages ou relance)
+     * → la porte reste fermée même après un redémarrage — la voix ambiante
+     * ne reparle qu'au retour de l'utilisateur (question, photo, caméra).
+     */
+    fun syncGate() {
+        if (settings().navigationGuidanceEnabled) voiceGate.unmuteGps() else voiceGate.muteGps()
     }
 
     /** État de la navigation vocale (repos, confirmation, guidage, carte). */
