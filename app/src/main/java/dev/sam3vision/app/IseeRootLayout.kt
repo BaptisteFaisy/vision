@@ -2,6 +2,7 @@ package dev.sam3vision.app
 
 import android.content.Context
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -38,6 +39,13 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */
     var gesturesEnabled: () -> Boolean = { true }
+
+    /**
+     * Zone tactile du bouton Picto, en coordonnées fenêtre (`null` = pas affiché) :
+     * un DOWN dedans descend aux enfants au lieu d'être intercepté (voir
+     * [onInterceptTouchEvent]). Posée par le chip lui-même, lue à chaque DOWN.
+     */
+    var pictoZone: (() -> RectF?)? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private var capturing = false
@@ -83,7 +91,21 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      * (mesuré sur le téléphone). Hors iSee, rien n'est intercepté : Réglages garde ses
      * boutons.
      */
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = gesturesEnabled()
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        // Le bouton Picto est le seul contrôle tactile d'iSee : un DOWN dans sa
+        // zone descend au chip — sinon le tap togglerait la vidéo au lieu de
+        // générer (vu sur le téléphone). Sans zone, interception inchangée.
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && inPictoZone(ev)) return false
+        return gesturesEnabled()
+    }
+
+    /** Vrai si le DOWN tombe dans la zone du chip (coordonnées fenêtre des deux côtés). */
+    private fun inPictoZone(ev: MotionEvent): Boolean {
+        val zone = pictoZone?.invoke() ?: return false
+        val at = IntArray(2)
+        getLocationInWindow(at)
+        return zone.contains(ev.x + at[0], ev.y + at[1])
+    }
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (!gesturesEnabled()) return super.onTouchEvent(ev)

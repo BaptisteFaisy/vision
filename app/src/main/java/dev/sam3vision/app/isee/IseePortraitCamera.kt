@@ -76,7 +76,12 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         }
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         if (state.recordingVideo && !showGlasses) {
-            PictoChip(state.picto, Modifier.align(Alignment.BottomEnd)) { viewModel.picto.onPictoButton() }
+            PictoChip(
+                state.picto,
+                Modifier.align(Alignment.BottomEnd),
+                onPicto = { viewModel.picto.onPictoButton() },
+                onBounds = viewModel.picto::setChipBounds,
+            )
         }
         ProbeNoticeCard(probe)
         PictureFade(Modifier.fillMaxSize())

@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee.vm
 
+import android.graphics.RectF
 import android.os.SystemClock
 import dev.sam3vision.app.isee.PictoStore
 import dev.sam3vision.app.isee.StoredPicto
@@ -76,6 +77,9 @@ class IseePicto(
     @Volatile
     private var lastMatchAt = 0L
 
+    @Volatile
+    private var chipBounds: RectF? = null
+
     /** Charge les repères validés (ouverture de l'écran) et arme la détection. */
     fun refresh() {
         scope.launch(io) { load() }
@@ -86,6 +90,14 @@ class IseePicto(
 
     /** PNG d'un repère pour l'overlay, `null` si inconnu. */
     fun pngOf(id: String): ByteArray? = pictos.firstOrNull { it.id == id }?.png
+
+    /** Zone tactile du chip, en coordonnées fenêtre, `null` quand il n'est pas affiché. */
+    fun chipZone(): RectF? = chipBounds
+
+    /** Le chip se place / se retire : la racine exempte sa zone de l'interception. */
+    fun setChipBounds(bounds: RectF?) {
+        chipBounds = bounds
+    }
 
     /**
      * Bouton « Picto » de la carte : photo de l'objet filmé, puis pictogramme.
