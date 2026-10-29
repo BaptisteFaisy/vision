@@ -40,6 +40,12 @@ import dev.sam3vision.core.glasses.CaptureAction
 const val EXTRA_ROUTE = "route"
 
 /**
+ * Extra adb `--es destination <texte>` (debug seul) : démarre un guidage vers
+ * la destination, comme une dictée « aller à … » confirmée (recette carte).
+ */
+const val EXTRA_DESTINATION = "destination"
+
+/**
  * Demande d'écran posée de l'extérieur : `MainActivity` y dépose le nom,
  * `AppNav` la consomme et pousse la route (inconnue = accueil, jamais vide).
  */

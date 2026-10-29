@@ -125,10 +125,11 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Trois entrées par `Intent` : les callbacks de l'app Meta AI (enregistrement,
+     * Quatre entrées par `Intent` : les callbacks de l'app Meta AI (enregistrement,
      * invocation vocale) vont au SDK ; `--ez mock` / `--ez analyze` ouvrent le banc
-     * d'essai ; `--es route <nom>` ouvre l'écran nommé. Ni le banc ni les écrans
-     * n'étant des `Activity`, c'est la seule façon de les lancer depuis adb.
+     * d'essai ; `--es route <nom>` ouvre l'écran nommé ; `--es destination <texte>`
+     * (debug seul) démarre un guidage. Ni le banc ni les écrans n'étant des
+     * `Activity`, c'est la seule façon de les lancer depuis adb.
      */
     private fun routeIntent(intent: Intent) {
         glasses.handleIntent(intent)
@@ -147,6 +148,11 @@ class MainActivity : ComponentActivity() {
         }
         // Recette adb générique : `--es route <nom>` ouvre l'écran nommé.
         intent.getStringExtra(EXTRA_ROUTE)?.let { RouteRequest.push(it) }
+        // Recette guidage (debug seul) : `--es destination <texte>` démarre un
+        // guidage vers la destination, sans passer par la dictée vocale.
+        if (BuildConfig.DEBUG) {
+            intent.getStringExtra(EXTRA_DESTINATION)?.let { isee.debugNavTo(it) }
+        }
     }
 
     /**
