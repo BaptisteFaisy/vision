@@ -14,6 +14,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -23,11 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.app.guidemap.GuidanceMapView
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.MapBounds
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.fit
 import dev.sam3vision.core.nav.mapBoundsAround
+import dev.sam3vision.core.nav.mapModeMapStateOf
 import dev.sam3vision.core.settings.Settings
 import java.util.Locale
 
@@ -42,9 +48,10 @@ private val MapPosition = Color(0xFF2F6FED)
 private val MapAccuracy = Color(0xFF2F6FED).copy(alpha = 0.18f)
 
 /**
- * Mode navigation sans destination : la carte plein écran, la position GPS
- * et les passages piétons connus, plus le micro (même appui long que les
- * autres écrans) pour dicter « va à … » ou « quitte la carte ».
+ * Mode navigation sans destination : la carte OSM plein écran (tuiles MapLibre,
+ * repli schéma si elles échouent), la position GPS et les feux connus, plus le
+ * micro (même appui long que les autres écrans) pour dicter « va à … » ou
+ * « quitte la carte ».
  *
  * L'écran n'invente rien : [fix] vient de [MapPositionWatcher], [signals] de
  * `/signals` (même base que l'itinéraire), et [onLeave] de la session. Sans
@@ -75,7 +82,7 @@ fun MapModeScreen(
             ui = micUi,
             modifier = Modifier.weight(1f),
         ) {
-            MapCanvas(fix = fix, signals = signals, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)))
+            MapPanel(fix = fix, signals = signals, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)))
         }
         Text(
             positionLine(fix, gpsAvailable),
@@ -116,11 +123,17 @@ internal fun positionLine(fix: NavFix?, gpsAvailable: Boolean): String = when {
 private fun formatCoord(value: Double): String =
     String.format(Locale.FRANCE, "%.5f", value)
 
-/** Fond de carte : passages piétons, cercle de précision, point de position. */
+/** Fond de carte OSM (tuiles), repli schéma quand les tuiles échouent. */
 @Composable
-private fun MapCanvas(fix: NavFix?, signals: List<RoutePoint>, modifier: Modifier) {
+private fun MapPanel(fix: NavFix?, signals: List<RoutePoint>, modifier: Modifier) {
+    var tilesOk by remember { mutableStateOf(true) }
+    val state = remember(fix, signals) { mapModeMapStateOf(fix, signals) }
     Box(modifier.background(AppColors.surfaceHigh)) {
-        Canvas(Modifier.fillMaxSize()) { drawMap(viewBoundsOf(fix), fix, signals) }
+        if (tilesOk) {
+            GuidanceMapView(state, Modifier.fillMaxSize(), onTilesError = { tilesOk = false })
+        } else {
+            Canvas(Modifier.fillMaxSize()) { drawMap(viewBoundsOf(fix), fix, signals) }
+        }
     }
 }
 

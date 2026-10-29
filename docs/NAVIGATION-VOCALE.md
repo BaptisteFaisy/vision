@@ -73,6 +73,9 @@ passages piétons connus autour, et le micro (appui long) pour enchaîner.
   annonce de guidage).
 - **Depuis la carte** : une destination dictée (« emmène-moi à X ») ouvre la
   confirmation comme depuis l'accueil — le mode n'est qu'un point de départ.
+- **Fond de carte** : le fond OSM MapLibre du guidage (`GuidanceMapView`,
+  `docs/CARTE-OSM.md` §4 bis), caméra au zoom rue sur la position ; tuiles en
+  échec → repli schéma (même contrat que le guidage, §3 de ce document-là).
 - **Position** : `MapPositionWatcher` (GPS + réseau, 2 s, `LocationManager`
   sans Play Services) — distinct du pilote d'itinéraire, qui n'a rien à
   démarrer sans destination. Sans permission : « Position indisponible —
