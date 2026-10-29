@@ -18,10 +18,16 @@ SIGNALS_MARGIN_DEG = 0.001
 SIGNALS_CACHE_TTL_SECONDS = 24 * 3600
 SIGNALS_EMPTY_TTL_SECONDS = 300
 SIGNALS_MAX_NODES = 2000
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-OVERPASS_TIMEOUT_SECONDS = 10
+OVERPASS_TIMEOUT_SECONDS = 8
 # Overpass exige un User-Agent descriptif (406 sans lui, même avec curl).
 OVERPASS_USER_AGENT = "sam3-vision/1.0 (+https://github.com/BaptisteFaisy/vision)"
+# Miroirs essayés dans l'ordre (l'instance principale 502 de temps en temps).
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.nchc.org.tw/api/interpreter",
+]
 
 APP_NAME = "valhalla-idf-cpu"
 VOLUME_NAME = "valhalla-idf-tiles"
@@ -131,13 +137,19 @@ def _fetch_signals(s: float, w: float, n: float, e: float) -> list:
         "[out:json][timeout:10];"
         f'node["highway"="traffic_signals"]({box});out geom;'
     )
-    url = OVERPASS_URL + "?data=" + urllib.parse.quote(query)
-    request = urllib.request.Request(url, headers={"User-Agent": OVERPASS_USER_AGENT})
-    try:
-        with urllib.request.urlopen(request, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
-            payload = json.load(response)
-    except Exception as exc:
-        print(f"[signals] overpass indisponible : {exc}")
+    data = urllib.parse.quote(query)
+    payload = None
+    for base in OVERPASS_URLS:
+        request = urllib.request.Request(
+            base + "?data=" + data, headers={"User-Agent": OVERPASS_USER_AGENT}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
+                payload = json.load(response)
+            break
+        except Exception as exc:
+            print(f"[signals] {base} indisponible : {exc}")
+    if payload is None:
         return []
     points = []
     for element in payload.get("elements", [])[:SIGNALS_MAX_NODES]:
