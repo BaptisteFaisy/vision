@@ -35,14 +35,18 @@ object LivePrompts {
     )
 
     /**
-     * Preset extérieur : **8** concepts de cheminement urbain — la personne et
+     * Preset extérieur : **12** concepts de cheminement urbain — la personne et
      * le mobilier qui borde le trottoir (poteaux, bornes, clôtures, barrières,
-     * portails, panneaux, arbres). Bascule depuis la pastille « Extérieur » du
-     * direct, sans passer par le champ « Suivre ». Tient sous [MAX] comme
-     * [default], qui reste les 12 dangers (pastille « Rue »).
+     * portails, panneaux, arbres), plus les encombrants (poubelles, bennes),
+     * les animaux et le feu tricolore — ordre user du 29/10, détecté en
+     * permanence hors mode traversée pour anticiper les passages protégés.
+     * Bascule depuis la pastille « Extérieur » du direct, sans passer par le
+     * champ « Suivre ». Tient sous [MAX] comme [default], qui reste les
+     * 12 dangers (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
         "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
+        "trash can", "dumpster", "animal", "traffic light",
     )
 
     /**
