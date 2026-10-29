@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import android.graphics.BitmapFactory
+import android.graphics.RectF
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,10 +92,22 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
  * à côté du debug — même gabarit que les chips de la carte historique.
  */
 @Composable
-internal fun BoxScope.PictoChip(picto: PictoUiState, modifier: Modifier, onPicto: () -> Unit) {
+internal fun BoxScope.PictoChip(
+    picto: PictoUiState,
+    modifier: Modifier,
+    onPicto: () -> Unit,
+    onBounds: (RectF?) -> Unit,
+) {
     val dot = if (picto.armed > 0) PICTO_YELLOW else Color(0xFF808080)
+    // La racine intercepte tous les taps : le chip publie sa zone fenêtre pour
+    // en être exempté, et la retire en partant (sinon taps fantômes).
+    DisposableEffect(Unit) { onDispose { onBounds(null) } }
     Row(
         modifier
+            .onGloballyPositioned { coords ->
+                val r = coords.boundsInWindow()
+                onBounds(RectF(r.left, r.top, r.right, r.bottom))
+            }
             .padding(8.dp)
             .background(Color(0x99000000), RoundedCornerShape(8.dp))
             .clickable(onClick = onPicto)
