@@ -204,3 +204,29 @@ def test_timing(timing) -> None:
           timing.format_boot_cpu("total", 14800.0, 14800.0).startswith(
               timing.BOOT_CPU_PREFIX + " "),
           timing.format_boot_cpu("total", 14800.0, 14800.0))
+
+
+def test_max_objects_ceiling(segmentation) -> None:
+    """Plafond serveur à 32 : ``finalize`` coupe à 32, les meilleurs scores gardés."""
+    from test_units import check
+
+    check("MAX_OBJECTS = 32 (demande user 29/10)", segmentation.MAX_OBJECTS == 32,
+          str(segmentation.MAX_OBJECTS))
+    many = [{"label": f"objet{i}", "score": 1.0 - i / 100.0, "box": [0.0, 0.0, 8.0, 8.0],
+             "mask": None} for i in range(40)]
+    capped = segmentation.finalize(many, (8, 8), segmentation.MAX_OBJECTS, "none")
+    check("finalize: 40 entrées → 32 objets", len(capped["objects"]) == 32,
+          str(len(capped["objects"])))
+    check("finalize: les 32 meilleurs scores gardés",
+          [item["label"] for item in capped["objects"]] == [f"objet{i}" for i in range(32)])
+
+
+def test_live_clamp_ceiling(live_app) -> None:
+    """Knob ``max_objects`` : 32 passe, au-delà le plafond serveur s'applique, défaut 12."""
+    from test_units import check
+
+    cap = __import__("segmentation").MAX_OBJECTS
+    low, default = live_app.MAX_OBJECTS_MIN, live_app.MAX_OBJECTS_DEFAULT
+    check("_clamp: 32 passe (plafond serveur)", live_app._clamp(32, default, low, cap) == 32)
+    check("_clamp: au-delà → plafond serveur", live_app._clamp(99, default, low, cap) == cap)
+    check("défaut /live inchangé (12)", default == 12)

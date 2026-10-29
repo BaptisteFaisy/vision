@@ -29,7 +29,7 @@ DEFAULT_PROMPTS = (
 # Fallback concepts when the generic list finds nothing at all.
 FALLBACK_PROMPTS = ("object", "thing")
 MAX_PROMPTS = 16
-MAX_OBJECTS = 24
+MAX_OBJECTS = 32
 MAX_PROMPT_CHARS = 64
 SEG_MAX_EDGE = 1024
 SCORE_THRESHOLD = 0.35
