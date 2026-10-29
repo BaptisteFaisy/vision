@@ -33,6 +33,17 @@ internal fun BuildInfoBlock() {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
+        Text(
+            buildConfigSummary(
+                llm = BuildConfig.LLM_API_KEY.isNotBlank(),
+                voice = BuildConfig.TTS_API_KEY.isNotBlank(),
+                sam = BuildConfig.SAM_BASE_URL.isNotBlank() ||
+                    BuildConfig.SAM_US_BASE_URL.isNotBlank(),
+                asr = BuildConfig.ASR_API_KEY.isNotBlank(),
+            ),
+            color = SettingsLight.muted,
+            fontSize = 13.sp,
+        )
     }
 }
 
