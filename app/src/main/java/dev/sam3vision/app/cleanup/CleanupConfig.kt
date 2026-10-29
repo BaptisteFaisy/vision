@@ -19,7 +19,6 @@ data class CleanupConfig(
     val deleteVideos: Boolean = DELETE_VIDEOS,
     val maxAgeMinutes: Long = MAX_AGE_MINUTES,
     val inProgressGraceSeconds: Long = IN_PROGRESS_GRACE_SECONDS,
-    val addToGallery: Boolean = ADD_TO_GALLERY,
 ) {
     companion object {
         const val PERIOD_HOURS = 1
@@ -27,9 +26,6 @@ data class CleanupConfig(
         const val DELETE_VIDEOS = true
         const val MAX_AGE_MINUTES = 0L
         const val IN_PROGRESS_GRACE_SECONDS = 60L
-
-        /** Par défaut les captures restent dans le stockage privé : invisible dans la galerie. */
-        const val ADD_TO_GALLERY = false
 
         /** Nom unique du job : `KEEP` s'appuie dessus pour ne jamais doubler la purge. */
         const val WORK_NAME = "samvision-capture-cleanup"

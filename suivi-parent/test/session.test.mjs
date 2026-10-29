@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shareIdOf, stateOf, destPoint, objectsOf, movementBetween, narrationOf, neverPublished, NO_STREAM_TEXT } from '../session.mjs';
+import { shareIdOf, stateOf, movementBetween, narrationOf, neverPublished, NO_STREAM_TEXT } from '../session.mjs';
 import { wordsSpoken } from '../spoken-line.mjs';
 
 const fix = { lat: 48.85, lon: 2.35, accM: 1, atMs: 1000, headingDeg: 0, indoor: false };
@@ -12,20 +12,12 @@ test('le lien reçu choisit son flux ; aucun flux local ou par défaut', () => {
   }
 });
 
-test('les objets se figent puis disparaissent même si le dernier paquet reste en mémoire', () => {
+test('le flux se périme par paliers même si le dernier paquet reste en mémoire', () => {
   const live = { serverAt: 1000, objects: [{ label: 'porte', distM: 2, angleDeg: 0 }] };
   assert.equal(stateOf(live, 12_999), 'live');
   assert.equal(stateOf(live, 13_000), 'lost');
-  assert.equal(objectsOf(live, 'lost')[0].frozen, true);
   assert.equal(stateOf(live, 121_000), 'offline');
-  assert.deepEqual(objectsOf(live, 'offline'), []);
-});
-
-test('le cap absolu place correctement les objets au nord, est, sud et ouest', () => {
-  assert.ok(destPoint({ distM: 10, angleDeg: 0 }, fix).lat > fix.lat);
-  assert.ok(destPoint({ distM: 10, angleDeg: 90 }, fix).lon > fix.lon);
-  assert.ok(destPoint({ distM: 10, angleDeg: 180 }, fix).lat < fix.lat);
-  assert.ok(destPoint({ distM: 10, angleDeg: -90 }, fix).lon < fix.lon);
+  assert.equal(stateOf(null), 'offline');
 });
 
 test('un déplacement mesuré distingue avance et décalage', () => {
