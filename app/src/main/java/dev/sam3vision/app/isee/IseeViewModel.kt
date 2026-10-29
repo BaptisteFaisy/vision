@@ -94,9 +94,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
-    // Voix TwinLite tue après une alerte danger (trottoir, escaliers).
-    val twinlite = IseeTwinLite(getApplication(), viewModelScope, { settings }, player, { hazards?.mutesTwinLite(System.currentTimeMillis()) ?: false })
-
+    // Guidage SAM seul : TwinLite viré (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
 
@@ -138,7 +136,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); twinlite.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset() },
         prune = ::enforceFifo,
     )
 
@@ -268,7 +266,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
-        probe.stop(); twinlite.close()
+        probe.stop()
         super.onCleared()
     }
 

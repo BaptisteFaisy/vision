@@ -431,7 +431,7 @@ _state.update { it.cleared() }
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
-                spokenUrgent = if (phrase != null) (steering?.blocked == true) else current.spokenUrgent,
+                spokenUrgent = if (phrase != null) (steering?.blocked == true || steering?.urgent == true) else current.spokenUrgent,
                 steering = steering,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),

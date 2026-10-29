@@ -104,4 +104,19 @@ class ProbeVoiceTest {
         assertNull(voice.cue())
         assertFalse(voice.detour)
     }
+
+    @Test
+    fun `chemin porte le decalage urgent quand une personne s approche`() {
+        val voice = guided()
+        val droite = { m: Float -> PlacedLabel("personne", 0.7f, 0.5f, m) }
+        voice.phrase(0L, listOf(droite(3.0f)), SteeringCap.Straight)
+        voice.phrase(250L, listOf(droite(2.6f)), SteeringCap.Straight)
+        voice.phrase(500L, listOf(droite(2.2f)), SteeringCap.Straight)
+
+        val cue = voice.cue()
+
+        assertEquals(SteeringCap.Left, cue!!.passage)
+        assertTrue(cue.urgent)
+        assertFalse(cue.blocked)
+    }
 }

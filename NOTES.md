@@ -32,8 +32,7 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:27` |
 | guava | **33.3.1-android** (pinning transitif Room, sans import direct) | `libs.versions.toml:28`, `app/build.gradle.kts:216-217` |
 | onnxruntime-android (profondeur) | **1.18.0** | `libs.versions.toml:29` |
-| litert-edge (segmentation TwinLite) | **2.2.0** (API CompiledModel, cascade GPU→CPU ; pas la 2.3.x : metadata Kotlin 2.4, illisible en 2.2) | `libs.versions.toml:68-71` |
-| fragment (pinning lint) | **1.8.9** (litert tire 1.1.0, lint exige ≥ 1.3.0) | `libs.versions.toml:10-11` |
+| fragment (pinning lint) | **1.8.9** (un transitif tire 1.1.0, lint exige ≥ 1.3.0) | `libs.versions.toml:10-11` |
 
 **Le JDK n'est pas dans le dépôt.** `gradle.properties` (17-24) ne contient que
 `org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, `daemon=false`, `parallel`, `workers.max=2`,

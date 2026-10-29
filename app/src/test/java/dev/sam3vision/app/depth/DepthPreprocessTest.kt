@@ -27,20 +27,6 @@ class DepthPreprocessTest {
     }
 
     @Test
-    fun `resize rect rend un rectangle de la taille demandee`() {
-        val src = IntArray(8 * 4) { 0xFF808080.toInt() }
-        val out = DepthPreprocess.resizeArgbBilinearRect(src, 8, 4, 640, 360)
-        assertEquals(640 * 360, out.size)
-    }
-
-    @Test
-    fun `resize rect conserve une image uniforme`() {
-        val src = IntArray(6 * 6) { 0xFF102030.toInt() }
-        val out = DepthPreprocess.resizeArgbBilinearRect(src, 6, 6, 12, 6)
-        out.forEach { assertEquals(0xFF102030.toInt(), it) }
-    }
-
-    @Test
     fun `normalizeCHW centre le gris moyen pres de zero`() {
         val gray = 0xFF808080.toInt()
         val buf = DepthPreprocess.normalizeCHW(

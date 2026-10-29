@@ -3,6 +3,33 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : guidage SAM seul, TwinLiteNet viré (ordre user)
+
+- **Demande** : plus de TwinLiteNet (sol) — SAM seul guide : conseil de
+  décalage latéral calculé à chaque frame (« Décalez-vous à gauche. » si des
+  personnes arrivent à droite) et dit par SAM, une info par frame reçue.
+- `LateralNudge` (pur core, miroir `VehicleApproach` sans boîte/identité) :
+  côté le plus proche qui se rapproche 2 frames de suite → phrase urgente,
+  branché dans `GuidanceAnnouncer` entre bouché et trottoir (bouché > décalez
+  > trottoir > libre). Flèche existante réutilisée (`passage` + `urgent`).
+  Voix = Laure ElevenLabs comme le reste (pas de 2ᵉ moteur).
+- TwinLite supprimé : paquets `core/segment` + `app/segment` + `app/litert`,
+  `IseeTwinLite`, `TwinLite{Layer,Voice,Wiring}`, route `Segment` + bouton
+  Réglages, 8 MP3 `vp_tl_*` + entrées catalogue, dép. `litert-edge`,
+  `mutesTwinLite` + fenêtre 10 s (`ProbeHazards` = reset commun), helper
+  `resizeArgbBilinearRect`. Perte du secours sol offline assumée.
+- Non-fait volontaire : `Cadence.Fast.targetMs` reste à 0 — le passer à 250
+  espaçait les **envois** (info toutes les 250 + latence au lieu de chaque
+  frame) et cassait 4 tests sonde ; revert prouvé vert.
+- Preuves : `:core` 1 780 + `:app` 1 042 tests, 0 échec, sur r630
+  (`LateralNudgeTest` 12/12, `GuidanceAnnouncerTest` 15/15, `ProbeVoiceTest`
+  9/9, `ProbeHazardsTest` 2/2, `ProbeWiringSpokenTest` 3/3),
+  `assembleDebug` vert, `check-kotlin-limits` + `check-voicepack` OK.
+- Fichiers : `LateralNudge.kt`, `GuidanceAnnouncer.kt`, `Steering.kt`,
+  `ProbeVoice.kt`, `LiveProbe.kt`, `ProbeWiring.kt`, `IseeViewModel.kt`,
+  `AppNav.kt`, `Settings*.kt`, `UiLogicTest.kt` (+35 fichiers supprimés).
+- Recette téléphone (Direct, obstacle réel, logcat sans `twinlite`) après merge.
+
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
 - **Demande** : devant un obstacle, même au contact, iSee dit où passer

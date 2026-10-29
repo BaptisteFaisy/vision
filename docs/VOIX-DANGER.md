@@ -193,6 +193,10 @@ gagnant, Stop → parlé chat en lecture) et `GuidanceTest` (22).
 
 ## 8. TwinLite se tait après une alerte danger (ordre user du 29/10)
 
+> **Supprimé le 29/10** (guidage SAM seul, ordre user) : TwinLiteNet viré,
+> `mutesTwinLite` et la fenêtre de silence 10 s n'existent plus. Ci-dessous
+> l'historique.
+
 TwinLiteNet ne voit que le sol praticable (gauche/droit/tout droit/stop) ;
 trottoir et escaliers sont des dangers nommés par SAM et parlent en
 prioritaires (`urgent`, coupe). Sans garde, la consigne sol suivante
