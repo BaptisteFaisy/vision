@@ -2,6 +2,7 @@ package dev.sam3vision.core.distance
 
 import dev.sam3vision.core.live.LivePrompts
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,6 +68,42 @@ class KnownSizesTest {
         assertEquals(1.00f, KnownSizes.heightMeters("barrier")!!, 0.001f)
         assertEquals(1.00f, KnownSizes.heightMeters("Barrière")!!, 0.001f)
         assertEquals(1.00f, KnownSizes.heightMeters("barrières")!!, 0.001f)
+    }
+
+    @Test
+    fun `exterieur sept concepts calibres et poteau en profondeur`() {
+        listOf("person", "bollard", "fence", "barrier", "gate", "sign", "tree").forEach { concept ->
+            assertNotNull("concept extérieur non calibré : $concept", KnownSizes.heightMeters(concept))
+        }
+        assertNull(KnownSizes.heightMeters("pole"))
+        assertTrue("pole" in KnownSizes.DEPTH_ONLY)
+    }
+
+    @Test
+    fun `synonymes exterieur donnent la hauteur du concept`() {
+        assertEquals(0.80f, KnownSizes.heightMeters("bollard")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("Borne")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("plot")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("potelet")!!, 0.001f)
+        assertEquals(1.50f, KnownSizes.heightMeters("fence")!!, 0.001f)
+        assertEquals(1.50f, KnownSizes.heightMeters("cloture")!!, 0.001f)
+        assertEquals(1.50f, KnownSizes.heightMeters("grillage")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("gate")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("portail")!!, 0.001f)
+        assertEquals(2.20f, KnownSizes.heightMeters("panneau")!!, 0.001f)
+        assertEquals(4.00f, KnownSizes.heightMeters("arbre")!!, 0.001f)
+    }
+
+    @Test
+    fun `accents pluriels et expressions exterieur`() {
+        assertEquals(1.50f, KnownSizes.heightMeters("Clôtures")!!, 0.001f)
+        assertEquals(1.50f, KnownSizes.heightMeters("grillages")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("Portails")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("bornes")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("potelets")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("plots")!!, 0.001f)
+        assertEquals(1.50f, KnownSizes.heightMeters("clôture grillagée")!!, 0.001f)
+        assertEquals(0.80f, KnownSizes.heightMeters("borne anti-stationnement")!!, 0.001f)
     }
 
     @Test
