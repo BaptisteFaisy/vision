@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.voicenav.VoiceNavUiState
+import dev.sam3vision.app.voicenav.sharedTripOf
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.RouteSummary
 import org.junit.Assert.assertEquals
