@@ -55,9 +55,9 @@ private fun metersByBox(readings: List<DistanceReading>): Map<List<Float>, Float
  * Objets de [frame] placés pour l'annonce vocale, chacun avec sa distance quand elle est
  * mesurée. Un objet dont la géométrie est inutilisable est simplement omis.
  *
- * Le `PlacedLabel` est construit **avec** sa distance : la version précédente le
- * construisait puis le recopiait (`copy(meters = …)`), soit un objet de plus par objet
- * détecté et par frame.
+ * Le `PlacedLabel` est construit **avec** sa distance et ses bords : la version
+ * précédente le construisait puis le recopiait (`copy(meters = …)`), soit un objet de
+ * plus par objet détecté et par frame.
  */
 fun placedLabels(frame: LiveFrame, readings: List<DistanceReading>): List<PlacedLabel> {
     val meters = metersByBox(readings)
@@ -69,7 +69,9 @@ fun placedLabels(frame: LiveFrame, readings: List<DistanceReading>): List<Placed
         val detection = Detection(obj.label, obj.score, obj.box, frame.width, frame.height)
         val position = PositionText.fromDetection(detection)
         if (position != null) {
-            placed += PlacedLabel(position.label, position.centerX, position.centerY, meters[obj.box])
+            placed += PlacedLabel(
+                position.label, position.centerX, position.centerY, meters[obj.box], position.x0, position.x1,
+            )
         }
         i++
     }

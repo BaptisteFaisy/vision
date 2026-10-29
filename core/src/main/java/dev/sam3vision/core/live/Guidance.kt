@@ -38,11 +38,13 @@ data class GuidanceDecision(
  * Guidage à partir des seuls objets SAM : aucune image, aucun LLM, aucun
  * réseau — la phrase produite part directement à ElevenLabs.
  *
- * Le couloir marché dépend du [cap] : bande centrale de [PositionText]
- * (`centerX` entre 0,34 et 0,66) pour tout droit, moitié visée sinon. Un
- * objet dedans et à portée ([RANGE_METERS]) bloque la marche. Une distance
- * inconnue bloque par prudence (mieux vaut un détour inutile qu'un silence
- * dangereux) ; un objet lointain ne bloque pas, même au centre.
+ * Le cap droit projette un **trait** : la largeur du marcheur
+ * ([RAY_HALF_WIDTH_M] de chaque côté de l'axe) à la distance de l'objet —
+ * large de près, fin de loin ; les caps latéraux gardent la moitié visée.
+ * Un objet qui coupe le trait, à portée ([RANGE_METERS]), bloque la marche.
+ * Sans bords ou sans distance connus, repli prudent sur la bande centrale
+ * historique (`centerX` entre 0,34 et 0,66) ; un objet lointain ne bloque
+ * pas, même au centre.
  *
  * Tout est pur et testé en JVM : la décision ([decide]), sa mise en mots
  * ([phrase], FR/EN comme les positions) et sa signature anti-répétition
@@ -60,6 +62,13 @@ object Guidance {
      */
     const val STOP_METERS = 0.6f
 
+    /**
+     * Demi-largeur du marcheur (m) : le trait droit a l'épaisseur du corps —
+     * épaules ≈ 0,45 m, arrondi prudent. Projetée à la distance de l'objet,
+     * elle donne la demi-largeur du trait dans l'image.
+     */
+    const val RAY_HALF_WIDTH_M = 0.25f
+
     /** Demi-couloir marché normalisé, cap droit : bande centrale / 2. */
     const val STRAIGHT_HALF_CORRIDOR = (1f - 2f * PositionText.SIDE_EDGE) / 2f
 
@@ -73,7 +82,7 @@ object Guidance {
     const val SHIFT_STEP_M = 0.5f
 
     /**
-     * Le couloir est-il bouché, et par où passer ? Les labels vides et le sol
+     * Le passage est-il bouché, et par où passer ? Les labels vides et le sol
      * marchable ([CurbConcepts.isGround]) sont ignorés : on ne contourne pas le
      * trottoir sur lequel on marche (la bordure, elle, reste un obstacle).
      * Cap droit : à égalité des côtés, on passe à l'opposé du décalage de
@@ -91,7 +100,7 @@ object Guidance {
         val cleaned = labels.filter {
             it.label.isNotBlank() && !CurbConcepts.isGround(it.label) && SignConcepts.keep(it)
         }
-        val blocking = cleaned.filter { inCorridor(it.centerX, cap) && inRange(it, rangeMeters) }
+        val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg) }
         if (blocking.isEmpty()) return GuidanceDecision(blocked = false, cap = cap)
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
@@ -152,6 +161,36 @@ object Guidance {
      * de cap qui change le mot reparle ; le même mot ne se répète jamais.
      */
     fun key(decision: GuidanceDecision): String = word(decision).key
+
+    /**
+     * Le label bouche-t-il le cap marché ? Droit = le trait coupe la boîte,
+     * latéral = la moitié visée (inchangé).
+     */
+    private fun blocks(label: PlacedLabel, cap: SteeringCap, rangeMeters: Float, hfovDeg: Float): Boolean {
+        if (!inRange(label, rangeMeters)) return false
+        if (cap != SteeringCap.Straight) return inCorridor(label.centerX, cap)
+        return rayBlocks(label, hfovDeg)
+    }
+
+    /**
+     * Le trait droit est-il coupé par [label] ? Le trait a l'épaisseur du
+     * marcheur ([RAY_HALF_WIDTH_M] de chaque côté de l'axe `x = 0,5`)
+     * projetée à sa distance : large de près (prudence), fin de loin
+     * (« exactement tout droit »). Sans bords ou sans distance connus, repli
+     * sur la bande centrale — on ne devine jamais un passage.
+     */
+    private fun rayBlocks(label: PlacedLabel, hfovDeg: Float): Boolean {
+        val x0 = label.x0
+        val x1 = label.x1
+        val depth = label.meters?.takeIf { it.isFinite() && it > 0f }
+        if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite() || depth == null) {
+            return inCorridor(label.centerX, SteeringCap.Straight)
+        }
+        val fov = hfovDeg.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
+        val halfTangent = tan(Math.toRadians(fov / 2.0)).toFloat()
+        val halfWidth = (RAY_HALF_WIDTH_M / (2f * depth * halfTangent)).coerceIn(0f, 0.5f)
+        return minOf(x0, x1) <= 0.5f + halfWidth && maxOf(x0, x1) >= 0.5f - halfWidth
+    }
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
     private fun inCorridor(centerX: Float, cap: SteeringCap): Boolean = when (cap) {

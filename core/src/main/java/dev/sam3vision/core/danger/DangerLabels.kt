@@ -47,6 +47,6 @@ fun dangerPlacedLabels(
     return tracks.mapNotNull { track ->
         val reading = byTrack[track.id] ?: return@mapNotNull null
         if (track.label.isBlank() || track.box.size < 4) return@mapNotNull null
-        PlacedLabel(track.label, track.centerX, track.centerY, reading.meters)
+        PlacedLabel(track.label, track.centerX, track.centerY, reading.meters, track.box[0], track.box[2])
     }
 }
