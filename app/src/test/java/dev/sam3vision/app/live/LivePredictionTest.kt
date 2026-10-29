@@ -133,6 +133,22 @@ class LivePredictionTest {
         assertTrue(prediction.boxesAt(300L, width, height).empty)
     }
 
+    @Test
+    fun `publishableLayer ne publie que ce qui a change`() {
+        val off = LivePrediction(enabled = false)
+        assertNull(off.publishableLayer(300L, width, height, PredictionLayer()))
+
+        val prediction = LivePrediction(enabled = true)
+        prediction.absorb(frame(100f), 0L, width, height)
+        // Masque encore frais et couche vide : rien à écrire.
+        assertNull(prediction.publishableLayer(ANCHOR_WINDOW_MS, width, height, PredictionLayer()))
+        // Boîte périmée : la couche est publiée, même vide elle efface l'ancienne.
+        val stale = prediction.publishableLayer(300L, width, height, PredictionLayer())
+        assertTrue(stale != null && !stale.empty)
+        val cleared = prediction.publishableLayer(700L, width, height, stale!!)
+        assertTrue(cleared != null && cleared.empty)
+    }
+
     private companion object {
         /** Demi-largeur de la boîte de test : 80 px de côté, assez pour que l'IoU suive. */
         const val HALF = 40f
