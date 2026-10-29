@@ -186,6 +186,10 @@ class DetrGraphs:
         except Exception as exc:  # noqa: BLE01 — le service doit continuer en eager
             # Cette forme seulement : un échec (contrôle Python, forme exotique) ne doit
             # pas interdire les captures des autres formes (budget préservé).
+            import traceback
+
+            print(f"[detr_graph] capture {key} impossible, eager conservé :\n"
+                  f"{traceback.format_exc()}", flush=True)
             self._failed.add(key)
             self.state = f"failed:{type(exc).__name__}:{str(exc)[:90]}"
 
