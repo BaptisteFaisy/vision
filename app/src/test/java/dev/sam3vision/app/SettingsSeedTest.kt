@@ -132,6 +132,27 @@ class SettingsSeedTest {
     }
 
     @Test
+    fun `une base sans scheme est reparee par la base du build`() {
+        val cassee = Settings.Default.copy(llmBaseUrl = "inference.baseten.co/v1", llmApiKey = "ma-cle")
+
+        val seed = seeded(cassee, build)
+
+        assertEquals("une base sans https:// n'est pas un choix, le build reprend la main", "https://build.example/v1", seed.llmBaseUrl)
+        assertEquals("ma-cle", seed.llmApiKey)
+        assertTrue(seed.llmConfigured)
+    }
+
+    @Test
+    fun `une base inutilisable et un build vide retombent sur le defaut du code`() {
+        val vide = BuildDefaults("", "", "", "", "", "")
+        val cassee = Settings.Default.copy(llmBaseUrl = "inference.baseten.co/v1")
+        val blanche = Settings.Default.copy(llmBaseUrl = "  ")
+
+        assertEquals(Settings.DEFAULT_LLM_BASE_URL, seeded(cassee, vide).llmBaseUrl)
+        assertEquals(Settings.DEFAULT_LLM_BASE_URL, seeded(blanche, vide).llmBaseUrl)
+    }
+
+    @Test
     fun `le defaut reste Meta meme apres seed`() {
         val seed = seeded(Settings.Default, build)
 
