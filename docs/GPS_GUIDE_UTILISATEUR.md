@@ -18,20 +18,25 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
    « aller à X »… (9 motifs, voir `docs/NAVIGATION.md` § Déclenchement
    vocal). Transcription Meta, repli ElevenLabs Scribe.
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
-   Destination propose un champ de saisie clavier — même écran de
-   confirmation ensuite, sans redicter.
+   propose un champ de saisie clavier — la saisie vaut une dictée : le
+   guidage démarre aussitôt, sans redicter.
 4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
 
 ## 2. Voir (les écrans)
 
-- **Destination** : adresse géocodée + résumé (distance · durée), boutons
-  « Démarrer » / « Annuler », lien « Dicter une autre destination ».
-  Sans position GPS ou sans URL Valhalla : adresse seule (distance et
-  durée à zéro). Si l'itinéraire échoue : adresse + motif en rouge, et
-  « Démarrer » bascule sur Google Maps.
+- **Aucun écran Destination sur le chemin vocal** : le guidage démarre
+  dès la dictée (`autoStartOnVoice`), sans bouton. L'écran de confirmation
+  ci-dessous ne subsiste qu'en mode historique (`autoStartOnVoice =
+  false`), pour les tests et un éventuel retour arrière.
+- **Destination** (mode confirmation seulement) : adresse géocodée + résumé
+  (distance · durée), boutons « Démarrer » / « Annuler », lien « Dicter une
+  autre destination ». Sans position GPS ou sans URL Valhalla : adresse
+  seule (distance et durée à zéro). Si l'itinéraire échoue : adresse +
+  motif en rouge, et « Démarrer » bascule sur Google Maps, **à pied**.
 - **Guidage** : prochaine instruction (« Tournez à gauche dans 50 mètres »),
   distances restantes, bouton « Arrêter », dictée « arrête le guidage ».
+  Le guidage est **piéton** : ni voiture, ni transport, ni carte.
   La voix iSee parle chaque consigne ; l'écran suit en grand texte.
 - **Écart** : en cas de sortie d'itinéraire, bandeau « Écart — recalcul… »
   + annonce « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
@@ -78,10 +83,11 @@ SHA du build — règle ISEE-TEST-MASTER-SEUL), APK installé, clés ElevenLabs
 + voix renseignées, interrupteur sur oui, URL Valhalla par défaut,
 téléphone pris sous verrou dur + annonce dans `BOITE-USER.md`.
 
-1. Dicter « je veux aller à la gare de Lyon » → écran Destination :
-   adresse + résumé chiffré (ex. « 2,4 km · 30 min »).
-2. « Démarrer » → écran Guidage : prochaine instruction + voix iSee
-   (« Navigation vers la gare de Lyon » puis consignes).
+1. Dicter « je veux aller à la gare de Lyon » → **guidage lancé
+   directement** : écran Guidage, annonce puis consignes, sans écran
+   Destination et sans appuyer sur « Démarrer ».
+2. Lire le résumé sur l'écran de guidage : distance et durée chiffrées
+   (ex. « 2,4 km · 30 min »).
 3. Marcher : consignes suivies, distances décroissantes, grand texte lisible.
 4. S'écarter d'un pâté de maisons → bandeau « Écart — recalcul… » +
    annonce, puis nouvel itinéraire.
@@ -97,8 +103,9 @@ entendue + app au premier plan).
 
 ## 7. Check-list non-régression (rien d'autre ne change)
 
-- URL vide : handoff Maps direct, relecture « Navigation vers X »,
-  comportement MVP inchangé (`docs/RECETTE-NAVIGATION-VOCALE.md` rejouable).
+- URL vide : handoff Maps direct **à pied** (`mode=w`), relecture
+  « Navigation vers X », comportement MVP inchangé
+  (`docs/RECETTE-NAVIGATION-VOCALE.md` rejouable).
 - Guidage éteint : fiche lieu + « Voici la fiche de X », pas de guidage.
 - Stop vocal hors session : ignoré (chemin question normal), pas d'erreur.
 - « Où est X », « c'est loin X ? » : questions LLM, jamais un ordre.
