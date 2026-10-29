@@ -193,14 +193,14 @@ bash scripts/build.sh                                      # assembleDebug --off
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`.
 
-## SAM 3.1 recall on pedestrian lights (measured 29/10/2026)
+## SAM 3.1 recall on pedestrian lights, and `PedLightGate` on real SAM crops (measured 29/10/2026)
 
-The crossing mode (`docs/TRAVERSEE.md`) rests on a question nobody had measured: does
-SAM 3.1 actually find a pedestrian signal, and does it get the colour right? 16 real
-photographs from Wikimedia Commons (7 countries, from full-frame pictograms to a
-1920×3413 street), RTX 3060 Ti, `unsloth/sam3.1` in `bfloat16`. The measuring code
-lives outside this tree; full protocol, image attribution and limits in
-`docs/MESURES-SAM3-FEUX.md`.
+The crossing mode (`docs/TRAVERSEE.md`) rests on two unmeasured assumptions: that SAM 3.1
+finds a pedestrian signal at all, and that the box it returns frames the lamp. Both were
+tested on 16 real photographs from Wikimedia Commons (7 countries), RTX 3060 Ti,
+`unsloth/sam3.1` in `bfloat16`. Measuring code lives outside this tree; the §6 test runs the
+**actual Kotlin** `PedLightGate` / `TrainedLightColor` / `PedLightColor` from this tree.
+Protocol, image attribution and limits: `docs/MESURES-SAM3-FEUX.md`.
 
 | Prompt | Detections | Images found | Recall |
 |---|---|---|---|
@@ -209,23 +209,37 @@ lives outside this tree; full protocol, image attribution and limits in
 | `red pedestrian traffic light` | 2 | 2/16 | 12.5 % |
 | `green pedestrian traffic light` | 13 | 7/16 | 43.8 % |
 
-Three conclusions worth carrying into the code:
+**The generic prompt detects, a state prompt verifies.** Naming the state drops recall to
+12.5 % — but the 3 detections it did return were all correct (confidence 1.00). Treat state
+prompts as a cross-check, never as the detector.
 
-- **The generic prompt detects, a state prompt verifies.** Naming the state drops recall to
-  12.5 % — but the 3 detections it did return were all correct (confidence 1.00). Treat
-  state prompts as a cross-check, never as the detector.
+**`PedLightGate` says green 1 time out of 6 true green signals.** Feeding it crops built
+exactly like `CrossingPixels.frame` (best-score box, longest edge → 48 px) gives Green 1/6,
+Red 5/16, Unknown 9/16 over the 16 images — no false green on labelled images, so the
+fail-safe direction holds, but a crossing mode that never announces green is dead weight.
+The check that rejects is `ELONGATION_MIN = 1.5f`, and it cannot be re-tuned: the highest
+elongation among rejected true greens is **1.11**, the lowest among the car discs the gate
+must reject is **1.30**. The two domains are inverted, so the assumption written in the gate —
+*"the SAM box hugs the lamp"* — does not hold for a text-prompted SAM 3.1, which segments the
+**housing**. Fix belongs upstream (frame the lamp, or re-calibrate on the housing domain), not
+in the constant.
+
+Two defects found while running it, worth carrying into the measurement code:
+
 - **One 384-pixel sliver flipped a whole scene.** SAM returned the real signal (516×1056 px,
   green) plus three 8-to-48-pixel slivers on the mounting pole; the scene verdict came out
   `red`. Votes must be restricted to detections within 10× of the largest one in frame.
-- **A dim dotted-LED green pictogram read as "off".** It filled 0.65 % of its crop against a
-  1.2 % "is anything lit" floor. Lowering the floor to 0.6 % gained the case *and* improved
-  the synthetic corpus (masked 95.5 % → 95.6 %, whole-crop 80.3 % → 81.9 %). `PedLightColor`
-  uses a different statistic (`MIN_FRACTION = 0.06f` over HSV hue bins, not a luminance-weighted
-  lit fraction), so the number does not transfer — only the shape of the fix does.
+- **A dim dotted-LED green pictogram read as "off"** (0.65 % of its crop against a 1.2 % floor).
+  Lowering the floor to 0.6 % gained the case *and* improved the synthetic corpus (masked
+  95.5 → 95.6 %, whole-crop 80.3 → 81.9 %).
 
 State accuracy on the 9 photos with an unambiguous ground truth: **7/9, zero red↔green
 errors**. The two misses are ground-level LED strips, not signal heads. End-to-end cost:
 **0.71 s/image** for four prompts, once the vision embedding is shared across prompts.
+
+Harness control: the same harness reproduces **9/9** of the expected verdicts in
+`core/src/test/resources/feuxfr/ATTRIBUTION.md` before the SAM crops are read — that is the
+check that makes the 1/6 citable.
 
 ## CI and merge queue
 
