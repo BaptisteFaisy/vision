@@ -157,8 +157,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /**
-     * Navigation vocale in-app (confirmée, moteur embarqué) : câblage paresseux
-     * et éteint par défaut ([IseeVoiceNav]) — coût nul sans URL Valhalla.
+     * Navigation vocale in-app (démarrage direct, moteur embarqué) : câblage
+     * paresseux ([IseeVoiceNav]), actif dès que `routeBaseUrl` est renseignée
+     * (seed du build) — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing)
 
@@ -416,8 +417,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Ordre de cap (« va à gauche ») : consommé ici AVANT la navigation Maps
         // (« va à gauche » matche aussi « va à X ») — guidage + voix, jamais LLM.
         if (runSteeringCommand(text)) return
-        // Navigation vocale in-app (URL Valhalla configurée) : écrans + moteur,
-        // avant le handoff Maps — éteinte par défaut (comportement inchangé).
+        // Navigation vocale in-app (URL Valhalla configurée) : démarrage direct
+        // + moteur, avant le handoff Maps.
         if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
         // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return

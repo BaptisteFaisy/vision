@@ -20,10 +20,12 @@ import org.junit.Test
 /** Doublure artisanale du lanceur : enregistre les appels, échec programmable. */
 private class FakeLauncher(var fail: Boolean = false) : NavigationLauncher {
     val launched = mutableListOf<NavDestination>()
+    val modes = mutableListOf<TravelMode>()
     val opened = mutableListOf<String>()
 
     override fun launch(destination: NavDestination, mode: TravelMode): Result<NavRoute> {
         launched += destination
+        modes += mode
         return if (fail) Result.failure(IllegalStateException("refusé")) else Result.success(NavRoute.MapsApp)
     }
 
@@ -42,6 +44,8 @@ class VoiceNavSessionTest {
         launcher: FakeLauncher = FakeLauncher(),
         guidance: Boolean = true,
         loader: RouteLoader = { Result.success(summary) },
+        engine: (suspend (String, RouteSummary?) -> Boolean)? = { _, _ -> true },
+        autoStart: Boolean = false,
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { guidance },
@@ -49,6 +53,8 @@ class VoiceNavSessionTest {
         voice = VoiceNavAnnouncer({ Settings.Default }) { _, text -> spoken += text },
         routeLoader = loader,
         router = NavigationRouter(),
+        engineStart = engine,
+        autoStartOnVoice = autoStart,
     )
 
     @Test
@@ -88,17 +94,31 @@ class VoiceNavSessionTest {
     }
 
     @Test
-    fun `confirmer lance le guidage et annonce le depart`() = runBlocking {
+    fun `confirmer avec moteur demarre le guidage sans Maps`() = runBlocking {
         val launcher = FakeLauncher()
         val session = session(launcher)
         session.onVoiceTranscript("naviguer vers la gare")
 
         session.confirmDestination()
 
-        assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
         val state = session.state.value as VoiceNavUiState.Guiding
         assertEquals("la gare", state.destination)
         assertEquals("Direction la gare", state.update.instruction)
+        assertTrue(launcher.launched.isEmpty())
+        assertEquals(listOf("Destination : la gare"), spoken)
+    }
+
+    @Test
+    fun `confirmer sans moteur bascule sur Maps pieton et revient au repos`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher, engine = null)
+        session.onVoiceTranscript("va à la gare")
+
+        session.confirmDestination()
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
+        assertEquals(listOf(TravelMode.WALK), launcher.modes)
         assertEquals(listOf("Destination : la gare", "Navigation vers la gare"), spoken)
     }
 
@@ -110,7 +130,7 @@ class VoiceNavSessionTest {
 
         session.confirmDestination()
 
-        assertEquals(1, launcher.launched.size)
+        assertTrue(launcher.launched.isEmpty())
         assertTrue(session.state.value is VoiceNavUiState.Guiding)
     }
 
@@ -133,7 +153,7 @@ class VoiceNavSessionTest {
 
     @Test
     fun `lancement refuse reste en confirmation avec motif`() = runBlocking {
-        val session = session(FakeLauncher(fail = true))
+        val session = session(FakeLauncher(fail = true), engine = null)
         session.onVoiceTranscript("va à la gare")
 
         session.confirmDestination()
@@ -229,6 +249,71 @@ class VoiceNavSessionTest {
     }
 
     @Test
+    fun `auto-start moteur demarre sans confirmation`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher, autoStart = true)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        val state = session.state.value as VoiceNavUiState.Guiding
+        assertEquals("la gare", state.destination)
+        assertTrue(launcher.launched.isEmpty())
+        // Une seule voix : le moteur dit « Navigation vers X », pas la session.
+        assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `auto-start sans moteur bascule sur Maps pieton et revient au repos`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher, engine = null, autoStart = true)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
+        assertEquals(listOf(TravelMode.WALK), launcher.modes)
+        assertEquals(listOf("Navigation vers la gare"), spoken)
+    }
+
+    @Test
+    fun `auto-start moteur en panne bascule sur Maps pieton`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(
+            launcher,
+            engine = { _, _ -> throw IllegalStateException("panne") },
+            autoStart = true,
+        )
+
+        assertTrue(session.onVoiceTranscript("va à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(TravelMode.WALK), launcher.modes)
+    }
+
+    @Test
+    fun `auto-start guidage eteint ouvre la fiche lieu`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher, guidance = false, autoStart = true)
+
+        assertTrue(session.onVoiceTranscript("va à la tour Eiffel"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf("la tour Eiffel"), launcher.opened)
+        assertTrue(launcher.launched.isEmpty())
+        assertEquals(listOf("Voici la fiche de la tour Eiffel"), spoken)
+    }
+
+    @Test
+    fun `auto-start Maps en echec annonce sans ecran`() = runBlocking {
+        val session = session(FakeLauncher(fail = true), engine = null, autoStart = true)
+
+        assertTrue(session.onVoiceTranscript("va à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
+    }
+
+    @Test
     fun `collaborateur qui jette ne fait pas lever`() = runBlocking {
         val throwing = VoiceNavSession(
             launcher = FakeLauncher(),
@@ -237,6 +322,7 @@ class VoiceNavSessionTest {
             voice = VoiceNavAnnouncer({ Settings.Default }) { _, _ -> },
             routeLoader = { throw IllegalStateException("panne") },
             router = NavigationRouter(parse = { throw IllegalStateException("panne") }),
+            autoStartOnVoice = false,
         )
 
         assertFalse(throwing.onVoiceTranscript("va à la gare"))

@@ -13,7 +13,8 @@ const val MAPS_PACKAGE = "com.google.android.apps.maps"
  * sinon navigateur. Jamais d'exception — tout échec remonte en [Result.failure].
  */
 interface NavigationLauncher {
-    fun launch(destination: NavDestination, mode: TravelMode = TravelMode.DRIVE): Result<NavRoute>
+    /** Guidage toujours piéton : le GPS d'iSee ne propose ni voiture ni transport. */
+    fun launch(destination: NavDestination, mode: TravelMode = TravelMode.WALK): Result<NavRoute>
 
     /** Fiche du lieu, sans lancer de guidage (réglage « Guidage GPS » éteint). */
     fun openPlace(query: String): Result<NavRoute>
@@ -56,7 +57,7 @@ sealed class NavLaunchError(message: String) : Exception(message) {
  * URI `google.navigation:q=…` de l'app Maps. Bâtie par [MapsUri] (implémentation
  * unique des URIs, côté `:core`) — ce fichier n'en duplique aucune.
  */
-fun navigationAppUri(destination: NavDestination, mode: TravelMode = TravelMode.DRIVE): Result<String> =
+fun navigationAppUri(destination: NavDestination, mode: TravelMode = TravelMode.WALK): Result<String> =
     when (destination) {
         is NavDestination.Query -> MapsUri.navigation(destination.query.trim(), mode.core)
         is NavDestination.Coordinates ->
@@ -64,7 +65,7 @@ fun navigationAppUri(destination: NavDestination, mode: TravelMode = TravelMode.
     }
 
 /** URL universelle `https://www.google.com/maps/dir/?api=1…` (repli sans l'app). */
-fun universalMapsUrl(destination: NavDestination, mode: TravelMode = TravelMode.DRIVE): Result<String> =
+fun universalMapsUrl(destination: NavDestination, mode: TravelMode = TravelMode.WALK): Result<String> =
     when (destination) {
         is NavDestination.Query -> MapsUri.directions(destination.query.trim(), mode.core)
         is NavDestination.Coordinates ->

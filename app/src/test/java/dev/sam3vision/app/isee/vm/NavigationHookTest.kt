@@ -18,10 +18,12 @@ import org.junit.Test
 /** Doublure artisanale du lanceur : enregistre les appels, échec programmable. */
 private class FakeLauncher(var fail: Boolean = false) : NavigationLauncher {
     val launched = mutableListOf<NavDestination>()
+    val modes = mutableListOf<TravelMode>()
     val opened = mutableListOf<String>()
 
     override fun launch(destination: NavDestination, mode: TravelMode): Result<NavRoute> {
         launched += destination
+        modes += mode
         return if (fail) Result.failure(IllegalStateException("refusé")) else Result.success(NavRoute.MapsApp)
     }
 
@@ -81,6 +83,7 @@ class NavigationHookTest {
 
         assertTrue(consumed)
         assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
+        assertEquals(listOf(TravelMode.WALK), launcher.modes)
         assertTrue(launcher.opened.isEmpty())
         assertEquals(listOf("Navigation vers la gare"), spoken)
         assertEquals(null, state.status)

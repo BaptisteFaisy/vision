@@ -66,14 +66,22 @@ class VoiceNavTracker(
     fun reroute(route: NavRoute): Result<Unit> = engine.reroute(route)
 
     /**
-     * Démarre l'écoute GPS + réseau ; sans permission, ne fait rien.
+    /**
+     * Démarre l'écoute GPS + réseau.
+     *
      * Idempotent : un second appel pendant l'écoute est no-op (pas de
      * double abonnement après un retour de fond).
+     *
+     * @return `true` si au moins un fournisseur écoute réellement. Sans
+     *   permission ou sans fournisseur, rien n'est demandé et `false` est
+     *   rendu : l'appelant bascule sur Maps au lieu d'afficher un guidage
+     *   qui ne recevrait jamais de position.
      */
     @SuppressLint("MissingPermission")
-    fun start() {
-        if (listening) return
+    fun start(): Boolean {
+        if (listening) return true
         listening = listen(LocationManager.GPS_PROVIDER) or listen(LocationManager.NETWORK_PROVIDER)
+        return listening
     }
 
     /**
@@ -96,10 +104,19 @@ class VoiceNavTracker(
             manager.requestLocationUpdates(provider, NAV_GPS_MS, 0f, listener, Looper.getMainLooper())
             true
         } catch (_: SecurityException) {
+            // Permission refusée : l'autre fournisseur peut encore suffire.
+            false
+        } catch (_: IllegalArgumentException) {
+            // Pas de GPS sur l'appareil : le réseau suffit pour guider grossièrement.
+            false
+        }
+    }
+        } catch (_: SecurityException) {
             false
         } catch (_: IllegalArgumentException) {
             false
         }
+        return listening
     }
 
     /** Coupe l'écoute et oublie l'itinéraire (fin du guidage). */

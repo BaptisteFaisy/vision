@@ -105,8 +105,13 @@ class VoiceNavEngineDriver(
         }?.getOrNull() ?: return false
         val nav = trip.toNavRoute(place.label).getOrNull() ?: return false
         if (runCatching { tracker.guide(nav) }.getOrNull()?.isSuccess != true) return false
+        // Écoute GPS réellement démarrée : sinon aucun écran de guidage muet,
+        // l'appelant bascule sur Maps (voir `VoiceNavTracker.start`).
+        if (!runCatching { tracker.start() }.getOrDefault(false)) {
+            stop()
+            return false
+        }
         legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
-        runCatching { tracker.start() }
         runCatching { speaker.onStarted(destination) }
         return true
     }
