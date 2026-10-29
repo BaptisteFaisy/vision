@@ -30,11 +30,11 @@ class ProbeVoiceTest {
     }
 
     @Test
-    fun `guidage dit continue sur voie libre`() {
+    fun `guidage dit tout droit sur voie libre`() {
         val voice = guided()
 
-        assertNull(voice.phrase(0L, libre, SteeringCap.Straight))
-        assertEquals("Continue.", voice.phrase(500L, libre, SteeringCap.Straight))
+        assertEquals("Tout droit.", voice.phrase(0L, libre, SteeringCap.Straight))
+        assertNull(voice.phrase(500L, libre, SteeringCap.Straight))
     }
 
     @Test
@@ -42,8 +42,8 @@ class ProbeVoiceTest {
         val voice = guided()
         voice.routeCap = SteeringCap.Right
 
-        assertNull(voice.phrase(0L, libre, SteeringCap.Left))
-        assertEquals("Va à droite.", voice.phrase(1_000L, libre, SteeringCap.Left))
+        assertEquals("Droite.", voice.phrase(0L, libre, SteeringCap.Left))
+        assertNull(voice.phrase(1_000L, libre, SteeringCap.Left))
     }
 
     @Test

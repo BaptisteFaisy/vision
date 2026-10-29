@@ -27,8 +27,8 @@ class ProbeVoiceSidewalkTest {
         voice.routeCap = SteeringCap.Right
         val labels = listOf(trottoir(0.1f))
 
-        assertNull(voice.phrase(0L, labels, SteeringCap.Right))
-        assertEquals("Remonte sur le trottoir, à gauche.", voice.phrase(500L, labels, SteeringCap.Right))
+        assertEquals("Gauche.", voice.phrase(0L, labels, SteeringCap.Right))
+        assertNull(voice.phrase(500L, labels, SteeringCap.Right))
         assertEquals(SteeringCap.Left, voice.cue()?.arrowDir())
         assertTrue(voice.detour)
     }
@@ -39,8 +39,8 @@ class ProbeVoiceSidewalkTest {
         voice.routeCap = SteeringCap.Left
         val labels = listOf(trottoir(0.9f))
 
-        assertNull(voice.phrase(0L, labels, SteeringCap.Left))
-        assertEquals("Remonte sur le trottoir, à droite.", voice.phrase(500L, labels, SteeringCap.Left))
+        assertEquals("Droite.", voice.phrase(0L, labels, SteeringCap.Left))
+        assertNull(voice.phrase(500L, labels, SteeringCap.Left))
         assertEquals(SteeringCap.Right, voice.cue()?.arrowDir())
         assertTrue(voice.detour)
     }
@@ -51,8 +51,8 @@ class ProbeVoiceSidewalkTest {
         voice.routeCap = SteeringCap.Right
         val labels = listOf(trottoir(0.5f))
 
-        assertNull(voice.phrase(0L, labels, SteeringCap.Right))
-        assertEquals("Va à droite.", voice.phrase(500L, labels, SteeringCap.Right))
+        assertEquals("Droite.", voice.phrase(0L, labels, SteeringCap.Right))
+        assertNull(voice.phrase(500L, labels, SteeringCap.Right))
         assertEquals(SteeringCap.Right, voice.cue()?.arrowDir())
         assertFalse(voice.detour)
     }
@@ -62,19 +62,19 @@ class ProbeVoiceSidewalkTest {
         val voice = guided()
         voice.routeCap = SteeringCap.Right
 
-        assertNull(voice.phrase(0L, emptyList(), SteeringCap.Right))
-        assertEquals("Va à droite.", voice.phrase(500L, emptyList(), SteeringCap.Right))
+        assertEquals("Droite.", voice.phrase(0L, emptyList(), SteeringCap.Right))
+        assertNull(voice.phrase(500L, emptyList(), SteeringCap.Right))
         assertFalse(voice.detour)
     }
 
     @Test
-    fun `scene percue sans trottoir = consigne prudente, fleche inchangee`() {
+    fun `scene percue sans trottoir garde le cap, fleche inchangee`() {
         val voice = guided()
         voice.routeCap = SteeringCap.Right
         val labels = listOf(personne(10f))
 
-        assertNull(voice.phrase(0L, labels, SteeringCap.Right))
-        assertEquals("Trottoir introuvable, avancez lentement.", voice.phrase(500L, labels, SteeringCap.Right))
+        assertEquals("Droite.", voice.phrase(0L, labels, SteeringCap.Right))
+        assertNull(voice.phrase(500L, labels, SteeringCap.Right))
         assertEquals(SteeringCap.Right, voice.cue()?.arrowDir())
         assertFalse(voice.detour)
     }
@@ -85,8 +85,7 @@ class ProbeVoiceSidewalkTest {
         voice.routeCap = SteeringCap.Right
         val labels = listOf(personne(2f), trottoir(0.1f))
 
-        val phrase = voice.phrase(0L, labels, SteeringCap.Right).orEmpty()
-        assertTrue("consigne obstacle attendue, reçu : $phrase", phrase.startsWith("Va vers la gauche"))
+        assertEquals("Gauche.", voice.phrase(0L, labels, SteeringCap.Right))
         assertNull(voice.phrase(500L, labels, SteeringCap.Right))
         assertEquals(SteeringCap.Left, voice.cue()?.arrowDir())
         assertTrue(voice.detour)

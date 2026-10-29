@@ -3,7 +3,6 @@ package dev.sam3vision.core.curb
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.live.SteeringCap
-import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Position du trottoir vu caméra : devant (dans le couloir marché — l'utilisateur
@@ -63,14 +62,6 @@ object SidewalkKeep {
         SidewalkPosition.Ahead, SidewalkPosition.Absent -> null
     }
 
-    /** Signature anti-répétition, toujours française (comme `Guidance.key`). */
-    fun key(position: SidewalkPosition): String = when (position) {
-        SidewalkPosition.Ahead -> "walk|ahead"
-        SidewalkPosition.Left -> "walk|left"
-        SidewalkPosition.Right -> "walk|right"
-        SidewalkPosition.Absent -> "walk|absent"
-    }
-
     /**
      * Côté du trottoir le plus proche (distance connue), `null` si aucun côté
      * n'est mesuré : le certain prime sur le doute, et deux doutes n'en font
@@ -87,31 +78,4 @@ object SidewalkKeep {
 
     /** Distance mesurable, `null` sinon (inconnue, infinie ou négative). */
     private fun known(meters: Float?): Float? = meters?.takeIf { it.isFinite() && it > 0f }
-}
-
-/**
- * Consignes de retour au trottoir, FR/EN comme les positions ([PositionText]).
- * Devant : `null` (rien à corriger, le cap suit son cours). Sur un côté : ordre
- * de retour (« Remonte sur le trottoir, à gauche. »). Absent : consigne prudente
- * (« Trottoir introuvable, avancez lentement. ») — on ne guide jamais à l'aveugle.
- */
-object SidewalkText {
-
-    /** Consigne pour [position], `null` quand il n'y a rien à corriger. */
-    fun phrase(position: SidewalkPosition, language: SpeechLanguage = SpeechLanguage.Fr): String? =
-        when (position) {
-            SidewalkPosition.Ahead -> null
-            SidewalkPosition.Left -> when (language) {
-                SpeechLanguage.Fr -> "Remonte sur le trottoir, à gauche."
-                SpeechLanguage.En -> "Step back onto the sidewalk, to the left."
-            }
-            SidewalkPosition.Right -> when (language) {
-                SpeechLanguage.Fr -> "Remonte sur le trottoir, à droite."
-                SpeechLanguage.En -> "Step back onto the sidewalk, to the right."
-            }
-            SidewalkPosition.Absent -> when (language) {
-                SpeechLanguage.Fr -> "Trottoir introuvable, avancez lentement."
-                SpeechLanguage.En -> "Sidewalk not visible, walk slowly."
-            }
-        }
 }
