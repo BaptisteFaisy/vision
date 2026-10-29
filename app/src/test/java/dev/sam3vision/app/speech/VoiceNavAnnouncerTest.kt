@@ -16,27 +16,40 @@ class VoiceNavAnnouncerTest {
 
     @Test
     fun `phrases exactes du contrat`() {
-        assertEquals("Destination : la gare", VoiceNavPhrases.destinationHeard("  la gare "))
+        assertEquals(
+            "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no.",
+            VoiceNavPhrases.confirmQuestion("  la gare ", "15 minutes"),
+        )
+        assertEquals(
+            "Do you really want to go to la gare? Answer yes or no.",
+            VoiceNavPhrases.confirmQuestion("la gare", null),
+        )
         assertEquals("Voici la fiche de la tour Eiffel", VoiceNavPhrases.placeOpened("la tour Eiffel"))
         assertEquals("Guidage arrêté", VoiceNavPhrases.STOP_DONE)
         assertEquals("Arrivée à destination", VoiceNavPhrases.ARRIVED)
+        assertEquals("Cancelled.", VoiceNavPhrases.CONFIRM_CANCELLED)
+        assertEquals("Your route is still loading, one moment.", VoiceNavPhrases.CONFIRM_LOADING)
     }
 
     @Test
     fun `annonces parlent la phrase attendue`() = runBlocking {
         val voice = announcer()
 
-        voice.announceHeard("la gare")
+        voice.announceConfirmQuestion("la gare", "15 minutes")
         voice.announcePlace("la tour Eiffel")
         voice.announceStopped()
         voice.announceArrived()
+        voice.announceConfirmCancelled()
+        voice.announceConfirmLoading()
 
         assertEquals(
             listOf(
-                "Destination : la gare",
+                "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no.",
                 "Voici la fiche de la tour Eiffel",
                 "Guidage arrêté",
                 "Arrivée à destination",
+                "Cancelled.",
+                "Your route is still loading, one moment.",
             ),
             spoken,
         )
@@ -46,7 +59,7 @@ class VoiceNavAnnouncerTest {
     fun `destination blanche refusee sans rien dire`() = runBlocking {
         val voice = announcer()
 
-        assertTrue(voice.announceHeard("   ").isFailure)
+        assertTrue(voice.announceConfirmQuestion("   ", "15 minutes").isFailure)
         assertTrue(voice.announcePlace("").isFailure)
         assertTrue(spoken.isEmpty())
     }
@@ -59,6 +72,6 @@ class VoiceNavAnnouncerTest {
 
         assertTrue(failing.announceStopped().isFailure)
         assertTrue(failing.announceArrived().isFailure)
-        assertTrue(failing.announceHeard("la gare").isFailure)
+        assertTrue(failing.announceConfirmQuestion("la gare", "15 minutes").isFailure)
     }
 }

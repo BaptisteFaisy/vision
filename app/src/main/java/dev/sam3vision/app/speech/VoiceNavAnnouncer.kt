@@ -13,7 +13,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * vaut 1, pas 2 : les événements sont discrets (un virage émis une fois
  * doit se dire), pas des frames à 2 ips dont il faut lisser le tremblé.
  *
- * Canal session ([announceHeard] et sœurs) : annonces de la navigation à
+ * Canal session ([announceConfirmQuestion] et sœurs) : annonces de la navigation à
  * confirmation via le chemin TTS existant — même motif que
  * [NavigationAnnouncer] : synthèse + lecture injectées par [speak] (l'app
  * passe `voice::say`, les tests un espion). Ne lève jamais ([Result]).
@@ -63,11 +63,22 @@ class VoiceNavAnnouncer(
         Result.failure(t)
     }
 
-    /** Annonce « Destination : X ». Destination blanche refusée, sans rien dire. */
-    suspend fun announceHeard(destination: String): Result<Unit> {
+    /**
+     * Question « Do you really want to go to X? … ». Destination blanche
+     * refusée, sans rien dire ; [durationEn] `null` = question sans le temps.
+     */
+    suspend fun announceConfirmQuestion(destination: String, durationEn: String?): Result<Unit> {
         if (destination.isBlank()) return Result.failure(IllegalArgumentException("destination vide"))
-        return said { speak(settings(), VoiceNavPhrases.destinationHeard(destination)) }
+        return said { speak(settings(), VoiceNavPhrases.confirmQuestion(destination, durationEn)) }
     }
+
+    /** Annulation vocale (« no ») : « Cancelled. ». Ne lève jamais. */
+    suspend fun announceConfirmCancelled(): Result<Unit> =
+        said { speak(settings(), VoiceNavPhrases.CONFIRM_CANCELLED) }
+
+    /** « yes » pendant le chargement : « …still loading… ». Ne lève jamais. */
+    suspend fun announceConfirmLoading(): Result<Unit> =
+        said { speak(settings(), VoiceNavPhrases.CONFIRM_LOADING) }
 
     /** Annonce « Voici la fiche de X ». Destination blanche refusée, sans rien dire. */
     suspend fun announcePlace(destination: String): Result<Unit> {

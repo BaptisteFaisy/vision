@@ -247,12 +247,29 @@ object VoiceNavPhrases {
     const val CROSSING_DONE = "Traversée terminée."
 
     // ── Confirmation (session) : complètent NavigationPhrases ──
-    // « Destination : X », « Voici la fiche de X », « Guidage arrêté »,
-    // « Arrivée à destination ». Miroirs `nav_confirm_heard`,
-    // `nav_place_opened`, `nav_stop_done`, `nav_arrived` dans `strings.xml`.
+    // Question vocale (toujours en anglais, exigence produit), « Voici la
+    // fiche de X », « Guidage arrêté », « Arrivée à destination ». Miroirs
+    // `nav_confirm_question[_no_time]`, `nav_confirm_cancelled`,
+    // `nav_confirm_loading`, `nav_place_opened`, `nav_stop_done`,
+    // `nav_arrived` dans `strings.xml`.
 
-    /** « Destination : X » — [destination] brute, espaces rognés. */
-    fun destinationHeard(destination: String): String = "Destination : ${destination.trim()}"
+    /**
+     * Question de confirmation, toujours en anglais : « Do you really want
+     * to go to X? Travel time: Y. Answer yes or no. » — [destination] brute,
+     * espaces rognés. [durationEn] `null` (résumé indisponible, repli Maps) :
+     * la question omet le temps au lieu d'inventer.
+     */
+    fun confirmQuestion(destination: String, durationEn: String?): String {
+        val clean = destination.trim()
+        val time = durationEn?.trim()?.takeIf { it.isNotEmpty() }?.let { " Travel time: $it." } ?: ""
+        return "Do you really want to go to $clean?$time Answer yes or no."
+    }
+
+    /** Confirmation refusée (« no ») : accusé bref, en anglais. */
+    const val CONFIRM_CANCELLED = "Cancelled."
+
+    /** « yes » pendant le chargement du résumé : patienter, en anglais. */
+    const val CONFIRM_LOADING = "Your route is still loading, one moment."
 
     /** « Voici la fiche de X » — guidage éteint, fiche lieu ouverte. */
     fun placeOpened(destination: String): String = "Voici la fiche de ${destination.trim()}"

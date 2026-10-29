@@ -6,6 +6,8 @@ import dev.sam3vision.app.navigation.TravelMode
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.NavigationPhrases
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
+import dev.sam3vision.core.nav.ConfirmAnswer
+import dev.sam3vision.core.nav.ConfirmAnswerParser
 import dev.sam3vision.core.nav.DestinationQuery
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.RouteSummary
@@ -56,8 +58,9 @@ sealed interface VoiceNavUiState {
  * Même motif que `NavigationHook` : cette classe ne fait que déléguer —
  * [router] (transcript → demande, `null` si pas une navigation),
  * [launcher] (destination → `Result`), [announcer] + [voice] (phrases TTS),
- * [routeLoader] (destination → résumé). Elle-même ne parse rien d'autre que
- * l'ordre stop ([StopGuidanceParser]), ne lance rien, ne synthétise rien.
+ * [routeLoader] (destination → résumé). Elle-même ne parse que l'ordre stop
+ * ([StopGuidanceParser]) et le oui/non ([ConfirmAnswerParser]), ne lance
+ * rien, ne synthétise rien.
  *
  * Contrat :
  * - [onVoiceTranscript] blanc ou sans intention → `false`, l'appelant
@@ -65,8 +68,9 @@ sealed interface VoiceNavUiState {
  *   ou [extraParsers]) → `true` (consommé) et, si [autoStartOnVoice] est
  *   vrai (câblage iSee), démarrage direct sans bouton : moteur embarqué si
  *   possible, sinon Maps piéton ;
- * - [autoStartOnVoice] faux → écran de confirmation + annonce
- *   « Destination : X », puis [confirmDestination] décide ;
+ * - [autoStartOnVoice] faux → écran de confirmation + question vocale
+ *   (« Do you really want to go to X? … », [ConfirmAnswerParser] : « yes »
+ *   = [confirmDestination], « no » = annuler) ;
  * - repli Maps toujours piéton ([TravelMode.WALK]) et **sans** état
  *   [VoiceNavUiState.Guiding] : iSee ne montre jamais un faux guidage quand
  *   c'est Maps qui guide ;
@@ -126,6 +130,10 @@ class VoiceNavSession(
         if (runCatching { StopGuidanceParser.isStop(text) }.getOrDefault(false)) {
             return stopFromVoice()
         }
+        val answer = runCatching { ConfirmAnswerParser.parse(text) }.getOrNull()
+        if (answer != null && _state.value is VoiceNavUiState.Confirming) {
+            return answerFromVoice(answer)
+        }
         val destination = destinationOf(text) ?: return false
         if (autoStartOnVoice) {
             startFromVoice(destination)
@@ -172,14 +180,39 @@ class VoiceNavSession(
         launchMaps(destination)
     }
 
-    /** Ouvre la confirmation et y charge le résumé (annonce « Destination : X »). */
+    /**
+     * Ouvre la confirmation, y charge le résumé, puis pose la question vocale
+     * (« Do you really want to go to X? Travel time: Y. Answer yes or no. »,
+     * sans le temps si le résumé a échoué — le repli Maps reste possible).
+     */
     private suspend fun openConfirmation(destination: String) {
         _state.value = VoiceNavUiState.Confirming(destination, null, true, null)
-        loadSummaryResult(destination).fold(
-            onSuccess = { _state.value = VoiceNavUiState.Confirming(destination, it, false, null) },
-            onFailure = { _state.value = VoiceNavUiState.Confirming(destination, null, false, summaryError(it)) },
+        val loaded = loadSummaryResult(destination)
+        val summary = loaded.getOrNull()
+        _state.value = loaded.fold(
+            onSuccess = { VoiceNavUiState.Confirming(destination, it, false, null) },
+            onFailure = { VoiceNavUiState.Confirming(destination, null, false, summaryError(it)) },
         )
-        voice.announceHeard(destination)
+        voice.announceConfirmQuestion(destination, summary?.durationEn())
+    }
+
+    /**
+     * Réponse vocale sur la confirmation : « yes » = Démarrer (ou patienter
+     * si le résumé charge encore), « no » = Annuler + « Cancelled. ».
+     */
+    private suspend fun answerFromVoice(answer: ConfirmAnswer): Boolean {
+        val current = _state.value as? VoiceNavUiState.Confirming ?: return false
+        if (answer == ConfirmAnswer.NO) {
+            cancelConfirmation()
+            voice.announceConfirmCancelled()
+            return true
+        }
+        if (current.loading) {
+            voice.announceConfirmLoading()
+            return true
+        }
+        confirmDestination()
+        return true
     }
 
     /** Bouton « Démarrer » : lance le guidage (ou la fiche lieu) depuis la confirmation. */

@@ -26,9 +26,10 @@ import dev.sam3vision.core.nav.RouteSummary
  * Confirmation de destination : adresse entendue + résumé d'itinéraire
  * (distance · durée), boutons « Démarrer » / « Annuler » / dictée.
  *
- * Gros texte malvoyant (thème sombre [AppColors]) : la destination est lue
- * à voix haute à l'ouverture (« Destination : X »), l'écran sert de
- * contrôle visuel avant le départ. [onVoiceEntry] redonne la main à la
+ * Gros texte malvoyant (thème sombre [AppColors]) : la question parlée est
+ * posée à l'ouverture (« Do you really want to go to X? … », réponse vocale
+ * « yes »/« no »), l'écran sert de contrôle visuel avant le départ.
+ * [onVoiceEntry] redonne la main à la
  * dictée existante (l'intégrateur déclenche le pipeline habituel).
  * [onSubmitText] reçoit le texte saisi au clavier ([DestinationTextField],
  * câblé par l'intégrateur vers `submitTypedDestination`) ; défaut vide =
