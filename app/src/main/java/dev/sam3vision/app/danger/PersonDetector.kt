@@ -13,9 +13,11 @@ import java.nio.FloatBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Une passe YOLO11n : latence, personnes (pixels source) et forme du tenseur. */
+/** Une passe YOLO11n : latence totale = session ORT + décodage/NMS, personnes et forme. */
 data class PersonResult(
     val inferenceMs: Long,
+    val sessionMs: Long,
+    val decodeMs: Long,
     val persons: List<Detection>,
     val outRows: Int,
     val outCols: Int,
@@ -46,8 +48,10 @@ class PersonDetector private constructor(
                 val input = DepthPreprocess.normalizeCHW(resized, YoloDecode.INPUT_SIZE, ZERO_MEAN, UNIT_STD)
                 val started = SystemClock.elapsedRealtime()
                 val rows = guard.run { runSession(input) }.getOrThrow()
+                val decoded = SystemClock.elapsedRealtime()
                 val persons = YoloDecode.persons(rows, width, height)
-                PersonResult(SystemClock.elapsedRealtime() - started, persons, rows.size, rows[0].size)
+                val done = SystemClock.elapsedRealtime()
+                PersonResult(done - started, decoded - started, done - decoded, persons, rows.size, rows[0].size)
             }
         }
 

@@ -70,18 +70,27 @@ object YoloDecode {
     }
 
     /**
+     * Cap pré-NMS (pratique standard) : la NMS gloutonne est en n², et une
+     * image hors distribution peut sortir des centaines de propositions —
+     * sur le banc Samsung, 1764 candidats non plafonnés coûtaient ~2,5 s.
+     * Sur une vraie frame (quelques personnes), le cap ne change rien.
+     */
+    const val MAX_CANDIDATES = 300
+
+    /**
      * Suppression des non-maximums gloutonne : meilleur score d'abord, on jette
      * ce qui recouvre une boîte gardée (IoU ≥ [iou]) — les doublons YOLO.
+     * Boîtes normalisées une seule fois (pas une allocation par paire).
      */
     private fun nms(candidates: List<Detection>, iou: Float): List<Detection> {
-        val kept = mutableListOf<Detection>()
-        for (candidate in candidates.sortedByDescending { it.score }) {
-            val box = candidate.normalizedBox() ?: continue
-            if (kept.none { ours -> boxIou(ours.normalizedBox().orEmpty(), box) >= iou }) {
-                kept.add(candidate)
-            }
+        val boxed = candidates.sortedByDescending { it.score }
+            .take(MAX_CANDIDATES)
+            .mapNotNull { detection -> detection.normalizedBox()?.let { detection to it } }
+        val kept = mutableListOf<Pair<Detection, List<Float>>>()
+        for ((detection, box) in boxed) {
+            if (kept.none { boxIou(it.second, box) >= iou }) kept.add(detection to box)
         }
-        return kept
+        return kept.map { it.first }
     }
 
     private fun sigmoid(x: Float): Float = (1f / (1f + kotlin.math.exp(-x)))

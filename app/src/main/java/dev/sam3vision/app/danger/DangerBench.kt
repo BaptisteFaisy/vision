@@ -3,10 +3,12 @@ package dev.sam3vision.app.danger
 import android.content.Context
 import android.util.Log
 
-/** Verdict du banc pour YOLO11n : médiane des runs + forme de sortie, ou erreur. */
+/** Verdict du banc pour YOLO11n : médianes totale/session/décodage + forme, ou erreur. */
 data class DangerBenchVerdict(
     val runsMs: List<Long>,
     val medianMs: Long,
+    val sessionMs: Long,
+    val decodeMs: Long,
     val outShape: String,
     val boxes: Int,
     val error: String?,
@@ -38,11 +40,14 @@ object DangerBench {
     ): DangerBenchVerdict {
         val detector = runCatching { PersonDetector.open(context) }.getOrNull()
         if (detector == null) {
-            return logged(DangerBenchVerdict(emptyList(), 0, "", 0, "modèle absent — asset yolo11n.onnx manquant"))
+            val missing = DangerBenchVerdict(emptyList(), 0, 0, 0, "", 0, "modèle absent — asset yolo11n.onnx manquant")
+            return logged(missing)
         }
         try {
             detector.detect(argb, width, height)
             val times = mutableListOf<Long>()
+            val sessions = mutableListOf<Long>()
+            val decodes = mutableListOf<Long>()
             var shape = ""
             var boxes = 0
             var error: String? = null
@@ -54,21 +59,26 @@ object DangerBench {
                     break
                 }
                 times.add(result.inferenceMs)
+                sessions.add(result.sessionMs)
+                decodes.add(result.decodeMs)
                 boxes = result.persons.size
                 shape = "${result.outRows}x${result.outCols}"
             }
-            return logged(DangerBenchVerdict(times, medianOf(times), shape, boxes, error))
+            val verdict = DangerBenchVerdict(
+                times, medianOf(times), medianOf(sessions), medianOf(decodes), shape, boxes, error,
+            )
+            return logged(verdict)
         } finally {
             detector.close()
         }
     }
 
-    /** Une ligne : « model=YOLO11n medianMs=88 runs=5 out=84x8400 boxes=0 fps=11.4 ». */
+    /** Une ligne : « model=YOLO11n medianMs=88 sess=80 dec=8 runs=5 out=84x8400 boxes=0 fps=11.4 ». */
     fun summary(result: DangerBenchVerdict): String {
         if (!result.ok) return "model=$CODE KO — ${result.error}"
         // Locale.US : point décimal même sur téléphone français (parsé par la recette).
         val fps = if (result.medianMs <= 0) "?" else "%.1f".format(java.util.Locale.US, 1000f / result.medianMs)
-        return "model=$CODE medianMs=${result.medianMs} " +
+        return "model=$CODE medianMs=${result.medianMs} sess=${result.sessionMs} dec=${result.decodeMs} " +
             "runs=${result.runsMs.size} out=${result.outShape} boxes=${result.boxes} fps=$fps"
     }
 

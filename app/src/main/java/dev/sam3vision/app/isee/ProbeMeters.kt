@@ -5,6 +5,7 @@ import dev.sam3vision.app.danger.DangerAlert
 import dev.sam3vision.app.danger.DangerPipeline
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.depth.LiveDepthMeter
+import dev.sam3vision.core.danger.DangerSnapshot
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
@@ -39,6 +40,9 @@ internal class ProbeMeters(
     /** Distances affinées par la profondeur, ou le sténopé tel quel. */
     fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> =
         depth?.readingsFor(frame, pinhole) ?: pinhole
+
+    /** Dernière frame danger analysée (vide sans contexte) : pistes + dimensions. */
+    fun dangerSnapshot(): DangerSnapshot = danger?.snapshot() ?: DangerSnapshot.Empty
 
     /** Oublie cartes, pistes et moteurs (nouvelle séance). */
     fun reset() {
