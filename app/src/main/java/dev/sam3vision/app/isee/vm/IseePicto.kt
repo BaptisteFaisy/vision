@@ -91,6 +91,9 @@ class IseePicto(
     /** PNG d'un repère pour l'overlay, `null` si inconnu. */
     fun pngOf(id: String): ByteArray? = pictos.firstOrNull { it.id == id }?.png
 
+    /** Libellés armés : la chasse vocale vise l'un d'eux. */
+    fun labels(): List<String> = pictos.map { it.label }
+
     /** Zone tactile du chip, en coordonnées fenêtre, `null` quand il n'est pas affiché. */
     fun chipZone(): RectF? = chipBounds
 

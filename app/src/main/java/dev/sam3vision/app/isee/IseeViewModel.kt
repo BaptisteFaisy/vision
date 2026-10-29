@@ -22,6 +22,7 @@ import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
+import dev.sam3vision.app.isee.vm.IseePictoVoice
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
@@ -159,8 +160,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
     )
 
-    /** Ordre vocal « maison » : direct essentiels + annonce, en premier (jamais LLM). */
+    /** Ordres vocaux maison puis picto/chasse : transfèrent au direct, jamais LLM. */
     private val maisonEnter = MaisonEnterOrder({ settings }, ::speakNavigation, ::update)
+    private val pictoVoice = IseePictoVoice(picto::labels, { settings }, ::speakNavigation, ::update)
 
     /**
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
@@ -417,17 +419,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IseeStatusText.NOTHING_HEARD)
             return
         }
-        // Une seule question à la fois : deux appels LLM concurrents sont refusés (409).
         if (_state.value.thinking) {
             dropHeard(IseeStatusText.ANSWER_PENDING)
             return
         }
         if (maisonEnter.run(text)) return
-        // Ordre de cap : consommé AVANT Maps (« va à gauche » matche « va à X »), jamais LLM.
+        if (pictoVoice.run(text)) return
         if (runSteeringCommand(text)) return
-        // Navigation in-app (Valhalla) : démarrage direct + moteur, avant le handoff Maps.
         if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
-        // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
         if (runCrossingCommand(text)) return
