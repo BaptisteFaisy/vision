@@ -81,21 +81,32 @@ deploy_once() {
 # « ok » si /health montre l'app rapide AVEC ses leviers ; sinon la raison.
 check_once() {
   local body
-  body="$(timeout 60 curl -fsS --max-time 50 "$URL" 2>/dev/null)" || { echo "injoignable"; return 1; }
+  body="$(timeout 60 curl -fsS --max-time 50 "$URL" 2>/dev/null)" \
+    || { echo "injoignable ou 5xx (fenêtre de mort ?)"; return 1; }
   printf '%s' "$body" | python3 -c '
 import json, sys
 h = json.load(sys.stdin)
 lev, app = h.get("levers") or {}, h.get("applied") or {}
+restored = h.get("restored")
 print("gpu    :", h.get("gpu"))
 print("model  :", h.get("model"))
 print("levers :", json.dumps(lev, ensure_ascii=False, sort_keys=True))
 print("applied:", json.dumps(app, ensure_ascii=False, sort_keys=True))
+print("boot   :", "restore" if restored is True else
+      "complet" if restored is False else "inconnu (backend trop vieux ?)")
+print("load   :", json.dumps(h.get("load_breakdown"), ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
                            "snapshot": True, "detr_graph": False,
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
     sys.exit("model pas \"fast\"")
+if not isinstance(restored, bool):
+    sys.exit("champ restored absent (backend trop vieux ?)")
+lb = h.get("load_breakdown")
+if not isinstance(lb, dict) or any(k not in lb for k in
+        ("age_conteneur_s", "poids_cpu_1er_demarrage_s", "gpu_s")):
+    sys.exit("champ load_breakdown absent ou incomplet")
 if missing:
     sys.exit("leviers absents : %s" % ",".join(missing))
 if app.get("vision_accel") != "ok":
