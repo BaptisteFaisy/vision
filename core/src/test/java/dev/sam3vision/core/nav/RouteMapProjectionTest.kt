@@ -12,6 +12,36 @@ class RouteMapProjectionTest {
     private val gare = RoutePoint(48.8443, 2.3730)
 
     @Test
+    fun `un cadre autour d'une position la met au centre`() {
+        val bounds = mapBoundsAround(louvre, 150.0)
+        val fit = bounds.fit(600f, 600f, 40f)
+        val px = fit.project(louvre)
+
+        assertEquals(300f, px.x, 1f)
+        assertEquals(300f, px.y, 1f)
+        // 150 m de chaque côté : l'échelle est celle du cadre, pas du bruit.
+        val half = fit.metersToPx(150.0)
+        assertTrue("échelle attendue > 100 px, obtenue $half", half > 100f)
+    }
+
+    @Test
+    fun `un cadre de rayon nul reste projetable`() {
+        val fit = mapBoundsAround(gare, 0.0).fit(400f, 400f, 20f)
+        val px = fit.project(gare)
+
+        assertEquals(200f, px.x, 1f)
+        assertEquals(200f, px.y, 1f)
+    }
+
+    @Test
+    fun `une position non finie rend un cadre vide sans lever`() {
+        val bounds = mapBoundsAround(RoutePoint(Double.NaN, 2.0), 150.0)
+
+        assertEquals(0.0, bounds.minLat, 1e-9)
+        assertEquals(0.0, bounds.maxLon, 1e-9)
+    }
+
+    @Test
     fun `cadre englobant ignore les points non finis`() {
         val bounds = mapBoundsOf(
             listOf(

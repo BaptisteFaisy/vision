@@ -53,9 +53,9 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
-| Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) |
-| Tests | **2 867 `@Test`** JVM (`:core` 1 804, `:app` 1 063, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
-| Taille | **918** fichiers `.kt`, **54 863** lignes de prod (`:core` 22 179, `:app` 32 684, mesure du 29/10/2026 par `tools/count-tree.py`) |
+| Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35` (+ `MAX`)) |
+| Tests | **2 875 `@Test`** JVM (`:core` 1 804, `:app` 1 071, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
+| Taille | **913** fichiers `.kt`, **54 750** lignes de prod (`:core` 22 200, `:app` 32 550, mesure du 29/10/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
@@ -75,7 +75,7 @@ vient de `JAVA_HOME` / `ANDROID_HOME` (§3.3).
 Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle passe sous
 `timeout 280` : un build bloqué ne doit jamais manger la session. Tests JVM uniquement
 (`TestHttpServer` maison, pas de MockWebServer) ; pas d'instrumentation sans demande explicite
-(les 10 tests `androidTest` exigent un appareil).
+(les 9 tests `androidTest` exigent un appareil).
 
 ## 3. Règles strictes — la CI échoue si elles sont violées
 
@@ -146,7 +146,7 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
   de file externe, et pas de gate IA : la seule porte est la CI (`docs/CI-QUEUE.md`).
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
-  **12 concepts** par défaut, 16 au plus (`core/live/LivePrompts.kt:31-35,43`) et **deux cadences** — Direct
+  **12 concepts** par défaut, 16 au plus (`core/live/LivePrompts.kt:31-35` (+ `MAX`)) et **deux cadences** — Direct
   350/500/900 ms (`core/live/LiveSession.kt:34`), sonde iSee `fastMs = 0`, `concurrency = 1`,
   budget 150 ms (`LiveSession.kt:43-50`).
 - Langue du projet : **français** (code commenté, commits `feat(isee): …`, docs).

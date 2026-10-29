@@ -17,14 +17,19 @@ Deux leviers, dans cet ordre, mesurés sur `sam3-eu-a100` (A100-40GB, eu-west) :
    `Restoring Function from memory snapshot`, puis `GET /health -> 200` en **2,3 à 7,3 s**).
    Le tout premier démarrage après un déploiement crée le snapshot (≈ 24 s, incompressible).
 
-Restauration **opportuniste, pas garantie** (enquête Modal du 29/10/2026) : le snapshot
-ne survit qu'**~1 min après la mort du conteneur** — passé ce délai, le réveil est un
-**boot complet (18-32 s)** : poids CPU + phase GPU. Tout réveil se lit donc « restore
-**ou** boot complet », jamais comme un restore acquis.
+Restauration **freeze/thaw** (mesuré le 29/10/2026, 2 réveils) : après une extinction
+idle (scaledown 60 s), Modal **gèle** le conteneur au lieu de le tuer — le réveil est
+un **thaw à 5,5-10,9 s** (thaw réseau + phase GPU 1,4-4,6 s), pas un boot complet.
+L'âge `/proc` inclut le gel (thaw à 185,8 s pour un snap de 20,4 s).
+
+En revanche **POST /release tue** (`os._exit`, pas de gel) : le réveil suivant est
+un **boot complet** — 27,6 s mesuré (hôte froid : ~20 s CPU dont 12 s
+`import transformers`, + GPU + overhead Modal ; ~11 s sur hôte chaud). Quitter
+l'app coûte donc le boot complet au retour ; la laisser idler 60 s donne le thaw.
 
 Contrainte à connaître : un snapshot mémoire ne contient pas d'état CUDA, d'où la
-coupure CPU/GPU entre les deux `enter`. `/health` expose `restored` (vrai ssi ce boot
-est une restauration : `snap_seconds > age_conteneur_s + 2`), `load_breakdown`
+coupure CPU/GPU entre les deux `enter`. `/health` expose `restored` (vrai ssi thaw :
+`age_conteneur_s - poids_cpu_1er_demarrage_s > 30`), `load_breakdown`
 (`age_conteneur_s`, `poids_cpu_1er_demarrage_s`, `gpu_s`) et `memory_snapshot`.
 (`load_seconds` ne mesure que la phase GPU ; le VRAI temps d'ouverture est
 `load_breakdown.age_conteneur_s`.)

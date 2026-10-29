@@ -48,6 +48,27 @@ fun mapBoundsOf(points: List<RoutePoint>): MapBounds? {
 }
 
 /**
+ * Cadre carré de [radiusM] mètres autour d'un point : la vue du mode
+ * navigation, où il n'y a pas d'itinéraire à encadrer. Point non fini :
+ * cadre vide en (0, 0) — [MapFit] le rend dégénéré, donc centré. Ne lève jamais.
+ */
+fun mapBoundsAround(center: RoutePoint, radiusM: Double): MapBounds {
+    if (!center.lat.isFinite() || !center.lon.isFinite()) {
+        return MapBounds(0.0, 0.0, 0.0, 0.0)
+    }
+    val span = radiusM.coerceAtLeast(0.0)
+    val latSpan = span / METERS_PER_DEGREE
+    val cosRef = cos(center.lat * Math.PI / 180.0).coerceAtLeast(0.01)
+    val lonSpan = span / (METERS_PER_DEGREE * cosRef)
+    return MapBounds(
+        minLat = center.lat - latSpan,
+        maxLat = center.lat + latSpan,
+        minLon = center.lon - lonSpan,
+        maxLon = center.lon + lonSpan,
+    )
+}
+
+/**
  * Ajustement d'un [MapBounds] à un canevas : projection équirectangulaire
  * (longitude corrigée par `cos` de la latitude moyenne), homothétie uniforme
  * (aspect-fit), nord en haut. Cadre dégénéré (un seul point) : centré.

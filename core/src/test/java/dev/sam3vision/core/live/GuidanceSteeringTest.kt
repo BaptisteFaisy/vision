@@ -97,41 +97,38 @@ class GuidanceSteeringTest {
     }
 
     @Test
-    fun `phrase voie libre par cap`() {
-        assertEquals("Va à gauche.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left)))
-        assertEquals("Va à droite.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Right)))
+    fun `mot voie libre par cap`() {
+        assertEquals("Gauche.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left)))
+        assertEquals("Droite.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Right)))
         assertEquals(
-            "Go left.",
+            "Left.",
             Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left), SpeechLanguage.En),
         )
     }
 
     @Test
-    fun `phrase cap bouche avec obstacle et passage`() {
+    fun `mot cap bouche avec passage`() {
         val gauche = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
-        assertEquals("Va vers le centre, 2 mètres.", Guidance.phrase(gauche))
+        assertEquals("Tout droit.", Guidance.phrase(gauche))
     }
 
     @Test
-    fun `phrase cap bouche anglaise et sans distance`() {
+    fun `mot cap bouche anglais et sans distance`() {
         val droite = Guidance.decide(listOf(placed("person", 0.8f, 2f)), SteeringCap.Right)
 
-        assertEquals(
-            "Go to the center, 2 meters.",
-            Guidance.phrase(droite, SpeechLanguage.En),
-        )
+        assertEquals("Straight.", Guidance.phrase(droite, SpeechLanguage.En))
         val sansDistance = Guidance.decide(listOf(placed("personne", 0.2f)), SteeringCap.Left)
 
-        assertEquals("Va vers le centre.", Guidance.phrase(sansDistance))
+        assertEquals("Tout droit.", Guidance.phrase(sansDistance))
     }
 
     @Test
-    fun `signature porte le cap`() {
-        assertEquals("Left:free", Guidance.key(Guidance.decide(emptyList(), SteeringCap.Left)))
+    fun `signature le mot seul`() {
+        assertEquals("w|left", Guidance.key(Guidance.decide(emptyList(), SteeringCap.Left)))
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.2f, 2.4f)), SteeringCap.Left)
 
-        assertEquals("Left:b|personne|Straight|2|10h", Guidance.key(bloque))
+        assertEquals("w|straight", Guidance.key(bloque))
     }
 }

@@ -43,9 +43,28 @@ queue_rules:
     max_checks_retries: 1
 
 merge_queue:
-  # 4 lots testés en parallèle. Chaque lot = 3 jobs (`ci` 2 jobs + `couche0`)
-  # sur les runners self-hosted ; 4 × 3 = 12 créneaux sur 19.
-  max_parallel_checks: 4
+  # 8 lots testés en parallèle (demande user du 29/10 : « pousse à 8 »).
+  # Pool : 21 runners self-hosted. Par lot, un seul job lourd (`ci`, ~40 s) et
+  # des jobs courts (`ci-budget` 9 s, `couche0` 7 s) ; le doublon `pull_request`
+  # sur la branche de lot ne rejoue plus Gradle (cf. `ci.yml`, pas « Cette PR
+  # touche-t-elle du code ? »). 8 lots ≈ 8 jobs lourds simultanés, très en
+  # dessous des 21 créneaux : le reste du pool garde la CI des PR, qui est la
+  # porte d'entrée de la file.
+  #
+  # `mode` et `max_parallel_checks` sont des options de la FILE : les mettre
+  # dans une règle de `queue_rules` est refusé par le schéma Mergify
+  # (« Additional properties are not allowed »). C'était le cas dans
+  # BaptisteFaisy/isee, corrigé ici au bon niveau.
+  #
+  # isolated (2026-10-29) : chaque lot est testé seul contre `master`, sans
+  # dépendance aux autres lots — les 8 lots ne s'attendent plus. Contrepartie
+  # assumée : plus de test cumulatif, deux PR vertes séparément peuvent casser
+  # `master` ensemble ; et `skip_intermediate_results` ne s'applique pas dans
+  # ce mode. `parallel` (dépendances par scopes) demanderait un bloc `scopes:`
+  # que ce dépôt n'a pas, et `fast-forward` est interdit ici — on merge en
+  # `rebase`, donc compatible.
+  mode: isolated
+  max_parallel_checks: 8
 
 priority_rules:
   - name: urgent

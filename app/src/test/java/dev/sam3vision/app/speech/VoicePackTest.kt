@@ -26,10 +26,10 @@ class VoicePackTest {
 
     @Test
     fun `le nom de fichier suit vp id langue`() {
-        assertEquals("vp_tl_left_fr.mp3",
-            VoicePack.fileNameFor("tl_left", SpeechLanguage.Fr))
-        assertEquals("vp_tl_stop_en.mp3",
-            VoicePack.fileNameFor("tl_stop", SpeechLanguage.En))
+        assertEquals("vp_cross_green_fr.mp3",
+            VoicePack.fileNameFor("cross_green", SpeechLanguage.Fr))
+        assertEquals("vp_cross_red_en.mp3",
+            VoicePack.fileNameFor("cross_red", SpeechLanguage.En))
     }
 
     @Test
@@ -42,7 +42,7 @@ class VoicePackTest {
     fun `le clip embarqué s installe quand la voix colle`() {
         val voix = pack(embarque = { "MP3".toByteArray() })
 
-        val clip = voix.clipFor("tl_left", SpeechLanguage.Fr, "voix-laure-12345678")
+        val clip = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
 
         assertEquals("MP3", clip?.readText())
         assertTrue(clip?.path?.contains("voicepack-voix-lau") == true)
@@ -52,9 +52,9 @@ class VoicePackTest {
     fun `le cache relit sans toucher l embarqué`() {
         var lectures = 0
         val voix = pack(embarque = { lectures++; "MP3".toByteArray() })
-        val premier = voix.clipFor("tl_left", SpeechLanguage.Fr, "voix-laure-12345678")
+        val premier = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
 
-        val second = voix.clipFor("tl_left", SpeechLanguage.Fr, "voix-laure-12345678")
+        val second = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
 
         assertEquals(premier?.path, second?.path)
         assertEquals(1, lectures)
@@ -65,7 +65,7 @@ class VoicePackTest {
         var lectures = 0
         val voix = pack(embarque = { lectures++; "MP3".toByteArray() })
 
-        val clip = voix.clipFor("tl_left", SpeechLanguage.Fr, "autre-voix-00000000")
+        val clip = voix.clipFor("cross_green", SpeechLanguage.Fr, "autre-voix-00000000")
 
         assertNull(clip)
         assertEquals(0, lectures)
@@ -75,12 +75,12 @@ class VoicePackTest {
     fun `clip périmé réinstallé`() {
         var lectures = 0
         val voix = pack(embarque = { lectures++; "NEUF".toByteArray() })
-        val vieux = voix.clipFor("tl_left", SpeechLanguage.Fr, "voix-laure-12345678")
+        val vieux = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
         vieux?.setLastModified(0L)
         val perime = pack(embarque = { lectures++; "NEUF".toByteArray() },
             horloge = { VoicePack.CLIP_TTL_MS + 1 })
 
-        val clip = perime.clipFor("tl_left", SpeechLanguage.Fr, "voix-laure-12345678")
+        val clip = perime.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
 
         assertEquals(vieux?.path, clip?.path)
         assertEquals(2, lectures)
@@ -90,27 +90,27 @@ class VoicePackTest {
     fun `put met en cache la synthèse runtime`() {
         val voix = pack()
 
-        val clip = voix.put("tl_stop", SpeechLanguage.En, "voix-laure-12345678", "SYNTH".toByteArray())
+        val clip = voix.put("cross_red", SpeechLanguage.En, "voix-laure-12345678", "SYNTH".toByteArray())
 
         assertEquals("SYNTH", clip?.readText())
         assertEquals(clip?.path,
-            voix.clipFor("tl_stop", SpeechLanguage.En, "voix-laure-12345678")?.path)
+            voix.clipFor("cross_red", SpeechLanguage.En, "voix-laure-12345678")?.path)
     }
 
     @Test
     fun `put refuse le vide`() {
         val voix = pack()
 
-        assertNull(voix.put("tl_stop", SpeechLanguage.En, "v", null))
-        assertNull(voix.put("tl_stop", SpeechLanguage.En, "v", ByteArray(0)))
+        assertNull(voix.put("cross_red", SpeechLanguage.En, "v", null))
+        assertNull(voix.put("cross_red", SpeechLanguage.En, "v", ByteArray(0)))
     }
 
     @Test
     fun `le cache runtime survit au changement de pack`() {
         val voix = pack(voixPack = "ancienne-voix-11111111")
-        voix.put("tl_left", SpeechLanguage.Fr, "nouvelle-voix-22222222", "SYNTH".toByteArray())
+        voix.put("cross_green", SpeechLanguage.Fr, "nouvelle-voix-22222222", "SYNTH".toByteArray())
 
-        val clip = voix.clipFor("tl_left", SpeechLanguage.Fr, "nouvelle-voix-22222222")
+        val clip = voix.clipFor("cross_green", SpeechLanguage.Fr, "nouvelle-voix-22222222")
 
         assertEquals("SYNTH", clip?.readText())
     }
@@ -118,10 +118,10 @@ class VoicePackTest {
     @Test
     fun `les langues ne se mélangent pas`() {
         val voix = pack()
-        voix.put("tl_left", SpeechLanguage.Fr, "v", "FR".toByteArray())
-        voix.put("tl_left", SpeechLanguage.En, "v", "EN".toByteArray())
+        voix.put("cross_green", SpeechLanguage.Fr, "v", "FR".toByteArray())
+        voix.put("cross_green", SpeechLanguage.En, "v", "EN".toByteArray())
 
-        assertEquals("FR", voix.clipFor("tl_left", SpeechLanguage.Fr, "v")?.readText())
-        assertEquals("EN", voix.clipFor("tl_left", SpeechLanguage.En, "v")?.readText())
+        assertEquals("FR", voix.clipFor("cross_green", SpeechLanguage.Fr, "v")?.readText())
+        assertEquals("EN", voix.clipFor("cross_green", SpeechLanguage.En, "v")?.readText())
     }
 }

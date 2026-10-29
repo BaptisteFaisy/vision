@@ -21,13 +21,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   compagnon embarquée dans chaque APK ne se chargeait plus. `getElementById('recenter')`
   visait aussi un élément disparu. Les deux lignes partent ; `destPoint`, `objectsOf`,
   `iconFor` (exports de la carte) partent avec leurs assertions.
-- README réécrit sur des chiffres **re-mesurés** (918 `.kt` et non 876, 54 863 lignes de prod
-  et non 52 815, 2 867 `@Test` JVM + 10 instrumentés, 35 fichiers Python) : 12 concepts du
+- README réécrit sur des chiffres **re-mesurés** (913 `.kt` et non 876, 54 750 lignes de prod
+  et non 52 815, 2 875 `@Test` JVM + 9 instrumentés, 35 fichiers Python) : 12 concepts du
   direct par défaut et 16 au plus (et non 6), **LiteRT** et non « TensorFlow Lite », les
   écrans legacy réellement listés dans « Other screens » (Direct, Classic home, segment),
   traversée *proposée* et jamais activée, file de merge **Mergify** et non native, relais
   `suivi-relais/` (Worker + D1) et non le Vercel abandonné, `server/backend/baseten/`,
-  `NOTICE` et les 45 docs cités, clé Maps pour la navigation (la carte compagnon n'existe plus).
+  `NOTICE` et les 46 docs cités, clé Maps pour la navigation (la carte compagnon n'existe plus).
 - `tools/count-tree.py` : le relevé devient rejouable (`--json`) — les chiffres recopiés
   avaient dérivé trois fois en une journée. `docs/ARCHITECTURE.md` §1, `docs/PERF.md`
   §1.1-1.2, `docs/TESTING.md` §1 et §6 (régénéré depuis les rapports JUnit), `NOTES.md`,
@@ -35,8 +35,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   rien n'écrit plus dans `traced_captures`.
 - Boule Portrait : empreinte re-gelée (`tools/orb-frozen-baseline.json`, « changement voulu »
   du garde) — seul un wrapper sans appelant est parti, **aucune ligne de rendu** ne bouge.
-- Preuves : `:core` 1 804 + `:app` 1 063 tests JVM, 0 échec ; `:app:assembleDebug` OK (poste
-  MS-7D18, JDK 21 → bytecode 17) ; `check-kotlin-limits` (1 017 fichiers, 0 dépassement),
+- Preuves : `:core` 1 804 + `:app` 1 071 tests JVM, 0 échec ; `:app:assembleDebug` OK (poste
+  MS-7D18, JDK 21 → bytecode 17) ; `check-kotlin-limits` (1 013 fichiers, 0 dépassement),
   `check-isee-design`, `check-budget-derive`, `check-voice-nav-doc`, `check-apk-keys` OK ;
   `scripts/test_scripts.sh` 101/101 ; `node --test suivi-parent/test/*.test.mjs` 16/16 ;
   `suivi-relais` 10/10.
@@ -46,6 +46,109 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   isee/IseePortraitOrb.kt,isee/ProbeFrame.kt,perms/PermGate.kt}`,
   `core/.../{mask/MaskCore.kt,net/Json.kt,segment/Segmenter.kt}`,
   `suivi-parent/{live.mjs,session.mjs,test/session.test.mjs}`.
+## 2026-10-29 — voix : le guidage dit quatre mots en moins de 100 ms (ordre user)
+
+- **Demande** : pas assez d'infos/seconde (5 minimum) — dire juste
+  `left`/`straight`/`right`/`stop`, source SAM, mot parlé en <100ms.
+- `GuidanceWord` (core pur) : voie libre ⇒ cap, bouché ⇒ côté/passage,
+  contact mesuré ≤0,6m ⇒ stop, décalage/trottoir ⇒ côté ; FR/EN.
+  Annonceur : mot nouveau dit aussitôt (ni délai ni stabilité), même mot
+  muet. `LateralNudgeText`/`SidewalkText`/clés morts supprimés.
+- Clips `guide_*` (8 MP3 voix Laure, catalogue + garde OK) joués depuis
+  le disque (`VoicePack` + `playFile`, zéro réseau) ; synthèse + cache
+  sinon (`ProximityVoice.speakWord`). Tous les mots urgents (coupent tout).
+- Preuves : `:core` 1 800 + `:app` 1 071 tests, 0 échec, sur r630
+  (`GuidanceWordTest` 5/5, `GuidanceAnnouncerTest` 15/15,
+  `ProximityVoiceWordTest` 3/3), `check-kotlin-limits` +
+  `check-voicepack` OK. Docs `GUIDAGE-TOUT-DROIT.md`, `VOIX-DANGER.md` § 10.
+- Fichiers : `GuidanceWord.kt`, `Guidance.kt`, `GuidanceAnnouncer.kt`,
+  `LateralNudge.kt`, `SidewalkKeep.kt`, `ProximityVoice.kt`,
+  `ProbeWiring.kt`, `IseeViewModel.kt`, `LiveProbe.kt` (+8 MP3, +10 tests).
+
+## 2026-10-29 — iSee : guidage SAM seul, TwinLiteNet viré (ordre user)
+
+- **Demande** : plus de TwinLiteNet (sol) — SAM seul guide : conseil de
+  décalage latéral calculé à chaque frame (« Décalez-vous à gauche. » si des
+  personnes arrivent à droite) et dit par SAM, une info par frame reçue.
+- `LateralNudge` (pur core, miroir `VehicleApproach` sans boîte/identité) :
+  côté le plus proche qui se rapproche 2 frames de suite → phrase urgente,
+  branché dans `GuidanceAnnouncer` entre bouché et trottoir (bouché > décalez
+  > trottoir > libre). Flèche existante réutilisée (`passage` + `urgent`).
+  Voix = Laure ElevenLabs comme le reste (pas de 2ᵉ moteur).
+- TwinLite supprimé : paquets `core/segment` + `app/segment` + `app/litert`,
+  `IseeTwinLite`, `TwinLite{Layer,Voice,Wiring}`, route `Segment` + bouton
+  Réglages, 8 MP3 `vp_tl_*` + entrées catalogue, dép. `litert-edge`,
+  `mutesTwinLite` + fenêtre 10 s (`ProbeHazards` = reset commun), helper
+  `resizeArgbBilinearRect`. Perte du secours sol offline assumée.
+- Non-fait volontaire : `Cadence.Fast.targetMs` reste à 0 — le passer à 250
+  espaçait les **envois** (info toutes les 250 + latence au lieu de chaque
+  frame) et cassait 4 tests sonde ; revert prouvé vert.
+- Preuves : `:core` 1 780 + `:app` 1 042 tests, 0 échec, sur r630
+  (`LateralNudgeTest` 12/12, `GuidanceAnnouncerTest` 15/15, `ProbeVoiceTest`
+  9/9, `ProbeHazardsTest` 2/2, `ProbeWiringSpokenTest` 3/3),
+  `assembleDebug` vert, `check-kotlin-limits` + `check-voicepack` OK.
+- Fichiers : `LateralNudge.kt`, `GuidanceAnnouncer.kt`, `Steering.kt`,
+  `ProbeVoice.kt`, `LiveProbe.kt`, `ProbeWiring.kt`, `IseeViewModel.kt`,
+  `AppNav.kt`, `Settings*.kt`, `UiLogicTest.kt` (+35 fichiers supprimés).
+- Recette téléphone (Direct, obstacle réel, logcat sans `twinlite`) après merge.
+## 2026-10-29 — Mode navigation : la carte passe sous la caméra (ordre user)
+
+- **Demande** : « la map navigation doit être sous la caméra et disparaître
+  quand l'user parle ».
+- Le mode carte n'empile plus d'écran : `NavigationMapLayer` est la **première
+  couche de la scène iSee** (avant la rue, la boule et les textes), plein
+  écran, fond OSM MapLibre + repli schéma (`drawNavigationMap`).
+- **Effacement pendant la parole** : `navigationMapHidden(state)` =
+  `holding || transcribing` → alpha 0 en 220 ms, retour ensuite ; iSee qui
+  parle ne masque pas la carte. La MapView n'est pas détruite (pas de
+  rechargement de tuiles à chaque tenue).
+- `AppNav` : l'état `Map` ne pousse plus `Route.VoiceNav` ; entrer en mode
+  carte depuis n'importe quelle page ramène à l'accueil iSee. `MapModeScreen`
+  (écran plein écran avec bouton « Quitter ») supprimé : les sorties sont
+  vocales, comme l'entrée.
+- Preuves : `:core` 1 801 tests, `:app` 1 068, 0 échec (dont
+  `NavigationMapLayerTest` 5 : effacement, cadre de repli),
+  `check-kotlin-limits` et `check-voice-nav-doc.py` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
+  `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
+
+## 2026-10-29 — Mode navigation : la carte s'ouvre à la voix (ordre user)
+
+- **Demande** : « un mode navigation dans iSee, accessible en lui parlant, avec
+  la carte et le GPS si besoin ».
+- `:core` `MapModeCommand` (pur) : « navigation », « carte », « plan », « mode
+  navigation », « ouvre la carte », « affiche le plan », « où suis-je » entrent ;
+  une destination (« navigation vers X », « ouvre la carte de X ») et un ordre de
+  sortie (« arrête la navigation », « quitte la carte ») n'entrent pas.
+  `MapModeText` : phrases FR/EN d'entrée et de sortie.
+- `VoiceNavUiState.Map` + `VoiceNavSession.enterMap()/leaveMap()` : ouverture
+  seulement depuis le repos (jamais par-dessus un guidage), sortie muette côté
+  session (l'appelant parle, jamais « Guidage arrêté ») ; une destination dictée
+  depuis la carte ouvre la confirmation comme depuis l'accueil.
+- `MapModeScreen` plein écran (position + cercle de précision, passages piétons
+  du `/signals`, micro appui long, bouton « Quitter »), `MapPositionWatcher`
+  (GPS + réseau, 2 s, `LocationManager`) et `mapBoundsAround` (cadre de 200 m).
+- iSee : `IseeModeOrders` réunit maison, carte et pictos en un seul point
+  d'essai (avant la navigation et le LLM) ; `IseeViewModel` repasse sous 500
+  lignes (498).
+- Preuves locales : `:core` 1 816 tests, `:app` 1 080, 0 échec (dont
+  `MapModeCommandTest` 9, `MapModeOrderTest` 6, `VoiceNavSessionMapTest` 6,
+  `MapModeScreenTest` 5, `RouteMapProjectionTest` 9), `check-kotlin-limits` OK.
+- `MapModeScreen` plein écran : **fond OSM MapLibre** du guidage
+  (`GuidanceMapView`, caméra rue sur la position — `docs/CARTE-OSM.md` §4 bis),
+  repli schéma si les tuiles échouent, feux du `/signals`, micro appui long,
+  bouton « Quitter » ; `MapPositionWatcher` (GPS + réseau, 2 s,
+  `LocationManager`) et `mapBoundsAround` (schéma de repli, cadre de 200 m).
+- iSee : `IseeModeOrders` réunit maison, carte et pictos en un seul point
+  d'essai (avant la navigation et le LLM) ; `IseeViewModel` repasse sous 500
+  lignes (498).
+- Preuves locales (après rebasage sur le fond OSM de master) : `:core` 1 801
+  tests, `:app` 1 068, 0 échec (dont `MapModeCommandTest` 9,
+  `MapModeMapStateTest` 4, `MapModeOrderTest` 6, `VoiceNavSessionMapTest` 6,
+  `MapModeScreenTest` 5, `RouteMapProjectionTest` 9), `check-kotlin-limits` et
+  `check-voice-nav-doc.py` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis, `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
+- Recette téléphone (carte + vrai GPS) après merge.
 
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
@@ -105,6 +208,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Feu vert : quatre tentatives de rappel, zéro gain (documenté)
+
+- **Demande** : relever le rappel vert de 1/6 vers ≥ 4/6 sans faux vert.
+- `docs/CALIBRAGE-FEU.md` (**nouveau**) : la chaîne de mesure, la chasse aux
+  données, quatre variantes mesurées, et le chiffre qui condamne le réglage.
+- Quatre voies testées sur les mêmes 16 crops : boîte brute **1/6**, crop sur la
+  tache verte 2/6 **+1 faux vert**, crop sur la lentille 1/6 **+1 faux vert**,
+  boîte élargie +25 % 1/7 **+1 faux vert**. Aucune n'est retenue.
+- Cause démontrée : `ELONGATION_MIN = 1.5` suppose une tache allongée. Vrais
+  verts rejetés : 1,00 · 1,07 · 1,11 · 0,15 ; disques voiture à rejeter : 1,30 ·
+  1,47. **Ordre inversé**, aucun seuil ne sépare.
+- Données : **Ampel-Pilot est mort** (`NoSuchBucket`, la source citée dans
+  `TrainedLightColor`), ImVisible bloqué par le quota Drive (4 images lisibles
+  sur 1 363 dans le zip tronqué), LytNet chargé mais inutilisable (prétraitement
+  0-255 non documenté, `AvgPool2d(12,9)` figé, domaine plein cadre US).
+- Piège écarté : l'élargissement +25 % fait passer l'acceptation du vert de
+  26 % à 40 % sur 280 crops jittés — mais ces crops viennent de **6 feux**, et
+  sur les photos indépendantes il crée un faux vert. Mémoire, pas généralisation.
+- **Recommandation écrite** : ne pas toucher la porte ; il faut des données
+  labellisées dans le domaine SAM (235 lampes Panoramax, ou 200-400 crops
+  téléphone jour+nuit).
+
 ## 2026-10-29 — Traversée : un passage piéton reconnu propose le mode
 
 - **Demande** : si l'app reconnaît un passage piéton, qu'elle propose de passer
@@ -126,8 +251,10 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   la proposition reviendrait à la frame suivante.
 - **Preuves** : `CrossingOfferTest` 8, `CrossingWiringTest` 6 ; `:core`
   1 809 tests + `:app` 1 059, 0 échec ; `check-kotlin-limits` OK.
-- **À vérifier** : la fiabilité de `crosswalk` sur une vraie chaussée — la
-  mesure du jour portait sur les feux, pas sur les passages.
+- `crosswalk` **mesuré** : 7 détections sur 5 photos de passages réels (scores
+  0,54-0,89), **0** sur 5 scènes sans passage (2 salons, 3 autoroutes vues du
+  ciel). Le concept discrimine sur cet échantillon (n = 10, détail et attribution
+  dans `docs/TRAVERSEE.md` §8).
 
 ## 2026-10-29 — Traversée : la lecture locale du feu partout, et le rappel vert mesuré
 

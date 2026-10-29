@@ -193,6 +193,10 @@ gagnant, Stop → parlé chat en lecture) et `GuidanceTest` (22).
 
 ## 8. TwinLite se tait après une alerte danger (ordre user du 29/10)
 
+> **Supprimé le 29/10** (guidage SAM seul, ordre user) : TwinLiteNet viré,
+> `mutesTwinLite` et la fenêtre de silence 10 s n'existent plus. Ci-dessous
+> l'historique.
+
 TwinLiteNet ne voit que le sol praticable (gauche/droit/tout droit/stop) ;
 trottoir et escaliers sont des dangers nommés par SAM et parlent en
 prioritaires (`urgent`, coupe). Sans garde, la consigne sol suivante
@@ -212,7 +216,7 @@ Verrouillé par `ProbeHazardsTest` (5 : silence initial, trottoir,
 escaliers, expiration, reset) et `TwinLiteWiringTest` (+2 : voix tue +
 flèche affichée, reprise sans alerte).
 
-## 9. Contournement chiffré remplace le « Stop. » (ordre user du 29/10)
+## 9. Contournement chiffré remplace le « Stop. » (ordre user du 29/10 — REMPLACÉ par le § 10, gardé pour mémoire)
 
 Le user marche avec l'app : le « Stop. » en boucle devant un obstacle ne dit
 pas où passer. Nouveau contrat, qui **remplace** le stop des § 5, § 6 et § 7
@@ -238,3 +242,36 @@ Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.
 Verrouillé par `GuidanceTest` (18), `GuidanceAnnouncerTest` (12),
 `LiveProbeGuidanceTest` (4, dont l'urgence du contournement seul) et
 `ProbeWiringSpokenTest` (3 : contournement parlé chat en lecture).
+
+## 10. Quatre mots en moins de 100 ms (ordre user du 29/10)
+
+Le user marche avec l'app : pas assez d'infos par seconde, il en veut 5
+minimum — et le contournement chiffré du § 9 (remplacé, gardé pour mémoire)
+est trop lent à dire. Nouveau contrat : la voix du guidage ne dit que quatre
+mots (`left`, `straight`, `right`, `stop`), un mot par changement de
+consigne, **en moins de 100 ms** (décision → premier son).
+
+- **mots** : `GuidanceWord` (core pur) — voie libre ⇒ cap, bouché ⇒ côté de
+  sortie, contact mesuré (≤ 0,6 m) ⇒ stop, décalage et retour trottoir ⇒
+  côté ; sans mesure, le mot reste le côté (on ne juge pas le contact sans
+  distance). FR/EN, langue de la voix ;
+- **déclenchement** : mot nouveau ⇒ dit aussitôt, dès la 1re frame, sans
+  délai ni stabilité (`GuidanceAnnouncer`, `firstSight` + urgent partout) ;
+  même mot ⇒ silence (scène stable = pas de bégaiement). À 5 ips, un
+  changement peut se dire à chaque frame ;
+- **< 100 ms** : clips pré-synthétisés `guide_*` (8 MP3 voix Laure,
+  `tools/voicepack-catalog.json`, gardés par `tools/check-voicepack.py`),
+  joués depuis le disque (`VoicePack` + `SpeechPlayer.playFile`, zéro
+  réseau) ; voix non-Laure ⇒ synthèse mise en cache à la première
+  occurrence (`ProximityVoice.speakWord`) ;
+- **voix unique** : TwinLiteNet est viré (SAM seul), les annonces de
+  positions gardent la synthèse réseau (vocabulaire infini), les alertes
+  trottoir/escaliers et la traversée (« Stop, mur ») sont inchangées.
+
+Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.
+
+Verrouillé par `GuidanceTest` (18), `GuidanceWordTest` (5),
+`GuidanceAnnouncerTest` (15), `LiveProbeGuidanceTest` (4, mots urgents +
+positions non urgentes), `ProbeWiringSpokenTest` (3) et
+`ProximityVoiceWordTest` (3 : clip sans synthèse, synthèse mise en cache,
+mot unique).

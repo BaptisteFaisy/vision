@@ -1,27 +1,22 @@
 package dev.sam3vision.core.live
 
-import dev.sam3vision.core.curb.SidewalkKeep
 import dev.sam3vision.core.curb.SidewalkPosition
-import dev.sam3vision.core.curb.SidewalkText
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Déclencheur des consignes de guidage, avec une différence assumée : **le danger
- * parle tout de suite**.
+ * Déclencheur des consignes de guidage : **un mot par changement, en moins de
+ * 100 ms** (ordre user du 29/10 — [GuidanceWord], clips pré-synthétisés).
  *
- * La machine anti-répétition (stabilité, nouveauté, délai) est [AnnouncementGate],
- * partagée avec les annonces de positions : ici, tout passage au bouché saute le
- * délai **et la stabilité** — un obstacle qui entre dans le couloir parle dès la
- * première frame (le lecteur audio coupe : une seule lecture à la fois), et un
- * obstacle qui s'approche reparle à chaque seau de distance au lieu de se taire
- * (sa clé change à chaque frame, elle ne serait jamais stable). Le retour au
- * libre, lui, attend : la réassurance peut patienter, le danger non.
+ * La machine anti-répétition est [AnnouncementGate], partagée avec les
+ * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
+ * une consigne nouvelle parle dès la première frame (le clip coupe la lecture
+ * en cours : une seule lecture à la fois), et le même mot ne se répète jamais
+ * (scène stable = silence, pas de bégaiement).
  *
- * Maintien trottoir ([sidewalk]) : sur voie libre, un trottoir sur un côté suspend
- * la consigne de cap (« Remonte sur le trottoir, à gauche. ») jusqu'au retour
- * dessus, où le cap reprend ; un trottoir absent parle prudemment, sans dévier.
- * Le bouché prime toujours : la sécurité ne négocie jamais.
+ * Priorité du mot : stop (contact) > côté de sortie (bouché) > décalage
+ * (personne qui s'approche par un côté) > retour trottoir (côté vu, sinon
+ * cap) > cap marché. Le bouché prime toujours : la sécurité ne négocie jamais.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -51,6 +46,15 @@ class GuidanceAnnouncer(
         private set
 
     /**
+     * Décalage de la dernière frame (`null` le plus souvent) : la vidéo y lit
+     * la flèche latérale, en direct comme la décision.
+     */
+    var lastNudge: LateralNudge? = null
+        private set
+
+    private val nudge = LateralNudgeTracker()
+
+    /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
      * change ni les seuils, ni la mémoire de décision. [cap] est la direction
@@ -74,35 +78,37 @@ class GuidanceAnnouncer(
         val decision = Guidance.decide(labels, effective, rangeMeters, hfovDeg)
         lastDecision = decision
         lastSidewalk = sidewalk
-        if (decision.blocked) return speakBlocked(atMs, decision, language)
-        val correction = SidewalkText.phrase(sidewalk, language)
-        if (correction != null) return speakSidewalk(atMs, sidewalk, correction)
-        return speakFree(atMs, decision, language)
+        lastNudge = null
+        val word = when {
+            decision.blocked -> Guidance.word(decision)
+            else -> nudgeOf(atMs, labels)?.let { GuidanceWord.fromCap(it.side) }
+                ?: sidewalkWord(sidewalk, decision.cap)
+        }
+        return speakWord(atMs, word, language)
     }
 
-    /** Consigne d'obstacle : urgente, elle saute le délai (le danger n'attend pas). */
-    private fun speakBlocked(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
-        val key = Guidance.key(decision)
-        if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
-        val phrase = Guidance.phrase(decision, language)
-        gate.markSpoken(key, atMs, phrase)
-        return phrase
+    /** Décalage latéral : personne proche qui s'approche — mot du côté où aller. */
+    private fun nudgeOf(atMs: Long, labels: List<PlacedLabel>): LateralNudge? {
+        val cue = nudge.onFrame(atMs, labels) ?: return null
+        lastNudge = cue
+        return cue
     }
 
-    /** Correction trottoir : consigne, pas danger — elle attend son tour. */
-    private fun speakSidewalk(atMs: Long, sidewalk: SidewalkPosition, correction: String): String? {
-        val key = SidewalkKeep.key(sidewalk)
-        if (!gate.admit(atMs, key, urgent = false)) return null
-        gate.markSpoken(key, atMs, correction)
-        return correction
+    /**
+     * Mot du trottoir : le côté vu (ordre de retour), sinon le cap marché
+     * (dessus ou introuvable : sans dévier — la prudence n'a pas de direction).
+     */
+    private fun sidewalkWord(sidewalk: SidewalkPosition, cap: SteeringCap): GuidanceWord = when (sidewalk) {
+        SidewalkPosition.Left -> GuidanceWord.Left
+        SidewalkPosition.Right -> GuidanceWord.Right
+        else -> GuidanceWord.fromCap(cap)
     }
 
-    /** Consigne de cap : la voie libre dans la direction demandée. */
-    private fun speakFree(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
-        val key = Guidance.key(decision)
-        if (!gate.admit(atMs, key, urgent = false)) return null
-        val phrase = Guidance.phrase(decision, language)
-        gate.markSpoken(key, atMs, phrase)
+    /** Mot nouveau : dit aussitôt, sans délai ni stabilité (clips < 100 ms). */
+    private fun speakWord(atMs: Long, word: GuidanceWord, language: SpeechLanguage): String? {
+        if (!gate.admit(atMs, word.key, urgent = true, firstSight = true)) return null
+        val phrase = word.text(language)
+        gate.markSpoken(word.key, atMs, phrase)
         return phrase
     }
 
@@ -111,5 +117,7 @@ class GuidanceAnnouncer(
         gate.reset()
         lastDecision = null
         lastSidewalk = null
+        lastNudge = null
+        nudge.reset()
     }
 }

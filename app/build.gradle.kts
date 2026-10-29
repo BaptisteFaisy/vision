@@ -197,7 +197,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    // Pinning explicite du Fragment transitif de LiteRT (1.1.0 -> 1.8.9) : aucun import direct.
+    // Pinning explicite du Fragment transitif (>= 1.3.0, lint) : aucun import direct.
     implementation(libs.androidx.fragment.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -224,10 +224,11 @@ dependencies {
     // Mock Device Kit (lunettes simulées) : build debug seulement, hors de l'APK public.
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
-    // Profondeur embarquée : DA2 Small (ONNX). LiteRT sert la segmentation.
-    // Segmentation TwinLiteNet : même runtime (CompiledModel GPU→CPU).
+    // Profondeur embarquée : DA2 Small (ONNX), seul runtime embarqué restant.
     implementation(libs.onnxruntime.android)
-    implementation(libs.litert.edge)
+    // Carte du guidage vocal : MapLibre Native (MapView classique, Maven Central,
+    // BSD-2) + tuiles raster OSM France gratuites sans clé (guidemap/GuideMapStyle).
+    implementation("org.maplibre.gl:android-sdk:13.7.1")
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).

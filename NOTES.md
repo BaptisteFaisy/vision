@@ -32,8 +32,7 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:27` |
 | guava | **33.3.1-android** (pinning transitif Room, sans import direct) | `libs.versions.toml:28`, `app/build.gradle.kts:216-217` |
 | onnxruntime-android (profondeur) | **1.18.0** | `libs.versions.toml:29` |
-| litert-edge (segmentation TwinLite) | **2.2.0** (API CompiledModel, cascade GPU→CPU ; pas la 2.3.x : metadata Kotlin 2.4, illisible en 2.2) | `libs.versions.toml:68-71` |
-| fragment (pinning lint) | **1.8.9** (litert tire 1.1.0, lint exige ≥ 1.3.0) | `libs.versions.toml:10-11` |
+| fragment (pinning lint) | **1.8.9** (un transitif tire 1.1.0, lint exige ≥ 1.3.0) | `libs.versions.toml:10-11` |
 
 **Le JDK n'est pas dans le dépôt.** `gradle.properties` (17-24) ne contient que
 `org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, `daemon=false`, `parallel`, `workers.max=2`,
@@ -49,12 +48,12 @@ les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **918** |
-| Lignes de prod (`*/src/main`) | **54 863** — `:core` 215 f./22 179 l. · `:app` 291 f./32 684 l. (dont banc 15 f./1 641 l.) |
-| `@Test` | **2 877** = **2 867 JVM** + **10 instrumentés** |
+| Fichiers `.kt` | **913** |
+| Lignes de prod (`*/src/main`) | **54 750** — `:core` 213 f./22 200 l. · `:app` 286 f./32 550 l. (dont banc 15 f./1 641 l.) |
+| `@Test` | **2 884** = **2 875 JVM** + **9 instrumentés** |
 | dont `core/src/test` | **1 804** |
-| dont `app/src/test` | **1 063** (dont banc **95**) |
-| dont `app/src/androidTest` (nettoyage, profondeur, segment, média) | **9** (appareil requis) |
+| dont `app/src/test` | **1 071** (dont banc **95**) |
+| dont `app/src/androidTest` (nettoyage, profondeur, média) | **8** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
 | Plus gros fichiers | `app/AppViewModel.kt` et `app/isee/IseeViewModel.kt` — **498** lignes chacun (côté Python : `conflict_agent.py`, `fast_core.py` — 499) |
@@ -142,6 +141,10 @@ lancé sur cette machine pour ce comptage.
   (12 le 29/10, ordre user) et `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) ;
   le backend tronque à `PROMPT_LIMIT = 16` (`server/backend/tracking.py:53`, décision user du
   28/10). Historique : 2 le 27/10, 6 puis 16 le 28/10.
+- **Preset extérieur 8 concepts** : `LivePrompts.outdoor` = person, pole, bollard, fence,
+  barrier, gate, sign, tree (cheminement urbain, pastille « Extérieur »,
+  `app/HomePresetRow.kt`) — le défaut rue (12 dangers) et les presets maison restent
+  inchangés.
 - **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:34`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
   (`app/isee/LiveProbe.kt:191`) : `fastMs = 0`, `targetMs = 0`, `slowMs = 900`,

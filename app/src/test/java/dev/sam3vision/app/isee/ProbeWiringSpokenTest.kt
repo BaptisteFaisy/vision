@@ -5,6 +5,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.CompletableDeferred
@@ -20,9 +21,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * La voix de la sonde : une phrase ré-émise par les frames suivantes n'annule
- * pas sa synthèse (seule une phrase plus fraîche le fait), et le contournement
- * parle même quand le chat lit (urgent, coupe).
+ * La voix de la sonde : un mot ré-émis par les frames suivantes n'annule
+ * pas sa synthèse (seul un mot plus frais le fait), et le mot parle même
+ * quand le chat lit (urgent, coupe).
  */
 class ProbeWiringSpokenTest {
 
@@ -31,7 +32,7 @@ class ProbeWiringSpokenTest {
     private fun frame(objects: List<SegObject> = emptyList(), elapsedMs: Long = 120L) =
         LiveFrame(width = 512, height = 1138, elapsedMs = elapsedMs, objects = objects)
 
-    /** Personne mesurée au centre : « Va à gauche, 2 mètres. » */
+    /** Personne mesurée au centre : « Gauche. » */
     private fun personne() = SegObject(
         label = "person",
         score = 0.9f,
@@ -40,16 +41,16 @@ class ProbeWiringSpokenTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Voiture mesurée au centre, autre seau : « Va à gauche, 4 mètres. » */
-    private fun voiture() = SegObject(
-        label = "car",
+    /** Personne décalée à gauche du couloir : « Droite. » */
+    private fun obstacleAGauche() = SegObject(
+        label = "person",
         score = 0.9f,
-        box = listOf(226f, 400f, 286f, 600f),
+        box = listOf(180f, 400f, 230f, 900f),
         maskPngB64 = "",
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Personne au contact, boîte coupée : non mesurée → contournement non chiffré. */
+    /** Personne au contact, boîte coupée : non mesurée → « Gauche. » */
     private fun contact() = SegObject(
         label = "person",
         score = 0.9f,
@@ -80,8 +81,8 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Va à gauche, 2 mètres."), attempts)
-        assertEquals(listOf("Va à gauche, 2 mètres."), completions)
+        assertEquals(listOf("Gauche."), attempts)
+        assertEquals(listOf("Gauche."), completions)
     }
 
     @Test
@@ -102,20 +103,20 @@ class ProbeWiringSpokenTest {
         val (probe, fake) = harness(this)
         avecVoix(probe, voice, { true }) {
             respond(personne(), fake, probe, "A")
-            respond(voiture(), fake, probe, "B", "C")
+            respond(obstacleAGauche(), fake, probe, "B", "C")
             gate.complete(Result.success(ByteArray(0)))
             advanceUntilIdle()
         }
 
         assertEquals(
-            listOf("Va à gauche, 2 mètres.", "Va à gauche, 4 mètres."),
+            listOf("Gauche.", "Droite."),
             attempts,
         )
-        assertEquals(listOf("Va à gauche, 4 mètres."), completions)
+        assertEquals(listOf("Droite."), completions)
     }
 
     @Test
-    fun `contournement parle meme quand le chat lit`() = runTest {
+    fun `mot parle meme quand le chat lit`() = runTest {
         val spoken = mutableListOf<String>()
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
@@ -129,7 +130,7 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Va à gauche."), spoken)
+        assertEquals(listOf("Gauche."), spoken)
     }
 
     /** Sonde guidée branchée sur le faux client partagé, prête à recevoir des frames. */
@@ -158,7 +159,7 @@ class ProbeWiringSpokenTest {
     ) {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         try {
-            probe.observeSpoken(scope, voice, playerIdle)
+            probe.observeSpoken(scope, voice, playerIdle) { SpeechLanguage.Fr }
             corps()
         } finally {
             scope.cancel()

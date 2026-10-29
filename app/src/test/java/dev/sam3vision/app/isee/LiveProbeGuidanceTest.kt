@@ -13,14 +13,15 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * La page caméra iSee guide la marche quand le réglage est actif : « Continue. »
- * sur voie libre, consigne de contournement devant un obstacle — au lieu
- * de l'annonce des positions. Sans objet à décorer ni masque à décoder, sans Android.
+ * La page caméra iSee guide la marche quand le réglage est actif : « Tout droit. »
+ * sur voie libre, mot de sortie devant un obstacle — au lieu de l'annonce
+ * des positions. Sans objet à décorer ni masque à décoder, sans Android.
  */
 class LiveProbeGuidanceTest {
 
@@ -39,7 +40,7 @@ class LiveProbeGuidanceTest {
     )
 
     @Test
-    fun `guidage dit continue tout droit sur voie libre`() = runTest {
+    fun `guidage dit tout droit sur voie libre`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -50,11 +51,11 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Continue.", probe.state.value.spoken)
+        assertEquals("Tout droit.", probe.state.value.spoken)
     }
 
     @Test
-    fun `guidage dit le cote de sortie devant un obstacle`() = runTest {
+    fun `guidage dit le mot de sortie devant un obstacle`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -69,13 +70,11 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        val spoken = probe.state.value.spoken.orEmpty()
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Va à "))
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("mètre"))
+        assertEquals("Gauche.", probe.state.value.spoken)
     }
 
     @Test
-    fun `contournement urgent, voie libre non urgente`() = runTest {
+    fun `mots du guidage urgents, positions non urgentes`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -86,17 +85,29 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Continue.", probe.state.value.spoken)
-        assertFalse(probe.state.value.spokenUrgent)
+        assertEquals("Tout droit.", probe.state.value.spoken)
+        assertTrue(probe.state.value.spokenUrgent)
 
         probe.onFrame("C", captureAtNs = 20_000_000L)
         advanceUntilIdle()
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        val spoken = probe.state.value.spoken.orEmpty()
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Va à "))
+        assertEquals("Gauche.", probe.state.value.spoken)
         assertTrue(probe.state.value.spokenUrgent)
+
+        val (sonde, faux) = harness(this, guide = false, announce = true)
+        sonde.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        sonde.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        faux.respond("A", frame(listOf(personne())))
+        advanceUntilIdle()
+        faux.respond("B", frame(listOf(personne())))
+        advanceUntilIdle()
+
+        assertNotNull(sonde.state.value.spoken)
+        assertFalse(sonde.state.value.spokenUrgent)
     }
 
     @Test

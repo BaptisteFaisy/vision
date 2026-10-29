@@ -1,10 +1,13 @@
 package dev.sam3vision.app.isee
 
+import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
+import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairLabelSignals
@@ -24,6 +27,27 @@ import kotlinx.coroutines.launch
  * Isolé du ViewModel pour que celui-ci reste sous la limite de 500 lignes : la
  * logique est la même, elle vit simplement à côté.
  */
+
+/**
+ * Pack voix des mots du guidage : clips embarqués (`res/raw/vp_guide_*`) puis
+ * cache par voix, voix du pack lue dans `assets/vp_voice.txt`. Tout accès est
+ * gardé : sans pack, la voix synthétise (plus lent, mais parle).
+ */
+internal fun guideVoicePack(app: Application): VoicePack = VoicePack(
+    filesDir = app.filesDir,
+    packVoiceId = {
+        runCatching { app.assets.open("vp_voice.txt").bufferedReader().readText().trim() }.getOrNull()
+    },
+    bundledClip = { name -> rawClip(app, name) },
+)
+
+/** Clip embarqué `res/raw` par nom de fichier (`vp_guide_left_fr.mp3`), ou `null`. */
+private fun rawClip(app: Application, fileName: String): ByteArray? = runCatching {
+    val base = fileName.substringBeforeLast('.')
+    val id = app.resources.getIdentifier(base, "raw", app.packageName)
+    if (id == 0) return null
+    app.resources.openRawResource(id).use { it.readBytes() }
+}.getOrNull()
 
 /**
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
@@ -54,24 +78,29 @@ internal fun LiveProbe.configureFrom(
 
 /**
  * Chaque nouvelle phrase de la sonde est confiée à la voix (une seule fois par
- * scène). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
+ * phrase). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
  * Dernier-gagnant : une phrase plus fraîche annule la synthèse en cours au lieu
  * de faire la queue derrière — une consigne datée ne sert à rien. La même phrase
  * ré-émise par les frames suivantes n'annule rien (`distinctUntilChanged`) :
  * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
- * L'urgence vient de l'état ([LiveProbeState.spokenUrgent], couloir bouché) :
- * un contournement coupe la lecture en cours, chat compris. Le flag ne change
- * qu'avec la phrase, donc la paire reste aussi stable que la phrase seule.
+ * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
+ * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
+ * mot du guidage) : un mot coupe la lecture en cours, chat compris. Le flag
+ * ne change qu'avec la phrase, donc la paire reste aussi stable que la phrase
+ * seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
     voice: ProximityVoice,
     playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
 ) {
     scope.launch {
         state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
             val text = phrase ?: return@collectLatest
-            voice.onPhrase(text, playerIdle(), urgent = urgent)
+            val clipId = GuidanceWord.clipIdFor(text)
+            if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent)
+            else voice.onPhrase(text, playerIdle(), urgent = urgent)
         }
     }
 }
@@ -149,24 +178,6 @@ internal class ProbeHazards(
     fun reset() {
         curb.reset()
         stairs.reset()
-    }
-
-    /**
-     * TwinLite doit-il se taire à [nowMs] ? Oui dans les [MUTE_MS] qui suivent
-     * une alerte : le danger nommé a la priorité sur le guidage du sol (la
-     * flèche reste affichée, seule la voix se tait). La fenêtre couvre les
-     * cooldowns des guetteurs : condition persistante = alertes chaînées =
-     * silence TwinLite continu ; condition partie = reprise après la fenêtre.
-     */
-    fun mutesTwinLite(nowMs: Long): Boolean =
-        recent(curb.lastAlertMs, nowMs) || recent(stairs.lastAlertMs, nowMs)
-
-    companion object {
-        /** Fenêtre de priorité après une alerte (couvre les cooldowns guetteurs). */
-        val MUTE_MS: Long = maxOf(CurbWatcher.DEFAULT_COOLDOWN_MS, StairWatcher.DEFAULT_COOLDOWN_MS)
-
-        private fun recent(alertMs: Long?, nowMs: Long): Boolean =
-            alertMs != null && nowMs - alertMs in 0..<MUTE_MS
     }
 }
 

@@ -107,6 +107,10 @@ private fun VoiceNavScreen(
                 isee.dismissVoiceNav()
             },
         )
+        // Jamais composé : le mode carte vit sur l'accueil iSee, en première
+        // couche sous la caméra (`NavigationMapLayer`) — la pile n'ouvre pas
+        // d'écran pour lui (AppNav, `VoiceNavStateEffect`).
+        is VoiceNavUiState.Map -> Box(Modifier.fillMaxSize())
     }
 }
 

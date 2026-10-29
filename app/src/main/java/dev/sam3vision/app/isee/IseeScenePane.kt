@@ -62,7 +62,10 @@ fun IseeScenePane(
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        // Carte de debug : première couche, derrière la rue, la boule et les textes.
+        // Carte du mode navigation : première couche, sous la caméra, la boule et
+        // les textes — elle s'efface pendant que l'utilisateur parle.
+        NavigationMapLayer(viewModel, state, Modifier.fillMaxSize())
+        // Carte de debug : derrière la rue, la boule et les textes.
         DebugRouteMapLayer(debugMapEnabled, viewModel, Modifier.fillMaxSize())
         PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }

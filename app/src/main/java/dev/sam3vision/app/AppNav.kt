@@ -32,7 +32,6 @@ import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.voicenav.VoiceNavRoute
 import dev.sam3vision.app.voicenav.VoiceNavUiState
-import dev.sam3vision.app.segment.SegmentScreen
 import dev.sam3vision.app.tap.TapCaptureScreen
 import dev.sam3vision.core.glasses.CaptureAction
 
@@ -104,10 +103,6 @@ sealed interface Route {
      * guidage, poussée par l'état de session — jamais ouverte à la main.
      */
     data object VoiceNav : Route
-
-
-    /** Démo segmentation : zone praticable locale, complément on-device de SAM 3.1. */
-    data object Segment : Route
 }
 
 /**
@@ -134,6 +129,10 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
  * L'état de session pilote l'écran navigation : confirmation ou guidage =
  * poussé (une fois), repos = dépilé (arrivée, arrêt, annulation). Le retour
  * système dépile sans repousse : quitter l'écran arrête le guidage.
+ *
+ * Le **mode carte** ([VoiceNavUiState.Map]) n'empile rien : il vit sur
+ * l'accueil iSee, en première couche sous la caméra (`NavigationMapLayer`) —
+ * on y revient donc, d'où qu'on soit, plutôt que d'ouvrir un écran de plus.
  */
 @Composable
 private fun VoiceNavStateEffect(
@@ -141,13 +140,14 @@ private fun VoiceNavStateEffect(
     route: Route,
     push: (Route) -> Unit,
     pop: () -> Unit,
+    showScene: () -> Unit,
 ) {
     val navState by isee.voiceNavState.collectAsState()
     LaunchedEffect(navState) {
-        if (navState is VoiceNavUiState.Idle) {
-            if (route == Route.VoiceNav) pop()
-        } else if (route != Route.VoiceNav) {
-            push(Route.VoiceNav)
+        when {
+            navState is VoiceNavUiState.Map -> if (route != Route.Isee) showScene()
+            navState is VoiceNavUiState.Idle -> if (route == Route.VoiceNav) pop()
+            route != Route.VoiceNav -> push(Route.VoiceNav)
         }
     }
 }
@@ -167,10 +167,11 @@ fun AppNav(
     val route = stack.first()
     val push: (Route) -> Unit = { names = listOf(routeToName(it)) + names }
     val pop: () -> Unit = { if (names.size > 1) names = names.drop(1) }
+    val home: () -> Unit = { names = listOf(routeToName(Route.Isee)) }
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     RouteRequestEffect(push)
-    VoiceNavStateEffect(isee, route, push, pop)
+    VoiceNavStateEffect(isee, route, push, pop, home)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
@@ -186,7 +187,7 @@ fun AppNav(
             push = push,
             pop = pop,
             // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
-            onHome = { names = listOf(routeToName(Route.Isee)) },
+            onHome = home,
             // À la racine, la roue dentée et le retour système ouvrent les Réglages.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
         )
@@ -243,7 +244,6 @@ private fun RouteHost(
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
         Route.VoiceNav -> VoiceNavRoute(isee, state.settings)
-        Route.Segment -> SegmentScreen(onBack = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
 }
@@ -260,7 +260,6 @@ internal fun routeToName(route: Route): String = when (route) {
     Route.Onboarding -> "onboarding"
     Route.Bench -> "bench"
     Route.VoiceNav -> "voicenav"
-    Route.Segment -> "segment"
     is Route.Tap -> "tap:${route.autoStart}"
 }
 
@@ -276,7 +275,6 @@ internal fun routeFromName(name: String): Route = when {
     name == "onboarding" -> Route.Onboarding
     name == "bench" -> Route.Bench
     name == "voicenav" -> Route.VoiceNav
-    name == "segment" -> Route.Segment
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
 }
@@ -389,7 +387,6 @@ private fun SettingsEntry(
             pop = pop,
             onOpenLive = { push(Route.Live) },
             onOpenClassic = { push(Route.Capture) },
-            onOpenSegment = { push(Route.Segment) },
             onOpenGestures = { push(Route.Onboarding) },
             onPickRole = { next ->
                 viewModel.saveSettings(next)
@@ -432,7 +429,6 @@ private fun SettingsRoute(
     pop: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenClassic: () -> Unit,
-    onOpenSegment: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
 ) {
@@ -455,7 +451,6 @@ private fun SettingsRoute(
         onStopVoice = viewModel::stopSpeaking,
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
-        onOpenSegment = onOpenSegment,
         onOpenGestures = onOpenGestures,
         onPickRole = onPickRole,
         onStartTracking = { draft -> startParentTracking(viewModel, context, draft) },

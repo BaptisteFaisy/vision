@@ -1,7 +1,7 @@
 """Tests des infos de boot de ``/health`` (``restored``, ``load_breakdown``).
 
 Sans GPU : mêmes doublures que le test du split (``weights_tests``) — on fige la
-règle ``restored = snap > age + 2`` et la forme des nouveaux champs, pas le modèle.
+règle ``restored = age - snap > 30`` et la forme des nouveaux champs, pas le modèle.
 """
 
 from __future__ import annotations
@@ -51,14 +51,14 @@ def _booted(service, snap, age):
 
 
 def test_restored_rule(_module) -> None:
-    """``restored`` : snap figé > âge du processus neuf + 2 s, sinon faux."""
+    """``restored`` : l'âge /proc inclut le gel, écart > 30 s (mesures 29/10)."""
     from test_units import check
     from tests_units.weights_tests import _fresh_live_fast
 
-    cases = [("restore (snap 12, âge 2,5)", 12.0, 2.5, True),
-             ("complet (snap 12, âge 13)", 12.0, 13.0, False),
-             ("limite haute (12 > 9,9 + 2)", 12.0, 9.9, True),
-             ("limite basse (12 > 10 + 2 faux)", 12.0, 10.0, False),
+    cases = [("thaw mesuré (snap 20,4, âge 185,8)", 20.4, 185.8, True),
+             ("complet mesuré (snap 20,4, âge 23,6)", 20.4, 23.6, False),
+             ("limite haute (écart 31)", 20.0, 51.0, True),
+             ("limite basse (écart 30 pile)", 20.0, 50.0, False),
              ("Baseten (pas de snap)", None, 1.0, False),
              ("âge illisible (/proc absent)", 12.0, None, False)]
     for name, snap, age, expected in cases:
@@ -74,14 +74,14 @@ def test_health_boot_shape(_module) -> None:
     from tests_units.weights_tests import _fresh_live_fast
 
     service = _fresh_live_fast("service")
-    health = _booted(service, 12.0, 2.5).health()
+    health = _booted(service, 20.4, 185.8).health()
     breakdown = health.get("load_breakdown") or {}
     check("boot : breakdown à 3 clés",
           sorted(breakdown) == ["age_conteneur_s", "gpu_s", "poids_cpu_1er_demarrage_s"],
           str(sorted(breakdown)))
     check("boot : breakdown porte snap figé + âge",
-          breakdown.get("poids_cpu_1er_demarrage_s") == 12.0
-          and breakdown.get("age_conteneur_s") == 2.5, str(breakdown))
+          breakdown.get("poids_cpu_1er_demarrage_s") == 20.4
+          and breakdown.get("age_conteneur_s") == 185.8, str(breakdown))
     check("boot : memory_snapshot est un booléen",
           isinstance(health.get("memory_snapshot"), bool),
           repr(health.get("memory_snapshot")))

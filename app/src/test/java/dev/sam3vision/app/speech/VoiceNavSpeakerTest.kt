@@ -163,9 +163,9 @@ class VoiceNavSpeakerTest {
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 100f)
 
-        val phrase = voice.onHazard("Va à gauche, 2 mètres.")
+        val phrase = voice.onHazard("Gauche.")
 
-        assertEquals("Va à gauche, 2 mètres.", phrase)
+        assertEquals("Gauche.", phrase)
         assertEquals(2, driver.calls.size)
         assertTrue(driver.calls[1].flush)
     }
@@ -182,7 +182,7 @@ class VoiceNavSpeakerTest {
     fun `danger refuse par le moteur vaut silence`() {
         val voice = speaker(FakeSpeakerDriver(fail = true))
 
-        assertNull(voice.onHazard("Va à gauche, 2 mètres."))
+        assertNull(voice.onHazard("Gauche."))
     }
 
     @Test

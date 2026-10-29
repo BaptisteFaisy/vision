@@ -1,6 +1,6 @@
 # Pack voix — mêmes phrases ElevenLabs, zéro latence
 
-Le guidage (TwinLiteNet aujourd'hui, traversée et navigation demain) parle la
+Le guidage (traversée et navigation) parle la
 **même voix ElevenLabs** que la narration, lue par le **même lecteur partagé**
 (`SpeechPlayer` de l'écran iSee : une seule lecture à la fois, chaque entrée
 coupe la précédente). Fini les deux moteurs qui se parlent dessus.
@@ -8,7 +8,7 @@ coupe la précédente). Fini les deux moteurs qui se parlent dessus.
 ## Principe
 
 1. Les phrases fixes vivent dans `tools/voicepack-catalog.json` (miroir du
-   Kotlin : `TwinLiteText`, `CrossingText`, `VoiceNavPolicy`).
+   Kotlin : `CrossingText`, `VoiceNavPolicy`).
 2. `tools/gen-voicepack.py` les synthétise **une fois** (voix Laure par défaut,
    mêmes paramètres que l'app) en `app/src/main/res/raw/vp_<id>_<lang>.mp3` +
    `assets/vp_voice.txt` (voix du pack).

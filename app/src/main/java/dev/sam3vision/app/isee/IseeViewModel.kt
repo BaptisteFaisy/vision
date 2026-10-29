@@ -26,6 +26,7 @@ import dev.sam3vision.app.isee.vm.IseePictoVoice
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
+import dev.sam3vision.app.isee.vm.IseeModeOrders
 import dev.sam3vision.app.isee.vm.IseeVoiceNav
 import dev.sam3vision.app.isee.vm.MaisonEnterOrder
 import dev.sam3vision.app.isee.vm.NavigationHook
@@ -94,11 +95,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
-    // Voix TwinLite tue après une alerte danger (trottoir, escaliers).
-    val twinlite = IseeTwinLite(getApplication(), viewModelScope, { settings }, player, { hazards?.mutesTwinLite(System.currentTimeMillis()) ?: false })
-
+    // Guidage SAM seul : TwinLite viré (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
+    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()))
 
     /** Guetteurs trottoir + escaliers, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -138,7 +137,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); twinlite.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset() },
         prune = ::enforceFifo,
     )
 
@@ -161,10 +160,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
     )
 
-    /** Ordres vocaux maison puis picto/chasse : transfèrent au direct, jamais LLM. */
-    private val maisonEnter = MaisonEnterOrder({ settings }, ::speakNavigation, ::update)
-    private val pictoVoice = IseePictoVoice(picto::labels, { settings }, ::speakNavigation, ::update)
-
     /**
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
@@ -177,8 +172,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La session sous-jacente (boutons de l'écran navigation). */
     fun voiceNav(): VoiceNavSession = voiceNav.session
 
-    /** Quitter l'écran navigation : confirmation annulée ou guidage arrêté. */
+    /** Quitter l'écran navigation : carte fermée, confirmation annulée, guidage arrêté. */
     fun dismissVoiceNav() = voiceNav.dismiss()
+
+    /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, voiceNav, picto::labels)
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
@@ -212,7 +210,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             picto.refresh()
             intro.playIfPending()
         }
-        probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }
+        probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
@@ -268,7 +266,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
-        probe.stop(); twinlite.close()
+        probe.stop()
         super.onCleared()
     }
 
@@ -424,8 +422,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IseeStatusText.ANSWER_PENDING)
             return
         }
-        if (maisonEnter.run(text)) return
-        if (pictoVoice.run(text)) return
+        if (modes.run(text)) return
         if (runSteeringCommand(text)) return
         if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
         if (navigation.onTranscript(text)) return

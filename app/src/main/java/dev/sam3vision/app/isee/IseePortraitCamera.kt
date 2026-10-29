@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,8 +103,6 @@ private fun BoxScope.StreetFeed(
         GlassesMaskLayer(probe.masks, probe.width, probe.height)
         LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
         SteeringLayer(probe.steering)
-        val twinUi by viewModel.twinlite.ui.collectAsState()
-        TwinLiteLayer(twinUi)
         CrossingOnVideo(probe, rememberCrossingPump(viewModel))
     } else {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())

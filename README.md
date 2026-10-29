@@ -11,7 +11,7 @@
 >   on-device depth model, via `onnx-community/depth-anything-v2-small`
 > - **Valhalla** — open-source routing engine (CPU backend)
 > - Standard open-source libraries: AndroidX (Compose, CameraX, Room, WorkManager),
->   OkHttp, ONNX Runtime, **LiteRT** (on-device segmentation), PyTorch, FastAPI
+>   OkHttp, ONNX Runtime, PyTorch, FastAPI
 > - **Meta Wearable Device Access SDK** — camera and microphone access on Ray-Ban Meta
 >   glasses
 >
@@ -57,8 +57,9 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
    questions. No memory is carried from one question to the next: each question
    leaves alone, with no previous turns. The thread itself lives on the phone
    (Room) and is purged when the app closes.
-5. **Speak and guide** — synthetic voice, distance pills, walking instructions,
-   navigation to Google Maps — while the companion follows on their page.
+5. **Speak and guide** — synthetic voice, distance pills, walking instructions, the
+   route drawn on an in-app MapLibre map, and a hand-off to Google Maps for the last
+   mile — while the companion follows on their page.
 
 ```
 ┌──────────────┐  images   ┌──────────────────┐  objects+masks   ┌──────────────┐
@@ -85,16 +86,17 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   WebSocket `/live/ws`, pills, distances, and voice announcements
   (`docs/LIVE-SPEC.md`).
 - **Photo → description → questions** — the legacy screens stay reachable from
-  Settings → **"Other screens"**: Direct mode (continuous video), Classic home
-  (photo → analysis → chat) and the segment demo (`app/SettingsClassicScreens.kt`).
+  Settings → **"Other screens"**: Direct mode (continuous video) and Classic home
+  (photo → analysis → chat) (`app/SettingsClassicScreens.kt`).
 - **Tap mode** — film briefly, get a spoken summary. `POST /video` client written
   and tested; the route is implemented on no server here (`docs/MODE-TAP.md`).
 - **On-device depth (beta)** — a proximity map 100% on the phone (Depth Anything V2
   Small, ONNX Runtime, the `.ort` model downloaded once), fused with the masks
   (`docs/DEPTH.md`).
-- **Voice navigation** — "take me to X" opens Google Maps in walking mode; the
-  Valhalla router runs both in the app and on the CPU backend (`/route`), with
-  pedestrian-light data from `/signals` (`docs/NAVIGATION-VOCALE.md`).
+- **Voice navigation** — "take me to X" routes with Valhalla (in the app and on the
+  CPU backend, `/route`), draws the trip on an in-app MapLibre map
+  (`docs/CARTE-OSM.md`) and hands off to Google Maps in walking mode
+  (`docs/NAVIGATION-VOCALE.md`); pedestrian-light data comes from `/signals`.
 - **Walking guidance** — "straight ahead" instructions, obstacles and crossings
   announced by voice (`docs/GUIDAGE-TOUT-DROIT.md`, `docs/VOIX-DANGER.md`).
 - **Crossing mode (beta)** — iSee **proposes** the mode when it sees a pedestrian
@@ -112,7 +114,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Block | Role |
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla, signals), pacing, masks, distances, pure depth, gestures, crossing, voice, encrypted settings, design tokens (`iseedesign`) |
-| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), segmentation (LiteRT), voice navigation, capture purge |
+| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), in-app map (MapLibre), voice navigation, capture purge |
 | `server/` | Modal backend (Python): live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), photo legacy (`backend/modal_app.py`), the same live service ported to Baseten (`backend/baseten/`), GPU probes, and `scripts/` (deploy, benches, probes) — plus `legacy-expo-app/`, the archived old Expo app |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`); its Vercel relay is abandoned since 28/10 |
 | `suivi-relais/` | The relay actually used (Cloudflare Worker + D1): `POST /api/share`, `GET /api/state` |
@@ -132,7 +134,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin, no direct import) |
 | Network | OkHttp 4.12.0 (a single client, a single pool), `org.json` (shipped with Android, zero dependencies), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (TTS + STT fallback), Meta ASR (dictation), jump3r 1.0.4 (pure-Java MP3) |
-| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0, LiteRT 2.2.0 (`litert-edge`, TwinLite segmentation) |
+| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0 (depth) |
+| Map | MapLibre 13.7.1 (guidance screen, OSM tiles, `docs/CARTE-OSM.md`) |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
 ### `server/` backend (Python, Modal + Baseten)
@@ -183,7 +186,7 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,867 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,875 @Test)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -203,16 +206,16 @@ drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **918** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **98 230** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **54 863** — `:core` 215 f. / 22 179 l. · `:app` 291 f. / 32 684 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **2 867** — `:core` 1 804 · `:app` 1 063 (banc lunettes compris) | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
-| Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
+| Fichiers `.kt` | **913** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **98 209** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **54 750** — `:core` 213 f. / 22 200 l. · `:app` 286 f. / 32 550 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **2 875** — `:core` 1 804 · `:app` 1 071 (banc lunettes compris) | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
-| Backend Python (`server/backend`) | **35** fichiers, **7 176** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **45** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Backend Python (`server/backend`) | **35** fichiers, **7 172** lignes | `find server/backend -name '*.py' \| wc -l` |
+| Docs | **46** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
 | Workflows CI | **6** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/.../isee/IseeViewModel.kt` — **499** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Plus gros fichier de prod | `app/.../isee/LiveProbe.kt` — **498** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
@@ -266,6 +269,10 @@ Harness control: the same harness reproduces **9/9** of the expected verdicts in
 `core/src/test/resources/feuxfr/ATTRIBUTION.md` before the SAM crops are read — that is the
 check that makes the 1/6 citable.
 
+Four attempts to lift that 1/6 to 4/6 (new features, retrained tree, another crop framing,
+another prompt) **all failed without a single false green**; the numbers and the reasons are
+in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
+
 ## CI and merge queue
 
 - **PRs**: `ci` (guards + JVM tests + backend unit tests + goldens) and `ci-budget`
@@ -296,14 +303,14 @@ Detail: `docs/CI-QUEUE.md`.
   `docs/NAVIGATION.md`, `docs/NAVIGATION-VOCALE.md`, `docs/RECETTE-NAVIGATION-VOCALE.md`,
   `docs/VOICE_NAV_PROXY.md`, `docs/GPS_GUIDE_UTILISATEUR.md`, `docs/GUIDAGE-TOUT-DROIT.md`.
 - **Imaging**: `docs/MASQUES-DEBUG.md`, `docs/MASK-DECODE.md`, `docs/DISTANCES.md`,
-  `docs/DEPTH.md`, `docs/TWINLITE-SAM31.md`, `docs/MESURES-SAM3-FEUX.md`,
+  `docs/DEPTH.md`, `docs/MESURES-SAM3-FEUX.md`, `docs/CALIBRAGE-FEU.md`,
   `docs/MESURES-u11c.txt`.
 - **Glasses**: `docs/META-GLASSES.md`, `docs/META-IMAGE.md`, `docs/GLASSES-ETAT.md`,
   `docs/GLASSES-DECISION.md`, `docs/LUNETTES-LANCEMENT.md`, `docs/glasses-dat-spike.md`,
   `docs/glasses-spike-ci.md`.
 - **Product and infrastructure**: `docs/MODE-TAP.md`, `docs/MODE-US.md`,
-  `docs/ISEE-DESIGN-PORTRAIT.md`, `docs/TRAVERSEE.md`, `docs/NETTOYAGE.md`,
-  `docs/CLES-DU-BUILD.md`, `docs/CI-QUEUE.md`.
+  `docs/ISEE-DESIGN-PORTRAIT.md`, `docs/TRAVERSEE.md`, `docs/CARTE-OSM.md`,
+  `docs/NETTOYAGE.md`, `docs/CLES-DU-BUILD.md`, `docs/CI-QUEUE.md`.
 - **Server**: `server/README.md`, `server/backend/README.md`, `server/docs/`
   (contracts, latency, deployment).
 - **Companion**: `suivi-parent/README.md`, `suivi-relais/README.md`.

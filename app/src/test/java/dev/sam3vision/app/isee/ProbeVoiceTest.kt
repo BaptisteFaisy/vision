@@ -30,11 +30,11 @@ class ProbeVoiceTest {
     }
 
     @Test
-    fun `guidage dit continue sur voie libre`() {
+    fun `guidage dit tout droit sur voie libre`() {
         val voice = guided()
 
-        assertNull(voice.phrase(0L, libre, SteeringCap.Straight))
-        assertEquals("Continue.", voice.phrase(500L, libre, SteeringCap.Straight))
+        assertEquals("Tout droit.", voice.phrase(0L, libre, SteeringCap.Straight))
+        assertNull(voice.phrase(500L, libre, SteeringCap.Straight))
     }
 
     @Test
@@ -42,8 +42,8 @@ class ProbeVoiceTest {
         val voice = guided()
         voice.routeCap = SteeringCap.Right
 
-        assertNull(voice.phrase(0L, libre, SteeringCap.Left))
-        assertEquals("Va à droite.", voice.phrase(1_000L, libre, SteeringCap.Left))
+        assertEquals("Droite.", voice.phrase(0L, libre, SteeringCap.Left))
+        assertNull(voice.phrase(1_000L, libre, SteeringCap.Left))
     }
 
     @Test
@@ -103,5 +103,20 @@ class ProbeVoiceTest {
 
         assertNull(voice.cue())
         assertFalse(voice.detour)
+    }
+
+    @Test
+    fun `chemin porte le decalage urgent quand une personne s approche`() {
+        val voice = guided()
+        val droite = { m: Float -> PlacedLabel("personne", 0.7f, 0.5f, m) }
+        voice.phrase(0L, listOf(droite(3.0f)), SteeringCap.Straight)
+        voice.phrase(250L, listOf(droite(2.6f)), SteeringCap.Straight)
+        voice.phrase(500L, listOf(droite(2.2f)), SteeringCap.Straight)
+
+        val cue = voice.cue()
+
+        assertEquals(SteeringCap.Left, cue!!.passage)
+        assertTrue(cue.urgent)
+        assertFalse(cue.blocked)
     }
 }

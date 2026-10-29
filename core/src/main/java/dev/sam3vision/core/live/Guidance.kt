@@ -1,7 +1,6 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.CurbConcepts
-import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -53,6 +52,13 @@ object Guidance {
 
     /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
     const val RANGE_METERS = 4f
+
+    /**
+     * En deçà (mesuré), contourner n'est plus un pas : le mot est « stop ».
+     * À 1,2 m/s, 0,6 m c'est un pas avant le contact — et la frame parlée a
+     * déjà ~1 s de retard. Sans mesure, le mot reste le côté de sortie.
+     */
+    const val STOP_METERS = 0.6f
 
     /** Demi-couloir marché normalisé, cap droit : bande centrale / 2. */
     const val STRAIGHT_HALF_CORRIDOR = (1f - 2f * PositionText.SIDE_EDGE) / 2f
@@ -113,48 +119,37 @@ object Guidance {
     }
 
     /**
-     * Consigne prononcée, jamais `null` : le guidage a toujours quelque chose à dire.
-     * Vocabulaire minimal (décisions user des 28-29/10, remplace la consigne
-     * chiffrée « décalez-vous » du 28/10 puis le « Stop. » du 29/10 : un
-     * obstacle, même au contact, se contourne — jamais d'ordre d'arrêt).
-     * Forme (fr) : `Continue.` ou `Va à gauche, 2 mètres.`
-     * Forme (en) : `Continue.` ou `Go left, 2 meters.`
-     * Ni nom d'obstacle, ni cadran, ni décalage latéral : côté + distance
-     * courte de l'obstacle ([DistanceText.spokenShort] : mètre entier,
-     * centimètres sous un mètre). Sans distance mesurée, la consigne reste non
-     * chiffrée (`Va à gauche.`, `Go left.`).
+     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie,
+     * contact mesuré ([STOP_METERS] ou moins) ⇒ stop. Sans mesure, le mot
+     * reste le côté de sortie (on ne juge pas le contact sans distance).
+     */
+    fun word(decision: GuidanceDecision): GuidanceWord {
+        val obstacle = decision.obstacle
+        if (!decision.blocked || obstacle == null) return GuidanceWord.fromCap(decision.cap)
+        val meters = obstacle.meters?.takeIf { it.isFinite() }
+        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
+        if (decision.cap == SteeringCap.Straight) {
+            return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left)
+        }
+        return GuidanceWord.fromCap(decision.passage ?: SteeringCap.Straight)
+    }
+
+    /**
+     * Consigne prononcée, jamais `null` : un des quatre mots ([GuidanceWord]),
+     * langue de la voix. Ni nom d'obstacle, ni cadran, ni distance, ni
+     * décalage : le mot seul, dit en moins de 100 ms (clips pré-synthétisés).
      */
     fun phrase(
         decision: GuidanceDecision,
         language: SpeechLanguage = SpeechLanguage.Fr,
-    ): String {
-        if (!decision.blocked || decision.obstacle == null) return free(decision.cap, language)
-        val meters = decision.obstacle.meters?.takeIf { it.isFinite() }
-        if (decision.cap != SteeringCap.Straight) {
-            val exit = decision.passage ?: SteeringCap.Straight
-            return capBlocked(exit, meters, language).replaceFirstChar { it.uppercaseChar() }
-        }
-        val side = decision.side ?: GuidanceSide.Left
-        return blocked(side, meters, language).replaceFirstChar { it.uppercaseChar() }
-    }
+    ): String = word(decision).text(language)
 
     /**
-     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure` — le
-     * mètre arrondi fait reparler un obstacle qui s'approche, comme
-     * [PositionText.key], et l'heure un obstacle qui glisse dans le couloir.
-     * Le cap droit garde ses signatures au caractère près ; les autres caps
-     * se préfixent (`Left:free`) — un changement de cap fait reparler.
-     * Toujours française, pour ne pas rebavarder au changement de langue de
-     * la voix.
+     * Signature anti-répétition : le mot ([GuidanceWord.key]) — tout le reste
+     * est pareil, seule une consigne différente fait reparler. Un changement
+     * de cap qui change le mot reparle ; le même mot ne se répète jamais.
      */
-    fun key(decision: GuidanceDecision): String {
-        val prefix = if (decision.cap == SteeringCap.Straight) "" else "${decision.cap.name}:"
-        val obstacle = decision.obstacle?.takeIf { decision.blocked } ?: return prefix + "free"
-        val exit = if (decision.cap == SteeringCap.Straight) decision.side?.name else decision.passage?.name
-        val bucket = PositionText.sceneBucket(obstacle.meters)
-        val hour = "${PositionText.clockHour(obstacle.centerX)}h"
-        return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour"
-    }
+    fun key(decision: GuidanceDecision): String = word(decision).key
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
     private fun inCorridor(centerX: Float, cap: SteeringCap): Boolean = when (cap) {
@@ -237,68 +232,6 @@ object Guidance {
     /** Distance du plus proche objet mesuré du côté, `null` si aucun n'est mesuré. */
     private fun nearestKnown(labels: List<PlacedLabel>): Float? =
         labels.mapNotNull { it.meters?.takeIf { meters -> meters.isFinite() } }.minOrNull()
-
-    /** « Continue. » / « Go left. » : la voie libre dans la langue de la voix. */
-    private fun free(cap: SteeringCap, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> when (cap) {
-            SteeringCap.Left -> "Va à gauche."
-            SteeringCap.Straight -> "Continue."
-            SteeringCap.Right -> "Va à droite."
-        }
-        SpeechLanguage.En -> when (cap) {
-            SteeringCap.Left -> "Go left."
-            SteeringCap.Straight -> "Continue."
-            SteeringCap.Right -> "Go right."
-        }
-    }
-
-    /**
-     * Cap droit bouché : « va à gauche, 2 mètres » / « go left, 2 meters ».
-     * [meters] `null` = distance inconnue : consigne non chiffrée.
-     */
-    private fun blocked(
-        side: GuidanceSide,
-        meters: Float?,
-        language: SpeechLanguage,
-    ): String {
-        val move = when (language) {
-            SpeechLanguage.Fr -> if (side == GuidanceSide.Left) "va à gauche" else "va à droite"
-            SpeechLanguage.En -> if (side == GuidanceSide.Left) "go left" else "go right"
-        }
-        if (meters == null) return "$move."
-        return "$move, ${DistanceText.spokenShort(meters, language)}."
-    }
-
-    /**
-     * Cap latéral bouché : « va vers le centre, 2 mètres » /
-     * « go to the center, 2 meters ». [meters] `null` = consigne non chiffrée.
-     */
-    private fun capBlocked(
-        passage: SteeringCap,
-        meters: Float?,
-        language: SpeechLanguage,
-    ): String {
-        val exit = when (language) {
-            SpeechLanguage.Fr -> "va vers ${exitWord(passage, language)}"
-            SpeechLanguage.En -> "go to the ${exitWord(passage, language)}"
-        }
-        if (meters == null) return "$exit."
-        return "$exit, ${DistanceText.spokenShort(meters, language)}."
-    }
-
-    /** « la gauche » / « le centre » / « center » : la sortie en mots. */
-    private fun exitWord(passage: SteeringCap, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> when (passage) {
-            SteeringCap.Left -> "la gauche"
-            SteeringCap.Straight -> "le centre"
-            SteeringCap.Right -> "la droite"
-        }
-        SpeechLanguage.En -> when (passage) {
-            SteeringCap.Left -> "left"
-            SteeringCap.Straight -> "center"
-            SteeringCap.Right -> "right"
-        }
-    }
 
     /** Sortie V1 (gauche/droite) vue comme cap, pour le chemin publié. */
     private fun GuidanceSide.toCap(): SteeringCap = when (this) {
