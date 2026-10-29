@@ -219,8 +219,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 transport = if (trackerEnabled) TRANSPORT_TRACK else TRANSPORT_WS,
             )
         }
-        wake.arm()
-        viewModelScope.launch { GpuWake.wake(base) }
+        wake.arm().also { viewModelScope.launch { GpuWake.wake(base) } }
     }
 
     /** Direct en vision LLM seule : ni session, ni client SAM, ni réveil GPU — juste l'image au LLM. */
