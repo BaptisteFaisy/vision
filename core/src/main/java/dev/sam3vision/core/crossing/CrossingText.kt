@@ -29,6 +29,18 @@ object CrossingText {
             }
         }
 
+
+    /**
+     * Annonce d'un **passage piéton reconnu**, hors mode Traversée : elle sert à
+     * proposer le mode à quelqu'un qui ne voit pas la pastille. Elle dit quoi
+     * faire (« dites traverser ») et non seulement ce qu'on voit.
+     */
+    fun offer(language: SpeechLanguage = SpeechLanguage.Fr): String =
+        when (language) {
+            SpeechLanguage.En -> "Crosswalk. Say cross for crossing mode."
+            SpeechLanguage.Fr -> "Passage piéton. Dites traverser."
+        }
+
     /**
      * Distance fictive jointe aux annonces traversée (mètres) : sous le seuil
      * voix proche, donc dite par le **TTS système, hors ligne** — la sécurité

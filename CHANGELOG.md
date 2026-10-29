@@ -409,6 +409,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Traversée : la voix annonce le passage piéton reconnu
+
+- La proposition de mode traversée était **visuelle seulement** (pastille ambre) :
+  une personne aveugle ne pouvait pas la recevoir. Elle est maintenant dite.
+- `CrossingText.offer` (`:core`) : « Passage piéton. Dites traverser. » /
+  « Crosswalk. Say cross for crossing mode. » — elle dit **quoi faire**, pas
+  seulement ce qu'on voit.
+- `isee.observeCrossingOffer` : l'offre est un **état**, `distinctUntilChanged`
+  + `filter` en font l'événement de montée → **une phrase par apparition**,
+  jamais une par frame.
+- Câblé dans `IseeViewModel.init` à côté de `observeSpoken`, sur le même canal
+  vocal que « Mode traversée activé » (498 lignes, limite 500).
+- Ce qui existait déjà et n'a pas bougé : l'état du feu est parlé aux transitions
+  (`CrossingAnnouncer`), le cadre et l'étiquette sont dessinés sur la vidéo
+  (§7), et l'état est relu localement toutes les 150 ms.
+- **Preuves** : `CrossingTextTest` 4, `CrossingOfferVoiceTest` 3 (une phrase par
+  apparition, réannonce après disparition, langue des réglages) ; `:core`
+  1 836 tests + `:app` 1 067, 0 échec ; `check-kotlin-limits` OK.
+
 ## 2026-10-29 — Feu : le corpus PTL trouvé sur Hugging Face, mesuré, non livré
 
 - Après « aucune donnée joignable », une source réelle : `ngqtrung/ptl-crossing-check`
