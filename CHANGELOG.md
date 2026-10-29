@@ -3,6 +3,27 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — serveur : plafond /live et /segment à 32 objets
+
+- **Demandé** : rendre effectif le max client à 32 (demande user du 29/10) — le serveur
+  coupait encore à 24.
+- `MAX_OBJECTS` 24 → 32 dans `server/backend/segmentation.py` **et** sa copie vendored
+  `live_fast/segmentation.py` (parité byte-identique exigée par les tests) : les clamps
+  de `live_app.py` et `live_fast/service.py` laissent passer 32, le défaut reste 12 —
+  aucun changement pour les clients existants.
+- Docs : `server/docs/SPEC.md` (coupe silencieuse à 32), `server/docs/ARCHITECTURE.md`,
+  docstring `segmentation_native.py` (suit `MAX_OBJECTS` par import).
+- Rectification de l'entrée précédente : le tracker n'est pas à « 16 × 2 concepts » —
+  `PROMPT_LIMIT` vaut 16 depuis le 28/10 (16 concepts × 16 objets/concept max) ; seuls
+  `/live` et `/segment` étaient bornés à 24.
+- Déploiement : automatique au merge (CI `deploy-live-fast`, app `sam3-eu-a100`).
+- Preuves : `python3 server/scripts/test_units.py` → **333 OK, 0 KO** (dont 6 nouveaux :
+  `test_max_objects_ceiling`, `test_live_clamp_ceiling`) ; parité vendored OK ;
+  `check-kotlin-limits` OK.
+- Fichiers : `segmentation.py` (×2), `segmentation_native.py`,
+  `tests_units/latency_tests.py`, `test_units.py` (2 runners), `server/docs/SPEC.md`,
+  `server/docs/ARCHITECTURE.md`.
+
 ## 2026-10-29 — direct : chemin central des objets suivis + plafond 32 objets
 
 - **Demandé** : afficher le chemin exact au milieu des objets trackés de SAM 3.1, et

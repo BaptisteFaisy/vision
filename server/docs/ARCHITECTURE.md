@@ -92,7 +92,7 @@ Erreurs : `400 {"detail": "..."}` (image illisible), `500` sinon. Images en base
 - **Pipeline SAM** : l'encodeur image ne passe qu'une fois (`vision_embeds` réutilisé pour les N
   prompts). Processeur = resize fixe 1008×1008 ; la segmentation est lancée sur une copie ≤ 1024 px
   puis les masques sont remontés en `nearest` à la taille d'origine (mémoire + latence).
-- **Bornes** : `MAX_PROMPTS` 16, `MAX_PROMPT_CHARS` 64, `MAX_OBJECTS` 24 (tri par score décroissant,
+- **Bornes** : `MAX_PROMPTS` 16, `MAX_PROMPT_CHARS` 64, `MAX_OBJECTS` 32 (tri par score décroissant,
   coupe silencieuse au-delà), `SCORE_THRESHOLD` 0.35, `MASK_THRESHOLD` 0.5.
 - **Concepts français** : l'encodeur texte de SAM 3.1 est un CLIP **anglais** — `CONCEPT_ALIASES`
   traduit pour le modèle, le label renvoyé reste celui saisi par le client.
