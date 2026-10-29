@@ -1,0 +1,64 @@
+name: Clés du build
+description: >-
+  Écrit local.properties (gitignoré) depuis les secrets du dépôt, pour que
+  l'APK embarque les clés. Sans secret : ne fait rien, l'APK sort sans clé
+  (saisie dans Réglages). Valeurs jamais affichées. Source unique de
+  l'étape « Clés du build » (ci.yml, ci-native.yml × 2).
+inputs:
+  llm-base-url:
+    description: Base URL du LLM (secret LLM_BASE_URL)
+    required: false
+    default: ''
+  llm-api-key:
+    description: Clé LLM (secret LLM_API_KEY)
+    required: false
+    default: ''
+  llm-model:
+    description: Modèle LLM (secret LLM_MODEL)
+    required: false
+    default: ''
+  llm-live-api-key:
+    description: Clé narration Direct (secret LLM_LIVE_API_KEY)
+    required: false
+    default: ''
+  tts-api-key:
+    description: Clé ElevenLabs (secret TTS_API_KEY)
+    required: false
+    default: ''
+  tts-voice-id:
+    description: Voix ElevenLabs (secret TTS_VOICE_ID)
+    required: false
+    default: ''
+  asr-api-key:
+    description: Clé dictée Meta (secret ASR_API_KEY)
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Clés du build (secrets → local.properties)
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        LLM_BASE_URL: ${{ inputs.llm-base-url }}
+        LLM_API_KEY: ${{ inputs.llm-api-key }}
+        LLM_MODEL: ${{ inputs.llm-model }}
+        LLM_LIVE_API_KEY: ${{ inputs.llm-live-api-key }}
+        TTS_API_KEY: ${{ inputs.tts-api-key }}
+        TTS_VOICE_ID: ${{ inputs.tts-voice-id }}
+        ASR_API_KEY: ${{ inputs.asr-api-key }}
+      run: |
+        if [ -z "$LLM_API_KEY" ] && [ -z "$TTS_API_KEY" ] && [ -z "$ASR_API_KEY" ]; then
+          echo "Aucun secret de clé : APK sans clé, saisie dans Réglages."
+          exit 0
+        fi
+        : > local.properties
+        for pair in "llm.base.url=$LLM_BASE_URL" "llm.api.key=$LLM_API_KEY" \
+                    "llm.model=$LLM_MODEL" "llm.live.api.key=$LLM_LIVE_API_KEY" \
+                    "tts.api.key=$TTS_API_KEY" \
+                    "tts.voice.id=$TTS_VOICE_ID" "asr.api.key=$ASR_API_KEY"; do
+          cle="${pair%%=*}"
+          valeur="${pair#*=}"
+          [ -n "$valeur" ] && printf '%s=%s\n' "$cle" "$valeur" >> local.properties
+        done
+        echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."

@@ -4,7 +4,7 @@ Le guidage vocal piéton appelle un backend Valhalla (tuiles Île-de-France)
 **sur Modal CPU** (`server/backend/valhalla_cpu.py`, app `valhalla-idf-cpu`) :
 HTTPS publique, aucune GPU, extinction à zéro entre les requêtes (~0 €),
 **sans Tailscale** (ordre user 2026-10-28 — le montage Funnel précédent est
-abandonné, `scripts/valhalla-funnel.sh` ne sert plus).
+abandonné, `scripts/valhalla-funnel.sh` a été supprimé le 29/10).
 
 Le r630 garde son Valhalla local (`127.0.0.1:8002`) pour la QA et les tuiles
 source ; le téléphone ne l'appelle jamais directement.
@@ -12,7 +12,7 @@ source ; le téléphone ne l'appelle jamais directement.
 ## Déploiement
 
 Automatique : tout push sur master qui touche `server/backend/valhalla_cpu.py`
-redéploie via `.github/workflows/deploy-valhalla-cpu.yml` (CPU, ≤ 5 min).
+redéploie via `.github/workflows/deploy-valhalla-cpu.yml` (CPU, 10 min max, hors PR).
 
 Manuel (premier déploiement déjà fait le 2026-10-28) :
 

@@ -37,15 +37,11 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Installer la CLI Modal
-        run: python3 -m pip install --quiet "modal==1.6.2"
-
-      - name: Vérifier que les jetons sont présents (sans les afficher)
-        run: |
-          set -euo pipefail
-          [ -n "${MODAL_TOKEN_ID:-}" ] || { echo "::error::MODAL_TOKEN_ID manquant"; exit 1; }
-          [ -n "${MODAL_TOKEN_SECRET:-}" ] || { echo "::error::MODAL_TOKEN_SECRET manquant"; exit 1; }
-          echo "jetons présents (valeurs masquées par GitHub)"
+      - name: Setup Modal (CLI épinglée + jetons)
+        uses: ./.github/actions/modal-setup
+        with:
+          modal-token-id: ${{ secrets.MODAL_TOKEN_ID }}
+          modal-token-secret: ${{ secrets.MODAL_TOKEN_SECRET }}
 
       - name: Déployer l'app CPU
         run: |

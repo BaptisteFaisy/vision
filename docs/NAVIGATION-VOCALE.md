@@ -185,15 +185,14 @@ Valhalla est écarté (lourd face aux deux options client).
 Constat du 28/10 : Valhalla écoute sur `0.0.0.0:8002` au r630 (joignable via
 Tailscale `100.124.18.48`, baseline POST `/route` piéton Paris = HTTP 200 en
 1,48 s) mais le port est injoignable depuis l'IP publique (Tailscale-only
-confirmé). Recommandation retenue : **Tailscale Funnel** sur le r630
-(`tailscale funnel --bg 8002`, v1.104.1, jamais activé) — le téléphone
-appelle l'URL funnel en HTTPS direct, sans proxy ni install. Prérequis :
-activation Funnel dans la console d'admin du tailnet (une fois, côté user).
-Écartés pour l'instant : proxy CPU Modal (les conteneurs Modal ne voient ni
-`127.0.0.1:8002` ni l'IP Tailscale — utile plus tard comme façade
-auth/rate-limit, pas comme ingress) et tunnel `cloudflared` nommé (repli si
-le tailnet refuse Funnel). Côté client : une `ROUTE_BASE_URL` configurable
-suivrait le motif existant (`BuildConfig.SAM_BASE_URL` + réglage persisté).
+confirmé). **Décision du 28/10 (ordre user, voir `docs/VOICE_NAV_PROXY.md`)** :
+Tailscale Funnel est **abandonné** (jamais activé, v1.104.1) au profit du
+**proxy CPU Modal déployé** (app `valhalla-idf-cpu`, `ROUTE_BASE_URL`) —
+le téléphone appelle le proxy en HTTPS direct, sans install. Le script
+`scripts/valhalla-funnel.sh` a été supprimé le 29/10. Écartés : tunnel
+`cloudflared` nommé (repli si le proxy Modal vient à manquer). Côté client :
+`ROUTE_BASE_URL` configurable, sur le motif existant
+(`BuildConfig.SAM_BASE_URL` + réglage persisté).
 
 ## 8. Interdits
 
