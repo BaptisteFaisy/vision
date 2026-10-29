@@ -150,6 +150,24 @@ internal class ProbeHazards(
         curb.reset()
         stairs.reset()
     }
+
+    /**
+     * TwinLite doit-il se taire à [nowMs] ? Oui dans les [MUTE_MS] qui suivent
+     * une alerte : le danger nommé a la priorité sur le guidage du sol (la
+     * flèche reste affichée, seule la voix se tait). La fenêtre couvre les
+     * cooldowns des guetteurs : condition persistante = alertes chaînées =
+     * silence TwinLite continu ; condition partie = reprise après la fenêtre.
+     */
+    fun mutesTwinLite(nowMs: Long): Boolean =
+        recent(curb.lastAlertMs, nowMs) || recent(stairs.lastAlertMs, nowMs)
+
+    companion object {
+        /** Fenêtre de priorité après une alerte (couvre les cooldowns guetteurs). */
+        val MUTE_MS: Long = maxOf(CurbWatcher.DEFAULT_COOLDOWN_MS, StairWatcher.DEFAULT_COOLDOWN_MS)
+
+        private fun recent(alertMs: Long?, nowMs: Long): Boolean =
+            alertMs != null && nowMs - alertMs in 0..<MUTE_MS
+    }
 }
 
 /**

@@ -22,6 +22,7 @@ class IseeTwinLite(
     scope: CoroutineScope,
     settings: () -> Settings,
     player: SpeechPlayer,
+    muted: () -> Boolean = { false },
 ) {
     private val pack = VoicePack(
         filesDir = app.filesDir,
@@ -56,6 +57,7 @@ class IseeTwinLite(
         voice,
         scope,
         { settings().speechLanguage },
+        muted,
     )
 
     /** Overlay courant (`null` = caché : pas de masque frais). */
