@@ -27,12 +27,14 @@ object YoloDecode {
     /**
      * Tenseur → personnes en pixels source. [rows] = les 84 lignes de 8400
      * colonnes ; [confThreshold] après sigmoïde ; [nmsIou] pour la NMS.
+     * Seuil bas volontaire (= temps faible ByteTrack) : le tracker partage
+     * lui-même fortes et faibles — couper ici affamerait le 2e temps.
      */
     fun persons(
         rows: Array<FloatArray>,
         srcWidth: Int,
         srcHeight: Int,
-        confThreshold: Float = 0.35f,
+        confThreshold: Float = 0.1f,
         nmsIou: Float = 0.5f,
     ): List<Detection> {
         require(rows.size > PERSON_CLASS + 4) { "tenseur YOLO inattendu : ${rows.size} lignes" }
