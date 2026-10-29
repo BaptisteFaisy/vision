@@ -36,10 +36,10 @@ import dev.sam3vision.core.share.caregiverPageUrl
 
 /** La page Portrait embarquée dans l'APK ; son lien choisit uniquement le flux distant. */
 @Composable
-fun CaregiverScreen(link: String, onBack: () -> Unit, mapsKey: String) {
+fun CaregiverScreen(link: String, onBack: () -> Unit) {
     val context = LocalContext.current
     val openSettings by rememberUpdatedState(onBack)
-    val pageUrl = remember(link, mapsKey) { caregiverPageUrl(link, mapsKey) }
+    val pageUrl = remember(link) { caregiverPageUrl(link) }
     var loading by remember(pageUrl) { mutableStateOf(true) }
     var error by remember(pageUrl) { mutableStateOf<String?>(null) }
     val web = remember(pageUrl) {
@@ -86,7 +86,7 @@ private fun caregiverWeb(
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.cacheMode = WebSettings.LOAD_NO_CACHE
-    // La carte se zoome au pincement : la WebView ne doit pas le bloquer.
+    // L'image du proche se zoome au pincement : la WebView ne doit pas le bloquer.
     settings.setSupportZoom(true)
     settings.builtInZoomControls = true
     settings.displayZoomControls = false

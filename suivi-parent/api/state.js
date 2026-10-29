@@ -1,5 +1,5 @@
 // GET /api/state?share=leo — le site parent lit le dernier état (poll toutes les 2 s).
-// Réponse : {ok, live, ageMs, fix, objects, serverAt} ou {ok:true, live:false} sans état.
+// Réponse : {ok, live, ageMs, fix, objects, scene, photo, trip, serverAt} ou {ok:true, live:false}.
 // live = état de moins de 12 s ; puis signal perdu et hors ligne, sans simulation.
 const { storeGet, validId } = require('./_store');
 
@@ -19,6 +19,8 @@ module.exports = async (req, res) => {
     fix: state.fix,
     objects: state.objects,
     scene: state.scene || null,
+    photo: state.photo || null,
+    trip: state.trip || null,
     serverAt: state.serverAt,
   });
 };

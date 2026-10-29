@@ -10,10 +10,17 @@ sans un mot.
 
 ```text
 POST /api/share   {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor},
-                   objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking}}
-GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix, objects, scene, serverAt}
+                   objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking},
+                   photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
+GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix, objects, scene, photo, trip, serverAt}
 GET  /health                          → {ok:true}
 ```
+
+- `photo` (JPEG base64 ≤ 120 000 caractères) et `trip` (progression 0..1) sont
+  facultatifs : un appareil d'avant continue d'envoyer position, objets et
+  phrase. Une écriture **sans** image (service de suivi écran éteint) garde la
+  dernière photo et son `atMs` : la page la cache au lieu de la faire passer
+  pour du direct. Un `trip` absent retire la barre de progression.
 
 - **Un état par identifiant de flux** : deux proches suivis = deux `?share=`, deux
   lignes distinctes. Plusieurs caregivers peuvent lire le même identifiant, aucun

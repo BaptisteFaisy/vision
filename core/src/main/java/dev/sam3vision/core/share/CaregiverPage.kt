@@ -69,14 +69,14 @@ fun relayBaseOf(url: String): String =
 
 /**
  * Même origine que le relais : la page vient de l'APK, les appels `/api/state` du
- * relais. Seuls `share` (le flux) et `key` (fond de carte) traversent l'URL.
+ * relais. Seuls `share` (le flux) et `embedded` traversent l'URL ; une ancienne
+ * clé de fond de carte (`key`, carte supprimée) est retirée du lien reçu.
  */
-fun caregiverPageUrl(link: String, mapsKey: String): String {
+fun caregiverPageUrl(link: String): String {
     val url = link.toHttpUrlOrNull() ?: Settings.DEFAULT_PARENT_SITE_URL.toHttpUrlOrNull()!!
     return url.newBuilder().encodedPath(CAREGIVER_ASSET_PREFIX + "index.html")
         .fragment(null).removeAllQueryParameters("key").removeAllQueryParameters("embedded")
         .addQueryParameter("embedded", "1")
-        .apply { if (mapsKey.isNotBlank()) addQueryParameter("key", mapsKey) }
         .build().toString()
 }
 
