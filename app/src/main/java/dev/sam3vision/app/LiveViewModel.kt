@@ -495,5 +495,5 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Lit les réglages chiffrés puis démarre la session (appelé à l'entrée à l'écran). */
-    fun startFromSettings() = viewModelScope.launch { start(store.load()) }
+    fun startFromSettings(prompts: List<String> = LivePrompts.default) = viewModelScope.launch { start(store.load(), prompts) }
 }

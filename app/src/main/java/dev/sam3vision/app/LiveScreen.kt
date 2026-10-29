@@ -76,7 +76,7 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val previewView = rememberLivePreview(context) { attached = it }
 
-    LaunchedEffect(Unit) { viewModel.startFromSettings() }
+    LaunchedEffect(Unit) { viewModel.startFromSettings(HomePresetRequest.consume()) }
     ForegroundGate(viewModel)
     LiveCameraHost(viewModel, previewView, attached) { failure = it }
     // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
@@ -94,6 +94,7 @@ fun LiveScreen(
         onAsk = onAsk,
         onOpenSettings = onOpenSettings,
         onApplyPrompts = { viewModel.restartWith(draft) },
+        onPreset = { viewModel.restartWith(it.joinToString(", ")) },
         onRecover = { viewModel.restartActive() },
         memoryOpen = memoryOpen,
         onToggleMemory = { memoryOpen = !memoryOpen },
@@ -193,7 +194,7 @@ private fun LiveStage(
     onBack: () -> Unit,
     onAsk: () -> Unit,
     onOpenSettings: () -> Unit,
-    onApplyPrompts: () -> Unit,
+    onApplyPrompts: () -> Unit, onPreset: (List<String>) -> Unit,
     onRecover: () -> Unit,
     memoryOpen: Boolean,
     onToggleMemory: () -> Unit,
@@ -211,7 +212,7 @@ private fun LiveStage(
             state = state,
             draft = draft,
             onDraftChange = onDraftChange,
-            onApply = onApplyPrompts,
+            onApply = onApplyPrompts, onPreset = onPreset,
             failure = failure,
             onBack = onBack,
             onOpenSettings = onOpenSettings,
