@@ -7,6 +7,8 @@ import dev.sam3vision.core.net.TtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraverseClipStore
+import dev.sam3vision.core.traverse.TraverseDecision
+import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraversePlayer
 import dev.sam3vision.core.traverse.TraverseSystemTts
@@ -36,7 +38,7 @@ class TraverseWiringTest {
 
     private fun frame(objects: List<SegObject>): LiveFrame = LiveFrame(640, 480, 0L, objects)
 
-    private fun wiring(): TraverseWiring = TraverseWiring(TraversePipeline())
+    private fun wiring(): TraverseWiring = TraverseWiring(TraversePipeline(), log = {})
 
     private suspend fun TraverseWiring.at(objects: List<SegObject>, index: Int): ShownFrame =
         filter(frame(objects), 640, 480, 1000f, index * 1000L, SpeechLanguage.Fr)
@@ -144,10 +146,48 @@ class TraverseWiringTest {
         assertFalse(tts.asked.contains("Vert, traversez."))
     }
 
+    @Test
+    fun `transitions phase - une ligne par phase`() = runBlocking {
+        val lines = mutableListOf<String>()
+        val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })
+        wiring.updateLight(CrossingState.Green)
+        wiring.at(emptyList(), 1)
+        wiring.at(emptyList(), 2)
+        wiring.at(emptyList(), 3)
+
+        assertEquals(
+            listOf("traversee phase=PRET veto=false", "traversee phase=TRAVERSER veto=false"),
+            lines,
+        )
+    }
+
+    @Test
+    fun `ligne simple - phase et veto seuls`() {
+        val decision = TraverseDecision(TraversePhase.PRET, "prêt", false, null, null, null, false)
+
+        assertEquals("traversee phase=PRET veto=false", traverseLogLine(decision))
+    }
+
+    @Test
+    fun `ligne veto - label et mesures`() {
+        val decision = TraverseDecision(TraversePhase.ALERTE, "attendez", true, "car", 8.2f, 2.1f, true)
+
+        assertEquals("traversee phase=ALERTE veto=true blocking=car meters=8.2 ttc=2.1", traverseLogLine(decision))
+    }
+
+    @Test
+    fun `deactivate - mode OFF journalise`() {
+        val lines = mutableListOf<String>()
+        val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })
+        wiring.deactivate { }
+
+        assertEquals(listOf("traversee mode=OFF"), lines)
+    }
+
     private fun voicedWiring(tts: FakeTts): TraverseWiring {
         val pipeline = TraversePipeline()
         pipeline.voice = TraverseVoice(tts, FakePlayer(), FakeSystemTts(), FakeStore())
-        return TraverseWiring(pipeline)
+        return TraverseWiring(pipeline, log = {})
     }
 
     private class FakeTts : TtsClient {
