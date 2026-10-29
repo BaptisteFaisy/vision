@@ -51,6 +51,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Preuves locales : `:core` 1 816 tests, `:app` 1 080, 0 échec (dont
   `MapModeCommandTest` 9, `MapModeOrderTest` 6, `VoiceNavSessionMapTest` 6,
   `MapModeScreenTest` 5, `RouteMapProjectionTest` 9), `check-kotlin-limits` OK.
+- `MapModeScreen` plein écran : **fond OSM MapLibre** du guidage
+  (`GuidanceMapView`, caméra rue sur la position — `docs/CARTE-OSM.md` §4 bis),
+  repli schéma si les tuiles échouent, feux du `/signals`, micro appui long,
+  bouton « Quitter » ; `MapPositionWatcher` (GPS + réseau, 2 s,
+  `LocationManager`) et `mapBoundsAround` (schéma de repli, cadre de 200 m).
+- iSee : `IseeModeOrders` réunit maison, carte et pictos en un seul point
+  d'essai (avant la navigation et le LLM) ; `IseeViewModel` repasse sous 500
+  lignes (498).
+- Preuves locales (après rebasage sur le fond OSM de master) : `:core` 1 801
+  tests, `:app` 1 068, 0 échec (dont `MapModeCommandTest` 9,
+  `MapModeMapStateTest` 4, `MapModeOrderTest` 6, `VoiceNavSessionMapTest` 6,
+  `MapModeScreenTest` 5, `RouteMapProjectionTest` 9), `check-kotlin-limits` et
+  `check-voice-nav-doc.py` OK.
 - Docs : `NAVIGATION-VOCALE.md` §1 bis, `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
 - Recette téléphone (carte + vrai GPS) après merge.
 

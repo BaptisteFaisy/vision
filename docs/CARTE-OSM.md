@@ -104,6 +104,26 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
   Les pastilles portent le libellé (« Tournez à droite sur rue de
   Rivoli ») ; l'allumage viendra avec le moteur.
 
+## 4 bis. Mode navigation (la carte sans destination)
+
+Le même fond sert au **mode navigation** ouvert à la voix (« navigation »,
+« carte », « où suis-je » — `NAVIGATION-VOCALE.md` §1 bis) : carte plein
+écran, caméra au zoom rue sur la position, position + cercle de précision,
+feux connus autour. Aucun itinéraire, aucune manœuvre, aucune instruction :
+ce mode **situe**, il ne guide pas.
+
+- État carte : `core/.../nav/GuidanceMapData.kt::mapModeMapStateOf(fix,
+  signals)` — caméra nulle sans fix utilisable (cadrage automatique),
+  overlays réduits à `position`, `accuracyM` et `signals`.
+- Affichage : `app/.../voicenav/MapModeScreen.kt` (`MapPanel`) compose
+  `GuidanceMapView` et **retombe sur le schéma** (`drawMap`, même dessin que
+  `MiniRouteMap`) dès que le SDK signale l'échec des tuiles — même contrat
+  que le §3, sans écran d'erreur.
+- Les feux sont rechargés par maille de 0,001° (~110 m) de déplacement, pas à
+  chaque point : la carte bouge, la requête non.
+- Attribution OSM : portée par `GuidanceMapView` (bas-gauche), donc absente
+  avec les tuiles en repli.
+
 ## 5. Notes batterie et réseau
 
 - **Surface bornée** : la carte fait 170 dp de haut
