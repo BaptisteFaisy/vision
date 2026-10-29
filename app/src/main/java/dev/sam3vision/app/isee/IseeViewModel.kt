@@ -177,8 +177,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
-    /** Base URL Valhalla pour les clients annexes (feux) ; `""` si non configurée. */
-    fun routeBaseUrl(): String = settings.routeBaseUrl
+    /** Recette adb : guidage debug vers [destination] (debug seul, voir [IseeVoiceNav]). */
+    fun debugNavTo(destination: String) = voiceNav.debugNavTo(destination)
 
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile
