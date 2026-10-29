@@ -5,6 +5,7 @@ import android.util.Log
 import dev.sam3vision.app.depth.DepthPixels
 import dev.sam3vision.core.danger.ApproachEstimator
 import dev.sam3vision.core.danger.ApproachReading
+import dev.sam3vision.core.danger.DangerSnapshot
 import dev.sam3vision.core.danger.PersonTracker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,7 @@ class DangerPipeline(
     private var detector: PersonDetector? = null
     private var engineTriedMs = 0L
     private var lastKey: String? = null
+    private var lastSnapshot: DangerSnapshot = DangerSnapshot.Empty
 
     /** Dernière frame à analyser (les intermédiaires sont jetées, pas empilées). */
     fun offer(jpegB64: String) {
@@ -49,12 +51,16 @@ class DangerPipeline(
         scope.launch(background) { pump() }
     }
 
+    /** Dernière frame analysée : pistes + dimensions (pour la voix). */
+    fun snapshot(): DangerSnapshot = synchronized(lock) { lastSnapshot }
+
     /** Oublie files, pistes, historique et moteur (nouvelle séance). */
     fun reset() {
         val stale: PersonDetector?
         synchronized(lock) {
             pendingJpeg = null
             lastKey = null
+            lastSnapshot = DangerSnapshot.Empty
             stale = detector
             detector = null
         }
@@ -91,6 +97,7 @@ class DangerPipeline(
             val result = engine.detect(frame.argb, frame.width, frame.height).getOrNull() ?: return
             val nowMs = android.os.SystemClock.elapsedRealtime()
             val tracks = tracker.update(result.persons, nowMs)
+            synchronized(lock) { lastSnapshot = DangerSnapshot(tracks, frame.width, frame.height) }
             approach.retainAlive(tracks.map { it.id }.toSet())
             publish(pickAlert(tracks.map { approach.update(it, nowMs) }, result.persons.size))
         } catch (e: Exception) {
