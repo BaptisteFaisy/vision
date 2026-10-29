@@ -30,7 +30,7 @@ unique du 26/10.
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
-- `docs/VOIX-DANGER.md` — voix danger : priorité collision, trottoir « levez la jambe », décalage chiffré (décision 28/10).
+- `docs/VOIX-DANGER.md` — voix : guidage doux + « Attention à … », stop seul urgent (ordre 29/10).
 - `docs/ISEE-DESIGN-PORTRAIT.md` — design Portrait de l'écran iSee, obligatoire (§3.12).
 - `server/README.md` + `server/docs/` — backend Modal (direct déployé, Valhalla CPU,
   tracker, legacy) : lire avant de toucher `server/` ou un endpoint.

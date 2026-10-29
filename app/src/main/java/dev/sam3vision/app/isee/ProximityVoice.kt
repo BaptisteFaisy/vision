@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -18,13 +19,14 @@ import kotlin.coroutines.coroutineContext
  * annulée (phrase plus fraîche arrivée entre-temps, `collectLatest` côté sonde)
  * n'est jamais jouée.
  *
- * [urgent] = danger (couloir bouché, trottoir, escaliers) : coupe la lecture
- * en cours et parle quand même, y compris pendant une dictée — la sécurité
- * passe avant le sous-titre (miroir de `TraverseVoice`, qui préempte la verte
- * par la rouge). [synthesize] injecte le moteur (ElevenLabs en prod, faux en
- * test — miroir `IseePlayback`). [clips] est le pack voix (mots du guidage) :
- * clip local quand il existe (< 100 ms, zéro réseau), synthèse + mise en
- * cache sinon (`null` = synthèse seule, comme avant).
+ * [urgent] = stop (mot du guidage ou modèle d'urgence externe) : coupe la
+ * lecture en cours et parle quand même, y compris pendant une dictée — la
+ * sécurité passe avant le sous-titre (miroir de `TraverseVoice`, qui
+ * préempte la verte par la rouge). Les mots doux et les « Attention … »
+ * attendent le silence. [synthesize] injecte le moteur (ElevenLabs en prod,
+ * faux en test — miroir `IseePlayback`). [clips] est le pack voix (mots du
+ * guidage) : clip local quand il existe (< 100 ms, zéro réseau), synthèse
+ * + mise en cache sinon (`null` = synthèse seule, comme avant).
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -98,5 +100,18 @@ class ProximityVoice(
             onSpeaking(text)
             player.play(bytes).onFailure { onSpeaking("") }
         }
+    }
+
+    /**
+     * Stop d'urgence injecté par le modèle d'urgence externe (ordre user du
+     * 29/10, contrat `docs/URGENCE-EXTERNE.md`) : « Stop. » dit aussitôt, en
+     * clip local (< 100 ms) quand le pack l'a, coupe tout (chat compris).
+     * Dédupliqué comme le reste : un « Stop. » déjà dit ne se répète pas (le
+     * stop interne, contact ≤ 0,6 m, est gardé en attendant — même mot, pas
+     * de conflit).
+     */
+    suspend fun reportEmergency(language: SpeechLanguage, playerIdle: Boolean) {
+        val stop = GuidanceWord.Stop
+        speakWord(stop.clipId, stop.text(language), language, playerIdle, urgent = true)
     }
 }

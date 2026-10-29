@@ -85,4 +85,20 @@ class ProximityVoiceWordTest {
 
         assertEquals(1, spoken.count { it == "Gauche." })
     }
+
+    @Test
+    fun `urgence externe coupe le chat en clip`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val pack = VoicePack(
+            filesDir = tempDir(),
+            packVoiceId = { "voix-test" },
+            bundledClip = { "faux-mp3".toByteArray() },
+        )
+
+        voice(pack, attempts, spoken).reportEmergency(SpeechLanguage.Fr, playerIdle = false)
+
+        assertTrue(attempts.isEmpty())
+        assertEquals("Stop.", spoken.first())
+    }
 }

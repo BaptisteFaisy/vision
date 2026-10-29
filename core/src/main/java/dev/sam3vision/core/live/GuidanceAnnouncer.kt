@@ -10,9 +10,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * La machine anti-répétition est [AnnouncementGate], partagée avec les
  * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
- * une consigne nouvelle parle dès la première frame (le clip coupe la lecture
- * en cours : une seule lecture à la fois), et le même mot ne se répète jamais
- * (scène stable = silence, pas de bégaiement).
+ * une consigne nouvelle parle dès la première frame (seul « Stop. » coupe
+ * la lecture en cours, les mots doux attendent le silence), et le même mot
+ * ne se répète jamais (scène stable = silence, pas de bégaiement).
  *
  * Priorité du mot : stop (contact) > côté de sortie (bouché) > décalage
  * (personne qui s'approche par un côté) > retour trottoir (côté vu, sinon

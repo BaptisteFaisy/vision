@@ -95,8 +95,8 @@ class CurbWatcherTest {
 
     @Test
     fun `phrases FR et EN`() {
-        assertEquals("Trottoir, levez la jambe.", CurbText.phrase(SpeechLanguage.Fr))
-        assertEquals("Curb, lift your foot.", CurbText.phrase(SpeechLanguage.En))
+        assertEquals("Attention à la marche.", CurbText.phrase(SpeechLanguage.Fr))
+        assertEquals("Attention, step.", CurbText.phrase(SpeechLanguage.En))
     }
 
     @Test
@@ -109,7 +109,7 @@ class CurbWatcherTest {
         val cue = watcher.onSignal(positive, 3000L)
 
         assertNotNull(cue)
-        assertEquals("Trottoir, levez la jambe.", cue!!.phrase)
+        assertEquals("Attention à la marche.", cue!!.phrase)
         assertEquals(0.8f, cue.meters!!, 0.001f)
     }
 

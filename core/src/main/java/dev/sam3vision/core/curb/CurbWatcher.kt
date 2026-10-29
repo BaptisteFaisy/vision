@@ -71,15 +71,15 @@ data class CurbCue(
 )
 
 /**
- * Phrases « trottoir, levez la jambe », FR/EN comme les positions
+ * Phrases « Attention à la marche », FR/EN comme les positions
  * (`PositionText`). Liste fermée d'une seule phrase : le préchauffage
  * hors-ligne n'a qu'un clip à générer si la phrase rejoint le mode traversée.
  */
 object CurbText {
-    /** « Trottoir, levez la jambe. » / « Curb, lift your foot. » selon [language]. */
+    /** « Attention à la marche. » / « Attention, step. » selon [language]. */
     fun phrase(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Trottoir, levez la jambe."
-        SpeechLanguage.En -> "Curb, lift your foot."
+        SpeechLanguage.Fr -> "Attention à la marche."
+        SpeechLanguage.En -> "Attention, step."
     }
 }
 
@@ -89,14 +89,14 @@ object CurbText {
  * silence pendant [cooldownMs] (un trottoir ne bouge pas).
  *
  * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
- * trottoir ne doit pas annoncer « levez la jambe » — le plan sous les pieds
- * (bas collé en bas de l'image, haut vers l'horizon) est ignoré, seuls les
- * plans à bord proche parlent (montée : bas décollé ; descente : haut
+ * trottoir ne doit pas annoncer « Attention à la marche » — le plan sous les
+ * pieds (bas collé en bas de l'image, haut vers l'horizon) est ignoré, seuls
+ * les plans à bord proche parlent (montée : bas décollé ; descente : haut
  * borné). Seuils priors, à valider sur captures du téléphone (comme le
  * veto trafic) : en cas de doute le bord parle, jamais l'inverse.
  *
- * Pur JVM et testé. Urgence : l'appelant parle avec `urgent = true` (coupe la
- * lecture en cours, comme le couloir bouché).
+ * Pur JVM et testé. Douceur : l'appelant parle avec `urgent = false` (ne
+ * coupe rien, attend le silence) — seule l'urgence (stop) coupe.
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,

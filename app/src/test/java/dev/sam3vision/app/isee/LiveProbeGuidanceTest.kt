@@ -39,6 +39,15 @@ class LiveProbeGuidanceTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
+    /** Gobelet centré à ~0,4 m (sténopé 10 cm / 90 px) : contact mesuré. */
+    private fun gobelet() = SegObject(
+        label = "cup",
+        score = 0.9f,
+        box = listOf(206f, 500f, 306f, 590f),
+        maskPngB64 = "",
+        maskEncoding = MASK_ENCODING_NONE,
+    )
+
     @Test
     fun `guidage dit tout droit sur voie libre`() = runTest {
         val (probe, fake) = harness(this, guide = true)
@@ -74,7 +83,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `mots du guidage urgents, positions non urgentes`() = runTest {
+    fun `mots doux et positions non urgents, stop seul urgent`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -86,7 +95,7 @@ class LiveProbeGuidanceTest {
         advanceUntilIdle()
 
         assertEquals("Tout droit.", probe.state.value.spoken)
-        assertTrue(probe.state.value.spokenUrgent)
+        assertFalse(probe.state.value.spokenUrgent)
 
         probe.onFrame("C", captureAtNs = 20_000_000L)
         advanceUntilIdle()
@@ -94,7 +103,7 @@ class LiveProbeGuidanceTest {
         advanceUntilIdle()
 
         assertEquals("Gauche.", probe.state.value.spoken)
-        assertTrue(probe.state.value.spokenUrgent)
+        assertFalse(probe.state.value.spokenUrgent)
 
         val (sonde, faux) = harness(this, guide = false, announce = true)
         sonde.onFrame("A", captureAtNs = 8_000_000L)
@@ -108,6 +117,22 @@ class LiveProbeGuidanceTest {
 
         assertNotNull(sonde.state.value.spoken)
         assertFalse(sonde.state.value.spokenUrgent)
+    }
+
+    @Test
+    fun `stop interne au contact mesure = urgent`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame(listOf(gobelet())))
+        advanceUntilIdle()
+        fake.respond("B", frame(listOf(gobelet())))
+        advanceUntilIdle()
+
+        assertEquals("Stop.", probe.state.value.spoken)
+        assertTrue(probe.state.value.spokenUrgent)
     }
 
     @Test

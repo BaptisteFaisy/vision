@@ -18,12 +18,13 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * La voix de la sonde : un mot ré-émis par les frames suivantes n'annule
- * pas sa synthèse (seul un mot plus frais le fait), et le mot parle même
- * quand le chat lit (urgent, coupe).
+ * pas sa synthèse (seul un mot plus frais le fait), et le mot doux reste
+ * muet quand le chat lit (seul « Stop. » coupe).
  */
 class ProbeWiringSpokenTest {
 
@@ -116,7 +117,7 @@ class ProbeWiringSpokenTest {
     }
 
     @Test
-    fun `mot parle meme quand le chat lit`() = runTest {
+    fun `mot doux muet quand le chat lit`() = runTest {
         val spoken = mutableListOf<String>()
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
@@ -130,7 +131,7 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Gauche."), spoken)
+        assertTrue(spoken.isEmpty())
     }
 
     /** Sonde guidée branchée sur le faux client partagé, prête à recevoir des frames. */

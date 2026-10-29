@@ -68,9 +68,11 @@ de parler.
 3. **priorité** — stop (contact) > côté de sortie (bouché) > décalage
    (personne qui s'approche par un côté) > retour trottoir (côté vu, sinon
    cap) > cap marché. Le bouché prime toujours : la sécurité ne négocie jamais.
-4. **urgence** — chaque mot coupe la lecture en cours, chat compris
-   (`LiveProbeState.spokenUrgent`, vrai pour tout mot du guidage) : un mot
-   daté ne sert à rien (`ProbeWiring.observeSpoken`).
+4. **urgence** — seul « Stop. » coupe la lecture en cours, chat compris
+   (`LiveProbeState.spokenUrgent`, vrai pour le seul mot stop) : les mots
+   doux (gauche/tout droit/droite) attendent le silence
+   (`ProbeWiring.observeSpoken`). Le stop interne (contact ≤ 0,6 m) est gardé
+   en attendant le modèle d'urgence externe (`docs/URGENCE-EXTERNE.md).
 
 Différence assumée avec les positions : **la voie libre se dit** (« Tout droit. »,
 une fois par période libre) là où une scène vide reste muette
@@ -96,14 +98,16 @@ guidage est muet — par construction, pas par bug.
 Aucun import réseau dans `Guidance.kt`, `GuidanceWord.kt` ni `GuidanceAnnouncer.kt` :
 le guidage ne peut pas appeler le LLM, même par accident.
 
-Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceWordTest` (5),
-`GuidanceObstaclesTest` (8, mur + liste bloquants de bout en bout, § 8),
-`GuidanceAnnouncerTest` (15), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (4,
-sonde branchée sur un faux client SAM : voie libre → mot, obstacle → mot de sortie,
-mots urgents + positions non urgentes, positions seules → silence sur voie libre),
+Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceWordTest` (6,
+dont seul-stop-coupe), `GuidanceObstaclesTest` (8, mur + liste bloquants de bout en
+bout, § 8), `GuidanceAnnouncerTest` (15), `SettingsGuidanceTest` (4),
+`LiveProbeGuidanceTest` (5, sonde branchée sur un faux client SAM : voie libre →
+mot, obstacle → mot de sortie, mots doux + positions non urgents, stop interne au
+contact mesuré = urgent, positions seules → silence sur voie libre),
 `ProbeWiringSpokenTest` (3 : même mot ré-émis → une synthèse qui aboutit, mot frais →
-dernier gagnant, mot → parlé chat en lecture), `ProximityVoiceWordTest` (3 : clip
-sans synthèse, synthèse mise en cache, mot unique).
+dernier gagnant, mot doux → muet chat en lecture), `ProximityVoiceWordTest` (4 :
+clip sans synthèse, synthèse mise en cache, mot unique, urgence externe coupe le
+chat en clip).
 
 ## 6. Recette
 
