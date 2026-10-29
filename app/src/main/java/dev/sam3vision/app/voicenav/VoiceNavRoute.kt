@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.isee.IseeViewModel
+import dev.sam3vision.core.net.HttpSignalsClient
 
 /**
  * Écran navigation de la pile : guidage direct (ou confirmation si la
@@ -61,11 +62,34 @@ fun VoiceNavRoute(isee: IseeViewModel, onClose: () -> Unit) {
             onVoiceEntry = onClose,
             // W3 : ajouter `onSubmitText = nav::submitTypedDestination` à son merge.
         )
-        is VoiceNavUiState.Guiding -> GuidanceScreen(
-            state = current,
-            onStop = nav::stopGuidance,
-            onVoiceEntry = onClose,
-        )
+        is VoiceNavUiState.Guiding -> GuidingRoute(isee, current, nav::stopGuidance, onClose)
         // W5 : ajouter `is VoiceNavUiState.Arrived -> ArrivedScreen(...)` à son merge.
     }
+}
+
+/**
+ * Guidage actif : écran + mini-carte (tracé + feux). Les feux viennent de
+ * `/signals` (même base que l'itinéraire) ; sans URL, liste vide.
+ */
+@Composable
+private fun GuidingRoute(
+    isee: IseeViewModel,
+    state: VoiceNavUiState.Guiding,
+    onStop: () -> Unit,
+    onVoiceEntry: () -> Unit,
+) {
+    val signalsClient = remember { HttpSignalsClient(isee::routeBaseUrl) }
+    GuidanceScreen(
+        state = state,
+        onStop = onStop,
+        onVoiceEntry = onVoiceEntry,
+        navSnapshot = isee::debugNavSnapshot,
+        fetchSignals = { bounds ->
+            if (isee.routeBaseUrl().isBlank()) {
+                emptyList()
+            } else {
+                signalsClient.signals(bounds).getOrElse { emptyList() }
+            }
+        },
+    )
 }

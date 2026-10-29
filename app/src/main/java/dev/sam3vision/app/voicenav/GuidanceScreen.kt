@@ -18,22 +18,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.core.model.RoutePoint
+import dev.sam3vision.core.nav.MapBounds
+import dev.sam3vision.core.nav.NavFix
+import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.nav.progressOf
 
 /**
  * Guidage actif : prochaine instruction en très gros, distance avant la
- * manœuvre, reste du trajet, barre de progression, bouton « Arrêter ».
+ * manœuvre, reste du trajet, petite carte (tracé + feux), barre de
+ * progression, bouton « Arrêter ».
  *
  * Les valeurs viennent du moteur d'itinéraire via
  * [VoiceNavViewModel.onGuidanceUpdate] — cet écran n'en calcule aucune, il
  * ne fait qu'afficher. [onVoiceEntry] redonne la main à la dictée existante
- * (« arrête le guidage » y est consommé comme ordre stop).
+ * (« arrête le guidage » y est consommé comme ordre stop). La mini-carte
+ * n'apparaît que si [navSnapshot] et [fetchSignals] sont fournis.
  */
 @Composable
 fun GuidanceScreen(
     state: VoiceNavUiState.Guiding,
     onStop: () -> Unit,
     onVoiceEntry: () -> Unit,
+    navSnapshot: (() -> Pair<NavRoute?, NavFix?>)? = null,
+    fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)? = null,
 ) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -60,6 +68,10 @@ fun GuidanceScreen(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
+        }
+        if (navSnapshot != null && fetchSignals != null) {
+            // Petite carte : où le guidage m'emmène (tracé + feux).
+            MiniRouteMap(navSnapshot, fetchSignals, Modifier.fillMaxWidth().height(170.dp))
         }
         GuidanceProgress(state)
         Spacer(Modifier.weight(1f))
