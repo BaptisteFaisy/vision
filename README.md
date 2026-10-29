@@ -193,6 +193,41 @@ bash scripts/build.sh                                      # assembleDebug --off
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`.
 
+## SAM 3.1 recall on pedestrian lights (measured 29/10/2026)
+
+The crossing mode (`docs/TRAVERSEE.md`) rests on a question nobody had measured: does
+SAM 3.1 actually find a pedestrian signal, and does it get the colour right? 16 real
+photographs from Wikimedia Commons (7 countries, from full-frame pictograms to a
+1920×3413 street), RTX 3060 Ti, `unsloth/sam3.1` in `bfloat16`. The measuring code
+lives outside this tree; full protocol, image attribution and limits in
+`docs/MESURES-SAM3-FEUX.md`.
+
+| Prompt | Detections | Images found | Recall |
+|---|---|---|---|
+| `pedestrian traffic light` | 41 | 14/16 | **87.5 %** |
+| `pedestrian signal` | 10 | 7/16 | 43.8 % |
+| `red pedestrian traffic light` | 2 | 2/16 | 12.5 % |
+| `green pedestrian traffic light` | 13 | 7/16 | 43.8 % |
+
+Three conclusions worth carrying into the code:
+
+- **The generic prompt detects, a state prompt verifies.** Naming the state drops recall to
+  12.5 % — but the 3 detections it did return were all correct (confidence 1.00). Treat
+  state prompts as a cross-check, never as the detector.
+- **One 384-pixel sliver flipped a whole scene.** SAM returned the real signal (516×1056 px,
+  green) plus three 8-to-48-pixel slivers on the mounting pole; the scene verdict came out
+  `red`. Votes must be restricted to detections within 10× of the largest one in frame.
+- **A dim dotted-LED green pictogram read as "off".** It filled 0.65 % of its crop against a
+  1.2 % "is anything lit" floor. Lowering the floor to 0.6 % gained the case *and* improved
+  the synthetic corpus (masked 95.5 % → 95.6 %, whole-crop 80.3 % → 81.9 %). `PedLightColor`
+  uses a different statistic (`MIN_FRACTION = 0.06f` over HSV hue bins, not a luminance-weighted
+  lit fraction), so the number does not transfer — only the shape of the fix does.
+
+State accuracy on the 9 photos with an unambiguous ground truth: **7/9, zero red↔green
+errors**. The two misses are ground-level LED strips, not signal heads. End-to-end cost:
+**0.71 s/image** for four prompts, once the vision embedding is shared across prompts.
+
+
 ## CI and merge queue
 
 - **PRs**: a single `ci` job (guards + JVM tests) + `ci-budget` (≤ 5 min) + `couche0`

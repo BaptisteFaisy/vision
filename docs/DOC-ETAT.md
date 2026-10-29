@@ -8,6 +8,7 @@ plus l'arbre — bandeau ajouté).
 
 | Document | Verdict | Ce qui a été vérifié / corrigé ici |
 |---|---|---|
+| `docs/MESURES-SAM3-FEUX.md` | **nouveau** (29/10), **relevé hors arbre** | Rappel de SAM 3.1 sur 16 photos publiques : 87,5 % avec `pedestrian traffic light`, 12,5 % avec un prompt d'état ; 7/9 d'exactitude, 0 inversion rouge/vert ; deux défauts trouvés (éclat de 384 px qui renverse la scène, bonhomme LED sombre lu « éteint »). Les images ne sont pas versionnées, attribution au §7 |
 | `docs/TRAVERSEE.md` | **nouveau** (28/10) | Bilan traversée : recherche 10 angles, PR #163-167 + #174, dépendances in-app vs `/live`, preuves JVM, 4 restes bloquants listés |
 | `README.md` | **réécrit** (28/10) | Problème, solution, 4 blocs, stack complète ; chiffres remesurés (733 `.kt`, 43 457 lignes de prod, 2 202 `@Test` JVM + 10 instrumentés) ; backend dans `server/`, gestes sans double tap |
 | `docs/ARCHITECTURE.md` | **recompté** (28/10, §1 + §8) | Comptes §1 refaits, §8 réécrit (backend dans `server/`, `LIVE-SPEC` existe, tracker et `/video` câblés) ; §2-7 : valeurs vraies, lignes non recalées |
