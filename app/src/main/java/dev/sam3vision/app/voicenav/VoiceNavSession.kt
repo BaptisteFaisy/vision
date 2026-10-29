@@ -10,7 +10,6 @@ import dev.sam3vision.core.nav.ConfirmAnswer
 import dev.sam3vision.core.nav.ConfirmAnswerParser
 import dev.sam3vision.core.nav.DestinationQuery
 import dev.sam3vision.core.nav.GuidanceUpdate
-import dev.sam3vision.core.nav.MapModeCommand
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.nav.StopGuidanceParser
 import dev.sam3vision.core.nav.initialGuidance
@@ -60,15 +59,6 @@ sealed interface VoiceNavUiState {
         val destination: String,
         val summary: RouteSummary?,
     ) : VoiceNavUiState
-
-    /**
-     * Mode navigation sans destination : la carte et la position GPS à
-     * l'écran, ouverte par la voix (`MapModeOrder`, « navigation »,
-     * « carte », « où suis-je »). Une destination dictée depuis cet état
-     * ouvre la confirmation comme d'habitude ; « quitte la carte » ou
-     * « arrête la navigation » referme.
-     */
-    data object Map : VoiceNavUiState
 }
 
 /**
@@ -107,12 +97,6 @@ sealed interface VoiceNavUiState {
  *   un second `arrived` est ignoré, on n'est plus en [Guiding]) ;
  *   [dismissArrived] referme l'arrivée vers le repos (le pilote coupe le
  *   moteur à ce moment-là, pas à l'arrivée).
- *
- * - [enterMap] / [leaveMap] : mode navigation (carte + position GPS, sans
- *   destination). [enterMap] ne vole aucun état ouvert (guidage, confirmation,
- *   arrivée) ; [leaveMap] rend le repos sans annonce (l'appelant parle). En
- *   [VoiceNavUiState.Map], une destination dictée ouvre la confirmation et
- *   « quitte la carte » / un ordre stop referme sans « Guidage arrêté ».
  *
  * Ne lève jamais : un collaborateur qui jetterait est replié (routeur qui
  * jette = pas d'intention, chargeur/lanceur qui jette = échec annoncé).
@@ -162,12 +146,6 @@ class VoiceNavSession(
         if (text.isBlank()) return false
         if (runCatching { StopGuidanceParser.isStop(text) }.getOrDefault(false)) {
             return stopFromVoice()
-        }
-        if (_state.value is VoiceNavUiState.Map &&
-            runCatching { MapModeCommand.isLeaveOrder(text) }.getOrDefault(false)
-        ) {
-            leaveMap()
-            return true
         }
         val answer = runCatching { ConfirmAnswerParser.parse(text) }.getOrNull()
         if (answer != null && _state.value is VoiceNavUiState.Confirming) {
@@ -351,28 +329,6 @@ class VoiceNavSession(
         }
     }
 
-    /**
-     * Entrée en mode navigation : la carte et la position, sans destination.
-     * Ne vole aucun état ouvert — `false` si une confirmation, un guidage ou
-     * une arrivée est déjà à l'écran (l'appelant ne parle alors pas).
-     */
-    fun enterMap(): Boolean {
-        if (_state.value !is VoiceNavUiState.Idle) return false
-        _state.value = VoiceNavUiState.Map
-        return true
-    }
-
-    /**
-     * Fermeture du mode navigation (bouton « Quitter », retour système ou
-     * ordre dicté) : retour au repos, sans annonce — c'est l'appelant qui
-     * parle ([MapModeText]). `false` si la carte n'était pas ouverte.
-     */
-    fun leaveMap(): Boolean {
-        if (_state.value !is VoiceNavUiState.Map) return false
-        goIdle()
-        return true
-    }
-
     /** Retour au repos : le pilote est notifié (il coupe le moteur). */
     private fun goIdle() {
         _state.value = VoiceNavUiState.Idle
@@ -389,11 +345,6 @@ class VoiceNavSession(
 
     /** Ordre stop dicté : ne consomme que si une session est ouverte. */
     private suspend fun stopFromVoice(): Boolean {
-        if (_state.value is VoiceNavUiState.Map) {
-            // La carte se ferme sans « Guidage arrêté » : aucun guidage n'était actif.
-            goIdle()
-            return true
-        }
         if (_state.value is VoiceNavUiState.Arrived) {
             // Guidage déjà terminé : on referme, sans « Guidage arrêté ».
             goIdle()
