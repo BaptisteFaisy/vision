@@ -41,10 +41,26 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `trottoir au-dela d un metre = silence`() {
-        val signal = CurbSignal.of(listOf(curb(1.5f)), 512, 1138)
+    fun `trottoir au-dela de trois metres = silence`() {
+        val signal = CurbSignal.of(listOf(curb(3.5f)), 512, 1138)
 
         assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `trottoir a deux metres = detecte`() {
+        val signal = CurbSignal.of(listOf(curb(2.0f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(2.0f, signal.meters!!, 0.001f)
+    }
+
+    @Test
+    fun `bord a trois metres en bande moyenne = detecte`() {
+        // À 3 m le bord tombe plus haut dans l'image (tangage) : la bande suit.
+        val loin = reading("sidewalk", 2.8f, listOf(156f, 512f, 356f, 626f))
+
+        assertTrue(CurbSignal.of(listOf(loin), 512, 1138).detected)
     }
 
     @Test
