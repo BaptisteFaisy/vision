@@ -158,9 +158,9 @@ class HttpLlmClient(
      * le statut affiché. `null` = l'URL exacte de l'appel passe le parseur.
      */
     private fun endpointError(): ApiError? {
-        if (baseUrl.isBlank()) return ApiError.InvalidKey("endpoint LLM absent — renseigne-le dans Réglages")
+        if (baseUrl.isBlank()) return ApiError.Network("endpoint LLM absent — renseigne-le dans Réglages")
         if (!isUsableHttpUrl(joinUrl(baseUrl, "/chat/completions"))) {
-            return ApiError.InvalidKey("endpoint LLM invalide (https://…) — corrige-le dans Réglages")
+            return ApiError.Network("endpoint LLM invalide (https://…) — corrige-le dans Réglages")
         }
         return null
     }

@@ -185,12 +185,12 @@ class LlmClientTest {
     }
 
     @Test
-    fun `base sans scheme echoue en InvalidKey sans appel reseau`() {
+    fun `base sans scheme echoue sans appel reseau, message actionnable`() {
         val server = serverReplying("devrait etre inutilise")
         try {
             val noScheme = HttpLlmClient("inference.baseten.co/v1", TEST_KEY, "modele", retryDelayMs = 5)
             val failure = runBlocking { noScheme.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
-            assertTrue("attendu InvalidKey, obtenu $failure", failure is ApiError.InvalidKey)
+            assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
             assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Réglages") == true)
             assertTrue(server.requests.isEmpty())
         } finally {
@@ -199,12 +199,13 @@ class LlmClientTest {
     }
 
     @Test
-    fun `base vide echoue en InvalidKey sans appel reseau`() {
+    fun `base vide echoue sans appel reseau, message actionnable`() {
         val server = serverReplying("devrait etre inutilise")
         try {
             val noBase = HttpLlmClient("  ", TEST_KEY, "modele", retryDelayMs = 5)
             val failure = runBlocking { noBase.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
-            assertTrue("attendu InvalidKey, obtenu $failure", failure is ApiError.InvalidKey)
+            assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
+            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Réglages") == true)
             assertTrue(server.requests.isEmpty())
         } finally {
             server.close()
