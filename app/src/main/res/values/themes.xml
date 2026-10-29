@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Fond de fenêtre SOMBRE : évite tout flash blanc au cold start, avant que
-         Compose ne dessine. (L'accueil Portrait iSee lui-même est blanc voulu.) -->
+    <!-- Fond de fenêtre BLANC, aligné sur l'accueil Portrait : le favicon de
+         démarrage s'affiche sur blanc, sans rupture de couleur à l'ouverture. -->
     <style name="Theme.Sam3Vision" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
