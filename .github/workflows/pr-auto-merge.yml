@@ -27,6 +27,23 @@
 # filet) ; le `sleep 60` devient un sondage borné 6 × 5 s ; `green()`
 # n'exige plus que `ci`, `ci-budget` et `couche0` (le natif est vérifié sur
 # master par `ci-native.yml`, protection réduite à ces 3 checks).
+# Relance (v10, 2026-10-29) : `BLOCKED` n'est plus « rien à faire » — c'était
+# le trou qui laissait une PR d'auteur pourrir indéfiniment (PR #215 de Gaïa :
+# `couche0` rouge sur un `## Scope` absent, donc jamais relancée ni mergée).
+# Désormais, pour une PR bloquée :
+#   - checks `ci` / `ci-budget` tombés pour de l'infrastructure (job perdu,
+#     checkout, cache, runner) → jobs en échec relancés, 2 fois max par tête,
+#     marqueur en commentaire : jamais de boucle ;
+#   - échec réel (étape de tests rouge) → aucune relance inutile, un
+#     commentaire dit quelle étape est en cause, une fois par tête ;
+#   - `couche0` rouge sur le périmètre → l'agent de périmètre
+#     (.github/fireworks/scope_agent.py) rédige la déclaration manquante depuis
+#     le diff et la vérifie avec le garde de master AVANT d'écrire le corps
+#     (le garde n'est pas assoupli : fichier non déclaré et déclaration inutile
+#     restent refusés) ; l'édition du corps relance `couche0` ;
+#   - `UNKNOWN` : sondage borné (4 × 5 s) au lieu de rendre la main aussitôt.
+#   `workflow_run` écoute aussi `couche0` pour enchaîner sans attendre le cron.
+
 name: pr-auto-merge
 
 on:
@@ -37,7 +54,7 @@ on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "couche0"]
     types: [completed]
 
 concurrency:
@@ -107,6 +124,8 @@ jobs:
           FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
           FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
           FIREWORKS_AGENT_RESOLVE: ${{ vars.FIREWORKS_AGENT_RESOLVE }}
+          FIREWORKS_AGENT_SCOPE: ${{ vars.FIREWORKS_AGENT_SCOPE }}
+          REPO: BaptisteFaisy/vision
           PR: ${{ matrix.pr }}
           SHA: ${{ matrix.sha }}
           BRANCH: ${{ matrix.branch }}
@@ -122,11 +141,72 @@ jobs:
               ([$got[] | select(.state == "SUCCESS")] | length == 3)
             ' >/dev/null
           }
+          # ── état d'une PR bloquée ────────────────────────────────────────
+          # `BLOCKED` était le trou de la v9 : le `case` ne le traitait pas,
+          # donc la PR restait bloquée pour toujours (cas réel : #215).
+          echecs_requis() { # noms des checks requis en échec, séparés par une espace
+            gh pr checks "$1" --json name,bucket 2>/dev/null \
+              | jq -r '[.[] | select(.bucket=="fail")
+                        | .name | select(.=="ci" or .=="ci-budget" or .=="couche0")]
+                       | join(" ")' || true
+          }
+          marques() { # $1=pr $2=marque → nb de commentaires qui portent la marque
+            gh pr view "$1" --json comments --jq '.comments[].body' 2>/dev/null \
+              | grep -cF -- "$2" || true
+          }
+          commente_une_fois() { # $1=pr $2=marque $3=corps (le corps porte la marque)
+            [ "$(marques "$1" "$2")" -gt 0 ] && return 0
+            gh pr comment "$1" --body "$3" >/dev/null 2>&1 || true
+            return 0
+          }
+          etapes_cassees() { # $1=run id → étapes en échec (vide = job perdu)
+            gh run view "$1" --json jobs --jq '
+              [.jobs[] | select(.conclusion=="failure")
+               | .steps[] | select(.conclusion=="failure") | .name] | join(" | ")' \
+              2>/dev/null || true
+          }
+          ECHELLE_ETAPES=""
+          relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
+            local pr="$1" runs run sha_run etapes rc=2
+            runs=$(gh pr checks "$pr" --json name,bucket,link 2>/dev/null \
+              | jq -r '[.[] | select(.bucket=="fail")
+                         | select(.name=="ci" or .name=="ci-budget") | .link][]
+                       | select(. != null)' \
+              | sed -n 's#.*/runs/\([0-9][0-9]*\).*#\1#p' | sort -u)
+            [ -n "$runs" ] || return 2
+            for run in $runs; do
+              # Ne jamais relancer un run d'un autre commit : ça ne changerait
+              # pas les checks de cette PR, ça brûlerait juste un runner.
+              sha_run=$(gh run view "$run" --json headSha --jq .headSha 2>/dev/null || true)
+              if [ "$sha_run" != "$SHA" ]; then
+                echo "  run $run : autre commit, pas de relance"
+                continue
+              fi
+              etapes=$(etapes_cassees "$run")
+              # Panne d'infrastructure (runner perdu, checkout, cache) : relancer
+              # est le bon geste. Test rouge : relancer ne prouve rien et brûle
+              # le budget de 5 min par job — on le dit, une fois par tête.
+              if [ -z "$etapes" ] || printf '%s' "$etapes" |
+                   grep -qE 'Set up job|heckout|Setup Gradle|Post |Récupérer|cache|périmètre|chaîne d.outils'; then
+                if gh run rerun "$run" --failed >/dev/null 2>&1; then
+                  echo "  run $run relancé (panne d'infrastructure)"
+                  rc=0
+                else
+                  echo "  run $run : relance refusée"
+                fi
+              else
+                echo "  run $run : échec réel dans « $etapes », pas de relance"
+                ECHELLE_ETAPES="$etapes"
+                rc=1
+              fi
+            done
+            return $rc
+          }
           rm -rf repo
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —
           # rien n'est persisté dans la conf git du runner. Le helper gh
           # ('!gh auth git-credential') rend 403 sur les runners (vu 28/10).
-          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/BaptisteFaisy/vision.git"
+          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git clone --quiet --filter=blob:none "$AUTH_URL" repo
           cd repo
           git config user.name "isee-automerge"
@@ -151,7 +231,7 @@ jobs:
                 # un exit != 0 de l'agent tuerait tout le sweep.
                 git show origin/master:.github/fireworks/conflict_agent.py \
                   > /tmp/fw-agent.py 2>/dev/null \
-                  && python3 /tmp/fw-agent.py resolve --repo BaptisteFaisy/vision \
+                  && python3 /tmp/fw-agent.py resolve --repo "$REPO" \
                     --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc=$?
                 git rebase --abort >/dev/null 2>&1 || true
                 git checkout -q master 2>/dev/null || true
@@ -173,6 +253,74 @@ jobs:
               else
                 echo "PR #$PR : CI pas encore verte"
               fi
+              ;;
+            BLOCKED)
+              echecs="$(echecs_requis "$PR")"
+              if [ -z "${echecs:-}" ]; then
+                echo "PR #$PR : BLOCKED sans check requis en échec (revue demandée ?), rien à faire"
+              else
+                echo "PR #$PR : BLOCKED — check(s) requis en échec : $echecs"
+                case " $echecs " in
+                  *" couche0 "*)
+                    # Périmètre : une seule tentative par tête de PR.
+                    if [ "$(marques "$PR" "<!-- automerge-scope sha=$SHA -->")" -eq 0 ]; then
+                      rc=0
+                      git show origin/master:.github/fireworks/scope_agent.py \
+                        > /tmp/fw-scope.py 2>/dev/null \
+                        && git show origin/master:.github/couche0/check_couche0.py \
+                          > /tmp/couche0.py 2>/dev/null \
+                        && python3 /tmp/fw-scope.py fix --repo "$REPO" --pr "$PR" \
+                          --sha "$SHA" --guard /tmp/couche0.py || rc=$?
+                      case "$rc" in
+                        0) echo "PR #$PR : périmètre complété, couche0 va rejuger" ;;
+                        2) echo "PR #$PR : périmètre laissé tel quel (rien de réparable ou déjà tenté)" ;;
+                        *) echo "PR #$PR : périmètre non complété (code $rc)" ;;
+                      esac
+                    else
+                      echo "PR #$PR : périmètre déjà traité pour ce SHA, pas de boucle"
+                    fi
+                    ;;
+                esac
+                case " $echecs " in
+                  *" ci "*|*" ci-budget "*)
+                    n="$(marques "$PR" "<!-- automerge-retry sha=$SHA -->")"
+                    n="${n:-0}"
+                    if [ "$n" -lt 2 ]; then
+                      rc=0
+                      relancer "$PR" || rc=$?
+                      case "$rc" in
+                        0)
+                          printf -v corps '%s\n' \
+                            "<!-- automerge-retry sha=$SHA -->" \
+                            "Relance automatique ($((n + 1))/2) des checks requis en échec sur \`${SHA:0:7}\` — redémarrage des jobs, aucun nouveau commit."
+                          gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                          ;;
+                        1)
+                          printf -v corps '%s\n' \
+                            "<!-- automerge-echec sha=$SHA -->" \
+                            "Échec **réel** de la CI (étape « ${ECHELLE_ETAPES} ») : la file ne relance pas un test rouge, ça ne prouverait rien. Il faut un correctif, pas un re-run."
+                          commente_une_fois "$PR" "<!-- automerge-echec sha=$SHA -->" "$corps"
+                          ;;
+                        *)
+                          echo "PR #$PR : rien à relancer (run d'un autre commit ?)"
+                          ;;
+                      esac
+                    else
+                      echo "PR #$PR : 2 relances déjà faites pour ce SHA, on s'arrête là"
+                    fi
+                    ;;
+                esac
+              fi
+              ;;
+            UNKNOWN)
+              # GitHub recalcule souvent en quelques secondes : sondage borné.
+              st="$STATE"
+              for _ in 1 2 3 4; do
+                sleep 5
+                st="$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus 2>/dev/null || echo UNKNOWN)"
+                [ "${st:-UNKNOWN}" != "UNKNOWN" ] && break
+              done
+              echo "PR #$PR : état $st après sondage, prochain passage"
               ;;
             *) echo "PR #$PR : état $STATE, rien à faire" ;;
           esac
