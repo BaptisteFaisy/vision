@@ -34,34 +34,6 @@ export function neverPublished(snapshot) {
 export const NO_STREAM_TEXT =
   'Aucun suivi pour ce lien : il a peut-être changé (app réinstallée). Ouvre iSee sur le téléphone de ton proche, puis redemande le lien.';
 
-export function iconFor(label) {
-  const name = String(label || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  if (/personne|homme|femme|enfant|pieton|person|woman|child|pedestrian/.test(name)) return '🚶';
-  if (/chien|chat|animal|dog|cat/.test(name)) return '🐕';
-  if (/voiture|bus|camion|velo|moto|vehicule|car|truck|bike/.test(name)) return '🚗';
-  if (/poteau|grille|barriere|chantier|pole|post|barrier|fence/.test(name)) return '🚧';
-  if (/poubelle|bin|trash/.test(name)) return '🗑️';
-  if (/porte|door/.test(name)) return '🚪';
-  if (/feu|traffic light/.test(name)) return '🚦';
-  return '📦';
-}
-
-// Un cap 0 pointe vers le nord : les latitudes augmentent, elles ne diminuent pas.
-export function destPoint(object, from) {
-  const angle = object.angleDeg * RAD;
-  return {
-    lat: from.lat + object.distM * Math.cos(angle) / METERS_PER_DEGREE,
-    lon: from.lon + object.distM * Math.sin(angle) / (METERS_PER_DEGREE * Math.cos(from.lat * RAD)),
-  };
-}
-
-export function objectsOf(live, status) {
-  if (!live || status === 'offline') return [];
-  return (live.objects || []).map((object, index) => ({
-    ...object, id: `o${index}`, ico: iconFor(object.label), frozen: status === 'lost',
-  }));
-}
-
 /** Ne pas transformer le bruit GPS, une consigne ou un saut de position en geste accompli. */
 export function movementBetween(before, after) {
   if (!before || !after) return '';

@@ -32,10 +32,12 @@ précédent affirmait « 6/6 vertes » sans renvoi à une exécution récente.
 
 ## Traces MediaStore : liste blanche, jamais une plage de dates
 
-Par défaut `CleanupConfig.ADD_TO_GALLERY = false` (`CleanupConfig.kt:32`) : les captures restent
-privées, invisibles dans la galerie. Si l'app publie dans MediaStore (`MediaStoreGallery.publish`,
-`MediaStoreGallery.kt:28`, Android 10+), l'`_ID` rendu est écrit **dans la table Room à la
-création** — `traced_captures`, schéma exporté v1
+**État au 29/10/2026 : rien n'écrit dans `traced_captures`.** L'app ne publie jamais une capture
+dans la galerie : les captures restent dans le stockage privé, invisibles pour les autres apps.
+Le code de publication (`MediaStoreGallery`, Android 10+) n'avait aucun appelant ; il a été
+retiré (un seul appelant perdu ne se devine pas). La table Room et la purge restent en place,
+testées, pour le jour où une capture sera publiée : si l'app publie dans MediaStore, l'`_ID`
+rendu doit être écrit **dans la table Room à la création** — `traced_captures`, schéma exporté v1
 (`app/schemas/dev.sam3vision.app.cleanup.CleanupDatabase/1.json`) :
 
 | Colonne | Rôle |
