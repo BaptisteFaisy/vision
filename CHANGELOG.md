@@ -68,7 +68,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 ## 2026-10-28 — GPS : piéton partout, démarrage vocal, plus d'écran fantôme
 
 - `VoiceNavSession` démarre le guidage **dès la dictée** (`autoStartOnVoice`,
-  défaut `true`) : plus de bouton « Démarrer » dans le chemin vocal, et une
+  activé par `IseeVoiceNav` ; défaut `false` = API de confirmation
+  historique) : plus de bouton « Démarrer » dans le chemin vocal, et une
   seule annonce (le moteur, ou le repli Maps) au lieu de deux voix
   superposées. La confirmation reste l'API historique (`false`), utilisée
   par les tests.
