@@ -8,12 +8,9 @@ import com.google.ai.edge.litert.CompiledModel
  * codé ici). `env` nul : pas de cache compilateur (ouverture unique par
  * écran, les modèles vivent dans `filesDir`, pas dans les assets).
  */
-fun openCompiledModel(
-    modelPath: String,
-    vararg accelerators: Accelerator = arrayOf(Accelerator.GPU, Accelerator.CPU),
-): CompiledModel =
+fun openCompiledModel(modelPath: String): CompiledModel =
     CompiledModel.create(
         modelPath,
-        CompiledModel.Options(*accelerators),
+        CompiledModel.Options(Accelerator.GPU, Accelerator.CPU),
         null,
     )
