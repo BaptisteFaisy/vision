@@ -64,11 +64,6 @@ class VoiceNavViewModel(private val session: VoiceNavSession) : ViewModel() {
         viewModelScope.launch { session.stopGuidance() }
     }
 
-    /** Bouton « Quitter » du mode navigation (carte) : retour au repos. */
-    fun leaveMap() {
-        session.leaveMap()
-    }
-
     /** L'intégrateur pousse ici l'état du moteur d'itinéraire. */
     fun onGuidanceUpdate(update: GuidanceUpdate) {
         viewModelScope.launch { session.onGuidanceUpdate(update) }
