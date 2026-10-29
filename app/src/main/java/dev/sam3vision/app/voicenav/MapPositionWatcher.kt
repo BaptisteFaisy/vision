@@ -78,7 +78,16 @@ class MapPositionWatcher(
         }
     }
 
-    /** Dernière position connue (GPS puis réseau), `null` sans fix utilisable. */
+    /**
+     * Dernière position connue (GPS puis réseau), `null` sans fix utilisable.
+     *
+     * `getLastKnownLocation` exige la permission : elle est vérifiée une fois
+     * dans [start] (aucun appel n'arrive ici sans elle), comme dans
+     * `VoiceNavTracker`. `runCatching` ne suffit pas à lint — il ne reconnaît
+     * qu'un `try`/`catch` de `SecurityException` explicite — d'où la
+     * suppression, identique à celle des autres lecteurs GPS du projet.
+     */
+    @SuppressLint("MissingPermission")
     private fun lastKnown(): NavFix? {
         val manager = locations ?: return null
         val known = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
