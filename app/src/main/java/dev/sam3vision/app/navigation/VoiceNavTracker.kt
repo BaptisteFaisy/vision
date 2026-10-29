@@ -66,7 +66,6 @@ class VoiceNavTracker(
     fun reroute(route: NavRoute): Result<Unit> = engine.reroute(route)
 
     /**
-    /**
      * Démarre l'écoute GPS + réseau.
      *
      * Idempotent : un second appel pendant l'écoute est no-op (pas de
@@ -110,13 +109,6 @@ class VoiceNavTracker(
             // Pas de GPS sur l'appareil : le réseau suffit pour guider grossièrement.
             false
         }
-    }
-        } catch (_: SecurityException) {
-            false
-        } catch (_: IllegalArgumentException) {
-            false
-        }
-        return listening
     }
 
     /** Coupe l'écoute et oublie l'itinéraire (fin du guidage). */
