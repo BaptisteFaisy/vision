@@ -28,6 +28,16 @@ class LivePromptsTest {
     }
 
     @Test
+    fun `preset exterieur : huit concepts de cheminement, sous le plafond`() {
+        assertEquals(
+            listOf("person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree"),
+            LivePrompts.outdoor,
+        )
+        assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
+        assertEquals(LivePrompts.outdoor, LivePrompts.normalize(LivePrompts.outdoor))
+    }
+
+    @Test
     fun `une liste vide retombe sur les defauts`() {
         assertEquals(LivePrompts.default, LivePrompts.normalize(emptyList()))
     }

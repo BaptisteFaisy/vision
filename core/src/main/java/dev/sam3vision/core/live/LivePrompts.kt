@@ -35,6 +35,17 @@ object LivePrompts {
     )
 
     /**
+     * Preset extérieur : **8** concepts de cheminement urbain — la personne et
+     * le mobilier qui borde le trottoir (poteaux, bornes, clôtures, barrières,
+     * portails, panneaux, arbres). Bascule depuis la pastille « Extérieur » du
+     * direct, sans passer par le champ « Suivre ». Tient sous [MAX] comme
+     * [default], qui reste les 12 dangers (pastille « Rue »).
+     */
+    val outdoor: List<String> = listOf(
+        "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
+    )
+
+    /**
      * Nombre maximal de concepts : **16**, décision user du 28/10 (dangers
      * extérieurs + marge pour le champ « Suivre »). Le backend tronque à
      * `PROMPT_LIMIT = 16` côté tracker ; le client ne doit pas en envoyer
