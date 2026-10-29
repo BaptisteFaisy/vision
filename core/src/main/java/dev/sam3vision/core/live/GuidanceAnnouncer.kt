@@ -14,9 +14,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * la lecture en cours, les mots doux attendent le silence), et le même mot
  * ne se répète jamais (scène stable = silence, pas de bégaiement).
  *
- * Priorité du mot : stop (contact) > côté de sortie (bouché) > décalage
- * (personne qui s'approche par un côté) > retour trottoir (côté vu, sinon
- * cap) > cap marché. Le bouché prime toujours : la sécurité ne négocie jamais.
+ * Arbitrage voix (ordre user du 29/10) : couloir bouché → voix TwinLite
+ * ([TwinLiteWord] : arrêt au contact, côté de sortie sinon), voie libre →
+ * mots SAM ([GuidanceWord] : décalage, retour trottoir, cap marché). Une
+ * seule porte pour les deux voix : un seul parle à la fois, jamais de
+ * doublon, et le bouché prime toujours — la sécurité ne négocie jamais.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -79,12 +81,13 @@ class GuidanceAnnouncer(
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
-        val word = when {
-            decision.blocked -> Guidance.word(decision)
-            else -> nudgeOf(atMs, labels)?.let { GuidanceWord.fromCap(it.side) }
-                ?: sidewalkWord(sidewalk, decision.cap)
+        if (decision.blocked) {
+            val tl = TwinLiteWord.fromGuidance(Guidance.word(decision))
+            return speak(atMs, tl.key, tl.text(language))
         }
-        return speakWord(atMs, word, language)
+        val word = nudgeOf(atMs, labels)?.let { GuidanceWord.fromCap(it.side) }
+            ?: sidewalkWord(sidewalk, decision.cap)
+        return speak(atMs, word.key, word.text(language))
     }
 
     /** Décalage latéral : personne proche qui s'approche — mot du côté où aller. */
@@ -104,11 +107,10 @@ class GuidanceAnnouncer(
         else -> GuidanceWord.fromCap(cap)
     }
 
-    /** Mot nouveau : dit aussitôt, sans délai ni stabilité (clips < 100 ms). */
-    private fun speakWord(atMs: Long, word: GuidanceWord, language: SpeechLanguage): String? {
-        if (!gate.admit(atMs, word.key, urgent = true, firstSight = true)) return null
-        val phrase = word.text(language)
-        gate.markSpoken(word.key, atMs, phrase)
+    /** Mot nouveau, SAM ou TwinLite : dit aussitôt, sans délai ni stabilité (clips < 100 ms). */
+    private fun speak(atMs: Long, key: String, phrase: String): String? {
+        if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
+        gate.markSpoken(key, atMs, phrase)
         return phrase
     }
 

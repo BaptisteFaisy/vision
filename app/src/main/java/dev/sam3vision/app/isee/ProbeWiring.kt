@@ -10,6 +10,7 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairLabelSignals
@@ -31,9 +32,10 @@ import kotlinx.coroutines.launch
  */
 
 /**
- * Pack voix des mots du guidage : clips embarqués (`res/raw/vp_guide_*`) puis
- * cache par voix, voix du pack lue dans `assets/vp_voice.txt`. Tout accès est
- * gardé : sans pack, la voix synthétise (plus lent, mais parle).
+ * Pack voix des mots du guidage : clips embarqués (`res/raw/vp_guide_*` SAM,
+ * `res/raw/vp_tl_*` TwinLite obstacle) puis cache par voix, voix du pack lue
+ * dans `assets/vp_voice.txt`. Tout accès est gardé : sans pack, la voix
+ * synthétise (plus lent, mais parle).
  */
 internal fun guideVoicePack(app: Application): VoicePack = VoicePack(
     filesDir = app.filesDir,
@@ -100,7 +102,7 @@ internal fun LiveProbe.observeSpoken(
     scope.launch {
         state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
             val text = phrase ?: return@collectLatest
-            val clipId = GuidanceWord.clipIdFor(text)
+            val clipId = GuidanceWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
             if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent)
             else voice.onPhrase(text, playerIdle(), urgent = urgent)
         }
