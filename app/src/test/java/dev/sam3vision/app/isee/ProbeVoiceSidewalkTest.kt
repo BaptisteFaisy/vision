@@ -87,7 +87,7 @@ class ProbeVoiceSidewalkTest {
         voice.phrase(0L, labels, SteeringCap.Right)
 
         val phrase = voice.phrase(500L, labels, SteeringCap.Right).orEmpty()
-        assertTrue("consigne obstacle attendue, reçu : $phrase", phrase.startsWith("Personne"))
+        assertTrue("consigne obstacle attendue, reçu : $phrase", phrase.startsWith("Va vers la gauche"))
         assertEquals(SteeringCap.Left, voice.cue()?.arrowDir())
         assertTrue(voice.detour)
     }

@@ -87,7 +87,7 @@ class LivePositionVoiceTest {
         val reading = DistanceReading(trackId = 1, label = "personne", meters = 1.4f, rawMeters = 1.4f, box = box)
         voice.announce(frame(), 200, 200, 1_000L, listOf(reading))
         val phrase = state.value.spoken.orEmpty()
-        assertTrue("la distance doit être dite : $phrase", phrase.contains("1,4"))
+        assertTrue("la distance doit être dite : $phrase", phrase.contains("1 mètre"))
     }
 
     @Test
