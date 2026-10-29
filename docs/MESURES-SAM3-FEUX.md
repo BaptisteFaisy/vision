@@ -168,6 +168,40 @@ Le recadrage sur la tache allumée a été testé : rappel vert **2/6** (contre 
 bonhomme debout forme une bande verticale). Gain de rappel payé en sûreté : à ne pas retenir en
 l'état.
 
+
+### Trois tentatives pour relever le rappel vert, trois échecs (29/10)
+
+Après le constat du §6 (1 vert sur 6), trois variantes ont été mesurées sur les
+**mêmes 16 crops**, avec le même code Kotlin, seule la préparation changeant :
+
+| variante | verts acceptés | faux verts |
+|---|---|---|
+| boîte SAM brute (référence) | **1/6** | 0 |
+| crop sur la **tache verte** | 2/6 | **1** |
+| crop sur la **lentille allumée** (plus lumineuse et saturée) | 1/6 | **1** |
+
+Le faux vert est toujours le même : `ru_moscow_03`, un bonhomme **debout** dont
+l'image de vérité est rouge. Le crop isole un bras vertical — élongation 6,50,
+6,50 > 1,5 — et la porte l'accepte. **Gagner du rappel en perdant la sûreté n'est
+pas un gain** : ce mode sert à dire « traversez ».
+
+La cause est structurelle, pas un réglage : `ELONGATION_MIN = 1.5f` suppose un
+pictogramme allongé dans un cadre qui l'épouse. Avec un prompt texte, SAM segmente
+le **caisson**, et une fois ramené à 48 px le pictogramme est emboîté dans une
+lentille **ronde** — sa boîte englobante est donc quasi carrée (élongation mesurée
+1,03 à 1,11 pour les vrais verts). Les crops du corpus de calibration, eux, sont
+cadrés sur le pictogramme (1,92 / 2,20 / 2,33). Le trait ne transfère pas.
+
+**Ce qu'il faudrait pour conclure** : refitter un autre trait sur les 235 lampes
+Panoramax — qui ne sont pas dans cet arbre (9 crops extraits seulement, §9) — ou
+sur quelques centaines de crops téléphone. Avec 6 verts étiquetés et 2 disques de
+voiture, aucun trait ne peut être validé : les densités se recouvrent (taux de
+remplissage de la boîte du vert : 0,16 à 0,65 pour les bonshommes contre 0,46 à
+0,54 pour les disques).
+
+**Recommandation** : ne pas toucher `ELONGATION_MIN`. Le prochain pas est la
+collecte, pas le réglage.
+
 ## 7. Reproductibilité
 
 Le harnais (copie du 29/10 des quatre fichiers `crossing/`, compiler et exécuter) vit hors de

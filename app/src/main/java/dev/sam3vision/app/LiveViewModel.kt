@@ -301,6 +301,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             keepFrame(jpegB64)
             return
         }
+        if (traverse.active) { traverse.offerLightFrame(jpegB64); _state.update { it.withCrossing(true, traverse.local ?: traverse.light) } }
         dispatcher.onFrame(active, jpegB64, captureAtNs, System.currentTimeMillis())
     }
 
@@ -391,7 +392,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 memory = current.memory.copy(tracks = recent.tracks),
                 distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
-            ).withCrossing(traverse.active, traverse.light)
+            ).withCrossing(traverse.active, traverse.local ?: traverse.light)
         }
     }
 

@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isee.CrossingLight
+import dev.sam3vision.app.isee.CrossingLocalLight
 import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.crossing.CrossingPrompts
@@ -20,6 +21,7 @@ import dev.sam3vision.core.traverse.TraverseVoice
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -75,6 +77,21 @@ class TraverseWiring(
      */
     @Volatile var light: CrossingLight? = null
         private set
+
+    /**
+     * Couleur du feu relue localement (≤ 150 ms) sur la frame caméra la plus
+     * fraîche : la boîte vient de [light], qui n'a pas besoin d'être fraîche.
+     */
+    private var pump: CrossingLocalLight? = null
+        private set
+
+    /** Dernière lecture locale, `null` tant qu'aucune frame n'a été lue. */
+    val local: CrossingLight? get() = pump?.ui?.value
+
+    /** Frame caméra : relit la couleur si le mode est actif et le créneau libre. */
+    fun offerLightFrame(jpegB64: String) {
+        if (active) pump?.offerFrame(jpegB64)
+    }
 
     /** Clé de la dernière transition journalisée : les répétitions se taisent. */
     private var lastKey: String = ""
@@ -141,6 +158,7 @@ class TraverseWiring(
         if (active == this.active) return
         if (active) {
             this.active = true
+            pump = CrossingLocalLight(scope, Dispatchers.Default, boxOf = { light?.box })
             quiet()
             relaunch(attach(requireNotNull(app), settings, scope, prompts))
             log("traversee mode=ON")
@@ -163,6 +181,8 @@ class TraverseWiring(
         pipeline.reset()
         lightGreen = false
         light = null
+        pump?.clear()
+        pump = null
         quiet()
     }
 
@@ -171,6 +191,7 @@ class TraverseWiring(
         pipeline.reset()
         lightGreen = false
         light = null
+        pump?.clear()
     }
 
     /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */
