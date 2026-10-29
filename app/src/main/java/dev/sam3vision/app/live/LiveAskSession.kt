@@ -56,7 +56,8 @@ import kotlinx.coroutines.sync.Mutex
  * Les repères armés (les siens comme ceux de l'écran iSee : même magasin)
  * sont cherchés à 2 Hz et posés en overlay, mais restent **muets** : seule
  * la chasse nommée parle (« Médics à 9 heures »), et les positions SAM se
- * taisent pendant qu'un picto parle ([pictoActive]).
+ * taisent pendant qu'un picto parle ([pictoActive]). La démo (« démo picto »)
+ * remplace le repérage par des faux repères fixes, guidables pareil.
  *
  * Les réglages sont relus à chaque question ([reloadSettings]) : une clé saisie pendant
  * le direct s'applique tout de suite. C'est aussi pourquoi la classe ne garde pas de
@@ -104,6 +105,10 @@ class LiveAskSession(
     @Volatile
     private var pictoHunt: String? = null
 
+    /** Démo active : les faux repères remplacent le repérage (overlay + guidage). */
+    @Volatile
+    private var pictoDemo = false
+
     /** Génération du tour : une séance neuve fait taire les retours tardifs. */
     @Volatile
     private var pictoTurn = 0
@@ -122,6 +127,7 @@ class LiveAskSession(
         history = emptyList()
         timeline.clear()
         pictoHunt = null
+        pictoDemo = false
         pictoTurn++
         state.update { it.copy(pictoOverlay = null) }
         scope.launch(io) { pictos = store.list() }
@@ -133,6 +139,10 @@ class LiveAskSession(
      * repère armé → guidage ; mot maison seul → chasse SAM ; sinon LLM.
      */
     fun ask(question: String) {
+        if (PictoVoiceOrder.isDemoToggle(question)) {
+            toggleDemo()
+            return
+        }
         PictoVoiceOrder.parse(question)?.let { createPicto(it); return }
         pictoHunt = null
         val hunted = huntWord(question)
@@ -166,12 +176,20 @@ class LiveAskSession(
         }
     }
 
-    /** Mot de [question] qui vise un repère armé, `null` si aucun. */
+    /** Mot de [question] qui vise un repère armé (ou de démo), `null` si aucun. */
     private fun huntWord(question: String): String? {
-        val known = pictos
-        if (known.isEmpty()) return null
+        val labels = pictos.map { it.label } +
+            if (pictoDemo) PictoVoiceOrder.demoHits().map { it.label } else emptyList()
+        if (labels.isEmpty()) return null
         return KnownSizes.canonical(question).split(' ').filter { it.isNotEmpty() }
-            .firstOrNull { word -> known.any { PictoVoiceOrder.matches(word, it.label) } }
+            .firstOrNull { word -> labels.any { PictoVoiceOrder.matches(word, it) } }
+    }
+
+    /** Bascule de la démo : faux repères affichés (et guidables), état dit à voix haute. */
+    private fun toggleDemo() {
+        pictoDemo = !pictoDemo
+        if (!pictoDemo) state.update { it.copy(pictoOverlay = null) }
+        speakPicto(PictoVoiceText.demo(pictoDemo, settings().speechLanguage))
     }
 
     /** Ordre « fais un pictogramme de X » : frame gardée → Muse → repère armé, sans relecture. */
@@ -214,16 +232,27 @@ class LiveAskSession(
      * posé dans tous les cas, la voix ne guide que le mot chassé.
      */
     fun onLiveFrame(width: Int, height: Int, nowMs: Long = System.currentTimeMillis()) {
-        val known = pictos
-        if (known.isEmpty()) return
         if (nowMs - lastPictoMatchAt < IseePicto.MATCH_EVERY_MS) return
         lastPictoMatchAt = nowMs
+        if (pictoDemo) {
+            scope.launch { matchDemo(width, height, nowMs) }
+            return
+        }
+        val known = pictos
+        if (known.isEmpty()) return
         scope.launch(io) {
             val frame = frameGray(latestJpeg(), PICTO_FRAME_EDGE) ?: return@launch
             val hits = known.mapNotNull { matchTemplate(frame, it.template, it.id, it.label) }
             state.update { it.copy(pictoOverlay = PictoOverlay(width, height, hits)) }
             guide(hits, nowMs)
         }
+    }
+
+    /** Démo : les faux repères remplacent le repérage (overlay + guidage testables sans caméra). */
+    private suspend fun matchDemo(width: Int, height: Int, nowMs: Long) {
+        val hits = PictoVoiceOrder.demoHits()
+        state.update { it.copy(pictoOverlay = PictoOverlay(width, height, hits)) }
+        guide(hits, nowMs)
     }
 
     /** Guidage : les détections du mot chassé parlent, les autres restent muettes. */
