@@ -85,7 +85,7 @@ private fun VoiceNavScreen(
             hold = hold,
             settings = settings,
             onHoldTranscript = { nav.session().onVoiceTranscript(it) },
-            // W3 : ajouter `onSubmitText = nav::submitTypedDestination` à son merge.
+            onSubmitText = nav::submitTypedDestination,
         )
         is VoiceNavUiState.Guiding -> GuidingRoute(
             isee = isee,
