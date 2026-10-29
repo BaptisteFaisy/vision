@@ -1,12 +1,10 @@
 node_modules/
-legacy-expo-app/node_modules/
 .expo/
 __pycache__/
 *.pyc
 .DS_Store
 .env
 *.log
-legacy-expo-app/android/
 
 # brouillons locaux (jamais versionnés)
 *.bak

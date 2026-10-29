@@ -1,5 +1,9 @@
 # NOTES de build — backend legacy (server/)
 
+> **Historique** : notes de l'époque où l'APK se construisait ici (app Expo, retirée de
+> l'arbre le 29/10/2026). Les scripts `build-apk.sh`, `dev_qr.sh` et `install-android-sdk.sh`
+> ont été retirés avec elle ; `find_jdk`/`sdk_env` ne sont plus dans `lib-env.sh`.
+
 ## Réglages hors `scripts/` (à valider par le parent)
 
 1. **`app/app.json`** — ajout de `expo.android.package = "com.baptiste.sam3vision"`

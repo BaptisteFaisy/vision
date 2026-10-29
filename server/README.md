@@ -1,152 +1,96 @@
-# server/ — backend Modal SAM 3.1 (dépôt vision)
+# server/ — backend SAM 3.1 (Modal, Baseten) + Valhalla
 
-> ⚠️ **L'app Android est native Kotlin (à la racine du dépôt : `app/`, `core/`).
-> Ce dossier garde le backend Modal SAM 3.1 et l'ancienne app Expo (legacy).**
-> Fermeture Modal, relance en une commande et preuve de l'état : [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).
->
-> Backend déployé aujourd'hui : `backend/live_fast/` (app `sam3-eu-a100`, voir
-> [`docs/LIVE-FAST.md`](docs/LIVE-FAST.md)) ; `modal_app.py` est l'ère `sam3-vision`
-> (`/analyze`, `/ask`). Le reste de cette page décrit l'époque Expo/legacy.
+> ⚠️ **L'app Android est native Kotlin, à la racine du dépôt (`app/`, `core/`).**
+> Ce dossier ne contient que le **serveur** : segmentation SAM 3.1 sur GPU Modal,
+> routage piéton Valhalla, tracker, et les sondes de mesure.
+> L'ancienne app Expo (`legacy-expo-app/`) a été **retirée de l'arbre le 29/10/2026** —
+> elle vit toujours dans l'historique git (`git log -- server/legacy-expo-app`).
 
-Photo → segmentation SAM 3.1 sur Modal → description et questions/réponses par un LLM vision, dans une app Android (Expo / React Native).
+## Ce qui est déployé
 
-L'app ne contient aucune clé API : elle appelle un backend FastAPI déployé sur Modal, qui détient le modèle de segmentation et la clé du LLM.
-*Description héritée de l'app Expo : l'app Kotlin appelle le LLM (InferHub) depuis le téléphone et n'utilise le backend Modal que pour `/segment` — la clé côté serveur n'est donc plus nécessaire, voir [`docs/MODAL-CLOSED.md`](docs/MODAL-CLOSED.md).*
+| App Modal | Dossier | Routes | Déploiement |
+|---|---|---|---|
+| `sam3-eu-a100` (A100-40GB, `eu-west`) | `backend/live_fast/` | `GET /health`, `POST /segment`, `POST /live`, `WS /live/ws`, `POST /release` | **CI** (`deploy-live-fast.yml`, à chaque push qui touche le dossier) ou `scripts/deploy-live-fast.sh` |
+| `valhalla-idf-cpu` (CPU, tiles Île-de-France) | `backend/valhalla_cpu.py` | `GET /health`, `POST /route`, `GET /signals` | **CI** (`deploy-valhalla-cpu.yml`) |
+| `sam3-vision` (ère photo, A10G) | `backend/modal_app.py` | `GET /health`, `POST /segment`, `POST /analyze`, `POST /ask` | manuel, `scripts/deploy_backend.sh` |
+| tracker | `backend/track_app.py` | `GET /health`, `POST /session`, `POST /frame`, `POST /session/close` | manuel (`modal deploy`) |
 
-## Ce que fait l'app
+Le **même service live** tourne aussi sur **Baseten** (`backend/baseten/`) ; la synchro des poids
+passe par `scripts/baseten_sync.py`.
 
-1. **Camera** — prise de photo (ou import depuis la galerie en secours).
-2. **Analyse** — envoi à `/analyze` : masques d'objets + description textuelle qui cite les objets segmentés.
-3. **Résultat** — overlays de masques colorés (opacité ~0,45, activables), description, et chat pour poser des questions sur la photo (`/ask`, avec historique).
-4. **Réglages** — URL du backend modifiable et persistée ; écran d'erreur réseau explicite (timeout 60 s) avec bouton *Réessayer*.
+`backend/{concepts,http_errors,imaging,live_ws,schemas,segmentation,timing}.py` existent en double
+dans `backend/live_fast/` : Modal ne suit pas les imports hors du dossier déployé. La parité
+octet-à-octet est vérifiée par `scripts/test_units.py` (`VENDORED_PARITY`) — toucher l'un sans
+l'autre fait échouer la CI.
 
-## Architecture en 3 blocs
+## Règle d'or : une seule GPU
 
-```
-┌─────────────────────────┐      HTTPS/JSON      ┌──────────────────────────────────┐
-│  App Expo (Android)     │ ───────────────────► │  Modal — app `sam3-vision`       │
-│  expo-camera            │  image base64        │  FastAPI (asgi_app, GPU A10G)    │
-│  expo-image-picker      │ ◄─────────────────── │  ├─ SAM 3.1  → masques PNG b64   │
-│  overlays + chat        │  masques + texte     │  └─ LLM vision (API OpenAI-like) │
-└─────────────────────────┘                      └──────────────────────────────────┘
-   legacy-expo-app/                                backend/  (secret `sam3-llm`)
-```
+Le direct réveille la carte, et la coupe quand le flux s'arrête (`POST /release`, en-tête
+`x-sam-release: confirm`). Aucune tâche planifiée ne garde la carte allumée. Garde-fou :
+`scripts/modal-one-gpu.sh --status`.
 
-- **App** : Expo SDK stable, TypeScript, client API unique (`legacy-expo-app/src/api.ts`).
-- **Segmentation** : SAM 3.1 **officiel** — poids `facebook/sam3.1` (`sam3.1_multiplex.pt`, volume Modal `sam3-official`) + code natif Meta (`facebookresearch/sam3`), predictor multiplex construit dans `@modal.enter()`, masques encodés en PNG base64. (La route `/live` de `sam3-eu-a100` reste temporairement sur le miroir `transformers` `unsloth/sam3.1` — bascule par étapes, voir `docs/SPEC.md`.)
-- **LLM** : endpoint compatible OpenAI (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`), vision obligatoire, injecté par le secret Modal `sam3-llm`.
-
-Détail du flux et des routes : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Prérequis
-
-| Outil | Version / note |
-|---|---|
-| Python | ≥ 3.11 (client de test : stdlib uniquement) |
-| Modal CLI | venv dédié `~/.venv-modal`, profil `baptiste-faisy` |
-| Node.js | ≥ 20 (Expo SDK stable) |
-| Android | Expo Go (dev) ou Android Studio / JDK 17 (build APK) |
-| Compte Modal | avec jeton d'accès et GPU A10G autorisé |
-| Clé LLM | endpoint compatible OpenAI **avec vision** |
-
-## Déploiement backend
+## Déployer
 
 ```bash
-export LLM_BASE_URL="https://openrouter.ai/api/v1"
-export LLM_API_KEY="<ta clé>"          # jamais commitée
-export LLM_MODEL="<modèle vision>"
+# direct (le seul chemin normal : il attend la nouvelle version et vérifie /health)
+bash scripts/deploy-live-fast.sh              # --no-deploy pour vérifier sans déployer
 
-./scripts/deploy_backend.sh
+# ère photo (sam3-vision) : secret + déploiement + smoke test
+LLM_BASE_URL=… LLM_API_KEY=… LLM_MODEL=… ./scripts/deploy_backend.sh
+
+# rotation de la clé LLM, puis redéploiement
+./scripts/rotate_llm_secret.sh /chemin/cle.txt
 ```
 
-Le script est idempotent : il vérifie le venv Modal, crée/actualise le secret `sam3-llm`
-(`modal secret create (avec écrasement) --from-json`, valeurs lues dans l'environnement dans un fichier
-`chmod 600` et jamais affichées — la clé ne passe **jamais** en argument de commande),
-déploie `backend/modal_app.py`, affiche l'URL `https://…modal.run` et lance le test `/health`.
+`deploy_backend.sh` et `rotate_llm_secret.sh` sont idempotents : la clé ne passe **jamais** en
+argument de commande (fichier temporaire `chmod 600`, secret Modal écrasé depuis un JSON).
+`DRY_RUN=1` valide l'environnement **sans appeler Modal**.
 
-Options : `--skip-smoke`, `--help`, et `MODAL_PROFILE` / `MODAL_BIN` / `SECRET_NAME` /
-`APP_NAME` surchargeables. `DRY_RUN=1 ./scripts/deploy_backend.sh` valide l'environnement et
-les fichiers **sans appeler Modal** ; sans `LLM_API_KEY` le script refuse de tourner.
-Pour changer seulement la clé : `./scripts/rotate_llm_secret.sh /chemin/cle.txt`
-(rotation depuis un fichier, puis redéploiement).
-
-## Test
+## Tester
 
 ```bash
-# tests unitaires backend, sans GPU ni token Modal (stdlib + PIL + numpy + fastapi)
+# tests unitaires backend, sans GPU ni token (stdlib + PIL + numpy + fastapi) — ce que lance la CI
 python3 scripts/test_units.py
 
-# suite E2E complète (health, segment ± prompts, analyze, ask, erreur 400)
-python3 scripts/test_api.py https://xxxx.modal.run
+# contrat WebSocket sans GPU ni réseau (24 vérifications)
+python3 scripts/test_live_ws.py
 
-# ou via l'environnement
-API_URL=https://xxxx.modal.run python3 scripts/test_api.py --timeout 90
-
-# image imposée et test isolé
-python3 scripts/test_api.py --url … --image photo.jpg --only health
-
-# contrat des corps invalides : 7 cas → 400, sans réémission du payload
-python3 scripts/test_api.py --url … --only contract-errors
-
-# plusieurs groupes d'un coup
-python3 scripts/test_api.py --url … --only segment,segment-prompts,bad-image
-
-# tests du client Expo (parsing, api.ts contre un serveur local, masques) — sans npm
-node legacy-expo-app/tools/test-client.mjs
+# E2E contre un backend déployé (stdlib seule ; groupes health, segment, analyze, ask, contract-errors…)
+python3 scripts/test_api.py --url https://…modal.run --only contract-errors
 ```
 
-Sans `--image`, `test_api.py` télécharge un échantillon public ; à défaut il génère une scène
-synthétique. Code de sortie ≠ 0 dès qu'un test échoue (utilisable en CI). `--only analyze,ask`
-nécessite une vraie clé LLM dans le secret `sam3-llm` (tant que la clé est un placeholder, ces
-deux routes renvoient 500).
-
-## Dev Expo Go
-
-```bash
-./scripts/dev_qr.sh            # npx expo start --tunnel depuis legacy-expo-app/
-```
-
-Vérifie `node_modules` (installe si absent), puis affiche un QR code à scanner avec Expo Go.
-Renseigne ensuite l'URL Modal dans l'écran **Réglages** de l'app.
-
-## Build APK
-
-```bash
-./scripts/build-apk.sh debug     # APK debug (keystore debug, installable direct)
-./scripts/build-apk.sh           # release (défaut, keystore de release requis)
-```
-
-Le script vérifie le SDK Android (`ANDROID_HOME`, défaut `~/Android/Sdk`), installe les
-dépendances JS, lance `expo prebuild` puis Gradle (`ABI`, `GRADLE_JVMARGS` surchargeables).
-
-APK produite : `legacy-expo-app/android/app/build/outputs/apk/{debug,release}/`.
-Équivalent manuel : `cd legacy-expo-app && npx expo prebuild -p android && cd android && ./gradlew assembleDebug`.
+Détail script par script : [`scripts/README.md`](scripts/README.md). Contrats et mesures :
+[`docs/`](docs/) (`LIVE-FAST.md` pour le direct, `LIVE-SPEC.md` pour le protocole,
+`SPEC.md`/`ARCHITECTURE.md` pour l'ère photo — documents datés).
 
 ## Coûts indicatifs (GPU)
 
 | Poste | Ordre de grandeur |
 |---|---|
-| A10G sur Modal | ~1,10 $/h de calcul facturé à la seconde |
-| Cold start (chargement SAM 3.1) | **~36 s mesurés une seule fois** (35,8 s pour `/health`, puis 5,7 s pour le `/segment` suivant) ; le second essai après 567 s d'inactivité n'a donné aucun cold start — non reproductible, chiffres détaillés dans [`docs/PERF.md`](docs/PERF.md) |
-| Requête `/segment` | ~1,6–2,0 s à chaud (médians mesurés sur 3 passes) → quelques centimes |
-| Requête `/analyze` | segmentation + appel LLM : non mesuré tant que la clé LLM est absente (500 attendu) |
-| LLM vision `/analyze`, `/ask` | ~0,001–0,01 $ par appel selon le modèle |
-| App au repos | 0 $ si `scaledown_window` est court (60 s) ; si le conteneur ne descend pas, le GPU reste facturé |
+| A10G sur Modal (ère `sam3-vision`) | ~1,10 $/h de calcul facturé à la seconde |
+| Cold start (chargement SAM 3.1) | **~36 s mesurés une seule fois** (35,8 s pour `/health`, puis 5,7 s pour le `/segment` suivant) ; non reproductible au second essai — chiffres détaillés dans [`docs/PERF.md`](docs/PERF.md) |
+| Requête `/segment` | ~1,6–2,0 s à chaud (médians sur 3 passes) |
+| Requête `/analyze` | segmentation + appel LLM : dépend de la clé côté serveur |
+| App au repos | 0 $ si `scaledown_window` est court (60 s) ; sinon le GPU reste facturé |
 
 À retenir : le coût dominant est le **temps de GPU allumé**, pas le nombre de requêtes.
 Un `keep_warm` évite les cold starts mais facture en continu.
 
 ## Limites connues
 
-- **Cold start** : ~36 s mesurés une seule fois après 450 s d'inactivité (`scaledown_window=300`) ; le second essai après 567 s n'en a produit aucun — non reproductible, à surveiller en console Modal (détail : `docs/PERF.md`).
-- **Liste d'objets coupée à 24** : `MAX_OBJECTS = 24` dans `backend/segmentation.py` trie par score décroissant puis ne garde que les 24 premiers, **sans champ d'avertissement** dans la réponse (voir `docs/SPEC.md`).
-- **Prompts libres** : la qualité dépend des concepts demandés ; sans prompt, le serveur choisit une liste générique et peut manquer de petits objets.
-- **Masques PNG base64** : réponse lourde (quelques centaines de Ko à plusieurs Mo) → Wi-Fi conseillé, timeout client 60 s.
-- **Sans état** : l'historique du chat est renvoyé par le client à chaque `/ask`, rien n'est stocké côté serveur.
-- **Android uniquement**, pas d'écran iOS prévu ; Expo Go ne teste pas les modules natifs custom (utiliser un build de dev).
-- **Pas d'authentification** sur le backend Modal : toute personne ayant l'URL peut consommer du GPU — à garder privée.
-- SAM 3.1 est un modèle de segmentation *promptable*, pas un détecteur exhaustif : les scores faibles doivent être filtrés côté client.
+- **Cold start** : ~36 s mesurés une fois après 450 s d'inactivité (`scaledown_window=300`) ; le
+  second essai après 567 s n'en a produit aucun — à surveiller en console Modal (`docs/PERF.md`).
+- **Liste d'objets coupée à 24** : `MAX_OBJECTS = 24` dans `backend/segmentation.py` trie par score
+  puis ne garde que 24 objets, **sans champ d'avertissement** (`docs/SPEC.md`).
+- **Prompts libres** : la qualité dépend des concepts demandés ; sans prompt, le serveur choisit une
+  liste générique et peut manquer de petits objets.
+- **Masques PNG base64** : réponse lourde (centaines de Ko à plusieurs Mo) → Wi-Fi conseillé,
+  timeout client 60 s.
+- **Sans état** : l'historique du chat est renvoyé par le client à chaque `/ask`, rien n'est stocké.
+- **Pas d'authentification** : toute personne ayant l'URL peut consommer du GPU — garder l'URL privée.
+- SAM 3.1 est un modèle *promptable*, pas un détecteur exhaustif : les scores faibles se filtrent
+  côté client.
 
 ## Crédit
 
-Backend SAM 3.1 officiel (poids Meta `facebook/sam3.1` + code natif) — **fait par Baptiste Faisy** (2026-10-29).
+Backend SAM 3.1 officiel (poids Meta `facebook/sam3.1` + code natif) — **fait par Baptiste Faisy**.

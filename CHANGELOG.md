@@ -24,6 +24,37 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `TwinLiteWord.kt`, `GuidanceAnnouncer.kt`, `GuidanceWord.kt`
   (`isStopPhrase`), `ProbeWiring.kt`, `IseeViewModel.kt` (commentaire),
   8 tests, 3 docs (+8 MP3, +12 tests).
+## 2026-10-29 — ménage (2) : l'app Expo sort de l'arbre, la table de permissions morte aussi
+
+- **Demande** : « vire les 2 » — l'app Expo archivée et la table de décision des permissions
+  qui ne vivait plus que par ses tests.
+- `server/legacy-expo-app/` (55 fichiers, ~0,8 Mo) **retirée** : remplacer l'app Kotlin depuis
+  le 29/10, elle n'était plus lue par la CI, ni par un script, ni par l'APK. Elle reste dans
+  l'historique git (`git log -- server/legacy-expo-app`).
+- Serviteurs de cette app retirés avec elle, faute d'appelant : `server/scripts/build-apk.sh`,
+  `dev_qr.sh` (tunnel Expo Go), `install-android-sdk.sh` (seul appelant : `build-apk.sh`), les
+  helpers `find_jdk` / `sdk_env` de `lib-env.sh`, la ligne d'aide de `deploy_backend.sh`, et
+  les entrées `legacy-expo-app/*` de `server/.gitignore`.
+- `server/README.md` **réécrit** : il décrivait l'app Expo (son en-tête l'admettait à moitié).
+  Il dit maintenant ce qui est déployé — 4 apps Modal (`sam3-eu-a100`, `valhalla-idf-cpu`,
+  `sam3-vision`, tracker) plus le portage Baseten, routes vérifiées ligne à ligne —, la règle
+  « une seule GPU », les commandes de déploiement et de test, et les limites connues.
+  `server/scripts/README.md` perd sa section « App Android / Expo » (l'APK se construit à la
+  racine, `./gradlew :app:assembleDebug`). Les docs `server/docs/*` datées gardent leurs
+  références historiques, encadrées par un bandeau « retirée de l'arbre le 29/10 ».
+- `perms/PermDecision.kt` **100 → 24 lignes** : `PermKind`, `PermStep`, `nextStep`, `fgGranted`,
+  `appSettingsUri`, `PermCopy`, `copyFor` et les six libellés inutilisés n'étaient lus que par
+  `PermDecisionTest`. Restent `canAskBackground` (lu par `MainActivity`) et
+  `PermTexts.MIC_DENIED` (lu par `DictationFeature` et `LiveVoice`). Le test suit : 10 → 2.
+- Chiffres re-mesurés (`tools/count-tree.py`) : 911 `.kt`, 98 050 lignes, 54 501 lignes de
+  prod, 2 873 `@Test` JVM (`:core` 1 825 + `:app` 1 048, 0 échec), 9 instrumentés, 47 docs.
+  README, PERF, TESTING (§1 et §6 re-générés depuis les rapports JUnit), ARCHITECTURE, NOTES,
+  AGENTS et DOC-ETAT alignés.
+- Fichiers : `README.md`, `CHANGELOG.md`, `NOTES.md`, `AGENTS.md`, `docs/{ARCHITECTURE,DOC-ETAT,
+  PERF,TESTING}.md`, `app/.../perms/PermDecision.kt` (+ son test), `server/README.md`,
+  `server/.gitignore`, `server/scripts/{README,NOTES}.md`, `server/scripts/{deploy_backend.sh,
+  lib-env.sh}`, `server/docs/{SPEC,ARCHITECTURE,AUDIT,KOTLIN-SPEC,MODAL-CLOSED}.md`,
+  et la suppression de `server/legacy-expo-app/` + 3 scripts.
 
 ## 2026-10-29 — iSee : mur et concepts = obstacles bloquants (preuves JVM)
 

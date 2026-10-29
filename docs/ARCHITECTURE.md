@@ -11,8 +11,8 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **213** fichiers | 244 fichiers / **1 804** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **286** fichiers | 161 fichiers / **1 071** `@Test` | 5 fichiers / **9** tests |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **215** fichiers | 247 fichiers / **1 825** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **283** fichiers | 158 fichiers / **1 048** `@Test` | 4 fichiers / **9** tests |
 | `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
@@ -24,25 +24,25 @@ dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus a
 `glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 213
-find core/src/test -name '*.kt' | wc -l            # 244
-find app/src/main -name '*.kt' | wc -l             # 286
-find app/src/test -name '*.kt' | wc -l             # 161
+find core/src/main -name '*.kt' | wc -l            # 215
+find core/src/test -name '*.kt' | wc -l            # 247
+find app/src/main -name '*.kt' | wc -l             # 283
+find app/src/test -name '*.kt' | wc -l             # 158
 find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 15
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 913
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 98 242
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 911
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 98 050
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
 `rg` absent rend **0** sans le dire (piège à connaître avant de conclure « aucun test »).
 
-- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 213 fichiers `main`,
+- `:core` est une **bibliothèque Android**, pas un module JVM. Sur ses 215 fichiers `main`,
   **4** importent `android.*` : `mask/Masks.kt`, `settings/EncryptedSettingsStore.kt`,
   `settings/SettingsCipher.kt`, `settings/SettingsStoreFactory.kt`. Tout le reste — réseau,
   gestes, cadence, distances, masques, texte, prédiction — est du Kotlin pur, testé sur la JVM.
-- Les 286 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
+- Les 283 fichiers de `:app` comptent un **stub** hors du paquet applicatif :
   `app/src/main/java/javax/sound/sampled/AudioFormat.kt`, surface minimale de
   `javax.sound.sampled` pour que le port Java de LAME (`jump3r`) encode du MP3 sur Android.
 - Le détail des tests (par module et par domaine) est dans `docs/TESTING.md`.
