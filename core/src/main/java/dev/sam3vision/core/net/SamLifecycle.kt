@@ -4,8 +4,9 @@ import okhttp3.OkHttpClient
 
 /**
  * Délai de l'extinction : long, parce que la requête peut arriver sur un conteneur
- * endormi — elle attend alors son démarrage (2 à 7 s avec le snapshot, ~24 s la première
- * fois). Un délai court échouerait au pire moment, celui où l'app se ferme.
+ * endormi — elle attend alors son démarrage (2 à 7 s sur restore, sinon boot complet
+ * 18-32 s : le restore est opportuniste, ~1 min après la mort). Un délai court
+ * échouerait au pire moment, celui où l'app se ferme.
  */
 const val RELEASE_TIMEOUT_SECONDS: Long = 45L
 
@@ -25,7 +26,7 @@ private val TYPED_REFUSALS = setOf(401, 402, 403, 429)
  * Sans ça, la carte A100 reste allumée jusqu'à la fenêtre de réduintage — et tant
  * qu'un client sonde `/health`, elle ne s'éteint jamais. Le backend tue son propre
  * processus après avoir répondu ; `min_containers=0` fait que Modal ne le relance pas,
- * et le prochain réveil repart d'un snapshot restauré (2 à 7 s mesurées).
+ * et le prochain réveil est un restore (2 à 7 s) ou un boot complet (18-32 s).
  *
  * **Une seule requête par appel** : le rejeu d'un refus doublait l'extinction (un 401 ou un
  * 429 partait deux fois). `Result.success(false)` = le serveur a refusé (400, 404, 5xx) ;

@@ -12,14 +12,22 @@ Deux leviers, dans cet ordre, mesurés sur `sam3-eu-a100` (A100-40GB, eu-west) :
    conteneur ne retélécharge plus 1,7 Go au démarrage. `load_seconds` passe de
    **32 s à 12-13 s** ; le Hub HF ne renvoie plus son avertissement de débit.
 2. **Snapshot mémoire** (`enable_memory_snapshot=True` + `@modal.enter(snap=True)` pour
-   les poids chargés **sur CPU**, puis un `@modal.enter()` pour le passage GPU) : les
-   démarrages suivants restaurent la mémoire au lieu de recharger. Journaux Modal :
-   `Restoring Function from memory snapshot` puis `GET /health -> 200` en **2,3 à 7,3 s**.
+   les poids chargés **sur CPU**, puis un `@modal.enter()` pour le passage GPU) : quand
+   elle a lieu, la restauration évite de recharger (journaux Modal :
+   `Restoring Function from memory snapshot`, puis `GET /health -> 200` en **2,3 à 7,3 s**).
    Le tout premier démarrage après un déploiement crée le snapshot (≈ 24 s, incompressible).
 
+Restauration **opportuniste, pas garantie** (enquête Modal du 29/10/2026) : le snapshot
+ne survit qu'**~1 min après la mort du conteneur** — passé ce délai, le réveil est un
+**boot complet (18-32 s)** : poids CPU + phase GPU. Tout réveil se lit donc « restore
+**ou** boot complet », jamais comme un restore acquis.
+
 Contrainte à connaître : un snapshot mémoire ne contient pas d'état CUDA, d'où la
-coupure CPU/GPU entre les deux `enter`. `/health` expose `load_breakdown`
+coupure CPU/GPU entre les deux `enter`. `/health` expose `restored` (vrai ssi ce boot
+est une restauration : `snap_seconds > age_conteneur_s + 2`), `load_breakdown`
 (`age_conteneur_s`, `poids_cpu_1er_demarrage_s`, `gpu_s`) et `memory_snapshot`.
+(`load_seconds` ne mesure que la phase GPU ; le VRAI temps d'ouverture est
+`load_breakdown.age_conteneur_s`.)
 
 ## ⚠️ Ne pas déployer `live_app.py` (relevé antérieur, hors de cet arbre)
 
