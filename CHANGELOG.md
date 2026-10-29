@@ -26,6 +26,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Recette téléphone : main devant l'objectif → « Stop. » ; approche mesurée →
   consignes par seau puis « Stop. » — dus sur master après merge.
 
+## 2026-10-29 — iSee : voix unique ElevenLabs (pack MP3 + lecteur partagé)
+
+- `VoicePack` (`app/.../speech/`) : clips MP3 rejoués sans réseau (dossier
+  par voix, TTL 30 j, miroir des annonces tap) ; `TwinLiteVoice` réécrite :
+  clip → `SpeechPlayer` PARTAGÉ de l'écran (une seule voix, chaque entrée
+  coupe la précédente), sinon synthèse ElevenLabs bornée 500 ms + cache,
+  sinon silence + remplissage fond. Second moteur TTS système supprimé.
+- Catalogue 20 concepts / 37 MP3 (`tools/voicepack-catalog.json` : TwinLite 8,
+  traversée 10, nav statique 19) ; `tools/gen-voicepack.py` (clé par env,
+  jamais stockée, voix Laure + params app) ; `tools/check-voicepack.py`
+  (catalogue = code = fichiers) ; `docs/VOICEPACK.md`.
+- MP3 générés voix Laure (`ELEVENLABS_API_KEY` par env, jamais stockée) :
+  37 clips FR/EN versionnés dans `app/src/main/res/raw/` + `vp_voice.txt`.
+- Preuves : `:app` `testDebugUnitTest` vert sur r630 (`VoicePackTest` 10/10,
+  `TwinLiteVoiceTest` 5/5, `TwinLiteWiringTest` 8/8), `assembleDebug` vert,
+  `check-voicepack.py` OK, `check-kotlin-limits` OK.
+
 ## 2026-10-29 — page caregiver : la carte disparaît, l'image du proche et la barre de trajet la remplacent (ordre user)
 
 - `suivi-parent/index.html` : plus de carte (ni MapLibre, ni clé Google, ni appel
