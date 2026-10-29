@@ -14,7 +14,7 @@ une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est a
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1766
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1765
 grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 938
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 95
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 9
@@ -23,13 +23,13 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 239 (dont 14 aides) | 226 | **1 766** |
+| `:core` | 239 (dont 14 aides) | 226 | **1 765** |
 | `:app` | 140 (dont 3 aides) | 138 | **938** |
-| **Total JVM** | **379** | **364** | **2 704** |
+| **Total JVM** | **379** | **364** | **2 703** |
 | `:app` `androidTest` | 4 | 4 | **9** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **2 704 tests JVM** au total, dont **1 766** dans `:core` et **938** dans `:app`. Dans `:app`, le
+- **2 703 tests JVM** au total, dont **1 765** dans `:core` et **938** dans `:app`. Dans `:app`, le
   banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
   **10 tests instrumentés** (9 + 1) sont hors de ce total.
 - « Classes `@Test` » = déclarations `class …Test` dans les fichiers portant `@Test`
@@ -53,7 +53,7 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 ```
 
 Relevé du 29/10, sur r630 (`:core:testDebugUnitTest :app:testDebugUnitTest`) : **`:core`
-1 766 / 0 échec / 0 ignoré**, **`:app` 938 / 0 / 0** — **2 704 exécutés** au total, conformes aux
+1 765 / 0 échec / 0 ignoré**, **`:app` 938 / 0 / 0** — **2 703 exécutés** au total, conformes aux
 comptages statiques du §1. (Historique : le 26/10 après 19 h, `:core` 663, `:app` 305 et le banc
 lunettes 36 — 1 004 au total, avant la fusion du banc dans `:app`, non comparable.)
 
@@ -209,7 +209,7 @@ périmètre limité au stockage privé de l'app · job horaire unique et sans r�
 
 Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deux fichiers portent deux classes : `PictoMatcherTest.kt` — 6 + 2 — et `TapZonesTest.kt` — 4 + 2).
 
-### `:core` — 1766
+### `:core` — 1765
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **crossing** (68) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, PedLightGateTest 20, TrainedLightColorTest 4
@@ -222,7 +222,7 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **haptics** (10) : CrossingHapticsTest 2, WaveformTest 8
 - **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (300) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 11, GuidanceSteeringTest 13, GuidanceTest 17, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 10, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 8, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
+- **live** (299) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 11, GuidanceSteeringTest 13, GuidanceTest 17, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 10, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
 - **local** (27) : LocalOverlayEngineTest 24, LocalOverlaySimTest 3
 - **mask** (97) : MaskBenchTest 2, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
 - **model** (7) : GeometryTest 4, ObjectLimitsTest 3
