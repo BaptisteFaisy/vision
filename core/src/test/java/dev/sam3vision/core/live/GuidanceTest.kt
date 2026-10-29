@@ -14,9 +14,6 @@ class GuidanceTest {
     private fun placed(label: String, x: Float, meters: Float? = null) =
         PlacedLabel(label, x, 0.5f, meters)
 
-    private fun huge(label: String, height: Float = 0.9f, width: Float = 0.8f) =
-        PlacedLabel(label, 0.5f, 0.5f, null, LabelExtent(height, width))
-
     @Test
     fun `voie libre sans objet`() {
         val decision = Guidance.decide(emptyList())
@@ -52,7 +49,6 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertFalse(decision.stop)
         assertEquals("Va à gauche.", Guidance.phrase(decision))
         assertEquals("Go left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
@@ -72,24 +68,21 @@ class GuidanceTest {
     }
 
     @Test
-    fun `obstacle tres proche demande l'arret`() {
+    fun `obstacle tres proche contourne en centimetres`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f, 0.4f)))
 
         assertTrue(decision.blocked)
-        assertTrue(decision.stop)
-        assertEquals("Stop.", Guidance.phrase(decision))
-        assertEquals("Stop.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Va à gauche, 40 centimètres.", Guidance.phrase(decision))
+        assertEquals("Go left, 40 centimeters.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
-    fun `le passage en stop fait reparler dans le meme seau`() {
-        val roule = Guidance.decide(listOf(placed("personne", 0.5f, 0.65f)))
-        val stop = Guidance.decide(listOf(placed("personne", 0.5f, 0.55f)))
+    fun `dans le meme seau, pas de reannonce`() {
+        val pres = Guidance.decide(listOf(placed("personne", 0.5f, 0.65f)))
+        val tresPres = Guidance.decide(listOf(placed("personne", 0.5f, 0.55f)))
 
-        assertFalse(roule.stop)
-        assertTrue(stop.stop)
-        assertNotEquals(Guidance.key(roule), Guidance.key(stop))
-        assertEquals("b|personne|Left|1|12h|stop", Guidance.key(stop))
+        assertEquals(Guidance.key(pres), Guidance.key(tresPres))
+        assertEquals("b|personne|Left|1|12h", Guidance.key(tresPres))
     }
 
     @Test
@@ -170,48 +163,10 @@ class GuidanceTest {
     }
 
     @Test
-    fun `matiere proche non mesuree demande l'arret`() {
-        val decision = Guidance.decide(listOf(huge("mur")))
+    fun `peinture au sol bloque sans chiffre`() {
+        val decision = Guidance.decide(listOf(placed("crosswalk", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertTrue(decision.stop)
-        assertEquals("Stop.", Guidance.phrase(decision))
-        assertEquals("b|mur|Left|?|12h|stop", Guidance.key(decision))
-    }
-
-    @Test
-    fun `petite matiere non mesuree ne demande pas l'arret`() {
-        val decision = Guidance.decide(listOf(huge("mur", height = 0.2f, width = 0.1f)))
-
-        assertTrue(decision.blocked)
-        assertFalse(decision.stop)
         assertEquals("Va à gauche.", Guidance.phrase(decision))
-    }
-
-    @Test
-    fun `poteau fin meme immense ne demande pas l'arret`() {
-        val decision = Guidance.decide(listOf(huge("pole", height = 1f, width = 0.02f)))
-
-        assertTrue(decision.blocked)
-        assertFalse(decision.stop)
-    }
-
-    @Test
-    fun `peinture au sol immense ne demande pas l'arret`() {
-        val decision = Guidance.decide(listOf(huge("crosswalk")))
-
-        assertTrue(decision.blocked)
-        assertFalse(decision.stop)
-    }
-
-    @Test
-    fun `mesure lointaine prime sur la taille immense`() {
-        val mur = PlacedLabel("mur", 0.5f, 0.5f, 2f, LabelExtent(0.9f, 0.9f))
-
-        val decision = Guidance.decide(listOf(mur))
-
-        assertTrue(decision.blocked)
-        assertFalse(decision.stop)
-        assertEquals("Va à gauche, 2 mètres.", Guidance.phrase(decision))
     }
 }

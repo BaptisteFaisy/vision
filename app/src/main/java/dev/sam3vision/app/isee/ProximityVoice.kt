@@ -16,12 +16,11 @@ import kotlin.coroutines.coroutineContext
  * annulée (phrase plus fraîche arrivée entre-temps, `collectLatest` côté sonde)
  * n'est jamais jouée.
  *
- * [urgent] = danger : coupe la lecture en cours et parle quand même, y compris
- * pendant une dictée — la sécurité passe avant le sous-titre (miroir de
- * `TraverseVoice`, qui préempte la verte par la rouge). Le « Stop. » urgent sort
- * d'un clip pré-synthétisé ([prewarmStop]) : zéro réseau au moment où chaque
- * dixième de seconde compte. [synthesize] injecte le moteur (ElevenLabs en
- * prod, faux en test — miroir `IseePlayback`).
+ * [urgent] = danger (couloir bouché, trottoir, escaliers) : coupe la lecture
+ * en cours et parle quand même, y compris pendant une dictée — la sécurité
+ * passe avant le sous-titre (miroir de `TraverseVoice`, qui préempte la verte
+ * par la rouge). [synthesize] injecte le moteur (ElevenLabs en prod, faux en
+ * test — miroir `IseePlayback`).
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -34,26 +33,9 @@ class ProximityVoice(
 
     private var lastPhrase: String? = null
 
-    /** Clip « Stop. » en mémoire, `null` tant que [prewarmStop] n'a pas abouti. */
-    @Volatile
-    private var stopClip: ByteArray? = null
-
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
-    }
-
-    /**
-     * Pré-synthétise le « Stop. » urgent (une fois, à l'ouverture) : l'alerte
-     * qui suit n'attend plus le réseau. Silencieux sans clé ou en échec — le
-     * « Stop. » sera alors synthétisé à la volée, une fois, puis gardé.
-     */
-    suspend fun prewarmStop() {
-        if (stopClip != null) return
-        val current = settings()
-        if (!current.ttsConfigured) return
-        stopClip = synthesize(current.ttsApiKey, current.ttsVoiceId, STOP_WORD)
-            .getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -69,10 +51,6 @@ class ProximityVoice(
         if (!current.ttsConfigured) return
         if (!urgent && !playerIdle) return
         if (urgent) player.stop()
-        if (urgent && phrase == STOP_WORD) {
-            playStop(current)
-            return
-        }
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
         coroutineContext.ensureActive()
@@ -80,26 +58,5 @@ class ProximityVoice(
             onSpeaking(phrase)
             player.play(bytes).onFailure { onSpeaking("") }
         }
-    }
-
-    /** « Stop. » urgent : clip pré-synthétisé si prêt, sinon synthèse gardée pour la suite. */
-    private suspend fun playStop(current: Settings) {
-        stopClip?.takeIf { it.isNotEmpty() }?.let {
-            onSpeaking(STOP_WORD)
-            player.play(it).onFailure { onSpeaking("") }
-            return
-        }
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, STOP_WORD)
-            .getOrElse { return }
-        coroutineContext.ensureActive()
-        if (bytes.isEmpty()) return
-        stopClip = bytes
-        onSpeaking(STOP_WORD)
-        player.play(bytes).onFailure { onSpeaking("") }
-    }
-
-    companion object {
-        /** Le seul mot critique, identique en français et en anglais. */
-        const val STOP_WORD = "Stop."
     }
 }
