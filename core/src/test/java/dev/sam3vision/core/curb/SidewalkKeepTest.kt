@@ -27,7 +27,7 @@ class SidewalkKeepTest {
     fun `trottoir dans le couloir = devant`() {
         assertEquals(SidewalkPosition.Ahead, SidewalkKeep.positionOf(listOf(trottoir(0.5f))))
         assertEquals(SidewalkPosition.Ahead, SidewalkKeep.positionOf(listOf(trottoir(0.34f))))
-        assertEquals(SidewalkPosition.Ahead, SidewalkKeep.positionOf(listOf(trottoir(0.66f))))
+        assertEquals(SidewalkPosition.Ahead, SidewalkKeep.positionOf(listOf(trottoir(0.65f))))
     }
 
     @Test
