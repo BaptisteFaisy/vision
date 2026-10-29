@@ -33,7 +33,9 @@ data class TwinLiteUi(val arrow: String, val label: String) {
  * ne parle qu'aux changements (annonceur). 100 % téléphone, 0 GPU Modal.
  *
  * Le masque périmé cache l'overlay et tait la voix : une flèche obsolète (« tout
- * droit » vers un mur) est pire que pas de flèche.
+ * droit » vers un mur) est pire que pas de flèche. [muted] tait la voix seule
+ * (danger SAM récent : trottoir, escaliers) : la flèche reste affichée et la
+ * voix reprend dès la fin de la fenêtre, sans consigne en retard.
  */
 class TwinLiteWiring(
     private val meter: SegmentMeter,
@@ -41,6 +43,7 @@ class TwinLiteWiring(
     private val voice: TwinLiteVoice? = null,
     private val scope: CoroutineScope? = null,
     private val language: () -> SpeechLanguage = { SpeechLanguage.DEFAULT },
+    private val muted: () -> Boolean = { false },
 ) {
     /** Câblage de production : mètre réel LiteRT sur le scope du ViewModel. */
     constructor(
@@ -48,7 +51,8 @@ class TwinLiteWiring(
         appContext: Context,
         voice: TwinLiteVoice,
         language: () -> SpeechLanguage = { SpeechLanguage.DEFAULT },
-    ) : this(LiveSegmentMeter(scope, appContext), TwinLiteAnnouncer(), voice, scope, language)
+        muted: () -> Boolean = { false },
+    ) : this(LiveSegmentMeter(scope, appContext), TwinLiteAnnouncer(), voice, scope, language, muted)
 
     private val _ui = MutableStateFlow<TwinLiteUi?>(null)
 
@@ -84,8 +88,10 @@ class TwinLiteWiring(
         val advice = TwinLiteGuide.directionFor(mask)
         val shown = TwinLiteUi.forAdvice(advice, language)
         _ui.value = shown
-        val cue: TwinLiteCue? = announcer.onAdvice(advice, nowMs, language)
-        if (cue != null) say(cue, language)
+        if (!muted()) {
+            val cue: TwinLiteCue? = announcer.onAdvice(advice, nowMs, language)
+            if (cue != null) say(cue, language)
+        }
         return shown
     }
 

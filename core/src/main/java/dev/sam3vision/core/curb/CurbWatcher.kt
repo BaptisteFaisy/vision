@@ -94,6 +94,10 @@ class CurbWatcher(
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
 
+    /** Dernière annonce, `null` si aucune (priorité voix : TwinLite se tait après une alerte). */
+    val lastAlertMs: Long?
+        get() = lastCueAtMs.takeIf { it != NO_INSTANT }
+
     /**
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
      * quand le compte de confirmation est atteint hors cooldown, `null` sinon.

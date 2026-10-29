@@ -94,7 +94,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
-    val twinlite = IseeTwinLite(getApplication(), viewModelScope, { settings }, player) // flèche + voix du sol (lecteur partagé)
+    // Voix TwinLite tue après une alerte danger (trottoir, escaliers).
+    val twinlite = IseeTwinLite(getApplication(), viewModelScope, { settings }, player, { hazards?.mutesTwinLite(System.currentTimeMillis()) ?: false })
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
