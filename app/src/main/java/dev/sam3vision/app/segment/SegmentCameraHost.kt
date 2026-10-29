@@ -2,8 +2,6 @@ package dev.sam3vision.app.segment
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.SystemClock
-import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -32,9 +30,6 @@ class SegmentCameraHost(private val context: Context) {
 
     /** Bitmap redressé pile 640×360 : consommé par le segmenteur. */
     var onFrame: ((Bitmap) -> Unit)? = null
-
-    private var frames = 0
-    private var firstAt = 0L
 
     /** Faux = une inférence est déjà en vol : on jette la frame sans convertir. */
     var wantsFrame: (() -> Boolean)? = null
@@ -75,14 +70,6 @@ class SegmentCameraHost(private val context: Context) {
 
     private fun analyse(proxy: ImageProxy) {
         try {
-            frames += 1
-            if (frames == 1) {
-                firstAt = SystemClock.elapsedRealtime()
-                Log.i("sam3vision", "segment-cam: analyse ${proxy.width}x${proxy.height}")
-            } else if (frames % 50 == 0) {
-                val dt = SystemClock.elapsedRealtime() - firstAt
-                Log.i("sam3vision", "segment-cam: $frames frames en ${dt}ms")
-            }
             if (wantsFrame?.invoke() == false) return
             val bitmap = proxy.toBitmap() ?: return
             onFrame?.invoke(

@@ -75,8 +75,15 @@ vers le runtime neuf.
 | run | ms inférence (médiane) | ips effectifs | scène |
 | --- | --- | --- | --- |
 | démo `route segment` | 2-4 | 4,9-5,6 | intérieur, 0 % praticable, overlay propre (screencap) |
+| démo optimisée 2026-10-29 (normalisation directe, passe native, overlay hors fil principal) | 2-5 | 14-18 | Samsung, intérieur, 0 % praticable, walk=STOP |
 | banc `SegmentBenchDeviceTest` (11 runs, 1 warmup) | 2 | — | gradient synthétique 640×360, OK |
 | banc `DepthBenchDeviceTest` MiDaS (5 runs) | 2 | — | gradient synthétique 256×256, OK (non-régression migration) |
 | banc `DepthBenchDeviceTest` DA2 (5 runs) | 216 | — | gradient synthétique 256×256, OK |
 
 (`ms` = LiteRT seul, `ips` = bout en bout caméra → affichage.)
+
+Goulot constaté le 2026-10-29 (diag temporaire, retiré) : le `run` GPU
+ne prend que 2-5 ms, c'est le rapatriement des 2 têtes (`readFloat`)
+qui coûte — 37 ms sur Samsung, ~90 ms sur Redmi. Expérience CPU seul
+écartée : `read` à 2 ms mais `run` à 420-550 ms. Modèle et résolution
+inchangés : mêmes pixels, même qualité.
