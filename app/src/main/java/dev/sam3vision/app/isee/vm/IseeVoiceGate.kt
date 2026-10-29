@@ -1,0 +1,73 @@
+package dev.sam3vision.app.isee.vm
+
+import android.os.SystemClock
+
+/**
+ * Porte de la voix ambiante d'iSee : l'ordre « désactive le GPS » la ferme,
+ * les actions de l'utilisateur la rouvrent à la fenêtre.
+ *
+ * Contrat (demande produit : la voix IA ne parle « que si question, photo,
+ * caméra, ou GPS activé ») :
+ * - GPS actif : la porte est ouverte ([ambientAllowed]);
+ * - ordre « désactive le GPS » ([muteGps]) : la voix ambiante — annonces de
+ *   la sonde comme voix du sol TwinLite — se tait, jusqu'à réactivation
+ *   (« active le GPS », Réglages, guidage relancé) ;
+ * - une action de l'utilisateur ([openWindow] : caméra activée, vidéo ou
+ *   photo prise) rouvre la parole pendant [AMBIENT_WINDOW_MS] : la fenêtre
+ *   laisse la voix décrire ce qui vient d'être pris ;
+ * - les urgences (trottoir, escaliers, hors-trace) ne passent pas par ici :
+ *   la sécurité passe avant le silence ([maySpeak]).
+ *
+ * Pur (l'horloge est injectée, testé en JVM sans Android).
+ */
+class IseeVoiceGate(
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
+    private val windowMs: Long = AMBIENT_WINDOW_MS,
+) {
+
+    /** Ordre « désactive le GPS » en vigueur : la voix ambiante est fermée. */
+    @Volatile
+    private var gpsMuted = false
+
+    /** Fin de la fenêtre de parole ouverte par une action. */
+    @Volatile
+    private var allowedUntil = 0L
+
+    /** Consomme l'ordre « désactive le GPS » (idempotent). */
+    fun muteGps() {
+        gpsMuted = true
+    }
+
+    /** GPS actif de nouveau (« active le GPS », Réglages, guidage relancé). */
+    fun unmuteGps() {
+        gpsMuted = false
+    }
+
+    /** Une action de l'utilisateur (photo, caméra) rouvre la parole un instant. */
+    fun openWindow() {
+        allowedUntil = clock() + windowMs
+    }
+
+    /** Vrai quand la parole ambiante est permise : GPS actif, ou fenêtre ouverte. */
+    fun ambientAllowed(): Boolean = !gpsMuted || clock() < allowedUntil
+
+    /**
+     * Décision d'une voix ambiante : GPS actif → l'urgence coupe (la
+     * sécurité passe), sinon parler seulement quand rien n'occupe la voix ;
+     * GPS coupé → fenêtre ouverte seulement, urgences comprises, la
+     * désactivation est une demande de silence.
+     */
+    fun maySpeak(urgent: Boolean, busy: Boolean): Boolean = when {
+        !gpsMuted -> urgent || !busy
+        ambientAllowed() -> !busy
+        else -> false
+    }
+
+    companion object {
+        /**
+         * Durée de la fenêtre laissée ouverte par une action (photo prise,
+         * caméra activée) : une phrase de scène, pas un retour au bavardage.
+         */
+        const val AMBIENT_WINDOW_MS = 6_000L
+    }
+}
