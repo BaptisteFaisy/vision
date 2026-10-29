@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.net.isUsableHttpUrl
 import dev.sam3vision.core.settings.SamRegion
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
@@ -43,7 +44,7 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShareRelay(
     seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
-        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build),
+        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmEndpoint(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build), build),
     ), build), build),
 )
 
@@ -156,6 +157,18 @@ internal fun migrateLegacyLlm(loaded: Settings, build: BuildDefaults): Settings 
  */
 internal fun dropPresetUrl(loaded: Settings): Settings =
     if (SamRegion.isPreset(loaded.samBaseUrl)) loaded.copy(samBaseUrl = "") else loaded
+
+/**
+ * Auto-réparation : une base LLM vide ou inutilisable (sans scheme) n'a jamais été un
+ * choix — le build reprend la main, à défaut le défaut du code. Sans ça, une vieille
+ * saisie cassée restait à vie (« jamais écrasée ») et chaque question échouait,
+ * contrairement à « installer l'APK suffit ».
+ */
+internal fun healLlmEndpoint(loaded: Settings, build: BuildDefaults): Settings {
+    if (isUsableHttpUrl(loaded.llmBaseUrl)) return loaded
+    val base = build.llmBaseUrl.takeIf { isUsableHttpUrl(it) } ?: Settings.DEFAULT_LLM_BASE_URL
+    return loaded.copy(llmBaseUrl = base)
+}
 
 /** Clé LLM de build : uniquement si rien n'a encore été saisi. */
 internal fun withLlmKey(loaded: Settings, build: BuildDefaults): Settings {
