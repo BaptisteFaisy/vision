@@ -1,7 +1,8 @@
 # CI et file de merge
 
 Relu le **2026-10-28** sur cet arbre (découpe v9 : natif hors PR), mis à jour le
-**2026-10-29** (gardes branchées, périmètre backend, actions composites). Chaque affirmation
+**2026-10-29** (fluidité v11 : `ci-budget` replié dans `ci.yml`, `stale-base-guard` supprimé,
+un seul balayage par couple tête/base, journal `merge=union`). Chaque affirmation
 ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-budget/`,
 `.github/couche0/`.
 
@@ -10,11 +11,13 @@ ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-bud
 - Chaque job déclare `timeout-minutes: 5` — c'est le plafond, jamais un réglage à allonger.
 - Checkout superficiel (`fetch-depth: 1`) partout, `concurrency` par workflow pour annuler les runs
   devenus obsolètes.
-- Le garde-fou est un workflow à part : `ci-budget.yml` lance `check_timeouts.py`, qui lit les
-  workflows ligne à ligne et **échoue** sur un job sans `timeout-minutes` ou au-delà de 5 minutes ;
-  il **avertit** (sans échouer) sur un `concurrency` absent ou un checkout sans `fetch-depth: 1`.
+- Le garde-fou est le job **`ci-budget` de `ci.yml`** (replié le 29/10 : c'était un workflow à part,
+  qui coûtait un run de plus par push de PR). Il lance `check_timeouts.py`, qui lit les workflows
+  ligne à ligne et **échoue** sur un job sans `timeout-minutes` ou au-delà de 5 minutes ; il
+  **avertit** (sans échouer) sur un `concurrency` absent ou un checkout sans `fetch-depth: 1`.
 - Il tourne sur chaque PR pour que le check `ci-budget` existe toujours : c'est une condition
   d'entrée de la file. Sans lui, une PR pourrait entrer dans la file avec un job de 30 minutes.
+  Le nom du check est celui du **job**, pas du fichier : la protection de branche est inchangée.
 
 ## 2. Le job `ci` de `ci.yml` (et le natif hors PR)
 
@@ -82,18 +85,27 @@ succès : l'APK est produit sans clé et l'utilisateur saisit la sienne dans Ré
 Le juge est **téléchargé depuis `master`**, jamais depuis le head de la PR : une PR ne peut pas
 assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml -f pr=<n>`.
 
-## 4. `stale-base-guard` — informatif
+## 4. `stale-base-guard` — supprimé (29/10)
 
-`stale-base-guard.yml` compare la PR à sa base et **avertit** si la branche est en retard
-(`behind_by`), sans jamais échouer : `exit 0` dans tous les cas. Il peut servir de check « requis »
-sans bloquer : seul un vrai conflit s'oppose à un rebase.
+Ancien workflow informatif : il comparait la PR à sa base et avertissait si la branche était en
+retard, avec `exit 0` dans tous les cas — donc **jamais rouge**, et son avertissement redisait ce
+que le balayeur fait déjà (il rébase les PR `BEHIND`). Coût mesuré : 52 runs par jour pour un
+verdict qui ne pouvait pas changer. Supprimé ; le retard se lit dans l'état `BEHIND` de la PR et
+dans le commentaire d'état du balayeur (§5).
 
 ## 5. Protection de `master` et file de merge (balayeur v10)
 
 `master` est protégé (PR obligatoire, historique linéaire, pas de push direct) et les
 PR sont fusionnées par le workflow `pr-auto-merge` (jobs `discover` + `sweep` en
-matrice, un job par PR : à chaque fin de CI, toutes les 10 min en filet, et à
-chaque push sur `master` ou événement de PR).
+matrice, un job par PR : à chaque fin de `CI` ou de `couche0`, toutes les 15 min en filet, à
+chaque push sur `master` et au passage brouillon → prête). Depuis la v11 (29/10), un couple
+**(tête de PR, base, état de fusion)** n'est balayé qu'une fois : l'empreinte vit dans un
+commentaire unique édité sur place (`<!-- automerge-etat -->`), et un changement d'état
+(`BLOCKED` → `CLEAN` quand les checks passent) en fait un nouveau couple. Avant, les trois
+déclencheurs refaisaient le même clone et le même rebase (153 runs/jour, 63 % annulés).
+Les conflits de `CHANGELOG.md` sont résolus par `merge=union` (journal additif, les deux entrées
+sont gardées, aucun appel LLM) : c'est ce qui cassait la boucle « master bouge → conflit →
+agent → push → CI → master bouge ».
 La seule porte reste la CI : les 3 checks `ci`, `ci-budget`, `couche0` verts, puis
 merge en rebase. Le natif (`apk`, `apk-release`, `lint`) est vérifié sur `master`
 par `ci-native.yml` après chaque atterrissage. Pas de gate humaine, pas de merge
@@ -148,8 +160,8 @@ pause », exit 0) au lieu d'échouer — file à l'arrêt jusqu'à sa (re)créat
 `gh`/`jq` viennent de `~/bin` sur les runners (`export PATH`, vu le 27/10 : sans
 ça, `gh` introuvable et file muette selon le runner).
 
-Une branche en retard sur `master` reste verte : `stale-base-guard` avertit
-(informatif), c'est le rebase du balayeur qui met la PR à jour.
+Une branche en retard sur `master` reste verte : c'est le rebase du balayeur (état `BEHIND`) qui
+la met à jour, sans check bloquant.
 
 ## 6. Ce qui n'est pas dans ce dépôt
 

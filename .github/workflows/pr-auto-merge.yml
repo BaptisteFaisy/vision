@@ -43,17 +43,41 @@
 #     restent refusés) ; l'édition du corps relance `couche0` ;
 #   - `UNKNOWN` : sondage borné (4 × 5 s) au lieu de rendre la main aussitôt.
 #   `workflow_run` écoute aussi `couche0` pour enchaîner sans attendre le cron.
+# Fluidité (v11, 2026-10-29) — mesuré sur 153 runs du 29/10 : 96 annulés (63 %),
+# 92 déclenchés par `workflow_run` pour 52 push de PR, et le même couple
+# (tête, base) balayé 3 fois (CI finie, couche0 fini, cron). Trois coupes :
+#   - plus de déclencheur `pull_request` large : au push d'une PR, aucun check
+#     n'existe encore, le balayage ne pouvait rien faire (matrice vide, run
+#     brûlé). Reste `ready_for_review` (brouillon → prête : c'est le moment
+#     où on veut merger) ;
+#   - **un seul balayage par couple** (tête de PR, base, état de fusion,
+#     empreinte des checks) :
+#     une empreinte dans un commentaire unique, mis à jour sur place (pas un
+#     commentaire par passage). Quand les checks passent, l'état change
+#     (BLOCKED → CLEAN) — ou qu'un check change de verdict — et le balayage
+#     suivant est un vrai travail ;
+#   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
+#     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
+# Journal (v11) : `CHANGELOG.md merge=union` — le journal est additif, la
+# fusion garde les deux entrées au lieu de lever un conflit que l'agent devait
+# résoudre à chaque mouvement de `master` (livelock observé : 6 réconciliations
+# sur la même PR, un push par commit de `master`).
 
 name: pr-auto-merge
 
 on:
+  # Uniquement les moments où le balayage peut *faire* quelque chose : les
+  # événements `pull_request` larges (opened/synchronize/reopened) arrivaient
+  # avant que le moindre check existe (52 runs/jour pour rien, mesuré le 29/10).
   pull_request:
-    types: [opened, ready_for_review, reopened, synchronize]
+    types: [ready_for_review]
   push:
     branches: [master]
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/15 * * * *'
   workflow_run:
+    # `ci-budget` est un job de `CI` depuis le 29/10 : ces deux workflows
+    # couvrent les trois checks requis.
     workflows: ["CI", "couche0"]
     types: [completed]
 
@@ -98,10 +122,11 @@ jobs:
             done
           fi
           MATRIX=$(gh pr list --base master --state open \
-            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository \
+            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid \
             --jq '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
               | {pr: .number, sha: .headRefOid, branch: .headRefName,
-                 state: .mergeStateStatus, draft: (.isDraft | tostring)}]' \
+                 state: .mergeStateStatus, draft: (.isDraft | tostring),
+                 master: .baseRefOid}]' \
             | jq -c .)
           [ -n "$MATRIX" ] || MATRIX="[]"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -129,6 +154,7 @@ jobs:
           PR: ${{ matrix.pr }}
           SHA: ${{ matrix.sha }}
           BRANCH: ${{ matrix.branch }}
+          MASTER: ${{ matrix.master }}
           STATE: ${{ matrix.state }}
           DRAFT: ${{ matrix.draft }}
         run: |
@@ -164,6 +190,45 @@ jobs:
               [.jobs[] | select(.conclusion=="failure")
                | .steps[] | select(.conclusion=="failure") | .name] | join(" | ")' \
               2>/dev/null || true
+          }
+          # ── empreinte de balayage ───────────────────────────────────────
+          # Les déclencheurs arrivent par rafales (fin de `CI`, fin de
+          # `couche0`, cron) et refaisaient le même clone + le même rebase pour
+          # rien : un couple (tête, base, état, empreinte des checks) n'est
+          # balayé qu'une fois.
+          # L'empreinte des checks est nécessaire : une PR est BLOCKED quand la
+          # CI tourne *et* quand elle a échoué, or c'est exactement le passage
+          # où il faut relancer. La signature (nom=état, triée) distingue les
+          # deux, et un nouveau verdict change la clé.
+          # Signature illisible → « indetermine » → jamais de déduplication.
+          sig="$( { gh pr checks "$PR" --json name,state 2>/dev/null || true; } \
+            | jq -er '[.[] | "\(.name)=\(.state)"] | sort | join(",")' 2>/dev/null || true )"
+          PF="indetermine"
+          if [ -n "${sig:-}" ]; then
+            PF="$(printf '%s' "$sig" | sha1sum | cut -c1-10)"
+          fi
+          echo "empreinte checks : $PF"
+          ETAT_MARQUE="<!-- automerge-etat -->"
+          deja_balayee() {
+            [ "$PF" = "indetermine" ] && return 1
+            gh pr view "$PR" --json comments \
+              --jq '[.comments[] | select(.body | startswith("<!-- automerge-etat -->"))]
+                    | last | .body // ""' 2>/dev/null \
+              | grep -qF "sha=$SHA master=$MASTER state=$STATE pf=$PF"
+          }
+          noter_etat() { # $1 = ce qui a été fait (une ligne)
+            local cid corps
+            cid=$(gh pr view "$PR" --json comments \
+              --jq '[.comments[] | select(.body | startswith("<!-- automerge-etat -->"))]
+                    | last | .id // ""' 2>/dev/null || true)
+            corps=$(printf '%s\nsha=%s master=%s state=%s pf=%s\n\n%s' \
+              "$ETAT_MARQUE" "$SHA" "$MASTER" "$STATE" "$PF" "$1")
+            if [ -n "${cid:-}" ] && [ "$cid" != "null" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$cid" \
+                -f body="$corps" >/dev/null 2>&1 || true
+            else
+              gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+            fi
           }
           ECHELLE_ETAPES=""
           relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
@@ -202,6 +267,10 @@ jobs:
             done
             return $rc
           }
+          if deja_balayee; then
+            echo "PR #$PR : balayée pour ${SHA:0:7} sur ${MASTER:0:7} en état $STATE (rien de neuf)"
+            exit 0
+          fi
           rm -rf repo
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —
           # rien n'est persisté dans la conf git du runner. Le helper gh
@@ -209,6 +278,13 @@ jobs:
           AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git clone --quiet --filter=blob:none "$AUTH_URL" repo
           cd repo
+          # Journal additif : `union` garde les deux entrées au lieu de lever
+          # un conflit. Posé dans `info/attributes` et pas seulement dans
+          # `.gitattributes` : une branche ancienne ne porte pas encore le
+          # fichier, et c'est justement elle qui conflicte. Sans ça, chaque
+          # mouvement de `master` relançait l'agent Fireworks sur CHANGELOG.md
+          # → un push → une CI → un mouvement de `master` (livelock, 29/10).
+          printf 'CHANGELOG.md merge=union\n' >> .git/info/attributes
           git config user.name "isee-automerge"
           git config user.email "isee-automerge@users.noreply.github.com"
           export GIT_EDITOR=true
@@ -324,3 +400,4 @@ jobs:
               ;;
             *) echo "PR #$PR : état $STATE, rien à faire" ;;
           esac
+          noter_etat "état \`$STATE\` · tête \`${SHA:0:7}\` · base \`${MASTER:0:7}\` — balayée, prochain passage au prochain changement." 

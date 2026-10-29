@@ -15,6 +15,14 @@ on:
   push:
     branches: [master]
     tags: ['*']
+    # Un push qui ne touche que de la doc ne peut pas casser l'APK : trois VM
+    # (apk, apk-release, lint) et un cache Gradle à chaud pour rien. Mesuré le
+    # 29/10 : 10 runs sur la journée, dont 7 annulés par le suivant — la
+    # majorité sur des atterrissages de doc/CHANGELOG. (`paths` n'est pas
+    # évalué sur un push de tag : les tags construisent toujours.)
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch: {}
 
 concurrency:
