@@ -58,6 +58,26 @@
 #     suivant est un vrai travail ;
 #   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
 #     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
+# Débit (v12, 2026-10-29) — la demande est « plus de PR mergées par heure », pas
+# « moins de runs ». Mesuré : 15 merges/h au mieux, p90 création→merge 70 min.
+# La cause n'était pas la durée d'un balayage (17 s) mais le **rebase imposé** :
+# chaque merge déplace `master`, donc les autres PR passent `BEHIND`, et le
+# balayeur les rebasait une à une — chaque rebase poussait un commit, ce qui
+# **relançait la CI de la PR** (≈ 60-90 s) et invalidait `master` à nouveau.
+# Taxe en O(N²) sur le nombre de PR ouvertes.
+#   - **Merge direct d'une PR `BEHIND`** dont les checks requis sont verts et
+#     dont les fichiers ne croisent aucun fichier atterri depuis sa base : le
+#     serveur rebase (`merge --rebase`, `strict: false` est déjà la politique
+#     du dépôt), sans clone, sans push, **sans relancer la CI**. Si les
+#     fichiers se croisent — ou au moindre doute — on rebase comme avant.
+#   - Le groupe `concurrency` du workflow disparaît : il faisait « un run à la
+#     fois » et GitHub **annule le run en attente** quand un nouveau arrive,
+#     donc un « CI finie, merge-moi » pouvait être perdu et la PR attendait le
+#     cron (c'était la queue p90). L'empreinte v11 est le vrai garde-fou : deux
+#     runs qui prennent la même PR font la même chose, l'un des deux échoue
+#     proprement (`--match-head-commit`).
+#   - Cron de filet à 5 min (au lieu de 15) : avec `discover` seul (6 s) et la
+#     déduplication, un réveil coûte quelques secondes.
 # Journal (v11) : `CHANGELOG.md merge=union` — le journal est additif, la
 # fusion garde les deux entrées au lieu de lever un conflit que l'agent devait
 # résoudre à chaque mouvement de `master` (livelock observé : 6 réconciliations
@@ -74,15 +94,21 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_run:
     # `ci-budget` est un job de `CI` depuis le 29/10 : ces deux workflows
     # couvrent les trois checks requis.
     workflows: ["CI", "couche0"]
     types: [completed]
 
+# Un groupe par **événement et par tête** (v12). Un groupe unique annulait le
+# run *en attente* dès qu'un autre se déclenchait : le « CI verte, merge-moi »
+# d'une PR était annulé par le run d'une autre, et la PR attendait le cron —
+# c'était la queue p90. Deux têtes différentes ne s'annulent plus ; deux
+# déclencheurs de la même tête (fin de `CI`, fin de `couche0`) restent un
+# doublon que l'empreinte v11 déduplique de toute façon.
 concurrency:
-  group: pr-auto-merge-queue
+  group: pr-auto-merge-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -112,7 +138,7 @@ jobs:
             # Laisse GitHub recalculer les états après l'atterrissage :
             # sondage borné (6 × 5 s max, jamais de sleep fixe > 30 s).
             # On part dès que plus aucune PR n'est en état transitoire.
-            for _ in 1 2 3 4 5 6; do
+            for _ in 1 2 3; do
               inconnus="$(gh pr list --base master --state open \
                 --json mergeStateStatus \
                 --jq '[.[].mergeStateStatus] | map(select(. == "UNKNOWN")) | length' \
@@ -230,6 +256,29 @@ jobs:
               gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
             fi
           }
+          # ── fusion sans rebase ──────────────────────────────────────────
+          # Une PR `BEHIND` peut être mergée telle quelle : `strict` est à
+          # `false` dans la protection, et `merge --rebase` rebase côté serveur.
+          # On ne le fait que si aucun fichier ne croise ce que `master` a pris
+          # depuis la base de la PR : là où un rebase ne pourrait rien changer
+          # au contenu, il ne sert qu'à relancer la CI (60-90 s par PR).
+          recouvrement_fichiers() { # 0 = recouvrement (ou doute) → rebaser
+            local pr_files master_files n
+            pr_files=$(gh api "repos/$REPO/pulls/$PR/files?per_page=100" --paginate \
+              --jq '.[].filename' 2>/dev/null | sort -u || true)
+            master_files=$(gh api "repos/$REPO/compare/$MASTER...master" \
+              --jq '.files[].filename' 2>/dev/null | sort -u || true)
+            # Liste vide ou tronquée (l'API plafonne à 300 fichiers) : doute.
+            [ -n "$pr_files" ] && [ -n "$master_files" ] || return 0
+            n=$(printf '%s\n' "$master_files" | wc -l)
+            [ "$n" -ge 300 ] && return 0
+            comm -12 <(printf '%s\n' "$pr_files") \
+                      <(printf '%s\n' "$master_files") | grep -q . && return 0
+            return 1
+          }
+          fusionner() { # $1=pr : merge rebase sur la tête attendue ; 0 = mergée
+            gh pr merge --rebase --match-head-commit "$SHA" "$1" >/dev/null 2>&1
+          }
           ECHELLE_ETAPES=""
           relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
             local pr="$1" runs run sha_run etapes rc=2
@@ -271,6 +320,20 @@ jobs:
             echo "PR #$PR : balayée pour ${SHA:0:7} sur ${MASTER:0:7} en état $STATE (rien de neuf)"
             exit 0
           fi
+          # ── chemin rapide : en retard sur la base, vert, fichiers disjoints ──
+          # Aucun clone : c'est ce cas qui fait le débit. Chaque merge déplace
+          # `master`, donc *toutes* les autres PR passent `BEHIND` ; les
+          # rebaser une par une relançait leur CI et re-déplaçait `master`
+          # (O(N²)). Ici on fusionne, point.
+          if [ "$STATE" = "BEHIND" ] && [ "$DRAFT" != "true" ] \
+            && green "$PR" && ! recouvrement_fichiers; then
+            if fusionner "$PR"; then
+              echo "PR #$PR mergée sans rebase (base en retard, fichiers disjoints)"
+              noter_etat "mergée sans rebase : base en retard, fichiers disjoints, CI relancée pour rien évitée."
+              exit 0
+            fi
+            echo "PR #$PR : merge direct refusé (conflit côté serveur ?), on rebase"
+          fi
           rm -rf repo
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —
           # rien n'est persisté dans la conf git du runner. Le helper gh
@@ -288,8 +351,7 @@ jobs:
           git config user.name "isee-automerge"
           git config user.email "isee-automerge@users.noreply.github.com"
           export GIT_EDITOR=true
-          case "$STATE" in
-            DIRTY|BEHIND)
+          rebaser() { # rebase la PR sur master ; l'agent Fireworks résout les conflits
               if git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null \
                 && git checkout -q "pr-$PR" 2>/dev/null \
                 && git rebase -q origin/master >/dev/null 2>&1; then
@@ -316,7 +378,12 @@ jobs:
                   *) echo "PR #$PR sautée (conflit, à l'auteur de rebaser)" ;;
                 esac
               fi
-              ;;
+          }
+          case "$STATE" in
+            DIRTY) rebaser ;;
+            # `BEHIND` : le chemin rapide a déjà dit non (fichiers qui se
+            # croisent, brouillon, ou checks pas verts) → rebase classique.
+            BEHIND) rebaser ;;
             CLEAN)
               if [ "$DRAFT" = "true" ]; then
                 echo "PR #$PR : brouillon à jour, pas de merge"
@@ -391,7 +458,7 @@ jobs:
             UNKNOWN)
               # GitHub recalcule souvent en quelques secondes : sondage borné.
               st="$STATE"
-              for _ in 1 2 3 4; do
+              for _ in 1 2; do
                 sleep 5
                 st="$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus 2>/dev/null || echo UNKNOWN)"
                 [ "${st:-UNKNOWN}" != "UNKNOWN" ] && break
