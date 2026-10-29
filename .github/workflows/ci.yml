@@ -12,7 +12,12 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master]
+    branches:
+      - master
+      # Branches de la file de merge Mergify (`mergify/merge-queue/...`) : la
+      # file y pousse l'arbre fusionné du lot et attend les trois checks
+      # requis. Sans ce déclencheur, le lot n'aurait jamais de verdict.
+      - 'mergify/merge-queue/**'
   # File de merge native (29/10) : le groupe construit un commit temporaire
   # (`master` + les PR de la file) et rejoue **les mêmes** checks dessus.
   # Sans ce déclencheur, `ci` et `ci-budget` n'existent jamais sur
