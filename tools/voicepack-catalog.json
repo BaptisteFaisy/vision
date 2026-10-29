@@ -1,0 +1,25 @@
+{
+  "_doc": "Pack voix ElevenLabs : une entrée = un concept parlé (fichiers vp_<id>_fr.mp3 / vp_<id>_en.mp3 dans app/src/main/res/raw + voix dans assets/vp_voice.txt). Les textes sont le MIROIR du Kotlin (TwinLiteText, CrossingText, VoiceNavPolicy) — tools/check-voicepack.py refuse tout écart. Les entrées 'parts' sont composées en code (vérifiées morceau par morceau). Génération : ELEVENLABS_API_KEY=… python3 tools/gen-voicepack.py (clé jamais stockée ni affichée).",
+  "clips": [
+    {"id": "tl_left", "fr": "gauche.", "en": "left."},
+    {"id": "tl_straight", "fr": "tout droit.", "en": "straight ahead."},
+    {"id": "tl_right", "fr": "droite.", "en": "right."},
+    {"id": "tl_stop", "fr": "obstacle, arrêtez-vous.", "en": "obstacle, stop."},
+    {"id": "cross_red", "fr": "Rouge, attendez.", "en": "Red, wait."},
+    {"id": "cross_green", "fr": "Vert, traversez.", "en": "Green, cross now."},
+    {"id": "cross_unsure", "fr": "Doute, attendez.", "en": "Unsure, wait."},
+    {"id": "cross_on", "fr": "Mode traversée activé.", "en": "Crossing mode on."},
+    {"id": "cross_off", "fr": "Mode traversée coupé.", "en": "Crossing mode off."},
+    {"id": "nav_offroute", "fr": "Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", "en": "You are off route. Recalculating."},
+    {"id": "nav_rerouted", "fr": "Nouvel itinéraire calculé.", "en": "New route calculated."},
+    {"id": "nav_stopped", "fr": "Guidage arrêté.", "en": "Guidance stopped."},
+    {"id": "nav_back", "fr": "De retour sur l'itinéraire.", "en": "Back on route."},
+    {"id": "nav_arrived", "fr": "Vous êtes arrivé.", "en": "You have arrived."},
+    {"id": "nav_straight", "fr": "Continuez tout droit.", "en": "Continue straight ahead."},
+    {"id": "nav_left", "fr": "Tournez à gauche.", "en": "Turn left.", "parts": ["Tournez à", "gauche", "Turn", "left"]},
+    {"id": "nav_right", "fr": "Tournez à droite.", "en": "Turn right.", "parts": ["Tournez à", "droite", "Turn", "right"]},
+    {"id": "nav_cancelled", "en": "Cancelled."},
+    {"id": "nav_loading", "en": "Your route is still loading, one moment."},
+    {"id": "nav_crossing_done", "fr": "Traversée terminée."}
+  ]
+}
