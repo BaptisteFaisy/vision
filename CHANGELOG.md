@@ -146,6 +146,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Feu vert : quatre tentatives de rappel, zéro gain (documenté)
+
+- **Demande** : relever le rappel vert de 1/6 vers ≥ 4/6 sans faux vert.
+- `docs/CALIBRAGE-FEU.md` (**nouveau**) : la chaîne de mesure, la chasse aux
+  données, quatre variantes mesurées, et le chiffre qui condamne le réglage.
+- Quatre voies testées sur les mêmes 16 crops : boîte brute **1/6**, crop sur la
+  tache verte 2/6 **+1 faux vert**, crop sur la lentille 1/6 **+1 faux vert**,
+  boîte élargie +25 % 1/7 **+1 faux vert**. Aucune n'est retenue.
+- Cause démontrée : `ELONGATION_MIN = 1.5` suppose une tache allongée. Vrais
+  verts rejetés : 1,00 · 1,07 · 1,11 · 0,15 ; disques voiture à rejeter : 1,30 ·
+  1,47. **Ordre inversé**, aucun seuil ne sépare.
+- Données : **Ampel-Pilot est mort** (`NoSuchBucket`, la source citée dans
+  `TrainedLightColor`), ImVisible bloqué par le quota Drive (4 images lisibles
+  sur 1 363 dans le zip tronqué), LytNet chargé mais inutilisable (prétraitement
+  0-255 non documenté, `AvgPool2d(12,9)` figé, domaine plein cadre US).
+- Piège écarté : l'élargissement +25 % fait passer l'acceptation du vert de
+  26 % à 40 % sur 280 crops jittés — mais ces crops viennent de **6 feux**, et
+  sur les photos indépendantes il crée un faux vert. Mémoire, pas généralisation.
+- **Recommandation écrite** : ne pas toucher la porte ; il faut des données
+  labellisées dans le domaine SAM (235 lampes Panoramax, ou 200-400 crops
+  téléphone jour+nuit).
+
 ## 2026-10-29 — Traversée : un passage piéton reconnu propose le mode
 
 - **Demande** : si l'app reconnaît un passage piéton, qu'elle propose de passer
