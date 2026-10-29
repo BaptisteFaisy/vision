@@ -34,6 +34,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `KnownSizesTest` (dont « portes et barrières calibrées ») ;
   `check-kotlin-limits.py` OK.
 
+## 2026-10-29 — iSee : la vidéo d'environnement s'écrit enfin au premier tap
+
+- **Cause mesurée sur l'appareil** (SM-G780G, build `1.0.426-4c06e4c`) : au premier
+  tap de iSee, `MediaCacheStore.newVideoFile()` rendait un chemin dans
+  `cacheDir/isee` **sans créer le dossier** (il ne naissait qu'au premier MP3).
+  CameraX mesure l'espace libre du dossier parent avant d'écrire et journalisait
+  `IllegalArgumentException: Invalid path: /data/user/0/dev.sam3vision.app/cache/isee` ;
+  le MP4 n'était pas écrit, et le second tap affichait « enregistrement perdu ».
+  Vérifié sur le téléphone : `cache/isee` absent après le tap, aucune vidéo.
+- `newVideoFile()` / `newPhotoFile()` créent désormais le dossier (`pendingFile`),
+  donc la vidéo **et** la photo de l'appui long ont un chemin réel dès la première
+  installation.
+- Panneau de debug du direct : en mode `dense` il ignore l'inset de barre d'état et
+  était posé en haut de la rue, sous l'horloge et derrière le wordmark « iSee ».
+  Il passe en bas à gauche, après le fondu (`IseePortraitCamera.kt`) ; le contenu de
+  la rue est sorti dans `StreetFeed` pour rester sous le plafond de 50 lignes.
+- Preuves : `MediaCacheStoreTest` (nouveau cas « le dossier est cree avant le premier
+  enregistrement ») et `IseeCameraCoordinatorTest` verts ; `:app:assembleDebug` vert ;
+  `check-kotlin-limits` OK.
+
 ## 2026-10-28 — suivi : plus de « Léo », le lien porte le flux du téléphone
 
 - **Cause du lien « leo »** : le message WhatsApp était écrit en dur « Suivi de Léo
