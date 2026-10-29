@@ -2,7 +2,7 @@
 """Génère le pack voix (MP3 ElevenLabs) depuis tools/voicepack-catalog.json.
 
 Usage :
-    ELEVENLABS_API_KEY=… python3 tools/gen-voicepack.py [--voice ID] [--force]
+    ELEVENLABS_API_KEY=… python3 tools/gen-voicepack.py [--voice ID] [--regenerate]
 
 - La clé vient de l'environnement, JAMAIS d'un argument/fichier (jamais affichée
   ni stockée). La voix par défaut est lue dans Settings.kt (LAURE_VOICE_ID).
@@ -10,7 +10,7 @@ Usage :
   mp3_44100_128, stability 0.5, similarity 0.75, style 0.0, speaker boost.
 - Sorties : app/src/main/res/raw/vp_<id>_<lang>.mp3 + assets/vp_voice.txt
   (voix du pack — l'app ignore le pack si l'utilisateur a changé de voix).
-- Sans --force, les MP3 existants non vides sont gardés (reprise).
+- Sans --regenerate, les MP3 existants non vides sont gardés (reprise).
 """
 import json
 import os
@@ -64,20 +64,20 @@ def synthesize(api_key: str, voice: str, text: str) -> bytes:
 
 
 def parse_args(argv: list) -> tuple:
-    """(voix, force) depuis argv ; erreur d'usage = SystemExit(2)."""
+    """(voix, regenere) depuis argv ; erreur d'usage = SystemExit(2)."""
     voice = ""
-    force = False
+    regenere = False
     args = list(argv)
     while args:
         arg = args.pop(0)
         if arg == "--voice" and args:
             voice = args.pop(0)
-        elif arg == "--force":
-            force = True
+        elif arg == "--regenerate":
+            regenere = True
         else:
             print(f"gen-voicepack: option inconnue {arg}", file=sys.stderr)
             raise SystemExit(2)
-    return voice, force
+    return voice, regenere
 
 
 def main(argv: list) -> int:
@@ -86,7 +86,7 @@ def main(argv: list) -> int:
         print("gen-voicepack: ELEVENLABS_API_KEY manquante", file=sys.stderr)
         return 2
     root = repo_root()
-    voice, force = parse_args(argv)
+    voice, regenere = parse_args(argv)
     voice = voice or default_voice(root)
     with open(os.path.join(root, "tools/voicepack-catalog.json"),
               encoding="utf-8") as fh:
@@ -103,7 +103,7 @@ def main(argv: list) -> int:
                 continue
             name = f"vp_{clip['id']}_{lang}.mp3"
             dest = os.path.join(raw_dir, name)
-            if not force and os.path.isfile(dest) and os.path.getsize(dest):
+            if not regenere and os.path.isfile(dest) and os.path.getsize(dest):
                 kept += 1
                 continue
             try:
