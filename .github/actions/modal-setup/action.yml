@@ -1,0 +1,29 @@
+name: Setup Modal
+description: >-
+  Installe la CLI Modal épinglée et vérifie les jetons (sans les afficher).
+  Source unique de la version Modal des déploiements (deploy-live-fast,
+  deploy-valhalla-cpu).
+inputs:
+  modal-token-id:
+    description: Jeton Modal (secret MODAL_TOKEN_ID)
+    required: true
+  modal-token-secret:
+    description: Secret Modal (secret MODAL_TOKEN_SECRET)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Installer la CLI Modal
+      shell: bash
+      run: python3 -m pip install --quiet "modal==1.6.2"
+
+    - name: Vérifier que les jetons sont présents (sans les afficher)
+      shell: bash
+      env:
+        MODAL_TOKEN_ID: ${{ inputs.modal-token-id }}
+        MODAL_TOKEN_SECRET: ${{ inputs.modal-token-secret }}
+      run: |
+        set -euo pipefail
+        [ -n "${MODAL_TOKEN_ID:-}" ] || { echo "::error::MODAL_TOKEN_ID manquant"; exit 1; }
+        [ -n "${MODAL_TOKEN_SECRET:-}" ] || { echo "::error::MODAL_TOKEN_SECRET manquant"; exit 1; }
+        echo "jetons présents (valeurs masquées par GitHub)"
