@@ -70,6 +70,16 @@ jobs:
           echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."
       - name: APK debug
         run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleDebug
+      # Garde clés embarquées : tant que les secrets existent, l'APK DOIT les
+      # contenir et la clé LLM DOIT répondre — sinon build rouge (déjà vu :
+      # secrets restés sur l'ancien fournisseur, APK sans clé valide). Sans
+      # secret, comportement inchangé (APK sans clé). Aucune valeur affichée.
+      - name: Garde clés embarquées (dex + ping LLM)
+        env:
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: python3 tools/check-apk-keys.py
       # L'APK du téléphone, publié à chaque push sur master.
       - name: APK debug sur master
         if: github.ref == 'refs/heads/master'
@@ -119,6 +129,14 @@ jobs:
           echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."
       - name: APK release
         run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleRelease
+      # Garde clés embarquées (même étape que le job `apk`) : l'APK DOIT
+      # contenir la clé du secret et elle DOIT répondre — sinon build rouge.
+      - name: Garde clés embarquées (dex + ping LLM)
+        env:
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: python3 tools/check-apk-keys.py
 
   # ── lint — le poste le plus cher, donc sa propre VM ─────────────────────────
   lint:

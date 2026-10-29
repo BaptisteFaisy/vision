@@ -59,6 +59,17 @@ elle est présente dans les trois jobs qui bâtissent (`ci.yml` : tests,
 `ci-native.yml` : `apk` debug et `apk-release`), donc **chaque APK téléchargé
 depuis GitHub embarque les clés**.
 
+## Garde : prouvé à chaque build
+
+`tools/check-apk-keys.py` tourne après chaque assemblage (`apk` et
+`apk-release`) et fait échouer le job si, les secrets existant : le
+`local.properties` ne reprend pas la clé du secret, la clé est absente du dex
+de l'APK, ou un ping minimal au LLM ne répond pas 200 (secret périmé ou
+mauvais fournisseur — la panne vue avec des secrets restés sur InferHub alors
+que le produit parlait à Baseten). Sans secret, la garde reste inactive et
+l'APK sort sans clé, comme avant. Ses tests (`tools/test_check_apk_keys.py`,
+faux APK + faux LLM local, aucun réseau) tournent dans le job `ci`.
+
 Secrets à créer — Settings → Secrets and variables → Actions → *New repository secret* :
 `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_LIVE_API_KEY`, `TTS_API_KEY`,
 `TTS_VOICE_ID` (facultatif), `ASR_API_KEY` (facultatif). Aucune valeur n'est jamais
