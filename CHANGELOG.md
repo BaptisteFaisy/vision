@@ -33,6 +33,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (`deploy.json` porte le binding `RELAY_ROOM` et la migration `v1-relay-room` ;
   le token wrangler local est expiré, donc **déploiement non fait**), puis un APK
   neuf. Rien ne change tant que ce n'est pas déployé : la page garde la photo lente.
+## 2026-10-29 — fix(endpoints) : refus actionnable uniforme, seed SAM/route/dictée réparé
+
+- **Demande** : même traitement qu'au LLM pour les autres clients — le jargon
+  OkHttp (`Expected URL scheme…`) ne doit remonter à l'écran nulle part.
+- `net/Http.kt` : `endpointRefusal()` + `invalidEndpointMessage()` partagés ;
+  refus local (zéro appel réseau) sur Meta (dictée, picto), SAM (photo), direct,
+  tracker, vidéo, itinéraire et `/release` — chaque type historique gardé
+  (vidéo en `BadResponse`, les autres en `Network`), le LLM réutilise le partage.
+  Seed : URL SAM manuelle cassée → preset région, route cassée → build sinon
+  Maps, dictée cassée → défaut Meta (le vide garde ses replis Scribe/Maps).
+  TTS/STT ElevenLabs et WS inchangés (bases figées, refus booléen).
+- Preuves : `:core` 1 888 + `:app` 1 093 tests, 0 échec, sur r630
+  (`HttpRequestsTest` 7/7 dont 4 nouveaux, `SettingsSeedTest` 26/26 dont 4
+  nouveaux — vus rouges avant le fix), `check-kotlin-limits` OK.
+- Fichiers : `Http.kt`, 8 clients, `SettingsSeed.kt`, `HttpRequestsTest.kt`,
+  `SettingsSeedTest.kt`, `CLES-DU-BUILD.md`.
 
 ## 2026-10-29 — suivi caregiver : le relais par défaut est le Worker, plus l'hôte tombé
 

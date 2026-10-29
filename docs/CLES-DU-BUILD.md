@@ -34,6 +34,10 @@ s'ouvre, parle et segmente ; seuls le LLM et la voix demandent une clé.
 Donc : une installation neuve hérite de tout ; quelqu'un qui a déjà saisi sa propre clé
 la garde. Pour repartir du build, vider le champ et enregistrer.
 
+Exception : une base inutilisable (vide ou sans `https://`, LLM comme SAM, route
+ou dictée) n'est pas un choix — le build (à défaut le défaut du code, le preset
+de région, Maps ou Scribe selon le champ) reprend la main tout seul.
+
 ## Modèles épinglés (démo)
 
 | Rôle | Base | Modèle |
