@@ -33,7 +33,7 @@ class PictoVoiceOrderTest {
     }
 
     @Test
-    fun `le mot vise le repere : egalite pluriel prefixe`() {
+    fun `le mot vise le repere - egalite pluriel prefixe`() {
         assertTrue(PictoVoiceOrder.matches("médics", "medics"))
         assertTrue(PictoVoiceOrder.matches("médicament", "medics"))
         assertTrue(PictoVoiceOrder.matches("médicaments", "boîte de médicaments"))
