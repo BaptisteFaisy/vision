@@ -18,18 +18,23 @@ arrêtez-vous. » au contact, côté de sortie sinon), mots SAM sur voie libre
 seuls objets SAM** — **aucun appel LLM**, le mot part en clip
 pré-synthétisé, jamais de synthèse réseau au moment de parler.
 
-## 2. Le couloir et la portée
+## 2. Le trait et la portée
 
-- **Couloir** : la bande centrale, `centerX` entre 0,34 et 0,66
-  (`PositionText.SIDE_EDGE`, `core/.../live/Guidance.kt`, `inCorridor`) — les seuils
-  sont partagés avec les positions, mais la consigne ne dit ni cadran ni label :
-  le mot suffit.
-- **Portée** : `RANGE_METERS = 4f` (`Guidance.kt`) — au-delà, un objet au centre est
+- **Trait** : le cap droit projette le marcheur devant lui — `RAY_HALF_WIDTH_M
+  = 0,25 m` de chaque côté de l'axe `x = 0,5`, à la distance de l'objet
+  (`Guidance.kt`, `rayBlocks`) : large de près (à 1 m, ±0,19), fin de loin (à
+  4 m, ±0,05). Une boîte SAM qui coupe le trait bloque, même décentrée ;
+  l'objet étroit à côté libère, même centré dans l'ancienne bande. La
+  consigne ne dit ni cadran ni label : le mot suffit.
+- **Repli prudent** : sans bords (`x0`/`x1`) ou sans distance connus, la bande
+  centrale historique (`centerX` entre 0,34 et 0,66, `PositionText.SIDE_EDGE`,
+  `inCorridor`) tranche — on ne devine jamais un passage.
+- **Portée** : `RANGE_METERS = 4f` (`Guidance.kt`) — au-delà, un objet sur le trait est
   trop loin pour un pas et ne bloque pas.
-- **Distance inconnue = prudence** : un objet du couloir sans distance mesurée
-  (classe inconnue, boîte coupée) bloque quand même, et le mot reste le côté
-  de sortie (`inRange`, `nearRank`, `Guidance.kt`) — on ne juge pas le contact
-  sans distance.
+- **Distance inconnue = prudence** : un objet de la bande de repli sans distance
+  mesurée (classe inconnue, boîte coupée) bloque quand même, et le mot reste
+  le côté de sortie (`inRange`, `nearRank`, `Guidance.kt`) — on ne juge pas le
+  contact sans distance.
 - **Stop** (contact mesuré) : `STOP_METERS = 0,6f` (`Guidance.kt`) — en deçà
   (mesuré), contourner n'est plus un pas : le mot est « obstacle,
   arrêtez-vous. » (voix TwinLite). À 1,2 m/s, 0,6 m c'est un pas avant le
@@ -104,9 +109,11 @@ guidage est muet — par construction, pas par bug.
 Aucun import réseau dans `Guidance.kt`, `GuidanceWord.kt`, `TwinLiteWord.kt` ni
 `GuidanceAnnouncer.kt` : le guidage ne peut pas appeler le LLM, même par accident.
 
-Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceWordTest` (6,
-dont seul-stop-coupe), `TwinLiteWordTest` (9, dont stop-coupe FR/EN),
-`GuidanceObstaclesTest` (8, mur + liste bloquants de bout en bout, § 8),
+Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceRayTest` (8,
+trait : précision, rappel, affinage au loin, replis, producteurs, voix),
+`GuidanceWordTest` (6, dont seul-stop-coupe), `TwinLiteWordTest` (9, dont
+stop-coupe FR/EN), `GuidanceObstaclesTest` (8, mur + liste bloquants de bout en
+bout, § 8),
 `GuidanceAnnouncerTest` (18, dont l'arbitrage des deux voix),
 `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (5, sonde branchée sur un faux
 client SAM : voie libre → mot, obstacle → voix TwinLite, mots doux + positions
