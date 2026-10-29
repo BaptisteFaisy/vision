@@ -69,6 +69,12 @@ object KnownSizes {
         "lampadaire" to 5.00f, "poubelle" to 0.90f, "bin" to 0.90f,
         // Barrière de chantier type Vauban ≈ 1 m (glissière 0,75 m : ordre de grandeur).
         "barriere" to 1.00f, "barrier" to 1.00f,
+        // Extérieur — APPROXIMATIF, modèles très variables : borne 0,80 m
+        // (plots et potelets urbains 0,6-1,0 m), clôture 1,50 m (clôtures et
+        // grillages 1,0-2,0 m), portail 1,75 m (portails courants 1,5-2,0 m).
+        "bollard" to 0.80f, "borne" to 0.80f, "plot" to 0.80f, "potelet" to 0.80f,
+        "fence" to 1.50f, "cloture" to 1.50f, "grillage" to 1.50f,
+        "gate" to 1.75f, "portail" to 1.75f,
         // Objets portables et de bureau
         "bouteille" to 0.25f, "bottle" to 0.25f, "verre" to 0.12f, "glass" to 0.12f,
         "cup" to 0.10f, "gobelet" to 0.12f, "mug" to 0.10f, "bol" to 0.09f,
