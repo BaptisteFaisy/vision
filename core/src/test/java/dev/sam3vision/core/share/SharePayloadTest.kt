@@ -137,4 +137,11 @@ class SharePayloadTest {
         val json = shareJson("leo", "", fix, emptyList(), pictos = picto)
         assertNull(json.optJSONObject("pictos"))
     }
+
+    @Test
+    fun `sans position l'image et la phrase partent quand meme`() {
+        val json = shareJson("leo", "cle", null, emptyList(), photo = SharedPhoto("AAAA", 1L))
+        assertTrue(json.isNull("fix"))
+        assertEquals("AAAA", json.getJSONObject("photo").getString("jpeg"))
+    }
 }

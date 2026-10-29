@@ -47,6 +47,7 @@ class SharePosition(context: Context) {
     /** Démarre l'écoute GPS + boussole ; sans permission, ne fait rien. */
     @SuppressLint("MissingPermission")
     fun start() {
+        seedLastKnown()
         try {
             locations?.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
@@ -74,6 +75,20 @@ class SharePosition(context: Context) {
         sensors?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)?.let {
             sensors?.registerListener(listener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+    }
+
+    /**
+     * Amorce la position avec la dernière connue (GPS ou réseau, la plus fraîche) :
+     * sans elle, un téléphone qui ouvre iSee à l'intérieur ne publiait rien tant que
+     * le GPS n'accrochait pas. Une position peut dater : le relais horodate l'envoi,
+     * et les gestes exigent deux fixes frais (voir la page caregiver).
+     */
+    @SuppressLint("MissingPermission")
+    private fun seedLastKnown() {
+        val gps = runCatching { locations?.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
+        val net = runCatching { locations?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
+        val best = if ((gps?.time ?: 0L) >= (net?.time ?: 0L)) gps else net
+        if (best != null) onLocation(best)
     }
 
     /** Coupe l'écoute et oublie la position (fin du Direct). */

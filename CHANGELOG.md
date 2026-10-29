@@ -32,6 +32,32 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   fichiers) ; JVM (`:core` + `:app`, 12 `@Test` neufs :
   `GuidanceHeartbeatTest` 6, fusion annonceur 4, contrat passage 2) : non
   rejoués ici (ni JDK ni SDK Android sur ce poste), verdict CI.
+## 2026-10-29 — suivi caregiver : la caméra du proche s'affiche sans GPS (branche `fix/caregiver-camera-sans-gps`)
+
+- **Demande** : quand le proche partage son lien et allume sa caméra iSee,
+  l'aidant ne voyait que le badge OFFLINE sur la page caregiver ; supprimer
+  aussi la ligne « L'image apparaîtra quand ton proche ouvrira la caméra. ».
+- Cause : le téléphone ne publiait rien sans fix GPS (`ShareBroadcaster`
+  exigeait une position), donc aucun état n'arrivait au relais — ni LIVE,
+  ni photo. Vérifié en production : `POST /api/share` + `GET /api/state`
+  répondent, mais `/ws` rend 404 « route inconnue » (salle temps réel non
+  déployée) — seule la photo lente porte l'image aujourd'hui.
+- `fix` devient optionnel de bout en bout : `shareJson` omet la position
+  sans GPS, le relais accepte un POST sans `fix` (une position présentée
+  reste validée comme avant), la page affiche caméra/phrase/repères et
+  n'invente aucun déplacement (`anchorAfter`, testé). `SharePosition`
+  amorce la position avec la dernière connue (GPS/réseau) pour publier dès
+  l'ouverture, y compris à l'intérieur. Ligne d'attente caméra supprimée :
+  sans image la section se replie, l'image la rouvre ; seul un lien absent
+  s'écrit.
+- Preuves : node 49/49 (`suivi-parent` + `suivi-relais`, dont 2 nouveaux),
+  `:core` 1906/1911 (5 échecs préexistants `PrivateFileSettingsStoreTest`,
+  POSIX sous Windows, hors zone), `:app` 1097/1097,
+  `check-kotlin-limits` OK. `assembleDebug` : non rejoué.
+- Fichiers : `SharePayload.kt` (+test), `ShareBroadcaster.kt`,
+  `SharePosition.kt`, `contrat.js` (+test), `worker.js` (doc),
+  `session.mjs` (+test, `anchorAfter`), `live.mjs`, `index.html`,
+  2 README, `TESTING.md` (compteur `share` recalé 24 → 31).
 
 ## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
 

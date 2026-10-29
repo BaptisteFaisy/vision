@@ -143,15 +143,18 @@ const val MAX_SHARED_JPEG = 120_000
 const val MAX_SHARED_DESTINATION = 80
 
 /**
- * Corps JSON du relais : `{shareId, writeKey, fix, objects, scene?, photo?, trip?, pictos?}`.
+ * Corps JSON du relais : `{shareId, writeKey, fix?, objects, scene?, photo?, trip?, pictos?}`.
  * La clé d'écriture est vérifiée par le relais (jamais stockée côté site).
- * `photo`, `trip` et `pictos` sont optionnels : un client d'avant continue
- * d'envoyer position, objets et phrase, et le relais les accepte tels quels.
+ * `fix` est optionnel : sans GPS (intérieur, démarrage, permission refusée), la
+ * caméra, la phrase et les repères partent quand même — sinon la page caregiver
+ * restait OFFLINE alors que la caméra tournait. `photo`, `trip` et `pictos`
+ * sont optionnels : un client d'avant continue d'envoyer position, objets et
+ * phrase, et le relais les accepte tels quels.
  */
 fun shareJson(
     shareId: String,
     writeKey: String,
-    fix: SharedFix,
+    fix: SharedFix?,
     objects: List<SharedObject>,
     scene: SharedScene? = null,
     photo: SharedPhoto? = null,
@@ -160,16 +163,7 @@ fun shareJson(
 ): JSONObject = JSONObject()
     .put("shareId", shareId)
     .put("writeKey", writeKey)
-    .put(
-        "fix",
-        JSONObject()
-            .put("lat", fix.lat)
-            .put("lon", fix.lon)
-            .put("accM", fix.accM.toDouble())
-            .put("atMs", fix.atMs)
-            .put("indoor", fix.indoor)
-            .put("headingDeg", fix.headingDeg?.toDouble()),
-    )
+    .apply { fix?.let { put("fix", fixJson(it)) } }
     .put(
         "objects",
         JSONArray().apply {
@@ -180,6 +174,15 @@ fun shareJson(
     .apply { photoJson(photo)?.let { put("photo", it) } }
     .apply { tripJson(trip)?.let { put("trip", it) } }
     .apply { pictoJson(pictos)?.let { put("pictos", it) } }
+
+/** Position publiable, absente sans GPS (la caméra part quand même). */
+private fun fixJson(fix: SharedFix): JSONObject = JSONObject()
+    .put("lat", fix.lat)
+    .put("lon", fix.lon)
+    .put("accM", fix.accM.toDouble())
+    .put("atMs", fix.atMs)
+    .put("indoor", fix.indoor)
+    .put("headingDeg", fix.headingDeg?.toDouble())
 
 /** Image publiable, ou `null` si le base64 est inexploitable (jamais un 400 du relais). */
 private fun photoJson(photo: SharedPhoto?): JSONObject? {
