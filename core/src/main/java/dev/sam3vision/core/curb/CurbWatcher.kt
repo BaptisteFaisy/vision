@@ -143,10 +143,14 @@ class CurbWatcher(
         const val DEFAULT_COOLDOWN_MS = 10_000L
 
         /** Au-delà de cette distance (m), un bord ne fait pas lever la jambe. */
-        const val CURB_METERS = 1f
+        const val CURB_METERS = 3f
 
-        /** Bas de boîte minimal (fraction de hauteur) : le champ proche. */
-        const val LOWER_BAND_FRACTION = 0.6f
+        /**
+         * Bas de boîte minimal (fraction de hauteur) : à 3 m le bord tombe en
+         * bande moyenne selon le tangage du téléphone — la bande suit pour ne
+         * pas le rater (prior, à valider sur captures).
+         */
+        const val LOWER_BAND_FRACTION = 0.45f
 
         /** Bas de plan maximal (fraction) : au-delà, le plan touche les pieds (montée). */
         const val PLANE_BOTTOM_MAX = 0.95f
