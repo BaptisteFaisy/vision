@@ -5,10 +5,12 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -64,17 +66,8 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
                 .graphicsLayer { scaleX = focus.scale; scaleY = focus.scale }
                 .blur(focus.blur.dp),
         ) {
-            if (showGlasses) {
-                GlassesLive(Modifier.fillMaxSize())
-                GlassesMaskLayer(probe.masks, probe.width, probe.height)
-                LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
-                SteeringLayer(probe.steering)
-            } else {
-                CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
-                PictoLayer(state.picto.hits, viewModel.picto::pngOf)
-            }
+            StreetFeed(state, glue, probe, viewModel, showGlasses)
         }
-        LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         if (state.recordingVideo && !showGlasses) {
             PictoChip(
                 state.picto,
@@ -85,6 +78,34 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         }
         ProbeNoticeCard(probe)
         PictureFade(Modifier.fillMaxSize())
+        // Dense = pas d'inset de barre d'état : posé en haut, le panneau passait sous
+        // l'horloge et derrière le wordmark « iSee » (constaté sur l'appareil le
+        // 2026-10-29). En bas à gauche, au-dessus du fondu, il ne recouvre plus rien :
+        // la chip reste en bas à droite, le wordmark garde le haut.
+        LiveDebugPanel(probe, Modifier.align(Alignment.BottomStart).padding(8.dp), dense = true)
+    }
+}
+
+/**
+ * La rue elle-même : les lunettes si [showGlasses], sinon la caméra du téléphone. Les
+ * deux sources portent les mêmes masques, distances, flèche et pastilles de pictos.
+ */
+@Composable
+private fun BoxScope.StreetFeed(
+    state: IseeUiState,
+    glue: CameraGlue,
+    probe: LiveProbeState,
+    viewModel: IseeViewModel,
+    showGlasses: Boolean,
+) {
+    if (showGlasses) {
+        GlassesLive(Modifier.fillMaxSize())
+        GlassesMaskLayer(probe.masks, probe.width, probe.height)
+        LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
+        SteeringLayer(probe.steering)
+    } else {
+        CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
+        PictoLayer(state.picto.hits, viewModel.picto::pngOf)
     }
 }
 
