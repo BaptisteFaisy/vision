@@ -118,10 +118,17 @@ if app.get("attn_impl") != "sdpa":
 
 # Attend que la **nouvelle** version serve (l'ancien conteneur peut vivre 20-300 s).
 wait_for_new_version() { # essais, délai
-  local tries="$1" delay="$2" i
+  local tries="$1" delay="$2" i out
   for i in $(seq 1 "$tries"); do
     sleep "$delay"
-    check_once && return 0
+    # 500/injoignable = fenêtre de mort (ancien tué, nouveau en boot 18-32 s) : retry
+    # transparent, PAS une preuve que l'ancien sert encore. Seul un /health lisible
+    # mais non conforme (vieux code, leviers faux) prouve l'ancien conteneur.
+    if out="$(check_once 2>&1)"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    echo "  essai $i/$tries : nouvelle version pas encore en ligne (${out##*$'\n'})"
   done
   return 1
 }
@@ -134,7 +141,7 @@ if (( deploy )); then
     echo "OK : app rapide en place, graphe vision actif"
     exit 0
   fi
-  echo "== l'ancien conteneur sert encore : arrêt de l'app puis redéploiement"
+  echo "== nouvelle version toujours pas en ligne : arrêt de l'app puis redéploiement"
   timeout 120 "$MODAL" app stop "$APP_NAME" -y "${profile_arg[@]}" >/dev/null 2>&1 || true
   deploy_once || { echo "KO : redéploiement impossible" >&2; exit 1; }
   if wait_for_new_version 12 10; then
