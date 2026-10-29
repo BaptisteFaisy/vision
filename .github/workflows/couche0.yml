@@ -16,7 +16,12 @@ on:
   # `gh-readonly-queue/**` reste pour les file(s) construites en push.
   merge_group:
   push:
-    branches: ['gh-readonly-queue/**']
+    branches:
+      - 'gh-readonly-queue/**'
+      # Branche de lot de la file Mergify : on y rejoue le contrôle pour que
+      # le check existe sur l'arbre fusionné (le vrai jugement a eu lieu sur
+      # chaque PR avant son entrée en file).
+      - 'mergify/merge-queue/**'
   workflow_dispatch:
     inputs:
       pr:
@@ -58,7 +63,14 @@ jobs:
             esac
           fi
           if [ -z "$PR_NUMBER" ]; then
-            echo "::warning::aucun numéro de PR joignable depuis ce ref (${REF:-$GITHUB_REF_NAME}) — rien à juger"
+            case "${REF:-$GITHUB_REF_NAME}" in
+              *mergify/merge-queue/*)
+                echo "Branche de lot Mergify : le périmètre a déjà été jugé sur chaque PR avant son entrée en file — rien de neuf à contrôler ici."
+                ;;
+              *)
+                echo "::warning::aucun numéro de PR joignable depuis ce ref (${REF:-$GITHUB_REF_NAME}) — rien à juger"
+                ;;
+            esac
             exit 0
           fi
           GARDE="$RUNNER_TEMP/check_couche0.py"

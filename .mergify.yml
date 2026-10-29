@@ -1,0 +1,63 @@
+# File de merge Mergify — BaptisteFaisy/vision
+#
+# Pourquoi Mergify et pas la file native de GitHub : celle-ci exige un dépôt
+# public possédé par une **organisation** (« available in any public repository
+# owned by an organization ») ; ce dépôt appartient à un compte utilisateur, et
+# l'API refuse la règle `merge_queue` (422 « Invalid rule 'merge_queue' »).
+#
+# Ce que fait la file : elle met les PR en file, les met à jour contre `master`
+# (`update_method: rebase`), rejoue les trois checks requis sur l'arbre fusionné
+# du lot (`batch_size`), puis merge le lot en rebase (historique linéaire
+# conservé). C'est la garantie que `strict_required_status_checks_policy`
+# cherchait — sans relancer la CI d'une PR à chaque mouvement de `master`.
+#
+# Prérequis (une fois, côté dépôt) :
+#   - app Mergify installée (id 10562) ;
+#   - Mergify **acteur de contournement** du ruleset 25911098, mode `exempt`
+#     (sinon `strict` + `pull_request` bloquent les branches de file) ;
+#   - `ci.yml` et `couche0.yml` tournent sur `push` vers `mergify/merge-queue/**`.
+#
+# Le balayeur `pr-auto-merge.yml` ne merge plus ni ne rebase quand la file est
+# active : il ne garde que les conflits (`DIRTY`) et les relances de panne.
+
+queue_rules:
+  - name: default
+    queue_conditions:
+      # Les trois checks requis par le ruleset. Une PR n'entre en file
+      # qu'une fois verte : la file ne sert pas à tester, elle sert à merger
+      # proprement sur une base à jour.
+      - check-success = ci
+      - check-success = ci-budget
+      - check-success = couche0
+      - base = master
+      - -draft
+      - -conflict
+    # Lot de 3 : trois PR mergées pour un seul passage de CI.
+    batch_size:
+      min: 1
+      max: 3
+    batch_max_wait_time: 20 seconds
+    merge_method: rebase
+    update_method: rebase
+    checks_timeout: 20 min
+    max_checks_retries: 1
+
+merge_queue:
+  # 4 lots testés en parallèle. Chaque lot = 3 jobs (`ci` 2 jobs + `couche0`)
+  # sur les runners self-hosted ; 4 × 3 = 12 créneaux sur 19.
+  max_parallel_checks: 4
+
+priority_rules:
+  - name: urgent
+    conditions:
+      - label = urgent
+    priority: high
+  - name: priority-low
+    conditions:
+      - label = priority-low
+    priority: low
+
+# Mise en file automatique par le produit Merge Queue (pas besoin du produit
+# « Workflow Automation », dont `pull_request_rules` dépend).
+merge_protections_settings:
+  auto_merge_conditions: true
