@@ -69,6 +69,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
   `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
 
+## 2026-10-29 — Mode navigation : la carte devient une bande permanente en bas (ordre user)
+
+- **Demande** : « non je veux que la map navigation soit en permanence affichée
+  en bas » (remplace le fond plein écran sous la caméra).
+- `NavigationMapBand` : bande collée en bas, 26 % de la hauteur bornée
+  150–260 dp (`navigationMapBandHeight`, pure et testée), fond OSM MapLibre +
+  repli schéma, position GPS 2 s, feux par maille de ~110 m.
+- **En permanence** : plus d'effacement pendant la parole
+  (`navigationMapHidden` supprimé) — la bande reste visible quand
+  l'utilisateur dicte et quand iSee parle.
+- `IseeScenePane` : la scène est composée dans un cadre réduit de la hauteur
+  de la bande, donc sa géométrie (boule, gros texte) se recalcule au-dessus —
+  le texte ne passe jamais sous la carte.
+- Preuves : `:core` 1 804 tests, `:app` 1 071, 0 échec (dont
+  `NavigationMapBandTest` 5 : hauteur sur trois écrans, cadre de repli),
+  `check-kotlin-limits` et `check-voice-nav-doc.py` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
+  `GPS_GUIDE_UTILISATEUR.md` §2.
+
 ## 2026-10-29 — Mode navigation : la carte s'ouvre à la voix (ordre user)
 
 - **Demande** : « un mode navigation dans iSee, accessible en lui parlant, avec
