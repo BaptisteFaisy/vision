@@ -86,8 +86,9 @@ seul ne suffit pas. Bytecode et `-jvm-target` sont fixés à **17** (`app/build.
 
 ## 3. Recette émulateur (flotte arrêtée — ne plus utiliser)
 
-> **La flotte d'émulateurs est arrêtée et désactivée depuis le 24/10** : on ne
-> teste que sur le **téléphone réel** (section « Téléphone réel » ci-dessous).
+> **La flotte d'émulateurs est arrêtée et désactivée** (relevé antérieur, hors de
+> cet arbre) : on ne teste que sur le **téléphone réel** (section « Téléphone réel »
+> ci-dessous).
 > La recette émulateur ci-dessous est conservée pour mémoire — ses commandes
 > ne passent plus sur aucune machine du projet.
 
