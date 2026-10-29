@@ -52,6 +52,11 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  *   obstacles partagent le même tuyau, jamais deux voix en même temps.
  * - [stopRoute] coupe la parole route (fin de guidage), miroir de [speakRoute].
  *
+ * Priorité à la voix du user : tant qu'il parle ([userSpeaking]), la voix
+ * ordinaire se tait — sauf urgence ([VoiceNavPolicy.isUrgent]) qui coupe.
+ * [stopVoice] coupe la parole en cours quand le user prend la parole,
+ * sans toucher au guidage lui-même.
+ *
  * Voix : virages francs par [VoiceNavSpeaker.onTurn] (« Dans 100 mètres,
  * tournez à gauche, rue X »), le reste en phrase littérale du moteur
  * ([VoiceNavPhrases.ahead]) — un demi-tour ou un giratoire n'a pas de verbe
@@ -82,12 +87,14 @@ class VoiceNavEngineDriver(
     private val onAutoCrossing: (Boolean) -> Unit = {},
     private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
     private val stopRoute: () -> Unit = {},
+    /** L'utilisateur parle (dictée en cours) : la voix ordinaire se tait. */
+    private val userSpeaking: () -> Boolean = { false },
 ) {
 
     private val app = appContext.applicationContext
     private val tracker = VoiceNavTracker(app, onEvent = ::handleEvent)
     private val ttsLazy = lazy { SystemTtsEngine(AndroidTtsDriver(app)) }
-    private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings) }
+    private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings, userSpeaking = userSpeaking) }
     private val speaker by speakerLazy
     private val routeAnnouncer = VoiceNavAnnouncer()
     private val detourReroute = DetourReroute()
@@ -174,6 +181,15 @@ class VoiceNavEngineDriver(
             runCatching { speaker.stop() }
             runCatching { speaker.reset() }
         }
+    }
+
+    /**
+     * L'utilisateur prend la parole : la parole en cours est coupée, la
+     * mémoire du guidage intacte (le moteur réémettra). Idempotent, sans
+     * effet si la voix n'a jamais parlé.
+     */
+    fun stopVoice() {
+        if (speakerLazy.isInitialized()) runCatching { speaker.stop() }
     }
 
     /**

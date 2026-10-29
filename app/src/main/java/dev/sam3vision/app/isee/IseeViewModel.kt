@@ -23,17 +23,13 @@ import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.isee.vm.IseePictoVoice
 import dev.sam3vision.app.isee.vm.IseeStatusText
+import dev.sam3vision.app.isee.vm.IseeSteeringOrders
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
 import dev.sam3vision.app.isee.vm.IseeModeOrders
 import dev.sam3vision.app.isee.vm.IseeVoiceNav
 import dev.sam3vision.app.isee.vm.MaisonEnterOrder
 import dev.sam3vision.app.isee.vm.NavigationHook
-import dev.sam3vision.core.crossing.CrossingText
-import dev.sam3vision.core.crossing.CrossingVoiceAction
-import dev.sam3vision.core.crossing.CrossingVoiceCommand
-import dev.sam3vision.core.live.SteeringCommand
-import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
@@ -81,6 +77,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
+
+    /** Ordres cap/Traversée + guidage auto, extraits du ViewModel (limite 500). */
+    private val steering = IseeSteeringOrders(probe, { settings }, ::speakNavigation, ::update)
 
     /** Repères visuels : photo → picto Muse (même clé que l'ASR) → overlay temps réel. */
     val picto = IseePicto(
@@ -136,7 +135,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); voiceNavVoiceGate.openWindow() },
         prune = ::enforceFifo,
     )
 
@@ -163,7 +162,17 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
-    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing, { text, urgent -> proximity.onPhrase(text, canAnnounce(), urgent) }, player::stop, { cap -> if (cap == null) probe.clearRouteCap() else probe.setRouteCap(cap) })
+    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
+        onAutoCrossing = { steering.setAutoCrossing(it) },
+        speakRoute = { text, urgent -> proximity.onPhrase(text, canAnnounce(), urgent) },
+        stopRoute = player::stop,
+        onRouteCap = { cap -> if (cap == null) probe.clearRouteCap() else probe.setRouteCap(cap) },
+        userSpeaking = { _state.value.holding || _state.value.transcribing },
+        setGuidance = { enabled ->
+            if (settings.navigationGuidanceEnabled != enabled) settings = settings.copy(navigationGuidanceEnabled = enabled)
+            viewModelScope.launch { runCatching { prefs.save(settings) } }
+        },
+    )
 
     /** État de la navigation vocale (repos, confirmation, guidage) pour l'écran. */
     val voiceNavState: StateFlow<VoiceNavUiState> get() = voiceNav.state
@@ -204,6 +213,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             // ne passe pas par onDestroy — le téléphone gardait alors les messages.
             runCatching { cleaner.purgeAll() }
             settings = loadedSettings(prefs)
+            // GPS laissé désactivé (ordre vocal, réglages) : la voix ambiante
+            // reste muette après redémarrage, jusqu'à une action du user.
+            voiceNav.syncGate()
             syncProbe()
             transcript.refresh()
             picto.refresh()
@@ -220,49 +232,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
-    fun toggleCrossing() {
-        probe.setCrossingActive(settings, !probe.state.value.crossingActive)
-    }
-
-    /**
-     * Guidage auto : le rappel proche d'une traversée arme le mode, le
-     * passage le coupe (la voix du mode parle, pas d'annonce ici). Sans
-     * effet si le mode est déjà dans l'état demandé (reconfigurer coûte
-     * une session GPU).
-     */
-    private fun setAutoCrossing(wantActive: Boolean) {
-        if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings, wantActive)
-        }
-    }
-
-    /**
-     * Ordre « traverser » : consommé ici (jamais LLM), confirmé par le chemin navigation.
-     * Sans effet si déjà dans l'état demandé (reconfigurer coûte une session GPU).
-     */
-    private suspend fun runCrossingCommand(text: String): Boolean {
-        val command = CrossingVoiceCommand.parse(text) ?: return false
-        val wantActive = command == CrossingVoiceAction.Activate
-        if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings, wantActive)
-        }
-        speakNavigation(CrossingText.mode(wantActive, settings.speechLanguage))
-        return true
-    }
-
-    /**
-     * Ordre vocal de cap (« va à gauche ») : le guidage recalcule le passage
-     * vers ce cap, la confirmation part par le même chemin que la navigation.
-     * Vrai si [text] portait un ordre (la dictée ne part ni à Maps ni au LLM).
-     */
-    private suspend fun runSteeringCommand(text: String): Boolean {
-        val cap = SteeringCommand.parse(text) ?: return false
-        probe.setSteering(cap)
-        val confirm = SteeringText.confirm(cap, settings.guideStraight, settings.speechLanguage)
-        update { it.copy(status = confirm) }
-        speakNavigation(confirm)
-        return true
-    }
+    fun toggleCrossing() = steering.toggleCrossing()
 
     override fun onCleared() {
         liveDictation.stop()
@@ -289,12 +259,16 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun setCameraActive(active: Boolean) {
         if (_state.value.cameraActive == active) return
         update { it.copy(cameraActive = active) }
-        if (active) syncProbe() else probe.stop()
+        if (active) {
+            voiceNavVoiceGate.openWindow()
+            syncProbe()
+        } else probe.stop()
     }
 
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */
     fun refreshSettings() = viewModelScope.launch {
         settings = loadedSettings(prefs)
+        voiceNav.resumeGps()
         syncProbe()
         transcript.refresh()
     }
@@ -315,6 +289,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
         }
+        // La voix du user a priorité : le guidage en cours se tait aussi.
+        voiceNav.stopVoice()
         // Ce qui est filmé devient le contexte de la question : une frame d'une
         // tenue précédente est périmée et gagnerait sinon la place (question
         // portant sur une image figée).
@@ -426,11 +402,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (modes.run(text)) return
-        if (runSteeringCommand(text)) return
+        if (steering.runSteering(text)) return
+        // Ordre GPS (« arrête / désactive / active le GPS ») : consommé même
+        // sans URL Valhalla (guidage Maps), avant le handoff navigation.
+        if (voiceNav.runOrder(text)) return
         if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
-        if (runCrossingCommand(text)) return
+        if (steering.runCrossing(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
@@ -452,8 +431,19 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun canAnnounce(): Boolean {
         val state = _state.value
-        return playerIdle() && !state.holding && !state.transcribing && !state.thinking
+        val busy = !playerIdle() || state.holding || state.transcribing || state.thinking
+        return !busy && voiceNavVoiceGate.ambientAllowed()
     }
+
+    /** Décision d'une voix ambiante (annonce ou voix du sol), urgence mise à part. */
+    private fun maySpeakAmbient(urgent: Boolean): Boolean {
+        val state = _state.value
+        val busy = !playerIdle() || state.holding || state.transcribing || state.thinking
+        return voiceNavVoiceGate.maySpeak(urgent, busy)
+    }
+
+    /** GPS désactivé (ordre) : la fenêtre d'action (photo, caméra) réouvre la voix. */
+    private val voiceNavVoiceGate get() = voiceNav.voiceGate
 
     /** Position média pour les sous-titres ; aucune estimation d'une vitesse de parole. */
     fun speechPosition() = player.position()
