@@ -115,7 +115,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla, signals), pacing, masks, distances, pure depth, gestures, crossing, voice, encrypted settings, design tokens (`iseedesign`) |
 | `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), in-app map (MapLibre), voice navigation, capture purge |
-| `server/` | Modal backend (Python): live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), photo legacy (`backend/modal_app.py`), the same live service ported to Baseten (`backend/baseten/`), GPU probes, and `scripts/` (deploy, benches, probes) — plus `legacy-expo-app/`, the archived old Expo app |
+| `server/` | Modal backend (Python): live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), photo legacy (`backend/modal_app.py`), the same live service ported to Baseten (`backend/baseten/`), GPU probes, and `scripts/` (deploy, benches, probes). The old Expo app was removed from the tree on 29/10/2026 (git history keeps it) |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`); its Vercel relay is abandoned since 28/10 |
 | `suivi-relais/` | The relay actually used (Cloudflare Worker + D1): `POST /api/share`, `GET /api/state` |
 | `tools/` | CI guards (Kotlin sizes, Portrait design, latency budget, voice navigation, APK keys), fake LLM/SAM for tests, the tree census (`count-tree.py`) |
@@ -186,7 +186,7 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,875 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,873 @Test)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -206,16 +206,16 @@ drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **913** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **98 242** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **54 784** — `:core` 213 f. / 22 200 l. · `:app` 286 f. / 32 584 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **2 875** — `:core` 1 804 · `:app` 1 071 (banc lunettes compris) | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **911** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **98 050** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **54 501** — `:core` 215 f. / 22 362 l. · `:app` 283 f. / 32 139 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **2 873** — `:core` 1 825 · `:app` 1 048 (banc lunettes compris) | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
 | Backend Python (`server/backend`) | **35** fichiers, **7 172** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **46** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Docs | **47** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
 | Workflows CI | **6** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/.../isee/LiveProbe.kt` — **498** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Plus gros fichier de prod | `app/.../isee/LiveProbe.kt` — **499** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
@@ -301,7 +301,8 @@ Detail: `docs/CI-QUEUE.md`.
   `docs/VOICEPACK.md`, `docs/VOIX-POSITIONS.md`, `docs/VOIX-ANGLAIS.md`,
   `docs/VOIX-DANGER.md`, `docs/MICRO-VERROUILLE.md`, `docs/TEST-LONGPRESS-DICTEE.md`,
   `docs/NAVIGATION.md`, `docs/NAVIGATION-VOCALE.md`, `docs/RECETTE-NAVIGATION-VOCALE.md`,
-  `docs/VOICE_NAV_PROXY.md`, `docs/GPS_GUIDE_UTILISATEUR.md`, `docs/GUIDAGE-TOUT-DROIT.md`.
+  `docs/VOICE_NAV_PROXY.md`, `docs/GPS_GUIDE_UTILISATEUR.md`, `docs/GUIDAGE-TOUT-DROIT.md`,
+  `docs/URGENCE-EXTERNE.md`.
 - **Imaging**: `docs/MASQUES-DEBUG.md`, `docs/MASK-DECODE.md`, `docs/DISTANCES.md`,
   `docs/DEPTH.md`, `docs/MESURES-SAM3-FEUX.md`, `docs/CALIBRAGE-FEU.md`,
   `docs/MESURES-u11c.txt`.

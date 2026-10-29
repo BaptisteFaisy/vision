@@ -2,7 +2,11 @@
 
 Périmètre : backend Modal SAM 3.1 + app Expo. Audit statique, tests unitaires, tests E2E contre le
 backend déployé (`…sam3service-web.us-east.modal.run`), cas d'erreur du contrat, latence.
-Aucun déploiement, aucune modification de secret, `legacy-expo-app/app.json` et `legacy-expo-app/android/` non touchés.
+Aucun déploiement, aucune modification de secret, rien touché côté app.
+
+> **Historique** : l'app Expo décrite par ce document a été **retirée de l'arbre le
+> 29/10/2026** (elle vit dans l'historique git : `git log -- server/legacy-expo-app`).
+> Ce qui reste dans `server/` est le backend déployé — voir [`../README.md`](../README.md).
 
 ## 1. Limites (fichiers < 500 lignes, fonctions < 50 lignes)
 
