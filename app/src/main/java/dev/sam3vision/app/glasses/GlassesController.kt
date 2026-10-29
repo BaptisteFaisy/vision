@@ -247,6 +247,22 @@ class GlassesController(
         }
         dropSession()
         _state.update { it.copy(phase = SessionPhase.STARTING) }
+        scope.launch { openSession() }
+    }
+
+    /**
+     * `createSession` refuse une paire pas encore `CONNECTED` — le « Aucune paire éligible »
+     * affiché sur des lunettes pourtant appairées : on attend le lien ([GlassesLinkGate]).
+     */
+    private suspend fun openSession() {
+        // Paire simulée : aucun lien Bluetooth à attendre.
+        val linked = _state.value.mockActive || awaitLinkedDevice(clock) {
+            note(GlassesMessages.waitingForLink())
+        }
+        if (!linked) {
+            _state.update { it.copy(phase = SessionPhase.IDLE) }
+            return note(GlassesMessages.noLinkedDevice())
+        }
         Wearables.createSession(AutoDeviceSelector()).fold(
             onSuccess = { created ->
                 Log.i(TAG, "session créée, démarrage")
