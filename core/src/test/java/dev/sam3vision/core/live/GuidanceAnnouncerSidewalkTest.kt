@@ -71,7 +71,7 @@ class GuidanceAnnouncerSidewalkTest {
         assertEquals("Tout droit.", announcer.onFrame(0L, emptyList()))
 
         val bloque = listOf(personne(2f), trottoir(0.1f))
-        assertEquals("Gauche.", announcer.onFrame(500L, bloque, sidewalk = SidewalkPosition.Left))
+        assertEquals("gauche.", announcer.onFrame(500L, bloque, sidewalk = SidewalkPosition.Left))
         assertNull(announcer.onFrame(1_000L, bloque, sidewalk = SidewalkPosition.Left))
     }
 

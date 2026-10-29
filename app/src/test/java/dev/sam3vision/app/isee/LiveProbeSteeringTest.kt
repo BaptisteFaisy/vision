@@ -19,7 +19,7 @@ import org.junit.Test
 
 /**
  * La page caméra suit le cap demandé à la voix : « Gauche. » sur voie
- * libre, mot de passage devant un obstacle, et chemin publié dans l'état
+ * libre, passage TwinLite devant un obstacle, et chemin publié dans l'état
  * pour la flèche vidéo. Sans objet à décorer ni masque à décoder, sans Android.
  */
 class LiveProbeSteeringTest {
@@ -56,7 +56,7 @@ class LiveProbeSteeringTest {
     }
 
     @Test
-    fun `cap gauche bouche dit le mot de passage`() = runTest {
+    fun `cap gauche bouche dit le passage TwinLite`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.setSteering(SteeringCap.Left)
         probe.onFrame("A", captureAtNs = 8_000_000L)
@@ -68,7 +68,7 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame(listOf(personneGauche())))
         advanceUntilIdle()
 
-        assertEquals("Tout droit.", probe.state.value.spoken)
+        assertEquals("tout droit.", probe.state.value.spoken)
     }
 
     @Test

@@ -20,7 +20,7 @@ import org.junit.Test
 
 /**
  * La page caméra iSee guide la marche quand le réglage est actif : « Tout droit. »
- * sur voie libre, mot de sortie devant un obstacle — au lieu de l'annonce
+ * sur voie libre, voix TwinLite devant un obstacle — au lieu de l'annonce
  * des positions. Sans objet à décorer ni masque à décoder, sans Android.
  */
 class LiveProbeGuidanceTest {
@@ -64,7 +64,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `guidage dit le mot de sortie devant un obstacle`() = runTest {
+    fun `guidage dit TwinLite devant un obstacle`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -79,7 +79,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("Gauche.", probe.state.value.spoken)
+        assertEquals("gauche.", probe.state.value.spoken)
     }
 
     @Test
@@ -102,7 +102,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("Gauche.", probe.state.value.spoken)
+        assertEquals("gauche.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
 
         val (sonde, faux) = harness(this, guide = false, announce = true)
