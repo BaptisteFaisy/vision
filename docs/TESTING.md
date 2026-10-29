@@ -15,7 +15,7 @@ une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est a
 
 ```bash
 grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1765
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 938
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 944
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 95
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 9
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
@@ -24,12 +24,12 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
 | `:core` | 239 (dont 14 aides) | 226 | **1 765** |
-| `:app` | 140 (dont 3 aides) | 138 | **938** |
-| **Total JVM** | **379** | **364** | **2 703** |
+| `:app` | 142 (dont 3 aides) | 140 | **944** |
+| **Total JVM** | **381** | **366** | **2 709** |
 | `:app` `androidTest` | 4 | 4 | **9** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **2 703 tests JVM** au total, dont **1 765** dans `:core` et **938** dans `:app`. Dans `:app`, le
+- **2 709 tests JVM** au total, dont **1 765** dans `:core` et **944** dans `:app`. Dans `:app`, le
   banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
   **10 tests instrumentés** (9 + 1) sont hors de ce total.
 - « Classes `@Test` » = déclarations `class …Test` dans les fichiers portant `@Test`
@@ -53,7 +53,7 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 ```
 
 Relevé du 29/10, sur r630 (`:core:testDebugUnitTest :app:testDebugUnitTest`) : **`:core`
-1 765 / 0 échec / 0 ignoré**, **`:app` 938 / 0 / 0** — **2 703 exécutés** au total, conformes aux
+1 765 / 0 échec / 0 ignoré**, **`:app` 944 / 0 / 0** — **2 709 exécutés** au total, conformes aux
 comptages statiques du §1. (Historique : le 26/10 après 19 h, `:core` 663, `:app` 305 et le banc
 lunettes 36 — 1 004 au total, avant la fusion du banc dans `:app`, non comparable.)
 
@@ -242,14 +242,14 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **usecase** (40) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 14
 - **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 938
+### `:app` — 944
 
-- **(racine)** (167) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
+- **(racine)** (171) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
 - **depth** (11) : DepthPreprocessTest 6, ModelDownloaderTest 5
 - **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
 - **glasses.bench** (95) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 22, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
-- **isee** (163) : BubbleCountTest 2, CrossingWiringTest 3, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 3, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 3, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 8, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3, TwinLiteWiringTest 8
+- **isee** (165) : BubbleCountTest 2, CrossingWiringTest 3, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 3, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 3, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 8, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3, TwinLiteWiringTest 8
 - **isee.vm** (74) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, NavigationHookTest 6
 - **live** (68) : LiveAskForgetTest 1, LiveAskSessionTest 13, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
 - **locked** (6) : LockedMicAnswerTest 6
@@ -276,7 +276,7 @@ simulés (`core/src/test/…/TestHttpServer.kt`, `net/TestLiveClients.kt`, `net/
 ## 7. Gardes et limites connues
 
 - `tools/check-kotlin-limits.py` (heuristique accolades, faux positifs possibles) : **vert le
-  29/10** sur cet arbre (964 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
+  29/10** sur cet arbre (967 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
 - `bash scripts/test_scripts.sh` : **101 assertions, 101 ok**.
 - Voix ElevenLabs sans clé : `VoiceAnnouncer.say()` rend `InvalidKey`
   (`app/VoiceAnnouncer.kt:32-33`), mais l'annonce des positions

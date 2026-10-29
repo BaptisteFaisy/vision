@@ -12,7 +12,7 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
 | `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **211** fichiers | 239 fichiers / **1 765** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **276** fichiers | 140 fichiers / **938** `@Test` | 5 fichiers / **10** tests |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **277** fichiers | 140 fichiers / **944** `@Test` | 5 fichiers / **10** tests |
 | `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
@@ -32,7 +32,7 @@ find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l    
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
 find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 876
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 93 704
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 93 871
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
