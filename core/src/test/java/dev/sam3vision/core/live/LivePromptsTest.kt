@@ -41,6 +41,27 @@ class LivePromptsTest {
     }
 
     @Test
+    fun `sept objets d interieur dedans, douze dangers dehors`() {
+        assertEquals(
+            listOf("person", "door", "chair", "table", "stairs", "wall", "window"),
+            LivePrompts.indoor,
+        )
+        assertEquals(7, LivePrompts.indoor.size)
+        assertEquals(LivePrompts.default, LivePrompts.forMode(true))
+        assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
+    }
+
+    @Test
+    fun `les deux mondes tiennent sous le plafond et se normalisent a l identique`() {
+        assertTrue(LivePrompts.default.size <= LivePrompts.MAX)
+        assertTrue(LivePrompts.indoor.size <= LivePrompts.MAX)
+        assertEquals(LivePrompts.indoor, LivePrompts.normalize(LivePrompts.indoor))
+        LivePrompts.indoor.forEach { concept ->
+            assertTrue(concept.length <= LivePrompts.MAX_LENGTH)
+        }
+    }
+
+    @Test
     fun `une liste vide retombe sur les defauts`() {
         assertEquals(LivePrompts.default, LivePrompts.normalize(emptyList()))
     }

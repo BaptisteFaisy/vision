@@ -40,6 +40,7 @@ class SettingsStoreParityTest {
         localOverlayEnabled = false,
         debugRouteMapEnabled = false,
         navigationGuidanceEnabled = false,
+        outdoorMode = false,
         cameraFovDeg = 63.5f,
         caregiverRole = CaregiverRole.Caregiver,
         caregiverInvite = "https://suivi-parent.vercel.app/?share=marie",
@@ -62,6 +63,7 @@ class SettingsStoreParityTest {
         assertEquals(63.5f, relu.cameraFovDeg, 0.001f)
         assertEquals(false, relu.distanceOverlayEnabled)
         assertEquals(false, relu.navigationGuidanceEnabled)
+        assertEquals(false, relu.outdoorMode)
         assertEquals(true, relu.boxPredictionEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.Fr, relu.speechLanguage)

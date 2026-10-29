@@ -27,9 +27,11 @@ sealed interface VoiceNavEvent {
     data class Started(val destination: String) : VoiceNavEvent
 
     /**
-     * Virage à [cap] ([SteeringCap.Left] ou `Right`), dans [meters] mètres,
-     * [street] si la rue est connue. Un cap [SteeringCap.Straight] n'est pas
-     * un virage : il se dit comme [ContinueStraight] (clémence, jamais d'erreur).
+     * Virage à [cap] ([SteeringCap.Left] ou `Right`), à [meters] mètres
+     * ([street] si la rue est connue) : préavis directionnel de loin,
+     * ordre sec sans distance de près ([VoiceNavPolicy.TURN_NOW_M]).
+     * Un cap [SteeringCap.Straight] n'est pas un virage : il se dit comme
+     * [ContinueStraight] (clémence, jamais d'erreur).
      */
     data class Turn(
         val cap: SteeringCap,
@@ -68,8 +70,10 @@ sealed interface VoiceNavEvent {
  * Phrases du guidage vocal, dans la langue de la voix ([SpeechLanguage]).
  *
  * Français (contrat, miroirs `nav_voice_*` dans `strings.xml`) :
- * « Continuez dans cette direction. », « Tournez à gauche. », « Tournez à droite. »,
- * « Continuez tout droit. », « Vous êtes arrivé à X. »,
+ * « Continuez dans cette direction[, rue X]. » de loin,
+ * « Tournez à gauche[, rue X]. » de près (jamais de distance de virage —
+ * [VoiceNavPolicy.TURN_NOW_M]), « Continuez tout droit. »,
+ * « Vous êtes arrivé à X. »,
  * « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
  * « Nouvel itinéraire calculé. », « Guidage arrêté. »,
  * « De retour sur l'itinéraire. » (+ phrases littérales du moteur).
@@ -80,14 +84,6 @@ sealed interface VoiceNavEvent {
  * Pures et sans Android : testées en JVM.
  */
 object VoiceNavPhrases {
-
-    /**
-     * Au-delà (m), on n'est pas au carrefour : un virage se dit « continuez dans
-     * cette direction », et le moment venu (« near » moteur, ≤ 25 m, ou distance
-     * inconnue) « tournez ». Pour un aveugle, « tournez dans 25 mètres » ne dit
-     * pas où mettre le prochain pas ; la direction continue, puis l'ordre sec.
-     */
-    const val TURN_NOW_M = 40f
 
     /** Phrase prononcée pour [event], jamais blanche. */
     fun phrase(event: VoiceNavEvent, language: SpeechLanguage = SpeechLanguage.Fr): String =
@@ -110,17 +106,26 @@ object VoiceNavPhrases {
             SpeechLanguage.En -> "Navigating to ${destination.trim()}"
         }
 
-    /** Loin : « Continuez dans cette direction[, rue X]. » ; au carrefour : « Tournez à gauche[, rue X]. » ; cap droit = ligne droite. */
+    /**
+     * Virage franc : préavis directionnel de loin, ordre sec sans distance
+     * de près ([VoiceNavPolicy.TURN_NOW_M]) ; cap droit = ligne droite.
+     */
     private fun turn(event: VoiceNavEvent.Turn, language: SpeechLanguage): String {
         if (event.cap == SteeringCap.Straight) return continueStraight(event.meters, language)
         val side = if (event.cap == SteeringCap.Left) sideWord(Side.Left, language) else sideWord(Side.Right, language)
         val street = event.street?.trim().orEmpty()
         val tail = if (street.isEmpty()) "." else ", $street."
-        val far = (event.meters ?: 0f) > TURN_NOW_M
+        if (!VoiceNavPolicy.isTurnNow(event.meters)) return turnAhead(tail, language)
         return when (language) {
-            SpeechLanguage.Fr -> if (far) "Continuez dans cette direction$tail" else "Tournez à $side$tail"
-            SpeechLanguage.En -> if (far) "Continue straight ahead$tail" else "Turn $side$tail"
+            SpeechLanguage.Fr -> "Tournez à $side$tail"
+            SpeechLanguage.En -> "Turn $side$tail"
         }
+    }
+
+    /** Préavis lointain d'un virage franc : la direction, jamais la distance. */
+    private fun turnAhead(tail: String, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "Continuez dans cette direction$tail"
+        SpeechLanguage.En -> "Continue in this direction$tail"
     }
 
     /** « Continuez tout droit[ pendant 200 mètres]. » */
@@ -195,7 +200,8 @@ object VoiceNavPhrases {
     // ── Événements moteur (NavEvent) : textes du contrat moteur ──
     // « Vous avez quitté l'itinéraire. Recalcul en cours. »,
     // « De retour sur l'itinéraire. », « Vous êtes arrivé à X »,
-    // « Continuez dans cette direction, rue de la Paix » puis « Tournez à droite, rue de la Paix ».
+    // « Continuez dans cette direction, rue de la Paix » (loin) puis
+    // « Tournez à droite, rue de la Paix » (près, sans distance).
     // Miroirs `nav_voice_left_route`, `nav_voice_back_on_route`,
     // `nav_voice_arrived[_plain]`, `nav_voice_maneuver` dans `strings.xml`.
 
@@ -223,17 +229,33 @@ object VoiceNavPhrases {
     }
 
     /**
-     * Loin : « Continuez dans cette direction[, rue X] » ; au carrefour : le
-     * verbe sec (« Tournez à gauche, rue des Fleurs »). L'arrivée à venir se
-     * dit « Destination dans X » (le compte à rebours reste utile). Rue
-     * inconnue : la phrase omet la rue au lieu d'inventer.
+     * Annonce d'une manœuvre à venir : les virages francs (même ensemble
+     * que [toSteeringCap][dev.sam3vision.app.voicenav.toSteeringCap]) se
+     * disent en deux temps — préavis directionnel de loin, ordre sec sans
+     * distance de près ([VoiceNavPolicy.TURN_NOW_M]) ; le reste
+     * (« [verbe] dans [distance] ») et l'arrivée à venir
+     * (« Destination dans X ») sont inchangés. Rue inconnue : la phrase
+     * omet la rue au lieu d'inventer.
      */
     fun ahead(action: ManeuverAction, street: String?, distM: Double): String {
+        val where = street?.trim()?.takeIf { it.isNotEmpty() }?.let { ", $it" } ?: ""
+        if (isFrankTurn(action) && !VoiceNavPolicy.isTurnNow(distM)) {
+            return "Continuez dans cette direction$where"
+        }
+        val verb = verb(action)
+        if (isFrankTurn(action)) return "$verb$where"
         val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.Fr)
         if (action == ManeuverAction.Arrive) return "Destination dans $distance"
-        val where = street?.trim()?.takeIf { it.isNotEmpty() }?.let { ", $it" } ?: ""
-        if (distM > TURN_NOW_M) return "Continuez dans cette direction$where"
-        return "${verb(action)}$where"
+        return "$verb dans $distance$where"
+    }
+
+    /** Virages francs : les actions routées au cap parlé (tourner, serrer). */
+    private fun isFrankTurn(action: ManeuverAction): Boolean = when (action) {
+        ManeuverAction.TurnLeft, ManeuverAction.TurnRight,
+        ManeuverAction.SlightLeft, ManeuverAction.SlightRight -> true
+        ManeuverAction.Start, ManeuverAction.Continue,
+        ManeuverAction.UTurn, ManeuverAction.Roundabout,
+        ManeuverAction.Arrive -> false
     }
 
     /** « Vous êtes arrivé à X » (ou [ARRIVED_PLAIN] sans nom). */
@@ -315,11 +337,31 @@ object VoiceNavPhrases {
  * par [VoiceNavAnnouncer].
  *
  * Les signatures sont toujours françaises (comme [dev.sam3vision.core.live.Guidance.key],
- * pour ne pas rebavarder au changement de langue) : un virage lointain se dit
- * une fois (`far`), puis une fois au carrefour (`now`) — « dans 100 mètres »
- * puis « dans 50 mètres » ne sont plus deux annonces. Pur et testé en JVM.
+ * pour ne pas rebavarder au changement de langue). Un virage franc porte sa
+ * phase (`ahead` puis `now`) au lieu de la distance : le préavis lointain se
+ * dit une seule fois, l'ordre sec une seule fois — deux annonces, pas une
+ * répétition. Pur et testé en JVM.
  */
 object VoiceNavPolicy {
+
+    /**
+     * Seuil de l'ordre sec, en mètres : à cette distance ou moins (ou sans
+     * distance), le virage franc se dit « Tournez à gauche[, rue X]. » ;
+     * au-delà, préavis « Continuez dans cette direction[, rue X]. », dit
+     * une seule fois (signature [key]). Aligné sur
+     * [NavTuning.announceNearM][dev.sam3vision.core.nav.NavTuning] : le
+     * rappel proche du moteur parle l'ordre sec, l'annonce lointaine le
+     * préavis — jamais « dans X mètres » pour un virage franc.
+     */
+    const val TURN_NOW_M = 25f
+
+    /** Ordre sec (près, inconnu ou invalide) plutôt que préavis lointain ? */
+    fun isTurnNow(meters: Float?): Boolean =
+        meters == null || !meters.isFinite() || meters <= TURN_NOW_M
+
+    /** Même décision sur une distance moteur (voir [ahead][VoiceNavPhrases.ahead]). */
+    fun isTurnNow(distM: Double): Boolean =
+        !distM.isFinite() || distM <= TURN_NOW_M
 
     /**
      * Distance conservatrice : `null` si inconnue ou invalide, telle quelle sous
@@ -353,11 +395,11 @@ object VoiceNavPolicy {
         else -> false
     }
 
-    /** `turn|left|far|rue de rivoli` (loin = une seule annonce ; `now` au carrefour ; cap droit = ligne droite). */
+    /** `turn|left|ahead|rue de rivoli` (cap droit = signature de ligne droite). */
     private fun turnKey(event: VoiceNavEvent.Turn): String {
         if (event.cap == SteeringCap.Straight) return straightKey(event.meters)
         val side = if (event.cap == SteeringCap.Left) "left" else "right"
-        val phase = if ((event.meters ?: 0f) > VoiceNavPhrases.TURN_NOW_M) "far" else "now"
+        val phase = if (isTurnNow(event.meters)) "now" else "ahead"
         val street = event.street?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: "-"
         return "turn|$side|$phase|$street"
     }

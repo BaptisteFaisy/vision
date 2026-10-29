@@ -195,6 +195,14 @@ class IseeVoiceNav(
         }
     }
 
+    /**
+     * Vrai si la voix route parle (arbitre vocal : l'obstacle non urgent
+     * attend). N'initialise jamais le pilote paresseux : jamais démarré =
+     * silencieux, hors guidage le comportement est inchangé.
+     */
+    fun isRouteSpeaking(): Boolean =
+        if (driverLazy.isInitialized()) driver.isSpeaking() else false
+
     /** Itinéraire guidé, `null` au repos ou pilote jamais démarré (carte de debug). */
     fun debugRoute(): NavRoute? =
         if (driverLazy.isInitialized()) runCatching { driver.debugRoute() }.getOrNull() else null

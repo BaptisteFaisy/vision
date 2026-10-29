@@ -248,6 +248,14 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
   cheminement : mobilier + poubelles, bennes, animaux, feu tricolore — ordre user
   du 29/10, détecté en permanence hors traversée ; pastille « Extérieur » du
   direct, `LivePrompts.outdoor`) — le défaut rue (12 dangers) reste inchangé.
+- Liste d'intérieur : `["person", "door", "chair", "table", "stairs", "wall",
+  "window"]` (7 objets d'appartement, `LivePrompts.indoor`) — la sonde iSee
+  la suit quand le monde est « dedans » (`Settings.outdoorMode = false`,
+  `LivePrompts.forMode`) ; une liste vide ou un défaut passé à
+  `configureFrom` bascule sur le monde, une liste explicite (Traversée,
+  champ « Suivre ») traverse inchangée
+  (`app/src/main/java/dev/sam3vision/app/isee/ProbeWiring.kt`). V1 : seuls
+  les prompts basculent, la portée reste 4 m dans les deux mondes.
 - Plafond : `LivePrompts.MAX = 16`. Le client n'en envoie jamais plus,
   le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 16`
   (`server/backend/tracking.py:53`).

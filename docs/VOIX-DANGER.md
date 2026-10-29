@@ -364,3 +364,79 @@ mode annonce). Coupé en mode Traversée. Câblé en 4e guetteur
 
 Verrouillé par `SidewalkWatcherTest` (8) et `ProbeHazardsTest` (+1 : reset
 trottoir nommé).
+
+## 15. Filtre tête des panneaux : enseignes tues, panneaux bas gardés
+
+Une rue commerçante, c'est dix enseignes par vitrine : chacune au centre
+bloquait le couloir et la voix bavardait à chaque pas. Nouveau contrat :
+un panneau haut ne se percute pas — on passe dessous — donc il sort du
+couloir ; un panneau à hauteur d'homme reste un obstacle, annoncé comme
+les autres.
+
+- **règle** : `SignConcepts.isHighSign` (concept panneau FR/EN : sign,
+  panneau, enseigne, affiche… — casse, accents, pluriel simple
+  neutralisés — plus les composés du backend reconnus au mot :
+  « traffic sign », « stop sign », « no entry sign ») : centre
+  au-dessus de `HEAD_TOP` (0,22, exclu) et mesuré
+  dans `HEAD_RANGE_M` (4,0 m) ⇒ ignoré par `Guidance.decide` (même filtre
+  que le sol marchable) ;
+- **prudence gardée** : distance inconnue ou non finie ⇒ panneau gardé —
+  le filtre ne statue que sur du mesuré (« panneau »/« sign » sont au
+  sténopé, 2,20 m, `KnownSizes`) ; un non-panneau n'est jamais filtré,
+  même haut et proche ;
+- **seuils provisoires** : 0,22 / 4,0 m sont des valeurs de départ, pas
+  des mesures — la calibration téléphone ci-dessous les fixera.
+
+Verrouillé par `SignConceptsTest` (10 : reco FR/EN, frontières `HEAD_TOP`
+et `HEAD_RANGE_M`, prudence distance inconnue, composés backend, `Guidance.decide`
+ignore le panneau haut et bloque sur le panneau bas) ; `*Guidance*` +
+`*SignConcepts*` verts en JVM (102 tests, 0 échec, relevé du 29/10/2026).
+
+### Calibration téléphone (protocole — corpus en attente, non mesuré)
+
+But : faire des deux seuils une règle calibrée. Filmer avec le preset
+Extérieur (suit « sign »), téléphone tenu à hauteur de poitrine, tangage
+neutre, et relever pour chaque détection panneau : `centerY` normalisé
+(0 = haut de l'image), `meters` (sténopé ou profondeur), annoncé ou non.
+
+1. **corpus A** : 10 panneaux à hauteur d'homme (affiches basses,
+   panneaux d'info, pub à hauteur des yeux) — attendu : 100 % annoncés
+   à < 3 m ;
+2. **corpus B** : 10 panneaux routiers ou pubs hautes (enseignes de
+   vitrine, mâts, 4×3) — attendu : 0 annonce (0 bavardage) ;
+3. **réglage** : choisir `HEAD_TOP` entre le plus haut des A et le plus
+   bas des B (tous les A sous le seuil, tous les B au-dessus) ;
+   `HEAD_RANGE_M` = portée maximale où la séparation tient ;
+4. **report** : remplir les tables ci-dessous, mettre à jour les
+   constantes + les tests de frontière (`SignConceptsTest`), dater le
+   relevé ici — aucun seuil ne change sans son corpus.
+
+Corpus A — panneaux à hauteur d'homme (non mesuré) :
+
+| # | lieu | panneau | centerY | meters | annoncé ? |
+|---|------|---------|---------|--------|-----------|
+| 1 | | | | | |
+| 2 | | | | | |
+| 3 | | | | | |
+| 4 | | | | | |
+| 5 | | | | | |
+| 6 | | | | | |
+| 7 | | | | | |
+| 8 | | | | | |
+| 9 | | | | | |
+| 10 | | | | | |
+
+Corpus B — panneaux routiers / pubs hautes (non mesuré) :
+
+| # | lieu | panneau | centerY | meters | annoncé ? |
+|---|------|---------|---------|--------|-----------|
+| 1 | | | | | |
+| 2 | | | | | |
+| 3 | | | | | |
+| 4 | | | | | |
+| 5 | | | | | |
+| 6 | | | | | |
+| 7 | | | | | |
+| 8 | | | | | |
+| 9 | | | | | |
+| 10 | | | | | |

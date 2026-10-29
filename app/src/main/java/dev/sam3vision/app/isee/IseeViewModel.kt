@@ -95,7 +95,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     val crossingChip = CrossingChipZone()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()))
+    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -444,6 +444,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** GPS désactivé (ordre) : la fenêtre d'action (photo, caméra) réouvre la voix. */
     private val voiceNavVoiceGate get() = voiceNav.voiceGate
+
+    private fun isRouteSpeaking(): Boolean = runCatching { voiceNav.isRouteSpeaking() }.getOrDefault(false)
 
     /** Position média pour les sous-titres ; aucune estimation d'une vitesse de parole. */
     fun speechPosition() = player.position()

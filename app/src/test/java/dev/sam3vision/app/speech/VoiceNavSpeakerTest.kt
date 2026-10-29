@@ -51,7 +51,7 @@ class VoiceNavSpeakerTest {
     )
 
     @Test
-    fun `virage loin parle continuer en file`() {
+    fun `virage parle francais en file`() {
         val driver = FakeSpeakerDriver()
 
         val phrase = speaker(driver).onTurn(SteeringCap.Left, 100f)
@@ -72,7 +72,7 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `carrefour reparle apres le delai`() {
+    fun `virage proche reparle apres le delai`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 100f)
@@ -84,13 +84,23 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
+    fun `virage proche dit l'ordre sec`() {
+        val driver = FakeSpeakerDriver()
+
+        val phrase = speaker(driver).onTurn(SteeringCap.Left, 20f, "rue de Rivoli")
+
+        assertEquals("Tournez à gauche, rue de Rivoli.", phrase)
+        assertEquals(1, driver.calls.size)
+    }
+
+    @Test
     fun `voix anglaise parle anglais`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver, Settings.Default.copy(speechLanguage = SpeechLanguage.En))
 
         val phrase = voice.onTurn(SteeringCap.Right, 100f, "Main Street")
 
-        assertEquals("Continue straight ahead, Main Street.", phrase)
+        assertEquals("Continue in this direction, Main Street.", phrase)
         assertEquals(Locale.ENGLISH, driver.calls.single().locale)
     }
 

@@ -41,7 +41,7 @@ class VoiceNavSpeaker(
     private val userSpeaking: () -> Boolean = { false },
 ) {
 
-    /** Virage à [cap] dans [meters] mètres ([street] si connue). */
+    /** Virage franc à [cap], à [meters] mètres ([street] si connue) : préavis de loin, ordre sec de près. */
     fun onTurn(cap: SteeringCap, meters: Float? = null, street: String? = null): String? =
         announce(VoiceNavEvent.Turn(cap, meters, street))
 
@@ -84,6 +84,9 @@ class VoiceNavSpeaker(
         if (clean.isEmpty()) return null
         return runCatching { utter(clean, flush = true) }.getOrNull()
     }
+
+    /** Vrai si une phrase route est en cours de lecture (arbitre vocal : l'obstacle attend). */
+    fun isSpeaking(): Boolean = engine.speaking
 
     /** Coupe la parole en cours (écran quitté, app en arrière-plan). */
     fun stop() = engine.stop()

@@ -50,6 +50,28 @@ object LivePrompts {
     )
 
     /**
+     * Concepts d'intérieur : **7** objets d'appartement pour la sonde iSee en
+     * mode maison — la personne et ce qui structure une pièce (portes,
+     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables).
+     * Bien sous [MAX] ; les pastilles du mode Maison ([HomeModes]) gardent
+     * leurs petits objets (clés, médicaments…), ici c'est le décor qui est
+     * suivi, pas la chasse au mot parlé.
+     */
+    val indoor: List<String> = listOf(
+        "person", "door", "chair", "table", "stairs", "wall", "window",
+    )
+
+    /**
+     * Liste du monde sensoriel : dehors = [default] (les 12 dangers de la
+     * rue), dedans = [indoor] (les 7 objets d'intérieur). V1 : seuls les
+     * prompts basculent, la portée reste 4 m dans les deux mondes. À ne pas
+     * confondre avec le preset [outdoor] (12 concepts de cheminement, pastille
+     * « Extérieur » du direct) : la bascule monde s'applique à la sonde iSee,
+     * pas aux pastilles.
+     */
+    fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
+
+    /**
      * Nombre maximal de concepts : **16**, décision user du 28/10 (dangers
      * extérieurs + marge pour le champ « Suivre »). Le backend tronque à
      * `PROMPT_LIMIT = 16` côté tracker ; le client ne doit pas en envoyer

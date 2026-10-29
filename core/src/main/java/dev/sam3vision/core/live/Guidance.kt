@@ -82,9 +82,11 @@ object Guidance {
     const val SHIFT_STEP_M = 0.5f
 
     /**
-     * Le passage est-il bouché, et par où passer ? Les labels vides et le sol
-     * marchable ([CurbConcepts.isGround]) sont ignorés : on ne contourne pas le
-     * trottoir sur lequel on marche (la bordure, elle, reste un obstacle).
+     * Le passage est-il bouché, et par où passer ? Les labels vides, le sol
+     * marchable ([CurbConcepts.isGround]) et les panneaux hauts
+     * ([SignConcepts.isHighSign]) sont ignorés : on ne contourne ni le
+     * trottoir sur lequel on marche (la bordure, elle, reste un obstacle),
+     * ni une enseigne sous laquelle on passe.
      * Cap droit : à égalité des côtés, on passe à l'opposé du décalage de
      * l'obstacle (pilier légèrement à gauche ⇒ on passe à droite) ; pile au
      * centre ⇒ à gauche. Cap latéral : le passage est le plus libre des deux
@@ -98,7 +100,8 @@ object Guidance {
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): GuidanceDecision {
         val cleaned = labels.filter {
-            it.label.isNotBlank() && !CurbConcepts.isGround(it.label) && SignConcepts.keep(it)
+            it.label.isNotBlank() && !CurbConcepts.isGround(it.label) &&
+                !SignConcepts.isHighSign(it.label, it.centerY, it.meters)
         }
         val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg) }
         if (blocking.isEmpty()) return GuidanceDecision(blocked = false, cap = cap)

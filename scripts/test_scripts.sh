@@ -14,7 +14,8 @@ VERIFY="${HERE}/verify-tap-voix.sh"
 VERIFY_PORT="${HERE}/verify-longpress-port.sh"
 LATEST="${HERE}/install-phone-latest.sh"
 VERIFY_NAV="${HERE}/verify-voice-nav.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV")
+VERIFY_STREET="${HERE}/verify-street.sh"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -137,6 +138,10 @@ run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY_NAV"
 expect_nonzero 'verify-voice-nav refuse un APK absent'
 expect_grep 'APK absent' 'verify-voice-nav nomme l APK manquant'
 
+run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$VERIFY_STREET"
+expect_nonzero 'verify-street refuse un APK absent'
+expect_grep 'APK absent' 'verify-street nomme l APK manquant'
+
 # --- 5. safe_rm_rf ---------------------------------------------------------
 echo "== 5. safe_rm_rf : garde des suppressions =="
 run bash -c '. "$1"; safe_rm_rf ""' _ "$LIB"
@@ -230,6 +235,22 @@ run grep -q -F '"Emmène-moi à"' "$NAV_TEST"
 expect_status 0 'le verrou JVM cite la destination vide'
 run grep -q -F '"va à gauche"' "$NAV_TEST"
 expect_status 0 'le verrou JVM documente le piège cap'
+
+# --- 8. recette rue : phrases E2E verrouillées ------------------------------
+# Les phrases dictées puis écoutées dans la rue sont recopiées à l'identique
+# dans le script et la fiche : toute dérive casse ici.
+echo "== 8. recette rue : phrases E2E =="
+STREET_DOC="${HERE}/../docs/RECETTE-RUE.md"
+run test -f "$STREET_DOC"
+expect_status 0 "RECETTE-RUE.md existe"
+for phrase in 'je veux aller à' 'Passage protégé dans' 'Mode traversée activé.' 'Traversée terminée.' 'Attention au poteau' 'Vous êtes arrivé à' 'Continuez dans cette direction' 'Tournez à'; do
+  run grep -q -F "$phrase" "$VERIFY_STREET"
+  expect_status 0 "verify-street cite $phrase"
+  run grep -q -F "$phrase" "$STREET_DOC"
+  expect_status 0 "RECETTE-RUE.md cite $phrase"
+done
+run grep -q -F 'PHONE_WAIT' "$VERIFY_STREET"
+expect_status 0 'verify-street passe par le verrou téléphone (PHONE_WAIT)'
 
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"

@@ -13,9 +13,10 @@ import kotlin.coroutines.coroutineContext
  * Voix de proximité de la fenêtre caméra : dit **une fois** chaque nouvelle phrase de
  * [LiveProbe] (« Personne à 1 mètre. »).
  *
- * Quatre garde-fous : la même phrase n'est jamais répétée, rien n'est dit sans clé
+ * Cinq garde-fous : la même phrase n'est jamais répétée, rien n'est dit sans clé
  * ElevenLabs, rien par-dessus la réponse du chat (une seule source sonore à la
- * fois — c'est l'appelant qui dit si le lecteur est libre), et une synthèse
+ * fois — c'est l'appelant qui dit si le lecteur est libre), rien par-dessus la
+ * voix route (sauf urgence : l'obstacle attend la fin du virage), et une synthèse
  * annulée (phrase plus fraîche arrivée entre-temps, `collectLatest` côté sonde)
  * n'est jamais jouée.
  *
@@ -27,6 +28,8 @@ import kotlin.coroutines.coroutineContext
  * faux en test — miroir `IseePlayback`). [clips] est le pack voix (mots du
  * guidage) : clip local quand il existe (< 100 ms, zéro réseau), synthèse
  * + mise en cache sinon (`null` = synthèse seule, comme avant).
+ * [routeSpeaking] dit si la voix route parle : l'obstacle non urgent se tait tant
+ * qu'elle parle, le danger urgent coupe toujours.
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -36,6 +39,7 @@ class ProximityVoice(
     private val synthesize: suspend (apiKey: String, voiceId: String, text: String) -> Result<ByteArray> =
         { apiKey, voiceId, text -> ElevenLabsTtsClient(apiKey, voiceId).synthesize(text) },
     private val clips: VoicePack? = null,
+    private val routeSpeaking: () -> Boolean = { false },
 ) {
 
     private var lastPhrase: String? = null
@@ -50,6 +54,9 @@ class ProximityVoice(
      * sinon on ne dit rien (et la phrase reste mémorisée comme déjà traitée, pour ne pas
      * la dire en retard une fois le chat terminé). [urgent] coupe la lecture en cours
      * et parle quand même, dictée ou pas.
+     * Tant que la voix route parle ([routeSpeaking]),
+     * l'obstacle non urgent se tait aussi (mémorisé, pas de rattrapage tardif : une
+     * nouvelle signature réémettra si l'obstacle évolue).
      */
     suspend fun onPhrase(phrase: String, playerIdle: Boolean, urgent: Boolean = false) {
         if (phrase == lastPhrase) return
@@ -57,6 +64,7 @@ class ProximityVoice(
         val current = settings()
         if (!current.ttsConfigured) return
         if (!urgent && !playerIdle) return
+        if (!urgent && routeSpeaking()) return
         if (urgent) player.stop()
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }

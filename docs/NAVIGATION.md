@@ -97,6 +97,40 @@ URL) et l'état du moteur par `VoiceNavEngineDriver`
 s'ouvrent que si `Settings.routeBaseUrl` est renseignée (seed du build ou
 Réglages) : sinon, `IseeViewModel` garde le handoff direct ci-dessus.
 
+### Contrat vocal virage (deux temps, jamais de distance)
+
+Un virage franc (tourner, serrer — `ManeuverAction.toSteeringCap`) se dit
+en deux temps, avec la rue quand Valhalla la donne : de loin (au-delà de
+`VoiceNavPolicy.TURN_NOW_M` = 25 m), préavis directionnel
+« Continuez dans cette direction, rue X. », dit une seule fois ; de près,
+ordre sec « Tournez à gauche, rue X. », sans distance. Aucun virage franc
+ne contient plus « dans X mètres ». Inchangés : demi-tour
+(« Faites demi-tour dans X »), giratoire (« Au rond-point, suivez la
+route dans X »), traversée (« Passage protégé dans X ») et arrivée
+(« Vous êtes arrivé à X »).
+
+### Recette appareil — wording virage (protocole, non rejoué)
+
+⚠️ **Protocole consigné sans téléphone** : aucune étape ci-dessous n'a été
+rejouée sur appareil. Preuve JVM acquise : `VoiceNavPhrasesTest`,
+`VoiceNavPolicyTest`, `VoiceNavSpeakerTest`, `VoiceNavScriptTest`,
+`NavigationHookTest` verts (voir `docs/TESTING.md`).
+
+Prérequis : build du HEAD de `origin/master`, `routeBaseUrl` renseignée
+(proxy Valhalla), GPS actif, parcours avec un virage franc à plus de
+100 m du départ. Noter SHA du build, heure et phrases entendues.
+
+1. Dicter une destination dont l'itinéraire commence par plus de 100 m
+   puis un virage franc nommé (rue X). Attendu : une seule fois
+   « Continuez dans cette direction, rue X. », puis silence jusqu'au
+   carrefour (aucune répétition à distance intermédiaire).
+2. Marcher jusqu'au carrefour. Attendu : « Tournez à gauche, rue X. »
+   (ou droite), **sans distance**, audible avant d'avoir à tourner.
+3. Pendant tout le trajet : vérifier qu'aucun virage franc entendu ne
+   contient « dans X mètres ».
+4. Demi-tour, giratoire, traversée, arrivée : vérifier les phrases
+   inchangées du § contrat ci-dessus (distances conservées).
+
 ## Limites
 
 - **Guidage in-app piéton, Île-de-France uniquement** : pas de carte, pas de

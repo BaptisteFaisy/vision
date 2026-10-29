@@ -94,7 +94,7 @@ fun SettingsScreen(
 }
 
 /**
- * Milieu de page : prédiction, overlay, navigation et profondeur embarquée.
+ * Milieu de page : prédiction, overlay, navigation, monde et profondeur embarquée.
  * Extrait pour que l'appelant reste sous la garde des 50 lignes.
  */
 @Composable
@@ -108,6 +108,7 @@ private fun PerceptionSettings(
         PredictionSettings(draft) { onChange(it) }
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
+        WorldModeSettings(draft) { onChange(it) }
         DebugMapSettings(draft) { onChange(it) }
         DepthSettings(draft, onChange, onTestDepth)
         DangerSettings(onTestDanger)
