@@ -160,6 +160,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
         run: |
+          set -euo pipefail
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           if [ -z "$GH_TOKEN" ]; then
             echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
@@ -175,7 +176,7 @@ jobs:
                 --json mergeStateStatus \
                 --jq '[.[].mergeStateStatus] | map(select(. == "UNKNOWN")) | length' \
                 2>/dev/null || echo 1)"
-              [ "${inconnus:-1}" = "0" ] && break
+              if [ "${inconnus:-1}" = "0" ]; then break; fi
               sleep 5
             done
           fi
@@ -197,25 +198,34 @@ jobs:
           done
           echo "strict=$STRICT file_de_merge=$QUEUE"
           printf 'strict=%s\nqueue=%s\n' "$STRICT" "$QUEUE" >> "$GITHUB_OUTPUT"
-          MATRIX=$(gh pr list --base master --state open \
-            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid,updatedAt \
-            --jq '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
-              | {pr: .number, sha: .headRefOid, branch: .headRefName,
-                 state: .mergeStateStatus, draft: (.isDraft | tostring),
-                 master: .baseRefOid, maj: .updatedAt}]
-              | (map(select(.state == "CLEAN" and .draft == "false"))) as $pretes
-              | if ($pretes | length) > 0 then
-                  # Une PR est prête : on merge, et on ne rebase personne —
-                  # ce merge déplace `master`, tout rebase serait perdu.
-                  map(select(.state != "BEHIND"))
-                else
-                  # Rien à merger : on prépare UNE PR (la plus ancienne), pas
-                  # toutes. Rebaser N PR d'un coup, c'est N CI relancées dont
-                  # aucune ne finit avant le mouvement suivant de `master`.
-                  map(select(.state != "BEHIND"))
-                  + (map(select(.state == "BEHIND")) | sort_by(.maj) | .[0:1])
-                end' \
-            | jq -c .)
+          # Sélection (v13) : s'il existe une PR prête (CLEAN, non brouillon),
+          # on inclut tout sauf les BEHIND — le merge qui vient déplace `master`,
+          # donc un rebase serait perdu. Sinon on prépare UNE seule PR `BEHIND`,
+          # la plus ancienne : rebaser toutes les PR à chaque mouvement de
+          # `master`, c'est N CI relancées dont aucune ne finit avant le
+          # mouvement suivant.
+          # Les commentaires restent HORS du filtre jq : une apostrophe dans un
+          # `--jq '…'` ferme le guillemet simple et gh meurt sur « unknown
+          # arguments » (vécu le 29/10 : `discover` rendait une matrice vide en
+          # silence et plus aucune PR n'était balayée).
+          FILTRE='[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
+            | {pr: .number, sha: .headRefOid, branch: .headRefName,
+               state: .mergeStateStatus, draft: (.isDraft | tostring),
+               master: .baseRefOid, maj: .updatedAt}]
+            | (map(select(.state == "CLEAN" and .draft == "false"))) as $pretes
+            | if ($pretes | length) > 0
+              then map(select(.state != "BEHIND"))
+              else map(select(.state != "BEHIND"))
+                   + (map(select(.state == "BEHIND")) | sort_by(.maj) | .[0:1])
+              end'
+          # Une liste illisible doit être ROUGE, pas vide : une matrice vide
+          # passait pour « aucune PR à balayer » et la file se taisait.
+          if ! MATRIX=$(gh pr list --base master --state open \
+              --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid,updatedAt \
+              --jq "$FILTRE" | jq -c .); then
+            echo "::error::liste des PR illisible — file en pause (voir le log ci-dessus)"
+            exit 1
+          fi
           [ -n "$MATRIX" ] || MATRIX="[]"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state) (maj \(.maj))"'
@@ -553,7 +563,7 @@ jobs:
               for _ in 1 2; do
                 sleep 5
                 st="$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus 2>/dev/null || echo UNKNOWN)"
-                [ "${st:-UNKNOWN}" != "UNKNOWN" ] && break
+                if [ "${st:-UNKNOWN}" != "UNKNOWN" ]; then break; fi
               done
               echo "PR #$PR : état $st après sondage, prochain passage"
               ;;
