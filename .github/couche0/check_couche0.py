@@ -22,6 +22,7 @@ import urllib.request
 
 API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 MAX_PAGES = 20
+MAX_ERREURS_AFFICHEES = 12
 
 # Fichiers de garde : les modifier exige une mention explicite dans le corps.
 GUARD_FILES = (".github/ci-budget/", ".github/couche0/",
@@ -110,6 +111,68 @@ def is_exempt(path):
     return any(s in path for s in EXEMPT_SUBSTR) or path.endswith(EXEMPT_SUFFIX)
 
 
+def suggerer_scope(files):
+    """Motifs prêts à coller dans `## Scope`, groupés quand le glob est évident.
+
+    Un refus sans rien à copier coûte des minutes (aller-retour humain ou agent
+    Fireworks, puis un nouveau run) : ici le garde ne s'assouplit pas, il rend
+    la déclaration faisable en un copier-coller. Trois fichiers ou plus du même
+    dossier et de même extension deviennent `dossier/*.ext` — `matches()` sait
+    déjà le lire.
+    """
+    groupes, ordre = {}, []
+    for f in files:
+        path = f["filename"]
+        if is_exempt(path):
+            continue
+        dossier, _, base = path.rpartition("/")
+        extension = "." + base.rsplit(".", 1)[1] if "." in base.lstrip(".") else ""
+        cle = (dossier, extension)
+        if cle not in groupes:
+            groupes[cle] = []
+            ordre.append(cle)
+        groupes[cle].append(path)
+    motifs = []
+    for cle in ordre:
+        dossier, extension = cle
+        membres = groupes[cle]
+        if len(membres) >= 3 and dossier and extension:
+            motifs.append("%s/*%s" % (dossier, extension))
+        else:
+            motifs.extend(membres)
+    return motifs
+
+
+def bloc_scope(files):
+    """Le bloc markdown à coller dans le corps de la PR."""
+    motifs = suggerer_scope(files)
+    if not motifs:
+        return ""
+    lignes = ["## Scope", ""]
+    lignes += ["- `%s` — à préciser" % m for m in motifs]
+    return "\n".join(lignes)
+
+
+def publier_suggestion(files):
+    """Écrit le bloc dans le résumé du job (et dans le log) : copiable."""
+    bloc = bloc_scope(files)
+    if not bloc:
+        return
+    print("Périmètre déclarable tel quel dans le corps de la PR :")
+    print(bloc)
+    resume = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not resume:
+        return
+    try:
+        with open(resume, "a", encoding="utf-8") as fh:
+            fh.write("### Périmètre à déclarer\n\n"
+                     "Ce bloc, collé dans le corps de la PR, rend `couche0` vert "
+                     "(relancer le workflow sans nouveau commit suffit ensuite).\n\n"
+                     "```markdown\n%s\n```\n" % bloc)
+    except OSError:
+        pass
+
+
 def check_scope(files, body, errors):
     """Tout fichier modifié déclaré, toute déclaration servie."""
     declared = parse_scope(body)
@@ -178,10 +241,18 @@ def main(argv=None):
     errors = []
     if args.control in (None, "scope"):
         check_scope(files, body, errors)
+        if any(e.startswith("scope :") for e in errors):
+            publier_suggestion(files)
     if args.control in (None, "forbidden"):
         check_forbidden(files, body, errors)
-    for message in errors:
+    # Un refus peut lister 38 fichiers : le log devient illisible et noie la
+    # cause. Les douze premiers suffisent à comprendre ; le résumé du job
+    # porte le bloc complet à coller (publier_suggestion).
+    for message in errors[:MAX_ERREURS_AFFICHEES]:
         print("::error::%s" % message)
+    if len(errors) > MAX_ERREURS_AFFICHEES:
+        print("::error::… et %d autre(s) — bloc `## Scope` complet dans le "
+              "résumé du job." % (len(errors) - MAX_ERREURS_AFFICHEES))
     print("%s — %d fichier(s) controlé(s), %d erreur(s)"
           % ("OK" if not errors else "REFUSÉ", len(files), len(errors)))
     return 1 if errors else 0

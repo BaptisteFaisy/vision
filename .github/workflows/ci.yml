@@ -121,7 +121,8 @@ jobs:
 
       # Les clés des APK distribués. Sans secret, l'APK sort sans clé (saisie
       # dans Réglages) : c'est le comportement par défaut d'un dépôt public.
-      # Action composite : une seule implémentation pour les trois jobs qui bâtissent.
+      # Action composite : une seule implémentation pour les jobs qui bâtissent
+      # (l'ancienne copie inline avait oublié `llm.live.api.key`).
       - name: Clés du build (secrets → local.properties)
         uses: ./.github/actions/cles-build
         with:
@@ -221,3 +222,20 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+  # ── 4. garde-fou de configuration (ex-workflow ci-budget.yml) ───────────────
+  # Fusionné ici le 29/10 : le check s'appelle toujours `ci-budget` (c'est le
+  # nom du job qui nomme le check, pas le fichier), donc la protection de
+  # `master` et la file de merge restent valides. Un run de moins par push de
+  # PR (61/jour mesurés) et un seul verdict à lire.
+  ci-budget:
+    name: ci-budget
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (superficiel)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Vérifier le budget de 5 min par job
+        run: python3 .github/ci-budget/check_timeouts.py
