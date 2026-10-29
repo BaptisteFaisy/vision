@@ -78,10 +78,10 @@ class GuidanceAnnouncerSidewalkTest {
         assertEquals("Continue.", announcer.onFrame(500L, emptyList()))
 
         val bloque = listOf(personne(2f), trottoir(0.1f))
-        assertNull(announcer.onFrame(1_500L, bloque, sidewalk = SidewalkPosition.Left))
-        val phrase = announcer.onFrame(2_000L, bloque, sidewalk = SidewalkPosition.Left).orEmpty()
+        val phrase = announcer.onFrame(1_500L, bloque, sidewalk = SidewalkPosition.Left).orEmpty()
         assertTrue("consigne obstacle attendue, reçu : $phrase", phrase.startsWith("Va à "))
         assertTrue("consigne obstacle attendue, reçu : $phrase", phrase.contains("2 mètres"))
+        assertNull(announcer.onFrame(2_000L, bloque, sidewalk = SidewalkPosition.Left))
     }
 
     @Test

@@ -50,9 +50,9 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
 `core/.../live/AnnouncementGate.kt` — machine à états **pure** (l'horodatage est fourni),
 partagée avec les consignes de guidage (`GuidanceAnnouncer.kt`) :
 
-1. **stabilité** — la même scène doit être vue **2 frames de suite**
-   (`DEFAULT_MIN_FRAMES = 2`, `AnnouncementGate.kt:83`) : un masque qui clignote ne
-   déclenche rien ;
+1. **première vue** — une scène nouvelle parle **dès la 1re frame** (`firstSight`) :
+   un objet qui s'approche change de clé à chaque frame (seau de distance) et ne
+   serait jamais « stable » ; le délai de 4 s borne le bavardage ;
 2. **nouveauté** — une scène déjà annoncée reste muette, même si les objets sont toujours
    là. La signature de scène est `label|heure|distance arrondie au mètre`
    (`PositionText.key`, `PositionText.kt:138-143`) : c'est ce qui fait reparler un objet
@@ -99,7 +99,7 @@ est `announcePositions = ttsAnnouncePositions && ttsConfigured` (`Settings.kt:18
 | Élément | Fichier |
 |---|---|
 | Heures, phrase, signature de scène | `core/.../live/PositionText.kt` (163 l.) |
-| Machine 2 frames / 4 s / non-répétition | `core/.../live/AnnouncementGate.kt` (88 l.), `PositionAnnouncer.kt` (49 l.) |
+| Machine 1re vue / 4 s / non-répétition | `core/.../live/AnnouncementGate.kt`, `PositionAnnouncer.kt` |
 | Frame → objets placés + distance | `core/.../live/FrameRoster.kt` (`placedLabels`, `:62-77`) |
 | Direct (VM + annonce) | `app/.../LiveViewModel.kt`, `app/.../live/LivePositionVoice.kt` |
 | iSee (sonde + voix) | `app/.../isee/LiveProbe.kt`, `ProbeWiring.kt`, `ProximityVoice.kt` |

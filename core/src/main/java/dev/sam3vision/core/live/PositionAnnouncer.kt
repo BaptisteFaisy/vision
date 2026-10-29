@@ -8,7 +8,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * La machine anti-répétition (stabilité, nouveauté, délai) est [AnnouncementGate],
  * partagée avec les consignes de guidage : ici, pas d'urgence — une scène vide fait
- * retomber la mémoire, pour que le retour des objets parle.
+ * retomber la mémoire, pour que le retour des objets parle. Une scène nouvelle parle
+ * dès la première frame (pas de stabilité : un objet qui s'approche change de clé
+ * à chaque frame) ; le délai de 4 s reste, qui borne le bavardage.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -38,7 +40,7 @@ class PositionAnnouncer(
             gate.clearScene()
             return null
         }
-        if (!gate.admit(atMs, key)) return null
+        if (!gate.admit(atMs, key, firstSight = true)) return null
         val phrase = PositionText.phrase(labels, maxObjects, language) ?: return null
         gate.markSpoken(key, atMs, phrase)
         return phrase

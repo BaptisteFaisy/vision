@@ -12,6 +12,7 @@ import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -51,15 +52,19 @@ internal fun LiveProbe.configureFrom(
 /**
  * Chaque nouvelle phrase de la sonde est confiée à la voix (une seule fois par
  * scène). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
+ * Dernier-gagnant (`collectLatest`) : une phrase plus fraîche annule la synthèse
+ * en cours au lieu de faire la queue derrière — une consigne datée ne sert à rien.
+ * Pré-synthétise aussi le « Stop. » urgent (une fois, en fond).
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
     voice: ProximityVoice,
     playerIdle: () -> Boolean,
 ) {
+    scope.launch { voice.prewarmStop() }
     scope.launch {
-        state.collect { st ->
-            val phrase = st.spoken ?: return@collect
+        state.collectLatest { st ->
+            val phrase = st.spoken ?: return@collectLatest
             voice.onPhrase(phrase, playerIdle())
         }
     }
@@ -80,11 +85,11 @@ internal fun LiveProbe.observeCurb(
 ): CurbWatcher {
     val watcher = CurbWatcher()
     scope.launch {
-        state.collect { st ->
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings ?: return@collect
+        state.collectLatest { st ->
+            if (st.crossingActive) return@collectLatest
+            val readings = st.distanceLayer?.readings ?: return@collectLatest
             val signal = CurbSignal.of(readings, st.width, st.height)
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collectLatest
             voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
         }
     }
@@ -105,11 +110,13 @@ internal fun LiveProbe.observeStairs(
     playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
 ): StairWatcher {
-    val watcher = StairWatcher()
+    // Deux frames suffisent côté voix (le flux Canny d'affichage garde trois) :
+    // un escalier nommé deux fois de suite n'est plus un clignotement.
+    val watcher = StairWatcher(confirmFrames = 2)
     scope.launch {
-        state.collect { st ->
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings ?: return@collect
+        state.collectLatest { st ->
+            if (st.crossingActive) return@collectLatest
+            val readings = st.distanceLayer?.readings ?: return@collectLatest
             val found = StairLabelSignals.of(readings, st.width, st.height)
             val signal = if (found.detected) {
                 StairSignal(detected = true, confidence = 1f, lineCount = 0, roiTop = 0, roiBottom = 0)
@@ -117,7 +124,7 @@ internal fun LiveProbe.observeStairs(
                 StairSignal.none()
             }
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction)
-                ?: return@collect
+                ?: return@collectLatest
             voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
         }
     }
