@@ -34,6 +34,8 @@ fun GlassesSection(
     state: GlassesUiState,
     debugBuild: Boolean,
     onRegister: () -> Unit,
+    onRequestCamera: () -> Unit,
+    onRequestMic: () -> Unit,
     onConnect: () -> Unit,
     onCapture: () -> Unit,
     onDisconnect: () -> Unit,
@@ -48,6 +50,7 @@ fun GlassesSection(
         Text("Lunettes Ray-Ban Meta", color = SettingsLight.text, fontSize = 15.sp)
         GlassesStatusLines(state)
         state.message?.let { StatusBanner(it.text, bannerColor(it.kind)) }
+        PermissionActions(onRequestCamera, onRequestMic)
         ProductionActions(state, onRegister, onConnect, onCapture, onDisconnect)
         photoHint(state)?.let { Text(it, color = AppColors.warning, fontSize = 12.sp) }
         if (debugBuild) {
@@ -55,6 +58,21 @@ fun GlassesSection(
         }
         BenchEntry()
     }
+}
+
+/**
+ * Autorisations des lunettes : la question se pose dans **Meta AI**, pas dans les réglages du
+ * téléphone ni dans ceux d'iSee. Ces deux boutons ouvrent la page du SDK, la seule voie qui
+ * aboutit — en Developer Mode la fiche de l'app n'expose que « Déconnecter ».
+ *
+ * Toujours affichés, même quand le SDK n'est pas encore prêt : le premier appui appelle
+ * `initialize()`. Les masquer derrière `sdkReady` cachait le **seul** chemin qui autorise la
+ * caméra, ce qui se lisait comme « il n'y a aucun bouton ».
+ */
+@Composable
+private fun PermissionActions(onCamera: () -> Unit, onMic: () -> Unit) {
+    GlassButton("Autoriser la caméra (Meta AI)", true, primary = false, onClick = onCamera)
+    GlassButton("Autoriser le micro (Meta AI)", true, primary = false, onClick = onMic)
 }
 
 /** Les trois gestes de production : enregistrement Meta AI, session, photo. */

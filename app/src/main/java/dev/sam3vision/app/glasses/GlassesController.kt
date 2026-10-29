@@ -8,8 +8,7 @@ import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.session.DeviceSessionState
-import com.meta.wearable.dat.core.types.DeviceIdentifier
-import com.meta.wearable.dat.core.types.DonState
+import com.meta.wearable.dat.core.types.DeviceSessionError
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationError
@@ -73,6 +72,8 @@ class GlassesController(
     private val collectVideoFrames: Boolean = false,
     /** Réglages courants (clés LLM/SAM/TTS) : lus à chaque frame analysée. */
     private val frameSettings: () -> Settings = { Settings.Default },
+    /** Ouvre la page d'autorisation de Meta AI (contrat du SDK, fil principal). */
+    private val permissionRequester: (Permission) -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(GlassesUiState())
@@ -94,12 +95,22 @@ class GlassesController(
         say = { text ->
             val settings = frameSettings()
             frameVoice.say(settings, text)
-            if (settings.ttsApiKey.isBlank()) "voix coupée (clé TTS absente)" else "haut-parleur"
+            when {
+                settings.ttsApiKey.isBlank() -> "voix coupée (clé TTS absente)"
+                GlassesVoiceRoute.targetsGlasses -> "lunettes"
+                else -> "haut-parleur"
+            }
         },
     )
 
     val state: StateFlow<GlassesUiState> = _state
     val events: SharedFlow<GlassesEvent> = _events
+
+    init {
+        // La voix suit la session : chaque phrase relit la sortie des lunettes, et
+        // la fermeture de session la rend au téléphone (voir [GlassesVoiceRoute]).
+        scope.launch { _state.collect(GlassesVoiceRoute::follow) }
+    }
 
     // Implémentation (Mock Device Kit) en `app/src/debug/` : la dépendance n'est pas
     // embarquée dans l'APK de release, d'où la fabrique réflexive [mockDevice].
@@ -109,8 +120,19 @@ class GlassesController(
     private var camera: GlassesCamera? = null
     private var inputs: GlassesInputs? = null
     private var activity: Activity? = null
-    private var deviceJob: Job? = null
     private var started = false
+
+    /** Autorisations : demande ouverte par l'activité, verdict appliqué ici. */
+    private val permissions = GlassesPermissionGate(
+        requester = permissionRequester,
+        hasActivity = { activity != null },
+        update = { change -> _state.update(change) },
+        note = ::note,
+        onCameraGranted = { session?.let { live -> scope.launch { attachCapabilities(live) } } },
+    )
+
+    /** Première paire connue du SDK, publiée en nom / batterie / portée. */
+    private val devices = GlassesDeviceWatch(scope) { change -> _state.update(change) }
 
     /** Dernier enregistrement connu, pour ne dire la perte qu'une fois (transition). */
     private var wasRegistered = false
@@ -142,7 +164,7 @@ class GlassesController(
     private fun onSdkReady() {
         _state.update { current -> current.copy(sdkReady = true, devMode = Wearables.isDevMode) }
         watchRegistration()
-        watchDevices()
+        devices.start()
     }
 
     /**
@@ -175,34 +197,6 @@ class GlassesController(
         if (registered) unregisterWanted = false
     }
 
-    private fun watchDevices() {
-        scope.launch {
-            Wearables.devices.collect { identifiers -> bindFirstDevice(identifiers) }
-        }
-    }
-
-    /** Le SDK peut connaître plusieurs paires : on suit la première, ça suffit ici. */
-    private fun bindFirstDevice(identifiers: Set<DeviceIdentifier>) {
-        deviceJob?.cancel()
-        val flow = identifiers.firstOrNull()?.let { Wearables.devicesMetadata[it] }
-        if (flow == null) {
-            deviceJob = null
-            _state.update { it.copy(deviceName = null, battery = null, worn = false) }
-            return
-        }
-        deviceJob = scope.launch {
-            flow.collect { device ->
-                _state.update {
-                    it.copy(
-                        deviceName = device.name,
-                        battery = device.batteryLevel.takeIf { level -> level > 0 },
-                        worn = device.donState == DonState.DONNED,
-                    )
-                }
-            }
-        }
-    }
-
     /** Enregistre l'app auprès de l'app Meta AI : la confirmation se fait côté Meta AI. */
     fun register() {
         initialize()
@@ -223,10 +217,25 @@ class GlassesController(
         activity?.let { Wearables.startUnregistration(it) }
     }
 
+    /** Demande caméra ou micro : la question se pose dans Meta AI (contrat du SDK). */
+    fun requestPermission(permission: Permission) {
+        initialize()
+        permissions.request(permission)
+    }
+
+    /** Verdict de Meta AI : l'état suit, et la caméra s'attache sans refaire la session. */
+    fun onPermissionResult(permission: Permission, result: PermissionResult) =
+        permissions.result(permission, result)
+
     /** Retour d'enregistrement ou d'invocation vocale depuis l'app Meta AI. */
     fun handleIntent(intent: Intent) {
         val host = activity ?: return
-        Wearables.handleIntent(intent) { request -> request.continueRegistration(host) }
+        // Les deux étapes peuvent échouer (demande illisible, identifiants refusés) : sans ces
+        // `onFailure`, Meta AI revenait dans l'app et l'écran restait muet.
+        Wearables.handleIntent(intent) { request ->
+            request.continueRegistration(host)
+                .onFailure { error, _ -> note(registrationRequestErrorMessage(error)) }
+        }.onFailure { error, _ -> note(registrationRequestErrorMessage(error)) }
     }
 
     fun connect() {
@@ -246,7 +255,7 @@ class GlassesController(
             onFailure = { error, _ ->
                 Log.w(TAG, "session refusée : ${error.description}")
                 _state.update { it.copy(phase = SessionPhase.IDLE) }
-                note(GlassesMessages.sessionRefused(error.description))
+                reportSessionError(error, activity, ::note)
             },
         )
     }
@@ -258,7 +267,7 @@ class GlassesController(
         sessionWatch = scope.launch {
             launch { created.state.collect { state -> onSessionState(created, state) } }
             launch {
-                created.errors.collect { error -> note(GlassesMessages.sessionInterrupted(error.description)) }
+                created.errors.collect { error -> reportSessionError(error, activity, ::note) }
             }
         }
         created.start()
@@ -287,6 +296,13 @@ class GlassesController(
         if (camera != null) return
         if (!ensureCameraPermission()) return
         val micAllowed = ensureMicPermission()
+        // Une vidéo par session : elle démarre à la première image du flux et se publie
+        // dans la galerie à la fermeture. Aucun ré-encodage : le H.265 est muxé tel quel.
+        val recorder = GlassesVideoRecorder(
+            context = context,
+            onNote = ::note,
+            onRecording = { active -> _state.update { it.copy(recordingName = active) } },
+        )
         val cam = GlassesCamera(
             session = created,
             scope = scope,
@@ -302,6 +318,7 @@ class GlassesController(
             collectFrames = collectVideoFrames,
             onFrame = ::onGlassesFrame,
             onFrameLog = ::frameLog,
+            recorder = recorder,
         )
         // Une caméra qui n'a pas démarré n'est pas retenue : elle bloquerait toute reprise.
         val started = cam.start()
@@ -390,7 +407,7 @@ class GlassesController(
         camera?.stop()
         camera = null
         frameVoice.stop()
-        _state.update { it.copy(streaming = false, micActive = false) }
+        _state.update { it.copy(streaming = false, micActive = false, recordingName = null) }
     }
 
     /** Lunettes simulées : démo sans matériel, et plan B si l'appairage coince. */
@@ -451,6 +468,7 @@ class GlassesController(
         dropSession()
         mock.stop()
         frameVoice.release()
+        GlassesVoiceRoute.forget()
         scope.cancel()
     }
 
@@ -460,13 +478,4 @@ class GlassesController(
         _state.update { it.copy(message = message) }
         _events.tryEmit(GlassesEvent.Note(message))
     }
-}
-
-/** Phase du SDK → phase affichée. `PAUSED` reste « en cours », la session reprend. */
-internal fun DeviceSessionState.toPhase(): SessionPhase = when (this) {
-    DeviceSessionState.IDLE -> SessionPhase.IDLE
-    DeviceSessionState.STARTING -> SessionPhase.STARTING
-    DeviceSessionState.STARTED -> SessionPhase.STARTED
-    DeviceSessionState.PAUSED -> SessionPhase.STARTING
-    DeviceSessionState.STOPPING, DeviceSessionState.STOPPED -> SessionPhase.STOPPED
 }

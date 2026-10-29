@@ -43,12 +43,19 @@ class GlassesUiStateTest {
     }
 
     @Test
-    fun `les cinq lignes d etat existent toujours`() {
+    fun `les six lignes d etat existent toujours`() {
         listOf(GlassesUiState(), ready(), idleStream()).forEach { state ->
             val lines = statusLines(state)
-            assertEquals(5, lines.size)
+            assertEquals(6, lines.size)
             assertTrue(lines.all { it.isNotBlank() })
         }
+    }
+
+    @Test
+    fun `la ligne video dit le fichier en cours, sinon rien`() {
+        assertEquals("Vidéo : rien en cours", statusLines(GlassesUiState())[5])
+        val recording = GlassesUiState(recordingName = "isee-lunettes-20261029-101500.mp4")
+        assertTrue(statusLines(recording)[5].contains("Movies/iSee/isee-lunettes-"))
     }
 
     @Test

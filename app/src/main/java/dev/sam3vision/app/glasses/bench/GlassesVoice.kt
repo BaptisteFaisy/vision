@@ -9,6 +9,8 @@ import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import dev.sam3vision.app.glasses.bluetoothOutputs
+import dev.sam3vision.app.glasses.pickBluetoothOutput
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.net.TtsClient
 import dev.sam3vision.core.settings.Settings
@@ -73,7 +75,9 @@ class GlassesVoice(
      */
     fun routeToGlasses(preferredName: String? = null): String {
         val manager = audio ?: return logLine("voix : sortie par défaut (AudioManager indisponible)")
-        val available = candidates(manager)
+        // Lecture d'`AudioManager` et rang des types : partagés avec la production
+        // (`glasses/GlassesAudioRoute.kt`), une seule décision pour les deux.
+        val available = bluetoothOutputs(manager)
         val picked = pickBluetoothOutput(available.map { it.first }, preferredName)
         route = available.firstOrNull { it.first == picked }?.second
         return logLine(
@@ -114,37 +118,6 @@ class GlassesVoice(
         Log.i(TAG, line)
         return line
     }
-
-    /** Sorties Bluetooth proposées par la plateforme, avec leur objet Android d'origine. */
-    private fun candidates(manager: AudioManager): List<Pair<AudioOutput, AudioDeviceInfo>> =
-        runCatching { manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList() }
-            .getOrDefault(emptyList())
-            .filter { isBluetoothOutput(it.type) }
-            .map { device ->
-                AudioOutput(
-                    name = device.productName?.toString().orEmpty(),
-                    type = device.type,
-                    isSink = device.isSink,
-                    rank = rankOf(device.type),
-                ) to device
-            }
-
-    /** Ce qui peut sortir du son vers une paire : BLE d'abord, A2DP (la musique des lunettes) ensuite. */
-    private fun rankOf(type: Int): Int = when (type) {
-        AudioDeviceInfo.TYPE_BLE_HEADSET -> 0
-        AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> 1
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> 2
-        AudioDeviceInfo.TYPE_HEARING_AID -> 3
-        else -> 4
-    }
-
-    @Suppress("InlinedApi")
-    private fun isBluetoothOutput(type: Int): Boolean = type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-        type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
-        type == AudioDeviceInfo.TYPE_BLE_BROADCAST ||
-        type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-        type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-        type == AudioDeviceInfo.TYPE_HEARING_AID
 
     // ---- Lecture -------------------------------------------------------------
 

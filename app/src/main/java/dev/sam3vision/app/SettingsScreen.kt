@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
+import com.meta.wearable.dat.core.types.Permission
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -289,6 +290,8 @@ private fun GlassesBlock(glasses: GlassesController) {
         state = glassesState,
         debugBuild = BuildConfig.DEBUG,
         onRegister = glasses::register,
+        onRequestCamera = { glasses.requestPermission(Permission.CAMERA) },
+        onRequestMic = { glasses.requestPermission(Permission.MICROPHONE) },
         onConnect = glasses::connect,
         onCapture = { glasses.capture() },
         onDisconnect = glasses::disconnect,
