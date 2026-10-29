@@ -3,8 +3,28 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-29 — voix : appui long sur les écrans navigation (tout à la voix) + iSee : flèche TwinLite remontée + log voix
+## 2026-10-29 — page caregiver : la carte disparaît, l'image du proche et la barre de trajet la remplacent (ordre user) + voix : appui long sur les écrans navigation (tout à la voix) + iSee : flèche TwinLite remontée + log voix
 
+- `suivi-parent/index.html` : plus de carte (ni MapLibre, ni clé Google, ni appel
+  tiers) ; à sa place la **dernière frame de la caméra iSee** et, pendant un
+  guidage, une **barre de progression liquide** du départ à l'arrivée (teintes de
+  la boule iSee, liquide + bille qui avance).
+- Contrat du relais étendu, sans casser les anciens clients : `POST /api/share`
+  accepte `photo:{jpeg,atMs}` (JPEG base64 ≤ 120 000 caractères) et
+  `trip:{destination,totalM,remainingM,remainingS,progress}` ;
+  `GET /api/state` les rend. Une écriture sans image (service de suivi écran
+  éteint) conserve la dernière photo, dont l'âge est rendu à la page.
+- App : `ShareBroadcaster.publish` et `ShareRelay` portent le trajet et la photo ;
+  `IseeShare` compose `trip` depuis `VoiceNavUiState.Guiding` (`progressOf`) et
+  `SharedCameraFrame` publie la frame déjà convertie pour SAM, seulement si elle a
+  moins de 6 s (sinon la page l'efface au lieu de la faire passer pour du direct).
+- La clé de fond de carte ne traverse plus l'URL de la page (`caregiverPageUrl`,
+  `CaregiverScreen`), et le champ Réglages Google Maps reste pour les liens Maps.
+- Fichiers : `suivi-relais/src/{contrat,worker}.js`, `suivi-parent/api/{share,state}.js`,
+  `suivi-parent/{index.html,styles.css,live.mjs,live-view.mjs,README.md}`
+  (`maps.mjs` supprimé), `core/share/{SharePayload,CaregiverPage}.kt`,
+  `app/{ShareBroadcaster,ShareRelay,CaregiverScreen,AppNav}.kt`,
+  `app/isee/{IseeShare,SharedCameraFrame,IseeVisionCard}.kt`.
 - **Cause (ordre user)** : sur l'écran de confirmation de destination, « Dicter »
   renvoyait à l'accueil iSee — pas de micro sur place ; tout doit être
   faisable à la voix.
@@ -21,11 +41,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   empilée au-dessus des deux désormais.
 - `TwinLiteVoice.say` : `twinlite: dit « … » (urgent=…) : ok` — chaque consigne
   parlée est traçable au logcat (recette voix + observabilité).
-- Preuves : `VoiceNavHoldTest` 11/11 + `:app` `testDebugUnitTest` verts sur
-  r630 (8/8 `TwinLiteWiringTest` inchangés — voix `null` en test),
+- Preuves caregiver (rejouées sur `origin/master` 61e91cb8, branche
+  `feat/caregiver-media-live`) : `node --test suivi-parent/test/*.test.mjs
+  suivi-relais/test/*.test.mjs` 26/26 (relais 10/10 dont photo + trajet, page 5/5,
+  API héritée 4/4, session 7/7) ; `:app:testDebugUnitTest` vert ; `:core` 1773
+  tests, seuls les 5 `PrivateFileSettingsStoreTest` (permissions POSIX sous
+  Windows) échouent, les mêmes 5 sur `origin/master` seul (rejoué) ;
+  `:app:assembleDebug` vert, APK 174 Mo avec `assets/caregiver/live-view.mjs`,
+  sans `maps.mjs` ; `check-kotlin-limits.py` OK (`check-isee-design.py` signale
+  une boule Portrait hors baseline, déjà le cas sur `master`).
+- Preuves voix/iSee : `VoiceNavHoldTest` 11/11 + `:app` `testDebugUnitTest` verts
+  sur r630 (8/8 `TwinLiteWiringTest` inchangés — voix `null` en test),
   `assembleDebug` vert, `check-kotlin-limits` OK. Recette voix sur téléphone
   après merge (voix du user requise) ; recette flèche + `dit` dues sur master
   après merge.
+- Limite : le relais déployé doit être republié (`suivi-relais/deploy.json`) pour
+  que `photo` et `trip` traversent la production ; d'ici là la page affiche
+  l'image d'attente et aucune barre, le reste étant inchangé.
 
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 

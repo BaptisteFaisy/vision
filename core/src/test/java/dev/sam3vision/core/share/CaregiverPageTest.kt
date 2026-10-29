@@ -10,18 +10,19 @@ import org.junit.Test
 
 class CaregiverPageTest {
     @Test
-    fun `le contenu embarque conserve le flux recu et active la cle des reglages`() {
-        val url = caregiverPageUrl("https://proche.example/?share=telephone-b&key=ancienne", "cle-carte").toHttpUrl()
+    fun `le contenu embarque conserve le flux recu et oublie la cle de carte`() {
+        val url = caregiverPageUrl("https://proche.example/?share=telephone-b&key=ancienne").toHttpUrl()
         assertEquals("proche.example", url.host)
         assertEquals("telephone-b", url.queryParameter("share"))
-        assertEquals("cle-carte", url.queryParameter("key"))
+        // La carte n'existe plus : la clé d'un ancien lien ne part pas à la page.
+        assertNull(url.queryParameter("key"))
         assertEquals("1", url.queryParameter("embedded"))
         assertEquals(CAREGIVER_ASSET_PREFIX + "index.html", url.encodedPath)
     }
 
     @Test
     fun `sans lien recu aucun flux local implicite n est selectionne`() {
-        val url = caregiverPageUrl("", "cle-carte").toHttpUrl()
+        val url = caregiverPageUrl("").toHttpUrl()
         assertFalse(url.queryParameterNames.contains("share"))
     }
 
@@ -67,7 +68,7 @@ class CaregiverPageTest {
 
     @Test
     fun `seuls les assets de l interface sont interceptes sans toucher au relais`() {
-        val page = caregiverPageUrl("https://proche.example/?share=telephone-b", "cle-carte")
+        val page = caregiverPageUrl("https://proche.example/?share=telephone-b")
         assertEquals("live.mjs", caregiverAssetName("https://proche.example/.isee-caregiver/live.mjs", page))
         assertNull(caregiverAssetName("https://proche.example/api/state?share=telephone-b", page))
         assertNull(caregiverAssetName("https://autre.example/.isee-caregiver/live.mjs", page))

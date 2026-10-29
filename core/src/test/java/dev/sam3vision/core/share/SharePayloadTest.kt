@@ -61,6 +61,41 @@ class SharePayloadTest {
     }
 
     @Test
+    fun `le json du relais porte l'image de la camera et le trajet en cours`() {
+        val fix = SharedFix(48.85, 2.35, 12f, 90f, 1_700_000_000_000L, false)
+        val json = shareJson(
+            "leo",
+            "cle",
+            fix,
+            emptyList(),
+            photo = SharedPhoto("AAAA", 1_700_000_000_500L),
+            trip = SharedTrip("Gare de Lyon", 1_200, 300, 240, 0.75f),
+        )
+        assertEquals("AAAA", json.getJSONObject("photo").getString("jpeg"))
+        assertEquals(1_700_000_000_500L, json.getJSONObject("photo").getLong("atMs"))
+        val trip = json.getJSONObject("trip")
+        assertEquals("Gare de Lyon", trip.getString("destination"))
+        assertEquals(1_200L, trip.getLong("totalM"))
+        assertEquals(300L, trip.getLong("remainingM"))
+        assertEquals(0.75, trip.getDouble("progress"), 1e-9)
+    }
+
+    @Test
+    fun `une image illisible ou un trajet hors bornes ne partent pas`() {
+        val fix = SharedFix(48.85, 2.35, 12f, null, 1L, false)
+        val sansImage = shareJson("leo", "", fix, emptyList(), photo = SharedPhoto("<script>", 1L))
+        assertNull(sansImage.optJSONObject("photo"))
+        val progresse = shareJson(
+            "leo",
+            "",
+            fix,
+            emptyList(),
+            trip = SharedTrip("Arrivée", 0, 0, 0, 4f),
+        ).getJSONObject("trip")
+        assertEquals(1.0, progresse.getDouble("progress"), 1e-9)
+    }
+
+    @Test
     fun `le seuil interieur marque les positions imprecises`() {
         assertTrue(INDOOR_ACCURACY_M == 25f)
     }

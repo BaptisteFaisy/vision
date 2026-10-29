@@ -239,7 +239,6 @@ private fun RouteHost(
         Route.Caregiver -> CaregiverScreen(
             link = caregiverShareLink(state.settings),
             onBack = onCaregiverBack,
-            mapsKey = state.settings.googleMapsApiKey,
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)

@@ -297,6 +297,8 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
         }
         glue.host.onFrame = { jpeg, captureAtNs ->
             if (!GlassesVideoLink.live.value) {
+                // La même frame part au proche : sa page montre ce que voit iSee.
+                SharedCameraFrame.offer(jpeg)
                 if (sending(viewModel)) {
                     viewModel.probe.onFrame(jpeg, captureAtNs)
                     viewModel.twinlite.offerFrame(jpeg)
@@ -304,6 +306,10 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
                 if (picturing(viewModel)) viewModel.picto.onFrame(jpeg)
             }
         }
+    }
+    // Carte retirée (fin de la scène) : plus d'image à proposer au partage.
+    DisposableEffect(glue.host) {
+        onDispose { SharedCameraFrame.clear() }
     }
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
 }

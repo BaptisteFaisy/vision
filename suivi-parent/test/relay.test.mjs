@@ -47,6 +47,18 @@ test('un ancien client sans texte reste lisible ; aucun texte antérieur ne fuit
   assert.equal(response.body.objects.length, 1);
 });
 
+test('la photo et le trajet du téléphone arrivent à la page', async () => {
+  const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
+  const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
+  await request(share, { method: 'POST', body: { ...payload('test-media'), photo, trip } });
+  const response = await request(state, { query: { share: 'test-media' } });
+  assert.deepEqual(response.body.photo, photo);
+  assert.deepEqual(response.body.trip, trip);
+  assert.equal((await request(state, { query: { share: 'test-old' } })).body.photo, null);
+  await request(share, { method: 'POST', body: { ...payload('test-media'), photo: { jpeg: '<b>' } } });
+  assert.equal((await request(state, { query: { share: 'test-media' } })).body.photo.jpeg, photo.jpeg);
+});
+
 test('texte borné et clé d’écriture toujours exigée quand configurée', async () => {
   const body = { ...payload('test-long'), scene: { text: 'x'.repeat(3000) } };
   await request(share, { method: 'POST', body });

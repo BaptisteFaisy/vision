@@ -7,6 +7,12 @@ export const MAX_OBJECTS = 8;
 export const MAX_TEXT = 2_000;
 export const MAX_KEY = 64;
 
+/** Frame JPEG base64 de la caméra iSee (320 px ≈ 24 k caractères). */
+export const MAX_PHOTO = 120_000;
+
+/** Nom de destination affiché au proche. */
+export const MAX_DESTINATION = 80;
+
 /** Identifiant de flux : un par proche suivi, glissé dans `?share=`. */
 export function validId(id) {
   return typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
@@ -23,6 +29,45 @@ function sceneOf(scene) {
     text: scene.text.slice(0, MAX_TEXT),
     fromUser: scene.fromUser === true,
     speaking: scene.speaking === true,
+  };
+}
+
+/**
+ * Image courante : `{jpeg, atMs}`. `null` = absente (ancien client, ou envoi du
+ * service de suivi en arrière-plan, caméra fermée), `false` = présenté mais
+ * illisible (le relais répond alors 400). Son `atMs` ne vieillit pas quand
+ * l'image manque : la page cache une frame trop ancienne au lieu de la faire
+ * passer pour du direct.
+ */
+function photoOf(photo, now) {
+  if (photo === undefined || photo === null) return null;
+  if (typeof photo !== 'object' || typeof photo.jpeg !== 'string') return false;
+  const jpeg = photo.jpeg.trim();
+  if (!jpeg || jpeg.length > MAX_PHOTO || !/^[A-Za-z0-9+/]+={0,2}$/.test(jpeg)) return false;
+  return {
+    jpeg,
+    atMs: num(photo.atMs, 0, 9e15) ? photo.atMs : now,
+  };
+}
+
+/**
+ * Trajet guidé : `{destination, totalM, remainingM, remainingS, progress}`.
+ * `null` = aucun guidage en cours, `false` = trajet illisible (400).
+ */
+function tripOf(trip) {
+  if (trip === undefined || trip === null) return null;
+  if (typeof trip !== 'object') return false;
+  const destination = typeof trip.destination === 'string' ? trip.destination.trim() : '';
+  if (!destination) return false;
+  if (!num(trip.totalM, 0, 5e6) || !num(trip.remainingM, 0, 5e6)) return false;
+  if (!num(trip.remainingS, 0, 1e6)) return false;
+  if (!num(trip.progress, 0, 1)) return false;
+  return {
+    destination: destination.slice(0, MAX_DESTINATION),
+    totalM: trip.totalM,
+    remainingM: trip.remainingM,
+    remainingS: trip.remainingS,
+    progress: trip.progress,
   };
 }
 
@@ -69,11 +114,16 @@ export function readShare(body, globalKey = '') {
   const objects = objectsOf(body.objects);
   if (objects === null) return fail(400, 'objet invalide');
   const scene = sceneOf(body.scene);
+  const photo = photoOf(body.photo, Date.now());
+  if (photo === false) return fail(400, 'photo invalide');
+  const trip = tripOf(body.trip);
+  if (trip === false) return fail(400, 'trip invalide');
   return {
     ok: true,
     id: body.shareId,
     key,
-    doc: (now) => ({ fix: fixOf(f, now), objects, scene }),
+    photo,
+    doc: (now) => ({ fix: fixOf(f, now), objects, scene, photo, trip }),
   };
 }
 
@@ -93,6 +143,8 @@ export function stateOf(row, now) {
     fix: row.fix,
     objects: row.objects || [],
     scene: row.scene || null,
+    photo: row.photo || null,
+    trip: row.trip || null,
     serverAt,
   };
 }
