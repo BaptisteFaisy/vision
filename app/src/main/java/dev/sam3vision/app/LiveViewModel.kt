@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sam3vision.app.isee.pictosDir
 import dev.sam3vision.app.live.LiveAskSession
 import dev.sam3vision.app.live.LiveFrameDispatcher
 import dev.sam3vision.app.live.LiveFpsMeter
@@ -152,7 +153,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         llm = { llmClient(it) },
         windowMs = MEMORY_WINDOW_MS,
         restart = { restart(it) },
-        pictoDir = { app.filesDir },
+        pictoDir = { pictosDir(app.filesDir) },
         pictoSpeak = { current, phrase -> voice.say(current, phrase) },
     )
 
