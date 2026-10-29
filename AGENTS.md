@@ -17,7 +17,7 @@ unique du 26/10.
 - `README.md` — fonctionnalités réelles, transport du direct, endpoints, sécurité (clé debug).
 - `NOTES.md` — versions épinglées et décisions techniques.
 - `docs/ARCHITECTURE.md` + `docs/PERF.md` — état du produit et chiffres tenus.
-- `docs/CI-QUEUE.md` — CI, budget 5 min par job, gardes `couche0` / `stale-base-guard`, contrat `## Scope`.
+- `docs/CI-QUEUE.md` — CI, budget 5 min par job, garde `couche0`, contrat `## Scope`.
 - `docs/NETTOYAGE.md` — purge horaire (Room + WorkManager).
 - `docs/META-ASR.md` — contrat dictée Meta Muse (facturation 402, pièges).
 - `docs/META-IMAGE.md` — contrat pictogrammes Meta Muse Image (même clé, `/images/edits`).

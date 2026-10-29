@@ -142,5 +142,36 @@ class ForbiddenTest(unittest.TestCase):
         self.assertEqual(erreurs, [])
 
 
+class SuggestionScopeTest(unittest.TestCase):
+    """Le refus rend un bloc `## Scope` copiable (même règle, moins d'attente)."""
+
+    def test_trois_fichiers_meme_dossier_devinent_un_glob(self):
+        fichiers = [fichier("app/res/raw/vp_%d.mp3" % i) for i in range(38)]
+        self.assertEqual(check_couche0.suggerer_scope(fichiers),
+                         ["app/res/raw/*.mp3"])
+
+    def test_deux_fichiers_restent_nommes(self):
+        fichiers = [fichier("app/a.kt"), fichier("app/b.kt")]
+        self.assertEqual(sorted(check_couche0.suggerer_scope(fichiers)),
+                         ["app/a.kt", "app/b.kt"])
+
+    def test_exemptes_absents_de_la_suggestion(self):
+        fichiers = [fichier("app/build/x.class"), fichier("app/a.kt")]
+        self.assertEqual(check_couche0.suggerer_scope(fichiers), ["app/a.kt"])
+
+    def test_bloc_scope_collable(self):
+        bloc = check_couche0.bloc_scope([fichier("core/net/Http.kt")])
+        self.assertTrue(bloc.startswith("## Scope"))
+        self.assertIn("- `core/net/Http.kt`", bloc)
+        # Le garde doit accepter ce qu'il vient de suggérer.
+        self.assertEqual(check_couche0.parse_scope(bloc), ["core/net/Http.kt"])
+
+    def test_le_bloc_suggere_satisfait_le_controle(self):
+        fichiers = [fichier("app/res/raw/vp_%d.mp3" % i) for i in range(5)]
+        erreurs = []
+        check_couche0.check_scope(fichiers, check_couche0.bloc_scope(fichiers), erreurs)
+        self.assertEqual(erreurs, [])
+
+
 if __name__ == "__main__":
     unittest.main()

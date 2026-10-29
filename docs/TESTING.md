@@ -71,7 +71,7 @@ python3 -m unittest tools/test_check_apk_keys.py tools/test_export_caregiver_orb
 python3 .github/fireworks/test_conflict_agent.py  # 16 tests (agent de conflits)
 python3 .github/couche0/test_check_couche0.py     # 19 tests (garde de périmètre)
 python3 .github/ci-budget/test_check_timeouts.py  # 11 tests (garde budget)
-python3 .github/ci-budget/check_timeouts.py      # 8 workflows
+python3 .github/ci-budget/check_timeouts.py      # 6 workflows
 python3 scripts/gen_mask_golden.py --check       # fixtures dorées <-> générateur
 python3 scripts/budget_latence.py --check-doc    # chiffres du budget <-> doc
 python3 tools/export-caregiver-orb.py --check    # shader suivi <-> .mjs versionné
