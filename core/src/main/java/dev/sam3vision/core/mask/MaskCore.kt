@@ -18,7 +18,6 @@ data class GrayMask(val width: Int, val height: Int, val pixels: ByteArray) {
     fun isObject(x: Int, y: Int): Boolean = levelAt(x, y) >= 128
 }
 
-private const val PNG_SIGNATURE_SIZE = 8
 private const val IHDR_OFFSET = 12
 
 /**
