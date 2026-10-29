@@ -18,22 +18,22 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
    « aller à X »… (9 motifs, voir `docs/NAVIGATION.md` § Déclenchement
    vocal). Transcription Meta, repli ElevenLabs Scribe.
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
-   propose un champ de saisie clavier — la saisie vaut une dictée : le
-   guidage démarre aussitôt, sans redicter.
+   propose un champ de saisie clavier — la saisie vaut une dictée : elle
+   ouvre la confirmation, sans redicter.
 4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
 
 ## 2. Voir (les écrans)
 
-- **Aucun écran Destination sur le chemin vocal** : le guidage démarre
-  dès la dictée (`autoStartOnVoice`), sans bouton. L'écran de confirmation
-  ci-dessous ne subsiste qu'en mode historique (`autoStartOnVoice =
-  false`), pour les tests et un éventuel retour arrière.
-- **Destination** (mode confirmation seulement) : adresse géocodée + résumé
-  (distance · durée), boutons « Démarrer » / « Annuler », lien « Dicter une
-  autre destination ». Sans position GPS ou sans URL Valhalla : adresse
-  seule (distance et durée à zéro). Si l'itinéraire échoue : adresse +
-  motif en rouge, et « Démarrer » bascule sur Google Maps, **à pied**.
+- **Destination** (toujours, depuis le 29/10) : la dictée n'ouvre que
+  cet écran — adresse géocodée + résumé (distance · durée), boutons
+  « Démarrer » / « Annuler », lien « Dicter une autre destination ».
+  Le départ direct sans bouton (`autoStartOnVoice`) est abandonné : trop de
+  guidages partaient sur une question ou une dictée malentendue
+  (« comment aller à… ? » devenait un ordre). Sans position GPS ou sans URL
+  Valhalla : adresse seule (distance et durée à zéro). Si l'itinéraire
+  échoue : adresse + motif en rouge, et « Démarrer » bascule sur Google
+  Maps, **à pied**.
 - **Guidage** : prochaine instruction (« Tournez à gauche dans 50 mètres »),
   distances restantes, bouton « Arrêter », dictée « arrête le guidage ».
   Le guidage est **piéton** : ni voiture, ni transport, ni carte.

@@ -66,17 +66,20 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 
 ## Navigation vocale in-app (Valhalla)
 
-Depuis le 28/10, `app/.../voicenav/` démarre le guidage **dès la dictée** :
-dictée → `VoiceNavSession.onVoiceTranscript` → moteur Valhalla ; aucun bouton
-« Démarrer ». Si le moteur ne peut pas démarrer (adresse, GPS, réseau,
-itinéraire), repli Google Maps **piéton** (`TravelMode.WALK`) et retour au
-repos : iSee n'affiche pas d'écran de guidage qu'il ne conduit pas.
+Depuis le 29/10, `app/.../voicenav/` n'ouvre que la confirmation :
+dictée → `VoiceNavSession.onVoiceTranscript` → écran `DestinationConfirmScreen`
+(« Destination : X » + résumé + « Démarrer » / « Annuler ») ; le moteur
+Valhalla ne démarre qu'au bouton « Démarrer ». Le départ direct sans bouton
+(`autoStartOnVoice = true`, du 28/10) est abandonné : une question ou une
+dictée malentendue devenait un guidage, sans recours autre que l'ordre stop.
+Si le moteur ne peut pas démarrer (adresse, GPS, réseau, itinéraire), repli
+Google Maps **piéton** (`TravelMode.WALK`) et retour au repos : iSee n'affiche
+pas d'écran de guidage qu'il ne conduit pas.
 
-L'écran de confirmation (`DestinationConfirmScreen`) est l'API par défaut
-(`autoStartOnVoice = false`) : adresse + résumé, bouton « Démarrer ».
-`IseeVoiceNav` passe `true` — c'est le seul chemin produit qui démarre sans
-bouton, et il conserve l'accès à l'écran de confirmation pour les appelants
-historiques (écran `VoiceNavRoute`, tests).
+L'écran de confirmation est l'API par défaut (`autoStartOnVoice = false`) :
+adresse + résumé, bouton « Démarrer ». `IseeVoiceNav` garde ce défaut — plus
+aucun chemin produit ne démarre sans bouton ; `autoStartOnVoice = true`
+subsiste pour les tests de session (`VoiceNavSessionTest`).
 
 Deux voix se partagent une session : les consignes du moteur (virages,
 écart, arrivée) passent par `SystemTtsEngine` — le TTS Android, français,

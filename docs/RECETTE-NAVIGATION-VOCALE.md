@@ -11,6 +11,10 @@ d'ici, aucune commande `adb` n'a été lancée. Ce qui suit décrit ce que le
 > Google Maps**, utilisé quand le moteur ne peut pas démarrer (URL absente,
 > hors Île-de-France, GPS ou réseau indisponible). Le chemin in-app est décrit
 > dans `docs/NAVIGATION.md`.
+>
+> **Mise à jour 29/10** : le départ direct sans bouton est abandonné —
+> la dictée in-app n'ouvre que l'écran de confirmation (« Destination : X »,
+> bouton « Démarrer »). Le repli Maps décrit ici est inchangé.
 
 Le script `scripts/verify-voice-nav.sh` déroule cette fiche en une prise :
 l'intégrateur parle (phrases § Recette, recopiées à l'identique), le script

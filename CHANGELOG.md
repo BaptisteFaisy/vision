@@ -3,7 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-29 — direct : portes et barrières reconnues en extérieur (ordre user)
+## 2026-10-29 — voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
+
+### Voix — fin du guidage surprise, confirmation obligatoire
+
+- **Cause** : `IseeVoiceNav` passait `autoStartOnVoice = true` — toute dictée
+  ressemblant à une destination (y compris une question « comment aller
+  à… ? », motif `aller à X`) démarrait le guidage Valhalla sans écran ni
+  bouton, puis la voix répétait les consignes à chaque fix GPS.
+- La dictée n'ouvre plus que `DestinationConfirmScreen` (« Destination : X »
+  + résumé + « Démarrer » / « Annuler ») : aucun guidage sans objectif
+  explicite. `autoStartOnVoice = true` subsiste pour les tests de session.
+- Fichiers : `IseeVoiceNav.kt` (retrait du forçage), `docs/NAVIGATION.md`,
+  `docs/GPS_GUIDE_UTILISATEUR.md`, `docs/RECETTE-NAVIGATION-VOCALE.md`.
+- Preuves : `VoiceNavSessionTest` + `VoiceNavSessionWiringTest` (chemin
+  confirmation déjà verrouillé) verts en CI ; aucun test modifié.
+
+### Direct — portes et barrières reconnues en extérieur (ordre user)
 
 - `LivePrompts.default` : 10 → 12 concepts (`door`, `barrier` en plus, en fin
   de liste) ; `MAX = 16` et `PROMPT_LIMIT = 16` inchangés (12 < 16, soit
