@@ -223,10 +223,11 @@ private fun RecordingChip() {
 
 /**
  * Bouton du mode Traversée : pastille d'état (grise = coupé ou doute, rouge,
- * verte) et libellé. Posé en bas de carte, à côté du REC.
+ * verte) et libellé. Ex-posé en bas de l'ancienne carte, aujourd'hui en haut
+ * de la rue Portrait (le bas-centre est pris par le debug et le verdict).
  */
 @Composable
-private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
+internal fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
     // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
     val offering = probe.crossingOffer && !probe.crossingActive
     val dot = if (offering) Color(CROSSING_ACCENT_DOUBT) else Color(crossingAccent(probe.crossingActive, probe.crossing))
