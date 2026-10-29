@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee.vm
 
+import android.graphics.RectF
 import dev.sam3vision.app.isee.IseeCameraActions
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.app.isee.PictoStore
@@ -152,6 +153,17 @@ class IseePictoTest {
         picto(calls)(this).onFrame("frame-1")
         advanceUntilIdle()
         assertTrue(calls.isEmpty())
+    }
+
+    @Test
+    fun `chipZone publie la zone tactile du chip`() = runTest {
+        val coordinator = picto()(this)
+        assertNull(coordinator.chipZone())
+        val zone = RectF(1f, 2f, 3f, 4f)
+        coordinator.setChipBounds(zone)
+        assertEquals(zone, coordinator.chipZone())
+        coordinator.setChipBounds(null)
+        assertNull(coordinator.chipZone())
     }
 
     private fun tempDir(prefix: String): File =
