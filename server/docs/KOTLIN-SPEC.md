@@ -49,19 +49,21 @@ interface SamClient {                                             // endpoint SA
 }
 
 package dev.sam3vision.core.mask
-fun decodeMaskPng(maskPngB64: String): Bitmap?                    // gris 8 bits → Bitmap
+fun decodeMaskAny(maskB64: String, encoding: String = MASK_ENCODING_PNG): GrayMask?
+                                                              // PNG ou bits → masque gris
 fun colorizeMask(src: Bitmap, argb: Int, alpha: Int): Bitmap       // overlay coloré
 
 package dev.sam3vision.core.settings
 data class Settings(
     val llmBaseUrl: String, val llmApiKey: String, val llmModel: String,
-    val samBaseUrl: String,                                        // vide = segmentation désactivée
+    val samBaseUrl: String,                                        // vide = preset de région
 )
 interface SettingsStore { suspend fun load(): Settings; suspend fun save(s: Settings) }
 ```
 
-Valeurs par défaut : `llmBaseUrl = https://api.inferhub.dev/v1`, `llmModel = ali/qwen3.8-omni-flash`
-(modèle vision déjà utilisé sur cette machine), `llmApiKey = ""`, `samBaseUrl = ""`.
+Valeurs par défaut (`Settings.kt`) : `llmBaseUrl = https://inference.baseten.co/v1`,
+`llmModel = meta-models/muse-spark-open-1026`, `llmApiKey = ""`, `samBaseUrl = ""`
+(vide = preset de région `SamRegion`, jamais de segmentation désactivée).
 
 ## Contrat HTTP SAM (inchangé, celui de l'ancien backend Modal)
 

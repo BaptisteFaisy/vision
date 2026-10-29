@@ -23,11 +23,11 @@ import org.junit.runner.RunWith
  *
  * Lancement manuel (r630, téléphone visible par le tunnel adb) :
  * ```bash
- * ~/bin/phone take --task "depth: banc instrumenté"   # depuis le poste
+ * phone take --task "depth: banc instrumenté"   # depuis le poste
  * cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
  *   ./gradlew :app:connectedDebugAndroidTest \
  *   --tests "dev.sam3vision.app.depth.DepthBenchDeviceTest"
- * ~/bin/phone release
+ * phone release
  * ```
  * Verdicts aussi dans logcat (`DEVICE backend=DA2 medianMs=…`).
  */

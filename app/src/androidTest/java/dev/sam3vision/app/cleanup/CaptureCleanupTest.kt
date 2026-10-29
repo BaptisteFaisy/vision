@@ -38,17 +38,13 @@ import org.junit.runner.RunWith
  * **Aucun workflow ne les exécute** : la CI ne lance que `:core:` et `:app:`
  * `testDebugUnitTest`. Vert ici = vert sur *cet* appareil, jamais « vert en CI ».
  *
- * Lancement manuel (émulateur ou téléphone branché) :
+ * Lancement manuel (téléphone réel, jamais d'émulateur — flotte arrêtée) :
  * ```bash
- * EMULATOR_SERIAL=emulator-5554 bash scripts/install-emulator.sh   # appareil en ligne
- * ANDROID_SERIAL=$EMULATOR_SERIAL ./gradlew :app:connectedDebugAndroidTest --offline
- * # ou, après `:app:assembleDebug :app:assembleDebugAndroidTest` :
- * adb -s $EMULATOR_SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
- * adb -s $EMULATOR_SERIAL install -r \
- *   app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
- * adb -s $EMULATOR_SERIAL shell am instrument -w \
- *   -e class dev.sam3vision.app.cleanup.CaptureCleanupTest \
- *   dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
+ * phone take --task "cleanup: tests instrumentés"   # depuis le poste
+ * cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
+ *   ./gradlew :app:connectedDebugAndroidTest \
+ *   --tests "dev.sam3vision.app.cleanup.CaptureCleanupTest"
+ * phone release
  * ```
  *
  * La variante **systématique** de la passe (store factice, suppression qui échoue, absence de

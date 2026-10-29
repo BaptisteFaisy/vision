@@ -55,12 +55,12 @@ dans un écran démo (Réglages → « Segment demo » ou
 ## Recette téléphone
 
 ```bash
-~/bin/phone take --task "twinlite: démo + mesure" --ttl 20m   # depuis le poste
+phone take --task "twinlite: démo + mesure"   # depuis le poste
 ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac install -r -d builds/sam-wt-litert-twinlite/app/build/outputs/apk/debug/app-debug.apk'
 ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac shell am start -n dev.sam3vision.app/.MainActivity --es route segment'
 # tenir en paysage ~30 s face à une route, puis :
 ssh baptiste@100.124.18.48 '/home/baptiste/bin/phone-adb -s 2c6852ac logcat -d' | grep 'twinlite:'
-~/bin/phone release
+phone release
 ```
 
 (`-d` : la build tarball a `versionCode = 1`, inférieur à la build git
