@@ -21,6 +21,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `Guidance.kt`, `PositionText.kt`, `FrameRoster.kt`,
   `ProximityVoice.kt`, `ProbeWiring.kt`, `LiveProbe.kt`, `LiveProbeState.kt`,
   `Settings.kt` (+5 tests).
+## 2026-10-29 — Trottoir annoncé à 3 m ou moins (ordre user)
+
+- 1 m = une seconde pour réagir à pied : `CURB_METERS` 1 → 3 m. La bande
+  basse suit (0,6 → 0,45) : à 3 m le bord tombe en bande moyenne selon le
+  tangage du téléphone — sans ça la distance seule ne servait à rien.
+- Inchange : plan sous les pieds ignoré, montée/descente par géométrie,
+  labels de bord prioritaires, cooldown 10 s, phrase urgente.
+- Preuves : `:core` `testDebugUnitTest` vert sur r630 (`CurbWatcherTest`
+  18/18 dont 2 nouveaux : 2 m détecté, bord à 3 m en bande moyenne ;
+  rouge-avant vérifié), `:core` + `:app` verts, `assembleDebug` vert,
+  `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 2 à jour.
+- Fichiers : `CurbWatcher.kt` (+ test), `VOIX-DANGER.md`.
 
 ## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
 

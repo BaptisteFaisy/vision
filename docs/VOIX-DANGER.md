@@ -37,8 +37,11 @@ Les classes rue demandées (humains, voitures, vélos, trottinettes
 ## 2. Trottoir et dénivelés — « levez la jambe » (livré le 28/10/2026)
 
 **Règle** : un bord de trottoir (ou une marche, une différence de terrain)
-détecté **dans le couloir marché à 1 m ou moins** déclenche une annonce
-**urgente** :
+détecté **dans le couloir marché à 3 m ou moins** déclenche une annonce
+**urgente** (1 m le 28/10 → 3 m le 29/10, ordre user : 1 m = une seconde
+pour réagir à pied). La bande basse suit (0,45) : à 3 m le bord tombe en
+bande moyenne selon le tangage. Marcher *sur* le trottoir n'alerte plus
+(plan vs bord, voir ci-dessous).
 
 - FR : `Trottoir, levez la jambe.`
 - EN : `Curb, lift your foot.`
@@ -59,11 +62,19 @@ consécutives (un positif isolé ne parle pas), long cooldown (un trottoir ne
 bouge pas), `urgent = true` (coupe la phrase en cours, comme le couloir
 bouché).
 
-**Non tranché, à valider sur téléphone (non mesuré)** : le seuil (1 m ?
-1,5 m ?), les labels SAM réels (`curb` ? `step` ? — `sidewalk` seul ne dit
-pas le bord), montée vs descente (deux phrases ?), fiabilité de la profondeur
-à moins d'1 m, et l'extension aux autres différences de terrain (pente,
-rampe, gravier — détection **non définie** à ce stade).
+**Non tranché, à valider sur téléphone (non mesuré)** : les labels SAM réels
+(`curb` ? `step` ? — `sidewalk` seul ne dit pas le bord), montée vs descente
+(deux phrases ? — la géométrie les distingue, une seule phrase), fiabilité
+de la profondeur à moins d'1 m, et l'extension aux autres différences de
+terrain (pente, rampe, gravier — détection **non définie** à ce stade).
+Tranché le 29/10 : seuil 3 m (ordre user), plan sous les pieds ignoré
+(montee/descente par géométrie de boîte, seuils 0,95/0,5 priors).
+
+**Plan vs bord (29/10)** : pour les labels de plan (`sidewalk`…) — montée
+= bas de boîte décollé des pieds (< 0,95), descente = bas aux pieds mais
+haut borné (≥ 0,5), sinon sol ignoré ; labels de bord (`curb`…) : règle
+inchangée (`CurbSignal.nearEdge`, `core/.../curb/CurbWatcher.kt`). Seuils
+priors à valider dehors : en cas de doute ça parle, jamais l'inverse.
 
 ## 3. Décalage latéral chiffré en mètres (livré le 28/10/2026 — REMPLACÉ par le § 5 le 29/10, gardé pour mémoire)
 
