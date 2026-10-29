@@ -8,8 +8,13 @@ import kotlinx.coroutines.sync.Semaphore
 /**
  * Pipeline multi-frames du direct : contrairement à [LiveSession] (une seule frame en vol),
  * il laisse [maxParallel] requêtes partir en parallèle et n'affiche que la **plus récente**
- * des réponses reçues. C'est ce qui débride la cadence : le téléphone n'attend plus le
- * round-trip complet avant d'envoyer la frame suivante, le GPU enchaîne.
+ * des réponses reçues.
+ *
+ * **Non branché** (aucun appelant prod, voulu) : mesuré sur le téléphone, deux frames en
+ * vol ne gagnent aucun débit — le backend sérialise sur un verrou GPU et la latence par
+ * frame double (417 ms contre 185 ms, voir [Cadence.Fast]). [LiveSession] (un créneau,
+ * sans plancher artificiel) est donc l'optimum mesuré des deux chemins live. Le jour où
+ * le serveur pipelinera vraiment, ce pipeline redeviendra le chemin.
  *
  * `/live` est sans état : l'ordre des réponses n'a donc aucun sens métier, seule la
  * fraîcheur du résultat compte. D'où deux règles, et elles suffisent :
@@ -20,11 +25,11 @@ import kotlinx.coroutines.sync.Semaphore
  *   compté (anti-rebond du rendu), donc une réponse en retard ne réécrit jamais un
  *   affichage postérieur.
  *
- * Mesuré sur A100 eu-west (relevé user, hors de cet arbre) : 1 frame en vol = 150 ms d'aller-retour,
- * 8 en vol = 300 ms pour 5,9 ips. Le multi-frames coûte +150 ms et rend 8× le débit : la
- * fenêtre vaut le coup. Le serveur, lui, sérialise ses inférences (`max_containers=1` +
- * verrou GPU) : au-delà de quelques frames en vol, on ne gagne plus de débit, on ne
- * fabrique que de la latence — d'où la borne [DEFAULT_PARALLEL].
+ * Historique (backend précédent, A100 eu-west, relevé user hors de cet arbre) : 1 frame
+ * en vol = 150 ms d'aller-retour, 8 en vol = 300 ms pour 5,9 ips. Le multi-frames coûtait
+ * +150 ms et rendait 8× le débit. Le serveur actuel sérialise ses inférences
+ * (`max_containers=1` + verrou GPU) : au-delà d'une frame en vol, on ne gagne plus de
+ * débit, on ne fabrique que de la latence — d'où [Cadence.Fast] à un créneau.
  */
 class LivePipeline(
     private val client: LiveClient,
