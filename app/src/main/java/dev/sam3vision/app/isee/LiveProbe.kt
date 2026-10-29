@@ -9,6 +9,7 @@ import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.ForegroundTracker
+import dev.sam3vision.app.GpuWake
 import dev.sam3vision.app.MASK_ALPHA
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
@@ -172,7 +173,15 @@ resetPipeline()
                 crossingActive = crossingActive,
             )
         }
-        if (clean.isNotBlank()) markWarming()
+        if (clean.isNotBlank()) {
+            markWarming()
+            fireWake(clean)
+        }
+    }
+
+    /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod). */
+    internal fun fireWake(url: String) {
+        scope.launch { GpuWake.wake(url, health = { openClient(it, COLD_TIMEOUT_SECONDS, null).health().map { h -> h.ok } }) }
     }
 
     /**
