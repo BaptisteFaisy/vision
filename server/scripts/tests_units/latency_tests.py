@@ -197,3 +197,10 @@ def test_timing(timing) -> None:
         leaked = True
     check("timing: Stage ne masque pas l'exception et mesure quand même",
           leaked and "detr_ms" in timers, str(timers))
+    line = timing.format_boot_cpu("import_torch", 1200.5, 1200.5)
+    check("timing: boot_cpu format exact",
+          line == "boot_cpu: stage=import_torch ms=1200.5 total_ms=1200.5", line)
+    check("timing: boot_cpu préfixe constant",
+          timing.format_boot_cpu("total", 14800.0, 14800.0).startswith(
+              timing.BOOT_CPU_PREFIX + " "),
+          timing.format_boot_cpu("total", 14800.0, 14800.0))
