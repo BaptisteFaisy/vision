@@ -4,15 +4,16 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Ordre vocal d'entrée en mode Maison : dire « maison » ou « house » ouvre
- * le direct sur les essentiels. Appelé sur le texte dicté avant le chemin
- * question → LLM (et avant la navigation) — une commande ne fait jamais
- * d'appel réseau.
+ * Ordre vocal d'entrée en mode Maison : dire « maison », « house » ou
+ * « mode maison » ouvre le direct sur les essentiels. Appelé sur le texte
+ * dicté avant le chemin question → LLM (et avant la navigation) — une
+ * commande ne fait jamais d'appel réseau.
  *
- * Seul le mot isolé compte : « va à la maison » reste une navigation,
- * « mode maison » et « je veux rentrer à la maison » partent comme avant —
- * le mode ne vole ni destination ni phrase. Tolérant : casse, accents et
- * ponctuation neutralisés par [KnownSizes.canonical]. Pur et testé en JVM.
+ * Le mot isolé ou le duo « mode » + « maison » comptent : « va à la maison »
+ * reste une navigation, « je veux rentrer à la maison » part comme avant —
+ * le mode ne vole ni destination ni phrase (aucune forme de navigation ne
+ * contient « mode »). Tolérant : casse, accents et ponctuation neutralisés
+ * par [KnownSizes.canonical]. Pur et testé en JVM.
  */
 object MaisonEnterCommand {
 
@@ -22,7 +23,8 @@ object MaisonEnterCommand {
     /** Vrai si [text] dicté ordonne d'entrer en mode Maison. */
     fun isEnterOrder(text: String): Boolean {
         val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        return words.size == 1 && ENTER_WORDS.contains(words[0])
+        if (words.size == 1 && ENTER_WORDS.contains(words[0])) return true
+        return words.contains("mode") && words.contains("maison")
     }
 }
 
