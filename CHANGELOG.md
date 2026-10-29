@@ -107,6 +107,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Docs : `NAVIGATION-VOCALE.md` §1 bis, `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
 - Recette téléphone (carte + vrai GPS) après merge.
 
+## 2026-10-29 — Démarrage : le favicon s'affiche sur fond blanc (ordre user)
+
+- **Demande** : à l'ouverture, l'écran de démarrage (favicon centré) doit être sur
+  fond blanc, pas noir.
+- `window_background` passe de `#FF0B0D12` à `#FFFFFFFF` : c'est la couleur de
+  fenêtre que le splash Android utilise derrière l'icône, avant la première frame
+  Compose. L'accueil Portrait iSee étant blanc, l'ouverture ne change plus de
+  couleur entre l'icône et l'accueil.
+- `AppColors.background` n'est pas touché : les écrans Compose sombres (Chat,
+  Direct) gardent leur fond.
+- Preuves : `:app:processDebugResources --offline` BUILD SUCCESSFUL (ressources
+  et manifeste compilés, 52 s). Rendu sur téléphone non vérifié ici : aucun APK
+  de ce commit n'a été construit ni installé.
+- Fichiers : `app/src/main/res/values/colors.xml`, `themes.xml`.
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
 - **Demande** : devant un obstacle, même au contact, iSee dit où passer
