@@ -83,7 +83,9 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
    sur 235 lampes FR (Panoramax, jour) — couleur 97,9 %, 0 vert sur
    90 rouges ; porte recalibrée (fraction 0,004, élancement 1,5,
    bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. Reste :
-   nuit/pluie, poses larges, corpus téléphone + seuil bloquant faux verts.
+   poses larges, corpus téléphone + seuil bloquant faux verts.
+   **Nuit et pluie sortis du périmètre le 29/10** (décision produit, voir
+   `docs/CALIBRAGE-FEU.md` §9) : le mode ne traite que le jour.
 2. **Terrain** : aucun test téléphone — crop réel, voix sur appareil, veto
    avec vraies distances, à valider sur build du HEAD.
 3. **Anti-confusion feu voiture / feu piéton** : porte recalibrée sur

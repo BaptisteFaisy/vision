@@ -239,8 +239,9 @@ l'attribution et le partage à l'identique des dérivés.
   d'essai, c'est un déballage. Le 1/6 dit « la preuve demandée au §6.3 est négative », pas
   « la porte est cassée sur le terrain » : le cadrage réel de production (crop JPEG, décodeur
   Android) n'a pas été reproduit à l'octet près.
-- Aucune condition **nocturne**, de **pluie** ni de contre-jour — les cas qui cassent
-  réellement un classifieur de couleur.
+- **Portée : de jour uniquement** (décision du 29/10, voir `docs/CALIBRAGE-FEU.md` §9).
+  La nuit sort du périmètre ; le contre-jour, non — un feu à contre-jour de jour est
+  aussi sombre qu'un feu de nuit.
 - `TAU` et le plancher d'allumage du paquet de mesure n'ont **pas** été recalibrés sur les
   **9** crops `feuxfr/` versionnés ici (le corpus de 235 lampes qui a servi à calibrer
   `PedLightGate` n'est pas dans cet arbre : seuls 9 crops extraits le sont).
