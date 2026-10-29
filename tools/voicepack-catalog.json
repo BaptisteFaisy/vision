@@ -16,6 +16,10 @@
     {"id": "nav_right", "fr": "Tournez à droite.", "en": "Turn right.", "parts": ["Tournez à", "droite", "Turn", "right"]},
     {"id": "nav_cancelled", "en": "Cancelled."},
     {"id": "nav_loading", "en": "Your route is still loading, one moment."},
-    {"id": "nav_crossing_done", "fr": "Traversée terminée."}
+    {"id": "nav_crossing_done", "fr": "Traversée terminée."},
+    {"id": "guide_straight", "fr": "Tout droit.", "en": "Straight."},
+    {"id": "guide_left", "fr": "Gauche.", "en": "Left."},
+    {"id": "guide_right", "fr": "Droite.", "en": "Right."},
+    {"id": "guide_stop", "fr": "Stop.", "en": "Stop."}
   ]
 }

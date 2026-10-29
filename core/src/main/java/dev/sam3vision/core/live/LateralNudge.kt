@@ -1,35 +1,16 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.distance.KnownSizes
-import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Consigne de décalage latéral : une personne proche qui s'approche par un
- * côté conseille de se décaler de l'autre ([side], direction où aller).
+ * côté conseille de se décaler de l'autre ([side], direction où aller). Le
+ * mot parlé est celui du côté ([GuidanceWord]), comme tout le guidage.
  */
 data class LateralNudge(
     val side: SteeringCap,
     val meters: Float,
-) {
-    companion object {
-        /**
-         * Signature anti-répétition : reparle quand le seau de distance
-         * change (miroir [Guidance.key]), pas à chaque frame.
-         */
-        fun key(nudge: LateralNudge): String =
-            "n|${nudge.side.name.lowercase()}|${PositionText.sceneBucket(nudge.meters)}"
-    }
-}
-
-/** Mise en mots du décalage, FR/EN comme le guidage. */
-object LateralNudgeText {
-
-    fun phrase(side: SteeringCap, language: SpeechLanguage = SpeechLanguage.Fr): String =
-        when (language) {
-            SpeechLanguage.En -> if (side == SteeringCap.Left) "Move left." else "Move right."
-            else -> if (side == SteeringCap.Left) "Décalez-vous à gauche." else "Décalez-vous à droite."
-        }
-}
+)
 
 /**
  * Suit les personnes par côté avant (gauche/droite du couloir marché) : une

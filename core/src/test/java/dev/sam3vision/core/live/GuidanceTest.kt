@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Guidage « tout droit » : couloir central, côté de sortie, phrases FR/EN, signature. */
+/** Guidage « tout droit » : couloir central, côté de sortie, quatre mots FR/EN, signature. */
 class GuidanceTest {
 
     private fun placed(label: String, x: Float, meters: Float? = null) =
@@ -19,8 +19,8 @@ class GuidanceTest {
         val decision = Guidance.decide(emptyList())
 
         assertFalse(decision.blocked)
-        assertEquals("Continue.", Guidance.phrase(decision))
-        assertEquals("Continue.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Tout droit.", Guidance.phrase(decision))
+        assertEquals("Straight.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
@@ -41,16 +41,16 @@ class GuidanceTest {
 
         assertTrue(decision.blocked)
         assertEquals(GuidanceSide.Right, decision.side)
-        assertEquals("Va à droite, 2 mètres.", Guidance.phrase(decision))
+        assertEquals("Droite.", Guidance.phrase(decision))
     }
 
     @Test
-    fun `distance inconnue bloque par prudence sans chiffre`() {
+    fun `distance inconnue bloque par prudence`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Va à gauche.", Guidance.phrase(decision))
-        assertEquals("Go left.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Gauche.", Guidance.phrase(decision))
+        assertEquals("Left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
@@ -61,28 +61,29 @@ class GuidanceTest {
     }
 
     @Test
-    fun `phrase anglaise avec distance`() {
+    fun `mot anglais du cote de sortie`() {
         val decision = Guidance.decide(listOf(placed("person", 0.5f, 2f)))
 
-        assertEquals("Go left, 2 meters.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
     @Test
-    fun `obstacle tres proche contourne en centimetres`() {
+    fun `contact mesure dit stop`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f, 0.4f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Va à gauche, 40 centimètres.", Guidance.phrase(decision))
-        assertEquals("Go left, 40 centimeters.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("Stop.", Guidance.phrase(decision))
+        assertEquals("Stop.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("w|stop", Guidance.key(decision))
     }
 
     @Test
-    fun `dans le meme seau, pas de reannonce`() {
-        val pres = Guidance.decide(listOf(placed("personne", 0.5f, 0.65f)))
-        val tresPres = Guidance.decide(listOf(placed("personne", 0.5f, 0.55f)))
+    fun `deux obstacles differents, meme mot, pas de reannonce`() {
+        val pres = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
+        val loin = Guidance.decide(listOf(placed("personne", 0.5f, 3.4f)))
 
-        assertEquals(Guidance.key(pres), Guidance.key(tresPres))
-        assertEquals("b|personne|Left|1|12h", Guidance.key(tresPres))
+        assertEquals(Guidance.key(pres), Guidance.key(loin))
+        assertEquals("w|left", Guidance.key(loin))
     }
 
     @Test
@@ -103,49 +104,45 @@ class GuidanceTest {
 
     @Test
     fun `signature libre et signature obstacle`() {
-        assertEquals("free", Guidance.key(Guidance.decide(emptyList())))
+        assertEquals("w|straight", Guidance.key(Guidance.decide(emptyList())))
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
 
-        assertEquals("b|personne|Left|2|12h", Guidance.key(bloque))
+        assertEquals("w|left", Guidance.key(bloque))
     }
 
     @Test
-    fun `la signature bouge au metre pres comme les positions`() {
-        val deux = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
-        val trois = Guidance.decide(listOf(placed("personne", 0.5f, 3.4f)))
-        val deuxBis = Guidance.decide(listOf(placed("personne", 0.5f, 2.1f)))
+    fun `un mot different fait reparler`() {
+        val libre = Guidance.decide(emptyList())
+        val bloque = Guidance.decide(listOf(placed("personne", 0.5f, 2.4f)))
 
-        assertNotEquals(Guidance.key(deux), Guidance.key(trois))
-        assertEquals(Guidance.key(deux), Guidance.key(deuxBis))
+        assertNotEquals(Guidance.key(libre), Guidance.key(bloque))
     }
 
     @Test
-    fun `la signature bouge a l heure pres dans le couloir`() {
+    fun `le cote de sortie donne le mot`() {
         val onze = Guidance.decide(listOf(placed("personne", 0.36f, 2f)))
-        val midi = Guidance.decide(listOf(placed("personne", 0.44f, 2f)))
 
-        assertEquals("b|personne|Right|2|11h", Guidance.key(onze))
-        assertEquals("b|personne|Right|2|12h", Guidance.key(midi))
-        assertEquals("Va à droite, 2 mètres.", Guidance.phrase(onze))
+        assertEquals("w|right", Guidance.key(onze))
+        assertEquals("Droite.", Guidance.phrase(onze))
     }
 
     @Test
-    fun `decalage nul sans distance, signature point d interrogation`() {
+    fun `decalage nul sans distance`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
         assertNull(decision.shiftMeters)
-        assertEquals("b|personne|Left|?|12h", Guidance.key(decision))
+        assertEquals("w|left", Guidance.key(decision))
     }
 
     @Test
-    fun `decalage grandit avec la distance et fait reparler`() {
+    fun `le decalage ne fait plus reparler`() {
         val pres = Guidance.decide(listOf(placed("personne", 0.5f, 2f)))
         val loin = Guidance.decide(listOf(placed("personne", 0.5f, 3.4f)))
 
         assertEquals(1f, pres.shiftMeters!!, 0.001f)
         assertEquals(1.5f, loin.shiftMeters!!, 0.001f)
-        assertNotEquals(Guidance.key(pres), Guidance.key(loin))
+        assertEquals(Guidance.key(pres), Guidance.key(loin))
     }
 
     @Test
@@ -160,13 +157,14 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("curb", 0.5f)))
 
         assertTrue(decision.blocked)
+        assertEquals("Gauche.", Guidance.phrase(decision))
     }
 
     @Test
-    fun `peinture au sol bloque sans chiffre`() {
+    fun `peinture au sol bloque`() {
         val decision = Guidance.decide(listOf(placed("crosswalk", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Va à gauche.", Guidance.phrase(decision))
+        assertEquals("Gauche.", Guidance.phrase(decision))
     }
 }

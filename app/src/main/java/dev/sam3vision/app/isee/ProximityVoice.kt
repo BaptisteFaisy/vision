@@ -1,8 +1,10 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
@@ -20,7 +22,9 @@ import kotlin.coroutines.coroutineContext
  * en cours et parle quand même, y compris pendant une dictée — la sécurité
  * passe avant le sous-titre (miroir de `TraverseVoice`, qui préempte la verte
  * par la rouge). [synthesize] injecte le moteur (ElevenLabs en prod, faux en
- * test — miroir `IseePlayback`).
+ * test — miroir `IseePlayback`). [clips] est le pack voix (mots du guidage) :
+ * clip local quand il existe (< 100 ms, zéro réseau), synthèse + mise en
+ * cache sinon (`null` = synthèse seule, comme avant).
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -29,6 +33,7 @@ class ProximityVoice(
     private val canPlay: () -> Boolean = { true },
     private val synthesize: suspend (apiKey: String, voiceId: String, text: String) -> Result<ByteArray> =
         { apiKey, voiceId, text -> ElevenLabsTtsClient(apiKey, voiceId).synthesize(text) },
+    private val clips: VoicePack? = null,
 ) {
 
     private var lastPhrase: String? = null
@@ -56,6 +61,41 @@ class ProximityVoice(
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
             onSpeaking(phrase)
+            player.play(bytes).onFailure { onSpeaking("") }
+        }
+    }
+
+    /**
+     * Mot du guidage (`GuidanceWord`) : clip local quand le pack l'a (< 100
+     * ms, zéro réseau), sinon synthèse réseau mise en cache pour la suite.
+     * Mêmes garde-fous que [onPhrase] (dédupliqué, clé exigée, urgent coupe).
+     */
+    suspend fun speakWord(
+        clipId: String,
+        text: String,
+        language: SpeechLanguage,
+        playerIdle: Boolean,
+        urgent: Boolean = true,
+    ) {
+        if (text == lastPhrase) return
+        lastPhrase = text
+        val current = settings()
+        if (!current.ttsConfigured) return
+        if (!urgent && !playerIdle) return
+        if (urgent) player.stop()
+        val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
+        if (file != null) {
+            coroutineContext.ensureActive()
+            onSpeaking(text)
+            player.playFile(file).onFailure { onSpeaking("") }
+            return
+        }
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text)
+            .getOrElse { return }
+        coroutineContext.ensureActive()
+        if (bytes.isNotEmpty() && (urgent || canPlay())) {
+            clips?.put(clipId, language, current.ttsVoiceId, bytes)
+            onSpeaking(text)
             player.play(bytes).onFailure { onSpeaking("") }
         }
     }

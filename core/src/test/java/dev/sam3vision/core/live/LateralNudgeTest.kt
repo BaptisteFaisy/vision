@@ -1,6 +1,5 @@
 package dev.sam3vision.core.live
 
-import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -113,19 +112,5 @@ class LateralNudgeTest {
         suivi.reset()
 
         assertNull(suivi.onFrame(500L, listOf(personne(0.65f, 2.2f))))
-    }
-
-    @Test
-    fun `phrase du decalage`() {
-        val nudge = LateralNudge(SteeringCap.Left, 2.0f)
-
-        assertEquals("Décalez-vous à gauche.", LateralNudgeText.phrase(nudge.side, SpeechLanguage.Fr))
-        assertEquals("Move left.", LateralNudgeText.phrase(nudge.side, SpeechLanguage.En))
-    }
-
-    @Test
-    fun `cle au seau de distance`() {
-        assertEquals("n|left|2", LateralNudge.key(LateralNudge(SteeringCap.Left, 2.2f)))
-        assertEquals("n|right|1", LateralNudge.key(LateralNudge(SteeringCap.Right, 1.4f)))
     }
 }

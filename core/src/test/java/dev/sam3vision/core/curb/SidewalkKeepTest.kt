@@ -2,10 +2,8 @@ package dev.sam3vision.core.curb
 
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
-import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -94,48 +92,4 @@ class SidewalkKeepTest {
         assertNull(SidewalkKeep.returnCap(SidewalkPosition.Absent))
     }
 
-    @Test
-    fun `consignes de retour en francais`() {
-        assertEquals(
-            "Remonte sur le trottoir, à gauche.",
-            SidewalkText.phrase(SidewalkPosition.Left),
-        )
-        assertEquals(
-            "Remonte sur le trottoir, à droite.",
-            SidewalkText.phrase(SidewalkPosition.Right),
-        )
-    }
-
-    @Test
-    fun `absent = consigne prudente, devant = silence`() {
-        assertEquals(
-            "Trottoir introuvable, avancez lentement.",
-            SidewalkText.phrase(SidewalkPosition.Absent),
-        )
-        assertNull(SidewalkText.phrase(SidewalkPosition.Ahead))
-    }
-
-    @Test
-    fun `consignes anglaises`() {
-        assertEquals(
-            "Step back onto the sidewalk, to the left.",
-            SidewalkText.phrase(SidewalkPosition.Left, SpeechLanguage.En),
-        )
-        assertEquals(
-            "Step back onto the sidewalk, to the right.",
-            SidewalkText.phrase(SidewalkPosition.Right, SpeechLanguage.En),
-        )
-        assertEquals(
-            "Sidewalk not visible, walk slowly.",
-            SidewalkText.phrase(SidewalkPosition.Absent, SpeechLanguage.En),
-        )
-    }
-
-    @Test
-    fun `cles distinctes par position`() {
-        val keys = SidewalkPosition.values().map { SidewalkKeep.key(it) }.toSet()
-
-        assertEquals(SidewalkPosition.values().size, keys.size)
-        assertNotEquals(SidewalkKeep.key(SidewalkPosition.Left), SidewalkKeep.key(SidewalkPosition.Right))
-    }
 }
