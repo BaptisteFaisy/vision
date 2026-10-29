@@ -2,6 +2,7 @@ package dev.sam3vision.app
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import dev.sam3vision.core.model.ObjectLimits
 
 /** Palette sombre de l'app (cohérente avec l'ancienne app Expo). */
 /**
@@ -32,8 +33,10 @@ object AppColors {
 }
 
 /**
- * Couleur d'overlay par objet (rotation). Les 6 premières reprises de l'app Expo,
- * étendues pour ne pas collisionner sur les scènes chargées.
+ * Couleur d'overlay par objet : une couleur distincte par rang jusqu'au plafond
+ * ([ObjectLimits.MAX_ON_SCREEN]) pour que masques, pastilles et chemins désignent
+ * le même objet sans collision ; au-delà, rotation. Les 8 premières sont les
+ * couleurs historiques (reprises de l'app Expo), les suivantes les étendent.
  */
 val MASK_COLORS: List<Color> = listOf(
     AppColors.primary,
@@ -44,6 +47,30 @@ val MASK_COLORS: List<Color> = listOf(
     Color(0xFF35C8D4),
     Color(0xFFFF8A4C),
     Color(0xFF7EE081),
+    Color(0xFFFF4D8D),
+    Color(0xFFD946EF),
+    Color(0xFFA855F7),
+    Color(0xFF7C3AED),
+    Color(0xFF6366F1),
+    Color(0xFF2563EB),
+    Color(0xFF0284C7),
+    Color(0xFF0891B2),
+    Color(0xFF0D9488),
+    Color(0xFF059669),
+    Color(0xFF16A34A),
+    Color(0xFF65A30D),
+    Color(0xFFA3E635),
+    Color(0xFFEAB308),
+    Color(0xFFCA8A04),
+    Color(0xFFEA580C),
+    Color(0xFFDC2626),
+    Color(0xFFE11D48),
+    Color(0xFFF472B6),
+    Color(0xFFE879F9),
+    Color(0xFF818CF8),
+    Color(0xFF93C5FD),
+    Color(0xFF5EEAD4),
+    Color(0xFFBEF264),
 )
 
 /** Opacité de base des masques (0-255 pour `colorizeMask`). */

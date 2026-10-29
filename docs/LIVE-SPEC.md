@@ -209,7 +209,7 @@ Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au
 | Intervalle appliqué | `> 900 ms` → 900, `< 350 ms` → 350, sinon 500 | `LiveSession.kt:153-157` |
 | Image envoyée | côté long **512 px**, JPEG **q65** | `app/src/main/java/dev/sam3vision/app/LiveScreen.kt:50-51`, `:308`, `:331` |
 | `work_edge` | **512** (**768** côté serveur si absent) | `LiveSession.kt:211`, `server/backend/live_fast/service.py:36` |
-| `max_objects` | 8 par défaut, borné 1..12 | `LiveSession.kt:199`, `core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt:16-18` |
+| `max_objects` | 8 par défaut, borné 1..32 côté client | `LiveSession.kt:199`, `core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt:16-19` |
 | Budget de frame | 10 s (`withTimeoutOrNull`) | `WsLiveClient.kt:27`, `:156` |
 
 ### Écran caméra iSee
