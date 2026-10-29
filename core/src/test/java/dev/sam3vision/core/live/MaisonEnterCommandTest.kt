@@ -17,10 +17,17 @@ class MaisonEnterCommandTest {
     }
 
     @Test
-    fun `les phrases ne declenchent pas, navigation et llm intacts`() {
+    fun `le duo mode maison fait entrer lui aussi`() {
+        assertTrue(MaisonEnterCommand.isEnterOrder("mode maison"))
+        assertTrue(MaisonEnterCommand.isEnterOrder("le mode maison"))
+        assertTrue(MaisonEnterCommand.isEnterOrder("Active le mode maison !"))
+    }
+
+    @Test
+    fun `les autres phrases ne declenchent pas, navigation et llm intacts`() {
         assertFalse(MaisonEnterCommand.isEnterOrder("va à la maison"))
         assertFalse(MaisonEnterCommand.isEnterOrder("je veux rentrer à la maison"))
-        assertFalse(MaisonEnterCommand.isEnterOrder("mode maison"))
+        assertFalse(MaisonEnterCommand.isEnterOrder("la maison"))
         assertFalse(MaisonEnterCommand.isEnterOrder("où est la maison ?"))
         assertFalse(MaisonEnterCommand.isEnterOrder(""))
         assertFalse(MaisonEnterCommand.isEnterOrder("   "))
