@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
+
+- `TwinLiteGuide` (`core/.../segment/`) : tiers de la moitié basse du masque
+  praticable → ←/↑/→/■, seuil 0,25, STOP sous le seuil partout ; `TwinLiteText`
+  (FR/EN) ; `TwinLiteAnnouncer` sur `AnnouncementGate` (stabilité 2, délai 4 s,
+  STOP urgent).
+- `LiveSegmentMeter` (`app/.../segment/`, miroir `LiveDepthMeter`) : inférence
+  fond ~3/s, masque frais < 1 s, modèle auto-téléchargé (release
+  `segment-models-v1`, comme la profondeur) ; `TwinLiteWiring` + `TwinLiteLayer`
+  (flèche bas-centrée verte/ambre/rouge) branchés sur la caméra iSee
+  (téléphone + lunettes) ; voix système hors ligne (`TwinLiteVoice`,
+  urgent = flush) ; `IseeTwinLite` tient le ViewModel sous 500 lignes.
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630
+  (`TwinLiteGuideTest` 13/13, `TwinLiteAnnouncerTest` 12/12,
+  `TwinLiteWiringTest` 8/8), `assembleDebug` vert, `check-kotlin-limits` OK.
+- Recette téléphone : flèche + annonce dues sur master après merge.
+
 ## 2026-10-29 — profondeur : repli MiDaS supprimé, DA2 seul (ordre user)
 
 - **Cause** : deux moteurs embarqués (DA2 ONNX 174 ms, MiDaS LiteRT 275 ms
