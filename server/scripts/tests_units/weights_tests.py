@@ -202,6 +202,14 @@ def test_deploy_script(_module) -> None:
           "LIVE_APP_NAME" in script and "sam3-eu-a100" in script, "absent du script")
     check("déploiement : le contrôle exige le snapshot",
           '"snapshot": True' in script, "absent du contrôle")
+    check("déploiement : le contrôle exige restored",
+          "champ restored absent" in script, "absent du contrôle")
+    check("déploiement : le contrôle exige load_breakdown",
+          "champ load_breakdown absent" in script, "absent du contrôle")
+    check("déploiement : le contrôle acte le boot (restore vs complet)",
+          'print("boot   :"' in script, "absent du contrôle")
+    check("déploiement : 500/injoignable = retry transparent",
+          "fenêtre de mort" in script, "absent du script")
 
 
 def test_no_cudagraph_typo(_module) -> None:
