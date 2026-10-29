@@ -26,7 +26,7 @@ git add app/src/main/res/raw/vp_*.mp3 app/src/main/assets/vp_voice.txt
 
 La clé ne transite que par l'environnement (jamais affichée ni stockée).
 Voix non défaut : `--voice <id>` (le pack reste ignoré tant que `vp_voice.txt`
-ne colle pas à la voix réglée). `--force` régénère tout.
+ne colle pas à la voix réglée). `--regenerate` régénère tout.
 
 ## Garde
 
