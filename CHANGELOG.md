@@ -3,6 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — fix(seed) : modèles LLM et dictée vides réparés en dur
+
+- **Demande** : « stocke tout en dur » — constantes dans le code, champs
+  Réglages gardés en repli manuel. Les 4 bases l'étaient déjà, la voix aussi
+  (`withTtsDefaults` + Sarah→Laure) : restaient les deux modèles.
+- `SettingsSeed` : modèle LLM vide → build puis épinglé, modèle dictée vide →
+  défaut Meta. Les modèles saisis sont conservés (le repli 404 exotique vit
+  dans le client) ; l'épinglé ne peut pas être défait (non vide par nature).
+- Preuves : `:core` 1 903 + `:app` 1 093 tests, 0 échec, sur r630
+  (`SettingsSeedTest` 29/29 dont 3 nouveaux — vus rouges avant le fix),
+  `check-kotlin-limits` OK.
+- Fichiers : `SettingsSeed.kt`, `SettingsSeedTest.kt`.
+
 ## 2026-10-29 — guidage : le cap droit projette un trait, plus une bande
 
 - **Demande** : savoir « si je continue exactement tout droit je vais rencontrer
