@@ -12,29 +12,37 @@ import org.junit.Test
 class VoiceNavPhrasesTest {
 
     @Test
-    fun `virage avec rue et distance`() {
+    fun `virage loin dit de continuer`() {
         assertEquals(
-            "Tournez à droite dans 50 mètres, rue de la Paix",
+            "Continuez dans cette direction, rue de la Paix",
             VoiceNavPhrases.ahead(ManeuverAction.TurnRight, "rue de la Paix", 50.0),
         )
     }
 
     @Test
-    fun `tout droit sans rue`() {
+    fun `virage proche dit de tourner sec`() {
         assertEquals(
-            "Continuez tout droit dans 99 mètres",
+            "Tournez à droite, rue de la Paix",
+            VoiceNavPhrases.ahead(ManeuverAction.TurnRight, "rue de la Paix", 20.0),
+        )
+    }
+
+    @Test
+    fun `tout droit loin sans rue`() {
+        assertEquals(
+            "Continuez dans cette direction",
             VoiceNavPhrases.ahead(ManeuverAction.Continue, null, 98.9),
         )
     }
 
     @Test
-    fun `demi-tour et rond-point`() {
+    fun `demi-tour et rond-point proches sans distance`() {
         assertEquals(
-            "Faites demi-tour dans 20 mètres",
+            "Faites demi-tour",
             VoiceNavPhrases.ahead(ManeuverAction.UTurn, null, 20.0),
         )
         assertEquals(
-            "Au rond-point, suivez la route dans 30 mètres",
+            "Au rond-point, suivez la route",
             VoiceNavPhrases.ahead(ManeuverAction.Roundabout, "  ", 30.0),
         )
     }
@@ -85,7 +93,7 @@ class VoiceNavPhrasesTest {
             VoiceNavPhrases.event(NavEvent.Arrived, "la gare"),
         )
         assertEquals(
-            "Serrez à gauche dans 10 mètres",
+            "Serrez à gauche",
             VoiceNavPhrases.event(
                 NavEvent.ManeuverAhead(ManeuverAction.SlightLeft, null, 10.0, near = true),
                 null,

@@ -244,8 +244,10 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
   ordre user du 28/10 + portes et barrières le 29/10) —
   `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
 - Preset extérieur : `["person", "pole", "bollard", "fence", "barrier", "gate", "sign",
-  "tree"]` (8 concepts de cheminement, pastille « Extérieur » du direct,
-  `LivePrompts.outdoor`) — le défaut rue (12 dangers) reste inchangé.
+  "tree", "trash can", "dumpster", "animal", "traffic light"]` (12 concepts de
+  cheminement : mobilier + poubelles, bennes, animaux, feu tricolore — ordre user
+  du 29/10, détecté en permanence hors traversée ; pastille « Extérieur » du
+  direct, `LivePrompts.outdoor`) — le défaut rue (12 dangers) reste inchangé.
 - Plafond : `LivePrompts.MAX = 16`. Le client n'en envoie jamais plus,
   le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 16`
   (`server/backend/tracking.py:53`).

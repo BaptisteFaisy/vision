@@ -88,7 +88,9 @@ object Guidance {
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): GuidanceDecision {
-        val cleaned = labels.filter { it.label.isNotBlank() && !CurbConcepts.isGround(it.label) }
+        val cleaned = labels.filter {
+            it.label.isNotBlank() && !CurbConcepts.isGround(it.label) && SignConcepts.keep(it)
+        }
         val blocking = cleaned.filter { inCorridor(it.centerX, cap) && inRange(it, rangeMeters) }
         if (blocking.isEmpty()) return GuidanceDecision(blocked = false, cap = cap)
         val obstacle = blocking.minWith(
