@@ -37,14 +37,13 @@ seule fois** par scène, sans se répéter et sans couper une réponse en cours.
 ## 3. Ce que la phrase dit
 
 - **Forme** : label + heure, **sans article** — donc aucune faute de genre sur des
-  labels libres (`Personne à 9 heures, chien à 3 heures.`, `PositionText.kt:99-119`).
-- **Ordre** : gauche → droite (`centerX` croissant, puis label) — `PositionText.kt:109`.
-- **Doublons** : même label à la même heure cité **une fois** (`PositionText.kt:108`).
-- **Plafond** : `MAX_OBJECTS = 3` (`PositionText.kt:49`) puis « et N autres objets »
-  (`PositionText.kt:116-117`).
-- **Distance** : quand elle est connue, `DistanceText.spoken` la met en mots et les objets
-  sont séparés par ` ; ` (la virgule sert déjà à séparer position et distance) —
-  `PositionText.kt:114` et `item` (`:122-130`).
+  labels libres (`Personne à 9 heures, chien à 3 heures.`, `PositionText.kt`).
+- **Ordre** : le plus proche d'abord, puis le plus en face (distance, puis écart
+  à l'axe, puis label) — `PositionText.kt`.
+- **Doublons** : même label à la même heure cité **une fois** (`PositionText.kt`).
+- **Plafond** : `MAX_OBJECTS = 3` (`PositionText.kt`) puis « et N autres objets ».
+- **Distance** : quand elle est connue, `DistanceText.spokenShort` la met en mots
+  au mètre entier et **remplace** l'heure (`Personne à 1 mètre.`) — `PositionText.kt`.
 
 ## 4. Quand elle parle : trois garde-fous
 
@@ -133,7 +132,8 @@ Attendus, dans l'ordre :
 1. Réglages → **clé ElevenLabs** + **ID de voix** renseignés (sinon muet, cf. § 5) et
    bascule « Annoncer les objets et leur distance » **activée** ;
 2. analyse d'une photo contenant **trois objets séparés** (9 h, midi, 3 h) →
-   **une** phrase, p. ex. `Personne à 9 heures, chaise à midi, bouteille à 3 heures.` ;
+   **une** phrase, le plus en face d'abord, p. ex.
+   `Chaise à midi, bouteille à 3 heures, personne à 9 heures.` ;
 3. la même photo réanalysée → **aucune** nouvelle annonce (scène déjà dite) ;
 4. bascule **coupée** + Enregistrer → l'analyse tourne, **plus aucune** annonce.
 

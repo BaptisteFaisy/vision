@@ -7,6 +7,9 @@ import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairLabelSignals
+import dev.sam3vision.core.stairs.StairSignal
+import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -87,3 +90,62 @@ internal fun LiveProbe.observeCurb(
     }
     return watcher
 }
+
+/**
+ * Guetteur escaliers de la sonde, miroir du trottoir : les libellés SAM
+ * « stairs » lus dans l'état (lectures de distance + dimensions, déjà
+ * publiées par frame), sans toucher à `LiveProbe`. Le sens vient des mots du
+ * libellé (« stairs going up », exact) sinon de la hauteur de la boîte
+ * ([StairLabelSignals]) ; l'annonce est urgente (coupe) mais reste une info
+ * de navigation, jamais une consigne d'évitement. Coupé en mode Traversée.
+ */
+internal fun LiveProbe.observeStairs(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): StairWatcher {
+    val watcher = StairWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val found = StairLabelSignals.of(readings, st.width, st.height)
+            val signal = if (found.detected) {
+                StairSignal(detected = true, confidence = 1f, lineCount = 0, roiTop = 0, roiBottom = 0)
+            } else {
+                StairSignal.none()
+            }
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction)
+                ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
+        }
+    }
+    return watcher
+}
+
+/** Les deux guetteurs de la sonde (trottoir + escaliers), reset commun. */
+internal class ProbeHazards(
+    val curb: CurbWatcher,
+    val stairs: StairWatcher,
+) {
+    /** Oublie les deux guetteurs (nouvelle séance). */
+    fun reset() {
+        curb.reset()
+        stairs.reset()
+    }
+}
+
+/**
+ * Les deux guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * (plafond 500 — voir `observeCurb`, même contrat).
+ */
+internal fun LiveProbe.observeHazards(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): ProbeHazards = ProbeHazards(
+    observeCurb(scope, voice, playerIdle, language),
+    observeStairs(scope, voice, playerIdle, language),
+)

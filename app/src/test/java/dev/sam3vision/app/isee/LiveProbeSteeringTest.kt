@@ -69,9 +69,8 @@ class LiveProbeSteeringTest {
         advanceUntilIdle()
 
         val spoken = probe.state.value.spoken.orEmpty()
-        assertTrue("passage attendu, reçu : $spoken", spoken.startsWith("Person"))
-        assertTrue("passage attendu, reçu : $spoken", spoken.contains("décalez-vous de"))
-        assertTrue("passage attendu, reçu : $spoken", spoken.contains("vers le centre"))
+        assertTrue("passage attendu, reçu : $spoken", spoken.startsWith("Va vers le centre"))
+        assertTrue("passage attendu, reçu : $spoken", spoken.contains("mètre"))
     }
 
     @Test
@@ -117,7 +116,7 @@ class LiveProbeSteeringTest {
         advanceUntilIdle()
 
         assertEquals(SteeringCap.Straight, probe.state.value.steeringCap)
-        assertEquals("Continue tout droit.", probe.state.value.spoken)
+        assertEquals("Continue.", probe.state.value.spoken)
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */
