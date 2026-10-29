@@ -15,16 +15,7 @@ object DepthEstimators {
 
     fun open(context: Context, backend: DepthBackend): DepthEstimator {
         if (backend == DepthBackend.OFF) return NoOpDepthEstimator
-        if (backend == DepthBackend.DA2) return openDa2(context)
-        if (backend == DepthBackend.MIDAS) return openMidas(context)
-        val da2 = openDa2(context)
-        if (da2 !is MissingAssetEstimator) return da2
-        val midas = openMidas(context)
-        if (midas !is MissingAssetEstimator) return midas
-        return MissingAssetEstimator(
-            DepthBackend.AUTO,
-            "aucun modèle téléchargé — bouton Tester pour télécharger",
-        )
+        return openDa2(context)
     }
 
     private fun openDa2(context: Context): DepthEstimator {
@@ -41,22 +32,6 @@ object DepthEstimators {
             }
         }
         return MissingAssetEstimator(DepthBackend.DA2, reason)
-    }
-
-    private fun openMidas(context: Context): DepthEstimator {
-        val outcome = runCatching { LiteRtDepthEstimator.open(context) }
-        val estimator = outcome.getOrNull()
-        if (estimator != null) return estimator
-        val failure = outcome.exceptionOrNull()
-        var reason = "modèle MiDaS absent — bouton Tester pour le télécharger"
-        if (failure != null) {
-            Log.i(DepthBench.TAG, "MIDAS-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
-            val detail = failure.message
-            if (detail != null) {
-                reason = "ouverture MiDaS : $detail"
-            }
-        }
-        return MissingAssetEstimator(DepthBackend.MIDAS, reason)
     }
 }
 

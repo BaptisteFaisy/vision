@@ -58,7 +58,7 @@ object PointClouds {
      * ([DepthReadings.scaleFromAnchors]) : `mètres = échelle / proximité`.
      *
      * TODO téléphone : l'échelle seule laisse un décalage affine résiduel
-     * (DA2/MiDaS sont relatifs à échelle + décalage) — à mesurer à 1–5 m.
+     * (DA2 est relatif à échelle + décalage) — à mesurer à 1–5 m.
      */
     fun fromCloseness(
         depth: DepthMap,

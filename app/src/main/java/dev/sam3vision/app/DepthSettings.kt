@@ -13,10 +13,10 @@ import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Profondeur (bêta) » des Réglages : moteur embarqué (DA2 Small par
- * ONNX, MiDaS small par LiteRT — 100 % sur le téléphone, 0 GPU Modal) + bouton
- * de banc (5 inférences sur image synthétique, verdict en bas de page et dans
- * logcat `DepthBench`). Active par défaut (AUTO, seuil < 200 ms tenu).
+ * Section « Profondeur (bêta) » des Réglages : moteur embarqué DA2 Small par
+ * ONNX (100 % sur le téléphone, 0 GPU Modal) + bouton de banc (5 inférences
+ * sur image synthétique, verdict en bas de page et dans logcat `DepthBench`).
+ * Active par défaut (DA2, seuil < 200 ms tenu).
  */
 @Composable
 fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: () -> Unit) {
@@ -31,10 +31,10 @@ fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: ()
             DepthBackendButton(draft, backend, onChange)
         }
         Text(
-            "Carte de profondeur monoculaire estimée sur le téléphone : " +
-                "Depth Anything V2 Small (le plus précis) ou MiDaS small " +
-                "(repli). Modèle téléchargé une fois au premier test (~26/63 Mo), " +
-                "inférence 100 % locale ensuite — ni GPU Modal.",
+            "Carte de profondeur monoculaire estimée sur le téléphone " +
+                "(Depth Anything V2 Small). Modèle téléchargé une fois au " +
+                "premier test (~26 Mo), inférence 100 % locale ensuite — " +
+                "ni GPU Modal.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )

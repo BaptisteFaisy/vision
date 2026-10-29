@@ -224,7 +224,7 @@ dependencies {
     // Mock Device Kit (lunettes simulées) : build debug seulement, hors de l'APK public.
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
-    // Profondeur embarquée : DA2 Small (ONNX, primaire) + MiDaS small (LiteRT, repli).
+    // Profondeur embarquée : DA2 Small (ONNX). LiteRT sert la segmentation.
     // Segmentation TwinLiteNet : même runtime (CompiledModel GPU→CPU).
     implementation(libs.onnxruntime.android)
     implementation(libs.litert.edge)
