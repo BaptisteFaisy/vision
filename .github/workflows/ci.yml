@@ -13,6 +13,13 @@ on:
   pull_request:
   push:
     branches: [master]
+  # File de merge native (29/10) : le groupe construit un commit temporaire
+  # (`master` + les PR de la file) et rejoue **les mêmes** checks dessus.
+  # Sans ce déclencheur, `ci` et `ci-budget` n'existent jamais sur
+  # `gh-readonly-queue/**` et la file attendrait indéfiniment un verdict qui
+  # n'arrive pas. Le pas « Cette PR touche-t-elle du code ? » retombe alors sur
+  # `code=1` (aucune liste de fichiers) : dans la file, on teste toujours.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

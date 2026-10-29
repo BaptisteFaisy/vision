@@ -115,7 +115,20 @@ Désormais une PR `BEHIND` dont les **trois checks requis sont verts** et dont l
 croisent **aucun** fichier atterri depuis sa base est **mergée directement** (`merge --rebase`
 côté serveur, `strict: false` est déjà la politique du dépôt) : pas de clone, pas de push, pas de
 CI relancée. Au moindre doute — fichiers qui se croisent, liste tronquée à 300, brouillon, checks
-pas verts — on rebase comme avant. **Le plafond, et pourquoi (v13, 29/10).** Le ruleset `master — PR obligatoire, checks requis` porte
+pas verts — on rebase comme avant. **File de merge native (v14, 29/10).** Le plafond ci-dessous (~1 merge par cycle de CI) se lève
+en **groupant** : la file de merge de GitHub construit `master` + les PR du lot, rejoue les trois
+checks requis (`ci`, `ci-budget`, `couche0`) sur le résultat fusionné, puis merge le lot. C'est la
+garantie que `strict` cherchait, sans relancer la CI d'une PR à chaque mouvement de `master`.
+Le balayeur ne rebase plus et ne merge plus : il **met la PR dans la file** dès que ses trois
+checks sont verts, et il lit la règle `merge_queue` du ruleset à la source (`QUEUE`) — si la file
+est désactivée, il reprend son ancien chemin tout seul. Les conflits (`DIRTY`) restent traités par
+le rebase + agent Fireworks : une PR en conflit ne peut pas entrer dans la file.
+Côté workflows, `merge_group` est déclaré dans `ci.yml` (les checks requis existent donc sur
+`gh-readonly-queue/**`) et dans `couche0.yml`, qui lit le numéro de PR dans le nom du ref du groupe.
+Un lot qui échoue est éjecté : la PR garde ses propres checks verts, mais la file ne la reprend
+qu'à la passe suivante du balayeur (le `isInMergeQueue` retombe à `false`).
+
+**Le plafond, et pourquoi (v13, 29/10).** Le ruleset `master — PR obligatoire, checks requis` porte
 `strict_required_status_checks_policy: true` : GitHub **refuse** de merger une branche en retard, même
 quand la protection classique dit `strict: false`. Sous cette règle, chaque merge déplace `master` et
 invalide la CI de **toutes** les autres PR : le débit est plafonné à environ un merge par cycle de CI

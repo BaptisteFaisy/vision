@@ -58,6 +58,20 @@
 #     suivant est un vrai travail ;
 #   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
 #     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
+# File de merge native (v14, 2026-10-29) — la v13 a montré le plafond : avec
+# `strict_required_status_checks_policy: true`, chaque merge invalide la CI de
+# toutes les autres PR, donc ~1 merge par cycle de CI (~40/h au mieux). Le seul
+# moyen de monter sans perdre la garantie est de **grouper** : la file de merge
+# de GitHub construit `master` + les PR du lot, rejoue les 3 checks sur le
+# résultat fusionné, et merge le lot. Le balayeur ne rebase plus et ne merge
+# plus : il **met dans la file** dès que les 3 checks de la PR sont verts.
+#   - `QUEUE` est lu à la source (règle `merge_queue` du ruleset) : si la file
+#     est désactivée un jour, le balayeur reprend son ancien chemin tout seul.
+#   - Plus de rebase sur les PR `BEHIND` vertes : la file teste l'arbre
+#     fusionné, c'est exactement la garantie que `strict` cherchait — sans
+#     relancer la CI d'une PR à chaque mouvement de `master`.
+#   - Les conflits (`DIRTY`) restent traités par le rebase + agent Fireworks :
+#     une PR en conflit ne peut pas entrer dans la file.
 # Débit (v13, 2026-10-29) — la v12 a buté sur une règle du dépôt : le ruleset
 # `master — PR obligatoire, checks requis` porte
 # `strict_required_status_checks_policy: true`, donc GitHub **refuse** de merger
@@ -138,6 +152,7 @@ jobs:
     outputs:
       matrix: ${{ steps.build.outputs.matrix }}
       strict: ${{ steps.build.outputs.strict }}
+      queue: ${{ steps.build.outputs.queue }}
     steps:
       - name: Lister les PR internes ouvertes
         id: build
@@ -169,16 +184,19 @@ jobs:
           # ruleset gagne (il est actif sur `master`).
           STRICT=$( { gh api "repos/$GITHUB_REPOSITORY/branches/master/protection" \
               --jq '.required_status_checks.strict' 2>/dev/null || echo false; } )
+          QUEUE=false
           RULESET=$( { gh api "repos/$GITHUB_REPOSITORY/rulesets" --jq '.[].id' 2>/dev/null || true; } )
           for rs in $RULESET; do
-            s_rs=$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$rs" 2>/dev/null \
-              | jq -r '[.rules[]? | select(.type=="required_status_checks")
-                        | .parameters.strict_required_status_checks_policy] | first // false' \
-              2>/dev/null || echo false)
+            regles=$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$rs" 2>/dev/null || true)
+            [ -n "$regles" ] || continue
+            s_rs=$(printf '%s' "$regles" | jq -r '[.rules[]? | select(.type=="required_status_checks")
+                      | .parameters.strict_required_status_checks_policy] | first // false' 2>/dev/null || echo false)
+            q_rs=$(printf '%s' "$regles" | jq -r '[.rules[]? | select(.type=="merge_queue")] | length' 2>/dev/null || echo 0)
             [ "${s_rs:-false}" = "true" ] && STRICT=true
+            [ "${q_rs:-0}" -gt 0 ] && QUEUE=true
           done
-          echo "strict=$STRICT"
-          echo "strict=$STRICT" >> "$GITHUB_OUTPUT"
+          echo "strict=$STRICT file_de_merge=$QUEUE"
+          printf 'strict=%s\nqueue=%s\n' "$STRICT" "$QUEUE" >> "$GITHUB_OUTPUT"
           MATRIX=$(gh pr list --base master --state open \
             --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid,updatedAt \
             --jq '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
@@ -228,6 +246,7 @@ jobs:
           STATE: ${{ matrix.state }}
           DRAFT: ${{ matrix.draft }}
           STRICT: ${{ needs.discover.outputs.strict }}
+          QUEUE: ${{ needs.discover.outputs.queue }}
         run: |
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           green() { # 0 si les 3 checks requis de la PR $1 sont SUCCESS
@@ -358,6 +377,37 @@ jobs:
             done
             return $rc
           }
+          # ── file de merge native ─────────────────────────────────────────
+          # Rien à rebaser ni à merger : on met la PR dans la file dès que ses
+          # 3 checks sont verts. La file construit `master` + le lot et rejoue
+          # les mêmes checks sur l'arbre fusionné — la garantie que `strict`
+          # cherchait, sans relancer la CI à chaque mouvement de `master`.
+          OWNER="${REPO%%/*}"; NOM="${REPO##*/}"
+          en_file() { # 0 si la PR $1 est déjà dans la file
+            gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$NOM\"){pullRequest(number:$1){isInMergeQueue}}}" \
+              --jq '.data.repository.pullRequest.isInMergeQueue' 2>/dev/null | grep -q '^true$'
+          }
+          if [ "${QUEUE:-false}" = "true" ]; then
+            case "$STATE" in
+              CLEAN|BEHIND)
+                if [ "$DRAFT" = "true" ]; then
+                  echo "PR #$PR : brouillon, pas de mise en file"
+                elif en_file "$PR"; then
+                  echo "PR #$PR : déjà dans la file de merge"
+                elif green "$PR"; then
+                  if err=$(gh pr merge "$PR" 2>&1); then
+                    echo "PR #$PR mise dans la file de merge"
+                    noter_etat "mise dans la file de merge : le groupe teste \`master\` + le lot, aucun rebase."
+                  else
+                    echo "PR #$PR : mise en file refusée ($(printf '%s' "$err" | tail -1 | cut -c1-160))"
+                  fi
+                else
+                  echo "PR #$PR : CI pas encore verte, la file prendra le relais"
+                fi
+                exit 0
+                ;;
+            esac
+          fi
           if deja_balayee; then
             echo "PR #$PR : balayée pour ${SHA:0:7} sur ${MASTER:0:7} en état $STATE (rien de neuf)"
             exit 0

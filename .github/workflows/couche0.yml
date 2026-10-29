@@ -11,6 +11,10 @@ name: couche0
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  # File de merge native : même contrôle sur le commit temporaire du groupe.
+  # `merge_group` est l'événement d'aujourd'hui ; le `push` sur
+  # `gh-readonly-queue/**` reste pour les file(s) construites en push.
+  merge_group:
   push:
     branches: ['gh-readonly-queue/**']
   workflow_dispatch:
@@ -39,20 +43,22 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          # `merge_group` ne porte pas `pull_request` : le numéro de PR vit dans
+          # le nom du ref (`refs/heads/gh-readonly-queue/<base>/pr-<n>-<sha>`).
+          REF: ${{ github.event.merge_group.head_ref || github.ref_name }}
         run: |
           set -euo pipefail
-          # Sur un groupe de merge, il n'y a pas d'événement `pull_request` : le numéro
-          # de PR est dans le nom du ref (`…/pr-<n>-<sha>`).
           if [ -z "$PR_NUMBER" ]; then
-            case "$GITHUB_REF_NAME" in
-              gh-readonly-queue/*/pr-*-*)
-                PR_NUMBER="${GITHUB_REF_NAME#*pr-}"
+            ref="${REF#refs/heads/}"
+            case "$ref" in
+              */pr-*-*)
+                PR_NUMBER="${ref#*pr-}"
                 PR_NUMBER="${PR_NUMBER%%-*}"
                 ;;
             esac
           fi
           if [ -z "$PR_NUMBER" ]; then
-            echo "::warning::aucun numéro de PR joignable depuis ce ref ($GITHUB_REF_NAME) — rien à juger"
+            echo "::warning::aucun numéro de PR joignable depuis ce ref (${REF:-$GITHUB_REF_NAME}) — rien à juger"
             exit 0
           fi
           GARDE="$RUNNER_TEMP/check_couche0.py"
