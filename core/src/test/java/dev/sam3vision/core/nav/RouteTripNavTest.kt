@@ -38,6 +38,7 @@ class RouteTripNavTest {
         assertEquals(48.8566, route.maneuvers[0].lat, 1e-9)
         assertEquals("Rue de Rivoli", route.maneuvers[0].street)
         assertEquals("la gare", route.destinationName)
+        assertEquals(leg.shape, route.shape)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package dev.sam3vision.core.nav
 
+import dev.sam3vision.core.model.RoutePoint
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -65,24 +66,71 @@ object NavGeo {
         if (!pLat.isFinite() || !pLon.isFinite()) return Double.NaN
         if (!aLat.isFinite() || !aLon.isFinite()) return Double.NaN
         if (!bLat.isFinite() || !bLon.isFinite()) return Double.NaN
-        // Projection équirectangulaire locale autour de A : exacte au mètre
-        // près sur les segments piétons (quelques centaines de mètres).
+        return projectOnSegment(pLat, pLon, aLat, aLon, bLat, bLon).second
+    }
+
+    /**
+     * Point recalé sur une polyligne : [point] le projeté le plus proche,
+     * [crossTrackM] l'écart en mètres (voir [snapToPolyline]).
+     */
+    data class SnapResult(val point: RoutePoint, val crossTrackM: Double)
+
+    /**
+     * Recale P sur la polyligne : projeté le plus proche ([projectOnSegment]
+     * par tronçon, meilleur écart gardé). Entrée non finie ou sans point
+     * fini ⇒ `null` ; un seul point fini ⇒ ce point + distance haversine.
+     * Ne lève jamais.
+     */
+    fun snapToPolyline(pLat: Double, pLon: Double, points: List<RoutePoint>): SnapResult? {
+        if (!pLat.isFinite() || !pLon.isFinite()) return null
+        val finite = points.filter { it.lat.isFinite() && it.lon.isFinite() }
+        if (finite.isEmpty()) return null
+        if (finite.size == 1) {
+            val only = finite[0]
+            return SnapResult(only, haversineMeters(pLat, pLon, only.lat, only.lon))
+        }
+        var best: SnapResult? = null
+        for (i in 0 until finite.size - 1) {
+            val a = finite[i]
+            val b = finite[i + 1]
+            val (point, dist) = projectOnSegment(pLat, pLon, a.lat, a.lon, b.lat, b.lon)
+            if (best == null || dist < best.crossTrackM) best = SnapResult(point, dist)
+        }
+        return best
+    }
+
+    /**
+     * Projette P sur le segment AB : paire (point projeté, écart en mètres).
+     * Projection équirectangulaire locale autour de A, clampée à [0, 1] —
+     * exacte au mètre près sur les segments piétons (quelques centaines de
+     * mètres). Segment dégénéré (A = B) ⇒ (A, distance à A). Entrées
+     * finies exigées (vérifiées par l'appelant).
+     */
+    private fun projectOnSegment(
+        pLat: Double,
+        pLon: Double,
+        aLat: Double,
+        aLon: Double,
+        bLat: Double,
+        bLon: Double,
+    ): Pair<RoutePoint, Double> {
         val refLat = Math.toRadians(aLat)
         val kx = EARTH_RADIUS_M * cos(refLat)
         val ky = EARTH_RADIUS_M
-        val ax = 0.0
-        val ay = 0.0
         val bx = Math.toRadians(bLon - aLon) * kx
         val by = Math.toRadians(bLat - aLat) * ky
         val px = Math.toRadians(pLon - aLon) * kx
         val py = Math.toRadians(pLat - aLat) * ky
-        val abx = bx - ax
-        val aby = by - ay
-        val squared = abx * abx + aby * aby
-        if (squared == 0.0) return sqrt(px * px + py * py)
-        val t = ((px * abx + py * aby) / squared).coerceIn(0.0, 1.0)
-        val dx = px - (ax + t * abx)
-        val dy = py - (ay + t * aby)
-        return sqrt(dx * dx + dy * dy)
+        val squared = bx * bx + by * by
+        if (squared == 0.0) return Pair(RoutePoint(aLat, aLon), sqrt(px * px + py * py))
+        val t = ((px * bx + py * by) / squared).coerceIn(0.0, 1.0)
+        val qx = t * bx
+        val qy = t * by
+        val dx = px - qx
+        val dy = py - qy
+        // Pôles (kx = 0) : la longitude est indéfinie, on garde celle de A.
+        val lon = if (kx == 0.0) aLon else aLon + Math.toDegrees(qx / kx)
+        val point = RoutePoint(aLat + Math.toDegrees(qy / ky), lon)
+        return Pair(point, sqrt(dx * dx + dy * dy))
     }
 }
