@@ -13,6 +13,7 @@ import dev.sam3vision.app.voicenav.ValhallaRouteLoader
 import dev.sam3vision.app.voicenav.VoiceNavEngineDriver
 import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.BanGeocoder
 import dev.sam3vision.core.nav.GeocodeChain
@@ -41,6 +42,12 @@ class IseeVoiceNav(
     private val speak: suspend (String) -> Unit,
     /** Le pilote y arme/coupe le mode traversée (rappel proche / passage). */
     private val onAutoCrossing: (Boolean) -> Unit = {},
+    /** Parole route via Laure (manœuvres GPS, même voix que les obstacles). */
+    private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
+    /** Coupe la parole route (fin de guidage). */
+    private val stopRoute: () -> Unit = {},
+    /** Cap route poussé à la sonde (`null` = fin, retour au cap manuel). */
+    private val onRouteCap: (SteeringCap?) -> Unit = {},
 ) {
 
     private val context = app.applicationContext
@@ -58,6 +65,9 @@ class IseeVoiceNav(
             scope = scope,
             onUpdate = ::pushGuidanceUpdate,
             onAutoCrossing = onAutoCrossing,
+            speakRoute = speakRoute,
+            stopRoute = stopRoute,
+            onRouteCap = onRouteCap,
         )
     }
     private val driver: VoiceNavEngineDriver by driverLazy
@@ -114,6 +124,17 @@ class IseeVoiceNav(
     fun onTraverseModeChanged(active: Boolean) {
         if (driverLazy.isInitialized()) {
             runCatching { driver.onTraverseModeChanged(active) }
+        }
+    }
+
+    /**
+     * Détour obstacle de la sonde : transmis au pilote (recalcul Valhalla
+     * depuis le GPS temps réel s'il dure). Sans effet si le pilote n'a
+     * jamais démarré.
+     */
+    fun onProbeDetour(detour: Boolean, nowMs: Long) {
+        if (driverLazy.isInitialized()) {
+            runCatching { driver.onDetour(detour, nowMs) }
         }
     }
 

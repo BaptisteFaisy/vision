@@ -136,6 +136,24 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
+    fun `detour publie pour le GPS`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame())
+        advanceUntilIdle()
+
+        assertFalse(probe.state.value.detour)
+
+        fake.respond("B", frame(listOf(personne())))
+        advanceUntilIdle()
+
+        assertTrue(probe.state.value.detour)
+    }
+
+    @Test
     fun `sans guidage la voie libre reste muette`() = runTest {
         val (probe, fake) = harness(this, guide = false, announce = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)

@@ -202,6 +202,20 @@ internal fun LiveProbe.observeHazard(
     return watcher
 }
 
+/**
+ * Détour obstacle de la sonde : le pilote GPS y lit le détour subi (recalcul
+ * Valhalla depuis le GPS temps réel s'il dure — `VoiceNavEngineDriver`).
+ * Changements seuls (`distinctUntilChanged`) : le détecteur compte le
+ * continu, pas les frames.
+ */
+internal fun LiveProbe.observeDetour(scope: CoroutineScope, onDetour: (Boolean, Long) -> Unit) {
+    scope.launch {
+        state.map { it.detour }.distinctUntilChanged().collect { detour ->
+            onDetour(detour, System.currentTimeMillis())
+        }
+    }
+}
+
 /** Les trois guetteurs de la sonde (trottoir + escaliers + mobilier), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,

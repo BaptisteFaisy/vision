@@ -2,13 +2,18 @@ package dev.sam3vision.app.voicenav
 
 import android.content.Context
 import dev.sam3vision.app.navigation.VoiceNavTracker
+import dev.sam3vision.app.speech.SpeechArbitration
+import dev.sam3vision.app.speech.SpeechPriority
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.AndroidTtsDriver
+import dev.sam3vision.app.speech.VoiceNavAnnouncer
+import dev.sam3vision.app.speech.VoiceNavEvent
 import dev.sam3vision.app.speech.VoiceNavPhrases
 import dev.sam3vision.app.speech.VoiceNavSpeaker
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
+import dev.sam3vision.core.nav.DetourReroute
 import dev.sam3vision.core.nav.GeocodedPlace
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.ManeuverAction
@@ -41,6 +46,11 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  *   sonde marche le couloir de la route (fusion itinéraire × obstacle).
  * - [onAutoCrossing] bascule le mode traversée (`true` = le rappel proche
  *   d'une traversée l'arme, `false` = traversée passée ou guidage coupé).
+ * - [speakRoute] dit les manœuvres par la voix Laure (`null` = voix système) :
+ *   la phrase (même politique que le canal système) + son urgence (sortie de
+ *   trace et recalcul coupent, le reste attend). Une seule voix : GPS et
+ *   obstacles partagent le même tuyau, jamais deux voix en même temps.
+ * - [stopRoute] coupe la parole route (fin de guidage), miroir de [speakRoute].
  *
  * Voix : virages francs par [VoiceNavSpeaker.onTurn] (« Dans 100 mètres,
  * tournez à gauche, rue X »), le reste en phrase littérale du moteur
@@ -70,6 +80,8 @@ class VoiceNavEngineDriver(
     private val onUpdate: (GuidanceUpdate) -> Unit,
     private val onRouteCap: (SteeringCap?) -> Unit = {},
     private val onAutoCrossing: (Boolean) -> Unit = {},
+    private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
+    private val stopRoute: () -> Unit = {},
 ) {
 
     private val app = appContext.applicationContext
@@ -77,6 +89,8 @@ class VoiceNavEngineDriver(
     private val ttsLazy = lazy { SystemTtsEngine(AndroidTtsDriver(app)) }
     private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings) }
     private val speaker by speakerLazy
+    private val routeAnnouncer = VoiceNavAnnouncer()
+    private val detourReroute = DetourReroute()
 
     @Volatile
     private var legs: GuidingLegs? = null
@@ -114,8 +128,37 @@ class VoiceNavEngineDriver(
             return false
         }
         legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
-        runCatching { speaker.onStarted(destination) }
+        detourReroute.reset()
+        say(VoiceNavEvent.Started(destination)) { speaker.onStarted(destination) }
         return true
+    }
+
+    /**
+     * Parole d'un événement route : voix Laure quand elle est câblée
+     * ([speakRoute], même politique que le canal système), sinon voix système
+     * ([system]). L'urgence vient de [SpeechArbitration] (sortie de trace,
+     * recalcul : coupe). Ne lève jamais.
+     */
+    private fun say(event: VoiceNavEvent, system: () -> String?) {
+        val laure = speakRoute
+        if (laure == null) {
+            runCatching { system() }
+            return
+        }
+        val phrase = routeAnnouncer.onEvent(System.currentTimeMillis(), event, settings().speechLanguage)
+            ?: return
+        val danger = SpeechArbitration.priorityOf(event) == SpeechPriority.Danger
+        scope.launch { runCatching { laure(phrase, danger) } }
+    }
+
+    /**
+     * Détour obstacle de la sonde : subi assez longtemps ([DetourReroute]),
+     * l'itinéraire est recalculé depuis la position GPS temps réel — le
+     * meilleur chemin tient compte des obstacles (le local contourne, le
+     * global replanifie). Sans guidage en cours, sans effet.
+     */
+    fun onDetour(detour: Boolean, nowMs: Long) {
+        if (detourReroute.onDetour(detour, nowMs)) launchReroute()
     }
 
     /** Coupe l'écoute, la parole et la mémoire ; réutilisable après. */
@@ -124,6 +167,8 @@ class VoiceNavEngineDriver(
         rerouting = false
         clearAutoCrossing()
         runCatching { onRouteCap(null) }
+        runCatching { stopRoute() }
+        detourReroute.reset()
         runCatching { tracker.stop() }
         if (speakerLazy.isInitialized()) {
             runCatching { speaker.stop() }
@@ -171,10 +216,10 @@ class VoiceNavEngineDriver(
                     stop()
                 }
                 is NavEvent.OffRoute -> {
-                    speaker.onOffRoute()
+                    say(VoiceNavEvent.OffRoute) { speaker.onOffRoute() }
                     launchReroute()
                 }
-                is NavEvent.BackOnRoute -> speaker.onBackOnRoute()
+                is NavEvent.BackOnRoute -> say(VoiceNavEvent.BackOnRoute) { speaker.onBackOnRoute() }
             }
         }
     }
@@ -183,9 +228,12 @@ class VoiceNavEngineDriver(
     private fun speakManeuver(event: NavEvent.ManeuverAhead) {
         val cap = event.action.toSteeringCap()
         if (cap == null) {
-            speaker.onLiteral(VoiceNavPhrases.ahead(event.action, event.street, event.distM))
+            val phrase = VoiceNavPhrases.ahead(event.action, event.street, event.distM)
+            say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
         } else {
-            speaker.onTurn(cap, event.distM.toFloat(), event.street)
+            say(VoiceNavEvent.Turn(cap, event.distM.toFloat(), event.street)) {
+                speaker.onTurn(cap, event.distM.toFloat(), event.street)
+            }
         }
     }
 
@@ -195,12 +243,14 @@ class VoiceNavEngineDriver(
      */
     private fun speakCrossing(event: NavEvent.CrossingAhead) {
         if (!event.near) {
-            speaker.onLiteral(VoiceNavPhrases.crossingAhead(event.distM))
+            val phrase = VoiceNavPhrases.crossingAhead(event.distM)
+            say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
             return
         }
         if (autoCrossing) return
         autoCrossing = true
-        runCatching { speaker.onLiteral(CrossingText.mode(true, settings().speechLanguage)) }
+        val phrase = CrossingText.mode(true, settings().speechLanguage)
+        say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
         runCatching { onAutoCrossing(true) }
     }
 
@@ -208,7 +258,7 @@ class VoiceNavEngineDriver(
     private fun onCrossingPassed() {
         if (!autoCrossing) return
         autoCrossing = false
-        runCatching { speaker.onLiteral(VoiceNavPhrases.CROSSING_DONE) }
+        say(VoiceNavEvent.Literal(VoiceNavPhrases.CROSSING_DONE)) { speaker.onLiteral(VoiceNavPhrases.CROSSING_DONE) }
         runCatching { onAutoCrossing(false) }
     }
 
@@ -277,7 +327,7 @@ class VoiceNavEngineDriver(
         val nav = trip.toNavRoute(legs.route.destinationName).getOrNull() ?: return
         if (runCatching { tracker.reroute(nav) }.getOrNull()?.isSuccess == true) {
             this.legs = legs.copy(route = nav, tails = tailDistances(nav.maneuvers))
-            runCatching { speaker.onRerouted() }
+            say(VoiceNavEvent.Rerouted) { speaker.onRerouted() }
         }
     }
 
