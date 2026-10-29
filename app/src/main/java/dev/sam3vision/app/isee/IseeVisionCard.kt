@@ -197,6 +197,7 @@ internal fun CrossingOnVideo(probe: LiveProbeState, pump: CrossingLocalLight) {
         state = local?.state ?: probe.crossing,
         frameWidth = probe.width,
         frameHeight = probe.height,
+        phase = probe.traversePhase,
     )
 }
 
