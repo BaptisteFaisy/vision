@@ -62,12 +62,25 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_SHA: ${{ github.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           # Une PR de docs/config n'a pas besoin de Gradle : le verdict tombe en
           # quelques secondes. La liste des fichiers vient de l'API (le checkout
           # est superficiel, la base n'y est pas).
           code=1
           fichiers=""
+          lot=0
+          # PR de lot de la file de merge : le `push` sur la même tête a déjà
+          # fait tourner les tests (même commit, même arbre). Ce passage-ci
+          # existe seulement parce que la file ouvre une PR sur sa branche ;
+          # on le rend vert en quelques secondes au lieu de rejouer Gradle —
+          # sinon chaque lot chargeait deux fois 21 runners pour un verdict.
+          case "${PR_HEAD_REF:-}" in
+            mergify/merge-queue/*)
+              echo "PR de lot de la file de merge : tests déjà exécutés par le push de la branche."
+              lot=1
+              ;;
+          esac
           if [ -n "$PR_NUMBER" ]; then
             fichiers="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
               "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
@@ -100,6 +113,9 @@ jobs:
               backend=0; echo "Backend intact : tests Python sautés."
             fi
           fi
+          # Dernier mot pour une PR de lot : quoi qu'ait décidé la liste de
+          # fichiers ci-dessus, ce passage ne rejoue pas les tests.
+          if [ "$lot" = "1" ]; then code=0; backend=0; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
 
