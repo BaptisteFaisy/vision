@@ -51,8 +51,13 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
         slot.complete(Result.success(frame))
     }
 
-    override suspend fun health(): Result<LiveHealth> =
-        Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+    /** Appels `/health` (réveil explicite) reçus par le faux client. */
+    var healthCalls = 0
+
+    override suspend fun health(): Result<LiveHealth> {
+        healthCalls += 1
+        return Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+    }
 
     override fun close() {
         closed += 1
