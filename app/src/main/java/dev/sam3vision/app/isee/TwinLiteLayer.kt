@@ -26,9 +26,11 @@ private val TWINLITE_BIAS = Color(0xFFF1C40F)
 private val TWINLITE_STOP = Color(0xFFE74C3C)
 
 /**
- * Flèche TwinLite sur la vidéo : bas-centrée comme le guidage, avec son libellé —
- * verte tout droit, ambre sur un biais, rouge à l'arrêt. Posée après [SteeringLayer] ;
- * rien de composé sans masque frais (caméra coupée, moteur en chargement).
+ * Flèche TwinLite sur la vidéo : centrée AU-DESSUS de la flèche du guidage, avec son
+ * libellé — verte tout droit, ambre sur un biais, rouge à l'arrêt. Posée après
+ * [SteeringLayer] ; rien de composé sans masque frais (caméra coupée, moteur en
+ * chargement). À 28 dp elle disparaissait sous le panneau statut et le triangle
+ * du guidage (recette 92c5392) : 150 dp la remonte au-dessus des deux.
  */
 @Composable
 internal fun TwinLiteLayer(ui: TwinLiteUi?, modifier: Modifier = Modifier) {
@@ -66,5 +68,5 @@ private fun twinLiteColor(arrow: String): Color = when (arrow) {
     else -> TWINLITE_BIAS
 }
 
-/** Bas de carte, au-dessus de la pastille Traversée. */
-private const val LAYER_BOTTOM_DP = 28
+/** Au-dessus du triangle du guidage et du panneau statut (sinon invisibles). */
+private const val LAYER_BOTTOM_DP = 150
