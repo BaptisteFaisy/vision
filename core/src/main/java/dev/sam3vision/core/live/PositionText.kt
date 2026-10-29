@@ -8,6 +8,16 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
+ * Emprise d'un objet dans l'image, en fractions 0..1 : ce que le guidage lit
+ * quand la distance est inconnue (boîte coupée au contact : une matière qui
+ * remplit le champ en face, c'est un « Stop. »).
+ */
+data class LabelExtent(
+    val heightFrac: Float,
+    val widthFrac: Float,
+)
+
+/**
  * Un objet nommé à une position **normalisée** (0..1), avec sa distance estimée
  * quand elle est connue : ce que la voix met en mots.
  */
@@ -16,6 +26,7 @@ data class PlacedLabel(
     val centerX: Float,
     val centerY: Float = 0.5f,
     val meters: Float? = null,
+    val extent: LabelExtent? = null,
 ) {
     /** Repère lisible **français** (interface et signature de scène) : « à 9 heures ». */
     val position: String get() = PositionText.clockLabel(centerX)
@@ -82,14 +93,21 @@ object PositionText {
     fun fromDetection(detection: Detection): PlacedLabel? {
         val box = detection.normalizedBox() ?: return null
         if (detection.label.isBlank()) return null
-        return PlacedLabel(detection.label, (box[0] + box[2]) / 2f, (box[1] + box[3]) / 2f)
+        return PlacedLabel(detection.label, (box[0] + box[2]) / 2f, (box[1] + box[3]) / 2f, extent = extentOf(box))
     }
 
     /** Objet suivi (boîte déjà normalisée) → label placé ; `null` si la boîte est illisible. */
     fun fromSeenObject(obj: SeenObject): PlacedLabel? {
         if (obj.label.isBlank() || obj.box.size < 4) return null
-        return PlacedLabel(obj.label, (obj.box[0] + obj.box[2]) / 2f, (obj.box[1] + obj.box[3]) / 2f)
+        return PlacedLabel(obj.label, (obj.box[0] + obj.box[2]) / 2f, (obj.box[1] + obj.box[3]) / 2f, extent = extentOf(obj.box))
     }
+
+    /**
+     * Emprise d'une boîte normalisée (`x1,y1,x2,y2`, 0..1) : hauteur et largeur
+     * en fractions, bornées (une boîte qui déborde du cadre remplit tout le champ).
+     */
+    private fun extentOf(box: List<Float>): LabelExtent =
+        LabelExtent((box[3] - box[1]).coerceIn(0f, 1f), (box[2] - box[0]).coerceIn(0f, 1f))
 
     /** Les détections exploitables d'une frame, dans l'ordre d'arrivée. */
     fun placed(detections: List<Detection>): List<PlacedLabel> = detections.mapNotNull(::fromDetection)

@@ -94,6 +94,15 @@ class FrameRosterTest {
         assertEquals(listOf("personne"), placed.map { it.label })
     }
 
+    @Test
+    fun `les objets places portent l emprise de leur boite`() {
+        // BOX (10,20)-(110,220) sur 200×400 : 100×200 px → 0,50 × 0,50.
+        val placed = placedLabels(frame(listOf(obj("chien"))), emptyList())
+        assertEquals(1, placed.size)
+        assertEquals(0.50f, placed[0].extent!!.heightFrac, 0.001f)
+        assertEquals(0.50f, placed[0].extent!!.widthFrac, 0.001f)
+    }
+
     private companion object {
         /** Boîte de référence, en pixels, dans le repère 200×400 des frames de test. */
         val BOX = listOf(10f, 20f, 110f, 220f)

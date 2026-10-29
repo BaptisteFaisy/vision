@@ -129,4 +129,13 @@ class GuidanceAnnouncerTest {
 
         assertNull(announcer.lastDecision)
     }
+
+    @Test
+    fun `matiere proche non mesuree dit stop des la premiere frame`() {
+        val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
+        fun matiere() = PlacedLabel("mur", 0.5f, 0.5f, null, LabelExtent(0.9f, 0.8f))
+
+        assertEquals("Stop.", announcer.onFrame(0L, listOf(matiere())))
+        assertNull(announcer.onFrame(500L, listOf(matiere())))
+    }
 }
