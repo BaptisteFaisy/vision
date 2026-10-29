@@ -38,7 +38,7 @@ internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean) {
  * ([state]). Les deux viennent de la même lecture, donc l'étiquette posée sur la
  * vidéo ne peut pas désigner un autre feu que celui qui a été classifié.
  */
-internal data class CrossingLight(
+data class CrossingLight(
     val box: List<Float>?,
     val state: CrossingState,
 )

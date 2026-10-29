@@ -3,7 +3,8 @@ package dev.sam3vision.app.traverse
 import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.app.isee.crossingStateOf
+import dev.sam3vision.app.isee.CrossingLight
+import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
@@ -68,6 +69,13 @@ class TraverseWiring(
     /** Vert du module feu, relu à chaque frame active (défaut sûr : `false`). */
     @Volatile var lightGreen: Boolean = false
 
+    /**
+     * Dernier feu lu (boîte + état) : sert à le **dessiner** sur la vidéo du
+     * direct, à l'endroit où les masques sont posés. `null` = mode coupé.
+     */
+    @Volatile var light: CrossingLight? = null
+        private set
+
     /** Clé de la dernière transition journalisée : les répétitions se taisent. */
     private var lastKey: String = ""
 
@@ -85,7 +93,7 @@ class TraverseWiring(
         language: SpeechLanguage,
         jpegB64: String = "",
     ): ShownFrame {
-        if (active) updateLight(crossingStateOf(frame, jpegB64))
+        if (active) updateLight(crossingLightOf(frame, jpegB64))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
         logTransition(out.decision)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
@@ -94,6 +102,12 @@ class TraverseWiring(
     /** Seul un vert tranché autorise la traversée ; rouge et doute attendent. */
     fun updateLight(state: CrossingState) {
         lightGreen = state == CrossingState.Green
+    }
+
+    /** Même règle, en gardant la boîte : l'affichage du direct en a besoin. */
+    fun updateLight(light: CrossingLight) {
+        this.light = light
+        lightGreen = light.state == CrossingState.Green
     }
 
     /**
@@ -148,6 +162,7 @@ class TraverseWiring(
         tts = null
         pipeline.reset()
         lightGreen = false
+        light = null
         quiet()
     }
 
@@ -155,6 +170,7 @@ class TraverseWiring(
     fun reset() {
         pipeline.reset()
         lightGreen = false
+        light = null
     }
 
     /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */
