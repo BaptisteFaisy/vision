@@ -27,6 +27,17 @@ class StairWatcherTest {
     }
 
     @Test
+    fun `l'heure situe l'annonce`() {
+        val watcher = StairWatcher()
+
+        watcher.onSignal(positive(), 1000L, SpeechLanguage.Fr, StairDirection.Up, 0.3f)
+        watcher.onSignal(positive(), 2000L, SpeechLanguage.Fr, StairDirection.Up, 0.3f)
+        val cue = watcher.onSignal(positive(), 3000L, SpeechLanguage.Fr, StairDirection.Up, 0.3f)
+
+        assertEquals("Escalier montant, à 11 heures.", cue!!.phrase)
+    }
+
+    @Test
     fun `negatif remet le compte a zero`() {
         val watcher = StairWatcher()
 

@@ -1,5 +1,6 @@
 package dev.sam3vision.core.stairs
 
+import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -20,20 +21,26 @@ data class StairCue(
  * contourne pas l'escalier qu'on veut prendre.
  */
 object StairText {
-    /** « Escalier montant. » / « Stairs up. » (sens inconnu : « Escalier devant. »). */
-    fun phrase(language: SpeechLanguage, direction: StairDirection = StairDirection.Unknown): String =
-        when (language) {
+    /** « Escalier montant, à 11 heures. » (`null` = sans heure, ex. flux Canny). */
+    fun phrase(
+        language: SpeechLanguage,
+        direction: StairDirection = StairDirection.Unknown,
+        centerX: Float? = null,
+    ): String {
+        val base = when (language) {
             SpeechLanguage.Fr -> when (direction) {
-                StairDirection.Up -> "Escalier montant."
-                StairDirection.Down -> "Escalier descendant."
-                StairDirection.Unknown -> "Escalier devant."
+                StairDirection.Up -> "Escalier montant"
+                StairDirection.Down -> "Escalier descendant"
+                StairDirection.Unknown -> "Escalier devant"
             }
             SpeechLanguage.En -> when (direction) {
-                StairDirection.Up -> "Stairs up."
-                StairDirection.Down -> "Stairs down."
-                StairDirection.Unknown -> "Stairs ahead."
+                StairDirection.Up -> "Stairs up"
+                StairDirection.Down -> "Stairs down"
+                StairDirection.Unknown -> "Stairs ahead"
             }
         }
+        return PositionText.withHour(base, centerX, language)
+    }
 }
 
 /**
@@ -63,13 +70,15 @@ class StairWatcher(
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
      * quand le compte de confirmation est atteint hors cooldown, `null` sinon.
      * [direction] est le sens annoncé (voie labels SAM ; le Canny seul ne le
-     * voit pas et garde [StairDirection.Unknown]).
+     * voit pas et garde [StairDirection.Unknown]). [centerX] est le centre
+     * normalisé (l'heure du cadran, `null` = sans heure).
      */
     fun onSignal(
         signal: StairSignal,
         nowMs: Long,
         language: SpeechLanguage = SpeechLanguage.Fr,
         direction: StairDirection = StairDirection.Unknown,
+        centerX: Float? = null,
     ): StairCue? {
         if (!signal.detected) {
             hits = 0
@@ -80,7 +89,9 @@ class StairWatcher(
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
-        return StairCue(StairText.phrase(language, direction), signal.confidence, signal.lineCount, direction)
+        return StairCue(
+            StairText.phrase(language, direction, centerX), signal.confidence, signal.lineCount, direction,
+        )
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */

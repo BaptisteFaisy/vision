@@ -65,6 +65,15 @@ object PositionText {
     }
 
     /**
+     * [base] (sans point) située au cadran : « Attention à la barrière, à 2
+     * heures. » — [centerX] `null` (géométrie inconnue) = [base] seule, jamais
+     * d'heure devinée. Les « Attention … » (marche, escaliers, mobilier) y
+     * passent : l'info dit où, au cadran des aveugles (ordre user du 29/10).
+     */
+    fun withHour(base: String, centerX: Float?, language: SpeechLanguage): String =
+        if (centerX == null) "$base." else "$base, ${clockLabel(centerX, language)}."
+
+    /**
      * Direction parlée au cadran : « à 11 heures », « à midi », « à 3 heures »
      * (ou « at 11 o'clock », « at 12 o'clock ») — la convention des déplacements
      * sans voir, plus précise que « à gauche / au centre / à droite ».

@@ -8,12 +8,14 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * Signal mobilier d'une frame : [detected] quand du mobilier suivi est dans
  * le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins, [meters] sa
  * distance (la plus proche en cas de doublons), [label] son libellé SAM brut
- * (la phrase y lit le nom parlé).
+ * (la phrase y lit le nom parlé), [centerX] son centre normalisé (l'heure du
+ * cadran, `null` = inconnue).
  */
 data class HazardSignal(
     val detected: Boolean,
     val meters: Float?,
     val label: String?,
+    val centerX: Float? = null,
 ) {
     companion object {
         /** Signal vide : jamais d'exception sur le chemin du direct. */
@@ -26,17 +28,20 @@ data class HazardSignal(
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): HazardSignal {
             if (frameW <= 0 || frameH <= 0) return none()
-            var best: Pair<Float, String>? = null
+            var best: Hit? = null
             for (reading in readings) {
                 val hit = nearHazard(reading, frameW) ?: continue
-                if (best == null || hit.first < best.first) best = hit
+                if (best == null || hit.meters < best.meters) best = hit
             }
             return if (best == null) none()
-            else HazardSignal(detected = true, meters = best.first, label = best.second)
+            else HazardSignal(detected = true, meters = best.meters, label = best.label, centerX = best.centerX)
         }
 
-        /** Distance + libellé si [reading] est du mobilier proche, `null` sinon. */
-        private fun nearHazard(reading: DistanceReading, frameW: Int): Pair<Float, String>? {
+        /** Mobilier proche candidat : distance, libellé et centre normalisé. */
+        private data class Hit(val meters: Float, val label: String, val centerX: Float)
+
+        /** Candidat si [reading] est du mobilier proche, `null` sinon. */
+        private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
             if (!HazardConcepts.isHazard(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
             if (meters > HazardWatcher.HAZARD_METERS) return null
@@ -44,7 +49,7 @@ data class HazardSignal(
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
             if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
-            return meters to reading.label
+            return Hit(meters, reading.label, centerX)
         }
     }
 }
@@ -60,14 +65,19 @@ data class HazardCue(
 
 /**
  * Phrases « Attention … », FR/EN comme les positions (`PositionText`) :
- * « Attention à la barrière. » / « Attention, barrier. » — une info de
- * description, jamais une consigne (l'ordre user : iSee décrit, en douceur).
+ * « Attention à la barrière, à 2 heures. » / « Attention, barrier, at 2
+ * o'clock. » — une info de description, jamais une consigne (l'ordre user :
+ * iSee décrit, en douceur, au cadran des aveugles).
  */
 object HazardText {
-    /** « Attention … » pour [name] selon [language]. */
-    fun phrase(name: HazardConcepts.HazardName, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Attention ${name.fr}."
-        SpeechLanguage.En -> "Attention, ${name.en}."
+    /** « Attention … » pour [name] selon [language], située à [centerX] (`null` = sans heure). */
+    fun phrase(
+        name: HazardConcepts.HazardName,
+        language: SpeechLanguage,
+        centerX: Float? = null,
+    ): String = when (language) {
+        SpeechLanguage.Fr -> PositionText.withHour("Attention ${name.fr}", centerX, language)
+        SpeechLanguage.En -> PositionText.withHour("Attention, ${name.en}", centerX, language)
     }
 }
 
@@ -108,7 +118,7 @@ class HazardWatcher(
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
-        return HazardCue(HazardText.phrase(name, language), signal.meters)
+        return HazardCue(HazardText.phrase(name, language, signal.centerX), signal.meters)
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */

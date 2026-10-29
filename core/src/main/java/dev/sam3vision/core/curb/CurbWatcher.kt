@@ -7,11 +7,13 @@ import dev.sam3vision.core.speech.SpeechLanguage
 /**
  * Signal trottoir d'une frame : [detected] quand un bord à monter est dans le
  * couloir marché à [CurbWatcher.CURB_METERS] ou moins, [meters] sa distance
- * (la plus proche en cas de doublons).
+ * (la plus proche en cas de doublons), [centerX] son centre normalisé (l'heure
+ * du cadran, `null` = inconnue).
  */
 data class CurbSignal(
     val detected: Boolean,
     val meters: Float?,
+    val centerX: Float? = null,
 ) {
     companion object {
         /** Signal vide : jamais d'exception sur le chemin du direct. */
@@ -25,16 +27,17 @@ data class CurbSignal(
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): CurbSignal {
             if (frameW <= 0 || frameH <= 0) return none()
-            var best: Float? = null
+            var best: Pair<Float, Float>? = null
             for (reading in readings) {
-                val meters = nearCurbMeters(reading, frameW, frameH) ?: continue
-                if (best == null || meters < best) best = meters
+                val hit = nearCurb(reading, frameW, frameH) ?: continue
+                if (best == null || hit.first < best.first) best = hit
             }
-            return if (best == null) none() else CurbSignal(detected = true, meters = best)
+            return if (best == null) none()
+            else CurbSignal(detected = true, meters = best.first, centerX = best.second)
         }
 
-        /** Distance du bord si [reading] en est un proche, `null` sinon. */
-        private fun nearCurbMeters(reading: DistanceReading, frameW: Int, frameH: Int): Float? {
+        /** Distance + centre si [reading] est un bord proche, `null` sinon. */
+        private fun nearCurb(reading: DistanceReading, frameW: Int, frameH: Int): Pair<Float, Float>? {
             if (!CurbConcepts.isCurb(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
             if (meters > CurbWatcher.CURB_METERS) return null
@@ -44,7 +47,7 @@ data class CurbSignal(
             if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
             if (box[3] / frameH < CurbWatcher.LOWER_BAND_FRACTION) return null
             if (CurbConcepts.isGround(reading.label) && !nearEdge(box, frameH)) return null
-            return meters
+            return meters to centerX
         }
 
         /**
@@ -76,10 +79,10 @@ data class CurbCue(
  * hors-ligne n'a qu'un clip à générer si la phrase rejoint le mode traversée.
  */
 object CurbText {
-    /** « Attention à la marche. » / « Attention, step. » selon [language]. */
-    fun phrase(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Attention à la marche."
-        SpeechLanguage.En -> "Attention, step."
+    /** « Attention à la marche, à midi. » / « Attention, step, at 12 o'clock. » (`null` = sans heure). */
+    fun phrase(language: SpeechLanguage, centerX: Float? = null): String = when (language) {
+        SpeechLanguage.Fr -> PositionText.withHour("Attention à la marche", centerX, language)
+        SpeechLanguage.En -> PositionText.withHour("Attention, step", centerX, language)
     }
 }
 
@@ -126,7 +129,7 @@ class CurbWatcher(
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
-        return CurbCue(CurbText.phrase(language), signal.meters)
+        return CurbCue(CurbText.phrase(language, signal.centerX), signal.meters)
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */
