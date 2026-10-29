@@ -36,6 +36,9 @@ class HttpSam31VideoClient(
         if (onDeviceMode) return Result.failure(ApiError.BadResponse(INFERRED_ON_DEVICE))
         if (baseUrl.isBlank()) return Result.failure(ApiError.InvalidKey("endpoint SAM 3.1 vide"))
         if (!video.isFile || video.length() == 0L) return Result.failure(ApiError.BadResponse("vidéo absente ou vide"))
+        if (!isUsableHttpUrl(joinUrl(baseUrl, path))) {
+            return Result.failure(ApiError.BadResponse(invalidEndpointMessage("endpoint SAM 3.1")))
+        }
         // Multipart assemblé en IO : pas de stat fichier sur l'appelant.
         // L'échec de construction reste un BadResponse (contrat historique), pas un Network.
         return client.executeBuilt {
@@ -49,6 +52,7 @@ class HttpSam31VideoClient(
 
     override suspend fun health(): Result<Boolean> {
         if (baseUrl.isBlank()) return Result.success(false)
+        endpointRefusal("endpoint SAM 3.1", baseUrl, "/health")?.let { return Result.failure(it) }
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
         return client.executeBuilt { requestTo(baseUrl, "/health") }.map { outcome ->
             outcome.code in 200..299 && parse(outcome.body)?.optBoolean("ok", false) == true

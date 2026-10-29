@@ -27,24 +27,30 @@ class HttpTrackClient(
 ) : TrackClient {
 
     override suspend fun start(imageB64: String, prompts: List<String>): Result<TrackSessionStart> {
+        endpointRefusal("endpoint tracker", baseUrl, "/session")?.let { return Result.failure(it) }
         return postBuilt("/session") { trackStartJson(imageB64, prompts) }
             .then { raw -> catchingResult { parseSessionStart(raw) } }
     }
 
     override suspend fun frame(sessionId: String, imageB64: String): Result<TrackFrame> {
+        endpointRefusal("endpoint tracker", baseUrl, "/frame")?.let { return Result.failure(it) }
         return postBuilt("/frame") { trackFrameJson(sessionId, imageB64) }
             .then { raw -> catchingResult { parseFrame(raw) } }
     }
 
-    override suspend fun close(sessionId: String): Result<Unit> =
-        client.executeBuilt { requestTo(baseUrl, "/session/" + sessionId.trim(), "DELETE", userAgent = TRACK_USER_AGENT) }
+    override suspend fun close(sessionId: String): Result<Unit> {
+        endpointRefusal("endpoint tracker", baseUrl, "/session/")?.let { return Result.failure(it) }
+        return client.executeBuilt { requestTo(baseUrl, "/session/" + sessionId.trim(), "DELETE", userAgent = TRACK_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .map { Unit }
+    }
 
-    override suspend fun health(): Result<TrackHealth> =
-        client.executeBuilt { requestTo(baseUrl, "/health", userAgent = TRACK_USER_AGENT) }
+    override suspend fun health(): Result<TrackHealth> {
+        endpointRefusal("endpoint tracker", baseUrl, "/health")?.let { return Result.failure(it) }
+        return client.executeBuilt { requestTo(baseUrl, "/health", userAgent = TRACK_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseTrackHealth(raw) } }
+    }
 
     /** Un POST JSON sur le tracker, corps assemblé en IO et non rejouable. */
     private suspend fun postBuilt(path: String, buildBody: () -> String): Result<String> =
