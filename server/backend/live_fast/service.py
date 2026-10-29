@@ -81,6 +81,26 @@ def accepts_mask_encoding(pipeline) -> bool:
     return accepts_param(pipeline, "mask_encoding")
 
 
+def container_age_seconds():
+    """Âge du conteneur en secondes (uptime machine - début du processus).
+
+    Copie volontaire de ``live_app_utils.container_age_seconds`` : ce module vit hors
+    de ``live_fast/`` donc hors de l'image déployée (non importable ici). Après une
+    restauration de snapshot, le processus est neuf mais ``/proc`` voit son vrai âge —
+    là où le chrono du code ne verrait que la phase GPU rejouée.
+    """
+    try:
+        with open("/proc/uptime", "r", encoding="utf-8") as handle:
+            uptime = float(handle.read().split()[0])
+        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
+            fields = handle.read().rsplit(") ", 1)[1].split()
+        start_ticks = int(fields[19])
+        hertz = os.sysconf("SC_CLK_TCK")
+        return round(uptime - start_ticks / hertz, 1)
+    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
+        return None
+
+
 class Sam3LiveService:
     """Modèle chargé une fois, leviers activables, verrou GPU unique.
 
@@ -99,12 +119,17 @@ class Sam3LiveService:
         self.snap_seconds = round(time.monotonic() - started, 1)
 
     def load_container(self) -> None:
-        """Charge le modèle au dtype demandé, applique résolution/compile/graph, chronomètre."""
+        """Charge le modèle au dtype demandé, applique résolution/compile/graph, chronomètre.
+
+        ``load_seconds`` ne mesure que cette phase GPU (post-restauration) ; le VRAI temps
+        d'ouverture (restauration du snapshot comprise) est ``load_breakdown``, figé ici.
+        """
         if getattr(self, "ctx", None) is not None:  # déjà chargé : ne rien refaire
             return
         from segmentation import device_label
 
         started = time.monotonic()
+        age = container_age_seconds()
         if getattr(self, "cpu", None) is None:
             # Baseten / 1er démarrage : pas d'état snapshotté, chargement complet.
             model, processor, device, dtype = load(DTYPE_NAME, EDGE)
@@ -131,6 +156,15 @@ class Sam3LiveService:
             self.ctx["detr_graphs"] = None
         self.gpu_name = gpu_name()
         self.load_seconds = round(time.monotonic() - started, 1)
+        snap = getattr(self, "snap_seconds", None)
+        self.load_breakdown = {"age_conteneur_s": age,
+                               "poids_cpu_1er_demarrage_s": snap,
+                               "gpu_s": self.load_seconds}
+        # Restauration : la mémoire (dont `snap_seconds` du 1er boot) revient dans un
+        # processus neuf — `snap` dépasse donc l'âge du processus. Boot complet : le
+        # processus a vécu toute la phase CPU, `snap` ≈ `age`. Marge +2 s : restauration
+        # + jitter (à valider sur boots réels) ; `None` (Baseten, `/proc` illisible) = faux.
+        self.restored = (snap is not None and age is not None and snap > age + 2)
         self._gpu_lock = threading.Lock()
 
     def _live_sync(self, image_b64, prompts, max_objects, work_edge, batch_prompts, edge,
@@ -331,10 +365,12 @@ class Sam3LiveService:
                 pass
 
     def health(self) -> dict:
-        """État du conteneur : modèle, carte, région, leviers appliqués.
+        """État du conteneur : modèle, carte, région, boot, leviers appliqués.
 
         Les variables de région diffèrent selon l'hôte (``MODAL_*`` / ``BASETEN_*``) : on
         les lit toutes, le client ne voit qu'un champ ``region``/``cloud`` stable.
+        ``load_seconds`` = phase GPU seule ; ``restored``/``load_breakdown`` disent comment
+        ce conteneur a booté (restore vs complet), ``memory_snapshot`` si le levier est armé.
         """
         return {"ok": True, "model": MODEL_LABEL, "device": self.ctx.get("device_label", "cpu"),
                 "gpu": getattr(self, "gpu_name", "unknown"),
@@ -344,6 +380,11 @@ class Sam3LiveService:
                           or os.environ.get("BASETEN_CLOUD") or "unknown"),
                 "platform": os.environ.get("BACKEND_PLATFORM", "unknown"),
                 "load_seconds": getattr(self, "load_seconds", None),
+                "load_breakdown": getattr(self, "load_breakdown", None),
+                # Via levers() (pas d'import direct de SNAPSHOT) : les deux fast_core
+                # exposent levers(), seul celui de live_fast porte le flag snapshot.
+                "memory_snapshot": levers().get("snapshot", False),
+                "restored": getattr(self, "restored", None),
                 "levers": levers(), "applied": {
                     "edge_applied": self.ctx.get("edge_applied"),
                     "vision_grid": self.ctx.get("vision_grid"),
