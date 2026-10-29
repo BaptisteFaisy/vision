@@ -33,6 +33,11 @@ data class GuidanceDecision(
      * sur voie libre ou distance inconnue (la consigne reste alors non chiffrée).
      */
     val shiftMeters: Float? = null,
+    /**
+     * Vrai quand l'obstacle est à [Guidance.STOP_METERS] ou moins (mesuré) :
+     * trop près pour contourner, la consigne est « Stop. », urgente.
+     */
+    val stop: Boolean = false,
 )
 
 /**
@@ -53,6 +58,13 @@ object Guidance {
 
     /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
     const val RANGE_METERS = 4f
+
+    /**
+     * En deçà (mesuré), contourner n'est plus un pas : la consigne est « Stop. »,
+     * urgente (elle coupe la phrase en cours). À 1,2 m/s, 0,6 m c'est un pas
+     * avant le contact — et la frame parlée a déjà ~1 s de retard.
+     */
+    const val STOP_METERS = 0.6f
 
     /** Demi-couloir marché normalisé, cap droit : bande centrale / 2. */
     const val STRAIGHT_HALF_CORRIDOR = (1f - 2f * PositionText.SIDE_EDGE) / 2f
@@ -88,14 +100,15 @@ object Guidance {
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
+        val stop = obstacle.meters?.takeIf { it.isFinite() }?.let { it <= STOP_METERS } == true
         if (cap == SteeringCap.Straight) {
             val side = freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
+            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, stop)
         }
         val passage = bestPassage(cleaned, cap, rangeMeters)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift)
+        return GuidanceDecision(true, obstacle, null, cap, passage, shift, stop)
     }
 
     /**
@@ -114,40 +127,39 @@ object Guidance {
 
     /**
      * Consigne prononcée, jamais `null` : le guidage a toujours quelque chose à dire.
-     * Forme (fr) : `Continue tout droit.` ou
-     * `Personne à 2 mètres à midi, décalez-vous de 1 mètre vers la gauche.`
-     * Forme (en) : `Continue straight ahead.` ou
-     * `Person 2 meters at 12 o'clock, move 1 meter to the left.`
-     * L'obstacle se dit au cadran ([PositionText.clockLabel]), comme les positions.
-     * Sans décalage mesurable (decision construite sans `shiftMeters`), la consigne
-     * reste non chiffrée (`va à gauche`, `go left`).
+     * Vocabulaire minimal (décision user du 29/10, remplace la consigne chiffrée
+     * « décalez-vous » du 28/10 : quand on fonce sur quelqu'un, chaque mot retarde
+     * le « stop »).
+     * Forme (fr) : `Continue.` ou `Va à gauche, 2 mètres.` ou `Stop.`
+     * Forme (en) : `Continue.` ou `Go left, 2 meters.` ou `Stop.`
+     * Ni nom d'obstacle, ni cadran, ni décalage latéral : côté + distance de
+     * l'obstacle au mètre entier, et « Stop. » sous [STOP_METERS]. Sans distance
+     * mesurée, la consigne reste non chiffrée (`Va à gauche.`, `Go left.`).
      */
     fun phrase(
         decision: GuidanceDecision,
         language: SpeechLanguage = SpeechLanguage.Fr,
     ): String {
-        val obstacle = decision.obstacle?.takeIf { decision.blocked && it.label.isNotBlank() }
-            ?: return free(decision.cap, language)
-        val shift = decision.shiftMeters
-            ?.takeIf { it.isFinite() && it > 0f }
-            ?.let { DistanceText.spoken(it, language) }
+        if (!decision.blocked || decision.obstacle == null) return free(decision.cap, language)
+        if (decision.stop) return "Stop."
+        val meters = decision.obstacle.meters?.takeIf { it.isFinite() }
         if (decision.cap != SteeringCap.Straight) {
             val exit = decision.passage ?: SteeringCap.Straight
-            return capBlocked(obstacle, exit, shift, language).replaceFirstChar { it.uppercaseChar() }
+            return capBlocked(exit, meters, language).replaceFirstChar { it.uppercaseChar() }
         }
-        val side = sideWord(decision.side ?: GuidanceSide.Left, language)
-        return blocked(obstacle, side, shift, language).replaceFirstChar { it.uppercaseChar() }
+        val side = decision.side ?: GuidanceSide.Left
+        return blocked(side, meters, language).replaceFirstChar { it.uppercaseChar() }
     }
 
     /**
-     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure|décalage` —
+     * Signature anti-répétition : `free`, ou `b|label|côté|mètre|heure|stop?` —
      * le mètre arrondi fait reparler un obstacle qui s'approche, comme
-     * [PositionText.key], et l'heure un obstacle qui glisse dans le couloir
-     * (11 h → midi dit une autre phrase, elle doit pouvoir se dire) ; le palier
-     * de décalage annoncé fait reparler quand la consigne chiffrée change. Le cap
-     * droit garde ses signatures au caractère près ; les autres caps se préfixent
-     * (`Left:free`) — un changement de cap fait reparler. Toujours française,
-     * pour ne pas rebavarder au changement de langue de la voix.
+     * [PositionText.key], et l'heure un obstacle qui glisse dans le couloir ;
+     * le marqueur stop fait reparler au passage en « Stop. » même dans le
+     * même seau de distance. Le cap droit garde ses signatures au caractère
+     * près ; les autres caps se préfixent (`Left:free`) — un changement de cap
+     * fait reparler. Toujours française, pour ne pas rebavarder au changement
+     * de langue de la voix.
      */
     fun key(decision: GuidanceDecision): String {
         val prefix = if (decision.cap == SteeringCap.Straight) "" else "${decision.cap.name}:"
@@ -155,12 +167,8 @@ object Guidance {
         val exit = if (decision.cap == SteeringCap.Straight) decision.side?.name else decision.passage?.name
         val bucket = PositionText.sceneBucket(obstacle.meters)
         val hour = "${PositionText.clockHour(obstacle.centerX)}h"
-        val shift = decision.shiftMeters
-            ?.takeIf { it.isFinite() && it > 0f }
-            ?.toString()
-            ?.removeSuffix(".0")
-            ?: "?"
-        return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour|$shift"
+        val stop = if (decision.stop) "|stop" else ""
+        return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour$stop"
     }
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
@@ -245,87 +253,52 @@ object Guidance {
     private fun nearestKnown(labels: List<PlacedLabel>): Float? =
         labels.mapNotNull { it.meters?.takeIf { meters -> meters.isFinite() } }.minOrNull()
 
-    /** « Continue tout droit. » / « Go left. » : la voie libre dans la langue de la voix. */
+    /** « Continue. » / « Go left. » : la voie libre dans la langue de la voix. */
     private fun free(cap: SteeringCap, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> when (cap) {
             SteeringCap.Left -> "Va à gauche."
-            SteeringCap.Straight -> "Continue tout droit."
+            SteeringCap.Straight -> "Continue."
             SteeringCap.Right -> "Va à droite."
         }
         SpeechLanguage.En -> when (cap) {
             SteeringCap.Left -> "Go left."
-            SteeringCap.Straight -> "Continue straight ahead."
+            SteeringCap.Straight -> "Continue."
             SteeringCap.Right -> "Go right."
         }
     }
 
     /**
-     * Cap droit bouché : « personne à 2 mètres à midi, décalez-vous de 1 mètre vers la gauche » /
-     * « person 2 meters at 12 o'clock, move 1 meter to the left ». [shift] est le décalage déjà
-     * mis en mots (`null` = distance inconnue : la consigne legacy non chiffrée).
+     * Cap droit bouché : « va à gauche, 2 mètres » / « go left, 2 meters ».
+     * [meters] `null` = distance inconnue : consigne non chiffrée.
      */
     private fun blocked(
-        obstacle: PlacedLabel,
-        side: String,
-        shift: String?,
+        side: GuidanceSide,
+        meters: Float?,
         language: SpeechLanguage,
     ): String {
-        val label = obstacle.label.trim()
-        val clock = PositionText.clockLabel(obstacle.centerX, language)
-        val meters = obstacle.meters?.takeIf { it.isFinite() }
-        return when (language) {
-            SpeechLanguage.Fr -> if (meters == null || shift == null) {
-                "$label $clock, va à $side."
-            } else {
-                "$label à ${DistanceText.spoken(meters, language)} $clock, décalez-vous de $shift vers la $side."
-            }
-            SpeechLanguage.En -> if (meters == null || shift == null) {
-                "$label $clock, go $side."
-            } else {
-                "$label ${DistanceText.spoken(meters, language)} $clock, move $shift to the $side."
-            }
+        val move = when (language) {
+            SpeechLanguage.Fr -> if (side == GuidanceSide.Left) "va à gauche" else "va à droite"
+            SpeechLanguage.En -> if (side == GuidanceSide.Left) "go left" else "go right"
         }
+        if (meters == null) return "$move."
+        return "$move, ${DistanceText.spokenShort(meters, language)}."
     }
 
     /**
-     * Cap latéral bouché : « personne à 2 mètres à 10 heures, décalez-vous de 1 mètre
-     * vers le centre » / « person 2 meters at 10 o'clock, move 1 meter to the center ».
-     * L'obstacle se dit au cadran comme en cap droit, seule la sortie change.
-     * [shift] est le décalage déjà mis en mots (`null` = consigne legacy non chiffrée).
+     * Cap latéral bouché : « va vers le centre, 2 mètres » /
+     * « go to the center, 2 meters ». [meters] `null` = consigne non chiffrée.
      */
     private fun capBlocked(
-        obstacle: PlacedLabel,
         passage: SteeringCap,
-        shift: String?,
+        meters: Float?,
         language: SpeechLanguage,
     ): String {
-        val label = obstacle.label.trim()
-        val clock = PositionText.clockLabel(obstacle.centerX, language)
-        val meters = obstacle.meters?.takeIf { it.isFinite() }
         val exit = when (language) {
-            SpeechLanguage.Fr -> when (passage) {
-                SteeringCap.Left -> "va à gauche"
-                SteeringCap.Straight -> "passe au centre"
-                SteeringCap.Right -> "va à droite"
-            }
-            SpeechLanguage.En -> when (passage) {
-                SteeringCap.Left -> "go left"
-                SteeringCap.Straight -> "go straight"
-                SteeringCap.Right -> "go right"
-            }
+            SpeechLanguage.Fr -> "va vers ${exitWord(passage, language)}"
+            SpeechLanguage.En -> "go to the ${exitWord(passage, language)}"
         }
-        return when (language) {
-            SpeechLanguage.Fr -> if (meters == null || shift == null) {
-                "$label $clock, $exit."
-            } else {
-                "$label à ${DistanceText.spoken(meters, language)} $clock, décalez-vous de $shift vers ${exitWord(passage, language)}."
-            }
-            SpeechLanguage.En -> if (meters == null || shift == null) {
-                "$label $clock, $exit."
-            } else {
-                "$label ${DistanceText.spoken(meters, language)} $clock, move $shift to the ${exitWord(passage, language)}."
-            }
-        }
+        if (meters == null) return "$exit."
+        return "$exit, ${DistanceText.spokenShort(meters, language)}."
     }
 
     /** « la gauche » / « le centre » / « center » : la sortie en mots. */
@@ -340,12 +313,6 @@ object Guidance {
             SteeringCap.Straight -> "center"
             SteeringCap.Right -> "right"
         }
-    }
-
-    /** « gauche » / « left ». */
-    private fun sideWord(side: GuidanceSide, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> if (side == GuidanceSide.Left) "gauche" else "droite"
-        SpeechLanguage.En -> if (side == GuidanceSide.Left) "left" else "right"
     }
 
     /** Sortie V1 (gauche/droite) vue comme cap, pour le chemin publié. */

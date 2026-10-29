@@ -3,26 +3,37 @@ package dev.sam3vision.core.stairs
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Ordre d'annonce « escalier devant » : [phrase] dans la langue de la voix,
- * [confidence] et [lineCount] du signal qui l'a déclenché (journal, réglages).
+ * Ordre d'annonce d'escalier : [phrase] dans la langue de la voix, [direction]
+ * son sens, [confidence] et [lineCount] du signal qui l'a déclenché (journal,
+ * réglages ; voie labels SAM : confiance 1, 0 ligne — le Canny seul compte).
  */
 data class StairCue(
     val phrase: String,
     val confidence: Float,
     val lineCount: Int,
+    val direction: StairDirection = StairDirection.Unknown,
 )
 
 /**
- * Phrases « escalier devant », FR/EN comme les positions (`PositionText`).
- * Liste fermée d'une seule phrase : le préchauffage hors-ligne n'a qu'un clip
- * à générer quand le câblage voix sera branché (voir `StairDetector`).
+ * Phrases d'escalier, FR/EN comme les positions (`PositionText`) : une info de
+ * navigation (« Escalier montant. »), jamais une consigne d'évitement — on ne
+ * contourne pas l'escalier qu'on veut prendre.
  */
 object StairText {
-    /** « Escalier devant. » / « Stairs ahead. » selon [language]. */
-    fun phrase(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Escalier devant."
-        SpeechLanguage.En -> "Stairs ahead."
-    }
+    /** « Escalier montant. » / « Stairs up. » (sens inconnu : « Escalier devant. »). */
+    fun phrase(language: SpeechLanguage, direction: StairDirection = StairDirection.Unknown): String =
+        when (language) {
+            SpeechLanguage.Fr -> when (direction) {
+                StairDirection.Up -> "Escalier montant."
+                StairDirection.Down -> "Escalier descendant."
+                StairDirection.Unknown -> "Escalier devant."
+            }
+            SpeechLanguage.En -> when (direction) {
+                StairDirection.Up -> "Stairs up."
+                StairDirection.Down -> "Stairs down."
+                StairDirection.Unknown -> "Stairs ahead."
+            }
+        }
 }
 
 /**
@@ -47,8 +58,15 @@ class StairWatcher(
     /**
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
      * quand le compte de confirmation est atteint hors cooldown, `null` sinon.
+     * [direction] est le sens annoncé (voie labels SAM ; le Canny seul ne le
+     * voit pas et garde [StairDirection.Unknown]).
      */
-    fun onSignal(signal: StairSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): StairCue? {
+    fun onSignal(
+        signal: StairSignal,
+        nowMs: Long,
+        language: SpeechLanguage = SpeechLanguage.Fr,
+        direction: StairDirection = StairDirection.Unknown,
+    ): StairCue? {
         if (!signal.detected) {
             hits = 0
             return null
@@ -58,7 +76,7 @@ class StairWatcher(
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
-        return StairCue(StairText.phrase(language), signal.confidence, signal.lineCount)
+        return StairCue(StairText.phrase(language, direction), signal.confidence, signal.lineCount, direction)
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */
