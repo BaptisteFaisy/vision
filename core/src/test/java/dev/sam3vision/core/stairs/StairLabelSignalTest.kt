@@ -27,6 +27,7 @@ class StairLabelSignalTest {
 
         assertTrue(up.detected)
         assertEquals(StairDirection.Up, up.direction)
+        assertEquals(0.5f, up.centerX!!, 0.001f)
         assertTrue(down.detected)
         assertEquals(StairDirection.Down, down.direction)
     }

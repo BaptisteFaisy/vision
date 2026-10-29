@@ -38,6 +38,18 @@ class CurbWatcherTest {
 
         assertTrue(signal.detected)
         assertEquals(0.8f, signal.meters!!, 0.001f)
+        assertEquals(0.5f, signal.centerX!!, 0.001f)
+    }
+
+    @Test
+    fun `l'heure situe l'annonce`() {
+        val watcher = CurbWatcher()
+        val signal = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f)
+        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+        watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 3_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention à la marche, à midi.", cue!!.phrase)
     }
 
     @Test

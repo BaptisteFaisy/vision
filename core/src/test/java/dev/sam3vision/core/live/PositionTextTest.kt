@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SeenObject
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -141,5 +142,33 @@ class PositionTextTest {
         assertEquals(PositionText.key(listOf(trois)), PositionText.key(listOf(troisBis)))
         assertEquals("personne|à midi|2", PositionText.key(listOf(deux)))
         assertEquals("personne|à midi|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
+    }
+
+    @Test
+    fun `withHour situe au cadran`() {
+        assertEquals(
+            "Attention à la barrière, à 2 heures.",
+            PositionText.withHour("Attention à la barrière", 0.8f, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Attention à la marche, à midi.",
+            PositionText.withHour("Attention à la marche", 0.5f, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Escalier montant, à 11 heures.",
+            PositionText.withHour("Escalier montant", 0.3f, SpeechLanguage.Fr),
+        )
+    }
+
+    @Test
+    fun `withHour anglais et sans heure`() {
+        assertEquals(
+            "Attention, barrier, at 2 o'clock.",
+            PositionText.withHour("Attention, barrier", 0.8f, SpeechLanguage.En),
+        )
+        assertEquals(
+            "Attention à la barrière.",
+            PositionText.withHour("Attention à la barrière", null, SpeechLanguage.Fr),
+        )
     }
 }

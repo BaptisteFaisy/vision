@@ -167,7 +167,7 @@ internal fun LiveProbe.observeStairs(
             } else {
                 StairSignal.none()
             }
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction)
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction, found.centerX)
                 ?: return@collect
             voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
         }

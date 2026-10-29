@@ -25,6 +25,17 @@ class HazardWatchTest {
         assertTrue(signal.detected)
         assertEquals(0.8f, signal.meters!!, 0.001f)
         assertEquals("barrier", signal.label)
+        assertEquals(0.5f, signal.centerX!!, 0.001f)
+    }
+
+    @Test
+    fun `l'heure situe l'annonce`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier", centerX = 0.8f)
+        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention à la barrière, à 2 heures.", cue!!.phrase)
     }
 
     @Test
