@@ -193,7 +193,9 @@ jobs:
         if: steps.perimetre.outputs.backend == '1'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          # 3.13 : seule ligne avec un build précompilé pour Debian 13 (le système
+          # des runners) — 3.12 n'en a pas (« was not found for Debian 13 »).
+          python-version: '3.13'
           cache: 'pip'
           cache-dependency-path: server/scripts/requirements-test.txt
       - name: Tests unitaires backend
