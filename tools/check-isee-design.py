@@ -11,7 +11,8 @@ Quatre contrôles, sans compilation :
    sont figées par `IseePortraitTest`). Les commentaires ne comptent pas :
    un câblage commenté est un câblage absent.
 3. Boule gelée : le code qui dessine la boule (`IseePortraitOrb.kt` entier
-   et 5 unités d'animation de `IseeScenePane.kt`) correspond à l'octet près
+   et 5 unités d'animation de `IseeScenePane.kt`) correspond, à la fin de
+   ligne près (CRLF et LF normalisés : même baseline sous Windows et en CI),
    à `tools/orb-frozen-baseline.json`. Changement voulu (demande explicite
    du user uniquement) : `python3 tools/freeze-orb-baseline.py`, puis
    relire le diff — docs/ISEE-DESIGN-PORTRAIT.md §6.
@@ -170,11 +171,21 @@ def check_wiring(root, limits):
     return errors
 
 
+def _sha256_source(path):
+    """Empreinte d'un source, insensible aux fins de ligne.
+
+    Le dépôt stocke des LF ; un poste Windows en recopie des CRLF. Hasher les
+    octets bruts rendait la baseline propre à une seule plateforme (CI Linux
+    rouge sur une baseline figée sous Windows) alors que le code est identique.
+    """
+    with open(path, "rb") as handle:
+        return hashlib.sha256(handle.read().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def orb_hashes(root, limits):
     """Empreintes du code gelé : fichier boule + 5 unités d'animation."""
     hashes = {"version": 1, "files": {}, "regions": {}}
-    with open(os.path.join(root, ORB_FILE), "rb") as handle:
-        hashes["files"][ORB_FILE] = hashlib.sha256(handle.read()).hexdigest()
+    hashes["files"][ORB_FILE] = _sha256_source(os.path.join(root, ORB_FILE))
     text = _read(os.path.join(root, ORB_PANE))
     _, found = limits.kotlin_declarations(text)
     for name in ORB_REGIONS:

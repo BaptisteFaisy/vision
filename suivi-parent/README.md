@@ -7,7 +7,7 @@
 > Gradle `caregiverAssets`) et de référence pour l'ancien contrat.
 
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
-Android : fond blanc, petite boule Portrait bleue et verte, phrase courante,
+Android : fond blanc, petite boule Portrait cacao et caramel, phrase courante,
 **image du téléphone accompagné** (dernière frame caméra, 320 px) et, pendant un
 trajet guidé, une **barre de progression liquide** du départ à l'arrivée.
 
@@ -38,10 +38,13 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
 
 ## Rendu et données
 
-- La boule reprend le shader Portrait Android, avec un liquide bleu et vert,
-  un rayon de 24 % de la largeur et un plafond de 100 px CSS. À la racine,
-  `python tools/export-caregiver-orb.py` régénère son port WebGL. Le shader
-  Android gelé reste inchangé. Repli en verre bleu et vert si WebGL est indisponible.
+- La boule reprend le shader Portrait Android, avec un liquide cacao et caramel
+  (proposition 32 de la planche de couleurs), un rayon de 24 % de la largeur et
+  un plafond de 100 px CSS. À la racine, `python tools/export-caregiver-orb.py`
+  régénère son port WebGL depuis la source AGSL, qui reste la seule vérité :
+  verre, bord et liseré y prennent la teinte du liquide, donc pas d'arc-en-ciel
+  rose, vert ou bleu. Repli en verre cacao et caramel si WebGL est indisponible
+  (mêmes variables `--orb-color-*`).
 - Texte Portrait, quatre lignes maximum, même cadence d'éclairage mot à mot
   quand le téléphone indique qu'il parle. La dernière phrase est transmise
   sans historique ; sinon le site décrit les deux objets reçus les plus proches.
