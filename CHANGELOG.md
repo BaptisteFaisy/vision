@@ -33,6 +33,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `:core` 1 789 tests + `:app` 989 tests, 0 échec ; `check-kotlin-limits` OK.
 
 ## 2026-10-29 — iSee : la voix dit les obstacles proches, même non mesurés
+## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix) ; la voix dit les obstacles proches, même non mesurés ; suivi : le lien se lit dans les Réglages, un lien mort se dit ; voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
 
 - **Cause** : le user marche avec l'app, elle ne dit plus les obstacles même en
   approchant. Deux causes lues dans le code : (1) `observeSpoken` en
@@ -41,13 +42,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   = silence total ; (2) la matière au contact (boîte coupée ⇒ non mesurable)
   disait un mot puis se taisait (clé `?` constante, nouveauté muette), sans
   jamais passer en « Stop. ».
-- `ProbeWiring.observeSpoken` : `distinctUntilChanged` sur `spoken` (seule une
-  phrase plus fraîche annule), « Stop. » urgent (clip pré-synthétisé, coupe le
-  chat) ; guetteurs trottoir/escaliers en `collect` (une alerte confirmée ne
-  s'annule pas). `Guidance` : matière non mesurée qui remplit le champ
-  (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC = 0,05`, emprise `LabelExtent`
-  portée par `PlacedLabel`) ⇒ « Stop. » immédiat, sauf peinture au sol
-  (`crosswalk`) ; `ProximityVoice` : moteur de synthèse injectable (faux en test).
+- **Voix** : `ProbeWiring.observeSpoken` : `distinctUntilChanged` sur `spoken`
+  (seule une phrase plus fraîche annule), « Stop. » urgent (clip pré-synthétisé,
+  coupe le chat) ; guetteurs trottoir/escaliers en `collect` (une alerte
+  confirmée ne s'annule pas). `Guidance` : matière non mesurée qui remplit le
+  champ (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC = 0,05`, emprise
+  `LabelExtent` portée par `PlacedLabel`) ⇒ « Stop. » immédiat, sauf peinture
+  au sol (`crosswalk`) ; `ProximityVoice` : moteur de synthèse injectable
+  (faux en test).
+- **Guidage TwinLiteNet sur la caméra** : flèche + voix ; fin du guidage
+  surprise, confirmation obligatoire avant d'appliquer la consigne.
+- **Suivi** : le lien se lit dans les Réglages ; un lien mort se dit (annoncé
+  à voix haute).
+- **Direct** : portes et barrières reconnues en extérieur (ordre user).
 - Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630 (cœur 1785/1785,
   app 962/962, 0 échec — `GuidanceTest` 22/22, `GuidanceAnnouncerTest` 12/12,
   `ProbeWiringSpokenTest` 3/3 dont rouge-sans-fix vérifié par revert),
@@ -125,6 +132,11 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   empilée au-dessus des deux désormais.
 - `TwinLiteVoice.say` : `twinlite: dit « … » (urgent=…) : ok` — chaque consigne
   parlée est traçable au logcat (recette voix + observabilité).
+- **Suivi (ordre user)** : le lien se lit dans les Réglages ; un lien mort se
+  dit (annonce explicite à la voix plutôt qu'un silence).
+- **Voix (ordre user)** : fin du guidage surprise — confirmation obligatoire
+  avant de lancer le guidage.
+- **Direct (ordre user)** : portes et barrières reconnues en extérieur.
 - Preuves voix/iSee : `VoiceNavHoldTest` 11/11 + `:app` `testDebugUnitTest` verts
   sur r630 (8/8 `TwinLiteWiringTest` inchangés — voix `null` en test),
   `assembleDebug` vert, `check-kotlin-limits` OK. Recette voix sur téléphone
@@ -165,8 +177,6 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   316 → **0** pixel vert ou magenta. Ancien shader mesuré à l'identique pour
   comparaison.
 
-## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
-
 - `TwinLiteGuide` (`core/.../segment/`) : tiers de la moitié basse du masque
   praticable → ←/↑/→/■, seuil 0,25, STOP sous le seuil partout ; `TwinLiteText`
   (FR/EN) ; `TwinLiteAnnouncer` sur `AnnouncementGate` (stabilité 2, délai 4 s,
@@ -177,6 +187,12 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (flèche bas-centrée verte/ambre/rouge) branchés sur la caméra iSee
   (téléphone + lunettes) ; voix système hors ligne (`TwinLiteVoice`,
   urgent = flush) ; `IseeTwinLite` tient le ViewModel sous 500 lignes.
+- Suivi : le lien se lit dans les Réglages (lecture explicite du lien affiché),
+  et un lien mort se dit (annonce du lien inactif au lieu du silence).
+- Voix : fin du guidage surprise — plus d'annonce non sollicitée ; toute
+  confirmation devient obligatoire avant de parler.
+- Direct : portes et barrières reconnues aussi en extérieur, dans l'ordre
+  défini par l'utilisateur.
 - Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630
   (`TwinLiteGuideTest` 13/13, `TwinLiteAnnouncerTest` 12/12,
   `TwinLiteWiringTest` 8/8), `assembleDebug` vert, `check-kotlin-limits` OK.
@@ -199,10 +215,8 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `DepthMap.kt`, `PointCloud.kt`, `app/build.gradle.kts` (commentaire),
   `README.md`, `docs/DEPTH.md`, `docs/TESTING.md`,
   `docs/TWINLITE-SAM31.md`, `NOTICE-depth.txt`.
-- Preuves : `:core:test` + `:app:testDebugUnitTest` verts sur le r630 ;
+- Preuves : `:core:test` + `:app:testDebugUnitTest` verts sur r630 ;
   `DepthEstimatorTest` verrouille la migration `fromName`.
-
-## 2026-10-29 — voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
 
 ### Voix — fin du guidage surprise, confirmation obligatoire
 
@@ -220,6 +234,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 ### Direct — portes et barrières reconnues en extérieur (ordre user)
 
+- **Cause mesurée** : le lien de suivi n'existait que dans le message WhatsApp.
+  Impossible de vérifier quel flux un téléphone publie, donc un lien devenu faux
+  (app réinstallée → identifiant de flux réattribué) ressemblait trait pour trait
+  à un proche qui n'a pas encore filmé. Côté page, le relais répond
+  `{ok:true, live:false}` **sans `serverAt`** pour un identifiant jamais publié —
+  exactement la même chose qu'un flux qui s'est tu ; la page attendait donc
+  « En attente du téléphone de ton proche » indéfiniment, sur une carte au niveau
+  monde sans repère, sans jamais nommer le problème.
+- Réglages → « Parent tracking » : le lien exact envoyé par WhatsApp est **affiché**
+  (sélectionnable) avec « Copy link » (presse-papier, confirmation 2 s), plus un
+  avertissement quand « Send position… » est coupé (le lien existe alors mais
+  aucun envoi ne part). Section extraite dans `app/ParentShareSettings.kt` :
+  `SettingsScreen.kt` repasse sous le plafond de 500 lignes.
+- Page caregiver embarquée : état `NO STREAM` (`neverPublished` dans
+  `session.mjs`, pastille grise, recentrage désactivé) et message actionnable
+  « Aucun suivi pour ce lien : il a peut-être changé (app réinstallée)… ».
+  Aucun « lien mort » annoncé avant la première réponse du relais, et un flux
+  simplement muet garde son état OFFLINE.
 - `LivePrompts.default` : 10 → 12 concepts (`door`, `barrier` en plus, en fin
   de liste) ; `MAX = 16` et `PROMPT_LIMIT = 16` inchangés (12 < 16, soit
   2 inférences/frame assumées de plus sur le chemin tracker).
@@ -228,7 +260,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   et le guidage obstacle annonce portes et barrières comme tout obstacle.
 - Côté serveur, rien à changer : `porte→door` et `barrière→barrier` déjà dans
   `server/backend/concepts.py`, plafond déjà à 16 (`tracking.py:53`).
-- Preuves : `:core` `LivePromptsTest` (dont « portes et barrières suivies en
+- Preuves : `node --test suivi-parent/test/session.test.mjs
+  suivi-parent/test/relay.test.mjs` → 11/11 verts (dont le nouveau cas
+  `neverPublished`) ; `:app:testDebugUnitTest` (`CaregiverShareLinkTest`,
+  `ParentShareTest`) et `:core:testDebugUnitTest` (`CaregiverPageTest`) verts ;
+  `:app:assembleDebug` vert ; `tools/check-kotlin-limits.py` OK ; asset
+  `assets/caregiver/live.mjs` de l'APK contient bien l'état `NO STREAM`.
+- Preuves (direct) : `:core` `LivePromptsTest` (dont « portes et barrières suivies en
   extérieur »), `LivePromptsNavigationTest`, `StairConceptsTest`,
   `KnownSizesTest` (dont « portes et barrières calibrées ») ;
   `check-kotlin-limits.py` OK.

@@ -62,6 +62,11 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   s'arrête et se fige (atténuée) quand le flux n'est plus LIVE.
 - LIVE avant 12 s ; SIGNAL LOST jusqu'à 2 min (objets et position figés en gris) ;
   OFFLINE ensuite (aucun repère ni phrase active). Aucune simulation en production.
+- NO STREAM quand le relais ne connaît pas l'identifiant (`{ok:true, live:false}`
+  sans `serverAt`, ou flux purgé après 24 h) : la page le dit et propose de
+  redemander le lien, au lieu d'attendre indéfiniment un téléphone qui n'existe
+  plus — un lien périmé (app réinstallée, nouvel identifiant) ne ressemble plus
+  trait pour trait à un proche pas encore en direct.
 
 ## Flux
 
