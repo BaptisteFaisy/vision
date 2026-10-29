@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -159,9 +160,10 @@ class IseePictoTest {
     fun `chipZone publie la zone tactile du chip`() = runTest {
         val coordinator = picto()(this)
         assertNull(coordinator.chipZone())
+        // Identité, pas égalité : le stub android RectF.equals rend faux en JVM.
         val zone = RectF(1f, 2f, 3f, 4f)
         coordinator.setChipBounds(zone)
-        assertEquals(zone, coordinator.chipZone())
+        assertSame(zone, coordinator.chipZone())
         coordinator.setChipBounds(null)
         assertNull(coordinator.chipZone())
     }
