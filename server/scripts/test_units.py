@@ -27,8 +27,8 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.modules.setdefault("test_units", sys.modules["__main__"])
 
-from tests_units import (latency_tests, live_fast_tests, live_fast_perf_tests, llm_tests,  # noqa: E402
-                         merge_tests, native_tests, weights_tests)
+from tests_units import (boot_tests, latency_tests, live_fast_tests, live_fast_perf_tests,  # noqa: E402
+                         llm_tests, merge_tests, native_tests, weights_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -456,6 +456,8 @@ RUNNERS = (
     ("live_fast : poids locaux (module déployé)", "timing", weights_tests.test_live_fast_weights),
     ("live_fast : image (poids + snapshot déployés)", "timing", weights_tests.test_live_fast_image),
     ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
+    ("live_fast : règle restored", "timing", boot_tests.test_restored_rule),
+    ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
     ("natif : source officielle", "segmentation_native", native_tests.test_native_source),
