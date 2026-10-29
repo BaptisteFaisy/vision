@@ -1,5 +1,7 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.distance.KnownSizes
+
 /**
  * Mode Maison : trois presets d'objets d'appartement pour le direct, ceux qu'un
  * malvoyant peine à retrouver (médicaments, clés, lunettes…). Chaque preset tient
@@ -86,4 +88,75 @@ object HomeModes {
      * maison : le mode rue garde ses étiquettes inchangées.
      */
     fun french(label: String): String = FRENCH[label.trim().lowercase()] ?: label
+
+    /** Les 21 concepts maison, toutes pastilles : le vocabulaire chassable à la voix. */
+    val CONCEPTS: Set<String> = ALL.flatMap { it.prompts }.toSet()
+
+    /**
+     * Mots parlés d'un seul mot vers les concepts à libellé français composé
+     * (« médicaments » vise la boîte, « étui » l'étui à lunettes). Clés déjà
+     * canoniques ([KnownSizes.canonical]).
+     */
+    private val WORD_ALIASES = mapOf(
+        "medicaments" to "medicine box",
+        "mouchoirs" to "tissue box",
+        "etui" to "glasses case",
+    )
+
+    /** Libellés français d'un seul mot → concept (« cles » → « keys »). */
+    private val WORD_FR: Map<String, String> = buildMap {
+        FRENCH.forEach { (concept, label) ->
+            val key = KnownSizes.canonical(label)
+            if (!key.contains(' ')) put(key, concept)
+        }
+    }
+
+    /** Concepts anglais d'un seul mot → eux-mêmes (« keys » dicté en anglais). */
+    private val WORD_EN: Map<String, String> = buildMap {
+        ALL.flatMap { it.prompts }.forEach { concept ->
+            val key = KnownSizes.canonical(concept)
+            if (!key.contains(' ')) put(key, concept)
+        }
+    }
+
+    /**
+     * Mot dicté → concept SAM maison, `null` si inconnu. Tolérant : casse,
+     * accents et ponctuation neutralisés, singulier/pluriel simple accepté
+     * (« clé » → « keys »), anglais accepté, alias pour les libellés composés.
+     * Un texte de plusieurs mots n'est jamais un mot : `null`.
+     */
+    fun conceptForWord(word: String): String? {
+        val key = KnownSizes.canonical(word)
+        if (key.isEmpty() || key.contains(' ')) return null
+        WORD_FR[key]?.let { return it }
+        WORD_EN[key]?.let { return it }
+        WORD_ALIASES[key]?.let { return it }
+        val flip = if (key.endsWith("s")) key.dropLast(1) else key + "s"
+        WORD_FR[flip]?.let { return it }
+        WORD_EN[flip]?.let { return it }
+        return WORD_ALIASES[flip]
+    }
+
+    /**
+     * Vrai quand le direct suit des concepts maison : un preset ([activeId]) ou
+     * la chasse lancée par un mot parlé (un ou plusieurs concepts maison). La
+     * rue, la traversée et le champ « Suivre » libre n'y sont pas.
+     */
+    fun isHome(prompts: List<String>): Boolean {
+        if (prompts.isEmpty()) return false
+        if (activeId(prompts) != null) return true
+        return prompts.all { CONCEPTS.contains(it.trim().lowercase()) }
+    }
+
+    /**
+     * Texte parlé ou écrit → concept à chasser par SAM, `null` = question LLM.
+     * Un seul mot du vocabulaire maison, mode maison actif et SAM allumé : le
+     * LLM n'est pas appelé, SAM resegmente et la voix dit où c'est.
+     */
+    fun voiceConcept(text: String, prompts: List<String>, samEnabled: Boolean): String? {
+        if (!samEnabled || !isHome(prompts)) return null
+        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        if (words.size != 1) return null
+        return conceptForWord(words[0])
+    }
 }

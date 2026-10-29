@@ -1,6 +1,7 @@
 package dev.sam3vision.core.live
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -68,5 +69,71 @@ class HomeModesTest {
         assertEquals("person", HomeModes.french("person"))
         assertEquals("electric scooter", HomeModes.french("electric scooter"))
         assertEquals("", HomeModes.french(""))
+    }
+
+    @Test
+    fun `conceptForWord traduit le francais parle, casse et accents neutres`() {
+        assertEquals("keys", HomeModes.conceptForWord("clés"))
+        assertEquals("keys", HomeModes.conceptForWord("  CLÉS ! "))
+        assertEquals("tv remote", HomeModes.conceptForWord("télécommande"))
+        assertEquals("drinking glass", HomeModes.conceptForWord("verre"))
+        assertEquals("light switch", HomeModes.conceptForWord("Interrupteur"))
+    }
+
+    @Test
+    fun `conceptForWord accepte le singulier et l anglais`() {
+        assertEquals("keys", HomeModes.conceptForWord("clé"))
+        assertEquals("keys", HomeModes.conceptForWord("key"))
+        assertEquals("keys", HomeModes.conceptForWord("keys"))
+        assertEquals("bottle", HomeModes.conceptForWord("bouteille"))
+        assertEquals("scissors", HomeModes.conceptForWord("ciseaux"))
+    }
+
+    @Test
+    fun `conceptForWord vise les libelles composes par alias`() {
+        assertEquals("medicine box", HomeModes.conceptForWord("médicaments"))
+        assertEquals("tissue box", HomeModes.conceptForWord("mouchoirs"))
+        assertEquals("glasses case", HomeModes.conceptForWord("étui"))
+        assertEquals("glasses", HomeModes.conceptForWord("lunettes"))
+    }
+
+    @Test
+    fun `conceptForWord refuse l inconnu le vide et les phrases`() {
+        assertNull(HomeModes.conceptForWord("doudou"))
+        assertNull(HomeModes.conceptForWord("pourquoi"))
+        assertNull(HomeModes.conceptForWord(""))
+        assertNull(HomeModes.conceptForWord("   "))
+        assertNull(HomeModes.conceptForWord("boîte de médicaments"))
+        assertNull(HomeModes.conceptForWord("les clés"))
+    }
+
+    @Test
+    fun `isHome couvre les presets et la chasse par mot`() {
+        assertTrue(HomeModes.isHome(HomeModes.ESSENTIELS.prompts))
+        assertTrue(HomeModes.isHome(HomeModes.SANTE.prompts))
+        assertTrue(HomeModes.isHome(HomeModes.CUISINE.prompts))
+        assertTrue(HomeModes.isHome(listOf("keys")))
+        assertTrue(HomeModes.isHome(listOf("keys", "glasses")))
+        assertTrue(HomeModes.isHome(listOf("Keys")))
+    }
+
+    @Test
+    fun `isHome refuse la rue la traversee et le vide`() {
+        assertFalse(HomeModes.isHome(LivePrompts.default))
+        assertFalse(HomeModes.isHome(listOf("person")))
+        assertFalse(HomeModes.isHome(listOf("keys", "person")))
+        assertFalse(HomeModes.isHome(emptyList()))
+    }
+
+    @Test
+    fun `voiceConcept ne chasse qu un mot maison sam allume`() {
+        val maison = HomeModes.ESSENTIELS.prompts
+        assertEquals("keys", HomeModes.voiceConcept("clés", maison, true))
+        assertEquals("keys", HomeModes.voiceConcept("CLÉS ?", listOf("keys"), true))
+        assertNull(HomeModes.voiceConcept("où sont les clés ?", maison, true))
+        assertNull(HomeModes.voiceConcept("doudou", maison, true))
+        assertNull(HomeModes.voiceConcept("clés", LivePrompts.default, true))
+        assertNull(HomeModes.voiceConcept("clés", maison, false))
+        assertNull(HomeModes.voiceConcept("   ", maison, true))
     }
 }
