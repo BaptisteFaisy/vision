@@ -101,7 +101,7 @@ class IseeVoiceNav(
             announcer = NavigationAnnouncer({ settings() }) { _, text -> speak(text) },
             voice = VoiceNavAnnouncer({ settings() }) { _, text -> speak(text) },
             routeLoader = { destination -> loader(destination) },
-            extraParsers = listOf(VoiceDestinationParser::parse),
+            extraParsers = listOf(VoiceDestinationParser::parseExtra),
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
             // Ordres « désactive / active le GPS » : la porte de voix suit.

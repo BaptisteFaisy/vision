@@ -147,4 +147,48 @@ class NavigationIntentTest {
         assertNull(destinationOf("j'aime naviguer"))
         assertNull(destinationOf("nous naviguons vers le large"))
     }
+
+    @Test
+    fun `articles contractes au et aux`() {
+        assertEquals("supermarché", destinationOf("je veux aller au supermarché"))
+        assertEquals("toilettes", destinationOf("je veux aller aux toilettes"))
+        assertEquals("marché", destinationOf("je voudrais aller au marché"))
+        assertEquals("resto", destinationOf("aller au resto"))
+        assertEquals("urgences", destinationOf("aller aux urgences"))
+        assertEquals("bout de la rue", destinationOf("va au bout de la rue"))
+        assertEquals("café", destinationOf("emmène-moi au café"))
+        assertEquals("toilettes", destinationOf("conduis-moi aux toilettes"))
+        assertEquals("MARCHE", destinationOf("JE VEUX ALLER AU MARCHE"))
+    }
+
+    @Test
+    fun `prepositions en dans vers chez jusqua`() {
+        assertEquals("ville", destinationOf("je vais aller en ville"))
+        assertEquals("centre-ville", destinationOf("aller en centre-ville"))
+        assertEquals("le médecin", destinationOf("je veux aller chez le médecin"))
+        assertEquals("le magasin", destinationOf("je veux aller dans le magasin"))
+        assertEquals("la sortie", destinationOf("je veux aller vers la sortie"))
+        assertEquals("la gare", destinationOf("je veux aller jusqu'à la gare"))
+        assertEquals("bout de la rue", destinationOf("je veux aller jusqu'au bout de la rue"))
+        assertEquals("bout", destinationOf("guide-moi jusqu'au bout"))
+        assertEquals("ville", destinationOf("va en ville"))
+        assertEquals("cinéma", destinationOf("j'aimerais aller au cinéma"))
+    }
+
+    @Test
+    fun `variante STT amene-moi`() {
+        assertEquals("la gare", destinationOf("amène-moi à la gare"))
+        assertEquals("la plage", destinationOf("amene-moi a la plage"))
+        assertEquals("Halles", destinationOf("Amenez-moi aux Halles"))
+    }
+
+    @Test
+    fun `expressions figees ne sont pas des destinations`() {
+        assertNull(destinationOf("je veux aller en savoir plus"))
+        assertNull(destinationOf("je veux aller dans le détail"))
+        assertNull(destinationOf("je veux aller dans les détails"))
+        assertNull(destinationOf("va en arrière"))
+        assertNull(destinationOf("va en avant"))
+        assertNull(destinationOf("va en haut"))
+    }
 }

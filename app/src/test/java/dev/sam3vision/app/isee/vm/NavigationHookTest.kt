@@ -113,6 +113,15 @@ class NavigationHookTest {
     }
 
     @Test
+    fun `direction X hors routeur ouvre Maps au lieu du LLM`() = runBlocking {
+        val launcher = FakeLauncher()
+
+        assertTrue(hook(launcher).onTranscript("direction gare de Lyon"))
+        assertEquals(listOf(NavDestination.Query("gare de Lyon")), launcher.launched)
+        assertEquals(listOf("Navigation vers gare de Lyon"), spoken)
+    }
+
+    @Test
     fun `routeur qui jette = pas d'intention`() = runBlocking {
         val launcher = FakeLauncher()
         val throwing = NavigationRouter(parse = { throw IllegalStateException("boom") })

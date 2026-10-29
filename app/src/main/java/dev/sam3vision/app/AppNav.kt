@@ -107,7 +107,8 @@ sealed interface Route {
 
     /**
      * Navigation vocale in-app (URL Valhalla configurée) : confirmation puis
-     * guidage, poussée par l'état de session — jamais ouverte à la main.
+     * arrivée, poussée par l'état de session — jamais ouverte à la main. Le
+     * guidage vit sur l'accueil iSee (caméra + carte dessous).
      */
     data object VoiceNav : Route
 }
@@ -133,9 +134,11 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
 
 
 /**
- * L'état de session pilote l'écran navigation : confirmation ou guidage =
- * poussé (une fois), repos = dépilé (arrivée, arrêt, annulation). Le retour
- * système dépile sans repousse : quitter l'écran arrête le guidage.
+ * L'état de session pilote l'écran navigation : confirmation ou arrivée =
+ * poussé (une fois), repos = dépilé (arrivée fermée, arrêt, annulation).
+ * Le guidage, lui, vit sur l'accueil iSee (caméra + carte dessous) : s'il
+ * est poussé, il est dépilé. Le retour système dépile sans repousse :
+ * quitter la confirmation l'annule, quitter l'arrivée la referme.
  */
 @Composable
 private fun VoiceNavStateEffect(
@@ -148,6 +151,7 @@ private fun VoiceNavStateEffect(
     LaunchedEffect(navState) {
         when {
             navState is VoiceNavUiState.Idle -> if (route == Route.VoiceNav) pop()
+            navState is VoiceNavUiState.Guiding -> if (route == Route.VoiceNav) pop()
             route != Route.VoiceNav -> push(Route.VoiceNav)
         }
     }

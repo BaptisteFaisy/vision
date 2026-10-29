@@ -6,7 +6,9 @@ import dev.sam3vision.app.navigation.NavigationLauncher
 import dev.sam3vision.app.navigation.TravelMode
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.NavigationPhrases
+import dev.sam3vision.core.nav.DestinationQuery
 import dev.sam3vision.core.usecase.NavigationRouter
+import dev.sam3vision.core.voicenav.VoiceDestinationParser
 
 /**
  * Hook dictée → navigation : appelé à la réception du transcript, avant le chemin
@@ -17,8 +19,9 @@ import dev.sam3vision.core.usecase.NavigationRouter
  * TTS [NavigationPhrases]). Lui-même ne parse rien, ne lance rien, ne synthétise rien.
  *
  * Contrat :
- * - pas d'intention navigation (routeur `null`, transcript blanc) → `false`,
- *   l'appelant poursuit le chemin question normal ;
+ * - pas d'intention navigation (routeur `null`, repli `direction X` / sans
+ *   préposition `null`, transcript blanc) → `false`, l'appelant poursuit le
+ *   chemin question normal ;
  * - intention reconnue → lancement tenté ([NavigationLauncher.launch] si
  *   [guidanceEnabled], sinon [NavigationLauncher.openPlace]), annonce TTS dans
  *   tous les cas, `true` (consommé — même si le lancement échoue, le texte
@@ -45,8 +48,10 @@ class NavigationHook(
      */
     suspend fun onTranscript(text: String): Boolean {
         if (text.isBlank()) return false
-        val request = runCatching { router.route(text) }.getOrNull() ?: return false
-        val destination = request.destination
+        val request = runCatching { router.route(text) }.getOrNull()
+        // Routeur `null` (dont exception repliée) : seules les formes hors
+        // routeur sont essayées — jamais ses propres formes (confinement).
+        val destination = request?.destination ?: extraDestination(text) ?: return false
         val outcome = runCatching {
             if (guidanceEnabled()) {
                 launcher.launch(NavDestination.Query(destination), TravelMode.WALK)
@@ -65,5 +70,17 @@ class NavigationHook(
             },
         )
         return true
+    }
+
+    /**
+     * Formes hors routeur (« direction X », « emmène-moi X » sans
+     * préposition) : mêmes formes que les `extraParsers` de la session
+     * in-app, normalisées comme le routeur — le handoff Maps les ouvre
+     * au lieu de les laisser décrire la scène.
+     */
+    private fun extraDestination(text: String): String? {
+        val raw = runCatching { VoiceDestinationParser.parseExtra(text) }.getOrNull()
+        if (raw.isNullOrBlank()) return null
+        return runCatching { DestinationQuery.normalize(raw) }.getOrNull()?.getOrNull()
     }
 }

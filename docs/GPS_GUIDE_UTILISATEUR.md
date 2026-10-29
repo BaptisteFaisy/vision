@@ -14,9 +14,11 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 
 1. **Appui long** (~300 ms) sur la surface iSee → « J'écoute. Parle, puis
    relâche pour envoyer. »
-2. **Dicter** : « je veux aller à la gare de Lyon », « emmène-moi à X »,
-   « aller à X »… (9 motifs, voir `docs/NAVIGATION.md` § Déclenchement
-   vocal). Transcription Meta, repli ElevenLabs Scribe.
+2. **Dicter** : « je veux aller à la gare de Lyon », « emmène-moi au X »,
+   « aller aux X »… (9 motifs, prépositions à, au, aux, en, dans, vers,
+   chez, jusqu'à — voir `docs/NAVIGATION-VOCALE.md` §3). Transcription
+   Meta, repli ElevenLabs Scribe. Sans destination comprise, iSee
+   redemande (« Je n'ai pas compris où tu veux aller… »).
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
    propose un champ de saisie clavier — la saisie vaut une dictée : elle
    ouvre la confirmation, sans redicter.
@@ -34,10 +36,12 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
   Valhalla : adresse seule (distance et durée à zéro). Si l'itinéraire
   échoue : adresse + motif en rouge, et « Démarrer » bascule sur Google
   Maps, **à pied**.
-- **Guidage** : prochaine instruction (« Tournez à gauche dans 50 mètres »),
-  distances restantes, bouton « Arrêter », dictée « arrête le guidage ».
-  Le guidage est **piéton** : ni voiture, ni transport, ni carte.
-  La voix iSee parle chaque consigne ; l'écran suit en grand texte.
+- **Guidage** : sur l'accueil iSee, sous la caméra — carte (tracé +
+  position), prochaine instruction, distances restantes, bouton
+  « Arrêter le guidage », dictée « arrête le guidage ». Le guidage est
+  **piéton** : ni voiture, ni transport. La caméra et la sonde
+  continuent (évitement d'obstacles préservé) ; la voix iSee parle
+  chaque consigne.
 - **Écart** : en cas de sortie d'itinéraire, bandeau « Écart — recalcul… »
   + annonce « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
@@ -83,9 +87,9 @@ SHA du build — règle ISEE-TEST-MASTER-SEUL), APK installé, clés ElevenLabs
 + voix renseignées, interrupteur sur oui, URL Valhalla par défaut,
 téléphone pris sous verrou dur + annonce dans `BOITE-USER.md`.
 
-1. Dicter « je veux aller à la gare de Lyon » → **guidage lancé
-   directement** : écran Guidage, annonce puis consignes, sans écran
-   Destination et sans appuyer sur « Démarrer ».
+1. Dicter « je veux aller à la gare de Lyon » → écran Destination
+   (adresse + résumé), « Démarrer » → retour à l'accueil iSee : carte
+   sous la caméra, annonce puis consignes.
 2. Lire le résumé sur l'écran de guidage : distance et durée chiffrées
    (ex. « 2,4 km · 30 min »).
 3. Marcher : consignes suivies, distances décroissantes, grand texte lisible.
