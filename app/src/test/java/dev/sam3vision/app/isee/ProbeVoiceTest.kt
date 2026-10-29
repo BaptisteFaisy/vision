@@ -30,7 +30,7 @@ class ProbeVoiceTest {
     }
 
     @Test
-    fun `guidage dit continue tout droit sur voie libre`() {
+    fun `guidage dit continue sur voie libre`() {
         val voice = guided()
 
         assertNull(voice.phrase(0L, libre, SteeringCap.Straight))

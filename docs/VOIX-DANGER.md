@@ -129,3 +129,25 @@ fonce sur quelqu'un. Nouveau contrat, qui **remplace** le § 3 :
   d'évitement.
 
 Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.
+
+## 6. Réactivité maximale (décision du 29/10)
+
+Le 29/10, le user marche avec l'app : elle est trop lente — devant une personne
+sur qui on fonce, elle ne dit parfois **rien**. Cause : la clé de stabilité
+contient le seau de distance, donc un obstacle qui s'approche change de clé à
+chaque frame et n'est jamais « stable » ; et les synthèses se suivaient en file,
+une consigne datée passant devant la fraîche. Nouveau contrat (le user accepte
+que la voix se coupe et parle souvent) :
+
+- **danger dès la 1re frame** : un obstacle qui entre dans le couloir parle
+  aussitôt, sans stabilité ni délai (`firstSight`, `AnnouncementGate`) ; un
+  obstacle qui s'approche reparle à chaque seau (`3 m → 2 m → 1 m → Stop.`) ;
+  la nouveauté reste (une clé déjà dite ne reparle pas) ;
+- **dernier-gagnant** : une phrase plus fraîche annule la synthèse en cours
+  (`collectLatest` côté sonde) au lieu de faire la queue derrière ;
+- **« Stop. » pré-synthétisé** : clip en mémoire (`ProximityVoice.prewarmStop`),
+  zéro réseau au moment critique ;
+- **l'urgent coupe tout**, dictée comprise (`canPlay` ne s'applique qu'aux
+  phrases ordinaires) ;
+- une scène de positions nouvelle parle aussi dès la 1re frame (délai 4 s
+  gardé, qui borne le bavardage) ; les escaliers voix confirment en 2 frames.
