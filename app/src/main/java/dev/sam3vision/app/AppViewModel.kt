@@ -3,7 +3,6 @@ package dev.sam3vision.app
 import android.app.Application
 import android.graphics.Bitmap
 import android.os.SystemClock
-import android.util.Log
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -212,13 +211,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!shouldPrewarm(lastPrewarmMs, now, PREWARM_WINDOW_MS)) return
         lastPrewarmMs = now
         val settings = _state.value.settings
-        val client = samClientOrNull(settings) ?: return
         val endpoint = settings.samEndpoint()
         viewModelScope.launch {
-            val outcome = client.health()
-            gpuMonitor.noteHealthResult(endpoint, outcome)
-            val hot = outcome.getOrNull() == true
-            Log.i("sam3vision", "préchauffage GPU ($endpoint) : ${if (hot) "chaud" else "réveil en cours"}")
+            GpuWake.wake(endpoint) { gpuMonitor.noteHealthResult(endpoint, it) }
         }
     }
 
