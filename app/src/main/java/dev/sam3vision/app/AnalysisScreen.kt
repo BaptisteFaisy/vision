@@ -64,7 +64,8 @@ fun AnalysisScreen(
 @Composable
 private fun PhaseBlock(phase: Phase, onRetry: () -> Unit) {
     when (phase) {
-        Phase.Analyzing -> Row(
+        // Idle = écran poussé, chargement pas encore fini : le spinner répond au clic en 1 frame.
+        Phase.Analyzing, Phase.Idle -> Row(
             Modifier.fillMaxWidth().padding(24.dp),
             horizontalArrangement = Arrangement.Center,
         ) { CircularProgressIndicator(color = AppColors.primary) }
