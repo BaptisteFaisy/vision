@@ -94,20 +94,18 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
     val talking = position != null || (state.holding && state.userSpeaking)
     val speech by animateFloatAsState(if (talking) 1f else 0f, tween(420), label = "camera-speech")
-    // Source affichée, avec mémoire : la dernière image des lunettes reste figée pendant
-    // le fondu de fermeture (`showGlassesFeed`). L'affectation est un point fixe stable.
-    var lastGlasses by remember { mutableStateOf(false) }
-    val showGlasses = showGlassesFeed(layers.glassesFeed, layers.glassesGhost, layers.cameraCard, open, lastGlasses)
-    lastGlasses = showGlasses
+    val showGlasses = rememberGlassesFeed(layers, open)
     val density = LocalDensity.current
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
     val time = rememberSceneTime()
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
     GlassesProbeWiring(viewModel.probe, glassesLive)
-    OrbLayer(view.scene, geo, time, open)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
-    with(density) {
-        SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
+    SceneGuidanceLayer(viewModel, open, with(density) { geo.pictureH.toDp() }) {
+        OrbLayer(view.scene, geo, time, open)
+        with(density) {
+            SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
+        }
     }
     BottomScrim()
     // Ligne de statut + pill d'instructions : sans elle, `IseeUiState.status`
@@ -238,3 +236,15 @@ private fun BoxWithConstraintsScope.BottomScrim() {
 /** Le crochet de navigation (raccourci : l'inset de navigation du téléphone). */
 @Composable
 internal fun navInsetDp(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+/**
+ * Source affichée, avec mémoire : la dernière image des lunettes reste figée pendant
+ * le fondu de fermeture (`showGlassesFeed`). L'affectation est un point fixe stable.
+ */
+@Composable
+private fun rememberGlassesFeed(layers: IseeSceneLayers, open: Float): Boolean {
+    var lastGlasses by remember { mutableStateOf(false) }
+    val showGlasses = showGlassesFeed(layers.glassesFeed, layers.glassesGhost, layers.cameraCard, open, lastGlasses)
+    lastGlasses = showGlasses
+    return showGlasses
+}

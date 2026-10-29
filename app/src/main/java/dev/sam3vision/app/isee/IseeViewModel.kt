@@ -12,6 +12,7 @@ import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.loadedSettings
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speechClient
+import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.isee.vm.IseeAnswers
@@ -19,6 +20,7 @@ import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
+import dev.sam3vision.app.isee.vm.IseeNavClarify
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.isee.vm.IseePictoVoice
@@ -180,11 +182,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La session sous-jacente (boutons de l'écran navigation). */
     fun voiceNav(): VoiceNavSession = voiceNav.session
 
-    /** Quitter l'écran navigation : carte fermée, confirmation annulée, guidage arrêté. */
+    /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
     private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels)
+
+    /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
+    private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
@@ -410,6 +415,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
         if (steering.runCrossing(text)) return
+        // Ordre navigation sans destination comprise : demande, jamais une description LLM.
+        if (navClarify.run(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
@@ -479,10 +486,13 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         session.onBackground()
         probe.onBackground()
         probe.stop()
+        // Guidage affiché sur l'accueil : GPS + voix maintenus par le service (W1).
+        if (voiceNav.state.value is VoiceNavUiState.Guiding) GuidanceLifecycle.startBackground(getApplication())
     }
 
     /** L'app revient au premier plan : minuteur annulé (option C), sessions rouvertes. */
     fun onForeground() {
+        GuidanceLifecycle.stopBackground(getApplication())
         session.onForeground()
         probe.onForeground()
         syncProbe()

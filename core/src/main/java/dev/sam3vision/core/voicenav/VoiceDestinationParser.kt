@@ -1,5 +1,6 @@
 package dev.sam3vision.core.voicenav
 
+import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.nav.NavigationIntentParser
 
 /**
@@ -42,11 +43,12 @@ object VoiceDestinationParser {
     )
 
     /**
-     * « emmène-moi X » sans « à » (et « emmenez-moi »). La forme avec « à »
-     * est déjà rendue par [NavigationIntentParser], essayé avant.
+     * « emmène/amène-moi X » sans préposition (et « emmenez/amenez-moi »,
+     * variantes STT). Les formes avec préposition sont déjà rendues par
+     * [NavigationIntentParser], essayé avant.
      */
     private val EMMENE_SANS_A = Regex(
-        """\bemm[eèéêëEÈÉÊË]nez?[\s\-'’`]+moi\s+(.+)""",
+        """\b(?:emm|am)[eèéêëEÈÉÊË]nez?[\s\-'’`]+moi\s+(.+)""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -57,6 +59,18 @@ object VoiceDestinationParser {
     fun parse(transcript: String): String? {
         if (transcript.isBlank()) return null
         NavigationIntentParser.parse(transcript)?.let { return it.destination }
+        return parseExtra(transcript)
+    }
+
+    /**
+     * Formes hors routeur seules (« direction X », « emmène/amène-moi X »
+     * sans préposition), sans la délégation à [NavigationIntentParser] :
+     * pour les replis essayés quand le routeur a rendu `null` — un
+     * routeur en panne (exception repliée en `null`) ne doit pas voir
+     * ses propres formes relancées par le repli (confinement d'erreur).
+     */
+    fun parseExtra(transcript: String): String? {
+        if (transcript.isBlank()) return null
         direction(transcript)?.let { return it }
         return emmeneSansA(transcript)
     }
@@ -64,16 +78,21 @@ object VoiceDestinationParser {
     private fun direction(text: String): String? {
         val raw = DIRECTION.find(text)?.groupValues?.getOrNull(1) ?: return null
         val sansDe = DE_RESIDUEL.find(raw.trim())?.groupValues?.getOrNull(1) ?: raw
-        return clean(sansDe).ifEmpty { null }
+        val destination = clean(sansDe)
+        if (destination.isEmpty()) return null
+        if (KnownSizes.canonical(destination) in PREP_SEULE) return null
+        return destination
     }
+
+    /** Prépositions seules : « emmène-moi au », « direction de » sans suite ne sont pas des destinations. */
+    private val PREP_SEULE = setOf("a", "au", "aux", "en", "dans", "vers", "chez", "jusqu a", "de", "d", "du", "des")
 
     private fun emmeneSansA(text: String): String? {
         val raw = EMMENE_SANS_A.find(text)?.groupValues?.getOrNull(1) ?: return null
         val destination = clean(raw)
-        // « emmène-moi à » sans suite : il ne reste que la préposition.
-        if (destination.equals("à", ignoreCase = true)) return null
-        if (destination.equals("a", ignoreCase = true)) return null
-        return destination.ifEmpty { null }
+        if (destination.isEmpty()) return null
+        if (KnownSizes.canonical(destination) in PREP_SEULE) return null
+        return destination
     }
 
     /** Même règle que [NavigationIntentParser] : original rogné, ponctuation finale retirée. */
