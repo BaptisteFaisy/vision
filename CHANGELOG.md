@@ -29,6 +29,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProbeVoice.kt`, `LiveProbe.kt`, `ProbeWiring.kt`, `IseeViewModel.kt`,
   `AppNav.kt`, `Settings*.kt`, `UiLogicTest.kt` (+35 fichiers supprimés).
 - Recette téléphone (Direct, obstacle réel, logcat sans `twinlite`) après merge.
+## 2026-10-29 — Mode navigation : la carte passe sous la caméra (ordre user)
+
+- **Demande** : « la map navigation doit être sous la caméra et disparaître
+  quand l'user parle ».
+- Le mode carte n'empile plus d'écran : `NavigationMapLayer` est la **première
+  couche de la scène iSee** (avant la rue, la boule et les textes), plein
+  écran, fond OSM MapLibre + repli schéma (`drawNavigationMap`).
+- **Effacement pendant la parole** : `navigationMapHidden(state)` =
+  `holding || transcribing` → alpha 0 en 220 ms, retour ensuite ; iSee qui
+  parle ne masque pas la carte. La MapView n'est pas détruite (pas de
+  rechargement de tuiles à chaque tenue).
+- `AppNav` : l'état `Map` ne pousse plus `Route.VoiceNav` ; entrer en mode
+  carte depuis n'importe quelle page ramène à l'accueil iSee. `MapModeScreen`
+  (écran plein écran avec bouton « Quitter ») supprimé : les sorties sont
+  vocales, comme l'entrée.
+- Preuves : `:core` 1 801 tests, `:app` 1 068, 0 échec (dont
+  `NavigationMapLayerTest` 5 : effacement, cadre de repli),
+  `check-kotlin-limits` et `check-voice-nav-doc.py` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis et §6, `CARTE-OSM.md` §4 bis,
+  `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
+
 ## 2026-10-29 — Mode navigation : la carte s'ouvre à la voix (ordre user)
 
 - **Demande** : « un mode navigation dans iSee, accessible en lui parlant, avec
