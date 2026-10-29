@@ -33,6 +33,8 @@ import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.live.SteeringCommand
 import dev.sam3vision.core.live.SteeringText
+import dev.sam3vision.core.nav.NavFix
+import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
@@ -171,6 +173,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Quitter l'écran navigation : confirmation annulée ou guidage arrêté. */
     fun dismissVoiceNav() = voiceNav.dismiss()
+
+    /** Itinéraire guidé + dernier fix GPS pour la carte de debug (`null` au repos). */
+    fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> =
+        runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
 
     /** Vrai quand l'écran iSee est à l'écran : les gestes ne touchent que lui. */
     @Volatile

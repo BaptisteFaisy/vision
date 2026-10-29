@@ -38,6 +38,7 @@ class SettingsStoreParityTest {
         liveSamEnabled = false,
         boxPredictionEnabled = true,
         localOverlayEnabled = false,
+        debugRouteMapEnabled = false,
         navigationGuidanceEnabled = false,
         cameraFovDeg = 63.5f,
         caregiverRole = CaregiverRole.Caregiver,

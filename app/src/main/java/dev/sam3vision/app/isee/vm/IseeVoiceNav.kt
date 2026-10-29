@@ -17,6 +17,8 @@ import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.BanGeocoder
 import dev.sam3vision.core.nav.GeocodeChain
 import dev.sam3vision.core.nav.GuidanceUpdate
+import dev.sam3vision.core.nav.NavFix
+import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.voicenav.VoiceDestinationParser
 import kotlinx.coroutines.CoroutineScope
@@ -114,6 +116,14 @@ class IseeVoiceNav(
             runCatching { driver.onTraverseModeChanged(active) }
         }
     }
+
+    /** Itinéraire guidé, `null` au repos ou pilote jamais démarré (carte de debug). */
+    fun debugRoute(): NavRoute? =
+        if (driverLazy.isInitialized()) runCatching { driver.debugRoute() }.getOrNull() else null
+
+    /** Dernier fix GPS, `null` sans fix ou pilote jamais démarré (carte de debug). */
+    fun debugFix(): NavFix? =
+        if (driverLazy.isInitialized()) runCatching { driver.debugFix() }.getOrNull() else null
 
     /** Le pilote pousse ici l'état du moteur (instruction, distances, arrivée). */
     private fun pushGuidanceUpdate(update: GuidanceUpdate) {
