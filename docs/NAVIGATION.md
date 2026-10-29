@@ -72,8 +72,11 @@ dictée → `VoiceNavSession.onVoiceTranscript` → moteur Valhalla ; aucun bout
 itinéraire), repli Google Maps **piéton** (`TravelMode.WALK`) et retour au
 repos : iSee n'affiche pas d'écran de guidage qu'il ne conduit pas.
 
-L'écran de confirmation (`DestinationConfirmScreen`) reste l'API historique
+L'écran de confirmation (`DestinationConfirmScreen`) est l'API par défaut
 (`autoStartOnVoice = false`) : adresse + résumé, bouton « Démarrer ».
+`IseeVoiceNav` passe `true` — c'est le seul chemin produit qui démarre sans
+bouton, et il conserve l'accès à l'écran de confirmation pour les appelants
+historiques (écran `VoiceNavRoute`, tests).
 
 Deux voix se partagent une session : les consignes du moteur (virages,
 écart, arrivée) passent par `SystemTtsEngine` — le TTS Android, français,
