@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Banc d'essai de `gitValue()` (app/build.gradle.kts) : que valent versionCode/versionName
-# quand git n'est pas exploitable ? Trois situations, chacune une configuration Gradle
-# réelle dans un arbre **hors dépôt git** (tarball produit par `git archive`) :
+# quand git n'est pas exploitable ? Cinq situations, chacune une configuration Gradle
+# réelle (`--no-daemon`, un environnement par situation) :
 #
-#   1. arbre extrait d'un tarball : aucun `.git` ;
+#   0. dépôt git normal : la valeur réelle doit passer inchangée ;
+#   1. arbre extrait d'un tarball : aucun `.git` (produit par `git archive`) ;
 #   2. idem avec un PATH sans `git` du tout (binaire réellement absent) ;
 #   3. dépôt git valide mais commandes git en échec (`GIT_DIR` bidon, code 128) :
 #      le cas « code de retour non nul » que `runCatching` seul ne voit pas ;

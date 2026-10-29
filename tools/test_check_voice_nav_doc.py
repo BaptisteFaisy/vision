@@ -9,6 +9,7 @@ lance la porte en sous-processus — donc sur son vrai code de retour — et
 vérifie la sortie. Aucun fichier du dépôt n'est touché.
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,9 +70,24 @@ DOCUMENT = """# Navigation vocale
 """ % (INTENT, ANNOUNCER, SETTINGS)
 
 
+_DEPOTS = []
+
+
+def mkdtemp_suivi():
+    """mkdtemp suivi : chaque dépôt est supprimé en fin de module."""
+    depot = tempfile.mkdtemp(prefix="voix-nav-")
+    _DEPOTS.append(depot)
+    return depot
+
+
+def tearDownModule():
+    for depot in _DEPOTS:
+        shutil.rmtree(depot, ignore_errors=True)
+
+
 def faux_depot(fichiers):
     """Répertoire temporaire contenant fichiers = {chemin relatif: contenu}."""
-    depot = tempfile.mkdtemp(prefix="voix-nav-")
+    depot = mkdtemp_suivi()
     for chemin, contenu in fichiers.items():
         cible = os.path.join(depot, chemin)
         os.makedirs(os.path.dirname(cible), exist_ok=True)
@@ -166,7 +182,7 @@ class PorteVoixNavTest(unittest.TestCase):
         self.assertEqual(code, 1, sortie)
 
     def test_racine_inconnue(self):
-        code, _ = porte(os.path.join(tempfile.mkdtemp(), "absent"))
+        code, _ = porte(os.path.join(mkdtemp_suivi(), "absent"))
         self.assertEqual(code, 2)
 
 

@@ -65,8 +65,8 @@ def runs_on_pr(lines):
     return False
 
 
-def check_file(path, errors, warnings):
-    rel = path
+def check_file(path, errors, warnings, display=None):
+    rel = display if display is not None else path
     lines = read_lines(path)
     jobs = scan_jobs(lines)
     if not jobs:
@@ -99,7 +99,10 @@ def main():
     if not paths:
         print("::warning::Aucun workflow dans %s" % WORKFLOWS)
     for path in paths:
-        check_file(os.path.relpath(path, root), errors, warnings)
+        # On lit le chemin réel (CI_BUDGET_ROOT peut viser ailleurs que le
+        # répertoire courant) mais on affiche le chemin relatif, stable.
+        check_file(path, errors, warnings,
+                   display=os.path.relpath(path, root))
 
     for message in warnings:
         print("::warning::%s" % message)

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SEULE commande de déploiement du backend live (l'app du téléphone) — app sam3-eu-a100.
 #
-#   bash scripts/deploy-live-fast.sh              # déploie, attend la nouvelle version, vérifie
-#   bash scripts/deploy-live-fast.sh --no-deploy  # vérifie seulement (sans réveiller si elle dort)
+#   bash server/scripts/deploy-live-fast.sh              # déploie, attend la nouvelle version, vérifie
+#   bash server/scripts/deploy-live-fast.sh --no-deploy  # vérifie seulement (sans réveiller si elle dort)
 #
 # Les leviers sont ici, et **seulement ici** : c'est ce qui les rend persistants.
 #   FAST_CUDA_GRAPH=1    graphe CUDA de l'encodeur vision (45 ms → 1,4 ms mesurés)
@@ -23,7 +23,6 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODAL="${MODAL_BIN:-modal}"
 URL="${LIVE_HEALTH_URL:-https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/health}"
-TIMEOUT="${LIVE_HEALTH_TIMEOUT:-300}"
 
 APP_NAME="${LIVE_APP_NAME:-sam3-eu-a100}"
 GPU="${FAST_GPU:-A100-40GB}"

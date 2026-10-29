@@ -2,11 +2,11 @@
 # Garde-fou « un seul GPU » — enveloppe mince de `sam3-gpu guard`.
 # Une seule implémentation vit dans ~/bin/sam3-gpu (voir ref/sam3-gpu.md).
 #
-#   bash scripts/modal-one-gpu.sh                 # garde l'app SAM 3.1 ($SAM3_APP)
-#   KEEP=sam3-live-eu bash scripts/modal-one-gpu.sh
-#   bash scripts/modal-one-gpu.sh --status        # affiche seulement, n'arrête rien
+#   bash server/scripts/modal-one-gpu.sh                 # garde l'app SAM 3.1 ($SAM3_APP)
+#   KEEP=sam3-live-eu bash server/scripts/modal-one-gpu.sh
+#   bash server/scripts/modal-one-gpu.sh --status        # affiche seulement, n'arrête rien
 #
-# Déploiement du direct : scripts/deploy-live-fast.sh (jamais backend/live_app.py).
+# Déploiement du direct : server/scripts/deploy-live-fast.sh (jamais backend/live_app.py).
 #
 # Défaut corrigé (relevé antérieur, hors de cet arbre) : l'ancien défaut (KEEP=sam3-live-b200) arrêtait
 # silencieusement l'app live du téléphone (sam3-eu-a100) — incident de 22:21.

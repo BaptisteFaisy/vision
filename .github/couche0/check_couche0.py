@@ -28,7 +28,10 @@ GUARD_FILES = (".github/ci-budget/", ".github/couche0/",
                ".github/workflows/couche0.yml", ".github/workflows/ci-budget.yml",
                # Fermé le 26/10 : sans ça une PR pouvait retirer les tests du job
                # `ci` sans le déclarer — la porte ouverte derrière la garde.
-               ".github/workflows/ci.yml")
+               # Même motif le 29/10 pour le natif hors PR et la file de merge :
+               # vider `lint`/`apk-release` ou l'auto-merge passerait inaperçu.
+               ".github/workflows/ci.yml", ".github/workflows/ci-native.yml",
+               ".github/workflows/pr-auto-merge.yml")
 GUARD_FLAG = "SAMVISION_ALLOW_GUARD_BUMP"
 
 # Exemptés de déclaration de périmètre : régénérable ou non signé.
@@ -75,7 +78,7 @@ def pr_context(repo, number, token):
 
 
 def parse_scope(body):
-    """Motifs déclarés dans `## Scope` (puces `- \`motif\` — raison`)."""
+    r"""Motifs déclarés dans `## Scope` (puces `- \`motif\` — raison`)."""
     patterns, inside = [], False
     for line in body.splitlines():
         if line.strip().lower().startswith("## scope"):
