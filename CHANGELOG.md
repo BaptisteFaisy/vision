@@ -40,6 +40,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Limite dite tout haut** : plus frais n'est pas plus juste. La mesure du
   jour donne 1 vert accepté sur 6 (`docs/MESURES-SAM3-FEUX.md` §6) — c'est ce
   chiffre-là qu'il faut bouger ensuite, pas la cadence.
+## 2026-10-29 — proche : la navigation publie position + trajet au relais
+
+- **Cause (ordre user)** : le trajet ne partait que depuis l'accueil iSee —
+  dès que l'écran navigation (confirmation, guidage) s'affichait, l'accueil
+  était dépilé et le proche ne recevait plus rien (ni position ni barre).
+- `VoiceNavRoute` publie via `ShareRelay` (position + `trip`, pas de photo
+  ni scène) tant que l'écran est affiché ; `sharedTripOf` déménage de
+  `IseeShare.kt` vers `voicenav/VoiceNavTrip.kt` (une seule implémentation
+  pour les deux écrans, tests inchangés).
+- Preuves : `:app` `testDebugUnitTest` verts sur r630
+  (`IseeShareTest` 5/5 dont le trajet), `check-kotlin-limits` OK. Recette
+  relais (barre du proche en guidage) après merge, avec une vraie session.
 
 ## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
 
