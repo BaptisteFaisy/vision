@@ -92,13 +92,6 @@ internal fun crossingPatchOf(
 }
 
 /**
- * État du feu sur une frame. Conservé pour le direct (`TraverseWiring`), qui n'a
- * pas d'affichage à nourrir : il ne veut que la couleur.
- */
-internal fun crossingStateOf(frame: LiveFrame, jpegB64: String): CrossingState =
-    crossingLightOf(frame, jpegB64).state
-
-/**
  * Chaque nouvel état du feu fait vibrer le téléphone (vert = double salve,
  * rouge = créneau long), en plus de la voix déjà câblée par `observeSpoken`.
  */
