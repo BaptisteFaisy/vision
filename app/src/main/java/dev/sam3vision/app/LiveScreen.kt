@@ -260,6 +260,8 @@ private fun LiveCameraStage(
         modifier = Modifier.fillMaxSize(),
     )
     LiveDistanceLayer(state.distanceLayer)
+    // Repères reconnus : cadres jaunes + noms, vides tant que rien n'est armé ou vu.
+    LivePictoOverlay(state.pictoOverlay)
     // Boîtes prédites (T8) : couche vide tant que la prédiction est éteinte — l'overlay
     // reste alors celui d'avant (les masques serveur seuls).
     LivePredictionOverlay(state.prediction)
