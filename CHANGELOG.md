@@ -82,8 +82,10 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   la proposition reviendrait à la frame suivante.
 - **Preuves** : `CrossingOfferTest` 8, `CrossingWiringTest` 6 ; `:core`
   1 809 tests + `:app` 1 059, 0 échec ; `check-kotlin-limits` OK.
-- **À vérifier** : la fiabilité de `crosswalk` sur une vraie chaussée — la
-  mesure du jour portait sur les feux, pas sur les passages.
+- `crosswalk` **mesuré** : 7 détections sur 5 photos de passages réels (scores
+  0,54-0,89), **0** sur 5 scènes sans passage (2 salons, 3 autoroutes vues du
+  ciel). Le concept discrimine sur cet échantillon (n = 10, détail et attribution
+  dans `docs/TRAVERSEE.md` §8).
 
 ## 2026-10-29 — Traversée : la lecture locale du feu partout, et le rappel vert mesuré
 
