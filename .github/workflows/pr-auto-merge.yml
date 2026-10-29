@@ -58,13 +58,15 @@
 #     suivant est un vrai travail ;
 #   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
 #     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
-# File de merge native (v14, 2026-10-29) — la v13 a montré le plafond : avec
+# File de merge (v14/v15, 2026-10-29) — la v13 a montré le plafond : avec
 # `strict_required_status_checks_policy: true`, chaque merge invalide la CI de
 # toutes les autres PR, donc ~1 merge par cycle de CI (~40/h au mieux). Le seul
-# moyen de monter sans perdre la garantie est de **grouper** : la file de merge
-# de GitHub construit `master` + les PR du lot, rejoue les 3 checks sur le
-# résultat fusionné, et merge le lot. Le balayeur ne rebase plus et ne merge
-# plus : il **met dans la file** dès que les 3 checks de la PR sont verts.
+# moyen de monter sans perdre la garantie est de **grouper**.
+# La file native de GitHub est indisponible sur ce dépôt (elle exige un dépôt
+# public possédé par une **organisation** ; celui-ci appartient à un compte
+# utilisateur) : c'est **Mergify** qui tient la file (`.mergify.yml`). Quand
+# elle est active (`QUEUE`), le balayeur ne merge plus et ne rebase plus : il
+# ne garde que les conflits (`DIRTY`) et les relances de panne (`BLOCKED`).
 #   - `QUEUE` est lu à la source (règle `merge_queue` du ruleset) : si la file
 #     est désactivée un jour, le balayeur reprend son ancien chemin tout seul.
 #   - Plus de rebase sur les PR `BEHIND` vertes : la file teste l'arbre
@@ -387,33 +389,16 @@ jobs:
             done
             return $rc
           }
-          # ── file de merge native ─────────────────────────────────────────
-          # Rien à rebaser ni à merger : on met la PR dans la file dès que ses
-          # 3 checks sont verts. La file construit `master` + le lot et rejoue
-          # les mêmes checks sur l'arbre fusionné — la garantie que `strict`
-          # cherchait, sans relancer la CI à chaque mouvement de `master`.
-          OWNER="${REPO%%/*}"; NOM="${REPO##*/}"
-          en_file() { # 0 si la PR $1 est déjà dans la file
-            gh api graphql -f query="query{repository(owner:\"$OWNER\",name:\"$NOM\"){pullRequest(number:$1){isInMergeQueue}}}" \
-              --jq '.data.repository.pullRequest.isInMergeQueue' 2>/dev/null | grep -q '^true$'
-          }
+          # ── file de merge (Mergify) ──────────────────────────────────────
+          # Quand une file est active, le balayeur ne merge plus et ne rebase
+          # plus : c'est la file qui met en file, qui met à jour la PR contre
+          # `master` et qui rejoue les checks sur l'arbre fusionné du lot.
+          # Le balayeur garde ce que la file ne sait pas faire : résoudre un
+          # conflit (DIRTY) et relancer une panne d'infrastructure (BLOCKED).
           if [ "${QUEUE:-false}" = "true" ]; then
             case "$STATE" in
               CLEAN|BEHIND)
-                if [ "$DRAFT" = "true" ]; then
-                  echo "PR #$PR : brouillon, pas de mise en file"
-                elif en_file "$PR"; then
-                  echo "PR #$PR : déjà dans la file de merge"
-                elif green "$PR"; then
-                  if err=$(gh pr merge "$PR" 2>&1); then
-                    echo "PR #$PR mise dans la file de merge"
-                    noter_etat "mise dans la file de merge : le groupe teste \`master\` + le lot, aucun rebase."
-                  else
-                    echo "PR #$PR : mise en file refusée ($(printf '%s' "$err" | tail -1 | cut -c1-160))"
-                  fi
-                else
-                  echo "PR #$PR : CI pas encore verte, la file prendra le relais"
-                fi
+                echo "PR #$PR : $STATE — la file de merge prend le relais (ni rebase ni merge ici)"
                 exit 0
                 ;;
             esac
