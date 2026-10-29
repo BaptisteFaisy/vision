@@ -160,11 +160,10 @@ class Sam3LiveService:
         self.load_breakdown = {"age_conteneur_s": age,
                                "poids_cpu_1er_demarrage_s": snap,
                                "gpu_s": self.load_seconds}
-        # Restauration : la mémoire (dont `snap_seconds` du 1er boot) revient dans un
-        # processus neuf — `snap` dépasse donc l'âge du processus. Boot complet : le
-        # processus a vécu toute la phase CPU, `snap` ≈ `age`. Marge +2 s : restauration
-        # + jitter (à valider sur boots réels) ; `None` (Baseten, `/proc` illisible) = faux.
-        self.restored = (snap is not None and age is not None and snap > age + 2)
+        # Restauration = freeze/thaw Modal : l'âge /proc inclut le gel (mesuré : thaw
+        # à 185,8 s pour un snap de 20,4 s) ; boot complet : écart ≈ 2-5 s. Seuil
+        # 30 s : le gel minimal (scaledown 60 s) le dépasse toujours (29/10/2026).
+        self.restored = (age is not None and snap is not None and age - snap > 30)
         self._gpu_lock = threading.Lock()
 
     def _live_sync(self, image_b64, prompts, max_objects, work_edge, batch_prompts, edge,
