@@ -224,9 +224,15 @@ data class Settings(
          * Relais de suivi de l'app (`suivi-relais/`, Worker + D1) : un état par
          * identifiant de flux. C'est lui qui reçoit la position et que lit la page
          * caregiver — plus aucun site web à maintenir.
+         *
+         * L'adresse est celle du Worker lui-même (`wrangler` le publie sous
+         * `isee-suivi.<compte>.workers.dev`), pas un domaine d'apparence plus jolie :
+         * l'hôte gratuit `…freebuff.page` retenu le 29/10 a rendu **502 « Site
+         * unavailable »** le soir même, ce qui laissait la page caregiver en NO STREAM
+         * alors que le Worker répondait encore. Un relais qui sert des personnes doit
+         * pointer sur l'infrastructure qu'on déploie, pas sur une redirection.
          */
-        const val DEFAULT_PARENT_SITE_URL =
-            "https://site-1607fe95049a481989380f019f9067f3.freebuff.page/"
+        const val DEFAULT_PARENT_SITE_URL = "https://isee-suivi.duello.workers.dev/"
 
         /**
          * Ancien relais du site Vercel, abandonné (déploiement figé, écritures

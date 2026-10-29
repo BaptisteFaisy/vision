@@ -34,9 +34,9 @@ fun shareIdOf(raw: String): String? {
 
 /**
  * Lien de suivi d'un identifiant, **toujours reconstruit sur le relais de l'app**
- * ([Settings.DEFAULT_PARENT_SITE_URL]). Un ancien lien du site
- * (`suivi-parent.vercel.app`) n'en garde que son identifiant : ce site ne sert plus
- * la carte et refuse les écritures, donc le rouvrir ne montrerait rien.
+ * ([Settings.DEFAULT_PARENT_SITE_URL]). Un ancien lien (`suivi-parent.vercel.app`,
+ * `…freebuff.page`) n'en garde que son identifiant : ces hôtes ne servent plus rien
+ * et refusent les écritures, donc le rouvrir ne montrerait rien.
  */
 fun relayShareLink(shareId: String, base: String = Settings.DEFAULT_PARENT_SITE_URL): String? {
     val id = normalizeShareId(shareId)
@@ -48,15 +48,23 @@ fun relayShareLink(shareId: String, base: String = Settings.DEFAULT_PARENT_SITE_
         .toString()
 }
 
-/** Ancien relais (site Vercel, déploiement figé, écritures refusées). */
-private const val LEGACY_RELAY_HOST = "suivi-parent.vercel.app"
+/**
+ * Anciens relais, abandonnés : le site Vercel (déploiement figé, écritures refusées)
+ * et l'hôte gratuit `…freebuff.page` (502 « Site unavailable » le 29/10 au soir, alors
+ * que le Worker répondait encore). Un lien reçu d'avant la bascule n'en garde que son
+ * identifiant : le rouvrir ne montrerait rien puisque la page y appelle `/api/state`.
+ */
+private val LEGACY_RELAY_HOSTS = setOf("suivi-parent.vercel.app")
 
-/** Vrai si l'URL vient de l'ancien site, quel que soit son chemin (`?share=` compris). */
+/** Suffixes d'hébergement gratuits abandonnés : l'identifiant du site varie, l'hôte non. */
+private val LEGACY_RELAY_SUFFIXES = listOf(".freebuff.page")
+
+/** Vrai si l'URL vient d'un relais abandonné, quel que soit son chemin (`?share=` compris). */
 fun isLegacyRelayUrl(url: String): Boolean {
     val at = url.indexOf("://")
     val host = url.substring(if (at >= 0) at + 3 else 0)
         .substringBefore('/').substringBefore('?').substringBefore(':').lowercase()
-    return host == LEGACY_RELAY_HOST
+    return host in LEGACY_RELAY_HOSTS || LEGACY_RELAY_SUFFIXES.any(host::endsWith)
 }
 
 /**
