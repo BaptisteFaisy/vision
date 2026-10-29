@@ -128,6 +128,9 @@ class LiveAskSession(
     /** Le picto parle ou va parler : les positions SAM se taisent (pas de chevauchement). */
     val pictoActive: Boolean get() = pictoBusy || pictoHunt != null
 
+    /** PNG d'un repère armé pour l'overlay, `null` si inconnu (démo, faux repères). */
+    fun pngOf(id: String): ByteArray? = pictos.firstOrNull { it.id == id }?.png
+
     /** Fin de séance (démarrage suivant **ou** arrêt) : conversation et journal repartent de zéro. */
     fun reset() {
         history = emptyList()
