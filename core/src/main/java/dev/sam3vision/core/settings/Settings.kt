@@ -80,6 +80,12 @@ data class Settings(
      */
     val localOverlayEnabled: Boolean = true,
     /**
+     * Carte de debug : tracé schématique de l'itinéraire guidé + position GPS,
+     * en fond de l'écran iSee (derrière la boule et les textes). `true` par
+     * défaut ; sans guidage actif, rien n'est dessiné et l'écran est inchangé.
+     */
+    val debugRouteMapEnabled: Boolean = true,
+    /**
      * Guidage GPS : la destination confirmée (« emmène-moi à X ») part en guidage
      * Google Maps (`google.navigation:` puis repli URL universelle). Éteint : seule
      * la fiche du lieu s'affiche, sans lancer de guidage. `true` par défaut.
@@ -254,6 +260,7 @@ data class Settings(
             liveSamEnabled = true,
             boxPredictionEnabled = false,
             localOverlayEnabled = true,
+            debugRouteMapEnabled = true,
             navigationGuidanceEnabled = true,
             cameraFovDeg = 0f,
             caregiverRole = CaregiverRole.Blind,
@@ -330,6 +337,7 @@ data class Settings(
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
+        "debugRouteMapEnabled=$debugRouteMapEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +
         "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects, " +
