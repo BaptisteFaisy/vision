@@ -93,8 +93,7 @@ class HazardWatchTest {
 
         watcher.onSignal(signal, 3_000L, SpeechLanguage.Fr)
         assertNull(watcher.onSignal(signal, 4_000L, SpeechLanguage.Fr))
-        watcher.onSignal(signal, 13_000L, SpeechLanguage.Fr)
-        val cue = watcher.onSignal(signal, 14_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 13_000L, SpeechLanguage.Fr)
 
         assertEquals("Attention à la barrière.", cue!!.phrase)
     }
