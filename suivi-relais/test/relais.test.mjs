@@ -160,3 +160,27 @@ test('le texte est borné et reste absent quand il manque', () => {
   const sans = readShare(payload('ok', { scene: undefined }));
   assert.equal(sans.doc(Date.now()).scene, null);
 });
+
+test('les repères reconnus arrivent en dessins à la page caregiver', async () => {
+  const e = env();
+  const pictos = { atMs: 1_700_000_000_000, items: [{ label: 'medics', png: 'AQID' }] };
+  assert.equal((await call(e, '/api/share', post(payload('suivi-picto', { pictos })))).code, 200);
+  const state = await call(e, '/api/state?share=suivi-picto');
+  assert.deepEqual(state.body.pictos, pictos);
+  // Sans détection, le bandeau disparaît au paquet suivant.
+  assert.equal((await call(e, '/api/share', post(payload('suivi-picto')))).code, 200);
+  assert.equal((await call(e, '/api/state?share=suivi-picto')).body.pictos, null);
+  // Une liste vide explicite vaut absence, pas un objet vide stocké.
+  const vide = { atMs: 1, items: [] };
+  assert.equal((await call(e, '/api/share', post(payload('suivi-picto', { pictos: vide })))).code, 200);
+  assert.equal((await call(e, '/api/state?share=suivi-picto')).body.pictos, null);
+});
+
+test('des repères illisibles sont refusés explicitement', async () => {
+  const e = env();
+  const bad = (pictos) => call(e, '/api/share', post(payload('picto-casse', { pictos })));
+  assert.equal((await bad({ atMs: 1, items: [{ label: '', png: 'AQID' }] })).code, 400);
+  assert.equal((await bad({ atMs: 1, items: [{ label: 'x', png: '<script>' }] })).code, 400);
+  assert.equal((await bad({ atMs: 1, items: [{ label: 'x', png: 'A'.repeat(30_001) }] })).code, 400);
+  assert.equal((await bad({ atMs: 1, items: 'non' })).code, 400);
+});

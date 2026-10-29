@@ -13,6 +13,15 @@ export const MAX_PHOTO = 120_000;
 /** Nom de destination affiché au proche. */
 export const MAX_DESTINATION = 80;
 
+/** Repères reconnus gardés au plus par rapport. */
+export const MAX_PICTOS = 4;
+
+/** PNG base64 d'un repère : dessin ≈ 3-11 k caractères. */
+export const MAX_PICTO_PNG = 30_000;
+
+/** Nom d'un repère affiché au proche. */
+export const MAX_PICTO_LABEL = 40;
+
 /** Identifiant de flux : un par proche suivi, glissé dans `?share=`. */
 export function validId(id) {
   return typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
@@ -21,6 +30,9 @@ export function validId(id) {
 function num(v, min, max) {
   return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 }
+
+/** Caractères d'un base64 (JPEG ou PNG) : le préfixe `data:` reste côté page. */
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 /** Phrase courante ; les anciennes versions de l'app ne l'envoient pas. */
 function sceneOf(scene) {
@@ -43,7 +55,7 @@ function photoOf(photo, now) {
   if (photo === undefined || photo === null) return null;
   if (typeof photo !== 'object' || typeof photo.jpeg !== 'string') return false;
   const jpeg = photo.jpeg.trim();
-  if (!jpeg || jpeg.length > MAX_PHOTO || !/^[A-Za-z0-9+/]+={0,2}$/.test(jpeg)) return false;
+  if (!jpeg || jpeg.length > MAX_PHOTO || !BASE64.test(jpeg)) return false;
   return {
     jpeg,
     atMs: num(photo.atMs, 0, 9e15) ? photo.atMs : now,
@@ -69,6 +81,28 @@ function tripOf(trip) {
     remainingS: trip.remainingS,
     progress: trip.progress,
   };
+}
+
+/**
+ * Repères reconnus : `{atMs, items:[{label, png}]}`. `null` = aucun (paquet
+ * sans détection, liste vide, ou ancien client), `false` = présenté mais
+ * illisible (400). Suit le paquet comme le trajet : pas de conservation
+ * d'un envoi à l'autre.
+ */
+function pictosOf(pictos, now) {
+  if (pictos === undefined || pictos === null) return null;
+  if (typeof pictos !== 'object' || !Array.isArray(pictos.items)) return false;
+  const kept = [];
+  for (const item of pictos.items.slice(0, MAX_PICTOS)) {
+    if (!item || typeof item !== 'object') return false;
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    const png = typeof item.png === 'string' ? item.png : '';
+    if (!label || !png || png.length > MAX_PICTO_PNG) return false;
+    if (!BASE64.test(png)) return false;
+    kept.push({ label: label.slice(0, MAX_PICTO_LABEL), png });
+  }
+  if (!kept.length) return null;
+  return { atMs: num(pictos.atMs, 0, 9e15) ? pictos.atMs : now, items: kept };
 }
 
 function fixOf(f, now) {
@@ -118,12 +152,14 @@ export function readShare(body, globalKey = '') {
   if (photo === false) return fail(400, 'photo invalide');
   const trip = tripOf(body.trip);
   if (trip === false) return fail(400, 'trip invalide');
+  const pictos = pictosOf(body.pictos, Date.now());
+  if (pictos === false) return fail(400, 'pictos invalides');
   return {
     ok: true,
     id: body.shareId,
     key,
     photo,
-    doc: (now) => ({ fix: fixOf(f, now), objects, scene, photo, trip }),
+    doc: (now) => ({ fix: fixOf(f, now), objects, scene, photo, trip, pictos }),
   };
 }
 
@@ -145,6 +181,7 @@ export function stateOf(row, now) {
     scene: row.scene || null,
     photo: row.photo || null,
     trip: row.trip || null,
+    pictos: row.pictos || null,
     serverAt,
   };
 }

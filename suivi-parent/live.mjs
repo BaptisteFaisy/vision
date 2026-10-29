@@ -1,5 +1,5 @@
 import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
-import { frameOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
+import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { startOrb } from './orb.mjs';
 import { spokenLine } from './spoken-line.mjs';
 import './settings.mjs';
@@ -15,7 +15,9 @@ const tripRest = document.getElementById('trip-rest');
 const tripTrack = document.getElementById('trip-track');
 const tripLiquid = document.getElementById('trip-liquid');
 const tripBall = document.getElementById('trip-ball');
-let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '';
+const pictoEl = document.getElementById('pictos');
+const pictoStrip = document.getElementById('picto-strip');
+let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '', pictoSig = '';
 // Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
 let known = true;
 const STATES = {
@@ -38,7 +40,36 @@ function render() {
   document.getElementById('speaker').textContent = fromUser ? 'YOU' : 'ISEE';
   spoken.dataset.speaker = fromUser ? 'you' : 'isee';
   renderFrame(status);
+  renderPictos(status);
   renderTrip(status);
+}
+
+/**
+ * Objets reconnus : leurs dessins en bandeau, rien sans détection fraîche.
+ * Mêmes repères : le bandeau n'est pas reconstruit, les images ne clignotent pas.
+ */
+function renderPictos(status) {
+  const items = pictosOf(live, status);
+  if (!items) {
+    pictoEl.hidden = true;
+    if (pictoSig) { pictoSig = ''; pictoStrip.replaceChildren(); }
+    return;
+  }
+  pictoEl.hidden = false;
+  const signature = JSON.stringify(items.map((item) => item.label));
+  if (signature === pictoSig) return;
+  pictoSig = signature;
+  pictoStrip.replaceChildren(...items.map((item) => {
+    const figure = document.createElement('figure');
+    figure.setAttribute('role', 'listitem');
+    const img = document.createElement('img');
+    img.src = item.src;
+    img.alt = item.label;
+    const caption = document.createElement('figcaption');
+    caption.textContent = item.label;
+    figure.append(img, caption);
+    return figure;
+  }));
 }
 
 /**

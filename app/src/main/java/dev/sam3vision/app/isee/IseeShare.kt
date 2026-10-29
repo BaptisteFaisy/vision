@@ -7,6 +7,7 @@ import dev.sam3vision.app.ShareRelay
 import dev.sam3vision.app.voicenav.sharedTripOf
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.SharedScene
+import dev.sam3vision.core.share.sharedPictosOf
 
 /** Le proche reçoit les détections, l'image de cette caméra, le trajet et la phrase courante. */
 @Composable
@@ -19,6 +20,7 @@ internal fun IseeShare(state: IseeUiState, viewModel: IseeViewModel, settings: S
         scene = sharedSceneOf(state, probe),
         trip = sharedTripOf(nav),
         photo = SharedCameraFrame::photoOf,
+        pictos = { now -> sharedPictosOf(state.picto.hits, viewModel.picto::pngOf, now) },
     )
 }
 
