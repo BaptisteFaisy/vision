@@ -3,6 +3,12 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.picto.PictoTemplate
 import java.io.File
 
+/** Dossier des repères dans les fichiers privés : le seul magasin, Direct comme iSee. */
+const val PICTOS_DIR = "pictos"
+
+/** Dossier des repères pour un [filesDir] : l'unique construction du chemin, Direct comme iSee. */
+fun pictosDir(filesDir: File): File = File(filesDir, PICTOS_DIR)
+
 /**
  * Un repère validé : son nom, son PNG et son gabarit de reconnaissance.
  * Les octets sont chargés d'un coup : quelques pictos de quelques Ko chacun.
@@ -24,21 +30,61 @@ data class StoredPicto(
  */
 class PictoStore(private val root: File) {
 
-    /** Tous les repères valides, par ordre de création. */
-    fun list(): List<StoredPicto> =
-        root.listFiles()?.sortedBy { it.name }?.mapNotNull { readDir(it) } ?: emptyList()
+    /**
+     * Tous les repères valides, par ordre de création. Rapatrie d'abord les
+     * égarés ([adoptLoose]) : le Direct écrivait à la racine avant l'unification.
+     */
+    fun list(): List<StoredPicto> {
+        adoptLoose()
+        return root.listFiles()?.sortedBy { it.name }?.mapNotNull { readDir(it) } ?: emptyList()
+    }
+
+    /**
+     * Rapatrie les repères créés avant l'unification du magasin (dossiers
+     * `picto-*` restés à la racine des fichiers privés) dans ce dossier.
+     * Ne fait rien quand ce magasin n'est pas le dossier [PICTOS_DIR]
+     * (tests, ancien chemin), ni quand il n'y a plus rien à rapatrier.
+     * Seuls les dossiers valides voyagent ; un homonyme déjà présent est
+     * laissé en place, jamais écrasé.
+     */
+    private fun adoptLoose() {
+        if (root.name != PICTOS_DIR) return
+        val parent = root.parentFile ?: return
+        root.mkdirs()
+        parent.listFiles()
+            ?.filter { it.isDirectory && it.name.startsWith(PICTO_PREFIX) }
+            ?.forEach { dir ->
+                val target = File(root, dir.name)
+                if (!target.exists() && readDir(dir) != null) dir.renameTo(target)
+            }
+    }
 
     /** PNG d'un repère pour l'overlay, `null` si inconnu ou illisible. */
     fun pngOf(id: String): ByteArray? = readDir(File(root, id))?.png
 
     /** Enregistre un repère validé ; lève sur écriture impossible. */
     fun save(label: String, png: ByteArray, template: PictoTemplate): StoredPicto {
-        val dir = File(root, "picto-${System.currentTimeMillis()}")
+        val dir = newPictoDir()
         dir.mkdirs()
         File(dir, LABEL_FILE).writeText(label.trim().ifEmpty { DEFAULT_LABEL }, Charsets.UTF_8)
         File(dir, PNG_FILE).writeBytes(png)
         File(dir, TEMPLATE_FILE).writeBytes(encodeTemplate(template))
         return readDir(dir) ?: throw IllegalStateException("repère illisible après écriture")
+    }
+
+    /**
+     * Dossier neuf `picto-<millis>` : en cas d'homonyme (deux créations la même
+     * milliseconde, Direct + iSee), le millis avance jusqu'à un nom libre —
+     * jamais d'écrasement.
+     */
+    internal fun newPictoDir(nowMs: Long = System.currentTimeMillis()): File {
+        var stamp = nowMs
+        var dir = File(root, "$PICTO_PREFIX$stamp")
+        while (dir.exists()) {
+            stamp += 1
+            dir = File(root, "$PICTO_PREFIX$stamp")
+        }
+        return dir
     }
 
     private fun readDir(dir: File): StoredPicto? {
@@ -71,6 +117,7 @@ class PictoStore(private val root: File) {
         private const val LABEL_FILE = "label.txt"
         private const val PNG_FILE = "picto.png"
         private const val TEMPLATE_FILE = "template.bin"
+        private const val PICTO_PREFIX = "picto-"
 
         /** Nom quand l'aidant valide sans rien saisir. */
         const val DEFAULT_LABEL = "Objet"

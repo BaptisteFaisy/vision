@@ -42,7 +42,6 @@ import dev.sam3vision.core.speech.SettingsVoiceCommand
 import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
-import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -88,7 +87,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         media = media,
         camera = { camera },
         settings = { settings },
-        store = PictoStore(File(app.filesDir, "pictos")),
+        store = PictoStore(pictosDir(app.filesDir)),
         clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) },
         update = ::update,
         scope = viewModelScope,
