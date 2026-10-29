@@ -1,7 +1,7 @@
 package dev.sam3vision.app.glasses
 
 /**
- * Les quatre lignes d'état du bloc « Lunettes », en texte pur : elles se testent en JVM et
+ * Les lignes d'état du bloc « Lunettes », en texte pur : elles se testent en JVM et
  * l'écran ne fait que les afficher. Tout y est en français lisible, sans jargon du SDK.
  */
 fun statusLines(state: GlassesUiState): List<String> = listOf(
@@ -10,7 +10,12 @@ fun statusLines(state: GlassesUiState): List<String> = listOf(
     deviceLine(state),
     sessionLine(state),
     micLine(state),
+    videoLine(state),
 )
+
+/** La vidéo en cours d'enregistrement, et où la retrouver une fois la session fermée. */
+private fun videoLine(state: GlassesUiState): String =
+    "Vidéo : " + (state.recordingName?.let { "enregistrement → Movies/iSee/$it" } ?: "rien en cours")
 
 private fun sdkLine(state: GlassesUiState): String {
     val dev = if (state.devMode) " (dev mode)" else ""

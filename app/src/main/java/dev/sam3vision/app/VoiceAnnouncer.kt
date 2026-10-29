@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import android.content.Context
+import dev.sam3vision.app.glasses.GlassesVoiceRoute
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
@@ -20,7 +21,11 @@ import java.io.File
  */
 class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
 
-    private val player = SpeechPlayer(File(context.cacheDir, dirName))
+    private val player = SpeechPlayer(
+        dir = File(context.cacheDir, dirName),
+        // Lunettes en session : la phrase sort dans la paire, sinon sur le téléphone.
+        output = { GlassesVoiceRoute.current(context) },
+    )
 
     /**
      * Synthétise puis lit [text]. Rien à dire (texte vide) = succès ; clé absente,

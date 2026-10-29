@@ -461,6 +461,92 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   relais (barre du proche en guidage) après merge, avec une vraie session.
 
 ## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
+## 2026-10-29 — lunettes : le fichier garde le cadre des lunettes (plus de quart de tour)
+
+- **Objectif** : la vidéo de démonstration ne doit pas montrer une scène couchée.
+- **Correction** : `KEY_ROTATION` n'est plus écrit et `videoRotationFor` disparaît. Le capteur
+  des lunettes est **portrait natif** et son contenu est **déjà droit** dans ce cadre
+  (`VideoQuality.HIGH` = 720×1280) : le quart de tour de la veille couchait la scène. Le fichier
+  sort en **9:16**, identique à ce que l'app affiche.
+- **Le 16:9** ne peut venir ni du capteur (`StreamConfiguration` n'expose ni format ni
+  orientation), ni d'un recadrage sans perte : une bande 16:9 dans du 9:16 ne garde que **32 %**
+  de la hauteur d'image (504×896 → 504×283). Il se fait donc **au montage**, sur la source
+  intacte ; l'app ne produit aucun export 16:9.
+- Preuves : `GlassesVideoRecorderTest` ne teste plus que le nom et l'unicité ;
+  `:app:testDebugUnitTest` et `tools/check-kotlin-limits.py` verts.
+- **Manque** : pas d'export 16:9 dans l'app ; pas de limite de durée ni de taille.
+
+## 2026-10-29 — lunettes : le son entre dans la vidéo enregistrée
+
+- **Objectif** : la vidéo de démonstration doit porter le son des lunettes, pas seulement
+  l'image, et se retrouver dans la galerie après la session.
+- `GlassesAudioTap` (`app/glasses/`) : **une seule** collecte du micro pour toute la session,
+  répartie entre l'enregistreur et la dictée. Deux abonnés au même flux SDK se volaient des
+  trames ; le relais supprime ce risque.
+- `GlassesAudioEncoder` : PCM 16 bits → **AAC-LC 64 kbit/s** (`MediaCodec`), rappels de format
+  (`csd-0`) et d'échantillon sur le fil appelant, horodatages du flux conservés.
+- `GlassesVideoRecorder` : deux pistes dans le **même** MP4 (H.265 recopié + AAC), déclarées
+  avant `start()`, origine temporelle commune (le plus tôt des deux premiers horodatages) ;
+  attente du format AAC bornée à **4 s** ou 150 images, puis écriture **sans son** plutôt que
+  rien ; le message de fin dit « avec le son » / « sans son ».
+- **16:9** : rien ne change côté fichier, et c'est une contrainte du SDK — `StreamConfiguration`
+  (AAR 1.0.0) n'expose ni format ni orientation ; le capteur livre un tampon portrait dont le
+  contenu est déjà droit (rotation `KEY_ROTATION` retirée le même jour, entrée ci-dessus).
+- Preuves : `:app:testDebugUnitTest` vert (955 tests, dont le message de fin dans
+  `GlassesVideoRecorderTest`) ; `tools/check-kotlin-limits.py` OK.
+- **Manque** : pas de limite de durée ni de taille. **Non mesuré** : la sortie réelle d'un MP4
+  H.265 + AAC sur le téléphone, faute de matériel ici.
+
+## 2026-10-29 — lunettes : la vidéo filmée est enregistrée dans la galerie
+
+- **Objectif** : avec une session iSee ouverte, ce que filment les lunettes doit exister en
+  fichier (vidéo de démonstration), en 16:9.
+- `GlassesVideoRecorder` (`app/glasses/`) : les trames **H.265 déjà compressées** sont écrites
+  telles quelles dans un `MediaMuxer` (aucun ré-encodage), à partir de la trame de
+  configuration (`csd-0`) ; fichier publié dans la galerie
+  `Movies/iSee/isee-lunettes-AAAAMMJJ-HHMMSS.mp4`.
+- **16:9 sans perte** : `videoRotationFor` écrit `KEY_ROTATION = 90` pour un flux 9:16
+  (504×896 → 896×504, exactement 16:9) ; aucun recadrage, aucune image en moins.
+  *(Retiré le même jour : le contenu du flux est droit dans son cadre portrait, un quart de tour
+  couchait la scène — voir l'entrée « plus de quart de tour ».)*
+- Branché au **seul point de passage** des trames (`GlassesCamera.pushCopy`, `stop`), donc une
+  vidéo par session, sans bouton à oublier ; ligne d'état « Vidéo : … » dans
+  Réglages → Lunettes (`GlassesUiState.recordingName`, `GlassesStatus.videoLine`).
+- Pannes dites et nettoyées : pas d'en-tête H.265, aucune image, muxage refusé ; un fichier
+  incomplet est supprimé de la galerie (`recordingEmpty`, `recordingFailed`).
+- Preuves : `:app:testDebugUnitTest` vert (954 tests, dont `GlassesVideoRecorderTest` 4 et la
+  ligne vidéo dans `GlassesUiStateTest`) ; `tools/check-kotlin-limits.py` OK (969 fichiers).
+- **Manque** : pas de piste audio (PCM non encodé en AAC), pas de limite de durée ni de taille.
+- **Non mesuré** : le MP4 réel n'a pas été produit ici (pas de matériel) ; la rotation dépend
+  de `MediaMuxer`, à vérifier au premier enregistrement sur la paire.
+
+## 2026-10-29 — lunettes : les autorisations se demandent, les erreurs se traduisent
+
+- **Cause du blocage** : iSee n'a jamais demandé caméra ni micro. Le SDK 1.0.0 n'expose pas
+  `requestPermission` : il fournit `Wearables.RequestPermissionContract` (contrat d'activité →
+  `fb-viewapp://device/permissions/request`), resté inutilisé. Le seul chemin documenté
+  jusque-là — la fiche de l'app dans Meta AI — n'affiche que « Déconnecter » en Developer
+  Mode. D'où `CAPABILITY_DENIED` à chaque session et aucune photo possible.
+- `MainActivity` : lanceur `Wearables.RequestPermissionContract()` et mémorisation de la
+  permission en cours, passés au contrôleur (`permissionRequester`).
+- `GlassesSection` : deux boutons « Autoriser la caméra (Meta AI) » et « Autoriser le micro
+  (Meta AI) », actifs tant que la permission manque ; accordée, la caméra s'attache aussitôt à
+  la session en cours, sans la refaire.
+- Nouveaux fichiers : `glasses/GlassesPermission.kt` (verdict → état + message,
+  `GlassesPermissionGate`, `reportSessionError`) et `glasses/GlassesDevices.kt` (suivi de la
+  paire extrait du contrôleur, 482 → 469 lignes ; garde `check-kotlin-limits` OK).
+- **Erreur par erreur**, plus aucune description anglaise nue à l'écran : les 18
+  `DeviceSessionError`, les 8 `StreamError`, les 4 `CaptureError`, les 7 `PermissionError` et
+  les 5 `RegistrationRequestError`. `DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED` et
+  `INSUFFICIENT_SDK_VERSION` ouvrent la page de mise à jour (`openDATGlassesAppUpdate`).
+- `handleIntent` : les deux `onFailure` du retour d'enregistrement sont dits (avant : silence
+  complet quand Meta AI revenait avec une demande invalide).
+- Preuves : `:app:testDebugUnitTest` vert (949 tests, dont `GlassesPermissionTest` 6) ;
+  `tools/check-kotlin-limits.py` OK (967 fichiers).
+- **Non mesuré** : la page de permission de Meta AI n'a pas pu être ouverte depuis ce poste ;
+  que le contrat ouvre la question et accorde la caméra reste à constater sur la paire.
+
+## 2026-10-29 — lunettes : la voix de la production sort dans la paire
 
 - **Demande** : la reconnaissance du feu piéton ne vivait que dans une pastille
   en bas de carte et dans la voix ; elle devait se voir **sur la même vidéo que
@@ -641,6 +727,35 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   iSee) : cacao 506 → **0** pixel hors palette brun-caramel (8-55°), Portrait
   316 → **0** pixel vert ou magenta. Ancien shader mesuré à l'identique pour
   comparaison.
+## 2026-10-29 — lunettes : la voix de la production sort dans la paire
+
+- **Cause** : le banc savait router la voix vers les lunettes (A2DP constaté sur
+  la paire le 27/10), la production non — tout partait sur le haut-parleur du
+  téléphone.
+- `GlassesVoiceRoute` (`app/glasses/`) : retient l'état de session (`follow`,
+  `forget`) et rend, **à chaque phrase**, la sortie Bluetooth de la paire
+  (nom du SDK d'abord, puits de son seulement) ; hors session ou appareil
+  refusé, `null` = sortie par défaut, aucun échec silencieux (ligne
+  `GlassesVoice` au changement de décision).
+- `SpeechPlayer` gagne `output: () -> AudioDeviceInfo?` (défaut `null`), posé
+  sur `MediaPlayer.preferredDevice` avant chaque lecture, donc **un seul point
+  de passage** pour le chat, l'analyse, l'intro, les bandeaux, le tap et
+  Traverse ; branché dans `AppViewModel`, `IseeViewModel`, `VoiceAnnouncer`,
+  `TapCaptureScreen`, `TraverseWiring`.
+- Décision **partagée** avec le banc : `AudioOutput`, `pickBluetoothOutput`,
+  `rankOf`, `isBluetoothOutput`, `bluetoothOutputs` déplacés de
+  `glasses/bench/GlassesAudioRoute.kt` vers `glasses/GlassesAudioRoute.kt`
+  (`git mv`, imports à jour) — une seule copie de la règle.
+- Message `framesOnSpeaker` → `framesVoiceRoute` : « la voix des descriptions
+  suit les lunettes, haut-parleur en repli ».
+- Preuves : `:app:compileDebugKotlin` vert ; `:app:testDebugUnitTest` vert sur
+  `dev.sam3vision.app.glasses.*` et `dev.sam3vision.app.isee.*`, dont
+  `GlassesVoiceRouteTest` (5) et `GlassesAudioRouteTest` déplacé.
+- **Non mesuré** : la voix réellement entendue dans la paire en production
+  (à vérifier avec `adb logcat -s GlassesVoice`) ; la voix système (TwinLite,
+  navigation) ne passe pas par ce routage.
+
+## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 
 - `TwinLiteGuide` (`core/.../segment/`) : tiers de la moitié basse du masque
   praticable → ←/↑/→/■, seuil 0,25, STOP sous le seuil partout ; `TwinLiteText`

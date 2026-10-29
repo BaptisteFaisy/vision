@@ -12,10 +12,12 @@ import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoFrame
 import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
+import com.meta.wearable.dat.core.types.DeviceSessionError
 import android.util.Log
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
@@ -41,6 +43,8 @@ internal class GlassesCamera(
     private val onFrame: (suspend (JpegFrame) -> Unit)? = null,
     /** Journal du collecteur (logcat côté contrôleur, rien par défaut). */
     private val onFrameLog: (String) -> Unit = {},
+    /** Enregistreur de la galerie : il voit le flux compressé, une seule fois par trame. */
+    private val recorder: GlassesVideoRecorder? = null,
 ) {
     private var camera: Camera? = null
     private var stream: Stream? = null
@@ -53,6 +57,9 @@ internal class GlassesCamera(
     var audio: GlassesAudio? = null
         private set
 
+    /** Collecte unique du micro pour toute la session : MP4 et dictée la partagent. */
+    private var audioTap: GlassesAudioTap? = null
+
     /**
      * Attache la caméra en descendant le plan audio ([GlassesAudioPlan]) : 16 kHz — le format
      * de la dictée — puis 48 kHz mono, puis caméra seule. Un codec refusé par le flux ne doit
@@ -61,6 +68,7 @@ internal class GlassesCamera(
     fun start(): Boolean {
         if (camera != null) return true
         var reason = NO_REASON
+        var refusal: DeviceSessionError? = null
         for (choice in GlassesAudioPlan.ladder(audioAllowed)) {
             val attempt = session.addCamera(configuration(choice))
             val attached = attempt.getOrNull()
@@ -68,10 +76,13 @@ internal class GlassesCamera(
                 adopt(attached, choice)
                 return true
             }
+            refusal = attempt.errorOrNull() ?: refusal
             reason = attempt.errorOrNull()?.description ?: reason
             if (!choice.silent) onNote(GlassesMessages.audioRefused(choice.hertz, reason))
         }
-        onNote(GlassesMessages.cameraUnavailable(reason))
+        // Le refus est un `DeviceSessionError` : sa phrase dit quoi faire (autorisation,
+        // paire absente, session ailleurs), pas seulement « caméra indisponible ».
+        onNote(refusal?.let(::sessionErrorMessage) ?: GlassesMessages.cameraUnavailable(reason))
         return false
     }
 
@@ -100,13 +111,21 @@ internal class GlassesCamera(
     private fun adopt(attached: Camera, choice: AudioChoice) {
         camera = attached
         stream = attached.stream
-        audio = GlassesAudio(attached.stream.audioStream, choice, audioDir, scope, onMicActive)
+        // L'enregistreur sait, avant la première image, s'il doit attendre une piste son.
+        recorder?.expectAudio(choice)
+        val tap = if (choice.silent) {
+            null
+        } else {
+            GlassesAudioTap(attached.stream.audioStream, scope, recorder, onFrameLog).also { it.start() }
+        }
+        audioTap = tap
+        audio = GlassesAudio(tap?.dictationFrames ?: emptyFlow(), choice, audioDir, scope, onMicActive)
         if (choice.silent && audioAllowed) onNote(GlassesMessages.audioUnavailable())
         watch(attached)
         startFrameCollector(attached.stream)
         pumpFrames(attached.stream)
         attached.stream.start()
-            .onFailure { error, _ -> onNote(GlassesMessages.streamRefused(error.description)) }
+            .onFailure { error, _ -> onNote(streamErrorMessage(error)) }
     }
 
     /**
@@ -119,7 +138,7 @@ internal class GlassesCamera(
         val pump = GlassesFrameCollector(onFrame = consumer, onLog = onFrameLog)
         collector = pump
         collectorJob = scope.launch { pump.run(active.videoStream) }
-        onNote(GlassesMessages.framesOnSpeaker())
+        onNote(GlassesMessages.framesVoiceRoute())
     }
 
     /** Pompe vidéo : chaque frame part en copie vers l'accueil iSee (jamais de buffer vivant). */
@@ -137,16 +156,16 @@ internal class GlassesCamera(
         if (pushed == 1L || pushed % 150 == 0L) {
             Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o)")
         }
-        GlassesVideoLink.push(
-            GlassesFrame(
-                bytes = bytes,
-                width = frame.width,
-                height = frame.height,
-                presentationTimeUs = frame.presentationTimeUs,
-                compressed = frame.isCompressed,
-                codecConfig = frame.isCodecConfig,
-            ),
+        val copy = GlassesFrame(
+            bytes = bytes,
+            width = frame.width,
+            height = frame.height,
+            presentationTimeUs = frame.presentationTimeUs,
+            compressed = frame.isCompressed,
+            codecConfig = frame.isCodecConfig,
         )
+        recorder?.consume(copy)
+        GlassesVideoLink.push(copy)
     }
 
     private fun watch(attached: Camera) {
@@ -154,7 +173,7 @@ internal class GlassesCamera(
             attached.stream.state.collect { state -> onStreaming(state == StreamState.STREAMING) }
         }
         scope.launch {
-            attached.stream.errorStream.collect { error -> onNote(GlassesMessages.streamError(error.description)) }
+            attached.stream.errorStream.collect { error -> onNote(streamErrorMessage(error)) }
         }
     }
 
@@ -167,7 +186,7 @@ internal class GlassesCamera(
         val active = stream ?: return fail(GlassesMessages.streamStopped())
         return active.capturePhoto().fold(
             onSuccess = { data -> data.toBitmapOrNull() ?: fail(GlassesMessages.photoUndecodable()) },
-            onFailure = { error, _ -> fail(GlassesMessages.photoRefused(error.description)) },
+            onFailure = { error, _ -> fail(captureErrorMessage(error)) },
         )
     }
 
@@ -178,6 +197,9 @@ internal class GlassesCamera(
     }
 
     fun stop() {
+        // Le micro s'arrête d'abord : plus aucune trame n'entre pendant la finalisation.
+        audioTap?.stop()
+        audioTap = null
         audio?.abort()
         audio = null
         onMicActive(false)
@@ -188,6 +210,8 @@ internal class GlassesCamera(
         framesJob?.cancel()
         framesJob = null
         GlassesVideoLink.clear()
+        // La vidéo se finalise avant le flux : l'enregistreur tient ses propres octets.
+        recorder?.stop()
         stream?.stop()
         if (camera != null) session.removeCamera()
         camera = null

@@ -57,14 +57,62 @@ le direct occupe la rue du Portrait quand il est vivant).
    (`GlassesController.kt:145`).
 3. **Session** — « Démarrer la session » → `connect()` (`:150`), qui exige
    `registered` (`GlassesUiState.canConnect`, `GlassesState.kt:26`).
-4. **Capacités** — à l'état SDK `STARTED`, `attachCapabilities` (`:199`) attache la caméra,
+4. **Autorisation** — « Autoriser la caméra (Meta AI) » / « Autoriser le micro (Meta AI) »
+   (`GlassesSection.kt`, `PermissionActions`) : `requestPermission()` lance le contrat du SDK
+   (`Wearables.RequestPermissionContract` → `fb-viewapp://device/permissions/request`), Meta AI
+   pose la question, et le verdict revient par `onPermissionResult` (`GlassesPermission.kt`).
+   **C'est la seule voie qui aboutit en Developer Mode** : la fiche de l'app n'offre que
+   « Déconnecter ». La caméra obtenue s'attache aussitôt à la session en cours, sans la refaire.
+5. **Capacités** — à l'état SDK `STARTED`, `attachCapabilities` (`:199`) attache la caméra,
    puis, si la permission caméra est accordée, le bouton capture.
-5. **Photo** — appui court → tick 80 ms → `PHOTO` → `capture()` (`:229`) →
+6. **Photo** — appui court → tick 80 ms → `PHOTO` → `capture()` (`:229`) →
    `stream.capturePhoto()` → JPEG écrit dans le cache (`GlassesFrames.kt:49`) →
    `GlassesEvent.PhotoTaken` → `AppNav.kt:91-101` → `viewModel.onPhoto(file)` → écran
    d'analyse, ou chat pour l'appui long.
 
-## 3. Cycle de vie de la session
+## 3. L'enregistrement vidéo (2026-10-29)
+
+Toute session ouverte **enregistre** : `GlassesVideoRecorder` reçoit les trames compressées au
+même point que l'affichage (`GlassesCamera.pushCopy`), écrit les octets H.265 **tels quels**
+dans un `MediaMuxer` — aucun ré-encodage, donc presque gratuit — et publie le fichier dans la
+galerie : **`Movies/iSee/isee-lunettes-AAAAMMJJ-HHMMSS.mp4`**.
+
+- démarrage à la première image qui suit la trame de configuration (`isCodecConfig`, le
+  `csd-0` du H.265) ; arrêt avec la session (`GlassesCamera.stop`), puis `IS_PENDING` levé
+  pour que la galerie le voie ;
+- **aucune rotation** (corrigé le 2026-10-29) : le capteur des lunettes est **portrait natif**
+  et son contenu est **déjà droit** dans ce cadre (`VideoQuality.MEDIUM` = 504×896,
+  `HIGH` = 720×1280). Un quart de tour (`KEY_ROTATION`) couchait la scène : il a été retiré.
+  Le fichier sort donc en **9:16**, exactement ce que l'app affiche (`isee/IseeGlassesLive.kt`
+  ne tourne rien non plus) ;
+- **le 16:9 natif n'existe pas** : `StreamConfiguration` (AAR 1.0.0) n'expose que `audioCodec`,
+  `videoQuality`, `frameRate`, `compressVideo` — aucun format, aucune orientation. Et le 16:9
+  ne se fabrique pas non plus sans perte : couper une bande 16:9 dans du 9:16 ne garde que
+  **32 %** de la hauteur d'image (504×896 → 504×283). Le 16:9 se fait donc **au montage**, sur
+  la source intacte, pas à l'enregistrement ;
+- **pannes dites à l'écran** : pas d'en-tête H.265, aucune image, muxage refusé
+  (`recordingEmpty`, `recordingFailed`) ; un fichier à moitié écrit est retiré de la galerie ;
+- état visible : ligne « Vidéo : enregistrement → Movies/iSee/… » dans Réglages → Lunettes.
+
+### 3 bis. Le son dans la vidéo (2026-10-29)
+
+Le micro des lunettes est **collecté pendant toute la session** par `GlassesAudioTap` : une
+seule collecte pour deux consommateurs — le MP4 et la dictée (`GlassesAudio`). Deux abonnés au
+même flux SDK se voleraient des trames, d'où ce relais unique.
+
+- PCM 16 bits → **AAC-LC 64 kbit/s** (`GlassesAudioEncoder`), puis muxé dans le même fichier ;
+  l'image reste du H.265 recopié tel quel ;
+- les deux pistes sont horodatées par le flux, avec une origine commune (le plus tôt des deux
+  premiers horodatages) : la synchronisation ne se recalcule pas ;
+- le fichier attend le format AAC au plus **4 s** (ou 150 images) : passé ce délai, il s'écrit
+  **sans son** plutôt que pas du tout, et le message de fin le dit (« avec le son » / « sans son ») ;
+- micro refusé côté Meta AI → aucune piste audio demandée, aucun délai d'attente.
+
+**Manque** : rien ne limite la durée ni la taille du fichier, et l'app ne produit **aucun
+export 16:9** (le fichier garde le cadre des lunettes). **Non vérifié ici** : qu'un MP4 H.265 +
+AAC sorte bien de `MediaMuxer` sur ce téléphone. À constater au premier enregistrement.
+
+## 3 ter. Cycle de vie de la session
 
 | État SDK (`DeviceSessionState`) | Phase affichée | Détail |
 |---|---|---|
@@ -126,11 +174,17 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
   48 kHz mono en repli, puis « sans micro » — et `GlassesCamera.start()` essaie les trois
   (`:43-54`), en annonçant chaque refus (`GlassesMessages.audioRefused`). Un refus de micro
-  laisse donc la caméra seule, sans code mort. Ce qui reste **absent**, c'est le **routage de la
-  voix vers les lunettes** : il n'existe que dans le banc (`bench/GlassesVoice.kt`).
+  laisse donc la caméra seule, sans code mort.
+- **La voix sort dans les lunettes** quand la session est ouverte : le lecteur unique de l'app
+  (`SpeechPlayer`) relit la sortie Bluetooth **à chaque phrase** et la pose sur
+  `MediaPlayer.preferredDevice` (`glasses/GlassesVoiceRoute.kt`), la paire étant reconnue à son
+  nom et un **puits de son** seulement ; hors session, ou si aucun appareil ne peut recevoir
+  le son, la sortie par défaut du téléphone reste en place (aucun échec silencieux : une ligne
+  `GlassesVoice` au changement de décision). Le choix lui-même est pur et partagé avec le banc
+  (`glasses/GlassesAudioRoute.kt`, testé en JVM).
 - Le flux vidéo a **deux consommateurs** dans `GlassesCamera.kt` : le collecteur de production
   (`GlassesFrameCollector.kt` : `videoStream` → décodage H.265 ou YUV → `JpegFrame` →
-  `AnalyzeUseCase` → voix haut-parleur), derrière un flag **éteint par défaut** (drapeau
+  `AnalyzeUseCase` → voix, dans les lunettes en session), derrière un flag **éteint par défaut** (drapeau
   `collectFrames` : éteint, le flux n'est pas lu et la raison est écrite,
   `frameCollectionIdleReason`, testée en JVM) ; et la pompe vers l'accueil iSee, qui envoie
   chaque frame en copie défensive (`GlassesFrame`, jamais de buffer SDK vivant) vers
@@ -205,6 +259,14 @@ et tous les textes sont écrits une seule fois dans `GlassesMessages` (`:36-98`)
 - `INFO` → bandeau neutre : demande d'enregistrement lancée, mode Direct pas porté sur
   lunettes, lunettes simulées prêtes.
 
+Aucune erreur du SDK n'arrive plus sous sa forme anglaise : chaque énumération est traduite
+**erreur par erreur**, avec le geste qui repare quand il existe — 18 `DeviceSessionError`
+(`sessionErrorMessage`), 8 `StreamError` (`streamErrorMessage`), 4 `CaptureError`
+(`captureErrorMessage`), 7 `PermissionError` (`permissionFailed`), 5 `RegistrationRequestError`
+(`registrationRequestErrorMessage`). Deux d'entre elles (`DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED`,
+`INSUFFICIENT_SDK_VERSION`) ouvrent en plus la page de mise à jour de l'app DAT
+(`reportSessionError` → `Wearables.openDATGlassesAppUpdate`).
+
 Chemins muets corrigés dans cette branche (aucun changement de comportement matériel, que du
 diagnostic) :
 
@@ -240,10 +302,14 @@ Ne marche pas, et c'est écrit dans le code :
   (`GlassesFrameCollector.kt`) mais son flag est éteint, et son décodeur H.265 n'a
   jamais vu de matériel — donc pas de descriptions automatiques sans geste explicite ;
   le direct affiché et le guidage, eux, tournent dès que les lunettes streament ;
-- pas de routage de la voix vers les lunettes : le micro des lunettes est demandé (palier
-  `GlassesAudioPlan`), mais la sortie audio reste le haut-parleur du téléphone (annoncé
-  comme tel quand la collecte tourne) ; la permission `MODIFY_AUDIO_SETTINGS` est déclarée
-  (`AndroidManifest.xml:15`), pour le banc et non pour l'app ;
+- la voix ne sort **pas** dans les lunettes hors session : le routage est lié à une session
+  ouverte (`STARTED`), donc une paire allumée mais non connectée à l'app garde la voix sur le
+  téléphone — c'est voulu (le nom de la paire vient du SDK) ;
+- la voix **système** (flèche TwinLite, navigation) ne passe pas par ce routage : elle utilise
+  `TextToSpeech`, qui suit la sortie audio choisie par Android, pas `preferredDevice` ;
+- l'audio de la voix n'a **jamais été entendu dans la paire en production** : le routage est
+  compilé et testé en JVM, le banc a seulement prouvé que la sortie A2DP de la paire est
+  utilisable (`bt_a2dp`, 27/10) ;
 - pas de tap ni tap-long du pavé : l'app ne s'abonne qu'à `InputSource.CAPTURE_BUTTON`
   (`GlassesInputs.kt:39-43`), ces gestes étant réservés par le système (pause/arrêt) ;
 - pas d'invocation vocale par mot-clé : exigerait un projet Developer Center et une version
@@ -281,7 +347,7 @@ l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune oc
 | Cadence | 15 i/s (`GlassesCamera.kt`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
 | Compression | `compressVideo = true` : bitstream H.265 | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
 | Trames vidéo | direct vers l'accueil + guidage (`GlassesLiveDecoder`), collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
-| Audio | piste PCM demandée par palier (`GlassesAudioPlan`), pas de routage de sortie | routage de la voix vers les lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
+| Audio | piste PCM demandée par palier (`GlassesAudioPlan`) ; voix sortie dans les lunettes en session par `SpeechPlayer` (`GlassesVoiceRoute`), haut-parleur en repli | routage explicite avant chaque phrase (`bench/GlassesVoice.kt`), même choix partagé (`GlassesAudioRoute.kt`) |
 | Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |
 
@@ -332,5 +398,5 @@ Paire `RB Meta 01TK`, téléphone `2c6852ac`, app en **Developer Mode** (`APPLIC
 | Avec 1.0.0, la session **reste ouverte** | `session démarrée`, `caméra ajoutée`, `flux démarré` ; seul refus restant : `CAPABILITY_DENIED` (permission caméra) |
 | Le lien se monte en ~2 à 10 s après l'allumage | `linkState` = `CONNECTING` puis `CONNECTED` ; une session créée avant rend `NO_ELIGIBLE_DEVICE` (déjà géré : `hasLinkedDevice`) |
 | Le SDK publie son verdict de compatibilité | `Device.compatibility` = `COMPATIBLE` / `DEVICE_UPDATE_REQUIRED` / `SDK_UPDATE_REQUIRED`, déjà affiché par `GlassesRealCheck` |
-| En Developer Mode, la page de permission caméra **n'existe pas** | ☰ → Lunettes → paire → Paramètres → Applications → « Applications du mode développeur(se) » → app : une seule ligne « Déconnecter » ; les libellés « Always allow » n'existent pas dans l'APK 295. Texte de `GlassesMessages` aligné sur ce chemin réel |
+| En Developer Mode, la page de permission caméra **n'existe pas** dans la fiche de l'app | ☰ → Lunettes → paire → Paramètres → Applications → « Applications du mode développeur(se) » → app : une seule ligne « Déconnecter » ; les libellés « Always allow » n'existent pas dans l'APK 295. La demande passe donc par le **contrat du SDK** (bouton « Autoriser … (Meta AI) »), pas par cette page ; le chemin manuel n'est que le repli |
 | Pas de canal public | Meta ne propose que le Developer Mode (sans invitation) et un canal privé « Beta », **sur invitation par e-mail du compte Meta** (wearables.meta.com) |
