@@ -20,9 +20,8 @@ data class DepthModelSpec(
 )
 
 /**
- * Catalogue des modèles (un par moteur) : hébergés sur la release
- * `depth-models-v1` du dépôt, vérifiés par sha256 après téléchargement.
- * [AUTO] résout vers DA2 (moteur préféré).
+ * Catalogue des modèles (un seul moteur, DA2) : hébergé sur la release
+ * `depth-models-v1` du dépôt, vérifié par sha256 après téléchargement.
  */
 object DepthModels {
     private const val RELEASE =
@@ -35,16 +34,8 @@ object DepthModels {
         bytes = 27516544,
     )
 
-    val MIDAS = DepthModelSpec(
-        fileName = "midas_v21_small.tflite",
-        url = RELEASE + "midas_v21_small.tflite",
-        sha256 = "93d871071edff1218973ce25ee27ce95ccd20450c70a55e1b89efa3f5a772cdd",
-        bytes = 66338288,
-    )
-
     fun forBackend(backend: DepthBackend): DepthModelSpec? = when (backend) {
-        DepthBackend.DA2, DepthBackend.AUTO -> DA2
-        DepthBackend.MIDAS -> MIDAS
+        DepthBackend.DA2 -> DA2
         DepthBackend.OFF -> null
     }
 }
@@ -63,7 +54,7 @@ object DepthModelStore {
 }
 
 /**
- * Téléchargement des modèles à l'exécution (l'APK ne porte plus les ~92 Mo) :
+ * Téléchargement du modèle à l'exécution (l'APK ne porte pas les ~27 Mo) :
  * fichier déjà présent et empreinte OK ⇒ réutilisé ; sinon GET + vérification
  * sha256 + renommage atomique (un `.tmp` abandonné ne pollue jamais le store).
  * Échec ⇒ `Result.failure` avec un message affichable (banc, ligne de statut).
