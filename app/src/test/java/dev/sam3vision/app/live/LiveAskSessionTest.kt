@@ -7,14 +7,23 @@ import dev.sam3vision.app.NO_FRAME_LINE
 import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveTimeline
+import dev.sam3vision.app.isee.PictoStore
+import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.net.LlmClient
+import dev.sam3vision.core.net.PictoImageClient
+import dev.sam3vision.core.picto.GrayImage
+import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
+import java.nio.file.Files
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -76,6 +85,77 @@ class LiveAskSessionTest {
     private fun homeState() = MutableStateFlow(
         LiveUiState(prompts = HomeModes.ESSENTIELS.prompts, samEnabled = true),
     )
+
+    /** Génération d'image espionne : rend toujours [result], note photo et consigne. */
+    private class FakePictoClient(var result: Result<ByteArray>) : PictoImageClient {
+        var calls = 0
+        var lastPhoto: ByteArray? = null
+        var lastHint: String? = null
+
+        override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
+            calls++
+            lastPhoto = photoJpeg
+            lastHint = hint
+            return result
+        }
+    }
+
+    /** Gabarit 24px non plat (dégradé) : le matcher le reconnaît toujours. */
+    private fun testTemplate() = PictoTemplate(IntArray(24 * 24) { it % 256 }, 24)
+
+    /** Frame 96px où [template] est collé en (10, 20) : corrélation 1.0. */
+    private fun frameWith(template: PictoTemplate): GrayImage {
+        val gray = IntArray(96 * 96) { 128 }
+        for (y in 0 until template.edge) {
+            for (x in 0 until template.edge) {
+                gray[(20 + y) * 96 + 10 + x] = template.gray[y * template.edge + x]
+            }
+        }
+        return GrayImage(gray, 96, 96)
+    }
+
+    private class PictoFakes(
+        val session: LiveAskSession,
+        val state: MutableStateFlow<LiveUiState>,
+        val llm: FakeLlm,
+        val client: FakePictoClient,
+        val store: PictoStore,
+        val spoken: MutableList<String>,
+        val restarts: MutableList<List<String>>,
+    )
+
+    /** Session branchée sur un magasin réel (dossier jetable) et une voix espionne. */
+    private fun TestScope.pictoFakes(
+        frame: GrayImage? = null,
+        clientResult: Result<ByteArray> = Result.success("png".toByteArray()),
+        jpeg: String = "jpeg-de-test",
+    ): PictoFakes {
+        val llm = FakeLlm(Result.success("ne doit pas servir"))
+        val client = FakePictoClient(clientResult)
+        val store = PictoStore(Files.createTempDirectory("live-picto-store").toFile())
+        val spoken = mutableListOf<String>()
+        val restarts = mutableListOf<List<String>>()
+        val state = homeState()
+        val session = LiveAskSession(
+            scope = this,
+            state = state,
+            timeline = LiveTimeline(),
+            latestJpeg = { jpeg },
+            refreshSettings = {},
+            settings = { configured.copy(speechLanguage = SpeechLanguage.Fr) },
+            llm = { llm },
+            windowMs = 30_000L,
+            restart = restarts::add,
+            pictoSpeak = { _, phrase -> spoken += phrase },
+            io = UnconfinedTestDispatcher(),
+            pictoClient = { client },
+            store = store,
+            frameGray = { _, _ -> frame },
+            decodeB64 = { it.toByteArray() },
+            guideAnnouncer = PositionAnnouncer(minFrames = 1, cooldownMs = 0),
+        )
+        return PictoFakes(session, state, llm, client, store, spoken, restarts)
+    }
 
     @Test
     fun `question vide ou blanche ignoree`() = runTest {
@@ -232,5 +312,125 @@ class LiveAskSessionTest {
         advanceUntilIdle()
         assertTrue(restarts.isEmpty())
         assertEquals(1, llm.calls)
+    }
+
+    @Test
+    fun `ordre picto cree le repere et confirme sans llm`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.session.ask("fais un pictogramme de ces médics")
+        advanceUntilIdle()
+        assertEquals(1, fakes.client.calls)
+        assertEquals("medics", fakes.client.lastHint)
+        assertArrayEquals("jpeg-de-test".toByteArray(), fakes.client.lastPhoto)
+        assertEquals(listOf("medics"), fakes.store.list().map { it.label })
+        assertEquals(
+            listOf(
+                "Je crée le pictogramme.",
+                "Pictogramme medics prêt. Dis son nom pour être guidé.",
+            ),
+            fakes.spoken,
+        )
+        assertEquals(0, fakes.llm.calls)
+        assertTrue(fakes.restarts.isEmpty())
+    }
+
+    @Test
+    fun `ordre picto sans image parle echec sans generer`() = runTest {
+        val fakes = pictoFakes(jpeg = "")
+        fakes.session.ask("fais un pictogramme de ces médics")
+        advanceUntilIdle()
+        assertEquals(listOf("Création du pictogramme impossible."), fakes.spoken)
+        assertEquals(0, fakes.client.calls)
+        assertTrue(fakes.store.list().isEmpty())
+    }
+
+    @Test
+    fun `echec muse parle echec sans stocker`() = runTest {
+        val fakes = pictoFakes(
+            frame = frameWith(testTemplate()),
+            clientResult = Result.failure(RuntimeException("402")),
+        )
+        fakes.session.ask("fais un pictogramme de ces médics")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("Je crée le pictogramme.", "Création du pictogramme impossible."),
+            fakes.spoken,
+        )
+        assertTrue(fakes.store.list().isEmpty())
+        assertEquals(0, fakes.llm.calls)
+    }
+
+    @Test
+    fun `le mot chasse guide la voix et pose l overlay`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.store.save("medics", "png".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.ask("médicament")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        val hits = fakes.state.value.pictoOverlay?.hits.orEmpty()
+        assertEquals(listOf("medics"), hits.map { it.label })
+        assertEquals(1, fakes.spoken.size)
+        assertTrue("guide parlé : ${fakes.spoken}", fakes.spoken.single().startsWith("Medics "))
+        assertEquals(fakes.spoken.single(), fakes.state.value.spoken)
+        assertEquals(0, fakes.llm.calls)
+        assertTrue(fakes.restarts.isEmpty())
+    }
+
+    @Test
+    fun `sans chasse les reperes restent muets mais affiches`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.store.save("medics", "png".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(listOf("medics"), fakes.state.value.pictoOverlay?.hits.orEmpty().map { it.label })
+        assertTrue(fakes.spoken.isEmpty())
+    }
+
+    @Test
+    fun `le picto passe avant sam, sam reste le repli`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.store.save("medics", "png".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.ask("médicament")
+        advanceUntilIdle()
+        assertTrue("picto prioritaire, pas de relance SAM", fakes.restarts.isEmpty())
+        fakes.session.ask("clés")
+        advanceUntilIdle()
+        assertEquals(listOf(listOf("keys")), fakes.restarts)
+    }
+
+    @Test
+    fun `les medicaments au pluriel guide aussi`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.store.save("medics", "png".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.ask("les médicaments")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(1, fakes.spoken.size)
+        assertEquals(0, fakes.llm.calls)
+    }
+
+    @Test
+    fun `reset coupe le guidage`() = runTest {
+        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+        fakes.store.save("medics", "png".toByteArray(), testTemplate())
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.ask("médicament")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(1, fakes.spoken.size)
+        fakes.session.reset()
+        advanceUntilIdle()
+        fakes.session.onLiveFrame(200, 200, 2_000L)
+        advanceUntilIdle()
+        assertEquals("guidage coupé, pas de nouvelle phrase", 1, fakes.spoken.size)
     }
 }
