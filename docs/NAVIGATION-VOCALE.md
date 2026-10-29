@@ -27,14 +27,21 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
    Scribe) → overlay « Transcription / Un instant… », puis texte transcrit
    affiché + relu.
 3. **Extraction** : `NavigationHook` analyse le texte **avant** le LLM
-   (insensible casse/accents), avec les 9 motifs GO du §6 : « je veux /
-   voudrais / vais aller … X », « j'aimerais aller … X », « emmène/amène-moi
-   … X », « conduis-moi … X », « guide-moi jusqu'à/au/aux / vers X »,
-   « naviguer vers X », « itinéraire vers X », « aller … X », « va … X » —
-   « … » vaut à, au, aux, en, dans, vers, chez, jusqu'à. X = reste de la
-   phrase, transmis tel quel à Maps, aucun géocodage local. Un ordre sans
-   destination comprise (« je veux aller », « emmène-moi »…) ne part pas
-   au LLM : iSee redemande la destination (`NavClarify`).
+   (insensible casse/accents), avec les 12 motifs GO du §6 : « je veux /
+   voudrais / vais aller à X », « j'aimerais aller à X », « emmène-moi /
+   conduis-moi à X », « guide-moi jusqu'à X », « naviguer vers X »,
+   « itinéraire vers X », « aller à X », « va à X », plus les formes orales
+   sans préposition (« je veux aller X », « aller X », « va X ») et
+   contractées (« aller au / aux X ») : la STT mange souvent le « à », et un
+   complément d'action (« aller vite ») n'est jamais une destination. X = reste
+   de la phrase, transmis tel quel à Maps, aucun géocodage local. Un ordre sans
+   destination comprise (« je veux aller », « emmène-moi »…) ne part pas au
+   LLM : iSee redemande la destination (`NavClarify`).
+   La dictée du **direct** suit la même extraction : une destination comprise
+   ouvre l'écran de navigation
+   (`app/src/main/java/dev/sam3vision/app/live/LiveNavOrders.kt`), une demande
+   d'itinéraire incomplète redemande l'adresse — jamais de description de la
+   scène à la place.
 4. **Confirmation (implicite, one-shot)** : pas de question oui/non (non-but
    MVP : garder le geste unique mains libres). La confirmation = relecture
    vocale immédiate « Navigation vers X » + overlay affichant la destination
@@ -162,13 +169,13 @@ avec le code qui l'utilise (X remplace `%1$s` dans ce tableau).
 Aide sous l'interrupteur (en dur dans le composable, comme les autres aides) :
 « Éteint : iSee montre la fiche du lieu au lieu de lancer le guidage. »
 Motifs STOP déterministes (insensibles casse/accents) : « arrête / stop /
-annule (le/la) guidage / navigation » ; les 9 motifs GO restent inchangés.
+annule (le/la) guidage / navigation » ; les 12 motifs GO restent valables.
 
 ## 6. Ancres code (ce que le MVP réutilise, sans le dupliquer)
 
 | Fait publié | Ancre |
 |---|---|
-| 9 motifs GO déterministes, destination brute | `core/src/main/java/dev/sam3vision/core/nav/NavigationIntent.kt::PATTERNS` — 9 motifs |
+| 12 motifs GO déterministes, destination brute | `core/src/main/java/dev/sam3vision/core/nav/NavigationIntent.kt::PATTERNS` — 12 motifs |
 | Ordre sans destination comprise → redemande, jamais le LLM | `core/src/main/java/dev/sam3vision/core/voicenav/NavClarify.kt` |
 | Normalisation de X dicté (pas de géocodage) | `core/src/main/java/dev/sam3vision/core/nav/DestinationQuery.kt` |
 | URIs intent / universelle / fiche (pur JVM) | `core/src/main/java/dev/sam3vision/core/nav/MapsUri.kt` |

@@ -14,11 +14,12 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 
 1. **Appui long** (~300 ms) sur la surface iSee → « J'écoute. Parle, puis
    relâche pour envoyer. »
-2. **Dicter** : « je veux aller à la gare de Lyon », « emmène-moi au X »,
-   « aller aux X »… (9 motifs, prépositions à, au, aux, en, dans, vers,
-   chez, jusqu'à — voir `docs/NAVIGATION-VOCALE.md` §3). Transcription
-   Meta, repli ElevenLabs Scribe. Sans destination comprise, iSee
-   redemande (« Je n'ai pas compris où tu veux aller… »).
+2. **Dicter** : « je veux aller à la gare de Lyon », « emmène-moi à X »,
+   « aller à X », « aller X » (sans le « à ») — 12 motifs, liste exacte dans
+   `docs/NAVIGATION-VOCALE.md` § 3. Transcription Meta, repli ElevenLabs
+   Scribe. Une destination non comprise est redemandée à voix haute (« Je
+   n'ai pas compris où tu veux aller… »), jamais remplacée par une
+   description de la scène.
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
    propose un champ de saisie clavier — la saisie vaut une dictée : elle
    ouvre la confirmation, sans redicter.
