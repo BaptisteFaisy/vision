@@ -4,6 +4,8 @@ import dev.sam3vision.app.LLM_ABSENT_LINE
 import dev.sam3vision.app.LiveMemoryState
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.app.NO_FRAME_LINE
+import dev.sam3vision.core.live.HomeModes
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
@@ -54,6 +56,7 @@ class LiveAskSessionTest {
         state: MutableStateFlow<LiveUiState> = MutableStateFlow(LiveUiState()),
         jpeg: String = "jpeg-de-test",
         settings: Settings = configured,
+        onRestart: (List<String>) -> Unit = {},
     ): Pair<LiveAskSession, MutableStateFlow<LiveUiState>> {
         var current = settings
         val session = LiveAskSession(
@@ -65,9 +68,14 @@ class LiveAskSessionTest {
             settings = { current },
             llm = { llm },
             windowMs = 30_000L,
+            restart = onRestart,
         )
         return session to state
     }
+
+    private fun homeState() = MutableStateFlow(
+        LiveUiState(prompts = HomeModes.ESSENTIELS.prompts, samEnabled = true),
+    )
 
     @Test
     fun `question vide ou blanche ignoree`() = runTest {
@@ -149,5 +157,80 @@ class LiveAskSessionTest {
         session.ask("troisième")
         advanceUntilIdle()
         assertEquals(listOf(0, 2, 0), llm.historySizes)
+    }
+
+    @Test
+    fun `un mot maison seul relance sam sans appeler le llm`() = runTest {
+        val llm = FakeLlm(Result.success("ne doit pas servir"))
+        val restarts = mutableListOf<List<String>>()
+        val (session, state) = harness(this, llm, state = homeState(), onRestart = restarts::add)
+        session.ask("clés")
+        advanceUntilIdle()
+        assertEquals(listOf(listOf("keys")), restarts)
+        assertEquals(0, llm.calls)
+        assertFalse(state.value.memory.asking)
+        assertNull(state.value.memory.answer)
+    }
+
+    @Test
+    fun `la chasse sam n exige ni image gardee ni cle llm`() = runTest {
+        val llm = FakeLlm(Result.success("ne doit pas servir"))
+        val restarts = mutableListOf<List<String>>()
+        val (session, _) = harness(
+            this, llm, state = homeState(), jpeg = "",
+            settings = Settings.Default, onRestart = restarts::add,
+        )
+        session.ask("télécommande")
+        advanceUntilIdle()
+        assertEquals(listOf(listOf("tv remote")), restarts)
+        assertEquals(0, llm.calls)
+    }
+
+    @Test
+    fun `une phrase part au llm meme en mode maison`() = runTest {
+        val llm = FakeLlm(Result.success("Les clés sont à gauche."))
+        val restarts = mutableListOf<List<String>>()
+        val (session, _) = harness(this, llm, state = homeState(), onRestart = restarts::add)
+        session.ask("où sont les clés ?")
+        advanceUntilIdle()
+        assertTrue(restarts.isEmpty())
+        assertEquals(1, llm.calls)
+    }
+
+    @Test
+    fun `un mot inconnu part au llm meme en mode maison`() = runTest {
+        val llm = FakeLlm(Result.success("Je ne vois pas de doudou."))
+        val restarts = mutableListOf<List<String>>()
+        val (session, _) = harness(this, llm, state = homeState(), onRestart = restarts::add)
+        session.ask("doudou")
+        advanceUntilIdle()
+        assertTrue(restarts.isEmpty())
+        assertEquals(1, llm.calls)
+    }
+
+    @Test
+    fun `un mot maison hors mode maison part au llm`() = runTest {
+        val llm = FakeLlm(Result.success("réponse"))
+        val street = MutableStateFlow(LiveUiState(prompts = LivePrompts.default, samEnabled = true))
+        val restarts = mutableListOf<List<String>>()
+        val (session, _) = harness(this, llm, state = street, onRestart = restarts::add)
+        session.ask("clés")
+        advanceUntilIdle()
+        assertTrue(restarts.isEmpty())
+        assertEquals(1, llm.calls)
+    }
+
+    @Test
+    fun `un mot maison sam coupe part au llm`() = runTest {
+        val llm = FakeLlm(Result.success("réponse"))
+        val visionOnly = MutableStateFlow(
+            LiveUiState(prompts = HomeModes.ESSENTIELS.prompts, samEnabled = false),
+        )
+        val restarts = mutableListOf<List<String>>()
+        val (session, _) = harness(this, llm, state = visionOnly, onRestart = restarts::add)
+        session.ask("clés")
+        advanceUntilIdle()
+        assertTrue(restarts.isEmpty())
+        assertEquals(1, llm.calls)
     }
 }

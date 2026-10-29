@@ -2,6 +2,7 @@ package dev.sam3vision.app.live
 
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
@@ -39,6 +40,8 @@ class LivePositionVoice(
     /**
      * Dit la frame à voix haute si la scène a changé ([PositionAnnouncer] décide).
      * La distance suit la boîte qui l'a produite : aucune indexation fragile.
+     * Les labels maison sont dits en français (« Clés à 9 heures »), les autres
+     * tels quels (le mode rue ne change pas).
      */
     fun announce(
         frame: LiveFrame,
@@ -50,7 +53,8 @@ class LivePositionVoice(
         if (!settings().announcePositions || asking()) return
         val metersByBox = readings.associate { it.box to it.meters }
         val placed = frame.objects.mapNotNull { obj ->
-            PositionText.fromDetection(Detection(obj.label, obj.score, obj.box, width, height))
+            val label = HomeModes.french(obj.label)
+            PositionText.fromDetection(Detection(label, obj.score, obj.box, width, height))
                 ?.copy(meters = metersByBox[obj.box])
         }
         val phrase = announcer.onFrame(nowMs, placed, settings().speechLanguage) ?: return
