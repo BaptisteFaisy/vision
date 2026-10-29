@@ -48,12 +48,13 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
-        assertEquals(MessageKind.INFO, GlassesMessages.framesOnSpeaker().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
     }
 
     @Test
-    fun `la collecte active annonce la voix sur haut-parleur`() {
-        assertTrue(GlassesMessages.framesOnSpeaker().text.contains("haut-parleur"))
+    fun `la collecte active annonce la sortie de la voix`() {
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("lunettes"))
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("haut-parleur"))
     }
 
     @Test
@@ -74,13 +75,13 @@ class GlassesMessagesTest {
     }
 
     @Test
-    fun `le refus de camera dit ou cliquer dans l app Meta AI`() {
-        // Chemin mesuré sur la paire le 27/10/2026 : la permission est par paquet, et en
-        // Developer Mode l'entrée de l'app vit sous « Applications du mode développeur(se) ».
+    fun `le refus de camera dit d abord le bouton, puis le chemin manuel`() {
+        // La permission est par paquet et se demande dans Meta AI : d'abord le bouton qui
+        // ouvre la page du SDK, et seulement en repli le chemin de la fiche de l'app.
         val text = GlassesMessages.cameraPermissionMissing().text
         assertTrue(text, text.contains("Caméra non autorisée"))
-        assertTrue(text, text.contains("Applications du mode développeur(se)"))
-        assertTrue(text, text.contains("Toujours autoriser"))
+        assertTrue(text, text.contains("Autoriser"))
+        assertTrue(text, text.contains("applications du mode développeur"))
     }
 
     @Test
@@ -94,7 +95,7 @@ class GlassesMessagesTest {
             GlassesMessages.registrationStarted(),
             GlassesMessages.mockReady(),
             GlassesMessages.noMockPress(),
-            GlassesMessages.framesOnSpeaker(),
+            GlassesMessages.framesVoiceRoute(),
             GlassesMessages.videoUndecodable(),
         )
         all.forEach { message ->

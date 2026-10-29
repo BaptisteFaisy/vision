@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.Permission
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
@@ -81,12 +83,28 @@ class MainActivity : ComponentActivity() {
     private val backgroundLocationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
+    /** Dernière permission demandée : le contrat du SDK ne rend que le verdict. */
+    private var pendingGlassesPermission = Permission.CAMERA
+
+    /**
+     * Autorisation caméra/micro des lunettes : le SDK n'expose pas de `requestPermission`, mais
+     * ce contrat, qui ouvre la page de Meta AI. Déclaré avant `onCreate`, comme les autres.
+     */
+    private val glassesPermission =
+        registerForActivityResult(Wearables.RequestPermissionContract()) { result ->
+            glasses.onPermissionResult(pendingGlassesPermission, result)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         glasses = GlassesController(
             applicationContext,
             // Lus paresseusement à chaque frame : `viewModel` est prêt bien avant.
             frameSettings = { viewModel.state.value.settings },
+            permissionRequester = { permission ->
+                pendingGlassesPermission = permission
+                glassesPermission.launch(permission)
+            },
         ).also {
             it.bind(this)
             it.initialize()

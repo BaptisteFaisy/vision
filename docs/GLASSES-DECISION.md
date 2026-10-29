@@ -100,7 +100,7 @@ qu'il livre vraiment, pas pour livrer.
 | cadence demandée | **15** (`GlassesCamera.kt:129`, `:62`) | **24** (`bench/GlassesDeviceSession.kt:12`, `:46`) — soit le défaut du SDK |
 | compression | `compressVideo = true` (`GlassesCamera.kt:63`) | autre choix, avec son propre encodeur (`bench/GlassesFrameEncoder.kt`) |
 | trames vidéo | **jamais** consommées (0 occurrence de `videoStream` hors `bench/`, mesuré) | pompées et étranglées à une frame / 1,5 s (`bench/GlassesFramePump.kt:38-44`, `bench/GlassesSessionPolicy.kt:23`) |
-| audio | piste PCM demandée par palier (`GlassesAudioPlan`, `GlassesCamera.kt:43-44`), pas de routage Bluetooth | routage de la voix vers la sortie des lunettes (`bench/GlassesVoice.kt:74-86`, `routeToGlasses`) |
+| audio | piste PCM demandée par palier (`GlassesAudioPlan`, `GlassesCamera.kt:43-44`) ; voix sortie dans la paire en session (`GlassesVoiceRoute`, `SpeechPlayer.preferredDevice`), haut-parleur en repli | routage explicite avant chaque phrase (`bench/GlassesVoice.kt`, `routeToGlasses`), même décision partagée (`glasses/GlassesAudioRoute.kt`) |
 | conversion d'image | aucune (`PhotoData.toBitmapOrNull()`, `glasses/GlassesFrames.kt:40`) | convertisseur YUV écrit pour le banc (`bench/FrameTypes.kt:76`, `:134`) |
 
 Conséquence, inchangée depuis le 26/10 : **aucun chiffre du banc ne se transpose à la
@@ -181,8 +181,8 @@ plus lents que le lien.
 ## 8. Matériel
 
 **Cible retenue : Ray-Ban Meta de deuxième génération, sans écran.** La réponse est lue dans les
-oreilles (TTS de l'app sur la sortie du téléphone, aucun routage Bluetooth branché dans la
-production), et les masques restent sur l'écran du téléphone.
+oreilles : TTS de l'app, dans les lunettes quand la session est ouverte (`GlassesVoiceRoute`,
+repli haut-parleur), et les masques restent sur l'écran du téléphone.
 
 - écarté : **Ray-Ban Display** — rendu dans le champ de vision, donc +3–4 semaines
   d'estimation, et les Web Apps du Display n'ont pas d'accès caméra (utiles à l'affichage, pas
@@ -192,8 +192,9 @@ production), et les masques restent sur l'écran du téléphone.
   occurrence de `VoiceInvocation` dans le code de cet arbre), et le micro des lunettes est une capacité
   beta **jamais exécutée ici** — le code existe pourtant des deux côtés de la frontière : la
   production collecte la piste audio du flux en WAV 16 kHz mono
-  (`glasses/GlassesAudio.kt`, plan dans `glasses/GlassesAudioPlan.kt`), le banc choisit la
-  sortie de la voix vers les lunettes (`bench/GlassesAudioRoute.kt`) ;
+  (`glasses/GlassesAudio.kt`, plan dans `glasses/GlassesAudioPlan.kt`), et la sortie de la
+  voix vers les lunettes est choisie une seule fois (`glasses/GlassesAudioRoute.kt`), pour la
+  production comme pour le banc ;
 - prérequis d'une recette réelle, imposés mais non testés ici : téléphone **Android 10+**
   (API 29, imposé par les AAR Meta), app **Meta AI ≥ v292**, firmware lunettes **≥ v128**,
   **Developer Mode** activé, une **seule** app tierce à la fois en Developer Mode ;
@@ -247,7 +248,7 @@ jamais inventé.
 | dimensions `MEDIUM` annoncées par le SDK | bytecode | format de flux, pas une mesure optique |
 | I420 vs NV12 et padding de ligne réel | — | **non vérifié** ; l'ambiguïté est mesurée (un NV12 serré ≡ un I420 serré) |
 | latence, débit, pertes de frames sur le lien Bluetooth | — | **non mesuré** (aucune lunette) |
-| routage audio vers les lunettes | code du banc seulement (`bench/GlassesVoice.kt`) | jamais exécuté, **non vérifié** |
+| routage audio vers les lunettes | production (`GlassesVoiceRoute` + `SpeechPlayer`) et banc (`bench/GlassesVoice.kt`) compilés, décision testée en JVM | **non entendu dans la paire en production** ; la sortie A2DP de la paire a été constatée au banc le 27/10 |
 | thermique, batterie, optique, mise en pause sur retrait | — | **non mesuré** |
 | alternatives matérielles (Brilliant Labs Frame, Even Realities G1, RayNeo/Rokid) | page 15 | liste externe, **non revérifiée** |
 | durée d'un build ou d'une session réels sur lunettes | — | **non mesuré** ; les chiffres de CI cités sont des relevés datés des 26 et 27/10 |

@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import android.media.AudioDeviceInfo
 import android.media.MediaPlayer
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.iseedesign.SpeechPosition
@@ -25,12 +26,18 @@ enum class PlaybackEnd { Done, Stopped }
  * Une seule lecture à la fois : chaque entrée arrête la précédente.
  * La vitesse ([speed], réglage `ttsSpeed`, ×1,9 par défaut) est appliquée en lecture
  * locale : le modèle ElevenLabs runtime ignore le réglage `speed` du cloud.
+ *
+ * [output] est relu **à chaque phrase** et posé sur le lecteur lui-même
+ * (`preferredDevice`) : c'est ainsi que la voix des lunettes sort dans la paire
+ * quand la session est ouverte ([dev.sam3vision.app.glasses.GlassesVoiceRoute]),
+ * sans toucher au reste de l'audio du téléphone. `null` = sortie par défaut.
  */
 class SpeechPlayer(
     private val dir: File,
     private val onComplete: () -> Unit = {},
     private val onPlaybackError: (String) -> Unit = {},
     speed: Float = Settings.DEFAULT_TTS_SPEED,
+    private val output: () -> AudioDeviceInfo? = { null },
 ) {
     @Volatile
     private var player: MediaPlayer? = null
@@ -106,6 +113,11 @@ class SpeechPlayer(
     private fun playBlocking(file: File, onDone: () -> Unit, onError: (String) -> Unit) {
         val mp = MediaPlayer()
         player = mp
+        // Sortie de la phrase : relue ici, jamais mémorisée à la construction — la
+        // paire des lunettes apparaît en Bluetooth quelques secondes après la session.
+        // Un appareil refusé par la plateforme laisse la sortie par défaut : le son
+        // part quand même, il ne se tait pas pour un routage raté.
+        runCatching { output()?.let { device -> mp.preferredDevice = device } }
         mp.setDataSource(file.absolutePath)
         mp.setOnCompletionListener { onDone() }
         mp.setOnErrorListener { _, what, extra ->
