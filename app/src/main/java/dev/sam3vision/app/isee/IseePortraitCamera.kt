@@ -78,6 +78,9 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         }
         ProbeNoticeCard(probe)
         PictureFade(Modifier.fillMaxSize())
+        // Bascule manuelle du mode Traversée (sans elle, l'ordre vocal seul l'arme) :
+        // ex-puce de l'ancienne carte, remontée en haut-centre après le fondu.
+        CrossingChip(probe, Modifier.align(Alignment.TopCenter).padding(top = 12.dp)) { viewModel.toggleCrossing() }
         // Dense = pas d'inset de barre d'état : posé en haut, le panneau passait sous
         // l'horloge et derrière le wordmark « iSee » (constaté sur l'appareil le
         // 2026-10-29). En bas à gauche, au-dessus du fondu, il ne recouvre plus rien :
