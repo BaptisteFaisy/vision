@@ -68,6 +68,8 @@ data class UiState(
     val statusLine: String? = null,
     val dictation: DictationState = DictationState(),
     val speak: SpeakState = SpeakState.Idle,
+    /** Chronologie de la dernière analyse (`photo charge=… sam=… analyse=… total=…`). */
+    val timingsLine: String = "",
 ) {
     val objects: List<SegObject> get() = analysis?.objects.orEmpty()
     val canAsk: Boolean get() = photoB64.isNotBlank() && settings.llmConfigured && !asking
@@ -141,6 +143,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stopPlayback = { speech.stop() },
     )
 
+    /** Chronologie de l'analyse en cours (logcat `ISEE_PERF` + écran Analyse). */
+    private val photoTimings = PhotoTimings()
+
     /** Analyse d'une photo : SAM puis LLM, masques coloriés et positions annoncées. */
     private val analysis = AppAnalysis(
         state = { _state.value },
@@ -150,6 +155,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         overlays = ::buildOverlays,
         announce = ::announcePositions,
         noteSam = { endpoint, result -> gpuMonitor.noteSamResult(endpoint, result) },
+        mark = photoTimings::mark,
     )
 
     /** Chat sur la photo courante. */
@@ -218,9 +224,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Une photo capturée ou choisie : on l'affiche tout de suite, puis on l'analyse. */
     fun onPhoto(file: File) = viewModelScope.launch {
+        photoTimings.begin()
         val loaded = loader.load(file)
+        photoTimings.mark("charge")
         if (loaded == null) {
-            update { it.copy(phase = Phase.Failed(AppStatusText.imageUnreadable(file))) }
+            val line = photoTimings.emit()
+            update { it.copy(phase = Phase.Failed(AppStatusText.imageUnreadable(file)), timingsLine = line) }
             return@launch
         }
         _state.update {
@@ -234,6 +243,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         analysis.analyze(loaded.base64)
+        update { it.copy(timingsLine = photoTimings.emit()) }
     }
 
     /**
@@ -265,8 +275,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun retryAnalysis() = viewModelScope.launch {
         val encoded = _state.value.photoB64
         if (encoded.isNotBlank()) {
+            photoTimings.begin()
             update { it.copy(phase = Phase.Analyzing) }
             analysis.analyze(encoded)
+            update { it.copy(timingsLine = photoTimings.emit()) }
         }
     }
 

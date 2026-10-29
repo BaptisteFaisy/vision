@@ -54,6 +54,7 @@ fun AnalysisScreen(
         state.segmentationNote?.let { StatusBanner(it, AppColors.warning) }
         PhaseBlock(state.phase, onRetry)
         state.analysis?.description?.let { DescriptionCard(it, state.speak, onSpeak, onStopVoice) }
+        state.timingsLine.takeIf { it.isNotBlank() }?.let { TimingsLine(it) }
         ObjectList(state.objects)
         AnalysisActions(state, onOpenChat, onToggleMasks)
     }
@@ -97,6 +98,12 @@ private fun AnalysisActions(state: UiState, onOpenChat: () -> Unit, onToggleMask
             0.38f,
         )
     }
+}
+
+/** Chronologie de l'analyse sur une ligne (même lecture que le direct). */
+@Composable
+private fun TimingsLine(line: String) {
+    Text(line, color = AppColors.success, fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 16.dp))
 }
 
 /** Bloc de description produit par le LLM, avec lecture à voix haute (ElevenLabs). */
