@@ -9,7 +9,6 @@
 >   model, loaded with Hugging Face `transformers`
 > - **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small`, Apache-2.0) —
 >   on-device depth model, via `onnx-community/depth-anything-v2-small`
-> - **MiDaS v2.1 small** (`isl-org/MiDaS`, MIT) — fallback depth model
 > - **Valhalla** — open-source routing engine (CPU backend)
 > - Standard open-source libraries: AndroidX (Compose, CameraX, Room, WorkManager),
 >   OkHttp, ONNX Runtime, TensorFlow Lite, PyTorch, FastAPI
@@ -83,8 +82,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   Chat, Direct, Tap) stay reachable from Settings ("Other screens").
 - **Tap mode** — film briefly, get a spoken summary. `POST /video` client written
   and tested; the server route is implemented nowhere here (`docs/MODE-TAP.md`).
-- **On-device depth (beta)** — a proximity map 100% on the phone (Depth Anything V2,
-  MiDaS fallback), models downloaded once, fused with the masks (`docs/DEPTH.md`).
+- **On-device depth (beta)** — a proximity map 100% on the phone (Depth Anything V2),
+  model downloaded once, fused with the masks (`docs/DEPTH.md`).
 - **Voice navigation** — "emmène-moi à X" opens Google Maps in walking mode; Valhalla
   router built into the app and CPU backend (`docs/NAVIGATION-VOCALE.md`).
 - **Walking guidance** — "tout droit" instructions, obstacles and crossings announced
@@ -101,7 +100,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Block | Role |
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video), pacing, masks, distances, pure depth, gestures, voice, encrypted settings |
-| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX, LiteRT), capture purge |
+| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), segmentation (LiteRT), capture purge |
 | `server/` | Modal backend (Python): live/photo (`live_fast`, app `sam3-eu-a100`), Valhalla CPU routing (`valhalla-idf-cpu`), tracker (`track_app.py`, manual deploy), photo legacy (`modal_app.py`), GPU probes — plus `legacy-expo-app/`, the archived old Expo app |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) + Vercel relay; embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`) |
 | `tools/` | CI guards (Kotlin sizes, Portrait design, latency budget, voice navigation), fake LLM/SAM for tests, utilities |

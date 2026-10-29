@@ -3,6 +3,26 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — profondeur : repli MiDaS supprimé, DA2 seul (ordre user)
+
+- **Cause** : deux moteurs embarqués (DA2 ONNX 174 ms, MiDaS LiteRT 275 ms
+  sur Redmi) ; MiDaS, hors seuil < 200 ms, ne servait que de repli —
+  le user garde DA2, plus précis et ~1,6x plus rapide.
+- `DepthBackend` : `MIDAS` et `AUTO` supprimés (reste `DA2`, `OFF`) ;
+  `fromName` migre les réglages persistés pré-29/10 (`AUTO`, `MIDAS`) vers
+  `DA2`, inconnu/absent ⇒ `OFF`. Supprimés : `LiteRtDepthEstimator.kt`,
+  `DepthPreprocess.normalizeHWC` (+ son test), le banc MiDaS instrumenté.
+- LiteRT reste une dépendance (segmentation TwinLiteNet) ; le `.tflite`
+  reste sur la release `depth-models-v1`, rien ne le télécharge plus.
+- Fichiers : `core/depth/DepthEstimator.kt`, `app/depth/DepthEstimators.kt`,
+  `ModelDownloader.kt`, `DepthPreprocess.kt`, `OnnxDepthEstimator.kt`,
+  `DepthSettings.kt`, `Settings.kt` (défaut DA2), `AppViewModel.kt`,
+  `DepthMap.kt`, `PointCloud.kt`, `app/build.gradle.kts` (commentaire),
+  `README.md`, `docs/DEPTH.md`, `docs/TESTING.md`,
+  `docs/TWINLITE-SAM31.md`, `NOTICE-depth.txt`.
+- Preuves : `:core:test` + `:app:testDebugUnitTest` verts sur le r630 ;
+  `DepthEstimatorTest` verrouille la migration `fromName`.
+
 ## 2026-10-29 — voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
 
 ### Voix — fin du guidage surprise, confirmation obligatoire
