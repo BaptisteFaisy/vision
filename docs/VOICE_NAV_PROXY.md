@@ -46,11 +46,14 @@ curl -s -m 30 -X POST https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-we
 Attendus : `/health` → 200 + JSON `status ok` ; `/route` → 200 + `trip`
 avec `summary` et `legs[].maneuvers[]` (mesuré : 1,308 km, 12 manoeuvres).
 
-Sécurité traversées (piéton) : `/route` répare les passages piétons sans feu
-proche (manœuvres tout-droit "crosswalk" à +40 m d'un feu) en reroutant via
-le feu le plus proche (150 m max, 2 réparations, +20 % de temps max, repli
-route de base). Mesuré Gare de Lyon → Louvre : 3 → 1 traversées sans feu,
-+1 % de temps.
+Sécurité traversées (piéton, v2) : `/route` répare les traversées de
+chaussée sans feu proche (manœuvre tout-droit "crosswalk"/"crossing" OU
+point à ≤30 m d'un carrefour routier sans mot d'infra piétonne —
+`road_junctions_idf.json`, 493 406 pts, grille 0,01°) en reroutant via
+le feu le plus proche (150 m max, 2 réparations, +20 % de temps max,
+réduction stricte, repli route de base). Mesuré : réparations actives
+en prod (logs `traversée réparée`), routes propres inchangées,
+Montmartre non réparé par design (pas de feu ≤150 m).
 
 ## Rollback
 
