@@ -180,7 +180,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         isee.onForeground()
         // Pas de réveil GPU à l'ouverture : la carte ne démarre que quand ça filme,
-        // réveillée par la première frame du Direct / de la sonde iSee.
+        // réveillée par GpuWake à la liaison caméra (la 1re frame reste le signal de prêt).
+        // Cycle contrat user : quitter (onPause → /release, ~0 $) puis rouvrir → réveil auto.
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
