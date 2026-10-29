@@ -273,6 +273,31 @@ Four attempts to lift that 1/6 to 4/6 (new features, retrained tree, another cro
 another prompt) **all failed without a single false green**; the numbers and the reasons are
 in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
 
+## YOLO11n person benchmark: base vs fine-tuned (post-training)
+
+The urgency pipeline (YOLO11n person + ByteTrack-style tracker + voice at 3 m)
+is measured on two axes. **Quality**: 100 hold-out street views (Panoramax,
+day/night, eye-verified, stems disjoint from train — `yolo-eval/`, outside
+this tree), `eval.py` base-vs-fine-tuned in one run. **Speed**: Samsung
+SM-G780G, median of 5 (`DangerBench`, full NMS decode included), Settings
+"Tester YOLO11n" button or `DangerBenchDeviceTest`.
+
+| Metric | Base yolo11n | Fine-tuned (teacher SAM 3.1) |
+|---|---|---|
+| mAP50 (eval, conf 0.25) | **0.383** | pending (training v1) |
+| mAP50-95 | 0.234 | pending |
+| Precision / Recall | 0.737 / 0.412 | pending |
+| Recall small persons | 0.29 | pending |
+| False positives / 100 img | 13 (capture rig) | pending |
+| Phone 640 CPU (Samsung) | **6.2 fps** (sess 130 ms + dec 37 ms) | same bench, pending |
+
+Base = COCO weights (Ultralytics, AGPL-3.0 — `app/src/main/assets/NOTICE-detect.txt`).
+Teacher = SAM 3.1 (`unsloth/sam3.1`) pseudo-labels with rig filter (boxes
+`cy>0.9` dropped, else the model learns "car roof = person"). Small-person
+recall is the metric to watch. Uncapped NMS measured 0.4 fps before the fix —
+the 6.2 fps includes the capped decode. The fine-tuned column fills
+automatically (`DELTA.md`) when training lands; this table follows.
+
 ## CI and merge queue
 
 - **PRs**: `ci` (guards + JVM tests + backend unit tests + goldens) and `ci-budget`
