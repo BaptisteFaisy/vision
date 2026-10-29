@@ -1,4 +1,5 @@
-import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf } from './session.mjs';
+import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
+import { bootMap, updateMap } from './maps.mjs';
 import { frameOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { startOrb } from './orb.mjs';
 import { spokenLine } from './spoken-line.mjs';
@@ -15,16 +16,22 @@ const tripTrack = document.getElementById('trip-track');
 const tripLiquid = document.getElementById('trip-liquid');
 const tripBall = document.getElementById('trip-ball');
 let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '';
-const STATES = { live: ['LIVE', 'green'], lost: ['SIGNAL LOST', 'orange'], offline: ['OFFLINE', 'grey'] };
+// Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
+let known = true;
+const STATES = {
+  live: ['LIVE', 'green'], lost: ['SIGNAL LOST', 'orange'],
+  offline: ['OFFLINE', 'grey'], unknown: ['NO STREAM', 'grey'],
+};
 
 function render() {
-  const status = stateOf(live);
+  const status = known ? stateOf(live) : 'unknown';
   const [label, color] = STATES[status];
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
+  document.getElementById('recenter').disabled = status === 'offline' || status === 'unknown';
   const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
-  showWords(narrationOf(live, status, motion, !!shareId), status === 'live' && live?.scene?.speaking);
+  showWords(narrationOf(live, status, motion, !!shareId, known), status === 'live' && live?.scene?.speaking);
   const spoken = document.querySelector('.spoken');
   spoken.hidden = status === 'offline' || !shareId;
   spoken.parentElement.classList.toggle('with-text', !spoken.hidden);
@@ -69,8 +76,14 @@ function renderTrip(status) {
 }
 
 function receive(snapshot) {
+  // Identifiant jamais publié (ou flux purgé) : le dire, au lieu d'attendre à vie.
+  if (neverPublished(snapshot)) {
+    known = false; live = null; anchor = null; movement = '';
+    return;
+  }
   if (snapshot.ok && snapshot.fix && Number.isFinite(snapshot.serverAt)) {
     if (live && snapshot.serverAt < live.serverAt) return;
+    known = true;
     if (stateOf(live) !== 'live') anchor = null;
     const nextMovement = movementBetween(anchor, snapshot.fix);
     if (nextMovement) { movement = nextMovement; movementAt = Date.now(); }
