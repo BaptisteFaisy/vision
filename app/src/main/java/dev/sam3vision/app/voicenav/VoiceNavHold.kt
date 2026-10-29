@@ -1,7 +1,11 @@
 package dev.sam3vision.app.voicenav
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -117,6 +122,87 @@ class VoiceNavHold(
 }
 
 /**
+ * État affiché d'une tenue micro, partagé entre le bouton et l'appui long
+ * écran : quand le micro s'ouvre depuis n'importe où, le bouton affiche
+ * « J'écoute… » et les nouveaux appuis sont ignorés ([busy]).
+ */
+@Stable
+class HoldMicUiState {
+    var recording by mutableStateOf(false)
+    var busy by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+}
+
+/** État d'une tenue micro, conservé pendant la vie de l'écran. */
+@Composable
+fun rememberHoldMicUiState(): HoldMicUiState = remember { HoldMicUiState() }
+
+/**
+ * Une tenue micro complète, partagée par le bouton ([VoiceNavHoldButton],
+ * appui immédiat) et l'appui long écran ([HoldMicArea]) : ouvre le micro,
+ * attend [awaitRelease], transcrit et route vers [onTranscript]. Met [ui]
+ * à jour (écoute, transcription, erreur) ; ne rend rien.
+ */
+suspend fun runHoldSession(
+    hold: VoiceNavHold,
+    settings: Settings,
+    onTranscript: suspend (String) -> Boolean,
+    hint: String,
+    ui: HoldMicUiState,
+    awaitRelease: suspend () -> Unit,
+) {
+    ui.error = null
+    if (!hold.start()) {
+        ui.error = VoiceNavHoldText.MIC_UNAVAILABLE
+        return
+    }
+    ui.recording = true
+    try {
+        awaitRelease()
+    } finally {
+        ui.recording = false
+        ui.busy = true
+        try {
+            holdError(hold.finish(settings), onTranscript, hint)?.let { ui.error = it }
+        } finally {
+            ui.busy = false
+        }
+    }
+}
+
+/**
+ * Zone d'appui long des écrans navigation : le doigt tenu ~500 ms ouvre le
+ * micro (même tenue que le bouton : relâcher pour transcrire), sans viser
+ * le bouton. Le tap n'a aucune action ici ; les boutons de l'écran gardent
+ * leur tap normal (ils sont hors de la zone). Même état [ui] que le bouton.
+ */
+@Composable
+fun HoldMicArea(
+    hold: VoiceNavHold,
+    settings: Settings,
+    onTranscript: suspend (String) -> Boolean,
+    hint: String,
+    ui: HoldMicUiState,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    DisposableEffect(hold) { onDispose { hold.discard() } }
+    Box(
+        modifier.pointerInput(hold, ui.busy) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                // Relâché avant le délai : tap, sans action.
+                if (awaitLongPressOrCancellation(down.id) != null) return@awaitEachGesture
+                if (ui.busy) return@awaitEachGesture
+                runHoldSession(hold, settings, onTranscript, hint, ui) { waitForUpOrCancellation() }
+            }
+        },
+    ) {
+        content()
+    }
+}
+
+/**
  * Bouton d'appui long des écrans navigation : le doigt posé ouvre le micro,
  * le relâchement transcrit et route le texte vers [onTranscript] (la
  * session : stop, oui/non, destination). Texte non consommé → [hint].
@@ -125,7 +211,8 @@ class VoiceNavHold(
  * sans le délai de 300 ms de l'accueil (qui distingue l'appui long du tap
  * vidéo). Une tenue en cours de transcription ignore
  * les nouveaux appuis ; quitter l'écran en pleine tenue jette
- * l'enregistrement ([VoiceNavHold.discard]).
+ * l'enregistrement ([VoiceNavHold.discard]). [ui] est partagé avec
+ * [HoldMicArea] quand l'écran propose l'appui long partout.
  */
 @Composable
 fun VoiceNavHoldButton(
@@ -134,44 +221,27 @@ fun VoiceNavHoldButton(
     onTranscript: suspend (String) -> Boolean,
     hint: String,
     modifier: Modifier = Modifier,
+    ui: HoldMicUiState = rememberHoldMicUiState(),
 ) {
-    var recording by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     DisposableEffect(hold) { onDispose { hold.discard() } }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(
             Modifier.fillMaxWidth().height(56.dp)
                 .border(1.dp, AppColors.primary, RoundedCornerShape(4.dp))
-                .pointerInput(hold, busy) {
+                .pointerInput(hold, ui.busy) {
                     detectTapGestures(
                         onPress = {
-                            if (busy) return@detectTapGestures
-                            error = null
-                            if (!hold.start()) {
-                                error = VoiceNavHoldText.MIC_UNAVAILABLE
-                                return@detectTapGestures
-                            }
-                            recording = true
-                            try {
-                                awaitRelease()
-                            } finally {
-                                recording = false
-                                busy = true
-                                try {
-                                    holdError(hold.finish(settings), onTranscript, hint)?.let { error = it }
-                                } finally {
-                                    busy = false
-                                }
-                            }
+                            if (ui.busy) return@detectTapGestures
+                            val scope = this
+                            runHoldSession(hold, settings, onTranscript, hint, ui) { scope.awaitRelease() }
                         },
                     )
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Text(holdLabel(recording, busy), fontSize = 18.sp, color = AppColors.primary)
+            Text(holdLabel(ui.recording, ui.busy), fontSize = 18.sp, color = AppColors.primary)
         }
-        error?.let { Text(it, color = AppColors.danger, fontSize = 16.sp) }
+        ui.error?.let { Text(it, color = AppColors.danger, fontSize = 16.sp) }
     }
 }
 

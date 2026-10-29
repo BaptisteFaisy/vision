@@ -136,6 +136,42 @@ class VoiceNavHoldTest {
         assertEquals("le micro est rendu", 1, mic.abortCount)
     }
 
+    @Test
+    fun `session partagee — micro indisponible, motif sous le bouton`() = runBlocking {
+        mic.available = false
+        val ui = HoldMicUiState()
+
+        runHoldSession(hold, Settings.Default, { true }, "indice", ui) { }
+
+        assertEquals(VoiceNavHoldText.MIC_UNAVAILABLE, ui.error)
+        assertFalse("pas d'écoute", ui.recording)
+        assertFalse("pas de transcription", ui.busy)
+    }
+
+    @Test
+    fun `session partagee — texte consomme, aucune erreur`() = runBlocking {
+        val ui = HoldMicUiState()
+        var heard: String? = null
+
+        runHoldSession(hold, Settings.Default, { heard = it; true }, "indice", ui) { }
+
+        assertEquals("bonjour", heard)
+        assertNull("pas d'erreur", ui.error)
+        assertFalse("écoute rendue", ui.recording)
+        assertFalse("transcription finie", ui.busy)
+    }
+
+    @Test
+    fun `session partagee — texte non consomme, indice affiche`() = runBlocking {
+        val ui = HoldMicUiState()
+
+        runHoldSession(hold, Settings.Default, { false }, "indice", ui) { }
+
+        assertEquals("indice", ui.error)
+        assertFalse("écoute rendue", ui.recording)
+        assertFalse("transcription finie", ui.busy)
+    }
+
     /** Micro simulé : compte les appels et rend le texte ou l'échec demandé. */
     private class FakeMic : IseeMic {
         var available = true

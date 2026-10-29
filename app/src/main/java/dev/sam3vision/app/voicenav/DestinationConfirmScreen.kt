@@ -2,7 +2,6 @@ package dev.sam3vision.app.voicenav
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,9 +29,11 @@ import dev.sam3vision.core.settings.Settings
  * posée à l'ouverture (« Do you really want to go to X? … »), et tout l'écran
  * est faisable à la voix ([VoiceNavHoldButton], même moteur que l'accueil
  * iSee) : « yes »/« no », nouvelle destination, ordre stop — sans retour.
- * [onSubmitText] reçoit le texte saisi au clavier ([DestinationTextField],
- * câblé par l'intégrateur vers `submitTypedDestination`) ; défaut vide =
- * champ inopérant, l'appelant historique compile inchangé.
+ * Le micro s'ouvre aussi par appui long n'importe où hors boutons
+ * ([HoldMicArea]) : pas besoin de viser le bouton. [onSubmitText] reçoit le
+ * texte saisi au clavier ([DestinationTextField], câblé par l'intégrateur
+ * vers `submitTypedDestination`) ; défaut vide = champ inopérant, l'appelant
+ * historique compile inchangé.
  */
 @Composable
 fun DestinationConfirmScreen(
@@ -44,20 +45,21 @@ fun DestinationConfirmScreen(
     onHoldTranscript: suspend (String) -> Boolean,
     onSubmitText: (String) -> Unit = {},
 ) {
+    val micUi = rememberHoldMicUiState()
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Destination", color = AppColors.textMuted, fontSize = 18.sp)
-        Text(
-            state.destination,
-            color = AppColors.text,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 38.sp,
-        )
-        SummaryBlock(state.summary, state.loading, state.error)
-        Spacer(Modifier.weight(1f))
+        HoldMicArea(
+            hold = hold,
+            settings = settings,
+            onTranscript = onHoldTranscript,
+            hint = VoiceNavHoldText.CONFIRM_NOT_UNDERSTOOD,
+            ui = micUi,
+            modifier = Modifier.weight(1f),
+        ) {
+            ConfirmHead(state)
+        }
         Button(
             onClick = onConfirm,
             enabled = !state.loading,
@@ -74,6 +76,7 @@ fun DestinationConfirmScreen(
             settings = settings,
             onTranscript = onHoldTranscript,
             hint = VoiceNavHoldText.CONFIRM_NOT_UNDERSTOOD,
+            ui = micUi,
         )
         DestinationTextField(onSubmitText)
     }
@@ -115,6 +118,22 @@ private fun LoadingRow() {
     ) {
         CircularProgressIndicator(color = AppColors.primary)
         Text("Chargement de l'itinéraire…", color = AppColors.textMuted, fontSize = 18.sp)
+    }
+}
+
+/** Tête de l'écran : destination entendue + résumé (zone d'appui long). */
+@Composable
+private fun ConfirmHead(state: VoiceNavUiState.Confirming) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Destination", color = AppColors.textMuted, fontSize = 18.sp)
+        Text(
+            state.destination,
+            color = AppColors.text,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 38.sp,
+        )
+        SummaryBlock(state.summary, state.loading, state.error)
     }
 }
 
