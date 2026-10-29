@@ -26,6 +26,7 @@ import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
 import dev.sam3vision.app.isee.vm.IseeVoiceNav
+import dev.sam3vision.app.isee.vm.MaisonEnterOrder
 import dev.sam3vision.app.isee.vm.NavigationHook
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
@@ -159,10 +160,12 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
     )
 
+    /** Ordre vocal « maison » : direct essentiels + annonce, en premier (jamais LLM). */
+    private val maisonEnter = MaisonEnterOrder({ settings }, ::speakNavigation, ::update)
+
     /**
-     * Navigation vocale in-app (démarrage direct, moteur embarqué) : câblage
-     * paresseux ([IseeVoiceNav]), actif dès que `routeBaseUrl` est renseignée
-     * (seed du build) — coût nul sans URL Valhalla.
+     * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
+     * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing)
 
@@ -230,9 +233,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Ordre vocal « traverser » : consommé ici, jamais une question LLM.
-     * Confirmation parlée par le même chemin que la navigation. Sans effet si
-     * le mode est déjà dans l'état demandé (reconfigurer coûte une session GPU).
+     * Ordre « traverser » : consommé ici (jamais LLM), confirmé par le chemin navigation.
+     * Sans effet si déjà dans l'état demandé (reconfigurer coûte une session GPU).
      */
     private suspend fun runCrossingCommand(text: String): Boolean {
         val command = CrossingVoiceCommand.parse(text) ?: return false
@@ -415,17 +417,15 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IseeStatusText.NOTHING_HEARD)
             return
         }
-        // Une seule question à la fois : deux appels LLM concurrents sont refusés
-        // par le backend (409 « limite atteinte ») et le second restait sans réponse.
+        // Une seule question à la fois : deux appels LLM concurrents sont refusés (409).
         if (_state.value.thinking) {
             dropHeard(IseeStatusText.ANSWER_PENDING)
             return
         }
-        // Ordre de cap (« va à gauche ») : consommé ici AVANT la navigation Maps
-        // (« va à gauche » matche aussi « va à X ») — guidage + voix, jamais LLM.
+        if (maisonEnter.run(text)) return
+        // Ordre de cap : consommé AVANT Maps (« va à gauche » matche « va à X »), jamais LLM.
         if (runSteeringCommand(text)) return
-        // Navigation vocale in-app (URL Valhalla configurée) : démarrage direct
-        // + moteur, avant le handoff Maps.
+        // Navigation in-app (Valhalla) : démarrage direct + moteur, avant le handoff Maps.
         if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
         // Ordre de navigation : consommé ici (Maps + voix), jamais une question LLM.
         if (navigation.onTranscript(text)) return
