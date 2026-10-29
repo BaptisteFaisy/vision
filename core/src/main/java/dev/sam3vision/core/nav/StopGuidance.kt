@@ -19,22 +19,10 @@ object StopGuidanceParser {
 
     private val NOUNS = setOf("guidage", "navigation", "itineraire")
 
-    private val ACCENTS = mapOf(
-        'à' to 'a', 'â' to 'a', 'ä' to 'a',
-        'é' to 'e', 'è' to 'e', 'ê' to 'e', 'ë' to 'e',
-        'î' to 'i', 'ï' to 'i', 'ô' to 'o', 'ö' to 'o',
-        'ù' to 'u', 'û' to 'u', 'ü' to 'u', 'ÿ' to 'y',
-        'ç' to 'c', 'œ' to 'o', 'æ' to 'a',
-    )
-
     /** Vrai si [text] ordonne d'arrêter le guidage en cours. */
     fun isStop(text: String): Boolean {
         if (text.isBlank()) return false
-        val words = fold(text).split(Regex("[^a-z]+")).filter { it.isNotEmpty() }
+        val words = foldAccents(text).split(Regex("[^a-z]+")).filter { it.isNotEmpty() }
         return words.any { it in VERBS } && words.any { it in NOUNS }
     }
-
-    /** Minuscules + accents repliés, pour comparer sans dépendre d'Unicode. */
-    private fun fold(text: String): String =
-        text.lowercase().map { ACCENTS[it] ?: it }.joinToString("")
 }

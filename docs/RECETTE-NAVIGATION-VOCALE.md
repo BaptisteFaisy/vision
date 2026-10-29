@@ -13,8 +13,10 @@ d'ici, aucune commande `adb` n'a été lancée. Ce qui suit décrit ce que le
 > dans `docs/NAVIGATION.md`.
 >
 > **Mise à jour 29/10** : le départ direct sans bouton est abandonné —
-> la dictée in-app n'ouvre que l'écran de confirmation (« Destination : X »,
-> bouton « Démarrer »). Le repli Maps décrit ici est inchangé.
+> la dictée in-app n'ouvre que l'écran de confirmation (question vocale
+> « Do you really want to go to X? Travel time: Y. Answer yes or no. »,
+> boutons « Démarrer »/« Annuler » en secours). Le repli Maps décrit ici
+> est inchangé.
 
 Le script `scripts/verify-voice-nav.sh` déroule cette fiche en une prise :
 l'intégrateur parle (phrases § Recette, recopiées à l'identique), le script
@@ -62,8 +64,10 @@ Phrases verrouillées par `VoiceNavScriptTest` (recopies exactes, garde § 7 de
 1. **Commande.** Appui long ≥ 300 ms sur iSee, dicter
    « je veux aller à la gare de Lyon », relâcher. Attendu : transcription
    affichée, pas de crash, pas de question LLM.
-2. **Confirmation.** Attendu : voix « Navigation vers la gare de Lyon »
-   (clé `nav_confirm_destination`).
+2. **Confirmation.** Attendu : question vocale
+   « Do you really want to go to la gare de Lyon? Travel time: … » ;
+   répondre « yes » (ou « Démarrer »). Attendu ensuite : voix
+   « Navigation vers la gare de Lyon » (clé `nav_confirm_destination`).
 3. **Guidage.** Attendu : Google Maps au premier plan, guidage actif vers
    la gare de Lyon, **mode piéton** (`mode=w`). Capture écran.
 4. **Hors-trace.** S'écarter d'un pâté de maisons. Attendu : Maps recalcule

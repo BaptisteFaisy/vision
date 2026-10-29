@@ -29,6 +29,9 @@ data class RouteSummary(
 
     /** « moins d'une minute », « 12 min », « 1 h 05 ». */
     fun durationFr(): String = formatDurationFr(durationSeconds)
+
+    /** « less than a minute », « 12 minutes », « 1 hour, 5 minutes » (question vocale). */
+    fun durationEn(): String = formatDurationEn(durationSeconds)
 }
 
 /**
@@ -56,4 +59,21 @@ fun formatDurationFr(seconds: Long): String {
     val hours = minutes / 60
     val rest = minutes % 60
     return "$hours h ${rest.toString().padStart(2, '0')}"
+}
+
+/**
+ * Durée parlée en anglais (question de confirmation) : mêmes arrondis que
+ * [formatDurationFr] (minute la plus proche, heures au-delà de 59 min),
+ * minutes nulles omises (« 2 hours », pas « 2 hours, 0 minutes »).
+ */
+fun formatDurationEn(seconds: Long): String {
+    val safe = seconds.coerceAtLeast(0)
+    if (safe < 60) return "less than a minute"
+    val minutes = (safe + 30) / 60
+    if (minutes < 60) return "$minutes ${if (minutes == 1L) "minute" else "minutes"}"
+    val hours = minutes / 60
+    val rest = minutes % 60
+    val head = "$hours ${if (hours == 1L) "hour" else "hours"}"
+    if (rest == 0L) return head
+    return "$head, $rest ${if (rest == 1L) "minute" else "minutes"}"
 }

@@ -36,8 +36,14 @@
     <!-- Ligne droite, sans distance. -->
     <string name="nav_voice_continue">Continuez tout droit.</string>
 
-    <!-- Confirmation : destination entendue (cf. VoiceNavPhrases.destinationHeard). -->
-    <string name="nav_confirm_heard">Destination : %1$s</string>
+    <!-- Confirmation : question vocale (cf. VoiceNavPhrases.confirmQuestion). -->
+    <string name="nav_confirm_question">Do you really want to go to %1$s? Travel time: %2$s. Answer yes or no.</string>
+    <!-- Confirmation sans résumé : question sans le temps. -->
+    <string name="nav_confirm_question_no_time">Do you really want to go to %1$s? Answer yes or no.</string>
+    <!-- Confirmation refusée (cf. VoiceNavPhrases.CONFIRM_CANCELLED). -->
+    <string name="nav_confirm_cancelled">Cancelled.</string>
+    <!-- « yes » pendant le chargement (cf. VoiceNavPhrases.CONFIRM_LOADING). -->
+    <string name="nav_confirm_loading">Your route is still loading, one moment.</string>
     <!-- Guidage éteint : fiche lieu ouverte (cf. VoiceNavPhrases.placeOpened). -->
     <string name="nav_place_opened">Voici la fiche de %1$s</string>
     <!-- Ordre stop consommé (cf. VoiceNavPhrases.STOP_DONE). -->

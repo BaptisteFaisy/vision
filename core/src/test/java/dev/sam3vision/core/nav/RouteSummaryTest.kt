@@ -40,6 +40,17 @@ class RouteSummaryTest {
     }
 
     @Test
+    fun `duree parlee en anglais`() {
+        assertEquals("less than a minute", formatDurationEn(0))
+        assertEquals("less than a minute", formatDurationEn(59))
+        assertEquals("1 minute", formatDurationEn(60))
+        assertEquals("12 minutes", formatDurationEn(720))
+        assertEquals("1 hour", formatDurationEn(3600))
+        assertEquals("1 hour, 5 minutes", formatDurationEn(3900))
+        assertEquals("2 hours, 30 minutes", formatDurationEn(9000))
+    }
+
+    @Test
     fun `duree negative ramenee a moins d'une minute`() {
         assertEquals("moins d'une minute", formatDurationFr(-30))
     }
