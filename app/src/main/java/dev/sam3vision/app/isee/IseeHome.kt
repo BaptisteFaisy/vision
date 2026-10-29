@@ -37,5 +37,10 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Set
         }
     }
 
-    IseeScenePane(state = state, viewModel = viewModel, modifier = Modifier.fillMaxSize())
+    IseeScenePane(
+        state = state,
+        viewModel = viewModel,
+        debugMapEnabled = settings.debugRouteMapEnabled,
+        modifier = Modifier.fillMaxSize(),
+    )
 }

@@ -13,6 +13,7 @@ import dev.sam3vision.core.nav.GeocodedPlace
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.ManeuverAction
 import dev.sam3vision.core.nav.NavEvent
+import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavGeo
 import dev.sam3vision.core.nav.NavManeuver
 import dev.sam3vision.core.nav.NavRoute
@@ -77,6 +78,7 @@ class VoiceNavEngineDriver(
     private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings) }
     private val speaker by speakerLazy
 
+    @Volatile
     private var legs: GuidingLegs? = null
     private var rerouting = false
 
@@ -143,6 +145,12 @@ class VoiceNavEngineDriver(
         stop()
         if (speakerLazy.isInitialized()) runCatching { speaker.shutdown() }
     }
+
+    /** Itinéraire en cours de guidage, `null` au repos (carte de debug). */
+    fun debugRoute(): NavRoute? = legs?.route
+
+    /** Dernier fix GPS reçu, `null` sans fix (carte de debug). */
+    fun debugFix(): NavFix? = tracker.lastFix
 
     /** Un événement moteur : parole + écran, jamais d'exception. */
     private fun handleEvent(event: NavEvent) {
