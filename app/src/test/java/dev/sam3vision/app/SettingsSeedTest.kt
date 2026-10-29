@@ -287,4 +287,29 @@ class SettingsSeedTest {
         assertEquals(Settings.DEFAULT_ASR_BASE_URL, seeded(cassee, build).asrBaseUrl)
         assertEquals("le vide garde le repli Scribe", "", seeded(vide, build).asrBaseUrl)
     }
+
+    @Test
+    fun `un modele LLM vide est repare par le build, sinon l epingle`() {
+        val vide = Settings.Default.copy(llmApiKey = "ma-cle", llmModel = "")
+        val sansModele = build.copy(llmModel = "")
+
+        assertEquals("modele-du-build", seeded(vide, build).llmModel)
+        assertEquals(Settings.DEFAULT_LLM_MODEL, seeded(vide, sansModele).llmModel)
+    }
+
+    @Test
+    fun `un modele LLM saisi a la main est conserve`() {
+        val choisi = Settings.Default.copy(llmApiKey = "ma-cle", llmModel = "mon-modele")
+
+        assertEquals("mon-modele", seeded(choisi, build).llmModel)
+    }
+
+    @Test
+    fun `un modele dictee vide retombe sur le defaut Meta`() {
+        val vide = Settings.Default.copy(asrModel = "")
+        val choisi = Settings.Default.copy(asrModel = "mon-modele-dictee")
+
+        assertEquals(Settings.DEFAULT_ASR_MODEL, seeded(vide, build).asrModel)
+        assertEquals("mon-modele-dictee", seeded(choisi, build).asrModel)
+    }
 }
