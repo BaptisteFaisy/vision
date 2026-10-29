@@ -107,20 +107,23 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
 ## 4 bis. Mode navigation (la carte sans destination)
 
 Le même fond sert au **mode navigation** ouvert à la voix (« navigation »,
-« carte », « où suis-je » — `NAVIGATION-VOCALE.md` §1 bis) : carte plein
-écran, caméra au zoom rue sur la position, position + cercle de précision,
-feux connus autour. Aucun itinéraire, aucune manœuvre, aucune instruction :
-ce mode **situe**, il ne guide pas.
+« carte », « où suis-je » — `NAVIGATION-VOCALE.md` §1 bis), en **première
+couche de la scène iSee, sous la caméra** : la rue, la boule et les textes
+restent au-dessus.
 
 - État carte : `core/.../nav/GuidanceMapData.kt::mapModeMapStateOf(fix,
   signals)` — caméra nulle sans fix utilisable (cadrage automatique),
   overlays réduits à `position`, `accuracyM` et `signals`.
-- Affichage : `app/.../voicenav/MapModeScreen.kt` (`MapPanel`) compose
-  `GuidanceMapView` et **retombe sur le schéma** (`drawMap`, même dessin que
-  `MiniRouteMap`) dès que le SDK signale l'échec des tuiles — même contrat
-  que le §3, sans écran d'erreur.
+- Affichage : `app/.../isee/NavigationMapLayer.kt` compose `GuidanceMapView`
+  et **retombe sur le schéma** (`drawNavigationMap`) dès que le SDK signale
+  l'échec des tuiles — même contrat que le §3, sans écran d'erreur.
+- **Effacement pendant la parole** : la couche passe en alpha 0 en 220 ms
+  quand l'utilisateur tient le micro ou pendant la transcription
+  (`navigationMapHidden`), et revient ensuite. iSee qui parle ne la masque
+  pas. La MapView n'est pas détruite : pas de rechargement de tuiles à chaque
+  tenue.
 - Les feux sont rechargés par maille de 0,001° (~110 m) de déplacement, pas à
-  chaque point : la carte bouge, la requête non.
+  chaque point (échec : nouvel essai après 60 s).
 - Attribution OSM : portée par `GuidanceMapView` (bas-gauche), donc absente
   avec les tuiles en repli.
 
