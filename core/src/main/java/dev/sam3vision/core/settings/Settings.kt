@@ -5,8 +5,9 @@ import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Réglages de l'app. [samBaseUrl] vide = segmentation désactivée (la photo part
- * directement au LLM). Aucune valeur de clé n'est jamais écrite en dur.
+ * Réglages de l'app. [samBaseUrl] vide = preset de la région ([samRegion]) :
+ * l'endpoint se résout toujours ([resolveSamEndpoint]), la segmentation n'est
+ * jamais « désactivée » faute d'URL. Aucune valeur de clé n'est jamais écrite en dur.
  */
 data class Settings(
     val llmBaseUrl: String,
@@ -209,10 +210,11 @@ data class Settings(
          * Narration du Direct : **même endpoint et même modèle Meta** que les questions
          * (Baseten, `muse-spark-open-1026`) — tout le LLM de l'app parle à un seul
          * fournisseur. Seule la clé diffère (`liveLlmApiKey`, Réglages / build) : sans
-         * elle, le Direct se tait. Base et modèle sont figés ici.
+         * elle, le Direct se tait. Alias du LLM photo : le jour où le direct aura son
+         * propre modèle, dédoubler ici.
          */
-        const val DEFAULT_LIVE_LLM_BASE_URL = "https://inference.baseten.co/v1"
-        const val DEFAULT_LIVE_LLM_MODEL = "meta-models/muse-spark-open-1026"
+        const val DEFAULT_LIVE_LLM_BASE_URL = DEFAULT_LLM_BASE_URL
+        const val DEFAULT_LIVE_LLM_MODEL = DEFAULT_LLM_MODEL
 
         /** API Meta (non compatible OpenAI) : la route est `{base}/asr/transcribe`. */
         const val DEFAULT_ASR_BASE_URL = "https://api.meta.ai/v1"
@@ -240,36 +242,15 @@ data class Settings(
          */
         const val LEGACY_SHARE_ID = "leo"
 
+        /**
+         * Réglages d'usine : les 4 champs sans défaut du constructeur, le reste
+         * suit les défauts déclarés plus haut (une seule source de vérité).
+         */
         val Default = Settings(
             llmBaseUrl = DEFAULT_LLM_BASE_URL,
             llmApiKey = "",
             llmModel = DEFAULT_LLM_MODEL,
             samBaseUrl = "",
-            ttsApiKey = "",
-            ttsVoiceId = DEFAULT_TTS_VOICE_ID,
-            ttsAutoplay = true,
-            asrBaseUrl = DEFAULT_ASR_BASE_URL,
-            asrApiKey = "",
-            asrModel = DEFAULT_ASR_MODEL,
-            liveLlmApiKey = "",
-            ttsAnnouncePositions = true,
-            ttsGuidanceStraight = true,
-            introEnabled = true,
-            introPlayed = false,
-            distanceOverlayEnabled = true,
-            liveSamEnabled = true,
-            boxPredictionEnabled = false,
-            localOverlayEnabled = true,
-            debugRouteMapEnabled = true,
-            navigationGuidanceEnabled = true,
-            cameraFovDeg = 0f,
-            caregiverRole = CaregiverRole.Blind,
-            parentSiteUrl = DEFAULT_PARENT_SITE_URL,
-            shareEnabled = true,
-            shareId = "",
-            shareWriteKey = "",
-            maxObjects = ObjectLimits.DEFAULT_ON_SCREEN,
-            routeBaseUrl = "",
         )
     }
 

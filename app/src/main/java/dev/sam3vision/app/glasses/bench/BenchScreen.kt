@@ -314,12 +314,13 @@ internal class BenchController(
             llmBaseUrl = build.llmBaseUrl,
             llmApiKey = build.llmApiKey,
             llmModel = build.llmModel,
-            // Seul champ absent de [BuildDefaults] : l'endpoint SAM 3.1 n'a pas de seed.
+            // Endpoint tap SAM 3.1 (seed `sam31.endpoint`), pas le SAM photo :
+            // le banc segmente via l'app tap.
             samBaseUrl = BuildConfig.SAM31_ENDPOINT,
             ttsApiKey = build.ttsApiKey,
             ttsVoiceId = build.ttsVoiceId,
         )
-        val sam = if (settings.segmentationEnabled) HttpSamClient(settings.samBaseUrl) else null
+        val sam = settings.samBaseUrl.takeIf { it.isNotBlank() }?.let(::HttpSamClient)
         if (!settings.llmConfigured) log("ATTENTION : llm.api.key absente de local.properties")
         // Client LLM unique de l'app ([llmClient]) : même langue que la voix, zéro doublon.
         return AnalyzeUseCase(llmClient(settings), sam)
