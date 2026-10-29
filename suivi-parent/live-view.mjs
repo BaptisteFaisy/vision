@@ -1,17 +1,21 @@
 // Image et trajet du téléphone partagé : aucune donnée n'est inventée côté page.
 export const PHOTO_FRESH_MS = 8_000;
 
-/** Image affichable : data URL du JPEG reçu, et fraîcheur (frame encore du direct). */
+/**
+ * Image affichable : celle d'une caméra qui tourne **maintenant**.
+ *
+ * Le relais garde la dernière frame jusqu'à deux minutes après la coupure du
+ * téléphone : cette image conservée n'est jamais affichée, sinon la page montre
+ * une caméra que le proche a déjà éteinte. Il faut donc un flux `live` **et** une
+ * frame de moins de [PHOTO_FRESH_MS] ; tout le reste laisse la place au texte.
+ */
 export function frameOf(live, status, now = Date.now()) {
+  if (status !== 'live') return null;
   const photo = live && live.photo;
   if (!photo || typeof photo.jpeg !== 'string' || !photo.jpeg) return null;
-  if (status === 'offline') return null;
   const at = Number(photo.atMs);
-  return {
-    src: 'data:image/jpeg;base64,' + photo.jpeg,
-    // Une frame n'est « du direct » que si le flux est vivant ET la frame récente.
-    fresh: status === 'live' && Number.isFinite(at) && now - at <= PHOTO_FRESH_MS,
-  };
+  if (!Number.isFinite(at) || now - at > PHOTO_FRESH_MS) return null;
+  return { src: 'data:image/jpeg;base64,' + photo.jpeg };
 }
 
 /** Trajet guidé en cours, `null` hors guidage ou quand le flux est mort. */

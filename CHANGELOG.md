@@ -152,6 +152,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 2 à jour.
 - Fichiers : `CurbWatcher.kt` (+ test), `VOIX-DANGER.md`.
 
+## 2026-10-29 — Page du proche : la caméra ne s'affiche que si elle tourne (ordre user)
+
+- **Demande** : l'image ne s'affiche que lorsque le proche a démarré sa caméra.
+- **Cause** : `frameOf` rendait la dernière frame stockée par le relais pour tout
+  état sauf `offline`. Après une coupure du téléphone, le relais garde le paquet
+  jusqu'à 2 min : la page montrait une image (atténuée) alors que la caméra ne
+  tournait forcément plus, et une frame de plus de 8 s restait affichée en gris.
+- **Correctif** : `frameOf` exige `status === 'live'` **et** une frame de moins de
+  `PHOTO_FRESH_MS` (8 s) ; le champ `fresh` et la classe `.stale` de l'image
+  disparaissent. Sans image, `#view` perd son cadre sombre et la page affiche
+  « L'image apparaîtra quand ton proche ouvrira la caméra. » (lien absent :
+  message du lien). Aucun changement côté téléphone : il n'envoie déjà `photo`
+  que pendant que ses frames sont récentes.
+- Preuves : `node --test suivi-parent/test/*.test.mjs` vert ; page rechargée en
+  Chrome headless sur trois états (LIVE + frame récente, LIVE + frame de 20 s,
+  SIGNAL LOST + frame) → image seulement dans le premier, cadre sombre absent
+  dans les deux autres.
+- Fichiers : `suivi-parent/live-view.mjs`, `live.mjs`, `styles.css`, `README.md`
+  (+ `test/live-view.test.mjs`).
 ## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
 
 - `sidewalk` segmente le plan entier : marcher SUR le trottoir remplissait la
@@ -165,6 +184,33 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   seuils), `:core` + `:app` verts, `assembleDebug` vert, `check-kotlin-limits`
   OK. Rouge-avant-vérifié (2 échecs voulus).
 - Fichiers : `CurbWatcher.kt` (+ test).
+## 2026-10-29 — iSee : irisation bleu et jaune, très légère, sur le haut du verre
+
+- **Cause** : le verre lisait une seule teinte de la palette (`pal(0.45)`) puis la
+  multipliait par `film()`, trois longueurs d'onde fixes (650/540/450 nm) : c'est
+  ce qui produisait des **reflets rose et vert**. Au repos, la bulle blind person
+  (liquide bleu et ambre) n'avait donc jamais de reflet bleu.
+- `IseePortraitOrb` : `film()` devient `sheen()` (gris 0..1, lumière seulement).
+  L'irisation ne teinte plus rien : elle ne fait que les bandes claires et sombres.
+  La teinte vient de **deux couleurs opposées de la palette active** — `pal(0.04)`,
+  le bleu profond du début de palette, et `pal(0.34)`, l'or du milieu — séparées par
+  une frontière ondulée par le bruit (`q.x + 0.45 * (grain - 0.48)`).
+- Elle ne se pose que sur le **haut** du verre (`top = smoothstep(-0.15, 0.85, q.y)`) :
+  les 50 % restants sont blanc laiteux, et le dosage garde l'enveloppe d'origine
+  (`(0.03 + 0.62 * fres) * 0.45`). Le verre est donc aussi clair qu'avant, sans
+  lavis de couleur.
+- `suivi-parent/orb-shader.mjs` régénéré (`tools/export-caregiver-orb.py`) : le port
+  WebGL reste identique à la source AGSL ; `tools/orb-frozen-baseline.json` refigé
+  pour le changement demandé.
+- Preuves (Chrome headless, WebGL, couronne 0,80–1,02 R). Verre du **haut** de la
+  bulle, 90 points sondés, chroma ≥ 0,045 : **10 bleus, 16 jaunes, 64 neutres, 0 vert,
+  0 magenta** (master : 0 bleu, 52 jaunes — son rose/vert était plus pâle encore que
+  ce seuil). Couronne entière : au repos 600 pixels vifs dont **124 bleus** et 476
+  chauds (master : 80 bleus / 656 chauds), 0 hors palette ; user qui parle 858 bleus,
+  0 chaud ; iSee qui parle 926 chauds, 0 bleu ; page caregiver 436 chauds, 0 bleu,
+  saturation moyenne 0,214 contre 0,217 avant.
+- Docs alignées : `docs/ISEE-DESIGN-PORTRAIT.md` §1, `suivi-parent/README.md`.
+
 ## 2026-10-29 — iSee : trottoir/escaliers prioritaires sur la voix TwinLite (ordre user)
 
 - TwinLiteNet ne voit que le sol ; SAM nomme les dangers (trottoir, escaliers

@@ -42,9 +42,10 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   (proposition 32 de la planche de couleurs), un rayon de 24 % de la largeur et
   un plafond de 100 px CSS. À la racine, `python tools/export-caregiver-orb.py`
   régénère son port WebGL depuis la source AGSL, qui reste la seule vérité :
-  verre, bord et liseré y prennent la teinte du liquide, donc pas d'arc-en-ciel
-  rose, vert ou bleu. Repli en verre cacao et caramel si WebGL est indisponible
-  (mêmes variables `--orb-color-*`).
+  le haut du verre y répond en deux teintes du liquide (le bleu profond de la
+  palette et son or ; ici deux cacao), sans rose ni vert, et sans laver la boule
+  de couleur. Repli en verre cacao et caramel si WebGL est indisponible (mêmes
+  variables `--orb-color-*`).
 - Texte Portrait, quatre lignes maximum, même cadence d'éclairage mot à mot
   quand le téléphone indique qu'il parle. La dernière phrase est transmise
   sans historique ; sinon le site décrit les deux objets reçus les plus proches.
@@ -53,9 +54,10 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   être compatible avec une marche. Aucun petit pas en intérieur ni contournement
   n'est affirmé à partir d'une simple consigne. La précision reste limitée par
   le GPS du téléphone accompagné.
-- Image : la dernière frame publiée par la caméra iSee, en `object-fit: cover`.
-  Elle reste affichée atténuée (gris) quand le flux perd le direct ou que la
-  frame a plus de 8 s, puis laisse place à « En attente de l'image… ».
+- Image : la caméra du proche s'affiche **seulement pendant qu'il la fait
+  tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`. Hors de
+  là, aucun cadre ni image : la page écrit « L'image apparaîtra quand ton proche
+  ouvrira la caméra. »
 - Trajet : pendant un guidage iSee, une barre du départ à l'arrivée. Le liquide
   (dégradé bleu → vert de la boule) et la bille avancent à `progress` ; le reste
   s'écrit « Encore 300 m · 4 min ». La barre disparaît dès que le guidage
@@ -84,7 +86,8 @@ GET /api/state?share=<identifiant>
 l'app ; le texte est borné à 2 000 caractères et l'image base64 à 120 000. Le
 service reprend la position seule en arrière-plan, sans inventer les objets
 d'une caméra fermée ; le relais iSee conserve alors la dernière image avec son
-âge, et la page l'efface plutôt que de la présenter comme du direct. Le relais
+âge, et la page ne l'affiche jamais : une caméra s'affiche parce qu'elle tourne,
+pas parce qu'une image traîne. Le relais
 utilise l'origine du site, même si les réglages contiennent un lien complet avec
 `?share=`.
 

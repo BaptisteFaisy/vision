@@ -6,19 +6,20 @@ const now = 1_700_000_000_000;
 const photo = { jpeg: 'AAAA', atMs: now - 1000 };
 const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
 
-test('la dernière image du téléphone est affichée telle quelle, data URL comprise', () => {
+test('la caméra s’affiche quand le proche la fait tourner, data URL comprise', () => {
   const view = frameOf({ photo }, 'live', now);
   assert.equal(view.src, 'data:image/jpeg;base64,AAAA');
-  assert.equal(view.fresh, true);
-  assert.equal(frameOf({ photo }, 'live', now + PHOTO_FRESH_MS + 1).fresh, false);
 });
 
-test('sans image, flux mort ou frame ancienne, la page ne montre rien d’inventé', () => {
+test('caméra éteinte : la page n’affiche ni image conservée ni image ancienne', () => {
   assert.equal(frameOf({}, 'live', now), null);
   assert.equal(frameOf({ photo: { jpeg: '' } }, 'live', now), null);
+  assert.equal(frameOf({ photo: { jpeg: 'AAAA' } }, 'live', now), null);
+  // Le relais garde la dernière frame après une coupure : elle ne s'affiche pas.
+  assert.equal(frameOf({ photo }, 'lost', now), null);
   assert.equal(frameOf({ photo }, 'offline', now), null);
-  // Une frame qui a vieilli reste visible, marquée figée, jusqu'à la coupure.
-  assert.equal(frameOf({ photo }, 'lost', now).fresh, false);
+  // Une frame de plus de 8 s ne prouve plus une caméra allumée.
+  assert.equal(frameOf({ photo }, 'live', now + PHOTO_FRESH_MS + 1), null);
 });
 
 test('la barre suit le trajet guidé, du départ à l’arrivée', () => {
