@@ -42,11 +42,13 @@ Le cadran est le même (sept bandes égales, `clockHours`, `PositionText.kt:52`)
 | 1 | à 1 heure | at 1 o'clock |
 | 2 | à 2 heures | at 2 o'clock |
 | 3 | à 3 heures | at 3 o'clock |
-| distance prononcée | 1,4 mètre · 85 centimètres · 12 mètres | 1.4 meters · 85 centimeters · 12 meters |
+| distance prononcée | 1 mètre · 50 centimètres · 12 mètres | 1 meter · 50 centimeters · 12 meters |
 | objets non cités | et 2 autres objets | and 2 other objects |
 
-Forme complète produite en anglais :
-`Person at 9 o'clock, 1.4 meters away; chair at 12 o'clock, 3 meters away.`
+Forme complète produite en anglais (distance connue : cadran tombé, mètre entier,
+le plus proche d'abord) :
+`Person 1 meter away, chair 3 meters away.`
+Sans distance connue, le cadran reste : `Person at 9 o'clock, chair at 12 o'clock.`
 
 Deux points qui ont leur raison :
 

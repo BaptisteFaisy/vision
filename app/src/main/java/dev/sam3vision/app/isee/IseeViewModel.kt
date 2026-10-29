@@ -31,7 +31,6 @@ import dev.sam3vision.app.isee.vm.NavigationHook
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
 import dev.sam3vision.core.crossing.CrossingVoiceCommand
-import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.live.SteeringCommand
 import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.nav.NavFix
@@ -99,8 +98,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
 
-    /** Guetteur trottoir, posé par `observeCurb` (reset à chaque début de séance). */
-    private var curbWatcher: CurbWatcher? = null
+    /** Guetteurs trottoir + escaliers, posés par `observeHazards` (reset à chaque début de séance). */
+    private var hazards: ProbeHazards? = null
 
     /** Voix de l'intro (le texte écrit, lui, ne part jamais). */
     private val intro = IseeIntro(getApplication(), player, { settings }, { settings = it }, prefs, ::update)
@@ -137,7 +136,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); curbWatcher?.reset(); twinlite.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); twinlite.reset() },
         prune = ::enforceFifo,
     )
 
@@ -212,7 +211,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
-        curbWatcher = probe.observeCurb(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
+        hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
     }
 
     /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */

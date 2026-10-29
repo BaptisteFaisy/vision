@@ -65,7 +65,7 @@ pas le bord), montée vs descente (deux phrases ?), fiabilité de la profondeur
 à moins d'1 m, et l'extension aux autres différences de terrain (pente,
 rampe, gravier — détection **non définie** à ce stade).
 
-## 3. Décalage latéral chiffré en mètres (livré le 28/10/2026)
+## 3. Décalage latéral chiffré en mètres (livré le 28/10/2026 — REMPLACÉ par le § 5 le 29/10, gardé pour mémoire)
 
 **Règle** : une consigne de côté ne dit plus seulement le côté, elle dit
 **de combien se décaler**, pour être précis :
@@ -101,3 +101,31 @@ mètres : à câbler sur `core/.../distance/`, pas à deviner dans la phrase).
 - Recette téléphone : trottoir réel à 1 m → phrase urgente ≤ 1 s après
   confirmation ; obstacle latéral → décalage annoncé puis vérifié au pas —
   **non mesuré**, exige un APK de cet arbre sur appareil réel.
+
+## 5. Vocabulaire minimal + stop + escaliers parlants (décision du 29/10)
+
+Le 29/10, le user marche avec l'app et tranche l'inverse du § 3 : en marchant,
+**chaque mot retarde le « stop »** — la consigne chiffrée est trop lente quand on
+fonce sur quelqu'un. Nouveau contrat, qui **remplace** le § 3 :
+
+- vocabulaire minimal : `Continue.` / `Va à gauche, 2 mètres.` /
+  `Va à droite, 2 mètres.` / `Stop.` (en : `Continue.` / `Go left, 2 meters.` /
+  `Go right, 2 meters.` / `Stop.`) — côté + distance de l'obstacle au mètre
+  entier, ni nom d'obstacle, ni cadran, ni décalage latéral (`Guidance.phrase`,
+  `DistanceText.spokenShort`) ;
+- **stop** : obstacle mesuré à `STOP_METERS = 0,6 m` ou moins ⇒ « Stop. »,
+  urgent (coupe la phrase en cours, chat compris) ;
+- **positions** : le plus proche d'abord, puis le plus en face (distance, puis
+  écart à l'axe), et la distance au mètre entier remplace le cadran
+  (`PositionText`) : `Personne à 1 mètre, chien à 3 mètres.` ;
+- **escaliers parlants** : les libellés SAM « stairs » dans les lectures sont
+  annoncés en info urgente (`observeStairs`, miroir de `observeCurb`, zéro ligne
+  dans `LiveProbe`) — `Escalier montant.` / `Escalier descendant.` /
+  `Escalier devant.` (sens inconnu). Le sens vient des mots du libellé
+  (« stairs going up », exact) sinon de la hauteur de la boîte (escalier cadré
+  net au-dessus du bas = montée, `StairLabelSignals`) ; le Canny seul ne voit
+  pas le sens et le gradient de profondeur embarqué reste le successeur prévu.
+  Un escalier ne bloque jamais le couloir : c'est une info, pas une consigne
+  d'évitement.
+
+Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.

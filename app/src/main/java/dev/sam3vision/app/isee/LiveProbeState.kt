@@ -13,7 +13,7 @@ import dev.sam3vision.core.live.SteeringCue
  * les concepts reconnus, les distances mesurées, et les chiffres qui disent si ça
  * rame (cadence, latence moyenne et p95, durée serveur, taille de frame, GPU).
  *
- * [spoken] est la phrase que la voix doit dire (« Continue tout droit. » en guidage,
+ * [spoken] est la phrase que la voix doit dire (« Continue. » en guidage,
  * « Personne à 9 heures, à 1,4 mètre » en annonce des positions) : elle reste dans
  * l'état (rien ne se perd si l'écran se recompose) et change de valeur une seule
  * fois par nouvelle scène. [steering] est le chemin calculé pour la dernière

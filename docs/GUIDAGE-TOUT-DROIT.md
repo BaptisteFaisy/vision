@@ -1,6 +1,6 @@
 # Guidage « tout droit » — contrat, seuils, recette
 
-Fiche relue dans le **code de cet arbre** le 2026-10-27 : chaque affirmation porte un
+Fiche relue dans le **code de cet arbre** le 2026-10-29 : chaque affirmation porte un
 `chemin:ligne`. Le contrat HTTP de la voix (endpoint, modèle, clé) est dans
 `docs/ELEVENLABS-TTS.md` ; l'annonce des positions (l'autre voix de l'app) dans
 `docs/VOIX-POSITIONS.md`. Ici : **la consigne de marche** — ce que la page caméra iSee
@@ -11,21 +11,25 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 
 ## 1. Le contrat, en une phrase
 
-Dire à voix haute **où mettre le prochain pas** (« Continue tout droit. », « Personne à
-2 mètres à midi, va à gauche. »), calculé **sur le téléphone depuis les seuls objets
+Dire à voix haute **où mettre le prochain pas** (« Continue. », « Va à gauche,
+2 mètres. », « Stop. »), calculé **sur le téléphone depuis les seuls objets
 SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 
 ## 2. Le couloir et la portée
 
 - **Couloir** : la bande centrale, `centerX` entre 0,34 et 0,66
   (`PositionText.SIDE_EDGE`, `core/.../live/Guidance.kt`, `inCorridor`) — les seuils
-  sont partagés avec les positions, mais le parlé est au cadran : un obstacle du
-  couloir se dit « à 11 heures », « à midi » ou « à 1 heure ».
+  sont partagés avec les positions, mais la consigne ne dit ni cadran ni label :
+  côté + distance suffisent (`key` garde l'heure pour reparler quand l'obstacle
+  glisse dans le couloir).
 - **Portée** : `RANGE_METERS = 4f` (`Guidance.kt`) — au-delà, un objet au centre est
   trop loin pour un pas et ne bloque pas.
 - **Distance inconnue = prudence** : un objet du couloir sans distance mesurée
   (classe inconnue, boîte coupée) bloque quand même, et la consigne ne porte pas de
   chiffre (`inRange`, `nearRank`, `Guidance.kt`).
+- **Stop** : `STOP_METERS = 0,6f` (`Guidance.kt`) — en deçà (mesuré), contourner
+  n'est plus un pas : la consigne est « Stop. », urgente (elle coupe la phrase en
+  cours, chat compris). À 1,2 m/s, 0,6 m c'est un pas avant le contact.
 - **Côté de sortie** : le moins encombré — moins d'objets à portée, sinon obstacle
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
@@ -35,17 +39,18 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 
 | Situation | fr | en |
 |---|---|---|
-| Voie libre | Continue tout droit. | Continue straight ahead. |
-| Obstacle mesuré | Personne à 2 mètres à midi, va à gauche. | Person 2 meters at 12 o'clock, go left. |
-| Obstacle non mesuré | Personne à midi, va à gauche. | Person at 12 o'clock, go left. |
+| Voie libre | Continue. | Continue. |
+| Obstacle mesuré | Va à gauche, 2 mètres. | Go left, 2 meters. |
+| Obstacle non mesuré | Va à gauche. | Go left. |
+| Obstacle à 0,6 m ou moins | Stop. | Stop. |
 
-- Forme produite par `Guidance.phrase` (`Guidance.kt`) : sans article, comme les
-  positions — donc aucune faute de genre sur des labels libres. La direction de
-  l'obstacle est le cadran (`PositionText.clockLabel`), pas « devant ».
-- La distance est `DistanceText.spoken` dans la langue de la voix, comme les positions.
-- Les labels SAM ne sont pas traduits (concepts anglais `person`, `door`) : la phrase
-  française dit « person à 2 mètres à midi » quand SAM dit `person` — même limite que
-  les positions (`docs/VOIX-ANGLAIS.md`), non corrigée ici.
+- Vocabulaire minimal (décision user du 29/10, `Guidance.phrase`) : côté + distance
+  de l'obstacle au mètre entier (`DistanceText.spokenShort`), ni nom d'obstacle, ni
+  cadran, ni décalage latéral — chaque mot retarde le « stop » quand on fonce sur
+  quelqu'un. Remplace la consigne chiffrée « décalez-vous » du 28/10
+  (voir `docs/VOIX-DANGER.md` § 3 et § 5).
+- Les labels SAM n'étant plus dits, leur non-traduction ne touche plus le guidage
+  (elle reste vraie des positions, `docs/VOIX-ANGLAIS.md`).
 
 ## 4. Quand elle parle : stabilité, nouveauté, danger prioritaire
 
@@ -54,9 +59,10 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 1. **stabilité** — la même décision doit être vue **2 frames de suite**
    (`DEFAULT_MIN_FRAMES = 2`) : un masque qui clignote ne fait pas changer de trottoir ;
 2. **nouveauté** — une décision déjà dite reste muette. La signature est `free`, ou
-   `b|label|côté|mètre arrondi|heure` (`Guidance.key`) : un obstacle qui s'approche
-   (3 m → 2 m → 1 m) ou qui glisse dans le couloir (11 h → midi) reparle, comme
-   les positions ;
+   `b|label|côté|mètre arrondi|heure|stop?` (`Guidance.key`) : un obstacle qui
+   s'approche (3 m → 2 m → 1 m) ou qui glisse dans le couloir (11 h → midi) reparle,
+   comme les positions ; le marqueur stop fait reparler au passage en « Stop. »
+   même dans le même seau de distance ;
 3. **délai asymétrique** — jamais deux consignes à moins de **4 s**
    (`DEFAULT_COOLDOWN_MS = 4_000L`), **sauf passage au bouché** : un obstacle qui entre
    dans le couloir parle aussitôt, sans attendre le délai. Le lecteur coupe la phrase
@@ -64,8 +70,8 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
    réassurance — c'est voulu. Le retour au libre, lui, attend : la réassurance peut
    patienter (`GuidanceAnnouncer.kt:40`, `urgent = decision.blocked`).
 
-Différence assumée avec les positions : **la voie libre se dit** (« Continue tout
-droit. », une fois par période libre) là où une scène vide reste muette
+Différence assumée avec les positions : **la voie libre se dit** (« Continue. »,
+une fois par période libre) là où une scène vide reste muette
 (`AnnouncementGate.clearScene`, via `PositionAnnouncer`). Le guidage confirme qu'il
 veille ; les positions décrivent ce qu'il y a.
 
@@ -87,8 +93,8 @@ guidage est muet — par construction, pas par bug.
 Aucun import réseau dans `Guidance.kt` ni `GuidanceAnnouncer.kt` : le guidage ne peut
 pas appeler le LLM, même par accident.
 
-Tests JVM qui verrouillent le contrat : `GuidanceTest` (11), `GuidanceAnnouncerTest`
-(7), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (3, sonde branchée sur un faux
+Tests JVM qui verrouillent le contrat : `GuidanceTest` (17), `GuidanceAnnouncerTest`
+(11), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (3, sonde branchée sur un faux
 client SAM : voie libre → consigne, obstacle → contournement, positions seules →
 silence sur voie libre).
 
@@ -96,13 +102,13 @@ silence sur voie libre).
 
 1. Réglages → **clé ElevenLabs** + **ID de voix** renseignés (sinon muet) et bascule
    « Guider tout droit (caméra iSee) » **activée** ;
-2. page caméra, champ vide → **une** fois « Continue tout droit. » (ou « Continue
-   straight ahead. » selon la langue de la voix), puis silence ;
-3. une personne entre au centre à ~2 m → « Personne à 2 mètres à midi, va à gauche. »
+2. page caméra, champ vide → **une** fois « Continue. », puis silence ;
+3. une personne entre au centre à ~2 m → « Va à gauche, 2 mètres. »
    (ou à droite si la gauche est encombrée), **sans attendre 4 s** ;
 4. la personne s'approche à ~1 m → nouvelle consigne avec la distance à jour ;
-5. le couloir se dégage → « Continue tout droit. » après le délai ;
-6. bascule **coupée** → retour aux annonces de positions, voie libre muette.
+5. la personne est à ~0,5 m → « Stop. », qui coupe la phrase en cours ;
+6. le couloir se dégage → « Continue. » après le délai ;
+7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
 ## 7. État des mesures (28/10/2026, appareil Redmi 2312DRA50G)
 

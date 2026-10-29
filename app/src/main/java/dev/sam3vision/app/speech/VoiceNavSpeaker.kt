@@ -70,7 +70,7 @@ class VoiceNavSpeaker(
     fun onLiteral(phrase: String): String? = announce(VoiceNavEvent.Literal(phrase))
 
     /**
-     * Danger obstacle (« Personne à 2 mètres à midi, va à gauche ») : coupe
+     * Danger obstacle (« Va à gauche, 2 mètres. ») : coupe
      * la phrase en cours, même une consigne. Blanc = silence, comme [onStarted].
      */
     fun onHazard(phrase: String): String? {

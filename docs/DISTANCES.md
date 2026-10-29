@@ -97,21 +97,21 @@ La voix (ElevenLabs, bascule « Annoncer les objets et leur distance » — coup
 sans erreur visible, cf. piège (b) de `docs/TESTING.md`) dit la scène **avec les distances** :
 
 ```
-Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.
+Personne à 1 mètre, chien à 3 mètres.
 ```
 
-Exact, dans le code : au-delà de 3 objets cités (`PositionText.MAX_OBJECTS`), le reste est résumé (« , et 2
-autres objets. ») ; le séparateur devient le point-virgule dès qu'une distance est présente (`PositionText.phrase`,
-`core/…/live/PositionText.kt:101-121`).
+Exact, dans le code : le plus proche d'abord, puis le plus en face ; au-delà de 3 objets cités
+(`PositionText.MAX_OBJECTS`), le reste est résumé (« , et 2 autres objets. ») ; le cadran tombe quand la
+distance est connue, au mètre entier (`PositionText.phrase`, `core/…/live/PositionText.kt`).
 
 Pas de duplication : c'est l'annonce de positions existante (`PositionAnnouncer` : stabilité **2 frames**,
 pas de répétition, **4 s** entre deux phrases — `AnnouncementGate.kt:83,86`) qui porte désormais la distance
 dans `PositionText.item`, et **la distance arrondie au mètre entre dans la signature de scène**
-(`PositionText.key` `:140-145` + `bucket` `:190-191`) — c'est ce qui fait reparler un objet qui s'approche (3 m → 2 m →
-1 m) sans bavarder à chaque frame. `DistanceText.spoken` met les mètres en mots de la langue de la voix — français ici
-(`SpeechLanguage.Fr`, défaut du paramètre `DistanceText.kt:36`), anglais si elle est réglée : « 85 centimètres »,
-« 1,4 mètre », « 12 mètres » ; le singulier va jusqu'à 2 sur la valeur **arrondie** (« 1,5 mètre »).
-La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …` (`LiveProbeText.kt:57`).
+(`PositionText.key` + `bucket`) — c'est ce qui fait reparler un objet qui s'approche (3 m → 2 m →
+1 m) sans bavarder à chaque frame. `DistanceText.spokenShort` met les mètres en mots courts de la langue
+de la voix — français ici (`SpeechLanguage.Fr`, défaut du paramètre), anglais si elle est réglée :
+« 50 centimètres », « 1 mètre », « 2 mètres ».
+La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …` (`LiveProbeText.kt`).
 
 ## Réglages
 
