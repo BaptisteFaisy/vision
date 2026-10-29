@@ -10,6 +10,10 @@ destination dictée. Pas de GPS, pas de carte, pas de virage-par-virage dans
 l'app. Le géocodage local (§7.1) et l'itinéraire Valhalla (§7.2) sont des
 chantiers liés, **hors MVP** : ce document les cadre sans les promettre.
 
+> **Mise à jour 28/10** : un guidage in-app Valhalla (piéton, tuiles
+> Île-de-France) existe désormais et démarre directement après la dictée.
+> Le MVP décrit ci-dessous reste le handoff Maps, utilisé en repli.
+
 **Cohérence outillée** : `tools/check-voice-nav-doc.py` vérifie que les
 phrases, le catalogue « en place » et les chiffres cités ici sont ceux du
 code (porte du job `ci`, comme `check-budget-derive.py`).

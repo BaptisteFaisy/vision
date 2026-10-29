@@ -28,8 +28,9 @@ import kotlinx.coroutines.launch
  * Valhalla, session + pilote. Extrait d'`IseeViewModel` (limite 500 lignes).
  *
  * Paresseux : ni géocodeur, ni TTS système, ni GPS ne sont touchés tant
- * qu'aucune dictée ne passe par le chemin configuré (`routeConfigured`) —
- * éteint par défaut. [speak] est la voix de navigation (`voice::say`).
+ * qu'aucune dictée ne passe par le chemin configuré (`routeConfigured`).
+ * Ce chemin est actif dès que `routeBaseUrl` est renseignée (seed du build
+ * dans `SettingsSeed`). [speak] est la voix de navigation (`voice::say`).
  */
 class IseeVoiceNav(
     app: Application,
@@ -75,6 +76,8 @@ class IseeVoiceNav(
             extraParsers = listOf(VoiceDestinationParser::parse),
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
+            // Mains libres : la destination dictée démarre le guidage sans bouton.
+            autoStartOnVoice = true,
         )
     }
 

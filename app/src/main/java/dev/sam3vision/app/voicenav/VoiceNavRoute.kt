@@ -15,8 +15,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.isee.IseeViewModel
 
 /**
- * Écran navigation de la pile : confirmation puis guidage, pilotés par
- * l'état de session ([VoiceNavUiState]) — un seul écran, deux visages.
+ * Écran navigation de la pile : guidage direct (ou confirmation si la
+ * session l'ouvre), piloté par l'état ([VoiceNavUiState]) — un seul écran,
+ * deux visages.
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
  * - dictée (« redicter », « arrête le guidage ») : retour à l'accueil iSee,

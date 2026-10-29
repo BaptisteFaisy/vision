@@ -39,6 +39,8 @@ Robolectric). Encodage percent-UTF-8, espace en `%20`.
 | Fiche lieu (guidage éteint) | `https://www.google.com/maps/search/?api=1&query=...` |
 
 Modes `google.navigation` : `d` voiture, `w` piéton, `b` vélo.
+Le GPS d'iSee force toujours `w` : `d`, `b` et `l` restent des formats
+supportés par `MapsUri`, jamais utilisés par la navigation.
 Intent : `ACTION_VIEW`, `setPackage("com.google.android.apps.maps")` en
 premier (fichier `app/.../navigation/NavigationLauncher.kt`).
 
@@ -62,33 +64,44 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 - `Settings.navigationGuidanceEnabled: Boolean = true`
 - Section Réglages « Navigation — guidage GPS » (`NavigationToggle.kt`)
 
-## Écrans de navigation vocale (API intégrateur)
+## Navigation vocale in-app (Valhalla)
 
-En plus du handoff direct ci-dessus, `app/.../voicenav/` expose une session
-avec confirmation : dictée → écran « Destination » (adresse + résumé
-distance · durée) → bouton « Démarrer » → écran de guidage (prochaine
-instruction, distances, progression, « Arrêter »). La voix reste le chemin
-TTS existant (`VoiceNavAnnouncer`, clés `nav_*`) ; l'ordre « arrête le
-guidage » (`core/.../nav/StopGuidance.kt`, déterministe) ferme la session.
+Depuis le 28/10, `app/.../voicenav/` démarre le guidage **dès la dictée** :
+dictée → `VoiceNavSession.onVoiceTranscript` → moteur Valhalla ; aucun bouton
+« Démarrer ». Si le moteur ne peut pas démarrer (adresse, GPS, réseau,
+itinéraire), repli Google Maps **piéton** (`TravelMode.WALK`) et retour au
+repos : iSee n'affiche pas d'écran de guidage qu'il ne conduit pas.
 
-Le résumé est fourni par `ValhallaRouteLoader` (géocodage GMS puis BAN +
-`POST /route` piéton, adresse seule sans position ni URL) et l'état du moteur
-par `VoiceNavEngineDriver` (`VoiceNavViewModel.onGuidanceUpdate`, voix système
-+ écran). Ces écrans ne s'ouvrent que si `Settings.routeBaseUrl` est renseignée
-(URL du tunnel Valhalla, Réglages ou build) : sinon, `IseeViewModel` garde le
-handoff direct ci-dessus, à l'identique — et « Démarrer » y rebascule si un
-maillon manque (adresse, position, réseau, itinéraire).
+L'écran de confirmation (`DestinationConfirmScreen`) reste l'API historique
+(`autoStartOnVoice = false`) : adresse + résumé, bouton « Démarrer ».
+
+Deux voix se partagent une session : les consignes du moteur (virages,
+écart, arrivée) passent par `SystemTtsEngine` — le TTS Android, français,
+gratuit et hors-ligne, car un virage n'attend pas le réseau ; les annonces de
+session (`VoiceNavAnnouncer` : repli Maps, fiche lieu, « Guidage arrêté »,
+« Arrivée à destination ») passent par `speakNavigation`, la voix ElevenLabs
+de l'app. Aucune annonce n'est doublée : au démarrage vocal, seule la voix du
+moteur (ou celle du repli Maps) dit « Navigation vers X ».
+
+Dans ce chemin historique, le résumé est fourni par `ValhallaRouteLoader`
+(géocodage GMS puis BAN + `POST /route` piéton, adresse seule sans position ni
+URL) et l'état du moteur par `VoiceNavEngineDriver`
+(`VoiceNavViewModel.onGuidanceUpdate`, voix système + écran). Ces écrans ne
+s'ouvrent que si `Settings.routeBaseUrl` est renseignée (seed du build ou
+Réglages) : sinon, `IseeViewModel` garde le handoff direct ci-dessus.
 
 ## Limites
 
-- **Pas de guidage in-app** : iSee lance, Maps guide. Si Maps est tué
-  ou déconnecté, iSee ne reprend rien.
-- **Pas de géocodage local** : la résolution « Gare de Lyon » →
-  coordonnées est faite par Maps ; une faute de dictée donne une
-  mauvaise destination (la destination est relue à voix haute au lancement).
-- **Hors-ligne** : sans réseau, Maps peut échouer ; iSee ne pré-cache
-  ni carte ni itinéraire.
-- **Vie privée** : la destination transcrite part chez Google via
-  l'intent ; rien n'est journalisé côté iSee au-delà du texte dicté.
+- **Guidage in-app piéton, Île-de-France uniquement** : pas de carte, pas de
+  voiture, pas de vélo, pas de transport ; hors tuiles IdF, le moteur échoue
+  et Maps piéton prend le relais.
+- **Géocodage GMS puis BAN** : le géocodeur Android résout les lieux ; le
+  repli BAN est une base d'adresses (pas de POI), donc une destination
+  ambiguë peut partir ailleurs. La destination est relue à voix haute.
+- **Hors-ligne** : sans réseau, ni Valhalla ni BAN ne répondent ; iSee ne
+  pré-cache ni carte ni itinéraire.
+- **Vie privée** : la destination et la position de départ partent chez
+  Valhalla (Modal) ; la destination part aussi chez Google/BAN pour le
+  géocodage. Rien n'est journalisé côté iSee au-delà du texte dicté.
 - **Écran verrouillé** : le micro verrouillé (`LockedMicAnswer`) ne route
   pas encore vers la navigation — chantier suivant.

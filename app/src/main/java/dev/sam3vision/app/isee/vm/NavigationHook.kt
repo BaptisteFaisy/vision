@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee.vm
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.app.navigation.NavDestination
 import dev.sam3vision.app.navigation.NavigationLauncher
+import dev.sam3vision.app.navigation.TravelMode
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.NavigationPhrases
 import dev.sam3vision.core.usecase.NavigationRouter
@@ -48,7 +49,7 @@ class NavigationHook(
         val destination = request.destination
         val outcome = runCatching {
             if (guidanceEnabled()) {
-                launcher.launch(NavDestination.Query(destination))
+                launcher.launch(NavDestination.Query(destination), TravelMode.WALK)
             } else {
                 launcher.openPlace(destination)
             }
