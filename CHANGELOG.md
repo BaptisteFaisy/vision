@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : trottoir/escaliers prioritaires sur la voix TwinLite (ordre user)
+
+- TwinLiteNet ne voit que le sol ; SAM nomme les dangers (trottoir, escaliers
+  montants/descendants). Sans garde, la consigne sol suivante coupait l'alerte
+  en pleine phrase (un seul lecteur : dernier gagnant).
+- `ProbeHazards.mutesTwinLite` : 10 s après chaque alerte, la voix TwinLite se
+  tait (flèche affichée, reprise sans retard) ; fenêtre = cooldowns guetteurs,
+  danger persistant = silence continu. Branché `IseeViewModel → IseeTwinLite →
+  TwinLiteWiring(muted)` ; `lastAlertMs` sur les deux guetteurs (pur).
+- Preuves : `:app` `testDebugUnitTest` vert sur r630 (`ProbeHazardsTest` 5/5,
+  `TwinLiteWiringTest` 10/10), `:core` + `:app` verts, `assembleDebug` vert,
+  `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
+- Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
+  `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+
 ## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
 
 - **Demande** : la reconnaissance du feu piéton ne vivait que dans une pastille

@@ -177,3 +177,24 @@ Deux causes, lues dans le code de cet arbre :
 Verrouillé par `ProbeWiringSpokenTest` (3, sonde branchée sur le faux client :
 même phrase ré-émise → une synthèse qui aboutit, phrase fraîche → dernier
 gagnant, Stop → parlé chat en lecture) et `GuidanceTest` (22).
+
+## 8. TwinLite se tait après une alerte danger (ordre user du 29/10)
+
+TwinLiteNet ne voit que le sol praticable (gauche/droit/tout droit/stop) ;
+trottoir et escaliers sont des dangers nommés par SAM et parlent en
+prioritaires (`urgent`, coupe). Sans garde, la consigne sol suivante
+(~2-4 s) coupait l'alerte en pleine phrase (un seul lecteur : dernier
+gagnant).
+
+Nouveau contrat : les 10 s qui suivent une alerte trottoir/escaliers, la
+voix TwinLite se tait — la flèche reste affichée, la voix reprend ensuite
+sans consigne en retard. La fenêtre couvre les cooldowns des guetteurs
+(10 s) : danger persistant = alertes chaînées = silence TwinLite continu.
+
+`ProbeHazards.mutesTwinLite` (`app/.../isee/ProbeWiring.kt`), branché sur
+`TwinLiteWiring(muted)` par le ViewModel ; `lastAlertMs` exposé par
+`CurbWatcher`/`StairWatcher` (pur, horloge explicite).
+
+Verrouillé par `ProbeHazardsTest` (5 : silence initial, trottoir,
+escaliers, expiration, reset) et `TwinLiteWiringTest` (+2 : voix tue +
+flèche affichée, reprise sans alerte).

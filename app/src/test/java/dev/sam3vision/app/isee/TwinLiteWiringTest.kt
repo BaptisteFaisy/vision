@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.segment.SegmentMeter
 import dev.sam3vision.core.segment.SegmentMask
+import dev.sam3vision.core.segment.TwinLiteAnnouncer
 import dev.sam3vision.core.segment.TwinLiteDirection
 import dev.sam3vision.core.segment.TwinLiteText
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -174,5 +175,30 @@ class TwinLiteWiringTest {
 
         assertTrue(stop.arrow != droit.arrow)
         assertTrue(stop.label != droit.label)
+    }
+
+    @Test
+    fun `sous alerte danger la voix se tait mais la fleche reste`() {
+        val annonceur = TwinLiteAnnouncer()
+        val metre = FauxMetre()
+        metre.frais = masqueTiers(gauche = true, centre = false, droit = false)
+        val cablage = TwinLiteWiring(meter = metre, announcer = annonceur, muted = { true })
+
+        repeat(10) { i -> cablage.tickUi(i * 1_000L, SpeechLanguage.Fr) }
+
+        assertNull(annonceur.lastCue)
+        assertTrue(cablage.ui.value != null)
+    }
+
+    @Test
+    fun `sans alerte la voix parle`() {
+        val annonceur = TwinLiteAnnouncer()
+        val metre = FauxMetre()
+        metre.frais = masqueTiers(gauche = true, centre = false, droit = false)
+        val cablage = TwinLiteWiring(meter = metre, announcer = annonceur, muted = { false })
+
+        repeat(10) { i -> cablage.tickUi(i * 1_000L, SpeechLanguage.Fr) }
+
+        assertTrue(annonceur.lastCue != null)
     }
 }
