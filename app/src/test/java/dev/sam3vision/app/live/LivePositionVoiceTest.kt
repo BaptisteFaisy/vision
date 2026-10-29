@@ -103,4 +103,28 @@ class LivePositionVoiceTest {
         advanceUntilIdle()
         assertEquals(2, spoken.size)
     }
+
+    @Test
+    fun `un label maison est dit en francais`() = runTest {
+        val voice = voice(this)
+        val hunt = LiveFrame(
+            width = 200,
+            height = 200,
+            elapsedMs = 10L,
+            objects = listOf(SegObject("keys", 0.9f, box, "masque")),
+        )
+        voice.announce(hunt, 200, 200, 1_000L, emptyList())
+        val phrase = state.value.spoken.orEmpty()
+        assertTrue("maison dite en français : $phrase", phrase.startsWith("Clés "))
+        advanceUntilIdle()
+        assertEquals(listOf(phrase), spoken)
+    }
+
+    @Test
+    fun `un label de rue est dit tel quel`() = runTest {
+        val voice = voice(this)
+        voice.announce(frame(), 200, 200, 1_000L, emptyList())
+        val phrase = state.value.spoken.orEmpty()
+        assertTrue("rue inchangée : $phrase", phrase.startsWith("Personne "))
+    }
 }
