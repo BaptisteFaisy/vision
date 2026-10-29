@@ -143,4 +143,45 @@ class CurbWatcherTest {
         assertNull(watcher.onSignal(positive, 5000L))
         assertNotNull(watcher.onSignal(positive, 6000L))
     }
+
+    @Test
+    fun `plan sous les pieds = silence`() {
+        // Marcher SUR le trottoir : le plan remplit jusqu'en haut, pas un bord.
+        val plane = reading("sidewalk", 0.4f, listOf(156f, 200f, 356f, 1130f))
+
+        assertFalse(CurbSignal.of(listOf(plane), 512, 1138).detected)
+    }
+
+    @Test
+    fun `montee plan qui commence devant = detecte`() {
+        // Bord à monter : le plan commence au-dessus des pieds.
+        val montee = reading("sidewalk", 0.8f, listOf(156f, 500f, 356f, 900f))
+
+        assertTrue(CurbSignal.of(listOf(montee), 512, 1138).detected)
+    }
+
+    @Test
+    fun `descente plan bas borne = detecte`() {
+        // Bord à descendre : plan collé aux pieds mais borné en haut.
+        val descente = reading("sidewalk", 0.5f, listOf(156f, 700f, 356f, 1130f))
+
+        assertTrue(CurbSignal.of(listOf(descente), 512, 1138).detected)
+    }
+
+    @Test
+    fun `bordure nette au pied = detecte`() {
+        // Labels de bord (pas de plan) : règle inchangée, même au pied.
+        val bord = reading("curb", 0.5f, listOf(206f, 800f, 306f, 1130f))
+
+        assertTrue(CurbSignal.of(listOf(bord), 512, 1138).detected)
+    }
+
+    @Test
+    fun `seuils du plan bas sous 095 ou haut bascule`() {
+        val sousSeuil = reading("sidewalk", 0.8f, listOf(156f, 341f, 356f, 1070f))
+        val pleinCadre = reading("sidewalk", 0.8f, listOf(156f, 341f, 356f, 1093f))
+
+        assertTrue(CurbSignal.of(listOf(sousSeuil), 512, 1138).detected)
+        assertFalse(CurbSignal.of(listOf(pleinCadre), 512, 1138).detected)
+    }
 }
