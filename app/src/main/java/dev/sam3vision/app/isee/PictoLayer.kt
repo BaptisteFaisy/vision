@@ -24,6 +24,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -105,7 +106,9 @@ internal fun BoxScope.PictoChip(
     Row(
         modifier
             .onGloballyPositioned { coords ->
-                val pos = coords.positionInWindow()
+                // Compose 1.11 : ni boundsInWindow ni positionInWindow n'existent
+                // plus — localToWindow(Zero) + size (prouvé au javap du cache).
+                val pos = coords.localToWindow(Offset.Zero)
                 val size = coords.size
                 onBounds(RectF(pos.x, pos.y, pos.x + size.width, pos.y + size.height))
             }
