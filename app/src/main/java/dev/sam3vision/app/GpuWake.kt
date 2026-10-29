@@ -2,8 +2,11 @@ package dev.sam3vision.app
 
 import android.os.SystemClock
 import android.util.Log
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.HttpLiveClient
+import java.io.InterruptedIOException
 import java.util.Locale
+import java.util.concurrent.TimeoutException
 
 /**
  * Réveil explicite de la GPU sur intention caméra ferme (ordre user 2026-10-29) :
@@ -38,17 +41,34 @@ object GpuWake {
         try {
             val outcome = health(clean)
             onResult(outcome)
-            log(wakeLine(clean, outcome.getOrNull() == true, clock() - startedAt))
+            log(wakeLine(clean, outcome.getOrNull() == true, clock() - startedAt, outcome.exceptionOrNull()))
         } finally {
             release(clean)
         }
         return true
     }
 
-    /** `réveil GPU (https://…) : 4.2 s, carte chaude` (point décimal fixe). */
-    internal fun wakeLine(endpoint: String, ok: Boolean, ms: Long): String =
+    /** `réveil GPU (https://…) : 4.2 s, carte chaude` — ou `…, échec 404` (point décimal fixe). */
+    internal fun wakeLine(endpoint: String, ok: Boolean, ms: Long, error: Throwable? = null): String =
         "réveil GPU ($endpoint) : ${"%.1f".format(Locale.US, ms / 1000.0)} s, " +
-            if (ok) "carte chaude" else "échec"
+            if (ok) "carte chaude" else "échec ${wakeMotif(error)}"
+
+    /**
+     * Motif court d'un réveil raté : le code HTTP (`404`, app arrêtée ou route
+     * manquante), `délai dépassé`, sinon la première ligne du message — pour
+     * savoir pourquoi sans rouvrir l'enquête.
+     */
+    internal fun wakeMotif(error: Throwable?): String = when (error) {
+        null -> "réponse négative"
+        is ApiError.BackendStopped -> "404"
+        is ApiError.Http -> error.code.toString()
+        is ApiError.Timeout,
+        is InterruptedIOException,
+        is TimeoutException -> "délai dépassé"
+        else -> error.message?.lineSequence()?.firstOrNull()?.trim().orEmpty()
+            .ifEmpty { error.javaClass.simpleName }
+            .take(80)
+    }
 
     private fun acquire(endpoint: String): Boolean = synchronized(flying) { flying.add(endpoint) }
 
