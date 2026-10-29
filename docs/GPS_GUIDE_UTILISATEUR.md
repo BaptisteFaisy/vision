@@ -20,10 +20,7 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
    propose un champ de saisie clavier — la saisie vaut une dictée : elle
    ouvre la confirmation, sans redicter.
-4. **Mode carte** : « navigation », « carte », « où suis-je » → la carte
-   s'ouvre sans destination (voir §2), dite « Mode navigation. La carte est
-   à l'écran. »
-5. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
+4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
 
 ## 2. Voir (les écrans)
@@ -45,25 +42,6 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
   + annonce « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
   actuelle, même destination, sans regéocoder).
-
-### Mode navigation (la carte en bas de l'écran)
-
-Dis **« navigation »**, **« carte »**, **« où suis-je »** (ou « ouvre la
-carte ») : une **bande carte** apparaît en bas de l'écran et y reste
-**en permanence** — la scène iSee (caméra, boule, phrase) garde tout le reste,
-au-dessus. Aucune destination, aucun itinéraire : position GPS (cercle de
-précision) et feux connus autour.
-
-- la bande ne s'efface **pas** pendant que tu parles : elle attend, la scène
-  reste utilisable au-dessus ;
-- « va à … » pendant le mode ouvre la confirmation d'itinéraire habituelle ;
-- « quitte la carte » ou « arrête la navigation » referment le mode
-  (« Mode navigation fermé. ») et font disparaître la bande. Il n'y a pas de
-  bouton : la scène iSee n'en a aucun ;
-- sans autorisation de localisation, la bande reste vide (le mode reste
-  ouvert) ;
-- le mode ne s'ouvre pas par-dessus un guidage : il n'y a jamais deux écrans
-  de navigation empilés.
 
 ## 3. Arriver
 

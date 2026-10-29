@@ -178,29 +178,3 @@ private fun maneuverLabel(maneuver: NavManeuver, destinationName: String?): Stri
     }
     return verb + joint + place
 }
-
-/**
- * État carte du **mode navigation** (la carte sans destination) : position et
- * cercle de précision, feux connus autour, caméra au zoom rue sur la position.
- * Aucun itinéraire, aucune manœuvre — ce mode ne guide pas, il situe.
- *
- * Sans fix utilisable : overlays vides et caméra nulle (cadrage automatique).
- * Ne lève jamais (repli : état vide).
- */
-fun mapModeMapStateOf(fix: NavFix?, signals: List<RoutePoint>): GuidanceMapState =
-    runCatching { buildMapModeState(fix, signals) }
-        .getOrElse { GuidanceMapState(null, emptyOverlays()) }
-
-/** Assemblage du mode navigation (voir [mapModeMapStateOf]). */
-private fun buildMapModeState(fix: NavFix?, signals: List<RoutePoint>): GuidanceMapState {
-    val usable = fix?.takeIf { it.isUsable() }
-    val position = usable?.let { RoutePoint(it.lat, it.lon) }
-    return GuidanceMapState(
-        camera = position?.let { MapCamera(target = it, zoom = ZOOM_STREET, bearingDeg = 0f) },
-        overlays = emptyOverlays().copy(
-            position = position,
-            accuracyM = usable?.accM,
-            signals = signals.filter { it.lat.isFinite() && it.lon.isFinite() },
-        ),
-    )
-}

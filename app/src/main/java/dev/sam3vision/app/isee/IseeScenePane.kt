@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.glasses.GlassesVideoLink
-import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.PortraitGeometry
@@ -63,27 +62,10 @@ fun IseeScenePane(
     val glassesStreaming by GlassesVideoLink.streaming.collectAsState()
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
-    val navState by viewModel.voiceNavState.collectAsState()
-    val mapBand = navState is VoiceNavUiState.Map
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        // Mode navigation : bande carte permanente en bas. La scène iSee garde le
-        // reste de l'écran et sa géométrie est recalculée sans la bande — le texte
-        // ne passe donc jamais dessous.
-        val bandHeight = if (mapBand) navigationMapBandHeight(maxHeight) else 0.dp
-        BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = bandHeight)) {
-            // Carte de debug : derrière la rue, la boule et les textes.
-            DebugRouteMapLayer(debugMapEnabled, viewModel, Modifier.fillMaxSize())
-            PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
-        }
-        if (mapBand) {
-            NavigationMapBand(
-                viewModel = viewModel,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(bandHeight),
-            )
-        }
+        // Carte de debug : derrière la rue, la boule et les textes.
+        DebugRouteMapLayer(debugMapEnabled, viewModel, Modifier.fillMaxSize())
+        PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }
 }
 
