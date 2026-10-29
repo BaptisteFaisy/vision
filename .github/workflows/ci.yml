@@ -166,11 +166,12 @@ jobs:
       - name: Tests de la garde clés embarquées
         run: python3 -m unittest tools/test_check_apk_keys.py
 
-      # Les gardes de la CI se testent elles-mêmes : agent de conflits,
-      # couche0, budget — stdlib, quelques secondes, aucun réseau.
-      - name: Tests des gardes CI (conflits, couche0, budget)
+      # Les gardes de la CI se testent elles-mêmes : agents de conflit et de
+      # périmètre, couche0, budget — stdlib, quelques secondes, aucun réseau.
+      - name: Tests des gardes CI (conflits, périmètre, couche0, budget)
         run: |
           python3 .github/fireworks/test_conflict_agent.py
+          python3 .github/fireworks/test_scope_agent.py
           python3 .github/couche0/test_check_couche0.py
           python3 .github/ci-budget/test_check_timeouts.py
 

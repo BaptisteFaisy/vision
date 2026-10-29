@@ -43,7 +43,8 @@ CALL_TIMEOUT_S = 90
 COMMENT_PREFIX = "_fireworks · agent de périmètre (MiniMax M3.1 Flash)_"
 MARKER = "<!-- automerge-scope sha=%s -->"
 LABEL_HUMAN = "intervention-humaine"
-PUCE = re.compile(r"^\s*[-*]\s+`?([^`\s]+)`?\s+[—:-]\s+(.+?)\s*$")
+PUCE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+`?([^`\s]+)`?"
+                  r"\s*(?:[—–:-]|-\s)\s+(.+?)\s*$")
 
 
 class AgentError(Exception):
@@ -123,7 +124,7 @@ def excerpt(fichier):
     return texte or "(binaire, renommage ou vidage)"
 
 
-def messages_pour(pr, fichiers, necessaires):
+def messages_pour(pr, fichiers, necessaires, relance=False):
     system = (
         "Tu rédiges la section `## Scope` du corps d'une pull request : elle "
         "déclare, fichier par fichier, ce que la PR change et pourquoi. "
@@ -133,6 +134,10 @@ def messages_pour(pr, fichiers, necessaires):
         "raison concrète tirée du diff (ce qui change, pas « modification du "
         "fichier ») ; aucune ligne pour un fichier non listé ; aucun titre, "
         "aucune phrase autour ; uniquement les puces, dans l'ordre donné.")
+    if relance:
+        system += (" Relance : tu as omis certains fichiers. Donne une puce "
+                   "pour CHACUN, chemin complet recopié caractère par "
+                   "caractère, sans astérisque, sans raccourci, sans exception.")
     blocs = ["Titre : %s" % pr["title"]]
     corps = (pr.get("body") or "").strip()
     if corps:
@@ -165,7 +170,7 @@ def fw_complete(api_url, key, model, messages):
 
 
 def raisons_repondue(texte):
-    """Puces du modèle → {chemin: raison}, sans les blocs de code vides."""
+    """Puces du modèle → {motif: raison}, sans les blocs de code vides."""
     balise = "think"                       # raisonnement interne éventuel
     texte = re.sub(r"<%s>.*?</%s>" % (balise, balise), "", texte, flags=re.S)
     raisons = {}
@@ -175,9 +180,33 @@ def raisons_repondue(texte):
             continue
         chemin = match.group(1).strip().strip("`").strip()
         raison = match.group(2).strip().strip("`").strip()
+        if chemin.startswith("./"):
+            chemin = chemin[2:]
         if chemin and raison:
             raisons[chemin] = raison
     return raisons
+
+
+def rapprocher(raisons, necessaires, garde):
+    """Associe les puces rendues aux fichiers à déclarer.
+
+    Le modèle rend parfois un glob (`app/**/Settings*.kt`) ou un dossier là où
+    on attendait un chemin exact : on applique la règle du garde lui-même
+    (`matches`) au lieu d'exiger l'égalité — sinon une puce juste était comptée
+    comme absente et la PR restait bloquée (29/10, #215).
+    Rend (couverts {chemin: raison}, manquants).
+    """
+    couverts = {}
+    for chemin in necessaires:
+        if chemin in raisons:
+            couverts[chemin] = raisons[chemin]
+            continue
+        for motif, raison in raisons.items():
+            if garde.matches(motif, chemin):
+                couverts[chemin] = raison
+                break
+    manquants = [chemin for chemin in necessaires if chemin not in couverts]
+    return couverts, manquants
 
 
 def recomposer(corps, fichiers, raisons, garde):
@@ -290,19 +319,33 @@ def cmd_fix(args):
         raise Skip("périmètre déjà tenté pour cette tête")
     garde = load_guard(args.guard)
     corps, fichiers, necessaires = contexte(args, garde)
-    messages = messages_pour({"title": titre_pr(args.repo, args.pr),
-                              "body": corps}, fichiers, necessaires)
+    titre = titre_pr(args.repo, args.pr)
     if args.dry_run:
+        messages = messages_pour({"title": titre, "body": corps},
+                                 fichiers, necessaires)
         print("===== prompt =====")
         print(messages[1]["content"][:6_000])
         return 0
     log("rédaction du périmètre (%d fichiers)" % len(necessaires))
-    raisons = raisons_repondue(fw_complete(api_url, key, model, messages))
-    manquants = [chemin for chemin in necessaires if chemin not in raisons]
+    texte = fw_complete(api_url, key, model,
+                        messages_pour({"title": titre, "body": corps},
+                                      fichiers, necessaires))
+    couverts, manquants = rapprocher(raisons_repondue(texte), necessaires, garde)
     if manquants:
+        # Relance ciblée : les fichiers oubliés, seuls, avec le diff sous les
+        # yeux. Une omission du modèle ne doit pas coûter la PR.
+        log("relance ciblée : %d fichier(s) sans puce" % len(manquants))
+        texte2 = fw_complete(api_url, key, model,
+                             messages_pour({"title": titre, "body": corps},
+                                           fichiers, manquants, relance=True))
+        trouves, manquants = rapprocher(raisons_repondue(texte2), manquants, garde)
+        couverts.update(trouves)
+    if manquants:
+        apercu = " ".join((texte or "").split())[:200]
+        log("réponse du modèle : %s" % (apercu or "(vide)"))
         raise AgentError("le modèle n'a rien rendu pour : %s"
                          % ", ".join(manquants)[:300])
-    nouveau, ajouts, retires = recomposer(corps, fichiers, raisons, garde)
+    nouveau, ajouts, retires = recomposer(corps, fichiers, couverts, garde)
     verif = []
     garde.check_scope(fichiers, nouveau, verif)
     if verif:

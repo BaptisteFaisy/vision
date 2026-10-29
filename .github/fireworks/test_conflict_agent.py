@@ -295,5 +295,121 @@ class DryRunStampTest(unittest.TestCase):
         self.assertEqual(stamps, [])
 
 
+class UnionAjoutsTest(unittest.TestCase):
+    """Journaux : deux entrées écrites en tête se réunissent sans modèle."""
+
+    def test_deux_ajouts_en_tete(self):
+        texte = ("# Journal\n\n"
+                 "<<<<<<< HEAD\n## Entrée master\n- fait A\n"
+                 "||||||| base\n"
+                 "=======\n## Entrée branche\n- fait B\n"
+                 ">>>>>>> 3e0e33b\n\n## Plus ancien\n")
+        self.assertEqual(conflict_agent.union_sans_perte(texte),
+                         "# Journal\n\n## Entrée master\n- fait A\n"
+                         "## Entrée branche\n- fait B\n\n## Plus ancien\n")
+
+    def test_ligne_commune_modifiee_refusee(self):
+        # Une ligne de base remplacée des deux côtés : vrai désaccord.
+        texte = ("<<<<<<< HEAD\nversion master\n"
+                 "||||||| base\nversion commune\n"
+                 "=======\nversion branche\n>>>>>>> x\n")
+        self.assertIsNone(conflict_agent.union_sans_perte(texte))
+
+    def test_marqueur_incomplet_refuse(self):
+        self.assertIsNone(conflict_agent.union_sans_perte("<<<<<<< HEAD\na\n"))
+
+    def test_chemin_de_journal(self):
+        self.assertTrue(conflict_agent.journal_ajout_pur("CHANGELOG.md"))
+        self.assertTrue(conflict_agent.journal_ajout_pur("docs/CHANGELOG.md"))
+        self.assertFalse(conflict_agent.journal_ajout_pur("CHANGELOG-OLD.md"))
+        self.assertFalse(conflict_agent.journal_ajout_pur("app/A.kt"))
+
+
+class ResoudreAjoutsTest(unittest.TestCase):
+    """Bout en bout sur un vrai rebase : CHANGELOG.md réuni, code au modèle."""
+
+    def _conflit(self, chemin, base, nous, eux):
+        run = _scratch_repo(self)
+        _commit(run, {chemin: base}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        run("checkout", "-qb", "br")
+        _commit(run, {chemin: nous}, "br")
+        run("checkout", "-q", base_branch)
+        _commit(run, {chemin: eux}, "m")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        return run
+
+    def test_changelog_reuni_sans_modele(self):
+        # Non-régression 29/10 : #215 rebasée six fois sur CHANGELOG.md, une
+        # saisine LLM (et son quota) par rebase.
+        self._conflit("CHANGELOG.md", "# Journal\n\n## Ancien\n- vieux\n",
+                      "# Journal\n\n## Branche\n- B\n\n## Ancien\n- vieux\n",
+                      "# Journal\n\n## Master\n- M\n\n## Ancien\n- vieux\n")
+        self.assertTrue(conflict_agent.resoudre_ajouts("CHANGELOG.md"))
+        self.assertEqual(conflict_agent.unmerged_files(), [])
+        with open("CHANGELOG.md") as fh:
+            contenu = fh.read()
+        self.assertIn("## Master", contenu)
+        self.assertIn("## Branche", contenu)
+        self.assertIn("- vieux", contenu)
+        self.assertNotIn("<<<<<<<", contenu)
+
+    def test_fichier_hors_journal_rend_la_main(self):
+        self._conflit("app.txt", "base\n", "branche\n", "master\n")
+        self.assertFalse(conflict_agent.resoudre_ajouts("app.txt"))
+        self.assertEqual(conflict_agent.unmerged_files(), ["app.txt"])
+
+    def test_boucle_union_seule_sans_saisine(self):
+        # Le modèle n'est pas appelé du tout : aucun saisine consommée.
+        self._conflit("CHANGELOG.md", "# J\n\n## Ancien\n",
+                      "# J\n\n## B\n\n## Ancien\n",
+                      "# J\n\n## M\n\n## Ancien\n")
+        with mock.patch.object(conflict_agent, "fw_complete",
+                               side_effect=AssertionError("modèle appelé")):
+            resolved = conflict_agent.finish_loop(
+                "http://x", "K", "M", time.time() + 60)
+        self.assertEqual(resolved, ["CHANGELOG.md"])
+        self.assertFalse(conflict_agent.rebase_in_progress())
+
+
+class SaisinesParPrTest(unittest.TestCase):
+    """Une PR ne peut pas consommer tout le plafond horaire à elle seule."""
+
+    def test_compte_par_pr_et_par_fenetre(self):
+        home = tempfile.mkdtemp(prefix="fw-home-")
+        self.addCleanup(shutil.rmtree, home, True)
+        with mock.patch.dict(os.environ, {"HOME": home}):
+            cache = conflict_agent.cache_dir()
+            os.makedirs(cache, exist_ok=True)
+            for pr, sha in (("215", "a" * 12), ("215", "b" * 12),
+                            ("215", "c" * 12), ("250", "d" * 12)):
+                with open(os.path.join(cache, "pr-%s-%s.stamp" % (pr, sha)),
+                          "w") as fh:
+                    fh.write("0")
+            vieux = os.path.join(cache, "pr-215-vieux.stamp")
+            with open(vieux, "w") as fh:
+                fh.write("0")
+            os.utime(vieux, (time.time() - 7_200,) * 2)
+            maintenant = time.time()
+            self.assertEqual(conflict_agent.saisines_pr("215", maintenant), 3)
+            self.assertEqual(conflict_agent.saisines_pr("250", maintenant), 1)
+
+    def test_plafond_par_pr_leve_skip(self):
+        home = tempfile.mkdtemp(prefix="fw-home-")
+        self.addCleanup(shutil.rmtree, home, True)
+        with mock.patch.dict(os.environ, {"HOME": home}):
+            cache = conflict_agent.cache_dir()
+            os.makedirs(cache, exist_ok=True)
+            for i in range(conflict_agent.SAISINES_PR_MAX):
+                with open(os.path.join(cache, "pr-215-%012d.stamp" % i),
+                          "w") as fh:
+                    fh.write("0")
+            with self.assertRaises(conflict_agent.Skip):
+                conflict_agent.autorisation_saisine("215", "e" * 40)
+
+
 if __name__ == "__main__":
     unittest.main()

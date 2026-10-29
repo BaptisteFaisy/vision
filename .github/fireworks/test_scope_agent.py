@@ -7,6 +7,7 @@ Lance : python3 -m unittest test_scope_agent -v
 import importlib.util
 import os
 import unittest
+from unittest import mock
 
 import scope_agent
 
@@ -106,6 +107,94 @@ class MessageTest(unittest.TestCase):
         contenu = messages[1]["content"]
         self.assertEqual(contenu.count("### app/A.kt"), 1)
         self.assertIn("val x = 1", contenu)
+
+
+class RapprocherTest(unittest.TestCase):
+    """Les puces rendues sont rapprochées des fichiers avec la règle du garde.
+
+    Non-régression 29/10 (#215) : le modèle rendait un glob là où le script
+    exigeait l'égalité exacte → la puce juste comptait comme absente et la PR
+    restait bloquée avec « le modèle n'a rien rendu ».
+    """
+
+    def setUp(self):
+        self.g = garde()
+
+    def test_chemin_exact(self):
+        couverts, manquants = scope_agent.rapprocher(
+            {"app/A.kt": "corrige A"}, ["app/A.kt"], self.g)
+        self.assertEqual(couverts, {"app/A.kt": "corrige A"})
+        self.assertEqual(manquants, [])
+
+    def test_glob_du_modele(self):
+        raisons = {"app/src/main/java/*/app/*Settings*.kt": "lit le lien"}
+        couverts, manquants = scope_agent.rapprocher(
+            raisons,
+            ["app/src/main/java/dev/sam3vision/app/SettingsScreen.kt"], self.g)
+        self.assertEqual(manquants, [])
+        self.assertEqual(couverts["app/src/main/java/dev/sam3vision/app/"
+                                  "SettingsScreen.kt"], "lit le lien")
+
+    def test_dossier(self):
+        couverts, manquants = scope_agent.rapprocher(
+            {"docs/": "documente"}, ["docs/CI-QUEUE.md"], self.g)
+        self.assertEqual(manquants, [])
+        self.assertIn("docs/CI-QUEUE.md", couverts)
+
+    def test_manquant_reel(self):
+        _, manquants = scope_agent.rapprocher(
+            {"app/A.kt": "x"}, ["app/A.kt", "app/B.kt"], self.g)
+        self.assertEqual(manquants, ["app/B.kt"])
+
+
+class RelanceTest(unittest.TestCase):
+    """Une omission du modèle déclenche une relance ciblée, pas un abandon."""
+
+    def test_second_appel_limite_aux_manquants(self):
+        fichiers = [fichier("app/A.kt"), fichier("app/B.kt")]
+        prompts = []
+
+        def faux_complete(api_url, key, model, messages):
+            prompts.append(messages[1]["content"])
+            if len(prompts) == 1:
+                return "- `app/A.kt` — corrige A"
+            return "- `app/B.kt` — corrige B"
+
+        args = mock.Mock(repo="O/R", pr="215", sha="abc", dry_run=False,
+                         guard=GARDE)
+        ecrits = []
+        with mock.patch.object(scope_agent, "deja_tente", return_value=False), \
+                mock.patch.object(scope_agent, "verifier_reglages",
+                                  return_value=("K", "M", "http://x")), \
+                mock.patch.object(scope_agent, "titre_pr", return_value="T"), \
+                mock.patch.object(scope_agent, "contexte",
+                                  return_value=("Corps sans scope.", fichiers,
+                                                ["app/A.kt", "app/B.kt"])), \
+                mock.patch.object(scope_agent, "fw_complete", faux_complete), \
+                mock.patch.object(scope_agent, "ecrire_corps",
+                                  side_effect=lambda r, p, c: ecrits.append(c)), \
+                mock.patch.object(scope_agent, "rendre_compte"):
+            self.assertEqual(scope_agent.cmd_fix(args), 0)
+        self.assertEqual(len(prompts), 2)
+        self.assertIn("app/B.kt", prompts[1])
+        self.assertNotIn("app/A.kt", prompts[1])
+        self.assertIn("app/B.kt", ecrits[0])
+
+
+class PuceToleranteTest(unittest.TestCase):
+    """Formats que le modèle rend réellement (listes numérotées, ./)."""
+
+    def test_liste_numerotee(self):
+        self.assertEqual(scope_agent.raisons_repondue("1. app/A.kt — x"),
+                         {"app/A.kt": "x"})
+
+    def test_chemin_relatif(self):
+        self.assertEqual(scope_agent.raisons_repondue("- `./app/A.kt` — x"),
+                         {"app/A.kt": "x"})
+
+    def test_deux_points(self):
+        self.assertEqual(scope_agent.raisons_repondue("- `app/A.kt` : x"),
+                         {"app/A.kt": "x"})
 
 
 if __name__ == "__main__":
