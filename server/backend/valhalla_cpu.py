@@ -1,7 +1,7 @@
 """Modal CPU backend: Valhalla pedestrian routing on IdF tiles.
 
 HTTP contract: GET /health, POST /route (Valhalla request JSON in, trip JSON
-out), GET /signals (traffic lights in a bbox, proxied from OpenStreetMap).
+out), GET /signals (traffic lights in a bbox, static OSM extract).
 CPU-only: no GPU, no secrets, scales to zero (~0 idle cost).
 Tiles live on Modal Volume ``valhalla-idf-tiles`` (/vol).
 Only ``modal`` is imported at module level, so this file stays importable
@@ -9,25 +9,17 @@ locally (py_compile) without pyvalhalla/fastapi installed.
 """
 
 import asyncio
-import time
+import pathlib
 
 import modal
 
-# Feux OSM : marge autour du cadre demandé (degrés ≈ 110 m) + cache conteneur.
+# Feux OSM : marge autour du cadre demandé (degrés ≈ 110 m).
 SIGNALS_MARGIN_DEG = 0.001
-SIGNALS_CACHE_TTL_SECONDS = 24 * 3600
-SIGNALS_EMPTY_TTL_SECONDS = 300
 SIGNALS_MAX_NODES = 2000
-OVERPASS_TIMEOUT_SECONDS = 8
-# Overpass exige un User-Agent descriptif (406 sans lui, même avec curl).
-OVERPASS_USER_AGENT = "sam3-vision/1.0 (+https://github.com/BaptisteFaisy/vision)"
-# Miroirs essayés dans l'ordre (l'instance principale 502 de temps en temps).
-OVERPASS_URLS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
-    "https://overpass.nchc.org.tw/api/interpreter",
-]
+# Extract statique highway=traffic_signals (IdF, 23 170 points) : Overpass
+# (direct + 4 miroirs) est injoignable depuis le conteneur — les feux ne
+# bougent quasiment jamais, autant les embarquer (471 ko dans l'image).
+SIGNALS_JSON_REMOTE = "/signals.json"
 
 APP_NAME = "valhalla-idf-cpu"
 VOLUME_NAME = "valhalla-idf-tiles"
@@ -35,9 +27,16 @@ VOL_DIR = "/vol"
 TILE_DIR = f"{VOL_DIR}/tiles"
 ADMIN_DB = f"{VOL_DIR}/admin.sqlite"
 
-image = modal.Image.debian_slim(python_version="3.13").pip_install(
-    "pyvalhalla==3.9.1",  # same version that built the tiles (r630)
-    "fastapi[standard]==0.162.0",  # repo pin (server/backend/requirements.txt)
+image = (
+    modal.Image.debian_slim(python_version="3.13")
+    .pip_install(
+        "pyvalhalla==3.9.1",  # same version that built the tiles (r630)
+        "fastapi[standard]==0.162.0",  # repo pin (server/backend/requirements.txt)
+    )
+    .add_local_file(
+        str(pathlib.Path(__file__).parent / "traffic_signals_idf.json"),
+        SIGNALS_JSON_REMOTE,
+    )
 )
 
 app = modal.App(APP_NAME)
@@ -74,6 +73,7 @@ class ValhallaRouter:
         from valhalla import Actor
 
         self._actor = Actor(_config())
+        self._signals = _load_signals()
 
     @modal.asgi_app()
     def web(self):
@@ -83,8 +83,7 @@ class ValhallaRouter:
         from fastapi import FastAPI, HTTPException, Request
         from fastapi.responses import JSONResponse
 
-        api = FastAPI(title=APP_NAME, version="1.1.0")
-        cache: dict = {}
+        api = FastAPI(title=APP_NAME, version="1.2.0")
 
         @api.get("/health")
         async def health():
@@ -104,58 +103,41 @@ class ValhallaRouter:
 
         @api.get("/signals")
         async def signals(s: float, w: float, n: float, e: float):
-            """Feux OSM dans le cadre (margé), via Overpass + cache 24 h.
+            """Feux OSM dans le cadre (margé), depuis l'extract embarqué.
 
-            Toujours 200 : ``{"signals": [...], "cached": bool}`` — liste vide
-            si Overpass est injoignable (l'app dégrade : carte sans feux).
+            Toujours 200 : ``{"signals": [...], "cached": bool}`` — le filtre
+            est instantané (23 170 points en mémoire), aucun cache.
             """
-            key = (round(s, 5), round(w, 5), round(n, 5), round(e, 5))
-            hit = cache.get(key)
-            if hit is not None:
-                # Vides (Overpass en panne) : revalidés après 5 min, pas 24 h.
-                ttl = SIGNALS_CACHE_TTL_SECONDS if hit[0] else SIGNALS_EMPTY_TTL_SECONDS
-                if time.time() - hit[1] < ttl:
-                    return {"signals": hit[0], "cached": True}
-            points = await asyncio.to_thread(_fetch_signals, s, w, n, e)
-            cache[key] = (points, time.time())
+            points = _filter_signals(self._signals, s, w, n, e)
             return {"signals": points, "cached": False}
 
         return api
 
 
-def _fetch_signals(s: float, w: float, n: float, e: float) -> list:
-    """Interroge Overpass (nœuds highway=traffic_signals) : [] si échec."""
+def _load_signals() -> list:
+    """Extract embarqué ([[lat, lon], …]) : [] si le fichier manque."""
     import json
-    import urllib.parse
-    import urllib.request
 
-    box = (
-        f"{s - SIGNALS_MARGIN_DEG:.5f},{w - SIGNALS_MARGIN_DEG:.5f},"
-        f"{n + SIGNALS_MARGIN_DEG:.5f},{e + SIGNALS_MARGIN_DEG:.5f}"
-    )
-    query = (
-        "[out:json][timeout:10];"
-        f'node["highway"="traffic_signals"]({box});out geom;'
-    )
-    data = urllib.parse.quote(query)
-    payload = None
-    for base in OVERPASS_URLS:
-        request = urllib.request.Request(
-            base + "?data=" + data, headers={"User-Agent": OVERPASS_USER_AGENT}
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
-                payload = json.load(response)
-            break
-        except Exception as exc:
-            print(f"[signals] {base} indisponible : {exc}")
-    if payload is None:
+    try:
+        with open(SIGNALS_JSON_REMOTE, encoding="utf-8") as handle:
+            points = json.load(handle)
+    except Exception as exc:
+        print(f"[signals] extract manquant : {exc}")
         return []
-    points = []
-    for element in payload.get("elements", [])[:SIGNALS_MAX_NODES]:
-        if element.get("type", "node") != "node":
-            continue
-        lat, lon = element.get("lat"), element.get("lon")
-        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
-            points.append({"lat": lat, "lon": lon})
+    print(f"[signals] {len(points)} feux chargés")
     return points
+
+
+def _filter_signals(all_points: list, s: float, w: float, n: float, e: float) -> list:
+    """Points dans le cadre margé, plafonnés, au format ``{"lat", "lon"}``."""
+    margin = SIGNALS_MARGIN_DEG
+    south, west, north, east = s - margin, w - margin, n + margin, e + margin
+    found = []
+    for point in all_points:
+        lat, lon = point[0], point[1]
+        if south <= lat <= north and west <= lon <= east:
+            found.append({"lat": lat, "lon": lon})
+            if len(found) >= SIGNALS_MAX_NODES:
+                break
+    return found
+
