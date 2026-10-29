@@ -2,7 +2,6 @@ package dev.sam3vision.app.voicenav
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,8 +32,10 @@ import dev.sam3vision.core.settings.Settings
  * [VoiceNavViewModel.onGuidanceUpdate] — cet écran n'en calcule aucune, il
  * ne fait qu'afficher. Tout l'écran est faisable à la voix
  * ([VoiceNavHoldButton], même moteur que l'accueil iSee) : ordre stop
- * (« arrête le guidage ») ou nouvelle destination — sans retour. La
- * mini-carte n'apparaît que si [navSnapshot] et [fetchSignals] sont fournis.
+ * (« arrête le guidage ») ou nouvelle destination — sans retour. Le micro
+ * s'ouvre aussi par appui long n'importe où hors bouton ([HoldMicArea]).
+ * La mini-carte n'apparaît que si [navSnapshot] et [fetchSignals] sont
+ * fournis.
  */
 @Composable
 fun GuidanceScreen(
@@ -46,10 +47,46 @@ fun GuidanceScreen(
     navSnapshot: (() -> Pair<NavRoute?, NavFix?>)? = null,
     fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)? = null,
 ) {
+    val micUi = rememberHoldMicUiState()
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        HoldMicArea(
+            hold = hold,
+            settings = settings,
+            onTranscript = onHoldTranscript,
+            hint = VoiceNavHoldText.GUIDING_NOT_UNDERSTOOD,
+            ui = micUi,
+            modifier = Modifier.weight(1f),
+        ) {
+            GuidingHead(state, navSnapshot, fetchSignals)
+        }
+        Button(
+            onClick = onStop,
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
+        ) {
+            Text("Arrêter", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
+        VoiceNavHoldButton(
+            hold = hold,
+            settings = settings,
+            onTranscript = onHoldTranscript,
+            hint = VoiceNavHoldText.GUIDING_NOT_UNDERSTOOD,
+            ui = micUi,
+        )
+    }
+}
+
+/** Tête du guidage : instruction + carte + progression (zone d'appui long). */
+@Composable
+private fun GuidingHead(
+    state: VoiceNavUiState.Guiding,
+    navSnapshot: (() -> Pair<NavRoute?, NavFix?>)?,
+    fetchSignals: (suspend (MapBounds) -> List<RoutePoint>)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OffRouteBanner(state.update.offRoute)
         Text("Prochaine instruction", color = AppColors.textMuted, fontSize = 18.sp)
         Text(
@@ -65,20 +102,6 @@ fun GuidanceScreen(
             MiniRouteMap(navSnapshot, fetchSignals, Modifier.fillMaxWidth().height(170.dp))
         }
         GuidanceProgress(state)
-        Spacer(Modifier.weight(1f))
-        Button(
-            onClick = onStop,
-            modifier = Modifier.fillMaxWidth().height(64.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
-        ) {
-            Text("Arrêter", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
-        VoiceNavHoldButton(
-            hold = hold,
-            settings = settings,
-            onTranscript = onHoldTranscript,
-            hint = VoiceNavHoldText.GUIDING_NOT_UNDERSTOOD,
-        )
     }
 }
 
