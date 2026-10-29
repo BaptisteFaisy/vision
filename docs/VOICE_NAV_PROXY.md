@@ -46,6 +46,12 @@ curl -s -m 30 -X POST https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-we
 Attendus : `/health` → 200 + JSON `status ok` ; `/route` → 200 + `trip`
 avec `summary` et `legs[].maneuvers[]` (mesuré : 1,308 km, 12 manoeuvres).
 
+Sécurité traversées (piéton) : `/route` répare les passages piétons sans feu
+proche (manœuvres tout-droit "crosswalk" à +40 m d'un feu) en reroutant via
+le feu le plus proche (150 m max, 2 réparations, +20 % de temps max, repli
+route de base). Mesuré Gare de Lyon → Louvre : 3 → 1 traversées sans feu,
++1 % de temps.
+
 ## Rollback
 
 `modal app stop valhalla-idf-cpu` (l'app retombe sur le guidage Maps dès
