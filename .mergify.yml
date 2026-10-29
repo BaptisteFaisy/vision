@@ -57,7 +57,10 @@ priority_rules:
       - label = priority-low
     priority: low
 
-# Mise en file automatique par le produit Merge Queue (pas besoin du produit
-# « Workflow Automation », dont `pull_request_rules` dépend).
+# Mise en file automatique : dépend du produit « Merge Protections », un
+# second produit Mergify. Vérifié le 29/10 : laissé à `true` sans activation,
+# il ne met rien en file. La mise en file effective est donc faite par le
+# balayeur (`pr-auto-merge.yml`), qui commente `@mergifyio queue` sur chaque PR
+# verte — une commande ne dépend d'aucun produit.
 merge_protections_settings:
   auto_merge_conditions: true
