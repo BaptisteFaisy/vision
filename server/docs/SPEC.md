@@ -1,11 +1,14 @@
 # SPEC — backend + app Expo legacy (server/)
 
+> **Historique** : l'app Expo décrite par ce document a été **retirée de l'arbre le
+> 29/10/2026** (elle vit dans l'historique git : `git log -- server/legacy-expo-app`).
+> Ce qui reste dans `server/` est le backend déployé — voir [`../README.md`](../README.md).
+
 App Android React Native (Expo) : photo → SAM 3.1 sur Modal (segmentation) → LLM vision (description) → questions/réponses sur la photo.
 
 ## Répertoires (racine = `server/` du dépôt vision)
 
 - `backend/` — app Modal (Python)
-- `legacy-expo-app/` — app Expo React Native (TypeScript)
 - `scripts/` — tests, déploiement, build APK
 - `docs/` — spec et notes
 
@@ -56,11 +59,11 @@ Erreurs : HTTP 400 `{"detail": "..."}` pour image illisible, HTTP 500 sinon.
 - Aucune clé API dans l'app : tout passe par le backend.
 - Overlays de masques : images PNG base64 superposées, opacité ~0.45, couleurs tournantes ; toggle « masques on/off ».
 - États UI : chargement, erreur réseau explicite (timeout 60 s), bouton réessayer.
-- Fichiers < 500 lignes, composants découpés, pas de duplication (client API unique dans `legacy-expo-app/src/api.ts`).
+- Fichiers < 500 lignes, composants découpés, pas de duplication (le client API unique vivait dans l'app Expo, retirée le 29/10).
 
 ## Vérifications attendues
 
 - `python3 -m py_compile` sur le backend, import du module sans token Modal.
 - `npx tsc --noEmit` sans erreur côté app.
-- Test E2E `scripts/test_api.py` : `/health`, `/segment`, `/analyze`, `/ask` sur une image d'exemple (`legacy-expo-app/assets/sample.jpg` ou l'image de test des docs SAM3).
-- APK debug/release produit dans `legacy-expo-app/android/app/build/outputs/apk/**`, taille et chemin affichés.
+- Test E2E `scripts/test_api.py` : `/health`, `/segment`, `/analyze`, `/ask` sur une image d'exemple (l'image de test des docs SAM3).
+- APK debug/release : construit à la racine du dépôt (`./gradlew :app:assembleDebug`), plus ici.
