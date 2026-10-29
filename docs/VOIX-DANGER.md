@@ -310,12 +310,31 @@ mots doux + positions non urgents, stop interne TwinLite au contact mesuré
 `ProximityVoiceWordTest` (4, dont urgence externe coupe le chat en clip) et
 `ProbeHazardsTest` (3, reset trottoir + escaliers + mobilier).
 
-## 12. Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user du 29/10)
+## 12. Les « Attention … » disent l'heure du cadran (ordre user du 29/10)
 
-Le guidage SAM seul (§ 8 : TwinLiteNet viré) parlait le côté de sortie et
-« Stop. » d'une seule voix. Nouvel ordre : **si obstacle → voix TwinLite,
-sinon → mots SAM** — un seul parle à la fois, jamais de doublon. Le guidage
-doux (§ 11) s'applique aux deux voix : seul le stop coupe.
+Les infos précisent les heures, au cadran des aveugles : « Attention à la
+barrière, à 2 heures. », « Attention à la marche, à midi. », « Escalier
+montant, à 11 heures. » (EN : « …, at 2 o'clock. »).
+
+- **une seule règle** : `PositionText.withHour` (base + heure, `null` =
+  sans heure — jamais d'heure devinée : le flux Canny, sans géométrie,
+  garde « Escalier devant. ») ;
+- **signaux porteurs** : `HazardSignal`, `CurbSignal`, `StairLabelSignal`
+  portent le centre normalisé (lus dans la boîte retenue), les guetteurs le
+  passe à la phrase ; les positions l'avaient déjà (inchangées).
+
+Verrouillé par `PositionTextTest` (+2 : cadran FR, EN + sans heure),
+`HazardWatchTest` (9), `CurbWatcherTest` (19), `StairWatcherTest` (8) et
+`StairLabelSignalTest` (5, centre retenu).
+
+## 13. Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user du 29/10)
+
+Complémentaire du § 12 (qui fixe le *texte* des « Attention … », heure du
+cadran incluse) : ici on fixe *qui* parle. Le guidage SAM seul (§ 8 :
+TwinLiteNet viré) parlait le côté de sortie et « Stop. » d'une seule voix.
+Nouvel ordre : **si obstacle → voix TwinLite, sinon → mots SAM** — un seul
+parle à la fois, jamais de doublon. Le guidage doux (§ 11) s'applique aux
+deux voix : seul le stop coupe.
 
 - **bouché** : `TwinLiteWord` — contact mesuré (≤ 0,6 m) ⇒ « obstacle,
   arrêtez-vous. » / « obstacle, stop. » (seul urgent : `isStopPhrase`, coupe
