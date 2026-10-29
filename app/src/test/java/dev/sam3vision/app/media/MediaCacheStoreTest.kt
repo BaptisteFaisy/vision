@@ -56,6 +56,26 @@ class MediaCacheStoreTest {
         assertEquals(video.path, dao.byId(row.id)?.cheminVideoEnvironnement)
     }
 
+    /**
+     * Le dossier du cache naît avec le premier fichier annoncé, pas avec le premier MP3 :
+     * CameraX refuse un chemin dont le dossier parent n'existe pas, et la vidéo
+     * d'environnement du premier tap d'une installation neuve était perdue.
+     */
+    @Test
+    fun `le dossier est cree avant le premier enregistrement`() {
+        val root = File(tempDir(), "isee")
+        val store = MediaCacheStore(root, FakeDao())
+        assertTrue("dossier absent au départ", !root.exists())
+
+        val video = store.newVideoFile()
+        assertTrue("dossier du MP4 créé", video.parentFile?.isDirectory == true)
+        assertTrue("nom .mp4", video.name.endsWith(".mp4"))
+
+        val photo = store.newPhotoFile()
+        assertTrue("dossier de la photo créé", photo.parentFile?.isDirectory == true)
+        assertTrue("nom .jpg", photo.name.endsWith(".jpg"))
+    }
+
     private fun tempDir(): File =
         Files.createTempDirectory("isee-media").toFile().apply { deleteOnExit() }
 

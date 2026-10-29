@@ -94,11 +94,24 @@ class MediaCacheStore internal constructor(
     suspend fun transcribe(client: SpeechClient, pcm: ByteArray): Result<String> =
         DictationUseCase(client).invoke(Wav.pcm16(pcm))
 
-    /** Fichier vidéo nommé pour l'enregistrement à venir (CameraX écrit directement dedans). */
-    fun newVideoFile(): File = File(dir(), "env-${now()}.mp4")
+    /**
+     * Fichier vidéo nommé pour l'enregistrement à venir (CameraX écrit directement dedans).
+     *
+     * Le **dossier est créé ici** : CameraX mesure l'espace libre du dossier parent
+     * (`OutputStorageImpl` → `StatFs`) avant la première écriture et lève
+     * `IllegalArgumentException: Invalid path` sur un dossier absent, puis le MP4 ne
+     * s'écrit pas. Le dossier `cacheDir/isee` n'était créé qu'au premier MP3 : au premier
+     * tap d'une installation neuve, la vidéo d'environnement était donc perdue
+     * (constaté sur l'appareil le 2026-10-29, `cache/isee` inexistant).
+     */
+    fun newVideoFile(): File = pendingFile("env-${now()}.mp4")
 
     /** Frame filmée de l'appui long ; contexte visuel du prochain échange, jamais Room. */
-    fun newPhotoFile(): File = File(dir(), "snap-${now()}.jpg")
+    fun newPhotoFile(): File = pendingFile("snap-${now()}.jpg")
+
+    /** Chemin d'un fichier à venir, dossier garanti : ni CameraX ni ImageCapture ne le créent. */
+    private fun pendingFile(name: String): File =
+        File(dir(), name).also { it.parentFile?.mkdirs() }
 
     /** Crochets internes : mutex d'écriture pour éviter deux fichiers au même timestamp. */
     private val writeMutex = Mutex()
