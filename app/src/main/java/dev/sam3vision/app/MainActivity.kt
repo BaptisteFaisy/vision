@@ -157,6 +157,7 @@ class MainActivity : ComponentActivity() {
         onHoldEnd = isee::onHoldEnd
         onHoldCancel = isee::onHoldCancel
         onSingleTap = isee::onSingleTap
+        pictoZone = { isee.picto.chipZone() }
         addView(
             ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, isee, glasses) } },
             MATCH_PARENT,
