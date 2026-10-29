@@ -13,6 +13,12 @@ Fireworks la résolution de chaque fichier en conflit, termine le rebase, pousse
 sur la branche de la PR avec bail et rend compte en commentaire. La file reprend
 au passage suivant ; seule la CI verte fait merger.
 
+Les journaux en ajout pur (`CHANGELOG.md`, `CHANGELOG`) ne passent jamais par le
+modèle : deux entrées écrites en tête de fichier ne sont pas un désaccord, elles
+sont réunies sans perte (`union_sans_perte`). Un bloc qui remplacerait une ligne
+commune, lui, reste au modèle. C'est ce qui a arrêté la boucle du 29/10 (#215
+rebasée six fois sur `CHANGELOG.md`, une saisine et un quota par rebase).
+
 ## Contrat d'appel
 
 ```bash
@@ -35,9 +41,12 @@ Le script est lu sur `origin/master` (pas sur la branche de la PR, qui peut
 
 ## Garde-fous
 
-Empreinte par tête de PR + cooldown 20 min, plafond 10 saisines/heure (`SPAWN_CAP`),
-8 fichiers max, refus des conflits sous `.github/`, des binaires et des
-fichiers de plus de 200 Ko, budget 240 s, push avec bail uniquement.
+Empreinte par tête de PR + cooldown 20 min, plafond 10 saisines/heure (`SPAWN_CAP`)
+et 3 saisines par PR en 30 min (`SAISINES_PR_MAX` : une PR ne peut pas brûler
+tout le quota horaire à elle seule), 8 fichiers max, refus des conflits sous
+`.github/`, des binaires et des fichiers de plus de 200 Ko, budget 240 s, push
+avec bail uniquement. Le dry-run ne consomme ni empreinte ni quota, et l'union
+déterministe des journaux ne consomme rien du tout.
 Labels `hold` / `intervention-humaine` : main humaine, aucune saisine.
 Succès : label `agent-conflit`. Le modèle ne voit que les bords du conflit,
 jamais aucun secret.
@@ -65,6 +74,13 @@ avec la tête, donc une seule tentative par commit), `1` échec avec compte rend
 `2` rien à faire. Réglages : `FIREWORKS_MODEL` / `FIREWORKS_BASE_URL` comme
 l'agent de conflit, `FIREWORKS_AGENT_SCOPE=0` pour couper. Plafond 25 fichiers ;
 au-delà, label `intervention-humaine` et main humaine.
+
+Une puce rendue sous forme de glob ou de dossier (`app/**/Settings*.kt`,
+`docs/`) est rapprochée du fichier avec la **règle du garde** (`matches`), pas
+par égalité de chaîne : le 29/10, un glob juste était compté comme absent et la
+PR restait bloquée sur « le modèle n'a rien rendu ». Si des fichiers manquent
+encore, une **relance ciblée** ne redemande qu'eux, avec leur diff ; la réponse
+du modèle est journalisée au moindre échec.
 
 ## Validation
 
