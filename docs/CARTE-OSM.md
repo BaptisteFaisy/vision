@@ -6,10 +6,11 @@ reste `docs/NAVIGATION.md`, le fonctionnel vocal `docs/NAVIGATION-VOCALE.md`
 — ce document n'y touche pas, il les cite.
 
 **Périmètre** : fond de carte MapLibre + tracé pendant
-`VoiceNavUiState.Guiding` (`GuidanceScreen`). Hors périmètre : géocodage
-(§7.1 de `NAVIGATION-VOCALE.md`), itinéraire Valhalla, carte plein écran,
-mode avion avec guidage neuf (impossible : ni Valhalla ni BAN ne répondent
-— § Limites de `NAVIGATION.md`).
+`VoiceNavUiState.Guiding`, affiché sur l'accueil iSee sous la caméra
+(`IseeGuidanceBlock`, qui remplace la boule pendant le guidage).
+Hors périmètre : géocodage (§7.1 de `NAVIGATION-VOCALE.md`), itinéraire
+Valhalla, carte plein écran, mode avion avec guidage neuf (impossible :
+ni Valhalla ni BAN ne répondent — § Limites de `NAVIGATION.md`).
 
 ## 1. Source de tuiles retenue
 
@@ -66,8 +67,8 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
 ### 3.2 UX exacte du repli
 
 - **Aucun écran d'erreur, aucun blocage** : le guidage vocal continue,
-  l'écran garde son instruction 32 sp, son résumé (`GuidanceSummary`,
-  jamais des zéros), sa barre de progression et son bouton « Arrêter ».
+  l'accueil garde son instruction, son reste de trajet et son bouton
+  « Arrêter le guidage ».
 - Le schéma `MiniRouteMap` s'affiche **tel quel** dans le même cadre
   170 dp : tracé + arrivée + position + feux (ou « 0 feu » si les feux
   aussi sont en échec réseau).
@@ -82,11 +83,10 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
 
 | Couche | Tuiles OK | Tuiles KO |
 |---|---|---|
-| Instruction + manœuvre + reste | oui | oui (inchangé) |
-| Barre de progression | oui | oui (inchangé) |
+| Instruction + reste | oui | oui (inchangé) |
 | Carte (tracé, arrivée, position, passages, feux, manœuvres) | fond OSM + surcouches | schéma seul (inchangé) |
 | Attribution « © OpenStreetMap contributors » | oui | **non** (avec les tuiles) |
-| Bouton « Arrêter » + micro d'appui long | oui | oui (inchangé) |
+| Bouton « Arrêter le guidage » + micro d'appui long | oui | oui (inchangé) |
 
 ## 4. Comportement carte (sans scintillement)
 
@@ -112,8 +112,8 @@ guidage, avec un tracé. Voir `NAVIGATION-VOCALE.md` §1 bis.
 
 ## 5. Notes batterie et réseau
 
-- **Surface bornée** : la carte fait 170 dp de haut
-  (`GuidanceScreen`) — quelques tuiles 256 px par zone, pas une carte
+- **Surface bornée** : la carte fait 150 dp de haut sur l'accueil
+  (`IseeGuidanceBlock`) — quelques tuiles 256 px par zone, pas une carte
   plein écran. Zoom borné (natif 20) : chaque niveau × 4 tuiles.
 - **Pas de pré-chargement** : tuiles de la zone visible uniquement. Le
   polling à 1 Hz (`ROUTE_MAP_POLL_MS`) ne relit que l'itinéraire et la
@@ -159,8 +159,9 @@ annonce prise/libération dans `BOITE-USER.md`. Destination IdF
 (guidage Valhalla piéton uniquement).
 
 1. Dicter « je veux aller à la gare de Lyon » → confirmer « Démarrer »
-   → l'écran de guidage montre l'instruction 32 sp **et** la carte OSM
-   avec rues + tracé bleu par-dessus. **Capture 1** : guidage + tuiles.
+   → retour à l'accueil : la carte OSM sous la caméra (rues + tracé
+   bleu par-dessus) **et** l'instruction en cours. **Capture 1** :
+   guidage + tuiles.
 2. Vérifier l'attribution « © OpenStreetMap contributors » visible en
    bas à gauche de la carte. **Capture 2** : zoom sur l'attribution.
 3. Marcher : la position suit sans scintillement, la caméra ne tremble

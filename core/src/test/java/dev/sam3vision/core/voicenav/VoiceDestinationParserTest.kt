@@ -89,4 +89,31 @@ class VoiceDestinationParserTest {
         assertIgnored("emmène-moi à")
         assertIgnored("va à")
     }
+
+    @Test
+    fun `prepositions etendues et variante amene`() {
+        assertDestination("je veux aller au supermarché", "supermarché")
+        assertDestination("je veux aller aux toilettes", "toilettes")
+        assertDestination("je veux aller chez le médecin", "le médecin")
+        assertDestination("amène-moi à la gare", "la gare")
+        assertDestination("amène-moi gare de l'Est", "gare de l'Est")
+        assertDestination("emmène-moi au café", "café")
+    }
+
+    @Test
+    fun `prepositions seules sans suite sont ignorees`() {
+        assertIgnored("emmène-moi au")
+        assertIgnored("emmène-moi aux")
+        assertIgnored("direction de")
+        assertIgnored("direction du")
+    }
+
+    @Test
+    fun `parseExtra ne rend que les formes hors routeur`() {
+        assertEquals("gare de Lyon", VoiceDestinationParser.parseExtra("direction gare de Lyon"))
+        assertEquals("gare de l'Est", VoiceDestinationParser.parseExtra("emmène-moi gare de l'Est"))
+        assertNull(VoiceDestinationParser.parseExtra("je veux aller à la gare"))
+        assertNull(VoiceDestinationParser.parseExtra("aller à Lyon"))
+        assertNull(VoiceDestinationParser.parseExtra("bonjour"))
+    }
 }

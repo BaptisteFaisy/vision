@@ -28,10 +28,13 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
    affiché + relu.
 3. **Extraction** : `NavigationHook` analyse le texte **avant** le LLM
    (insensible casse/accents), avec les 9 motifs GO du §6 : « je veux /
-   voudrais / vais aller à X », « j'aimerais aller à X », « emmène-moi /
-   conduis-moi à X », « guide-moi jusqu'à X », « naviguer vers X »,
-   « itinéraire vers X », « aller à X », « va à X ». X = reste de la phrase,
-   transmis tel quel à Maps, aucun géocodage local.
+   voudrais / vais aller … X », « j'aimerais aller … X », « emmène/amène-moi
+   … X », « conduis-moi … X », « guide-moi jusqu'à/au/aux / vers X »,
+   « naviguer vers X », « itinéraire vers X », « aller … X », « va … X » —
+   « … » vaut à, au, aux, en, dans, vers, chez, jusqu'à. X = reste de la
+   phrase, transmis tel quel à Maps, aucun géocodage local. Un ordre sans
+   destination comprise (« je veux aller », « emmène-moi »…) ne part pas
+   au LLM : iSee redemande la destination (`NavClarify`).
 4. **Confirmation (implicite, one-shot)** : pas de question oui/non (non-but
    MVP : garder le geste unique mains libres). La confirmation = relecture
    vocale immédiate « Navigation vers X » + overlay affichant la destination
@@ -81,9 +84,10 @@ l'aide vocale).
 
 ## 3. Cas limites — UX exacte de chacun
 
-1. **Aucune destination** (phrase sans X, « va à… » vide, bruit) : PAS
-   d'erreur ; le texte suit le chemin question normal (Room → LLM) ;
-   overlay standard du chat, zéro annonce navigation.
+1. **Aucune destination** : un ordre sans X (« va à… » vide, « je veux
+   aller ») redemande la destination (« Je n'ai pas compris où tu veux
+   aller… », `NavClarify`), jamais le LLM ; un bruit sans tête d'ordre
+   suit le chemin question normal (Room → LLM), zéro annonce navigation.
 2. **Phrase ambiguë** (« où est X », « c'est loin X ? ») : reste une question
    LLM, jamais un ordre ; aucune annonce navigation.
 3. **Hors-trace** (l'utilisateur s'écarte) : RIEN côté iSee — Maps recalcule
@@ -165,6 +169,7 @@ annule (le/la) guidage / navigation » ; les 9 motifs GO restent inchangés.
 | Fait publié | Ancre |
 |---|---|
 | 9 motifs GO déterministes, destination brute | `core/src/main/java/dev/sam3vision/core/nav/NavigationIntent.kt::PATTERNS` — 9 motifs |
+| Ordre sans destination comprise → redemande, jamais le LLM | `core/src/main/java/dev/sam3vision/core/voicenav/NavClarify.kt` |
 | Normalisation de X dicté (pas de géocodage) | `core/src/main/java/dev/sam3vision/core/nav/DestinationQuery.kt` |
 | URIs intent / universelle / fiche (pur JVM) | `core/src/main/java/dev/sam3vision/core/nav/MapsUri.kt` |
 | Routage transcript → requête | `core/src/main/java/dev/sam3vision/core/usecase/NavigationRouter.kt` |

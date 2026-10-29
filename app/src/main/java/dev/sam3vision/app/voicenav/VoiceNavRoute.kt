@@ -18,16 +18,17 @@ import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Écran navigation de la pile : guidage direct (ou confirmation si la
- * session l'ouvre), piloté par l'état ([VoiceNavUiState]) — un seul écran,
- * deux visages.
+ * Écran navigation de la pile : confirmation puis arrivée, piloté par
+ * l'état ([VoiceNavUiState]). Le guidage vit sur l'accueil iSee (caméra +
+ * carte dessous) ; sa branche n'est ici que transitoire.
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
  * - dictée sur place ([VoiceNavHoldButton], même moteur que l'accueil iSee) :
  *   « oui »/« non »/destination sur la confirmation, destination ou ordre
  *   stop en guidage — tout l'écran est faisable à la voix, sans retour ;
- * - quitter l'écran (retour) = arrêter : pas de guidage invisible — le repos
- *   de session coupe le moteur ([IseeViewModel.dismissVoiceNav]) ;
+ * - quitter l'écran (retour) = annuler la confirmation ou refermer
+ *   l'arrivée — le guidage n'a plus d'écran (il vit sur l'accueil) et
+ *   s'arrête par son bouton ou par « arrête le guidage » ;
  * - mise en fond (home, verrouillage) en guidage = maintien via le service
  *   W1 ([GuidanceLifecycle]) ; au retour, l'écran reprend sur l'état intact.
  * - proche : position + trajet publiés tant que l'écran est affiché
@@ -42,7 +43,17 @@ fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(nav) {
-        onDispose { isee.dismissVoiceNav() }
+        // Sortie d'écran : la confirmation s'annule, l'arrivée se referme.
+        // Le guidage n'est jamais coupé ici : il vit sur l'accueil iSee
+        // (bouton Arrêter + « arrête le guidage »), et la transition
+        // confirmation → guidage dépile cet écran sans arrêter le moteur.
+        onDispose {
+            when (nav.state.value) {
+                is VoiceNavUiState.Confirming -> nav.cancelConfirmation()
+                is VoiceNavUiState.Arrived -> nav.session().dismissArrived()
+                else -> Unit
+            }
+        }
     }
     DisposableEffect(lifecycle, nav) {
         val observer = LifecycleEventObserver { _, event ->
