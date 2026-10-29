@@ -18,7 +18,11 @@ DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "google/gemini-2.5-flash"
 REQUEST_TIMEOUT = 90.0
 TEMPERATURE = 0.2
-MAX_TOKENS = 800
+# muse-spark raisonne avant de répondre (tokens comptés dans le budget) : à 800,
+# /analyze (JSON contraint) rendait systématiquement un contenu vide et /ask avec
+# historique de façon intermittente (finish `length` — 29/10). Budget unique large :
+# le coût suit les tokens utilisés, pas le plafond.
+MAX_TOKENS = 3000
 MAX_HISTORY_MESSAGES = 20
 MAX_TAGS = 8
 

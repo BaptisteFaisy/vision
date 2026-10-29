@@ -1,5 +1,17 @@
 # Modal fermé (relevé antérieur, hors de cet arbre)
 
+## Redéployé avec SAM 3.1 officiel — 2026-10-29
+`sam3-vision` redéployé (`server/scripts/deploy_backend.sh --skip-smoke`) avec la segmentation
+**officielle** : poids `facebook/sam3.1` (volume `sam3-official`, pré-rempli par
+`server/scripts/fetch_official_weights.py`) + code natif Meta
+(`server/backend/segmentation_native.py`). Secret `sam3-llm` = **Baseten**
+(`https://inference.baseten.co/v1` + `meta-models/muse-spark-open-1026`) : `/analyze` et
+`/ask` suivent le même défaut LLM que l'app iSee (#54). Coût au repos : 0 (scaledown 300 s).
+**Validé le 2026-10-29** : E2E `server/scripts/test_api.py` **7/7 PASS** sur GPU A10G
+(`/health`, `/segment` ± prompts, `/analyze`, `/ask` + history, 400s, contrat d'erreurs).
+Correctifs de validation : dépendances `sam3` dans l'image (dont `setuptools<80`),
+budget LLM unique 3000 tokens (modèle à raisonnement), `width`/`height` sur `/analyze`.
+
 ## Nouvelle app : Kotlin natif
 L'app Android est désormais **native Kotlin** (à la racine du dépôt vision : LLM → InferHub
 `https://api.inferhub.dev/v1`, SAM 3.1 en endpoint optionnel). `server/` garde le backend Modal
