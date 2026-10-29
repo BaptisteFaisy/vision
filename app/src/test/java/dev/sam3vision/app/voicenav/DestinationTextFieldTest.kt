@@ -67,7 +67,10 @@ class DestinationTextFieldTest {
 
         val state = nav.state.value as VoiceNavUiState.Confirming
         assertEquals("gare de Lyon", state.destination)
-        assertEquals(listOf("Destination : gare de Lyon"), spoken)
+        assertEquals(
+            listOf("Do you really want to go to gare de Lyon? Travel time: 15 minutes. Answer yes or no."),
+            spoken,
+        )
     }
 
     @Test
@@ -80,6 +83,9 @@ class DestinationTextFieldTest {
 
         val state = nav.state.value as VoiceNavUiState.Confirming
         assertEquals("tour Eiffel", state.destination)
-        assertEquals(listOf("Destination : tour Eiffel"), spoken)
+        assertEquals(
+            listOf("Do you really want to go to tour Eiffel? Travel time: 15 minutes. Answer yes or no."),
+            spoken,
+        )
     }
 }
