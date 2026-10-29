@@ -87,6 +87,16 @@ object PictoVoiceOrder {
         return KnownSizes.canonical(label).split(' ').filter { it.isNotEmpty() }.any { matchWord(word, it) }
     }
 
+    /**
+     * Mot de [text] visant un label de [labels], `null` si aucun : la chasse
+     * picto, partagée par le direct et l'appui long iSee. Pur et testé en JVM.
+     */
+    fun huntWord(text: String, labels: List<String>): String? {
+        if (labels.isEmpty()) return null
+        return KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+            .firstOrNull { word -> labels.any { matches(word, it) } }
+    }
+
     /** Un mot parlé contre un mot de label : égalité, pluriel ou préfixe. */
     private fun matchWord(word: String, name: String): Boolean {
         if (word == name) return true
