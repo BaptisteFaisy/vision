@@ -430,6 +430,8 @@ RUNNERS = (
     ("latence : négociation mask_encoding", "imaging", latency_tests.test_mask_negotiation),
     ("latence : cap max_objects avant encodage", "segmentation", latency_tests.test_finalize_cap),
     ("latence : tri/cap par concept", "segmentation", latency_tests.test_top_indices),
+    ("plafond 32 : segmentation", "segmentation", latency_tests.test_max_objects_ceiling),
+    ("plafond 32 : clamp /live", "live_app", latency_tests.test_live_clamp_ceiling),
     ("latence : dédup alias FR/EN", "segmentation", latency_tests.test_alias_dedup),
     ("latence : détection → objets", "segmentation", live_fast_tests.test_detection_entries),
     ("chronos : postes et Server-Timing", "timing", latency_tests.test_timing),

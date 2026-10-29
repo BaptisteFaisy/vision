@@ -9,7 +9,7 @@ reste sur le chemin ``transformers`` (``segmentation.py`` + ``fast_core.py``).
 Une image = une vidéo d'une frame : ``start_session`` + ``add_prompt`` par
 concept sur la frame 0 (même recette que ``tracking.LiveSession.start``),
 sessions refermées aussitôt. Les objets repassent par ``segmentation.finalize``
-(tri global, coupe à 24, encodage PNG) : le contrat SPEC est inchangé.
+(tri global, coupe à 32, encodage PNG) : le contrat SPEC est inchangé.
 
 Poids : dépôt officiel (gated, licence Meta acceptée) via ``HF_TOKEN`` (secret
 Modal ``huggingface``), persistés dans le volume ``sam3-official`` monté sur
