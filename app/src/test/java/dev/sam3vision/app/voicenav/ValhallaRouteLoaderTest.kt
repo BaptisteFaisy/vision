@@ -53,13 +53,12 @@ class ValhallaRouteLoaderTest {
     }
 
     @Test
-    fun `sans position ni url l'adresse seule reste affichable`() = runBlocking {
-        val noOrigin = loader(originNow = { null })("la gare").getOrThrow()
-        assertEquals(0L, noOrigin.distanceMeters)
-        assertEquals("Gare de Lyon, Paris", noOrigin.address)
+    fun `sans position ni url le motif est explicite, jamais des zeros`() = runBlocking {
+        val noOrigin = loader(originNow = { null })("la gare").exceptionOrNull()
+        assertEquals("position de départ indisponible (activez la localisation)", noOrigin?.message)
 
-        val noUrl = loader(baseUrl = { "  " })("la gare").getOrThrow()
-        assertEquals(0L, noUrl.durationSeconds)
+        val noUrl = loader(baseUrl = { "  " })("la gare").exceptionOrNull()
+        assertEquals("service d'itinéraire non configuré", noUrl?.message)
     }
 
     @Test

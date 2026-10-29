@@ -263,6 +263,43 @@ class VoiceNavSessionTest {
     }
 
     @Test
+    fun `auto-start charge le résumé pour l'état initial, jamais des zéros`() = runBlocking {
+        var askedSummary: RouteSummary? = null
+        val launcher = FakeLauncher()
+        val session = session(
+            launcher,
+            engine = { _, loaded -> askedSummary = loaded; true },
+            autoStart = true,
+        )
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        val state = session.state.value as VoiceNavUiState.Guiding
+        assertEquals(summary, askedSummary)
+        assertEquals(summary, state.summary)
+        assertEquals(2450L, state.update.distanceToManeuverMeters)
+        assertEquals(2450L, state.update.remainingDistanceMeters)
+        assertEquals(900L, state.update.remainingDurationSeconds)
+    }
+
+    @Test
+    fun `auto-start résumé en échec affiche le calcul en cours`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(
+            launcher,
+            loader = { Result.failure(IllegalStateException("panne")) },
+            autoStart = true,
+        )
+
+        assertTrue(session.onVoiceTranscript("va à la gare"))
+
+        val state = session.state.value as VoiceNavUiState.Guiding
+        assertEquals(null, state.summary)
+        assertEquals("Calcul de l'itinéraire vers la gare…", state.update.instruction)
+        assertTrue(launcher.launched.isEmpty())
+    }
+
+    @Test
     fun `auto-start sans moteur bascule sur Maps pieton et revient au repos`() = runBlocking {
         val launcher = FakeLauncher()
         val session = session(launcher, engine = null, autoStart = true)
