@@ -106,6 +106,19 @@ déclencheurs refaisaient le même clone et le même rebase (153 runs/jour, 63 %
 Les conflits de `CHANGELOG.md` sont résolus par `merge=union` (journal additif, les deux entrées
 sont gardées, aucun appel LLM) : c'est ce qui cassait la boucle « master bouge → conflit →
 agent → push → CI → master bouge ».
+
+**Débit (v12, 29/10).** Le frein n'était pas la durée d'un balayage (17 s) mais le **rebase
+imposé** : chaque merge déplace `master`, donc les autres PR passent `BEHIND`, et les rebaser une
+par une poussait un commit — ce qui relançait la CI de chaque PR (60-90 s) et re-déplaçait
+`master` (taxe en O(N²) sur le nombre de PR ouvertes ; 15 merges/h au mieux, p90 70 min).
+Désormais une PR `BEHIND` dont les **trois checks requis sont verts** et dont les fichiers ne
+croisent **aucun** fichier atterri depuis sa base est **mergée directement** (`merge --rebase`
+côté serveur, `strict: false` est déjà la politique du dépôt) : pas de clone, pas de push, pas de
+CI relancée. Au moindre doute — fichiers qui se croisent, liste tronquée à 300, brouillon, checks
+pas verts — on rebase comme avant. Le groupe `concurrency` est désormais **par tête de PR** (et non unique) : avec un groupe unique,
+GitHub annulait le run *en attente* dès qu'un autre se déclenchait, donc le « CI verte, merge-moi »
+d'une PR pouvait être annulé par le run d'une autre — famine, et attente jusqu'au cron. Le cron de
+filet est passé à 5 min.
 La seule porte reste la CI : les 3 checks `ci`, `ci-budget`, `couche0` verts, puis
 merge en rebase. Le natif (`apk`, `apk-release`, `lint`) est vérifié sur `master`
 par `ci-native.yml` après chaque atterrissage. Pas de gate humaine, pas de merge
