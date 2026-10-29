@@ -30,7 +30,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 import urllib.request
 
 MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
@@ -226,19 +225,21 @@ def ecrire_corps(repo, pr, corps):
     sh(["gh", "pr", "edit", str(pr), "--repo", repo, "--body-file", chemin])
 
 
-def cmd_fix(args):
-    now = time.time()
+def verifier_reglages():
+    """Clés et coupe-circuit ; lève Skip si l'agent doit se taire."""
     key = env_or("FIREWORKS_API_KEY", "")
-    model = env_or("FIREWORKS_MODEL", MODEL_DEFAULT)
-    api_url = env_or("FIREWORKS_BASE_URL", API_DEFAULT)
     if env_or("FIREWORKS_AGENT_SCOPE", "1") == "0":
         raise Skip("agent de périmètre coupé (FIREWORKS_AGENT_SCOPE=0)")
     if not key:
         raise Skip("FIREWORKS_API_KEY absent : périmètre laissé à l'auteur")
-    if deja_tente(args.repo, args.pr, args.sha):
-        raise Skip("périmètre déjà tenté pour cette tête")
+    return (key, env_or("FIREWORKS_MODEL", MODEL_DEFAULT),
+            env_or("FIREWORKS_BASE_URL", API_DEFAULT))
 
-    garde = load_guard(args.guard)
+
+def contexte(args, garde):
+    """Corps, fichiers de la PR et fichiers à déclarer. Lève Skip si le garde
+    est rouge pour autre chose que le périmètre : on ne réécrit pas un corps
+    pour un échec que la réécriture ne corrige pas."""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     if not token:
         raise AgentError("aucun jeton GitHub dans l'environnement")
@@ -246,7 +247,6 @@ def cmd_fix(args):
         corps, fichiers = garde.pr_context(args.repo, args.pr, token)
     except Exception as exc:                                   # noqa: BLE001
         raise AgentError("API GitHub : %s" % str(exc)[:200])
-
     erreurs = []
     garde.check_scope(fichiers, corps, erreurs)
     if not erreurs:
@@ -255,7 +255,6 @@ def cmd_fix(args):
     if autres:
         raise Skip("couche0 rouge sur autre chose que le périmètre : %s"
                    % " ; ".join(autres)[:300])
-
     necessaires = [f["filename"] for f in fichiers
                    if not garde.is_exempt(f["filename"])]
     if not necessaires:
@@ -263,31 +262,16 @@ def cmd_fix(args):
     if len(necessaires) > MAX_FILES:
         raise Skip("%d fichiers (plafond %d) : main humaine"
                    % (len(necessaires), MAX_FILES))
+    return corps, fichiers, necessaires
 
-    pr = {"title": sh(["gh", "pr", "view", str(args.pr), "--repo", args.repo,
-                       "--json", "title", "-q", ".title"]),
-          "body": corps}
-    messages = messages_pour(pr, fichiers, necessaires)
-    if args.dry_run:
-        print("===== prompt =====")
-        print(messages[1]["content"][:6_000])
-        return 0
 
-    log("rédaction du périmètre (%d fichiers)" % len(necessaires))
-    raisons = raisons_repondue(fw_complete(api_url, key, model, messages))
-    manquants = [chemin for chemin in necessaires if chemin not in raisons]
-    if manquants:
-        raise AgentError("le modèle n'a rien rendu pour : %s"
-                         % ", ".join(manquants)[:300])
+def titre_pr(repo, pr):
+    return sh(["gh", "pr", "view", str(pr), "--repo", repo,
+               "--json", "title", "-q", ".title"])
 
-    nouveau, ajouts, retires = recomposer(corps, fichiers, raisons, garde)
-    verif = []
-    garde.check_scope(fichiers, nouveau, verif)
-    if verif:
-        raise AgentError("le garde refuse encore le corps recomposé : %s"
-                         % " ; ".join(verif)[:300])
 
-    ecrire_corps(args.repo, args.pr, nouveau)
+def rendre_compte(args, ajouts, retires):
+    """Commentaire unique : ce qui a été écrit, et la marque par tête."""
     lignes = ["Périmètre complété depuis le diff : **%d fichier(s)** déclaré(s)."
               % len(ajouts)]
     if retires:
@@ -298,6 +282,34 @@ def cmd_fix(args):
                   "sur ce nouveau corps.")
     lignes.append(MARKER % args.sha)
     comment(args.repo, args.pr, "\n\n".join(lignes))
+
+
+def cmd_fix(args):
+    key, model, api_url = verifier_reglages()
+    if deja_tente(args.repo, args.pr, args.sha):
+        raise Skip("périmètre déjà tenté pour cette tête")
+    garde = load_guard(args.guard)
+    corps, fichiers, necessaires = contexte(args, garde)
+    messages = messages_pour({"title": titre_pr(args.repo, args.pr),
+                              "body": corps}, fichiers, necessaires)
+    if args.dry_run:
+        print("===== prompt =====")
+        print(messages[1]["content"][:6_000])
+        return 0
+    log("rédaction du périmètre (%d fichiers)" % len(necessaires))
+    raisons = raisons_repondue(fw_complete(api_url, key, model, messages))
+    manquants = [chemin for chemin in necessaires if chemin not in raisons]
+    if manquants:
+        raise AgentError("le modèle n'a rien rendu pour : %s"
+                         % ", ".join(manquants)[:300])
+    nouveau, ajouts, retires = recomposer(corps, fichiers, raisons, garde)
+    verif = []
+    garde.check_scope(fichiers, nouveau, verif)
+    if verif:
+        raise AgentError("le garde refuse encore le corps recomposé : %s"
+                         % " ; ".join(verif)[:300])
+    ecrire_corps(args.repo, args.pr, nouveau)
+    rendre_compte(args, ajouts, retires)
     log("corps réécrit (%d ajout(s), %d retrait(s))" % (len(ajouts), len(retires)))
     return 0
 
