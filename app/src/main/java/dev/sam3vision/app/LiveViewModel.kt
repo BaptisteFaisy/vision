@@ -391,7 +391,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 memory = current.memory.copy(tracks = recent.tracks),
                 distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
-            )
+            ).withCrossing(traverse.active, traverse.light)
         }
     }
 

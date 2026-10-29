@@ -118,3 +118,28 @@ lequel des trois états). Vérifié par `CrossingOverlayLayoutTest`.
 **Ce que ça ne prouve pas** : que le cadre tombe juste sur un téléphone réel. Le
 placement est testé en JVM sur des cadres simulés, pas sur une frame capturée —
 même limite que les distances, dont la recette appareil reste à faire.
+
+### Où c'est affiché
+
+Les **deux** surfaces qui montrent des masques SAM portent le cadre :
+
+- l'accueil iSee (`IseePortraitCamera.StreetFeed`), caméra du téléphone **et** lunettes ;
+- l'écran Direct (`LiveScreen.LiveCameraStage`), via `LiveViewModel.withCrossing`
+  (`app/LiveCrossingPublish.kt`) alimenté par `TraverseWiring.light`.
+
+### Est-ce temps réel ?
+
+Oui au sens du direct, non au sens du 30 ips — et c'est le même compromis que les
+masques et les distances :
+
+| | valeur | source |
+|---|---|---|
+| rafraîchissement du cadre | **1 fois par frame analysée** (cadence du direct : 150 ms en `Cadence.Fast`, 350/500/900 ms en cadence prudente) | `core/live/LiveSession.kt`, `docs/LATENCE-BUDGET.md` |
+| retard du cadre sur l'aperçu | l'A/R complet : **422 ms médian**, plancher 123,7 ms | `docs/LATENCE-BUDGET.md` § étages (`HTTP`) |
+| coût ajouté par frame | un décodage JPEG complet + crop : **10-25 ms**, comparable à l'étage `DECODE` | idem |
+| thread | `Dispatchers.Default` (`scope.launch(background) { runFrame(...) }`) : **aucun à-coup** sur l'UI | `isee/LiveProbe.kt` |
+
+Conséquence pratique : sur un feu — qui ne bouge pas — le cadre est juste, même avec
+400 ms de retard. Dès que le téléphone **panote**, le cadre traîne derrière l'image
+vivante, comme les pastilles de distance. Ce n'est pas un défaut de l'overlay, c'est
+l'âge de la dernière frame analysée.

@@ -25,12 +25,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - `isee/LiveProbeState.kt` : `crossingBox` (boîte normalisée de la dernière
   frame, `null` = aucun feu dans le champ). `LiveProbe.kt` la publie ; le
   fichier reste à 499 lignes (limite 500).
-- Affiché sur les **deux** sources d'image de `StreetFeed` : caméra du téléphone
-  (`CameraLive`) et lunettes.
+- Affiché sur **trois** surfaces : l'accueil iSee (caméra du téléphone via
+  `CameraLive`, et lunettes) et l'écran **Direct** (`LiveScreen.LiveCameraStage`),
+  qui est le vrai flux temps réel. `TraverseWiring.light` garde la boîte avec
+  l'état (elle était jetée : seul `lightGreen` sortait), `LiveViewModel.withCrossing`
+  (`app/LiveCrossingPublish.kt`, nouveau — `LiveViewModel` reste à 498 lignes)
+  publie le couple dans `LiveUiState`, et `LiveScreen` pose la même couche.
+- Temps réel : rafraîchi à la cadence du direct (1 fois par frame analysée), avec
+  l'A/R complet de retard — même compromis que les masques et les distances
+  (`docs/LATENCE-BUDGET.md`). Décodage JPEG sur `Dispatchers.Default` : pas
+  d'à-coup UI.
 - **Preuves** : `CrossingOverlayLayoutTest` 11 tests (couleurs, vocabulaire
   identique à la pastille pour les états tranchés, cadrage panoramique recadré,
   boîte débordante ramenée, étiquette déplacée sous le cadre puis bornée) ;
-  `:core` 1 789 tests + `:app` 989 tests, 0 échec ; `check-kotlin-limits` OK.
+  `:core` 1 789 tests + `:app` 995 tests, 0 échec ; `check-kotlin-limits` OK.
 
 ## 2026-10-29 — iSee : la voix dit les obstacles proches, même non mesurés
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix) ; la voix dit les obstacles proches, même non mesurés ; suivi : le lien se lit dans les Réglages, un lien mort se dit ; voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
