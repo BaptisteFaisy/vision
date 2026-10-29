@@ -187,16 +187,17 @@ jobs:
 
       # Tests du backend Python, seulement quand `server/` est touché. Les runners
       # self-hosted (Debian 13) n'ont ni pip, ni ensurepip, ni build setup-python
-      # (« was not found for Debian 13 ») : on installe pip dans `~/.local` via
-      # get-pip.py (jamais le système), puis les paquets en `--user`. Idempotent :
-      # ~1 min au premier run d'un runner, ~10 s ensuite (tout persiste).
+      # (« was not found for Debian 13 »), et pip refuse même `--user`
+      # (externally-managed) : venv sans pip + get-pip.py dedans (jamais le
+      # système). ~1 min par run (pas de cache : chaque run repart d'un venv neuf).
       - name: Tests unitaires backend
         if: steps.perimetre.outputs.backend == '1'
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          command -v pip3 >/dev/null || curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --user
-          pip3 install --quiet --user -r server/scripts/requirements-test.txt
-          python3 server/scripts/test_units.py
+          VENV="$RUNNER_TEMP/venv-backend"
+          python3 -m venv --without-pip "$VENV"
+          curl -sS https://bootstrap.pypa.io/get-pip.py | "$VENV/bin/python" -
+          "$VENV/bin/pip" install --quiet -r server/scripts/requirements-test.txt
+          "$VENV/bin/python" server/scripts/test_units.py
 
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
