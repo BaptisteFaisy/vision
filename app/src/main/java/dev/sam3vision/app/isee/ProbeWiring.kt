@@ -6,6 +6,7 @@ import dev.sam3vision.app.debugModelsLine
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbWatcher
+import dev.sam3vision.core.curb.SidewalkWatcher
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
@@ -225,22 +226,51 @@ internal fun LiveProbe.observeDetour(scope: CoroutineScope, onDetour: (Boolean, 
 internal fun LiveProbe.steeringCueOf(): SteeringCue? =
     if (state.value.crossingActive) null else voice.cue()
 
-/** Les trois guetteurs de la sonde (trottoir + escaliers + mobilier), reset commun. */
+/**
+ * Guetteur trottoir-nommé de la sonde, miroir des dangers : la position lue
+ * dans la voix guidée (rien dans l'état ne porte le plan du trottoir, non
+ * mesuré), sans toucher à `LiveProbe`. L'annonce (« Trottoir à gauche. »)
+ * est douce (attend le silence) : une info de navigation, jamais une
+ * consigne — l'ordre de retour passe par les mots du guidage. Coupé en mode
+ * Traversée et guidage coupé (la voix des positions nomme déjà le trottoir).
+ * Lecture séquentielle, comme les dangers : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeSidewalk(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): SidewalkWatcher {
+    val watcher = SidewalkWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val position = this@observeSidewalk.voice.lastSidewalk
+            val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
+
+/** Les quatre guetteurs de la sonde (bordure + escaliers + mobilier + trottoir), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
     val hazard: HazardWatcher,
+    val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les trois guetteurs (nouvelle séance). */
+    /** Oublie les quatre guetteurs (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
         hazard.reset()
+        sidewalk.reset()
     }
 }
 
 /**
- * Les trois guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * Les quatre guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeCurb`, même contrat).
  */
 internal fun LiveProbe.observeHazards(
@@ -252,4 +282,5 @@ internal fun LiveProbe.observeHazards(
     observeCurb(scope, voice, playerIdle, language),
     observeStairs(scope, voice, playerIdle, language),
     observeHazard(scope, voice, playerIdle, language),
+    observeSidewalk(scope, voice, playerIdle, language),
 )
