@@ -1,8 +1,7 @@
 # scripts — tests, déploiement Modal, build Android
 
 Un script = un rôle. `lib-env.sh` est un helper *sourcé* (pas exécutable seul) :
-`PROJECT_ROOT`, `log/ok/warn/die`, `find_jdk` / `sdk_env` (Android) et le **chemin unique
-du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret create
+`PROJECT_ROOT`, `log/ok/warn/die` et le **chemin unique du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret create
 --from-json (avec écrasement)`, jamais de clé en argument).
 
 ## Tests
@@ -11,7 +10,6 @@ du secret** Modal (`sync_secret_from_env` : mktemp `chmod 600` → `modal secret
 |---|---|---|
 | `test_units.py` | tests unitaires backend sans GPU ni token (imagerie, masques PNG, prompts, app FastAPI pilotée en ASGI) ; sort ≠ 0 si échec | `python3 scripts/test_units.py` |
 | `test_api.py` | test E2E du contrat contre le backend déployé (stdlib seule) ; groupes `health`, `segment`, `segment-prompts`, `analyze`, `ask`, `bad-image`, `contract-errors` ; sort ≠ 0 si échec | `python3 scripts/test_api.py --url https://…modal.run --only contract-errors` |
-| `legacy-expo-app/tools/test-client.mjs` | tests du client Expo hors RN : parsing des 4 réponses, `api.ts` contre un serveur HTTP local, colorisation de masque pixel à pixel | `node legacy-expo-app/tools/test-client.mjs` |
 
 ## Déploiement Modal
 
@@ -36,23 +34,9 @@ Modal** : ni secret, ni déploiement). `MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAM
 | `test_units.py` + `tests_units/` | tests unitaires sans GPU (latence, fusion, poids, plomberie) | `python3 scripts/test_units.py` |
 | `probe_*.py`, `local_segment.py`, `baseten_sync.py` | sondes de mesure, segmentation locale, synchro Baseten | — |
 
-## App Android / Expo
+## App Android
 
-| Script | Rôle | Exemple |
-|---|---|---|
-| `install-android-sdk.sh` | installe/met à jour le SDK dans `~/Android/Sdk` sans root (idempotent ; `--minimal` sans NDK) | `./scripts/install-android-sdk.sh` |
-| `build-apk.sh` | `expo prebuild` si besoin puis Gradle ; APK dans `legacy-expo-app/android/app/build/outputs/apk/{release,debug}/` | `./scripts/build-apk.sh debug` |
-| `dev_qr.sh` | serveur Expo en tunnel pour tester dans Expo Go (installe `node_modules` si absent) | `./scripts/dev_qr.sh` |
-
-```bash
-./scripts/install-android-sdk.sh                 # une fois
-./scripts/build-apk.sh                           # release → app-release.apk
-./scripts/build-apk.sh debug                     # variante debug
-adb install -r legacy-expo-app/android/app/build/outputs/apk/release/app-release.apk
-./scripts/dev_qr.sh                              # ou : Expo Go + QR code
-```
-
-Prérequis : JDK 17+ **avec `javac`** (le JRE système n'en a pas ; `lib-env.sh` en trouve un dans
-`~/.gradle/jdks`). `build-apk.sh` exporte `ANDROID_HOME=~/Android/Sdk`, lance `expo prebuild` si
-`android/` manque, puis `./gradlew assembleRelease -x lint`. Signature : release signée avec le
-keystore *debug* (pas de keystore de prod) — suffisant pour tester, pas pour publier.
+L'APK ne se construit plus ici : l'app est native Kotlin à la racine du dépôt
+(`./gradlew :app:assembleDebug`, cf. `README.md` racine et `scripts/build.sh`). Les scripts
+`build-apk.sh`, `dev_qr.sh` et `install-android-sdk.sh` servaient l'app Expo **retirée de
+l'arbre le 29/10/2026** (historique git : `git log -- server/legacy-expo-app`).
