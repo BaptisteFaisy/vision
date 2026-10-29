@@ -89,9 +89,10 @@ internal fun LiveProbe.configureFrom(
  * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
  * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
- * mot stop) : seul « Stop. » coupe la lecture en cours, chat compris — les
- * mots doux attendent le silence. Le flag ne change qu'avec la phrase, donc
- * la paire reste aussi stable que la phrase seule.
+ * mot stop) : seul le stop coupe la lecture en cours, chat compris
+ * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » SAM urgence externe) —
+ * les mots doux attendent le silence. Le flag ne change qu'avec la phrase,
+ * donc la paire reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
