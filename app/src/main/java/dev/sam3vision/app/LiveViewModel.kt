@@ -151,9 +151,10 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         settings = { settings },
         llm = { llmClient(it) },
         windowMs = MEMORY_WINDOW_MS,
+        restart = { restart(it) },
     )
 
-    /** Voix du direct : « Parler » pose la question sur le flux, sans clavier. */
+    /** Voix du direct : « Parler » pose la question sur le flux (mot maison seul = chasse SAM), sans clavier. */
     private val liveVoice = LiveVoice(
         app = app,
         scope = viewModelScope,
@@ -236,8 +237,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         trackFallback.reset()
         traverse.reset()
         val chosen = LivePrompts.normalize(prompts)
-        // Journal et historique de questions : vidés par `asker.reset()` (une seule
-        // implémentation de « la mémoire du direct s'efface », partagée avec `stop()`).
+        // Journal et historique : vidés par `asker.reset()` (implémentation unique, partagée avec `stop()`).
         asker.reset()
         distances.enabled = settings.distanceOverlayEnabled
         distances.reset()

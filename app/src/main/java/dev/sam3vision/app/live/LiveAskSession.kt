@@ -6,6 +6,7 @@ import dev.sam3vision.app.NO_FRAME_LINE
 import dev.sam3vision.app.focusLabel
 import dev.sam3vision.app.focusWindow
 import dev.sam3vision.app.timelineContextOrNull
+import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.net.LlmClient
@@ -40,6 +41,8 @@ class LiveAskSession(
     private val llm: (Settings) -> LlmClient,
     /** Fenêtre du journal envoyée au LLM : 30 s suffisent pour « il y a 5 s ». */
     private val windowMs: Long,
+    /** Chasse SAM d'un mot maison seul : relance le direct, jamais le LLM. */
+    private val restart: (List<String>) -> Unit = {},
 ) {
 
     /** Historique envoyé au modèle, remis à zéro à chaque nouvelle séance. */
@@ -51,8 +54,17 @@ class LiveAskSession(
         timeline.clear()
     }
 
-    /** Question posée à l'écrit ou à la voix (« Parler ») : une seule à la fois. */
+    /**
+     * Question posée à l'écrit ou à la voix (« Parler ») : une seule à la fois.
+     * Un mot maison seul, mode maison et SAM allumé : chasse SAM directe (les
+     * positions parlées répondent), sans frame gardée, sans clé LLM, sans appel.
+     */
     fun ask(question: String) {
+        val hunt = HomeModes.voiceConcept(question, state.value.prompts, state.value.samEnabled)
+        if (hunt != null) {
+            restart(listOf(hunt))
+            return
+        }
         val text = question.trim()
         if (text.isEmpty() || state.value.memory.asking) return
         val jpeg = latestJpeg()
