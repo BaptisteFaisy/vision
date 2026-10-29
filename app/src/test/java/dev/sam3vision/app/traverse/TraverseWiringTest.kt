@@ -151,6 +151,23 @@ class TraverseWiringTest {
     }
 
     @Test
+    fun `le seau local reste vide hors mode actif`() {
+        // Sans activation il n'y a pas de seau : aucune frame n'est décodée pour rien.
+        val wiring = wiring()
+        wiring.offerLightFrame("jpeg")
+        assertEquals(null, wiring.local)
+    }
+
+    @Test
+    fun `offrir une frame hors mode ne casse rien`() {
+        val wiring = wiring()
+        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Red))
+        wiring.offerLightFrame("")
+        assertEquals(null, wiring.local)
+        assertEquals(CrossingState.Red, wiring.light?.state)
+    }
+
+    @Test
     fun `vert maintenu sans vehicule - traversez parle une fois`() = runBlocking {
         val tts = FakeTts()
         val wiring = voicedWiring(tts)

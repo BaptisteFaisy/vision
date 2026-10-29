@@ -153,7 +153,7 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
 internal fun rememberCrossingPump(viewModel: IseeViewModel): CrossingLocalLight {
     val scope = rememberCoroutineScope()
     return remember(viewModel) {
-        CrossingLocalLight(scope, Dispatchers.Default, boxOf = { viewModel.probe.state.value.crossingBox })
+        CrossingLightPump.install(scope, Dispatchers.Default) { viewModel.probe.state.value.crossingBox }
     }
 }
 

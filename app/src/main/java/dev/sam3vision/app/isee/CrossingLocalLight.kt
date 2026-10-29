@@ -67,3 +67,37 @@ internal fun readLight(jpegB64: String, box: List<Float>): CrossingState {
     val crop = CrossingPixels.frame(jpegB64, box) ?: return CrossingState.Unknown
     return PedLightGate.verdict(crop.argb, crop.width, crop.height)
 }
+
+/**
+ * Le seau **unique de l'écran iSee** : la caméra du téléphone et le pont des
+ * lunettes nourrissent le même seau, donc l'étiquette affichée vient de la
+ * dernière frame disponible, quelle que soit la source.
+ *
+ * Un objet de processus plutôt qu'un `remember` par carte : la rue des lunettes
+ * alimente la sonde depuis un autre composable que celui qui dessine l'overlay
+ * ([GlassesProbeWiring] vs [IseePortraitCamera]) — deux instances voudraient
+ * dire un seau qui ne reçoit jamais de frame.
+ */
+internal object CrossingLightPump {
+
+    @Volatile
+    private var pump: CrossingLocalLight? = null
+
+    /** Installe le seau une fois par session d'écran (idempotent). */
+    fun install(
+        scope: CoroutineScope,
+        background: CoroutineDispatcher,
+        boxOf: () -> List<Float>?,
+    ): CrossingLocalLight {
+        pump?.let { return it }
+        return CrossingLocalLight(scope, background, boxOf).also { pump = it }
+    }
+
+    /** Dernier seau installé (`null` avant la première carte caméra). */
+    val current: CrossingLocalLight? get() = pump
+
+    /** Frame caméra : lit la couleur si un seau existe et si le créneau est libre. */
+    fun offerFrame(jpegB64: String) {
+        pump?.offerFrame(jpegB64)
+    }
+}

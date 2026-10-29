@@ -17,6 +17,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Traversée : la lecture locale du feu partout, et le rappel vert mesuré
+
+- **Demande** : câbler le Direct et les lunettes sur le seau local à 150 ms, puis
+  s'attaquer au rappel vert.
+- `isee/CrossingLightPump` (objet, `CrossingLocalLight.kt`) : un seau **par écran**.
+  Nécessaire parce que la rue des lunettes alimente la sonde depuis
+  `GlassesProbeWiring`, pas depuis la carte caméra : deux `remember` auraient donné
+  un seau qui ne reçoit jamais de frame.
+- `traverse/TraverseWiring` : possède le seau du Direct (il possède déjà la boîte),
+  créé à l'activation, effacé à la coupure. `local` porte la dernière lecture.
+- `LiveViewModel.onFrame` : nourrit le seau et republie l'état à la cadence caméra
+  (une seule ligne : la garde des 500 lignes est à 498). `LiveScreen` dessine déjà
+  `crossing` / `crossingBox`, rien à y changer.
+- `GlassesProbeWiring` : même seau que le téléphone, nourri par le pont des lunettes.
+- `docs/MESURES-SAM3-FEUX.md` §6 : trois tentatives de rappel vert mesurées sur les
+  mêmes 16 crops — crop sur la tache verte et crop sur la lentille allumée
+  **n'améliorent pas** (1/6 et 2/6) et **introduisent un faux vert** (un bras de
+  bonhomme debout, élongation 6,50). Recommandation : ne pas toucher
+  `ELONGATION_MIN`, collecter d'abord.
+- **Preuves** : `:app` 1 059 tests, 0 échec ; `check-kotlin-limits` OK.
+
 ## 2026-10-29 — Traversée : la couleur du feu se relit localement, ≤ 150 ms
 
 - **Demande** : que la reconnaissance du feu ne dépende pas de la cadence du
