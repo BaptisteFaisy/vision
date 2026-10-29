@@ -85,11 +85,26 @@ LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COM
 
 
 def lever_env() -> dict:
-    """Env de l'image : PYTHONPATH + les leviers positionnés au déploiement."""
+    """Env de l'image : PYTHONPATH + les leviers positionnés au déploiement.
+
+    Poids 100 % locaux (``FAST_MODEL_DIR`` + ``local_files_only``) : le Hub n'est
+    jamais touché au boot, les interrupteurs offline ne changent donc que le
+    comportement réseau, pas le chargement. Mesuré : ``import transformers`` =
+    12,1 s pile sur deux boots (attente réseau probable) — ces vars visent à la
+    tuer. ``PYTHONPROFILEIMPORTTIME=1`` est un diagnostic temporaire (un seul
+    déploiement) : il nomme le sous-module des 12 s dans les logs Modal.
+    """
     values = {name: os.environ.get(name, "") for name in LEVER_NAMES}
     values["PYTHONPATH"] = "/root:/root/backend_src"
     values["BACKEND_PLATFORM"] = "modal"
     values["FAST_MODEL_DIR"] = MODEL_DIR
+    # Boot offline : zéro appel réseau pendant les imports (poids déjà locaux).
+    values["HF_HUB_OFFLINE"] = "1"
+    values["TRANSFORMERS_OFFLINE"] = "1"
+    values["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    values["TOKENIZERS_PARALLELISM"] = "false"
+    # Diagnostic temporaire : détail des imports (retirer au prochain déploiement).
+    values["PYTHONPROFILEIMPORTTIME"] = "1"
     return values
 
 
