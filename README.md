@@ -227,7 +227,6 @@ State accuracy on the 9 photos with an unambiguous ground truth: **7/9, zero red
 errors**. The two misses are ground-level LED strips, not signal heads. End-to-end cost:
 **0.71 s/image** for four prompts, once the vision embedding is shared across prompts.
 
-
 ## CI and merge queue
 
 - **PRs**: a single `ci` job (guards + JVM tests) + `ci-budget` (≤ 5 min) + `couche0`
