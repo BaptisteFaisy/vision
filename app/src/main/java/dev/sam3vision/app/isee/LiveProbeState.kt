@@ -51,6 +51,12 @@ data class LiveProbeState(
     val crossingActive: Boolean = false,
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
     val crossing: dev.sam3vision.core.crossing.CrossingState? = null,
+    /**
+     * Boîte normalisée du feu de la dernière frame (`x1,y1,x2,y2` en 0..1), pour
+     * poser l'état **sur la vidéo** ([CrossingOverlayLayer]). `null` = aucun feu
+     * dans le champ, ou mode coupé : rien à marquer.
+     */
+    val crossingBox: List<Float>? = null,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,

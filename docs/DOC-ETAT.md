@@ -9,7 +9,7 @@ plus l'arbre — bandeau ajouté).
 | Document | Verdict | Ce qui a été vérifié / corrigé ici |
 |---|---|---|
 | `docs/MESURES-SAM3-FEUX.md` | **nouveau** (29/10), **relevé hors arbre** | Deux mesures : rappel SAM 3.1 (87,5 % avec `pedestrian traffic light`, 12,5 % avec un prompt d'état) et **`PedLightGate` exécutée sur de vrais crops SAM** — 1 vert sur 6 signaux verts, rejet par `ELONGATION_MIN`, et l'ordre des élongations est inversé entre vert réel (≤ 1,11) et disque voiture (≥ 1,30) : le seuil ne peut pas être réglé, l'hypothèse « la boîte SAM serre la lampe » tombe. Harnais contrôlé 9/9 sur `feuxfr/`. Images non versionnées, attribution au §8 |
-| `docs/TRAVERSEE.md` | **nouveau** (28/10) | Bilan traversée : recherche 10 angles, PR #163-167 + #174, dépendances in-app vs `/live`, preuves JVM, 4 restes bloquants listés |
+| `docs/TRAVERSEE.md` | **à jour** (28/10, §7 ajouté le 29/10) | Bilan traversée : recherche 10 angles, PR #163-167 + #174, dépendances in-app vs `/live`, preuves JVM, 4 restes bloquants listés ; §7 = ce que la vidéo montre (cadre du feu + étiquette, `CrossingOverlayLayout` / `CrossingOverlayLayer`) |
 | `README.md` | **réécrit** (28/10) | Problème, solution, 4 blocs, stack complète ; chiffres remesurés (733 `.kt`, 43 457 lignes de prod, 2 202 `@Test` JVM + 10 instrumentés) ; backend dans `server/`, gestes sans double tap |
 | `docs/ARCHITECTURE.md` | **recompté** (28/10, §1 + §8) | Comptes §1 refaits, §8 réécrit (backend dans `server/`, `LIVE-SPEC` existe, tracker et `/video` câblés) ; §2-7 : valeurs vraies, lignes non recalées |
 | `docs/PERF.md` | **recompté** (28/10) | §1.1 refait (733 / 76 990 / 2 202 / 10), §2 ancres recalées (dont `work_edge` 512), §4 réécrit (mesures backend dans `server/docs/`) |

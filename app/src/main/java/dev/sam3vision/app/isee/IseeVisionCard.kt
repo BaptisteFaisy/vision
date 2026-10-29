@@ -165,6 +165,13 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     SteeringLayer(probe.steering)
     val twinUi by viewModel.twinlite.ui.collectAsState()
     TwinLiteLayer(twinUi)
+    CrossingOverlayLayer(
+        active = probe.crossingActive,
+        box = probe.crossingBox,
+        state = probe.crossing,
+        frameWidth = probe.width,
+        frameHeight = probe.height,
+    )
 }
 
 /** Point bleu « REC » sur la chip de la carte pendant l'enregistrement. */
@@ -193,12 +200,8 @@ private fun RecordingChip() {
  */
 @Composable
 private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
-    val dot = when {
-        !probe.crossingActive -> Color(0xFF808080)
-        probe.crossing == dev.sam3vision.core.crossing.CrossingState.Green -> Color(0xFF2ECC71)
-        probe.crossing == dev.sam3vision.core.crossing.CrossingState.Red -> Color(0xFFE74C3C)
-        else -> Color(0xFFF1C40F)
-    }
+    // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
+    val dot = Color(crossingAccent(probe.crossingActive, probe.crossing))
     Row(
         modifier
             .padding(8.dp)

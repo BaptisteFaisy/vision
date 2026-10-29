@@ -90,3 +90,31 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
    feux réels (2 disques de profil passent, cas frontal couvert) —
    reste la preuve sur crops SAM réels (cadrage exact inconnu).
 4. **Rappel SAM** sur feux piétons FR jamais mesuré (inconnue n° 1).
+
+## 7. Ce que la vidéo montre (29/10)
+
+L'état du feu n'est plus seulement une pastille en bas de carte et une phrase :
+il est **posé sur l'image**, au même endroit que les masques SAM. Un cadre de la
+couleur de l'état et une étiquette courte (`VERT`, `ROUGE`, `DOUTE`) désignent
+le feu qui vient d'être lu.
+
+- placement : `isee/CrossingOverlayLayout.kt` — `lightMarker` reprend la
+  transformation des pastilles de distance (`cropTransform`, `ContentScale.Crop`),
+  donc le cadre tombe sur les mêmes pixels que les masques ; `tagRect` met
+  l'étiquette au-dessus du cadre, ou en dessous quand le feu touche le haut, et
+  la ramène dans l'écran ;
+- dessin : `isee/CrossingOverlayLayer.kt` — cadre de 2,5 dp, pas de rectangle
+  plein (même règle que les distances : la couleur désigne l'objet, elle ne
+  masque pas l'image) ;
+- source unique de la couleur et du mot : `crossingAccent` / `crossingTag`,
+  réutilisés par la pastille de carte — deux surfaces, un seul vocabulaire ;
+- rien de dessiné quand le mode est coupé ou qu'aucun feu n'est dans le champ :
+  un cadre vide mentirait sur la position du feu.
+
+Le doute est le seul écart de vocabulaire assumé : la pastille écrit « … » (rien
+d'annoncé pour l'instant), le cadre écrit `DOUTE` (un feu est là, on ne sait pas
+lequel des trois états). Vérifié par `CrossingOverlayLayoutTest`.
+
+**Ce que ça ne prouve pas** : que le cadre tombe juste sur un téléphone réel. Le
+placement est testé en JVM sur des cadres simulés, pas sur une frame capturée —
+même limite que les distances, dont la recette appareil reste à faire.
