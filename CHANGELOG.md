@@ -17,6 +17,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Traversée : la couleur du feu se relit localement, ≤ 150 ms
+
+- **Demande** : que la reconnaissance du feu ne dépende pas de la cadence du
+  direct (350/500/900 ms) ni de l'aller-retour.
+- `core/live/LightClock.kt` (**nouveau**, pur) : seau de 150 ms, l'instant est
+  toujours passé en argument — testé en JVM (`LightClockTest`, 6 tests).
+- `isee/CrossingLocalLight.kt` (**nouveau**) : sur chaque frame caméra, si une
+  boîte serveur est connue et si le créneau est libre, crop + `PedLightGate`
+  sur `Dispatchers.Default` et publication d'un `StateFlow`. La lecture est
+  injectable : les tests JVM n'ont pas besoin d'Android (7 tests).
+- `isee/IseeVisionCard.kt` : la couleur vient du seau local quand il a parlé,
+  la boîte du dernier passage serveur (`CrossingOnVideo`). Le seau est créé
+  une fois par carte (`rememberCrossingPump`) et alimenté dans le callback
+  caméra, à côté de `twinlite.offerFrame`.
+- **Pourquoi deux cadences** : la couleur se périme (150 ms), la position non
+  (un feu ne se déplace pas). L'état affiché cesse d'avoir l'âge de l'A/R.
+- Lunettes : pas encore de seau local (frames du pont), l'affichage y garde
+  l'état du serveur.
+- **Preuves** : `LightClockTest` 6, `CrossingLocalLightTest` 7 ; `:core`
+  1 796 tests + `:app` 1 042, 0 échec ; `check-kotlin-limits` OK.
+- **Limite dite tout haut** : plus frais n'est pas plus juste. La mesure du
+  jour donne 1 vert accepté sur 6 (`docs/MESURES-SAM3-FEUX.md` §6) — c'est ce
+  chiffre-là qu'il faut bouger ensuite, pas la cadence.
 
 ## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
 
