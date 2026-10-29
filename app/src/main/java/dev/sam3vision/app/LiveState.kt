@@ -1,6 +1,7 @@
 package dev.sam3vision.app
 
 import dev.sam3vision.app.live.PredictionLayer
+import dev.sam3vision.app.live.TrailLayer
 import dev.sam3vision.app.live.runAsFrame
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
@@ -84,6 +85,11 @@ data class LiveUiState(
      * masques seuls.
      */
     val prediction: PredictionLayer = PredictionLayer(),
+    /**
+     * Chemins centraux des objets suivis : trajectoire du centre de chaque boîte
+     * identifiée, dans la couleur de son masque (`null` = rien à tracer).
+     */
+    val trails: TrailLayer? = null,
     /** Dernière phrase dite par la voix (positions ou picto) : affichée comme sous-titre. */
     val spoken: String? = null,
     /** Porteur de la dernière frame JPEG (identité seule : rien à copier d'une frame à l'autre). */
