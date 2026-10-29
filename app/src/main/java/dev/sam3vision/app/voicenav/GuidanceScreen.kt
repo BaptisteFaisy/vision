@@ -48,13 +48,19 @@ fun GuidanceScreen(
             fontWeight = FontWeight.Bold,
             lineHeight = 38.sp,
         )
-        Text(
-            state.update.maneuverFr(),
-            color = AppColors.primary,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
+        if (state.summary == null && !state.update.arrived) {
+            // Résumé inconnu (chargeur en échec, moteur parti quand même) :
+            // « calcul en cours », jamais des zéros (« Dans 0 m »).
+            Text("Calcul de l'itinéraire…", color = AppColors.textMuted, fontSize = 20.sp)
+        } else {
+            Text(
+                state.update.maneuverFr(),
+                color = AppColors.primary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
+        }
         GuidanceProgress(state)
         Spacer(Modifier.weight(1f))
         Button(

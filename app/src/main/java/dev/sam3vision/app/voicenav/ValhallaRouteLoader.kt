@@ -15,8 +15,10 @@ import kotlinx.coroutines.withTimeout
  * géocodage (chaîne GMS puis BAN) → itinéraire piéton depuis [originNow].
  *
  * - géocodage en échec → échec (son message français, affiché tel quel) ;
- * - sans position de départ ou sans URL Valhalla → résumé adresse seule
- *   (distance et durée à zéro, l'écran montre la destination) ;
+ * - sans position de départ → échec « position de départ indisponible
+ *   (activez la localisation) » ; sans URL Valhalla → échec « service
+ *   d'itinéraire non configuré » (jamais de résumé à zéro : des zéros
+ *   affichés comme des distances mentent — « Dans 0 m ») ;
  * - appel `/route` : 2 tentatives max (1 essai + 1 reprise), chacune bornée
  *   à [ROUTE_TIMEOUT_SECONDS] ; échec final → échec « itinéraire
  *   indisponible (motif) » (l'écran montre l'adresse + le motif, et
@@ -42,7 +44,7 @@ class ValhallaRouteLoader(
         val origin = runCatching { originNow() }.getOrNull()
         val base = runCatching { baseUrl().trim().trimEnd('/') }.getOrDefault("")
         if (origin == null || base.isNullOrBlank()) {
-            return Result.success(RouteSummary(destination, place.label, 0, 0))
+            return Result.failure(missingInputFailure(origin == null))
         }
         val client = try {
             routeClient(base)
@@ -78,6 +80,19 @@ class ValhallaRouteLoader(
             Result.failure(t)
         }
 }
+
+/**
+ * Entrée manquante : motif français actionnable (jamais un résumé à zéro,
+ * que l'écran afficherait comme des distances — « Dans 0 m »).
+ */
+private fun missingInputFailure(noOrigin: Boolean): Throwable =
+    IllegalStateException(
+        if (noOrigin) {
+            "position de départ indisponible (activez la localisation)"
+        } else {
+            "service d'itinéraire non configuré"
+        },
+    )
 
 /** Échec `/route` final : motif français actionnable pour l'écran. */
 private fun routeFailure(cause: Throwable): Throwable {
