@@ -3,6 +3,20 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
+
+- `sidewalk` segmente le plan entier : marcher SUR le trottoir remplissait la
+  bande basse et déclenchait l'alerte ( + 10 s de TwinLite tu à chaque fois).
+- Affinage plan vs bord (`CurbSignal`) : labels de plan (`isGround`) — montée
+  = bas décollé des pieds (< 0,95), descente = bas aux pieds mais haut borné
+  (≥ 0,5), sinon sol ignoré ; labels de bord (`curb`…) : règle inchangée.
+  Seuils priors à valider sur captures téléphone ; en cas de doute ça parle.
+- Preuves : `:core` `testDebugUnitTest` vert sur r630 (`CurbWatcherTest` 16/16
+  dont 5 nouveaux : plan sous les pieds, montée, descente, bordure au pied,
+  seuils), `:core` + `:app` verts, `assembleDebug` vert, `check-kotlin-limits`
+  OK. Rouge-avant-vérifié (2 échecs voulus).
+- Fichiers : `CurbWatcher.kt` (+ test).
+
 ## 2026-10-29 — iSee : trottoir/escaliers prioritaires sur la voix TwinLite (ordre user)
 
 - TwinLiteNet ne voit que le sol ; SAM nomme les dangers (trottoir, escaliers
