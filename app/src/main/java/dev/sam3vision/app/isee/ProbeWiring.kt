@@ -7,6 +7,8 @@ import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.hazard.HazardSignal
+import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -85,9 +87,9 @@ internal fun LiveProbe.configureFrom(
  * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
  * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
- * mot du guidage) : un mot coupe la lecture en cours, chat compris. Le flag
- * ne change qu'avec la phrase, donc la paire reste aussi stable que la phrase
- * seule.
+ * mot stop) : seul « Stop. » coupe la lecture en cours, chat compris — les
+ * mots doux attendent le silence. Le flag ne change qu'avec la phrase, donc
+ * la paire reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -110,9 +112,10 @@ internal fun LiveProbe.observeSpoken(
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
  * guetteur pour le `reset()` de début de séance. Coupé en mode Traversée (sa
- * voix rouge/vert est propriétaire du son) ; l'alerte est urgente (coupe).
- * Lecture séquentielle (`collect`) : une alerte confirmée est rare, et elle ne
- * doit pas être annulée par la frame suivante.
+ * voix rouge/vert est propriétaire du son) ; l'alerte est douce (attend le
+ * silence) — seule l'urgence (stop) coupe. Lecture séquentielle (`collect`) :
+ * une alerte confirmée est rare, et elle ne doit pas être annulée par la
+ * frame suivante.
  */
 internal fun LiveProbe.observeCurb(
     scope: CoroutineScope,
@@ -127,7 +130,7 @@ internal fun LiveProbe.observeCurb(
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = CurbSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
         }
     }
     return watcher
@@ -138,7 +141,7 @@ internal fun LiveProbe.observeCurb(
  * « stairs » lus dans l'état (lectures de distance + dimensions, déjà
  * publiées par frame), sans toucher à `LiveProbe`. Le sens vient des mots du
  * libellé (« stairs going up », exact) sinon de la hauteur de la boîte
- * ([StairLabelSignals]) ; l'annonce est urgente (coupe) mais reste une info
+ * ([StairLabelSignals]) ; l'annonce est douce (attend le silence) : une info
  * de navigation, jamais une consigne d'évitement. Coupé en mode Traversée.
  * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
  */
@@ -163,26 +166,55 @@ internal fun LiveProbe.observeStairs(
             }
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction)
                 ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = true)
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
         }
     }
     return watcher
 }
 
-/** Les deux guetteurs de la sonde (trottoir + escaliers), reset commun. */
+/**
+ * Guetteur mobilier de la sonde, miroir du trottoir : le mobilier suivi
+ * ([dev.sam3vision.core.hazard.HazardConcepts]) lu dans l'état, sans toucher
+ * à `LiveProbe` (lectures de distance + dimensions, déjà publiées par
+ * frame). L'annonce (« Attention à la barrière. ») est douce (attend le
+ * silence) : iSee décrit, en douceur. Coupé en mode Traversée. Lecture
+ * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeHazard(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): HazardWatcher {
+    val watcher = HazardWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val signal = HazardSignal.of(readings, st.width, st.height)
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
+
+/** Les trois guetteurs de la sonde (trottoir + escaliers + mobilier), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
+    val hazard: HazardWatcher,
 ) {
-    /** Oublie les deux guetteurs (nouvelle séance). */
+    /** Oublie les trois guetteurs (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
+        hazard.reset()
     }
 }
 
 /**
- * Les deux guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * Les trois guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeCurb`, même contrat).
  */
 internal fun LiveProbe.observeHazards(
@@ -193,4 +225,5 @@ internal fun LiveProbe.observeHazards(
 ): ProbeHazards = ProbeHazards(
     observeCurb(scope, voice, playerIdle, language),
     observeStairs(scope, voice, playerIdle, language),
+    observeHazard(scope, voice, playerIdle, language),
 )

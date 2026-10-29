@@ -99,7 +99,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()))
 
-    /** Guetteurs trottoir + escaliers, posés par `observeHazards` (reset à chaque début de séance). */
+    /** Guetteurs trottoir + escaliers + mobilier, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
 
     /** Voix de l'intro (le texte écrit, lui, ne part jamais). */

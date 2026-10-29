@@ -2,7 +2,9 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Les quatre mots : textes FR/EN (miroir du catalogue), clips, clés, caps. */
@@ -56,5 +58,15 @@ class GuidanceWordTest {
         assertEquals("guide_stop", GuidanceWord.clipIdFor("Stop."))
         assertNull(GuidanceWord.clipIdFor("Personne à 9 heures."))
         assertNull(GuidanceWord.clipIdFor(""))
+    }
+
+    @Test
+    fun `seul stop coupe`() {
+        assertTrue(GuidanceWord.isStopPhrase("Stop."))
+        assertTrue(GuidanceWord.isStopPhrase(GuidanceWord.Stop.text(SpeechLanguage.Fr)))
+        assertTrue(GuidanceWord.isStopPhrase(GuidanceWord.Stop.text(SpeechLanguage.En)))
+        assertFalse(GuidanceWord.isStopPhrase("Gauche."))
+        assertFalse(GuidanceWord.isStopPhrase("Straight."))
+        assertFalse(GuidanceWord.isStopPhrase("Personne à 9 heures."))
     }
 }
