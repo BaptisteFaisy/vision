@@ -79,7 +79,7 @@ class IseeVoiceNav(
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
             // Pas de départ surprise : la destination dictée ouvre l'écran de
-            // confirmation (« Destination : X », bouton Démarrer) — le guidage
+            // confirmation (question vocale + bouton Démarrer) — le guidage
             // ne démarre qu'après un objectif explicite (autoStartOnVoice=false).
         )
     }

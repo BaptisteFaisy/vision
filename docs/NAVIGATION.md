@@ -68,8 +68,9 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 
 Depuis le 29/10, `app/.../voicenav/` n'ouvre que la confirmation :
 dictée → `VoiceNavSession.onVoiceTranscript` → écran `DestinationConfirmScreen`
-(« Destination : X » + résumé + « Démarrer » / « Annuler ») ; le moteur
-Valhalla ne démarre qu'au bouton « Démarrer ». Le départ direct sans bouton
+(question vocale « Do you really want to go to X? … » + résumé +
+« Démarrer » / « Annuler ») ; le moteur Valhalla ne démarre qu'au « yes »
+vocal ou au bouton « Démarrer ». Le départ direct sans bouton
 (`autoStartOnVoice = true`, du 28/10) est abandonné : une question ou une
 dictée malentendue devenait un guidage, sans recours autre que l'ordre stop.
 Si le moteur ne peut pas démarrer (adresse, GPS, réseau, itinéraire), repli

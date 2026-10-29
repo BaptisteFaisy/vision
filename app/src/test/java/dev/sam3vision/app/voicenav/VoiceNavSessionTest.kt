@@ -11,6 +11,9 @@ import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.NavigationRouter
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +42,11 @@ class VoiceNavSessionTest {
 
     private val spoken = mutableListOf<String>()
     private val summary = RouteSummary("la gare", "Place Louis-Armand, Paris", 2450, 900)
+    private val questionGare =
+        "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no."
+    private val questionTour =
+        "Do you really want to go to la tour Eiffel? Travel time: 15 minutes. Answer yes or no."
+    private val questionTourNoTime = "Do you really want to go to la tour Eiffel? Answer yes or no."
 
     private fun session(
         launcher: FakeLauncher = FakeLauncher(),
@@ -77,7 +85,7 @@ class VoiceNavSessionTest {
         assertEquals("la gare", state.destination)
         assertEquals(summary, state.summary)
         assertFalse(state.loading)
-        assertEquals(listOf("Destination : la gare"), spoken)
+        assertEquals(listOf(questionGare), spoken)
     }
 
     @Test
@@ -90,7 +98,7 @@ class VoiceNavSessionTest {
         assertEquals("la tour Eiffel", state.destination)
         assertEquals(null, state.summary)
         assertEquals("moteur coupé", state.error)
-        assertEquals(listOf("Destination : la tour Eiffel"), spoken)
+        assertEquals(listOf(questionTourNoTime), spoken)
     }
 
     @Test
@@ -105,7 +113,7 @@ class VoiceNavSessionTest {
         assertEquals("la gare", state.destination)
         assertEquals("Direction la gare", state.update.instruction)
         assertTrue(launcher.launched.isEmpty())
-        assertEquals(listOf("Destination : la gare"), spoken)
+        assertEquals(listOf(questionGare), spoken)
     }
 
     @Test
@@ -119,7 +127,7 @@ class VoiceNavSessionTest {
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
         assertEquals(listOf(TravelMode.WALK), launcher.modes)
-        assertEquals(listOf("Destination : la gare", "Navigation vers la gare"), spoken)
+        assertEquals(listOf(questionGare, "Navigation vers la gare"), spoken)
     }
 
     @Test
@@ -146,7 +154,7 @@ class VoiceNavSessionTest {
         assertTrue(launcher.launched.isEmpty())
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(
-            listOf("Destination : la tour Eiffel", "Voici la fiche de la tour Eiffel"),
+            listOf(questionTour, "Voici la fiche de la tour Eiffel"),
             spoken,
         )
     }
@@ -161,7 +169,7 @@ class VoiceNavSessionTest {
         val state = session.state.value as VoiceNavUiState.Confirming
         assertEquals(NavigationPhrases.GUIDANCE_UNAVAILABLE, state.error)
         assertEquals(
-            listOf("Destination : la gare", NavigationPhrases.GUIDANCE_UNAVAILABLE),
+            listOf(questionGare, NavigationPhrases.GUIDANCE_UNAVAILABLE),
             spoken,
         )
     }
@@ -176,6 +184,60 @@ class VoiceNavSessionTest {
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `yes vocal demarre le guidage depuis la confirmation`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher)
+        session.onVoiceTranscript("va à la gare")
+
+        assertTrue(session.onVoiceTranscript("yes"))
+
+        assertTrue(session.state.value is VoiceNavUiState.Guiding)
+        assertTrue(launcher.launched.isEmpty())
+        assertEquals(listOf(questionGare), spoken)
+    }
+
+    @Test
+    fun `no vocal annule avec accuse`() = runBlocking {
+        val session = session()
+        session.onVoiceTranscript("va à la gare")
+
+        assertTrue(session.onVoiceTranscript("non"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf(questionGare, "Cancelled."), spoken)
+    }
+
+    @Test
+    fun `oui hors confirmation n'est pas consomme`() = runBlocking {
+        val session = session()
+
+        assertFalse(session.onVoiceTranscript("oui"))
+        assertFalse(session.onVoiceTranscript("no"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `yes pendant le chargement fait patienter`() = runBlocking {
+        val gate = CompletableDeferred<Result<RouteSummary>>()
+        val session = session(loader = { gate.await() })
+        val opening = async { session.onVoiceTranscript("va à la gare") }
+        delay(50)
+
+        assertTrue(session.onVoiceTranscript("yes"))
+        assertEquals(listOf("Your route is still loading, one moment."), spoken)
+
+        gate.complete(Result.success(summary))
+        assertTrue(opening.await())
+        assertEquals(
+            listOf("Your route is still loading, one moment.", questionGare),
+            spoken,
+        )
+        assertTrue(session.state.value is VoiceNavUiState.Confirming)
     }
 
     @Test
