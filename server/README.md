@@ -33,7 +33,7 @@ L'app ne contient aucune clé API : elle appelle un backend FastAPI déployé su
 ```
 
 - **App** : Expo SDK stable, TypeScript, client API unique (`legacy-expo-app/src/api.ts`).
-- **Segmentation** : `unsloth/sam3.1` (miroir non gated de `facebook/sam3.1`), chargé via `transformers` dans `@modal.enter()`, masques encodés en PNG base64.
+- **Segmentation** : SAM 3.1 **officiel** — poids `facebook/sam3.1` (`sam3.1_multiplex.pt`, volume Modal `sam3-official`) + code natif Meta (`facebookresearch/sam3`), predictor multiplex construit dans `@modal.enter()`, masques encodés en PNG base64. (La route `/live` de `sam3-eu-a100` reste temporairement sur le miroir `transformers` `unsloth/sam3.1` — bascule par étapes, voir `docs/SPEC.md`.)
 - **LLM** : endpoint compatible OpenAI (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`), vision obligatoire, injecté par le secret Modal `sam3-llm`.
 
 Détail du flux et des routes : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -146,3 +146,7 @@ Un `keep_warm` évite les cold starts mais facture en continu.
 - **Android uniquement**, pas d'écran iOS prévu ; Expo Go ne teste pas les modules natifs custom (utiliser un build de dev).
 - **Pas d'authentification** sur le backend Modal : toute personne ayant l'URL peut consommer du GPU — à garder privée.
 - SAM 3.1 est un modèle de segmentation *promptable*, pas un détecteur exhaustif : les scores faibles doivent être filtrés côté client.
+
+## Crédit
+
+Backend SAM 3.1 officiel (poids Meta `facebook/sam3.1` + code natif) — **fait par Baptiste Faisy** (2026-10-29).

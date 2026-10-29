@@ -29,7 +29,7 @@ Toutes les routes sont `POST` sauf `/health` (`GET`). Content-Type JSON. Images 
      voulus dans le top 24.
 3. `POST /analyze`
    - corps : `{"image_b64": str}`
-   - réponse : `{"description": str, "tags": [str], "objects": [...]}` (mêmes objets que `/segment`, plus la description LLM qui cite explicitement les objets segmentés).
+   - réponse : `{"description": str, "tags": [str], "width": int, "height": int, "objects": [...]}` (mêmes objets que `/segment` + dimensions pour valider les boîtes, plus la description LLM qui cite explicitement les objets segmentés).
 4. `POST /ask`
    - corps : `{"image_b64": str, "question": str, "history": [{"role": "user"|"assistant", "content": str}] | null}`
    - réponse : `{"answer": str}`
@@ -38,11 +38,12 @@ Erreurs : HTTP 400 `{"detail": "..."}` pour image illisible, HTTP 500 sinon.
 
 ## Backend Modal
 
-- Modèle : `unsloth/sam3.1` (miroir NON gated de `facebook/sam3.1`), chargé via `transformers` (`Sam3Model` / `Sam3Processor` — vérifier la classe réellement exposée par la version de transformers installée et le champ `architectures` du config.json).
-- GPU : `A10G` par défaut ; chargement en `@modal.enter()` (image build : `transformers`, `torch`, `accelerate`, `Pillow`, `numpy`, `fastapi[standard]`).
+- Modèle : SAM 3.1 **officiel** — poids `facebook/sam3.1` (`sam3.1_multiplex.pt` + `config.json`, dépôt gated Meta, licence acceptée) + code natif `facebookresearch/sam3` (predictor multiplex, une image = une vidéo d'une frame). Le dépôt officiel ne contenant aucun poids `transformers`, le miroir `unsloth/sam3.1` ne sert plus à `/segment` ni `/analyze` (bascule 2026-10-29, `backend/segmentation_native.py`).
+- GPU : `A10G` par défaut ; predictor construit en `@modal.enter()` (image build : `torch`, `torchvision`, `transformers`, `accelerate`, `Pillow`, `numpy`, `fastapi[standard]`, + paquet `sam3` via git).
+- Poids : volume Modal `sam3-official` monté sur `/root/ckpts`, pré-rempli par `scripts/fetch_official_weights.py` (`modal run`, CPU) ; `fetch_checkpoint()` ne retélécharge que ce qui manque (repli si volume vide).
 - Masques encodés en PNG base64 (numpy → PIL), pas de RLE.
 - LLM : API compatible OpenAI (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). Vision obligatoire. Défaut : OpenRouter + modèle vision rapide.
-- Secrets Modal : `sam3-llm` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`). Aucune clé en dur, aucun fichier `.env` commité. Jamais de clé en argument de commande : passage par `--from-json` (`scripts/lib-env.sh` → `sync_secret_from_env`).
+- Secrets Modal : `sam3-llm` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`) + `huggingface` (`HF_TOKEN`, lecture du dépôt officiel gated). Aucune clé en dur, aucun fichier `.env` commité. Jamais de clé en argument de commande : passage par `--from-json` (`scripts/lib-env.sh` → `sync_secret_from_env`).
 - Bornes : `MAX_PROMPTS` 16, `MAX_PROMPT_CHARS` 64, `MAX_OBJECTS` 24 (tri par score décroissant puis **coupe silencieuse**, sans champ d'avertissement — voir le détail au § Contrat HTTP, `/segment`).
 - Fichiers < 500 lignes, fonctions < 50 lignes, pas de duplication (helpers partagés : décodage image, encodage masque, appel LLM).
 

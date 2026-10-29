@@ -27,7 +27,8 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.modules.setdefault("test_units", sys.modules["__main__"])
 
-from tests_units import latency_tests, live_fast_tests, merge_tests, weights_tests  # noqa: E402
+from tests_units import (latency_tests, live_fast_tests, llm_tests, merge_tests,  # noqa: E402
+                         native_tests, weights_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -84,6 +85,7 @@ def install_stubs() -> None:
         # Concurrence d'entrée dans un conteneur (@modal.concurrent(max_inputs=2)).
         concurrent=_identity,
         Secret=types.SimpleNamespace(from_name=_identity),
+        Volume=types.SimpleNamespace(from_name=_identity),
     )
     stub_module("openai", OpenAI=types.SimpleNamespace)
 
@@ -436,6 +438,15 @@ RUNNERS = (
     ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
+    ("natif : source officielle", "segmentation_native", native_tests.test_native_source),
+    ("natif : image conteneur (sam3 + deps)", "modal_app", native_tests.test_native_image),
+    ("natif : récupération des poids", "segmentation_native", native_tests.test_native_fetch),
+    ("natif : sorties multiplex → entrées", "segmentation_native",
+     native_tests.test_native_entries),
+    ("natif : segmentation de bout en bout", "segmentation_native",
+     native_tests.test_native_flow),
+    ("contrat HTTP (payload /analyze)", "modal_app", native_tests.test_analyze_shape),
+    ("llm : budget unique", "llm", llm_tests.test_llm_budget),
 )
 
 

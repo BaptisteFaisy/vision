@@ -1,8 +1,9 @@
 """Modal backend for sam3-vision: SAM 3.1 segmentation + vision LLM.
 
 HTTP contract (docs/SPEC.md): GET /health, POST /segment, /analyze, /ask.
+Segmentation = SAM 3.1 **officiel** (code natif Meta + ``facebook/sam3.1``).
 
-Only ``modal`` is imported at module level: torch, transformers, PIL, fastapi
+Only ``modal`` is imported at module level: torch, sam3, PIL, fastapi
 and openai are imported inside the container-side functions, so this module
 stays importable locally (py_compile, ``import modal_app``) without a GPU stack.
 """
@@ -17,6 +18,7 @@ from pathlib import Path
 import modal
 
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
+from segmentation_native import CKPT_DIR, HF_SECRET_NAME, VOLUME_NAME
 
 APP_NAME = "sam3-vision"
 LLM_SECRET_NAME = "sam3-llm"
@@ -27,6 +29,19 @@ BACKEND_DIR = Path(__file__).resolve().parent
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install_from_requirements(str(BACKEND_DIR / "requirements.txt"))
+    # Paquet natif Meta (segmentation officielle) : apt après la couche pip pour
+    # garder le cache torch valide. Même liste que track_app.py (éprouvée) : le
+    # paquet sam3 ne déclare pas ses dépendances — sans elles, `import sam3`
+    # échoue au démarrage (`pkg_resources`, constaté le 2026-10-29).
+    .apt_install("git")
+    .pip_install(
+        "git+https://github.com/facebookresearch/sam3.git",
+        "einops",
+        "pycocotools",
+        "hydra-core",
+        "opencv-python-headless",
+        "setuptools<80",
+    )
     # .env() is a build step: it must run *before* add_local_* (Modal rule).
     .env({"PYTHONPATH": "/root:/root/backend_src"})
     .add_local_dir(str(BACKEND_DIR), remote_path="/root/backend_src")
@@ -47,7 +62,9 @@ def _labels(objects: list[dict]) -> list[str]:
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
-    secrets=[modal.Secret.from_name(LLM_SECRET_NAME)],
+    secrets=[modal.Secret.from_name(LLM_SECRET_NAME),
+             modal.Secret.from_name(HF_SECRET_NAME)],
+    volumes={CKPT_DIR: modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)},
     timeout=600,
     startup_timeout=900,
     scaledown_window=300,
@@ -57,34 +74,38 @@ class Sam3Service:
 
     @modal.enter()
     def load(self) -> None:
-        """Load SAM 3.1 + processor exactly once per container."""
-        from segmentation import load_model
+        """Poids officiels (volume, sinon dépôt) + predictor multiplex, une fois."""
+        from segmentation_native import build_predictor, fetch_checkpoint
 
-        self.model, self.processor, self.device, self.dtype = load_model()
+        self.fetch_s = fetch_checkpoint()
+        self.predictor, self.build_s = build_predictor()
         self._gpu_lock = threading.Lock()
 
     # ---- blocking pipelines, always executed from a worker thread ----
 
     def _segment_sync(self, image_b64: str, prompts) -> dict:
-        """Decode the image, then run SAM 3.1 (serialised on the GPU lock)."""
+        """Decode the image, then run official SAM 3.1 (serialised on the GPU lock)."""
         from imaging import decode_image
-        from segmentation import run_segmentation
+        from segmentation_native import run_segmentation_native
 
         image = decode_image(image_b64)
         with self._gpu_lock:
-            return run_segmentation(self.model, self.processor, self.device, self.dtype, image, prompts)
+            return run_segmentation_native(self.predictor, image, prompts)
 
     def _analyze_sync(self, image_b64: str) -> dict:
         """Segment with the default concepts, then describe the photo with the LLM."""
         from imaging import decode_image, to_llm_data_url
         from llm import describe_image, settings_from_env
-        from segmentation import run_segmentation
+        from segmentation_native import run_segmentation_native
 
         image = decode_image(image_b64)
         with self._gpu_lock:
-            result = run_segmentation(self.model, self.processor, self.device, self.dtype, image, None)
+            result = run_segmentation_native(self.predictor, image, None)
         description, tags = describe_image(to_llm_data_url(image), _labels(result["objects"]), settings_from_env())
-        return {"description": description, "tags": tags, "objects": result["objects"]}
+        # `width`/`height` : exigés par test_api.py (comme /segment) pour valider
+        # les boîtes — ajout additif, les anciens clients ignorent ces clés.
+        return {"description": description, "tags": tags, "width": result["width"],
+                "height": result["height"], "objects": result["objects"]}
 
     def _ask_sync(self, image_b64: str, question: str, history: list[dict]) -> dict:
         """Answer a question about the photo, with the client chat history."""

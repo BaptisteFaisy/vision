@@ -8,7 +8,7 @@
  ──────────────────                    ─────────────────────────────────────
  expo-camera  ──photo JPEG──►  POST /analyze {image_b64}
    │                                │
-   │                                ├─ 1. Sam3Processor + Sam3Model (unsloth/sam3.1)
+   │                                ├─ 1. SAM 3.1 officiel (facebook/sam3.1 + sam3 natif)
    │                                │      prompts=null → liste de concepts générique
    │                                │      → objets {label, score, box}
    │                                │      → masque numpy → PNG 8 bits gris → base64
@@ -29,9 +29,12 @@
 
 ## Choix techniques
 
-- **`unsloth/sam3.1` plutôt que `facebook/sam3.1`** : miroir **non gated** — pas de formulaire
-  d'accès ni de jeton HF à gérer côté serveur, donc déploiement reproductible par n'importe qui.
-  Chargé via `transformers` (`Sam3Model` / `Sam3Processor`, à confirmer sur la version installée).
+- **`facebook/sam3.1` officiel plutôt que le miroir `unsloth/sam3.1`** (depuis le
+  2026-10-29) : poids Meta + code natif `facebookresearch/sam3` (predictor multiplex) pour
+  `/segment` et `/analyze` — le dépôt officiel ne contenant aucun poids `transformers`, le
+  chemin `transformers` (`Sam3Model` / `Sam3Processor`) ne pouvait pas le charger. Licence
+  Meta acceptée, `HF_TOKEN` via le secret Modal `huggingface`, poids persistés dans le
+  volume `sam3-official`. `/live` reste temporairement sur `unsloth/sam3.1` (bascule par étapes).
 - **Masques PNG base64, pas de RLE** : décodage immédiat par `<Image>` côté React Native, sans
   bibliothèque de décompression ni JS de décodage. Coût : réponse plus lourde (~centaines de Ko) ;
   atténué par le Wi-Fi et un timeout client explicite de 60 s.
@@ -74,9 +77,12 @@ Erreurs : `400 {"detail": "..."}` (image illisible), `500` sinon. Images en base
 
 ## Détails d'implémentation vérifiés
 
-- **Modèle** : `unsloth/sam3.1`, miroir **non gated** de `facebook/sam3.1` (pas de jeton HF).
-  `config.json` ⇒ `architectures = ["Sam3Model"]` ; il n'existe **aucune** classe `Sam3_1*` —
-  « 3.1 » n'est qu'un jeu de poids. Chargé par `transformers` 5.20.2 (`Sam3Model` + `Sam3Processor`).
+- **Modèle** : `facebook/sam3.1` **officiel** (`sam3.1_multiplex.pt` + `config.json`,
+  volume `sam3-official`), chargé par le code natif Meta (`build_sam3_multiplex_video_predictor`,
+  `backend/segmentation_native.py`). `config.json` officiel ⇒ `architectures = ["Sam3VideoModel"]`,
+  `model_type = "sam3_video"` : aucun poids `transformers`, d'où le chemin natif. Le chemin
+  `transformers` 5.20.2 (`Sam3Model` + `Sam3Processor` sur `unsloth/sam3.1`) ne sert plus
+  qu'à `/live`, en attendant sa bascule.
 - **`torchvision` est requis** : `Sam3ImageProcessor` en dépend à l'import — sans lui,
   `from_pretrained` échoue même si `transformers` est présent (`requirements.txt` : 0.29.1).
 - **Image Modal** : `.env(...)` **avant** `.add_local_dir(...)` — l'inverse casse au build
