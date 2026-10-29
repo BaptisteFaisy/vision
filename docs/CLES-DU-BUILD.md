@@ -52,9 +52,12 @@ qu'après un « Tester le LLM » qui a réellement répondu.
 
 ## APK publié par la CI
 
-Le runner fait un checkout neuf : il n'a pas de `local.properties`, et l'artefact
-`apk-debug` partait donc **sans clé**. L'étape « Clés du build » de `ci.yml` écrit ce
-fichier depuis les secrets du dépôt quand ils existent (sinon elle ne fait rien).
+Le runner fait un checkout neuf : il n'a pas de `local.properties`, et un APK
+bâti sans l'étape « Clés du build » part donc **sans clé**. Cette étape écrit ce
+fichier depuis les secrets du dépôt quand ils existent (sinon elle ne fait rien) ;
+elle est présente dans les trois jobs qui bâtissent (`ci.yml` : tests,
+`ci-native.yml` : `apk` debug et `apk-release`), donc **chaque APK téléchargé
+depuis GitHub embarque les clés**.
 
 Secrets à créer — Settings → Secrets and variables → Actions → *New repository secret* :
 `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_LIVE_API_KEY`, `TTS_API_KEY`,
