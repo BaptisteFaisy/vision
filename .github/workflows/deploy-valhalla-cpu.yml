@@ -59,3 +59,5 @@ jobs:
           curl -sf -m 30 -X POST "$BASE/route" \
             -d '{"locations":[{"lat":48.8566,"lon":2.3522},{"lat":48.86,"lon":2.34}],"costing":"pedestrian"}' \
             | python3 -c "import json,sys; print('trip km:', json.load(sys.stdin)['trip']['summary']['length'])"
+          curl -sf -m 30 "$BASE/signals?s=48.843&w=2.336&n=48.862&e=2.352" \
+            | python3 -c "import json,sys; n=len(json.load(sys.stdin)['signals']); print('feux:', n); sys.exit(0 if n > 0 else 1)"
