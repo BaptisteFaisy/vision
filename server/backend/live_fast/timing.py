@@ -2,13 +2,15 @@
 
 Le conteneur de prod mesure déjà ses étages (``fast_core`` remplit ``timers``) mais le
 levier ``FAST_TIMING`` est éteint en production : la réponse ne porte que ``elapsed_ms``,
-un chiffre seul qui ne dit rien. Ce module ajoute les deux briques qui manquaient, sans
+un chiffre seul qui ne dit rien. Ce module ajoute les briques qui manquaient, sans
 dupliquer la mesure existante :
 
 * :class:`Stage` — ``with Stage(timers, "queue_ms"):`` chronomètre un bloc dans la même
   carte que les postes déjà remplis par ``fast_core`` ;
 * :func:`format_server_timing` — l'en-tête HTTP ``Server-Timing`` (RFC 8673) que le banc
-  téléphone peut lire sans parser le corps de la réponse.
+  téléphone peut lire sans parser le corps de la réponse ;
+* :func:`format_boot_cpu` — la ligne ``boot_cpu: ...`` du démarrage CPU : grep sans
+  faux positif dans les logs Modal, durées à la même décimale que les postes.
 
 Coût mesuré de l'instrumentation : ~0,6 µs pour six marques ``perf_counter`` — négligeable
 face aux 82-125 ms du serveur. L'horloge est **monotone** (``perf_counter``) : elle ne
@@ -24,6 +26,10 @@ import time
 # Une décimale : la précision utile est le dixième de ms, le bruit de mesure est du
 # demi-microseconde. Arrondir ici garde la charge utile compacte (6 postes ≈ 120 o).
 DIGITS = 1
+
+# Préfixe des lignes du démarrage CPU : `boot_cpu:` ne matche rien d'autre dans les
+# logs Modal, un `grep '^boot_cpu:'` isole la phase entière.
+BOOT_CPU_PREFIX = "boot_cpu:"
 
 
 def now() -> float:
@@ -90,3 +96,13 @@ def format_server_timing(timings: dict | None) -> str:
         if duration is not None:
             parts.append(f"{stage};dur={duration}")
     return ", ".join(parts)
+
+
+def format_boot_cpu(stage: str, ms: float, total_ms: float) -> str:
+    """Ligne de log d'un étage du boot CPU (durée + cumul depuis le début, en ms).
+
+    ``boot_cpu: stage=import_torch ms=1200.5 total_ms=1200.5`` — même décimale que
+    les postes ``Server-Timing`` (:data:`DIGITS`), préfixe :data:`BOOT_CPU_PREFIX`.
+    """
+    return (f"{BOOT_CPU_PREFIX} stage={stage} ms={ms:.{DIGITS}f} "
+            f"total_ms={total_ms:.{DIGITS}f}")
