@@ -16,7 +16,13 @@ package dev.sam3vision.core.crossing
  * ne sépare plus rien) — [GREEN_BOTTOM_MIN] n'est plus un prior de
  * position mais une garde anti-bruit-haut. Poses larges et pictogrammes
  * non standard : doute documenté (voir test `pose large`).
- * Pur Kotlin, testé en JVM (synthétique + échantillon `feuxfr/`).
+ * Pur Kotlin, testé en JVM (synthétique + échantillons `feuxfr/`, `feuxfr2/`).
+ *
+ * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : quand le vert
+ * passe tout sauf la garde bas (bonhomme cadré haut), la forme du nuage
+ * tranche — allongé, avec de l'intérieur, masse non entassée en haut.
+ * Mesuré : rappel vert 81/183 → 95/183, fuites inchangées (0 rouge,
+ * 100 voiture, 6 éteints), seuils existants intacts.
  */
 object PedLightGate {
 
@@ -34,6 +40,15 @@ object PedLightGate {
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     private const val BBOX_MIN_PX = 3
+
+    /** R1b : masse verte max du tiers haut de bbox (bonhomme non entassé en haut). */
+    private const val TOP3_MAX = 0.38f
+
+    /** R1b : fraction max de pixels verts en lisière (un disque n'est que contour). */
+    private const val EDGE_MAX = 0.72f
+
+    /** R1b : allongement vertical min du nuage (écart-types, pas bbox). */
+    private const val CLOUD_ELONGATION_MIN = 1.5f
 
     /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne
@@ -53,13 +68,80 @@ object PedLightGate {
         val scan = scan(argb, width, height)
         val total = argb.size.toFloat()
         if (scan.green / total < GREEN_MIN_FRACTION) return false
-        if (scan.greenBottom.toFloat() / scan.green < GREEN_BOTTOM_MIN) return false
         if (scan.red / total >= RED_MAX_FRACTION) return false
         val boxWidth = scan.maxX - scan.minX + 1
         val boxHeight = scan.maxY - scan.minY + 1
         if (boxHeight < BBOX_MIN_PX) return false
         if (boxHeight.toFloat() < boxWidth * ELONGATION_MIN) return false
-        return true
+        if (scan.greenBottom.toFloat() / scan.green >= GREEN_BOTTOM_MIN) return true
+        // R1b : bonhomme cadré haut — la forme du nuage tranche à la place.
+        return acceptShaped(argb, width, height)
+    }
+
+    /** R1b : nuage vert allongé, avec de l'intérieur, masse non entassée en haut. */
+    private fun acceptShaped(argb: IntArray, width: Int, height: Int): Boolean {
+        val xs = mutableListOf<Int>()
+        val ys = mutableListOf<Int>()
+        for (index in argb.indices) {
+            val pixel = argb[index]
+            if (!isLit(pixel)) continue
+            if (!isGreenHue(PedLightColor.hueDeg(pixel))) continue
+            xs.add(index % width)
+            ys.add(index / width)
+        }
+        if (xs.isEmpty()) return false
+        if (cloudElongation(xs, ys) < CLOUD_ELONGATION_MIN) return false
+        if (topThird(ys) > TOP3_MAX) return false
+        return edgeFraction(xs, ys, width, height) <= EDGE_MAX
+    }
+
+    /** Allongement vertical du nuage (écart-type y / écart-type x). */
+    private fun cloudElongation(xs: List<Int>, ys: List<Int>): Float {
+        val n = xs.size.toDouble()
+        val mx = xs.sumOf { it.toDouble() } / n
+        val my = ys.sumOf { it.toDouble() } / n
+        val xstd = Math.sqrt(xs.sumOf { (it - mx) * (it - mx) } / n)
+        val ystd = Math.sqrt(ys.sumOf { (it - my) * (it - my) } / n)
+        return (ystd / (xstd + 1e-9)).toFloat()
+    }
+
+    /** Part du vert dans le tiers haut des lignes de bbox. */
+    private fun topThird(ys: List<Int>): Float {
+        val lo = ys.min()
+        val hi = ys.max()
+        val prof = IntArray(hi - lo + 1)
+        for (y in ys) prof[y - lo]++
+        val third = maxOf(1, prof.size / 3)
+        return prof.take(third).sum().toFloat() / ys.size
+    }
+
+    /** Part des pixels verts touchant du non-vert (voisinage 4). */
+    private fun edgeFraction(xs: List<Int>, ys: List<Int>, width: Int, height: Int): Float {
+        val grid = BooleanArray(width * height)
+        for (k in xs.indices) grid[ys[k] * width + xs[k]] = true
+        val lo = ys.min()
+        val hi = ys.max()
+        var edge = 0
+        var n = 0
+        for (y in lo..hi) {
+            for (x in 0 until width) {
+                if (!grid[y * width + x]) continue
+                n++
+                if (isEdge(grid, width, height, x, y)) edge++
+            }
+        }
+        return edge.toFloat() / n
+    }
+
+    /** Vrai si le pixel vert a au moins un voisin 4 non vert. */
+    private fun isEdge(grid: BooleanArray, width: Int, height: Int, x: Int, y: Int): Boolean {
+        val neighbors = intArrayOf(x + 1, y, x - 1, y, x, y + 1, x, y - 1)
+        for (k in neighbors.indices step 2) {
+            val nx = neighbors[k]
+            val ny = neighbors[k + 1]
+            if (nx !in 0 until width || ny !in 0 until height || !grid[ny * width + nx]) return true
+        }
+        return false
     }
 
     /** Balayage du crop : compteurs de couleur et boîte englobante du vert. */
