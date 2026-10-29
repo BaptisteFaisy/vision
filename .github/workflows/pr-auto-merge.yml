@@ -58,6 +58,22 @@
 #     suivant est un vrai travail ;
 #   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
 #     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
+# Débit (v13, 2026-10-29) — la v12 a buté sur une règle du dépôt : le ruleset
+# `master — PR obligatoire, checks requis` porte
+# `strict_required_status_checks_policy: true`, donc GitHub **refuse** de merger
+# une branche en retard (la protection classique, elle, dit `strict: false` :
+# c'est le ruleset qui tranche). Conséquence : sous cette règle, chaque merge
+# déplace `master` et invalide la CI de toutes les autres PR — le débit est
+# plafonné à ~un merge par cycle de CI, quoi qu'on fasse. Deux corrections :
+#   - le balayeur **arrête de rebaser tout le monde**. Avant, chaque mouvement
+#     de `master` relançait un rebase + une CI pour *chaque* PR ouverte (O(N²)),
+#     et aucune ne finissait avant le mouvement suivant. Désormais : s'il y a
+#     une PR prête à être mergée, on merge et on ne rebase personne (ce serait
+#     invalidé aussitôt) ; sinon on prépare **une seule** PR, la plus ancienne.
+#   - le chemin « merge direct sans rebase » n'est armé que si le dépôt autorise
+#     les branches en retard (`strict` lu à la source) — sinon il ne peut pas
+#     aboutir et son échec ne servirait qu'à polluer le log.
+# Mesure de départ : 15 merges/h, p90 création→merge 70 min.
 # Débit (v12, 2026-10-29) — la demande est « plus de PR mergées par heure », pas
 # « moins de runs ». Mesuré : 15 merges/h au mieux, p90 création→merge 70 min.
 # La cause n'était pas la durée d'un balayage (17 s) mais le **rebase imposé** :
@@ -121,6 +137,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.build.outputs.matrix }}
+      strict: ${{ steps.build.outputs.strict }}
     steps:
       - name: Lister les PR internes ouvertes
         id: build
@@ -147,16 +164,43 @@ jobs:
               sleep 5
             done
           fi
+          # Le dépôt exige-t-il une branche à jour avant merge ? La protection
+          # classique et le ruleset peuvent diverger : on lit les deux, le
+          # ruleset gagne (il est actif sur `master`).
+          STRICT=$( { gh api "repos/$GITHUB_REPOSITORY/branches/master/protection" \
+              --jq '.required_status_checks.strict' 2>/dev/null || echo false; } )
+          RULESET=$( { gh api "repos/$GITHUB_REPOSITORY/rulesets" --jq '.[].id' 2>/dev/null || true; } )
+          for rs in $RULESET; do
+            s_rs=$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$rs" 2>/dev/null \
+              | jq -r '[.rules[]? | select(.type=="required_status_checks")
+                        | .parameters.strict_required_status_checks_policy] | first // false' \
+              2>/dev/null || echo false)
+            [ "${s_rs:-false}" = "true" ] && STRICT=true
+          done
+          echo "strict=$STRICT"
+          echo "strict=$STRICT" >> "$GITHUB_OUTPUT"
           MATRIX=$(gh pr list --base master --state open \
-            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid \
+            --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid,updatedAt \
             --jq '[.[] | select(.headRepository.nameWithOwner == "BaptisteFaisy/vision")
               | {pr: .number, sha: .headRefOid, branch: .headRefName,
                  state: .mergeStateStatus, draft: (.isDraft | tostring),
-                 master: .baseRefOid}]' \
+                 master: .baseRefOid, maj: .updatedAt}]
+              | (map(select(.state == "CLEAN" and .draft == "false"))) as $pretes
+              | if ($pretes | length) > 0 then
+                  # Une PR est prête : on merge, et on ne rebase personne —
+                  # ce merge déplace `master`, tout rebase serait perdu.
+                  map(select(.state != "BEHIND"))
+                else
+                  # Rien à merger : on prépare UNE PR (la plus ancienne), pas
+                  # toutes. Rebaser N PR d'un coup, c'est N CI relancées dont
+                  # aucune ne finit avant le mouvement suivant de `master`.
+                  map(select(.state != "BEHIND"))
+                  + (map(select(.state == "BEHIND")) | sort_by(.maj) | .[0:1])
+                end' \
             | jq -c .)
           [ -n "$MATRIX" ] || MATRIX="[]"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state)"'
+          echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state) (maj \(.maj))"'
 
   sweep:
     needs: discover
@@ -183,6 +227,7 @@ jobs:
           MASTER: ${{ matrix.master }}
           STATE: ${{ matrix.state }}
           DRAFT: ${{ matrix.draft }}
+          STRICT: ${{ needs.discover.outputs.strict }}
         run: |
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           green() { # 0 si les 3 checks requis de la PR $1 sont SUCCESS
@@ -276,9 +321,6 @@ jobs:
                       <(printf '%s\n' "$master_files") | grep -q . && return 0
             return 1
           }
-          fusionner() { # $1=pr : merge rebase sur la tête attendue ; 0 = mergée
-            gh pr merge --rebase --match-head-commit "$SHA" "$1" >/dev/null 2>&1
-          }
           ECHELLE_ETAPES=""
           relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
             local pr="$1" runs run sha_run etapes rc=2
@@ -325,14 +367,14 @@ jobs:
           # `master`, donc *toutes* les autres PR passent `BEHIND` ; les
           # rebaser une par une relançait leur CI et re-déplaçait `master`
           # (O(N²)). Ici on fusionne, point.
-          if [ "$STATE" = "BEHIND" ] && [ "$DRAFT" != "true" ] \
-            && green "$PR" && ! recouvrement_fichiers; then
-            if fusionner "$PR"; then
+          if [ "${STRICT:-true}" != "true" ] && [ "$STATE" = "BEHIND" ] \
+            && [ "$DRAFT" != "true" ] && green "$PR" && ! recouvrement_fichiers; then
+            if err=$(gh pr merge --rebase --match-head-commit "$SHA" "$PR" 2>&1); then
               echo "PR #$PR mergée sans rebase (base en retard, fichiers disjoints)"
               noter_etat "mergée sans rebase : base en retard, fichiers disjoints, CI relancée pour rien évitée."
               exit 0
             fi
-            echo "PR #$PR : merge direct refusé (conflit côté serveur ?), on rebase"
+            echo "PR #$PR : merge direct refusé ($(printf '%s' "$err" | tail -1 | cut -c1-160)), on rebase"
           fi
           rm -rf repo
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —

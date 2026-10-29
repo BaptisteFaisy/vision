@@ -115,7 +115,17 @@ Désormais une PR `BEHIND` dont les **trois checks requis sont verts** et dont l
 croisent **aucun** fichier atterri depuis sa base est **mergée directement** (`merge --rebase`
 côté serveur, `strict: false` est déjà la politique du dépôt) : pas de clone, pas de push, pas de
 CI relancée. Au moindre doute — fichiers qui se croisent, liste tronquée à 300, brouillon, checks
-pas verts — on rebase comme avant. Le groupe `concurrency` est désormais **par tête de PR** (et non unique) : avec un groupe unique,
+pas verts — on rebase comme avant. **Le plafond, et pourquoi (v13, 29/10).** Le ruleset `master — PR obligatoire, checks requis` porte
+`strict_required_status_checks_policy: true` : GitHub **refuse** de merger une branche en retard, même
+quand la protection classique dit `strict: false`. Sous cette règle, chaque merge déplace `master` et
+invalide la CI de **toutes** les autres PR : le débit est plafonné à environ un merge par cycle de CI
+(~70-90 s, soit ~40/h au mieux), quel que soit le nombre de runners. Le balayeur s'y conforme :
+s'il y a une PR prête (`CLEAN`, non brouillon), il merge et **ne rebase personne** (le rebase serait
+invalidé aussitôt) ; sinon il prépare **une seule** PR, la plus ancienne. Avant (v12 et antérieurs),
+chaque mouvement de `master` relançait un rebase + une CI pour *chaque* PR ouverte — taxe en O(N²),
+et aucune ne finissait avant le mouvement suivant (15 merges/h, p90 70 min).
+
+Le groupe `concurrency` est désormais **par tête de PR** (et non unique) : avec un groupe unique,
 GitHub annulait le run *en attente* dès qu'un autre se déclenchait, donc le « CI verte, merge-moi »
 d'une PR pouvait être annulé par le run d'une autre — famine, et attente jusqu'au cron. Le cron de
 filet est passé à 5 min.
