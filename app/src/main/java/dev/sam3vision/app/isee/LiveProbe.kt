@@ -309,8 +309,7 @@ _state.update { it.cleared() }
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
-        // Profondeur + danger à chaque frame capturée, même sans session SAM.
-        meters.offer(jpegB64)
+        meters.offer(jpegB64) // profondeur + danger, même sans session SAM.
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -412,7 +411,8 @@ _state.update { it.cleared() }
         val overlays = overlaysFor(frame, shown)
         val pinhole = readingsOf(distances, frame)
         val readings = meters.readingsFor(frame, pinhole)
-        val placed = placedLabels(frame, readings)
+        val placed = placedLabels(frame, readings) +
+            dangerPlaced(distances, meters.dangerSnapshot())
         val cross = crossingPatchOf(
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
         )

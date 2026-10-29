@@ -13,16 +13,16 @@ class DangerBenchTest {
 
     @Test
     fun `verdict vert avec fps forme de sortie et boites`() {
-        val verdict = DangerBenchVerdict(listOf(80, 88, 84, 90, 86), 86, "84x8400", 0, null)
+        val verdict = DangerBenchVerdict(listOf(80, 88, 84, 90, 86), 86, 80, 6, "84x8400", 0, null)
         assertEquals(
-            "model=YOLO11n medianMs=86 runs=5 out=84x8400 boxes=0 fps=11.6",
+            "model=YOLO11n medianMs=86 sess=80 dec=6 runs=5 out=84x8400 boxes=0 fps=11.6",
             DangerBench.summary(verdict),
         )
     }
 
     @Test
     fun `verdict KO explicite quand le modele est absent`() {
-        val verdict = DangerBenchVerdict(emptyList(), 0, "", 0, "modèle absent — asset yolo11n.onnx manquant")
+        val verdict = DangerBenchVerdict(emptyList(), 0, 0, 0, "", 0, "modèle absent — asset yolo11n.onnx manquant")
         assertTrue(DangerBench.summary(verdict).startsWith("model=YOLO11n KO — "))
     }
 
