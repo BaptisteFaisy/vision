@@ -43,7 +43,7 @@ dans un écran démo (Réglages → « Segment demo » ou
   `TwinLiteDecode` (argmax, miroir de la sample app du zoo), masques +
   prompts.
 - `app/…/segment/` : `SegmentPreprocess` (resize commun + normalisation NCHW),
-  `LiteRtTwinLiteSegmenter` (session LiteRT + `SerialRunGuard`, comme MiDaS),
+  `LiteRtTwinLiteSegmenter` (session LiteRT + `SerialRunGuard`),
   `SegmentCameraHost` (CameraX aperçu + analyse), `SegmentScreen` (masques +
   cadence via `LiveFpsMeter`), `SegmentModels` + `SegmentModelStore`.
 - Réutilisés tels quels : `ModelDownloader.ensureSpec` (avec `dir` paramétré),
@@ -77,7 +77,6 @@ vers le runtime neuf.
 | démo `route segment` | 2-4 | 4,9-5,6 | intérieur, 0 % praticable, overlay propre (screencap) |
 | démo optimisée 2026-10-29 (normalisation directe, passe native, overlay hors fil principal) | 2-5 | 14-18 | Samsung, intérieur, 0 % praticable, walk=STOP |
 | banc `SegmentBenchDeviceTest` (11 runs, 1 warmup) | 2 | — | gradient synthétique 640×360, OK |
-| banc `DepthBenchDeviceTest` MiDaS (5 runs) | 2 | — | gradient synthétique 256×256, OK (non-régression migration) |
 | banc `DepthBenchDeviceTest` DA2 (5 runs) | 216 | — | gradient synthétique 256×256, OK |
 
 (`ms` = LiteRT seul, `ips` = bout en bout caméra → affichage.)
