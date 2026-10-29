@@ -1,5 +1,8 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.SidewalkKeep
+import dev.sam3vision.core.curb.SidewalkPosition
+import dev.sam3vision.core.curb.SidewalkText
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -12,6 +15,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * délai — un obstacle qui entre dans le couloir ne doit pas attendre la fin de la
  * phrase en cours (le lecteur audio coupe : une seule lecture à la fois). Le retour
  * au libre, lui, attend : la réassurance peut patienter, le danger non.
+ *
+ * Maintien trottoir ([sidewalk]) : sur voie libre, un trottoir sur un côté suspend
+ * la consigne de cap (« Remonte sur le trottoir, à gauche. ») jusqu'au retour
+ * dessus, où le cap reprend ; un trottoir absent parle prudemment, sans dévier.
+ * Le bouché prime toujours : la sécurité ne négocie jamais.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -34,6 +42,13 @@ class GuidanceAnnouncer(
         private set
 
     /**
+     * Trottoir de la dernière frame (`null` avant la première) : la vidéo y
+     * lit le retour à dessiner, en direct comme la décision.
+     */
+    var lastSidewalk: SidewalkPosition? = null
+        private set
+
+    /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
      * change ni les seuils, ni la mémoire de décision. [cap] est la direction
@@ -41,6 +56,8 @@ class GuidanceAnnouncer(
      * reparler dès que le cap change. [routeCap] (cap de l'itinéraire, guidage
      * route actif) prime sur [cap] quand il est renseigné. [hfovDeg] calibre le
      * décalage chiffré (défaut 67° : l'appelant qui connaît la focale la passe).
+     * [sidewalk] est le trottoir vu caméra : sur voie libre, un côté suspend le
+     * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      */
     fun onFrame(
         atMs: Long,
@@ -49,12 +66,39 @@ class GuidanceAnnouncer(
         cap: SteeringCap = SteeringCap.Straight,
         routeCap: SteeringCap? = null,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        sidewalk: SidewalkPosition = SidewalkPosition.Ahead,
     ): String? {
         val effective = routeCap ?: cap
         val decision = Guidance.decide(labels, effective, rangeMeters, hfovDeg)
         lastDecision = decision
+        lastSidewalk = sidewalk
+        if (decision.blocked) return speakBlocked(atMs, decision, language)
+        val correction = SidewalkText.phrase(sidewalk, language)
+        if (correction != null) return speakSidewalk(atMs, sidewalk, correction)
+        return speakFree(atMs, decision, language)
+    }
+
+    /** Consigne d'obstacle : urgente, elle saute le délai (le danger n'attend pas). */
+    private fun speakBlocked(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
         val key = Guidance.key(decision)
-        if (!gate.admit(atMs, key, urgent = decision.blocked)) return null
+        if (!gate.admit(atMs, key, urgent = true)) return null
+        val phrase = Guidance.phrase(decision, language)
+        gate.markSpoken(key, atMs, phrase)
+        return phrase
+    }
+
+    /** Correction trottoir : consigne, pas danger — elle attend son tour. */
+    private fun speakSidewalk(atMs: Long, sidewalk: SidewalkPosition, correction: String): String? {
+        val key = SidewalkKeep.key(sidewalk)
+        if (!gate.admit(atMs, key, urgent = false)) return null
+        gate.markSpoken(key, atMs, correction)
+        return correction
+    }
+
+    /** Consigne de cap : la voie libre dans la direction demandée. */
+    private fun speakFree(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
+        val key = Guidance.key(decision)
+        if (!gate.admit(atMs, key, urgent = false)) return null
         val phrase = Guidance.phrase(decision, language)
         gate.markSpoken(key, atMs, phrase)
         return phrase
@@ -64,5 +108,6 @@ class GuidanceAnnouncer(
     fun reset() {
         gate.reset()
         lastDecision = null
+        lastSidewalk = null
     }
 }
