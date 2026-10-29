@@ -19,6 +19,11 @@ chaque frame recopie dedans et rejoue. Trois garde-fous, dans l'ordre :
   en eager, le service n'est jamais cassé.
 
 Le module s'importe **sans torch** : torch n'est touché qu'une fois sur le conteneur GPU.
+
+Contournement capture : `Sam3DetrEncoder._prepare_multilevel_features` construit
+`torch.tensor(liste_python, device="cuda")` à chaque forward, copie CPU→CUDA interdite
+en capture — `patch_spatial_cache()` (appelé au chargement quand le levier est actif)
+le remplace par une version à tenseur mémoïsé, mathématiquement identique.
 """
 
 from types import SimpleNamespace
@@ -27,6 +32,9 @@ from types import SimpleNamespace
 MAX_SHAPES = 3
 # Écart maximal accepté entre la sortie eager et la sortie graphée (bf16 : marge large).
 TOLERANCE = 2e-2
+# `spatial_shapes` mémoïsés (un par forme vision — même budget que les graphes, +1).
+_SPATIAL_MAX = MAX_SHAPES + 1
+_spatial_cache: dict = {}
 
 
 def enabled() -> bool:
@@ -219,3 +227,37 @@ class DetrGraphs:
 def graph_holder(ctx):
     """Le cache de la session, ou `None` si le levier est éteint (alors eager pur)."""
     return ctx.get("detr_graphs")
+
+
+def patch_spatial_cache() -> str:
+    """`spatial_shapes` pré-calculé sur CUDA (contournement capture, voir module).
+
+    `Sam3DetrEncoder._prepare_multilevel_features` fait
+    `torch.tensor(liste_python, device="cuda")` à chaque forward — copie CPU→CUDA
+    interdite pendant une capture CUDA graph (échec vu en prod). Version de rechange
+    mathématiquement identique (mêmes flatten/cat, tenseur mémoïsé par formes) :
+    indispensable au graphe, neutre en eager (mêmes valeurs). Idempotent. Pinné à
+    `transformers==5.20.2` (requirements) : à re-vérifier à tout upgrade — et la
+    vérification graphe-vs-eager rejetterait toute divergence.
+    """
+    torch = _torch()
+    from transformers.models.sam3.modeling_sam3 import Sam3DetrEncoder
+
+    if getattr(Sam3DetrEncoder._prepare_multilevel_features, "_spatial_patched", False):
+        return "already"
+
+    def _cached(self, vision_features, vision_pos_embeds):
+        key = tuple((f.shape[-2], f.shape[-1]) for f in vision_features)
+        feats = torch.cat([f.flatten(2).transpose(1, 2) for f in vision_features], dim=1)
+        pos = torch.cat([p.flatten(2).transpose(1, 2) for p in vision_pos_embeds], dim=1)
+        entry = _spatial_cache.get((key, str(feats.device)))
+        if entry is None:
+            entry = torch.tensor(list(key), dtype=torch.long, device=feats.device)
+            if len(_spatial_cache) >= _SPATIAL_MAX:
+                _spatial_cache.pop(next(iter(_spatial_cache)))
+            _spatial_cache[(key, str(feats.device))] = entry
+        return feats, pos, entry
+
+    _cached._spatial_patched = True
+    Sam3DetrEncoder._prepare_multilevel_features = _cached
+    return "ok"
