@@ -114,7 +114,6 @@ smoke_test() {
   fi
   printf '\n\033[32mDéploiement terminé.\033[0m URL : %s\n' "$url"
   printf 'Test complet : python3 scripts/test_api.py %s\n' "$url"
-  printf "App Expo     : ./scripts/dev_qr.sh (puis renseigner l'URL dans Réglages)\n"
 }
 
 dry_run_report() {

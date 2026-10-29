@@ -54,8 +54,8 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35` (+ `MAX`)) |
-| Tests | **2 875 `@Test`** JVM (`:core` 1 804, `:app` 1 071, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
-| Taille | **913** fichiers `.kt`, **54 784** lignes de prod (`:core` 22 200, `:app` 32 584, mesure du 29/10/2026 par `tools/count-tree.py`) |
+| Tests | **2 884 `@Test`** JVM (`:core` 1 835, `:app` 1 049, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
+| Taille | **913** fichiers `.kt`, **54 684** lignes de prod (`:core` 22 458, `:app` 32 226, mesure du 29/10/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
