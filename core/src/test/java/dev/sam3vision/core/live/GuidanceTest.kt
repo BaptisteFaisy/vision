@@ -14,6 +14,9 @@ class GuidanceTest {
     private fun placed(label: String, x: Float, meters: Float? = null) =
         PlacedLabel(label, x, 0.5f, meters)
 
+    private fun huge(label: String, height: Float = 0.9f, width: Float = 0.8f) =
+        PlacedLabel(label, 0.5f, 0.5f, null, LabelExtent(height, width))
+
     @Test
     fun `voie libre sans objet`() {
         val decision = Guidance.decide(emptyList())
@@ -164,5 +167,51 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("curb", 0.5f)))
 
         assertTrue(decision.blocked)
+    }
+
+    @Test
+    fun `matiere proche non mesuree demande l'arret`() {
+        val decision = Guidance.decide(listOf(huge("mur")))
+
+        assertTrue(decision.blocked)
+        assertTrue(decision.stop)
+        assertEquals("Stop.", Guidance.phrase(decision))
+        assertEquals("b|mur|Left|?|12h|stop", Guidance.key(decision))
+    }
+
+    @Test
+    fun `petite matiere non mesuree ne demande pas l'arret`() {
+        val decision = Guidance.decide(listOf(huge("mur", height = 0.2f, width = 0.1f)))
+
+        assertTrue(decision.blocked)
+        assertFalse(decision.stop)
+        assertEquals("Va à gauche.", Guidance.phrase(decision))
+    }
+
+    @Test
+    fun `poteau fin meme immense ne demande pas l'arret`() {
+        val decision = Guidance.decide(listOf(huge("pole", height = 1f, width = 0.02f)))
+
+        assertTrue(decision.blocked)
+        assertFalse(decision.stop)
+    }
+
+    @Test
+    fun `peinture au sol immense ne demande pas l'arret`() {
+        val decision = Guidance.decide(listOf(huge("crosswalk")))
+
+        assertTrue(decision.blocked)
+        assertFalse(decision.stop)
+    }
+
+    @Test
+    fun `mesure lointaine prime sur la taille immense`() {
+        val mur = PlacedLabel("mur", 0.5f, 0.5f, 2f, LabelExtent(0.9f, 0.9f))
+
+        val decision = Guidance.decide(listOf(mur))
+
+        assertTrue(decision.blocked)
+        assertFalse(decision.stop)
+        assertEquals("Va à gauche, 2 mètres.", Guidance.phrase(decision))
     }
 }

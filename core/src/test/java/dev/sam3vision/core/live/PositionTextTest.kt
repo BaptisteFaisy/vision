@@ -142,4 +142,20 @@ class PositionTextTest {
         assertEquals("personne|à midi|2", PositionText.key(listOf(deux)))
         assertEquals("personne|à midi|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
     }
+
+    @Test
+    fun `la detection convertie porte l emprise de sa boite`() {
+        val obj = PositionText.fromDetection(detection("chaise", listOf(0f, 0f, 20f, 40f)))
+
+        assertEquals(0.4f, obj!!.extent!!.heightFrac, 0.001f)
+        assertEquals(0.2f, obj.extent!!.widthFrac, 0.001f)
+    }
+
+    @Test
+    fun `l objet suivi porte l emprise de sa boite normalisee`() {
+        val obj = PositionText.fromSeenObject(SeenObject(1, "chien", 0.5f, listOf(0.4f, 0.1f, 0.6f, 0.9f)))
+
+        assertEquals(0.8f, obj!!.extent!!.heightFrac, 0.001f)
+        assertEquals(0.2f, obj.extent!!.widthFrac, 0.001f)
+    }
 }
