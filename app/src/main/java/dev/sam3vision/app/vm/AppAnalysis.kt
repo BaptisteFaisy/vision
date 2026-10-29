@@ -32,13 +32,15 @@ class AppAnalysis(
     private val announce: (List<SegObject>, Settings) -> Unit,
     /** Issue de l'appel SAM vers le moniteur GPU (endpoint appelé + résultat). */
     private val noteSam: (String, Result<SegmentResult>) -> Unit = { _, _ -> },
+    /** Jalons de chronologie (`sam`, `analyse`, `overlays`) : inerte par défaut. */
+    private val mark: (String) -> Unit = {},
 ) {
 
     /** Analyse la photo courante (son base64) ; l'état porte le résultat ou l'échec. */
     suspend fun analyze(encoded: String) {
         val settings = state().settings
         var samFailure: Throwable? = null
-        AnalyzeUseCase(
+        val result = AnalyzeUseCase(
             llm(settings),
             sam(settings),
             maxObjects = settings.objectsOnScreen,
@@ -46,16 +48,18 @@ class AppAnalysis(
                 if (outcome != null) {
                     samFailure = outcome.exceptionOrNull()
                     noteSam(settings.samEndpoint(), outcome)
+                    mark("sam")
                 }
             },
-        )
-            .invoke(encoded)
-            .fold(onSuccess = { ready(settings, it, samFailure) }, onFailure = { failed(it) })
+        ).invoke(encoded)
+        mark("analyse")
+        result.fold(onSuccess = { ready(settings, it, samFailure) }, onFailure = { failed(it) })
     }
 
     /** Analyse reçue : masques, note de segmentation, chat remis à zéro, puis annonce. */
     private suspend fun ready(settings: Settings, analysis: Analysis, samFailure: Throwable?) {
         val drawn = overlays(analysis.objects)
+        mark("overlays")
         update {
             it.copy(
                 analysis = analysis,
