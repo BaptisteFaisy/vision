@@ -5,14 +5,14 @@ import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Priorité danger sur le guidage du sol : après une alerte trottoir ou
- * escaliers, la voix TwinLite se tait le temps de la fenêtre (la flèche,
- * elle, reste affichée — voir TwinLiteWiringTest).
+ * Reset commun des guetteurs de la sonde : trottoir + escaliers oublient
+ * leur annonce à chaque début de séance (guidage SAM seul, plus de
+ * TwinLite à faire taire).
  */
 class ProbeHazardsTest {
 
@@ -33,41 +33,24 @@ class ProbeHazardsTest {
     }
 
     @Test
-    fun `sans alerte twinlite parle`() {
-        assertFalse(dangers().mutesTwinLite(1_000L))
-    }
-
-    @Test
-    fun `alerte trottoir tait twinlite`() {
+    fun `reset oublie l'alerte trottoir`() {
         val dangers = dangers()
         alerteTrottoir(dangers, 1_000L)
+        assertEquals(1_000L, dangers.curb.lastAlertMs)
 
-        assertTrue(dangers.mutesTwinLite(1_000L))
-        assertTrue(dangers.mutesTwinLite(1_000L + ProbeHazards.MUTE_MS - 1))
-    }
-
-    @Test
-    fun `alerte escalier tait twinlite`() {
-        val dangers = dangers()
-        alerteEscalier(dangers, 2_000L)
-
-        assertTrue(dangers.mutesTwinLite(2_000L))
-    }
-
-    @Test
-    fun `la priorite expire`() {
-        val dangers = dangers()
-        alerteTrottoir(dangers, 1_000L)
-
-        assertFalse(dangers.mutesTwinLite(1_000L + ProbeHazards.MUTE_MS))
-    }
-
-    @Test
-    fun `reset rend la voix`() {
-        val dangers = dangers()
-        alerteEscalier(dangers, 1_000L)
         dangers.reset()
 
-        assertFalse(dangers.mutesTwinLite(1_000L))
+        assertNull(dangers.curb.lastAlertMs)
+    }
+
+    @Test
+    fun `reset oublie l'alerte escalier`() {
+        val dangers = dangers()
+        alerteEscalier(dangers, 2_000L)
+        assertEquals(2_000L, dangers.stairs.lastAlertMs)
+
+        dangers.reset()
+
+        assertNull(dangers.stairs.lastAlertMs)
     }
 }

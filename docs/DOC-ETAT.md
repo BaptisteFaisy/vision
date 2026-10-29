@@ -43,7 +43,7 @@ plus l'arbre — bandeau ajouté).
 | `docs/T8-PREDICTION.md` | **périmée → corrigée** (27/10) | §4 réécrit : le module **est** branché derrière `Settings.boxPredictionEnabled` (`LiveViewModel.kt:94,235,368,373`), §1/§6 recalés |
 | `docs/TRACK-PERF.md` | **à jour** (relu 27/10) | `TrackClient`/`TrackRunner`, constantes de cadence, `FrameGate` — relus à l'identique ; chiffres serveur marqués « relevé antérieur » |
 | `docs/VOIX-POSITIONS.md` | **périmée → corrigée** (27/10) | `LiveProbe.phraseOf` → `:418-423`, `Settings.kt:28` → `:36`, `:148` → `:184` ; seuils, machine d'annonce et 5 suites de tests relus à l'identique |
-| `docs/DEPTH.md` | **cohérent avec l'arbre** (28/10) | Paquets `core/depth` + `app/depth`, deps ONNX/LiteRT au toml, release `depth-models-v1` ; chiffres Redmi repris du doc (non rejoués ici) |
+| `docs/DEPTH.md` | **cohérent avec l'arbre** (28/10) | Paquets `core/depth` + `app/depth`, dep ONNX au toml, release `depth-models-v1` ; chiffres Redmi repris du doc (non rejoués ici) |
 | `docs/VOICE_NAV_PROXY.md` | **à jour** (28/10) | URL = fumée du workflow, volume et rollback vérifiés ; câblage app relu (`routeBaseUrlDefault`, `ROUTE_BASE_URL`, `routeBaseUrl`, `HttpRouteClient`) |
 | `docs/RECETTE-NAVIGATION-VOCALE.md` | **cohérent** (28/10) | Cites vérifiées (`handleDictated`, `NavigationHook`, `nav_confirm_destination`, sha ancêtre de `master`) ; non rejoué sur appareil (le doc le dit) |
 | `docs/MESURES-u11c.txt` | **généré** (28/10) | Fixtures dorées : `gen_mask_golden.py --check` OK (ne pas éditer à la main) |
@@ -69,7 +69,7 @@ plus l'arbre — bandeau ajouté).
 | `scripts/README.md` | **recompté** (28/10) | 117 assertions `test_scripts.sh` |
 | `app/DEPS.txt` | **à jour** (28/10) | Entrées recoupées au build (`room`, `work`, `camera-video`) |
 | `.github/fireworks/README.md` | **à jour** (28/10) | Contrat = usage `pr-auto-merge`, défaut modèle relu dans `conflict_agent.py` |
-| `NOTES.md` | **recompté** (28/10) | Versions (lignes toml/build recalées, + guava/ONNX/LiteRT), taille, ancres du direct, `LivePrompts` 6 concepts, `LivePipeline` non branchée |
+| `NOTES.md` | **recompté** (28/10) | Versions (lignes toml/build recalées, + guava/ONNX), taille, ancres du direct, `LivePrompts` 6 concepts, `LivePipeline` non branchée |
 | `CHANGELOG.md` | **à jour** | Le journal des faits livrés depuis le 26/10 ; `docs/PERF.md` reste le seul endroit où chercher un chiffre tenu |
 | `docs/NAVIGATION.md` | **à jour** (relu 28/10) | Contrat technique du handoff Maps : 9 motifs GO, 4 formats d'URI, 4 replis, `navigationGuidanceEnabled = true` — relus à l'identique ; pointe vers `docs/NAVIGATION-VOCALE.md` pour le fonctionnel |
 | `docs/NAVIGATION-VOCALE.md` | **nouveau** (28/10) | Spécification fonctionnelle navigation vocale : parcours MVP, 7 annonces, 9 cas limites, recette 10 points, catalogue 7 chaînes (3 en place, 4 à venir), géocodage + ingress Valhalla cadrés hors MVP ; porte `tools/check-voice-nav-doc.py` |

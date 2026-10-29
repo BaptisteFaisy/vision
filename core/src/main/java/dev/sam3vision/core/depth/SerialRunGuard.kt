@@ -5,7 +5,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Sérialise les inférences natives d'un estimateur et reporte sa fermeture :
- * un seul `run()` à la fois (les sessions ONNX/LiteRT ne sont pas thread-safe)
+ * un seul `run()` à la fois (les sessions ONNX ne sont pas thread-safe)
  * et `close()` ne libère jamais pendant un `run()` en vol — la libération est
  * alors faite par le run finissant, sans bloquer l'appelant de `close()`.
  *

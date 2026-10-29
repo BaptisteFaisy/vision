@@ -108,7 +108,7 @@ class CurbWatcher(
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
 
-    /** Dernière annonce, `null` si aucune (priorité voix : TwinLite se tait après une alerte). */
+    /** Dernière annonce, `null` si aucune. */
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
 

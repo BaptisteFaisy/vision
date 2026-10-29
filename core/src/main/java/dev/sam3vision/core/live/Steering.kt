@@ -111,12 +111,15 @@ object SteeringText {
 /**
  * Chemin calculé pour la frame : le [cap] demandé, s'il est [blocked], et le
  * [passage] conseillé (toujours renseigné quand c'est bouché, `null` sur voie
- * libre). Vit dans l'état de la sonde : la voix le dit, la vidéo le dessine.
+ * libre). [urgent] (décalage latéral : personne proche qui s'approche) fait
+ * couper la voix comme le bouché, sans changer la couleur de la flèche. Vit
+ * dans l'état de la sonde : la voix le dit, la vidéo le dessine.
  */
 data class SteeringCue(
     val cap: SteeringCap,
     val blocked: Boolean,
     val passage: SteeringCap?,
+    val urgent: Boolean = false,
 ) {
     /** Direction de la flèche sur la vidéo : le passage si bouché, le cap sinon. */
     fun arrowDir(): SteeringCap = passage ?: cap

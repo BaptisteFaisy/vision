@@ -178,8 +178,6 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     )
     LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
     SteeringLayer(probe.steering)
-    val twinUi by viewModel.twinlite.ui.collectAsState()
-    TwinLiteLayer(twinUi)
     CrossingOnVideo(probe, pump)
 }
 
@@ -338,7 +336,6 @@ private fun IseeCameraWiring(
                 SharedCameraFrame.offer(jpeg)
                 if (sending(viewModel)) {
                     viewModel.probe.onFrame(jpeg, captureAtNs)
-                    viewModel.twinlite.offerFrame(jpeg)
                     // Couleur du feu relue ici, sur la frame la plus fraîche (≤ 150 ms).
                     if (viewModel.probe.state.value.crossingActive) pump.offerFrame(jpeg)
                 }
