@@ -213,7 +213,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val settings = _state.value.settings
         val endpoint = settings.samEndpoint()
         viewModelScope.launch {
-            GpuWake.wake(endpoint) { gpuMonitor.noteHealthResult(endpoint, it) }
+            GpuWake.wake(endpoint, onResult = { gpuMonitor.noteHealthResult(endpoint, it) })
         }
     }
 
