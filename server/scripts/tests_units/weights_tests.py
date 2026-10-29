@@ -310,6 +310,13 @@ def test_live_fast_image(_module) -> None:
     check("live_fast : FAST_MODEL_DIR transmis par lever_env()",
           app.lever_env().get("FAST_MODEL_DIR") == app.MODEL_DIR,
           str(app.lever_env().get("FAST_MODEL_DIR")))
+    offline = app.lever_env()
+    check("live_fast : boot offline (zéro réseau pendant les imports)",
+          offline.get("HF_HUB_OFFLINE") == "1"
+          and offline.get("TRANSFORMERS_OFFLINE") == "1"
+          and offline.get("HF_HUB_DISABLE_TELEMETRY") == "1",
+          str({k: offline.get(k) for k in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE",
+                                           "HF_HUB_DISABLE_TELEMETRY")}))
     check("live_fast : FAST_SNAPSHOT recuit dans l'env de l'image",
           "FAST_SNAPSHOT" in app.LEVER_NAMES, str(app.LEVER_NAMES))
     build = app.WEIGHTS_BUILD
