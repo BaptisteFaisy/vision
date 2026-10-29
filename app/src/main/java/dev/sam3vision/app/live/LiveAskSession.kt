@@ -145,10 +145,13 @@ class LiveAskSession(
 
     /**
      * Question posée à l'écrit ou à la voix (« Parler ») : une seule à la fois.
-     * Ordre picto (« fais un pictogramme de X ») → création ; mot visant un
-     * repère armé → guidage ; mot maison seul → chasse SAM ; sinon LLM.
+     * Ordre de navigation (« je veux aller à X », « aller X ») → écran de
+     * navigation, ou redemande de la destination si elle manque ; ordre picto
+     * (« fais un pictogramme de X ») → création ; mot visant un repère armé →
+     * guidage ; mot maison seul → chasse SAM ; sinon LLM.
      */
     fun ask(question: String) {
+        if (LiveNavOrders.handle(question, settings(), scope, pictoSpeak)) return
         if (MaisonEnterCommand.isEnterOrder(question)) {
             enterHome()
             return

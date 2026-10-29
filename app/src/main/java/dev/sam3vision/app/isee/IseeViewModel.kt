@@ -182,6 +182,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La session sous-jacente (boutons de l'écran navigation). */
     fun voiceNav(): VoiceNavSession = voiceNav.session
 
+    /** Destination dictée sur le direct : passe par la session de navigation. */
+    suspend fun acceptNavOrder(transcript: String) = voiceNav.run(transcript)
+
     /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
 
@@ -391,7 +394,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Ordre GPS (« arrête / désactive / active le GPS ») : consommé même
         // sans URL Valhalla (guidage Maps), avant le handoff navigation.
         if (voiceNav.runOrder(text)) return
-        if (settings.routeConfigured && voiceNav.session.onVoiceTranscript(text)) return
+        // Destination (avec ou sans « à », voir NavigationIntent) : l'ordre ne
+        // part jamais au LLM ; sans destination comprise, la voix la redemande.
+        if (voiceNav.run(text)) return
         if (navigation.onTranscript(text)) return
         // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
         if (steering.runCrossing(text)) return
