@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — voix : le guidage dit quatre mots en moins de 100 ms (ordre user)
+
+- **Demande** : pas assez d'infos/seconde (5 minimum) — dire juste
+  `left`/`straight`/`right`/`stop`, source SAM, mot parlé en <100ms.
+- `GuidanceWord` (core pur) : voie libre ⇒ cap, bouché ⇒ côté/passage,
+  contact mesuré ≤0,6m ⇒ stop, décalage/trottoir ⇒ côté ; FR/EN.
+  Annonceur : mot nouveau dit aussitôt (ni délai ni stabilité), même mot
+  muet. `LateralNudgeText`/`SidewalkText`/clés morts supprimés.
+- Clips `guide_*` (8 MP3 voix Laure, catalogue + garde OK) joués depuis
+  le disque (`VoicePack` + `playFile`, zéro réseau) ; synthèse + cache
+  sinon (`ProximityVoice.speakWord`). Tous les mots urgents (coupent tout).
+- Preuves : `:core` 1 800 + `:app` 1 071 tests, 0 échec, sur r630
+  (`GuidanceWordTest` 5/5, `GuidanceAnnouncerTest` 15/15,
+  `ProximityVoiceWordTest` 3/3), `check-kotlin-limits` +
+  `check-voicepack` OK. Docs `GUIDAGE-TOUT-DROIT.md`, `VOIX-DANGER.md` § 10.
+- Fichiers : `GuidanceWord.kt`, `Guidance.kt`, `GuidanceAnnouncer.kt`,
+  `LateralNudge.kt`, `SidewalkKeep.kt`, `ProximityVoice.kt`,
+  `ProbeWiring.kt`, `IseeViewModel.kt`, `LiveProbe.kt` (+8 MP3, +10 tests).
+
 ## 2026-10-29 — iSee : guidage SAM seul, TwinLiteNet viré (ordre user)
 
 - **Demande** : plus de TwinLiteNet (sol) — SAM seul guide : conseil de
