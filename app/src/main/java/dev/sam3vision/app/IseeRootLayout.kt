@@ -47,6 +47,12 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      */
     var pictoZone: (() -> RectF?)? = null
 
+    /**
+     * Zone tactile de la puce Traversée, mêmes règles que [pictoZone] : un DOWN
+     * dedans descend au chip au lieu de toggler la vidéo.
+     */
+    var crossingZone: (() -> RectF?)? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private var capturing = false
 
@@ -85,37 +91,42 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * iSee n'a **aucun** contrôle tactile (ni bouton, ni champ) : quand ses panneaux sont
-     * à l'écran, la racine prend le geste dès le DOWN. Sans ça, un balayage non consommé
-     * remontait au système, qui ouvrait le volet de notifications au milieu d'un swipe
-     * (mesuré sur le téléphone). Hors iSee, rien n'est intercepté : Réglages garde ses
-     * boutons.
+     * iSee n'a que deux contrôles tactiles (Picto, Traversée) : hors de leurs
+     * zones, quand ses panneaux sont à l'écran, la racine prend le geste dès le
+     * DOWN. Sans ça, un balayage non consommé remontait au système, qui ouvrait
+     * le volet de notifications au milieu d'un swipe (mesuré sur le téléphone).
+     * Hors iSee, rien n'est intercepté : Réglages garde ses boutons.
      */
     /**
-     * Geste en cours vers le chip Picto : une fois le DOWN exempté, tout le
+     * Geste en cours vers un chip exempté : une fois le DOWN exempté, tout le
      * geste (MOVE, UP) descend aussi — reprendre l'interception au UP enverrait
      * un CANCEL au chip et tuerait le clic (vu sur le téléphone : vidéo coupée,
      * aucune génération). Remis à zéro à chaque fin de geste.
      */
     private var pictoPass = false
+    private var crossingPass = false
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        // Le bouton Picto est le seul contrôle tactile d'iSee : un DOWN dans sa
-        // zone descend au chip — sinon le tap togglerait la vidéo au lieu de
-        // générer (vu sur le téléphone). Sans zone, interception inchangée.
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN) pictoPass = inPictoZone(ev)
-        if (pictoPass) {
+        // DOWN dans une zone de chip : il descend au chip — sinon le tap
+        // togglerait la vidéo au lieu d'agir (vu sur le téléphone, Picto puis
+        // Traversée). Sans zone, interception inchangée.
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            pictoPass = inZone(pictoZone?.invoke(), ev)
+            crossingPass = inZone(crossingZone?.invoke(), ev)
+        }
+        if (pictoPass || crossingPass) {
             if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
                 pictoPass = false
+                crossingPass = false
             }
             return false
         }
         return gesturesEnabled()
     }
 
-    /** Vrai si le DOWN tombe dans la zone du chip (coordonnées fenêtre des deux côtés). */
-    private fun inPictoZone(ev: MotionEvent): Boolean {
-        val zone = pictoZone?.invoke() ?: return false
+    /** Vrai si le DOWN tombe dans la zone (`null` = pas affichée, jamais dedans). */
+    private fun inZone(zone: RectF?, ev: MotionEvent): Boolean {
+        if (zone == null) return false
         val at = IntArray(2)
         getLocationInWindow(at)
         return zone.contains(ev.x + at[0], ev.y + at[1])
