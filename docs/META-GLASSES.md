@@ -351,6 +351,10 @@ l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune oc
 | Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |
 
+Une porte est **partagée** : `glasses/GlassesLinkGate.kt` (attente du lien `CONNECTED`, bornée à
+30 s) sert au banc **et** à l'app depuis le 2026-10-29 — c'est le seul code que les deux
+chemins exécutent à l'identique, parce que le refus du SDK est le même pour les deux.
+
 Les deux chemins coexistent volontairement : le banc peut essayer, l'app reste prudente. Les
 chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autre.
 
@@ -361,7 +365,7 @@ chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autr
 | Fichier | Couvre |
 |---|---|
 | `GlassesPolicyTest.kt` | phases joignables (`STOPPED` redevient joignable), libellés, phrases d'état, `photoHint`, raison de non-collecte documentée |
-| `GlassesMessagesTest.kt` | gravité de chaque message, aucun échec en `INFO`, filtrage des faux positifs d'enregistrement, aucun secret recopié, voix HP annoncée |
+| `GlassesMessagesTest.kt` | gravité de chaque message, aucun échec en `INFO`, filtrage des faux positifs d'enregistrement, aucun secret recopié, voix HP annoncée ; l'attente du lien et le lien absent **ne renvoient plus au ré-appairage** |
 | `GlassesUiStateTest.kt` | `connected`/`canConnect`/`hasDevice`, les 4 lignes d'état en français |
 | `GlassesPhaseMappingTest.kt` | `DeviceSessionState` → phase affichée, dont `PAUSED` |
 | `GlassesFrameCollectorTest.kt` | étranglement par rejet, routage compressé/brut/config, silences journalisés, libération |
@@ -380,7 +384,7 @@ isole dans des fichiers courts et on met la décision dans `GlassesPolicy.kt`.
 | Point | État |
 |---|---|
 | `mwdat-mockdevice` embedding : **corrigé le 26/10** — `debugImplementation` (`app/build.gradle.kts:181`), `GlassesMock.kt` en `app/src/debug/`, `main` passe par l'interface `GlassesMockDevice.kt` + une fabrique réflexive (AGP interdit de redéclarer la classe dans `main`, qui ne peut pas la lier) ; les boutons restent gatés debug (`GlassesSection.kt:61-63`, `SettingsScreen.kt:106`) | **fait** — `:app:compileDebugKotlin`, `:app:compileReleaseKotlin` et `:app:testDebugUnitTest` verts (334 tests) |
-| Aucun délai n'expire un `STARTING` ; **jamais essayé** sur lunettes | ouvert, assumé |
+| L'attente du lien borne désormais `STARTING` à 30 s (`LINK_WAIT_MS`) puis revient en `IDLE` avec un message ; `createSession` lui-même n'a toujours **aucun délai** | moitié corrigée le 29/10, `createSession` ouvert |
 | Messages visibles seulement dans Réglages (§7) | ouvert, hors périmètre |
 | `DonState.UNKNOWN` est affiché « non portées » (`GlassesStatus.kt:22-27`) : l'état inconnu et l'état « retirées » se ressemblent | ouvert, sans risque |
 | Qualité d'image à 15 i/s, décodage HEIC, latences | **non mesuré** |
@@ -396,7 +400,7 @@ Paire `RB Meta 01TK`, téléphone `2c6852ac`, app en **Developer Mode** (`APPLIC
 | Le runtime DAT des lunettes est **1.0.0.0.0**, seule version que Meta sert | Meta AI → ☰ → Paramètres → Informations sur l'application → « Version du SDK DAT » ; repasse à « non installée » si le Developer Mode est désactivé (5 taps sur le numéro de version) |
 | **SDK 1.0.1 refuse la paire** | session `STARTING → STARTED` puis coupée en ~70 ms, « Your glasses need an update » (`START_ERROR_DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED`, constante absente du 1.0.0). D'où `mwdat = "1.0.0"` et la garde `DatPinTest` |
 | Avec 1.0.0, la session **reste ouverte** | `session démarrée`, `caméra ajoutée`, `flux démarré` ; seul refus restant : `CAPABILITY_DENIED` (permission caméra) |
-| Le lien se monte en ~2 à 10 s après l'allumage | `linkState` = `CONNECTING` puis `CONNECTED` ; une session créée avant rend `NO_ELIGIBLE_DEVICE` (déjà géré : `hasLinkedDevice`) |
+| Le lien se monte en ~2 à 10 s après l'allumage | `linkState` = `CONNECTING` puis `CONNECTED` ; une session créée avant rend `NO_ELIGIBLE_DEVICE` — l'app **attend** ce lien depuis le 29/10 (`GlassesLinkGate.kt`), au lieu de refuser avec « Aucune paire éligible » |
 | Le SDK publie son verdict de compatibilité | `Device.compatibility` = `COMPATIBLE` / `DEVICE_UPDATE_REQUIRED` / `SDK_UPDATE_REQUIRED`, déjà affiché par `GlassesRealCheck` |
 | En Developer Mode, la page de permission caméra **n'existe pas** dans la fiche de l'app | ☰ → Lunettes → paire → Paramètres → Applications → « Applications du mode développeur(se) » → app : une seule ligne « Déconnecter » ; les libellés « Always allow » n'existent pas dans l'APK 295. La demande passe donc par le **contrat du SDK** (bouton « Autoriser … (Meta AI) »), pas par cette page ; le chemin manuel n'est que le repli |
 | Pas de canal public | Meta ne propose que le Developer Mode (sans invitation) et un canal privé « Beta », **sur invitation par e-mail du compte Meta** (wearables.meta.com) |

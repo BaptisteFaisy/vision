@@ -158,7 +158,7 @@ fun sessionErrorMessage(error: DeviceSessionError): GlassesMessage = when (error
     DeviceSessionError.CAPABILITY_DENIED ->
         GlassesMessage(MessageKind.ERROR, "Caméra refusée par le SDK : autorise-la, puis redémarre la session.")
     DeviceSessionError.NO_ELIGIBLE_DEVICE ->
-        GlassesMessage(MessageKind.ERROR, "Aucune paire éligible : appaire les lunettes dans Meta AI et enregistre l'app.")
+        GlassesMessage(MessageKind.ERROR, "Aucune paire disponible : déplie les lunettes, mets-les pour réveiller le lien, puis redémarre la session.")
     DeviceSessionError.SESSION_ALREADY_STOPPED ->
         GlassesMessage(MessageKind.INFO, "Session déjà arrêtée côté SDK : redémarre-la.")
     DeviceSessionError.SESSION_IDLE ->
@@ -211,6 +211,21 @@ object GlassesMessages {
 
     fun sessionAlreadyRunning() =
         GlassesMessage(MessageKind.WARNING, "Une session lunettes tourne déjà : arrête-la d'abord.")
+
+    /** L'attente du lien : c'est l'app qui patiente, l'utilisateur n'a rien à corriger. */
+    fun waitingForLink() = GlassesMessage(
+        MessageKind.INFO,
+        "Lunettes pas encore liées : j'attends le Bluetooth (jusqu'à 30 s), garde-les dépliées et portées.",
+    )
+
+    /**
+     * Le lien n'a jamais monté dans le délai. Le geste est sur les lunettes (dépliées, portées),
+     * pas un ré-appairage : c'est l'ancien message qui envoyait l'utilisateur sur une fausse piste.
+     */
+    fun noLinkedDevice() = GlassesMessage(
+        MessageKind.ERROR,
+        "Lunettes pas encore connectées : déplie-les, mets-les sur le nez, vérifie le Bluetooth, puis redémarre la session.",
+    )
 
     fun noCamera() = GlassesMessage(
         MessageKind.WARNING,
