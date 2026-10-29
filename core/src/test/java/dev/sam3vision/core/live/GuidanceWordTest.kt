@@ -65,8 +65,11 @@ class GuidanceWordTest {
         assertTrue(GuidanceWord.isStopPhrase("Stop."))
         assertTrue(GuidanceWord.isStopPhrase(GuidanceWord.Stop.text(SpeechLanguage.Fr)))
         assertTrue(GuidanceWord.isStopPhrase(GuidanceWord.Stop.text(SpeechLanguage.En)))
+        assertTrue(GuidanceWord.isStopPhrase("obstacle, arrêtez-vous."))
+        assertTrue(GuidanceWord.isStopPhrase("obstacle, stop."))
         assertFalse(GuidanceWord.isStopPhrase("Gauche."))
         assertFalse(GuidanceWord.isStopPhrase("Straight."))
+        assertFalse(GuidanceWord.isStopPhrase("gauche."))
         assertFalse(GuidanceWord.isStopPhrase("Personne à 9 heures."))
     }
 }

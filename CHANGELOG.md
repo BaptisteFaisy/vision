@@ -3,6 +3,28 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : arbitrage voix « obstacle → TwinLite, sinon SAM » (ordre user)
+
+- **Demande** : si obstacle → voix TwinLite (« obstacle, stop » + côté de
+  sortie), sinon → mots SAM (cap/trottoir/décalage) — un seul parle à la
+  fois, jamais de doublon, doctrine <100ms/clips gardée, guidage doux
+  (seul le stop coupe).
+- `TwinLiteWord` (core pur, restauré minimal du chemin voix-obstacle viré
+  par `d13ac26a`/PR #306 : textes `TwinLiteText`, clips `tl_*` de
+  `TwinLiteVoice.idFor`, lus dans `7d133f3f`) — sans segmentation
+  (ni LiteRT, ni masque : bouché/libre reste 100 % SAM). `GuidanceAnnouncer`
+  arbitre (une seule porte, clés `tl|*` ≠ `w|*`) ; `ProbeWiring` route les
+  phrases TwinLite vers `speakWord` (clips `vp_tl_*` restaurés, catalogue +
+  garde OK) ; `isStopPhrase` couvre les deux stops (TwinLite interne +
+  « Stop. » SAM externe), `LiveProbe` intact (499 lignes).
+- Preuves : `:core` 1 814 + `:app` 1 071 tests, 0 échec, sur r630
+  (`TwinLiteWordTest` 9/9, `GuidanceAnnouncerTest` 18/18 dont l'arbitrage),
+  `check-kotlin-limits` + `check-voicepack` OK. Docs `GUIDAGE-TOUT-DROIT.md`,
+  `VOIX-DANGER.md` § 12, `URGENCE-EXTERNE.md`.
+- Fichiers : `TwinLiteWord.kt`, `GuidanceAnnouncer.kt`, `GuidanceWord.kt`
+  (`isStopPhrase`), `ProbeWiring.kt`, `IseeViewModel.kt` (commentaire),
+  8 tests, 3 docs (+8 MP3, +12 tests).
+
 ## 2026-10-29 — iSee : mur et concepts = obstacles bloquants (preuves JVM)
 
 - **Demande** : le mur et la liste user (barrières, marches, escaliers,

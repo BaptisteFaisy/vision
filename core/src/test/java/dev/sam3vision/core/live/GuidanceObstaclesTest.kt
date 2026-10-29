@@ -192,9 +192,9 @@ class GuidanceObstaclesTest {
         val wallBox = listOf(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
         val cut = pinholeChain(frameOf(seg("mur", wallBox))).placed
 
-        assertEquals("Gauche.", announcer.onFrame(0L, cut))
+        assertEquals("gauche.", announcer.onFrame(0L, cut))
         assertNull(announcer.onFrame(100L, cut))
-        assertEquals("Stop.", announcer.onFrame(200L, depthWallStop().placed))
+        assertEquals("obstacle, arrêtez-vous.", announcer.onFrame(200L, depthWallStop().placed))
     }
 
     companion object {
