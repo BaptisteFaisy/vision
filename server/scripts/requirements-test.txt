@@ -1,0 +1,5 @@
+# Dépendances des seuls tests backend (`server/scripts/test_units.py`, via
+# `server/scripts/tests_units/`) : stdlib + ces deux paquets. Jamais le runtime
+# lourd (torch reste sur les conteneurs Modal).
+numpy
+pillow
