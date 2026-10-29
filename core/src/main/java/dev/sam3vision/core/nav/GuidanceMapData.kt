@@ -6,12 +6,9 @@ import kotlin.math.ln
 
 /**
  * État carte du guidage, pur JVM : ce que la carte OSM dessine par-dessus les
- * tuiles (tracé, destination, position, traversées, feux, pastilles) plus la
+ * tuiles (tracé, destination, position, traversées, pastilles) plus la
  * caméra (cible, zoom, cap).
  *
- * Ces quatre types miroirent `app/guidemap/MapState.kt` à l'identique (mêmes
- * noms, mêmes champs) : `:core` ne peut pas importer `:app`, le parent
- * déduplique à l'intégration.
  */
 
 /** Cible caméra : point centré, zoom et cap (0 = nord en haut). */
@@ -27,7 +24,6 @@ data class MapOverlays(
     val position: RoutePoint?,
     val accuracyM: Float?,
     val crossings: List<RoutePoint>,
-    val signals: List<RoutePoint>,
     val maneuvers: List<ManeuverMarker>,
 )
 
@@ -45,16 +41,51 @@ private const val ZOOM_STREET = 16.0
 private const val ZOOM_MIN = 2.0
 private const val ZOOM_MAX = 19.0
 
+/** Zoom suivi : caméra centrée sur la position connue, nord en haut. */
+private const val ZOOM_FOLLOW = 17.0
+
+/**
+ * Écart maximal affiché recalé, en mètres : miroir du défaut
+ * [NavTuning.offRouteM] — au-delà, le moteur déclare l'écart ([NavState.OffRoute])
+ * et l'affichage montre le fix brut (hors tracé) au lieu de le recaler.
+ */
+const val SNAP_DISPLAY_M = 30.0
+
+/**
+ * Tracé à dessiner : la `shape` Valhalla finie quand elle tient la route
+ * (≥ 2 points), sinon les manœuvres finies (repli sans géométrie).
+ * Route nulle ⇒ liste vide. Ne lève jamais.
+ */
+fun routePointsOf(route: NavRoute?): List<RoutePoint> {
+    val shape = route?.shape.orEmpty().filter { it.lat.isFinite() && it.lon.isFinite() }
+    if (shape.size >= 2) return shape
+    return route?.maneuvers.orEmpty().mapNotNull { it.finitePoint() }
+}
+
+/**
+ * Position à afficher : le fix exploitable ([NavFix.isUsable]) recalé sur
+ * [shape] ([NavGeo.snapToPolyline]) quand l'écart reste sous [SNAP_DISPLAY_M],
+ * le fix brut sinon (écarté : le moteur déclare l'écart, l'affichage le
+ * montre). Fix inexploitable ou nul ⇒ `null`. Ne lève jamais.
+ */
+fun snappedPositionOf(fix: NavFix?, shape: List<RoutePoint>): RoutePoint? {
+    val usable = fix?.takeIf { it.isUsable() } ?: return null
+    val snap = NavGeo.snapToPolyline(usable.lat, usable.lon, shape)
+    if (snap != null && snap.crossTrackM <= SNAP_DISPLAY_M) return snap.point
+    return RoutePoint(usable.lat, usable.lon)
+}
+
 /**
  * Construit l'état carte depuis le guidage actif. Ne lève jamais (repli :
  * overlays vides, caméra nulle).
  *
  * - route nulle ou sans manœuvre → overlays vides et caméra nulle ;
- * - tracé = manœuvres finies, destination = dernier point ;
- * - position = fix si [NavFix.isUsable] (avec sa précision) ;
- * - traversées = manœuvres `crossing` finies, signaux = feux finis ;
+ * - tracé = [routePointsOf], destination = dernier point ;
+ * - position = [snappedPositionOf] (avec la précision du fix) ;
+ * - traversées = manœuvres `crossing` finies ;
  * - une pastille par manœuvre finie, libellé [maneuverLabel] ;
- * - caméra : cible = position sinon centre du tracé, zoom [zoomFor], cap 0.
+ * - caméra : position connue → suivi (zoom 17), sinon cadrage du tracé
+ *   ([zoomFor]), sinon `null` (cadrage auto) ; cap 0 (nord en haut).
  *
  * [update] est réservé : [GuidanceUpdate] ne porte aucun index de manœuvre
  * (ni instruction ciblée), donc `upcoming` vaut `false` partout — le moteur
@@ -64,33 +95,29 @@ fun guidanceMapStateOf(
     route: NavRoute?,
     fix: NavFix?,
     update: GuidanceUpdate?,
-    signals: List<RoutePoint>,
 ): GuidanceMapState =
-    runCatching { buildMapState(route, fix, signals) }
+    runCatching { buildMapState(route, fix) }
         .getOrElse { GuidanceMapState(null, emptyOverlays()) }
 
 /** Surcouche vide : hors guidage ou repli après exception. */
 private fun emptyOverlays(): MapOverlays =
-    MapOverlays(emptyList(), null, null, null, emptyList(), emptyList(), emptyList())
+    MapOverlays(emptyList(), null, null, null, emptyList(), emptyList())
 
 /** Assemblage (voir [guidanceMapStateOf]) ; l'appelant encaisse les exceptions. */
 private fun buildMapState(
     route: NavRoute?,
     fix: NavFix?,
-    signals: List<RoutePoint>,
 ): GuidanceMapState {
     val maneuvers = route?.maneuvers.orEmpty()
     if (maneuvers.isEmpty()) return GuidanceMapState(null, emptyOverlays())
-    val usableFix = fix?.takeIf { it.isUsable() }
-    val position = usableFix?.let { RoutePoint(it.lat, it.lon) }
-    val points = maneuvers.mapNotNull { it.finitePoint() }
+    val points = routePointsOf(route)
+    val position = snappedPositionOf(fix, points)
     val overlays = MapOverlays(
         route = points,
         destination = points.lastOrNull(),
         position = position,
-        accuracyM = usableFix?.accM,
+        accuracyM = fix?.takeIf { it.isUsable() }?.accM,
         crossings = maneuvers.filter { it.crossing }.mapNotNull { it.finitePoint() },
-        signals = signals.filter { it.lat.isFinite() && it.lon.isFinite() },
         maneuvers = maneuvers.mapNotNull { maneuver ->
             maneuver.finitePoint()?.let { point ->
                 ManeuverMarker(point, maneuverLabel(maneuver, route?.destinationName), false)
@@ -101,11 +128,13 @@ private fun buildMapState(
 }
 
 /**
- * Caméra : cible = position sinon centre du tracé, zoom [zoomFor], cap 0
- * (nord en haut). Sans cible (ni position ni point) : `null` (cadrage auto).
+ * Caméra suivi : position connue → centrée dessus (zoom 17) ; sinon tracé →
+ * cadrage existant (centre + [zoomFor]) ; sinon `null` (cadrage auto).
+ * Cap 0 (nord en haut) dans tous les cas.
  */
 private fun cameraFor(points: List<RoutePoint>, position: RoutePoint?): MapCamera? {
-    val target = position ?: boundsCenter(points) ?: return null
+    if (position != null) return MapCamera(target = position, zoom = ZOOM_FOLLOW, bearingDeg = 0f)
+    val target = boundsCenter(points) ?: return null
     return MapCamera(target = target, zoom = zoomFor(points), bearingDeg = 0f)
 }
 

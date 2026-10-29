@@ -41,6 +41,13 @@ class ValhallaRouteTest {
         assertEquals(48.8509, route.maneuvers[1].lat, 1e-5)
         assertEquals(2.35135, route.maneuvers[2].lon, 1e-5)
         assertEquals("la gare", route.destinationName)
+        assertEquals(3, route.shape.size)
+        assertEquals(48.85, route.shape[0].lat, 1e-5)
+        assertEquals(2.35, route.shape[0].lon, 1e-5)
+        assertEquals(48.8509, route.shape[1].lat, 1e-5)
+        assertEquals(2.35, route.shape[1].lon, 1e-5)
+        assertEquals(48.8509, route.shape[2].lat, 1e-5)
+        assertEquals(2.35135, route.shape[2].lon, 1e-5)
     }
 
     @Test

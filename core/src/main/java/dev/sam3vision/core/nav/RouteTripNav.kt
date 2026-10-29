@@ -24,7 +24,7 @@ fun RouteTrip.toNavRoute(destinationName: String?): Result<NavRoute> {
     maneuvers[0] = maneuvers[0].copy(action = ManeuverAction.Start)
     maneuvers[maneuvers.lastIndex] = maneuvers[maneuvers.lastIndex].copy(action = ManeuverAction.Arrive)
     val name = destinationName?.takeIf { it.isNotBlank() } ?: maneuvers.last().street
-    return NavRoute.validate(NavRoute(maneuvers = maneuvers, destinationName = name))
+    return NavRoute.validate(NavRoute(maneuvers = maneuvers, destinationName = name, shape = leg.shape))
 }
 
 /**
