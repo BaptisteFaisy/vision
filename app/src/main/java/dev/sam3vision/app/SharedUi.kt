@@ -30,6 +30,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -244,17 +245,21 @@ fun PhotoStage(
     // Taille explicite au ratio réel de la photo : dans une colonne scrollable
     // (hauteur infinie), un `fillMaxSize` nu se mesure à 0 et la photo disparaît.
     val ratio = (bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)).coerceIn(0.25f, 4f)
+    // Les bitmaps ne sont jamais mutés en place : une conversion par image suffit,
+    // même quand seul un flag (masques, brouillon) fait recomposer l'écran.
+    val image = remember(bitmap) { bitmap.asImageBitmap() }
+    val masks = remember(overlays) { overlays.map { it.asImageBitmap() } }
     Box(modifier.fillMaxWidth().aspectRatio(ratio), contentAlignment = Alignment.Center) {
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = image,
             contentDescription = "Photo analysée",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
         if (showMasks) {
-            overlays.forEach { overlay ->
+            masks.forEach { mask ->
                 Image(
-                    bitmap = overlay.asImageBitmap(),
+                    bitmap = mask,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
