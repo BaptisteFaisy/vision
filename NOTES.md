@@ -48,12 +48,12 @@ les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **876** |
-| Lignes de prod (`*/src/main`) | **52 815** — `:core` 211 f./21 749 l. · `:app` 277 f./31 066 l. (dont banc 15 f./1 641 l.) |
-| `@Test` | **2 719** = **2 709 JVM** + **10 instrumentés** |
-| dont `core/src/test` | **1 765** |
-| dont `app/src/test` | **944** (dont banc **95**) |
-| dont `app/src/androidTest` (nettoyage, profondeur, segment, média) | **9** (appareil requis) |
+| Fichiers `.kt` | **913** |
+| Lignes de prod (`*/src/main`) | **54 784** — `:core` 213 f./22 200 l. · `:app` 286 f./32 584 l. (dont banc 15 f./1 641 l.) |
+| `@Test` | **2 884** = **2 875 JVM** + **9 instrumentés** |
+| dont `core/src/test` | **1 804** |
+| dont `app/src/test` | **1 071** (dont banc **95**) |
+| dont `app/src/androidTest` (nettoyage, profondeur, média) | **8** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
 | Plus gros fichiers | `app/AppViewModel.kt` et `app/isee/IseeViewModel.kt` — **498** lignes chacun (côté Python : `conflict_agent.py`, `fast_core.py` — 499) |

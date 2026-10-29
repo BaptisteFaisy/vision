@@ -4,7 +4,6 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.SegObject
-import org.json.JSONArray
 import org.json.JSONObject
 
 /** Accès tolérants au JSON : jamais d'exception, valeurs par défaut sinon. */
@@ -185,8 +184,6 @@ internal fun JSONObject.segments(path: String): List<String> {
     }
 }
 
-/** Construit un tableau JSON de chaînes. */
-internal fun jsonArrayOf(values: List<String>): JSONArray = JSONArray().apply { values.forEach { put(it) } }
 
 /** Label d'un objet sans nom dans la réponse du backend. */
 internal const val DEFAULT_LABEL = "objet"

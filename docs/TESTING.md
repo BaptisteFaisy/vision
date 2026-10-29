@@ -15,7 +15,7 @@ une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est a
 
 ```bash
 grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 1765
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 944
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 1 071
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 95
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 9
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
@@ -23,13 +23,13 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 239 (dont 14 aides) | 226 | **1 765** |
-| `:app` | 142 (dont 3 aides) | 140 | **944** |
-| **Total JVM** | **381** | **366** | **2 709** |
-| `:app` `androidTest` | 4 | 4 | **9** (instrumentés) |
+| `:core` | 244 (dont 14 aides) | 233 | **1 804** |
+| `:app` | 161 (dont 3 aides) | 159 | **1 071** |
+| **Total JVM** | **405** | **392** | **2 875** |
+| `:app` `androidTest` | 3 | 3 | **8** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **2 822 tests JVM** au total, dont **1 780** dans `:core` et **1 042** dans `:app`. Dans `:app`, le
+- **2 875 tests JVM** au total, dont **1 804** dans `:core` et **1 071** dans `:app`. Dans `:app`, le
   banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
   **9 tests instrumentés** (8 + 1) sont hors de ce total.
 - « Classes `@Test` » = déclarations `class …Test` dans les fichiers portant `@Test`
@@ -53,7 +53,7 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 ```
 
 Relevé du 29/10, sur r630 (`:core:testDebugUnitTest :app:testDebugUnitTest`) : **`:core`
-1 765 / 0 échec / 0 ignoré**, **`:app` 944 / 0 / 0** — **2 709 exécutés** au total, conformes aux
+1 804 / 0 échec / 0 ignoré**, **`:app` 1 071 / 0 / 0** — **2 875 exécutés** au total, conformes aux
 comptages statiques du §1. (Historique : le 26/10 après 19 h, `:core` 663, `:app` 305 et le banc
 lunettes 36 — 1 004 au total, avant la fusion du banc dans `:app`, non comparable.)
 
@@ -147,7 +147,7 @@ agent : téléphone occupé = sortie `2`, le tour suivant réessaie.
 Aucun des éléments suivants n'a d'exécution attestée dans cet arbre. Ils sont **à rejouer**
 avant d'être présentés comme validés :
 
-- les **10 tests instrumentés** (§5) — jamais lancés sur appareil ;
+- les **9 tests instrumentés** (§5) — jamais lancés sur appareil ;
 - la **recette manuelle du mode tap** (vidéo → SAM 3.1, écran « Envoyé / Échec ») ;
 - la **recette du direct WebSocket** (pastille « WebSocket » / « KO », `X ips`, question
   « qu'est-ce qui était à gauche il y a 5 s ? » avec le journal de pistes) ;
@@ -172,7 +172,7 @@ jamais d'émulateur — flotte arrêtée) :
 ```bash
 phone take --task "tests instrumentés"   # depuis le poste (relâche auto après 5 min)
 cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
-  ./gradlew :app:connectedDebugAndroidTest --offline   # les 10 tests instrumentés
+  ./gradlew :app:connectedDebugAndroidTest --offline   # les 9 tests instrumentés
 phone release
 # ou, après `:app:assembleDebug :app:assembleDebugAndroidTest`, classe par classe :
 adb -s 2c6852ac install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -204,17 +204,17 @@ trace MediaStore dé-synchronisée oubliée sans erreur · capture en cours d'é
 périmètre limité au stockage privé de l'app · job horaire unique et sans réseau.
 **Non exécutés ici** (voir §4).
 
-## 6. Tests JVM par domaine (comptage du 29/10)
+## 6. Tests JVM par domaine (comptage du 29/10/2026, exécuté par Gradle)
 
-Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deux fichiers portent deux classes : `PictoMatcherTest.kt` — 6 + 2 — et `TapZonesTest.kt` — 4 + 2).
+Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deux fichiers portent deux classes : `PictoMatcherTest.kt` et `TapZonesTest.kt`, listées séparément).
 
-### `:core` — 1779
+### `:core` — 1 804 (depuis 1779)
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
-- **crossing** (68) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, PedLightGateTest 20, TrainedLightColorTest 4
-- **curb** (21) : CurbWatcherTest 11, SidewalkKeepTest 10
+- **crossing** (76) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingOfferTest 8, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, PedLightGateTest 20, TrainedLightColorTest 4
+- **curb** (28) : CurbWatcherTest 18, SidewalkKeepTest 10
 - **depth** (29) : DepthEstimatorTest 3, DepthFusionTest 9, DepthMapTest 5, DepthReadingsTest 7, SerialRunGuardTest 5
-- **distance** (92) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 7, DistanceTextTest 8, GroundPlaneTest 17, KnownSizesTest 8, LensSpecTest 7, OpticsTest 24
+- **distance** (95) : DistanceFusionTest 9, DistanceMeterTest 12, DistanceTextEnglishTest 7, DistanceTextTest 8, GroundPlaneTest 17, KnownSizesTest 11, LensSpecTest 7, OpticsTest 24
 - **gesture** (19) : IseeGestureBrainTest 5, LongPressTriggerTest 10, TapOrHoldTest 4
 - **glasses** (7) : CaptureGestureTest 6, DatPinTest 1
 - **ground** (45) : ConnectedComponentsTest 5, DirectionalFeedbackTest 5, GroundConfigTest 4, GroundPipelineTest 3, GroundSeedsTest 4, ObstacleRegionsTest 6, PointCloudTest 7, RansacPlaneTest 6, RiskZonesTest 3, SceneLabelsTest 2
@@ -222,18 +222,18 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **hazard** (13) : HazardConceptsTest 5, HazardWatchTest 8
 - **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (334) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 15, GuidanceObstaclesTest 8, GuidanceSteeringTest 13, GuidanceTest 18, GuidanceWordTest 6, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 10, LatestFrameSlotTest 5, LightClockTest 6, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 10, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
+- **live** (334) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 15, GuidanceObstaclesTest 8, GuidanceSteeringTest 13, GuidanceTest 18, GuidanceWordTest 6, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 10, LatestFrameSlotTest 5, LightClockTest 6, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 11, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
 - **local** (27) : LocalOverlayEngineTest 24, LocalOverlaySimTest 3
 - **mask** (97) : MaskBenchTest 2, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
 - **model** (7) : GeometryTest 4, ObjectLimitsTest 3
 - **motion** (9) : MotionBenchTest 1, MotionSourceTest 8
-- **nav** (180) : BanGeocoderTest 7, ConfirmAnswerTest 4, CrossingManeuverTest 4, DestinationQueryTest 10, GeocodeCacheTest 6, GeocodeChainFailureTest 7, GeocodeChainTest 10, GuidanceUpdateTest 8, MapsUriTest 13, NavGeoTest 9, NavRouteTest 6, NavigationFlowTest 4, NavigationIntentTest 21, RouteMapProjectionTest 6, RouteSteeringFusionTest 7, RouteSummaryTest 11, RouteTripNavTest 6, StopGuidanceTest 4, ValhallaRouteTest 8, ValhallaShapeTest 6, VoiceNavArrivalBoundaryTest 4, VoiceNavCrossingTest 3, VoiceNavEngineTest 6, VoiceNavRerouteRobustnessTest 4, VoiceNavScriptTest 6
+- **nav** (201) : BanGeocoderTest 7, ConfirmAnswerTest 4, CrossingManeuverTest 4, DestinationQueryTest 10, GeocodeCacheTest 6, GeocodeChainFailureTest 7, GeocodeChainTest 10, GuidanceMapDataTest 5, GuidanceUpdateTest 8, MapModeCommandTest 9, MapModeMapStateTest 4, MapsUriTest 13, NavGeoTest 9, NavRouteTest 6, NavigationFlowTest 4, NavigationIntentTest 21, RouteMapProjectionTest 9, RouteSteeringFusionTest 7, RouteSummaryTest 11, RouteTripNavTest 6, StopGuidanceTest 4, ValhallaRouteTest 8, ValhallaShapeTest 6, VoiceNavArrivalBoundaryTest 4, VoiceNavCrossingTest 3, VoiceNavEngineTest 6, VoiceNavRerouteRobustnessTest 4, VoiceNavScriptTest 6
 - **navcore** (50) : NavErrorTest 10, NavMessagesTest 12, NavResultsTest 7, NavStopTest 6, NavUiStateTest 8, RetryPolicyTest 7
-- **net** (289) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, GpuMonitorTest 11, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 23, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, MetaImageClientTest 5, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 5, TrackClientTest 12, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
-- **picto** (8) : PictoMatcherTest 8 (deux classes : PictoMatcherTest 6 + PictoPromptTest 2)
+- **net** (294) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, GpuMonitorTest 11, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 23, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, MetaImageClientTest 5, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 5, TrackClientTest 12, TrafficSignalsTest 5, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
+- **picto** (17) : PictoMatcherTest 6, PictoPromptTest 2, PictoVoiceOrderTest 9
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
 - **settings** (95) : CaregiverInviteTest 7, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
-- **share** (22) : CaregiverPageTest 7, SharePayloadTest 7, ShareSendMessageTest 4, SharedSceneTest 4
+- **share** (24) : CaregiverPageTest 7, SharePayloadTest 9, ShareSendMessageTest 4, SharedSceneTest 4
 - **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
 - **stairs** (42) : StairConceptsTest 4, StairDetectorTest 13, StairLabelSignalTest 5, StairWatcherTest 7, StairsCannyTest 8, StairsFeedTest 5
 - **text** (14) : PromptShieldTest 10, TextSanitizerTest 4
@@ -241,35 +241,26 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **usecase** (40) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 14
 - **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 947
+### `:app` — 1 071 (947 sur master)
 
-- **(racine)** (171) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
+- **(racine)** (187) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 8, HomePresetRequestTest 3, LiveCrossingPublishTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceRequestTest 3, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PictoOverlayTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
 - **depth** (9) : DepthPreprocessTest 4, ModelDownloaderTest 5
 - **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
 - **glasses.bench** (95) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 22, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
+- **guidemap** (9) : GuideMapStyleTest 9
 - **isee** (194) : BubbleCountTest 2, CrossingLightPumpTest 1, CrossingLocalLightTest 7, CrossingOverlayLayoutTest 11, CrossingWiringTest 6, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 5, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeHazardsTest 3, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 9, ProbeWiringSpokenTest 3, ProximityVoiceWordTest 4, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3
-- **isee.vm** (82) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseePictoVoiceTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, NavigationHookTest 6
-- **live** (68) : LiveAskForgetTest 1, LiveAskSessionTest 13, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
+- **isee.vm** (88) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseePictoVoiceTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, MapModeOrderTest 6, NavigationHookTest 6
+- **live** (84) : LiveAskForgetTest 1, LiveAskSessionTest 24, LiveAskVoiceTest 5, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
 - **locked** (6) : LockedMicAnswerTest 6
 - **media** (14) : MediaCacheStoreTest 4, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **navigation** (22) : AndroidGeocoderLabelTest 4, NavigationLauncherTest 12, VoiceNavTrackerTest 6
 - **perms** (11) : PermDecisionTest 11
-- **speech** (66) : SpeechArbitrationTest 6, SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 7, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 14
-- **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapSessionTest 6, TapZonesTest 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)
-- **traverse** (17) : TraverseClipStoreTest 4, TraverseWiringTest 13
+- **speech** (76) : SpeechArbitrationTest 6, SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 7, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 14, VoicePackTest 10
+- **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapReleaseTest 2, TapSessionTest 6, TapZonesTest 4
+- **traverse** (21) : TraverseClipStoreTest 4, TraverseWiringTest 17
 - **vm** (39) : AppAnalysisTest 9, AppChatTest 6, AppDiagnosticsTest 10, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
-- **voicenav** (63) : DestinationTextFieldTest 6, GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, ValhallaRouteLoaderTest 8, VoiceNavEngineDriverTest 4, VoiceNavSessionTest 26, VoiceNavSessionWiringTest 8
-
-Le banc lunettes (`glasses.bench`) n'a plus de section à part : il est dans `:app` depuis la
-suppression du module dédié (décision : `docs/GLASSES-DECISION.md`). Ses dix fichiers
-mélangent l'ancien périmètre du spike (`GlassesFrameEncoderTest`, `SessionPolicyTest`,
-`YuvConverterTest`) et les pièces ajoutées depuis (`ChaineCompleteTest`, `CycleLatchTest`,
-`GlassesAudioRouteTest`, `GlassesFramePolicyTest`, `LinkGateTest`, `SpikeLaunchTest`,
-`SpikeLogTest`).
-
-Aucun test ne touche le GPU ni le réseau réel : `/live`, `/live/ws` et les autres endpoints sont
-simulés (`core/src/test/…/TestHttpServer.kt`, `net/TestLiveClients.kt`, `net/NetContractHarness.kt`).
+- **voicenav** (94) : DestinationTextFieldTest 6, GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, RouteMapSnapshotTest 5, ValhallaRouteLoaderTest 8, VoiceNavEngineDriverTest 4, VoiceNavHoldTest 14, VoiceNavSessionArrivedTest 6, VoiceNavSessionMapTest 6, VoiceNavSessionTest 26, VoiceNavSessionWiringTest 8
 
 ## 7. Gardes et limites connues
 
