@@ -141,6 +141,10 @@ lancé sur cette machine pour ce comptage.
   (12 le 29/10, ordre user) et `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) ;
   le backend tronque à `PROMPT_LIMIT = 16` (`server/backend/tracking.py:53`, décision user du
   28/10). Historique : 2 le 27/10, 6 puis 16 le 28/10.
+- **Preset extérieur 8 concepts** : `LivePrompts.outdoor` = person, pole, bollard, fence,
+  barrier, gate, sign, tree (cheminement urbain, pastille « Extérieur »,
+  `app/HomePresetRow.kt`) — le défaut rue (12 dangers) et les presets maison restent
+  inchangés.
 - **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:34`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
   (`app/isee/LiveProbe.kt:191`) : `fastMs = 0`, `targetMs = 0`, `slowMs = 900`,
