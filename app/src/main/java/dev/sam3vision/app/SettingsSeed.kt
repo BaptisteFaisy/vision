@@ -44,7 +44,7 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShareRelay(
     seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
-        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmEndpoint(withLlmKey(migrateLegacyLlm(dropPresetUrl(loaded), build), build), build), build), build), build), build),
+        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmEndpoint(withLlmKey(migrateLegacyLlm(healAsr(healRoute(healSamManual(dropPresetUrl(loaded)), build)), build), build), build), build), build), build), build),
     ), build), build),
 )
 
@@ -157,6 +157,34 @@ internal fun migrateLegacyLlm(loaded: Settings, build: BuildDefaults): Settings 
  */
 internal fun dropPresetUrl(loaded: Settings): Settings =
     if (SamRegion.isPreset(loaded.samBaseUrl)) loaded.copy(samBaseUrl = "") else loaded
+
+/**
+ * Auto-réparation : une URL SAM manuelle inutilisable (sans scheme) n'a jamais été un
+ * choix — vidée, la résolution retombe sur le build puis le preset de la région.
+ */
+internal fun healSamManual(loaded: Settings): Settings =
+    if (loaded.samBaseUrl.isNotBlank() && !isUsableHttpUrl(loaded.samBaseUrl)) loaded.copy(samBaseUrl = "") else loaded
+
+/**
+ * Auto-réparation : une base itinéraire inutilisable n'a jamais été un choix — le
+ * build reprend la main, à défaut le vide qui rend le guidage à Maps.
+ */
+internal fun healRoute(loaded: Settings, build: BuildDefaults): Settings {
+    if (loaded.routeBaseUrl.isBlank() || isUsableHttpUrl(loaded.routeBaseUrl)) return loaded
+    val base = build.routeBaseUrl.takeIf { isUsableHttpUrl(it) } ?: ""
+    return loaded.copy(routeBaseUrl = base)
+}
+
+/**
+ * Auto-réparation : une base dictée inutilisable n'a jamais été un choix — le défaut
+ * Meta reprend la main. Le vide est conservé : c'est le repli Scribe.
+ */
+internal fun healAsr(loaded: Settings): Settings =
+    if (loaded.asrBaseUrl.isNotBlank() && !isUsableHttpUrl(loaded.asrBaseUrl)) {
+        loaded.copy(asrBaseUrl = Settings.DEFAULT_ASR_BASE_URL)
+    } else {
+        loaded
+    }
 
 /**
  * Auto-réparation : une base LLM vide ou inutilisable (sans scheme) n'a jamais été un

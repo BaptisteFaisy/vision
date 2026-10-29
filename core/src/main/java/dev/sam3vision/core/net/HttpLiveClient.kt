@@ -78,6 +78,7 @@ class HttpLiveClient(
         workEdge: Int,
         maxObjects: Int,
     ): Result<LiveFrame> {
+        endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
         if (!binaryUpload) return client.executeBytesBuilt(marks) {
             val body = OneShotJsonBody(
                 liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge),
@@ -97,6 +98,7 @@ class HttpLiveClient(
     }
 
     override suspend fun health(): Result<LiveHealth> {
+        endpointRefusal("endpoint direct", baseUrl, "/health")?.let { return Result.failure(it) }
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
         return wakeClient.executeBuilt { requestTo(baseUrl, "/health", userAgent = LIVE_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }

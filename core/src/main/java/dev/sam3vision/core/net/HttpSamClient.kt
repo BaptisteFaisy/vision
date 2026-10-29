@@ -13,6 +13,7 @@ class HttpSamClient(
 ) : SamClient {
 
     override suspend fun segment(pngOrJpegB64: String, prompts: List<String>?): Result<SegmentResult> {
+        endpointRefusal("endpoint SAM", baseUrl, "/segment")?.let { return Result.failure(it) }
         // Corps assemblé dans Dispatchers.IO (base64 ~100 Ko jamais scanné sur l'appelant)
         // et non rejouable : pas de 2e inférence GPU sur keep-alive mort.
         return client.executeBuilt {
@@ -23,6 +24,7 @@ class HttpSamClient(
     }
 
     override suspend fun health(): Result<Boolean> {
+        endpointRefusal("endpoint SAM", baseUrl, "/health")?.let { return Result.failure(it) }
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
         return client.executeBuilt { requestTo(baseUrl, "/health") }.map { outcome ->
             outcome.code in 200..299 && parse(outcome.body)?.optBoolean("ok", false) == true

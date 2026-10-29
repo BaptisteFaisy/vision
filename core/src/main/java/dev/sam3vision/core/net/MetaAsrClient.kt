@@ -32,6 +32,7 @@ class MetaAsrClient(
         if (wav.size <= WAV_HEADER_BYTES) {
             return Result.failure(ApiError.BadResponse("audio vide"))
         }
+        endpointRefusal("endpoint Meta", baseUrl, TRANSCRIBE_PATH)?.let { return Result.failure(it) }
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
         return http.executeBuilt {
             requestTo(

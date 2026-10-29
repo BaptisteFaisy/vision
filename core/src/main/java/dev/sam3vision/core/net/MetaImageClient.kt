@@ -31,6 +31,7 @@ class MetaImageClient(
         if (photoJpeg.isEmpty()) {
             return Result.failure(ApiError.BadResponse("photo vide"))
         }
+        endpointRefusal("endpoint Meta", baseUrl, EDITS_PATH)?.let { return Result.failure(it) }
         return http.executeBuilt {
             requestTo(
                 baseUrl,

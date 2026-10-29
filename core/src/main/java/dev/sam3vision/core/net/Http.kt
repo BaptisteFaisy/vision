@@ -171,6 +171,25 @@ internal fun joinUrl(baseUrl: String, path: String): String =
 fun isUsableHttpUrl(url: String): Boolean = url.trim().toHttpUrlOrNull() != null
 
 /**
+ * Message partagé des refus d'endpoint : chaque client garde son type historique,
+ * seul le texte change — le jargon du parseur OkHttp (`Expected URL scheme…`) ne
+ * remonte plus à l'écran, l'utilisateur est guidé vers Réglages.
+ */
+fun invalidEndpointMessage(label: String): String =
+    "$label invalide (https://…) — corrige-le dans Réglages"
+
+/**
+ * Refus local partagé d'un endpoint inutilisable : `null` quand l'URL exacte de
+ * l'appel passe le parseur OkHttp. Une base vide ou sans scheme (saisie en
+ * Réglages) devient une erreur actionnable, sans aucun appel réseau.
+ */
+fun endpointRefusal(label: String, baseUrl: String, path: String): ApiError.Network? {
+    if (baseUrl.isBlank()) return ApiError.Network("$label absent — renseigne-le dans Réglages")
+    if (!isUsableHttpUrl(joinUrl(baseUrl, path))) return ApiError.Network(invalidEndpointMessage(label))
+    return null
+}
+
+/**
  * **Fabrique unique de requêtes** : URL, méthode, corps, en-têtes.
  *
  * Avant, chaque client construisait son `Request.Builder` à la main — dix fois, avec

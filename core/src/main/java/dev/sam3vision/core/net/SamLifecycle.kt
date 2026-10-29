@@ -38,6 +38,7 @@ suspend fun releaseSam(
     client: OkHttpClient = defaultHttpClient(RELEASE_TIMEOUT_SECONDS),
 ): Result<ReleaseOutcome> {
     if (baseUrl.isBlank()) return Result.success(ReleaseOutcome(false, 0, "base vide"))
+    endpointRefusal("endpoint SAM", baseUrl, "/release")?.let { return Result.failure(it) }
     // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
     return client.executeBuilt {
         requestTo(

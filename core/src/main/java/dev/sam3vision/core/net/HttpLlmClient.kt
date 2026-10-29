@@ -138,7 +138,7 @@ class HttpLlmClient(
         if (apiKey.isBlank()) {
             return Result.failure(ApiError.InvalidKey("clé API absente — renseigne-la dans Réglages"))
         }
-        endpointError()?.let { return Result.failure(it) }
+        endpointRefusal("endpoint LLM", baseUrl, "/chat/completions")?.let { return Result.failure(it) }
         var current = model
         var result = postOnce(messages, maxTokens, current)
         var error = result.exceptionOrNull() ?: return result
@@ -150,19 +150,6 @@ class HttpLlmClient(
         if (!error.isTransient) return result
         delay(retryDelayMs)
         return postOnce(messages, maxTokens, current)
-    }
-
-    /**
-     * Refus local d'un endpoint inutilisable, avant tout appel : une base vide ou sans
-     * scheme remontait le message brut du parseur OkHttp (`Expected URL scheme…`) dans
-     * le statut affiché. `null` = l'URL exacte de l'appel passe le parseur.
-     */
-    private fun endpointError(): ApiError? {
-        if (baseUrl.isBlank()) return ApiError.Network("endpoint LLM absent — renseigne-le dans Réglages")
-        if (!isUsableHttpUrl(joinUrl(baseUrl, "/chat/completions"))) {
-            return ApiError.Network("endpoint LLM invalide (https://…) — corrige-le dans Réglages")
-        }
-        return null
     }
 
     /** Une tentative : corps, en-têtes, extraction du texte — l'orchestreur décide du reste. */
