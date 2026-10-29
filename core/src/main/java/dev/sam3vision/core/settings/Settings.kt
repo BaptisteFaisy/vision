@@ -93,6 +93,14 @@ data class Settings(
      */
     val navigationGuidanceEnabled: Boolean = true,
     /**
+     * Monde sensoriel de la sonde iSee : `true` (défaut) = dehors, la rue et
+     * ses 12 dangers, GPS autorisé ; `false` = dedans, les 7 objets
+     * d'intérieur (`LivePrompts.forMode`), pas de GPS. V1 : seuls les prompts
+     * SAM basculent, la portée reste 4 m. Persisté comme les autres drapeaux :
+     * la bascule survit au kill de l'app.
+     */
+    val outdoorMode: Boolean = true,
+    /**
      * Champ de vision horizontal imposé à la caméra, en degrés : 0 = lu sur le
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
@@ -326,6 +334,7 @@ data class Settings(
         "localOverlayEnabled=$localOverlayEnabled, " +
         "debugRouteMapEnabled=$debugRouteMapEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
+        "outdoorMode=$outdoorMode, " +
         "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +
         "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects, " +
         "routeBaseUrl=$routeBaseUrl)"

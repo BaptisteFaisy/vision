@@ -57,8 +57,9 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * [stopVoice] coupe la parole en cours quand le user prend la parole,
  * sans toucher au guidage lui-même.
  *
- * Voix : virages francs par [VoiceNavSpeaker.onTurn] (« Dans 100 mètres,
- * tournez à gauche, rue X »), le reste en phrase littérale du moteur
+ * Voix : virages francs par [VoiceNavSpeaker.onTurn] (préavis « Continuez
+ * dans cette direction, rue X » puis ordre sec « Tournez à gauche,
+ * rue X »), le reste en phrase littérale du moteur
  * ([VoiceNavPhrases.ahead]) — un demi-tour ou un giratoire n'a pas de verbe
  * juste en caps, et une mauvaise consigne vaut moins que la phrase exacte.
  * L'arrivée ne passe PAS par le haut-parleur : [onUpdate] la signale et la
@@ -206,6 +207,14 @@ class VoiceNavEngineDriver(
         stop()
         if (speakerLazy.isInitialized()) runCatching { speaker.shutdown() }
     }
+
+    /**
+     * Vrai si la voix route parle (arbitre vocal : l'obstacle non urgent
+     * attend). N'initialise jamais le haut-parleur paresseux : jamais
+     * démarré = silencieux.
+     */
+    fun isSpeaking(): Boolean =
+        if (speakerLazy.isInitialized()) speaker.isSpeaking() else false
 
     /** Itinéraire en cours de guidage, `null` au repos (carte de debug). */
     fun debugRoute(): NavRoute? = legs?.route

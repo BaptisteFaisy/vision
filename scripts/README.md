@@ -45,7 +45,7 @@ exécutions parallèles ne se marchent pas dessus.
 ## Lancer les tests
 
 ```bash
-bash scripts/test_scripts.sh      # 101 assertions (mesuré le 29/10/2026), code 0 si tout passe
+bash scripts/test_scripts.sh      # 128 assertions (mesuré le 29/10/2026), code 0 si tout passe
 python3 scripts/gen_mask_golden.py --selftest   # 11 assertions sur l'encodeur de masques
 python3 scripts/gen_mask_golden.py --check      # fixtures dorées <-> générateur
 ```

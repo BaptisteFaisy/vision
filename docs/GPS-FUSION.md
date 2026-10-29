@@ -6,9 +6,8 @@ obstacles. Le local contourne, le global replanifie.
 
 ## 1. Une seule voix
 
-Les manœuvres GPS (« Continuez dans cette direction », puis « Tournez à gauche »
-au carrefour) passent par la voix Laure (`ProximityVoice`), comme les mots et
-les « Attention … » : plus
+Les manœuvres GPS (« Continuez dans cette direction, rue X » puis « Tournez à gauche, rue X » au carrefour) passent par la
+voix Laure (`ProximityVoice`), comme les mots et les « Attention … » : plus
 de voix robot par-dessus. `VoiceNavEngineDriver.say` garde la même politique
 (`VoiceNavAnnouncer`) et la même urgence (`SpeechArbitration` : sortie de
 trace et recalcul coupent, le reste attend) — seul le tuyau change

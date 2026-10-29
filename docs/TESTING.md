@@ -208,7 +208,15 @@ périmètre limité au stockage privé de l'app · job horaire unique et sans r�
 
 Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deux fichiers portent deux classes : `PictoMatcherTest.kt` et `TapZonesTest.kt`, listées séparément).
 
-### `:core` — 1 835
+MAJ intégration iSee dehors du 29/10/2026 : `live` 349 → 361 (`LivePromptsTest`
+11 → 13, `SignConceptsTest` 10), `settings` 95 → 99 (`OutdoorModeTest` 4),
+`:core` 1 835 → 1 851. Écart résiduel pré-existant (hors périmètre,
+constaté sur `master` `6aaf881` avant intégration) : `tools/count-tree.py`
+compte 1 859 `@Test` en `:core` et 1 085 en `:app` — une quinzaine de
+classes hors périmètre rue (traversée, lunettes, pictos, tap, partage)
+ont dérivé sans MAJ de cette table ; à recaler séparément.
+
+### `:core` — 1 851
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **crossing** (76) : CrossingAnnouncerTest 9, CrossingFeaturesTest 4, CrossingOfferTest 8, CrossingStateTest 8, CrossingTextTest 5, CrossingVoiceCommandTest 9, PedLightColorTest 9, PedLightGateTest 20, TrainedLightColorTest 4
@@ -222,7 +230,7 @@ Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deu
 - **hazard** (14) : HazardConceptsTest 5, HazardWatchTest 9
 - **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (349) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 18, GuidanceObstaclesTest 8, GuidanceSteeringTest 13, GuidanceTest 18, GuidanceWordTest 6, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 10, LatestFrameSlotTest 5, LightClockTest 6, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 11, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 14, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, TwinLiteWordTest 9, UploadLadderTest 19
+- **live** (361) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 18, GuidanceObstaclesTest 8, GuidanceSteeringTest 13, GuidanceTest 18, GuidanceWordTest 6, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 10, LatestFrameSlotTest 5, LightClockTest 6, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 13, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 14, ScreenTimingsTest 4, SignConceptsTest 10, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, TwinLiteWordTest 9, UploadLadderTest 19
 - **local** (27) : LocalOverlayEngineTest 24, LocalOverlaySimTest 3
 - **mask** (97) : MaskBenchTest 2, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
 - **model** (7) : GeometryTest 4, ObjectLimitsTest 3
@@ -232,7 +240,7 @@ Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deu
 - **net** (294) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, GpuMonitorTest 11, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 23, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, MetaImageClientTest 5, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 5, TrackClientTest 12, TrafficSignalsTest 5, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
 - **picto** (17) : PictoMatcherTest 6, PictoPromptTest 2, PictoVoiceOrderTest 9
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
-- **settings** (95) : CaregiverInviteTest 7, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
+- **settings** (99) : CaregiverInviteTest 7, OutdoorModeTest 4, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
 - **share** (24) : CaregiverPageTest 7, SharePayloadTest 9, ShareSendMessageTest 4, SharedSceneTest 4
 - **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
 - **stairs** (43) : StairConceptsTest 4, StairDetectorTest 13, StairLabelSignalTest 5, StairWatcherTest 8, StairsCannyTest 8, StairsFeedTest 5
@@ -241,7 +249,7 @@ Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deu
 - **usecase** (40) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 14
 - **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 1 049
+### `:app` — 1 056
 
 - **(racine)** (187) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 8, HomePresetRequestTest 3, LiveCrossingPublishTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceRequestTest 3, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PictoOverlayTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
@@ -256,7 +264,7 @@ Une entrée par **classe de test**, avec son nombre d’annotations `@Test` (deu
 - **media** (14) : MediaCacheStoreTest 4, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **navigation** (22) : AndroidGeocoderLabelTest 4, NavigationLauncherTest 12, VoiceNavTrackerTest 6
 - **perms** (2) : PermDecisionTest 2
-- **speech** (76) : SpeechArbitrationTest 6, SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 7, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 14, VoicePackTest 10
+- **speech** (83) : SpeechArbitrationTest 6, SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 10, VoiceNavPolicyTest 29, VoiceNavSpeakerTest 15, VoicePackTest 10
 - **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapReleaseTest 2, TapSessionTest 6, TapZonesTest 4
 - **traverse** (21) : TraverseClipStoreTest 4, TraverseWiringTest 17
 - **vm** (39) : AppAnalysisTest 9, AppChatTest 6, AppDiagnosticsTest 10, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
