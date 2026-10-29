@@ -22,7 +22,7 @@ Deux entrées, deux sources :
 
 | Entrée | D'où elle vient |
 |---|---|
-| **Hauteur réelle** | `KnownSizes.TABLE` (`KnownSizes.kt:40+`) : table label → mètres (personne 1,70 · voiture 1,45 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. |
+| **Hauteur réelle** | `KnownSizes.TABLE` (`KnownSizes.kt:40+`) : table label → mètres (personne 1,70 · voiture 1,45 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · borne 0,80 · clôture 1,50 · portail 1,75…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Quatre défauts n'ont volontairement pas de hauteur sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau) : leur distance vient de la profondeur ou du plan de sol. |
 | **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **focale mm + taille physique lues par l'interop Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt:22-27`), sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Ordre vérifié : direct `LiveViewModel.chosenLens` (`:338-341`), photo iSee `IseePhotoDistances.chosenLens` (`:53-56`). **Attention : la voie REC d'iSee ne passe pas par le capteur** — `LiveProbe.configureFrom` applique `LensSpec.fromSettings` (`ProbeWiring.kt:22-31`), qui borne en plus la valeur saisie à 15–130° (`LensSpec.kt:43-46,71-72`) alors que le direct accepte tout champ positif. Écart connu, non corrigé. |
 
 L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`, `LensSpec.kt:23-29`)
@@ -124,10 +124,11 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 ## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-26, par `grep -c '@Test'`)
 
 - `core.distance.LensSpecTest` (**7**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical.
-- `core.distance.KnownSizesTest` (**6**) : **tous** les concepts par défaut du direct sont calibrés — ils sont
-  **six** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter` — `LivePrompts.kt:27`, `MAX = 6` `:34`),
-  et la table couvre bien plus large (animaux, véhicules, mobilier, rue — `KnownSizes.TABLE`) ; synonymes FR/EN,
-  accents, concept inconnu.
+- `core.distance.KnownSizesTest` (**11**) : chaque défaut du direct est calibré au sténopé **ou**
+  explicitement profondeur (`DEPTH_ONLY` : `stairs`, `sidewalk`, `crosswalk`, `pole` — voir le KDoc de
+  `KnownSizes`) ; extérieur couvert (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage`
+  1,50 · `gate`/`portail` 1,75, `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions
+  (« clôture grillagée »), concept inconnu.
 - `core.distance.DistanceMeterTest` (**12**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
   deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes.
