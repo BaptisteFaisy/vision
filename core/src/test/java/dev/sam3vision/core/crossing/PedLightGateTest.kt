@@ -139,6 +139,27 @@ class PedLightGateTest {
         assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.ppm"))
     }
 
+    @Test
+    fun `r1b - bonhommes cadres haut acceptes (refuses sans R1b)`() {
+        for (name in listOf("r1b_g01.ppm", "r1b_g02.ppm", "r1b_g03.ppm", "r1b_g04.ppm", "r1b_g05.ppm")) {
+            assertEquals(CrossingState.Green, verdict2Of(name))
+        }
+    }
+
+    @Test
+    fun `r1b - verts stables toujours acceptes`() {
+        assertEquals(CrossingState.Green, verdict2Of("st_g01.ppm"))
+        assertEquals(CrossingState.Green, verdict2Of("st_g02.ppm"))
+    }
+
+    @Test
+    fun `r1b - rouges et disques toujours refuses`() {
+        assertEquals(CrossingState.Red, verdict2Of("st_r01.ppm"))
+        assertEquals(CrossingState.Red, verdict2Of("st_r02.ppm"))
+        assertNotEquals(CrossingState.Green, verdict2Of("st_c01.ppm"))
+        assertNotEquals(CrossingState.Green, verdict2Of("st_c02.ppm"))
+    }
+
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
     private fun barBottom(x0: Int = 8, x1: Int = 11): IntArray {
         val pixels = IntArray(20 * 20) { BLACK }
@@ -179,6 +200,14 @@ class PedLightGateTest {
     private fun verdictOf(name: String): CrossingState {
         val bytes = javaClass.classLoader.getResourceAsStream("feuxfr/$name")?.readBytes()
             ?: error("ressource manquante : feuxfr/$name")
+        val (pixels, width, height) = ppmPixels(bytes)
+        return PedLightGate.verdict(pixels, width, height)
+    }
+
+    /** Verdict sur un crop réel `feuxfr2/` (lot R1b, voir ATTRIBUTION.md). */
+    private fun verdict2Of(name: String): CrossingState {
+        val bytes = javaClass.classLoader.getResourceAsStream("feuxfr2/$name")?.readBytes()
+            ?: error("ressource manquante : feuxfr2/$name")
         val (pixels, width, height) = ppmPixels(bytes)
         return PedLightGate.verdict(pixels, width, height)
     }
