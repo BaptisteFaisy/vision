@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.CurbConcepts
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -35,7 +36,10 @@ data class GuidanceDecision(
     val shiftMeters: Float? = null,
     /**
      * Vrai quand l'obstacle est à [Guidance.STOP_METERS] ou moins (mesuré) :
-     * trop près pour contourner, la consigne est « Stop. », urgente.
+     * trop près pour contourner, la consigne est « Stop. », urgente. Vrai
+     * aussi sans distance mesurée quand la matière remplit le champ
+     * ([Guidance.STOP_HEIGHT_FRAC], [Guidance.STOP_WIDTH_FRAC]) : au contact
+     * la boîte est coupée donc non mesurable, et il faut absolument le dire.
      */
     val stop: Boolean = false,
 )
@@ -65,6 +69,19 @@ object Guidance {
      * avant le contact — et la frame parlée a déjà ~1 s de retard.
      */
     const val STOP_METERS = 0.6f
+
+    /**
+     * Sans mesure, la hauteur d'emprise qui dit le contact : une matière non
+     * mesurée qui remplit la moitié du champ en face, c'est un « Stop. » — au
+     * contact la boîte est coupée donc non mesurable, et elle remplit le cadre.
+     */
+    const val STOP_HEIGHT_FRAC = 0.5f
+
+    /** Sans mesure, la largeur d'emprise minimale du stop : un fil vertical lointain n'arrête pas. */
+    const val STOP_WIDTH_FRAC = 0.05f
+
+    /** Peinture au sol, pas de la matière : un passage piéton immense ne demande jamais l'arrêt. */
+    private val CROSSWALK_LABELS = setOf("crosswalk", "passage pieton")
 
     /** Demi-couloir marché normalisé, cap droit : bande centrale / 2. */
     const val STRAIGHT_HALF_CORRIDOR = (1f - 2f * PositionText.SIDE_EDGE) / 2f
@@ -100,7 +117,9 @@ object Guidance {
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
-        val stop = obstacle.meters?.takeIf { it.isFinite() }?.let { it <= STOP_METERS } == true
+        val measured = obstacle.meters?.takeIf { it.isFinite() }
+        val stop = measured?.let { it <= STOP_METERS } == true ||
+            (measured == null && isHuge(obstacle) && !isCrosswalk(obstacle.label))
         if (cap == SteeringCap.Straight) {
             val side = freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
@@ -170,6 +189,16 @@ object Guidance {
         val stop = if (decision.stop) "|stop" else ""
         return prefix + "b|${obstacle.label.trim().lowercase()}|${exit ?: "?"}|$bucket|$hour$stop"
     }
+
+    /** Matière qui remplit le champ : hauteur et largeur au-delà des seuils de stop. */
+    private fun isHuge(obstacle: PlacedLabel): Boolean {
+        val extent = obstacle.extent ?: return false
+        return extent.heightFrac >= STOP_HEIGHT_FRAC && extent.widthFrac >= STOP_WIDTH_FRAC
+    }
+
+    /** Passage piéton (canonique, voir [KnownSizes.canonical]) : de la peinture, pas un obstacle. */
+    private fun isCrosswalk(label: String): Boolean =
+        KnownSizes.canonical(label) in CROSSWALK_LABELS
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
     private fun inCorridor(centerX: Float, cap: SteeringCap): Boolean = when (cap) {
