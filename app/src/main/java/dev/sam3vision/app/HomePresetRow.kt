@@ -12,10 +12,11 @@ import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LivePrompts
 
 /**
- * Pastilles de presets du direct : Rue (défauts extérieurs) + les trois presets
- * maison. [prompts] sont les concepts suivis (l'état du direct) : la pastille
- * active est verte, les autres neutres. Un tap relance le direct sur le preset
- * ([onPreset]), sans quitter l'écran — comme le champ « Suivre ».
+ * Pastilles de presets du direct : Rue (12 dangers), Extérieur (8 concepts de
+ * cheminement) + les trois presets maison. [prompts] sont les concepts suivis
+ * (l'état du direct) : la pastille active est verte, les autres neutres. Un tap
+ * relance le direct sur le preset ([onPreset]), sans quitter l'écran — comme
+ * le champ « Suivre », par le même chemin (`restartWith`, `LiveScreen`).
  */
 @Composable
 fun HomePresetRow(prompts: List<String>, onPreset: (List<String>) -> Unit) {
@@ -25,6 +26,11 @@ fun HomePresetRow(prompts: List<String>, onPreset: (List<String>) -> Unit) {
             "Rue",
             if (maison == null && prompts == LivePrompts.default) AppColors.success else AppColors.surfaceHigh,
             { onPreset(LivePrompts.default) },
+        )
+        Chip(
+            "Extérieur",
+            if (maison == null && prompts == LivePrompts.outdoor) AppColors.success else AppColors.surfaceHigh,
+            { onPreset(LivePrompts.outdoor) },
         )
         HomeModes.ALL.forEach { preset ->
             Chip(
