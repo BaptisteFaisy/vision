@@ -54,8 +54,8 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) |
-| Tests | **2 704 `@Test`** JVM (`:core` 1 766, `:app` 938, relevé r630 du 29/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
-| Taille | **876** fichiers `.kt`, **52 685** lignes de prod (`:core` 21 740, `:app` 30 945, mesure du 29/10/2026) |
+| Tests | **2 703 `@Test`** JVM (`:core` 1 765, `:app` 938, relevé r630 du 29/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
+| Taille | **876** fichiers `.kt`, **52 753** lignes de prod (`:core` 21 749, `:app` 31 004, mesure du 29/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
