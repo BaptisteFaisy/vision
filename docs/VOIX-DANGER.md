@@ -112,9 +112,9 @@ fonce sur quelqu'un. Nouveau contrat, qui **remplace** le § 3 :
   `Va à droite, 2 mètres.` / `Stop.` (en : `Continue.` / `Go left, 2 meters.` /
   `Go right, 2 meters.` / `Stop.`) — côté + distance de l'obstacle au mètre
   entier, ni nom d'obstacle, ni cadran, ni décalage latéral (`Guidance.phrase`,
-  `DistanceText.spokenShort`) ;
-- **stop** : obstacle mesuré à `STOP_METERS = 0,6 m` ou moins ⇒ « Stop. »,
-  urgent (coupe la phrase en cours, chat compris) ;
+  `DistanceText.spokenShort`) — le « Stop. » est **remplacé**, voir § 9 ;
+- **stop** (remplacé, voir § 9) : obstacle mesuré à `STOP_METERS = 0,6 m`
+  ou moins ⇒ « Stop. », urgent (coupe la phrase en cours, chat compris) ;
 - **positions** : le plus proche d'abord, puis le plus en face (distance, puis
   écart à l'axe), et la distance au mètre entier remplace le cadran
   (`PositionText`) : `Personne à 1 mètre, chien à 3 mètres.` ;
@@ -141,12 +141,13 @@ que la voix se coupe et parle souvent) :
 
 - **danger dès la 1re frame** : un obstacle qui entre dans le couloir parle
   aussitôt, sans stabilité ni délai (`firstSight`, `AnnouncementGate`) ; un
-  obstacle qui s'approche reparle à chaque seau (`3 m → 2 m → 1 m → Stop.`) ;
+  obstacle qui s'approche reparle à chaque seau (`3 m → 2 m → 1 m`, puis
+  centimètres sous un mètre — le « → Stop. » est **remplacé**, voir § 9) ;
   la nouveauté reste (une clé déjà dite ne reparle pas) ;
 - **dernier-gagnant** : une phrase plus fraîche annule la synthèse en cours
   (`collectLatest` côté sonde) au lieu de faire la queue derrière ;
-- **« Stop. » pré-synthétisé** : clip en mémoire (`ProximityVoice.prewarmStop`),
-  zéro réseau au moment critique ;
+- **« Stop. » pré-synthétisé** (remplacé, voir § 9) : clip en mémoire
+  (`ProximityVoice.prewarmStop`), zéro réseau au moment critique ;
 - **l'urgent coupe tout**, dictée comprise (`canPlay` ne s'applique qu'aux
   phrases ordinaires) ;
 - une scène de positions nouvelle parle aussi dès la 1re frame (délai 4 s
@@ -166,13 +167,14 @@ Deux causes, lues dans le code de cet arbre :
   ne s'annule pas ;
 - **la matière au contact était non mesurée donc tue après un mot** : boîte
   coupée ⇒ pas de distance ⇒ clé `?` constante ⇒ nouveauté muette, et jamais
-  de « Stop. » (il exigeait une mesure). Nouveau contrat : matière non mesurée
-  qui remplit le champ en face (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC =
-  0,05`, `Guidance`) ⇒ « Stop. » immédiat — sauf peinture au sol
-  (`crosswalk`), et un fil vertical lointain n'arrête pas (largeur) ;
-- **le « Stop. » du guidage passe en urgent**, comme l'annonçait le § 5 sans
-  que le code le fasse : clip pré-synthétisé, coupe le chat
-  (`ProbeWiring.observeSpoken`, `urgent = phrase == STOP_WORD`).
+  de « Stop. » (il exigeait une mesure). Nouveau contrat (le « Stop. »
+  immédiat est **remplacé**, voir § 9) : matière non mesurée qui remplit le
+  champ en face (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC = 0,05`,
+  `Guidance`) ⇒ « Stop. » immédiat — sauf peinture au sol (`crosswalk`),
+  et un fil vertical lointain n'arrête pas (largeur) ;
+- **le « Stop. » du guidage passe en urgent** (remplacé, voir § 9), comme
+  l'annonçait le § 5 sans que le code le fasse : clip pré-synthétisé, coupe
+  le chat (`ProbeWiring.observeSpoken`, `urgent = phrase == STOP_WORD`).
 
 Verrouillé par `ProbeWiringSpokenTest` (3, sonde branchée sur le faux client :
 même phrase ré-émise → une synthèse qui aboutit, phrase fraîche → dernier
@@ -198,3 +200,30 @@ sans consigne en retard. La fenêtre couvre les cooldowns des guetteurs
 Verrouillé par `ProbeHazardsTest` (5 : silence initial, trottoir,
 escaliers, expiration, reset) et `TwinLiteWiringTest` (+2 : voix tue +
 flèche affichée, reprise sans alerte).
+
+## 9. Contournement chiffré remplace le « Stop. » (ordre user du 29/10)
+
+Le user marche avec l'app : le « Stop. » en boucle devant un obstacle ne dit
+pas où passer. Nouveau contrat, qui **remplace** le stop des § 5, § 6 et § 7
+(gardés pour mémoire) : un obstacle, même au contact, se contourne — la voix
+dit le côté et la distance (`Va à gauche, 1 mètre.`, `Va à droite,
+40 centimètres.`), jamais d'ordre d'arrêt.
+
+- **guidage** : `Guidance.phrase` ne connaît plus que `Continue.` et le
+  contournement chiffré (`DistanceText.spokenShort` : mètre entier,
+  centimètres sous un mètre, non chiffré sans mesure) ; `STOP_METERS`,
+  `STOP_HEIGHT_FRAC`, `STOP_WIDTH_FRAC`, le champ `stop` de la décision et le
+  marqueur `|stop` de la signature disparaissent, avec `LabelExtent`
+  (l'emprise de boîte, introduite pour le stop, ne servait qu'à lui) ;
+- **urgence gardée** : le contournement coupe la lecture en cours, chat
+  compris — le flag vient de l'état (`LiveProbeState.spokenUrgent`, publié
+  avec la phrase dans la même écriture), plus d'un mot magique
+  (`ProximityVoice.STOP_WORD` et le clip pré-synthétisé disparaissent) ;
+- **traversée inchangée** : « Stop, mur » (feu rouge) n'est pas un obstacle,
+  il reste tel quel.
+
+Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md`.
+
+Verrouillé par `GuidanceTest` (18), `GuidanceAnnouncerTest` (12),
+`LiveProbeGuidanceTest` (4, dont l'urgence du contournement seul) et
+`ProbeWiringSpokenTest` (3 : contournement parlé chat en lecture).
