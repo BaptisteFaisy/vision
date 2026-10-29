@@ -176,7 +176,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, voiceNav, picto::labels)
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels)
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)

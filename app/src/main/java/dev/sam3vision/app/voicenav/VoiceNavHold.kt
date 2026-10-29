@@ -45,8 +45,6 @@ object VoiceNavHoldText {
         "Je n'ai pas compris — dicte une destination, « oui » ou « non »."
     const val GUIDING_NOT_UNDERSTOOD =
         "Je n'ai pas compris — dicte une destination ou « arrête le guidage »."
-    const val MAP_NOT_UNDERSTOOD =
-        "Je n'ai pas compris — dis « va à … » ou « quitte la carte »."
 
     /** Échec de transcription, tel qu'affiché sous le bouton. */
     fun dictationFailed(error: Throwable): String =

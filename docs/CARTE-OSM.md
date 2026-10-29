@@ -104,25 +104,11 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
   Les pastilles portent le libellé (« Tournez à droite sur rue de
   Rivoli ») ; l'allumage viendra avec le moteur.
 
-## 4 bis. Mode navigation (la carte sans destination)
+## 4 bis. Pas de carte sans destination (retiré le 29/10/2026)
 
-Le même fond sert au **mode navigation** ouvert à la voix (« navigation »,
-« carte », « où suis-je » — `NAVIGATION-VOCALE.md` §1 bis), sous forme de
-**bande permanente en bas de l'écran** : 26 % de la hauteur, bornée à
-150–260 dp (`navigationMapBandHeight`), la scène iSee occupant le reste.
-
-- État carte : `core/.../nav/GuidanceMapData.kt::mapModeMapStateOf(fix,
-  signals)` — caméra nulle sans fix utilisable (cadrage automatique),
-  overlays réduits à `position`, `accuracyM` et `signals`.
-- Affichage : `app/.../isee/NavigationMapBand.kt` compose `GuidanceMapView`
-  et **retombe sur le schéma** (`drawNavigationMap`) dès que le SDK signale
-  l'échec des tuiles — même contrat que le §3, sans écran d'erreur.
-- **Toujours affichée** : la bande ne s'efface pas pendant la dictée ni quand
-  iSee parle ; elle disparaît avec le mode (ordre vocal de sortie).
-- Les feux sont rechargés par maille de 0,001° (~110 m) de déplacement, pas à
-  chaque point (échec : nouvel essai après 60 s).
-- Attribution OSM : portée par `GuidanceMapView` (bas-gauche de la bande),
-  donc absente avec les tuiles en repli.
+Un mode navigation sans destination a existé (bande permanente en bas de
+l'écran iSee) : retiré sur ordre user — la carte n'apparaît que pendant le
+guidage, avec un tracé. Voir `NAVIGATION-VOCALE.md` §1 bis.
 
 ## 5. Notes batterie et réseau
 
