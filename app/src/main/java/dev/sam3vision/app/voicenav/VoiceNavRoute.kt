@@ -56,6 +56,22 @@ fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
+    VoiceNavScreen(state, nav, isee, hold, settings)
+}
+
+/**
+ * Le visage courant de la navigation : un état, un écran. Extrait de
+ * [VoiceNavRoute] pour tenir sous le plafond de 50 lignes du garde-fou —
+ * aucun effet de bord ici, seulement le rendu.
+ */
+@Composable
+private fun VoiceNavScreen(
+    state: VoiceNavUiState,
+    nav: VoiceNavViewModel,
+    isee: IseeViewModel,
+    hold: VoiceNavHold,
+    settings: Settings,
+) {
     when (val current = state) {
         is VoiceNavUiState.Idle -> Box(Modifier.fillMaxSize())
         is VoiceNavUiState.Confirming -> DestinationConfirmScreen(
@@ -75,7 +91,17 @@ fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
             settings = settings,
             onHoldTranscript = { nav.session().onVoiceTranscript(it) },
         )
-        // W5 : ajouter `is VoiceNavUiState.Arrived -> ArrivedScreen(...)` à son merge.
+        // « Nouvelle destination » remet la session au repos (la dictée est à
+        // portée, contrat d'état de VoiceNavSession) ; « Fermer » referme
+        // l'arrivée puis rend l'accueil iSee (guide utilisateur, §3 Arriver).
+        is VoiceNavUiState.Arrived -> ArrivedScreen(
+            state = current,
+            onNewDestination = { nav.session().dismissArrived() },
+            onClose = {
+                nav.session().dismissArrived()
+                isee.dismissVoiceNav()
+            },
+        )
     }
 }
 

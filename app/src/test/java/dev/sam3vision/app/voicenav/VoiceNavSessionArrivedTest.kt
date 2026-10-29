@@ -41,6 +41,9 @@ class VoiceNavSessionArrivedTest {
         voice = VoiceNavAnnouncer({ Settings.Default }) { _, text -> spoken += text },
         routeLoader = { Result.success(summary) },
         router = NavigationRouter(),
+        // W6 : sans moteur embarqué (`engineStart`), la session part chez
+        // Google Maps et ne passe jamais en guidage — l'arrivée n'arrive pas.
+        engineStart = { _, _ -> true },
         onSessionIdle = { idled++ },
     )
 
