@@ -3,6 +3,30 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — lunettes : la session attend le lien au lieu de refuser une paire appairée
+
+- **Panne vue à l'écran** : « SDK : prêt », « Enregistrement : enregistrée », mais
+  « Appareil : Unknown · batterie inconnue · non portées » puis, sur « Démarrer la
+  session », **« Aucune paire éligible : appaire les lunettes dans Meta AI et enregistre
+  l'app. »** — un message qui accuse l'appairage alors que la paire est enregistrée.
+- **Cause** : `DeviceSessionError.NO_ELIGIBLE_DEVICE`, c'est-à-dire `createSession` refusé
+  tant que le lien n'est pas `CONNECTED` (mesure du 27/10, `docs/META-GLASSES.md` §13 : le
+  lien met 2 à 30 s à monter). Le banc attendait ce lien depuis cette mesure ; l'app, elle,
+  appelait `createSession` immédiatement — donc refus systématique sur une paire correcte.
+- `GlassesLinkGate.kt` (paquet `glasses/`) : attente bornée 30 s du lien `CONNECTED`,
+  partagée par l'app **et** le banc (ex-`awaitLinkedDevice`/`LINK_WAIT_MS` de
+  `bench/GlassesSessionPolicy.kt`, déplacés, pas dupliqués).
+- `GlassesController.connect()` passe par un `openSession()` suspendu : l'écran dit
+  « j'attends le Bluetooth (jusqu'à 30 s) » pendant l'attente, puis revient en `IDLE` avec
+  « Lunettes pas encore connectées : déplie-les, mets-les sur le nez… » si le lien ne monte
+  pas. Le refus du SDK ne parle plus de ré-appairage. Session simulée : aucune attente.
+- Preuves : `:app:testDebugUnitTest --tests "dev.sam3vision.app.glasses.*"` → **BUILD
+  SUCCESSFUL**, 182 tests (dont `GlassesMessagesTest` +1 : le lien absent ne doit pas
+  contenir « appaire ») ; `tools/check-kotlin-limits` OK.
+- Fichiers : `GlassesLinkGate.kt` (nouveau), `GlassesController.kt`, `GlassesPolicy.kt`,
+  `bench/GlassesSessionPolicy.kt`, `bench/GlassesRegistrationPhase.kt`,
+  `GlassesMessagesTest.kt`, `bench/LinkGateTest.kt`, `docs/META-GLASSES.md`.
+
 ## 2026-10-29 — fix(seed) : modèles LLM et dictée vides réparés en dur
 
 - **Demande** : « stocke tout en dur » — constantes dans le code, champs
@@ -100,7 +124,6 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   nouveaux — vus rouges avant le fix), `check-kotlin-limits` OK.
 - Fichiers : `Http.kt`, 8 clients, `SettingsSeed.kt`, `HttpRequestsTest.kt`,
   `SettingsSeedTest.kt`, `CLES-DU-BUILD.md`.
-
 ## 2026-10-29 — suivi caregiver : le relais par défaut est le Worker, plus l'hôte tombé
 
 - **Panne constatée** : `DEFAULT_PARENT_SITE_URL` pointait sur
