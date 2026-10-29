@@ -140,10 +140,16 @@ export function readShare(body, globalKey = '') {
   const key = typeof body.writeKey === 'string' ? body.writeKey : '';
   if (key.length > MAX_KEY) return fail(400, 'writeKey invalide');
   if (globalKey && key !== globalKey) return fail(403, 'clé invalide');
+  // La position est **optionnelle** : un téléphone sans GPS (intérieur, démarrage,
+  // permission refusée) publie quand même sa caméra, sa phrase et ses repères.
+  // Sans ça, la page caregiver restait OFFLINE alors que la caméra tournait.
+  // Une position présentée reste validée comme avant — seule son absence passe.
   const f = body.fix;
-  if (!f || typeof f !== 'object') return fail(400, 'fix invalide');
-  if (!num(f.lat, -90, 90) || !num(f.lon, -180, 180) || !num(f.accM, 0, 500)) {
-    return fail(400, 'fix invalide');
+  if (f !== undefined && f !== null) {
+    if (typeof f !== 'object') return fail(400, 'fix invalide');
+    if (!num(f.lat, -90, 90) || !num(f.lon, -180, 180) || !num(f.accM, 0, 500)) {
+      return fail(400, 'fix invalide');
+    }
   }
   const objects = objectsOf(body.objects);
   if (objects === null) return fail(400, 'objet invalide');
@@ -159,7 +165,7 @@ export function readShare(body, globalKey = '') {
     id: body.shareId,
     key,
     photo,
-    doc: (now) => ({ fix: fixOf(f, now), objects, scene, photo, trip, pictos }),
+    doc: (now) => ({ fix: f == null ? null : fixOf(f, now), objects, scene, photo, trip, pictos }),
   };
 }
 
@@ -176,7 +182,7 @@ export function stateOf(row, now) {
     ok: true,
     live: ageMs < FRESH_MS,
     ageMs,
-    fix: row.fix,
+    fix: row.fix || null,
     objects: row.objects || [],
     scene: row.scene || null,
     photo: row.photo || null,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shareIdOf, stateOf, movementBetween, narrationOf, neverPublished, NO_STREAM_TEXT } from '../session.mjs';
+import { shareIdOf, stateOf, movementBetween, anchorAfter, narrationOf, neverPublished, NO_STREAM_TEXT } from '../session.mjs';
 import { wordsSpoken } from '../spoken-line.mjs';
 
 const fix = { lat: 48.85, lon: 2.35, accM: 1, atMs: 1000, headingDeg: 0, indoor: false };
@@ -32,6 +32,19 @@ test('le bruit GPS, les sauts et la reconnexion ne deviennent pas des gestes inv
   assert.equal(movementBetween(fix, { ...moved, indoor: true }), '');
   assert.equal(movementBetween(fix, { ...moved, atMs: 1001 }), '');
   assert.equal(movementBetween(fix, { ...moved, atMs: 40_000 }), '');
+});
+
+test('sans position, la référence de déplacement s’efface au lieu d’inventer un geste', () => {
+  assert.equal(anchorAfter(null, '', fix), fix);
+  assert.equal(anchorAfter(fix, '', null), null);
+  assert.equal(anchorAfter(null, '', null), null);
+  // Un fix frais garde l’ancre pour mesurer le déplacement, un vieux la déplace.
+  assert.equal(anchorAfter(fix, '', { ...fix, atMs: fix.atMs + 1_000 }), fix);
+  const vieux = { ...fix, atMs: fix.atMs + 31_000 };
+  assert.equal(anchorAfter(fix, '', vieux), vieux);
+  // Un mouvement mesuré déplace l’ancre sur le fix courant.
+  const mesure = { ...fix, atMs: fix.atMs + 1_000 };
+  assert.equal(anchorAfter(fix, 'A avancé.', mesure), mesure);
 });
 
 test('le texte vient du téléphone partagé et les états déconnectés arrêtent son annonce', () => {

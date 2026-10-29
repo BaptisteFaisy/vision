@@ -176,6 +176,24 @@ test('les repères reconnus arrivent en dessins à la page caregiver', async () 
   assert.equal((await call(e, '/api/state?share=suivi-picto')).body.pictos, null);
 });
 
+test('sans position, la photo et la phrase passent quand même (caméra sans GPS)', async () => {
+  const e = env();
+  const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
+  const absent = { ...payload('sans-gps', { photo }), fix: undefined };
+  assert.equal((await call(e, '/api/share', post(absent))).code, 200);
+  const state = await call(e, '/api/state?share=sans-gps');
+  assert.equal(state.body.live, true);
+  assert.equal(state.body.fix, null);
+  assert.deepEqual(state.body.photo, photo);
+  // Un `null` explicite vaut absence, pas une erreur.
+  const nul = { ...payload('sans-gps-nul', { photo }), fix: null };
+  assert.equal((await call(e, '/api/share', post(nul))).code, 200);
+  assert.equal((await call(e, '/api/state?share=sans-gps-nul')).body.fix, null);
+  // Une position présentée mais invalide reste refusée.
+  const bad = { ...payload('sans-gps'), fix: { lat: 999, lon: 2, accM: 1 } };
+  assert.equal((await call(e, '/api/share', post(bad))).code, 400);
+});
+
 test('des repères illisibles sont refusés explicitement', async () => {
   const e = env();
   const bad = (pictos) => call(e, '/api/share', post(payload('picto-casse', { pictos })));

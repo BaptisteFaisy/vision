@@ -1,4 +1,4 @@
-import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
+import { LIVE_MS, shareIdOf, stateOf, movementBetween, anchorAfter, narrationOf, neverPublished } from './session.mjs';
 import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
@@ -88,11 +88,15 @@ function renderFrame(status) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
     if (!direct) { streamSrc = ''; }
     frameEl.hidden = true;
-    noteEl.hidden = false;
     viewEl.classList.add('empty');
-    noteEl.textContent = shareId
-      ? 'L’image apparaîtra quand ton proche ouvrira la caméra.'
-      : 'Ouvre le lien de suivi partagé par ton proche.';
+    // Pas de texte d'attente quand le lien est connu : la section se replie et
+    // l'image la rouvre dès que la caméra tourne. Seul un lien absent se dit.
+    if (shareId) {
+      noteEl.hidden = true;
+    } else {
+      noteEl.hidden = false;
+      noteEl.textContent = 'Ouvre le lien de suivi partagé par ton proche.';
+    }
     return;
   }
   noteEl.hidden = true;
@@ -137,13 +141,16 @@ function receive(snapshot) {
     known = false; live = null; anchor = null; movement = '';
     return;
   }
-  if (snapshot.ok && snapshot.fix && Number.isFinite(snapshot.serverAt)) {
+  // La position peut manquer (téléphone sans GPS) : la caméra, la phrase et les
+  // repères passent quand même, seule la mesure des gestes s'interrompt.
+  if (snapshot.ok && Number.isFinite(snapshot.serverAt)) {
     if (live && snapshot.serverAt < live.serverAt) return;
     known = true;
     if (stateOf(live) !== 'live') anchor = null;
-    const nextMovement = movementBetween(anchor, snapshot.fix);
+    const fix = snapshot.fix || null;
+    const nextMovement = movementBetween(anchor, fix);
     if (nextMovement) { movement = nextMovement; movementAt = Date.now(); }
-    if (!anchor || nextMovement || snapshot.fix.atMs - anchor.atMs > 30_000) anchor = snapshot.fix;
+    anchor = anchorAfter(anchor, nextMovement, fix);
     live = snapshot;
   } else if (snapshot.ok && snapshot.live === false) {
     live = null; anchor = null; movement = '';
