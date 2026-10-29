@@ -1,5 +1,7 @@
 # Dépendances des seuls tests backend (`server/scripts/test_units.py`, via
-# `server/scripts/tests_units/`) : stdlib + ces deux paquets. Jamais le runtime
+# `server/scripts/tests_units/`) : numpy + Pillow (images) et FastAPI (importé par
+# les modules `live_app*`/`modal_app` sous test ; tire pydantic). Jamais le runtime
 # lourd (torch reste sur les conteneurs Modal).
 numpy
 pillow
+fastapi
