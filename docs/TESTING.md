@@ -140,10 +140,10 @@ avant d'être présentés comme validés :
 - la **vérification de bascule de région EU/US** (« Tester SAM ») ;
 - les **recettes lunettes** (`app/…/glasses/` et le banc `app/…/glasses/bench/`, `Route.Bench`).
 
-## 5. Tests instrumentés (9 + 1 banc)
+## 5. Tests instrumentés (8 + 1 banc)
 
 `app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests),
-`app/src/androidTest/…/depth/DepthBenchDeviceTest.kt` (2 tests : DA2 et MiDaS tournent sur
+`app/src/androidTest/…/depth/DepthBenchDeviceTest.kt` (1 test : DA2 tourne sur
 appareil) et `app/src/androidTest/…/media/MediaDowngradeTest.kt` (1 test : rétrogradation v2
 vers v1 recréée vide, sans crash) ;
 `app/src/androidTestDebug/…/glasses/bench/MockGlassesTest.kt` (1 test — source set
@@ -152,7 +152,7 @@ vers v1 recréée vide, sans crash) ;
 
 ```bash
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --offline
-./gradlew :app:connectedDebugAndroidTest --offline               # les 10 tests instrumentés
+./gradlew :app:connectedDebugAndroidTest --offline               # les 9 tests instrumentés
 EMULATOR_SERIAL=emulator-5554 bash scripts/install-emulator.sh   # installe l'APK
 adb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s emulator-5554 shell am instrument -w \
