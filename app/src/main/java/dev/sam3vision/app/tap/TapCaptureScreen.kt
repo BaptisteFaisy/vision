@@ -34,6 +34,7 @@ import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.BigButton
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.cleanup.CapturePaths
+import dev.sam3vision.app.glasses.GlassesVoiceRoute
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.net.HttpSam31VideoClient
 import dev.sam3vision.core.net.HttpSamClient
@@ -168,7 +169,12 @@ private fun rememberTapDependencies(
     val key = TapConfig.elevenLabsKey(settings)
     val voice = TapConfig.elevenLabsVoice(settings)
     return remember(key, voice, settings.ttsSpeed, context) {
-        val speech = SpeechPlayer(File(context.cacheDir, "tap-clips"), speed = settings.ttsSpeed)
+        val speech = SpeechPlayer(
+            dir = File(context.cacheDir, "tap-clips"),
+            speed = settings.ttsSpeed,
+            // Lunettes en session : les annonces sortent dans la paire.
+            output = { GlassesVoiceRoute.current(context) },
+        )
         TapDependencies(
             scope = scope,
             video = TapVideoSession(context),

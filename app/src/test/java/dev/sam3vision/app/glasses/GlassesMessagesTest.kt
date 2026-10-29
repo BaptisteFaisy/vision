@@ -48,12 +48,13 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
-        assertEquals(MessageKind.INFO, GlassesMessages.framesOnSpeaker().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
     }
 
     @Test
-    fun `la collecte active annonce la voix sur haut-parleur`() {
-        assertTrue(GlassesMessages.framesOnSpeaker().text.contains("haut-parleur"))
+    fun `la collecte active annonce la sortie de la voix`() {
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("lunettes"))
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("haut-parleur"))
     }
 
     @Test
@@ -94,7 +95,7 @@ class GlassesMessagesTest {
             GlassesMessages.registrationStarted(),
             GlassesMessages.mockReady(),
             GlassesMessages.noMockPress(),
-            GlassesMessages.framesOnSpeaker(),
+            GlassesMessages.framesVoiceRoute(),
             GlassesMessages.videoUndecodable(),
         )
         all.forEach { message ->

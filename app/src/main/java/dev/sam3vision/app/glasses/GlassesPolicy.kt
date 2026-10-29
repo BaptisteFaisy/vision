@@ -283,12 +283,13 @@ object GlassesMessages {
     fun noMockPress() = GlassesMessage(MessageKind.WARNING, "Aucun appareil simulé actif.")
 
     /**
-     * Collecte des frames vidéo active : les descriptions partent sur le
-     * haut-parleur du téléphone (le routage vers les lunettes reste au banc).
+     * Collecte des frames vidéo active : les descriptions suivent la sortie de la
+     * voix ([GlassesVoiceRoute]), donc les lunettes quand la session est ouverte,
+     * le haut-parleur en repli (paire hors Bluetooth, sortie refusée).
      */
-    fun framesOnSpeaker() = GlassesMessage(
+    fun framesVoiceRoute() = GlassesMessage(
         MessageKind.INFO,
-        "Direct lunettes : les descriptions sont lues sur le haut-parleur.",
+        "Direct lunettes : la voix des descriptions suit les lunettes, haut-parleur en repli.",
     )
 
     fun videoUndecodable() = GlassesMessage(

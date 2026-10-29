@@ -116,7 +116,9 @@ Aucun de ces points n'a été observé, ni avant ni maintenant :
    format, pas une mesure d'image.
 4. **Le routage audio réellement entendu dans les lunettes.** `GlassesVoice.routeToGlasses()`
    (`GlassesVoice.kt:74`) n'a jamais tourné sur une paire ; un refus de la plateforme retombe
-   silencieusement sur le haut-parleur.
+   silencieusement sur le haut-parleur. Côté production, `GlassesVoiceRoute` branche la même
+   décision sur `SpeechPlayer` depuis le 29/10 : compilé et testé en JVM, **pas encore entendu
+   dans la paire** (la ligne `GlassesVoice` de logcat dira la sortie réellement choisie).
 5. **Les verrous Meta** : appairage réel, Developer Mode, firmware, permissions de l'app Meta AI.
    `GlassesRealCheck.kt` ne fait que **lire** ces faits et les dire en français.
 6. **Thermique et batterie** : rien sur la montée en température, l'autonomie, ni la mise en pause

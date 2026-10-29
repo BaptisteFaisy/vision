@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.IseeHaptics
-import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
@@ -66,12 +65,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val cleaner = CacheCleanerManager(dao, media.dir())
     private val haptics = IseeHaptics(app)
 
-    private val player = SpeechPlayer(
-        dir = File(app.cacheDir, "isee-play"),
-        onComplete = {
-            // Fin de la lecture : les sous-titres disparaissent aussitôt.
-            update { st -> st.copy(speakingEntryId = null, speakingText = "") }
-        },
+    /** Voix d'iSee : la fin de lecture ferme les sous-titres, aussitôt. */
+    private val player = iseeVoicePlayer(
+        app,
+        onComplete = { update { st -> st.copy(speakingEntryId = null, speakingText = "") } },
         onPlaybackError = { update { st -> st.copy(speakingEntryId = null, speakingText = "") } },
     )
 

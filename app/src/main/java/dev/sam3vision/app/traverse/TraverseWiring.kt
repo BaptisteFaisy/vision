@@ -3,6 +3,7 @@ package dev.sam3vision.app.traverse
 import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.glasses.GlassesVoiceRoute
 import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.app.isee.CrossingLocalLight
 import dev.sam3vision.app.isee.crossingLightOf
@@ -205,7 +206,13 @@ class TraverseWiring(
         val engine = TtsTraverseSystemTts(app, Locale.FRENCH)
         val voice = TraverseVoice(
             ttsClient(settings),
-            PlayerTraversePlayer(SpeechPlayer(File(app.cacheDir, TRAVERSE_VOICE_DIR))),
+            PlayerTraversePlayer(
+                SpeechPlayer(
+                    dir = File(app.cacheDir, TRAVERSE_VOICE_DIR),
+                    // Lunettes en session : les consignes sortent dans la paire.
+                    output = { GlassesVoiceRoute.current(app) },
+                ),
+            ),
             engine,
             DirTraverseClipStore(File(app.filesDir, TRAVERSE_CLIP_DIR)),
         )
