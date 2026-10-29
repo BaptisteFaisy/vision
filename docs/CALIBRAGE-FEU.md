@@ -122,3 +122,63 @@ CSV=1 java -cp "out:lib/*" MainKt <dossier-de-crops>
 
 Le point de contrôle qui rend tout le reste citable reste le **9/9** sur
 `feuxfr/` : toute réexécution doit d'abord le retrouver.
+
+## 8. Le corpus existe — et il est shanghaïen (29/10, second passage)
+
+Après le constat du §2 (« aucune donnée joignable »), une source a finalement été
+trouvée, et elle est **sérieuse** :
+
+| | |
+|---|---|
+| jeu | [`ngqtrung/ptl-crossing-check`](https://huggingface.co/datasets/ngqtrung/ptl-crossing-check) sur Hugging Face |
+| licence | **MIT** |
+| contenu | **5 059 photos**, 876×657, étiquettes **humaines d'origine** du PTL (ImVisible) : rouge, vert, décompte |
+| point de vue | **le piéton au bord du trottoir** — exactement la situation d'iSee |
+| hébergement | Hugging Face, donc **pas** le quota Google Drive qui bloquait ImVisible |
+
+**Toute la chaîne a tourné pour de vrai** : SAM trouve un feu sur **99 %** de ces
+photos (468/474 sur la validation — à comparer aux **0 %** obtenus sur les photos
+de rue Panoramax, où le feu fait 16 px). Crops « caisson » 48 px → traits de
+`CrossingFeatures` → arbre refit. 1 881 crops d'entraînement, 470 de validation,
+410 de test, tous disjoints.
+
+### Ce que donne le modèle réentraîné (profondeur 6, feuille 20)
+
+| jeu | verts acceptés | faux verts |
+|---|---|---|
+| PTL validation — arbre **actuel** | 16 % (39/238) | 1,3 % (3/232) |
+| PTL validation — arbre **refit** | **50 %** (130/238) | 0,9 % (2/232) |
+| PTL **test** — arbre actuel | 21 % (38/184) | 3,1 % (7/226) |
+| PTL **test** — arbre refit | **52 %** (95/184) | 3,5 % (8/226) |
+
+Sur le domaine PTL, c'est un **gain net : 2,5× plus de verts à taux de faux vert
+identique**. C'est la première fois qu'une variante gagne sans payer en sûreté.
+
+### Et c'est précisément pour ça qu'il ne faut pas le livrer
+
+Les 9 crops **français** de `core/src/test/resources/feuxfr/` — la seule référence
+tricolore de l'arbre — se dégradent :
+
+| arbre | conformes aux 9 verdicts attendus |
+|---|---|
+| actuel (calibré FR, 28/10) | **9/9** |
+| refit PTL, pureté 0,80–0,85 | **6/9** — `fr_green_fig_243` et `fr_green_fig_302` (deux vrais bonshommes verts) passent en `Unknown` |
+| refit PTL, pureté 0,90 | **5/9** — et `fr_cardisc_close_183` (un **disque de voiture**) passe en `Green` |
+
+Un bonhomme shanghaïen n'est pas un bonhomme français : silhouette, proportions,
+et surtout le caisson (format, lentille, halo) diffèrent. Le modèle apprend le bon
+domaine et le mauvais pays.
+
+**Décision : ne pas remplacer l'arbre.** Le gain est réel mais il est shanghaïen,
+et Baptiste traverse en France.
+
+### Ce que ça change pour la suite
+
+Le verrou n'est plus « trouver des données » : il est **« trouver des données
+françaises »**. Et la chaîne est maintenant éprouvée de bout en bout — elle a
+produit 2 761 crops étiquetés en 15 minutes de GPU. Appliquée à 200-400 crops
+téléphone français, elle donnera un modèle dans l'heure.
+
+Reproductible : `tools/build_ptl_crops.py` (PTL → crops caisson),
+`DumpKt` (17 traits), `tools/fit_and_eval.py` (refit + contrôle d'export +
+matrice de confusion **avec** la règle de pureté de `TrainedLightColor`).

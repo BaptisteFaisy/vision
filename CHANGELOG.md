@@ -378,6 +378,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Feu : le corpus PTL trouvé sur Hugging Face, mesuré, non livré
+
+- Après « aucune donnée joignable », une source réelle : `ngqtrung/ptl-crossing-check`
+  (Hugging Face, **MIT**, 5 059 photos 876×657, étiquettes humaines d'origine du PTL,
+  point de vue du piéton au bord du trottoir, hébergé hors du quota Drive).
+- Chaîne complète exécutée : SAM trouve un feu sur **99 %** de ces photos (468/474),
+  contre **0 %** sur les photos de rue Panoramax (feu de 16 px). 1 881 crops
+  d'entraînement, 470 de validation, 410 de test, disjoints.
+- Arbre refit (profondeur 6, feuille 20) : verts **21 % → 52 %** sur le test PTL,
+  faux verts 3,1 % → 3,5 % — **2,5× plus de verts à sûreté égale**.
+- **Non livré** : sur les 9 crops **français**, l'arbre actuel fait 9/9 et le refit
+  tombe à 6/9 (deux bonshommes verts en `Unknown`) ; à pureté 0,90 un **disque de
+  voiture** passe même en `Green`. Un bonhomme shanghaïen n'est pas un bonhomme
+  français.
+- Le verrou n'est donc plus « trouver des données » mais « trouver des données
+  **françaises** » — et la chaîne, éprouvée, sortira un modèle en une heure sur
+  200-400 crops téléphone.
+
 ## 2026-10-29 — Feu vert : quatre tentatives de rappel, zéro gain (documenté)
 
 - **Demande** : relever le rappel vert de 1/6 vers ≥ 4/6 sans faux vert.
