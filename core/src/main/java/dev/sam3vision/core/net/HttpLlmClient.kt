@@ -3,6 +3,7 @@ package dev.sam3vision.core.net
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.model.Role
+import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
@@ -26,12 +27,13 @@ private const val TEMPERATURE = 0.2
 private const val RETRY_DELAY_MS = 1_500L
 
 /**
- * Modèle de repli quand le défaut est inconnu du fournisseur (404 `model_not_found`).
- * Mesuré le 2026-10-28 : `meta-models/muse-spark-open-1026` répond 404 sur le fournisseur
- * par défaut quand qwen répond 200 (texte en ~5 s, `image_url` acceptée) — une clé qui ne
- * sert pas le défaut obtient donc quand même sa réponse, sans toucher aux réglages.
+ * Modèle de repli quand le modèle demandé est inconnu du fournisseur (404
+ * `model_not_found`) : le modèle épinglé (Baseten, `muse-spark-open-1026`) — un seul
+ * fournisseur pour tout le LLM de l'app. Un modèle exotique ou hérité (ex. qwen InferHub)
+ * qui 404 est donc rejoué sur l'épinglé, sans toucher aux réglages ; si l'épinglé lui-même
+ * 404, l'échec remonte tel quel (aucun second modèle Baseten à tenter).
  */
-internal const val FALLBACK_LLM_MODEL = "ali/qwen3.8-omni-flash"
+internal const val FALLBACK_LLM_MODEL = Settings.DEFAULT_LLM_MODEL
 
 /** 402 côté LLM : budget du fournisseur, jamais la voix ElevenLabs. */
 private const val LLM_PAYMENT_LINE =

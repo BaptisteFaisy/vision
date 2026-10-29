@@ -3,6 +3,7 @@ package dev.sam3vision.core.net
 import dev.sam3vision.core.TestHttpServer
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
+import dev.sam3vision.core.settings.Settings
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -185,7 +186,7 @@ class LlmContractTest {
     }
 
     @Test
-    fun `404 modele inconnu — repli sur le modele historique`() = runBlocking {
+    fun `404 modele inconnu — repli sur le modele epingle`() = runBlocking {
         scripted(
             TestHttpServer.Response(404, """{"error":{"message":"unknown model: x","type":"model_not_found"}}"""),
             TestHttpServer.Response(200, NetContract.chatReply("réponse")),
@@ -197,6 +198,11 @@ class LlmContractTest {
             assertEquals(2, server.requests.size)
             assertEquals(FALLBACK_LLM_MODEL, JSONObject(server.requests[1].body).getString("model"))
         }
+    }
+
+    @Test
+    fun `le repli 404 est le modele Baseten epingle, pas un modele historique`() {
+        assertEquals(Settings.DEFAULT_LLM_MODEL, FALLBACK_LLM_MODEL)
     }
 
     @Test
