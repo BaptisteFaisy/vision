@@ -46,20 +46,24 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
   actuelle, même destination, sans regéocoder).
 
-### Mode navigation (la carte, sans destination)
+### Mode navigation (la carte sous la caméra)
 
 Dis **« navigation »**, **« carte »**, **« où suis-je »** (ou « ouvre la
-carte ») sur l'accueil iSee : la **carte** s'ouvre, sans destination —
-position GPS au centre (cercle de précision), passages piétons connus
-autour, coordonnées et précision écrites en grand.
+carte ») : la **carte** apparaît **sous la caméra**, en fond de l'accueil
+iSee — la rue, la boule et la phrase restent au-dessus. Aucune destination,
+aucun itinéraire : position GPS (cercle de précision) et feux connus autour.
 
-- « va à … » depuis la carte ouvre la confirmation d'itinéraire habituelle ;
-- « quitte la carte », « arrête la navigation », le bouton **Quitter** ou le
-  retour système referment le mode ;
-- sans autorisation de localisation : « Position indisponible — autorise la
-  localisation pour ce téléphone. » (rien d'autre ne change) ;
-- le mode ne s'ouvre pas par-dessus un guidage : il n'y a donc jamais deux
-  écrans de navigation empilés.
+- **Elle s'efface dès que tu parles** : pendant l'appui long du micro et la
+  transcription, la carte disparaît ; elle revient au relâchement. Tu gardes
+  donc l'écran libre quand tu dictes.
+- « va à … » pendant le mode ouvre la confirmation d'itinéraire habituelle ;
+- « quitte la carte » ou « arrête la navigation » referment le mode
+  (« Mode navigation fermé. »). Il n'y a pas de bouton : la scène iSee n'en
+  a aucun ;
+- sans autorisation de localisation, la carte reste vide (le mode reste
+  ouvert) ;
+- le mode ne s'ouvre pas par-dessus un guidage : il n'y a jamais deux écrans
+  de navigation empilés.
 
 ## 3. Arriver
 

@@ -50,10 +50,18 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
 ## 1 bis. Mode navigation (la carte, sans destination)
 
 Dire **« navigation »**, **« carte »**, **« plan »**, **« mode navigation »**,
-**« ouvre la carte »**, **« affiche le plan »** ou **« où suis-je »** ouvre
-l'écran carte — sans destination, sans itinéraire : position GPS au centre,
-passages piétons connus autour, et le micro (appui long) pour enchaîner.
+**« ouvre la carte »**, **« affiche le plan »** ou **« où suis-je »** ouvre le
+mode carte — sans destination, sans itinéraire.
 
+- **La carte est sous la caméra** : première couche de la scène iSee
+  (`NavigationMapLayer`, avant la rue, la boule et les textes), plein écran ;
+  la caméra garde sa place au-dessus. Le mode carte **n'empile aucun écran** :
+  entrer depuis n'importe quelle page ramène à l'accueil iSee, où la carte
+  apparaît derrière la caméra.
+- **Elle s'efface quand l'utilisateur parle** : une tenue du micro (il dicte)
+  ou une transcription en cours la font disparaître en 220 ms
+  (`navigationMapHidden` = `holding || transcribing`) ; iSee qui parle ne la
+  masque pas. La voix reprend l'écran, la carte revient au relâchement.
 - **Extraction** : `MapModeCommand` (pur, `:core`), essayé **avant** la
   navigation et **avant le LLM** — même place que `MaisonEnterCommand` ;
   casse, accents et ponctuation neutralisés (`KnownSizes.canonical`).
@@ -68,26 +76,25 @@ passages piétons connus autour, et le micro (appui long) pour enchaîner.
   « Mode navigation fermé. » à la fermeture — même chemin audio que les
   bulles (ElevenLabs + lecteur partagé). La fermeture ne dit **jamais**
   « Guidage arrêté » : aucun guidage n'a couru.
-- **Sorties** : bouton « Quitter », retour système, « quitte la carte »,
-  « arrête la navigation » (l'ordre stop existant referme la carte sans
-  annonce de guidage).
+- **Sorties** (vocales, aucun bouton sur la scène) : « quitte la carte »,
+  « arrête la navigation ». Le retour système reste ce qu'il est sur
+  l'accueil : il ouvre les Réglages.
 - **Depuis la carte** : une destination dictée (« emmène-moi à X ») ouvre la
   confirmation comme depuis l'accueil — le mode n'est qu'un point de départ.
 - **Fond de carte** : le fond OSM MapLibre du guidage (`GuidanceMapView`,
   `docs/CARTE-OSM.md` §4 bis), caméra au zoom rue sur la position ; tuiles en
-  échec → repli schéma (même contrat que le guidage, §3 de ce document-là).
+  échec → repli schéma (position, précision, feux), même contrat que le
+  guidage (§3 de ce document-là).
 - **Position** : `MapPositionWatcher` (GPS + réseau, 2 s, `LocationManager`
   sans Play Services) — distinct du pilote d'itinéraire, qui n'a rien à
-  démarrer sans destination. Sans permission : « Position indisponible —
-  autorise la localisation pour ce téléphone. » ; sans premier fix :
-  « Recherche de la position… ». Cadre de 200 m autour de la position
-  (`mapBoundsAround`), passages piétons rechargés par maille de 0,001°
-  (~110 m), pas à chaque point.
+  démarrer sans destination. Sans permission : aucune position (la carte
+  reste vide, le mode reste ouvert) ; les feux sont rechargés par maille de
+  0,001° (~110 m), pas à chaque point.
 
 Fichiers : `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt`,
 `app/src/main/java/dev/sam3vision/app/isee/vm/MapModeOrder.kt`,
 `app/src/main/java/dev/sam3vision/app/isee/vm/IseeModeOrders.kt`,
-`app/src/main/java/dev/sam3vision/app/voicenav/MapModeScreen.kt`,
+`app/src/main/java/dev/sam3vision/app/isee/NavigationMapLayer.kt`,
 `app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt`.
 
 ## 2. Politique d'annonces vocales (phrase exacte par événement)
@@ -208,7 +215,7 @@ annule (le/la) guidage / navigation » ; les 9 motifs GO restent inchangés.
 | Dictée : Meta puis repli Scribe, MicBus un seul AudioRecord | `core/src/main/java/dev/sam3vision/core/net/FallbackSpeechClient.kt` |
 | Voix : ElevenLabs-only, silencieuse en échec | `app/src/main/java/dev/sam3vision/app/VoiceAnnouncer.kt` |
 | Mode navigation : ordre vocal « navigation » / « carte » / « où suis-je » | `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt` |
-| Écran carte sans destination (position + passages piétons + micro) | `app/src/main/java/dev/sam3vision/app/voicenav/MapModeScreen.kt` |
+| Carte du mode navigation, sous la caméra (s'efface quand l'utilisateur parle) | `app/src/main/java/dev/sam3vision/app/isee/NavigationMapLayer.kt` |
 | Position du mode navigation (GPS + réseau, 2 s) | `app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt` |
 
 ## 7. Chantiers liés, hors MVP (cadre, pas promesse)

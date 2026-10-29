@@ -129,6 +129,10 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
  * L'état de session pilote l'écran navigation : confirmation ou guidage =
  * poussé (une fois), repos = dépilé (arrivée, arrêt, annulation). Le retour
  * système dépile sans repousse : quitter l'écran arrête le guidage.
+ *
+ * Le **mode carte** ([VoiceNavUiState.Map]) n'empile rien : il vit sur
+ * l'accueil iSee, en première couche sous la caméra (`NavigationMapLayer`) —
+ * on y revient donc, d'où qu'on soit, plutôt que d'ouvrir un écran de plus.
  */
 @Composable
 private fun VoiceNavStateEffect(
@@ -136,13 +140,14 @@ private fun VoiceNavStateEffect(
     route: Route,
     push: (Route) -> Unit,
     pop: () -> Unit,
+    showScene: () -> Unit,
 ) {
     val navState by isee.voiceNavState.collectAsState()
     LaunchedEffect(navState) {
-        if (navState is VoiceNavUiState.Idle) {
-            if (route == Route.VoiceNav) pop()
-        } else if (route != Route.VoiceNav) {
-            push(Route.VoiceNav)
+        when {
+            navState is VoiceNavUiState.Map -> if (route != Route.Isee) showScene()
+            navState is VoiceNavUiState.Idle -> if (route == Route.VoiceNav) pop()
+            route != Route.VoiceNav -> push(Route.VoiceNav)
         }
     }
 }
@@ -162,10 +167,11 @@ fun AppNav(
     val route = stack.first()
     val push: (Route) -> Unit = { names = listOf(routeToName(it)) + names }
     val pop: () -> Unit = { if (names.size > 1) names = names.drop(1) }
+    val home: () -> Unit = { names = listOf(routeToName(Route.Isee)) }
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     RouteRequestEffect(push)
-    VoiceNavStateEffect(isee, route, push, pop)
+    VoiceNavStateEffect(isee, route, push, pop, home)
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
@@ -181,7 +187,7 @@ fun AppNav(
             push = push,
             pop = pop,
             // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
-            onHome = { names = listOf(routeToName(Route.Isee)) },
+            onHome = home,
             // À la racine, la roue dentée et le retour système ouvrent les Réglages.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
         )
