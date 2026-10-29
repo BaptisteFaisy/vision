@@ -26,6 +26,7 @@ export default {
     try {
       if (url.pathname === '/api/share') return await share(request, env);
       if (url.pathname === '/api/state') return await state(url, env);
+      if (url.pathname === '/ws') return await stream(request, url, env);
       if (url.pathname === '/health') return json({ ok: true }, 200);
       return json({ ok: false, error: 'route inconnue' }, 404);
     } catch {
@@ -71,6 +72,21 @@ async function state(url, env) {
   if (!validId(id)) return json({ ok: false, error: 'share invalide' }, 400);
   const row = await d1Store(env.DB).read(id);
   return json(row ? stateOf(row, Date.now()) : emptyState(), 200);
+}
+
+/**
+ * Diffusion temps réel (`/ws?share=<id>&role=push|watch`) : une salle par flux,
+ * portée par un Durable Object. Le Worker ne fait que router — les frames ne
+ * touchent ni D1 ni le worker, elles passent de la caméra du proche aux aidants
+ * connectés (`room.js` décrit le contrat, `durable.js` la salle).
+ */
+async function stream(request, url, env) {
+  const id = url.searchParams.get('share');
+  if (!validId(id)) return json({ ok: false, error: 'share invalide' }, 400);
+  // Déploiement sans binding : le dire, au lieu de casser la page qui a un repli.
+  if (!env.RELAY_ROOM) return json({ ok: false, error: 'diffusion non déployée' }, 503);
+  const room = env.RELAY_ROOM.get(env.RELAY_ROOM.idFromName(id));
+  return room.fetch(request);
 }
 
 function json(body, code) {

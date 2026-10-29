@@ -24,10 +24,15 @@ internal object SharedCameraFrame {
     @Volatile
     private var capturedAtMs: Long = 0L
 
+    /** Numéro de la frame : le direct ne renvoie jamais deux fois la même image. */
+    @Volatile
+    private var seq: Long = 0L
+
     /** Mémorise la frame qui vient d'être convertie par l'analyseur caméra. */
     fun offer(frame: String) {
         jpeg = frame
         capturedAtMs = System.currentTimeMillis()
+        seq += 1
     }
 
     /**
@@ -37,6 +42,17 @@ internal object SharedCameraFrame {
      */
     fun photoOf(nowMs: Long): SharedPhoto? =
         jpeg?.takeIf { nowMs - capturedAtMs <= FRESH_MS }?.let { SharedPhoto(it, nowMs) }
+
+    /**
+     * Frame à pousser au direct : son numéro et son base64, tant qu'elle vient
+     * d'être capturée ([maxAgeMs]). `null` = caméra fermée ou figée, rien à
+     * envoyer — le direct s'arrête de lui-même plutôt que de boucler une image.
+     */
+    fun latest(nowMs: Long, maxAgeMs: Long = dev.sam3vision.core.share.STREAM_FRAME_MAX_AGE_MS): Frame? =
+        jpeg?.takeIf { nowMs - capturedAtMs <= maxAgeMs }?.let { Frame(seq, it) }
+
+    /** Une frame prête pour le direct. */
+    data class Frame(val seq: Long, val jpegBase64: String)
 
     /** Caméra fermée : plus rien à montrer au proche. */
     fun clear() {

@@ -14,6 +14,8 @@ import dev.sam3vision.core.share.sharedPictosOf
 internal fun IseeShare(state: IseeUiState, viewModel: IseeViewModel, settings: Settings) {
     val probe by viewModel.probe.state.collectAsState()
     val nav by viewModel.voiceNavState.collectAsState()
+    // Direct de la caméra : les frames partent par le WebSocket de la salle.
+    IseeLiveStream(settings)
     ShareRelay(
         layer = if (state.recordingVideo) probe.distanceLayer else null,
         settings = settings,
