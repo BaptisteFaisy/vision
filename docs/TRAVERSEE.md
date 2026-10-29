@@ -143,3 +143,23 @@ Conséquence pratique : sur un feu — qui ne bouge pas — le cadre est juste, 
 400 ms de retard. Dès que le téléphone **panote**, le cadre traîne derrière l'image
 vivante, comme les pastilles de distance. Ce n'est pas un défaut de l'overlay, c'est
 l'âge de la dernière frame analysée.
+
+### Deux cadences, pas une (29/10)
+
+La couleur et la position n'ont pas la même urgence :
+
+- **la couleur** dit quoi faire, elle se périme vite → relue **localement sur
+  chaque frame caméra, au plus tard toutes les 150 ms** (`LightClock`,
+  `isee/CrossingLocalLight.kt`). `PedLightGate` est 100 % embarqué : rien ne
+  l'oblige à attendre le serveur ;
+- **la position** dit où regarder, elle ne bouge pas → elle garde la cadence
+  SAM (350-900 ms). Une boîte de 400 ms sur un feu fixe est juste.
+
+Concrètement, l'état affiché cesse d'avoir l'âge de l'aller-retour (422 ms
+médians) : il a l'âge de la dernière frame caméra, borné à 150 ms. La voix,
+elle, garde son hystérésis (`CrossingAnnouncer`) — deux seaux, deux usages.
+
+**Ce que ça ne règle pas** : la justesse. Rendre l'affichage plus frais ne le
+rend pas plus vrai ; la mesure du 29/10 donne **1 vert accepté sur 6** signaux
+verts réels (`docs/MESURES-SAM3-FEUX.md` §6). Le prochain gain est là, pas dans
+la cadence.

@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -143,10 +145,23 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
 }
 
 /** Aperçu vivant : masques SAM et notice « pourquoi la caméra ne voit rien ». */
+/**
+ * Le seau de lecture locale du feu, un par écran : la boîte vient de la sonde
+ * (serveur), la couleur est relue sur chaque frame caméra, ≤ 150 ms.
+ */
+@Composable
+internal fun rememberCrossingPump(viewModel: IseeViewModel): CrossingLocalLight {
+    val scope = rememberCoroutineScope()
+    return remember(viewModel) {
+        CrossingLocalLight(scope, Dispatchers.Default, boxOf = { viewModel.probe.state.value.crossingBox })
+    }
+}
+
 @Composable
 internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: IseeViewModel, modifier: Modifier) {
     // SAM tourne quand la caméra est active (enregistrement et Traversée aussi) : le câblage vit avec la carte.
-    IseeCameraWiring(glue, viewModel, probe.frames)
+    val pump = rememberCrossingPump(viewModel)
+    IseeCameraWiring(glue, viewModel, probe.frames, pump)
     if (!glue.granted) {
         Text(
             "iSee needs the camera.",
@@ -165,10 +180,23 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     SteeringLayer(probe.steering)
     val twinUi by viewModel.twinlite.ui.collectAsState()
     TwinLiteLayer(twinUi)
+    CrossingOnVideo(probe, pump)
+}
+
+/**
+ * Le feu sur la vidéo : la **couleur** vient de la lecture locale quand elle
+ * existe ([CrossingLocalLight], ≤ 150 ms), la **boîte** du dernier passage
+ * serveur. Un feu ne se déplace pas : une position vieille de 400 ms reste
+ * juste, alors qu'une couleur vieille de 400 ms ne l'est plus.
+ */
+@Composable
+internal fun CrossingOnVideo(probe: LiveProbeState, pump: CrossingLocalLight) {
+    if (!probe.crossingActive) return
+    val local by pump.ui.collectAsState()
     CrossingOverlayLayer(
-        active = probe.crossingActive,
-        box = probe.crossingBox,
-        state = probe.crossing,
+        active = true,
+        box = local?.box ?: probe.crossingBox,
+        state = local?.state ?: probe.crossing,
         frameWidth = probe.width,
         frameHeight = probe.height,
     )
@@ -286,7 +314,12 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
  * l'autre, et le dernier poste de la chronologie posé au frame Compose suivant.
  */
 @Composable
-private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames: Int) {
+private fun IseeCameraWiring(
+    glue: CameraGlue,
+    viewModel: IseeViewModel,
+    frames: Int,
+    pump: CrossingLocalLight,
+) {
     LaunchedEffect(glue.host, viewModel) {
         // SAM voit la caméra dès qu'elle est active (l'enregistrement et la Traversée
         // envoient aussi) : hors ces cas, aucune frame n'est même convertie.
@@ -305,6 +338,8 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
                 if (sending(viewModel)) {
                     viewModel.probe.onFrame(jpeg, captureAtNs)
                     viewModel.twinlite.offerFrame(jpeg)
+                    // Couleur du feu relue ici, sur la frame la plus fraîche (≤ 150 ms).
+                    if (viewModel.probe.state.value.crossingActive) pump.offerFrame(jpeg)
                 }
                 if (picturing(viewModel)) viewModel.picto.onFrame(jpeg)
             }
