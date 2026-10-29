@@ -1,5 +1,6 @@
 package dev.sam3vision.core.nav
 
+import dev.sam3vision.core.model.RoutePoint
 import org.json.JSONObject
 
 /**
@@ -39,7 +40,8 @@ object ValhallaRoute {
         maneuvers[maneuvers.lastIndex] = maneuvers[maneuvers.lastIndex].copy(action = ManeuverAction.Arrive)
         val name = destinationName?.takeIf { it.isNotBlank() }
             ?: maneuvers.last().street
-        return Result.success(NavRoute(maneuvers = maneuvers, destinationName = name))
+        val shape = points.map { (lat, lon) -> RoutePoint(lat, lon) }
+        return Result.success(NavRoute(maneuvers = maneuvers, destinationName = name, shape = shape))
     }
 
     /** Racine JSON, `null` si le texte n'est pas un objet. */

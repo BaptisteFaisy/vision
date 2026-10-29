@@ -1,5 +1,7 @@
 package dev.sam3vision.core.nav
 
+import dev.sam3vision.core.model.RoutePoint
+
 /**
  * Position GPS exploitable par le guidage : coordonnées WGS84, précision
  * annoncée par le fournisseur ([accM], 1σ en mètres) et horodatage
@@ -52,11 +54,14 @@ data class NavManeuver(
  * Itinéraire guidable : manœuvres ordonnées du départ à l'arrivée.
  * La dernière manœuvre porte [ManeuverAction.Arrive] et son point est la
  * destination ; [destinationName] (`null` si inconnu) habille l'annonce
- * d'arrivée (« Vous êtes arrivé à X »).
+ * d'arrivée (« Vous êtes arrivé à X »). [shape] est la géométrie Valhalla
+ * décodée (vide si le fournisseur ne l'a pas attachée : repli sur les
+ * manœuvres côté carte) — [validate] ne l'examine pas.
  */
 data class NavRoute(
     val maneuvers: List<NavManeuver>,
     val destinationName: String? = null,
+    val shape: List<RoutePoint> = emptyList(),
 ) {
     companion object {
         /**
