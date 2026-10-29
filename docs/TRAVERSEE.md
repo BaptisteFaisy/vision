@@ -163,3 +163,29 @@ elle, garde son hystérésis (`CrossingAnnouncer`) — deux seaux, deux usages.
 rend pas plus vrai ; la mesure du 29/10 donne **1 vert accepté sur 6** signaux
 verts réels (`docs/MESURES-SAM3-FEUX.md` §6). Le prochain gain est là, pas dans
 la cadence.
+
+## 8. Proposer le mode quand un passage piéton est dans le champ (29/10)
+
+`crosswalk` fait déjà partie des **douze concepts par défaut** du direct
+(`LivePrompts.default`) : SAM le détecte depuis le 29/10 sans que rien ne
+l'affiche. Aucun prompt à ajouter, aucun coût serveur de plus.
+
+Quand un passage piéton est vu sur **3 des 5 dernières frames** publiées et
+qu'aucun mode n'est actif, la pastille de carte change de libellé
+(« Passage piéton — traversée ? », ambre) et **un tap** active le mode Traversée —
+le geste qui existait déjà. Rien n'est automatique : entrer en Traversée change
+les concepts suivis (`traffic light` + `car`) et coupe le guidage obstacles, ce
+n'est pas une décision que l'app prend seule.
+
+- logique pure : `core/crossing/CrossingOffer.kt` — `isCrosswalkLabel`
+  (canonicalisation accents/casse), `seesCrosswalk` (score ≥ 0,40), et
+  `CrossingOfferGate` (fenêtre 5, seuil 3) ;
+- mémoire : `isee/CrossingWiring.CrossingOfferWatch`, une par processus — la
+  garde des 500 lignes ne laissait pas de place à un champ de plus dans
+  `LiveProbe` ;
+- un **refus se tait une minute** (`declined`, posé quand on coupe le mode) :
+  longer un carrefour sur 50 mètres ne doit pas faire clignoter la pastille.
+
+**Ce que ça ne prouve pas** : que `crosswalk` soit détecté de façon fiable par
+SAM sur une vraie chaussée — la mesure du 29/10 portait sur les feux, pas sur les
+passages. À vérifier avec le même protocole (`docs/MESURES-SAM3-FEUX.md`).
