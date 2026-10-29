@@ -3,6 +3,35 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
+
+- **Demande** : la reconnaissance du feu piéton ne vivait que dans une pastille
+  en bas de carte et dans la voix ; elle devait se voir **sur la même vidéo que
+  les masques SAM**, à l'endroit du feu.
+- `isee/CrossingOverlayLayout.kt` (**nouveau**, pur) : `lightMarker` place la
+  boîte normalisée du feu à l'écran avec la **même** transformation que les
+  pastilles de distance (`cropTransform`, `ContentScale.Crop`) ; `tagRect` pose
+  l'étiquette au-dessus, ou en dessous quand le feu touche le haut ; couleurs et
+  libellés (`VERT` / `ROUGE` / `DOUTE`) ont une seule source, `crossingAccent` /
+  `crossingTag` — la pastille de carte les réutilise au lieu de recopier les
+  teintes.
+- `isee/CrossingOverlayLayer.kt` (**nouveau**, Compose) : un cadre de la couleur
+  de l'état + une étiquette courte, dessinés dans un `Canvas`. Cadre et non
+  rectangle plein : même règle que les distances, l'image reste lisible.
+- `isee/CrossingWiring.kt` : `crossingLightOf` lit **une** fois la frame et
+  rend la boîte **et** l'état ; `crossingPatchOf` publie les deux. L'étiquette ne
+  peut donc pas désigner un autre feu que celui qui a été classifié, et le
+  décodage du crop n'est pas fait deux fois par frame.
+- `isee/LiveProbeState.kt` : `crossingBox` (boîte normalisée de la dernière
+  frame, `null` = aucun feu dans le champ). `LiveProbe.kt` la publie ; le
+  fichier reste à 499 lignes (limite 500).
+- Affiché sur les **deux** sources d'image de `StreetFeed` : caméra du téléphone
+  (`CameraLive`) et lunettes.
+- **Preuves** : `CrossingOverlayLayoutTest` 11 tests (couleurs, vocabulaire
+  identique à la pastille pour les états tranchés, cadrage panoramique recadré,
+  boîte débordante ramenée, étiquette déplacée sous le cadre puis bornée) ;
+  `:core` 1 789 tests + `:app` 989 tests, 0 échec ; `check-kotlin-limits` OK.
+
 ## 2026-10-29 — iSee : la voix dit les obstacles proches, même non mesurés
 
 - **Cause** : le user marche avec l'app, elle ne dit plus les obstacles même en
