@@ -49,6 +49,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+## 2026-10-29 — Traversée : un passage piéton reconnu propose le mode
+
+- **Demande** : si l'app reconnaît un passage piéton, qu'elle propose de passer
+  en mode Traversée.
+- Constat : `crosswalk` est **déjà** l'un des douze prompts par défaut
+  (`LivePrompts.default`) — SAM le détecte depuis le 29/10 et personne ne
+  l'affichait. Aucun concept à ajouter, aucun coût serveur.
+- `core/crossing/CrossingOffer.kt` (**nouveau**, pur) : étiquettes canonicalisées
+  (`crosswalk`, `zebra crossing`, `passage piéton`…), score ≥ 0,40, et
+  `CrossingOfferGate` — 3 frames sur les 5 dernières, silence d'une minute après
+  un refus, rien en mode actif. 8 tests JVM.
+- `isee/CrossingWiring.CrossingOfferWatch` : mémoire de processus (la garde des
+  500 lignes ne laisse pas de champ de plus dans `LiveProbe`, resté à 499).
+- `LiveProbeState.crossingOffer` + `LiveProbe` publie la proposition à chaque
+  frame ; `crossingButtonLabel` gagne un troisième cas, la pastille passe en
+  ambre sur « Passage piéton — traversée ? ». **Un tap active** — même geste
+  qu'avant, jamais d'activation automatique.
+- Couper le mode vaut refus : `setCrossingActive(false)` pose `declined`, sinon
+  la proposition reviendrait à la frame suivante.
+- **Preuves** : `CrossingOfferTest` 8, `CrossingWiringTest` 6 ; `:core`
+  1 809 tests + `:app` 1 059, 0 échec ; `check-kotlin-limits` OK.
+- **À vérifier** : la fiabilité de `crosswalk` sur une vraie chaussée — la
+  mesure du jour portait sur les feux, pas sur les passages.
+
 ## 2026-10-29 — Traversée : la lecture locale du feu partout, et le rappel vert mesuré
 
 - **Demande** : câbler le Direct et les lunettes sur le seau local à 150 ms, puis

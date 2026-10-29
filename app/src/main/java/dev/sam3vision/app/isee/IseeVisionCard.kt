@@ -229,7 +229,8 @@ private fun RecordingChip() {
 @Composable
 private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
     // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
-    val dot = Color(crossingAccent(probe.crossingActive, probe.crossing))
+    val offering = probe.crossingOffer && !probe.crossingActive
+    val dot = if (offering) Color(CROSSING_ACCENT_DOUBT) else Color(crossingAccent(probe.crossingActive, probe.crossing))
     Row(
         modifier
             .padding(8.dp)
@@ -241,7 +242,7 @@ private fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onT
         Box(Modifier.size(7.dp).background(dot, CircleShape))
         Spacer(Modifier.size(5.dp))
         Text(
-            crossingButtonLabel(probe.crossingActive, probe.crossing),
+            crossingButtonLabel(probe.crossingActive, probe.crossing, offering),
             color = Color.White,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
