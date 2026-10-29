@@ -33,7 +33,8 @@ fichier      : name="image"; filename="photo.jpg", image/jpeg, <octets JPEG 768 
 - **Réponse** : JSON `{created, data:[{b64_json}]}` (`extractImageB64`,
   `core/net/Json.kt`) ; une réponse `url` seule n'est pas prise en charge
   (`BadResponse` explicite, pas de second appel silencieux).
-- **Coût/latence (doc Meta, non mesuré ici)** : ~0,01 $ et ~10 s par image.
+- **Coût/latence** : ~0,01 $ par image (doc Meta, dépense non mesurée ici) ;
+  latence ~10-15 s mesurée sur le téléphone le 2026-10-29 (2 générations live).
 
 ## Erreurs : ce que voit l'utilisateur
 
@@ -45,9 +46,10 @@ fichier      : name="image"; filename="photo.jpg", image/jpeg, <octets JPEG 768 
 | image absente / base64 invalide | `BadResponse` | `Picto: réponse inattendue : …` |
 | délai / réseau | `Timeout` / `Network` | `Picto: backend injoignable : …` |
 
-Le compte Meta renvoyait 402 sur tout appel d'inférence (voir `META-ASR.md`,
-non re-vérifié) : tant que la facturation n'est pas configurée côté console
-(acte personnel, jamais un agent), la génération remonte ce 402 tel quel.
+La facturation Meta fonctionne pour l'image (vérifié le 2026-10-29 : 2
+générations live depuis le téléphone, clé des Réglages). Le 402 reste géré
+tel quel si le compte se retrouve sans paiement (voir `META-ASR.md` pour
+l'historique côté dictée).
 
 ## Où ça vit dans le code
 
