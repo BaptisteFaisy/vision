@@ -60,6 +60,12 @@ internal class ProbeVoice(
     }
 
     /**
+     * Trottoir de la dernière frame guidée (`null` = guidage coupé ou pas
+     * encore de frame) : le guetteur trottoir y lit ce qu'il annonce.
+     */
+    val lastSidewalk: SidewalkPosition? get() = guidance.lastSidewalk
+
+    /**
      * Phrase à dire pour la frame, ou `null` (muet) : guidage d'abord, sinon
      * positions, sinon silence. [manualCap] est le cap demandé à la voix.
      * Le trottoir vu caméra ([SidewalkKeep]) peut suspendre le cap : l'ordre
