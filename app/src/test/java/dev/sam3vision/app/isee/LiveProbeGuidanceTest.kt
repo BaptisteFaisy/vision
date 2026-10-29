@@ -131,7 +131,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame(listOf(gobelet())))
         advanceUntilIdle()
 
-        assertEquals("Stop.", probe.state.value.spoken)
+        assertEquals("obstacle, arrêtez-vous.", probe.state.value.spoken)
         assertTrue(probe.state.value.spokenUrgent)
     }
 

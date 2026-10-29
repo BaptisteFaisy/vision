@@ -2,8 +2,10 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Voix TwinLite de l'obstacle : textes restaurés, clips `tl_*`, clés séparées des mots SAM. */
@@ -65,5 +67,20 @@ class TwinLiteWordTest {
         assertNull(TwinLiteWord.clipIdFor("Stop."))
         assertNull(TwinLiteWord.clipIdFor("personne devant à 2 mètres."))
         assertNull(TwinLiteWord.clipIdFor(""))
+    }
+
+    @Test
+    fun `seul le stop TwinLite coupe, FR et EN`() {
+        assertTrue(TwinLiteWord.isStopPhrase("obstacle, arrêtez-vous."))
+        assertTrue(TwinLiteWord.isStopPhrase("obstacle, stop."))
+    }
+
+    @Test
+    fun `les cotes TwinLite doux ne coupent pas`() {
+        assertFalse(TwinLiteWord.isStopPhrase("gauche."))
+        assertFalse(TwinLiteWord.isStopPhrase("droite."))
+        assertFalse(TwinLiteWord.isStopPhrase("tout droit."))
+        assertFalse(TwinLiteWord.isStopPhrase("Stop."))
+        assertFalse(TwinLiteWord.isStopPhrase("personne devant à 2 mètres."))
     }
 }

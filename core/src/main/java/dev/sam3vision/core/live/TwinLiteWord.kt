@@ -72,5 +72,13 @@ enum class TwinLiteWord {
             "obstacle, stop.", "obstacle, arrêtez-vous." -> Stop.clipId
             else -> null
         }
+
+        /**
+         * Vrai si [phrase] est le stop TwinLite, FR ou EN : le seul mot qui
+         * coupe la lecture en cours (guidage doux — les côtés TwinLite
+         * attendent le silence, comme les mots SAM doux).
+         */
+        fun isStopPhrase(phrase: String): Boolean =
+            phrase == Stop.text(SpeechLanguage.Fr) || phrase == Stop.text(SpeechLanguage.En)
     }
 }
