@@ -1,6 +1,7 @@
 package dev.sam3vision.core.share
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.picto.PictoHit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -98,5 +99,42 @@ class SharePayloadTest {
     @Test
     fun `le seuil interieur marque les positions imprecises`() {
         assertTrue(INDOOR_ACCURACY_M == 25f)
+    }
+
+    @Test
+    fun `les reperes partagent nom dessin et instant, plafonnes`() {
+        val hits = (1..6).map { PictoHit("id$it", "objet$it", 0f, 0f, 0.1f, 0.1f, 1f) }
+        val shared = sharedPictosOf(hits, { byteArrayOf(1, 2, 3) }, 1_700_000_000_000L)!!
+        assertEquals(1_700_000_000_000L, shared.atMs)
+        assertEquals(MAX_SHARED_PICTOS, shared.items.size)
+        assertEquals("objet1", shared.items.first().label)
+        assertEquals("AQID", shared.items.first().pngBase64)
+    }
+
+    @Test
+    fun `sans dessin partageable aucun repere ne part`() {
+        assertNull(sharedPictosOf(emptyList(), { null }, 1L))
+        val demo = listOf(PictoHit("demo", "mur", 0f, 0f, 1f, 1f, 1f))
+        assertNull(sharedPictosOf(demo, { null }, 1L))
+    }
+
+    @Test
+    fun `le json du relais porte les reperes en dessins`() {
+        val fix = SharedFix(48.85, 2.35, 12f, 90f, 1_700_000_000_000L, false)
+        val picto = SharedPictos(1L, listOf(SharedPicto("medics", "AQID")))
+        val json = shareJson("leo", "cle", fix, emptyList(), pictos = picto)
+        val pictos = json.getJSONObject("pictos")
+        assertEquals(1L, pictos.getLong("atMs"))
+        assertEquals("medics", pictos.getJSONArray("items").getJSONObject(0).getString("label"))
+        assertEquals("AQID", pictos.getJSONArray("items").getJSONObject(0).getString("png"))
+    }
+
+    @Test
+    fun `un dessin trop gros ou un nom vide ne partent pas`() {
+        val fix = SharedFix(48.85, 2.35, 12f, null, 1L, false)
+        val gros = SharedPicto("medics", "A".repeat(MAX_SHARED_PICTO_PNG + 1))
+        val picto = SharedPictos(1L, listOf(SharedPicto("", "AQID"), gros))
+        val json = shareJson("leo", "", fix, emptyList(), pictos = picto)
+        assertNull(json.optJSONObject("pictos"))
     }
 }

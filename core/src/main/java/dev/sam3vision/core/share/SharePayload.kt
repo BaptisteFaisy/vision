@@ -1,6 +1,8 @@
 package dev.sam3vision.core.share
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.picto.PictoHit
+import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -90,6 +92,47 @@ data class SharedTrip(
     val progress: Float,
 )
 
+/** Un repère reconnu : son nom et son dessin PNG (base64, sans préfixe `data:`). */
+data class SharedPicto(
+    val label: String,
+    val pngBase64: String,
+)
+
+/** Repères reconnus au moment du rapport : la page les montre en dessins, jamais en texte seul. */
+data class SharedPictos(
+    val atMs: Long,
+    val items: List<SharedPicto>,
+)
+
+/** Repères envoyés au plus par rapport (la page les montre en bandeau). */
+const val MAX_SHARED_PICTOS = 4
+
+/** Longueur maximale d'un PNG de repère en base64 (dessin ≈ 3-11 k caractères). */
+const val MAX_SHARED_PICTO_PNG = 30_000
+
+/** Longueur maximale d'un nom de repère (comme les libellés d'objets du relais). */
+const val MAX_SHARED_PICTO_LABEL = 40
+
+/**
+ * Repères reconnus partageables : nom + dessin PNG (base64), au plus [max].
+ * `null` quand aucun n'a de dessin (démo, faux repères) : le paquet n'envoie
+ * alors pas de `pictos` et la page n'affiche rien.
+ */
+fun sharedPictosOf(
+    hits: List<PictoHit>,
+    pngOf: (String) -> ByteArray?,
+    atMs: Long,
+    max: Int = MAX_SHARED_PICTOS,
+): SharedPictos? {
+    val items = hits.mapNotNull { hit ->
+        val png = runCatching { pngOf(hit.pictoId) }.getOrNull()?.takeIf { it.isNotEmpty() }
+            ?: return@mapNotNull null
+        val label = hit.label.trim().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+        SharedPicto(label, Base64.getEncoder().encodeToString(png))
+    }.take(max)
+    return items.takeIf { it.isNotEmpty() }?.let { SharedPictos(atMs, it) }
+}
+
 /** Caractères d'un JPEG base64 : la page le colle derrière `data:image/jpeg;base64,`. */
 private val BASE64 = Regex("[A-Za-z0-9+/]+={0,2}")
 
@@ -100,10 +143,10 @@ const val MAX_SHARED_JPEG = 120_000
 const val MAX_SHARED_DESTINATION = 80
 
 /**
- * Corps JSON du relais : `{shareId, writeKey, fix, objects, scene?, photo?, trip?}`.
+ * Corps JSON du relais : `{shareId, writeKey, fix, objects, scene?, photo?, trip?, pictos?}`.
  * La clé d'écriture est vérifiée par le relais (jamais stockée côté site).
- * `photo` et `trip` sont optionnels : un client d'avant continue d'envoyer
- * position, objets et phrase, et le relais les accepte tels quels.
+ * `photo`, `trip` et `pictos` sont optionnels : un client d'avant continue
+ * d'envoyer position, objets et phrase, et le relais les accepte tels quels.
  */
 fun shareJson(
     shareId: String,
@@ -113,6 +156,7 @@ fun shareJson(
     scene: SharedScene? = null,
     photo: SharedPhoto? = null,
     trip: SharedTrip? = null,
+    pictos: SharedPictos? = null,
 ): JSONObject = JSONObject()
     .put("shareId", shareId)
     .put("writeKey", writeKey)
@@ -135,11 +179,26 @@ fun shareJson(
     .apply { scene?.let { put("scene", it.toJson()) } }
     .apply { photoJson(photo)?.let { put("photo", it) } }
     .apply { tripJson(trip)?.let { put("trip", it) } }
+    .apply { pictoJson(pictos)?.let { put("pictos", it) } }
 
 /** Image publiable, ou `null` si le base64 est inexploitable (jamais un 400 du relais). */
 private fun photoJson(photo: SharedPhoto?): JSONObject? {
     val jpeg = photo?.jpegBase64?.takeIf { BASE64.matches(it) && it.length <= MAX_SHARED_JPEG } ?: return null
     return JSONObject().put("jpeg", jpeg).put("atMs", photo.atMs)
+}
+
+/** Repères publiables (noms et PNG bornés), ou `null` si aucun n'est valable. */
+private fun pictoJson(pictos: SharedPictos?): JSONObject? {
+    if (pictos == null) return null
+    val items = JSONArray()
+    pictos.items.take(MAX_SHARED_PICTOS).forEach { item ->
+        val label = item.label.trim().takeIf { it.isNotEmpty() } ?: return@forEach
+        val png = item.pngBase64.takeIf { BASE64.matches(it) && it.length <= MAX_SHARED_PICTO_PNG }
+            ?: return@forEach
+        items.put(JSONObject().put("label", label.take(MAX_SHARED_PICTO_LABEL)).put("png", png))
+    }
+    if (items.length() == 0) return null
+    return JSONObject().put("atMs", pictos.atMs).put("items", items)
 }
 
 /** Trajet publiable ([MAX_SHARED_DESTINATION], bornes numériques), ou `null`. */

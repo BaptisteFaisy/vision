@@ -12,6 +12,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.SHARE_INTERVAL_MS
 import dev.sam3vision.core.share.SharedPhoto
+import dev.sam3vision.core.share.SharedPictos
 import dev.sam3vision.core.share.SharedScene
 import dev.sam3vision.core.share.SharedTrip
 import dev.sam3vision.core.share.canPublishShare
@@ -21,8 +22,8 @@ import kotlinx.coroutines.delay
  * Même publication pour Direct et iSee : le service reprend dès que l'écran s'efface.
  *
  * [photo] est relue à chaque envoi (dernière frame caméra, `null` quand elle a
- * vieilli) et [trip] porte le guidage en cours : la page caregiver reçoit l'image
- * et la barre de progression sans qu'aucune des deux ne passe par l'état Compose.
+ * vieilli), [trip] porte le guidage en cours et [pictos] les repères reconnus :
+ * la page caregiver reçoit image, barre et dessins sans passer par l'état Compose.
  */
 @Composable
 fun ShareRelay(
@@ -31,6 +32,7 @@ fun ShareRelay(
     scene: SharedScene? = null,
     trip: SharedTrip? = null,
     photo: (Long) -> SharedPhoto? = { null },
+    pictos: (Long) -> SharedPictos? = { null },
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -39,6 +41,7 @@ fun ShareRelay(
     val currentScene by rememberUpdatedState(scene)
     val currentTrip by rememberUpdatedState(trip)
     val currentPhoto by rememberUpdatedState(photo)
+    val currentPictos by rememberUpdatedState(pictos)
     LaunchedEffect(settings, lifecycle) {
         if (!canPublishShare(settings)) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -54,6 +57,7 @@ fun ShareRelay(
                         currentScene,
                         currentTrip,
                         currentPhoto(now),
+                        currentPictos(now),
                     )
                     delay(SHARE_INTERVAL_MS)
                 }

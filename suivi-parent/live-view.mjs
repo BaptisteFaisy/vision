@@ -1,5 +1,8 @@
-// Image et trajet du téléphone partagé : aucune donnée n'est inventée côté page.
+// Image, repères et trajet du téléphone partagé : aucune donnée n'est inventée côté page.
 export const PHOTO_FRESH_MS = 8_000;
+
+/** Repères reconnus affichables : dessins d'une détection qui tourne **maintenant**. */
+export const PICTO_FRESH_MS = 8_000;
 
 /**
  * Image affichable : celle d'une caméra qui tourne **maintenant**.
@@ -16,6 +19,26 @@ export function frameOf(live, status, now = Date.now()) {
   const at = Number(photo.atMs);
   if (!Number.isFinite(at) || now - at > PHOTO_FRESH_MS) return null;
   return { src: 'data:image/jpeg;base64,' + photo.jpeg };
+}
+
+/**
+ * Repères affichables : flux `live` **et** détection de moins de
+ * [PICTO_FRESH_MS] (même règle que la frame : un dessin conservé après
+ * coupure ne prouve plus rien). Chaque item rend `{src, label}`.
+ */
+export function pictosOf(live, status, now = Date.now()) {
+  if (status !== 'live') return null;
+  const pictos = live && live.pictos;
+  if (!pictos || !Array.isArray(pictos.items) || !pictos.items.length) return null;
+  const at = Number(pictos.atMs);
+  if (!Number.isFinite(at) || now - at > PICTO_FRESH_MS) return null;
+  const kept = [];
+  for (const item of pictos.items) {
+    if (!item || typeof item.label !== 'string' || !item.label.trim()) continue;
+    if (typeof item.png !== 'string' || !item.png) continue;
+    kept.push({ src: 'data:image/png;base64,' + item.png, label: item.label.trim() });
+  }
+  return kept.length ? kept : null;
 }
 
 /** Trajet guidé en cours, `null` hors guidage ou quand le flux est mort. */
