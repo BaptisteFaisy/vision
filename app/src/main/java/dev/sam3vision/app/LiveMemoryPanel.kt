@@ -1,8 +1,10 @@
 package dev.sam3vision.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gesture.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -151,8 +154,9 @@ private fun AskRow(
 }
 
 /**
- * Pastille micro : « Parler » ouvre le micro, « Stop » le referme et envoie la question.
- * Grisée pendant une question en cours ; indicateur pendant la transcription.
+ * Pastille micro en appui maintenu : le micro s'ouvre à la pose du doigt et se
+ * ferme au relâchement (« Stop » reste en secours). Grisée pendant une question
+ * en cours ; indicateur pendant la transcription.
  */
 @Composable
 private fun VoiceChip(voice: LiveVoiceState, asking: Boolean, onStart: () -> Unit, onStop: () -> Unit) {
@@ -164,7 +168,27 @@ private fun VoiceChip(voice: LiveVoiceState, asking: Boolean, onStart: () -> Uni
         )
         voice.listening -> Chip("Stop", AppColors.danger, onStop)
         asking -> Chip("Parler", AppColors.surfaceHigh, null)
-        else -> Chip("Parler", AppColors.primary, onStart)
+        else -> HoldChip(onStart, onStop)
+    }
+}
+
+/** Pastille tenue : mêmes couleurs que [Chip], le relâchement termine la dictée. */
+@Composable
+private fun HoldChip(onStart: () -> Unit, onStop: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier
+            .background(AppColors.primary.copy(alpha = 0.9f), shape)
+            .pointerInput(onStart, onStop) {
+                detectTapGestures(onPress = {
+                    onStart()
+                    tryAwaitRelease()
+                    onStop()
+                })
+            }
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text("Parler", color = contentOn(AppColors.primary), fontSize = 13.sp, maxLines = 1)
     }
 }
 

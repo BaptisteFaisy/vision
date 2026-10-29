@@ -5,6 +5,7 @@ import dev.sam3vision.app.LLM_ABSENT_LINE
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.app.NO_FRAME_LINE
 import dev.sam3vision.app.PictoOverlay
+import dev.sam3vision.app.LiveVoiceRequest
 import dev.sam3vision.app.focusLabel
 import dev.sam3vision.app.focusWindow
 import dev.sam3vision.app.isee.PICTO_FRAME_EDGE
@@ -14,9 +15,10 @@ import dev.sam3vision.app.isee.StoredPicto
 import dev.sam3vision.app.isee.decodeFrameGray
 import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.timelineContextOrNull
-import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LiveTimeline
+import dev.sam3vision.core.live.MaisonEnterCommand
+import dev.sam3vision.core.live.MaisonEnterText
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.ChatTurn
@@ -105,6 +107,10 @@ class LiveAskSession(
     @Volatile
     private var pictoHunt: String? = null
 
+    /** Label à créer dès la première frame (ordre iSee), `null` une fois lancé. */
+    @Volatile
+    private var pendingCreate: String? = null
+
     /** Démo active : les faux repères remplacent le repérage (overlay + guidage). */
     @Volatile
     private var pictoDemo = false
@@ -128,6 +134,7 @@ class LiveAskSession(
         timeline.clear()
         pictoHunt = null
         pictoDemo = false
+        pendingCreate = null
         pictoTurn++
         state.update { it.copy(pictoOverlay = null) }
         scope.launch(io) { pictos = store.list() }
@@ -139,6 +146,10 @@ class LiveAskSession(
      * repère armé → guidage ; mot maison seul → chasse SAM ; sinon LLM.
      */
     fun ask(question: String) {
+        if (MaisonEnterCommand.isEnterOrder(question)) {
+            enterHome()
+            return
+        }
         if (PictoVoiceOrder.isDemoToggle(question)) {
             toggleDemo()
             return
@@ -180,9 +191,28 @@ class LiveAskSession(
     private fun huntWord(question: String): String? {
         val labels = pictos.map { it.label } +
             if (pictoDemo) PictoVoiceOrder.demoHits().map { it.label } else emptyList()
-        if (labels.isEmpty()) return null
-        return KnownSizes.canonical(question).split(' ').filter { it.isNotEmpty() }
-            .firstOrNull { word -> labels.any { PictoVoiceOrder.matches(word, it) } }
+        return PictoVoiceOrder.huntWord(question, labels)
+    }
+
+    /** Ordre « maison » : le direct maison (Essentiels), confirmation dite dans tous les cas. */
+    private fun enterHome() {
+        val language = settings().speechLanguage
+        if (HomeModes.isHome(state.value.prompts)) {
+            speakPicto(MaisonEnterText.already(language))
+        } else {
+            restart(HomeModes.DEFAULT.prompts)
+            speakPicto(MaisonEnterText.entered(language))
+        }
+    }
+
+    /** Ordres venus de l'appui long iSee : chasse, démo ou création en attente de frame. */
+    fun applyVoiceRequest(request: LiveVoiceRequest.Request) {
+        request.pictoHunt?.let {
+            pictoHunt = it
+            guideAnnouncer.reset()
+        }
+        if (request.pictoDemo && !pictoDemo) toggleDemo()
+        request.pictoCreate?.let { pendingCreate = it }
     }
 
     /** Bascule de la démo : faux repères affichés (et guidables), état dit à voix haute. */
@@ -232,6 +262,12 @@ class LiveAskSession(
      * posé dans tous les cas, la voix ne guide que le mot chassé.
      */
     fun onLiveFrame(width: Int, height: Int, nowMs: Long = System.currentTimeMillis()) {
+        pendingCreate?.let { label ->
+            if (latestJpeg().isNotBlank()) {
+                pendingCreate = null
+                createPicto(label)
+            }
+        }
         if (nowMs - lastPictoMatchAt < IseePicto.MATCH_EVERY_MS) return
         lastPictoMatchAt = nowMs
         if (pictoDemo) {
