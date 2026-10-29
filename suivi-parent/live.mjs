@@ -1,5 +1,4 @@
 import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
-import { bootMap, updateMap } from './maps.mjs';
 import { frameOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { startOrb } from './orb.mjs';
 import { spokenLine } from './spoken-line.mjs';
@@ -7,6 +6,7 @@ import './settings.mjs';
 
 const shareId = shareIdOf(location.href);
 const showWords = spokenLine(document.getElementById('spoken-line'));
+const viewEl = document.getElementById('view');
 const frameEl = document.getElementById('view-frame');
 const noteEl = document.getElementById('view-note');
 const tripEl = document.getElementById('trip');
@@ -29,7 +29,6 @@ function render() {
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
-  document.getElementById('recenter').disabled = status === 'offline' || status === 'unknown';
   const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
   showWords(narrationOf(live, status, motion, !!shareId, known), status === 'live' && live?.scene?.speaking);
   const spoken = document.querySelector('.spoken');
@@ -42,20 +41,26 @@ function render() {
   renderTrip(status);
 }
 
-/** Ce que voit le proche : la dernière frame publiée, atténuée quand elle a vieilli. */
+/**
+ * Ce que voit le proche : rien tant que sa caméra ne tourne pas. Une image
+ * conservée après coupure resterait affichée alors que la caméra est éteinte.
+ */
 function renderFrame(status) {
   const view = frameOf(live, status);
   if (!view) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
     frameEl.hidden = true;
     noteEl.hidden = false;
-    noteEl.textContent = shareId ? 'En attente de l’image de ton proche…' : 'Ouvre le lien de suivi partagé par ton proche.';
+    viewEl.classList.add('empty');
+    noteEl.textContent = shareId
+      ? 'L’image apparaîtra quand ton proche ouvrira la caméra.'
+      : 'Ouvre le lien de suivi partagé par ton proche.';
     return;
   }
   noteEl.hidden = true;
   frameEl.hidden = false;
-  frameEl.classList.toggle('stale', !view.fresh);
-  frameEl.alt = view.fresh ? 'Ce que voit ton proche, en direct' : 'Dernière image reçue de ton proche';
+  viewEl.classList.remove('empty');
+  frameEl.alt = 'Ce que voit ton proche, en direct';
   // Une data URL identique n'est pas réassignée : l'image ne clignote pas à chaque poll.
   if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; }
 }

@@ -77,10 +77,10 @@ half3 pal(float s) {
   float y = clamp(uYou, 0.0, 1.0); float ee = clamp(uSee, 0.0, 1.0) * (1.0 - y);
   return cycIdle(s) * half(1.0 - y - ee) + cycYou(s) * half(y) + cycSee(s) * half(ee);
 }
-half3 film(float d) {
-  float3 I = float3(0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0));
-  float m = (I.r + I.g + I.b) / 3.0;
-  return half3(clamp(m + (I - m) * 1.15, 0.0, 1.0));
+// Éclat du verre : une seule longueur d'onde, donc un gris qui ne teinte rien. Il ne module
+// que la lumière (0..1) ; la couleur du reflet, elle, vient de `pal()`.
+float sheen(float d) {
+  return 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0);
 }
 float sdBox(float2 p, float2 b, float r) { float2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
 
@@ -90,9 +90,8 @@ half4 main(float2 fc) {
   float aa = 1.4 / uR;
   if (d > 1.0 + aa) return half4(0);
   float z = sqrt(max(0.0, 1.0 - min(d * d, 1.0)));
-  // Le reflet vient de la palette, jamais d'une couleur fixe : plus de bleu au repos, et le
-  // bord du verre ne se teinte plus en rose/vert/bleu (l'ancien arc-en-ciel à trois longueurs
-  // d'onde de film()).
+  // L'intérieur du verre se teinte de la palette, jamais d'une couleur fixe : le bord ne
+  // prend donc plus ni rose, ni vert (l'ancienne irisation arc-en-ciel), ni le bleu d'avant.
   half3 accent = pal(0.45);
   half3 col = mix(mix(half3(0.96, 0.964, 0.968), accent, half(0.05)), half3(1.0), half(z * 0.4));
   col = mix(col, accent, half((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(q - float2(0.0, -0.2)))));
@@ -115,10 +114,24 @@ half4 main(float2 fc) {
     col = mix(col, c, half(a));
   }
   col *= half(mix(1.0, 0.88, pow(1.0 - z, 3.0)));
-  // Le verre : irisation au bord, boîte à lumière, point chaud, liseré.
+  // Le verre : une irisation très légère, et seulement sur le haut de la boule. Elle n'a que
+  // deux teintes opposées de la palette active - le bleu froid du début de palette et l'or du
+  // milieu - choisies par le bruit spatial du verre : on voit donc des reflets bleu et jaune
+  // au lieu du rose/vert de l'ancien arc-en-ciel à trois longueurs d'onde. Le bas du verre et
+  // tout le reste de la boule restent blanc laiteux, comme avant.
   float fres = pow(1.0 - z, 2.6);
-  half3 fcol = mix(accent, half3(1.0), half(0.42)) * film(300.0 + 620.0 * fbm(q * 1.6 + float2(0.0, uTime * 0.05) + z) + 180.0 * (0.5 - 0.5 * q.y));
-  col = mix(col, fcol, half((0.03 + 0.7 * fres) * 0.45)) + fcol * half(fres * 0.08);
+  float grain = fbm(q * 1.6 + float2(0.0, uTime * 0.05) + z);
+  // La phase d'irisation ne sert plus qu'à l'éclat : les bandes claires et sombres du verre.
+  float irid = sheen(300.0 + 620.0 * grain + 180.0 * (0.5 - 0.5 * q.y));
+  // La teinte, elle, oppose les deux couleurs de la palette (bleu profond à gauche, or chaud à
+  // droite), avec un bord ondulé par le bruit pour que ce soit des reflets et non un dégradé.
+  // Le bleu est le premier de la palette et non le cyan : trop clair, il ne se voyait pas.
+  float top = smoothstep(-0.15, 0.85, q.y);
+  half3 tint = mix(pal(0.04), pal(0.34), half(smoothstep(0.02, 0.55, q.x + 0.45 * (grain - 0.48))));
+  half3 fcol = mix(mix(accent, half3(1.0), half(0.5)), tint, half(0.85 * top));
+  fcol = mix(fcol, half3(1.0), half(0.18));
+  fcol *= half(0.86 + 0.18 * irid);
+  col = mix(col, fcol, half((0.03 + 0.62 * fres) * 0.45)) + fcol * half(fres * 0.08);
   float2 r = 2.0 * z * q;
   float box = smoothstep(0.035, -0.02, sdBox(r - float2(-0.43, 0.5), float2(0.2, 0.085), 0.07));
   float hot = pow(max(dot(float3(q, z), normalize(float3(-0.45, 0.55, 0.7))), 0.0), 220.0);
