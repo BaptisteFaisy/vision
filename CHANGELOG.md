@@ -17,7 +17,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   phrases TwinLite vers `speakWord` (clips `vp_tl_*` restaurés, catalogue +
   garde OK) ; `isStopPhrase` couvre les deux stops (TwinLite interne +
   « Stop. » SAM externe), `LiveProbe` intact (499 lignes).
-- Preuves : `:core` 1 814 + `:app` 1 071 tests, 0 échec, sur r630
+- Preuves : `:core` 1 825 + `:app` 1 057 tests, 0 échec, sur r630
   (`TwinLiteWordTest` 9/9, `GuidanceAnnouncerTest` 18/18 dont l'arbitrage),
   `check-kotlin-limits` + `check-voicepack` OK. Docs `GUIDAGE-TOUT-DROIT.md`,
   `VOIX-DANGER.md` § 12, `URGENCE-EXTERNE.md`.
