@@ -3,6 +3,29 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : la voix dit les obstacles proches, même non mesurés
+
+- **Cause** : le user marche avec l'app, elle ne dit plus les obstacles même en
+  approchant. Deux causes lues dans le code : (1) `observeSpoken` en
+  `collectLatest` brut annulait la synthèse en cours à chaque frame publiée,
+  même quand la phrase n'avait pas changé — synthèse lente + frames continues
+  = silence total ; (2) la matière au contact (boîte coupée ⇒ non mesurable)
+  disait un mot puis se taisait (clé `?` constante, nouveauté muette), sans
+  jamais passer en « Stop. ».
+- `ProbeWiring.observeSpoken` : `distinctUntilChanged` sur `spoken` (seule une
+  phrase plus fraîche annule), « Stop. » urgent (clip pré-synthétisé, coupe le
+  chat) ; guetteurs trottoir/escaliers en `collect` (une alerte confirmée ne
+  s'annule pas). `Guidance` : matière non mesurée qui remplit le champ
+  (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC = 0,05`, emprise `LabelExtent`
+  portée par `PlacedLabel`) ⇒ « Stop. » immédiat, sauf peinture au sol
+  (`crosswalk`) ; `ProximityVoice` : moteur de synthèse injectable (faux en test).
+- Preuves : `:core` + `:app` `testDebugUnitTest` verts sur r630 (cœur 1785/1785,
+  app 962/962, 0 échec — `GuidanceTest` 22/22, `GuidanceAnnouncerTest` 12/12,
+  `ProbeWiringSpokenTest` 3/3 dont rouge-sans-fix vérifié par revert),
+  `check-kotlin-limits` OK.
+- Recette téléphone : main devant l'objectif → « Stop. » ; approche mesurée →
+  consignes par seau puis « Stop. » — dus sur master après merge.
+
 ## 2026-10-29 — page caregiver : la carte disparaît, l'image du proche et la barre de trajet la remplacent (ordre user)
 
 - `suivi-parent/index.html` : plus de carte (ni MapLibre, ni clé Google, ni appel
