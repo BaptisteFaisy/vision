@@ -187,7 +187,10 @@ fun HoldMicArea(
 ) {
     DisposableEffect(hold) { onDispose { hold.discard() } }
     Box(
-        modifier.pointerInput(hold, ui.busy) {
+        // Clé `hold` seul : `ui.busy` bascule pendant la transcription et
+        // redémarrer ici annulerait sa propre tenue (bug « yes » muet).
+        // Les nouveaux appuis sont ignorés par lecture de `ui.busy`.
+        modifier.pointerInput(hold) {
             detectTapGestures(
                 onPress = {
                     // Relâché avant le délai : tap, sans action.
@@ -237,7 +240,9 @@ fun VoiceNavHoldButton(
         Box(
             Modifier.fillMaxWidth().height(56.dp)
                 .border(1.dp, AppColors.primary, RoundedCornerShape(4.dp))
-                .pointerInput(hold, ui.busy) {
+                // Même clé stable que [HoldMicArea] : `ui.busy` ne doit pas
+                // redémarrer le geste (il annulerait sa transcription).
+                .pointerInput(hold) {
                     detectTapGestures(
                         onPress = {
                             if (ui.busy) return@detectTapGestures
