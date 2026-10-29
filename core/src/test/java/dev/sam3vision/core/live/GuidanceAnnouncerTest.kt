@@ -177,7 +177,7 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `pas de doublon : cote de sortie seul, sans arret devant`() {
+    fun `pas de doublon, cote de sortie seul sans arret devant`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
         // bouché à 2 m : le côté parle seul, jamais « obstacle » + côté ensemble
