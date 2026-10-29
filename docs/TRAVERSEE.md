@@ -186,6 +186,26 @@ n'est pas une décision que l'app prend seule.
 - un **refus se tait une minute** (`declined`, posé quand on coupe le mode) :
   longer un carrefour sur 50 mètres ne doit pas faire clignoter la pastille.
 
-**Ce que ça ne prouve pas** : que `crosswalk` soit détecté de façon fiable par
-SAM sur une vraie chaussée — la mesure du 29/10 portait sur les feux, pas sur les
-passages. À vérifier avec le même protocole (`docs/MESURES-SAM3-FEUX.md`).
+### Le concept est-il détecté ? Mesuré, oui (29/10)
+
+Même protocole que les feux (RTX 3060 Ti, `unsloth/sam3.1` bf16, seuil 0,5), dix
+photos publiques :
+
+| jeu | images | détections `crosswalk` |
+|---|---|---|
+| passages piétons réels (Londres ×4, Brunei ×1) | 5 | **7**, scores **0,54 à 0,89** — au moins une par image |
+| scènes **sans** passage (2 salons, 3 vues aériennes d'autoroute) | 5 | **0** |
+
+Le concept discrimine sur cet échantillon : aucune détection sur les négatifs.
+Variantes plus bavardes : `pedestrian crossing` 10 détections, `zebra crossing` 8,
+`sidewalk` 14 (le trottoir est partout, le passage non). Le prompt par défaut
+`crosswalk` est le plus économe.
+
+**Limites** : n = 10, aucune nuit ni pluie, aucun passage **français** ; et un
+passage vu de biais, partiellement masqué par une file de voitures, n'a pas été
+testé. Ce n'est pas une garantie de non-faux-positif en rue commerçante.
+
+Images : Wikimedia Commons, CC BY-SA 2.0/4.0 et CC0 — Conduit Street (David
+Howard), Freeman Street ×2 (Stephen Craven), Quality Street (Richard Sutcliffe),
+Brunei (Yu Chu Chin), IKEA Rostov (Vyacheslav Argenberg), Rio (Wilfredor),
+Somerset/M5 (Marek Ślusarczyk), Barcelone (Joe Mabel), Beachley (Colin Park).
