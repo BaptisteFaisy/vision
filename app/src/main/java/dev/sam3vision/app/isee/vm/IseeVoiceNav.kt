@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee.vm
 import android.Manifest
 import android.app.Application
 import android.location.LocationManager
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.navigation.AndroidGeocoderSource
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.perms.hasPerm
@@ -23,8 +24,13 @@ import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.voicenav.VoiceDestinationParser
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+/** Recette debug : 60 sondages de 500 ms = 30 s max pour le résumé. */
+private const val DEBUG_NAV_POLLS = 60
+private const val DEBUG_NAV_POLL_MS = 500L
 
 /**
  * Navigation vocale in-app de l'écran iSee : chaîne GMS puis BAN, résumés
@@ -145,6 +151,33 @@ class IseeVoiceNav(
     /** Dernier fix GPS, `null` sans fix ou pilote jamais démarré (carte de debug). */
     fun debugFix(): NavFix? =
         if (driverLazy.isInitialized()) runCatching { driver.debugFix() }.getOrNull() else null
+
+    /**
+     * Recette adb `--es destination <texte>` (builds debug seuls) : injecte
+     * une dictée « aller à … » puis confirme dès le résumé chargé — le
+     * guidage démarre sans voix. Hors debug ou destination blanche : sans
+     * effet. Ne lève jamais.
+     */
+    fun debugNavTo(destination: String) {
+        if (!BuildConfig.DEBUG || destination.isBlank()) return
+        scope.launch { runCatching { startDebugGuidance(destination) } }
+    }
+
+    /** Dictée injectée puis confirmation dès le résumé (30 s max). */
+    private suspend fun startDebugGuidance(destination: String) {
+        if (!session.onVoiceTranscript("aller à $destination")) return
+        repeat(DEBUG_NAV_POLLS) {
+            when (val current = state.value) {
+                is VoiceNavUiState.Guiding -> return
+                is VoiceNavUiState.Confirming -> if (!current.loading) {
+                    session.confirmDestination()
+                    return
+                }
+                else -> Unit
+            }
+            delay(DEBUG_NAV_POLL_MS)
+        }
+    }
 
     /** Le pilote pousse ici l'état du moteur (instruction, distances, arrivée). */
     private fun pushGuidanceUpdate(update: GuidanceUpdate) {
