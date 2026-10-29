@@ -12,13 +12,14 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * La page caméra iSee guide la marche quand le réglage est actif : « Continue tout
- * droit. » sur voie libre, consigne de contournement devant un obstacle — au lieu
+ * La page caméra iSee guide la marche quand le réglage est actif : « Continue. »
+ * sur voie libre, consigne de contournement devant un obstacle — au lieu
  * de l'annonce des positions. Sans objet à décorer ni masque à décoder, sans Android.
  */
 class LiveProbeGuidanceTest {
@@ -71,6 +72,31 @@ class LiveProbeGuidanceTest {
         val spoken = probe.state.value.spoken.orEmpty()
         assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Va à "))
         assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("mètre"))
+    }
+
+    @Test
+    fun `contournement urgent, voie libre non urgente`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame())
+        advanceUntilIdle()
+        fake.respond("B", frame())
+        advanceUntilIdle()
+
+        assertEquals("Continue.", probe.state.value.spoken)
+        assertFalse(probe.state.value.spokenUrgent)
+
+        probe.onFrame("C", captureAtNs = 20_000_000L)
+        advanceUntilIdle()
+        fake.respond("C", frame(listOf(personne())))
+        advanceUntilIdle()
+
+        val spoken = probe.state.value.spoken.orEmpty()
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Va à "))
+        assertTrue(probe.state.value.spokenUrgent)
     }
 
     @Test

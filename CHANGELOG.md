@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
+
+- **Demande** : devant un obstacle, même au contact, iSee dit où passer
+  (« Va à gauche, 1 mètre. ») au lieu de répéter « Stop. » en boucle.
+- `Guidance.phrase` : `Continue.` + contournement chiffré (`spokenShort` :
+  mètre entier, centimètres sous 1 m, non chiffré sans mesure) ; `STOP_METERS`,
+  `STOP_*_FRAC`, `GuidanceDecision.stop`, marqueur `|stop` et `LabelExtent`
+  supprimés. Urgence gardée : `LiveProbeState.spokenUrgent` (publié avec la
+  phrase) coupe la lecture en cours, chat compris ; clip `STOP_WORD`
+  pré-synthétisé supprimé. Traversée « Stop, mur » inchangée.
+- Preuves : `:core` 1 794 + `:app` 1 060 tests, 0 échec, sur r630
+  (`GuidanceTest` 18/18, `GuidanceAnnouncerTest` 12/12,
+  `LiveProbeGuidanceTest` 4/4 dont l'urgence, `ProbeWiringSpokenTest` 3/3),
+  `check-kotlin-limits` OK. Docs `GUIDAGE-TOUT-DROIT.md`,
+  `VOIX-DANGER.md` § 9. Recette téléphone (obstacle réel) après merge.
+- Fichiers : `Guidance.kt`, `PositionText.kt`, `FrameRoster.kt`,
+  `ProximityVoice.kt`, `ProbeWiring.kt`, `LiveProbe.kt`, `LiveProbeState.kt`,
+  `Settings.kt` (+5 tests).
+
 ## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
 
 - `sidewalk` segmente le plan entier : marcher SUR le trottoir remplissait la
@@ -16,7 +35,6 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   seuils), `:core` + `:app` verts, `assembleDebug` vert, `check-kotlin-limits`
   OK. Rouge-avant-vérifié (2 échecs voulus).
 - Fichiers : `CurbWatcher.kt` (+ test).
-
 ## 2026-10-29 — iSee : trottoir/escaliers prioritaires sur la voix TwinLite (ordre user)
 
 - TwinLiteNet ne voit que le sol ; SAM nomme les dangers (trottoir, escaliers

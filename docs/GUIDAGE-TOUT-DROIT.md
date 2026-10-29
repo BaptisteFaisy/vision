@@ -12,8 +12,9 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 ## 1. Le contrat, en une phrase
 
 Dire à voix haute **où mettre le prochain pas** (« Continue. », « Va à gauche,
-2 mètres. », « Stop. »), calculé **sur le téléphone depuis les seuls objets
-SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
+2 mètres. »), calculé **sur le téléphone depuis les seuls objets
+SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs. Un
+obstacle, même au contact, se contourne : il n'y a **jamais d'ordre d'arrêt**.
 
 ## 2. Le couloir et la portée
 
@@ -27,12 +28,12 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 - **Distance inconnue = prudence** : un objet du couloir sans distance mesurée
   (classe inconnue, boîte coupée) bloque quand même, et la consigne ne porte pas de
   chiffre (`inRange`, `nearRank`, `Guidance.kt`).
-- **Stop** : `STOP_METERS = 0,6f` (`Guidance.kt`) — en deçà (mesuré), contourner
-  n'est plus un pas : la consigne est « Stop. », urgente (elle coupe la phrase en
-  cours, chat compris). À 1,2 m/s, 0,6 m c'est un pas avant le contact. Sans
-  mesure, la matière qui remplit le champ en face arrête aussi (`STOP_HEIGHT_FRAC
-  = 0,5`, `STOP_WIDTH_FRAC = 0,05` : la boîte coupée au contact n'est pas
-  mesurable, et il faut absolument le dire) — sauf peinture au sol (`crosswalk`).
+- **Pas d'ordre d'arrêt** (ordre user du 29/10, remplace le « Stop. ») : un
+  obstacle mesuré à moins d'un mètre se contourne comme les autres, en
+  centimètres (`Va à gauche, 40 centimètres.`, `DistanceText.spokenShort`).
+  Sans mesure (boîte coupée au contact), la consigne ne porte pas de chiffre
+  (`Va à gauche.`). Le contournement est urgent : il coupe la phrase en cours,
+  chat compris (`LiveProbeState.spokenUrgent`).
 - **Côté de sortie** : le moins encombré — moins d'objets à portée, sinon obstacle
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
@@ -44,15 +45,14 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 |---|---|---|
 | Voie libre | Continue. | Continue. |
 | Obstacle mesuré | Va à gauche, 2 mètres. | Go left, 2 meters. |
+| Obstacle à moins d'un mètre | Va à gauche, 40 centimètres. | Go left, 40 centimeters. |
 | Obstacle non mesuré | Va à gauche. | Go left. |
-| Obstacle à 0,6 m ou moins | Stop. | Stop. |
-| Matière non mesurée qui remplit le champ | Stop. | Stop. |
 
-- Vocabulaire minimal (décision user du 29/10, `Guidance.phrase`) : côté + distance
-  de l'obstacle au mètre entier (`DistanceText.spokenShort`), ni nom d'obstacle, ni
-  cadran, ni décalage latéral — chaque mot retarde le « stop » quand on fonce sur
-  quelqu'un. Remplace la consigne chiffrée « décalez-vous » du 28/10
-  (voir `docs/VOIX-DANGER.md` § 3 et § 5).
+- Vocabulaire minimal (décisions user des 28-29/10, `Guidance.phrase`) : côté +
+  distance courte de l'obstacle (`DistanceText.spokenShort` : mètre entier,
+  centimètres sous un mètre), ni nom d'obstacle, ni cadran, ni décalage latéral.
+  Remplace la consigne chiffrée « décalez-vous » du 28/10 puis le « Stop. »
+  du 29/10 (voir `docs/VOIX-DANGER.md` § 3, § 5 et § 9).
 - Les labels SAM n'étant plus dits, leur non-traduction ne touche plus le guidage
   (elle reste vraie des positions, `docs/VOIX-ANGLAIS.md`).
 
@@ -65,16 +65,17 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
    à 2 ips, attendre la deuxième, c'est une demi-seconde de marche en plus, et un
    obstacle qui s'approche change de clé à chaque frame donc ne serait jamais stable ;
 2. **nouveauté** — une décision déjà dite reste muette. La signature est `free`, ou
-   `b|label|côté|mètre arrondi|heure|stop?` (`Guidance.key`) : un obstacle qui
+   `b|label|côté|mètre arrondi|heure` (`Guidance.key`) : un obstacle qui
    s'approche (3 m → 2 m → 1 m) ou qui glisse dans le couloir (11 h → midi) reparle,
-   comme les positions ; le marqueur stop fait reparler au passage en « Stop. »
-   même dans le même seau de distance ;
+   comme les positions ; dans le même seau, pas de re-annonce ;
 3. **délai asymétrique** — jamais deux consignes à moins de **4 s**
    (`DEFAULT_COOLDOWN_MS = 4_000L`), **sauf passage au bouché** : un obstacle qui entre
    dans le couloir parle aussitôt, sans attendre le délai. Le lecteur coupe la phrase
    en cours (`SpeechPlayer` : une seule lecture à la fois), donc le danger coupe la
    réassurance — c'est voulu. Le retour au libre, lui, attend : la réassurance peut
-   patienter (`GuidanceAnnouncer.kt:40`, `urgent = decision.blocked`).
+   patienter. Côté voix, l'urgence vient de l'état (`LiveProbeState.spokenUrgent`,
+   vrai quand le couloir est bouché) : le contournement coupe la lecture en cours,
+   chat compris (`ProbeWiring.observeSpoken`).
 
 Différence assumée avec les positions : **la voie libre se dit** (« Continue. »,
 une fois par période libre) là où une scène vide reste muette
@@ -99,12 +100,12 @@ guidage est muet — par construction, pas par bug.
 Aucun import réseau dans `Guidance.kt` ni `GuidanceAnnouncer.kt` : le guidage ne peut
 pas appeler le LLM, même par accident.
 
-Tests JVM qui verrouillent le contrat : `GuidanceTest` (22), `GuidanceAnnouncerTest`
-(12), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (3, sonde branchée sur un faux
-client SAM : voie libre → consigne, obstacle → contournement, positions seules →
-silence sur voie libre), `ProbeWiringSpokenTest` (3 : même phrase ré-émise → une
-synthèse qui aboutit, phrase fraîche → dernier gagnant, Stop → parlé chat en
-lecture).
+Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceAnnouncerTest`
+(12), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (4, sonde branchée sur un faux
+client SAM : voie libre → consigne, obstacle → contournement, urgence du
+contournement seul, positions seules → silence sur voie libre), `ProbeWiringSpokenTest`
+(3 : même phrase ré-émise → une synthèse qui aboutit, phrase fraîche → dernier
+gagnant, contournement → parlé chat en lecture).
 
 ## 6. Recette
 
@@ -114,8 +115,9 @@ lecture).
 3. une personne entre au centre à ~2 m → « Va à gauche, 2 mètres. »
    (ou à droite si la gauche est encombrée), **sans attendre 4 s** ;
 4. la personne s'approche à ~1 m → nouvelle consigne avec la distance à jour ;
-5. la personne est à ~0,5 m → « Stop. », qui coupe la phrase en cours ;
-   main devant l'objectif (matière non mesurée qui remplit le champ) → « Stop. » aussi ;
+5. la personne est à ~0,5 m → « Va à gauche, 50 centimètres. », qui coupe la
+   phrase en cours, chat compris ; main devant l'objectif (boîte coupée, non
+   mesurée) → « Va à gauche. » (non chiffré) ;
 6. le couloir se dégage → « Continue. » après le délai ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 

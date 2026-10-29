@@ -58,20 +58,20 @@ internal fun LiveProbe.configureFrom(
  * Dernier-gagnant : une phrase plus fraîche annule la synthèse en cours au lieu
  * de faire la queue derrière — une consigne datée ne sert à rien. La même phrase
  * ré-émise par les frames suivantes n'annule rien (`distinctUntilChanged`) :
- * annuler à chaque frame, c'était ne jamais finir une synthèse lente. « Stop. »
- * est urgent (clip pré-synthétisé, coupe le chat). Pré-synthétise aussi le
- * « Stop. » urgent (une fois, en fond).
+ * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
+ * L'urgence vient de l'état ([LiveProbeState.spokenUrgent], couloir bouché) :
+ * un contournement coupe la lecture en cours, chat compris. Le flag ne change
+ * qu'avec la phrase, donc la paire reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
     voice: ProximityVoice,
     playerIdle: () -> Boolean,
 ) {
-    scope.launch { voice.prewarmStop() }
     scope.launch {
-        state.map { it.spoken }.distinctUntilChanged().collectLatest { phrase ->
+        state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
             val text = phrase ?: return@collectLatest
-            voice.onPhrase(text, playerIdle(), urgent = text == ProximityVoice.STOP_WORD)
+            voice.onPhrase(text, playerIdle(), urgent = urgent)
         }
     }
 }
