@@ -2,6 +2,8 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbWatcher
+import dev.sam3vision.core.hazard.HazardSignal
+import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
@@ -10,13 +12,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Reset commun des guetteurs de la sonde : trottoir + escaliers oublient
- * leur annonce à chaque début de séance (guidage SAM seul, plus de
+ * Reset commun des guetteurs de la sonde : trottoir + escaliers + mobilier
+ * oublient leur annonce à chaque début de séance (guidage SAM seul, plus de
  * TwinLite à faire taire).
  */
 class ProbeHazardsTest {
 
-    private fun dangers() = ProbeHazards(CurbWatcher(), StairWatcher())
+    private fun dangers() = ProbeHazards(CurbWatcher(), StairWatcher(), HazardWatcher())
 
     /** 3 frames positives : les deux guetteurs par défaut confirment à 3. */
     private fun alerteTrottoir(dangers: ProbeHazards, aMs: Long) {
@@ -52,5 +54,18 @@ class ProbeHazardsTest {
         dangers.reset()
 
         assertNull(dangers.stairs.lastAlertMs)
+    }
+
+    @Test
+    fun `reset oublie l'alerte mobilier`() {
+        val dangers = dangers()
+        val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
+        dangers.hazard.onSignal(signal, 3_000L, SpeechLanguage.Fr)
+        dangers.hazard.onSignal(signal, 3_000L, SpeechLanguage.Fr)
+        assertEquals(3_000L, dangers.hazard.lastAlertMs)
+
+        dangers.reset()
+
+        assertNull(dangers.hazard.lastAlertMs)
     }
 }

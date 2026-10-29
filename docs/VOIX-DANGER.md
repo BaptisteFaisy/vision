@@ -275,3 +275,30 @@ Verrouillé par `GuidanceTest` (18), `GuidanceWordTest` (5),
 positions non urgentes), `ProbeWiringSpokenTest` (3) et
 `ProximityVoiceWordTest` (3 : clip sans synthèse, synthèse mise en cache,
 mot unique).
+
+## 11. Guidage doux + « Attention à … », stop seul urgent (ordre user du 29/10)
+
+Le user recadre : iSee/SAM sert aux situations **non urgentes** (décrire, guider
+en douceur), un **autre modèle** (en cours) gérera l'urgence. Nouveau contrat,
+qui remplace l'urgence du § 10 (gardée pour mémoire) :
+
+- **mots doux** : gauche/tout droit/droite ne coupent plus rien — dits aussitôt
+  dès la 1re frame (clips < 100 ms inchangés), ils attendent le silence quand
+  le chat lit (`LiveProbeState.spokenUrgent` = `GuidanceWord.isStopPhrase`) ;
+- **« Attention à … »** : trottoir (« Attention à la marche. », ex-« levez la
+  jambe »), escaliers (« Escalier montant. », inchangé) et mobilier suivi
+  (« Attention à la barrière. », `HazardConcepts` : barrière, poteau, borne,
+  clôture, portail — FR/EN, 3 m, 2 frames, 10 s de silence) parlent en douceur
+  (`urgent = false`, synthèse réseau, jamais de coupure) ;
+- **stop gardé en attendant** : le stop interne (contact mesuré ≤ 0,6 m) reste
+  le seul urgent (coupe tout, chat compris) jusqu'au branchement du modèle
+  externe — même mot « Stop. », pas de conflit (`docs/URGENCE-EXTERNE.md`).
+
+Contrat détaillé : `docs/GUIDAGE-TOUT-DROIT.md` (§ 4 : seul Stop coupe).
+
+Verrouillé par `GuidanceWordTest` (6, dont seul-stop-coupe),
+`HazardConceptsTest` (5), `HazardWatchTest` (8), `LiveProbeGuidanceTest` (5,
+mots doux + positions non urgents, stop interne au contact mesuré = urgent),
+`ProbeWiringSpokenTest` (3, mot doux muet chat en lecture),
+`ProximityVoiceWordTest` (4, dont urgence externe coupe le chat en clip) et
+`ProbeHazardsTest` (3, reset trottoir + escaliers + mobilier).

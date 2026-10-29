@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.GpuWake
@@ -431,7 +432,7 @@ _state.update { it.cleared() }
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
-                spokenUrgent = if (phrase != null) (voice.guide && steering != null) else current.spokenUrgent,
+                spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
                 steering = steering,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),

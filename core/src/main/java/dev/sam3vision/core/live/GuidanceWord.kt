@@ -69,5 +69,12 @@ enum class GuidanceWord {
             "Stop." -> Stop.clipId
             else -> null
         }
+
+        /**
+         * Vrai si [phrase] est le mot stop, FR ou EN (le même « Stop. » des
+         * deux côtés) : le seul mot qui coupe la lecture en cours (guidage
+         * doux, ordre user du 29/10 — les autres mots attendent le silence).
+         */
+        fun isStopPhrase(phrase: String): Boolean = phrase == "Stop."
     }
 }
