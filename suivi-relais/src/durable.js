@@ -51,21 +51,30 @@ export class RelayRoom {
 
   async webSocketClose(socket) {
     this.closeQuietly(socket);
-    this.notifyAudience();
+    this.notifyAudience(this.watchersExcept(socket));
   }
 
   async webSocketError(socket) {
     this.closeQuietly(socket);
-    this.notifyAudience();
+    this.notifyAudience(this.watchersExcept(socket));
   }
 
   closeQuietly(socket) {
     try { socket.close(1000, 'fin'); } catch { /* déjà fermé */ }
   }
 
+  /**
+   * Aidants encore là. À la fermeture, le runtime compte **encore** l'onglet qui
+   * s'en va : sans ce retrait, le téléphone apprendrait `watch:1` au départ du
+   * dernier aidant et continuerait d'émettre dans le vide.
+   */
+  watchersExcept(socket) {
+    return this.state.getWebSockets('watch').filter((s) => s !== socket).length;
+  }
+
   /** Dit aux téléphones combien d'aidants regardent : ils n'émettent que si > 0. */
-  notifyAudience() {
-    const notice = audienceNotice(this.state.getWebSockets('watch').length);
+  notifyAudience(watch = this.state.getWebSockets('watch').length) {
+    const notice = audienceNotice(watch);
     for (const socket of this.state.getWebSockets('push')) {
       try { socket.send(notice); } catch { /* téléphone parti */ }
     }

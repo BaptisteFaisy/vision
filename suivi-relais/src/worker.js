@@ -1,6 +1,10 @@
 import { readShare, stateOf, emptyState, validId } from './contrat.js';
 import { d1Store } from './store.js';
 
+// La salle temps réel doit être **exportée par l'entrée** : sans ça `wrangler dev`
+// et `wrangler deploy` refusent le binding (« not exported in your entrypoint »).
+export { RelayRoom } from './durable.js';
+
 /** Nettoyage des flux abandonnés, une écriture sur [PRUNE_EVERY] (base bornée). */
 const PRUNE_EVERY = 200;
 const KEEP_MS = 86_400_000;
