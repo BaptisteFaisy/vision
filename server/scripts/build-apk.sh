@@ -2,9 +2,9 @@
 # Construit l'APK Android de l'app legacy (legacy-expo-app) à partir de zéro,
 # de façon idempotente. L'app Kotlin se construit à la racine du dépôt (CI `apk`).
 #
-#   ./scripts/build-apk.sh              # release (défaut)
-#   ./scripts/build-apk.sh debug        # debug, signée avec le keystore debug
-#   VARIANT=debug ./scripts/build-apk.sh
+#   ./server/scripts/build-apk.sh              # release (défaut)
+#   ./server/scripts/build-apk.sh debug        # debug, signée avec le keystore debug
+#   VARIANT=debug ./server/scripts/build-apk.sh
 #
 # Variables : ANDROID_HOME (défaut ~/Android/Sdk), GRADLE_JVMARGS (défaut -Xmx4g)
 #

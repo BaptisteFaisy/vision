@@ -3,8 +3,8 @@
 # Tout va dans $ANDROID_HOME (défaut : ~/Android/Sdk).
 # Idempotent : relançable à volonté, ne retélécharge que ce qui manque.
 #
-#   ./scripts/install-android-sdk.sh            # installation standard
-#   ./scripts/install-android-sdk.sh --minimal  # sans NDK/CMake (build JS seul)
+#   ./server/scripts/install-android-sdk.sh            # installation standard
+#   ./server/scripts/install-android-sdk.sh --minimal  # sans NDK/CMake (build JS seul)
 #
 set -euo pipefail
 
@@ -51,6 +51,15 @@ sdkm() {
 log()  { printf '\033[1;34m[sdk]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[sdk]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[sdk]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Arguments explicites : avant, tout argument différent de --minimal
+# (--help, faute de frappe) lançait l'installation complète en silence.
+case "${1:-}" in
+  "") MINIMAL=0 ;;
+  --minimal) MINIMAL=1 ;;
+  -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
+  *) echo "argument inconnu : $1 (standard, --minimal, --help)" >&2; exit 2 ;;
+esac
 
 # ---------------------------------------------------------------- prérequis
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "commande manquante : $1"; }
@@ -99,12 +108,12 @@ sdkm --licenses >/dev/null || warn "certaines licences ont échoué"
 
 # --------------------------------------------------------------- paquets
 PKGS=("${BASE_PKGS[@]}")
-if [ "${1:-}" != "--minimal" ]; then PKGS+=("${NATIVE_PKGS[@]}"); fi
+if [ "$MINIMAL" = 0 ]; then PKGS+=("${NATIVE_PKGS[@]}"); fi
 # Les extras sont optionnels : ne bloquent pas si indisponibles.
 log "installation : ${PKGS[*]}"
 sdkm --install "${PKGS[@]}" || die "échec d'installation des paquets de base"
 
-if [ "${1:-}" != "--minimal" ]; then
+if [ "$MINIMAL" = 0 ]; then
   log "installation (optionnelle) : ${EXTRA_PKGS[*]}"
   sdkm --install "${EXTRA_PKGS[@]}" \
     || warn "paquets optionnels non installés (sans gravité)"

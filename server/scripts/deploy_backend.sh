@@ -2,9 +2,9 @@
 # Déploiement idempotent du backend sam3-vision sur Modal.
 # Le secret `sam3-llm` est poussé depuis l'environnement, jamais en clair (cf. lib-env.sh).
 #
-#   ./scripts/deploy_backend.sh                  # secret + deploy + smoke test
-#   ./scripts/deploy_backend.sh --skip-smoke     # sans le /health final
-#   DRY_RUN=1 ./scripts/deploy_backend.sh        # vérifie tout, n'appelle pas Modal
+#   ./server/scripts/deploy_backend.sh                  # secret + deploy + smoke test
+#   ./server/scripts/deploy_backend.sh --skip-smoke     # sans le /health final
+#   DRY_RUN=1 ./server/scripts/deploy_backend.sh        # vérifie tout, n'appelle pas Modal
 #
 # Surchargeables : MODAL_BIN, MODAL_PROFILE, SECRET_NAME, APP_NAME, API_URL, DRY_RUN.
 set -euo pipefail
