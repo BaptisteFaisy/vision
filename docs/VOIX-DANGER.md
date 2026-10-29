@@ -348,3 +348,19 @@ deux voix : seul le stop coupe.
   clés `tl|*` séparées des `w|*`) — scène stable = silence des deux côtés ;
   le câblage (`ProbeWiring.observeSpoken`) route les phrases TwinLite vers
   `speakWord` (clips < 100 ms) comme les mots SAM.
+
+## 14. Le trottoir nommé : « Trottoir à gauche. » (ordre user du 29/10)
+
+Le guidage ordonnait le retour (« Gauche. ») sans jamais nommer le trottoir.
+Nouveau guetteur (`SidewalkWatcher`, miroir bordure/marches/mobilier) : la
+position lue dans la voix guidée (`ProbeVoice.lastSidewalk` — rien dans
+l'état ne porte le plan du trottoir, non mesuré), deux frames pour confirmer,
+puis annonce douce au changement seul (« Trottoir devant. », « Trottoir à
+gauche. », « Trottoir à droite. » / EN « Sidewalk ahead/on the left/on the
+right », synthèse réseau, jamais de coupure). Stable = silence ; absent ou
+guidage coupé = silence (la voix des positions nomme déjà le trottoir en
+mode annonce). Coupé en mode Traversée. Câblé en 4e guetteur
+(`ProbeWiring.observeSidewalk`, `ProbeHazards.sidewalk`, reset commun).
+
+Verrouillé par `SidewalkWatcherTest` (8) et `ProbeHazardsTest` (+1 : reset
+trottoir nommé).

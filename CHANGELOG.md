@@ -26,6 +26,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `GlassesLinkGate.kt` (nouveau), `GlassesController.kt`, `GlassesPolicy.kt`,
   `bench/GlassesSessionPolicy.kt`, `bench/GlassesRegistrationPhase.kt`,
   `GlassesMessagesTest.kt`, `bench/LinkGateTest.kt`, `docs/META-GLASSES.md`.
+## 2026-10-29 — voix : le trottoir SAM est nommé (« Trottoir à gauche. »)
+
+- **Demande** : le téléphone reconnaît les trottoirs (SAM) et le dit — le
+  guidage ordonnait le retour (« Gauche. ») sans jamais nommer le trottoir.
+- `SidewalkWatcher` (miroir bordure/marches/mobilier) : position lue dans la
+  voix guidée (`ProbeVoice.lastSidewalk`), 2 frames pour confirmer, annonce
+  douce au changement seul (« Trottoir devant/à gauche/à droite. », EN miroir,
+  synthèse réseau, jamais de coupure). Stable, absent ou guidage coupé =
+  silence ; coupé en mode Traversée. Câblé 4e guetteur (`observeSidewalk`,
+  `ProbeHazards.sidewalk`, reset commun), sans toucher à `LiveProbe`.
+- Preuves : `:core` 1 911 + `:app` 1 094 tests JVM, 0 échec, sur r630
+  (`SidewalkWatcherTest` 8/8, `ProbeHazardsTest` 4/4) ; `assembleDebug` OK ;
+  `check-kotlin-limits` OK.
+- Fichiers : `SidewalkWatcher.kt`, `SidewalkWatcherTest.kt`, `ProbeVoice.kt`,
+  `ProbeWiring.kt`, `ProbeHazardsTest.kt`, `IseeViewModel.kt`,
+  `VOIX-DANGER.md`.
 
 ## 2026-10-29 — fix(seed) : modèles LLM et dictée vides réparés en dur
 
