@@ -109,7 +109,7 @@ private fun FocusChips(selected: Int, onFocus: (Int) -> Unit) {
         FOCUS_CHOICES.forEach { seconds ->
             val label = if (seconds == 0) "maintenant" else "il y a $seconds s"
             val color = if (seconds == selected) AppColors.success else AppColors.surfaceHigh
-            Chip(label, color) { onFocus(seconds) }
+            Chip(label, color, onClick = { onFocus(seconds) })
         }
     }
 }
@@ -145,7 +145,7 @@ private fun AskRow(
                 modifier = Modifier.size(24.dp),
             )
         } else {
-            Chip("Demander", AppColors.primary) { if (draft.isNotBlank()) onSend() }
+            Chip("Demander", AppColors.primary, onClick = { if (draft.isNotBlank()) onSend() })
         }
     }
 }
