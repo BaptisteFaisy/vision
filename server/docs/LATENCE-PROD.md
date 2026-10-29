@@ -26,9 +26,9 @@ redéployer). `max_containers=1`, `min_containers=0`, la région et le GPU ne ch
 | préprocess + masques hors verrou GPU | rend le créneau GPU au frame suivant (~20 ms en PNG, ~4 ms en bits) | `fast_core.run_frame`, rapport `cpu-serveur` |
 | `@modal.concurrent(max_inputs=2)` | supprime l'attente de la 2ᵉ frame en vol au proxy (~90 ms mesurés) | `live_app_fast.py` |
 | dédup alias FR/EN | −14 ms et 5 masques inutiles sur « chaise » + « chair » | rapport `concepts` |
-| `FAST_ATTN=sdpa` | attention fusionnée au lieu d'eager (matrice matérialisée, ~55 ms en `detr_ms`) ; supporté par `transformers` (`_supports_sdpa`) | `weights._set_attn`, `applied.attn_impl` |
-| `FAST_DETR_GRAPH=1` | graphe CUDA de la passe DETR (~55 ms → ~2 ms attendus, vérifié vs eager, repli automatique) | `detr_graph.DetrGraphs`, `applied.detr_graph` |
-| cache tokenize | entrées texte mémoïsées par concepts (`tokenize_ms` 23 ms → ~0, le texte ne change pas en séance) | `token_cache.py` |
+| `FAST_ATTN=sdpa` | attention fusionnée ; **aucun gain mesuré sur `detr_ms` en prod** (45,7 vs 41-45, le coût est aux lancements, pas au calcul) — conservé (standard upstream, inoffensif, encodeur vision 1,2 → 0,7 ms) | `weights._set_attn`, `applied.attn_impl` |
+| `FAST_DETR_GRAPH=1` | graphe CUDA de la passe DETR ; 1re activation : échec capture à 1 concept (mapping typé aplati en `dict` + budget gelé) — corrigé (type préservé, échec par forme), **à valider** (~45 → ~5 ms attendus) | `detr_graph.DetrGraphs`, `applied.detr_graph` |
+| cache tokenize | entrées texte mémoïsées par concepts — **validé en prod** : `tokenize_ms` 23,4 → 0,0, médiane serveur 74 → 52 ms | `token_cache.py` |
 
 Coût du `scaledown_window=60` : au pire une minute de A100 en plus par session ≈ **0,04 $**
 (2,415 $/h), et le bail de `~/bin/sam3-gpu` éteint de toute façon l'app.
