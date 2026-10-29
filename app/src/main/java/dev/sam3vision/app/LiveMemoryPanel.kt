@@ -1,7 +1,7 @@
 package dev.sam3vision.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gesture.detectTapGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
