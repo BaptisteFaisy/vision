@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.app.guidemap.GuidanceMapCard
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.MapBounds
 import dev.sam3vision.core.nav.NavFix
@@ -25,8 +26,8 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Guidage actif : prochaine instruction en très gros, distance avant la
- * manœuvre, reste du trajet, petite carte (tracé + feux), barre de
- * progression, bouton « Arrêter ».
+ * manœuvre, reste du trajet, carte OSM (tracé + passages + feux, repli
+ * schéma si les tuiles échouent), barre de progression, bouton « Arrêter ».
  *
  * Les valeurs viennent du moteur d'itinéraire via
  * [VoiceNavViewModel.onGuidanceUpdate] — cet écran n'en calcule aucune, il
@@ -34,7 +35,7 @@ import dev.sam3vision.core.settings.Settings
  * ([VoiceNavHoldButton], même moteur que l'accueil iSee) : ordre stop
  * (« arrête le guidage ») ou nouvelle destination — sans retour. Le micro
  * s'ouvre aussi par appui long n'importe où hors bouton ([HoldMicArea]).
- * La mini-carte n'apparaît que si [navSnapshot] et [fetchSignals] sont
+ * La carte n'apparaît que si [navSnapshot] et [fetchSignals] sont
  * fournis.
  */
 @Composable
@@ -98,8 +99,8 @@ private fun GuidingHead(
         )
         GuidanceSummary(state)
         if (navSnapshot != null && fetchSignals != null) {
-            // Petite carte : où le guidage m'emmène (tracé + feux).
-            MiniRouteMap(navSnapshot, fetchSignals, Modifier.fillMaxWidth().height(170.dp))
+            // Carte OSM : où le guidage m'emmène (rues + tracé + passages + feux).
+            GuidanceMapCard(navSnapshot, fetchSignals, state.update, Modifier.fillMaxWidth().height(170.dp))
         }
         GuidanceProgress(state)
     }

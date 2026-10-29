@@ -226,6 +226,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     // Profondeur embarquée : DA2 Small (ONNX), seul runtime embarqué restant.
     implementation(libs.onnxruntime.android)
+    // Carte du guidage vocal : MapLibre Native (MapView classique, Maven Central,
+    // BSD-2) + tuiles raster OSM France gratuites sans clé (guidemap/GuideMapStyle).
+    implementation("org.maplibre.gl:android-sdk:13.7.1")
 
     testImplementation(libs.junit)
     // org.json réel pour les tests JVM du banc lunettes (android.jar répondrait « not mocked »).
