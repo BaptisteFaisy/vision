@@ -49,11 +49,11 @@ les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **876** |
-| Lignes de prod (`*/src/main`) | **52 815** — `:core` 211 f./21 749 l. · `:app` 277 f./31 066 l. (dont banc 15 f./1 641 l.) |
-| `@Test` | **2 719** = **2 709 JVM** + **10 instrumentés** |
-| dont `core/src/test` | **1 765** |
-| dont `app/src/test` | **944** (dont banc **95**) |
+| Fichiers `.kt` | **918** |
+| Lignes de prod (`*/src/main`) | **54 863** — `:core` 215 f./22 179 l. · `:app` 291 f./32 684 l. (dont banc 15 f./1 641 l.) |
+| `@Test` | **2 877** = **2 867 JVM** + **10 instrumentés** |
+| dont `core/src/test` | **1 804** |
+| dont `app/src/test` | **1 063** (dont banc **95**) |
 | dont `app/src/androidTest` (nettoyage, profondeur, segment, média) | **9** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |

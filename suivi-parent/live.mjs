@@ -1,5 +1,4 @@
 import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
-import { bootMap, updateMap } from './maps.mjs';
 import { frameOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { startOrb } from './orb.mjs';
 import { spokenLine } from './spoken-line.mjs';
@@ -29,7 +28,6 @@ function render() {
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
-  document.getElementById('recenter').disabled = status === 'offline' || status === 'unknown';
   const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
   showWords(narrationOf(live, status, motion, !!shareId, known), status === 'live' && live?.scene?.speaking);
   const spoken = document.querySelector('.spoken');

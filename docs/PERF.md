@@ -12,24 +12,25 @@ chiffres ci-dessous ont été obtenus est **r630** (serveur Debian, JDK 17), pas
 Un chiffre de téléphone lu dans un commentaire de code reste un commentaire, pas une mesure de
 cet arbre.
 
-## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté le 27/10/2026 après le retrait du module lunettes ; recompté le 28/10/2026 puis le 29/10/2026)
+## 1. Mesuré dans cet arbre (26/10 après 19 h ; recompté les 27, 28 puis 29/10/2026 au soir —
+le relevé se rejoue avec `python3 tools/count-tree.py`, jamais à la main)
 
 ### 1.1 Taille de l'arbre
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **876** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **93 871** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **381** (239 `:core` + 142 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **1 765** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
-| `@Test` JVM `:app` | **944** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
-| **Total JVM** | **2 709** | somme des deux lignes |
+| Fichiers Kotlin | **918** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **98 230** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **402** (243 `:core` + 159 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **1 804** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| `@Test` JVM `:app` | **1 063** | idem sur `app/src/test` (dont **95** dans `glasses/bench`) |
+| **Total JVM** | **2 867** | somme des deux lignes |
 | Tests instrumentés | **10** (9 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
-| Garde de taille | **967** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
+| Garde de taille | **1 017** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
 | Gardes de scripts | **101** assertions, 101 ok | `bash scripts/test_scripts.sh` |
 | Tests de l'outillage | **118** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py tools/test_check_apk_keys.py tools/test_export_caregiver_orb.py` + `python3 .github/fireworks/test_conflict_agent.py` + `python3 .github/couche0/test_check_couche0.py` + `python3 .github/ci-budget/test_check_timeouts.py` (28 + 18 + 12 + 8 + 6 + 16 + 19 + 11) |
 | Tests backend | **254** tests, OK | `python3 server/scripts/test_units.py` (numpy, Pillow, fastapi) |
-| Budget CI | 8 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
+| Budget CI | 6 workflows, 0 erreur | `python3 .github/ci-budget/check_timeouts.py` |
 
 ### 1.2 Tests réellement exécutés par Gradle
 
@@ -40,7 +41,7 @@ export JAVA_HOME=<un JDK 17 qui a javac>
 ```
 
 Relevé du 29/10, sur r630 (`:core:testDebugUnitTest :app:testDebugUnitTest`) : **`:core`
-1 765 / 0 échec / 0 ignoré**, **`:app` 944 / 0 / 0** — **2 709 exécutés**, conformes au tableau
+1 804 / 0 échec / 0 ignoré**, **`:app` 1 063 / 0 / 0** — **2 867 exécutés**, conformes au tableau
 ci-dessus. (Historique : le 26/10, `:core` 663, `:app` 305 et le module lunettes 36 — 1 004 au
 total, avant la fusion du banc dans `:app`, non comparable.)
 Les 10 tests instrumentés ne sont **pas** dans ces chiffres (aucun appareil n'a été utilisé).

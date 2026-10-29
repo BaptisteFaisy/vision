@@ -3,6 +3,50 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — ménage : le code sans appelant part, le README se recale sur l'arbre
+
+- **Demande** : analyser le dépôt, retirer le code qui ne sert plus, et que le README dise
+  vrai partout.
+- Code retiré, chaque fois vérifié par grep (zéro référence hors tests) :
+  - `perms/PermGate.kt` **312 → 27 lignes** : les trois demandes de permission par écran
+    (`MicPermRequest`, `LocationFgPermRequest`, `LocationBgPermRequest`) et tout le flux qui
+    les portait n'avaient plus d'appelant depuis la demande groupée du premier lancement
+    (`FirstRunPermissions.kt`). Reste `hasPerm`, lu par `isee/vm/IseeVoiceNav.kt`.
+  - `cleanup/MediaStoreGallery.kt` (63 l.) et `CleanupConfig.addToGallery` : aucun appelant,
+    donc rien n'écrivait dans `traced_captures`. La table, le store et la purge restent (testés).
+  - `IseeOrb` (wrapper Compose sans appelant ; le peintre `rememberOrbPainter` reste),
+    `NoOpSegmenter`, `crossingStateOf`, `failureText`, `jsonArrayOf`, `PNG_SIGNATURE_SIZE`.
+- **Bug trouvé au passage** : `suivi-parent/live.mjs` importait `./maps.mjs`, supprimé le
+  29/10 avec la carte. Un import mort fait échouer **tout** le graphe de modules : la page
+  compagnon embarquée dans chaque APK ne se chargeait plus. `getElementById('recenter')`
+  visait aussi un élément disparu. Les deux lignes partent ; `destPoint`, `objectsOf`,
+  `iconFor` (exports de la carte) partent avec leurs assertions.
+- README réécrit sur des chiffres **re-mesurés** (918 `.kt` et non 876, 54 863 lignes de prod
+  et non 52 815, 2 867 `@Test` JVM + 10 instrumentés, 35 fichiers Python) : 12 concepts du
+  direct par défaut et 16 au plus (et non 6), **LiteRT** et non « TensorFlow Lite », les
+  écrans legacy réellement listés dans « Other screens » (Direct, Classic home, segment),
+  traversée *proposée* et jamais activée, file de merge **Mergify** et non native, relais
+  `suivi-relais/` (Worker + D1) et non le Vercel abandonné, `server/backend/baseten/`,
+  `NOTICE` et les 45 docs cités, clé Maps pour la navigation (la carte compagnon n'existe plus).
+- `tools/count-tree.py` : le relevé devient rejouable (`--json`) — les chiffres recopiés
+  avaient dérivé trois fois en une journée. `docs/ARCHITECTURE.md` §1, `docs/PERF.md`
+  §1.1-1.2, `docs/TESTING.md` §1 et §6 (régénéré depuis les rapports JUnit), `NOTES.md`,
+  `AGENTS.md` et `docs/DOC-ETAT.md` portent la même mesure ; `docs/NETTOYAGE.md` dit que
+  rien n'écrit plus dans `traced_captures`.
+- Boule Portrait : empreinte re-gelée (`tools/orb-frozen-baseline.json`, « changement voulu »
+  du garde) — seul un wrapper sans appelant est parti, **aucune ligne de rendu** ne bouge.
+- Preuves : `:core` 1 804 + `:app` 1 063 tests JVM, 0 échec ; `:app:assembleDebug` OK (poste
+  MS-7D18, JDK 21 → bytecode 17) ; `check-kotlin-limits` (1 017 fichiers, 0 dépassement),
+  `check-isee-design`, `check-budget-derive`, `check-voice-nav-doc`, `check-apk-keys` OK ;
+  `scripts/test_scripts.sh` 101/101 ; `node --test suivi-parent/test/*.test.mjs` 16/16 ;
+  `suivi-relais` 10/10.
+- Fichiers : `README.md`, `AGENTS.md`, `NOTES.md`, `CHANGELOG.md`, `docs/{ARCHITECTURE,DOC-ETAT,
+  NETTOYAGE,PERF,TESTING}.md`, `tools/count-tree.py`, `tools/orb-frozen-baseline.json`,
+  `app/.../{cleanup/CleanupConfig.kt,cleanup/MediaStoreGallery.kt,isee/CrossingWiring.kt,
+  isee/IseePortraitOrb.kt,isee/ProbeFrame.kt,perms/PermGate.kt}`,
+  `core/.../{mask/MaskCore.kt,net/Json.kt,segment/Segmenter.kt}`,
+  `suivi-parent/{live.mjs,session.mjs,test/session.test.mjs}`.
+
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
 - **Demande** : devant un obstacle, même au contact, iSee dit où passer

@@ -9,7 +9,6 @@ import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
-import dev.sam3vision.core.net.ApiError
 
 /**
  * Mise en forme d'une frame SAM : étiquettes, transport, distances, pastilles,
@@ -39,14 +38,6 @@ internal fun readingsOf(distances: DistanceMeter, frame: LiveFrame): List<Distan
 internal fun distanceLayerOf(frame: LiveFrame, readings: List<DistanceReading>): DistanceLayer? =
     if (readings.isEmpty() || frame.width <= 0 || frame.height <= 0) null
     else DistanceLayer(frame.width, frame.height, readings)
-
-/**
- * Message d'échec lisible. Un délai dépassé au premier appel = conteneur Modal
- * endormi (~30 s de réveil) : on le dit, et la frame suivante réessaie d'elle-même.
- */
-internal fun failureText(error: Throwable): String =
-    if (error is ApiError.Timeout) "réveil du GPU en cours… (nouvel essai à la frame suivante)"
-    else error.message ?: "échec de l'appel SAM"
 
 /** Plafond d'objets quand les Réglages n'en imposent pas (valeur du Direct). */
 internal const val DEFAULT_MAX_OBJECTS = 12

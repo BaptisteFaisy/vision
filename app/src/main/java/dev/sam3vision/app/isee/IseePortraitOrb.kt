@@ -3,10 +3,8 @@ package dev.sam3vision.app.isee
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -190,9 +188,3 @@ private fun drawOrbFallback(scope: DrawScope, c: Offset, r: Float, look: OrbLook
     drawCircle(Color(IseePortrait.INK).copy(alpha = 0.12f), r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(r * 0.012f))
 }
 
-/** Un Canvas qui ne dessine que la boule (le reste de la scène est en Compose). */
-@Composable
-fun IseeOrb(center: Offset, radius: Float, look: OrbLook, modifier: Modifier = Modifier) {
-    val paint = rememberOrbPainter()
-    Canvas(modifier) { paint(this, center, radius, look) }
-}

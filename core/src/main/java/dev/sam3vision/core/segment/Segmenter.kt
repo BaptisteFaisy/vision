@@ -113,15 +113,3 @@ interface Segmenter : AutoCloseable {
     /** Masques de l'image ; échec = modèle absent ou inférence tombée. */
     suspend fun segment(argb: IntArray, width: Int, height: Int): Result<SegmentResult>
 }
-
-/** Moteur coupé : tout appel échoue proprement (l'appelant affiche « coupée »). */
-object NoOpSegmenter : Segmenter {
-    override val backend: SegmentBackend = SegmentBackend.OFF
-
-    override val delegateName: String = "—"
-
-    override suspend fun segment(argb: IntArray, width: Int, height: Int): Result<SegmentResult> =
-        Result.failure(IllegalStateException("segmentation coupée"))
-
-    override fun close() = Unit
-}
