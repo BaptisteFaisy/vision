@@ -27,7 +27,6 @@ import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
-import dev.sam3vision.app.depth.LiveDepthMeter
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
@@ -79,8 +78,10 @@ class LiveProbe(
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
         LiveMaskTransport.clientFor(base, timeout, marks, this@LiveProbe.depthEngine != DepthBackend.OFF)
     }
-    private val liveMeter = depthMeter
-        ?: appContext?.let { ctx -> LiveDepthMeter(scope, ctx, background) { this@LiveProbe.depthEngine } }
+    /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
+    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine }) { alert ->
+        _state.update { it.copy(dangerAlert = alert?.line()) }
+    }
 
     private val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
@@ -235,7 +236,7 @@ _state.update { it.cleared() }
         voice.reset()
         crossing.reset()
         traverseVeto.reset()
-        liveMeter?.reset()
+        meters.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
@@ -308,8 +309,8 @@ _state.update { it.cleared() }
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
-        // Profondeur à chaque frame capturée, même sans session ni réponse SAM.
-        liveMeter?.offer(jpegB64)
+        // Profondeur + danger à chaque frame capturée, même sans session SAM.
+        meters.offer(jpegB64)
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
@@ -410,7 +411,7 @@ _state.update { it.cleared() }
     ) {
         val overlays = overlaysFor(frame, shown)
         val pinhole = readingsOf(distances, frame)
-        val readings = liveMeter?.readingsFor(frame, pinhole) ?: pinhole
+        val readings = meters.readingsFor(frame, pinhole)
         val placed = placedLabels(frame, readings)
         val cross = crossingPatchOf(
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
