@@ -76,8 +76,9 @@ class IseeVoiceNav(
             extraParsers = listOf(VoiceDestinationParser::parse),
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
-            // Mains libres : la destination dictée démarre le guidage sans bouton.
-            autoStartOnVoice = true,
+            // Pas de départ surprise : la destination dictée ouvre l'écran de
+            // confirmation (« Destination : X », bouton Démarrer) — le guidage
+            // ne démarre qu'après un objectif explicite (autoStartOnVoice=false).
         )
     }
 
