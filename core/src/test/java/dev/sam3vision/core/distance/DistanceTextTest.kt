@@ -48,6 +48,18 @@ class DistanceTextTest {
     }
 
     @Test
+    fun `distance courte pour la voix de marche`() {
+        assertEquals("50 centimètres", DistanceText.spokenShort(0.5f))
+        assertEquals("1 centimètre", DistanceText.spokenShort(0.01f))
+        assertEquals("1 mètre", DistanceText.spokenShort(1.44f))
+        assertEquals("2 mètres", DistanceText.spokenShort(1.96f))
+        assertEquals("3 mètres", DistanceText.spokenShort(3.288f))
+        assertEquals("12 mètres", DistanceText.spokenShort(12.4f))
+        assertEquals("distance inconnue", DistanceText.spokenShort(0f))
+        assertEquals("distance inconnue", DistanceText.spokenShort(Float.NaN))
+    }
+
+    @Test
     fun `objet le plus proche et ligne de barre d'etat`() {
         val readings = listOf(reading("personne", 3.2f), reading("chaise", 1.4f), reading("table", 2.0f))
         assertEquals("chaise", DistanceText.nearest(readings)!!.label)

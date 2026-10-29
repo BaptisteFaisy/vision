@@ -37,6 +37,15 @@ class DistanceTextEnglishTest {
     }
 
     @Test
+    fun `distance courte en anglais`() {
+        assertEquals("50 centimeters", DistanceText.spokenShort(0.5f, SpeechLanguage.En))
+        assertEquals("1 centimeter", DistanceText.spokenShort(0.01f, SpeechLanguage.En))
+        assertEquals("1 meter", DistanceText.spokenShort(1.44f, SpeechLanguage.En))
+        assertEquals("2 meters", DistanceText.spokenShort(1.96f, SpeechLanguage.En))
+        assertEquals("distance unknown", DistanceText.spokenShort(0f, SpeechLanguage.En))
+    }
+
+    @Test
     fun `le francais ne change pas`() {
         assertEquals("85 centimètres", DistanceText.spoken(0.85f))
         assertEquals("1,4 mètre", DistanceText.spoken(1.44f))

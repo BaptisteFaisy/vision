@@ -38,6 +38,16 @@ object DistanceText {
         SpeechLanguage.En -> spokenEnglish(meters)
     }
 
+    /**
+     * Distance **courte** pour la voix de marche : le mètre entier (« 2 mètres »,
+     * « 1 mètre »), le centimètre sous un mètre (« 50 centimètres »). Une consigne
+     * qui coupe la précédente n'a pas le temps des décimales.
+     */
+    fun spokenShort(meters: Float, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+        SpeechLanguage.Fr -> spokenShortFrench(meters)
+        SpeechLanguage.En -> spokenShortEnglish(meters)
+    }
+
     /** « 85 centimètres », « 1,4 mètre », « 12 mètres ». */
     private fun spokenFrench(meters: Float): String {
         if (!meters.isFinite() || meters <= 0f) return "distance inconnue"
@@ -62,6 +72,28 @@ object DistanceText {
         val text = decimal(meters, digits, Locale.US).removeSuffix(".0")
         val rounded = text.toFloatOrNull() ?: meters
         return "$text ${if (rounded == 1f) "meter" else "meters"}"
+    }
+
+    /** « 50 centimètres », « 1 mètre », « 2 mètres ». */
+    private fun spokenShortFrench(meters: Float): String {
+        if (!meters.isFinite() || meters <= 0f) return "distance inconnue"
+        if (meters < 1f) {
+            val centimeters = (meters * 100f).roundToInt()
+            return "$centimeters ${if (centimeters < 2) "centimètre" else "centimètres"}"
+        }
+        val rounded = meters.roundToInt()
+        return "$rounded ${if (rounded < 2) "mètre" else "mètres"}"
+    }
+
+    /** « 50 centimeters », « 1 meter », « 2 meters ». */
+    private fun spokenShortEnglish(meters: Float): String {
+        if (!meters.isFinite() || meters <= 0f) return "distance unknown"
+        if (meters < 1f) {
+            val centimeters = (meters * 100f).roundToInt()
+            return "$centimeters ${if (centimeters == 1) "centimeter" else "centimeters"}"
+        }
+        val rounded = meters.roundToInt()
+        return "$rounded ${if (rounded == 1) "meter" else "meters"}"
     }
 
     /** L'objet le plus proche de la frame, `null` si rien n'est mesuré. */

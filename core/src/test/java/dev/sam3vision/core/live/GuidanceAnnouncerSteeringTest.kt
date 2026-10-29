@@ -13,7 +13,7 @@ class GuidanceAnnouncerSteeringTest {
         val announcer = GuidanceAnnouncer()
 
         assertNull(announcer.onFrame(0L, emptyList()))
-        assertEquals("Continue tout droit.", announcer.onFrame(1_000L, emptyList()))
+        assertEquals("Continue.", announcer.onFrame(1_000L, emptyList()))
         assertNull(announcer.onFrame(6_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Left))
         assertEquals(
             "Va à gauche.",

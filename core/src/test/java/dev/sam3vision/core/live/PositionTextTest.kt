@@ -54,12 +54,33 @@ class PositionTextTest {
     }
 
     @Test
-    fun `phrase ordonnee de gauche a droite`() {
+    fun `sans distance, le plus en face se dit d'abord`() {
         val phrase = PositionText.phrase(
             listOf(placed("chien", 0.9f), placed("personne", 0.1f), placed("livre", 0.5f)),
         )
 
-        assertEquals("Personne à 9 heures, livre à midi, chien à 3 heures.", phrase)
+        assertEquals("Livre à midi, chien à 3 heures, personne à 9 heures.", phrase)
+    }
+
+    @Test
+    fun `le proche et centre passe devant le lointain lateral`() {
+        val loin = PlacedLabel("table", 0.05f, 0.5f, meters = 5f)
+        val milieu = PlacedLabel("chien", 0.9f, 0.5f, meters = 2f)
+        val proche = PlacedLabel("personne", 0.5f, 0.5f, meters = 1f)
+
+        val phrase = PositionText.phrase(listOf(loin, milieu, proche), maxObjects = 2)
+
+        assertEquals("Personne à 1 mètre, chien à 2 mètres, et 1 autre objet.", phrase)
+    }
+
+    @Test
+    fun `a distance egale, le centre passe devant les cotes`() {
+        val gauche = PlacedLabel("table", 0.1f, 0.5f, meters = 2f)
+        val centre = PlacedLabel("personne", 0.5f, 0.5f, meters = 2f)
+
+        val phrase = PositionText.phrase(listOf(gauche, centre))
+
+        assertEquals("Personne à 2 mètres, table à 2 mètres.", phrase)
     }
 
     @Test
@@ -81,7 +102,7 @@ class PositionTextTest {
 
         val phrase = PositionText.phrase(labels, maxObjects = 3)
 
-        assertTrue(phrase!!.startsWith("Personne à 9 heures, chien à 10 heures, livre à midi"))
+        assertTrue(phrase!!.startsWith("Livre à midi, chien à 10 heures, table à 2 heures"))
         assertTrue(phrase.endsWith(", et 2 autres objets."))
     }
 
@@ -95,18 +116,18 @@ class PositionTextTest {
     }
 
     @Test
-    fun `la distance s'ajoute a l'objet et impose le point-virgule`() {
+    fun `la distance remplace le cadran, au metre entier`() {
         val proche = PlacedLabel("personne", 0.1f, 0.5f, meters = 1.44f)
         val loin = PlacedLabel("chien", 0.9f, 0.5f, meters = 3.0f)
 
         assertEquals(
-            "Personne à 9 heures, à 1,4 mètre ; chien à 3 heures, à 3 mètres.",
+            "Personne à 1 mètre, chien à 3 mètres.",
             PositionText.phrase(listOf(proche, loin)),
         )
         // un seul objet avec distance : même règle, la phrase reste courte
-        assertEquals("Personne à 9 heures, à 1,4 mètre.", PositionText.phrase(listOf(proche)))
-        // sans distance connue : forme d'origine, virgules
-        assertEquals("Personne à 9 heures, chien à 3 heures.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
+        assertEquals("Personne à 1 mètre.", PositionText.phrase(listOf(proche)))
+        // sans distance connue : le cadran reste, l'ordre dit qui est en face
+        assertEquals("Chien à 3 heures, personne à 9 heures.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
     }
 
     @Test
