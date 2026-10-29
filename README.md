@@ -167,7 +167,7 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,634 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (2,704 @Test)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -180,12 +180,12 @@ bash scripts/build.sh                                      # assembleDebug --off
 
 | Metric | Value | Command |
 |---|---|---|
-| `.kt` files | **851** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Kotlin lines | **91,481** | same `find`, `-exec cat {} + \| wc -l` |
-| Prod lines (`*/src/main`) | **51,502** — `:core` 204 files / 21,314 lines · `:app` 268 files / 30,188 lines | same under `core/src/main`, `app/src/main` |
-| JVM `@Test` | **2,634** — `:core` 1,715 · `:app` 919 (incl. 95 glasses bench) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
+| `.kt` files | **876** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Kotlin lines | **93,656** | same `find`, `-exec cat {} + \| wc -l` |
+| Prod lines (`*/src/main`) | **52,685** — `:core` 211 files / 21,740 lines · `:app` 276 files / 30,945 lines | same under `core/src/main`, `app/src/main` |
+| JVM `@Test` | **2,704** — `:core` 1,766 · `:app` 938 (incl. 95 glasses bench) | `grep -rho '@Test' <dir> --include='*.kt' \| wc -l` |
 | Instrumented tests | **10** (device required) | same on `app/src/androidTest*` |
-| Python backend | **33** files, **6,504** lines | `find server/backend -name '*.py' …` |
+| Python backend | **34** files, **6,689** lines | `find server/backend -name '*.py' …` |
 | Guards | all green (sizes, Portrait, budget, voice, ci-budget, scripts, goldens, relay) | see `docs/TESTING.md` §2 |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
