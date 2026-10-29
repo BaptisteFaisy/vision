@@ -31,8 +31,8 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 from timing import Stage, add_ms, elapsed_ms, now
-# Poids + chargements (extrait ici pour la limite 500 lignes) : ré-exportés pour
-# `service.py` et les bancs (`from fast_core import load, ...` inchangé).
+# Poids + chargements ré-exportés pour service.py et les bancs (limite 500 lignes).
+from token_cache import tokenize_cached
 from weights import (ATTN_IMPL, DTYPE_NAME, MODEL_DIR, MODEL_ID, MODEL_SOURCE, load,
                      load_cpu, local_only, round_edge, torch_dtype)
 
@@ -75,7 +75,7 @@ def levers() -> dict:
     """État des leviers tels que lus à l'import — étiquette /health et lignes du banc."""
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
-            "dtype": DTYPE_NAME, "snapshot": SNAPSHOT,
+            "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
             "warmups": WARMUPS, "timing": TIMING}
 
 
@@ -319,8 +319,7 @@ def _detections(model, processor, device, dtype, vision, concepts, work_size, ti
     from segmentation import MASK_THRESHOLD, SCORE_THRESHOLD
 
     started = now()
-    inputs = {name: value.to(device)
-              for name, value in processor(text=list(concepts), return_tensors="pt").items()}
+    inputs = tokenize_cached(processor, concepts, device)
     add_ms(timers, "tokenize_ms", elapsed_ms(started))
     embeds = repeat_vision(vision, len(concepts))
 

@@ -116,7 +116,9 @@ class Sam3LiveService:
             model = model.to(device).eval()
             del self.cpu
         self.ctx = {"model": model, "processor": processor, "device": device, "dtype": dtype,
-                    "runtime_edge": RUNTIME_EDGE}
+                    "runtime_edge": RUNTIME_EDGE,
+                    "attn_impl": getattr(getattr(model, "config", None),
+                                         "_attn_implementation", "?")}
         self.ctx.update(prepare(model, processor, device, dtype, EDGE))
         self.ctx["device_label"] = device_label()
         self.ctx["vision_grid"] = vision_grid(model)
@@ -345,6 +347,7 @@ class Sam3LiveService:
                     "edge_applied": self.ctx.get("edge_applied"),
                     "vision_grid": self.ctx.get("vision_grid"),
                     "vision_accel": self.ctx.get("vision_accel"),
+                    "attn_impl": self.ctx.get("attn_impl"),
                     "detr_graph": (self.ctx["detr_graphs"].status()
                                    if self.ctx.get("detr_graphs") else None)}}
 

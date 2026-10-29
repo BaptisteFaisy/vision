@@ -28,6 +28,8 @@ Leviers (voir ``fast_core.py`` pour le détail technique) :
     FAST_EDGE=448          surcharge la taille d'entrée du préprocesseur (1008 par défaut)
     FAST_COMPILE=1         torch.compile de l'encodeur vision + warm-up
     FAST_CUDA_GRAPH=1      CUDA graph de l'encodeur vision (exclusive de FAST_COMPILE)
+    FAST_DETR_GRAPH=1      CUDA graph de la passe DETR (vérifié, repli eager)
+    FAST_ATTN=sdpa         attention fusionnée (eager matérialise, ~55 ms)
     FAST_DTYPE=bf16|fp16|fp32
     FAST_TIMING=1          réponse enrichie d'un détail par étage (vision/detr/masks)
 
@@ -79,7 +81,7 @@ WEIGHTS_BUILD = (
 # (les variables du shell de déploiement ne sont pas propagées telles quelles).
 LEVER_NAMES = ("FAST_BATCH_PROMPTS", "FAST_EDGE", "FAST_EDGE_RUNTIME", "FAST_COMPILE",
                 "FAST_CUDA_GRAPH", "FAST_DETR_GRAPH", "FAST_DTYPE", "FAST_TIMING",
-                "FAST_COMPILE_WARMUPS", "FAST_GZIP_MIN_BYTES", "FAST_SNAPSHOT")
+                "FAST_COMPILE_WARMUPS", "FAST_GZIP_MIN_BYTES", "FAST_SNAPSHOT", "FAST_ATTN")
 
 
 def lever_env() -> dict:
