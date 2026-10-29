@@ -456,6 +456,7 @@ RUNNERS = (
     ("live_fast : poids locaux (module déployé)", "timing", weights_tests.test_live_fast_weights),
     ("live_fast : image (poids + snapshot déployés)", "timing", weights_tests.test_live_fast_image),
     ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
+    ("live_fast : logs boot_cpu", "timing", weights_tests.test_boot_cpu_logs),
     ("live_fast : règle restored", "timing", boot_tests.test_restored_rule),
     ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),

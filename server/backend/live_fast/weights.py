@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import os
 
+from timing import elapsed_ms, format_boot_cpu, now
+
 PATCH = 14
 MODEL_ID = "unsloth/sam3.1"
 # Poids embarqués dans l'image (FAST_MODEL_DIR) : sans ça chaque démarrage à froid
@@ -82,6 +84,12 @@ def local_only() -> dict:
     return {"local_files_only": True} if MODEL_DIR else {}
 
 
+def _boot_log(booted: float, stage: str, started: float) -> float:
+    """Logge l'étage ``stage`` (durée + cumul depuis ``booted``) ; renvoie le top suivant."""
+    print(format_boot_cpu(stage, elapsed_ms(started), elapsed_ms(booted)), flush=True)
+    return now()
+
+
 def load(dtype_name: str = DTYPE_NAME, edge=None):
     """Charge SAM 3.1 avec le dtype demandé ; retourne (model, processor, device, dtype).
 
@@ -117,16 +125,28 @@ def load_cpu(dtype_name: str = DTYPE_NAME, edge=None):
     D'où la coupure : lecture des 1,7 Go et construction du graphe sur CPU ici, puis
     ``.to("cuda")`` dans une méthode `enter` normale, après restauration du snapshot.
     Retourne (model, processor, dtype) — le device n'est pas encore choisi.
+
+    Chaque étage logge une ligne ``boot_cpu:`` (durée + cumul) : c'est ce qui tranche
+    la répartition des ~15 s de phase CPU (imports ? lecture des poids ? autre ?).
     """
+    booted = now()
+    top = now()
     import torch
+    top = _boot_log(booted, "import_torch", top)
     from transformers import Sam3Config, Sam3Model, Sam3Processor
+    top = _boot_log(booted, "import_transformers", top)
 
     dtype = torch_dtype(dtype_name)
     kwargs = {}
     if edge:
+        top = now()
         config = Sam3Config.from_pretrained(MODEL_SOURCE, **local_only())
         config.vision_config.backbone_config.image_size = round_edge(int(edge))
         kwargs["config"] = config
+        top = _boot_log(booted, "config_edge", top)
     model = Sam3Model.from_pretrained(MODEL_SOURCE, dtype=dtype, **kwargs).eval()
+    top = _boot_log(booted, "model_from_pretrained", top)
     processor = Sam3Processor.from_pretrained(MODEL_SOURCE, **local_only())
+    _boot_log(booted, "processor_from_pretrained", top)
+    _boot_log(booted, "total", booted)
     return model, processor, dtype

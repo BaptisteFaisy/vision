@@ -371,3 +371,50 @@ def test_live_fast_split(_module) -> None:
             sys.modules.pop("segmentation", None)
         else:
             sys.modules["segmentation"] = saved_seg
+
+
+def test_boot_cpu_logs(_module) -> None:
+    """`load_cpu` logge chaque étage `boot_cpu:` (imports, poids, total), dans l'ordre."""
+    import contextlib
+    import io
+    import re
+
+    from test_units import check
+
+    def _stages(text: str) -> list:
+        found = []
+        for line in text.splitlines():
+            if not line.startswith("boot_cpu:"):
+                continue
+            match = re.search(r"stage=([a-z_]+)", line)
+            found.append(match.group(1) if match else "?")
+        return found
+
+    module = _fresh_live_fast("weights")
+    calls: list = []
+    out = io.StringIO()
+    with _Patched(calls), contextlib.redirect_stdout(out):
+        module.load_cpu("bf16")
+    stages = _stages(out.getvalue())
+    check("boot_cpu : étages dans l'ordre",
+          stages == ["import_torch", "import_transformers", "model_from_pretrained",
+                     "processor_from_pretrained", "total"], str(stages))
+    check("boot_cpu : durée + cumul parsables",
+          all(re.fullmatch(r"boot_cpu: stage=[a-z_]+ ms=\d+\.\d total_ms=\d+\.\d", line)
+              for line in out.getvalue().splitlines()
+              if line.startswith("boot_cpu:")) and len(stages) == 5,
+          out.getvalue()[:200])
+
+    class _Config:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            return _config_of([])
+
+    out = io.StringIO()
+    with _Patched(calls), contextlib.redirect_stdout(out):
+        sys.modules["transformers"].Sam3Config = _Config
+        module.load_cpu("bf16", edge=518)
+    check("boot_cpu : config_edge entre imports et poids",
+          _stages(out.getvalue()) == ["import_torch", "import_transformers", "config_edge",
+                                      "model_from_pretrained", "processor_from_pretrained",
+                                      "total"], _stages(out.getvalue()))
