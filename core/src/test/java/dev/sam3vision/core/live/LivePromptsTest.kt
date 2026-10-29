@@ -28,7 +28,7 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `preset exterieur : huit concepts de cheminement, sous le plafond`() {
+    fun `preset exterieur huit concepts de cheminement sous le plafond`() {
         assertEquals(
             listOf("person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree"),
             LivePrompts.outdoor,
