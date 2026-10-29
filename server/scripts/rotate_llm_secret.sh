@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Rotation du secret Modal « sam3-llm » depuis un fichier de clé, puis redéploiement.
 #
-#   ./scripts/rotate_llm_secret.sh /chemin/cle.txt
-#   LLM_KEY_FILE=/chemin/cle.txt ./scripts/rotate_llm_secret.sh
-#   DRY_RUN=1 ./scripts/rotate_llm_secret.sh /chemin/cle.txt   # valide sans rien pousser
+#   ./server/scripts/rotate_llm_secret.sh /chemin/cle.txt
+#   LLM_KEY_FILE=/chemin/cle.txt ./server/scripts/rotate_llm_secret.sh
+#   DRY_RUN=1 ./server/scripts/rotate_llm_secret.sh /chemin/cle.txt   # valide sans rien pousser
 #
 # Le fichier accepte des lignes `CLE=valeur` (api_key|key|token|secret, base_url|
 # endpoint, model — avec ou sans préfixe LLM_), des commentaires `#` ou `//`, ou UNE

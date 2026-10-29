@@ -437,10 +437,6 @@ def finish(repo, pr, branch, sha, files):
                            "--force-with-lease=%s:%s" % (branch, sha),
                            push_url(repo), "HEAD:%s" % branch],
                           capture_output=True, text=True, timeout=120)
-    push = subprocess.run(["git", "push",
-                           "--force-with-lease=%s:%s" % (branch, sha),
-                           push_url(repo), "HEAD:%s" % branch],
-                          capture_output=True, text=True, timeout=120)
     if push.returncode != 0:
         log("push refusé (bail, prochain passage) : %s"
             % push.stderr.strip()[:150])
@@ -465,7 +461,6 @@ def cmd_resolve(args):
         return 2
     except AgentError as exc:
         return fail(repo, pr, str(exc))
-    touch_stamp(pr, args.sha)
     deadline = now + BUDGET_S
     if args.dry_run:
         try:
@@ -474,6 +469,9 @@ def cmd_resolve(args):
         except AgentError as exc:
             return fail(repo, pr, str(exc))
         return 0
+    # Le dry-run ne touche jamais l'empreinte : une simulation ne doit ni
+    # déclencher le cooldown ni consommer le plafond horaire.
+    touch_stamp(pr, args.sha)
     try:
         resolved = finish_loop(api_url, key, model, deadline)
     except AgentError as exc:

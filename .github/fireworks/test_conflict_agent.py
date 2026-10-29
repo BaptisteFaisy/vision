@@ -232,5 +232,68 @@ class RebaseLoopTest(unittest.TestCase):
         self.assertIn("arrêts", str(ctx.exception))
 
 
+class FinishPushTest(unittest.TestCase):
+    """Fin de rebase : un seul push avec bail, puis compte rendu."""
+
+    def test_un_seul_push(self):
+        # Non-régression 29/10 : le push était exécuté deux fois avec le même
+        # bail — le second échouait toujours après un premier succès, et la PR
+        # repartait en « conflit » sans commentaire ni label.
+        appels = []
+
+        def faux_run(argv, **kw):
+            appels.append(argv)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(conflict_agent.subprocess, "run",
+                               side_effect=faux_run):
+            rc = conflict_agent.finish("O/R", "1", "br", "sha", ["f.txt"])
+        self.assertEqual(rc, 0)
+        pushes = [a for a in appels if a[:2] == ["git", "push"]]
+        self.assertEqual(len(pushes), 1)
+        self.assertIn("--force-with-lease=br:sha", pushes[0])
+
+    def test_push_refuse_sans_compte_rendu_succes(self):
+        def faux_run(argv, **kw):
+            if argv[:2] == ["git", "push"]:
+                return mock.Mock(returncode=1, stdout="", stderr="bail")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(conflict_agent.subprocess, "run",
+                               side_effect=faux_run):
+            rc = conflict_agent.finish("O/R", "1", "br", "sha", ["f.txt"])
+        self.assertEqual(rc, 1)
+
+
+class DryRunStampTest(unittest.TestCase):
+    """Le dry-run n'écrit jamais d'empreinte (ni cooldown ni plafond)."""
+
+    def test_dry_run_sans_stamp(self):
+        # Non-régression 29/10 : une simulation touchait l'empreinte avant la
+        # branche dry-run, et bloquait un vrai run pendant 20 min.
+        run = _scratch_repo(self)
+        _commit(run, {"f.txt": "base\n"}, "base")
+        base_branch = run("branch", "--show-current").stdout.strip()
+        run("checkout", "-qb", "br")
+        _commit(run, {"f.txt": "BR\n"}, "br")
+        run("checkout", "-q", base_branch)
+        _commit(run, {"f.txt": "M\n"}, "m")
+        run("checkout", "-q", "br")
+        failed = subprocess.run(["git", "rebase", base_branch],
+                                capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        home = tempfile.mkdtemp(prefix="fw-home-")
+        self.addCleanup(shutil.rmtree, home, True)
+        args = mock.Mock(repo="O/R", pr="1", branch="", sha="abc",
+                         dry_run=True)
+        with mock.patch.dict(os.environ, {"HOME": home}), \
+                mock.patch.object(conflict_agent, "pr_labels", return_value=[]):
+            rc = conflict_agent.cmd_resolve(args)
+        self.assertEqual(rc, 0)
+        cache = os.path.join(home, ".cache", "fireworks-agent")
+        stamps = os.listdir(cache) if os.path.isdir(cache) else []
+        self.assertEqual(stamps, [])
+
+
 if __name__ == "__main__":
     unittest.main()

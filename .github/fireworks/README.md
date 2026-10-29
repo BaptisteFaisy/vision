@@ -28,7 +28,7 @@ Le script est lu sur `origin/master` (pas sur la branche de la PR, qui peut
 
 ## Garde-fous
 
-Empreinte par tête de PR + cooldown 20 min, plafond 3 saisines/heure,
+Empreinte par tête de PR + cooldown 20 min, plafond 10 saisines/heure (`SPAWN_CAP`),
 8 fichiers max, refus des conflits sous `.github/`, des binaires et des
 fichiers de plus de 200 Ko, budget 240 s, push avec bail uniquement.
 Labels `hold` / `intervention-humaine` : main humaine, aucune saisine.

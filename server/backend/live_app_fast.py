@@ -146,7 +146,7 @@ app = modal.App(APP_NAME)
     enable_memory_snapshot=SNAPSHOT,
 )
 # DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
-# n'admet qu'une entrée à la fois : la 2e frame en vol (le client iHear tourne à 2 créneaux)
+# n'admet qu'une entrée à la fois : la 2e frame en vol (le client iSee tourne à 2 créneaux)
 # attend ~90 ms au proxy (mesuré : elapsed 91/90 ms mais ttfb 232 → 322 ms). Les routes sont
 # `async` et le travail bloquant passe par `asyncio.to_thread` : les entrées concurrentes
 # tournent en threads séparés, donc le décodage + le pré-traitement CPU de la frame N+1 se
