@@ -26,6 +26,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `+GuidanceObstaclesTest.kt` (213 lignes), `GUIDAGE-TOUT-DROIT.md`,
   `TESTING.md`, `CHANGELOG.md`. Périmètre voix tenu à l'écart
   (`GuidanceAnnouncer.kt`, TwinLite, `IseeViewModel` : lus, non modifiés).
+## 2026-10-29 — iSee : guidage doux + « Attention à … », stop seul urgent (ordre user)
+
+- **Demande** : iSee/SAM sert au non-urgent (décrire, guider en douceur) —
+  un autre modèle (en cours) gérera l'urgence ; garder le Stop. en attendant.
+- Mots doux : gauche/tout droit/droite dits aussitôt (clips < 100 ms) mais
+  n'interrompent plus (`spokenUrgent` = `GuidanceWord.isStopPhrase`) ; seul
+  « Stop. » coupe, chat compris. Stop interne (contact ≤ 0,6 m) gardé.
+- « Attention à … » : trottoir (« Attention à la marche. »), escaliers
+  (doux, texte inchangé), mobilier (`HazardConcepts`/`HazardWatcher` :
+  barrière, poteau, borne, clôture, portail — FR/EN, 3 m, 2 frames, 10 s),
+  3e guetteur `ProbeHazards`, synthèse réseau, jamais de coupure.
+- Hook urgence externe : `ProximityVoice.reportEmergency` (clip stop,
+  coupe tout, dédupliqué) + contrat `docs/URGENCE-EXTERNE.md` ; suppression
+  du stop interne prévue au branchement du modèle externe.
+- Preuves : `:core` 1 818 + `:app` 1 074 tests, 0 échec, sur r630
+  (`GuidanceWordTest` 6/6, `HazardConceptsTest` 5/5, `HazardWatchTest` 8/8,
+  `LiveProbeGuidanceTest` 5/5, `ProximityVoiceWordTest` 4/4),
+  `check-kotlin-limits` + `check-voicepack` OK. Docs `VOIX-DANGER.md` § 11,
+  `GUIDAGE-TOUT-DROIT.md` § 4, `URGENCE-EXTERNE.md` (nouveau).
+- Fichiers : `GuidanceWord.kt`, `CurbWatcher.kt`, `hazard/` (2 nouveaux),
+  `LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, `ProximityVoice.kt`,
+  `IseeViewModel.kt` (+17 tests, +2 fichiers).
 
 ## 2026-10-29 — voix : le guidage dit quatre mots en moins de 100 ms (ordre user)
 
