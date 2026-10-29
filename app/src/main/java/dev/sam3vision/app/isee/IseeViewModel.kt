@@ -46,6 +46,7 @@ import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -208,6 +209,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             intro.playIfPending()
         }
         probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
+        // Passage piéton reconnu : la voix le dit, une fois, sinon la proposition
+        // n'existe que pour ceux qui voient la pastille.
+        observeCrossingOffer(probe.state.map { it.crossingOffer }, viewModelScope, { settings.speechLanguage }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
