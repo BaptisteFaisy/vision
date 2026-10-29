@@ -43,7 +43,20 @@ data class CurbSignal(
             val centerX = (box[0] + box[2]) / 2f / frameW
             if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
             if (box[3] / frameH < CurbWatcher.LOWER_BAND_FRACTION) return null
+            if (CurbConcepts.isGround(reading.label) && !nearEdge(box, frameH)) return null
             return meters
+        }
+
+        /**
+         * Plan (`sidewalk`…) : bord proche ou sol sous les pieds ? Montée = le
+         * plan commence au-dessus des pieds (bas sous [CurbWatcher.PLANE_BOTTOM_MAX]) ;
+         * descente = plan collé aux pieds mais borné en haut (haut au-dessus de
+         * [CurbWatcher.PLANE_TOP_MIN]) ; sinon c'est le sol sur lequel on marche.
+         * Seuils : priors à valider sur captures téléphone.
+         */
+        private fun nearEdge(box: List<Float>, frameH: Int): Boolean {
+            if (box[3] / frameH < CurbWatcher.PLANE_BOTTOM_MAX) return true
+            return box[1] / frameH >= CurbWatcher.PLANE_TOP_MIN
         }
     }
 }
@@ -75,11 +88,12 @@ object CurbText {
  * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs, puis
  * silence pendant [cooldownMs] (un trottoir ne bouge pas).
  *
- * Limites assumées, à recalibrer sur captures du téléphone (priors, comme le
- * veto trafic) : `sidewalk` segmente le plan entier, et marcher **sur** un
- * trottoir peut en remplir la bande basse — une fausse annonce « levez la
- * jambe » à un utilisateur aveugle est une décision de sécurité, pas un
- * défaut : seuils à valider sur appareil avant usage réel.
+ * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
+ * trottoir ne doit pas annoncer « levez la jambe » — le plan sous les pieds
+ * (bas collé en bas de l'image, haut vers l'horizon) est ignoré, seuls les
+ * plans à bord proche parlent (montée : bas décollé ; descente : haut
+ * borné). Seuils priors, à valider sur captures du téléphone (comme le
+ * veto trafic) : en cas de doute le bord parle, jamais l'inverse.
  *
  * Pur JVM et testé. Urgence : l'appelant parle avec `urgent = true` (coupe la
  * lecture en cours, comme le couloir bouché).
@@ -133,6 +147,12 @@ class CurbWatcher(
 
         /** Bas de boîte minimal (fraction de hauteur) : le champ proche. */
         const val LOWER_BAND_FRACTION = 0.6f
+
+        /** Bas de plan maximal (fraction) : au-delà, le plan touche les pieds (montée). */
+        const val PLANE_BOTTOM_MAX = 0.95f
+
+        /** Haut de plan minimal (fraction) : en deçà + pieds = descente, sinon sol. */
+        const val PLANE_TOP_MIN = 0.5f
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE
