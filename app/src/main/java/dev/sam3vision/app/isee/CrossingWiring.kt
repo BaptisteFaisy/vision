@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
+import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.PedLightGate
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
  * actif : « Stop, mur » et « Vert, traversez » ne doivent jamais se mélanger.
  */
 internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean) {
+    if (!active) CrossingOfferWatch.declined(System.currentTimeMillis())
     val prompts = if (active) CrossingPrompts.PROMPTS else LivePrompts.default
     configureFrom(settings, prompts, active)
 }
@@ -133,11 +135,32 @@ internal fun LiveProbe.observeCrossingActive(scope: CoroutineScope, onChanged: (
  * Libellé du bouton Traversée : l'état du mode et, quand il est actif, le
  * dernier état connu du feu. Pur, testé en JVM.
  */
-internal fun crossingButtonLabel(active: Boolean, state: CrossingState?): String {
+internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: Boolean = false): String {
+    if (!active && offer) return "Passage piéton — traversée ?"
     if (!active) return "Traversée : OFF"
     return when (state) {
         CrossingState.Green -> "Traversée : VERT"
         CrossingState.Red -> "Traversée : ROUGE"
         CrossingState.Unknown, null -> "Traversée : …"
     }
+}
+
+/**
+ * Mémoire de la proposition « passage piéton → mode Traversée », une par
+ * processus : la sonde la consulte à chaque frame publiée (1 ligne, la garde des
+ * 500 lignes ne laisse pas de place à un champ de plus dans `LiveProbe`).
+ */
+internal object CrossingOfferWatch {
+
+    private val gate = CrossingOfferGate()
+
+    /** Vrai si l'app doit proposer le mode Traversée sur cette frame. */
+    fun update(objects: List<dev.sam3vision.core.model.SegObject>, nowMs: Long, traversing: Boolean): Boolean =
+        gate.onFrame(objects, nowMs, traversing)
+
+    /** L'utilisateur a coupé le mode : silence d'une minute. */
+    fun declined(nowMs: Long) = gate.declined(nowMs)
+
+    /** Nouvelle séance. */
+    fun reset() = gate.reset()
 }
