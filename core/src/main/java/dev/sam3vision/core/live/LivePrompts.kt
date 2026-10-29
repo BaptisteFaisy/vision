@@ -13,21 +13,25 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **10** dangers extérieurs pour un piéton aveugle —
+     * Concepts par défaut : **12** dangers extérieurs pour un piéton aveugle —
      * mobiles (« person », « car », « bicycle », « electric scooter ») puis
      * statiques (« pole », « sidewalk », « crosswalk », « wall », « window »,
-     * « stairs »), modifiables à chaud dans le direct (champ « Suivre »).
+     * « stairs », « door », « barrier »), modifiables à chaud dans le direct
+     * (champ « Suivre »).
      *
      * Historique des plafonds : 2 (26/10, le tracker tronquait à
      * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
      * tous les dangers extérieurs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
-     * Sur `/live` les prompts sont batchés (un seul forward, mesure du 26/10 :
-     * 2 ou 8 concepts = 118 ms médian) ; sur le tracker chaque concept coûte
-     * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
+     * Historique des défauts : 10 (28/10), 12 (29/10, ordre user : portes et
+     * barrières reconnues en plus). Sur `/live` les prompts sont batchés (un
+     * seul forward, mesure du 26/10 : 2 ou 8 concepts = 118 ms médian) ; sur
+     * le tracker chaque concept coûte une inférence par `/frame`, d'où un
+     * coût ×8 assumé sur ce chemin.
      */
     val default: List<String> = listOf(
         "person", "car", "bicycle", "electric scooter", "pole",
         "sidewalk", "crosswalk", "wall", "window", "stairs",
+        "door", "barrier",
     )
 
     /**

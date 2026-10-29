@@ -61,6 +61,15 @@ class KnownSizesTest {
     }
 
     @Test
+    fun `portes et barrieres calibre en francais et en anglais`() {
+        assertEquals(2.05f, KnownSizes.heightMeters("door")!!, 0.001f)
+        assertEquals(2.05f, KnownSizes.heightMeters("Porte")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("barrier")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("Barrière")!!, 0.001f)
+        assertEquals(1.00f, KnownSizes.heightMeters("barrières")!!, 0.001f)
+    }
+
+    @Test
     fun `concept inconnu reste inconnu`() {
         assertNull(KnownSizes.heightMeters("licorne"))
         assertNull(KnownSizes.heightMeters(""))

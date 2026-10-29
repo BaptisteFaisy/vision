@@ -237,10 +237,11 @@ mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 10 (plafond 16)
+## 5. Concepts suivis : 12 (plafond 16)
 
 - Liste par défaut : `["person", "car", "bicycle", "electric scooter", "pole", "sidewalk",
-  "crosswalk", "wall", "window", "stairs"]` (dangers extérieurs, ordre user du 28/10) —
+  "crosswalk", "wall", "window", "stairs", "door", "barrier"]` (dangers extérieurs,
+  ordre user du 28/10 + portes et barrières le 29/10) —
   `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
 - Plafond : `LivePrompts.MAX = 16`. Le client n'en envoie jamais plus,
   le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 16`

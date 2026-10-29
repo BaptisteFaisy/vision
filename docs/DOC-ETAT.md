@@ -34,7 +34,7 @@ plus l'arbre — bandeau ajouté).
 | `docs/GLASSES-ETAT.md` | **périmée → recorrigée** (27/10, chiffres 28/10 dans TESTING) | Banc : 15 fichiers / 1 640 lignes, 10 fichiers / **95** `@Test` (28/10, voir `docs/TESTING.md` §1/§6) ; garde de taille OK |
 | `docs/KEYFRAME-SCHEDULER.md` | **à jour** (relu 27/10) | 5 fichiers `keyframe/`, constantes (0,12 / 0,35 / 12 s / 3 req/s), `FrameGate` réutilisé, simulateur `KeyframeScene`/`KeyframeSim` — relus à l'identique |
 | `docs/LATENCE-BUDGET.md` | **périmée → corrigée** (27/10) | `scripts/budget_latence.py --check-doc` OK (6 tableaux) et `--selftest` 14/14 ; deux ancres `LiveSession.kt:33` → `:34` |
-| `docs/LIVE-SPEC.md` | **recorrigée** (28/10) | En-tête + §8 (serveur dans `server/`), `work_edge` 512 (client) / 768 (serveur), `PROMPT_LIMIT = 6`, `CHANGELOG.md:623` ; §5 juste ; §1-4, §6 : valeurs vraies, lignes non recalées |
+| `docs/LIVE-SPEC.md` | **recorrigée** (28/10, §5 le 29/10) | En-tête + §8 (serveur dans `server/`), `work_edge` 512 (client) / 768 (serveur), `PROMPT_LIMIT = 6`, `CHANGELOG.md:623` ; §5 juste (12 concepts : + `door`, `barrier`) ; §1-4, §6 : valeurs vraies, lignes non recalées |
 | `docs/LUNETTES-LANCEMENT.md` | **périmée → recorrigée** (28/10) | `test-mock-sam.sh` rejoué le 28/10 (26 ok / 0 KO) ; lien `ref/` mort retiré le 27/10 (dossier absent du dépôt) |
 | `docs/MASK-DECODE.md` | **à jour** (relu 27/10) | Codecs `rle`/`poly`, knobs `MASK_FORMAT`/`MASK_EDGE`, `MASK_MAX_PIXELS`, 6 suites de tests citées — relus à l'identique |
 | `docs/MICRO-VERROUILLE.md` | **périmée → corrigée** (27/10) | `LlmContractTest` 13 → **15** ; tout le reste (service, `MAX_RECORD_MS`, receiver debug, recette) relu à l'identique |

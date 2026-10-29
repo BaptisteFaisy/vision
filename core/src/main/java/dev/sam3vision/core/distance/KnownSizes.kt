@@ -67,6 +67,8 @@ object KnownSizes {
         "porte" to 2.05f, "door" to 2.05f, "fenetre" to 1.30f, "window" to 1.30f,
         "mur" to 2.50f, "wall" to 2.50f, "panneau" to 2.20f, "sign" to 2.20f,
         "lampadaire" to 5.00f, "poubelle" to 0.90f, "bin" to 0.90f,
+        // Barrière de chantier type Vauban ≈ 1 m (glissière 0,75 m : ordre de grandeur).
+        "barriere" to 1.00f, "barrier" to 1.00f,
         // Objets portables et de bureau
         "bouteille" to 0.25f, "bottle" to 0.25f, "verre" to 0.12f, "glass" to 0.12f,
         "cup" to 0.10f, "gobelet" to 0.12f, "mug" to 0.10f, "bol" to 0.09f,
