@@ -62,8 +62,9 @@ sealed interface VoiceNavUiState {
  * Contrat :
  * - [onVoiceTranscript] blanc ou sans intention → `false`, l'appelant
  *   poursuit son chemin normal (question LLM) ; intention reconnue (routeur
- *   ou [extraParsers]) → `true` (consommé) et, par défaut, démarrage direct
- *   sans bouton : moteur embarqué si possible, sinon Maps piéton ;
+ *   ou [extraParsers]) → `true` (consommé) et, si [autoStartOnVoice] est
+ *   vrai (câblage iSee), démarrage direct sans bouton : moteur embarqué si
+ *   possible, sinon Maps piéton ;
  * - [autoStartOnVoice] faux → écran de confirmation + annonce
  *   « Destination : X », puis [confirmDestination] décide ;
  * - repli Maps toujours piéton ([TravelMode.WALK]) et **sans** état
@@ -102,10 +103,10 @@ class VoiceNavSession(
     private val onSessionIdle: () -> Unit = {},
     /**
      * Démarre dès la dictée, sans écran de confirmation ni bouton
-     * « Démarrer ». Défaut `true` pour un usage mains libres ; `false`
-     * conserve l'écran de confirmation (API historique, tests).
+     * « Démarrer ». Défaut `false` : l'écran de confirmation reste l'API
+     * historique ; `IseeVoiceNav` passe `true` pour l'usage mains libres.
      */
-    private val autoStartOnVoice: Boolean = true,
+    private val autoStartOnVoice: Boolean = false,
 ) {
 
     private val _state = MutableStateFlow<VoiceNavUiState>(VoiceNavUiState.Idle)
