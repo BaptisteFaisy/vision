@@ -162,6 +162,11 @@ jobs:
           python3 tools/check-voice-nav-doc.py
           python3 -m unittest tools/test_check_voice_nav_doc.py
 
+      # La garde clés embarquées (`ci-native.yml`, jobs apk/apk-release) a ses
+      # tests ici : quelques secondes, aucune compilation, aucun réseau.
+      - name: Tests de la garde clés embarquées
+        run: python3 -m unittest tools/test_check_apk_keys.py
+
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
       - name: Tests JVM (:core + :app)
