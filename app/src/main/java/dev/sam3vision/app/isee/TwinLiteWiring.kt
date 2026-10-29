@@ -9,7 +9,6 @@ import dev.sam3vision.core.segment.TwinLiteAnnouncer
 import dev.sam3vision.core.segment.TwinLiteCue
 import dev.sam3vision.core.segment.TwinLiteGuide
 import dev.sam3vision.core.segment.TwinLiteText
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +41,6 @@ class TwinLiteWiring(
     private val voice: TwinLiteVoice? = null,
     private val scope: CoroutineScope? = null,
     private val language: () -> SpeechLanguage = { SpeechLanguage.DEFAULT },
-    private val rate: () -> Float = { Settings.DEFAULT_TTS_SPEED },
 ) {
     /** Câblage de production : mètre réel LiteRT sur le scope du ViewModel. */
     constructor(
@@ -50,8 +48,7 @@ class TwinLiteWiring(
         appContext: Context,
         voice: TwinLiteVoice,
         language: () -> SpeechLanguage = { SpeechLanguage.DEFAULT },
-        rate: () -> Float = { Settings.DEFAULT_TTS_SPEED },
-    ) : this(LiveSegmentMeter(scope, appContext), TwinLiteAnnouncer(), voice, scope, language, rate)
+    ) : this(LiveSegmentMeter(scope, appContext), TwinLiteAnnouncer(), voice, scope, language)
 
     private val _ui = MutableStateFlow<TwinLiteUi?>(null)
 
@@ -107,15 +104,11 @@ class TwinLiteWiring(
         _ui.value = null
     }
 
-    /** Prononce [cue] en fond (ou sur place sans scope, en test). */
+    /** Prononce [cue] en fond (voix ElevenLabs partagée, suspendue). */
     private fun say(cue: TwinLiteCue, language: SpeechLanguage) {
         val target = voice ?: return
-        val runner = scope
-        if (runner == null) {
-            runCatching { target.say(cue, language, rate()) }
-            return
-        }
-        runner.launch { runCatching { target.say(cue, language, rate()) } }
+        val runner = scope ?: return
+        runner.launch { runCatching { target.say(cue, language) } }
     }
 
     companion object {
