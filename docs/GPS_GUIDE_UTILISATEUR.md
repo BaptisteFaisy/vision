@@ -20,7 +20,10 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
    propose un champ de saisie clavier — la saisie vaut une dictée : elle
    ouvre la confirmation, sans redicter.
-4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
+4. **Mode carte** : « navigation », « carte », « où suis-je » → la carte
+   s'ouvre sans destination (voir §2), dite « Mode navigation. La carte est
+   à l'écran. »
+5. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
 
 ## 2. Voir (les écrans)
@@ -42,6 +45,21 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
   + annonce « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
   actuelle, même destination, sans regéocoder).
+
+### Mode navigation (la carte, sans destination)
+
+Dis **« navigation »**, **« carte »**, **« où suis-je »** (ou « ouvre la
+carte ») sur l'accueil iSee : la **carte** s'ouvre, sans destination —
+position GPS au centre (cercle de précision), passages piétons connus
+autour, coordonnées et précision écrites en grand.
+
+- « va à … » depuis la carte ouvre la confirmation d'itinéraire habituelle ;
+- « quitte la carte », « arrête la navigation », le bouton **Quitter** ou le
+  retour système referment le mode ;
+- sans autorisation de localisation : « Position indisponible — autorise la
+  localisation pour ce téléphone. » (rien d'autre ne change) ;
+- le mode ne s'ouvre pas par-dessus un guidage : il n'y a donc jamais deux
+  écrans de navigation empilés.
 
 ## 3. Arriver
 
