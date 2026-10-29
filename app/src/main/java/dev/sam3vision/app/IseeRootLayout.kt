@@ -91,11 +91,25 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      * (mesuré sur le téléphone). Hors iSee, rien n'est intercepté : Réglages garde ses
      * boutons.
      */
+    /**
+     * Geste en cours vers le chip Picto : une fois le DOWN exempté, tout le
+     * geste (MOVE, UP) descend aussi — reprendre l'interception au UP enverrait
+     * un CANCEL au chip et tuerait le clic (vu sur le téléphone : vidéo coupée,
+     * aucune génération). Remis à zéro à chaque fin de geste.
+     */
+    private var pictoPass = false
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // Le bouton Picto est le seul contrôle tactile d'iSee : un DOWN dans sa
         // zone descend au chip — sinon le tap togglerait la vidéo au lieu de
         // générer (vu sur le téléphone). Sans zone, interception inchangée.
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN && inPictoZone(ev)) return false
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) pictoPass = inPictoZone(ev)
+        if (pictoPass) {
+            if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+                pictoPass = false
+            }
+            return false
+        }
         return gesturesEnabled()
     }
 
