@@ -60,7 +60,7 @@ assets (mêmes noms) — le fichier téléchargé gagne, l'asset suit en repli.
 ## Guidage (direct)
 
 Les mètres profondeur alimentent le direct existant (pastilles, voix,
-consignes « personne à 2 mètres à midi, va à gauche », flèches) :
+consignes « va à gauche, 2 mètres », flèches) :
 - `:core` `depth/DepthReadings.kt` (pur, testé) : médiane de proximité par
   boîte, échelle calibrée par les ancres sténopé (médiane des
   mètres × proximité), remplace le sténopé quand elle mesure (même sans

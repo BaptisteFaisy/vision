@@ -49,7 +49,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Continue tout droit.", probe.state.value.spoken)
+        assertEquals("Continue.", probe.state.value.spoken)
     }
 
     @Test
@@ -69,9 +69,8 @@ class LiveProbeGuidanceTest {
         advanceUntilIdle()
 
         val spoken = probe.state.value.spoken.orEmpty()
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Person"))
-        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("décalez-vous de"))
-        assertTrue("côté de sortie attendu, reçu : $spoken", spoken.contains("vers la"))
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.startsWith("Va à "))
+        assertTrue("consigne de contournement attendue, reçu : $spoken", spoken.contains("mètre"))
     }
 
     @Test

@@ -34,7 +34,7 @@ class ProbeVoiceTest {
         val voice = guided()
 
         assertNull(voice.phrase(0L, libre, SteeringCap.Straight))
-        assertEquals("Continue tout droit.", voice.phrase(500L, libre, SteeringCap.Straight))
+        assertEquals("Continue.", voice.phrase(500L, libre, SteeringCap.Straight))
     }
 
     @Test
