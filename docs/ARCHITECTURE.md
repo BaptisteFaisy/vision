@@ -239,8 +239,8 @@ choisie → preset de la région. Une URL qui n'est qu'un preset est effacée au
 Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appelée
 (`SamRegion.kt:4-9`).
 
-**Plafonds** : `core/model/ObjectLimits.kt:16-18` → 8 objets affichés par défaut, réglable de
-1 à 12. `core/live/LivePrompts.kt` → **6 concepts suivis par défaut** (`person`, `door`,
+**Plafonds** : `core/model/ObjectLimits.kt:16-19` → 8 objets affichés par défaut, réglable de
+1 à 32. `core/live/LivePrompts.kt` → **6 concepts suivis par défaut** (`person`, `door`,
 `bicycle`, `car`, `truck`, `electric scooter`, `:27`), maximum 6 (`:34`), 32 caractères (`:37`).
 
 ## 6. Le direct : transport, cadence, délais

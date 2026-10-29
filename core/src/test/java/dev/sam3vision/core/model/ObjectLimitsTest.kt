@@ -12,6 +12,13 @@ class ObjectLimitsTest {
     }
 
     @Test
+    fun `le plafond est de 32 objets`() {
+        assertEquals(32, ObjectLimits.MAX_ON_SCREEN)
+        assertEquals(32, ObjectLimits.clamp(32))
+        assertEquals(32, ObjectLimits.clamp(99))
+    }
+
+    @Test
     fun `clamp ramene les valeurs hors bornes dans l'intervalle`() {
         assertEquals(ObjectLimits.MIN_ON_SCREEN, ObjectLimits.clamp(0))
         assertEquals(ObjectLimits.MIN_ON_SCREEN, ObjectLimits.clamp(-7))

@@ -2,7 +2,7 @@ package dev.sam3vision.core.live
 
 /**
  * Prompts du direct : concepts suivis par SAM 3.1, liste courte modifiable depuis l'UI.
- * [normalize] assainit avant l'envoi au backend (`/live` borne de toute façon à 12 objets).
+ * [normalize] assainit avant l'envoi au backend (`max_objects` borne la réponse).
  *
  * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
  * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
