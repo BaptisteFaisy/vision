@@ -1,0 +1,32 @@
+# Déploiement du relais iSee (Worker + D1 + salle temps réel).
+#
+# `deploy.json` décrit les modules au service d'hébergement utilisé jusqu'ici ; ce
+# fichier-ci est la source de vérité pour `wrangler deploy`, qui est le seul moyen
+# d'ajouter la **salle** (Durable Object) à un Worker déjà en ligne.
+#
+#   1. npx wrangler login
+#   2. npx wrangler d1 list          # y relever l'id de la base, puis le coller ici
+#   3. npx wrangler deploy           # depuis ce dossier
+
+name = "isee-suivi"
+main = "src/worker.js"
+compatibility_date = "2026-10-28"
+
+[observability]
+enabled = true
+
+[[durable_objects.bindings]]
+name = "RELAY_ROOM"
+class_name = "RelayRoom"
+
+# Une salle par flux, en mémoire seulement : rien n'est stocké côté objet.
+[[migrations]]
+tag = "v1-relay-room"
+new_sqlite_classes = ["RelayRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "isee-suivi"
+# À remplacer par l'id réel (`npx wrangler d1 list`) : un id inventé ferait
+# déployer un Worker qui répond 503 sur /api/state.
+database_id = "00000000-0000-0000-0000-000000000000"

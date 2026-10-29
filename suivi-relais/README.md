@@ -89,6 +89,11 @@ Le Worker est publié par le manifeste `deploy.json` (modules ESM + binding `DB`
 L'URL de production est recopiée dans `Settings.DEFAULT_PARENT_SITE_URL` côté
 `:core` ; la changer impose un APK neuf.
 
+**Déployer la salle** : `npx wrangler login`, puis `npx wrangler d1 list` (relever
+l'id de la base et le coller dans `wrangler.toml`), puis `npx wrangler deploy`
+depuis ce dossier. Le token wrangler de cette machine a expiré le 6/10/2026 — aucun
+déploiement n'est possible avant une nouvelle connexion.
+
 **URL de production (29/10) : `https://isee-suivi.duello.workers.dev/`** — c'est le
 Worker lui-même : `/health` → `{"ok":true}`, `/api/state?share=…` → l'état du flux, et
 il sert aussi la page de la WebView (`/`, `live.mjs`, `styles.css`). Le domaine
