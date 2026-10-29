@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.ConnectionPool
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -160,6 +161,14 @@ internal val OCTET_MEDIA = "application/octet-stream".toMediaType()
 
 internal fun joinUrl(baseUrl: String, path: String): String =
     baseUrl.trim().trimEnd('/') + path
+
+/**
+ * `true` si [url] est une URL http(s) complète et parsable par OkHttp : exactement ce
+ * que `Request.Builder().url(...)` accepte sans lever. Une base stockée sans scheme
+ * (copiée sans `https://`) rend `false` au lieu de laisser remonter le message brut du
+ * parseur (`Expected URL scheme…`) jusqu'à l'écran.
+ */
+fun isUsableHttpUrl(url: String): Boolean = url.trim().toHttpUrlOrNull() != null
 
 /**
  * **Fabrique unique de requêtes** : URL, méthode, corps, en-têtes.
