@@ -16,9 +16,12 @@ import modal
 # Feux OSM : marge autour du cadre demandé (degrés ≈ 110 m) + cache conteneur.
 SIGNALS_MARGIN_DEG = 0.001
 SIGNALS_CACHE_TTL_SECONDS = 24 * 3600
+SIGNALS_EMPTY_TTL_SECONDS = 300
 SIGNALS_MAX_NODES = 2000
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_TIMEOUT_SECONDS = 10
+# Overpass exige un User-Agent descriptif (406 sans lui, même avec curl).
+OVERPASS_USER_AGENT = "sam3-vision/1.0 (+https://github.com/BaptisteFaisy/vision)"
 
 APP_NAME = "valhalla-idf-cpu"
 VOLUME_NAME = "valhalla-idf-tiles"
@@ -102,8 +105,11 @@ class ValhallaRouter:
             """
             key = (round(s, 5), round(w, 5), round(n, 5), round(e, 5))
             hit = cache.get(key)
-            if hit is not None and time.time() - hit[1] < SIGNALS_CACHE_TTL_SECONDS:
-                return {"signals": hit[0], "cached": True}
+            if hit is not None:
+                # Vides (Overpass en panne) : revalidés après 5 min, pas 24 h.
+                ttl = SIGNALS_CACHE_TTL_SECONDS if hit[0] else SIGNALS_EMPTY_TTL_SECONDS
+                if time.time() - hit[1] < ttl:
+                    return {"signals": hit[0], "cached": True}
             points = await asyncio.to_thread(_fetch_signals, s, w, n, e)
             cache[key] = (points, time.time())
             return {"signals": points, "cached": False}
@@ -126,8 +132,9 @@ def _fetch_signals(s: float, w: float, n: float, e: float) -> list:
         f'node["highway"="traffic_signals"]({box});out geom;'
     )
     url = OVERPASS_URL + "?data=" + urllib.parse.quote(query)
+    request = urllib.request.Request(url, headers={"User-Agent": OVERPASS_USER_AGENT})
     try:
-        with urllib.request.urlopen(url, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=OVERPASS_TIMEOUT_SECONDS) as response:
             payload = json.load(response)
     except Exception as exc:
         print(f"[signals] overpass indisponible : {exc}")
