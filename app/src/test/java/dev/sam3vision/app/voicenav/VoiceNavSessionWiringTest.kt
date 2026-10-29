@@ -23,11 +23,15 @@ class VoiceNavSessionWiringTest {
 
     private class WiredLauncher(var fail: Boolean = false) : NavigationLauncher {
         val launched = mutableListOf<NavDestination>()
+        val modes = mutableListOf<TravelMode>()
+
         override fun launch(destination: NavDestination, mode: TravelMode): Result<NavRoute> {
             launched += destination
+            modes += mode
             return if (fail) Result.failure(IllegalStateException("refusé"))
             else Result.success(NavRoute.MapsApp)
         }
+
         override fun openPlace(query: String): Result<NavRoute> = Result.success(NavRoute.Browser)
     }
 
@@ -36,6 +40,7 @@ class VoiceNavSessionWiringTest {
         extra: List<(String) -> String?> = emptyList(),
         engine: (suspend (String, RouteSummary?) -> Boolean)? = null,
         idled: () -> Unit = {},
+        autoStart: Boolean = false,
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { true },
@@ -46,6 +51,7 @@ class VoiceNavSessionWiringTest {
         extraParsers = extra,
         engineStart = engine,
         onSessionIdle = idled,
+        autoStartOnVoice = autoStart,
     )
 
     @Test
@@ -82,18 +88,22 @@ class VoiceNavSessionWiringTest {
     }
 
     @Test
-    fun `moteur refuse ou en panne bascule sur Maps`() = runBlocking {
+    fun `moteur refuse ou en panne bascule sur Maps pieton et repos`() = runBlocking {
         val refused = WiredLauncher()
         val sessionRefused = session(launcher = refused, engine = { _, _ -> false })
         assertTrue(sessionRefused.onVoiceTranscript("emmène-moi à la gare"))
         sessionRefused.confirmDestination()
         assertEquals(1, refused.launched.size)
+        assertEquals(listOf(TravelMode.WALK), refused.modes)
+        assertEquals(VoiceNavUiState.Idle, sessionRefused.state.value)
 
         val broken = WiredLauncher()
         val sessionBroken = session(launcher = broken, engine = { _, _ -> throw IllegalStateException("panne") })
         assertTrue(sessionBroken.onVoiceTranscript("emmène-moi à la gare"))
         sessionBroken.confirmDestination()
         assertEquals(1, broken.launched.size)
+        assertEquals(listOf(TravelMode.WALK), broken.modes)
+        assertEquals(VoiceNavUiState.Idle, sessionBroken.state.value)
     }
 
     @Test
@@ -108,5 +118,51 @@ class VoiceNavSessionWiringTest {
         wired.confirmDestination()
         wired.stopGuidance()
         assertEquals(2, idles)
+    }
+
+    @Test
+    fun `auto-start forme hors routeur demarre sans confirmation`() = runBlocking {
+        val launcher = WiredLauncher()
+        val wired = session(
+            launcher = launcher,
+            extra = listOf({ s -> s.removePrefix("direction ") }),
+            engine = { _, _ -> true },
+            autoStart = true,
+        )
+
+        assertTrue(wired.onVoiceTranscript("direction gare de Lyon"))
+
+        val state = wired.state.value as VoiceNavUiState.Guiding
+        assertEquals("gare de Lyon", state.destination)
+        assertTrue(launcher.launched.isEmpty())
+    }
+
+    @Test
+    fun `auto-start moteur refuse bascule sur Maps pieton`() = runBlocking {
+        val launcher = WiredLauncher()
+        val wired = session(
+            launcher = launcher,
+            engine = { _, _ -> false },
+            autoStart = true,
+        )
+
+        assertTrue(wired.onVoiceTranscript("emmène-moi à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, wired.state.value)
+        assertEquals(listOf(TravelMode.WALK), launcher.modes)
+    }
+
+    @Test
+    fun `auto-start garde le routeur prioritaire sur les parseurs`() = runBlocking {
+        val wired = session(
+            extra = listOf({ "leurre" }),
+            engine = { _, _ -> true },
+            autoStart = true,
+        )
+
+        assertTrue(wired.onVoiceTranscript("emmène-moi à la gare"))
+
+        val state = wired.state.value as VoiceNavUiState.Guiding
+        assertEquals("la gare", state.destination)
     }
 }

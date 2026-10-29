@@ -65,6 +65,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (`StairsFeedTest` 5/5, `GroundPipelineTest` 3/3, `LiveStateTest` +2),
   `check-kotlin-limits` OK. Seuils MIT à recalibrer sur captures téléphone.
 
+## 2026-10-28 — GPS : piéton partout, démarrage vocal, plus d'écran fantôme
+
+- `VoiceNavSession` démarre le guidage **dès la dictée** (`autoStartOnVoice`,
+  défaut `true`) : plus de bouton « Démarrer » dans le chemin vocal, et une
+  seule annonce (le moteur, ou le repli Maps) au lieu de deux voix
+  superposées. La confirmation reste l'API historique (`false`), utilisée
+  par les tests.
+- Repli Google Maps toujours **piéton** : `TravelMode.WALK` par défaut et
+  explicite dans `NavigationHook` et `VoiceNavSession` ; `mode=w` verrouillé
+  par les tests.
+- Plus d'écran de guidage fantôme : quand le moteur ne démarre pas et que Maps
+  prend le relais, la session revient à `Idle` au lieu d'afficher `Guiding`
+  sans moteur. Le pilote exige aussi une écoute GPS réellement démarrée
+  (`VoiceNavTracker.start` rend `false` sans fournisseur) avant de dire oui.
+- Preuves : `:app:testDebugUnitTest` ciblé **46/46** (`NavigationLauncherTest`
+  12, `NavigationHookTest` 6, `VoiceNavSessionTest` 20,
+  `VoiceNavSessionWiringTest` 8), `:core:testDebugUnitTest`
+  `VoiceNavScriptTest` **6/6**, `check-kotlin-limits.py` OK. Non mesuré sur
+  appareil (aucun APK installé ici).
+
 ## 2026-10-28 — direct : 10 dangers extérieurs par défaut, plafond 16 (ordre user)
 
 - `LivePrompts.default` : `person, car, bicycle, electric scooter, pole, sidewalk,
