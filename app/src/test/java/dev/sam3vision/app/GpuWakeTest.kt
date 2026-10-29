@@ -1,5 +1,7 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.core.net.ApiError
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -59,8 +61,52 @@ class GpuWakeTest {
             GpuWake.wakeLine("https://g.test", true, 4200),
         )
         assertEquals(
-            "réveil GPU (https://g.test) : 0.0 s, échec",
+            "réveil GPU (https://g.test) : 0.0 s, échec réponse négative",
             GpuWake.wakeLine("https://g.test", false, 12),
         )
+    }
+
+    @Test
+    fun `l'echec porte le code http`() {
+        assertEquals(
+            "réveil GPU (https://g.test) : 1.5 s, échec 404",
+            GpuWake.wakeLine("https://g.test", false, 1500, ApiError.BackendStopped()),
+        )
+        assertEquals(
+            "réveil GPU (https://g.test) : 1.5 s, échec 500",
+            GpuWake.wakeLine("https://g.test", false, 1500, ApiError.Http(500, "boom")),
+        )
+    }
+
+    @Test
+    fun `l'echec par timeout dit delai depasse`() {
+        assertEquals("délai dépassé", GpuWake.wakeMotif(ApiError.Timeout()))
+        assertEquals("délai dépassé", GpuWake.wakeMotif(SocketTimeoutException("read timed out")))
+        assertEquals(
+            "réveil GPU (https://g.test) : 180.0 s, échec délai dépassé",
+            GpuWake.wakeLine("https://g.test", false, 180_000, ApiError.Timeout()),
+        )
+    }
+
+    @Test
+    fun `l'echec inconnu porte la premiere ligne du message`() {
+        assertEquals("boom", GpuWake.wakeMotif(RuntimeException("boom")))
+        assertEquals("panne", GpuWake.wakeMotif(RuntimeException("panne\nsuite")))
+        assertEquals("x".repeat(80), GpuWake.wakeMotif(RuntimeException("x".repeat(200))))
+        assertEquals("RuntimeException", GpuWake.wakeMotif(RuntimeException()))
+    }
+
+    @Test
+    fun `wake loggue le motif de l'echec`() = runBlocking {
+        val lines = mutableListOf<String>()
+        val woken = GpuWake.wake(
+            "https://g.test",
+            health = { Result.failure(ApiError.Timeout()) },
+            log = { lines += it },
+        )
+
+        assertTrue(woken)
+        assertEquals(1, lines.size)
+        assertTrue(lines[0], lines[0].endsWith("échec délai dépassé"))
     }
 }
