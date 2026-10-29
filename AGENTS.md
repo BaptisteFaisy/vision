@@ -53,9 +53,9 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
-| Concepts du direct | **6** (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`), `LivePrompts.MAX = 6` (`core/live/LivePrompts.kt:27,34`) |
-| Tests | **2 202 `@Test`** JVM (`:core` 1 418, `:app` 784, mesure statique du 28/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
-| Taille | **733** fichiers `.kt`, **43 457** lignes de prod (`:core` 16 654, `:app` 26 803, mesure du 28/10/2026) |
+| Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) |
+| Tests | **2 634 `@Test`** JVM (`:core` 1 715, `:app` 919, mesure statique du 29/10/2026, voir `docs/TESTING.md`) + 10 instrumentés (`:app` : 9 + 1 banc `MockGlassesTest`) |
+| Taille | **851** fichiers `.kt`, **51 502** lignes de prod (`:core` 21 314, `:app` 30 188, mesure du 29/10/2026) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
@@ -80,14 +80,14 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 ## 3. Règles strictes — la CI échoue si elles sont violées
 
 1. **Tailles Kotlin** : fichier `.kt` < 500 lignes, fonction/composable < 50 lignes
-   (`tools/check-kotlin-limits.py`, `ci.yml:139-140`). **Zéro duplication** : paramétrer et
+   (`tools/check-kotlin-limits.py`, `ci.yml:136-139`). **Zéro duplication** : paramétrer et
    extraire un helper plutôt que copier. Le garde-fou passe sans exception sur cet arbre ; les
-   plus gros fichiers sont `app/isee/LiveProbe.kt` (**495** lignes) et `app/LiveViewModel.kt`
-   (**493**) — ne pas les faire grossir, extraire comme ça a été fait pour
+   plus gros fichiers sont `app/LiveViewModel.kt` et `app/isee/IseeViewModel.kt` (**498**
+   lignes chacun, au plafond) — ne pas les faire grossir, extraire comme ça a été fait pour
    `app/isee/IseeScenePane.kt` (487 → 222 lignes, en-tête/dissolution/couches sortis),
-   `app/isee/LiveProbe.kt` (489 → 471, `cleared()`/`probeFailureText()` sortis et testés,
-   remonté à 495 depuis — au plafond) et `app/LiveViewModel.kt` lui-même
-   (498 → 492, `frameErrorState()`/`transportLabel()` purs et testés, remonté à 493).
+   `app/isee/LiveProbe.kt` (495 → 489 le 29/10) et `app/LiveViewModel.kt` lui-même
+   (493 → 498 le 29/10 — extraire avant d'ajouter). Côté Python, même plafond :
+   `.github/fireworks/conflict_agent.py` et `server/backend/fast_core.py` (499 chacun).
 2. **Aucune clé ni secret versionné** (`sk-…`, `sk_…`, `ghp_…`), jamais de `local.properties`.
    Les clés vivent dans Réglages (chiffré, Keystore, repli `PrivateFileSettingsStore`) ou
    `local.properties` (gitignoré) → `BuildConfig`. **Par défaut** (demande 2026-10-26) l'APK

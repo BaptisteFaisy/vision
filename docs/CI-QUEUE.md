@@ -1,6 +1,7 @@
 # CI et file de merge
 
-Relu le **2026-10-28** sur cet arbre (découpe v9 : natif hors PR). Chaque affirmation
+Relu le **2026-10-28** sur cet arbre (découpe v9 : natif hors PR), mis à jour le
+**2026-10-29** (gardes branchées, périmètre backend, actions composites). Chaque affirmation
 ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-budget/`,
 `.github/couche0/`.
 
@@ -18,8 +19,8 @@ ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-bud
 ## 2. Le job `ci` de `ci.yml` (et le natif hors PR)
 
 Déclencheurs : `pull_request` et `push`. La PR ne porte qu'**un seul job**,
-`ci` (`ci.yml:30`) : périmètre, chaîne d'outils, gardes, tests JVM `:core` +
-`:app`, rapport de tests. Runner **auto-hébergé** —
+`ci` (`ci.yml:32`) : périmètres, chaîne d'outils, gardes, tests Python (gardes,
+portes, backend), tests JVM `:core` + `:app`, rapport de tests. Runner **auto-hébergé** —
 `runs-on: [self-hosted, linux, x64, vision]` —, cache Gradle via
 `gradle/actions/setup-gradle@v4` avec `cache-read-only: false`,
 `timeout-minutes: 5`.
@@ -38,24 +39,32 @@ Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et test�
 Détail : la page « Le banc lunettes dans la CI » sous `docs/` (nom de fichier inchangé pour ne
 pas casser les liens).
 
-**Périmètre.** Le job `ci` demande d'abord à l'API la liste des fichiers de la PR (le checkout est
-superficiel, la base n'y est pas) et publie `steps.perimetre.outputs.code`. Une PR purement
-documentaire saute les étapes Gradle : le verdict tombe en quelques secondes. Un push est comparé à
-`github.event.before` par la même mécanique.
+**Périmètres.** Le job `ci` demande d'abord à l'API la liste des fichiers de la PR (le checkout est
+superficiel, la base n'y est pas) et publie `steps.perimetre.outputs.code` (Gradle : `app/`,
+`core/`, `gradle/`, fichiers racine — hors `.md`/`.txt`) et `steps.perimetre.outputs.backend`
+(Python : `server/`). `tools/` n'est dans aucun périmètre : une PR 100 % Python ne fait tourner
+que les gardes. Une PR purement documentaire saute Gradle et le backend : le verdict tombe en
+quelques secondes. Un push est comparé à `github.event.before` par la même mécanique.
 
-**Les quatre gardes du job `ci`.**
+**Les gardes du job `ci`, dans l'ordre.**
 
 1. chaîne d'outils : `JAVA_HOME` et `ANDROID_HOME` présents, version Java affichée ;
 2. aucun secret ni fichier local versionné : refus de `local.properties` suivi, et refus des motifs
    de clés en clair (`sk-…`, `sk_…`, `ghp_…`) hors `.github`, `docs` et `*.md` ;
 3. pas de `org.gradle.java.home` codé en dur dans `gradle.properties` ;
 4. taille Kotlin : `tools/check-kotlin-limits.py` refuse un fichier ≥ 500 lignes ou une fonction
-   ≥ 50 lignes.
+   ≥ 50 lignes (+ 28 tests) ;
+5. budget de latence (+ 18 tests), design iSee Portrait, navigation vocale (+ 12 tests),
+   clés embarquées (+ 8 tests) ;
+6. gardes CI elles-mêmes : agent de conflits (16 tests), couche0 (19 tests), budget (11 tests) ;
+7. portes Python et shell : `test_scripts.sh` (101 assertions), goldens des masques,
+   chiffres du budget, shader du suivi (+ 6 tests).
 
-**Les clés du build.** `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `TTS_API_KEY`, `TTS_VOICE_ID`,
-`ASR_API_KEY` sont lus depuis les secrets du dépôt et écrits dans `local.properties` (gitignoré,
-valeurs jamais affichées). Sans aucun secret, l'étape sort en succès : l'APK est produit sans clé et
-l'utilisateur saisit la sienne dans Réglages.
+**Les clés du build** (action composite `.github/actions/cles-build`, partagée avec
+`ci-native.yml`). `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_LIVE_API_KEY`, `TTS_API_KEY`,
+`TTS_VOICE_ID`, `ASR_API_KEY` sont lus depuis les secrets du dépôt et écrits dans
+`local.properties` (gitignoré, valeurs jamais affichées). Sans aucun secret, l'étape sort en
+succès : l'APK est produit sans clé et l'utilisateur saisit la sienne dans Réglages.
 
 ## 3. `couche0` — la garde de périmètre
 
@@ -65,7 +74,10 @@ l'utilisateur saisit la sienne dans Réglages.
   toute déclaration doit servir ;
 - `forbidden` : motifs refusés dans les lignes ajoutées du diff, plus une liste de fichiers de garde
   gelés — `.github/ci-budget/`, `.github/couche0/`, `.github/workflows/couche0.yml`,
-  `.github/workflows/ci-budget.yml`, `.github/workflows/ci.yml`. Les toucher exige une mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
+  `.github/workflows/ci-budget.yml`, `.github/workflows/ci.yml` (gelé le 26/10),
+  `.github/workflows/ci-native.yml` et `.github/workflows/pr-auto-merge.yml` (gelés le 29/10 :
+  vider `lint`/`apk-release` ou l'auto-merge passerait sinon inaperçu). Les toucher exige une
+  mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
 
 Le juge est **téléchargé depuis `master`**, jamais depuis le head de la PR : une PR ne peut pas
 assouplir son propre garde. Re-armable à la main : `gh workflow run couche0.yml -f pr=<n>`.

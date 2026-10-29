@@ -2,7 +2,7 @@
 
 Relu le **26/10/2026**, puis recompté le **27/10/2026** après la suppression du module
 `:glasses-spike` (le banc lunettes vit maintenant dans `:app`, `docs/GLASSES-DECISION.md`), puis
-recompté le **28/10/2026**. Les versions viennent
+recompté le **28/10/2026** et le **29/10/2026**. Les versions viennent
 des fichiers du dépôt, pas du souvenir d'un build : `gradle/libs.versions.toml`,
 `gradle/wrapper/gradle-wrapper.properties`, `app/build.gradle.kts`, `core/build.gradle.kts`.
 Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est marqué **non mesuré**.
@@ -14,49 +14,50 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | Gradle | **8.14.1** (wrapper) | `gradle/wrapper/gradle-wrapper.properties:3` |
 | AGP | **8.11.1** | `gradle/libs.versions.toml:2` (`agp`) |
 | Kotlin | **2.2.21** (+ plugin compose 2.2.21, même référence) | `libs.versions.toml:3` |
-| KSP | **2.2.21-2.0.5** | `libs.versions.toml:14` |
+| KSP | **2.2.21-2.0.5** | `libs.versions.toml:16` |
 | JDK | **17 par `JAVA_HOME` — PAS épinglé dans le dépôt** | `gradle.properties:25-27` |
 | compileSdk / targetSdk | **36** partout | `app/build.gradle.kts:83,88`, `core/build.gradle.kts:10` |
 | minSdk | **29 (`:app`, banc lunettes compris)** · 26 (`:core`, lib) | `app/build.gradle.kts:87`, `core/build.gradle.kts:13` |
 | Compose BOM | **2026.05.01** (activity-compose 1.13.0, lifecycle 2.10.0) | `libs.versions.toml:7,8,9` |
-| CameraX | **1.6.0** (core, camera2, lifecycle, view, **video**) | `libs.versions.toml:10` |
+| CameraX | **1.6.0** (core, camera2, lifecycle, view, **video**) | `libs.versions.toml:12` |
 | OkHttp | **4.12.0** | `libs.versions.toml:6` |
 | coroutines | **1.10.2** | `libs.versions.toml:5` |
-| Room | **2.8.5** (+ compiler via KSP) | `libs.versions.toml:12` |
-| WorkManager | **2.12.0** | `libs.versions.toml:13` |
-| security-crypto | **1.1.0** | `libs.versions.toml:11` |
+| Room | **2.8.5** (+ compiler via KSP) | `libs.versions.toml:14` |
+| WorkManager | **2.12.0** | `libs.versions.toml:15` |
+| security-crypto | **1.1.0** | `libs.versions.toml:13` |
 | core-ktx | **1.18.0** | `libs.versions.toml:4` (`coreKtx`) |
-| JUnit / androidx.test | **4.13.2** / ext-junit **1.3.0**, core **1.7.0**, runner+rules **1.7.0** | `libs.versions.toml:15,16,17,18` |
-| org.json (test only) | **20240303** | `libs.versions.toml:20`, `core/build.gradle.kts:40` |
-| jump3r (MP3 pur Java) | **1.0.4** | `libs.versions.toml:19` |
-| mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:25` |
-| guava | **33.3.1-android** | `libs.versions.toml:26` |
-| onnxruntime-android (profondeur) | **1.18.0** | `libs.versions.toml:27` |
-| tensorflow-lite (repli profondeur) | **2.17.0**, Java pur (le `litert` 2.3.x est en metadata Kotlin 2.4, illisible en 2.2) | `libs.versions.toml:28` |
+| JUnit / androidx.test | **4.13.2** / ext-junit **1.3.0**, core **1.7.0**, runner+rules **1.7.0** | `libs.versions.toml:17,18,19,20` |
+| org.json (test only) | **20240303** | `libs.versions.toml:22`, `core/build.gradle.kts:40` |
+| jump3r (MP3 pur Java) | **1.0.4** | `libs.versions.toml:21` |
+| mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:27` |
+| guava | **33.3.1-android** (pinning transitif Room, sans import direct) | `libs.versions.toml:28`, `app/build.gradle.kts:216-217` |
+| onnxruntime-android (profondeur) | **1.18.0** | `libs.versions.toml:29` |
+| litert-edge (segmentation TwinLite) | **2.2.0** (API CompiledModel, cascade GPU→CPU ; pas la 2.3.x : metadata Kotlin 2.4, illisible en 2.2) | `libs.versions.toml:68-71` |
+| fragment (pinning lint) | **1.8.9** (litert tire 1.1.0, lint exige ≥ 1.3.0) | `libs.versions.toml:10-11` |
 
-**Le JDK n'est pas dans le dépôt.** `gradle.properties` (15-22) ne contient que
+**Le JDK n'est pas dans le dépôt.** `gradle.properties` (17-24) ne contient que
 `org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, `daemon=false`, `parallel`, `workers.max=2`,
 `caching`, useAndroidX, nonTransitiveRClass, code.style, plus un **commentaire** (:25-27) disant
 de mettre `org.gradle.java.home` dans `~/.gradle/gradle.properties` (perso, non versionné). La CI
-bloque le retour de cette ligne (`.github/workflows/ci.yml:103-110`). Sur cette machine (r630) :
+bloque le retour de cette ligne (`.github/workflows/ci.yml:113-120`). Sur cette machine (r630) :
 `JAVA_HOME=~/toolchains/jdk17`, `ANDROID_HOME=$HOME/android-sdk`.
 
 ## Taille et tests : chiffres réels
 
-Relevé du 28/10/2026, compté sur le disque (arbre propre). L'arbre reçoit du code en parallèle :
+Relevé du 29/10/2026, compté sur le disque (arbre propre). L'arbre reçoit du code en parallèle :
 les totaux bougent de quelques dizaines de lignes, les proportions non.
 
 | Mesure | Valeur |
 |---|---|
-| Fichiers `.kt` | **733** |
-| Lignes de prod (`*/src/main`) | **43 457** — `:core` 167 f./16 654 l. · `:app` 240 f./26 803 l. (dont banc 15 f./1 640 l.) |
-| `@Test` | **2 212** = **2 202 JVM** + **10 instrumentés** |
-| dont `core/src/test` | **1 418** |
-| dont `app/src/test` | **784** (dont banc **95**) |
-| dont `app/src/androidTest` (nettoyage, profondeur, média) | **9** (appareil requis) |
+| Fichiers `.kt` | **851** |
+| Lignes de prod (`*/src/main`) | **51 502** — `:core` 204 f./21 314 l. · `:app` 268 f./30 188 l. (dont banc 15 f./1 640 l.) |
+| `@Test` | **2 644** = **2 634 JVM** + **10 instrumentés** |
+| dont `core/src/test` | **1 715** |
+| dont `app/src/test` | **919** (dont banc **95**) |
+| dont `app/src/androidTest` (nettoyage, profondeur, segment, média) | **9** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
-| Plus gros fichier | `app/src/main/java/dev/sam3vision/app/isee/LiveProbe.kt` — **495** lignes |
+| Plus gros fichiers | `app/AppViewModel.kt` et `app/isee/IseeViewModel.kt` — **498** lignes chacun (côté Python : `conflict_agent.py`, `fast_core.py` — 499) |
 
 Le nombre de tests réellement **exécutés** est **non mesuré ici** : aucun `gradlew` n'a été
 lancé sur cette machine pour ce comptage.
@@ -86,7 +87,8 @@ lancé sur cette machine pour ce comptage.
   `SAM_BUDGET_MS`, `:34`).
 - **Réglages chiffrés, avec repli silencieux** : `security-crypto` en priorité, sinon
   `PrivateFileSettingsStore` (fichier privé chiffré, clé Keystore non exportable) —
-  `core/settings/SettingsStoreFactory.kt:13-17`. `EncryptedSharedPreferences` est marqué
+  `core/settings/SettingsStoreFactory.kt:16-22`, repli autour de chaque opération
+  (`ResilientSettingsStore`). `EncryptedSharedPreferences` est marqué
   *deprecated* : warning de compilation seulement (**non revérifié ici**, pas de build lancé).
 - **Jamais de clé en dur** : `llmApiKey` vide par défaut, message « clé API absente —
   renseigne-la dans Réglages », échec immédiat sans appel réseau.
@@ -97,7 +99,7 @@ lancé sur cette machine pour ce comptage.
   `LensSpec.kt`) vivent dans `:core` et se testent sans Android.
 - **Distances sur le téléphone** : sténopé + hauteurs connues, 0 GPU et aucune requête
   (`DistanceMeter`, `core/distance/DistanceEstimator.kt:105`, `docs/DISTANCES.md`). La précision
-  « ±15-20 % » annoncée n'a **jamais** été confrontée à un mètre ruban (`docs/DISTANCES.md:56`).
+  « ±15-20 % » annoncée n'a **jamais** été confrontée à un mètre ruban (`docs/DISTANCES.md:57`).
 - **Masques dans la même surface que l'aperçu** (`app/CameraSurface.kt`) : un `AndroidView`
   est une `View` dessinée **après** le canevas Compose, donc les masques composés au-dessus
   passaient derrière l'aperçu — piège consigné dans `docs/MASQUES-DEBUG.md`.
@@ -111,11 +113,12 @@ lancé sur cette machine pour ce comptage.
   écrans** (Direct et page caméra iSee) : point d'entrée unique, pas un `new` dispersé. Elle
   construit un `WsLiveClient` dont le transport est un `OkHttpWsTransport` sur
   `ws(s)://…/live/ws` (`core/net/WsTransport.kt:35`).
-- **`POST /live` n'est plus appelé en production.** Le seul appel de `LiveClient.live(…)` en
-  prod est `LiveSession.kt:138`, et le client vient toujours de `liveClient()` → WebSocket.
-  `HttpLiveClient` reste dans la fabrique pour **`/health` seulement** (`LiveClientFactory.kt:47`,
-  `WsLiveClient.kt:98`) ; son `POST /live` (`HttpLiveClient.kt:75`) ne sert qu'aux tests JVM
-  (`core/src/test/…/LiveClientTest.kt`). Ne pas le reprendre pour des frames.
+- **`POST /live` n'est plus appelé en production.** Le seul appel de `LiveClient.live(…)` sur
+  le chemin exécuté est `LiveSession.kt:138`, et le client vient toujours de `liveClient()` →
+  WebSocket (l'autre, `LivePipeline.kt:75`, est dans du code sans appelant — voir § Écrit mais
+  pas appelé). `HttpLiveClient` reste dans la fabrique pour **`/health` seulement**
+  (`LiveClientFactory.kt:47`, `WsLiveClient.kt:98`) ; son `POST /live` (`HttpLiveClient.kt:75`)
+  ne sert qu'aux tests JVM (`core/src/test/…/LiveClientTest.kt`). Ne pas le reprendre pour des frames.
 - **Corrélation par `id`, une file par `id`** (`core/net/WsLiveClient.kt`) : le serveur peut
   répondre dans le désordre, un message dont l'`id` n'est pas en vol est ignoré ; l'attente est
   enregistrée **avant** l'ouverture du socket, sinon un refus de connexion laisse la frame
@@ -134,15 +137,15 @@ lancé sur cette machine pour ce comptage.
 - **`LiveMessages.kt`** (61 lignes) et **`app/isee/LiveProbeText.kt`** (101 lignes) : messages
   d'état et libellés extraits des ViewModels pour tenir sous les 500 lignes et rester
   testables en JVM.
-- **Six concepts par défaut, et six au maximum** : `LivePrompts.default =
-  listOf("person", "door", "bicycle", "car", "truck", "electric scooter")` et `LivePrompts.MAX = 6`
-  (`core/live/LivePrompts.kt:27,34`) — décision utilisateur du 28/10 « suivre aussi les
-  véhicules » (rue + intérieur) ; le backend tronque de toute façon à `PROMPT_LIMIT = 6`
-  (`server/backend/tracking.py:53`). Le 27/10 n'en suivait que 2.
+- **Douze concepts par défaut, seize au maximum** : `LivePrompts.default` = person, car,
+  bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs + door, barrier
+  (12 le 29/10, ordre user) et `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35,43`) ;
+  le backend tronque à `PROMPT_LIMIT = 16` (`server/backend/tracking.py:53`, décision user du
+  28/10). Historique : 2 le 27/10, 6 puis 16 le 28/10.
 - **Cadence** : `Cadence.Direct` = 350 / 500 / 900 ms (`core/live/LiveSession.kt:34`), le
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
-  (`app/isee/LiveProbe.kt:199`) : `fastMs = 0`, `slowMs = 900`, **`concurrency = 1`**,
-  `latencyBudgetMs = 150` (`LiveSession.kt:43-50`).
+  (`app/isee/LiveProbe.kt:191`) : `fastMs = 0`, `targetMs = 0`, `slowMs = 900`,
+  **`concurrency = 1`**, `latencyBudgetMs = 150` (`LiveSession.kt:43-49`).
 - **Régulation par hystérésis** (`LiveSession.kt`, régulateur) : on ne rouvre un créneau que sous la
   moitié du budget (`RELAX_RATIO = 0.5`, `:195`) et seulement après trois mesures
   (`REGULATE_MIN_SAMPLES = 3`, `:198`), la première frame payant le démarrage du conteneur.
@@ -173,9 +176,10 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
 - **`core/predict/*`** — le Direct l'appelle depuis `app/…/live/LivePrediction.kt`, **derrière le flag
   `Settings.boxPredictionEnabled`, éteint par défaut** — le branchement (T8) n'est allumé
   qu'après la mesure de la latence perçue. Flag éteint, le direct est celui d'avant.
-- Commentaires de code recalés le 28/10 : `HttpLiveClient.kt:42` cite
+- Commentaires de code recalés le 29/10 : `HttpLiveClient.kt:42` cite
   `docs/LIVE-SPEC.md`, qui **existe** (311 lignes, contrat du direct), et le KDoc de
-  `LivePrompts.kt:29-33` dit « 6 concepts », comme le code (`default`, `MAX = 6`).
+  `LivePrompts.kt:22-24` retrace l'historique des plafonds (2 → 6 → 16), comme le code
+  (`default` 12 concepts, `MAX = 16`).
 
 ## Non mesuré ici
 
@@ -189,7 +193,9 @@ la fois**, toutes régions confondues (`docs/MODE-US.md`) : changer de région n
 
 Le SDK DAT 1.0.1 expose bien l'audio public : `Stream.getAudioStream(): Flow<AudioFrame>`
 (**aucune** annotation `@Deprecated`, `@RequiresOptIn` ni `@Experimental*` — vérifié au
-`javap` sur `mwdat-camera-1.0.1.aar`, seule `@NotNull` est présente). `AudioFrame.buffer` est
+`javap` sur `mwdat-camera-1.0.1.aar`, seule `@NotNull` est présente). Ce 1.0.1 inspecté
+n'est **pas** la version pincée : le runtime lunettes exige le **1.0.0**
+(`libs.versions.toml:23-27`, garde `DatPinTest`). `AudioFrame.buffer` est
 du PCM déjà décodé par le SDK (le transport, lui, est AAC : `internal.codec.types.AudioCodec`,
 `AudioCodecProfile.AAC_LC`, décodé par `AudioDecoder` via `MediaCodec`). `Permission.MICROPHONE`
 existe côté `mwdat-core`, à côté de `Permission.CAMERA`.

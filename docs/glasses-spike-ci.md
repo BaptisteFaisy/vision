@@ -18,20 +18,23 @@ jobs de `:app` (§2).
 
 ## 2. Où le banc est vérifié maintenant
 
-`.github/workflows/ci.yml` déclare **4 jobs** (mesuré : `grep -n '^  [a-z-]*:' ci.yml`), chacun
-borné à **5 minutes** :
+`ci.yml` déclare **1 job** `ci` (`:32`), `ci-native.yml` **3 jobs** (`apk` `:35`,
+`apk-release` `:80`, `lint` `:114`) — découpe v9 : le natif est hors PR (mesuré :
+`grep -n '^  [a-z-]*:' ci.yml ci-native.yml`). Chacun est borné (`timeout-minutes: 5`
+en PR, 10 hors PR) :
 
-| Job | Ligne | Ce qu'il fait pour le banc |
+| Job | Fichier : ligne | Ce qu'il fait pour le banc |
 |---|---|---|
-| `ci` | `:26` (`timeout-minutes: 5` `:29`) | `./gradlew :core:testDebugUnitTest :app:testDebugUnitTest` (`:149`) → les **92 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
-| `apk` | `:164` | `:app:assembleDebug` (`:174`) → compile le banc, y compris `MockGlassesHarness` et le mock (`debugImplementation`) |
-| `apk-release` | `:186` | `:app:assembleRelease` (`:196`) → compile le banc **sans** le mock : c'est le stub `src/release/MockControl.kt` qui prend le relais |
-| `lint` | `:199` | `:app:lintDebug` (`:215`) → le banc passe au lint comme le reste de l'app |
+| `ci` | `ci.yml:199-203` | `./gradlew :core:testDebugUnitTest :app:testDebugUnitTest` → les **95 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
+| `apk` | `ci-native.yml:58` | `:app:assembleDebug` → compile le banc, y compris `MockGlassesHarness` et le mock (`debugImplementation`) |
+| `apk-release` | `ci-native.yml:103` | `:app:assembleRelease` → compile le banc **sans** le mock : c'est le stub `src/release/MockControl.kt` qui prend le relais |
+| `lint` | `ci-native.yml:129-130` | `:app:lintDebug` → le banc passe au lint comme le reste de l'app |
 
 Trois propriétés à retenir :
 
-- **le périmètre « code » nomme les modules** (`ci.yml:70`) :
-  `^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$|^tools/`.
+- **les périmètres nomment les modules** (`ci.yml:80,85`) :
+  `^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$`
+  pour Gradle, `^server/` pour les tests backend Python (`tools/` n'est dans aucun périmètre).
   Le banc vivant sous `app/`, toute PR qui le touche déclenche Gradle ; une PR de documentation
   seule continue de sauter les étapes Gradle du job `ci` ;
 - **aucun test d'instrumentation n'est exécuté** : `MockGlassesTest` et l'asset
