@@ -61,6 +61,40 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `assembleDebug` vert, `check-kotlin-limits` OK. Recette voix sur téléphone
   après merge (voix du user requise) ; recette flèche + `dit` dues sur master
   après merge.
+- Preuves : `:app` `testDebugUnitTest` vert sur r630 (8/8 `TwinLiteWiringTest`
+  inchangés — voix `null` en test), `assembleDebug` vert, `check-kotlin-limits`
+  OK ; recette flèche + `dit` dues sur master après merge.
+## 2026-10-29 — caregiver : bulle Cacao & caramel
+
+- Palette de la bulle caregiver : `BLUE_GREEN` est remplacé par `CACAO_CARAMEL`
+  (`#48342F`, `#7C5748`, `#B88760`, `#E1BE8B`, `#B29C84`), la proposition 32 de
+  la planche de couleurs, dans `suivi-parent/orb.mjs`. Une seule définition
+  alimente les uniformes WebGL (`uIdle`, `uPalYou`, `uPalSee`) et les variables
+  `--orb-color-*` du repli sans WebGL.
+- `suivi-parent/styles.css` : le dégradé de secours lit ces variables au lieu des
+  bleus et verts codés en dur. Lumière, rayon et animation inchangés.
+- Reflets : le verre n'a plus de couleur propre. Dans `IseePortraitOrb`, `film()`
+  ne garde que la modulation d'éclat (une seule longueur d'onde au lieu de
+  650/540/450 nm) et `pal()` — la teinte médiane de la palette active — alimente
+  le bord, le liseré et la boîte à lumière. Les deux bleus codés en dur
+  (`0.55,0.62,0.8` et `0.04,0.37,1.0`) disparaissent, le fond du verre se teinte
+  à 5 % de la palette. `suivi-parent/orb-shader.mjs` est régénéré depuis cette
+  source AGSL par `python tools/export-caregiver-orb.py`.
+- Les **deux** bulles sont concernées : la source AGSL est partagée par l'écran
+  iSee (blind person) et la page caregiver ; `docs/ISEE-DESIGN-PORTRAIT.md` est
+  aligné (« le verre n'a pas de couleur propre »).
+- Garde-fou `tools/check-isee-design.py` : l'empreinte de la boule normalise les
+  fins de ligne (CRLF → LF). Une baseline figée sous Windows ne valait plus en
+  CI Linux, où le même code est en LF : la CI du run `a476a78` est tombée sur
+  « boule Portrait modifiée » alors que le fichier était identique. Vérifié en
+  repassant le garde sur un arbre extrait en LF (`git archive`), et la baseline
+  est refigée sur l'empreinte normalisée.
+- Preuves : `./gradlew :app:testDebugUnitTest --tests "*OrbShaderTest*"` vert
+  (verrou des 15 subscripts constants), `node --check` sur le shader généré, et
+  mesure des pixels de couronne dans Chromium (390 px, WebGL, états repos / user /
+  iSee) : cacao 506 → **0** pixel hors palette brun-caramel (8-55°), Portrait
+  316 → **0** pixel vert ou magenta. Ancien shader mesuré à l'identique pour
+  comparaison.
 
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 
