@@ -16,7 +16,7 @@ crop (instance IGN, `GET /api/search?ids=<id>`) :
 |---|---|---|
 | r1b_g01.ppm | 073e963b-2a77-492d-b6e3-50e62ccbcd20 | Green (biarritz) |
 | r1b_g02.ppm | 46016145-0bf2-459f-a35c-e92b0295a2cc | Green (nancy) |
-| r1b_g03.ppm | 4ca92d5e-6cf3-4947-a44e-5a1f46d0fdf3 | Green (nice) |
+| r1b_g03.ppm | 073e963b-2a77-492d-b6e3-50e62ccbcd20 | Green (biarritz) |
 | r1b_g04.ppm | 396a83e4-d72b-4970-9bb2-47166e9e1e28 | Green (bayonne) |
 | r1b_g05.ppm | 7070003b-afe3-4092-af0d-66f4b34dfd2e | Green (bayonne) |
 | st_g01.ppm | 817c269a-1713-4a8c-883e-2a31e782fea9 | Green (cherbourg) |
