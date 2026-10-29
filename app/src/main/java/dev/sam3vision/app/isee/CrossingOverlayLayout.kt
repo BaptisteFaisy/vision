@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.cropTransform
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.traverse.TraversePhase
 
 /**
  * Mise en place du **feu sur la vidéo** : le mode Traversée lit l'état du feu
@@ -62,6 +63,33 @@ fun crossingTag(active: Boolean, state: CrossingState?): String {
 }
 
 /**
+ * Verdict de traversée posé sur la vidéo (vide = rien à écrire) : seul
+ * [TraversePhase.TRAVERSER] (vert confirmé, maintenu, sans veto) autorise —
+ * [TraversePhase.PRET] reste un « ne peut pas », prudent d'une frame.
+ */
+fun traverseTag(active: Boolean, phase: TraversePhase?): String {
+    if (!active) return ""
+    return when (phase) {
+        TraversePhase.TRAVERSER -> "peut traverser"
+        TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null ->
+            "ne peut pas traverser"
+    }
+}
+
+/**
+ * Couleur du bandeau verdict : vert pour partir, rouge pour attendre (mêmes
+ * teintes que le cadre du feu) ; gris mode coupé.
+ */
+fun traverseAccent(active: Boolean, phase: TraversePhase?): Int {
+    if (!active) return CROSSING_ACCENT_OFF
+    return when (phase) {
+        TraversePhase.TRAVERSER -> CROSSING_ACCENT_GREEN
+        TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null ->
+            CROSSING_ACCENT_RED
+    }
+}
+
+/**
  * Cadre écran du feu, depuis sa boîte normalisée (`x1,y1,x2,y2` en 0..1, voir
  * `CrossingPrompts.selectLightBox`) et la taille de l'image analysée.
  *
@@ -106,6 +134,26 @@ fun tagRect(
     val clampedTop = top.coerceIn(0f, (boxHeight - tagHeight).coerceAtLeast(0f))
     return LightMarker(left, clampedTop, left + tagWidth, clampedTop + tagHeight)
 }
+
+/**
+ * Rectangle du bandeau verdict : centré en bas de la vidéo, décollé du bord
+ * d'une marge fixe. Le verdict ne dépend d'aucune boîte SAM — même sans feu
+ * cadré, « ne peut pas traverser » reste affiché tant que le mode est actif.
+ */
+fun verdictRect(
+    tagWidth: Float,
+    tagHeight: Float,
+    boxWidth: Float,
+    boxHeight: Float,
+): LightMarker {
+    val left = ((boxWidth - tagWidth) / 2f).coerceIn(0f, (boxWidth - tagWidth).coerceAtLeast(0f))
+    val top = (boxHeight - tagHeight - VERDICT_MARGIN_PX)
+        .coerceIn(0f, (boxHeight - tagHeight).coerceAtLeast(0f))
+    return LightMarker(left, top, left + tagWidth, top + tagHeight)
+}
+
+/** Marge (px) entre le bas de la vidéo et le bandeau verdict. */
+private const val VERDICT_MARGIN_PX = 12f
 
 /** Sous cette taille (px), un cadre ne désigne plus rien : on n'affiche rien. */
 private const val MIN_MARKER_PX = 6f

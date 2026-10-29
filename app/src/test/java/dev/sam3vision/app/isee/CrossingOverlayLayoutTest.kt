@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.traverse.TraversePhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -112,5 +113,44 @@ class CrossingOverlayLayoutTest {
         assertEquals(300f, r.left, 0.001f)
         assertEquals(400f, r.right, 0.001f)
         assertEquals(366f, r.top, 0.001f)
+    }
+
+    @Test
+    fun `seul TRAVERSER autorise - le reste attend`() {
+        assertEquals("peut traverser", traverseTag(true, TraversePhase.TRAVERSER))
+        for (phase in listOf(TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null)) {
+            assertEquals("ne peut pas traverser", traverseTag(true, phase))
+        }
+        assertEquals("", traverseTag(false, TraversePhase.TRAVERSER))
+    }
+
+    @Test
+    fun `bandeau vert pour partir rouge pour attendre`() {
+        assertEquals(CROSSING_ACCENT_GREEN, traverseAccent(true, TraversePhase.TRAVERSER))
+        for (phase in listOf(TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null)) {
+            assertEquals(CROSSING_ACCENT_RED, traverseAccent(true, phase))
+        }
+        assertEquals(CROSSING_ACCENT_OFF, traverseAccent(false, TraversePhase.TRAVERSER))
+    }
+
+    @Test
+    fun `bandeau centre en bas avec sa marge`() {
+        // Carte 400x400, bandeau 200x30 : centré (x=100) et décollé du bas de 12 px.
+        val r = verdictRect(tagWidth = 200f, tagHeight = 30f, boxWidth = 400f, boxHeight = 400f)
+        assertMarker(r, 100f, 358f, 300f, 388f)
+    }
+
+    @Test
+    fun `bandeau trop large colle a gauche sans sortir en bas`() {
+        val r = verdictRect(tagWidth = 500f, tagHeight = 30f, boxWidth = 400f, boxHeight = 400f)
+        assertEquals(0f, r.left, 0.001f)
+        assertEquals(358f, r.top, 0.001f)
+    }
+
+    @Test
+    fun `bandeau trop haut colle en haut`() {
+        val r = verdictRect(tagWidth = 100f, tagHeight = 500f, boxWidth = 400f, boxHeight = 400f)
+        assertEquals(150f, r.left, 0.001f)
+        assertEquals(0f, r.top, 0.001f)
     }
 }

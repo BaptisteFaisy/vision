@@ -25,13 +25,13 @@ import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.SteeringCap
-import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.depth.LiveDepthMeter
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
@@ -107,9 +107,12 @@ class LiveProbe(
     private val distances = DistanceMeter()
 
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
-    private val voice = ProbeVoice()
+    internal val voice = ProbeVoice()
     /** Déclencheur du mode Traversée : vert confirmé, rouge vite, doute une fois. */
     private val crossing = CrossingAnnouncer()
+
+    /** Veto trafic du mode Traversée : un véhicule qui approche force l'attente. */
+    private val traverseVeto = TraverseVeto()
 
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
     private val chronology = ScreenTimings(clock)
@@ -231,6 +234,7 @@ _state.update { it.cleared() }
         rate.reset()
         voice.reset()
         crossing.reset()
+        traverseVeto.reset()
         liveMeter?.reset()
     }
 
@@ -408,7 +412,9 @@ _state.update { it.cleared() }
         val pinhole = readingsOf(distances, frame)
         val readings = liveMeter?.readingsFor(frame, pinhole) ?: pinhole
         val placed = placedLabels(frame, readings)
-        val cross = crossingPatchOf(crossing, _state.value.crossingActive, frame, jpegB64, at, speechLanguage)
+        val cross = crossingPatchOf(
+            crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
+        )
         val phrase = if (_state.value.crossingActive) {
             cross?.cue?.phrase
         } else {
@@ -433,7 +439,7 @@ _state.update { it.cleared() }
                 spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
                 steering = steering,
                 detour = if (_state.value.crossingActive) false else voice.detour,
-                crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
+                crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),
                 transport = transportLabel(active),
                 error = null,
@@ -450,14 +456,6 @@ _state.update { it.cleared() }
         if (!chronology.noteDrawn()) return
         _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
     }
-
-    /**
-     * Chemin dessiné sur la vidéo : lu dans la décision parlée à cette frame
-     * (la vidéo est en direct, la voix seule est débouncée). `null` en
-     * Traversée (ses prompts feu+voitures ne disent pas où marcher).
-     */
-    private fun steeringCueOf(): SteeringCue? =
-        if (_state.value.crossingActive) null else voice.cue()
 
     /**
      * Masques colorisés de la frame, calculés hors du thread principal : décodage selon

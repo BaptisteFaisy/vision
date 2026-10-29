@@ -8,10 +8,16 @@ import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.PedLightGate
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraversePhase
+import dev.sam3vision.core.traverse.TraversePipeline
+import dev.sam3vision.core.traverse.TraverseVeto
+import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
@@ -35,7 +41,7 @@ import kotlinx.coroutines.flow.Flow
  */
 internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean) {
     if (!active) CrossingOfferWatch.declined(System.currentTimeMillis())
-    val prompts = if (active) CrossingPrompts.PROMPTS else LivePrompts.default
+    val prompts = if (active) TraversePipeline.promptsFor(CrossingPrompts.PROMPTS) else LivePrompts.default
     configureFrom(settings, prompts, active)
 }
 
@@ -76,6 +82,7 @@ internal data class CrossingPatch(
     val cue: CrossingCue?,
     val state: CrossingState,
     val box: List<Float>?,
+    val phase: TraversePhase,
 )
 
 /**
@@ -84,15 +91,21 @@ internal data class CrossingPatch(
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
+    veto: TraverseVeto,
     active: Boolean,
     frame: LiveFrame,
+    lens: LensSpec,
     jpegB64: String,
     atMs: Long,
     language: SpeechLanguage,
 ): CrossingPatch? {
     if (!active) return null
     val light = crossingLightOf(frame, jpegB64)
-    return CrossingPatch(announcer.onFrame(atMs, light.state, language), light.state, light.box)
+    val detections = frame.objects.toDetections(frame.width, frame.height)
+    val focalPx = lens.focalPx(frame.width, frame.height)
+    val decision = veto.update(light.state == CrossingState.Green, detections, focalPx, atMs)
+    val vetoed = decision.crossingState()
+    return CrossingPatch(announcer.onFrame(atMs, vetoed, language), light.state, light.box, decision.state)
 }
 
 /**
