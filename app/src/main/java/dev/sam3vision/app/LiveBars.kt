@@ -38,6 +38,7 @@ fun LiveTopBar(
     onOpenSettings: () -> Unit,
     onToggleSam: () -> Unit,
     onToggleTracker: () -> Unit,
+    onToggleTraverse: () -> Unit,
     onToggleLocal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,6 +48,7 @@ fun LiveTopBar(
             Chip("Réglages", AppColors.surfaceHigh, onOpenSettings)
             SamModeChip(state.samEnabled, onToggleSam)
             TrackerChip(state.trackerEnabled, onToggleTracker)
+            TraverseModeChip(state.traverseActive, onToggleTraverse)
             LocalModeChip(state, onToggleLocal)
             TransportChip(state.transport)
         }
@@ -112,6 +114,16 @@ fun TransportChip(transport: String) {
 fun TrackerChip(trackerEnabled: Boolean, onToggle: () -> Unit) {
     val label = if (trackerEnabled) "Tracker" else "Live"
     Chip(label, if (trackerEnabled) AppColors.success else AppColors.surfaceHigh, onToggle)
+}
+
+/**
+ * Pastille du mode traversée : « Traversée ON » quand veto et voix guident,
+ * « Traversée » sinon. Même structure que [TrackerChip].
+ */
+@Composable
+fun TraverseModeChip(traverseActive: Boolean, onToggle: () -> Unit) {
+    val label = if (traverseActive) "Traversée ON" else "Traversée"
+    Chip(label, if (traverseActive) AppColors.success else AppColors.surfaceHigh, onToggle)
 }
 
 /**

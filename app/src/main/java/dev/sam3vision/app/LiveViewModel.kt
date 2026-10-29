@@ -194,8 +194,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
-        // Pas de pré-chauffe : la carte ne démarre que quand ça filme, la première
-        // frame la réveille (`LiveWakeGuard` couvre l'attente côté UI).
+        // Pas de pré-chauffe : la carte démarre quand ça filme — la première frame la réveille (`LiveWakeGuard` couvre l'attente côté UI).
         // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
         session = null
         client = null
@@ -249,7 +248,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         fps.reset()
         lastKeepAt = 0L
         _state.update {
-            it.copy(prompts = chosen, samEnabled = settings.liveSamEnabled, trackerEnabled = trackerEnabled)
+            it.copy(prompts = chosen, samEnabled = settings.liveSamEnabled, trackerEnabled = trackerEnabled, traverseActive = traverse.active)
         }
     }
 
@@ -282,14 +281,15 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Bascule le mode traversée : prompts véhicules + voix, ou retour au défaut. */
-    fun setTraverseActive(active: Boolean) =
+    fun setTraverseActive(active: Boolean) {
         traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) }, positions::reset)
+        _state.update { it.copy(traverseActive = traverse.active) }
+    }
 
     /**
      * Frame venue de l'analyseur caméra. Sans session SAM, elle est seulement **gardée
      * pour les questions** — les questions marchent donc même quand SAM est injoignable.
-     * Sinon elle part au GPU (c'est elle qui réveille le conteneur endormi) : `/live`
-     * en cadence continue avec une frame de réserve, tracker en cadence adaptative.
+     * Sinon elle part au GPU (elle réveille le conteneur) : `/live` continu, tracker adaptatif.
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L, frameLuma: ByteArray? = null) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return

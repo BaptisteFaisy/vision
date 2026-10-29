@@ -106,6 +106,8 @@ data class LiveUiState(
     val localNote: String = "",
     /** Escalier confirmé devant (phrase), vide = rien. */
     val stairsLine: String = "",
+    /** Mode traversée actif : prompts véhicules + veto + voix (pastille du bandeau). */
+    val traverseActive: Boolean = false,
 ) {
     /** Une frame a-t-elle déjà été gardée ? (bouton « Analyser la frame », questions). */
     val hasFrame: Boolean get() = latestFrame.present

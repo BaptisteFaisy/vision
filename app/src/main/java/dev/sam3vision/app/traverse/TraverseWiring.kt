@@ -1,6 +1,7 @@
 package dev.sam3vision.app.traverse
 
 import android.app.Application
+import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isee.crossingStateOf
 import dev.sam3vision.app.ttsClient
@@ -12,6 +13,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraverseDecision
 import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraverseVoice
 import java.io.File
@@ -42,6 +44,9 @@ data class ShownFrame(
  * seuls, aucun ordre parlé. [lightGreen] est le vert du module feu, relu
  * à chaque frame active (`false` par défaut : sans vert, « attendez »).
  *
+ * [log] reçoit les transitions (mode ON/OFF, phase/veto/TTC) — `Log.d`
+ * par défaut, une liste d'assertions en tests JVM.
+ *
  * [filter] hors activation, [updateLight], [reset], [close], [deactivate] et
  * [setActive] hors activation sont purs et testés en JVM (aucun Android
  * retenu) ; l'activation touche Android (moteur TTS, cache, `filesDir`) et
@@ -50,6 +55,7 @@ data class ShownFrame(
  */
 class TraverseWiring(
     private val pipeline: TraversePipeline,
+    private val log: (String) -> Unit = { Log.d("Traverse", it) },
 ) {
 
     /** Moteur TTS du préchauffage hors-ligne, fermé à la coupure du mode. */
@@ -61,6 +67,9 @@ class TraverseWiring(
 
     /** Vert du module feu, relu à chaque frame active (défaut sûr : `false`). */
     @Volatile var lightGreen: Boolean = false
+
+    /** Clé de la dernière transition journalisée : les répétitions se taisent. */
+    private var lastKey: String = ""
 
     /**
      * Filtre une frame publiée : hystérésis, conversion, veto, annonce et
@@ -78,12 +87,24 @@ class TraverseWiring(
     ): ShownFrame {
         if (active) updateLight(crossingStateOf(frame, jpegB64))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
+        logTransition(out.decision)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }
 
     /** Seul un vert tranché autorise la traversée ; rouge et doute attendent. */
     fun updateLight(state: CrossingState) {
         lightGreen = state == CrossingState.Green
+    }
+
+    /**
+     * Journalise la décision si elle change (phase, veto ou bloquant : la
+     * valeur du TTC ne redéclenche pas, sinon une ligne par frame en approche).
+     */
+    private fun logTransition(decision: TraverseDecision) {
+        val key = decision.state.toString() + "|" + decision.veto + "|" + decision.blockingLabel
+        if (key == lastKey) return
+        lastKey = key
+        log(traverseLogLine(decision))
     }
 
     /**
@@ -108,6 +129,7 @@ class TraverseWiring(
             this.active = true
             quiet()
             relaunch(attach(requireNotNull(app), settings, scope, prompts))
+            log("traversee mode=ON")
         } else {
             deactivate(quiet)
             relaunch(LivePrompts.default)
@@ -120,6 +142,7 @@ class TraverseWiring(
      */
     fun deactivate(quiet: () -> Unit) {
         active = false
+        log("traversee mode=OFF")
         pipeline.voice = null
         tts?.close()
         tts = null
@@ -155,4 +178,16 @@ class TraverseWiring(
         // Véhicules + feu : sans le concept feu, aucun vert ne serait jamais lu.
         return TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT) + prompts)
     }
+}
+
+/**
+ * Ligne de décision traversée, stable pour `adb logcat` et les recettes :
+ * phase + veto toujours, bloquant et mesures quand il y en a.
+ * Pure, testée en JVM.
+ */
+internal fun traverseLogLine(decision: TraverseDecision): String {
+    val blocking = decision.blockingLabel?.let { " blocking=$it" }.orEmpty()
+    val meters = decision.blockingMeters?.let { " meters=${"%.1f".format(Locale.US, it)}" }.orEmpty()
+    val ttc = decision.approachTtcSeconds?.let { " ttc=${"%.1f".format(Locale.US, it)}" }.orEmpty()
+    return "traversee phase=${decision.state} veto=${decision.veto}$blocking$meters$ttc"
 }
