@@ -468,6 +468,7 @@ RUNNERS = (
     ("contrat HTTP (payload /analyze)", "modal_app", native_tests.test_analyze_shape),
     ("llm : budget unique", "llm", llm_tests.test_llm_budget),
     ("live_fast : parité des vendored", "timing", test_live_fast_parity),
+    ("live_fast : cache tokenize", "timing", live_fast_tests.test_tokenize_cache),
 )
 
 

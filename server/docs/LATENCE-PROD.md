@@ -10,10 +10,10 @@ est la copie de référence. **Ne jamais déployer
 Seule commande : `server/scripts/deploy-live-fast.sh` (déploie `backend/live_fast/live_app_fast.py`,
 attend la nouvelle version, vérifie `/health`). Les leviers posés :
 
-`FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_SCALEDOWN=60 FAST_SNAPSHOT=1
-FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1` (les leviers sont **recuits dans
-l'image** au déploiement — changer un levier = redéployer). `max_containers=1`,
-`min_containers=0`, la région et le GPU ne changent pas.
+`FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_DETR_GRAPH=1 FAST_ATTN=sdpa
+FAST_SCALEDOWN=60 FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1`
+(les leviers sont **recuits dans l'image** au déploiement — changer un levier =
+redéployer). `max_containers=1`, `min_containers=0`, la région et le GPU ne changent pas.
 
 ## Ce que chaque levier apporte (mesuré, première salve + cette salve)
 
@@ -26,6 +26,9 @@ l'image** au déploiement — changer un levier = redéployer). `max_containers=
 | préprocess + masques hors verrou GPU | rend le créneau GPU au frame suivant (~20 ms en PNG, ~4 ms en bits) | `fast_core.run_frame`, rapport `cpu-serveur` |
 | `@modal.concurrent(max_inputs=2)` | supprime l'attente de la 2ᵉ frame en vol au proxy (~90 ms mesurés) | `live_app_fast.py` |
 | dédup alias FR/EN | −14 ms et 5 masques inutiles sur « chaise » + « chair » | rapport `concepts` |
+| `FAST_ATTN=sdpa` | attention fusionnée au lieu d'eager (matrice matérialisée, ~55 ms en `detr_ms`) ; supporté par `transformers` (`_supports_sdpa`) | `weights._set_attn`, `applied.attn_impl` |
+| `FAST_DETR_GRAPH=1` | graphe CUDA de la passe DETR (~55 ms → ~2 ms attendus, vérifié vs eager, repli automatique) | `detr_graph.DetrGraphs`, `applied.detr_graph` |
+| cache tokenize | entrées texte mémoïsées par concepts (`tokenize_ms` 23 ms → ~0, le texte ne change pas en séance) | `token_cache.py` |
 
 Coût du `scaledown_window=60` : au pire une minute de A100 en plus par session ≈ **0,04 $**
 (2,415 $/h), et le bail de `~/bin/sam3-gpu` éteint de toute façon l'app.
