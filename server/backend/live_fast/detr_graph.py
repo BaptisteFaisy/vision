@@ -57,7 +57,11 @@ def _clone(value, memo):
     if isinstance(value, list):
         return [_clone(v, memo) for v in value]
     if isinstance(value, dict):
-        return {k: _clone(v, memo) for k, v in value.items()}
+        cloned = {k: _clone(v, memo) for k, v in value.items()}
+        # Sortie vision brute (un concept) : un mapping typé (ex. sortie transformers,
+        # accès attribut) — le reconstruire au même type, sinon le forward plante
+        # (`'dict' object has no attribute 'fpn_hidden_states'`, vu en prod).
+        return type(value)(cloned) if type(value) is not dict else cloned
     if isinstance(value, SimpleNamespace):
         return SimpleNamespace(**{k: _clone(v, memo) for k, v in vars(value).items()})
     return value
@@ -133,6 +137,7 @@ class DetrGraphs:
         self.tolerance = tolerance
         self._entries = {}
         self._warm = set()
+        self._failed = set()
         self.state = "idle"
 
     def __call__(self, forward, embeds, inputs):
@@ -152,7 +157,9 @@ class DetrGraphs:
     def _capture(self, forward, embeds, inputs, key, eager_out) -> None:
         """Capture après une première passe eager, puis vérifie avant d'accepter le graphe."""
         torch = _torch()
-        if not torch.cuda.is_available() or len(self._entries) >= self.budget:
+        if key in self._failed or not torch.cuda.is_available():
+            return
+        if len(self._entries) >= self.budget:
             return
         if key not in self._warm:
             self._warm.add(key)
@@ -177,7 +184,9 @@ class DetrGraphs:
                                   "static_embeds": static_embeds, "static_inputs": static_inputs}
             self.state = f"ok:{len(self._entries)}"
         except Exception as exc:  # noqa: BLE01 — le service doit continuer en eager
-            self.budget = len(self._entries)
+            # Cette forme seulement : un échec (contrôle Python, forme exotique) ne doit
+            # pas interdire les captures des autres formes (budget préservé).
+            self._failed.add(key)
             self.state = f"failed:{type(exc).__name__}:{str(exc)[:90]}"
 
     @staticmethod

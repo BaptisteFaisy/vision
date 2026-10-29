@@ -27,8 +27,8 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.modules.setdefault("test_units", sys.modules["__main__"])
 
-from tests_units import (latency_tests, live_fast_tests, llm_tests, merge_tests,  # noqa: E402
-                         native_tests, weights_tests)
+from tests_units import (latency_tests, live_fast_tests, live_fast_perf_tests, llm_tests,  # noqa: E402
+                         merge_tests, native_tests, weights_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -468,7 +468,8 @@ RUNNERS = (
     ("contrat HTTP (payload /analyze)", "modal_app", native_tests.test_analyze_shape),
     ("llm : budget unique", "llm", llm_tests.test_llm_budget),
     ("live_fast : parité des vendored", "timing", test_live_fast_parity),
-    ("live_fast : cache tokenize", "timing", live_fast_tests.test_tokenize_cache),
+    ("live_fast : cache tokenize", "timing", live_fast_perf_tests.test_tokenize_cache),
+    ("live_fast : clone detr_graph", "timing", live_fast_perf_tests.test_detr_clone),
 )
 
 
