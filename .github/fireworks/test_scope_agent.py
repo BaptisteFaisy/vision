@@ -141,10 +141,69 @@ class RapprocherTest(unittest.TestCase):
         self.assertEqual(manquants, [])
         self.assertIn("docs/CI-QUEUE.md", couverts)
 
+    def test_casse_approximative_du_modele(self):
+        # Vu sur #215 le 29/10 : le modèle a rendu `sam3Vision` (V majuscule)
+        # pour `sam3vision` → la puce juste comptait comme absente.
+        raisons = {"app/src/main/java/dev/sam3Vision/app/ParentShareSettings.kt":
+                   "ajoute la section Réglages"}
+        couverts, manquants = scope_agent.rapprocher(
+            raisons, ["app/src/main/java/dev/sam3vision/app/"
+                      "ParentShareSettings.kt"], self.g)
+        self.assertEqual(manquants, [])
+        self.assertEqual(couverts, {"app/src/main/java/dev/sam3vision/app/"
+                                    "ParentShareSettings.kt":
+                                    "ajoute la section Réglages"})
+
+    def test_casse_et_glob(self):
+        raisons = {"APP/**/Settings*.kt": "lit le lien"}
+        _, manquants = scope_agent.rapprocher(
+            raisons, ["app/src/main/java/dev/sam3vision/app/SettingsScreen.kt"],
+            self.g)
+        self.assertEqual(manquants, [])
+
     def test_manquant_reel(self):
         _, manquants = scope_agent.rapprocher(
             {"app/A.kt": "x"}, ["app/A.kt", "app/B.kt"], self.g)
         self.assertEqual(manquants, ["app/B.kt"])
+
+
+class RecomposerRecalcitrantTest(unittest.TestCase):
+    """Les lignes que le garde lira comme déclarations sont traitées comme telles.
+
+    Non-régression 29/10 (#263) : `- `Parler`` dans la section Scope était
+    gardé comme « prose » (PUCE exige une raison) puis compté par le garde
+    comme périmètre surdimensionné — corps refusé.
+    """
+
+    def setUp(self):
+        self.g = garde()
+
+    def test_puce_sans_raison_retiree(self):
+        fichiers = [fichier("app/A.kt")]
+        corps = "## Scope\n- `Parler`\n- `app/B.kt` — autre chose\n"
+        nouveau, ajouts, retires = scope_agent.recomposer(
+            corps, fichiers, {"app/A.kt": "corrige A"}, self.g)
+        verif = []
+        self.g.check_scope(fichiers, nouveau, verif)
+        self.assertEqual(verif, [])
+        self.assertIn("Parler", retires)
+        self.assertNotIn("Parler", nouveau)
+        self.assertEqual(len(ajouts), 1)
+
+    def test_puce_utile_conservee(self):
+        fichiers = [fichier("app/A.kt")]
+        corps = "## Scope\n- `app/A.kt` — corrige A\n"
+        nouveau, ajouts, _ = scope_agent.recomposer(
+            corps, fichiers, {"app/A.kt": "doublon"}, self.g)
+        self.assertEqual(ajouts, [])
+        self.assertIn("- `app/A.kt` — corrige A", nouveau)
+
+    def test_prose_vraie_intacte(self):
+        fichiers = [fichier("app/A.kt")]
+        corps = "## Scope\nVoir aussi le ticket 42.\n"
+        nouveau, _, _ = scope_agent.recomposer(
+            corps, fichiers, {"app/A.kt": "corrige A"}, self.g)
+        self.assertIn("Voir aussi le ticket 42.", nouveau)
 
 
 class RelanceTest(unittest.TestCase):
