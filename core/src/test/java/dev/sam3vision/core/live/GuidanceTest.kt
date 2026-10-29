@@ -129,4 +129,18 @@ class GuidanceTest {
         assertEquals(1.5f, loin.shiftMeters!!, 0.001f)
         assertNotEquals(Guidance.key(pres), Guidance.key(loin))
     }
+
+    @Test
+    fun `le sol marchable ne bloque pas le couloir`() {
+        val decision = Guidance.decide(listOf(placed("sidewalk", 0.5f)))
+
+        assertFalse(decision.blocked)
+    }
+
+    @Test
+    fun `la bordure bloque toujours, elle se monte`() {
+        val decision = Guidance.decide(listOf(placed("curb", 0.5f)))
+
+        assertTrue(decision.blocked)
+    }
 }
