@@ -41,6 +41,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.sam3vision.app.isee.CrossingOverlayLayer
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import dev.sam3vision.app.live.setFocus
 import dev.sam3vision.app.media.Nv21JpegEncoder
@@ -260,6 +261,14 @@ private fun LiveCameraStage(
         modifier = Modifier.fillMaxSize(),
     )
     LiveDistanceLayer(state.distanceLayer)
+    // Feu piéton du mode Traversée : cadre + étiquette, posés comme les masques.
+    CrossingOverlayLayer(
+        active = state.traverseActive,
+        box = state.crossingBox,
+        state = state.crossing,
+        frameWidth = state.frame?.width ?: 0,
+        frameHeight = state.frame?.height ?: 0,
+    )
     // Repères reconnus : cadres jaunes + noms, vides tant que rien n'est armé ou vu.
     LivePictoOverlay(state.pictoOverlay)
     // Boîtes prédites (T8) : couche vide tant que la prédiction est éteinte — l'overlay

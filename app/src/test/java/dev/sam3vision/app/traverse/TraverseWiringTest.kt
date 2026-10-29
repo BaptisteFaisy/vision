@@ -1,5 +1,6 @@
 package dev.sam3vision.app.traverse
 
+import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -125,6 +126,28 @@ class TraverseWiringTest {
         assertFalse(wiring.lightGreen)
         wiring.updateLight(CrossingState.Unknown)
         assertFalse(wiring.lightGreen)
+    }
+
+    @Test
+    fun `updateLight garde la boite pour l affichage`() {
+        // Le direct dessine le feu à sa position : sans la boîte, le cadre n'aurait
+        // pas d'endroit où se poser et l'étiquette ne serait jamais affichée.
+        val wiring = wiring()
+        wiring.updateLight(CrossingLight(listOf(0.4f, 0.1f, 0.6f, 0.5f), CrossingState.Red))
+
+        assertEquals(CrossingState.Red, wiring.light?.state)
+        assertEquals(listOf(0.4f, 0.1f, 0.6f, 0.5f), wiring.light?.box)
+        assertFalse(wiring.lightGreen)
+    }
+
+    @Test
+    fun `updateLight simple ne laisse pas de boite perimee en place`() {
+        // Un test unitaire qui pose un état sans boîte ne doit pas laisser croire
+        // qu'un feu est dessinable : c'est `light` qui commande l'affichage.
+        val wiring = wiring()
+        wiring.updateLight(CrossingState.Green)
+        assertEquals(null, wiring.light)
+        assertTrue(wiring.lightGreen)
     }
 
     @Test
