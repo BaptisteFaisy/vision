@@ -11,8 +11,8 @@ let writes = 0;
  * Relais du suivi iSee (Worker Cloudflare + D1).
  *
  * - `POST /api/share` : le téléphone accompagné dépose son état (`{shareId, writeKey,
- *   fix, objects, scene}`), toutes les 2 s pendant iSee ou Direct. Un flux par
- *   identifiant : deux proches ne partagent jamais la même ligne.
+ *   fix, objects, scene, photo, trip}`), toutes les 2 s pendant iSee ou Direct. Un
+ *   flux par identifiant : deux proches ne partagent jamais la même ligne.
  * - `GET /api/state?share=<id>` : la page caregiver lit ce seul flux.
  * - `GET /health` : sonde.
  *
@@ -45,12 +45,24 @@ async function share(request, env) {
   if (existing && existing.key !== parsed.key) return json({ ok: false, error: 'clé invalide' }, 403);
   const now = Date.now();
   // `write` refuse si une autre clé a lié le flux entre la lecture et l'écriture.
-  if (!(await store.write(parsed.id, parsed.doc(now), parsed.key, now))) {
+  if (!(await store.write(parsed.id, withPreviousPhoto(parsed, existing), parsed.key, now))) {
     return json({ ok: false, error: 'clé invalide' }, 403);
   }
   writes += 1;
   if (writes % PRUNE_EVERY === 0) await store.prune(now - KEEP_MS);
   return json({ ok: true }, 200);
+}
+
+/**
+ * Document à écrire : l'image du paquet précédent est **conservée** quand cet
+ * envoi n'en porte pas (service de suivi écran éteint, caméra fermée) — son
+ * `atMs` reste ancien, donc la page la cache au lieu de la présenter comme du
+ * direct. Le trajet, lui, suit le paquet : plus de guidage = plus de barre.
+ */
+function withPreviousPhoto(parsed, existing) {
+  const doc = parsed.doc(Date.now());
+  if (!doc.photo && existing && existing.photo) doc.photo = existing.photo;
+  return doc;
 }
 
 async function state(url, env) {

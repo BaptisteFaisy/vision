@@ -93,7 +93,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 - **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.0), test bench built
   into the app (`docs/META-GLASSES.md`).
 - **Companion follow-up** — a share link to a real-time page: current sentence, nearby
-  objects, map (`suivi-parent/README.md`).
+  objects, the user's live camera image, and a liquid progress bar from start to
+  destination while iSee is guiding (`suivi-parent/README.md`).
 
 ## Repository contents
 
@@ -136,8 +137,9 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 ### Companion follow-up (`suivi-parent/`)
 
 Static page (HTML/CSS/JS, WebGL shader regenerated from the Android shader),
-dependency-free Node Vercel relay, Upstash Redis storage (in-memory fallback in
-dev), Google Maps if a key is provided (OpenFreeMap otherwise).
+dependency-free relay (`suivi-relais/`, Worker + D1; legacy Vercel handlers kept
+for local preview). No map provider: the page shows the shared camera frame and
+the guidance trip bar.
 
 ### Voice and LLM
 
@@ -172,7 +174,7 @@ Node (companion page, no `npm install`).
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
 bash scripts/test_scripts.sh                               # 101 shell assertions
-node --test suivi-parent/test/session.test.mjs suivi-parent/test/relay.test.mjs
+node --test suivi-parent/test/*.test.mjs suivi-relais/test/relais.test.mjs
 bash scripts/build.sh                                      # assembleDebug --offline + APK check
 ```
 

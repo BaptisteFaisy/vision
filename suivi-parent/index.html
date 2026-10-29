@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>iSee</title>
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
-  <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script type="module" src="./live.mjs"></script>
 </head>
 <body>
@@ -23,11 +21,17 @@
         <div class="orb-frame" aria-hidden="true"><canvas id="orb"></canvas></div>
         <div class="spoken" hidden><div id="speaker">ISEE</div><p id="spoken-line" aria-live="polite" aria-atomic="true"></p></div>
       </section>
-      <section id="map-wrap" aria-label="Carte des objets détectés">
-        <div id="map" role="region" aria-label="Position et objets du téléphone partagé" aria-busy="true"></div>
-        <p id="map-loading" role="status">Chargement de la carte…</p>
-        <button id="recenter" type="button" aria-label="Recentrer la carte">↗</button>
-        <p id="credit">© OpenStreetMap contributors · OpenFreeMap · Esri</p>
+      <section id="view" aria-label="Ce que voit ton proche">
+        <img id="view-frame" alt="Dernière image vue par ton proche" hidden>
+        <p id="view-note" role="status">L’image apparaîtra quand ton proche ouvrira la caméra.</p>
+      </section>
+      <section id="trip" aria-label="Trajet en cours" hidden>
+        <p class="trip-head"><span id="trip-dest"></span><span id="trip-rest"></span></p>
+        <div id="trip-track" class="trip-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Avancement du trajet">
+          <div id="trip-liquid" class="trip-liquid"></div>
+          <div id="trip-ball" class="trip-ball" aria-hidden="true"></div>
+        </div>
+        <p class="trip-ends"><span>Départ</span><span>Arrivée</span></p>
       </section>
     </main>
   </div>
@@ -37,10 +41,6 @@
       <label for="shared-link">Lien reçu de ton proche</label>
       <div class="input-row"><input id="shared-link" type="url" required autocomplete="off" placeholder="Colle le lien partagé"><button type="submit">Suivre</button></div>
     </form>
-    <label for="gkey">Clé API Google Maps</label>
-    <div class="input-row" id="keybox"><input id="gkey" type="password" autocomplete="off"><button id="savekey" type="button">Enregistrer</button><button id="clearkey" type="button" aria-label="Oublier la clé" hidden>×</button></div>
-    <p id="map-provider" role="status"></p><p id="gerr" role="status" hidden></p>
-    <div class="styles"><button data-s="hybrid" type="button">Hybride</button><button data-s="satellite" type="button">Satellite</button><button data-s="plan" type="button" class="on">Plan</button><button data-s="terrain" type="button">Terrain</button></div>
   </dialog>
 </body>
 </html>

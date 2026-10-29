@@ -1,5 +1,6 @@
 // POST /api/share — le téléphone pousse son état toutes les 2 s pendant le Direct.
-// Corps : {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor}, objects:[{label,distM,angleDeg}]}.
+// Corps : {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor}, objects:[{label,distM,angleDeg}],
+//         scene, photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}.
 // Si SHARE_WRITE_KEY est défini côté Vercel, la clé doit correspondre (sinon 403).
 const { storeSet, validId } = require('./_store');
 
@@ -14,6 +15,29 @@ function sceneOf(scene) {
     text: scene.text.slice(0, 2000),
     fromUser: scene.fromUser === true,
     speaking: scene.speaking === true,
+  };
+}
+
+/** Image courante de la caméra (JPEG base64) ; null = absente, false = illisible. */
+function photoOf(photo) {
+  if (photo === undefined || photo === null) return null;
+  if (typeof photo !== 'object' || typeof photo.jpeg !== 'string') return false;
+  const jpeg = photo.jpeg.trim();
+  if (!jpeg || jpeg.length > 120_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(jpeg)) return false;
+  return { jpeg, atMs: num(photo.atMs, 0, 9e15) ? photo.atMs : Date.now() };
+}
+
+/** Trajet guidé en cours ; null = aucun, false = illisible. */
+function tripOf(trip) {
+  if (trip === undefined || trip === null) return null;
+  if (typeof trip !== 'object') return false;
+  const destination = typeof trip.destination === 'string' ? trip.destination.trim() : '';
+  if (!destination) return false;
+  if (!num(trip.totalM, 0, 5e6) || !num(trip.remainingM, 0, 5e6)) return false;
+  if (!num(trip.remainingS, 0, 1e6) || !num(trip.progress, 0, 1)) return false;
+  return {
+    destination: destination.slice(0, 80),
+    totalM: trip.totalM, remainingM: trip.remainingM, remainingS: trip.remainingS, progress: trip.progress,
   };
 }
 
@@ -45,10 +69,16 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'objet invalide' });
     }
   }
+  const photo = photoOf(b.photo);
+  if (photo === false) return res.status(400).json({ ok: false, error: 'photo invalide' });
+  const trip = tripOf(b.trip);
+  if (trip === false) return res.status(400).json({ ok: false, error: 'trip invalide' });
   const stored = await storeSet('suivi:' + b.shareId, {
     fix: fixOf(f),
     objects: objects.map((o) => ({ label: String(o.label).slice(0, 40), distM: o.distM, angleDeg: o.angleDeg })),
     scene: sceneOf(b.scene),
+    photo,
+    trip,
     serverAt: Date.now(),
   });
   if (!stored) return res.status(503).json({ ok: false, error: 'relais indisponible' });

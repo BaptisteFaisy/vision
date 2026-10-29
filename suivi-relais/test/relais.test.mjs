@@ -129,6 +129,31 @@ test('un état de plus de 12 s n est plus LIVE mais garde sa position', () => {
   assert.equal(stateOf({ ...row, serverAt: now }, now).live, true);
 });
 
+test('la photo et le trajet arrivent tels quels à la page caregiver', async () => {
+  const e = env();
+  const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
+  const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
+  assert.equal((await call(e, '/api/share', post(payload('suivi-image', { photo, trip })))).code, 200);
+  const state = await call(e, '/api/state?share=suivi-image');
+  assert.deepEqual(state.body.photo, photo);
+  assert.deepEqual(state.body.trip, trip);
+  // Sans guidage, la barre disparaît au paquet suivant.
+  assert.equal((await call(e, '/api/share', post(payload('suivi-image')))).code, 200);
+  assert.equal((await call(e, '/api/state?share=suivi-image')).body.trip, null);
+});
+
+test('une photo refusée est explicite, et une image absente garde la dernière', async () => {
+  const e = env();
+  assert.equal((await call(e, '/api/share', post(payload('photo-cassee', { photo: { jpeg: '<script>' } })))).code, 400);
+  assert.equal((await call(e, '/api/share', post(payload('photo-longue', { photo: { jpeg: 'A'.repeat(120_001) } })))).code, 400);
+  assert.equal((await call(e, '/api/share', post(payload('trajet-casse', { trip: { destination: 'X', totalM: -1 } })))).code, 400);
+  const photo = { jpeg: 'BBBB', atMs: 1 };
+  await call(e, '/api/share', post(payload('photo-garde', { photo })));
+  // Le service de suivi écran éteint republie sans image : la dernière reste, avec son âge.
+  await call(e, '/api/share', post(payload('photo-garde')));
+  assert.deepEqual((await call(e, '/api/state?share=photo-garde')).body.photo, photo);
+});
+
 test('le texte est borné et reste absent quand il manque', () => {
   const long = readShare(payload('ok', { scene: { text: 'x'.repeat(3000) } }));
   assert.equal(long.doc(Date.now()).scene.text.length, 2000);
