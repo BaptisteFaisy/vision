@@ -33,7 +33,7 @@ class ProbeWiringSpokenTest {
     private fun frame(objects: List<SegObject> = emptyList(), elapsedMs: Long = 120L) =
         LiveFrame(width = 512, height = 1138, elapsedMs = elapsedMs, objects = objects)
 
-    /** Personne mesurée au centre : « Gauche. » */
+    /** Personne mesurée au centre : « gauche. » (voix TwinLite) */
     private fun personne() = SegObject(
         label = "person",
         score = 0.9f,
@@ -42,7 +42,7 @@ class ProbeWiringSpokenTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Personne décalée à gauche du couloir : « Droite. » */
+    /** Personne décalée à gauche du couloir : « droite. » (voix TwinLite) */
     private fun obstacleAGauche() = SegObject(
         label = "person",
         score = 0.9f,
@@ -51,7 +51,7 @@ class ProbeWiringSpokenTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Personne au contact, boîte coupée : non mesurée → « Gauche. » */
+    /** Personne au contact, boîte coupée : non mesurée → « gauche. » (voix TwinLite) */
     private fun contact() = SegObject(
         label = "person",
         score = 0.9f,
@@ -82,8 +82,8 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("Gauche."), attempts)
-        assertEquals(listOf("Gauche."), completions)
+        assertEquals(listOf("gauche."), attempts)
+        assertEquals(listOf("gauche."), completions)
     }
 
     @Test
@@ -110,10 +110,10 @@ class ProbeWiringSpokenTest {
         }
 
         assertEquals(
-            listOf("Gauche.", "Droite."),
+            listOf("gauche.", "droite."),
             attempts,
         )
-        assertEquals(listOf("Droite."), completions)
+        assertEquals(listOf("droite."), completions)
     }
 
     @Test
