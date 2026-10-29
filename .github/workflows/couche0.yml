@@ -51,8 +51,19 @@ jobs:
           # `merge_group` ne porte pas `pull_request` : le numéro de PR vit dans
           # le nom du ref (`refs/heads/gh-readonly-queue/<base>/pr-<n>-<sha>`).
           REF: ${{ github.event.merge_group.head_ref || github.ref_name }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
+          # PR de lot créée par la file de merge (Mergify) : ce n'est pas une PR
+          # d'auteur, son corps n'a donc pas de `## Scope`, et son arbre est
+          # exactement celui des PR déjà jugées une à une avant l'entrée en
+          # file. La juger ici produirait un faux rouge qui éjecterait le lot.
+          case "${PR_HEAD_REF:-}" in
+            mergify/merge-queue/*)
+              echo "PR de lot de la file de merge : périmètre déjà jugé sur chaque PR — rien à contrôler."
+              exit 0
+              ;;
+          esac
           if [ -z "$PR_NUMBER" ]; then
             ref="${REF#refs/heads/}"
             case "$ref" in
