@@ -1,5 +1,6 @@
 import { LIVE_MS, shareIdOf, stateOf, movementBetween, narrationOf, neverPublished } from './session.mjs';
 import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
+import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
 import { spokenLine } from './spoken-line.mjs';
 import './settings.mjs';
@@ -18,6 +19,8 @@ const tripBall = document.getElementById('trip-ball');
 const pictoEl = document.getElementById('pictos');
 const pictoStrip = document.getElementById('picto-strip');
 let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '', pictoSig = '';
+// Direct de la caméra : dernière frame reçue par WebSocket et son instant.
+let streamSrc = '', streamAt = 0;
 // Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
 let known = true;
 const STATES = {
@@ -77,9 +80,13 @@ function renderPictos(status) {
  * conservée après coupure resterait affichée alors que la caméra est éteinte.
  */
 function renderFrame(status) {
-  const view = frameOf(live, status);
+  // Le direct passe devant la photo lente : une frame de moins de 1,5 s est la
+  // caméra qui tourne maintenant, pas un état figé par le relais.
+  const direct = streamSrc && Date.now() - streamAt <= STREAM_FRESH_MS;
+  const view = direct ? { src: streamSrc } : frameOf(live, status);
   if (!view) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
+    if (!direct) { streamSrc = ''; }
     frameEl.hidden = true;
     noteEl.hidden = false;
     viewEl.classList.add('empty');
@@ -94,6 +101,19 @@ function renderFrame(status) {
   frameEl.alt = 'Ce que voit ton proche, en direct';
   // Une data URL identique n'est pas réassignée : l'image ne clignote pas à chaque poll.
   if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; }
+}
+
+/**
+ * Une frame du direct : on ne repeint que l'image. Un `render()` complet à chaque
+ * image (8 par seconde) reconstruirait le bandeau et la phrase pour rien.
+ */
+function paintStream() {
+  if (!streamSrc) { render(); return; }
+  noteEl.hidden = true;
+  frameEl.hidden = false;
+  viewEl.classList.remove('empty');
+  frameEl.alt = 'Ce que voit ton proche, en direct';
+  if (frameSrc !== streamSrc) { frameSrc = streamSrc; frameEl.src = streamSrc; }
 }
 
 /** Le trajet en cours : départ → arrivée, le liquide suit l'avancement du proche. */
@@ -145,8 +165,21 @@ async function poll() {
 startOrb(document.getElementById('orb'));
 render(); poll();
 setInterval(poll, 2000);
+
+// Direct : la caméra du proche arrive par le WebSocket de la salle. Sans salle
+// (déploiement d'avant, réseau qui bloque `wss`), la page garde la photo lente.
+if (shareId) {
+  watchStream({
+    href: location.href,
+    onFrame: (src) => { streamSrc = src; streamAt = Date.now(); paintStream(); },
+    onState: () => { /* coupure : la fraîcheur fait retomber sur la photo lente */ },
+  });
+}
+
 let lastStatus = stateOf(live);
 setInterval(() => {
   const status = stateOf(live);
-  if (status !== lastStatus) { lastStatus = status; render(); }
+  const staleStream = streamSrc && Date.now() - streamAt > STREAM_FRESH_MS;
+  if (staleStream) streamSrc = '';
+  if (status !== lastStatus || staleStream) { lastStatus = status; render(); }
 }, 1000);

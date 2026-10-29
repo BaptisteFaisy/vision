@@ -4,6 +4,14 @@
   "modules": [
     { "name": "src/worker.js", "type": "esm", "path": "./src/worker.js" },
     { "name": "src/contrat.js", "type": "esm", "path": "./src/contrat.js" },
-    { "name": "src/store.js", "type": "esm", "path": "./src/store.js" }
+    { "name": "src/store.js", "type": "esm", "path": "./src/store.js" },
+    { "name": "src/room.js", "type": "esm", "path": "./src/room.js" },
+    { "name": "src/durable.js", "type": "esm", "path": "./src/durable.js" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "RELAY_ROOM", "class_name": "RelayRoom" }]
+  },
+  "migrations": [
+    { "tag": "v1-relay-room", "new_sqlite_classes": ["RelayRoom"] }
   ]
 }
