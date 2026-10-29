@@ -35,7 +35,7 @@ class IseePictoVoice(
      * L'écran affiche la confirmation, dite par le chemin navigation.
      */
     suspend fun run(text: String): Boolean {
-        PictoVoiceOrder.createLabel(text)?.let { label ->
+        PictoVoiceOrder.parse(text)?.let { label ->
             openLive(LiveVoiceRequest.Request(pictoCreate = label), null)
             confirm(PictoVoiceText.started(settings().speechLanguage))
             return true
