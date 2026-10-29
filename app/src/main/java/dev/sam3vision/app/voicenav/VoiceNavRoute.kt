@@ -15,7 +15,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.ShareRelay
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.speechClient
-import dev.sam3vision.core.net.HttpSignalsClient
 import dev.sam3vision.core.settings.Settings
 
 /**
@@ -111,8 +110,8 @@ private fun VoiceNavScreen(
 }
 
 /**
- * Guidage actif : écran + mini-carte (tracé + feux). Les feux viennent de
- * `/signals` (même base que l'itinéraire) ; sans URL, liste vide.
+ * Guidage actif : écran + carte (tracé shape + position recalée + caméra
+ * suivi, repli schéma si les tuiles échouent).
  */
 @Composable
 private fun GuidingRoute(
@@ -123,7 +122,6 @@ private fun GuidingRoute(
     settings: Settings,
     onHoldTranscript: suspend (String) -> Boolean,
 ) {
-    val signalsClient = remember { HttpSignalsClient(isee::routeBaseUrl) }
     GuidanceScreen(
         state = state,
         onStop = onStop,
@@ -131,12 +129,5 @@ private fun GuidingRoute(
         settings = settings,
         onHoldTranscript = onHoldTranscript,
         navSnapshot = isee::debugNavSnapshot,
-        fetchSignals = { bounds ->
-            if (isee.routeBaseUrl().isBlank()) {
-                emptyList()
-            } else {
-                signalsClient.signals(bounds).getOrElse { emptyList() }
-            }
-        },
     )
 }
