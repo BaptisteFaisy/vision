@@ -29,6 +29,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProbeVoice.kt`, `LiveProbe.kt`, `ProbeWiring.kt`, `IseeViewModel.kt`,
   `AppNav.kt`, `Settings*.kt`, `UiLogicTest.kt` (+35 fichiers supprimés).
 - Recette téléphone (Direct, obstacle réel, logcat sans `twinlite`) après merge.
+## 2026-10-29 — Mode navigation : la carte s'ouvre à la voix (ordre user)
+
+- **Demande** : « un mode navigation dans iSee, accessible en lui parlant, avec
+  la carte et le GPS si besoin ».
+- `:core` `MapModeCommand` (pur) : « navigation », « carte », « plan », « mode
+  navigation », « ouvre la carte », « affiche le plan », « où suis-je » entrent ;
+  une destination (« navigation vers X », « ouvre la carte de X ») et un ordre de
+  sortie (« arrête la navigation », « quitte la carte ») n'entrent pas.
+  `MapModeText` : phrases FR/EN d'entrée et de sortie.
+- `VoiceNavUiState.Map` + `VoiceNavSession.enterMap()/leaveMap()` : ouverture
+  seulement depuis le repos (jamais par-dessus un guidage), sortie muette côté
+  session (l'appelant parle, jamais « Guidage arrêté ») ; une destination dictée
+  depuis la carte ouvre la confirmation comme depuis l'accueil.
+- `MapModeScreen` plein écran (position + cercle de précision, passages piétons
+  du `/signals`, micro appui long, bouton « Quitter »), `MapPositionWatcher`
+  (GPS + réseau, 2 s, `LocationManager`) et `mapBoundsAround` (cadre de 200 m).
+- iSee : `IseeModeOrders` réunit maison, carte et pictos en un seul point
+  d'essai (avant la navigation et le LLM) ; `IseeViewModel` repasse sous 500
+  lignes (498).
+- Preuves locales : `:core` 1 816 tests, `:app` 1 080, 0 échec (dont
+  `MapModeCommandTest` 9, `MapModeOrderTest` 6, `VoiceNavSessionMapTest` 6,
+  `MapModeScreenTest` 5, `RouteMapProjectionTest` 9), `check-kotlin-limits` OK.
+- Docs : `NAVIGATION-VOCALE.md` §1 bis, `GPS_GUIDE_UTILISATEUR.md` §1 et §2.
+- Recette téléphone (carte + vrai GPS) après merge.
 
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 

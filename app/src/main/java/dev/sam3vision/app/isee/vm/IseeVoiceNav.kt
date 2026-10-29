@@ -84,8 +84,18 @@ class IseeVoiceNav(
         )
     }
 
-    /** État de la navigation vocale (repos, confirmation, guidage). */
+    /** État de la navigation vocale (repos, confirmation, guidage, carte). */
     val state: StateFlow<VoiceNavUiState> get() = session.state
+
+    /**
+     * Ouvre le mode navigation (carte + position GPS, sans destination).
+     * `false` si un écran de navigation est déjà ouvert — l'ordre vocal ne
+     * vole jamais un guidage en cours.
+     */
+    fun enterMap(): Boolean = session.enterMap()
+
+    /** Ferme le mode navigation ; `false` si la carte n'était pas ouverte. */
+    fun leaveMap(): Boolean = session.leaveMap()
 
     /**
      * Quitter l'écran navigation : confirmation annulée ou guidage arrêté
@@ -97,6 +107,7 @@ class IseeVoiceNav(
      */
     fun dismiss() {
         GuidanceLifecycle.stopBackground(context)
+        session.leaveMap()
         session.cancelConfirmation()
         scope.launch { session.stopGuidance() }
     }

@@ -47,6 +47,46 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
    confirmée » (défaut oui) ; à non → fiche lieu (`geo:` / URL search) sans
    guidage.
 
+## 1 bis. Mode navigation (la carte, sans destination)
+
+Dire **« navigation »**, **« carte »**, **« plan »**, **« mode navigation »**,
+**« ouvre la carte »**, **« affiche le plan »** ou **« où suis-je »** ouvre
+l'écran carte — sans destination, sans itinéraire : position GPS au centre,
+passages piétons connus autour, et le micro (appui long) pour enchaîner.
+
+- **Extraction** : `MapModeCommand` (pur, `:core`), essayé **avant** la
+  navigation et **avant le LLM** — même place que `MaisonEnterCommand` ;
+  casse, accents et ponctuation neutralisés (`KnownSizes.canonical`).
+- **Ce qui n'est pas un ordre de mode** : une destination (« navigation vers
+  la gare », « ouvre la carte de la gare de Lyon ») et un ordre de sortie
+  (« arrête la navigation », « quitte la carte ») — `isLeaveOrder` répond
+  `true`, `isEnterOrder` `false`.
+- **Ouverture** : `VoiceNavSession.enterMap()` n'ouvre que depuis le repos ;
+  un guidage, une confirmation ou une arrivée déjà affichés ne sont jamais
+  volés (l'ordre est consommé sans annonce).
+- **Annonces** : « Mode navigation. La carte est à l'écran. » à l'ouverture,
+  « Mode navigation fermé. » à la fermeture — même chemin audio que les
+  bulles (ElevenLabs + lecteur partagé). La fermeture ne dit **jamais**
+  « Guidage arrêté » : aucun guidage n'a couru.
+- **Sorties** : bouton « Quitter », retour système, « quitte la carte »,
+  « arrête la navigation » (l'ordre stop existant referme la carte sans
+  annonce de guidage).
+- **Depuis la carte** : une destination dictée (« emmène-moi à X ») ouvre la
+  confirmation comme depuis l'accueil — le mode n'est qu'un point de départ.
+- **Position** : `MapPositionWatcher` (GPS + réseau, 2 s, `LocationManager`
+  sans Play Services) — distinct du pilote d'itinéraire, qui n'a rien à
+  démarrer sans destination. Sans permission : « Position indisponible —
+  autorise la localisation pour ce téléphone. » ; sans premier fix :
+  « Recherche de la position… ». Cadre de 200 m autour de la position
+  (`mapBoundsAround`), passages piétons rechargés par maille de 0,001°
+  (~110 m), pas à chaque point.
+
+Fichiers : `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt`,
+`app/src/main/java/dev/sam3vision/app/isee/vm/MapModeOrder.kt`,
+`app/src/main/java/dev/sam3vision/app/isee/vm/IseeModeOrders.kt`,
+`app/src/main/java/dev/sam3vision/app/voicenav/MapModeScreen.kt`,
+`app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt`.
+
 ## 2. Politique d'annonces vocales (phrase exacte par événement)
 
 | Événement | Phrase exacte |
@@ -164,6 +204,9 @@ annule (le/la) guidage / navigation » ; les 9 motifs GO restent inchangés.
 | Réglage guidage | `core/src/main/java/dev/sam3vision/core/settings/Settings.kt::navigationGuidanceEnabled` — défaut oui |
 | Dictée : Meta puis repli Scribe, MicBus un seul AudioRecord | `core/src/main/java/dev/sam3vision/core/net/FallbackSpeechClient.kt` |
 | Voix : ElevenLabs-only, silencieuse en échec | `app/src/main/java/dev/sam3vision/app/VoiceAnnouncer.kt` |
+| Mode navigation : ordre vocal « navigation » / « carte » / « où suis-je » | `core/src/main/java/dev/sam3vision/core/nav/MapModeCommand.kt` |
+| Écran carte sans destination (position + passages piétons + micro) | `app/src/main/java/dev/sam3vision/app/voicenav/MapModeScreen.kt` |
+| Position du mode navigation (GPS + réseau, 2 s) | `app/src/main/java/dev/sam3vision/app/voicenav/MapPositionWatcher.kt` |
 
 ## 7. Chantiers liés, hors MVP (cadre, pas promesse)
 
