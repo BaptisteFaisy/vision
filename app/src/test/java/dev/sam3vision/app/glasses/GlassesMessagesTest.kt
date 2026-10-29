@@ -74,13 +74,13 @@ class GlassesMessagesTest {
     }
 
     @Test
-    fun `le refus de camera dit ou cliquer dans l app Meta AI`() {
-        // Chemin mesuré sur la paire le 27/10/2026 : la permission est par paquet, et en
-        // Developer Mode l'entrée de l'app vit sous « Applications du mode développeur(se) ».
+    fun `le refus de camera dit d abord le bouton, puis le chemin manuel`() {
+        // La permission est par paquet et se demande dans Meta AI : d'abord le bouton qui
+        // ouvre la page du SDK, et seulement en repli le chemin de la fiche de l'app.
         val text = GlassesMessages.cameraPermissionMissing().text
         assertTrue(text, text.contains("Caméra non autorisée"))
-        assertTrue(text, text.contains("Applications du mode développeur(se)"))
-        assertTrue(text, text.contains("Toujours autoriser"))
+        assertTrue(text, text.contains("Autoriser"))
+        assertTrue(text, text.contains("applications du mode développeur"))
     }
 
     @Test
