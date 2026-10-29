@@ -7,17 +7,24 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `dix dangers exterieur par defaut, plafond client a seize`() {
-        assertEquals(10, LivePrompts.default.size)
+    fun `douze dangers exterieur par defaut, plafond client a seize`() {
+        assertEquals(12, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "bicycle", "electric scooter", "pole",
                 "sidewalk", "crosswalk", "wall", "window", "stairs",
+                "door", "barrier",
             ),
             LivePrompts.default,
         )
         assertEquals(16, LivePrompts.MAX)
         assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
+    }
+
+    @Test
+    fun `portes et barrieres suivies en exterieur en plus des dangers`() {
+        assertTrue("door" in LivePrompts.default)
+        assertTrue("barrier" in LivePrompts.default)
     }
 
     @Test

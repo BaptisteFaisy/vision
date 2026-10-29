@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — direct : portes et barrières reconnues en extérieur (ordre user)
+
+- `LivePrompts.default` : 10 → 12 concepts (`door`, `barrier` en plus, en fin
+  de liste) ; `MAX = 16` et `PROMPT_LIMIT = 16` inchangés (12 < 16, soit
+  2 inférences/frame assumées de plus sur le chemin tracker).
+- `KnownSizes` calibre `barrier`/`barrière` à 1,00 m (barrière de chantier
+  type Vauban ; `door`/`porte` déjà à 2,05 m) : la distance sténopé s'affiche
+  et le guidage obstacle annonce portes et barrières comme tout obstacle.
+- Côté serveur, rien à changer : `porte→door` et `barrière→barrier` déjà dans
+  `server/backend/concepts.py`, plafond déjà à 16 (`tracking.py:53`).
+- Preuves : `:core` `LivePromptsTest` (dont « portes et barrières suivies en
+  extérieur »), `LivePromptsNavigationTest`, `StairConceptsTest`,
+  `KnownSizesTest` (dont « portes et barrières calibrées ») ;
+  `check-kotlin-limits.py` OK.
+
 ## 2026-10-28 — suivi : plus de « Léo », le lien porte le flux du téléphone
 
 - **Cause du lien « leo »** : le message WhatsApp était écrit en dur « Suivi de Léo
