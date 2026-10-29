@@ -20,10 +20,15 @@ chaque frame recopie dedans et rejoue. Trois garde-fous, dans l'ordre :
 
 Le module s'importe **sans torch** : torch n'est touché qu'une fois sur le conteneur GPU.
 
-Contournement capture : `Sam3DetrEncoder._prepare_multilevel_features` construit
-`torch.tensor(liste_python, device="cuda")` à chaque forward, copie CPU→CUDA interdite
-en capture — `patch_spatial_cache()` (appelé au chargement quand le levier est actif)
-le remplace par une version à tenseur mémoïsé, mathématiquement identique.
+Contournements capture (`patch_detr_capture()`, au chargement quand le levier est
+actif), mathématiquement identiques, pinnés à `transformers==5.20.2` :
+
+- `Sam3DetrEncoder._prepare_multilevel_features` fait `torch.tensor(liste_python,
+  device="cuda")` à chaque forward, copie CPU→CUDA interdite en capture → tenseur
+  mémoïsé par formes ;
+- `Sam3DetrDecoder._get_coords` alloue `torch.arange` à chaque forward (son
+  `lru_cache` keye des tenseurs 0-d par identité, donc miss systématique) →
+  grilles mémoïsées par stockage parent (`data_ptr`, sans sync).
 """
 
 from types import SimpleNamespace
@@ -35,6 +40,9 @@ TOLERANCE = 2e-2
 # `spatial_shapes` mémoïsés (un par forme vision — même budget que les graphes, +1).
 _SPATIAL_MAX = MAX_SHAPES + 1
 _spatial_cache: dict = {}
+# Grilles RPB mémoïsées par stockage parent (même budget).
+_COORDS_MAX = MAX_SHAPES + 1
+_coords_cache: dict = {}
 
 
 def enabled() -> bool:
@@ -229,24 +237,19 @@ def graph_holder(ctx):
     return ctx.get("detr_graphs")
 
 
-def patch_spatial_cache() -> str:
-    """`spatial_shapes` pré-calculé sur CUDA (contournement capture, voir module).
+def patch_detr_capture() -> str:
+    """Contournements capture DETR (voir module) : `spatial_shapes` + grilles RPB.
 
-    `Sam3DetrEncoder._prepare_multilevel_features` fait
-    `torch.tensor(liste_python, device="cuda")` à chaque forward — copie CPU→CUDA
-    interdite pendant une capture CUDA graph (échec vu en prod). Version de rechange
-    mathématiquement identique (mêmes flatten/cat, tenseur mémoïsé par formes) :
-    indispensable au graphe, neutre en eager (mêmes valeurs). Idempotent. Pinné à
-    `transformers==5.20.2` (requirements) : à re-vérifier à tout upgrade — et la
-    vérification graphe-vs-eager rejetterait toute divergence.
+    Idempotent. Pinné à `transformers==5.20.2` (requirements) : à re-vérifier à tout
+    upgrade — et la vérification graphe-vs-eager rejetterait toute divergence.
     """
     torch = _torch()
-    from transformers.models.sam3.modeling_sam3 import Sam3DetrEncoder
+    from transformers.models.sam3.modeling_sam3 import Sam3DetrDecoder, Sam3DetrEncoder
 
     if getattr(Sam3DetrEncoder._prepare_multilevel_features, "_spatial_patched", False):
         return "already"
 
-    def _cached(self, vision_features, vision_pos_embeds):
+    def _cached_shapes(self, vision_features, vision_pos_embeds):
         key = tuple((f.shape[-2], f.shape[-1]) for f in vision_features)
         feats = torch.cat([f.flatten(2).transpose(1, 2) for f in vision_features], dim=1)
         pos = torch.cat([p.flatten(2).transpose(1, 2) for p in vision_pos_embeds], dim=1)
@@ -258,6 +261,24 @@ def patch_spatial_cache() -> str:
             _spatial_cache[(key, str(feats.device))] = entry
         return feats, pos, entry
 
-    _cached._spatial_patched = True
-    Sam3DetrEncoder._prepare_multilevel_features = _cached
+    def _cached_coords(self, height, width, dtype, device):
+        # `height`/`width` : vues 0-d d'un tenseur parent — `data_ptr()` du stockage
+        # (métadonnée, sans sync) identifie le parent ; les valeurs ne sont lues
+        # (`int`, sync) qu'au premier passage par stockage, toujours en eager
+        # (le warmup précède la capture, sur les mêmes clones).
+        key = (height.untyped_storage().data_ptr(), str(dtype), str(device))
+        hit = _coords_cache.get(key)
+        if hit is not None:
+            return hit
+        coords_h = torch.arange(0, int(height), device=device, dtype=dtype) / int(height)
+        coords_w = torch.arange(0, int(width), device=device, dtype=dtype) / int(width)
+        if len(_coords_cache) >= _COORDS_MAX:
+            _coords_cache.pop(next(iter(_coords_cache)))
+        _coords_cache[key] = (coords_h, coords_w)
+        return coords_h, coords_w
+
+    _cached_shapes._spatial_patched = True
+    Sam3DetrEncoder._prepare_multilevel_features = _cached_shapes
+    _cached_coords._coords_patched = True
+    Sam3DetrDecoder._get_coords = _cached_coords
     return "ok"

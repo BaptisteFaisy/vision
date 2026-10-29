@@ -125,7 +125,7 @@ class Sam3LiveService:
         # Graphe CUDA de la passe DETR (levier FAST_DETR_GRAPH) : le cache vit ici, la
         # passe elle-même est présentée par fast_core._detections.
         if detr_graph.enabled():
-            self.ctx["spatial_patch"] = detr_graph.patch_spatial_cache()
+            self.ctx["detr_patch"] = detr_graph.patch_detr_capture()
             self.ctx["detr_graphs"] = detr_graph.DetrGraphs()
         else:
             self.ctx["detr_graphs"] = None
@@ -349,7 +349,7 @@ class Sam3LiveService:
                     "vision_grid": self.ctx.get("vision_grid"),
                     "vision_accel": self.ctx.get("vision_accel"),
                     "attn_impl": self.ctx.get("attn_impl"),
-                    "spatial_patch": self.ctx.get("spatial_patch"),
+                    "detr_patch": self.ctx.get("detr_patch"),
                     "detr_graph": (self.ctx["detr_graphs"].status()
                                    if self.ctx.get("detr_graphs") else None)}}
 
