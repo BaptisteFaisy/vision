@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import android.graphics.RectF
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
@@ -32,6 +33,22 @@ import kotlinx.coroutines.flow.Flow
  * (même raison que `ProbeWiring.kt`) : la sonde ne porte que l'annonceur, le
  * fanion d'état et l'appel publié.
  */
+
+/**
+ * Zone tactile publiée par la puce Traversée (coordonnées fenêtre, `null` quand
+ * masquée) : la racine y exempte ses gestes, comme pour le chip Picto.
+ */
+class CrossingChipZone {
+    private var bounds: RectF? = null
+
+    /** Zone publiée, `null` quand la puce n'est pas affichée. */
+    fun zone(): RectF? = bounds
+
+    /** La puce se place / se retire : la racine exempte sa zone de l'interception. */
+    fun setBounds(bounds: RectF?) {
+        this.bounds = bounds
+    }
+}
 
 /**
  * Active ou coupe le mode Traversée : les prompts deviennent feu+voitures (ou
