@@ -54,6 +54,7 @@ object KnownSizes {
         "enfant" to 1.20f, "child" to 1.20f, "kid" to 1.20f,
         "chien" to 0.55f, "dog" to 0.55f, "chat" to 0.25f, "cat" to 0.25f,
         "cheval" to 1.60f, "horse" to 1.60f,
+        "animal" to 0.60f, "animaux" to 0.60f,
         // Véhicules
         "voiture" to 1.45f, "car" to 1.45f, "camion" to 2.80f, "truck" to 2.80f,
         "bus" to 3.00f, "moto" to 1.40f, "motorcycle" to 1.40f,
@@ -67,6 +68,7 @@ object KnownSizes {
         "porte" to 2.05f, "door" to 2.05f, "fenetre" to 1.30f, "window" to 1.30f,
         "mur" to 2.50f, "wall" to 2.50f, "panneau" to 2.20f, "sign" to 2.20f,
         "lampadaire" to 5.00f, "poubelle" to 0.90f, "bin" to 0.90f,
+        "trash can" to 0.90f, "benne" to 1.50f, "dumpster" to 1.50f,
         // Barrière de chantier type Vauban ≈ 1 m (glissière 0,75 m : ordre de grandeur).
         "barriere" to 1.00f, "barrier" to 1.00f,
         // Extérieur — APPROXIMATIF, modèles très variables : borne 0,80 m
@@ -93,7 +95,7 @@ object KnownSizes {
      * leur distance vient de la profondeur ou du plan de sol. Clés canoniques
      * anglaises (voir [canonical]).
      */
-    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole")
+    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole", "traffic light")
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
     private val FIRST_WORD: Map<String, Float> = TABLE

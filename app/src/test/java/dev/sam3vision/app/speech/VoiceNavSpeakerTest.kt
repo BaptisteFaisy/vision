@@ -47,12 +47,12 @@ class VoiceNavSpeakerTest {
     )
 
     @Test
-    fun `virage parle francais en file`() {
+    fun `virage loin parle continuer en file`() {
         val driver = FakeSpeakerDriver()
 
         val phrase = speaker(driver).onTurn(SteeringCap.Left, 100f)
 
-        assertEquals("Dans 100 mètres, tournez à gauche.", phrase)
+        assertEquals("Continuez dans cette direction.", phrase)
         assertEquals(1, driver.calls.size)
         assertEquals(FakeSpeakerDriver.Call(phrase!!, false, Locale.FRENCH, Settings.Default.ttsSpeed), driver.calls[0])
     }
@@ -68,14 +68,14 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `nouvelle distance reparle apres le delai`() {
+    fun `carrefour reparle apres le delai`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 100f)
 
         now += 5_000L
 
-        assertEquals("Dans 50 mètres, tournez à gauche.", voice.onTurn(SteeringCap.Left, 50f))
+        assertEquals("Tournez à gauche.", voice.onTurn(SteeringCap.Left, 20f))
         assertEquals(2, driver.calls.size)
     }
 
@@ -86,7 +86,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = voice.onTurn(SteeringCap.Right, 100f, "Main Street")
 
-        assertEquals("In 100 meters, turn right, Main Street.", phrase)
+        assertEquals("Continue straight ahead, Main Street.", phrase)
         assertEquals(Locale.ENGLISH, driver.calls.single().locale)
     }
 

@@ -22,10 +22,18 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage avec distance`() {
+    fun `virage loin dit de continuer`() {
         assertEquals(
-            "Dans 100 mètres, tournez à gauche.",
+            "Continuez dans cette direction.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f)),
+        )
+    }
+
+    @Test
+    fun `virage proche dit de tourner sec sans distance`() {
+        assertEquals(
+            "Tournez à gauche.",
+            VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 20f)),
         )
     }
 
@@ -38,10 +46,18 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage avec rue`() {
+    fun `virage loin avec rue`() {
         assertEquals(
-            "Dans 60 mètres, tournez à gauche, rue de Rivoli.",
+            "Continuez dans cette direction, rue de Rivoli.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 60f, "rue de Rivoli")),
+        )
+    }
+
+    @Test
+    fun `virage proche avec rue`() {
+        assertEquals(
+            "Tournez à gauche, rue de Rivoli.",
+            VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 20f, "rue de Rivoli")),
         )
     }
 
@@ -111,9 +127,9 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage annonce moins que le reel`() {
+    fun `virage loin annonce la direction pas la distance`() {
         assertEquals(
-            "Dans 100 mètres, tournez à gauche.",
+            "Continuez dans cette direction.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 127f)),
         )
     }
@@ -121,7 +137,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `kilometres au-dela d'un kilometre`() {
         assertEquals(
-            "Dans 1,2 kilomètre, tournez à gauche.",
+            "Continuez dans cette direction.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 1250f)),
         )
         assertEquals(
@@ -135,7 +151,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `phrases anglaises`() {
         assertEquals(
-            "In 100 meters, turn left.",
+            "Continue straight ahead.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f), SpeechLanguage.En),
         )
         assertEquals(
@@ -160,12 +176,16 @@ class VoiceNavPolicyTest {
     // ── Signatures et urgence ──
 
     @Test
-    fun `signatures portent direction distance et rue`() {
+    fun `signatures portent direction phase et rue`() {
         assertEquals(
-            "turn|left|100|rue de rivoli",
+            "turn|left|far|rue de rivoli",
             VoiceNavPolicy.key(VoiceNavEvent.Turn(SteeringCap.Left, 127f, "Rue de Rivoli")),
         )
-        assertEquals("turn|right|?|-", VoiceNavPolicy.key(VoiceNavEvent.Turn(SteeringCap.Right)))
+        assertEquals(
+            "turn|left|now|rue de rivoli",
+            VoiceNavPolicy.key(VoiceNavEvent.Turn(SteeringCap.Left, 20f, "Rue de Rivoli")),
+        )
+        assertEquals("turn|right|now|-", VoiceNavPolicy.key(VoiceNavEvent.Turn(SteeringCap.Right)))
         assertEquals("straight|200", VoiceNavPolicy.key(VoiceNavEvent.ContinueStraight(200f)))
         assertEquals("straight|?", VoiceNavPolicy.key(VoiceNavEvent.Turn(SteeringCap.Straight)))
     }
@@ -189,7 +209,7 @@ class VoiceNavPolicyTest {
 
         val phrase = announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
 
-        assertEquals("Dans 100 mètres, tournez à gauche.", phrase)
+        assertEquals("Continuez dans cette direction.", phrase)
         assertEquals(phrase, announcer.lastPhrase)
     }
 
@@ -203,14 +223,15 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `nouvelle distance reparle apres le delai`() {
+    fun `virage lointain ne se repete pas le carrefour reparle`() {
         val announcer = VoiceNavAnnouncer()
         announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
 
-        assertNull(announcer.onEvent(1_000L, VoiceNavEvent.Turn(SteeringCap.Left, 50f)))
+        // Même phase lointaine, même après le délai : une seule annonce « continuez ».
+        assertNull(announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Left, 50f)))
         assertEquals(
-            "Dans 50 mètres, tournez à gauche.",
-            announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Left, 50f)),
+            "Tournez à gauche.",
+            announcer.onEvent(6_000L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)),
         )
     }
 

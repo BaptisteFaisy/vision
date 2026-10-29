@@ -28,9 +28,12 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `preset exterieur huit concepts de cheminement sous le plafond`() {
+    fun `preset exterieur douze concepts de cheminement sous le plafond`() {
         assertEquals(
-            listOf("person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree"),
+            listOf(
+                "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
+                "trash can", "dumpster", "animal", "traffic light",
+            ),
             LivePrompts.outdoor,
         )
         assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
