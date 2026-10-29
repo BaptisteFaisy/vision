@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.core.session.DeviceSessionState
 import dev.sam3vision.core.glasses.CaptureAction
 import java.io.File
 
@@ -21,6 +22,8 @@ data class GlassesUiState(
     /** Vrai pendant que la dictée capte réellement le micro des lunettes. */
     val micActive: Boolean = false,
     val streaming: Boolean = false,
+    /** Nom du fichier en cours d'enregistrement, `null` hors enregistrement. */
+    val recordingName: String? = null,
     val mockActive: Boolean = false,
     val message: GlassesMessage? = null,
 ) {
@@ -31,6 +34,15 @@ data class GlassesUiState(
 
     /** L'appareil simulé ou réel est là. */
     val hasDevice: Boolean get() = deviceName != null
+}
+
+/** Phase du SDK → phase affichée. `PAUSED` reste « en cours », la session reprend. */
+internal fun DeviceSessionState.toPhase(): SessionPhase = when (this) {
+    DeviceSessionState.IDLE -> SessionPhase.IDLE
+    DeviceSessionState.STARTING -> SessionPhase.STARTING
+    DeviceSessionState.STARTED -> SessionPhase.STARTED
+    DeviceSessionState.PAUSED -> SessionPhase.STARTING
+    DeviceSessionState.STOPPING, DeviceSessionState.STOPPED -> SessionPhase.STOPPED
 }
 
 /** Ce que les lunettes demandent à l'app. */
