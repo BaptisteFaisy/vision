@@ -10,8 +10,9 @@ est la copie de référence. **Ne jamais déployer
 Seule commande : `server/scripts/deploy-live-fast.sh` (déploie `backend/live_fast/live_app_fast.py`,
 attend la nouvelle version, vérifie `/health`). Les leviers posés :
 
-`FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_DETR_GRAPH=1 FAST_ATTN=sdpa
+`FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_ATTN=sdpa
 FAST_SCALEDOWN=60 FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1`
+(`FAST_DETR_GRAPH` **éteint** : voir ligne graphe DETR ci-dessous)
 (les leviers sont **recuits dans l'image** au déploiement — changer un levier =
 redéployer). `max_containers=1`, `min_containers=0`, la région et le GPU ne changent pas.
 
@@ -27,7 +28,7 @@ redéployer). `max_containers=1`, `min_containers=0`, la région et le GPU ne ch
 | `@modal.concurrent(max_inputs=2)` | supprime l'attente de la 2ᵉ frame en vol au proxy (~90 ms mesurés) | `live_app_fast.py` |
 | dédup alias FR/EN | −14 ms et 5 masques inutiles sur « chaise » + « chair » | rapport `concepts` |
 | `FAST_ATTN=sdpa` | attention fusionnée ; **aucun gain mesuré sur `detr_ms` en prod** (45,7 vs 41-45, le coût est aux lancements, pas au calcul) — conservé (standard upstream, inoffensif, encodeur vision 1,2 → 0,7 ms) | `weights._set_attn`, `applied.attn_impl` |
-| `FAST_DETR_GRAPH=1` | graphe CUDA de la passe DETR ; 1re activation : échec capture à 1 concept (mapping typé aplati en `dict` + budget gelé) — corrigé (type préservé, échec par forme), **à valider** (~45 → ~5 ms attendus) | `detr_graph.DetrGraphs`, `applied.detr_graph` |
+| `FAST_DETR_GRAPH` (éteint) | graphe CUDA de la passe DETR : 2 obstacles capture levés (mapping typé, `arange` RPB), 1er replay à **0,3 ms**, puis **crash conteneur** (mort brutale sans traceback, cause inconnue) — levier coupé le 29/10, code + tests conservés, à reprendre sur carte dédiée | `detr_graph.DetrGraphs`, `applied.detr_graph` |
 | cache tokenize | entrées texte mémoïsées par concepts — **validé en prod** : `tokenize_ms` 23,4 → 0,0, médiane serveur 74 → 52 ms | `token_cache.py` |
 
 Coût du `scaledown_window=60` : au pire une minute de A100 en plus par session ≈ **0,04 $**

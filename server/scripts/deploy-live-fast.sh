@@ -6,7 +6,10 @@
 #
 # Les leviers sont ici, et **seulement ici** : c'est ce qui les rend persistants.
 #   FAST_CUDA_GRAPH=1    graphe CUDA de l'encodeur vision (45 ms → 1,4 ms mesurés)
-#   FAST_DETR_GRAPH=1    graphe CUDA de la passe DETR (~55 ms → ~2 ms attendus, repli eager)
+#   FAST_DETR_GRAPH      ÉTEINT : le replay a crashé un conteneur en prod (mort brutale
+#                        sans traceback après un 1er replay à 0,3 ms, cause inconnue).
+#                        Code + tests conservés ; réactiver après diagnostic sur carte
+#                        dédiée (reproduction contrôlée impossible sur la prod).
 #   FAST_ATTN=sdpa       attention fusionnée (eager matérialise la matrice, ~55 ms)
 #   FAST_SCALEDOWN=60    60 s de fenêtre avant extinction du conteneur
 #   FAST_EDGE=512        grille du modèle (le serveur rééchantillonne à 518)
@@ -70,7 +73,7 @@ fi
 deploy_once() {
   ( cd "$ROOT" && LIVE_APP_NAME="$APP_NAME" FAST_GPU="$GPU" FAST_REGION="$REGION" \
       FAST_ROUTING_REGION="$ROUTING" FAST_BATCH_PROMPTS=1 FAST_EDGE=512 \
-      FAST_CUDA_GRAPH=1 FAST_DETR_GRAPH=1 FAST_ATTN=sdpa FAST_SCALEDOWN=60 \
+      FAST_CUDA_GRAPH=1 FAST_ATTN=sdpa FAST_SCALEDOWN=60 \
       FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 \
       "$MODAL" deploy backend/live_fast/live_app_fast.py "${profile_arg[@]}" )
 }
@@ -88,7 +91,7 @@ print("model  :", h.get("model"))
 print("levers :", json.dumps(lev, ensure_ascii=False, sort_keys=True))
 print("applied:", json.dumps(app, ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
-                           "snapshot": True, "detr_graph": True,
+                           "snapshot": True, "detr_graph": False,
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
@@ -113,7 +116,7 @@ wait_for_new_version() { # essais, délai
 }
 
 if (( deploy )); then
-  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, detr_graph=1, attn=sdpa, scaledown=60, edge=512)"
+  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, detr_graph=OFF, attn=sdpa, scaledown=60, edge=512)"
   deploy_once || { echo "KO : le déploiement a échoué" >&2; exit 1; }
   echo "== attente de la nouvelle version"
   if wait_for_new_version 6 10; then
