@@ -151,3 +151,29 @@ que la voix se coupe et parle souvent) :
   phrases ordinaires) ;
 - une scène de positions nouvelle parle aussi dès la 1re frame (délai 4 s
   gardé, qui borne le bavardage) ; les escaliers voix confirment en 2 frames.
+
+## 7. Matière proche non mesurée + voix qui finit ses phrases (fix du 29/10)
+
+Le user marche avec l'app : elle ne dit plus les obstacles, même en approchant.
+Deux causes, lues dans le code de cet arbre :
+
+- **la même phrase ré-émise à chaque frame annulait sa propre synthèse** :
+  `state` est publié à chaque frame et `collectLatest` annulait le bloc en
+  cours — synthèse lente + frames continues = silence total. Nouveau contrat :
+  seule une phrase **plus fraîche** annule (`distinctUntilChanged` sur
+  `spoken`, `ProbeWiring.observeSpoken`) ; les guetteurs trottoir/escaliers,
+  rares et confirmés, restent séquentiels (`collect`) : une alerte confirmée
+  ne s'annule pas ;
+- **la matière au contact était non mesurée donc tue après un mot** : boîte
+  coupée ⇒ pas de distance ⇒ clé `?` constante ⇒ nouveauté muette, et jamais
+  de « Stop. » (il exigeait une mesure). Nouveau contrat : matière non mesurée
+  qui remplit le champ en face (`STOP_HEIGHT_FRAC = 0,5`, `STOP_WIDTH_FRAC =
+  0,05`, `Guidance`) ⇒ « Stop. » immédiat — sauf peinture au sol
+  (`crosswalk`), et un fil vertical lointain n'arrête pas (largeur) ;
+- **le « Stop. » du guidage passe en urgent**, comme l'annonçait le § 5 sans
+  que le code le fasse : clip pré-synthétisé, coupe le chat
+  (`ProbeWiring.observeSpoken`, `urgent = phrase == STOP_WORD`).
+
+Verrouillé par `ProbeWiringSpokenTest` (3, sonde branchée sur le faux client :
+même phrase ré-émise → une synthèse qui aboutit, phrase fraîche → dernier
+gagnant, Stop → parlé chat en lecture) et `GuidanceTest` (22).

@@ -29,7 +29,10 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
   chiffre (`inRange`, `nearRank`, `Guidance.kt`).
 - **Stop** : `STOP_METERS = 0,6f` (`Guidance.kt`) — en deçà (mesuré), contourner
   n'est plus un pas : la consigne est « Stop. », urgente (elle coupe la phrase en
-  cours, chat compris). À 1,2 m/s, 0,6 m c'est un pas avant le contact.
+  cours, chat compris). À 1,2 m/s, 0,6 m c'est un pas avant le contact. Sans
+  mesure, la matière qui remplit le champ en face arrête aussi (`STOP_HEIGHT_FRAC
+  = 0,5`, `STOP_WIDTH_FRAC = 0,05` : la boîte coupée au contact n'est pas
+  mesurable, et il faut absolument le dire) — sauf peinture au sol (`crosswalk`).
 - **Côté de sortie** : le moins encombré — moins d'objets à portée, sinon obstacle
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
@@ -43,6 +46,7 @@ SAM** — **aucun appel LLM**, la phrase part directement à ElevenLabs.
 | Obstacle mesuré | Va à gauche, 2 mètres. | Go left, 2 meters. |
 | Obstacle non mesuré | Va à gauche. | Go left. |
 | Obstacle à 0,6 m ou moins | Stop. | Stop. |
+| Matière non mesurée qui remplit le champ | Stop. | Stop. |
 
 - Vocabulaire minimal (décision user du 29/10, `Guidance.phrase`) : côté + distance
   de l'obstacle au mètre entier (`DistanceText.spokenShort`), ni nom d'obstacle, ni
@@ -95,10 +99,12 @@ guidage est muet — par construction, pas par bug.
 Aucun import réseau dans `Guidance.kt` ni `GuidanceAnnouncer.kt` : le guidage ne peut
 pas appeler le LLM, même par accident.
 
-Tests JVM qui verrouillent le contrat : `GuidanceTest` (17), `GuidanceAnnouncerTest`
-(11), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (3, sonde branchée sur un faux
+Tests JVM qui verrouillent le contrat : `GuidanceTest` (22), `GuidanceAnnouncerTest`
+(12), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (3, sonde branchée sur un faux
 client SAM : voie libre → consigne, obstacle → contournement, positions seules →
-silence sur voie libre).
+silence sur voie libre), `ProbeWiringSpokenTest` (3 : même phrase ré-émise → une
+synthèse qui aboutit, phrase fraîche → dernier gagnant, Stop → parlé chat en
+lecture).
 
 ## 6. Recette
 
@@ -109,6 +115,7 @@ silence sur voie libre).
    (ou à droite si la gauche est encombrée), **sans attendre 4 s** ;
 4. la personne s'approche à ~1 m → nouvelle consigne avec la distance à jour ;
 5. la personne est à ~0,5 m → « Stop. », qui coupe la phrase en cours ;
+   main devant l'objectif (matière non mesurée qui remplit le champ) → « Stop. » aussi ;
 6. le couloir se dégage → « Continue. » après le délai ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
