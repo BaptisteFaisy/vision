@@ -1,11 +1,7 @@
 package dev.sam3vision.app.voicenav
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -139,11 +135,9 @@ fun rememberHoldMicUiState(): HoldMicUiState = remember { HoldMicUiState() }
 
 /**
  * Ouvre une tenue micro ([ui] à jour, erreur positionnée si le micro est
- * indisponible). Seule l'attente du relâchement diffère entre le bouton
- * ([VoiceNavHoldButton], `awaitRelease`) et l'appui long écran
- * ([HoldMicArea], `waitForUpOrCancellation`) : les scopes restreints de
- * Compose interdisent de la partager, tout le reste vit ici et dans
- * [closeHoldSession].
+ * indisponible). Le bouton ([VoiceNavHoldButton]) ouvre dès l'appui,
+ * l'appui long écran ([HoldMicArea]) après 500 ms : seule cette attente
+ * diffère, tout le reste vit ici et dans [closeHoldSession].
  */
 fun openHoldSession(hold: VoiceNavHold, ui: HoldMicUiState): Boolean {
     ui.error = null
@@ -194,23 +188,28 @@ fun HoldMicArea(
     DisposableEffect(hold) { onDispose { hold.discard() } }
     Box(
         modifier.pointerInput(hold, ui.busy) {
-            awaitEachGesture {
-                val down = awaitFirstDown()
-                // Relâché avant le délai : tap, sans action.
-                if (awaitLongPressOrCancellation(down.id) != null) return@awaitEachGesture
-                if (ui.busy) return@awaitEachGesture
-                if (!openHoldSession(hold, ui)) return@awaitEachGesture
-                try {
-                    waitForUpOrCancellation()
-                } finally {
-                    closeHoldSession(hold, settings, onTranscript, hint, ui)
-                }
-            }
+            detectTapGestures(
+                onPress = {
+                    // Relâché avant le délai : tap, sans action.
+                    val tap = withTimeoutOrNull(LONG_PRESS_MILLIS) { awaitRelease(); true } ?: false
+                    if (tap) return@detectTapGestures
+                    if (ui.busy) return@detectTapGestures
+                    if (!openHoldSession(hold, ui)) return@detectTapGestures
+                    try {
+                        awaitRelease()
+                    } finally {
+                        closeHoldSession(hold, settings, onTranscript, hint, ui)
+                    }
+                },
+            )
         },
     ) {
         content()
     }
 }
+
+/** Délai d'appui long de la zone écran (système : ~500 ms). */
+private const val LONG_PRESS_MILLIS = 500L
 
 /**
  * Bouton d'appui long des écrans navigation : le doigt posé ouvre le micro,
