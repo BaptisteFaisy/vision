@@ -433,8 +433,8 @@ _state.update { it.cleared() }
                 spoken = phrase ?: current.spoken,
                 spokenUrgent = if (phrase != null) (steering?.blocked == true) else current.spokenUrgent,
                 steering = steering,
-                crossing = cross?.state ?: current.crossing,
-                crossingBox = cross?.box,
+                crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
+                crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),
                 transport = transportLabel(active),
                 error = null,
             )
