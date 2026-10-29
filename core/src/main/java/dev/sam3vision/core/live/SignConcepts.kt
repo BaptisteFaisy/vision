@@ -3,67 +3,70 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.distance.KnownSizes
 
 /**
- * Panneaux à hauteur d'humain : ce que SAM doit garder, et quoi taire.
+ * Concept panneau : ce que SAM suit en preset extérieur (`LivePrompts.outdoor`
+ * suit « sign ») et que le guidage obstacles doit savoir ignorer quand c'est
+ * hors de portée de tête.
  *
- * `sign` attrape tout — panneau routier à 4 m, pub en hauteur, affiche de
- * magasin. Sans filtre, le guidage bavarde à chaque rue commerçante. Règle
- * (ordre user du 29/10) : on ne garde que le plausible « à hauteur d'humain »,
- * le reste est écarté **avant** le couloir — un panneau écarté ne bloque pas
- * la marche et ne compte pas dans le côté le moins encombré.
+ * Une rue commerçante, c'est dix enseignes par vitrine : sans filtre, chacune
+ * au centre bloque le couloir et la voix bavarde à chaque pas. Or un panneau
+ * haut ne se percute pas — on passe dessous. Règle ([isHighSign]) : un
+ * panneau dont le centre est au-dessus de [HEAD_TOP] et mesuré dans
+ * [HEAD_RANGE_M] sort du couloir ([Guidance.decide] l'ignore comme le sol).
+ * Un panneau à hauteur d'homme (centre sous [HEAD_TOP]) bloque toujours :
+ * c'est un obstacle à contourner, annoncé comme les autres.
  *
- * Deux gardes, sans calibrage téléphone (pas de mesure terrain à ce stade) :
- * - **vertical** : `centerY < HEAD_TOP` = haut du cadre = panneau routier ou
- *   pub en hauteur, jamais un obstacle à hauteur d'homme filmé téléphone en
- *   main. Le tangage de la caméra fait varier l'horizon, le seuil est donc
- *   volontairement haut (on ne tait que l'évident) ;
- * - **profondeur** : au-delà de [HEAD_RANGE_M], un panneau n'est pas un
- *   obstacle du prochain pas — et le couloir l'ignore déjà au-delà de
- *   [Guidance.RANGE_METERS].
- *
- * Distance inconnue = prudence : on garde (mieux vaut une consigne de trop
- * qu'un panneau dans la figure). Pur et testé en JVM.
+ * Distances : « panneau »/« sign » sont au sténopé ([KnownSizes], 2,20 m) —
+ * les enseignes sans hauteur typique restent non mesurées donc gardées, par
+ * prudence (même doctrine que le couloir : l'inconnu bloque). Seuils
+ * provisoires, à calibrer au téléphone (corpus § 14 de `docs/VOIX-DANGER.md`).
  */
 object SignConcepts {
 
-    /** Au-dessus de cette hauteur normalisée, ce n'est pas à hauteur d'humain. */
+    /**
+     * Haut de la zone tête : un panneau centré au-dessus (coordonée
+     * normalisée, 0 = haut de l'image) est hors de portée de tête —
+     * téléphone tenu à hauteur de poitrine, tangage neutre.
+     */
     const val HEAD_TOP = 0.22f
 
-    /** Au-delà (m), un panneau n'est pas l'obstacle du prochain pas. */
+    /**
+     * Portée du filtre tête : au-delà, un haut de l'image ne prouve plus
+     * rien (à 10 m, tout est près de l'horizon) — le panneau est gardé.
+     */
     const val HEAD_RANGE_M = 4.0f
 
-    /** Étiquettes (canoniques) qui désignent un panneau, voir [KnownSizes.canonical]. */
-    private val SIGN_LABELS = setOf(
-        "sign",
-        "signs",
-        "panneau",
-        "panneaux",
-        "traffic sign",
-        "street sign",
-        "billboard",
-        "panneau publicitaire",
+    private val KEYS = setOf(
+        "sign", "signboard", "billboard", "panel", "poster", "placard",
+        "panneau", "enseigne", "affiche", "pancarte", "ecriteau",
     )
 
-    /** Vrai si [label] (brut, tel que renvoyé par SAM) désigne un panneau. */
+    /**
+     * Vrai si [label] désigne un panneau ou une enseigne (casse, accents,
+     * pluriel simple neutralisés). Les composés du backend (« traffic
+     * sign », « stop sign », « no entry sign » —
+     * `server/backend/concepts.py`) sont reconnus au mot : un seul mot
+     * connu suffit. « traffic light » reste un non-panneau (le feu ne se
+     * filtre jamais).
+     */
     fun isSign(label: String): Boolean {
         val key = KnownSizes.canonical(label)
         if (key.isEmpty()) return false
-        if (key in SIGN_LABELS) return true
-        return key.split(' ').any { it in SIGN_LABELS }
+        if (key in KEYS) return true
+        if (key.endsWith("s") && key.length > 3 && key.dropLast(1) in KEYS) return true
+        return key.split(' ').any { it in KEYS }
     }
 
     /**
-     * Faut-il garder ce panneau ([centerY] normalisé 0 = haut, [meters] sténopé
-     * ou profondeur, `null` = inconnue) ? Non-panneau = toujours gardé (ce
-     * filtre ne tranche que les panneaux).
+     * Panneau haut à ignorer : concept panneau ([isSign]), centre au-dessus
+     * de [HEAD_TOP] ([HEAD_TOP] exclu : à la frontière, on garde), mesuré
+     * dans [HEAD_RANGE_M]. Distance inconnue ou non finie ⇒ gardé (`false`) :
+     * sans mesure, la prudence bloque — le filtre ne statue que sur du
+     * mesuré. Un non-panneau n'est jamais filtré, même haut et proche.
      */
-    fun keep(label: String, centerY: Float, meters: Float?): Boolean {
-        if (!isSign(label)) return true
-        if (centerY < HEAD_TOP) return false
-        val depth = meters?.takeIf { it.isFinite() && it > 0f } ?: return true
+    fun isHighSign(label: String, centerY: Float, meters: Float?): Boolean {
+        if (!isSign(label)) return false
+        if (!(centerY < HEAD_TOP)) return false
+        val depth = meters?.takeIf { it.isFinite() } ?: return false
         return depth <= HEAD_RANGE_M
     }
-
-    /** Garde-fou de [Guidance] : écarte les panneaux hors hauteur d'humain. */
-    fun keep(placed: PlacedLabel): Boolean =
-        keep(placed.label, placed.centerY, placed.meters)
 }

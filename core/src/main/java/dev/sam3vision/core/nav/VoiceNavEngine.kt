@@ -9,9 +9,9 @@ data class NavTuning(
     val advanceRadiusM: Double = 12.0,
     /** À moins de ça de la destination, c'est l'arrivée. */
     val arrivalRadiusM: Double = 20.0,
-    /** Première annonce (« dans 100 mètres »). */
+    /** Première annonce, de loin (le préavis directionnel se dit une fois). */
     val announceFarM: Double = 100.0,
-    /** Rappel proche (« dans 25 mètres »). */
+    /** Rappel proche, au carrefour (l'ordre sec du virage). */
     val announceNearM: Double = 25.0,
     /** Au-delà de cet écart latéral, le fix est suspect. */
     val offRouteM: Double = 30.0,

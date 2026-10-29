@@ -11,6 +11,7 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.settings.Settings
@@ -57,19 +58,29 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
 
 /**
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
- * EU/US > URL du build), guidage « tout droit » (il prime sur l'annonce), annonce
- * vocale des objets et de leur distance, focale de la caméra, distances on/off,
- * plafond d'objets.
+ * EU/US > URL du build), monde sensoriel (dehors/dedans), guidage « tout droit »
+ * (il prime sur l'annonce), annonce vocale des objets et de leur distance,
+ * focale de la caméra, distances on/off, plafond d'objets.
+ *
+ * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
+ * l'appelant a passé les défauts ([LivePrompts.default], [LivePrompts.indoor]
+ * ou une liste vide) ; une liste explicite (Traversée feu+voitures, champ
+ * « Suivre ») traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
-    prompts: List<String> = dev.sam3vision.core.live.LivePrompts.default,
+    prompts: List<String> = LivePrompts.default,
     crossingActive: Boolean = false,
 ) {
     android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
+    val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
+        LivePrompts.forMode(settings.outdoorMode)
+    } else {
+        prompts
+    }
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
-        prompts = prompts,
+        prompts = effective,
         announce = settings.announcePositions,
         guide = settings.guideStraight,
         lens = LensSpec.fromSettings(settings.cameraFovDeg),

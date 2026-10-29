@@ -54,8 +54,8 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **12** par défaut (person, car, bicycle, electric scooter, pole, sidewalk, crosswalk, wall, window, stairs, door, barrier), `LivePrompts.MAX = 16` (`core/live/LivePrompts.kt:31-35` (+ `MAX`)) |
-| Tests | **2 884 `@Test`** JVM (`:core` 1 835, `:app` 1 049, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
-| Taille | **913** fichiers `.kt`, **54 684** lignes de prod (`:core` 22 458, `:app` 32 226, mesure du 29/10/2026 par `tools/count-tree.py`) |
+| Tests | **2 944 `@Test`** JVM (`:core` 1 859, `:app` 1 085, relevé du 29/10/2026 par `tools/count-tree.py`, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
+| Taille | **928** fichiers `.kt`, **56 456** lignes de prod (`:core` 22 742, `:app` 33 714, mesure du 29/10/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
 
 ## 2. Commandes de vérification (à passer avant chaque push)
@@ -82,7 +82,7 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 1. **Tailles Kotlin** : fichier `.kt` < 500 lignes, fonction/composable < 50 lignes
    (`tools/check-kotlin-limits.py`, `ci.yml:136-139`). **Zéro duplication** : paramétrer et
    extraire un helper plutôt que copier. Le garde-fou passe sans exception sur cet arbre ; les
-   plus gros fichiers sont `app/LiveViewModel.kt` et `app/isee/IseeViewModel.kt` (**498**
+   plus gros fichiers sont `app/LiveViewModel.kt` et `app/isee/IseeViewModel.kt` (**499**
    lignes chacun, au plafond) — ne pas les faire grossir, extraire comme ça a été fait pour
    `app/isee/IseeScenePane.kt` (487 → 222 lignes, en-tête/dissolution/couches sortis),
    `app/isee/LiveProbe.kt` (495 → 489 le 29/10) et `app/LiveViewModel.kt` lui-même

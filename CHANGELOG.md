@@ -3,6 +3,61 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
+
+- **Demande** : une branche cohérente depuis `origin/master` `6aaf881`
+  (qui portait déjà preset 12 concepts, filtre panneaux et virages sans
+  distance) intégrant P1 arbitre vocal, P2 mondes, P3 filtre sign, P4
+  wording virage, P5 recette rue, P6 cadrage lunettes (doc). Ordre :
+  P4 puis P1 puis P3 puis P2 puis P5 puis P6 — le contrat vocal
+  d'abord, les scripts en dernier (recalés une fois sur le final).
+- Conflits tranchés : VoiceNav = contrat P4 faisant foi (25 m,
+  `ahead`/`now`, virages francs seuls — remplace la variante 40 m du
+  master) ; sign = sémantique P3 (`isHighSign`, prudence inconnue) +
+  composés backend reconnus au mot (`SignConceptsTest` 9 → 10) ;
+  LIVE-SPEC = § extérieur 12 concepts + § intérieur P2 ; KDoc
+  `forMode` 8 → 12 concepts.
+- P5 recalé : verrou SHA paramétré (`EXPECT_REF`, défaut `master`),
+  phrases virage P4 script ↔ fiche verrouillées en § 8
+  (`test_scripts.sh` 124 → 128), benne calibrée 1,50 m, animal
+  générique 0,60 m, filtre tête et arbitre P1 dans la fiche, comptages
+  JVM et `TESTING.md` (`live` 361, `settings` 99) à jour.
+- Preuves : `:app` ciblé VoiceNav + full `:app` 1085/1085, `:core`
+  1854/1859 (5 échecs préexistants `PrivateFileSettingsStoreTest`,
+  permissions POSIX sous Windows, identiques sur `master` propre),
+  `assembleDebug` OK, `check-kotlin-limits` OK (499/500 aux deux
+  ViewModels, marge nulle), `test_scripts.sh` 128/128. Recette rue et
+  calibration sign : non rejouées, sans téléphone piloté d'ici.
+- Fichiers : merges P4/P1/P3/P2/P5 + cherry-pick P6-doc,
+  `SignConcepts.kt` (+ composés), `RECETTE-RUE.md`,
+  `verify-street.sh`, `test_scripts.sh`, `TESTING.md`, `AGENTS.md`.
+
+## 2026-10-29 — guidage vocal : virage franc en deux temps, jamais de distance (P4)
+
+- **Demande** : verrouiller le nouveau contrat vocal virage — préavis
+  directionnel de loin, ordre sec au carrefour, sans jamais « dans X
+  mètres » pour un virage franc ; demi-tour, giratoire, traversée et
+  arrivée inchangés.
+- `VoiceNavPolicy.TURN_NOW_M` = 25 m (aligné sur
+  `NavTuning.announceNearM`) + `isTurnNow` : au-delà, « Continuez dans
+  cette direction[, rue X]. » (dit une seule fois) ; en deçà ou sans
+  distance, « Tournez à gauche[, rue X]. ». `turn()`, `ahead()` et
+  `turnKey` (signatures `turn|<côté>|<ahead|now>|<rue>`) suivent ce
+  découpage ; `ahead()` garde « [verbe] dans [distance] » hors virages
+  francs.
+- Recette appareil consignée en protocole (`docs/NAVIGATION.md`, § contrat
+  + § recette) : non rejouée, sans téléphone.
+- Preuves : `:app` ciblé **60/60** (`VoiceNavPhrasesTest` 10,
+  `VoiceNavPolicyTest` 29, `VoiceNavSpeakerTest` 15, `NavigationHookTest`
+  6), `:core` nav **193/193** (dont `VoiceNavScriptTest` 6/6), full
+  `:app` **1085/1085**, full `:core` 1838/1843 (5 échecs préexistants
+  `PrivateFileSettingsStoreTest`, permissions POSIX sous Windows,
+  identiques sur `master` propre), `assembleDebug` OK,
+  `check-kotlin-limits` OK.
+- Fichiers : `VoiceNavPolicy.kt` (+`TURN_NOW_M`, `isTurnNow`, `turnAhead`,
+  `isFrankTurn`), `VoiceNavSpeaker.kt` + `VoiceNavEngineDriver.kt` +
+  `VoiceNavEngine.kt` (KDoc), 3 tests MAJ (+7 tests), `NAVIGATION.md`,
+  `GPS-FUSION.md`, `TESTING.md` (speech 76→83).
 ## 2026-10-29 — serveur : plafond /live et /segment à 32 objets
 
 - **Demandé** : rendre effectif le max client à 32 (demande user du 29/10) — le serveur
