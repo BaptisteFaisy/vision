@@ -432,8 +432,8 @@ _state.update { it.cleared() }
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
                 steering = steering,
-                crossing = cross?.state ?: current.crossing,
-                crossingBox = cross?.box,
+                crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
+                crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),
                 transport = transportLabel(active),
                 error = null,
             )

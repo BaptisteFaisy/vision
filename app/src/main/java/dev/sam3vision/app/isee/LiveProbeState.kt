@@ -57,6 +57,8 @@ data class LiveProbeState(
      * dans le champ, ou mode coupé : rien à marquer.
      */
     val crossingBox: List<Float>? = null,
+    /** Un passage piéton est dans le champ : proposer le mode Traversée (jamais automatique). */
+    val crossingOffer: Boolean = false,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,
