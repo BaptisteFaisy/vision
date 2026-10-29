@@ -433,4 +433,45 @@ class LiveAskSessionTest {
         advanceUntilIdle()
         assertEquals("guidage coupé, pas de nouvelle phrase", 1, fakes.spoken.size)
     }
+
+    @Test
+    fun `demo picto affiche les faux reperes sans llm ni image`() = runTest {
+        val fakes = pictoFakes(jpeg = "")
+        fakes.session.ask("démo picto")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(listOf("Démo picto activée."), fakes.spoken)
+        val hits = fakes.state.value.pictoOverlay?.hits.orEmpty()
+        assertEquals(listOf("mur", "fenêtre"), hits.map { it.label })
+        assertEquals(0, fakes.llm.calls)
+        assertTrue(fakes.restarts.isEmpty())
+    }
+
+    @Test
+    fun `mur chasse guide vers la demo`() = runTest {
+        val fakes = pictoFakes(jpeg = "")
+        fakes.session.ask("démo picto")
+        fakes.session.ask("mur")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(2, fakes.spoken.size)
+        assertTrue("guide démo : ${fakes.spoken}", fakes.spoken[1].startsWith("Mur "))
+        assertEquals(0, fakes.llm.calls)
+    }
+
+    @Test
+    fun `demo coupee efface l overlay`() = runTest {
+        val fakes = pictoFakes(jpeg = "")
+        fakes.session.ask("démo picto")
+        fakes.session.onLiveFrame(200, 200, 1_000L)
+        advanceUntilIdle()
+        assertEquals(2, fakes.state.value.pictoOverlay?.hits.orEmpty().size)
+        fakes.session.ask("démo picto")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("Démo picto activée.", "Démo picto coupée."),
+            fakes.spoken,
+        )
+        assertNull(fakes.state.value.pictoOverlay)
+    }
 }
