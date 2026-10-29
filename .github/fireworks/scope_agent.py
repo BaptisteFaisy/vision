@@ -24,6 +24,7 @@ Codes de sortie : 0 = corps complété ; 1 = échec avec compte rendu ;
 """
 
 import argparse
+import fnmatch
 import importlib.util
 import json
 import os
@@ -187,26 +188,51 @@ def raisons_repondue(texte):
     return raisons
 
 
+def designe(motif, chemin, garde):
+    """Ce motif désigne-t-il ce fichier ? (règle du garde, puis souplesse)
+
+    Le modèle rend un glob, un dossier, ou recopie le chemin avec une casse
+    approximative (`sam3Vision` pour `sam3vision`, vu sur #215 le 29/10). On
+    cherche le chemin exact, la règle du garde, puis l'égalité sans casse : le
+    fichier déclaré reste, lui, toujours écrit avec son vrai chemin.
+    """
+    if motif == chemin or garde.matches(motif, chemin):
+        return True
+    bas = motif.lower()
+    if bas == chemin.lower():
+        return True
+    if re.search(r"[*?\[]", bas):
+        return fnmatch.fnmatch(chemin.lower(), bas.replace("**", "*"))
+    return chemin.lower().startswith(bas.rstrip("/") + "/")
+
+
 def rapprocher(raisons, necessaires, garde):
     """Associe les puces rendues aux fichiers à déclarer.
 
-    Le modèle rend parfois un glob (`app/**/Settings*.kt`) ou un dossier là où
-    on attendait un chemin exact : on applique la règle du garde lui-même
-    (`matches`) au lieu d'exiger l'égalité — sinon une puce juste était comptée
-    comme absente et la PR restait bloquée (29/10, #215).
+    Une puce juste ne doit jamais être comptée comme absente : c'est ce qui
+    laissait les PR bloquées sur « le modèle n'a rien rendu » (29/10, #215).
     Rend (couverts {chemin: raison}, manquants).
     """
     couverts = {}
     for chemin in necessaires:
-        if chemin in raisons:
-            couverts[chemin] = raisons[chemin]
-            continue
         for motif, raison in raisons.items():
-            if garde.matches(motif, chemin):
+            if designe(motif, chemin, garde):
                 couverts[chemin] = raison
                 break
     manquants = [chemin for chemin in necessaires if chemin not in couverts]
     return couverts, manquants
+
+
+def motif_declare(ligne):
+    """Motif qu'un garde lit comme une déclaration dans `## Scope`.
+
+    Même expression que `parse_scope` : un garde lit `- `Parler`` même sans
+    raison, alors que `PUCE` (qui exige une raison) le prenait pour de la
+    prose. Ces lignes-là ne doivent pas survivre si elles ne servent aucun
+    fichier : le garde les compterait comme périmètre surdimensionné (#263).
+    """
+    match = re.match(r"^\s*[-*]\s+`?([^`\s]+)`?", ligne)
+    return match.group(1).strip().strip("`") if match else None
 
 
 def recomposer(corps, fichiers, raisons, garde):
@@ -227,14 +253,13 @@ def recomposer(corps, fichiers, raisons, garde):
                 if lignes[i].strip().startswith("## ")), len(lignes))
     gardees, couverts, retires = [], set(), []
     for ligne in lignes[debut + 1:fin]:
-        match = PUCE.match(ligne)
-        if not match:
+        motif = motif_declare(ligne)
+        if motif is None:
             if ligne.strip():
                 gardees.append(ligne)          # prose de l'auteur : intacte
             continue
-        motif = match.group(1).strip().strip("`").strip()
         servis = [chemin for chemin in necessaires
-                  if garde.matches(motif, chemin)]
+                  if designe(motif, chemin, garde)]
         if servis:
             gardees.append(ligne)
             couverts.update(servis)
