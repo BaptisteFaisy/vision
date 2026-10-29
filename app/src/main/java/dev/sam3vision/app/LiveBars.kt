@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,10 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.live.HomeModes
 
 /* * Bandeau du haut : retour, réglages, mode de vision, ligne d'état du direct, erreurs.
  * Le bouton « Partager le suivi » vit dans les Réglages, pas ici (suivi permanent). */
@@ -33,6 +37,7 @@ fun LiveTopBar(
     draft: String,
     onDraftChange: (String) -> Unit,
     onApply: () -> Unit,
+    onPreset: (List<String>) -> Unit,
     failure: String?,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -66,6 +71,7 @@ fun LiveTopBar(
             )
         }
         PromptRow(draft, onDraftChange, onApply)
+        HomePresetRow(state.prompts, onPreset)
         (failure ?: state.error)?.let { StatusBanner(it, AppColors.danger) }
     }
 }
@@ -170,10 +176,10 @@ fun LiveBottomBar(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         NarrationCard(state)
-        val labels = objectChips(state)
-        if (labels.isNotEmpty()) {
+        val items = objectChipItems(state)
+        if (items.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                labels.forEach { Chip(it, AppColors.primary, null) }
+                items.forEach { Chip(it.text, AppColors.primary, null, icon = HomeIcons.iconFor(it.label)) }
             }
         }
         BigButton(
@@ -223,31 +229,49 @@ fun NarrationCard(state: LiveUiState, modifier: Modifier = Modifier) {
     }
 }
 
+/** Pastille objet : label brut SAM (pour l'icône) + texte affiché (français + distance). */
+data class DetectedChip(val label: String, val text: String)
+
 /**
  * Pastilles du bas : une par concept suivi, avec sa distance la plus courte
- * (« personne 2,1 m ») quand elle est mesurée, sinon le concept seul.
+ * (« personne 2,1 m ») quand elle est mesurée, sinon le concept seul. Les objets
+ * maison s'affichent en français (« clés »), les autres gardent leur label brut.
  */
-fun objectChips(state: LiveUiState, max: Int = 5): List<String> {
+fun objectChipItems(state: LiveUiState, max: Int = 5): List<DetectedChip> {
     val readings = state.distanceLayer?.readings.orEmpty()
     val measured = DistanceText.perLabel(readings)
     if (measured.isNotEmpty()) {
-        return measured.take(max).map { (label, meters) -> "$label ${DistanceText.format(meters)}" }
+        return measured.take(max).map { (label, meters) -> DetectedChip(label, "${HomeModes.french(label)} ${DistanceText.format(meters)}") }
     }
     return state.frame?.objects?.map { it.label }?.distinct()?.take(max).orEmpty()
+        .map { DetectedChip(it, HomeModes.french(it)) }
 }
 
-/** Pastille : cliquable si [onClick] fourni, sinon simple étiquette. */
+/** Textes des pastilles : [objectChipItems] sans les labels (contrat historique). */
+fun objectChips(state: LiveUiState, max: Int = 5): List<String> = objectChipItems(state, max).map { it.text }
+
+/**
+ * Pastille : cliquable si [onClick] fourni, sinon simple étiquette.
+ * [icon] = drawable affiché devant le texte (`null` = texte seul, comme avant).
+ */
 @Composable
-fun Chip(label: String, color: Color, onClick: (() -> Unit)?) {
+fun Chip(label: String, color: Color, onClick: (() -> Unit)?, icon: Int? = null) {
     val shape = RoundedCornerShape(12.dp)
     val decorated = Modifier.background(color.copy(alpha = 0.9f), shape).padding(horizontal = 12.dp, vertical = 7.dp)
     val ink = contentOn(color)
     if (onClick == null) {
-        Box(decorated) { Text(label, color = ink, fontSize = 13.sp, maxLines = 1) }
+        Box(decorated) { ChipLabel(label, ink, icon) }
     } else {
-        TextButton(onClick = onClick, modifier = decorated) {
-            Text(label, color = ink, fontSize = 13.sp, maxLines = 1)
-        }
+        TextButton(onClick = onClick, modifier = decorated) { ChipLabel(label, ink, icon) }
+    }
+}
+
+/** Contenu d'une pastille : icône optionnelle + texte, partagé cliquable ou non. */
+@Composable
+private fun ChipLabel(label: String, ink: Color, icon: Int?) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (icon != null) Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+        Text(label, color = ink, fontSize = 13.sp, maxLines = 1)
     }
 }
 

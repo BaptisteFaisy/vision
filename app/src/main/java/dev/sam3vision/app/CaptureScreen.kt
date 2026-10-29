@@ -72,7 +72,7 @@ fun CaptureScreen(
     onPhoto: (File) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTap: (startNow: Boolean) -> Unit,
-    onOpenLive: () -> Unit,
+    onOpenLive: () -> Unit, onOpenHome: () -> Unit,
     onShown: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -114,7 +114,7 @@ fun CaptureScreen(
         onGallery = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         onSettings = onOpenSettings,
         onOpenTap = onOpenTap,
-        onLive = onOpenLive,
+        onLive = onOpenLive, onHome = onOpenHome,
     )
 }
 
@@ -176,6 +176,7 @@ private fun CameraSurface(
     onSettings: () -> Unit,
     onOpenTap: (startNow: Boolean) -> Unit,
     onLive: () -> Unit,
+    onHome: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
         if (granted) {
@@ -200,6 +201,7 @@ private fun CameraSurface(
             onSettings = onSettings,
             onOpenTap = { onOpenTap(false) }, // le bouton ouvre l'écran : l'utilisateur se place
             onLive = onLive,
+            onHome = onHome,
         )
     }
 }
@@ -284,6 +286,7 @@ private fun CaptureControls(
     onSettings: () -> Unit,
     onOpenTap: () -> Unit,
     onLive: () -> Unit,
+    onHome: () -> Unit,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp),
@@ -296,7 +299,10 @@ private fun CaptureControls(
             left = { BigButton("Vidéo (tap)", true, AppColors.success, onOpenTap, 0.5f) },
             right = { BigButton("Galerie", true, AppColors.surfaceHigh, onGallery, 0.5f) },
         )
-        BigButton("Réglages", true, AppColors.surfaceHigh, onSettings)
+        HalfRow(
+            left = { BigButton("Maison", true, AppColors.success, onHome, 0.5f) },
+            right = { BigButton("Réglages", true, AppColors.surfaceHigh, onSettings, 0.5f) },
+        )
     }
 }
 
