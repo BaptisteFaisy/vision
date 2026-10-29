@@ -44,7 +44,7 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShareRelay(
     seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
-        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmEndpoint(withLlmKey(migrateLegacyLlm(healAsr(healRoute(healSamManual(dropPresetUrl(loaded)), build)), build), build), build), build), build), build), build),
+        seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmModel(healLlmEndpoint(withLlmKey(migrateLegacyLlm(healAsrModel(healAsr(healRoute(healSamManual(dropPresetUrl(loaded)), build))), build), build), build), build), build), build), build), build),
     ), build), build),
 )
 
@@ -198,6 +198,16 @@ internal fun healLlmEndpoint(loaded: Settings, build: BuildDefaults): Settings {
     return loaded.copy(llmBaseUrl = base)
 }
 
+/**
+ * Auto-réparation : un modèle LLM vide n'a jamais été un choix — le build reprend la
+ * main, à défaut l'épinglé. Un modèle saisi (même exotique) est conservé : le repli
+ * 404 vit dans le client, pas ici. Après [withLlmKey], qui remplit déjà ce champ.
+ */
+internal fun healLlmModel(loaded: Settings, build: BuildDefaults): Settings {
+    if (loaded.llmModel.isNotBlank()) return loaded
+    return loaded.copy(llmModel = build.llmModel.ifBlank { Settings.DEFAULT_LLM_MODEL })
+}
+
 /** Clé LLM de build : uniquement si rien n'a encore été saisi. */
 internal fun withLlmKey(loaded: Settings, build: BuildDefaults): Settings {
     if (loaded.llmApiKey.isNotBlank() || build.llmApiKey.isBlank()) return loaded
@@ -207,6 +217,13 @@ internal fun withLlmKey(loaded: Settings, build: BuildDefaults): Settings {
         llmModel = loaded.llmModel.ifBlank { build.llmModel },
     )
 }
+
+/**
+ * Auto-réparation : un modèle de dictée vide n'a jamais été un choix — le défaut Meta
+ * reprend la main (aucun modèle de build n'existe pour la dictée).
+ */
+internal fun healAsrModel(loaded: Settings): Settings =
+    if (loaded.asrModel.isBlank()) loaded.copy(asrModel = Settings.DEFAULT_ASR_MODEL) else loaded
 
 /** Clé de dictée Meta de build : sans elle, la dictée retombe sur ElevenLabs Scribe. */
 internal fun seedAsr(loaded: Settings, build: BuildDefaults): Settings {
