@@ -29,9 +29,9 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 | `:app` `androidTest` | 4 | 4 | **9** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **2 709 tests JVM** au total, dont **1 765** dans `:core` et **944** dans `:app`. Dans `:app`, le
+- **2 822 tests JVM** au total, dont **1 780** dans `:core` et **1 042** dans `:app`. Dans `:app`, le
   banc lunettes pèse **95** (`glasses/bench/`) et le reste du paquet `glasses` **71**. Les
-  **10 tests instrumentés** (9 + 1) sont hors de ce total.
+  **9 tests instrumentés** (8 + 1) sont hors de ce total.
 - « Classes `@Test` » = déclarations `class …Test` dans les fichiers portant `@Test`
   (deux fichiers portent deux classes : `PictoMatcherTest.kt`, `TapZonesTest.kt` — §6).
 - Le banc lunettes **n'est plus un module** : ses tests JVM sont dans
@@ -157,12 +157,11 @@ avant d'être présentés comme validés :
 - la **vérification de bascule de région EU/US** (« Tester SAM ») ;
 - les **recettes lunettes** (`app/…/glasses/` et le banc `app/…/glasses/bench/`, `Route.Bench`).
 
-## 5. Tests instrumentés (9 + 1 banc)
+## 5. Tests instrumentés (8 + 1 banc)
 
 `app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests),
 `app/src/androidTest/…/depth/DepthBenchDeviceTest.kt` (1 test : DA2 tourne sur
-appareil), `app/src/androidTest/…/segment/SegmentBenchDeviceTest.kt` (1 test : TwinLite
-téléchargé depuis la release GitHub et inféré sur appareil, verdict dans logcat) et
+appareil) et
 `app/src/androidTest/…/media/MediaDowngradeTest.kt` (1 test : rétrogradation v2
 vers v1 recréée vide, sans crash) ;
 `app/src/androidTestDebug/…/glasses/bench/MockGlassesTest.kt` (1 test — source set
@@ -222,7 +221,7 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **haptics** (10) : CrossingHapticsTest 2, WaveformTest 8
 - **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (300) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 11, GuidanceSteeringTest 13, GuidanceTest 18, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LatestFrameSlotTest 5, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 10, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
+- **live** (322) : CaptureStampTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, GuidanceAnnouncerSidewalkTest 6, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 15, GuidanceSteeringTest 13, GuidanceTest 18, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 12, LatestFrameSlotTest 5, LightClockTest 6, LiveCadenceSimTest 1, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 10, LivePumpTest 4, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 19, LiveStatsTest 6, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 5, MaisonEnterCommandTest 4, PositionAnnouncerTest 7, PositionTextEnglishTest 5, PositionTextTest 12, ScreenTimingsTest 4, SteeringTest 12, TimelineTextTest 7, TrackRunnerStartTest 3, TrackRunnerTest 16, UploadLadderTest 19
 - **local** (27) : LocalOverlayEngineTest 24, LocalOverlaySimTest 3
 - **mask** (97) : MaskBenchTest 2, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
 - **model** (7) : GeometryTest 4, ObjectLimitsTest 3
@@ -232,7 +231,6 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 - **net** (289) : ElevenLabsSttClientTest 5, ElevenLabsTtsClientTest 8, FallbackSpeechClientTest 4, GpuMonitorTest 11, HttpErrorTest 4, HttpLlmClientTest 3, HttpRequestBuilderTest 10, HttpRequestsTest 3, LifecycleContractTest 10, LiveClientFactoryTest 4, LiveClientTest 16, LiveContractTest 13, LiveNarrationClientTest 4, LlmClientTest 12, LlmContractTest 23, LlmInjectionTest 5, LlmPromptsTest 6, LlmRequestLanguageTest 3, MetaAsrClientTest 8, MetaAsrContractTest 8, MetaImageClientTest 5, RouteClientTest 9, SamClientTest 6, SamContractTest 12, SamLifecycleTest 5, TrackClientTest 12, ValhallaRouteClientTest 6, VideoClientTest 12, VideoContractTest 10, VoiceContractTest 17, WsLiveClientTest 24, WsLiveContractTest 11
 - **picto** (8) : PictoMatcherTest 8 (deux classes : PictoMatcherTest 6 + PictoPromptTest 2)
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
-- **segment** (39) : TwinLiteAnnouncerTest 12, TwinLiteDecodeTest 6, TwinLiteGuideTest 13, WalkGuideTest 8
 - **settings** (95) : CaregiverInviteTest 7, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
 - **share** (22) : CaregiverPageTest 7, SharePayloadTest 7, ShareSendMessageTest 4, SharedSceneTest 4
 - **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
@@ -246,17 +244,16 @@ Une entrée par fichier `*Test.kt`, avec son nombre d’annotations `@Test` (deu
 
 - **(racine)** (171) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
-- **depth** (11) : DepthPreprocessTest 6, ModelDownloaderTest 5
+- **depth** (9) : DepthPreprocessTest 4, ModelDownloaderTest 5
 - **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
 - **glasses.bench** (95) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 22, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
-- **isee** (166) : BubbleCountTest 2, CrossingWiringTest 3, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 3, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 4, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 8, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3, TwinLiteWiringTest 8
-- **isee.vm** (74) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, NavigationHookTest 6
+- **isee** (188) : BubbleCountTest 2, CrossingLightPumpTest 1, CrossingLocalLightTest 7, CrossingOverlayLayoutTest 11, CrossingWiringTest 6, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 4, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeHazardsTest 2, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 9, ProbeWiringSpokenTest 3, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3
+- **isee.vm** (82) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseePictoVoiceTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, NavigationHookTest 6
 - **live** (68) : LiveAskForgetTest 1, LiveAskSessionTest 13, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
 - **locked** (6) : LockedMicAnswerTest 6
 - **media** (14) : MediaCacheStoreTest 4, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **navigation** (22) : AndroidGeocoderLabelTest 4, NavigationLauncherTest 12, VoiceNavTrackerTest 6
 - **perms** (11) : PermDecisionTest 11
-- **segment** (2) : SegmentPreprocessTest 2
 - **speech** (66) : SpeechArbitrationTest 6, SystemTtsEngineTest 9, VoiceNavAnnouncerTest 4, VoiceNavPhrasesTest 7, VoiceNavPolicyTest 26, VoiceNavSpeakerTest 14
 - **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapSessionTest 6, TapZonesTest 6 (deux classes : TapZonesTest 4 + TapReleaseTest 2)
 - **traverse** (17) : TraverseClipStoreTest 4, TraverseWiringTest 13

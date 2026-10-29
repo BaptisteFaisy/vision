@@ -138,4 +138,41 @@ class GuidanceAnnouncerTest {
         assertEquals("Va à gauche.", announcer.onFrame(0L, listOf(matiere())))
         assertNull(announcer.onFrame(500L, listOf(matiere())))
     }
+
+    private fun personneDroite(meters: Float) = PlacedLabel("personne", 0.7f, 0.5f, meters)
+
+    @Test
+    fun `personne qui s approche a droite conseille de decaler a gauche`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertNull(announcer.onFrame(0L, listOf(personneDroite(3.0f))))
+        assertEquals("Continue.", announcer.onFrame(250L, listOf(personneDroite(2.6f))))
+        assertEquals("Décalez-vous à gauche.", announcer.onFrame(500L, listOf(personneDroite(2.2f))))
+    }
+
+    @Test
+    fun `couloir bouche prime sur le decalage`() {
+        val announcer = GuidanceAnnouncer()
+        fun bloque(m: Float) = PlacedLabel("personne", 0.5f, 0.5f, m)
+
+        announcer.onFrame(0L, listOf(bloque(3.4f), personneDroite(3.0f)))
+        announcer.onFrame(250L, listOf(bloque(2.4f), personneDroite(2.6f)))
+
+        assertEquals(
+            "Va à gauche, 1 mètre.",
+            announcer.onFrame(500L, listOf(bloque(1.4f), personneDroite(2.2f))),
+        )
+        assertNull(announcer.lastNudge)
+    }
+
+    @Test
+    fun `decalage reparle a chaque seau de distance`() {
+        val announcer = GuidanceAnnouncer()
+
+        announcer.onFrame(0L, listOf(personneDroite(3.0f)))
+        announcer.onFrame(250L, listOf(personneDroite(2.6f)))
+        assertEquals("Décalez-vous à gauche.", announcer.onFrame(500L, listOf(personneDroite(2.2f))))
+        assertNull(announcer.onFrame(750L, listOf(personneDroite(1.8f))))
+        assertEquals("Décalez-vous à gauche.", announcer.onFrame(1_000L, listOf(personneDroite(1.4f))))
+    }
 }

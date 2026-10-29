@@ -151,7 +151,6 @@ class UiLogicTest {
             Route.Isee, Route.Capture, Route.Analysis, Route.Chat,
             Route.Live, Route.Settings, Route.Caregiver, Route.Onboarding,
             Route.Bench, Route.Tap(true), Route.Tap(false), Route.VoiceNav,
-            Route.Segment,
         )
         routes.forEach { assertEquals(it, routeFromName(routeToName(it))) }
         assertEquals(Route.Isee, routeFromName("inconnue"))
@@ -160,9 +159,9 @@ class UiLogicTest {
 
     @Test
     fun `la demande de route exterieure se pousse et se consomme une fois`() {
-        RouteRequest.push("segment")
-        assertEquals("segment", RouteRequest.pending.value)
-        assertEquals("segment", RouteRequest.consume())
+        RouteRequest.push("voicenav")
+        assertEquals("voicenav", RouteRequest.pending.value)
+        assertEquals("voicenav", RouteRequest.consume())
         assertEquals(null, RouteRequest.consume())
     }
 

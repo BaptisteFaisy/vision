@@ -51,6 +51,15 @@ class GuidanceAnnouncer(
         private set
 
     /**
+     * Décalage de la dernière frame (`null` le plus souvent) : la vidéo y lit
+     * la flèche latérale, en direct comme la décision.
+     */
+    var lastNudge: LateralNudge? = null
+        private set
+
+    private val nudge = LateralNudgeTracker()
+
+    /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
      * change ni les seuils, ni la mémoire de décision. [cap] est la direction
@@ -74,7 +83,9 @@ class GuidanceAnnouncer(
         val decision = Guidance.decide(labels, effective, rangeMeters, hfovDeg)
         lastDecision = decision
         lastSidewalk = sidewalk
+        lastNudge = null
         if (decision.blocked) return speakBlocked(atMs, decision, language)
+        nudgeOf(atMs, labels)?.let { return speakNudge(atMs, it, language) }
         val correction = SidewalkText.phrase(sidewalk, language)
         if (correction != null) return speakSidewalk(atMs, sidewalk, correction)
         return speakFree(atMs, decision, language)
@@ -85,6 +96,22 @@ class GuidanceAnnouncer(
         val key = Guidance.key(decision)
         if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
         val phrase = Guidance.phrase(decision, language)
+        gate.markSpoken(key, atMs, phrase)
+        return phrase
+    }
+
+    /** Décalage latéral : personne proche qui s'approche — urgent comme le bouché. */
+    private fun nudgeOf(atMs: Long, labels: List<PlacedLabel>): LateralNudge? {
+        val cue = nudge.onFrame(atMs, labels) ?: return null
+        lastNudge = cue
+        return cue
+    }
+
+    /** Consigne de décalage : urgente, clé au mètre (reparle en se rapprochant). */
+    private fun speakNudge(atMs: Long, cue: LateralNudge, language: SpeechLanguage): String? {
+        val key = LateralNudge.key(cue)
+        if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
+        val phrase = LateralNudgeText.phrase(cue.side, language)
         gate.markSpoken(key, atMs, phrase)
         return phrase
     }
@@ -111,5 +138,7 @@ class GuidanceAnnouncer(
         gate.reset()
         lastDecision = null
         lastSidewalk = null
+        lastNudge = null
+        nudge.reset()
     }
 }

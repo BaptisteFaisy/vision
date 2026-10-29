@@ -87,8 +87,10 @@ internal class ProbeVoice(
     fun cue(): SteeringCue? {
         if (!guide) return null
         val decision = guidance.lastDecision ?: return null
+        if (decision.blocked) return SteeringCue.from(decision)
+        guidance.lastNudge?.let { return SteeringCue(decision.cap, blocked = false, passage = it.side, urgent = true) }
         val back = guidance.lastSidewalk?.let { SidewalkKeep.returnCap(it) }
-        if (!decision.blocked && back != null) return SteeringCue(decision.cap, blocked = false, passage = back)
+        if (back != null) return SteeringCue(decision.cap, blocked = false, passage = back)
         return SteeringCue.from(decision)
     }
 

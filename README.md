@@ -101,7 +101,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Block | Role |
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video), pacing, masks, distances, pure depth, gestures, voice, encrypted settings |
-| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), segmentation (LiteRT), capture purge |
+| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, glasses + bench, depth (ONNX), capture purge |
 | `server/` | Modal backend (Python): live/photo (`live_fast`, app `sam3-eu-a100`), Valhalla CPU routing (`valhalla-idf-cpu`), tracker (`track_app.py`, manual deploy), photo legacy (`modal_app.py`), GPU probes — plus `legacy-expo-app/`, the archived old Expo app |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) + Vercel relay; embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`) |
 | `tools/` | CI guards (Kotlin sizes, Portrait design, latency budget, voice navigation), fake LLM/SAM for tests, utilities |
@@ -120,7 +120,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin, no direct import) |
 | Network | OkHttp 4.12.0 (a single client, a single pool), `org.json` (shipped with Android, zero dependencies), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (TTS + STT fallback), Meta ASR (dictation), jump3r 1.0.4 (pure-Java MP3) |
-| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0, LiteRT 2.2.0 (`litert-edge`, TwinLite segmentation) |
+| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0 |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
 ### `server/` backend (Python, Modal)
