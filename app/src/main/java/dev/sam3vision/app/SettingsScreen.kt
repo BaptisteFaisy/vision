@@ -376,49 +376,6 @@ private fun BackendFields(draft: Settings, onChange: (Settings) -> Unit) {
     }
 }
 
-/**
- * « Parent tracking »: the site link sent by WhatsApp + start/stop of the permanent
- * tracking. The stream id is not editable: every phone gets its own at first load,
- * so nobody has to rename a link before sharing it with a relative.
- */
-@Composable
-private fun ParentShareSettings(
-    draft: Settings,
-    onStartTracking: (Settings) -> Unit,
-    onStopTracking: () -> Unit,
-    onChange: (Settings) -> Unit,
-) {
-    val trackingActive by ShareTracking.running.collectAsState()
-    val shareProblem by ShareHealth.message.collectAsState()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            "Parent tracking",
-            color = SettingsLight.text,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        LabeledField("Tracking relay URL", draft.parentSiteUrl, false) {
-            onChange(draft.copy(parentSiteUrl = it))
-        }
-        SwitchRow("Send position + objects to the site during Direct", draft.shareEnabled) {
-            onChange(draft.copy(shareEnabled = it))
-        }
-        LabeledField("Relay write key (generated, never shared)", draft.shareWriteKey, true) {
-            onChange(draft.copy(shareWriteKey = it))
-        }
-        // Le suivi échoue peut-être sans rien dire : refus du relais, relais
-        // injoignable ou localisation coupée se lisent ici, jamais dans le vide.
-        shareProblem?.let {
-            Text(it, color = SettingsLight.danger, fontSize = 12.sp)
-        }
-        if (trackingActive) {
-            GlassButton("Stop tracking", true, false, onStopTracking)
-        } else {
-            GlassButton("\uD83D\uDCE4 Share tracking", true, false, onClick = { onStartTracking(draft) })
-        }
-    }
-}
-
 /** Save + one test button per engine (LLM, SAM, Meta dictation). */
 @Composable
 private fun SettingsActions(

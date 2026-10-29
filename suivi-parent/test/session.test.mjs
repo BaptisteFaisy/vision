@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shareIdOf, stateOf, destPoint, objectsOf, movementBetween, narrationOf } from '../session.mjs';
+import { shareIdOf, stateOf, destPoint, objectsOf, movementBetween, narrationOf, neverPublished, NO_STREAM_TEXT } from '../session.mjs';
 import { wordsSpoken } from '../spoken-line.mjs';
 
 const fix = { lat: 48.85, lon: 2.35, accM: 1, atMs: 1000, headingDeg: 0, indoor: false };
@@ -54,4 +54,16 @@ test('l’éclairage mot à mot suit la cadence Portrait, puis termine la phrase
   assert.equal(wordsSpoken('Un obstacle devant toi', 0), 0);
   assert.equal(wordsSpoken('Un obstacle devant toi', 151), 1);
   assert.equal(wordsSpoken('Un obstacle devant toi', 2000), 4);
+});
+
+test('un lien qui ne désigne aucun flux se dit, au lieu d’attendre à vie', () => {
+  // Le relais répond la même chose pour un identifiant inconnu et pour un flux muet :
+  // seul `serverAt` distingue un flux existant d’un identifiant jamais publié.
+  assert.equal(neverPublished({ ok: true, live: false }), true);
+  assert.equal(neverPublished({ ok: true, live: false, serverAt: 1000 }), false);
+  assert.equal(neverPublished({ ok: true, live: true, serverAt: 1000 }), false);
+  assert.equal(neverPublished(null), false);
+  assert.equal(narrationOf(null, 'offline', '', true, false), NO_STREAM_TEXT);
+  assert.match(NO_STREAM_TEXT, /réinstallée/);
+  assert.match(narrationOf(null, 'offline', '', false, false), /lien de suivi/);
 });
