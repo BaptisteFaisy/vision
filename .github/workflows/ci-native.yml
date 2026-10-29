@@ -41,33 +41,19 @@ jobs:
         with:
           fetch-depth: 1
       - uses: gradle/actions/setup-gradle@v4
-      # Les clés des APK distribués (même étape que le job `ci`) : sans elle,
-      # l'artefact apk-debug sort sans clé et l'app dit « No LLM key
-      # configured ». Sans secret, l'APK sort sans clé (saisie dans Réglages).
+      # Les clés des APK distribués (action composite, même étape que le job
+      # `ci`) : sans elle, l'artefact apk-debug sort sans clé et l'app dit
+      # « No LLM key configured ». Sans secret, l'APK sort sans clé.
       - name: Clés du build (secrets → local.properties)
-        env:
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
-          TTS_VOICE_ID: ${{ secrets.TTS_VOICE_ID }}
-          ASR_API_KEY: ${{ secrets.ASR_API_KEY }}
-          LLM_LIVE_API_KEY: ${{ secrets.LLM_LIVE_API_KEY }}
-        run: |
-          if [ -z "$LLM_API_KEY" ] && [ -z "$TTS_API_KEY" ] && [ -z "$ASR_API_KEY" ]; then
-            echo "Aucun secret de clé : APK sans clé, saisie dans Réglages."
-            exit 0
-          fi
-          : > local.properties
-          for pair in "llm.base.url=$LLM_BASE_URL" "llm.api.key=$LLM_API_KEY" \
-                      "llm.model=$LLM_MODEL" "llm.live.api.key=$LLM_LIVE_API_KEY" \
-                      "tts.api.key=$TTS_API_KEY" \
-                      "tts.voice.id=$TTS_VOICE_ID" "asr.api.key=$ASR_API_KEY"; do
-            cle="${pair%%=*}"
-            valeur="${pair#*=}"
-            [ -n "$valeur" ] && printf '%s=%s\n' "$cle" "$valeur" >> local.properties
-          done
-          echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."
+        uses: ./.github/actions/cles-build
+        with:
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-model: ${{ secrets.LLM_MODEL }}
+          tts-api-key: ${{ secrets.TTS_API_KEY }}
+          tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
+          asr-api-key: ${{ secrets.ASR_API_KEY }}
+          llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
       - name: APK debug
         run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleDebug
       # Garde clés embarquées : tant que les secrets existent, l'APK DOIT les
@@ -100,33 +86,19 @@ jobs:
         with:
           fetch-depth: 1
       - uses: gradle/actions/setup-gradle@v4
-      # Les clés des APK distribués (même étape que le job `apk`) : sans elle,
-      # la variante release sort sans clé alors que la debug les embarque.
-      # Sans secret, l'APK sort sans clé (saisie dans Réglages).
+      # Les clés des APK distribués (action composite, même étape que le job
+      # `apk`) : sans elle, la variante release sort sans clé alors que la
+      # debug les embarque. Sans secret, l'APK sort sans clé.
       - name: Clés du build (secrets → local.properties)
-        env:
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
-          TTS_VOICE_ID: ${{ secrets.TTS_VOICE_ID }}
-          ASR_API_KEY: ${{ secrets.ASR_API_KEY }}
-          LLM_LIVE_API_KEY: ${{ secrets.LLM_LIVE_API_KEY }}
-        run: |
-          if [ -z "$LLM_API_KEY" ] && [ -z "$TTS_API_KEY" ] && [ -z "$ASR_API_KEY" ]; then
-            echo "Aucun secret de clé : APK sans clé, saisie dans Réglages."
-            exit 0
-          fi
-          : > local.properties
-          for pair in "llm.base.url=$LLM_BASE_URL" "llm.api.key=$LLM_API_KEY" \
-                      "llm.model=$LLM_MODEL" "llm.live.api.key=$LLM_LIVE_API_KEY" \
-                      "tts.api.key=$TTS_API_KEY" \
-                      "tts.voice.id=$TTS_VOICE_ID" "asr.api.key=$ASR_API_KEY"; do
-            cle="${pair%%=*}"
-            valeur="${pair#*=}"
-            [ -n "$valeur" ] && printf '%s=%s\n' "$cle" "$valeur" >> local.properties
-          done
-          echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."
+        uses: ./.github/actions/cles-build
+        with:
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-model: ${{ secrets.LLM_MODEL }}
+          tts-api-key: ${{ secrets.TTS_API_KEY }}
+          tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
+          asr-api-key: ${{ secrets.ASR_API_KEY }}
+          llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
       - name: APK release
         run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleRelease
       # Garde clés embarquées (même étape que le job `apk`) : l'APK DOIT

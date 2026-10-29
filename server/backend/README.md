@@ -77,3 +77,14 @@ celui tapé par l'utilisateur**.
 - `scaledown_window=300` : le premier appel après 5 min de veille recharge les poids — **~36 s
   mesurés une seule fois** (35,8 s pour `/health`), non reproductible depuis : voir `docs/PERF.md`.
 - Les masques sont calculés sur une copie ≤ 1024 px puis remontés en nearest à la taille d'origine.
+
+## `live_fast/` : fichiers vendored
+
+L'app déployée (`live_fast/live_app_fast.py`) doit être **auto-suffisante** :
+Modal ne suit pas les imports hors de son dossier. Sept modules sont donc
+recopiés depuis `backend/` (`concepts`, `http_errors`, `imaging`, `live_ws`,
+`schemas`, `segmentation`, `timing`) — **byte-identiques**, parité gardée par
+`test_units.py` (`test_live_fast_parity`, lancé en CI sur les PR backend).
+Corriger d'un côté impose de recopier de l'autre. `fast_core.py` et
+`live_app_fast.py` sont volontairement **forkés** (poids extraits dans
+`weights.py`, leviers de déploiement) : exclus de la parité.

@@ -6,7 +6,7 @@ seule la plomberie HTTP et la logique pure sont exercées ici. Le rendu des
 masques, le chargement du modèle et l'appel LLM réel restent hors de portée —
 couverts par scripts/test_api.py contre le backend déployé.
 
-    python3 scripts/test_units.py
+    python3 server/scripts/test_units.py
 """
 
 from __future__ import annotations
@@ -393,6 +393,26 @@ def test_live_pipeline(live_app) -> None:
           status == 500 and len(payload.get("detail", "")) <= 300, str(payload)[:120])
 
 
+# Fichiers vendored dans live_fast/ : l'app déployée doit être auto-suffisante
+# (Modal ne suit pas les imports hors de son dossier), donc ces modules sont
+# copiés — et ils doivent rester byte-identiques à backend/, sinon ces tests
+# (qui importent backend/) ne prouvent plus le déployé. fast_core.py et
+# live_app_fast.py sont volontairement forkés (poids extraits, leviers) :
+# exclus de cette parité, voir server/backend/README.md.
+VENDORED_PARITY = ("concepts.py", "http_errors.py", "imaging.py", "live_ws.py",
+                   "schemas.py", "segmentation.py", "timing.py")
+
+
+def test_live_fast_parity(_) -> None:
+    live_fast = BACKEND_DIR / "live_fast"
+    for name in VENDORED_PARITY:
+        src, copie = BACKEND_DIR / name, live_fast / name
+        check(f"parité live_fast/{name}",
+              src.is_file() and copie.is_file()
+              and src.read_bytes() == copie.read_bytes(),
+              "vendored ≠ backend/ — corriger d'un côté, recopier de l'autre")
+
+
 RUNNERS = (
     ("imaging", "imaging", test_imaging),
     ("masques", "imaging", test_masks),
@@ -447,6 +467,7 @@ RUNNERS = (
      native_tests.test_native_flow),
     ("contrat HTTP (payload /analyze)", "modal_app", native_tests.test_analyze_shape),
     ("llm : budget unique", "llm", llm_tests.test_llm_budget),
+    ("live_fast : parité des vendored", "timing", test_live_fast_parity),
 )
 
 

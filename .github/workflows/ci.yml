@@ -70,16 +70,26 @@ jobs:
           # ProGuard) — pas seulement les .kt. Avant, un manifest ou un schéma
           # Room modifié passait pour « sans code » : Gradle ne tournait pas,
           # donc vert par absence de test. La doc (.md/.txt) reste hors
-          # périmètre, où qu'elle soit.
+          # périmètre, où qu'elle soit. `tools/` n'y est pas : aucun test JVM
+          # ne lit ces scripts (gardes CI + bancs manuels), une PR 100 %
+          # Python n'a pas besoin de Gradle — les gardes tournent toujours.
+          # `server/` a son propre verdict (`backend`) : tests Python, pas Gradle.
+          backend=1
           if [ -n "$fichiers" ]; then
             if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' \
-              | grep -qE '^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$|^tools/'; then
+              | grep -qE '^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$'; then
               code=1; echo "Code touché : Gradle complet."
             else
               code=0; echo "Sans code (${fichiers//$'\n'/, }) : étapes Gradle sautées."
             fi
+            if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' | grep -qE '^server/'; then
+              backend=1; echo "Backend touché : tests Python."
+            else
+              backend=0; echo "Backend intact : tests Python sautés."
+            fi
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
 
       - name: Chaîne d'outils
         run: |
@@ -111,33 +121,22 @@ jobs:
 
       # Les clés des APK distribués. Sans secret, l'APK sort sans clé (saisie
       # dans Réglages) : c'est le comportement par défaut d'un dépôt public.
+      # Action composite : une seule implémentation pour les trois jobs qui bâtissent.
       - name: Clés du build (secrets → local.properties)
-        env:
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
-          TTS_VOICE_ID: ${{ secrets.TTS_VOICE_ID }}
-          ASR_API_KEY: ${{ secrets.ASR_API_KEY }}
-          LLM_LIVE_API_KEY: ${{ secrets.LLM_LIVE_API_KEY }}
-        run: |
-          if [ -z "$LLM_API_KEY" ] && [ -z "$TTS_API_KEY" ] && [ -z "$ASR_API_KEY" ]; then
-            echo "Aucun secret de clé : APK sans clé, saisie dans Réglages."
-            exit 0
-          fi
-          : > local.properties
-          for pair in "llm.base.url=$LLM_BASE_URL" "llm.api.key=$LLM_API_KEY" \
-                      "llm.model=$LLM_MODEL" "llm.live.api.key=$LLM_LIVE_API_KEY" \
-                      "tts.api.key=$TTS_API_KEY" \
-                      "tts.voice.id=$TTS_VOICE_ID" "asr.api.key=$ASR_API_KEY"; do
-            cle="${pair%%=*}"
-            valeur="${pair#*=}"
-            [ -n "$valeur" ] && printf '%s=%s\n' "$cle" "$valeur" >> local.properties
-          done
-          echo "local.properties écrit (gitignoré) : $(grep -c . local.properties) clé(s), valeurs jamais affichées."
+        uses: ./.github/actions/cles-build
+        with:
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-model: ${{ secrets.LLM_MODEL }}
+          tts-api-key: ${{ secrets.TTS_API_KEY }}
+          tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
+          asr-api-key: ${{ secrets.ASR_API_KEY }}
+          llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
 
       - name: Garde de taille Kotlin (< 500 lignes/fichier, < 50 lignes/fonction)
-        run: python3 tools/check-kotlin-limits.py
+        run: |
+          python3 tools/check-kotlin-limits.py
+          python3 -m unittest tools/test_check_kotlin_limits.py
 
       # Le design Portrait est obligatoire (docs/ISEE-DESIGN-PORTRAIT.md) :
       # l'ancien design reste en quarantaine, le pane assemble la scène.
@@ -166,6 +165,34 @@ jobs:
       # tests ici : quelques secondes, aucune compilation, aucun réseau.
       - name: Tests de la garde clés embarquées
         run: python3 -m unittest tools/test_check_apk_keys.py
+
+      # Les gardes de la CI se testent elles-mêmes : agent de conflits,
+      # couche0, budget — stdlib, quelques secondes, aucun réseau.
+      - name: Tests des gardes CI (conflits, couche0, budget)
+        run: |
+          python3 .github/fireworks/test_conflict_agent.py
+          python3 .github/couche0/test_check_couche0.py
+          python3 .github/ci-budget/test_check_timeouts.py
+
+      # Portes documentées mais jamais branchées : scripts shell, fixtures
+      # dorées des masques, chiffres du budget, shader du suivi — secondes,
+      # bibliothèque standard, aucun réseau, aucun appareil.
+      - name: Portes Python et shell (scripts, goldens, budget, orb)
+        run: |
+          bash scripts/test_scripts.sh
+          python3 scripts/gen_mask_golden.py --check
+          python3 scripts/budget_latence.py --check-doc
+          python3 tools/export-caregiver-orb.py --check
+          python3 -m unittest tools/test_export_caregiver_orb.py
+
+      # Tests du backend Python, seulement quand `server/` est touché (les
+      # dépendances sont des tests seuls — numpy, Pillow, FastAPI — jamais le
+      # runtime lourd : torch reste sur les conteneurs Modal).
+      - name: Tests unitaires backend
+        if: steps.perimetre.outputs.backend == '1'
+        run: |
+          python3 -m pip install --quiet numpy pillow fastapi
+          python3 server/scripts/test_units.py
 
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.

@@ -16,6 +16,10 @@ de clé pour que le chat réponde et que la voix parle ; les clés sont dans le 
 | Clé dictée Meta | `asr.api.key` | `ASR_API_KEY` |
 | Endpoint SAM | `sam.base.url`, `sam.us.base.url` | `SAM_BASE_URL`, `SAM_US_BASE_URL` |
 | URL routeur Valhalla | `route.base.url` (défaut : backend Modal CPU) | `ROUTE_BASE_URL` |
+| Clé Google Maps | `google.maps.api.key` | `GOOGLE_MAPS_API_KEY` |
+| Endpoint tap SAM 3.1 | `sam31.endpoint` (vide = tap désactivé) | `SAM31_ENDPOINT` |
+| Surimpression locale (défaut build) | `live.local.overlay` | `LIVE_LOCAL_OVERLAY` |
+| Dev lunettes (manifest) | `mwdat.application.id`, `mwdat.client.token` (défaut `"0"`) | — (`manifestPlaceholders`) |
 
 `app/build.gradle.kts` lit le fichier, `app/SettingsSeed.kt` remplit les champs vides au
 démarrage (`seededFromBuild`, utilisé par iSee, le Direct et l'écran photo). L'intro et
@@ -53,11 +57,14 @@ qu'après un « Tester le LLM » qui a réellement répondu.
 ## APK publié par la CI
 
 Le runner fait un checkout neuf : il n'a pas de `local.properties`, et un APK
-bâti sans l'étape « Clés du build » part donc **sans clé**. Cette étape écrit ce
-fichier depuis les secrets du dépôt quand ils existent (sinon elle ne fait rien) ;
-elle est présente dans les trois jobs qui bâtissent (`ci.yml` : tests,
-`ci-native.yml` : `apk` debug et `apk-release`), donc **chaque APK téléchargé
-depuis GitHub embarque les clés**.
+bâti sans l'étape « Clés du build » part donc **sans clé**. Cette étape (action
+composite unique `.github/actions/cles-build`) écrit ce fichier depuis les
+secrets du dépôt quand ils existent (sinon elle ne fait rien) ; elle est
+présente dans les trois jobs qui bâtissent (`ci.yml` : tests, `ci-native.yml` :
+`apk` debug et `apk-release`), donc **chaque APK téléchargé depuis GitHub
+embarque les sept clés secrètes** (les autres lignes — Maps, tap, overlay,
+dev lunettes — viennent du `local.properties` du poste qui bâtit, ou restent
+à leur défaut).
 
 ## Garde : prouvé à chaque build
 
