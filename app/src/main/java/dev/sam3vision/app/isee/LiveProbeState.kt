@@ -78,6 +78,11 @@ data class LiveProbeState(
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,
+    /**
+     * Alerte danger du pipeline urgence (« ⚠ Personne droit devant — contact
+     * dans ~3 s »), `null` quand personne ne vient. La voix la lira plus tard.
+     */
+    val dangerAlert: String? = null,
 ) {
     /** Rien à afficher : ni frame analysée, ni erreur. */
     val idle: Boolean get() = frames == 0 && error == null

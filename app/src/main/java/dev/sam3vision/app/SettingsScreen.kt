@@ -55,6 +55,7 @@ fun SettingsScreen(
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
     onTestDepth: () -> Unit,
+    onTestDanger: () -> Unit,
     onSpeak: (String) -> Unit,
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
@@ -83,6 +84,7 @@ fun SettingsScreen(
             onTestSam = onTestSam,
             onTestAsr = onTestAsr,
             onTestDepth = onTestDepth,
+            onTestDanger = onTestDanger,
             onPickRole = onPickRole,
             onStartTracking = onStartTracking,
             onStopTracking = onStopTracking,
@@ -100,6 +102,7 @@ fun SettingsScreen(
 private fun PerceptionSettings(
     draft: Settings,
     onTestDepth: () -> Unit,
+    onTestDanger: () -> Unit,
     onChange: (Settings) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -108,6 +111,7 @@ private fun PerceptionSettings(
         NavigationToggle(draft) { onChange(it) }
         DebugMapSettings(draft) { onChange(it) }
         DepthSettings(draft, onChange, onTestDepth)
+        DangerSettings(onTestDanger)
     }
 }
 
@@ -322,6 +326,7 @@ internal fun TechnicalSection(
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
     onTestDepth: () -> Unit,
+    onTestDanger: () -> Unit,
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     nav: NavCallbacks,
@@ -335,7 +340,7 @@ internal fun TechnicalSection(
         ObjectsSettings(draft) { onChange(it) }
         GpuRegionSettings(draft, gpu) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
-        PerceptionSettings(draft, onTestDepth) { onChange(it) }
+        PerceptionSettings(draft, onTestDepth, onTestDanger) { onChange(it) }
         TtsSettings(
             draft = draft,
             speaking = speaking,
