@@ -67,6 +67,12 @@ data class LiveProbeState(
      * dans le champ, ou mode coupé : rien à marquer.
      */
     val crossingBox: List<Float>? = null,
+    /**
+     * Phase prudente du verdict direct (`null` = rien de publié encore) : seul
+     * [Traverser][dev.sam3vision.core.traverse.TraversePhase.Traverser] vaut
+     * « peut traverser », toute autre phase vaut « ne peut pas traverser ».
+     */
+    val traversePhase: dev.sam3vision.core.traverse.TraversePhase? = null,
     /** Un passage piéton est dans le champ : proposer le mode Traversée (jamais automatique). */
     val crossingOffer: Boolean = false,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */

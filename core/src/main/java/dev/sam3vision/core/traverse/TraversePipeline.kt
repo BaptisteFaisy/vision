@@ -97,9 +97,10 @@ class TraversePipeline(
 
 /**
  * Phase du veto vue par l'annonceur : vert confirmé ou maintenu = vert,
- * attente ou alerte = rouge (le doute parle comme le rouge).
+ * attente ou alerte = rouge (le doute parle comme le rouge). Publique :
+ * la sonde iSee y lit le même verdict que le direct.
  */
-private fun TraverseDecision.crossingState(): CrossingState = when (state) {
+fun TraverseDecision.crossingState(): CrossingState = when (state) {
     TraversePhase.PRET, TraversePhase.TRAVERSER -> CrossingState.Green
     TraversePhase.ATTENDRE, TraversePhase.ALERTE -> CrossingState.Red
 }

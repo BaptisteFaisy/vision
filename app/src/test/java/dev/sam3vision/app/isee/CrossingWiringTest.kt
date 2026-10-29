@@ -1,7 +1,13 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraverseVeto
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CrossingWiringTest {
@@ -41,5 +47,15 @@ class CrossingWiringTest {
     fun `mode actif libelle l etat du feu`() {
         assertEquals("Traversée : VERT", crossingButtonLabel(true, CrossingState.Green))
         assertEquals("Traversée : ROUGE", crossingButtonLabel(true, CrossingState.Red))
+    }
+
+    @Test
+    fun `mode coupe ne publie ni phrase ni phase`() {
+        // Sortie avant toute lecture : la sonde reste muette et le bandeau absent.
+        val patch = crossingPatchOf(
+            CrossingAnnouncer(), TraverseVeto(), false,
+            LiveFrame(100, 100, 0L, emptyList()), LensSpec.Default, "", 0L, SpeechLanguage.Fr,
+        )
+        assertNull(patch)
     }
 }

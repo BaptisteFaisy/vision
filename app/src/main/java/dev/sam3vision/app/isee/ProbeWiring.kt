@@ -10,6 +10,7 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -215,6 +216,14 @@ internal fun LiveProbe.observeDetour(scope: CoroutineScope, onDetour: (Boolean, 
         }
     }
 }
+
+/**
+ * Chemin dessiné sur la vidéo : lu dans la décision parlée à cette frame
+ * (la vidéo est en direct, la voix seule est débouncée). `null` en
+ * Traversée (ses prompts feu+voitures ne disent pas où marcher).
+ */
+internal fun LiveProbe.steeringCueOf(): SteeringCue? =
+    if (state.value.crossingActive) null else voice.cue()
 
 /** Les trois guetteurs de la sonde (trottoir + escaliers + mobilier), reset commun. */
 internal class ProbeHazards(
