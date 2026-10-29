@@ -18,8 +18,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * La page caméra suit le cap demandé à la voix : « Va à gauche. » sur voie
- * libre, consigne de passage devant un obstacle, et chemin publié dans l'état
+ * La page caméra suit le cap demandé à la voix : « Gauche. » sur voie
+ * libre, mot de passage devant un obstacle, et chemin publié dans l'état
  * pour la flèche vidéo. Sans objet à décorer ni masque à décoder, sans Android.
  */
 class LiveProbeSteeringTest {
@@ -39,7 +39,7 @@ class LiveProbeSteeringTest {
     )
 
     @Test
-    fun `cap gauche dit va a gauche sur voie libre`() = runTest {
+    fun `cap gauche dit gauche sur voie libre`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.setSteering(SteeringCap.Left)
         probe.onFrame("A", captureAtNs = 8_000_000L)
@@ -51,12 +51,12 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Va à gauche.", probe.state.value.spoken)
+        assertEquals("Gauche.", probe.state.value.spoken)
         assertEquals(SteeringCap.Left, probe.state.value.steeringCap)
     }
 
     @Test
-    fun `cap gauche bouche dit le passage`() = runTest {
+    fun `cap gauche bouche dit le mot de passage`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.setSteering(SteeringCap.Left)
         probe.onFrame("A", captureAtNs = 8_000_000L)
@@ -68,9 +68,7 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame(listOf(personneGauche())))
         advanceUntilIdle()
 
-        val spoken = probe.state.value.spoken.orEmpty()
-        assertTrue("passage attendu, reçu : $spoken", spoken.startsWith("Va vers le centre"))
-        assertTrue("passage attendu, reçu : $spoken", spoken.contains("mètre"))
+        assertEquals("Tout droit.", probe.state.value.spoken)
     }
 
     @Test
@@ -116,7 +114,7 @@ class LiveProbeSteeringTest {
         advanceUntilIdle()
 
         assertEquals(SteeringCap.Straight, probe.state.value.steeringCap)
-        assertEquals("Continue.", probe.state.value.spoken)
+        assertEquals("Tout droit.", probe.state.value.spoken)
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */

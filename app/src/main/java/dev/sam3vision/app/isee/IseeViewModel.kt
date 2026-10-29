@@ -97,7 +97,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     )
     // Guidage SAM seul : TwinLite viré (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
+    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()))
 
     /** Guetteurs trottoir + escaliers, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -210,7 +210,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             picto.refresh()
             intro.playIfPending()
         }
-        probe.observeSpoken(viewModelScope, proximity) { canAnnounce() }
+        probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })

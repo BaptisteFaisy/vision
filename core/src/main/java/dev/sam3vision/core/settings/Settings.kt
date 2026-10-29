@@ -45,10 +45,10 @@ data class Settings(
      */
     val ttsAnnouncePositions: Boolean = true,
     /**
-     * Guidage « tout droit » de la page caméra iSee : la voix dit la consigne de
-     * marche (« Continue. », « Va à gauche, 2 mètres. ») au lieu de la
+     * Guidage « tout droit » de la page caméra iSee : la voix dit un mot
+     * (« Tout droit. », « Gauche. », « Droite. », « Stop. ») au lieu de la
      * position des objets. `true` par défaut : c'est l'intention de marche attendue.
-     * Via ElevenLabs, jamais le TTS système, et sans aucun appel LLM.
+     * Clips pré-synthétisés (< 100 ms), jamais le TTS système, sans aucun appel LLM.
      */
     val ttsGuidanceStraight: Boolean = true,
     /** Intro vocale embarquée autorisée (bascule des Réglages, `true` par défaut). */

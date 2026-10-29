@@ -5,19 +5,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** L'annonceur suit le cap : un changement de cap fait reparler, comme un obstacle. */
+/** L'annonceur suit le cap : un changement de cap fait reparler aussitôt. */
 class GuidanceAnnouncerSteeringTest {
 
     @Test
-    fun `changement de cap fait reparler apres stabilite`() {
+    fun `changement de cap fait reparler aussitot`() {
         val announcer = GuidanceAnnouncer()
 
-        assertNull(announcer.onFrame(0L, emptyList()))
-        assertEquals("Continue.", announcer.onFrame(1_000L, emptyList()))
-        assertNull(announcer.onFrame(6_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Left))
+        assertEquals("Tout droit.", announcer.onFrame(0L, emptyList()))
         assertEquals(
-            "Va à gauche.",
-            announcer.onFrame(7_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Left),
+            "Gauche.",
+            announcer.onFrame(1_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Left),
         )
     }
 
@@ -25,9 +23,7 @@ class GuidanceAnnouncerSteeringTest {
     fun `meme cap meme scene reste muet`() {
         val announcer = GuidanceAnnouncer()
 
-        announcer.onFrame(0L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right)
-        announcer.onFrame(1_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right)
-
-        assertNull(announcer.onFrame(7_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
+        assertEquals("Droite.", announcer.onFrame(0L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
+        assertNull(announcer.onFrame(1_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
     }
 }
