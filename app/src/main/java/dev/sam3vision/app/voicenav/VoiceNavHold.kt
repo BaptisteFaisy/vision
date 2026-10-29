@@ -122,8 +122,8 @@ class VoiceNavHold(
  * session : stop, oui/non, destination). Texte non consommé → [hint].
  *
  * Le bouton est dédié (aucune action au tap) : le micro s'ouvre dès l'appui,
- * sans le délai de 300 ms de l'accueil ([LongPressTrigger] y distingue
- * l'appui long du tap vidéo). Une tenue en cours de transcription ignore
+ * sans le délai de 300 ms de l'accueil (qui distingue l'appui long du tap
+ * vidéo). Une tenue en cours de transcription ignore
  * les nouveaux appuis ; quitter l'écran en pleine tenue jette
  * l'enregistrement ([VoiceNavHold.discard]).
  */
