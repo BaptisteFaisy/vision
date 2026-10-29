@@ -152,18 +152,21 @@ class VoiceNavSession(
     }
 
     /**
-     * Démarrage direct : moteur embarqué s'il peut démarrer, sinon Maps
-     * piéton. Aucun écran de confirmation n'est ouvert et **aucune annonce
-     * ici** : le moteur dit « Navigation vers X », le repli Maps le dit aussi
-     * — une seule voix, jamais deux annonces qui se chevauchent.
+     * Démarrage direct : résumé chargé d'abord (l'état initial affiche ses
+     * totaux, jamais des zéros), puis moteur embarqué s'il peut démarrer,
+     * sinon Maps piéton. Aucun écran de confirmation n'est ouvert et
+     * **aucune annonce ici** : le moteur dit « Navigation vers X », le
+     * repli Maps le dit aussi — une seule voix, jamais deux annonces qui
+     * se chevauchent.
      */
     private suspend fun startFromVoice(destination: String) {
         if (!guidanceEnabled()) {
             openPlace(destination)
             return
         }
-        if (startEngine(destination, null)) {
-            _state.value = guiding(destination, null)
+        val summary = loadSummaryResult(destination).getOrNull()
+        if (startEngine(destination, summary)) {
+            _state.value = guiding(destination, summary)
             return
         }
         launchMaps(destination)
@@ -172,13 +175,7 @@ class VoiceNavSession(
     /** Ouvre la confirmation et y charge le résumé (annonce « Destination : X »). */
     private suspend fun openConfirmation(destination: String) {
         _state.value = VoiceNavUiState.Confirming(destination, null, true, null)
-        // `routeLoader` est `suspend` (`runCatching` ne l'est pas) : try/catch direct.
-        val loaded = try {
-            routeLoader(destination)
-        } catch (t: Exception) {
-            Result.failure(t)
-        }
-        loaded.fold(
+        loadSummaryResult(destination).fold(
             onSuccess = { _state.value = VoiceNavUiState.Confirming(destination, it, false, null) },
             onFailure = { _state.value = VoiceNavUiState.Confirming(destination, null, false, summaryError(it)) },
         )
@@ -322,15 +319,31 @@ class VoiceNavSession(
         }
     }
 
-    /** État de guidage initial, sans attendre la première mise à jour moteur. */
+    /**
+     * Charge le résumé via `routeLoader` : ne lève jamais (un jeté devient
+     * un échec) ; partagé par la confirmation et le démarrage voix.
+     */
+    private suspend fun loadSummaryResult(destination: String): Result<RouteSummary> =
+        // `routeLoader` est `suspend` (`runCatching` ne l'est pas) : try/catch direct.
+        try {
+            routeLoader(destination)
+        } catch (t: Exception) {
+            Result.failure(t)
+        }
+
+    /** État de guidage initial : totaux du résumé, ou « calcul en cours ». */
     private fun guiding(destination: String, summary: RouteSummary?): VoiceNavUiState.Guiding =
         VoiceNavUiState.Guiding(destination, summary, initialUpdate(destination, summary))
 }
 
-/** Premier état de guidage : résumé entier, ou cap sur la destination seule. */
+/**
+ * Premier état de guidage : résumé entier, ou « calcul en cours » quand le
+ * chargeur a échoué mais que le moteur a quand même démarré — jamais des
+ * zéros présentés comme des distances (« Dans 0 m »).
+ */
 private fun initialUpdate(destination: String, summary: RouteSummary?): GuidanceUpdate =
     summary?.let(::initialGuidance)
-        ?: GuidanceUpdate("Direction $destination", 0, 0, 0)
+        ?: GuidanceUpdate("Calcul de l'itinéraire vers $destination…", 0, 0, 0)
 
 /** Texte d'échec du chargeur : son message, ou le repli français. */
 private fun summaryError(cause: Throwable): String {
