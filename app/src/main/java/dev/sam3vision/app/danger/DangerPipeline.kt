@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dev.sam3vision.app.depth.DepthPixels
 import dev.sam3vision.core.danger.ApproachEstimator
+import dev.sam3vision.core.danger.ApproachReading
 import dev.sam3vision.core.danger.PersonTracker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -98,14 +99,16 @@ class DangerPipeline(
     }
 
     /** La plus urgente des pistes qui s'approchent (ttc minimal sous le seuil). */
-    private fun pickAlert(
-        readings: List<dev.sam3vision.core.danger.ApproachReading>,
-        persons: Int,
-    ): DangerAlert? {
-        val best = readings
-            .filter { it.approaching && it.ttcSec != null && it.ttcSec <= DangerAlert.ALERT_TTC_SEC }
-            .minByOrNull { it.ttcSec!! } ?: return null
-        return DangerAlert(best.trackId, best.ttcSec!!, persons)
+    private fun pickAlert(readings: List<ApproachReading>, persons: Int): DangerAlert? {
+        var best: ApproachReading? = null
+        for (reading in readings) {
+            val ttc = reading.ttcSec ?: continue
+            if (!reading.approaching || ttc > DangerAlert.ALERT_TTC_SEC) continue
+            val current = best?.ttcSec
+            if (current == null || ttc < current) best = reading
+        }
+        val winner = best ?: return null
+        return DangerAlert(winner.trackId, winner.ttcSec ?: return null, persons)
     }
 
     /** Publie l'alerte si elle a changé (apparition, piste ou seconde) ; logue. */
