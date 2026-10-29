@@ -2,6 +2,8 @@ package dev.sam3vision.app
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.os.SystemClock
+import android.util.Log
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -191,6 +193,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
+    /** Dernier réveil (écran Capture affiché) : un seul par fenêtre suffit. */
+    private var lastPrewarmMs: Long = -PREWARM_WINDOW_MS
+
+    /**
+     * Écran Capture affiché : réveille le GPU **pendant le cadrage**, avant le clic.
+     * Le même endpoint sert la photo et le direct : un appel couvre les deux.
+     * L'issue part au moniteur GPU, comme « Tester SAM ».
+     */
+    fun prewarmGpu() {
+        val now = SystemClock.elapsedRealtime()
+        if (!shouldPrewarm(lastPrewarmMs, now, PREWARM_WINDOW_MS)) return
+        lastPrewarmMs = now
+        val settings = _state.value.settings
+        val client = samClientOrNull(settings) ?: return
+        val endpoint = settings.samEndpoint()
+        viewModelScope.launch {
+            val outcome = client.health()
+            gpuMonitor.noteHealthResult(endpoint, outcome)
+            val hot = outcome.getOrNull() == true
+            Log.i("sam3vision", "préchauffage GPU ($endpoint) : ${if (hot) "chaud" else "réveil en cours"}")
+        }
+    }
+
     /** Une photo capturée ou choisie : on l'affiche tout de suite, puis on l'analyse. */
     fun onPhoto(file: File) = viewModelScope.launch {
         val loaded = loader.load(file)
@@ -355,5 +380,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** Côté de l'image synthétique du banc profondeur (carré, px). */
         const val BENCH_SIZE = 256
+
+        /** Fenêtre anti-rallumage : deux réveils rapprochés ne servent à rien. */
+        const val PREWARM_WINDOW_MS = 120_000L
     }
 }
+
+/** Pur et testé : un réveil suffit par fenêtre, Modal fait la queue tout seul. */
+internal fun shouldPrewarm(lastMs: Long, nowMs: Long, windowMs: Long): Boolean =
+    nowMs - lastMs >= windowMs
