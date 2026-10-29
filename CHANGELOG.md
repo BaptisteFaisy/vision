@@ -3,16 +3,29 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
-## 2026-10-29 — iSee : flèche TwinLite remontée + log voix (recette 92c5392)
+## 2026-10-29 — voix : appui long sur les écrans navigation (tout à la voix) + iSee : flèche TwinLite remontée + log voix
 
+- **Cause (ordre user)** : sur l'écran de confirmation de destination, « Dicter »
+  renvoyait à l'accueil iSee — pas de micro sur place ; tout doit être
+  faisable à la voix.
+- `VoiceNavHold` + `VoiceNavHoldButton` (`app/.../voicenav/`) : appui long
+  (micro dès l'appui, bouton dédié), même moteur que l'accueil
+  (`IseeHoldMic`, Meta puis Scribe, plafond 75 s partagé), textes français ;
+  le transcript part à la session existante (stop, oui/non, destination).
+- `DestinationConfirmScreen` (« oui »/« non »/destination) et `GuidanceScreen`
+  (destination/ordre stop) : le bouton remplace le renvoi vers l'accueil
+  (boutons tactiles inchangés) ; `VoiceNavRoute` partage un micro, réglages
+  depuis `AppNav` (snapshot, `IseeViewModel` déjà à 498 lignes).
 - `TwinLiteLayer` : 28 → 150 dp — la flèche et son libellé disparaissaient
   sous le panneau statut SAM et le triangle du guidage (même zone bas-centrée) ;
   empilée au-dessus des deux désormais.
 - `TwinLiteVoice.say` : `twinlite: dit « … » (urgent=…) : ok` — chaque consigne
   parlée est traçable au logcat (recette voix + observabilité).
-- Preuves : `:app` `testDebugUnitTest` vert sur r630 (8/8 `TwinLiteWiringTest`
-  inchangés — voix `null` en test), `assembleDebug` vert, `check-kotlin-limits`
-  OK ; recette flèche + `dit` dues sur master après merge.
+- Preuves : `VoiceNavHoldTest` 11/11 + `:app` `testDebugUnitTest` verts sur
+  r630 (8/8 `TwinLiteWiringTest` inchangés — voix `null` en test),
+  `assembleDebug` vert, `check-kotlin-limits` OK. Recette voix sur téléphone
+  après merge (voix du user requise) ; recette flèche + `dit` dues sur master
+  après merge.
 
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 

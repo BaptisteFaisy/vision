@@ -243,7 +243,7 @@ private fun RouteHost(
         )
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
-        Route.VoiceNav -> VoiceNavRoute(isee, onClose = pop)
+        Route.VoiceNav -> VoiceNavRoute(isee, state.settings)
         Route.Segment -> SegmentScreen(onBack = pop)
         Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
     }
