@@ -93,6 +93,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
+    val twinlite = IseeTwinLite(getApplication(), viewModelScope, { settings }) // flèche + voix du sol praticable
 
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce)
@@ -135,7 +136,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); curbWatcher?.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); curbWatcher?.reset(); twinlite.reset() },
         prune = ::enforceFifo,
     )
 
@@ -262,7 +263,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
-        probe.stop()
+        probe.stop(); twinlite.close()
         super.onCleared()
     }
 
