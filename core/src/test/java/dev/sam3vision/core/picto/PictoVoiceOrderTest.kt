@@ -67,6 +67,16 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `huntWord rend le mot qui vise un label arme`() {
+        val labels = listOf("medics", "boîte de médicaments")
+        assertEquals("medicament", PictoVoiceOrder.huntWord("médicament", labels))
+        assertEquals("medicaments", PictoVoiceOrder.huntWord("les médicaments", labels))
+        assertNull(PictoVoiceOrder.huntWord("clés", labels))
+        assertNull(PictoVoiceOrder.huntWord("médicament", emptyList()))
+        assertNull(PictoVoiceOrder.huntWord("", labels))
+    }
+
+    @Test
     fun `les phrases parlent la langue de la voix`() {
         assertEquals("Je crée le pictogramme.", PictoVoiceText.started(SpeechLanguage.Fr))
         assertEquals(
