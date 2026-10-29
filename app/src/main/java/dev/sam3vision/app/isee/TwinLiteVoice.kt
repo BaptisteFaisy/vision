@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import android.util.Log
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.core.segment.TwinLiteCue
 import dev.sam3vision.core.settings.Settings
@@ -29,6 +30,12 @@ class TwinLiteVoice(private val engine: SystemTtsEngine) {
         rate: Float = Settings.DEFAULT_TTS_SPEED,
     ): Boolean {
         val locale = SystemTtsEngine.localeOf(language)
-        return engine.speak(cue.phrase, cue.urgent, locale, rate)
+        val ok = engine.speak(cue.phrase, cue.urgent, locale, rate)
+        Log.i(TAG, "twinlite: dit « ${cue.phrase} » (urgent=${cue.urgent}) : $ok")
+        return ok
+    }
+
+    companion object {
+        private const val TAG = "sam3vision"
     }
 }
