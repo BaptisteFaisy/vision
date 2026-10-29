@@ -182,3 +182,28 @@ téléphone français, elle donnera un modèle dans l'heure.
 Reproductible : `tools/build_ptl_crops.py` (PTL → crops caisson),
 `DumpKt` (17 traits), `tools/fit_and_eval.py` (refit + contrôle d'export +
 matrice de confusion **avec** la règle de pureté de `TrainedLightColor`).
+
+## 9. Portée resserrée : de jour seulement (décision du 29/10)
+
+Décision produit : **le mode Traversée ne traite plus que le jour.** La nuit sort
+du périmètre — donc de la liste des preuves à apporter.
+
+Ce que ça change, mesuré et non supposé :
+
+- **le corpus PTL est déjà 100 % de jour** (luminance moyenne des 2 761 crops
+  utilisés : minimum 60/255, médiane 119, maximum 153). Filtrer la nuit ne retire
+  donc rien et n'ouvre aucun gain : la portée « jour » ne débloque pas le
+  transfert shanghaïen → français ;
+- **filtrer sur la luminosité ne suffit pas non plus.** En ne gardant que les
+  crops lumineux (≥ 110), le refit remonte de 6/9 à **7/9** sur les crops
+  français — toujours pas 9/9, et au prix de faux verts sur PTL (3,2 % à
+  pureté 0,85) ;
+- en revanche la portée resserrée **retire deux lignes de la dette** listée au
+  §6 de `docs/MESURES-SAM3-FEUX.md` : plus de nuit, plus de pluie. Il reste les
+  poses larges, le corpus téléphone, et le seuil bloquant des faux verts.
+
+Conséquence pratique : le seuil de nuit de `MIN_VALUE`/`MIN_SATURATION` dans
+`PedLightColor` et la garde de luminosité de `PedLightGate` n'ont plus à être
+calibrés sur des scènes sombres. Ils ne doivent pas non plus être *relâchés* :
+un feu à contre-jour de jour est aussi sombre qu'un feu de nuit, et il reste dans
+le périmètre.
