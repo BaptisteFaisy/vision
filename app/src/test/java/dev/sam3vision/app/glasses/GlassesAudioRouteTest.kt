@@ -1,4 +1,4 @@
-package dev.sam3vision.app.glasses.bench
+package dev.sam3vision.app.glasses
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -14,7 +14,8 @@ import org.junit.Test
  * **jamais** choisi (le téléphone de test se présente lui-même comme une sortie
  * SCO : s'y router fait disparaître le son sans erreur).
  *
- * Depuis que [GlassesVoice] n'est plus qu'un adaptateur, ce fichier est le seul
+ * Depuis que le banc (`bench/GlassesVoice`) **et** la production
+ * ([GlassesVoiceRoute]) ne sont plus que des adaptateurs, ce fichier est le seul
  * endroit où la décision est prouvée : le code Android ne fait que remplir des
  * [AudioOutput] et appliquer le résultat.
  */

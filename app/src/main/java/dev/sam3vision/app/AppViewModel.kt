@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sam3vision.app.glasses.GlassesVoiceRoute
 import dev.sam3vision.app.vm.AppAnalysis
 import dev.sam3vision.app.vm.AppChat
 import dev.sam3vision.app.vm.AppDiagnostics
@@ -109,7 +110,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Lecteur audio (MediaPlayer) dans le cache privé : un seul fichier à la fois. */
     private val speech: SpeechPlayer by lazy {
-        SpeechPlayer(File(getApplication<Application>().cacheDir, "tts"), speaker::onFinished, speaker::onError)
+        val app = getApplication<Application>()
+        SpeechPlayer(
+            dir = File(app.cacheDir, "tts"),
+            onComplete = speaker::onFinished,
+            onPlaybackError = speaker::onError,
+            // Lunettes en session : la voix sort dans la paire, sinon sur le téléphone.
+            output = { GlassesVoiceRoute.current(app) },
+        )
     }
 
     /** Voix ElevenLabs des bandeaux de dictée (aucun TTS système dans l'app). */

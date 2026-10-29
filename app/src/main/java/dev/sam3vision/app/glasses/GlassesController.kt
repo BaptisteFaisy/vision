@@ -95,12 +95,22 @@ class GlassesController(
         say = { text ->
             val settings = frameSettings()
             frameVoice.say(settings, text)
-            if (settings.ttsApiKey.isBlank()) "voix coupée (clé TTS absente)" else "haut-parleur"
+            when {
+                settings.ttsApiKey.isBlank() -> "voix coupée (clé TTS absente)"
+                GlassesVoiceRoute.targetsGlasses -> "lunettes"
+                else -> "haut-parleur"
+            }
         },
     )
 
     val state: StateFlow<GlassesUiState> = _state
     val events: SharedFlow<GlassesEvent> = _events
+
+    init {
+        // La voix suit la session : chaque phrase relit la sortie des lunettes, et
+        // la fermeture de session la rend au téléphone (voir [GlassesVoiceRoute]).
+        scope.launch { _state.collect(GlassesVoiceRoute::follow) }
+    }
 
     // Implémentation (Mock Device Kit) en `app/src/debug/` : la dépendance n'est pas
     // embarquée dans l'APK de release, d'où la fabrique réflexive [mockDevice].
@@ -458,6 +468,7 @@ class GlassesController(
         dropSession()
         mock.stop()
         frameVoice.release()
+        GlassesVoiceRoute.forget()
         scope.cancel()
     }
 

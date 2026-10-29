@@ -768,6 +768,35 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   iSee) : cacao 506 → **0** pixel hors palette brun-caramel (8-55°), Portrait
   316 → **0** pixel vert ou magenta. Ancien shader mesuré à l'identique pour
   comparaison.
+## 2026-10-29 — lunettes : la voix de la production sort dans la paire
+
+- **Cause** : le banc savait router la voix vers les lunettes (A2DP constaté sur
+  la paire le 27/10), la production non — tout partait sur le haut-parleur du
+  téléphone.
+- `GlassesVoiceRoute` (`app/glasses/`) : retient l'état de session (`follow`,
+  `forget`) et rend, **à chaque phrase**, la sortie Bluetooth de la paire
+  (nom du SDK d'abord, puits de son seulement) ; hors session ou appareil
+  refusé, `null` = sortie par défaut, aucun échec silencieux (ligne
+  `GlassesVoice` au changement de décision).
+- `SpeechPlayer` gagne `output: () -> AudioDeviceInfo?` (défaut `null`), posé
+  sur `MediaPlayer.preferredDevice` avant chaque lecture, donc **un seul point
+  de passage** pour le chat, l'analyse, l'intro, les bandeaux, le tap et
+  Traverse ; branché dans `AppViewModel`, `IseeViewModel`, `VoiceAnnouncer`,
+  `TapCaptureScreen`, `TraverseWiring`.
+- Décision **partagée** avec le banc : `AudioOutput`, `pickBluetoothOutput`,
+  `rankOf`, `isBluetoothOutput`, `bluetoothOutputs` déplacés de
+  `glasses/bench/GlassesAudioRoute.kt` vers `glasses/GlassesAudioRoute.kt`
+  (`git mv`, imports à jour) — une seule copie de la règle.
+- Message `framesOnSpeaker` → `framesVoiceRoute` : « la voix des descriptions
+  suit les lunettes, haut-parleur en repli ».
+- Preuves : `:app:compileDebugKotlin` vert ; `:app:testDebugUnitTest` vert sur
+  `dev.sam3vision.app.glasses.*` et `dev.sam3vision.app.isee.*`, dont
+  `GlassesVoiceRouteTest` (5) et `GlassesAudioRouteTest` déplacé.
+- **Non mesuré** : la voix réellement entendue dans la paire en production
+  (à vérifier avec `adb logcat -s GlassesVoice`) ; la voix système (TwinLite,
+  navigation) ne passe pas par ce routage.
+
+## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix)
 
 - `TwinLiteGuide` (`core/.../segment/`) : tiers de la moitié basse du masque
   praticable → ←/↑/→/■, seuil 0,25, STOP sous le seuil partout ; `TwinLiteText`

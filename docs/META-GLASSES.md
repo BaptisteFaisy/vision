@@ -174,11 +174,17 @@ l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
   48 kHz mono en repli, puis « sans micro » — et `GlassesCamera.start()` essaie les trois
   (`:43-54`), en annonçant chaque refus (`GlassesMessages.audioRefused`). Un refus de micro
-  laisse donc la caméra seule, sans code mort. Ce qui reste **absent**, c'est le **routage de la
-  voix vers les lunettes** : il n'existe que dans le banc (`bench/GlassesVoice.kt`).
+  laisse donc la caméra seule, sans code mort.
+- **La voix sort dans les lunettes** quand la session est ouverte : le lecteur unique de l'app
+  (`SpeechPlayer`) relit la sortie Bluetooth **à chaque phrase** et la pose sur
+  `MediaPlayer.preferredDevice` (`glasses/GlassesVoiceRoute.kt`), la paire étant reconnue à son
+  nom et un **puits de son** seulement ; hors session, ou si aucun appareil ne peut recevoir
+  le son, la sortie par défaut du téléphone reste en place (aucun échec silencieux : une ligne
+  `GlassesVoice` au changement de décision). Le choix lui-même est pur et partagé avec le banc
+  (`glasses/GlassesAudioRoute.kt`, testé en JVM).
 - Le flux vidéo a **deux consommateurs** dans `GlassesCamera.kt` : le collecteur de production
   (`GlassesFrameCollector.kt` : `videoStream` → décodage H.265 ou YUV → `JpegFrame` →
-  `AnalyzeUseCase` → voix haut-parleur), derrière un flag **éteint par défaut** (drapeau
+  `AnalyzeUseCase` → voix, dans les lunettes en session), derrière un flag **éteint par défaut** (drapeau
   `collectFrames` : éteint, le flux n'est pas lu et la raison est écrite,
   `frameCollectionIdleReason`, testée en JVM) ; et la pompe vers l'accueil iSee, qui envoie
   chaque frame en copie défensive (`GlassesFrame`, jamais de buffer SDK vivant) vers
@@ -296,10 +302,14 @@ Ne marche pas, et c'est écrit dans le code :
   (`GlassesFrameCollector.kt`) mais son flag est éteint, et son décodeur H.265 n'a
   jamais vu de matériel — donc pas de descriptions automatiques sans geste explicite ;
   le direct affiché et le guidage, eux, tournent dès que les lunettes streament ;
-- pas de routage de la voix vers les lunettes : le micro des lunettes est demandé (palier
-  `GlassesAudioPlan`), mais la sortie audio reste le haut-parleur du téléphone (annoncé
-  comme tel quand la collecte tourne) ; la permission `MODIFY_AUDIO_SETTINGS` est déclarée
-  (`AndroidManifest.xml:15`), pour le banc et non pour l'app ;
+- la voix ne sort **pas** dans les lunettes hors session : le routage est lié à une session
+  ouverte (`STARTED`), donc une paire allumée mais non connectée à l'app garde la voix sur le
+  téléphone — c'est voulu (le nom de la paire vient du SDK) ;
+- la voix **système** (flèche TwinLite, navigation) ne passe pas par ce routage : elle utilise
+  `TextToSpeech`, qui suit la sortie audio choisie par Android, pas `preferredDevice` ;
+- l'audio de la voix n'a **jamais été entendu dans la paire en production** : le routage est
+  compilé et testé en JVM, le banc a seulement prouvé que la sortie A2DP de la paire est
+  utilisable (`bt_a2dp`, 27/10) ;
 - pas de tap ni tap-long du pavé : l'app ne s'abonne qu'à `InputSource.CAPTURE_BUTTON`
   (`GlassesInputs.kt:39-43`), ces gestes étant réservés par le système (pause/arrêt) ;
 - pas d'invocation vocale par mot-clé : exigerait un projet Developer Center et une version
@@ -337,7 +347,7 @@ l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune oc
 | Cadence | 15 i/s (`GlassesCamera.kt`, `:62`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`) |
 | Compression | `compressVideo = true` : bitstream H.265 | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
 | Trames vidéo | direct vers l'accueil + guidage (`GlassesLiveDecoder`), collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
-| Audio | piste PCM demandée par palier (`GlassesAudioPlan`), pas de routage de sortie | routage de la voix vers les lunettes (`bench/GlassesVoice.kt:63`, `:97-110`) |
+| Audio | piste PCM demandée par palier (`GlassesAudioPlan`) ; voix sortie dans les lunettes en session par `SpeechPlayer` (`GlassesVoiceRoute`), haut-parleur en repli | routage explicite avant chaque phrase (`bench/GlassesVoice.kt`), même choix partagé (`GlassesAudioRoute.kt`) |
 | Entrée | l'app elle-même (accueil, Réglages) | une route d'iSee : `Route.Bench` (`AppNav.kt:45`, `:95`) |
 | Doc | cette page | `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md` |
 

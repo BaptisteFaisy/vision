@@ -138,7 +138,7 @@ internal class GlassesCamera(
         val pump = GlassesFrameCollector(onFrame = consumer, onLog = onFrameLog)
         collector = pump
         collectorJob = scope.launch { pump.run(active.videoStream) }
-        onNote(GlassesMessages.framesOnSpeaker())
+        onNote(GlassesMessages.framesVoiceRoute())
     }
 
     /** Pompe vidéo : chaque frame part en copie vers l'accueil iSee (jamais de buffer vivant). */
