@@ -92,7 +92,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
-
     /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
     val crossingChip = CrossingChipZone()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
