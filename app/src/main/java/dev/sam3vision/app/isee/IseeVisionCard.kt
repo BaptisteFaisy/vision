@@ -163,6 +163,8 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     )
     LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
     SteeringLayer(probe.steering)
+    val twinUi by viewModel.twinlite.ui.collectAsState()
+    TwinLiteLayer(twinUi)
 }
 
 /** Point bleu « REC » sur la chip de la carte pendant l'enregistrement. */
@@ -295,7 +297,10 @@ private fun IseeCameraWiring(glue: CameraGlue, viewModel: IseeViewModel, frames:
         }
         glue.host.onFrame = { jpeg, captureAtNs ->
             if (!GlassesVideoLink.live.value) {
-                if (sending(viewModel)) viewModel.probe.onFrame(jpeg, captureAtNs)
+                if (sending(viewModel)) {
+                    viewModel.probe.onFrame(jpeg, captureAtNs)
+                    viewModel.twinlite.offerFrame(jpeg)
+                }
                 if (picturing(viewModel)) viewModel.picto.onFrame(jpeg)
             }
         }
