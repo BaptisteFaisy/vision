@@ -137,15 +137,15 @@ class VoiceNavHoldTest {
     }
 
     @Test
-    fun `session partagee — micro indisponible, motif sous le bouton`() = runBlocking {
+    fun `session partagee — micro indisponible, motif sous le bouton`() {
         mic.available = false
         val ui = HoldMicUiState()
 
-        runHoldSession(hold, Settings.Default, { true }, "indice", ui) { }
+        val opened = openHoldSession(hold, ui)
 
+        assertFalse("ouverture refusée", opened)
         assertEquals(VoiceNavHoldText.MIC_UNAVAILABLE, ui.error)
         assertFalse("pas d'écoute", ui.recording)
-        assertFalse("pas de transcription", ui.busy)
     }
 
     @Test
@@ -153,7 +153,8 @@ class VoiceNavHoldTest {
         val ui = HoldMicUiState()
         var heard: String? = null
 
-        runHoldSession(hold, Settings.Default, { heard = it; true }, "indice", ui) { }
+        assertTrue("micro ouvert", openHoldSession(hold, ui))
+        closeHoldSession(hold, Settings.Default, { heard = it; true }, "indice", ui)
 
         assertEquals("bonjour", heard)
         assertNull("pas d'erreur", ui.error)
@@ -165,7 +166,8 @@ class VoiceNavHoldTest {
     fun `session partagee — texte non consomme, indice affiche`() = runBlocking {
         val ui = HoldMicUiState()
 
-        runHoldSession(hold, Settings.Default, { false }, "indice", ui) { }
+        openHoldSession(hold, ui)
+        closeHoldSession(hold, Settings.Default, { false }, "indice", ui)
 
         assertEquals("indice", ui.error)
         assertFalse("écoute rendue", ui.recording)

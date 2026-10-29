@@ -138,35 +138,40 @@ class HoldMicUiState {
 fun rememberHoldMicUiState(): HoldMicUiState = remember { HoldMicUiState() }
 
 /**
- * Une tenue micro complète, partagée par le bouton ([VoiceNavHoldButton],
- * appui immédiat) et l'appui long écran ([HoldMicArea]) : ouvre le micro,
- * attend [awaitRelease], transcrit et route vers [onTranscript]. Met [ui]
- * à jour (écoute, transcription, erreur) ; ne rend rien.
+ * Ouvre une tenue micro ([ui] à jour, erreur positionnée si le micro est
+ * indisponible). Seule l'attente du relâchement diffère entre le bouton
+ * ([VoiceNavHoldButton], `awaitRelease`) et l'appui long écran
+ * ([HoldMicArea], `waitForUpOrCancellation`) : les scopes restreints de
+ * Compose interdisent de la partager, tout le reste vit ici et dans
+ * [closeHoldSession].
  */
-suspend fun runHoldSession(
+fun openHoldSession(hold: VoiceNavHold, ui: HoldMicUiState): Boolean {
+    ui.error = null
+    if (!hold.start()) {
+        ui.error = VoiceNavHoldText.MIC_UNAVAILABLE
+        return false
+    }
+    ui.recording = true
+    return true
+}
+
+/**
+ * Ferme une tenue micro : coupe, transcrit et route vers [onTranscript]
+ * (texte non consommé → [hint]). Le micro est rendu dans tous les cas.
+ */
+suspend fun closeHoldSession(
     hold: VoiceNavHold,
     settings: Settings,
     onTranscript: suspend (String) -> Boolean,
     hint: String,
     ui: HoldMicUiState,
-    awaitRelease: suspend () -> Unit,
 ) {
-    ui.error = null
-    if (!hold.start()) {
-        ui.error = VoiceNavHoldText.MIC_UNAVAILABLE
-        return
-    }
-    ui.recording = true
+    ui.recording = false
+    ui.busy = true
     try {
-        awaitRelease()
+        holdError(hold.finish(settings), onTranscript, hint)?.let { ui.error = it }
     } finally {
-        ui.recording = false
-        ui.busy = true
-        try {
-            holdError(hold.finish(settings), onTranscript, hint)?.let { ui.error = it }
-        } finally {
-            ui.busy = false
-        }
+        ui.busy = false
     }
 }
 
@@ -194,7 +199,12 @@ fun HoldMicArea(
                 // Relâché avant le délai : tap, sans action.
                 if (awaitLongPressOrCancellation(down.id) != null) return@awaitEachGesture
                 if (ui.busy) return@awaitEachGesture
-                runHoldSession(hold, settings, onTranscript, hint, ui) { waitForUpOrCancellation() }
+                if (!openHoldSession(hold, ui)) return@awaitEachGesture
+                try {
+                    waitForUpOrCancellation()
+                } finally {
+                    closeHoldSession(hold, settings, onTranscript, hint, ui)
+                }
             }
         },
     ) {
@@ -232,8 +242,12 @@ fun VoiceNavHoldButton(
                     detectTapGestures(
                         onPress = {
                             if (ui.busy) return@detectTapGestures
-                            val scope = this
-                            runHoldSession(hold, settings, onTranscript, hint, ui) { scope.awaitRelease() }
+                            if (!openHoldSession(hold, ui)) return@detectTapGestures
+                            try {
+                                awaitRelease()
+                            } finally {
+                                closeHoldSession(hold, settings, onTranscript, hint, ui)
+                            }
                         },
                     )
                 },
