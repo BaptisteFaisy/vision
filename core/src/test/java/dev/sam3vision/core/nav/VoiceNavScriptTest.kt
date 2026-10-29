@@ -47,10 +47,10 @@ class VoiceNavScriptTest {
     }
 
     @Test
-    fun `guidage — la destination E2E part en intent navigation voiture`() {
-        val uri = MapsUri.navigation("la gare de Lyon", MapsUri.Mode.Driving).getOrThrow()
+    fun `guidage — la destination E2E part en intent navigation pieton`() {
+        val uri = MapsUri.navigation("la gare de Lyon", MapsUri.Mode.Walking).getOrThrow()
 
-        assertEquals("google.navigation:q=la%20gare%20de%20Lyon&mode=d", uri)
+        assertEquals("google.navigation:q=la%20gare%20de%20Lyon&mode=w", uri)
     }
 
     @Test

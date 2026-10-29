@@ -14,9 +14,9 @@ import org.junit.Test
 class NavigationLauncherTest {
 
     @Test
-    fun `intent maps voiture par defaut`() {
+    fun `intent maps pieton par defaut`() {
         assertEquals(
-            "google.navigation:q=Tour%20Eiffel&mode=d",
+            "google.navigation:q=Tour%20Eiffel&mode=w",
             navigationAppUri(NavDestination.Query("Tour Eiffel")).getOrThrow(),
         )
     }
@@ -37,7 +37,7 @@ class NavigationLauncherTest {
     @Test
     fun `coordonnees jamais encodees`() {
         assertEquals(
-            "google.navigation:q=48.8584,2.2945&mode=d",
+            "google.navigation:q=48.8584,2.2945&mode=w",
             navigationAppUri(NavDestination.Coordinates(48.8584, 2.2945)).getOrThrow(),
         )
     }
