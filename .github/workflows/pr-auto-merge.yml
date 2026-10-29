@@ -380,7 +380,22 @@ jobs:
           if [ "${QUEUE:-false}" = "true" ]; then
             case "$STATE" in
               CLEAN|BEHIND)
-                echo "PR #$PR : $STATE — la file de merge prend le relais (ni rebase ni merge ici)"
+                # La file met à jour la PR contre `master` et teste l'arbre
+                # fusionné du lot : ni rebase ni merge ici. Il reste à la faire
+                # entrer : `merge_protections_settings.auto_merge_conditions`
+                # dépend d'un second produit Mergify ; la commande, elle, ne
+                # dépend de rien (vérifié le 29/10 : « produit à activer » →
+                # « waiting for queue conditions » après activation).
+                if [ "$DRAFT" != "true" ] && green "$PR" && ! deja_balayee; then
+                  if gh pr comment "$PR" --body "@mergifyio queue" >/dev/null 2>&1; then
+                    echo "PR #$PR : mise en file demandée"
+                    noter_etat "mise en file demandée (\`@mergifyio queue\`) : le lot est testé sur l'arbre fusionné."
+                  else
+                    echo "PR #$PR : commande de file refusée"
+                  fi
+                else
+                  echo "PR #$PR : $STATE — file de merge, rien à faire ici"
+                fi
                 exit 0
                 ;;
             esac
