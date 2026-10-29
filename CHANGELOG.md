@@ -48,6 +48,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `GuidanceWord.kt`, `CurbWatcher.kt`, `hazard/` (2 nouveaux),
   `LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, `ProximityVoice.kt`,
   `IseeViewModel.kt` (+17 tests, +2 fichiers).
+## 2026-10-29 — iSee : arbitrage voix « obstacle → TwinLite, sinon SAM » (ordre user)
+
+- **Demande** : si obstacle → voix TwinLite (« obstacle, stop » + côté de
+  sortie), sinon → mots SAM (cap/trottoir/décalage) — un seul parle à la
+  fois, jamais de doublon, doctrine <100ms/clips gardée.
+- `TwinLiteWord` (core pur, restauré minimal du chemin voix-obstacle viré
+  par `d13ac26a`/PR #306 : textes `TwinLiteText`, clips `tl_*` de
+  `TwinLiteVoice.idFor`, lus dans `7d133f3f`) — sans segmentation
+  (ni LiteRT, ni masque : bouché/libre reste 100 % SAM). `GuidanceAnnouncer`
+  arbitre (une seule porte, clés `tl|*` ≠ `w|*`) ; `ProbeWiring` route les
+  phrases TwinLite vers `speakWord` (clips `vp_tl_*` restaurés, catalogue +
+  garde OK).
+- Preuves : `:core` + `:app` verts sur r630 (`TwinLiteWordTest` 7/7,
+  `GuidanceAnnouncerTest` 18/18 dont l'arbitrage), `check-kotlin-limits` +
+  `check-voicepack` OK. Docs `GUIDAGE-TOUT-DROIT.md`, `VOIX-DANGER.md` § 11.
+- Fichiers : `TwinLiteWord.kt`, `GuidanceAnnouncer.kt`, `ProbeWiring.kt`,
+  `IseeViewModel.kt` (commentaire), 6 tests, 2 docs (+8 MP3, +10 tests).
 
 ## 2026-10-29 — ménage : le code sans appelant part, le README se recale sur l'arbre
 
