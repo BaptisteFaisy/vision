@@ -1,5 +1,7 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.curb.SidewalkKeep
+import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
@@ -17,6 +19,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * via `setRouteCap`) : tant qu'il est renseigné, le couloir marché est celui
  * de la route, pas celui demandé à la voix. Le changer repart de zéro pour
  * que la nouvelle consigne se dise sans attendre ; `null` rend le cap manuel.
+ *
+ * Maintien trottoir : quand l'utilisateur n'y est plus (trottoir vu sur un
+ * côté), le cap est suspendu et la sonde ordonne le retour — voix et flèche
+ * ensemble, lues dans la même décision de frame. Le bouché prime toujours.
  *
  * Pure Android (aucun contexte, aucune coroutine) : testée en JVM.
  */
@@ -43,24 +49,31 @@ internal class ProbeVoice(
         }
 
     /**
-     * Détour en cours : le passage obstacle a primé sur le cap à la dernière
-     * frame guidée. Faux sans décision (première frame, guidage coupé).
+     * Détour en cours : le cap n'a pas été suivi à la dernière frame guidée
+     * (passage obstacle ou retour trottoir). Faux sans décision (première
+     * frame, guidage coupé).
      */
     val detour: Boolean get() {
         val decision = guidance.lastDecision ?: return false
-        return RouteSteeringFusion.fuse(decision.cap, decision).detour
+        val sidewalk = guidance.lastSidewalk ?: SidewalkPosition.Ahead
+        return RouteSteeringFusion.fuse(decision.cap, decision, sidewalk).detour
     }
 
     /**
      * Phrase à dire pour la frame, ou `null` (muet) : guidage d'abord, sinon
      * positions, sinon silence. [manualCap] est le cap demandé à la voix.
+     * Le trottoir vu caméra ([SidewalkKeep]) peut suspendre le cap : l'ordre
+     * de retour prime alors sur la consigne, jamais sur le danger.
      */
     fun phrase(
         atMs: Long,
         placed: List<PlacedLabel>,
         manualCap: SteeringCap,
     ): String? {
-        if (guide) return guidance.onFrame(atMs, placed, language, manualCap, routeCap)
+        if (guide) {
+            val sidewalk = SidewalkKeep.positionOf(placed)
+            return guidance.onFrame(atMs, placed, language, manualCap, routeCap, sidewalk = sidewalk)
+        }
         if (!announce) return null
         return positions.onFrame(atMs, placed, language)
     }
@@ -68,11 +81,14 @@ internal class ProbeVoice(
     /**
      * Chemin de la dernière frame guidée (`null` = guidage coupé ou pas
      * encore de frame) : lu dans la décision parlée, pas recalculé — la voix
-     * et la flèche ne peuvent pas se contredire.
+     * et la flèche ne peuvent pas se contredire. En retour trottoir, la flèche
+     * pointe le trottoir (le bouché garde son passage, jamais affaibli).
      */
     fun cue(): SteeringCue? {
         if (!guide) return null
         val decision = guidance.lastDecision ?: return null
+        val back = guidance.lastSidewalk?.let { SidewalkKeep.returnCap(it) }
+        if (!decision.blocked && back != null) return SteeringCue(decision.cap, blocked = false, passage = back)
         return SteeringCue.from(decision)
     }
 
