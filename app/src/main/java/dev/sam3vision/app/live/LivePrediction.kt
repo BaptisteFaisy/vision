@@ -95,6 +95,19 @@ class LivePrediction(
     }
 
     /**
+     * Couche à poser sur la frame caméra de [timestampMs], ou `null` si rien ne
+     * doit être publié : flag éteint, ou couche vide ici comme dans [current]
+     * (aucune écriture d'état, aucun coût — c'est ce qui fait avancer l'overlay
+     * **entre** deux réponses serveur, 30 fois par seconde).
+     */
+    fun publishableLayer(timestampMs: Long, width: Int, height: Int, current: PredictionLayer): PredictionLayer? {
+        if (!enabled) return null
+        val layer = boxesAt(timestampMs, width, height)
+        if (layer.empty && current.empty) return null
+        return layer
+    }
+
+    /**
      * Objets de la réponse avec un **id stable** : l'association par recouvrement
      * reprend les ids connus, un objet nouveau reçoit le plus petit id libre. Le rang
      * de l'objet (sa couleur de masque) est retenu au passage.

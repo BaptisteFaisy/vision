@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.isee.pictosDir
+import dev.sam3vision.app.live.CenterTrails
 import dev.sam3vision.app.live.LiveAskSession
 import dev.sam3vision.app.live.LiveFrameDispatcher
 import dev.sam3vision.app.live.LiveFpsMeter
@@ -81,6 +82,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Distances caméra→objets : sténopé + hauteurs connues, lissées par piste. */
     private val distances = DistanceMeter()
+
+    /** Chemins centraux des objets suivis : le centre de chaque boîte allonge sa piste. */
+    private val centerTrails = CenterTrails()
 
     /**
      * Prédiction locale des boîtes (T8) : remplacée à chaque démarrage, car c'est le
@@ -240,6 +244,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val chosen = LivePrompts.normalize(prompts)
         // Journal et historique : vidés par `asker.reset()` (implémentation unique, partagée avec `stop()`).
         asker.reset()
+        centerTrails.reset()
         distances.enabled = settings.distanceOverlayEnabled
         distances.reset()
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
@@ -393,19 +398,14 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 memory = current.memory.copy(tracks = recent.tracks),
                 distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
+                trails = centerTrails.observeFrame(now, width, height, shown.detections, seen).takeUnless { it.empty },
             ).withCrossing(traverse.active, traverse.local ?: traverse.light)
         }
     }
 
-    /**
-     * Boîtes prédites de la frame caméra, posées une fois par frame (30 fois par
-     * seconde) : c'est ce qui fait avancer l'overlay **entre** deux réponses serveur.
-     * Flag éteint ou rien de périmé : aucune écriture d'état, aucun coût.
-     */
+    /** Boîtes prédites de la frame caméra, posées si la couche a changé. */
     private fun publishPrediction() {
-        if (!prediction.enabled) return
-        val layer = prediction.boxesAt(System.currentTimeMillis(), lastKnownWidth, lastKnownHeight)
-        if (layer.empty && _state.value.prediction.empty) return
+        val layer = prediction.publishableLayer(System.currentTimeMillis(), lastKnownWidth, lastKnownHeight, _state.value.prediction) ?: return
         _state.update { it.copy(prediction = layer) }
     }
 

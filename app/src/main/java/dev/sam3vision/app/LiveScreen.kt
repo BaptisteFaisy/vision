@@ -277,6 +277,9 @@ private fun LiveCameraStage(
     // Boîtes prédites (T8) : couche vide tant que la prédiction est éteinte — l'overlay
     // reste alors celui d'avant (les masques serveur seuls).
     LivePredictionOverlay(state.prediction)
+    // Chemins centraux : trajectoire + point exact de chaque objet suivi — couche
+    // vide tant qu'aucune piste, l'overlay reste alors celui d'avant.
+    LiveTrailOverlay(state.trails)
     // Direct arrêté ou en erreur : un tap relance. Jamais pendant que le flux tourne.
     if (!state.running || state.error != null) RecoveryTap(onRecover)
 }
