@@ -103,6 +103,7 @@ fun LiveScreen(
         onVoiceStop = viewModel::stopVoice,
         onToggleSam = viewModel::toggleSam,
         onToggleTracker = viewModel::toggleTracker,
+        onToggleTraverse = { viewModel.setTraverseActive(!state.traverseActive) },
         onToggleLocal = { scope.launch { viewModel.local.toggle() } },
         localFrame = viewModel.local.frame,
     )
@@ -201,7 +202,7 @@ private fun LiveStage(
     onVoiceStart: () -> Unit,
     onVoiceStop: () -> Unit,
     onToggleSam: () -> Unit,
-    onToggleTracker: () -> Unit,
+    onToggleTracker: () -> Unit, onToggleTraverse: () -> Unit,
     onToggleLocal: () -> Unit, localFrame: StateFlow<Bitmap?>,
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -215,7 +216,7 @@ private fun LiveStage(
             onBack = onBack,
             onOpenSettings = onOpenSettings,
             onToggleSam = onToggleSam,
-            onToggleTracker = onToggleTracker,
+            onToggleTracker = onToggleTracker, onToggleTraverse = onToggleTraverse,
             onToggleLocal = onToggleLocal,
             modifier = Modifier.align(Alignment.TopCenter),
         )
