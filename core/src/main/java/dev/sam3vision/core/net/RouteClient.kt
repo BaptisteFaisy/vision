@@ -51,16 +51,20 @@ class HttpRouteClient(
     private val client: OkHttpClient = defaultHttpClient(ROUTE_TIMEOUT_SECONDS),
 ) : RouteClient {
 
-    override suspend fun route(from: RoutePoint, to: RoutePoint, costing: String): Result<RouteTrip> =
-        client.executeBuilt {
+    override suspend fun route(from: RoutePoint, to: RoutePoint, costing: String): Result<RouteTrip> {
+        endpointRefusal("endpoint itinéraire", baseUrl, "/route")?.let { return Result.failure(it) }
+        return client.executeBuilt {
             requestTo(baseUrl, "/route", "POST", OneShotJsonBody(routeRequestJson(from, to, costing)), ROUTE_USER_AGENT)
         }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseRouteTrip(raw) } }
+    }
 
-    override suspend fun health(): Result<Boolean> =
-        client.execute(requestTo(baseUrl, "/status"))
+    override suspend fun health(): Result<Boolean> {
+        endpointRefusal("endpoint itinéraire", baseUrl, "/status")?.let { return Result.failure(it) }
+        return client.execute(requestTo(baseUrl, "/status"))
             .then { Result.success(it.code in 200..299) }
+    }
 }
 
 /** Corps `/route` manuel : deux points, un coût, la langue des consignes. */
