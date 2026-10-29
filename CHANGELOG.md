@@ -3,6 +3,26 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — guidage : le cap droit projette un trait, plus une bande
+
+- **Demande** : savoir « si je continue exactement tout droit je vais rencontrer
+  un objet » en traçant un trait depuis le marcheur — la bande centrale
+  (centre dans 0,34-0,66) manquait les objets larges décentrés et bloquait sur
+  des objets étroits évitables.
+- `Guidance.rayBlocks` : le trait a l'épaisseur du corps (`RAY_HALF_WIDTH_M =
+  0,25 m` de chaque côté de l'axe `x = 0,5`) projetée à la distance de l'objet
+  (large de près, fin de loin) ; une boîte SAM qui le coupe bloque. Sans bords
+  (`PlacedLabel.x0`/`x1`, remplis par `fromDetection`, `fromSeenObject`,
+  `placedLabels`, `dangerPlacedLabels` et la chasse pictos) ou sans distance :
+  repli prudent sur la bande historique. Caps latéraux, côté de sortie, stop
+  et voix inchangés.
+- Preuves : `:core` 1 899 + `:app` 1 086 tests JVM, 0 échec, sur r630
+  (`GuidanceRayTest` 8/8 : précision, rappel, affinage au loin, boîte inversée,
+  2 replis, producteurs, voix) ; `assembleDebug` OK ; `check-kotlin-limits` OK.
+- Fichiers : `Guidance.kt`, `PositionText.kt`, `FrameRoster.kt`,
+  `DangerLabels.kt`, `LiveAskSession.kt`, `GuidanceRayTest.kt`,
+  `GUIDAGE-TOUT-DROIT.md`.
+
 ## 2026-10-29 — direct caregiver : la caméra passe par un WebSocket, plus par une photo toutes les 2 s
 
 - **Demande** : « cela va bien restream la caméra ? je veux que ça le soit. »
