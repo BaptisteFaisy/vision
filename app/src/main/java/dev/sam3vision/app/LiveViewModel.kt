@@ -129,7 +129,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         scope = viewModelScope,
         state = _state,
         settings = { settings },
-        asking = { _state.value.memory.asking },
+        asking = { _state.value.memory.asking || asker.pictoActive },
         speak = { current, phrase -> voice.say(current, phrase) },
     )
 
@@ -141,7 +141,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         _state.value.frame?.objects?.map { it.label }?.distinct().orEmpty()
     }
 
-    /** Questions sur le direct : dernière image + journal, historique conservé. */
+    /** Demandes sur le direct : questions LLM, chasses SAM, ordres picto. */
     private val asker = LiveAskSession(
         scope = viewModelScope,
         state = _state,
@@ -152,6 +152,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         llm = { llmClient(it) },
         windowMs = MEMORY_WINDOW_MS,
         restart = { restart(it) },
+        pictoDir = { app.filesDir },
+        pictoSpeak = { current, phrase -> voice.say(current, phrase) },
     )
 
     /** Voix du direct : « Parler » pose la question sur le flux (mot maison seul = chasse SAM), sans clavier. */
@@ -324,8 +326,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Échec : repli `/live` au démarrage (vrai = relancé), sinon erreur hors réveil. */
     private fun publishFailure(active: FramePipeline, error: Throwable): Boolean {
         publishStages(null)
-        // Tracker muet au démarrage (backend non déployé) : on relance en `/live`
-        // plutôt que d'afficher « injoignable ». Une seule fois par séance.
+        // Tracker muet au démarrage : repli `/live` unique (pas « injoignable »).
         if (trackFallback.shouldFallBack(_state.value.starting, active is TrackRunner)) {
             trackerEnabled = false
             LiveTransportLog.info("repli tracker->/live raison=" + (error.message ?: "GPU injoignable"))
@@ -352,8 +353,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         if (!shouldKeepFrame(now, lastKeepAt)) return
         lastKeepAt = now
         latestFrame.set(jpegB64)
-        // Une seule émission d'état porte le porteur : ensuite « Analyser la frame » se
-        // contente de lire `hasFrame`, sans recopier 28 Ko à chaque frame.
+        // Une seule émission porte le porteur ; « Analyser » lit `hasFrame` (pas de recopie 28 Ko).
         if (!_state.value.hasFrame) _state.update { it.copy(latestFrame = latestFrame) }
     }
 
@@ -373,6 +373,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         prediction.absorb(shown.frame, now, width, height)
         val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
         if (!traverse.active || shown.keepGuidance) positions.announce(shown.frame, width, height, now, readings)
+        if (!traverse.active) asker.onLiveFrame(width, height, now)
         // Calcul hors thread principal (voir LiveMaskDecoder) ; le poste `overlays` est posé là-bas.
         val overlays = masks.decode(shown.frame)
         val predicted = prediction.boxesAt(now, width, height)
@@ -465,8 +466,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         foregroundGate.reset()
         narration.close()
         liveVoice.cancel()
-        // La frame en vol est révoquée (époque close) : sa réponse tardive est jetée, elle
-        // ne réécrit pas l'état « arrêté » et ne vole pas le créneau de la séance suivante.
+        // Frame en vol révoquée (époque close) : réponse tardive jetée, état « arrêté » intact.
         pipeline?.reset()
         val closing = tracker
         session = null

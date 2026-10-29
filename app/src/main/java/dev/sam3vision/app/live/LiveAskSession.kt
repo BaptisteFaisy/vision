@@ -1,29 +1,62 @@
 package dev.sam3vision.app.live
 
+import android.util.Base64
 import dev.sam3vision.app.LLM_ABSENT_LINE
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.app.NO_FRAME_LINE
+import dev.sam3vision.app.PictoOverlay
 import dev.sam3vision.app.focusLabel
 import dev.sam3vision.app.focusWindow
+import dev.sam3vision.app.isee.PICTO_FRAME_EDGE
+import dev.sam3vision.app.isee.PICTO_PHOTO_EDGE
+import dev.sam3vision.app.isee.PictoStore
+import dev.sam3vision.app.isee.StoredPicto
+import dev.sam3vision.app.isee.decodeFrameGray
+import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.timelineContextOrNull
+import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LiveTimeline
+import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.net.LlmClient
+import dev.sam3vision.core.net.MetaImageClient
+import dev.sam3vision.core.net.PictoImageClient
+import dev.sam3vision.core.picto.GrayImage
+import dev.sam3vision.core.picto.PictoHit
+import dev.sam3vision.core.picto.PictoVoiceOrder
+import dev.sam3vision.core.picto.PictoVoiceText
+import dev.sam3vision.core.picto.buildTemplate
+import dev.sam3vision.core.picto.matchTemplate
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
+import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 /**
- * Questions sur le direct : la **dernière image part tout de suite au LLM**, sans
- * dépendre de SAM (ni session, ni journal, ni GPU). L'historique de la conversation est
- * conservé d'une question à l'autre — jusqu'à la fin de la séance : [reset] l'oublie, et
- * avec lui le journal ([LiveTimeline]) que ces questions consultent. C'est le point
- * unique où la mémoire du direct s'efface, appelé au démarrage **et** à l'arrêt : sinon
- * l'écran d'un direct arrêté montre encore, et répond encore sur, le direct précédent.
+ * Demandes sur le direct, à l'écrit ou à la voix (« Parler ») : questions LLM
+ * (la **dernière image part tout de suite au LLM**, sans dépendre de SAM),
+ * chasse SAM (mot maison seul → relance du direct) et ordres picto (« fais
+ * un pictogramme de X » → repère armé, « X » → guidage parlé).
+ *
+ * L'historique de la conversation est conservé d'une question à l'autre —
+ * jusqu'à la fin de la séance : [reset] l'oublie, et avec lui le journal
+ * ([LiveTimeline]) que ces questions consultent. C'est le point unique où
+ * la mémoire du direct s'efface, appelé au démarrage **et** à l'arrêt : sinon
+ * l'écran d'un direct arrêté montre encore, et répond encore sur, le direct
+ * précédent.
+ *
+ * Les repères armés (les siens comme ceux de l'écran iSee : même magasin)
+ * sont cherchés à 2 Hz et posés en overlay, mais restent **muets** : seule
+ * la chasse nommée parle (« Médics à 9 heures »), et les positions SAM se
+ * taisent pendant qu'un picto parle ([pictoActive]).
  *
  * Les réglages sont relus à chaque question ([reloadSettings]) : une clé saisie pendant
  * le direct s'applique tout de suite. C'est aussi pourquoi la classe ne garde pas de
@@ -43,23 +76,71 @@ class LiveAskSession(
     private val windowMs: Long,
     /** Chasse SAM d'un mot maison seul : relance le direct, jamais le LLM. */
     private val restart: (List<String>) -> Unit = {},
+    /** Dossier des repères : le magasin est partagé avec l'écran iSee. */
+    private val pictoDir: () -> File = { File("") },
+    /** Voix des positions, partagée : une seule phrase à la fois sur le direct. */
+    private val pictoSpeak: suspend (Settings, String) -> Unit = { _, _ -> },
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val pictoClient: (Settings) -> PictoImageClient =
+        { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) },
+    private val store: PictoStore = PictoStore(pictoDir()),
+    private val frameGray: (String, Int) -> GrayImage? = ::decodeFrameGray,
+    private val decodeB64: (String) -> ByteArray = { Base64.decode(it, Base64.DEFAULT) },
+    private val guideAnnouncer: PositionAnnouncer = PositionAnnouncer(),
 ) {
 
     /** Historique envoyé au modèle, remis à zéro à chaque nouvelle séance. */
     private var history: List<ChatTurn> = emptyList()
 
+    /** Repères armés (rechargés à chaque séance + après chaque création). */
+    @Volatile
+    private var pictos: List<StoredPicto> = emptyList()
+
+    /** Création en vol : une seule à la fois, la suivante est dite puis jetée. */
+    @Volatile
+    private var pictoBusy = false
+
+    /** Mot guidé (`null` = pas de guidage : les repères restent muets). */
+    @Volatile
+    private var pictoHunt: String? = null
+
+    /** Génération du tour : une séance neuve fait taire les retours tardifs. */
+    @Volatile
+    private var pictoTurn = 0
+
+    /** Dernier passage du matcher (2 Hz comme l'écran iSee). */
+    private var lastPictoMatchAt = 0L
+
+    /** Une phrase picto à la fois : la suivante est jetée, pas mise en file. */
+    private val pictoSpeaking = Mutex()
+
+    /** Le picto parle ou va parler : les positions SAM se taisent (pas de chevauchement). */
+    val pictoActive: Boolean get() = pictoBusy || pictoHunt != null
+
     /** Fin de séance (démarrage suivant **ou** arrêt) : conversation et journal repartent de zéro. */
     fun reset() {
         history = emptyList()
         timeline.clear()
+        pictoHunt = null
+        pictoTurn++
+        state.update { it.copy(pictoOverlay = null) }
+        scope.launch(io) { pictos = store.list() }
     }
 
     /**
      * Question posée à l'écrit ou à la voix (« Parler ») : une seule à la fois.
-     * Un mot maison seul, mode maison et SAM allumé : chasse SAM directe (les
-     * positions parlées répondent), sans frame gardée, sans clé LLM, sans appel.
+     * Ordre picto (« fais un pictogramme de X ») → création ; mot visant un
+     * repère armé → guidage ; mot maison seul → chasse SAM ; sinon LLM.
      */
     fun ask(question: String) {
+        PictoVoiceOrder.parse(question)?.let { createPicto(it); return }
+        pictoHunt = null
+        val hunted = huntWord(question)
+        if (hunted != null) {
+            pictoHunt = hunted
+            guideAnnouncer.reset()
+            return
+        }
         val hunt = HomeModes.voiceConcept(question, state.value.prompts, state.value.samEnabled)
         if (hunt != null) {
             restart(listOf(hunt))
@@ -82,6 +163,95 @@ class LiveAskSession(
                 return@launch
             }
             askWithContext(text, jpeg, state.value.memory.focusSeconds)
+        }
+    }
+
+    /** Mot de [question] qui vise un repère armé, `null` si aucun. */
+    private fun huntWord(question: String): String? {
+        val known = pictos
+        if (known.isEmpty()) return null
+        return KnownSizes.canonical(question).split(' ').filter { it.isNotEmpty() }
+            .firstOrNull { word -> known.any { PictoVoiceOrder.matches(word, it.label) } }
+    }
+
+    /** Ordre « fais un pictogramme de X » : frame gardée → Muse → repère armé, sans relecture. */
+    private fun createPicto(label: String) {
+        if (pictoBusy) {
+            speakPicto(PictoVoiceText.busy(settings().speechLanguage))
+            return
+        }
+        val jpeg = latestJpeg()
+        if (jpeg.isBlank()) {
+            speakPicto(PictoVoiceText.failed(settings().speechLanguage))
+            return
+        }
+        pictoBusy = true
+        val turn = pictoTurn
+        speakPicto(PictoVoiceText.started(settings().speechLanguage))
+        scope.launch(io) {
+            val done = runCatching {
+                val photo = decodeB64(jpeg)
+                val gray = frameGray(jpeg, PICTO_PHOTO_EDGE) ?: throw IllegalStateException("frame illisible")
+                val png = pictoClient(settings()).editToPictogram(photo, label).getOrThrow()
+                store.save(label, png, buildTemplate(gray))
+            }
+            pictos = runCatching { store.list() }.getOrElse { pictos }
+            pictoBusy = false
+            if (turn != pictoTurn) return@launch
+            val language = settings().speechLanguage
+            if (done.isSuccess) {
+                val created = if (label.isBlank()) PictoVoiceText.createdUnnamed(language)
+                else PictoVoiceText.created(label, language)
+                speakPicto(created)
+            } else {
+                speakPicto(PictoVoiceText.failed(language))
+            }
+        }
+    }
+
+    /**
+     * Frame du direct (2 Hz) : les repères armés y sont cherchés, l'overlay
+     * posé dans tous les cas, la voix ne guide que le mot chassé.
+     */
+    fun onLiveFrame(width: Int, height: Int, nowMs: Long = System.currentTimeMillis()) {
+        val known = pictos
+        if (known.isEmpty()) return
+        if (nowMs - lastPictoMatchAt < IseePicto.MATCH_EVERY_MS) return
+        lastPictoMatchAt = nowMs
+        scope.launch(io) {
+            val frame = frameGray(latestJpeg(), PICTO_FRAME_EDGE) ?: return@launch
+            val hits = known.mapNotNull { matchTemplate(frame, it.template, it.id, it.label) }
+            state.update { it.copy(pictoOverlay = PictoOverlay(width, height, hits)) }
+            guide(hits, nowMs)
+        }
+    }
+
+    /** Guidage : les détections du mot chassé parlent, les autres restent muettes. */
+    private suspend fun guide(hits: List<PictoHit>, nowMs: Long) {
+        val hunt = pictoHunt ?: return
+        val targets = hits.filter { PictoVoiceOrder.matches(hunt, it.label) }
+        if (targets.isEmpty()) return
+        val placed = targets.map { PlacedLabel(it.label, it.x + it.w / 2f) }
+        val phrase = guideAnnouncer.onFrame(nowMs, placed, settings().speechLanguage) ?: return
+        state.update { it.copy(spoken = phrase) }
+        if (!pictoSpeaking.tryLock()) return
+        try {
+            pictoSpeak(settings(), phrase)
+        } finally {
+            pictoSpeaking.unlock()
+        }
+    }
+
+    /** Dit [phrase] (voix des positions) + sous-titre ; jetée si une phrase picto joue. */
+    private fun speakPicto(phrase: String) {
+        state.update { it.copy(spoken = phrase) }
+        scope.launch {
+            if (!pictoSpeaking.tryLock()) return@launch
+            try {
+                pictoSpeak(settings(), phrase)
+            } finally {
+                pictoSpeaking.unlock()
+            }
         }
     }
 

@@ -76,13 +76,15 @@ data class LiveUiState(
     val prompts: List<String> = emptyList(),
     val memory: LiveMemoryState = LiveMemoryState(),
     val distanceLayer: DistanceLayer? = null,
+    /** Repères reconnus sur la frame courante (`null` = pas de repère armé ce tour-ci). */
+    val pictoOverlay: PictoOverlay? = null,
     /**
      * Boîtes prédites de la frame caméra (T8) : vides tant que la prédiction est
      * éteinte ou que le masque serveur est encore frais — l'overlay suit alors les
      * masques seuls.
      */
     val prediction: PredictionLayer = PredictionLayer(),
-    /** Dernière phrase dite par la voix (positions) : affichée comme sous-titre. */
+    /** Dernière phrase dite par la voix (positions ou picto) : affichée comme sous-titre. */
     val spoken: String? = null,
     /** Porteur de la dernière frame JPEG (identité seule : rien à copier d'une frame à l'autre). */
     val latestFrame: LatestFrame = LatestFrame(),
@@ -149,6 +151,20 @@ data class DistanceLayer(
 ) {
     /** Vrai si l'overlay n'a rien à poser (pas d'objet calibré, taille inconnue). */
     val empty: Boolean get() = width <= 0 || height <= 0 || readings.isEmpty()
+}
+
+/**
+ * Repères reconnus sur la frame courante : taille de l'image analysée (le
+ * repère des boîtes, en pixels) et une détection par objet retrouvé
+ * (coordonnées normalisées). Vide = rien à afficher.
+ */
+data class PictoOverlay(
+    val width: Int = 0,
+    val height: Int = 0,
+    val hits: List<dev.sam3vision.core.picto.PictoHit> = emptyList(),
+) {
+    /** Vrai si l'overlay n'a rien à poser (taille inconnue ou rien vu). */
+    val empty: Boolean get() = width <= 0 || height <= 0 || hits.isEmpty()
 }
 
 /** Ligne du direct en vision seule : pas de détecteur, donc pas de GPU à attendre. */
