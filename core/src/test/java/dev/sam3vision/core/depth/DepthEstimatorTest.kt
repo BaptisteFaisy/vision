@@ -9,10 +9,10 @@ import org.junit.Test
 class DepthEstimatorTest {
 
     @Test
-    fun `fromName tolere l inconnu et la casse`() {
+    fun `fromName migre l heritage et tolere l inconnu`() {
         assertEquals(DepthBackend.DA2, DepthBackend.fromName("da2"))
-        assertEquals(DepthBackend.MIDAS, DepthBackend.fromName("MIDAS"))
-        assertEquals(DepthBackend.AUTO, DepthBackend.fromName("Auto"))
+        assertEquals(DepthBackend.DA2, DepthBackend.fromName("MIDAS"))
+        assertEquals(DepthBackend.DA2, DepthBackend.fromName("Auto"))
         assertEquals(DepthBackend.OFF, DepthBackend.fromName("n importe quoi"))
         assertEquals(DepthBackend.OFF, DepthBackend.fromName(null))
     }

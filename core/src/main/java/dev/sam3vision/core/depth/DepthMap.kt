@@ -2,9 +2,9 @@ package dev.sam3vision.core.depth
 
 /**
  * Carte de profondeur monoculaire : une valeur flottante par pixel, en
- * **proximité** (grande valeur = proche, comme la sortie brute de MiDaS et de
- * Depth Anything V2 — une disparité, pas des mètres). Les deux modèles retenus
- * sont relatifs : l'échelle métrique vient d'une ancre sténopé
+ * **proximité** (grande valeur = proche, comme la sortie brute de Depth
+ * Anything V2 — une disparité, pas des mètres). Le modèle retenu est
+ * relatif : l'échelle métrique vient d'une ancre sténopé
  * ([DepthFusion.calibrateScale]), jamais de la carte seule.
  * Pur Kotlin (miroir de `GrayMask`), testable sur JVM.
  */

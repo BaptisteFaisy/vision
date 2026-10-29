@@ -54,13 +54,4 @@ class DepthPreprocessTest {
         assertEquals((px - 0.456f) / 0.224f, buf.get(4), 1e-6f)
         assertEquals((px - 0.406f) / 0.225f, buf.get(8), 1e-6f)
     }
-
-    @Test
-    fun `normalizeHWC entrelace R-G-B en 0_5`() {
-        val buf = DepthPreprocess.normalizeHWC(intArrayOf(0xFFFF0000.toInt()), 1)
-        assertEquals(3, buf.remaining())
-        assertEquals(1f, buf.get(0), 1e-6f)
-        assertEquals(-1f, buf.get(1), 1e-6f)
-        assertEquals(-1f, buf.get(2), 1e-6f)
-    }
 }

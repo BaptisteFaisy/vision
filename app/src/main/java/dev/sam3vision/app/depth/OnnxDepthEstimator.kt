@@ -13,12 +13,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Depth Anything V2 Small (primaire) via ONNX Runtime (paquet Android complet —
- * le `-mobile` ne sait pas exécuter le `ConvInteger` quantifié), 100 % sur le
+ * Depth Anything V2 Small via ONNX Runtime (paquet Android complet — le
+ * `-mobile` ne sait pas exécuter le `ConvInteger` quantifié), 100 % sur le
  * téléphone. Poids quantifiés uint8 (`.ort` 27 Mo, Apache-2.0), téléchargés une
  * fois à l'exécution (fichier vérifié d'abord, asset embarqué en repli dev),
  * entrée 256×256 → carte 252×252 (multiple de 14 du ViT). Modèle absent ou
- * inférence tombée ⇒ `Result.failure` (le sélecteur AUTO bascule sur MiDaS).
+ * inférence tombée ⇒ `Result.failure` avec un message explicite.
  */
 class OnnxDepthEstimator private constructor(
     private val session: OrtSession,
@@ -74,9 +74,10 @@ class OnnxDepthEstimator private constructor(
 
         /**
          * Session CPU ouverte sur le fichier téléchargé (puis l'asset embarqué
-         * en repli dev), `null` si le modèle est absent : le sélecteur essaie
-         * alors le moteur suivant. NNAPI essayé le 2026-10-28 : session OK et
-         * bit-identique au CPU, mais jamais plus rapide en dos-à-dos — CPU seul.
+         * en repli dev), `null` si le modèle est absent : le sélecteur rend
+         * alors un estimateur « modèle manquant » explicite. NNAPI essayé le
+         * 2026-10-28 : session OK et bit-identique au CPU, mais jamais plus
+         * rapide en dos-à-dos — CPU seul.
          */
         fun open(context: Context): DepthEstimator? {
             val weights = readStoreFile(context) ?: readAsset(context, ASSET_NAME) ?: return null

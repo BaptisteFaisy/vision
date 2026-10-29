@@ -149,10 +149,10 @@ data class Settings(
     val routeBaseUrl: String = "",
     /**
      * Moteur de profondeur embarqué (100 % sur le téléphone, 0 GPU Modal).
-     * Coupé par défaut : le banc embarqué (Réglages → Profondeur) valide la
-     * latence sur l'appareil avant toute activation.
+     * Actif par défaut (DA2, seuil < 200 ms tenu sur Redmi) ; OFF le coupe.
+     * Réglages pré-29/10 (AUTO, MIDAS) migrés vers DA2 par fromName.
      */
-    val depthBackend: DepthBackend = DepthBackend.AUTO,
+    val depthBackend: DepthBackend = DepthBackend.DA2,
 ) {
     companion object {
         /**

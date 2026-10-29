@@ -13,17 +13,17 @@ import org.junit.runner.RunWith
 
 /**
  * Banc profondeur SUR APPAREIL (téléphone réel, jamais d'émulateur) : prouve que
- * les deux moteurs téléchargent leurs modèles (release GitHub, ~92 Mo au
- * premier run) et infèrent sur du vrai matériel (CPU, NNAPI absent).
+ * le moteur télécharge son modèle (release GitHub, ~26 Mo au premier run) et
+ * infère sur du vrai matériel (CPU, NNAPI absent).
  * Complémentaire des tests JVM (`app/src/test`) : eux valident le
- * prétraitement, ceux-ci valident le téléchargement + l'inférence embarquée.
+ * prétraitement, celui-ci valide le téléchargement + l'inférence embarquée.
  *
- * **Aucun workflow ne les exécute** : la CI n'a pas d'appareil. Vert ici = vert
+ * **Aucun workflow ne l'exécute** : la CI n'a pas d'appareil. Vert ici = vert
  * sur *cet* appareil, jamais « vert en CI ».
  *
  * Lancement manuel (r630, téléphone visible par le tunnel adb) :
  * ```bash
- * ~/bin/phone take --task "depth: banc instrumenté" --ttl 15m   # depuis le poste
+ * ~/bin/phone take --task "depth: banc instrumenté"   # depuis le poste
  * cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
  *   ./gradlew :app:connectedDebugAndroidTest \
  *   --tests "dev.sam3vision.app.depth.DepthBenchDeviceTest"
@@ -39,11 +39,6 @@ class DepthBenchDeviceTest {
     @Test
     fun da2SmallTourneSurAppareil(): Unit = runBlocking {
         runBench(DepthBackend.DA2)
-    }
-
-    @Test
-    fun midasSmallTourneSurAppareil(): Unit = runBlocking {
-        runBench(DepthBackend.MIDAS)
     }
 
     private suspend fun runBench(backend: DepthBackend) {
