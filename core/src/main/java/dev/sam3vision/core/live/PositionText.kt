@@ -9,13 +9,16 @@ import kotlin.math.roundToInt
 
 /**
  * Un objet nommé à une position **normalisée** (0..1), avec sa distance estimée
- * quand elle est connue : ce que la voix met en mots.
+ * quand elle est connue : ce que la voix met en mots. Les bords ([x0], [x1])
+ * servent au trait droit ([Guidance]) ; `null` = inconnus (repli au centre).
  */
 data class PlacedLabel(
     val label: String,
     val centerX: Float,
     val centerY: Float = 0.5f,
     val meters: Float? = null,
+    val x0: Float? = null,
+    val x1: Float? = null,
 ) {
     /** Repère lisible **français** (interface et signature de scène) : « à 9 heures ». */
     val position: String get() = PositionText.clockLabel(centerX)
@@ -91,13 +94,19 @@ object PositionText {
     fun fromDetection(detection: Detection): PlacedLabel? {
         val box = detection.normalizedBox() ?: return null
         if (detection.label.isBlank()) return null
-        return PlacedLabel(detection.label, (box[0] + box[2]) / 2f, (box[1] + box[3]) / 2f)
+        return PlacedLabel(
+            detection.label, (box[0] + box[2]) / 2f, (box[1] + box[3]) / 2f,
+            x0 = box[0], x1 = box[2],
+        )
     }
 
     /** Objet suivi (boîte déjà normalisée) → label placé ; `null` si la boîte est illisible. */
     fun fromSeenObject(obj: SeenObject): PlacedLabel? {
         if (obj.label.isBlank() || obj.box.size < 4) return null
-        return PlacedLabel(obj.label, (obj.box[0] + obj.box[2]) / 2f, (obj.box[1] + obj.box[3]) / 2f)
+        return PlacedLabel(
+            obj.label, (obj.box[0] + obj.box[2]) / 2f, (obj.box[1] + obj.box[3]) / 2f,
+            x0 = obj.box[0], x1 = obj.box[2],
+        )
     }
 
     /** Les détections exploitables d'une frame, dans l'ordre d'arrivée. */
