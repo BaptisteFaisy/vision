@@ -310,6 +310,7 @@ private fun CaptureRoute(viewModel: AppViewModel, push: (Route) -> Unit) {
         },
         onOpenLive = { push(Route.Live) },
         onOpenHome = { HomePresetRequest.pushDefault(); push(Route.Live) },
+        onShown = viewModel::prewarmGpu,
     )
 }
 
