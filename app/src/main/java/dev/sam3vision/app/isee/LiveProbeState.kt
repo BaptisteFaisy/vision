@@ -55,6 +55,8 @@ data class LiveProbeState(
     val steeringCap: SteeringCap = SteeringCap.Straight,
     /** Chemin de la dernière frame (`null` = guidage coupé ou mode Traversée). */
     val steering: SteeringCue? = null,
+    /** Détour obstacle subi : le GPS recalcule l'itinéraire s'il dure (faux en Traversée). */
+    val detour: Boolean = false,
     /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */
     val crossingActive: Boolean = false,
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */

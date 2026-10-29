@@ -238,9 +238,7 @@ _state.update { it.cleared() }
     fun onBackground() = foregroundGate.onBackground(running = false)
 
     /** Retour au premier plan : la frame suivante repart (l'enregistrement continue). */
-    fun onForeground() {
-        foregroundGate.onForeground()
-    }
+    fun onForeground() = foregroundGate.onForeground()
 
     /**
      * Cap demandé à la voix (« va à gauche ») : le guidage recalcule le passage
@@ -434,6 +432,7 @@ _state.update { it.cleared() }
                 spoken = phrase ?: current.spoken,
                 spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
                 steering = steering,
+                detour = if (_state.value.crossingActive) false else voice.detour,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),
                 transport = transportLabel(active),

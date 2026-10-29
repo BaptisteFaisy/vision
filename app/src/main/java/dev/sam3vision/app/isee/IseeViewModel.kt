@@ -164,7 +164,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
-    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing)
+    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation, ::setAutoCrossing, { text, urgent -> proximity.onPhrase(text, canAnnounce(), urgent) }, player::stop, { cap -> if (cap == null) probe.clearRouteCap() else probe.setRouteCap(cap) })
 
     /** État de la navigation vocale (repos, confirmation, guidage) pour l'écran. */
     val voiceNavState: StateFlow<VoiceNavUiState> get() = voiceNav.state
@@ -213,6 +213,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
+        probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
     }
 
