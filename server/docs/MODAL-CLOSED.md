@@ -15,7 +15,7 @@ budget LLM unique 3000 tokens (modèle à raisonnement), `width`/`height` sur `/
 ## Nouvelle app : Kotlin natif
 L'app Android est désormais **native Kotlin** (à la racine du dépôt vision : LLM → InferHub
 `https://api.inferhub.dev/v1`, SAM 3.1 en endpoint optionnel). `server/` garde le backend Modal
-et l'ancienne app Expo, déplacée en `legacy-expo-app/`.
+et l'ancienne app Expo (retirée de l'arbre le 29/10/2026).
 
 ## Relancer SAM 3.1 (une commande)
 ```bash

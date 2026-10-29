@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Helpers partagés par les scripts du dépôt.
 # À sourcer : . "$(dirname "${BASH_SOURCE[0]}")/lib-env.sh"
-# Fournit : PROJECT_ROOT, log/ok/warn/die, find_jdk & sdk_env (Android),
-# et côté Modal : MODAL_BIN, MODAL_PROFILE, SECRET_NAME, APP_NAME, BASE_URL_DEFAULT,
+# Fournit : PROJECT_ROOT, log/ok/warn/die, et côté Modal : MODAL_BIN, MODAL_PROFILE, SECRET_NAME, APP_NAME, BASE_URL_DEFAULT,
 # DRY_RUN, SECRET_KEYS, plus le chemin UNIQUE du secret : sync_secret_from_env.
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -87,36 +86,4 @@ sync_secret_from_env() {
   cleanup_secret_tmp
   [[ $rc -eq 0 ]] || die "création du secret impossible (profil $MODAL_PROFILE, jeton valide ?)"
   ok "secret « $SECRET_NAME » à jour"
-}
-
-# -------------------------------------------------------------------- Android
-# Cherche un JDK *complet* (avec javac) : le JRE système de cette machine
-# (/usr/lib/jvm/java-21-openjdk-amd64) n'a pas de compilateur et casse AGP.
-find_jdk() {
-  local cand
-  # 1. JAVA_HOME déjà valide
-  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
-    return 0
-  fi
-  # 2. JDK provisionnés par Gradle (Adoptium), puis emplacements classiques
-  for cand in "$HOME"/.gradle/jdks/eclipse_adoptium-*-amd64-linux*/ \
-              "$HOME"/.gradle/jdks/*/ \
-              /usr/lib/jvm/*/ \
-              /opt/*/; do
-    if [ -x "${cand}bin/javac" ]; then
-      export JAVA_HOME="${cand%/}"
-      export PATH="$JAVA_HOME/bin:$PATH"
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Positionne ANDROID_HOME / ANDROID_SDK_ROOT / PATH pour le SDK utilisateur.
-sdk_env() {
-  local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
-  export ANDROID_HOME="$sdk"
-  export ANDROID_SDK_ROOT="$sdk"
-  export PATH="$sdk/cmdline-tools/latest/bin:$sdk/platform-tools:$sdk/emulator:$PATH"
-  printf '%s\n' "$sdk"
 }
