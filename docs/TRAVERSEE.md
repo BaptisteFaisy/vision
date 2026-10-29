@@ -211,3 +211,23 @@ Images : Wikimedia Commons, CC BY-SA 2.0/4.0 et CC0 — Conduit Street (David
 Howard), Freeman Street ×2 (Stephen Craven), Quality Street (Richard Sutcliffe),
 Brunei (Yu Chu Chin), IKEA Rostov (Vyacheslav Argenberg), Rio (Wilfredor),
 Somerset/M5 (Marek Ślusarczyk), Barcelone (Joe Mabel), Beachley (Colin Park).
+
+### Ce que la voix dit maintenant
+
+Le mode Traversée parlait déjà l'état du feu (`CrossingText.phrase` : « Vert,
+traversez. » / « Rouge, attendez. » / « Doute, attendez. ») et confirmait la
+bascule (« Mode traversée activé. »). Il manquait une chose : **la proposition**.
+
+La pastille de carte passe en ambre quand un passage piéton est reconnu — mais
+une personne aveugle ne la voit pas. Depuis le 29/10, la voix la dit **une fois**
+par apparition : « Passage piéton. Dites traverser. »
+(`CrossingText.offer`, `observeCrossingOffer`).
+
+Deux détails de conception :
+
+- l'offre est un **état** (vrai tant que le passage reste dans le champ) ;
+  `distinctUntilChanged` + `filter` en font l'événement de montée, donc **une
+  phrase par apparition**, jamais une par frame — sinon elle devient inaudible ;
+- la phrase dit **quoi faire** (« dites traverser »), pas seulement ce qu'on
+  voit : c'est le seul moyen pour quelqu'un qui ne voit pas la pastille de savoir
+  que le mode existe et comment l'activer.

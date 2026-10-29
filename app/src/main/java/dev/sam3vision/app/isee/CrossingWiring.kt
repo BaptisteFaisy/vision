@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
+import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
@@ -13,6 +14,9 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Câblage du **mode Traversée** de la sonde : prompts feu+voitures, couleur du
@@ -156,4 +160,27 @@ internal object CrossingOfferWatch {
 
     /** Nouvelle séance. */
     fun reset() = gate.reset()
+}
+
+/**
+ * Annonce **une seule fois** qu'un passage piéton vient d'être reconnu, quand le
+ * mode Traversée est coupé : la pastille de carte est ambre, mais une personne
+ * aveugle ne la voit pas — sans cette phrase, la proposition n'existe pas pour
+ * elle.
+ *
+ * L'offre est un **état** (vrai tant que le passage reste dans le champ) ;
+ * [distinctUntilChanged] + [filter] en font l'événement de montée, donc une
+ * phrase par apparition, pas une par frame.
+ */
+internal fun observeCrossingOffer(
+    offers: Flow<Boolean>,
+    scope: CoroutineScope,
+    language: () -> SpeechLanguage,
+    say: suspend (String) -> Unit,
+) {
+    scope.launch {
+        offers.distinctUntilChanged().filter { it }.collect {
+            say(CrossingText.offer(language()))
+        }
+    }
 }
