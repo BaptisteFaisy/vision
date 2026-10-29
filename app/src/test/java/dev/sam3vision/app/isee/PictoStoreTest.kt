@@ -60,4 +60,64 @@ class PictoStoreTest {
     fun `pngOf inconnu rend null`() {
         assertNull(store().pngOf("picto-inexistant"))
     }
+
+    @Test
+    fun `les reperes egares a la racine sont rapatries au listage`() {
+        val filesDir = Files.createTempDirectory("isee-picto-loose").toFile().apply { deleteOnExit() }
+        // Ancien chemin du Direct : dossier picto-* écrit à la racine.
+        val loose = PictoStore(filesDir).save("Médocs", byteArrayOf(1, 2, 3), template())
+        val store = PictoStore(File(filesDir, PICTOS_DIR))
+        val listed = store.list()
+        assertEquals(1, listed.size)
+        assertEquals("Médocs", listed.single().label)
+        assertTrue(listed.single().png.contentEquals(byteArrayOf(1, 2, 3)))
+        assertTrue(File(File(filesDir, PICTOS_DIR), loose.id).isDirectory)
+        assertTrue(!File(filesDir, loose.id).exists())
+        // Idempotent : le second listage ne bouge plus rien.
+        assertEquals(1, store.list().size)
+    }
+
+    @Test
+    fun `le rapatriement ignore l'invalide et n'ecrase jamais`() {
+        val filesDir = Files.createTempDirectory("isee-picto-clash").toFile().apply { deleteOnExit() }
+        val store = PictoStore(File(filesDir, PICTOS_DIR))
+        val kept = store.save("Garde", byteArrayOf(4), template())
+        // Homonyme valide à la racine : laissé en place, le présent gagne.
+        val clash = File(filesDir, kept.id).apply { mkdirs() }
+        File(clash, "label.txt").writeText("Intrus")
+        File(clash, "picto.png").writeBytes(byteArrayOf(9))
+        File(clash, "template.bin").writeBytes(templateBlob())
+        File(filesDir, "picto-vide").mkdirs()
+        val listed = store.list()
+        assertEquals(1, listed.size)
+        assertEquals("Garde", listed.single().label)
+        assertTrue(clash.exists())
+        assertTrue(File(filesDir, "picto-vide").exists())
+    }
+
+    @Test
+    fun `deux dossiers la meme milliseconde ne se confondent pas`() {
+        val root = Files.createTempDirectory("isee-picto-clash-ms").toFile().apply { deleteOnExit() }
+        val store = PictoStore(root)
+        val first = store.newPictoDir(1_000L).apply { mkdirs() }
+        val second = store.newPictoDir(1_000L)
+        assertEquals("picto-1000", first.name)
+        assertEquals("picto-1001", second.name)
+    }
+
+    @Test
+    fun `hors dossier pictos aucun rapatriement`() {
+        val filesDir = Files.createTempDirectory("isee-picto-root").toFile().apply { deleteOnExit() }
+        File(filesDir, "picto-vide").mkdirs()
+        val store = PictoStore(filesDir)
+        assertEquals(0, store.list().size)
+        assertTrue(File(filesDir, "picto-vide").exists())
+    }
+
+    private fun templateBlob(): ByteArray {
+        val blob = ByteArray(2 + TEMPLATE_EDGE * TEMPLATE_EDGE)
+        blob[0] = (TEMPLATE_EDGE shr 8).toByte()
+        blob[1] = TEMPLATE_EDGE.toByte()
+        return blob
+    }
 }
