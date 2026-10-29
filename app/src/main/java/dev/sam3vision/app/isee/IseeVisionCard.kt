@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.RectF
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
@@ -37,7 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -92,7 +95,12 @@ internal fun BoxWithConstraintsScope.VisionCard(
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
         PixelMosaic(grid, veil.value, circle = false, modifier = Modifier.fillMaxSize())
         if (state.recordingVideo) RecordingChip()
-        CrossingChip(probe, Modifier.align(Alignment.BottomCenter)) { viewModel.toggleCrossing() }
+        CrossingChip(
+            probe,
+            Modifier.align(Alignment.BottomCenter),
+            onToggle = { viewModel.toggleCrossing() },
+            onBounds = viewModel.crossingChip::setBounds,
+        )
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         ProbeNoticeCard(probe)
     }
@@ -227,12 +235,25 @@ private fun RecordingChip() {
  * de la rue Portrait (le bas-centre est pris par le debug et le verdict).
  */
 @Composable
-internal fun BoxScope.CrossingChip(probe: LiveProbeState, modifier: Modifier, onToggle: () -> Unit) {
+internal fun BoxScope.CrossingChip(
+    probe: LiveProbeState,
+    modifier: Modifier,
+    onToggle: () -> Unit,
+    onBounds: (RectF?) -> Unit,
+) {
     // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
     val offering = probe.crossingOffer && !probe.crossingActive
     val dot = if (offering) Color(CROSSING_ACCENT_DOUBT) else Color(crossingAccent(probe.crossingActive, probe.crossing))
+    // La racine intercepte tous les taps : le chip publie sa zone fenêtre pour
+    // en être exempté, et la retire en partant (sinon taps fantômes).
+    DisposableEffect(Unit) { onDispose { onBounds(null) } }
     Row(
         modifier
+            .onGloballyPositioned { coords ->
+                val pos = coords.localToWindow(Offset.Zero)
+                val size = coords.size
+                onBounds(RectF(pos.x, pos.y, pos.x + size.width, pos.y + size.height))
+            }
             .padding(8.dp)
             .background(Color(0x99000000), RoundedCornerShape(8.dp))
             .clickable(onClick = onToggle)
