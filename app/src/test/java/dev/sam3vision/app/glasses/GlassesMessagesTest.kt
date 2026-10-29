@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.core.types.DeviceSessionError
 import com.meta.wearable.dat.core.types.RegistrationError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,6 +19,7 @@ class GlassesMessagesTest {
         GlassesMessages.registrationFailed("refus"),
         GlassesMessages.sessionRefused("timeout"),
         GlassesMessages.sessionInterrupted("lien perdu"),
+        GlassesMessages.noLinkedDevice(),
         GlassesMessages.cameraPermissionMissing(),
         GlassesMessages.cameraUnavailable("occupée"),
         GlassesMessages.streamRefused("qualité"),
@@ -46,6 +48,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.waitingForLink().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
@@ -66,6 +69,19 @@ class GlassesMessagesTest {
         assertTrue(registrationErrorWorthTelling(RegistrationError.META_AI_NOT_INSTALLED))
         assertTrue(registrationErrorWorthTelling(RegistrationError.FAILED_TO_REGISTER))
         assertTrue(registrationErrorWorthTelling(RegistrationError.UNKNOWN))
+    }
+
+    @Test
+    fun `le lien manquant demande de porter les lunettes, pas de les reappairer`() {
+        // Mesure du 27/10 : le SDK rend « Aucun appareil éligible » tant que le lien n'est pas
+        // monté. Envoyer l'utilisateur ré-appairer était la fausse piste à supprimer.
+        val timeout = GlassesMessages.noLinkedDevice().text
+        assertTrue(timeout, timeout.contains("connectées"))
+        assertFalse(timeout, timeout.contains("appaire"))
+        assertFalse(timeout, timeout.contains("enregistre l'app"))
+        val refusal = sessionErrorMessage(DeviceSessionError.NO_ELIGIBLE_DEVICE).text
+        assertFalse(refusal, refusal.contains("appaire"))
+        assertTrue(refusal, refusal.contains("déplie"))
     }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses.bench
 
 import com.meta.wearable.dat.core.types.LinkState
+import dev.sam3vision.app.glasses.hasLinkedDevice
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
