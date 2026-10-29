@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SeenObject
 import dev.sam3vision.core.speech.SpeechLanguage
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -24,16 +25,18 @@ data class PlacedLabel(
  * Mise en mots des positions détectées, pour l'annonce vocale ElevenLabs.
  *
  * Tout est **pur et testé en JVM** : le cadran horaire, l'ordre de lecture
- * (gauche → droite), le dédoublonnage et la troncature à [MAX_OBJECTS] objets.
+ * (**le plus proche d'abord, puis le plus en face**), le dédoublonnage et la
+ * troncature à [MAX_OBJECTS] objets.
  *
  * Deux langues, même cadran : la langue ne change que les mots ([SpeechLanguage]),
  * jamais la géométrie. Français par défaut — les Réglages choisissent la voix.
  *
  * Forme produite (fr) : `Personne à 9 heures, chien à 3 heures.` — sans article, donc
  * sans faute de genre sur des labels libres (« table », « livre », « personne »…).
- * Avec distance : `Personne à 9 heures, à 1,4 mètre ; chien à midi, à 3 mètres.`
+ * Avec distance : `Personne à 1 mètre, chien à 3 mètres.` — le cadran tombe, la
+ * distance au mètre entier suffit, et l'ordre dit déjà qui est en face.
  * Forme produite (en) : `Person at 9 o'clock, chair at 3 o'clock.`
- * Avec distance : `Person at 9 o'clock, 1.4 meters away; chair at 12 o'clock, 3 meters away.`
+ * Avec distance : `Person 1 meter away, chair 3 meters away.`
  */
 object PositionText {
 
@@ -106,27 +109,28 @@ object PositionText {
             .map { it.copy(label = it.label.trim()) }
             // La signature reste française : elle ne dépend pas de la langue de la voix.
             .distinctBy { it.label.lowercase() to it.position }
-            .sortedWith(compareBy({ it.centerX }, { it.label }))
+            .sortedWith(compareBy({ distanceOf(it) }, { abs(it.centerX - 0.5f) }, { it.label }))
         if (cleaned.isEmpty()) return null
         val shown = cleaned.take(maxObjects.coerceAtLeast(1))
-        // Des distances dans la phrase imposent le point-virgule : la virgule sert
-        // déjà à séparer la position de la distance (« à 9 heures, à 1,4 mètre »).
-        val separator = if (shown.any { it.meters != null }) semicolon(language) else ", "
-        val body = shown.joinToString(separator) { item(it, language) }
+        val body = shown.joinToString(", ") { item(it, language) }
         val hidden = cleaned.size - shown.size
         val text = if (hidden > 0) "$body, ${others(hidden, language)}." else "$body."
         return text.replaceFirstChar { it.uppercaseChar() }
     }
 
-    /** Un objet en mots : « personne à 9 heures, à 1,4 mètre » / « person at 9 o'clock, 1.4 meters away ». */
+    /**
+     * Un objet en mots : « personne à 2 mètres » / « person 2 meters away » quand la
+     * distance est connue, sinon « personne à 9 heures » / « person at 9 o'clock ».
+     */
     fun item(label: PlacedLabel, language: SpeechLanguage = SpeechLanguage.Fr): String {
-        val place = "${label.label} ${clockLabel(label.centerX, language)}"
-        val meters = label.meters ?: return place
-        val distance = when (language) {
-            SpeechLanguage.Fr -> "à ${DistanceText.spoken(meters, language)}"
-            SpeechLanguage.En -> "${DistanceText.spoken(meters, language)} away"
+        val meters = label.meters
+        if (meters == null || !meters.isFinite()) {
+            return "${label.label} ${clockLabel(label.centerX, language)}"
         }
-        return "$place, $distance"
+        return when (language) {
+            SpeechLanguage.Fr -> "${label.label} à ${DistanceText.spokenShort(meters, language)}"
+            SpeechLanguage.En -> "${label.label} ${DistanceText.spokenShort(meters, language)} away"
+        }
     }
 
     /**
@@ -148,10 +152,10 @@ object PositionText {
         SpeechLanguage.En -> if (count == 1) "and 1 other object" else "and $count other objects"
     }
 
-    /** Séparateur des objets quand la phrase porte des distances. */
-    private fun semicolon(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> " ; "
-        SpeechLanguage.En -> "; "
+    /** Distance de tri : l'inconnu passe après toutes les mesures. */
+    private fun distanceOf(label: PlacedLabel): Float {
+        val meters = label.meters
+        return if (meters == null || !meters.isFinite()) Float.MAX_VALUE else meters
     }
 
     /**

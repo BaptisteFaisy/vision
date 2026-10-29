@@ -21,13 +21,13 @@ class PositionTextEnglishTest {
     }
 
     @Test
-    fun `phrase en anglais, de gauche a droite`() {
+    fun `phrase en anglais, le plus en face d'abord`() {
         val phrase = PositionText.phrase(
             listOf(placed("chair", 0.9f), placed("person", 0.1f), placed("book", 0.5f)),
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person at 9 o'clock, book at 12 o'clock, chair at 3 o'clock.", phrase)
+        assertEquals("Book at 12 o'clock, chair at 3 o'clock, person at 9 o'clock.", phrase)
     }
 
     @Test
@@ -37,7 +37,7 @@ class PositionTextEnglishTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person at 9 o'clock, 1.4 meters away; dog at 2 o'clock, 3.2 meters away.", phrase)
+        assertEquals("Person 1 meter away, dog 3 meters away.", phrase)
     }
 
     @Test
@@ -53,12 +53,12 @@ class PositionTextEnglishTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Person at 9 o'clock, chair at 11 o'clock, and 2 other objects.", phrase)
+        assertEquals("Table at 12 o'clock, chair at 11 o'clock, and 2 other objects.", phrase)
     }
 
     @Test
     fun `le francais par defaut`() {
         val phrase = PositionText.phrase(listOf(placed("personne", 0.1f, meters = 1.44f)))
-        assertEquals("Personne à 9 heures, à 1,4 mètre.", phrase)
+        assertEquals("Personne à 1 mètre.", phrase)
     }
 }

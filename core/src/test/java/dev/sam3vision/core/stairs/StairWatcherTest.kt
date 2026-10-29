@@ -80,5 +80,21 @@ class StairWatcherTest {
     fun `phrases FR et EN`() {
         assertEquals("Escalier devant.", StairText.phrase(SpeechLanguage.Fr))
         assertEquals("Stairs ahead.", StairText.phrase(SpeechLanguage.En))
+        assertEquals("Escalier montant.", StairText.phrase(SpeechLanguage.Fr, StairDirection.Up))
+        assertEquals("Escalier descendant.", StairText.phrase(SpeechLanguage.Fr, StairDirection.Down))
+        assertEquals("Stairs up.", StairText.phrase(SpeechLanguage.En, StairDirection.Up))
+        assertEquals("Stairs down.", StairText.phrase(SpeechLanguage.En, StairDirection.Down))
+    }
+
+    @Test
+    fun `le sens traverse le guetteur jusqu'a l'annonce`() {
+        val watcher = StairWatcher()
+
+        watcher.onSignal(positive(), 1000L, SpeechLanguage.Fr, StairDirection.Up)
+        watcher.onSignal(positive(), 2000L, SpeechLanguage.Fr, StairDirection.Up)
+        val cue = watcher.onSignal(positive(), 3000L, SpeechLanguage.Fr, StairDirection.Up)
+
+        assertEquals("Escalier montant.", cue!!.phrase)
+        assertEquals(StairDirection.Up, cue.direction)
     }
 }
