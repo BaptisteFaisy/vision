@@ -2,6 +2,9 @@
 
 HTTP contract: GET /health, POST /route (Valhalla request JSON in, trip JSON
 out), GET /signals (traffic lights in a bbox, static OSM extract).
+
+Safety: pedestrian /route answers are repaired so street crossings happen at
+traffic lights when a small detour allows it (see _repair_crossings).
 CPU-only: no GPU, no secrets, scales to zero (~0 idle cost).
 Tiles live on Modal Volume ``valhalla-idf-tiles`` (/vol).
 Only ``modal`` is imported at module level, so this file stays importable
@@ -16,6 +19,14 @@ import modal
 # Feux OSM : marge autour du cadre demandé (degrés ≈ 110 m).
 SIGNALS_MARGIN_DEG = 0.001
 SIGNALS_MAX_NODES = 2000
+# Traversées sûres : manœuvres "tout droit" sur passage piéton (Valhalla
+# types 7 = Becomes, 8 = Continue) sans feu à 40 m → reroutage via le feu
+# le plus proche (150 m max), détours bornés (2 réparations, +20 % max).
+CROSSING_TYPES = (7, 8)
+SIGNAL_NEAR_M = 40.0
+REPAIR_SEARCH_M = 150.0
+MAX_REPAIRS = 2
+DETOUR_FACTOR = 1.20
 # Extract statique highway=traffic_signals (IdF, 23 170 points) : Overpass
 # (direct + 4 miroirs) est injoignable depuis le conteneur — les feux ne
 # bougent quasiment jamais, autant les embarquer (471 ko dans l'image).
@@ -96,10 +107,12 @@ class ValhallaRouter:
             except Exception:
                 raise HTTPException(status_code=400, detail="invalid JSON body")
             try:
-                out = await asyncio.to_thread(self._actor.route, json.dumps(body))
+                data = await asyncio.to_thread(
+                    _route_with_repairs, self._actor, self._signals, body
+                )
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)[:2000])
-            return JSONResponse(content=json.loads(out))
+            return JSONResponse(content=data)
 
         @api.get("/signals")
         async def signals(s: float, w: float, n: float, e: float):
@@ -140,4 +153,134 @@ def _filter_signals(all_points: list, s: float, w: float, n: float, e: float) ->
             if len(found) >= SIGNALS_MAX_NODES:
                 break
     return found
+
+
+def _route_with_repairs(actor, signals: list, body: dict) -> dict:
+    """Itinéraire Valhalla, réparé (piéton uniquement, voir _repair_crossings).
+
+    Lève si l'appel de base échoue (→ 500) ; une réparation qui échoue rend
+    la route de base (sécurité = bonus, jamais de panne ajoutée).
+    """
+    import json
+
+    base = json.loads(actor.route(json.dumps(body)))
+    if body.get("costing") != "pedestrian" or not signals:
+        return base
+    try:
+        return _repair_crossings(actor, signals, body, base)
+    except Exception as exc:
+        print(f"[route] réparation annulée : {exc}")
+        return base
+
+
+def _repair_crossings(actor, signals: list, body: dict, base: dict) -> dict:
+    """Traversées sans feu → reroutage via le feu proche (borné, accepté si
+    moins de traversées dangereuses et au plus +20 % de temps)."""
+    import json
+
+    best = base
+    best_time = _trip_time(base)
+    locations = body.get("locations", [])
+    if len(locations) < 2:
+        return base
+    for _ in range(MAX_REPAIRS):
+        unsafe = _unsafe_crossings(best, signals)
+        if not unsafe:
+            return best
+        via = _nearest_signal(signals, unsafe[0][0], unsafe[0][1], REPAIR_SEARCH_M)
+        if via is None:
+            return best
+        attempt = dict(body)
+        attempt["locations"] = (
+            [locations[0]] + [{"lat": via[0], "lon": via[1], "type": "via"}] + [locations[-1]]
+        )
+        candidate = json.loads(actor.route(json.dumps(attempt)))
+        if _trip_time(candidate) > best_time * DETOUR_FACTOR:
+            return best
+        if len(_unsafe_crossings(candidate, signals)) >= len(unsafe):
+            return best
+        best, best_time = candidate, _trip_time(candidate)
+        print(f"[route] traversée réparée via ({via[0]:.5f}, {via[1]:.5f})")
+    return best
+
+
+def _trip_time(data: dict) -> float:
+    """Durée annoncée (s), infini si illisible (le garde-fou rejette)."""
+    try:
+        return float(data["trip"]["summary"]["time"])
+    except (KeyError, TypeError, ValueError):
+        return float("inf")
+
+
+def _unsafe_crossings(trip_data: dict, signals: list) -> list:
+    """Points des manœuvres "tout droit sur passage piéton" sans feu proche.
+
+    Approximation documentée : types 7/8 + "crosswalk" dans l'instruction.
+    Les virages et les places ouvertes ne sont pas couverts (v1).
+    """
+    try:
+        legs = trip_data["trip"]["legs"]
+    except (KeyError, TypeError):
+        return []
+    unsafe = []
+    for leg in legs:
+        try:
+            shape = _decode_polyline6(leg.get("shape", ""))
+        except Exception:
+            continue
+        for maneuver in leg.get("maneuvers", []):
+            if maneuver.get("type") not in CROSSING_TYPES:
+                continue
+            if "crosswalk" not in (maneuver.get("instruction") or "").lower():
+                continue
+            index = maneuver.get("begin_shape_index", 0)
+            if not isinstance(index, int) or index >= len(shape):
+                continue
+            lat, lon = shape[index]
+            if _nearest_signal(signals, lat, lon, SIGNAL_NEAR_M) is None:
+                unsafe.append((lat, lon))
+    return unsafe
+
+
+def _meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Distance équirectangulaire (suffit à Paris, IdF-only)."""
+    import math
+
+    return math.hypot(
+        (lat1 - lat2) * 111320.0,
+        (lon1 - lon2) * 111320.0 * math.cos(math.radians((lat1 + lat2) / 2.0)),
+    )
+
+
+def _nearest_signal(signals: list, lat: float, lon: float, max_m: float):
+    """Feu le plus proche (lat, lon), ou None au-delà de [max_m]."""
+    best, best_m = None, max_m
+    for point in signals:
+        dist = _meters(lat, lon, point[0], point[1])
+        if dist <= best_m:
+            best, best_m = (point[0], point[1]), dist
+    return best
+
+
+def _decode_polyline6(shape: str) -> list:
+    """Tracé Valhalla (polyline précision 6) → [(lat, lon), …]."""
+    points = []
+    lat, lon, index = 0, 0, 0
+    while index < len(shape):
+        for axis in range(2):
+            shift, result = 0, 0
+            while True:
+                byte = ord(shape[index]) - 63
+                index += 1
+                result |= (byte & 31) << shift
+                shift += 5
+                if byte < 32:
+                    break
+            delta = ~(result >> 1) if result & 1 else result >> 1
+            if axis == 0:
+                lat += delta
+            else:
+                lon += delta
+        points.append((lat / 1e6, lon / 1e6))
+    return points
 
