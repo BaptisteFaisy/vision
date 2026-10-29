@@ -105,8 +105,9 @@ internal fun BoxScope.PictoChip(
     Row(
         modifier
             .onGloballyPositioned { coords ->
-                val r = coords.boundsInWindow()
-                onBounds(RectF(r.left, r.top, r.right, r.bottom))
+                val pos = coords.positionInWindow()
+                val size = coords.size
+                onBounds(RectF(pos.x, pos.y, pos.x + size.width, pos.y + size.height))
             }
             .padding(8.dp)
             .background(Color(0x99000000), RoundedCornerShape(8.dp))
