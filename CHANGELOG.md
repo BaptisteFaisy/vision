@@ -48,6 +48,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `+GuidanceObstaclesTest.kt` (213 lignes), `GUIDAGE-TOUT-DROIT.md`,
   `TESTING.md`, `CHANGELOG.md`. Périmètre voix tenu à l'écart
   (`GuidanceAnnouncer.kt`, TwinLite, `IseeViewModel` : lus, non modifiés).
+## 2026-10-29 — GPS + obstacles : heures du cadran, une voix, recalcul temps réel (ordre user)
+
+- **Demande** : les infos précisent les heures (cadran des aveugles) ; GPS
+  lié aux obstacles, même voix ; meilleur chemin temps réel.
+- Heures : `PositionText.withHour` (heure optionnelle, jamais devinée) ;
+  « Attention à la barrière, à 2 heures. », « Attention à la marche, à
+  midi. », « Escalier montant, à 11 heures. » (signaux porteurs du centre).
+- Une voix : manœuvres GPS par Laure (`say`, même politique, urgence
+  arbitrage — sortie de trace et recalcul coupent), cap route câblé à la
+  sonde (émis dans le vide jusque-là) ; manœuvre perdue = ré-émission.
+- Recalcul : détour publié (`LiveProbeState.detour`), `DetourReroute` (8 s
+  subies → feu, 1/min max), `observeDetour` → pilote → Valhalla depuis le
+  GPS temps réel (« Nouvel itinéraire »). Pas d'`avoid_locations`.
+- Preuves : `:core` 1 836 + `:app` 1 075 tests, 0 échec, sur r630
+  (`DetourRerouteTest` 5/5, `PositionTextTest` 14/14, `LiveProbeGuidanceTest`
+  6/6), `check-kotlin-limits` OK. Docs `VOIX-DANGER.md` § 12,
+  `GPS-FUSION.md` (nouveau). (`TESTING.md` : comptes des autres paquets
+  déjà dérivés par d'autres agents — mes lignes seules remises à vrai.)
+- Fichiers : `PositionText.kt`, `HazardWatcher.kt`, `CurbWatcher.kt`,
+  `StairWatcher.kt`, `StairLabelSignal.kt`, `DetourReroute.kt` (nouveau),
+  `VoiceNavEngineDriver.kt`, `IseeVoiceNav.kt`, `IseeViewModel.kt`,
+  `LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt` (+11 tests).
+
 ## 2026-10-29 — iSee : guidage doux + « Attention à … », stop seul urgent (ordre user)
 
 - **Demande** : iSee/SAM sert au non-urgent (décrire, guider en douceur) —
