@@ -23,7 +23,8 @@ class PhotoTimingsTest {
 
         assertEquals("photo charge=40 sam=60 analyse=800 total=1000", line)
         assertEquals(listOf(line), lines)
-        assertEquals(900L, timings.sinceStart("sam"))
+        assertEquals(100L, timings.sinceStart("sam"))
+        assertEquals(900L, timings.sinceStart("analyse"))
     }
 
     @Test
