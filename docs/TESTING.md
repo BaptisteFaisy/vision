@@ -241,7 +241,7 @@ ont dérivé sans MAJ de cette table ; à recaler séparément.
 - **picto** (17) : PictoMatcherTest 6, PictoPromptTest 2, PictoVoiceOrderTest 9
 - **predict** (39) : BlockShiftTest 7, BoxPredictorTest 10, BoxTest 10, MotionModelTest 7, ObjectAssociatorTest 5
 - **settings** (99) : CaregiverInviteTest 7, OutdoorModeTest 4, PrivateFileSettingsStoreTest 17, ResilientSettingsStoreTest 2, RouteEndpointTest 5, SamRegionTest 8, SettingsAnnounceTest 4, SettingsAsrTest 2, SettingsCipherTest 9, SettingsCodecTest 13, SettingsGuidanceTest 4, SettingsIntroTest 6, SettingsSecretsTest 9, SettingsStoreParityTest 4, SettingsTtsTest 5
-- **share** (24) : CaregiverPageTest 7, SharePayloadTest 9, ShareSendMessageTest 4, SharedSceneTest 4
+- **share** (31) : CaregiverPageTest 9, SharePayloadTest 14, ShareSendMessageTest 4, SharedSceneTest 4
 - **speech** (46) : LockedMicStartTest 15, LockedMicTest 11, SettingsVoiceCommandTest 4, SpeechLanguageTest 5, TtsSpeedCommandTest 11
 - **stairs** (43) : StairConceptsTest 4, StairDetectorTest 13, StairLabelSignalTest 5, StairWatcherTest 8, StairsCannyTest 8, StairsFeedTest 5
 - **text** (14) : PromptShieldTest 10, TextSanitizerTest 4

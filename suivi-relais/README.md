@@ -9,10 +9,10 @@ sans un mot.
 ## Contrat (inchangé pour la page embarquée dans l'APK)
 
 ```text
-POST /api/share   {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor},
+POST /api/share   {shareId, writeKey, fix?:{lat,lon,accM,headingDeg,atMs,indoor},
                    objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking},
                    photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
-GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix, objects, scene, photo, trip, serverAt}
+GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix?, objects, scene, photo, trip, serverAt}
 GET  /health                          → {ok:true}
 GET  /ws?share=<id>&role=watch        → WebSocket : frames JPEG binaires du proche
 GET  /ws?share=<id>&role=push&key=<k> → WebSocket : le proche pousse ses frames
@@ -50,11 +50,13 @@ téléphone ──frames binaires──▶ RelayRoom (DO, un par identifiant) �
   répond `503 {"ok":false,"error":"diffusion non déployée"}` et la page continue
   de fonctionner.
 
-- `photo` (JPEG base64 ≤ 120 000 caractères) et `trip` (progression 0..1) sont
-  facultatifs : un appareil d'avant continue d'envoyer position, objets et
-  phrase. Une écriture **sans** image (service de suivi écran éteint) garde la
-  dernière photo et son `atMs` : la page la cache au lieu de la faire passer
-  pour du direct. Un `trip` absent retire la barre de progression.
+- `fix` (position), `photo` (JPEG base64 ≤ 120 000 caractères) et `trip`
+  (progression 0..1) sont facultatifs : un téléphone sans GPS publie quand
+  même sa caméra, sa phrase et ses repères, et un appareil d'avant continue
+  d'envoyer position, objets et phrase. Une écriture **sans** image (service
+  de suivi écran éteint) garde la dernière photo et son `atMs` : la page la
+  cache au lieu de la faire passer pour du direct. Un `trip` absent retire
+  la barre de progression.
 
 - **Un état par identifiant de flux** : deux proches suivis = deux `?share=`, deux
   lignes distinctes. Plusieurs caregivers peuvent lire le même identifiant, aucun
@@ -81,7 +83,7 @@ node --test suivi-relais/test/relais.test.mjs
 
 Les tests couvrent : isolement de deux flux, écriture sans clé, clé liée au flux
 (403), verrou global optionnel, corps invalides, lecture sans identifiant, âge de
-l'état et bornage du texte.
+l'état, la publication sans position et le bornage du texte.
 
 ## Déployer
 

@@ -40,9 +40,11 @@ class ShareBroadcaster(context: Context) {
     }
 
     /**
-     * Envoie l'état courant si complet, sinon ne fait rien. Sans objet mesuré
-     * (couche nulle, calibrage inconnu, scène vide), la position part quand
-     * même : sinon la carte restait OFFLINE alors que le téléphone partageait.
+     * Envoie l'état courant. Sans position (GPS pas encore accroché, intérieur,
+     * permission refusée), la caméra, la phrase et les repères partent quand
+     * même : sinon la page caregiver restait OFFLINE alors que la caméra
+     * tournait. Sans objet mesuré (couche nulle, calibrage inconnu, scène
+     * vide), la position part quand même.
      * L'identifiant est normalisé (`normalizeShareId`) : brut, « Léo » répond
      * 400 côté relais. Un champ site effacé retombe sur le site par défaut.
      * [photo], [trip] et [pictos] sont facultatifs : sans caméra, hors guidage
@@ -62,11 +64,7 @@ class ShareBroadcaster(context: Context) {
         val id = normalizeShareId(settings.shareId)
         if (id.isBlank()) return
         val fix = positions.lastFix
-        if (fix == null) {
-            ShareHealth.noFix()
-            return
-        }
-        val objects = layer?.let { sharedObjectsOf(it.readings, it.width, it.height, it.fovDeg, fix.headingDeg) }.orEmpty()
+        val objects = layer?.let { sharedObjectsOf(it.readings, it.width, it.height, it.fovDeg, fix?.headingDeg) }.orEmpty()
         val url = shareEndpoint(relayBaseOf(settings.parentSiteUrl)) ?: return
         ShareHealth.note(
             reporter.maybeSend(

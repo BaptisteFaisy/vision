@@ -53,12 +53,14 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
 - Les déplacements GPS distinguent avance, recul et décalage par rapport au
   cap précédent. Le déplacement doit dépasser la somme des incertitudes GPS et
   être compatible avec une marche. Aucun petit pas en intérieur ni contournement
-  n'est affirmé à partir d'une simple consigne. La précision reste limitée par
+  n'est affirmé à partir d'une simple consigne. Sans position (paquet sans
+  GPS), aucun déplacement n'est affirmé. La précision reste limitée par
   le GPS du téléphone accompagné.
 - Image : la caméra du proche s'affiche **seulement pendant qu'il la fait
   tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`. Hors de
-  là, aucun cadre ni image : la page écrit « L'image apparaîtra quand ton proche
-  ouvrira la caméra. »
+  là, aucun cadre, aucune image ni texte : la section se replie et l'image la
+  rouvre dès que la caméra tourne. Seul un lien absent s'écrit
+  (« Ouvre le lien de suivi partagé par ton proche. »).
 - **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
   connecte (`live-stream.mjs`) et affiche les frames **au fil de l'eau** —
   6 im/s, une image de moins de 1,5 s vaut « maintenant ». La photo de
@@ -85,14 +87,17 @@ Le téléphone accompagné publie toutes les deux secondes pendant iSee ou Direc
 
 ```text
 POST /api/share
-{shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor},
+{shareId, writeKey, fix?:{lat,lon,accM,headingDeg,atMs,indoor},
  objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking},
  photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
 GET /api/state?share=<identifiant>
 ```
 
-`scene`, `photo` et `trip` sont facultatifs pour les anciennes versions de
-l'app ; le texte est borné à 2 000 caractères et l'image base64 à 120 000. Le
+`fix`, `scene`, `photo` et `trip` sont facultatifs : un téléphone sans GPS
+(intérieur, démarrage, permission refusée) publie quand même sa caméra, sa
+phrase et ses repères — sinon la page restait OFFLINE alors que la caméra
+tournait ; un paquet sans position n'invente aucun déplacement. Le texte est
+borné à 2 000 caractères et l'image base64 à 120 000. Le
 service reprend la position seule en arrière-plan, sans inventer les objets
 d'une caméra fermée ; le relais iSee conserve alors la dernière image avec son
 âge, et la page ne l'affiche jamais : une caméra s'affiche parce qu'elle tourne,

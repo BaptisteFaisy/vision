@@ -53,6 +53,17 @@ export function movementBetween(before, after) {
   return `S’est décalé vers la ${relative > 0 ? 'droite' : 'gauche'} d’environ ${meters} m.`;
 }
 
+/**
+ * Référence du prochain déplacement : le fix courant quand il n’y en a pas
+ * encore, quand un geste vient d’être mesuré ou quand l’ancre a vieilli — et
+ * `null` quand la position est inconnue (paquet sans GPS : la caméra et la
+ * phrase passent quand même, sans inventer de mouvement).
+ */
+export function anchorAfter(anchor, movement, fix) {
+  if (!anchor || !fix || movement) return fix || null;
+  return fix.atMs - anchor.atMs > 30_000 ? fix : anchor;
+}
+
 export function obstacleText(objects) {
   const nearest = [...(objects || [])].sort((a, b) => a.distM - b.distM).slice(0, 2);
   if (!nearest.length) return 'Aucune détection partagée pour le moment.';
