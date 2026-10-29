@@ -54,6 +54,36 @@ class CaregiverPageTest {
         assertFalse(isLegacyRelayUrl("https://relais.example/"))
     }
 
+    /**
+     * Le 29/10, l'hôte gratuit `…freebuff.page` a rendu 502 alors que le Worker
+     * répondait encore : la page caregiver restait en NO STREAM et la caméra du
+     * proche ne s'affichait plus. Un lien d'avant doit repointer sans être ressaisi.
+     */
+    @Test
+    fun `un lien de l hebergement gratuit tombe garde son identifiant et repointe`() {
+        val freebuff = "https://site-1607fe95049a481989380f019f9067f3.freebuff.page/?share=leo"
+        assertTrue(isLegacyRelayUrl(freebuff))
+        assertEquals(Settings.DEFAULT_PARENT_SITE_URL, relayBaseOf(freebuff))
+        assertEquals("leo", shareIdOf(freebuff))
+        assertFalse(isLegacyRelayUrl(Settings.DEFAULT_PARENT_SITE_URL))
+    }
+
+    /**
+     * Garde de régression : le défaut de l'app est l'adresse du Worker lui-même, pas
+     * un domaine d'apparence qui peut tomber sans que le relais bouge d'un octet.
+     */
+    @Test
+    fun `le relais par defaut est le worker et non un hebergement intermediaire`() {
+        val url = Settings.DEFAULT_PARENT_SITE_URL.toHttpUrl()
+        assertEquals("isee-suivi.duello.workers.dev", url.host)
+        assertEquals("https", url.scheme)
+        assertNull(url.queryParameter("share"))
+        assertEquals(
+            "https://isee-suivi.duello.workers.dev/?share=marie",
+            relayShareLink("marie"),
+        )
+    }
+
     @Test
     fun `le lien du relais est stable et toujours sur la base de l app`() {
         assertEquals(

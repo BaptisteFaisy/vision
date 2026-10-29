@@ -3,6 +3,28 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — suivi caregiver : le relais par défaut est le Worker, plus l'hôte tombé
+
+- **Panne constatée** : `DEFAULT_PARENT_SITE_URL` pointait sur
+  `site-1607fe95…freebuff.page`, qui rend **502 « Site unavailable »** sur `/`,
+  `/health` et `/api/state`, alors que le Worker `isee-suivi.duello.workers.dev`
+  répond (`/health` `{"ok":true}`, `/api/state` 200, page et `live.mjs` servis).
+  Conséquence : la page caregiver restait en NO STREAM et **la caméra du proche ne
+  s'affichait jamais** — le téléphone publiait dans le vide.
+- `DEFAULT_PARENT_SITE_URL` → `https://isee-suivi.duello.workers.dev/` : l'adresse du
+  Worker déployé, pas un domaine intermédiaire qui peut tomber sans que le relais
+  bouge d'un octet.
+- `isLegacyRelayUrl` reconnaît désormais un **ensemble** d'hôtes
+  (`suivi-parent.vercel.app`) plus les **suffixes** d'hébergement gratuits
+  (`.freebuff.page`, dont l'identifiant de site varie) : un lien ou un réglage d'avant
+  repointera sur le relais sans être ressaisi.
+- Preuves : `:core` 1 854 tests, 0 échec (`CaregiverPageTest` +2 : hôte hérité repris,
+  défaut = Worker) ; `:app` sous-ensemble partage/caregiver 31/31
+  (`CaregiverShareLinkTest` 6, `ParentShareTest` 5, `SettingsSeedTest` 20) ;
+  `check-kotlin-limits` OK.
+- Fichiers : `Settings.kt`, `CaregiverPage.kt`, `CaregiverPageTest.kt`,
+  `suivi-relais/README.md`.
+
 ## 2026-10-29 — iSee : arbitrage voix « obstacle → TwinLite, sinon SAM » (ordre user)
 
 - **Demande** : si obstacle → voix TwinLite (« obstacle, stop » + côté de

@@ -54,3 +54,17 @@ l'état et bornage du texte.
 Le Worker est publié par le manifeste `deploy.json` (modules ESM + binding `DB`).
 L'URL de production est recopiée dans `Settings.DEFAULT_PARENT_SITE_URL` côté
 `:core` ; la changer impose un APK neuf.
+
+**URL de production (29/10) : `https://isee-suivi.duello.workers.dev/`** — c'est le
+Worker lui-même : `/health` → `{"ok":true}`, `/api/state?share=…` → l'état du flux, et
+il sert aussi la page de la WebView (`/`, `live.mjs`, `styles.css`). Le domaine
+d'apparence plus jolie retenu plus tôt (`…freebuff.page`) a rendu **502 « Site
+unavailable »** le 29/10 au soir alors que ce Worker répondait encore : la page
+caregiver restait en NO STREAM et la caméra du proche ne s'affichait plus. Un relais
+qui sert des personnes pointe sur l'infrastructure qu'on déploie, pas sur une
+redirection. Vérifier après tout déploiement :
+
+```bash
+curl -s https://isee-suivi.duello.workers.dev/health      # {"ok":true}
+curl -s "https://isee-suivi.duello.workers.dev/api/state?share=verif"   # {"ok":true,"live":false}
+```
