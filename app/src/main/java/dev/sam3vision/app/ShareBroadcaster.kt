@@ -4,6 +4,7 @@ import android.content.Context
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.ShareReporter
 import dev.sam3vision.core.share.SharedPhoto
+import dev.sam3vision.core.share.SharedPictos
 import dev.sam3vision.core.share.SharedScene
 import dev.sam3vision.core.share.SharedTrip
 import dev.sam3vision.core.share.canPublishShare
@@ -44,8 +45,9 @@ class ShareBroadcaster(context: Context) {
      * même : sinon la carte restait OFFLINE alors que le téléphone partageait.
      * L'identifiant est normalisé (`normalizeShareId`) : brut, « Léo » répond
      * 400 côté relais. Un champ site effacé retombe sur le site par défaut.
-     * [photo] et [trip] sont facultatifs : sans caméra ou hors guidage, le paquet
-     * reste celui d'avant (position, objets, phrase).
+     * [photo], [trip] et [pictos] sont facultatifs : sans caméra, hors guidage
+     * ou sans repère reconnu, le paquet reste celui d'avant (position, objets,
+     * phrase).
      */
     suspend fun publish(
         nowMs: Long,
@@ -54,6 +56,7 @@ class ShareBroadcaster(context: Context) {
         scene: SharedScene? = null,
         trip: SharedTrip? = null,
         photo: SharedPhoto? = null,
+        pictos: SharedPictos? = null,
     ) {
         if (!canPublishShare(settings)) return
         val id = normalizeShareId(settings.shareId)
@@ -69,7 +72,7 @@ class ShareBroadcaster(context: Context) {
             reporter.maybeSend(
                 nowMs,
                 url,
-                shareJson(id, settings.shareWriteKey, fix, objects, scene, photo, trip),
+                shareJson(id, settings.shareWriteKey, fix, objects, scene, photo, trip, pictos),
             ),
         )
     }

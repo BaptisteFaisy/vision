@@ -11,8 +11,8 @@ let writes = 0;
  * Relais du suivi iSee (Worker Cloudflare + D1).
  *
  * - `POST /api/share` : le téléphone accompagné dépose son état (`{shareId, writeKey,
- *   fix, objects, scene, photo, trip}`), toutes les 2 s pendant iSee ou Direct. Un
- *   flux par identifiant : deux proches ne partagent jamais la même ligne.
+ *   fix, objects, scene, photo, trip, pictos}`), toutes les 2 s pendant iSee ou
+ *   Direct. Un flux par identifiant : deux proches ne partagent jamais la même ligne.
  * - `GET /api/state?share=<id>` : la page caregiver lit ce seul flux.
  * - `GET /health` : sonde.
  *

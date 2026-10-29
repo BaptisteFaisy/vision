@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frameOf, tripOf, tripPercent, tripRemaining, PHOTO_FRESH_MS } from '../live-view.mjs';
+import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining, PHOTO_FRESH_MS, PICTO_FRESH_MS } from '../live-view.mjs';
 
 const now = 1_700_000_000_000;
 const photo = { jpeg: 'AAAA', atMs: now - 1000 };
+const pictos = { atMs: now - 1000, items: [{ label: 'medics', png: 'AQID' }] };
 const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
 
 test('la caméra s’affiche quand le proche la fait tourner, data URL comprise', () => {
@@ -20,6 +21,22 @@ test('caméra éteinte : la page n’affiche ni image conservée ni image ancien
   assert.equal(frameOf({ photo }, 'offline', now), null);
   // Une frame de plus de 8 s ne prouve plus une caméra allumée.
   assert.equal(frameOf({ photo }, 'live', now + PHOTO_FRESH_MS + 1), null);
+});
+
+test('les repères s’affichent en dessins, data URL comprise', () => {
+  const items = pictosOf({ pictos }, 'live', now);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].src, 'data:image/png;base64,AQID');
+  assert.equal(items[0].label, 'medics');
+});
+
+test('repères absents, périmés ou vides : rien ne s’affiche', () => {
+  assert.equal(pictosOf({}, 'live', now), null);
+  assert.equal(pictosOf({ pictos }, 'lost', now), null);
+  assert.equal(pictosOf({ pictos }, 'offline', now), null);
+  assert.equal(pictosOf({ pictos }, 'live', now + PICTO_FRESH_MS + 1), null);
+  assert.equal(pictosOf({ pictos: { atMs: now, items: [] } }, 'live', now), null);
+  assert.equal(pictosOf({ pictos: { atMs: now, items: [{ label: '', png: '' }] } }, 'live', now), null);
 });
 
 test('la barre suit le trajet guidé, du départ à l’arrivée', () => {

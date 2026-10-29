@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.share.sharedPictosOf
 import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
@@ -334,7 +335,11 @@ private fun LiveRoute(
     settings: Settings,
 ) {
     val liveState by liveViewModel.state.collectAsState()
-    ShareRelay(liveState.distanceLayer, settings)
+    ShareRelay(
+        liveState.distanceLayer,
+        settings,
+        pictos = { now -> sharedPictosOf(liveState.pictoOverlay?.hits.orEmpty(), liveViewModel.asker::pngOf, now) },
+    )
     LiveScreen(
         viewModel = liveViewModel,
         onBack = { liveViewModel.stop(); pop() },

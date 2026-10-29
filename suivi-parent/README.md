@@ -8,8 +8,9 @@
 
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
 Android : fond blanc, petite boule Portrait cacao et caramel, phrase courante,
-**image du téléphone accompagné** (dernière frame caméra, 320 px) et, pendant un
-trajet guidé, une **barre de progression liquide** du départ à l'arrivée.
+**image du téléphone accompagné** (dernière frame caméra, 320 px), **dessins des
+objets reconnus** et, pendant un trajet guidé, une **barre de progression
+liquide** du départ à l'arrivée.
 
 L'interface Android est embarquée dans chaque APK depuis ce dossier (tâche
 Gradle `caregiverAssets`). La WebView intercepte uniquement ces fichiers locaux
@@ -58,6 +59,9 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`. Hors de
   là, aucun cadre ni image : la page écrit « L'image apparaîtra quand ton proche
   ouvrira la caméra. »
+- Repères : les objets reconnus par le téléphone (pictogrammes créés à la voix)
+  s'affichent en bandeau, **en dessins** avec leur nom — flux LIVE et détection
+  de moins de 8 s, comme l'image. Sans détection, pas de bandeau.
 - Trajet : pendant un guidage iSee, une barre du départ à l'arrivée. Le liquide
   (dégradé bleu → vert de la boule) et la bille avancent à `progress` ; le reste
   s'écrit « Encore 300 m · 4 min ». La barre disparaît dès que le guidage
