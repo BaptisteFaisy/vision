@@ -20,13 +20,16 @@ import kotlin.coroutines.coroutineContext
  * pendant une dictée — la sécurité passe avant le sous-titre (miroir de
  * `TraverseVoice`, qui préempte la verte par la rouge). Le « Stop. » urgent sort
  * d'un clip pré-synthétisé ([prewarmStop]) : zéro réseau au moment où chaque
- * dixième de seconde compte.
+ * dixième de seconde compte. [synthesize] injecte le moteur (ElevenLabs en
+ * prod, faux en test — miroir `IseePlayback`).
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
     private val onSpeaking: (String) -> Unit = {},
     private val canPlay: () -> Boolean = { true },
+    private val synthesize: suspend (apiKey: String, voiceId: String, text: String) -> Result<ByteArray> =
+        { apiKey, voiceId, text -> ElevenLabsTtsClient(apiKey, voiceId).synthesize(text) },
 ) {
 
     private var lastPhrase: String? = null
@@ -49,8 +52,8 @@ class ProximityVoice(
         if (stopClip != null) return
         val current = settings()
         if (!current.ttsConfigured) return
-        stopClip = ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
-            .synthesize(STOP_WORD).getOrNull()?.takeIf { it.isNotEmpty() }
+        stopClip = synthesize(current.ttsApiKey, current.ttsVoiceId, STOP_WORD)
+            .getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -70,8 +73,7 @@ class ProximityVoice(
             playStop(current)
             return
         }
-        val bytes = ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
-            .synthesize(phrase)
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
@@ -87,8 +89,8 @@ class ProximityVoice(
             player.play(it).onFailure { onSpeaking("") }
             return
         }
-        val bytes = ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
-            .synthesize(STOP_WORD).getOrElse { return }
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, STOP_WORD)
+            .getOrElse { return }
         coroutineContext.ensureActive()
         if (bytes.isEmpty()) return
         stopClip = bytes
