@@ -5,13 +5,13 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Prétraitement commun aux deux moteurs de profondeur (carré 256, comme les
- * démos de référence). Pur Kotlin sur [IntArray] ARGB : pas de `Bitmap` ici,
+ * Prétraitement du moteur de profondeur (carré 256, comme les démos de
+ * référence). Pur Kotlin sur [IntArray] ARGB : pas de `Bitmap` ici,
  * l'appelant redimensionne avant s'il part d'une photo.
  */
 internal object DepthPreprocess {
 
-    /** Côté d'entrée des deux modèles embarqués (DA2 uint8 et MiDaS small). */
+    /** Côté d'entrée du modèle embarqué (DA2 uint8, 256×256). */
     const val INPUT_SIZE = 256
 
     /**
@@ -99,23 +99,6 @@ internal object DepthPreprocess {
                 val px = ((argb[i] shr shift) and 0xFF) / 255f
                 out.put((px - mean[c]) / std[c])
             }
-        }
-        out.rewind()
-        return out
-    }
-
-    /**
-     * Normalisation MiDaS vers un tampon NHWC float32 (entrée LiteRT) :
-     * `(px/255 - 0.5) / 0.5` par canal, pixels dans l'ordre R,G,B.
-     */
-    fun normalizeHWC(argb: IntArray, size: Int): FloatBuffer {
-        require(argb.size >= size * size) { "tampon trop petit" }
-        val out = directFloats(size * size * 3)
-        for (i in 0 until size * size) {
-            val px = argb[i]
-            out.put((((px shr 16) and 0xFF) / 255f - 0.5f) / 0.5f)
-            out.put((((px shr 8) and 0xFF) / 255f - 0.5f) / 0.5f)
-            out.put((((px) and 0xFF) / 255f - 0.5f) / 0.5f)
         }
         out.rewind()
         return out

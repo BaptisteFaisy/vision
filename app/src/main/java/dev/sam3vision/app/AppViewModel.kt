@@ -288,7 +288,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(statusLine = "Profondeur coupée — choisis un moteur.") }
             return@launch
         }
-        val target = if (backend == DepthBackend.AUTO) DepthBackend.DA2 else backend
+        val target = backend
         _state.update { it.copy(statusLine = "Modèle ${target.code} : vérification…") }
         val ensured = ModelDownloader.ensure(getApplication(), target) { done, total ->
             val pct = (done * 100 / total.coerceAtLeast(1)).toInt()

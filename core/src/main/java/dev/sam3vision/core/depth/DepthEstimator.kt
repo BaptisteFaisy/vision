@@ -1,9 +1,9 @@
 package dev.sam3vision.core.depth
 
 /**
- * Moteur de profondeur embarqué : Depth Anything V2 Small (primaire, ONNX) ou
- * MiDaS small (repli, LiteRT), 100 % sur le téléphone — 0 GPU Modal.
- * [AUTO] prend DA2 si son asset est présent, sinon MiDaS, sinon coupé.
+ * Moteur de profondeur embarqué : Depth Anything V2 Small (ONNX), 100 % sur
+ * le téléphone — 0 GPU Modal. Moteur unique depuis le 2026-10-29 (repli
+ * MiDaS supprimé : DA2 est plus précis et ~1,6x plus rapide sur Redmi).
  */
 enum class DepthBackend(
     /** Libellé des Réglages : tient sur une ligne, en pleine largeur. */
@@ -11,15 +11,20 @@ enum class DepthBackend(
     /** Code court pour les pastilles et les journaux. */
     val code: String,
 ) {
-    AUTO(label = "Automatique (DA2 puis MiDaS)", code = "AUTO"),
     DA2(label = "Depth Anything V2 Small", code = "DA2"),
-    MIDAS(label = "MiDaS small (repli)", code = "MIDAS"),
     OFF(label = "Coupée", code = "OFF");
 
     companion object {
-        /** Nom persisté → moteur ; valeur inconnue ou absente ⇒ [OFF] (sur, mesuré). */
-        fun fromName(name: String?): DepthBackend =
-            entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: OFF
+        /**
+         * Nom persisté → moteur. `AUTO`/`MIDAS` (réglages pré-29/10) migrent
+         * vers [DA2] (la profondeur reste active) ; valeur inconnue ou
+         * absente ⇒ [OFF] (sur, mesuré).
+         */
+        fun fromName(name: String?): DepthBackend {
+            if (name.equals("AUTO", ignoreCase = true)) return DA2
+            if (name.equals("MIDAS", ignoreCase = true)) return DA2
+            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: OFF
+        }
     }
 }
 
@@ -35,7 +40,7 @@ data class DepthResult(
  * le prétraitement reste testable sur JVM, le redimensionnement vit côté appelant).
  */
 interface DepthEstimator : AutoCloseable {
-    /** Moteur réellement utilisé (un sélecteur AUTO annonce le moteur élu). */
+    /** Moteur réellement utilisé (le backend élu par le sélecteur). */
     val backend: DepthBackend
 
     /** Carte de proximité de l'image ; échec = modèle absent ou inférence tombée. */
