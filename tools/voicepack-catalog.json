@@ -20,6 +20,10 @@
     {"id": "guide_straight", "fr": "Tout droit.", "en": "Straight."},
     {"id": "guide_left", "fr": "Gauche.", "en": "Left."},
     {"id": "guide_right", "fr": "Droite.", "en": "Right."},
-    {"id": "guide_stop", "fr": "Stop.", "en": "Stop."}
+    {"id": "guide_stop", "fr": "Stop.", "en": "Stop."},
+    {"id": "tl_straight", "fr": "tout droit.", "en": "straight ahead."},
+    {"id": "tl_left", "fr": "gauche.", "en": "left."},
+    {"id": "tl_right", "fr": "droite.", "en": "right."},
+    {"id": "tl_stop", "fr": "obstacle, arrêtez-vous.", "en": "obstacle, stop."}
   ]
 }

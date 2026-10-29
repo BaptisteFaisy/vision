@@ -95,7 +95,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update = ::update,
         scope = viewModelScope,
     )
-    // Guidage SAM seul : TwinLite viré (ordre user), sonde + guetteurs + traversée.
+    // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()))
 
