@@ -77,9 +77,9 @@ function salle(key = '') {
   const sent = [];
   const state = {
     acceptWebSocket(socket, names) { tags.set(socket, names[0]); },
-    // Le runtime de Cloudflare retire un onglet fermé : la doublure aussi.
+    // Comme le runtime : au moment du `close`, l'onglet est **encore** dans la liste.
     getWebSockets(tag) {
-      return [...tags.keys()].filter((s) => !s.ferme && (!tag || tags.get(s) === tag));
+      return [...tags.keys()].filter((s) => !tag || tags.get(s) === tag);
     },
   };
   const room = new RelayRoom(state, { DB: baseFactice(key) });

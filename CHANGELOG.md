@@ -36,6 +36,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `DangerLabels.kt`, `LiveAskSession.kt`, `GuidanceRayTest.kt`,
   `GUIDAGE-TOUT-DROIT.md`.
 
+## 2026-10-29 — salle temps réel : deux corrections trouvées en la faisant tourner
+
+- **`RelayRoom` n'était pas exportée par l'entrée** : `wrangler dev` et `wrangler
+  deploy` refusaient le binding (« not exported in your entrypoint file »). Le
+  `export { RelayRoom } from './durable.js'` est dans `src/worker.js` — sans lui,
+  la salle n'aurait jamais pu être déployée.
+- **L'audience ne redescendait pas** : au `close` d'un onglet, le runtime le compte
+  *encore*, donc le dernier aidant parti annonçait `watch:1` au téléphone, qui
+  continuait d'émettre dans le vide. `watchersExcept(socket)` retire l'onglet qui
+  s'en va ; le test de la salle reproduit maintenant ce comportement du runtime
+  (l'onglet reste listé pendant son `close`).
+- `suivi-relais/wrangler.toml` : chemin de déploiement de la salle (binding,
+  migration `v1-relay-room`, D1 à renseigner depuis `wrangler d1 list`).
+- Preuve locale, `wrangler dev --local` + client WebSocket : le téléphone apprend
+  `{"type":"audience","watch":1}` à l'arrivée de l'aidant, la frame binaire lui
+  arrive, le téléphone ne reçoit jamais la sienne, et le départ annonce `watch:0`.
+- Tests : `node --test suivi-relais/test/*.mjs` 22/22.
+
 ## 2026-10-29 — direct caregiver : la caméra passe par un WebSocket, plus par une photo toutes les 2 s
 
 - **Demande** : « cela va bien restream la caméra ? je veux que ça le soit. »
