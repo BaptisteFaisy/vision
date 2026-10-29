@@ -286,6 +286,12 @@ object VoiceNavPhrases {
     /** Ordre stop consommé, session fermée. */
     const val STOP_DONE = "Guidage arrêté"
 
+    /** GPS désactivé sur ordre de l'utilisateur (« désactive le GPS »). */
+    const val GPS_DISABLED = "GPS désactivé"
+
+    /** GPS réactivé sur ordre de l'utilisateur (« active le GPS »). */
+    const val GPS_ENABLED = "GPS activé"
+
     /** Arrivée signalée par le moteur d'itinéraire (jamais devinée). */
     const val ARRIVED = "Arrivée à destination"
 

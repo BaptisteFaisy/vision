@@ -33,6 +33,12 @@ class VoiceNavSpeaker(
     private val settings: () -> Settings,
     private val clock: () -> Long = System::currentTimeMillis,
     private val announcer: VoiceNavAnnouncer = VoiceNavAnnouncer(),
+    /**
+     * L'utilisateur parle (tenue du doigt en dictée) : la voix du user a
+     * priorité, l'IA se tait — sauf urgence ([VoiceNavPolicy.isUrgent] :
+     * hors-trace, recalcul, arrivée), qui coupe et parle quand même.
+     */
+    private val userSpeaking: () -> Boolean = { false },
 ) {
 
     /** Virage à [cap] dans [meters] mètres ([street] si connue). */
@@ -91,6 +97,8 @@ class VoiceNavSpeaker(
     /** Canal commun : politique ([VoiceNavAnnouncer]) puis moteur ([SystemTtsEngine]). */
     private fun announce(event: VoiceNavEvent): String? {
         try {
+            // Le user parle : l'IA se tait, sauf urgence (la sécurité passe).
+            if (userSpeaking() && !VoiceNavPolicy.isUrgent(event)) return null
             val language = settings().speechLanguage
             val phrase = announcer.onEvent(clock(), event, language) ?: return null
             val danger = SpeechArbitration.priorityOf(event) == SpeechPriority.Danger

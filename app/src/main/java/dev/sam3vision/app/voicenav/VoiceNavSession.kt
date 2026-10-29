@@ -9,6 +9,7 @@ import dev.sam3vision.app.speech.VoiceNavAnnouncer
 import dev.sam3vision.core.nav.ConfirmAnswer
 import dev.sam3vision.core.nav.ConfirmAnswerParser
 import dev.sam3vision.core.nav.DestinationQuery
+import dev.sam3vision.core.nav.GuidanceOrder
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.nav.StopGuidanceParser
@@ -75,9 +76,9 @@ sealed interface VoiceNavUiState {
  * Contrat :
  * - [onVoiceTranscript] blanc ou sans intention → `false`, l'appelant
  *   poursuit son chemin normal (question LLM) ; intention reconnue (routeur
- *   ou [extraParsers]) → `true` (consommé) et, si [autoStartOnVoice] est
- *   vrai (câblage iSee), démarrage direct sans bouton : moteur embarqué si
- *   possible, sinon Maps piéton ;
+ *   ou [extraParsers] ou ordre GPS) → `true` (consommé) et, si
+ *   [autoStartOnVoice] est vrai (câblage iSee), démarrage direct sans
+ *   bouton : moteur embarqué si possible, sinon Maps piéton ;
  * - [autoStartOnVoice] faux → écran de confirmation + question vocale
  *   (« Do you really want to go to X? … », [ConfirmAnswerParser] : « yes »
  *   = [confirmDestination], « no » = annuler) ;
@@ -87,6 +88,10 @@ sealed interface VoiceNavUiState {
  * - ordre stop en session ([Confirming] ou [Guiding]) → retour au repos +
  *   annonce « Guidage arrêté », `true` ; sur [Arrived] → fermé sans annonce
  *   (l'arrivée est déjà dite), `true` ; hors session → `false` ;
+ * - ordre « désactive le GPS » → session fermée au besoin, fonction éteinte
+ *   (réglage persisté), accusé « GPS désactivé », toujours consommé ;
+ * - ordre « active le GPS » → fonction rallumée (réglage persisté), accusé
+ *   « GPS activé », toujours consommé (le guidage reste à la demande) ;
  * - [confirmDestination] : guidage actif → moteur embarqué ([engineStart])
  *   puis repli Maps ; écran de guidage + annonce « Navigation vers X » dans
  *   les deux cas ; guidage éteint → fiche lieu + annonce « Voici la fiche
@@ -128,6 +133,10 @@ class VoiceNavSession(
      * historique ; `IseeVoiceNav` passe `true` pour l'usage mains libres.
      */
     private val autoStartOnVoice: Boolean = false,
+    /** Ordre « désactive le GPS » : persiste l'état guidage éteint ([Settings]). */
+    private val onGpsDisabled: suspend () -> Unit = {},
+    /** Ordre « active le GPS » : persiste l'état guidage rallumé. */
+    private val onGpsEnabled: suspend () -> Unit = {},
 ) {
 
     private val _state = MutableStateFlow<VoiceNavUiState>(VoiceNavUiState.Idle)
@@ -144,8 +153,19 @@ class VoiceNavSession(
      */
     suspend fun onVoiceTranscript(text: String): Boolean {
         if (text.isBlank()) return false
-        if (runCatching { StopGuidanceParser.isStop(text) }.getOrDefault(false)) {
-            return stopFromVoice()
+        // Ordres GPS : l'arrêt exige une session ouverte, la désactivation et
+        // l'activation sont honorées tout de suite (fonction, pas guidage).
+        when (runCatching { StopGuidanceParser.parse(text) }.getOrDefault(GuidanceOrder.NONE)) {
+            GuidanceOrder.STOP -> return stopFromVoice()
+            GuidanceOrder.DISABLE -> {
+                disableFromVoice()
+                return true
+            }
+            GuidanceOrder.ENABLE -> {
+                enableFromVoice()
+                return true
+            }
+            GuidanceOrder.NONE -> {}
         }
         val answer = runCatching { ConfirmAnswerParser.parse(text) }.getOrNull()
         if (answer != null && _state.value is VoiceNavUiState.Confirming) {
@@ -365,6 +385,28 @@ class VoiceNavSession(
         if (_state.value is VoiceNavUiState.Arrived) {
             goIdle()
         }
+    }
+
+    /**
+     * Ordre « désactive le GPS » : guidage coupé si besoin (confirmation
+     * ou guidage ouverts), fonction éteinte (réglage persisté), accusé
+     * « GPS désactivé » — consommé même sans session ouverte.
+     */
+    private suspend fun disableFromVoice() {
+        if (_state.value is VoiceNavUiState.Guiding || _state.value is VoiceNavUiState.Confirming) {
+            goIdle()
+        }
+        runCatching { onGpsDisabled() }
+        voice.announceDisabled()
+    }
+
+    /**
+     * Ordre « active le GPS » : fonction rallumée (réglage persisté), le
+     * guidage reprendra à la demande (« je veux aller à X »), accusé dit.
+     */
+    private suspend fun enableFromVoice() {
+        runCatching { onGpsEnabled() }
+        voice.announceEnabled()
     }
 
     /**
