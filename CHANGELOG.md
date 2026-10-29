@@ -3,6 +3,30 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-29 — iSee : mur et concepts = obstacles bloquants (preuves JVM)
+
+- **Demande** : le mur et la liste user (barrières, marches, escaliers,
+  voitures, vélos, humains) doivent bloquer le couloir de marche ; vérifier
+  de bout en bout, combler les vrais trous sans inventer de distances.
+- `GuidanceObstaclesTest` (8/8, pur JVM) : chaîne `LiveProbe.publish`
+  rejouée — sténopé, profondeur serveur (`with_depth`), `placedLabels`,
+  `decide`, mot, phrase. Mur à ~2 m (boîte coupée) → prudence + côté ;
+  mur mesuré ~3 m → décalage ; mur 0,5 m (profondeur) et petit objet
+  0,5 m (sténopé) → stop ; liste user à 2 m → lus et bloquants ;
+  escaliers/marches/trou sans distance → prudence, rien d'inventé.
+- Résultat : aucun trou de blocage — le couloir bloque tout label, mesuré
+  ou non. « Stop » à 0,5 m exige une mesure (profondeur, coupée par
+  défaut) : au sténopé seul, mur/personne à 0,5 m remplit le cadre et le
+  mot reste le côté. Suivis notés (`GUIDAGE-TOUT-DROIT.md` § 8) : Canny
+  non branché, deux `StairConcepts` en désaccord sur « marche », lecture
+  coupée-haut-seul écartée.
+- Preuves : `:core:testDebugUnitTest` 1 812 tests, 0 échec, sur r630
+  (`GuidanceObstaclesTest` 8/8). Docs `GUIDAGE-TOUT-DROIT.md` § 5 + § 8,
+  `TESTING.md` (live 333).
+- Fichiers : `+GuidanceObstaclesTest.kt` (213 lignes), `GUIDAGE-TOUT-DROIT.md`,
+  `TESTING.md`, `CHANGELOG.md`. Périmètre voix tenu à l'écart
+  (`GuidanceAnnouncer.kt`, TwinLite, `IseeViewModel` : lus, non modifiés).
+
 ## 2026-10-29 — voix : le guidage dit quatre mots en moins de 100 ms (ordre user)
 
 - **Demande** : pas assez d'infos/seconde (5 minimum) — dire juste

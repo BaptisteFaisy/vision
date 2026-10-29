@@ -97,6 +97,7 @@ Aucun import réseau dans `Guidance.kt`, `GuidanceWord.kt` ni `GuidanceAnnouncer
 le guidage ne peut pas appeler le LLM, même par accident.
 
 Tests JVM qui verrouillent le contrat : `GuidanceTest` (18), `GuidanceWordTest` (5),
+`GuidanceObstaclesTest` (8, mur + liste bloquants de bout en bout, § 8),
 `GuidanceAnnouncerTest` (15), `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (4,
 sonde branchée sur un faux client SAM : voie libre → mot, obstacle → mot de sortie,
 mots urgents + positions non urgentes, positions seules → silence sur voie libre),
@@ -138,3 +139,34 @@ ElevenLabs + voix renseignées, bascule « Guider tout droit (caméra iSee) »
 - **Non mesuré** : les quatre mots sur appareil (clips < 100 ms non chronométrés ;
   les libellés restent verrouillés par les tests JVM) et le comportement en marche
   réelle (couloir qui se dégage, obstacle qui s'approche).
+
+## 8. Mur, liste user, trous — vérifié en JVM le 2026-10-29
+
+Chaîne `LiveProbe.publish` rejouée en JVM (`core/.../live/GuidanceObstaclesTest.kt`) :
+sténopé, profondeur serveur, `placedLabels`, `decide`, mot, phrase — 8/8 sur r630.
+Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
+
+- **Mur** : `wall` dans les défauts (`LivePrompts.kt:31-35`), `mur`/`wall` 2,50 m
+  (`KnownSizes.kt:68`). À ~2 m le mur remplit l'image (boîte coupée haut/bas) :
+  pas de lecture sténopé, le couloir bloque par prudence avec le côté de sortie
+  (`GuidanceObstaclesTest.kt:90`). Mesuré (~3 m) : blocage + décalage chiffré
+  (`:109`). À 0,5 m le mot n'est « stop » que mesuré — par la profondeur
+  (`:119`, ancre personne + `with_depth`) ; au sténopé seul, un mur ou une
+  personne à 0,5 m remplit le cadre (coupé) et le mot reste le côté de sortie —
+  même physique que la main devant l'objectif de la recette § 6.5.
+- **Liste user** : barrière 1,00 m, voiture 1,45 m, humain 1,70 m, vélo 1,10 m
+  (`KnownSizes.kt:52-71`) — à 2 m, lus ≈ 2,0 m et bloquants (`:144`).
+  Escaliers et marches (`stairs`, `escalier`, `step`, `steps`, `marche`) : sans
+  hauteur sténopé (volontaire, `KnownSizes.kt:15-22`), lus sans distance,
+  bloquants par prudence (`:161`). « marche » est hors reconnaissance
+  (`traverse/StairConcepts.kt:37-38`, `CurbConcepts.kt:15-16`) mais le couloir
+  bloque tout label : la reco ne conditionne pas le blocage.
+- **Trou** : aucun concept, aucune taille inventée (`heightMeters("trou")` et
+  `("hole")` = `null`) — la prudence bloque (`:179`). Une vraie distance
+  demanderait la profondeur ou le plan de sol : suivi, pas ici.
+- **Suivis notés, non faits** : `StairDetector` (Canny) non branché, seuils à
+  recalibrer sur captures réelles avant tout câblage (`StairDetector.kt:44-51`) ;
+  `stairs.StairConcepts` reconnaît « marche » quand `traverse.StairConcepts` le
+  refuse (voix, autre agent) ; boîte coupée en haut seul : la ligne des pieds
+  reste valide mais `DistanceMeter.readOne` (`DistanceEstimator.kt:156`)
+  écarte toute la lecture — assouplir serait deviner, la prudence suffit.
