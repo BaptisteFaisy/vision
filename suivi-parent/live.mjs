@@ -21,6 +21,9 @@ const pictoStrip = document.getElementById('picto-strip');
 let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '', pictoSig = '';
 // Direct de la caméra : dernière frame reçue par WebSocket et son instant.
 let streamSrc = '', streamAt = 0;
+// La salle a dit que la caméra est éteinte : le direct comme la photo lente
+// restent cachés jusqu'à l'avis contraire, ou une frame qui prouve le contraire.
+let cameraOff = false;
 // Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
 let known = true;
 const STATES = {
@@ -83,7 +86,7 @@ function renderFrame(status) {
   // Le direct passe devant la photo lente : une frame de moins de 1,5 s est la
   // caméra qui tourne maintenant, pas un état figé par le relais.
   const direct = streamSrc && Date.now() - streamAt <= STREAM_FRESH_MS;
-  const view = direct ? { src: streamSrc } : frameOf(live, status);
+  const view = direct ? { src: streamSrc } : frameOf(live, status, Date.now(), cameraOff);
   if (!view) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
     if (!direct) { streamSrc = ''; }
@@ -178,8 +181,16 @@ setInterval(poll, 2000);
 if (shareId) {
   watchStream({
     href: location.href,
-    onFrame: (src) => { streamSrc = src; streamAt = Date.now(); paintStream(); },
+    onFrame: (src) => { cameraOff = false; streamSrc = src; streamAt = Date.now(); paintStream(); },
     onState: () => { /* coupure : la fraîcheur fait retomber sur la photo lente */ },
+    // Caméra éteinte : l'image disparaît tout de suite, sans attendre que la
+    // dernière frame périme. Les doublons ne repeignent pas.
+    onCamera: (on) => {
+      if (cameraOff === !on) return;
+      cameraOff = !on;
+      if (cameraOff) streamSrc = '';
+      render();
+    },
   });
 }
 

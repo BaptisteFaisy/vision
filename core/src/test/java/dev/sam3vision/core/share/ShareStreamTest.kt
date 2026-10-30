@@ -41,6 +41,12 @@ class ShareStreamTest {
     }
 
     @Test
+    fun `l annonce camera a la forme de l avis d audience`() {
+        assertEquals("""{"type":"camera","on":true}""", cameraNotice(true))
+        assertEquals("""{"type":"camera","on":false}""", cameraNotice(false))
+    }
+
+    @Test
     fun `un message qui n est pas un avis d audience ne fait rien`() {
         assertNull(audienceCountOf("bonjour"))
         assertNull(audienceCountOf(""))

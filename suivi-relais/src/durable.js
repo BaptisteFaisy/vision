@@ -1,4 +1,4 @@
-import { audienceNotice, frameOk, frameTargets, keyOf, roleOf, shareOf } from './room.js';
+import { audienceNotice, cameraNotice, cameraOnOf, frameOk, frameTargets, keyOf, roleOf, shareOf } from './room.js';
 import { validId } from './contrat.js';
 import { d1Store } from './store.js';
 
@@ -38,12 +38,26 @@ export class RelayRoom {
     // déjà regardée doit le savoir tout de suite, sinon il reste muet en
     // attendant un aidant déjà là.
     this.notifyAudience();
+    // Un aidant qui arrive pendant que le téléphone est parti apprend tout de
+    // suite que la caméra est éteinte, au lieu d'afficher une photo lente
+    // encore « fraîche ». Téléphone présent : c'est lui qui dit son état
+    // réel (caméra allumée ou non), et les frames parlent d'elles-mêmes.
+    if (role === 'watch' && !this.state.getWebSockets('push').length) {
+      try { server.send(cameraNotice(false)); } catch { /* onglet déjà parti */ }
+    }
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /** Frame binaire du téléphone : relayée aux aidants, rien d'autre. */
+  /** Le téléphone parle aux aidants : frames binaires et état de sa caméra. */
   async webSocketMessage(socket, message) {
-    if (typeof message === 'string') return;
+    // Le téléphone annonce sa caméra (allumée ou fermée) : transmis aux aidants
+    // après validation. Seul un `push` parle au nom de la caméra du proche —
+    // un aidant ne peut pas éteindre l'image des autres.
+    if (typeof message === 'string') {
+      const on = cameraOnOf(message);
+      if (on !== null && this.state.getWebSockets('push').includes(socket)) this.notifyCamera(on);
+      return;
+    }
     const bytes = message.byteLength ?? message.length;
     if (!frameOk(bytes)) return;
     if (!this.state.getWebSockets('watch').length) return;
@@ -55,11 +69,13 @@ export class RelayRoom {
   async webSocketClose(socket) {
     this.closeQuietly(socket);
     this.notifyAudience(this.watchersExcept(socket));
+    this.cameraOffIfAlone(socket);
   }
 
   async webSocketError(socket) {
     this.closeQuietly(socket);
     this.notifyAudience(this.watchersExcept(socket));
+    this.cameraOffIfAlone(socket);
   }
 
   closeQuietly(socket) {
@@ -73,6 +89,34 @@ export class RelayRoom {
    */
   watchersExcept(socket) {
     return this.state.getWebSockets('watch').filter((s) => s !== socket).length;
+  }
+
+  /**
+   * Téléphones encore là, hors celui qui s'en va : même lecture que
+   * `watchersExcept`, le runtime comptant encore l'onglet qui se ferme.
+   */
+  pushesExcept(socket) {
+    return this.state.getWebSockets('push').filter((s) => s !== socket);
+  }
+
+  /** Dit aux aidants si la caméra tourne : ils l'effacent dès qu'elle s'éteint. */
+  notifyCamera(on) {
+    const notice = cameraNotice(on);
+    for (const socket of this.state.getWebSockets('watch')) {
+      try { socket.send(notice); } catch { /* onglet fermé */ }
+    }
+  }
+
+  /**
+   * Le dernier téléphone qui s'en va éteint l'image des aidants tout de
+   * suite : sans cet avis, la photo lente encore « fraîche » resterait
+   * affichée jusqu'à 8 s après la coupure. Le départ d'un aidant ou d'un
+   * téléphone surnuméraire ne change rien.
+   */
+  cameraOffIfAlone(socket) {
+    if (!this.state.getWebSockets('push').includes(socket)) return;
+    if (this.pushesExcept(socket).length) return;
+    this.notifyCamera(false);
   }
 
   /** Dit aux téléphones combien d'aidants regardent : ils n'émettent que si > 0. */

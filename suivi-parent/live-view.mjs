@@ -11,8 +11,11 @@ export const PICTO_FRESH_MS = 8_000;
  * téléphone : cette image conservée n'est jamais affichée, sinon la page montre
  * une caméra que le proche a déjà éteinte. Il faut donc un flux `live` **et** une
  * frame de moins de [PHOTO_FRESH_MS] ; tout le reste laisse la place au texte.
+ * Quand la salle a dit que la caméra est éteinte (`cameraOff`), même une frame
+ * encore « fraîche » ne s'affiche plus : l'avis vaut mieux que l'âge.
  */
-export function frameOf(live, status, now = Date.now()) {
+export function frameOf(live, status, now = Date.now(), cameraOff = false) {
+  if (cameraOff) return null;
   if (status !== 'live') return null;
   const photo = live && live.photo;
   if (!photo || typeof photo.jpeg !== 'string' || !photo.jpeg) return null;
