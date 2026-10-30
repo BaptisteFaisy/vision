@@ -11,10 +11,10 @@ import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 
 /** Chemin libre : le même vert que le feu Traversée. */
-private val STEERING_FREE = Color(0xFF2ECC71)
+internal val STEERING_FREE = Color(0xFF2ECC71)
 
 /** Cap bouché : le même ambre que le doute Traversée. */
-private val STEERING_BLOCKED = Color(0xFFF1C40F)
+internal val STEERING_BLOCKED = Color(0xFFF1C40F)
 
 /**
  * Flèche du chemin sur la vidéo : verte sur voie libre, ambre quand le cap

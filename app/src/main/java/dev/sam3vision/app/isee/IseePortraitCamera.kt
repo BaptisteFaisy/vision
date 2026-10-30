@@ -118,6 +118,7 @@ private fun BoxScope.StreetFeed(
         GlassesMaskLayer(probe.masks, probe.width, probe.height)
         LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
         SteeringLayer(probe.steering)
+        InstructionLayer(probe.pulse)
         CrossingOnVideo(probe, rememberCrossingPump(viewModel))
     } else {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())

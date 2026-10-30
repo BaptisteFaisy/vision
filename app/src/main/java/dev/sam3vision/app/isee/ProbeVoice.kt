@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.curb.SidewalkKeep
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.live.GuidanceAnnouncer
+import dev.sam3vision.core.live.GuidanceDecision
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
@@ -69,6 +70,12 @@ internal class ProbeVoice(
      * encore de frame) : le guetteur trottoir y lit ce qu'il annonce.
      */
     val lastSidewalk: SidewalkPosition? get() = guidance.lastSidewalk
+
+    /**
+     * Décision de la dernière frame guidée (`null` = guidage coupé ou pas
+     * encore de frame) : le battement 500 ms y lit la consigne affichée.
+     */
+    val lastDecision: GuidanceDecision? get() = guidance.lastDecision
 
     /**
      * Phrase à dire pour la frame, ou `null` (muet) : guidage d'abord, sinon
