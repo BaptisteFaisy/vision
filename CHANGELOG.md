@@ -16,7 +16,9 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   un ordre du feu nouveau fait taire la voix douce 2,5 s (`CUE_QUIET_MS`, les
   répétitions du rouge ne réarment pas) — sans ce silence, le `collectLatest`
   jetterait un « Vert, traversez. » dit une seule fois.
-- Preuves : à compléter (run r630 + CI).
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 372 tests, 0 échec — dont `CrossingPeopleTest` 14/14) ;
+  `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes, inchangé).
 
 
 ## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)
