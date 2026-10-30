@@ -107,6 +107,7 @@ private fun PerceptionSettings(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PredictionSettings(draft) { onChange(it) }
         CadenceSettings(draft) { onChange(it) }
+        AdaptiveSettings(draft) { onChange(it) }
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
         WorldModeSettings(draft) { onChange(it) }
@@ -446,6 +447,27 @@ private fun CadenceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             "Continuous cadence instead of adaptive steps (experimental, unmeasured)",
             draft.continuousCadenceEnabled,
         ) { onChange(draft.copy(continuousCadenceEnabled = it)) }
+    }
+}
+
+/** « Direct/iSee » adaptatif (Q8+Q9) : paliers qualité + keyframes, A/B runtime, off par défaut. */
+@Composable
+private fun AdaptiveSettings(draft: Settings, onChange: (Settings) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Adaptive uploads + keyframes (Q8+Q9)",
+            color = SettingsLight.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        SwitchRow(
+            "Adaptive JPEG quality tiers (experimental, unmeasured)",
+            draft.adaptiveUploadEnabled,
+        ) { onChange(draft.copy(adaptiveUploadEnabled = it)) }
+        SwitchRow(
+            "On-demand keyframes (experimental, unmeasured)",
+            draft.keyframeSchedulerEnabled,
+        ) { onChange(draft.copy(keyframeSchedulerEnabled = it)) }
     }
 }
 
