@@ -33,6 +33,26 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `find the x rend le label sans article`() {
+        assertEquals("keys", PictoVoiceOrder.parseFind("Find the keys"))
+        assertEquals("keys", PictoVoiceOrder.parseFind("find keys"))
+        assertEquals("phone", PictoVoiceOrder.parseFind("Locate my phone"))
+        assertEquals("tv remote", PictoVoiceOrder.parseFind("find the tv remote"))
+        assertEquals("keys", PictoVoiceOrder.parseFind("Find the keys please"))
+    }
+
+    @Test
+    fun `find sans objet ou verbe non initial n est pas un ordre`() {
+        assertNull(PictoVoiceOrder.parseFind("find"))
+        assertNull(PictoVoiceOrder.parseFind("find the"))
+        assertNull(PictoVoiceOrder.parseFind("find the please"))
+        assertNull(PictoVoiceOrder.parseFind("I found my keys"))
+        assertNull(PictoVoiceOrder.parseFind("où sont les clés ?"))
+        assertNull(PictoVoiceOrder.parseFind("fais un pictogramme de ces médics"))
+        assertNull(PictoVoiceOrder.parseFind(""))
+    }
+
+    @Test
     fun `le mot vise le repere - egalite pluriel prefixe`() {
         assertTrue(PictoVoiceOrder.matches("médics", "medics"))
         assertTrue(PictoVoiceOrder.matches("médicament", "medics"))
@@ -95,5 +115,7 @@ class PictoVoiceOrderTest {
         assertEquals("Démo picto activée.", PictoVoiceText.demo(true, SpeechLanguage.Fr))
         assertEquals("Démo picto coupée.", PictoVoiceText.demo(false, SpeechLanguage.Fr))
         assertEquals("Picto demo on.", PictoVoiceText.demo(true, SpeechLanguage.En))
+        assertEquals("Je cherche keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.Fr))
+        assertEquals("Looking for keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.En))
     }
 }
