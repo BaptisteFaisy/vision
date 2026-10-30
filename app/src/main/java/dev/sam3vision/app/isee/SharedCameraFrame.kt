@@ -3,7 +3,8 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.share.SharedPhoto
 
 /**
- * Dernière frame JPEG (base64, 320 px) de la caméra iSee, pour la page du proche.
+ * Dernière frame JPEG de la caméra iSee, pour la page du proche : base64 320 px
+ * (photo lente) et binaire 480 px (direct).
  *
  * La caméra ne produit des frames que pendant qu'elle sert ([IseeCameraWiring]) :
  * cette copie de référence ne coûte donc rien et évite de faire transiter l'image

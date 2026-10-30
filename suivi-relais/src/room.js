@@ -7,8 +7,8 @@
 /** Rôles acceptés sur `/ws`. */
 export const ROLES = ['push', 'watch'];
 
-/** Une frame au-delà de 256 Ko n'est pas une frame de 320 px : on la refuse. */
-export const MAX_FRAME_BYTES = 256 * 1024;
+/** Une frame au-delà de 512 Ko n'est pas une frame de 480 px : on la refuse. */
+export const MAX_FRAME_BYTES = 512 * 1024;
 
 /** Rôle porté par l'URL (`?role=watch`), `null` si absent ou inconnu. */
 export function roleOf(url) {

@@ -24,6 +24,7 @@ import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.captureStamp
+import dev.sam3vision.core.share.STREAM_FRAME_MS
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -47,6 +48,17 @@ const val ISEE_FRAME_EDGE = 320
 const val ISEE_FRAME_QUALITY = 55
 
 /**
+ * Côté long de la frame du **direct aidant** (px) : le 320 px de SAM, étiré
+ * plein écran par la page, restait flou ; à 480 px l'image redevient lisible.
+ * Le capteur est demandé à cette taille (voir `newAnalysis`) : SAM continue
+ * de recevoir son 320 px, réduit dans la même passe NV21.
+ */
+const val SHARE_FRAME_EDGE = 480
+
+/** Qualité JPEG du direct aidant : 70 efface les aplats visibles à q55. */
+const val SHARE_FRAME_QUALITY = 70
+
+/**
  * Le vrai pilote CameraX d'iSee, derrière la fenêtre flottante : aperçu + `ImageCapture`
  * + `VideoCapture<Recorder>` + analyse de frames, tous liés en même temps, et
  * l'implémentation [IseeCameraActions] qu'appelle [IseeViewModel]. Vidéo sans piste
@@ -65,6 +77,9 @@ class IseeCameraHost(private val context: Context) {
 
     /** Frames converties depuis la liaison caméra (le log de coût ne tire qu'un coup sur 20). */
     private var conversionFrames = 0
+
+    /** Dernier encodage du direct : la cadence du direct, pas celle du capteur. */
+    private var lastShareEncodeMs = 0L
 
     /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
     private val encoder = Nv21JpegEncoder()
@@ -157,18 +172,22 @@ class IseeCameraHost(private val context: Context) {
         }.getOrElse { "Camera binding failed: ${it.message}" }
     }
 
-    /** Analyseur de frames 512 px, une frame à la fois (les anciennes sont jetées). */
+    /** Analyseur de frames 480 px, une frame à la fois (les anciennes sont jetées). */
     private fun newAnalysis(): ImageAnalysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setResolutionSelector(
             ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
-                        // On demande la taille **envoyée** : un buffer 640×480 pour un JPEG
-                        // de 320 px coûtait 12-42 ms de conversion par frame (mesuré au
-                        // logcat). Le repli prend le plus proche en dessous, quitte à
-                        // redimensionner à peine.
-                        Size(ISEE_FRAME_EDGE, ISEE_FRAME_EDGE),
+                        // On demande la taille du **direct** (480 px) : SAM reçoit
+                        // toujours son 320 px, réduit dans la même passe NV21. Un
+                        // buffer 640×480 pour un JPEG de 320 px coûtait 12-42 ms
+                        // de conversion par frame avec l'ancien chemin (mesuré au
+                        // logcat, 2026-10-26) — le coût actuel est mesuré au log
+                        // `conversion:`. Le repli prend le plus proche en dessous,
+                        // quitte à redimensionner à peine ; sous 480 px, le direct
+                        // part à la taille du buffer, jamais agrandi.
+                        Size(SHARE_FRAME_EDGE, SHARE_FRAME_EDGE),
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
                     ),
                 )
@@ -197,9 +216,9 @@ class IseeCameraHost(private val context: Context) {
         val startedAt = SystemClock.elapsedRealtime()
         try {
             val bytes = encodeFrameBytes(proxy)
-            // Le direct de l'aidant part en binaire : les octets sont offerts tels
-            // quels, sans le détour base64 que le pousseur défaisait aussitôt.
-            SharedCameraFrame.offerBytes(bytes)
+            // Le direct de l'aidant a son propre encodage (480 px q70) : la
+            // frame SAM (320 px q55) ne le nourrit plus.
+            val shareBytes = offerShareFrame(proxy, startedAt)
             onFrame?.invoke(
                 jpegBytesToBase64(bytes),
                 captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()),
@@ -209,6 +228,7 @@ class IseeCameraHost(private val context: Context) {
                 ms = SystemClock.elapsedRealtime() - startedAt,
                 size = proxy.width to proxy.height,
                 bytes = bytes.size,
+                shareBytes = shareBytes,
             )
         } catch (_: Throwable) {
             // frame illisible : la suivante arrive tout de suite
@@ -229,12 +249,39 @@ class IseeCameraHost(private val context: Context) {
                 ISEE_FRAME_QUALITY,
             )
 
+    /**
+     * Frame du direct aidant : encodée à la cadence du direct, seulement quand
+     * un aidant regarde — sinon ce deuxième JPEG brûlerait du CPU pour rien.
+     * Retourne la taille offerte (−1 si rien n'est parti).
+     */
+    private fun offerShareFrame(proxy: ImageProxy, nowMs: Long): Int {
+        if (!SharedCameraFrame.audience) return -1
+        if (nowMs - lastShareEncodeMs < STREAM_FRAME_MS) return -1
+        lastShareEncodeMs = nowMs
+        val share = encodeShareBytes(proxy)
+        SharedCameraFrame.offerBytes(share)
+        return share.size
+    }
+
+    /**
+     * Frame JPEG brute du direct : même chaîne NV21 que SAM, à 480 px q70. Sur
+     * un buffer plus petit (capteur 320), l'encodeur rend le buffer tel quel,
+     * jamais agrandi — pas de fausse qualité ni d'octets gaspillés.
+     */
+    private fun encodeShareBytes(proxy: ImageProxy): ByteArray =
+        encoder.encodeJpeg(proxy, SHARE_FRAME_EDGE, SHARE_FRAME_QUALITY)
+            ?: bitmapToJpeg(
+                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, SHARE_FRAME_EDGE),
+                SHARE_FRAME_QUALITY,
+            )
+
     /** Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames. */
-    private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int) {
+    private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int, shareBytes: Int) {
         if (frames % LOG_EVERY_FRAMES != 0) return
+        val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
         android.util.Log.i(
             "sam3vision",
-            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko)",
+            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct)",
         )
     }
 
