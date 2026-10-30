@@ -28,15 +28,33 @@ class IseeSteeringOrders(
     private val update: StateUpdate,
 ) {
 
+    /**
+     * Mode armé par la vision (passage détecté) : lui seul retombe tout seul
+     * quand le passage disparaît. Un armement manuel ou GPS reste jusqu'à sa
+     * propre coupe (un passage sans bandes se traverse sans zébrures).
+     */
+    internal var visionArmed: Boolean = false
+        private set
+
     /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
-    fun toggleCrossing() = setActive(!probe.state.value.crossingActive)
+    fun toggleCrossing() {
+        visionArmed = false
+        setActive(!probe.state.value.crossingActive)
+    }
 
     /**
      * Guidage auto : le rappel proche d'une traversée arme le mode, le
      * passage le coupe (la voix du mode parle, pas d'annonce ici). Sans
-     * effet si le mode est déjà dans l'état demandé.
+     * effet si le mode est déjà dans l'état demandé. [vision] vrai =
+     * armement par détection du passage : lui seul retombe tout seul quand
+     * le passage disparaît ([visionArmed]).
      */
-    fun setAutoCrossing(wantActive: Boolean) = setActive(wantActive)
+    fun setAutoCrossing(wantActive: Boolean, vision: Boolean = false) {
+        val was = probe.state.value.crossingActive
+        setActive(wantActive, auto = true)
+        if (!wantActive) visionArmed = false
+        else if (vision && !was) visionArmed = true
+    }
 
     /**
      * Ordre « traverser » : consommé ici (jamais LLM), confirmé à voix
@@ -45,6 +63,7 @@ class IseeSteeringOrders(
     suspend fun runCrossing(text: String): Boolean {
         val command = CrossingVoiceCommand.parse(text) ?: return false
         val wantActive = command == CrossingVoiceAction.Activate
+        visionArmed = false
         setActive(wantActive)
         speak(CrossingText.mode(wantActive, settings().speechLanguage))
         return true
@@ -65,9 +84,9 @@ class IseeSteeringOrders(
     }
 
     /** Bascule commune : sans effet si la sonde est déjà dans l'état demandé. */
-    private fun setActive(wantActive: Boolean) {
+    private fun setActive(wantActive: Boolean, auto: Boolean = false) {
         if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings(), wantActive)
+            probe.setCrossingActive(settings(), wantActive, auto)
         }
     }
 }

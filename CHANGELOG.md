@@ -18,6 +18,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `PedLightGateTest`, `CrossingAnnouncerTest` — échec constaté avant, vert
   après) ; suites complètes `:core` et `:app` vertes ;
   `check-kotlin-limits.py` vert.
+## 2026-10-30 — traversée automatique : le passage détecté arme le mode, perdu il le coupe, personnes annoncées (branche `auto-traversee`)
+
+- **Demande** : passer en mode Traversée automatiquement quand un passage
+  piéton est détecté, repasser en normal quand il n'est plus vu, et garder
+  en traversée les infos sur les gens (« right left etc »).
+- Fait : `observeCrossingAuto` (3/5 frames → arme + « Mode traversée
+  activé. », une fois par apparition), `CrossingLossGate` + `observeCrossingLoss`
+  (4 frames sans passage → coupe + « Mode traversée coupé. »),
+  `IseeSteeringOrders.visionArmed` (seul l'armement vision auto-perd ; manuel
+  et GPS gardent leur coupe, refus manuel = silence 1 min), prompts traversée
+  + `person` + `crosswalk` (12 concepts ≤ 16), `CrossingPeopleWatch` (le feu
+  parle en premier, sinon personnes au cadran + distance). `PersonLabels`
+  partagé (ex-liste privée de `LateralNudge`, comportement inchangé),
+  `CrossingText.offer` supprimée (phrase « Dites traverser » sans appelant).
+- Preuves : à compléter (run r630 + CI).
+
 
 ## 2026-10-30 — consigne de guidage toutes les 500 ms sur la vidéo (branche `feat/isee-instruction-500ms`)
 
