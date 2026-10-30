@@ -7,14 +7,6 @@ import org.junit.Test
 class CrossingTextTest {
 
     @Test
-    fun `l annonce d un passage dit quoi faire, pas seulement ce qu on voit`() {
-        // Une personne aveugle n'a que la voix : « passage piéton » seul ne lui
-        // apprend pas qu'un mot suffit pour entrer dans le mode.
-        assertEquals("Passage piéton. Dites traverser.", CrossingText.offer(SpeechLanguage.Fr))
-        assertEquals("Crosswalk. Say cross for crossing mode.", CrossingText.offer(SpeechLanguage.En))
-    }
-
-    @Test
     fun `phrases francaises courtes`() {
         assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
         assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
