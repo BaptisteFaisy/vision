@@ -49,14 +49,14 @@ téléphone ──{"type":"camera","on":…}──▶ RelayRoom ──{"type":"c
   Un téléphone qui rejoint une salle déjà regardée apprend ainsi tout de
   suite qu'on le regarde, au lieu de rester muet.
 - **Une frame ne revient jamais à son émetteur** et n'est jamais relue en base ;
-  au-delà de 256 Ko (`MAX_FRAME_BYTES`), elle est ignorée.
+  au-delà de 512 Ko (`MAX_FRAME_BYTES`), elle est ignorée.
 - **L'écriture reste protégée** : `role=push` exige la clé du flux quand le flux
   en a une (même règle que `/api/share`, liée au premier envoi) — un identifiant
   deviné ne suffit pas à diffuser une fausse caméra chez l'aidant.
 - **Hibernation** : la salle utilise l'API d'hibernation (`acceptWebSocket` avec
   étiquette de rôle), donc un aidant immobile ne coûte pas de durée. Sur l'offre
   gratuite (100 000 requêtes/jour, messages WebSocket comptés au 1/20), une heure
-  de direct coûte ~1 400 requêtes : très en dessous du plafond.
+  de direct coûte ~1 900 requêtes : très en dessous du plafond.
 - **Repli** : la page garde la photo lente (`/api/state`, une frame toutes les 2 s)
   si le WebSocket est indisponible. Un déploiement sans binding `RELAY_ROOM`
   répond `503 {"ok":false,"error":"diffusion non déployée"}` et la page continue

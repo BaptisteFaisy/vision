@@ -96,7 +96,7 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Cadence Direct (plancher / cible / lent) | **350 / 500 / 900 ms** | `core/live/LiveSession.kt:34` (`Cadence.Direct`) |
 | Cadence iSee | pas de plancher, **1 créneau**, budget **150 ms**, hystérésis **3** mesures, réouverture sous **0,5 ×** budget | `core/live/LiveSession.kt:43-50,195,198` |
 | Fenêtre de réveil du Direct | **60 s** | `app/live/LiveWakeGuard.kt` (`WAKE_TIMEOUT_MS`) |
-| Côté long de la frame iSee | **320 px** (qualité 55) | `app/isee/IseeCameraPane.kt:43,46` |
+| Côté long de la frame iSee | **320 px** (qualité 55) | `app/isee/IseeCameraPane.kt:44,47` |
 | Côté long de la frame du Direct | **512 px** | `app/LiveScreen.kt:55` (`LIVE_EDGE`) |
 | `work_edge` par défaut du direct | **512 px** | `core/live/LiveSession.kt:211` (`DEFAULT_WORK_EDGE`) |
 | Objets affichés par défaut | **8** (bornes 1–12) | `core/model/ObjectLimits.kt:16-18` |

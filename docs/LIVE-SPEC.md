@@ -228,7 +228,8 @@ Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au
 | Budget de latence | **150 ms** | `LiveSession.kt:48` |
 | Plancher / cible | 0 ms : on repart dès qu'un créneau se libère | `LiveSession.kt:44-45` |
 | Palier lent | 900 ms | `LiveSession.kt:46` |
-| Image envoyée | côté long **320 px**, JPEG **q55** | `app/src/main/java/dev/sam3vision/app/isee/FramePolicy.kt:17`, `:20` ; `IseeCameraPane.kt:41`, `:165`, `:217` |
+| Image envoyée | côté long **320 px**, JPEG **q55** | `app/src/main/java/dev/sam3vision/app/isee/FramePolicy.kt:17`, `:20` ; `IseeCameraPane.kt:42`, `:176`, `:245` |
+| Direct aidant | côté long **480 px**, JPEG **q70**, **15 im/s** | `IseeCameraPane.kt:56`, `:59`, `:257` ; `core/src/main/java/dev/sam3vision/core/share/ShareStream.kt:11` |
 | Cadence | `Cadence.Fast` | `app/src/main/java/dev/sam3vision/app/isee/LiveProbe.kt:181` |
 | Délai normal / première frame | 10 s / 60 s | `LiveProbe.kt:481`, `:484` |
 

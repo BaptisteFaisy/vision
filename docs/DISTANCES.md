@@ -28,7 +28,7 @@ Deux entrées, deux sources :
 L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`, `LensSpec.kt:23-29`)
 — le direct redresse chaque frame avant envoi (`uprightScaled`, `LiveScreen.kt:291`). La mesure est indépendante de la
 résolution envoyée : `focalPx` se recalcule pour chaque frame depuis les dimensions **revenant du serveur**
-(512 px côté direct `LIVE_EDGE`, `LiveScreen.kt:45` ; **320 px** côté iSee `ISEE_FRAME_EDGE`, `IseeCameraPane.kt:39` ;
+(512 px côté direct `LIVE_EDGE`, `LiveScreen.kt:45` ; **320 px** côté iSee `ISEE_FRAME_EDGE`, `IseeCameraPane.kt:40` ;
 `work_edge` demandé au serveur : 640, `LiveSession.kt:66,173`).
 
 **Bornes de plausibilité** (`Pinhole`, `DistanceEstimator.kt:30,33,36`) : rien sous **0,3 m** (`MIN_METERS`),

@@ -67,7 +67,7 @@ Une frame de réserve est convertie pendant que la requête court (emplacement d
 
 | Élément | Fichier |
 |---|---|
-| Analyseur de frames + `bind` caméra | `app/…/isee/IseeCameraPane.kt` (`IseeCameraHost`, côté long **320 px** : `ISEE_FRAME_EDGE`, `:39`) |
+| Analyseur de frames + `bind` caméra | `app/…/isee/IseeCameraPane.kt` (`IseeCameraHost`, côté long **320 px** : `ISEE_FRAME_EDGE`, `:40`) |
 | Envoi `/live/ws`, masques, stats | `app/…/isee/LiveProbe.kt` (l'appel passe par `liveClient()`, **WS uniquement**) |
 | Coloriage des masques (tampons réutilisés) | `app/…/isee/MaskPainter.kt:37-50` |
 | Formatage (pur, testé JVM) | `app/…/isee/LiveProbeText.kt` (21 tests `LiveProbeTextTest`) |
