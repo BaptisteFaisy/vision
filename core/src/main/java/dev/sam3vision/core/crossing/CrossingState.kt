@@ -16,11 +16,13 @@ import dev.sam3vision.core.model.SegObject
 enum class CrossingState { Red, Green, Unknown }
 
 /**
- * Prompts du **mode Traversée** : le feu, les voitures, les personnes et le
- * passage lui-même. Quatre concepts, bien sous le plafond [LivePrompts.MAX] :
- * le feu dit quand traverser, les voitures forcent l'attente, les personnes
- * sont annoncées par positions, et le passage vu garde le mode auto actif
- * (perdu plusieurs frames de suite, retour au mode normal).
+ * Concepts **minimaux** de la Traversée : le feu, les voitures, les personnes
+ * et le passage lui-même. Quatre concepts, garantis inclus dans
+ * [LivePrompts.default] (liste unique normal/Traversée, ordre user du 30/10 —
+ * la bascule ne change plus les prompts) : le feu dit quand traverser, les
+ * voitures forcent l'attente, les personnes sont annoncées par positions, et
+ * le passage vu garde le mode auto actif (perdu plusieurs frames de suite,
+ * retour au mode normal).
  */
 object CrossingPrompts {
 

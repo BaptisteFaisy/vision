@@ -36,7 +36,7 @@ class IseeSteeringOrders(
     internal var visionArmed: Boolean = false
         private set
 
-    /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
+    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
     fun toggleCrossing() {
         visionArmed = false
         setActive(!probe.state.value.crossingActive)

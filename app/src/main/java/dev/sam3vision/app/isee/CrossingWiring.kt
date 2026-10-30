@@ -27,7 +27,6 @@ import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
-import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
@@ -41,8 +40,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 
 /**
- * Câblage du **mode Traversée** de la sonde : prompts feu+voitures+personnes+
- * passage, couleur du feu lue dans la frame, annonces et vibrations.
+ * Câblage du **mode Traversée** de la sonde : mêmes masques qu'en mode normal
+ * (liste unique [LivePrompts.default]), couleur du feu lue dans la frame,
+ * annonces et vibrations.
  *
  * Isolé de [LiveProbe] pour que celle-ci reste sous la limite de 500 lignes
  * (même raison que `ProbeWiring.kt`) : la sonde ne porte que l'annonceur, le
@@ -66,17 +66,19 @@ class CrossingChipZone {
 }
 
 /**
- * Active ou coupe le mode Traversée : les prompts deviennent feu+voitures+
- * personnes+passage (ou retombent sur les défauts), la session repart de zéro
- * comme à tout changement de Réglages. Le guidage obstacles est coupé tant que
- * le mode est actif : « Stop, mur » et « Vert, traversez » ne doivent jamais
- * se mélanger. [auto] vrai (bascule auto vision ou GPS) : la coupe ne fait pas
- * taire la proposition — seul un refus manuel (bouton, ordre vocal) vaut refus.
+ * Active ou coupe le mode Traversée : les prompts **ne changent pas** (liste
+ * unique normal/Traversée, ordre user du 30/10 — mêmes masques dans les deux
+ * modes), seule la voix bascule (feu + veto trafic au lieu du guidage). Les
+ * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
+ * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
+ * est coupé tant que le mode est actif : « Stop, obstacle » et
+ * « Vert, traversez » ne doivent jamais se mélanger. [auto] vrai (bascule
+ * auto vision ou GPS) : la coupe ne fait pas taire la proposition — seul un
+ * refus manuel (bouton, ordre vocal) vaut refus.
  */
 internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean, auto: Boolean = false) {
     if (!active && !auto) CrossingOfferWatch.declined(System.currentTimeMillis())
-    val prompts = if (active) TraversePipeline.promptsFor(CrossingPrompts.PROMPTS) else LivePrompts.default
-    configureFrom(settings, prompts, active)
+    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active)
 }
 
 /**
