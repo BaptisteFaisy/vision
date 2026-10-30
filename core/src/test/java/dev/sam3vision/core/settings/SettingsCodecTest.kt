@@ -152,6 +152,26 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `les flags adaptatifs sont eteints par defaut et survivent a un aller-retour`() {
+        // Off par défaut : le direct est celui d'avant tant que l'A/B ne les allume pas.
+        assertEquals(false, Settings.Default.adaptiveUploadEnabled)
+        assertEquals(false, Settings.Default.keyframeSchedulerEnabled)
+        assertEquals(false, SettingsCodec.decode("").adaptiveUploadEnabled)
+        assertEquals(false, SettingsCodec.decode("").keyframeSchedulerEnabled)
+
+        val on = Settings.Default.copy(adaptiveUploadEnabled = true, keyframeSchedulerEnabled = true)
+        val round = SettingsCodec.decode(SettingsCodec.encode(on))
+        assertEquals(true, round.adaptiveUploadEnabled)
+        assertEquals(true, round.keyframeSchedulerEnabled)
+
+        // Un fichier écrit avant les flags : éteints, jamais d'adaptatif hérité.
+        val legacy = SettingsCodec.encode(Settings.Default).lines()
+            .filterNot { it.startsWith("adaptiveUploadEnabled=") || it.startsWith("keyframeSchedulerEnabled=") }
+        assertEquals(false, SettingsCodec.decode(legacy.joinToString("\n")).adaptiveUploadEnabled)
+        assertEquals(false, SettingsCodec.decode(legacy.joinToString("\n")).keyframeSchedulerEnabled)
+    }
+
+    @Test
     fun `l'endpoint d'itineraire survit a un aller-retour`() {
         val custom = Settings.Default.copy(routeBaseUrl = "https://route.test")
         assertEquals("https://route.test", SettingsCodec.decode(SettingsCodec.encode(custom)).routeBaseUrl)
