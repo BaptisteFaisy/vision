@@ -46,6 +46,11 @@ class TrainedLightColorTest {
         assertEquals(CrossingState.Green, TrainedLightColor.classify(bar(), 20, 20))
     }
 
+    @Test
+    fun `le vert se tranche des 0,50 de purete`() {
+        assertEquals(0.50f, TrainedLightColor.GREEN_MIN_PURITY, 0f)
+    }
+
     /** Barre verte 4x10 sur fond noir : petit bonhomme sombre (feuille 6 de l'arbre). */
     private fun bar(): IntArray {
         val pixels = IntArray(20 * 20) { BLACK }
