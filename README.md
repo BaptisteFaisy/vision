@@ -46,8 +46,7 @@ iSee is built on Meta AI, end to end:
   over a **Meta Model API-compatible** `chat/completions` endpoint
   (`core/src/main/java/dev/sam3vision/core/net/InferHubLlmClient.kt`, defaults in
   `core/src/main/java/dev/sam3vision/core/settings/Settings.kt`). Routing is
-  provider-agnostic; Meta-hosted models are the default, and Llama served over
-  the Meta Model API is the next wiring step.
+  provider-agnostic, with Meta-hosted models as the default.
 - **Speech-to-text — Meta AI API**: `POST https://api.meta.ai/v1/asr/transcribe`
   with `muse-voice-transcribe-1.0`
   (`core/src/main/java/dev/sam3vision/core/net/MetaAsrClient.kt`,
