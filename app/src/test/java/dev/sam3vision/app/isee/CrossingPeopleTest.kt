@@ -12,8 +12,9 @@ import org.junit.Test
 
 /**
  * Voix douce des personnes en mode Traversée : le feu parle en premier, le
- * décalage opposé aux gens proches ensuite (miroir du guidage normal), leurs
- * positions au cadran sinon — et silence doux après un ordre du feu nouveau.
+ * décalage opposé aux obstacles proches ensuite (miroir du guidage normal),
+ * les positions des personnes au cadran sinon — et silence doux après un
+ * ordre du feu nouveau.
  */
 class CrossingPeopleTest {
 

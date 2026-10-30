@@ -168,6 +168,20 @@ class LateralNudgeTest {
     }
 
     @Test
+    fun `le champ calibre la fenetre en metres`() {
+        val frames = listOf(4.0f, 3.9f, 3.8f)
+        // x = 0,92 à ~4 m : 2,1 m de l'axe à 67° (dehors), 1,2 m à 40° (dedans).
+        val large = LateralNudgeTracker()
+        frames.forEachIndexed { i, m -> assertNull(large.onFrame(i * 250L, listOf(personne(0.92f, m)))) }
+
+        val etroit = LateralNudgeTracker()
+        etroit.onFrame(0L, listOf(personne(0.92f, 4.0f)), 40f)
+        etroit.onFrame(250L, listOf(personne(0.92f, 3.9f)), 40f)
+
+        assertEquals(SteeringCap.Left, etroit.onFrame(500L, listOf(personne(0.92f, 3.8f)), 40f)!!.side)
+    }
+
+    @Test
     fun `reset oublie l approche`() {
         val suivi = LateralNudgeTracker()
         suivi.onFrame(0L, listOf(personne(0.65f, 3.0f)))
