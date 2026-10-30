@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -73,20 +74,25 @@ private fun DistancePills(
         fontFeatureSettings = "tnum",
         shadow = Shadow(Color.Black.copy(alpha = TEXT_SHADOW_ALPHA), Offset(0f, metrics.stroke), metrics.stroke * 2f),
     )
-    val labels = screenLabels(layer, transform, withLabel)
-    val texts = labels.map { measurer.measure(it.text, style, maxLines = 1) }
-    val widths = texts.map { it.size.width + metrics.dotRadius * 2f + metrics.dotGap + metrics.padH * 2f }
-    val heights = texts.map { it.size.height + metrics.padV * 2f }
-    val pills = placePills(
-        labels = labels,
-        widths = widths,
-        heights = heights,
-        boxWidth = boxWidth,
-        boxHeight = boxHeight,
-        topInset = metrics.topInset,
-        leadGap = metrics.leadGap,
-        stackGap = metrics.stackGap,
-    )
+    // `measure` refait la mise en page de chaque texte : mémoïsé, il ne rejoue qu'à
+    // contenu, style ou géométrie changés — plus une fois par frame du direct. Les clés
+    // sont structurelles (`DistanceLayer`, `CropTransform`, `TextStyle` : data classes).
+    val labels = remember(layer, transform, withLabel) { screenLabels(layer, transform, withLabel) }
+    val texts = remember(measurer, labels, style) { labels.map { measurer.measure(it.text, style, maxLines = 1) } }
+    val pills = remember(labels, texts, metrics, boxWidth, boxHeight) {
+        val widths = texts.map { it.size.width + metrics.dotRadius * 2f + metrics.dotGap + metrics.padH * 2f }
+        val heights = texts.map { it.size.height + metrics.padV * 2f }
+        placePills(
+            labels = labels,
+            widths = widths,
+            heights = heights,
+            boxWidth = boxWidth,
+            boxHeight = boxHeight,
+            topInset = metrics.topInset,
+            leadGap = metrics.leadGap,
+            stackGap = metrics.stackGap,
+        )
+    }
     Canvas(Modifier.fillMaxSize()) {
         pills.forEach { pill -> drawPillLead(pill, metrics) }
         pills.forEachIndexed { index, pill -> drawPill(pill, texts[index], metrics) }
