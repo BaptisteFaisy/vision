@@ -28,11 +28,39 @@ internal object SharedCameraFrame {
     @Volatile
     private var seq: Long = 0L
 
+    /**
+     * Vrai quand au moins un aidant regarde le direct (annoncé par le relais) :
+     * la caméra convertit des frames pour le proche même quand SAM n'en veut pas.
+     */
+    @Volatile
+    var audience: Boolean = false
+
+    @Volatile
+    private var jpegBytes: ByteArray? = null
+
+    @Volatile
+    private var bytesAtMs: Long = 0L
+
+    /** Numéro de la frame binaire : même règle anti-doublon que [seq], autre tuyau. */
+    @Volatile
+    private var bytesSeq: Long = 0L
+
     /** Mémorise la frame qui vient d'être convertie par l'analyseur caméra. */
     fun offer(frame: String) {
         jpeg = frame
         capturedAtMs = System.currentTimeMillis()
         seq += 1
+    }
+
+    /**
+     * Mémorise la frame **binaire** du direct : mêmes octets que le JPEG poussé
+     * sur le WebSocket, sans le détour base64 (la copie protège du tampon réutilisé
+     * de l'encodeur).
+     */
+    fun offerBytes(frame: ByteArray) {
+        jpegBytes = frame.copyOf()
+        bytesAtMs = System.currentTimeMillis()
+        bytesSeq += 1
     }
 
     /**
@@ -54,9 +82,22 @@ internal object SharedCameraFrame {
     /** Une frame prête pour le direct. */
     data class Frame(val seq: Long, val jpegBase64: String)
 
+    /**
+     * Frame binaire à pousser au direct : numéro et octets JPEG, tant qu'elle
+     * vient d'être capturée ([maxAgeMs]). `null` = rien de frais, le direct
+     * s'arrête de lui-même plutôt que de boucler une image.
+     */
+    fun latestBytes(nowMs: Long, maxAgeMs: Long = dev.sam3vision.core.share.STREAM_FRAME_MAX_AGE_MS): FrameBytes? =
+        jpegBytes?.takeIf { nowMs - bytesAtMs <= maxAgeMs }?.let { FrameBytes(bytesSeq, it) }
+
+    /** Une frame binaire prête pour le direct. */
+    data class FrameBytes(val seq: Long, val jpeg: ByteArray)
+
     /** Caméra fermée : plus rien à montrer au proche. */
     fun clear() {
         jpeg = null
         capturedAtMs = 0L
+        jpegBytes = null
+        bytesAtMs = 0L
     }
 }

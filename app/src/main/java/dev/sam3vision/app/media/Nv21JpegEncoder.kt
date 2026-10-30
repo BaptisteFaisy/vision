@@ -204,6 +204,19 @@ class Nv21JpegEncoder {
     fun encodeBase64(proxy: ImageProxy, edge: Int, quality: Int): String? =
         encodeFrame(proxy, edge, quality)?.jpegBase64
 
+    /**
+     * Frame → JPEG **brut** (octets, pas de base64) : le direct de l'aidant pousse
+     * des frames binaires sur son WebSocket, le détour par le base64 (+33 % de
+     * CPU et de mémoire par frame) ne servait qu'à être défait aussitôt.
+     *
+     * `null` si le buffer n'est pas en YUV 4:2:0 : l'appelant garde alors son
+     * chemin `Bitmap` en repli.
+     */
+    fun encodeJpeg(proxy: ImageProxy, edge: Int, quality: Int): ByteArray? {
+        val size = pack(proxy, edge) ?: return null
+        return compress(nv21, size.width, size.height, quality)
+    }
+
     /** Recopie NV21 des plans caméra (rotation et réduction) ; `null` si la forme manque. */
     private fun pack(proxy: ImageProxy, edge: Int): Packed? {
         if (proxy.format != ImageFormat.YUV_420_888) return null

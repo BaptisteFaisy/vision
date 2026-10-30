@@ -93,11 +93,12 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
 - Le statique (tracé, pastilles) n'est redessiné que quand il change ;
   à chaque tick (1 Hz), seule la position est rafraîchie.
 - La caméra ne bouge que si la cible a bougé de plus de 10 m ou si le
-  zoom change — le suivi ne tremble pas et n'arrache pas le doigt.
-- Zoom déduit de l'étendue du tracé (miroir de l'aspect-fit de
-  `RouteMapProjection`, clamp 2..19), cible = position sinon centre du
-  tracé, nord en haut. Sans tracé, rien n'est composé (comme la
-  mini-carte).
+  zoom change — le cadre ne tremble pas et n'arrache pas le doigt.
+- Caméra d'ensemble : le tracé entier (départ → arrivée) tient dans
+  le cadre, position incluse si connue (visible même hors tracé).
+  Zoom déduit de l'étendue cadrée (miroir de l'aspect-fit de
+  `RouteMapProjection`, clamp 2..19), nord en haut. Sans tracé, rien
+  n'est composé (comme la mini-carte).
 - Limite connue v1 : `upcoming` vaut `false` partout — le moteur
   n'expose pas l'index de la prochaine manœuvre (`GuidanceUpdate` ne
   porte ni index ni identifiant), donc aucune pastille n'est surlignée.

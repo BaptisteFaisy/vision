@@ -351,7 +351,8 @@ private fun IseeCameraWiring(
         // une fois resterait gelée.)
         glue.host.wantsFrame = {
             if (GlassesVideoLink.live.value) false
-            else (sending(viewModel) && viewModel.probe.wantsFrame()) || picturing(viewModel)
+            else (sending(viewModel) && viewModel.probe.wantsFrame()) || picturing(viewModel) ||
+                SharedCameraFrame.audience
         }
         glue.host.onFrame = { jpeg, captureAtNs ->
             if (!GlassesVideoLink.live.value) {

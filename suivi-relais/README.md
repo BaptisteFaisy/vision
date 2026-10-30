@@ -29,10 +29,20 @@ même durée côté Worker).
 
 ```text
 téléphone ──frames binaires──▶ RelayRoom (DO, un par identifiant) ──▶ aidants
+
+téléphone ──{"type":"camera","on":…}──▶ RelayRoom ──{"type":"camera","on":…}──▶ aidants
                                       │
                                       └─▶ {"type":"audience","watch":n}  (au téléphone)
 ```
 
+- **La caméra dit quand elle s'éteint** : le téléphone annonce
+  `{"type":"camera","on":…}` à chaque changement et la salle le transmet aux
+  aidants ; quand le dernier téléphone s'en va (fermeture, crash, réseau), la
+  salle émet elle-même `{"type":"camera","on":false}`. La page efface l'image
+  aussitôt — direct comme photo lente — au lieu de garder la dernière image
+  jusqu'à 8 s. Un aidant qui arrive sans téléphone apprend tout de suite que
+  la caméra est éteinte ; seul un `push` parle au nom de la caméra (un aidant
+  ne peut pas éteindre l'image des autres).
 - **Le téléphone n'émet que s'il est regardé** : à chaque arrivée ou départ
   (aidant comme téléphone), la salle republie `{"type":"audience","watch":n}`
   aux téléphones connectés ; à `n = 0`, la caméra se tait (forfait, batterie).

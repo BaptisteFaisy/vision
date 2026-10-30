@@ -1,12 +1,10 @@
-import { LIVE_MS, shareIdOf, stateOf, movementBetween, anchorAfter, narrationOf, neverPublished } from './session.mjs';
+import { NO_STREAM_TEXT, shareIdOf, stateOf, neverPublished } from './session.mjs';
 import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
-import { spokenLine } from './spoken-line.mjs';
 import './settings.mjs';
 
 const shareId = shareIdOf(location.href);
-const showWords = spokenLine(document.getElementById('spoken-line'));
 const viewEl = document.getElementById('view');
 const frameEl = document.getElementById('view-frame');
 const noteEl = document.getElementById('view-note');
@@ -18,9 +16,21 @@ const tripLiquid = document.getElementById('trip-liquid');
 const tripBall = document.getElementById('trip-ball');
 const pictoEl = document.getElementById('pictos');
 const pictoStrip = document.getElementById('picto-strip');
-let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '', pictoSig = '';
+let live = null, polling = false, frameSrc = '', pictoSig = '';
 // Direct de la caméra : dernière frame reçue par WebSocket et son instant.
 let streamSrc = '', streamAt = 0;
+// La salle a dit que la caméra est éteinte : le direct comme la photo lente
+// restent cachés jusqu'à l'avis contraire, ou une frame qui prouve le contraire.
+let cameraOff = false;
+/** Reprise du direct : une frame de moins que ça rallume l'image (hystérésis). */
+const STREAM_RESUME_MS = 200;
+let streamLive = false;
+// Peinture latest-only : une seule image en vol (pré-décodage hors écran), le
+// surplus entre deux frames peintes est jeté au lieu d'avorter un décodage.
+const preload = new Image();
+let paintQueued = false, decoding = null;
+let paintedCount = 0, droppedPaints = 0, lastPaintAt = 0;
+const paintGaps = [];
 // Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
 let known = true;
 const STATES = {
@@ -34,14 +44,6 @@ function render() {
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
-  const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
-  showWords(narrationOf(live, status, motion, !!shareId, known), status === 'live' && live?.scene?.speaking);
-  const spoken = document.querySelector('.spoken');
-  spoken.hidden = status === 'offline' || !shareId;
-  spoken.parentElement.classList.toggle('with-text', !spoken.hidden);
-  const fromUser = status === 'live' && live?.scene?.fromUser;
-  document.getElementById('speaker').textContent = fromUser ? 'YOU' : 'ISEE';
-  spoken.dataset.speaker = fromUser ? 'you' : 'isee';
   renderFrame(status);
   renderPictos(status);
   renderTrip(status);
@@ -76,26 +78,48 @@ function renderPictos(status) {
 }
 
 /**
+ * Le direct est-il affiché ? Hystérésis : perdu après [STREAM_FRESH_MS] sans
+ * frame, repris seulement sur une frame de moins de [STREAM_RESUME_MS] — entre
+ * les deux, on garde l'état affiché au lieu de flapper direct/photo lente.
+ */
+function streamIsLive() {
+  if (!streamSrc) return false;
+  const age = Date.now() - streamAt;
+  return streamLive ? age <= STREAM_FRESH_MS : age <= STREAM_RESUME_MS;
+}
+
+/**
  * Ce que voit le proche : rien tant que sa caméra ne tourne pas. Une image
  * conservée après coupure resterait affichée alors que la caméra est éteinte.
  */
 function renderFrame(status) {
-  // Le direct passe devant la photo lente : une frame de moins de 1,5 s est la
-  // caméra qui tourne maintenant, pas un état figé par le relais.
-  const direct = streamSrc && Date.now() - streamAt <= STREAM_FRESH_MS;
-  const view = direct ? { src: streamSrc } : frameOf(live, status);
+  // Le direct passe devant la photo lente : une frame fraîche est la caméra qui
+  // tourne maintenant, pas un état figé par le relais.
+  const direct = streamIsLive();
+  if (direct) {
+    // L'image du direct est peinte par paintStream (pré-décodage hors écran,
+    // latest-only) : render() n'y touche pas — écraser img.src ici forcerait
+    // un décodage hors pré-chargement à chaque poll et volerait une peinture.
+    noteEl.hidden = true;
+    frameEl.hidden = false;
+    viewEl.classList.remove('empty');
+    frameEl.alt = 'Ce que voit ton proche, en direct';
+    return;
+  }
+  const view = frameOf(live, status, Date.now(), cameraOff);
   if (!view) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
-    if (!direct) { streamSrc = ''; }
+    streamSrc = '';
     frameEl.hidden = true;
     viewEl.classList.add('empty');
-    // Pas de texte d'attente quand le lien est connu : la section se replie et
-    // l'image la rouvre dès que la caméra tourne. Seul un lien absent se dit.
-    if (shareId) {
-      noteEl.hidden = true;
-    } else {
+    // Pas de texte d'attente : sans image, la section se replie. Seuls un lien
+    // absent et un lien mort s'écrivent dans la zone caméra (plus de phrase).
+    if (!shareId || status === 'unknown') {
+      noteEl.textContent = !shareId ? 'Ouvre le lien de suivi partagé par ton proche.' : NO_STREAM_TEXT;
       noteEl.hidden = false;
-      noteEl.textContent = 'Ouvre le lien de suivi partagé par ton proche.';
+      viewEl.classList.remove('empty');
+    } else {
+      noteEl.hidden = true;
     }
     return;
   }
@@ -109,15 +133,61 @@ function renderFrame(status) {
 
 /**
  * Une frame du direct : on ne repeint que l'image. Un `render()` complet à chaque
- * image (8 par seconde) reconstruirait le bandeau et la phrase pour rien.
+ * image (10 par seconde) reconstruirait le bandeau, le trajet et le badge pour rien.
+ *
+ * Latest-only : les frames sont coalescées sur `requestAnimationFrame` (une seule
+ * peinture par tour), et l'image est décodée **hors écran** avant le swap — écraser
+ * `img.src` à chaque message avortait le décodage précédent et saccadait à 10/s.
  */
 function paintStream() {
   if (!streamSrc) { render(); return; }
-  noteEl.hidden = true;
-  frameEl.hidden = false;
-  viewEl.classList.remove('empty');
-  frameEl.alt = 'Ce que voit ton proche, en direct';
-  if (frameSrc !== streamSrc) { frameSrc = streamSrc; frameEl.src = streamSrc; }
+  if (document.hidden) return;
+  if (paintQueued) { droppedPaints += 1; return; }
+  paintQueued = true;
+  requestAnimationFrame(() => {
+    paintQueued = false;
+    const src = streamSrc;
+    if (!src || src === frameSrc) return;
+    if (decoding) { droppedPaints += 1; return; }
+    decoding = src;
+    preload.onload = () => {
+      if (decoding !== src) return;
+      decoding = null;
+      noteEl.hidden = true;
+      frameEl.hidden = false;
+      viewEl.classList.remove('empty');
+      frameEl.alt = 'Ce que voit ton proche, en direct';
+      frameSrc = src;
+      frameEl.src = src;
+      notePaint();
+    };
+    preload.onerror = () => { if (decoding === src) decoding = null; };
+    preload.src = src;
+  });
+}
+
+/**
+ * Rythme **affiché** du direct (médiane et p95 des intervalles de peinture,
+ * fenêtre de 60) : `window.__streamFps` est la preuve côté page des 10+ ips.
+ */
+function notePaint() {
+  const now = performance.now();
+  if (lastPaintAt > 0) {
+    paintGaps.push(now - lastPaintAt);
+    if (paintGaps.length > 60) paintGaps.shift();
+  }
+  lastPaintAt = now;
+  paintedCount += 1;
+  const sorted = [...paintGaps].sort((a, b) => a - b);
+  const median = sorted.length ? sorted[sorted.length >> 1] : 0;
+  const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, (sorted.length * 95 / 100) | 0)] : 0;
+  window.__streamFps = {
+    paints: paintedCount,
+    dropped: droppedPaints,
+    medianMs: Math.round(median * 10) / 10,
+    p95Ms: Math.round(p95 * 10) / 10,
+    ips: median > 0 ? Math.round(10000 / median) / 10 : 0,
+  };
 }
 
 /** Le trajet en cours : départ → arrivée, le liquide suit l'avancement du proche. */
@@ -138,7 +208,7 @@ function renderTrip(status) {
 function receive(snapshot) {
   // Identifiant jamais publié (ou flux purgé) : le dire, au lieu d'attendre à vie.
   if (neverPublished(snapshot)) {
-    known = false; live = null; anchor = null; movement = '';
+    known = false; live = null;
     return;
   }
   // La position peut manquer (téléphone sans GPS) : la caméra, la phrase et les
@@ -146,14 +216,9 @@ function receive(snapshot) {
   if (snapshot.ok && Number.isFinite(snapshot.serverAt)) {
     if (live && snapshot.serverAt < live.serverAt) return;
     known = true;
-    if (stateOf(live) !== 'live') anchor = null;
-    const fix = snapshot.fix || null;
-    const nextMovement = movementBetween(anchor, fix);
-    if (nextMovement) { movement = nextMovement; movementAt = Date.now(); }
-    anchor = anchorAfter(anchor, nextMovement, fix);
     live = snapshot;
   } else if (snapshot.ok && snapshot.live === false) {
-    live = null; anchor = null; movement = '';
+    live = null;
   }
 }
 
@@ -178,15 +243,37 @@ setInterval(poll, 2000);
 if (shareId) {
   watchStream({
     href: location.href,
-    onFrame: (src) => { streamSrc = src; streamAt = Date.now(); paintStream(); },
+    onFrame: (src) => {
+      cameraOff = false;
+      streamSrc = src;
+      streamAt = Date.now();
+      streamLive = streamIsLive();
+      paintStream();
+    },
     onState: () => { /* coupure : la fraîcheur fait retomber sur la photo lente */ },
+    // Caméra éteinte : l'image disparaît tout de suite, sans attendre que la
+    // dernière frame périme. Les doublons ne repeignent pas.
+    onCamera: (on) => {
+      if (cameraOff === !on) return;
+      cameraOff = !on;
+      if (cameraOff) streamSrc = '';
+      render();
+    },
   });
 }
+
+// Onglet masqué : les peintures sont suspendues (`paintStream` ne fait rien),
+// au retour on repeint la dernière frame si elle est encore du direct.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && streamIsLive()) paintStream();
+});
 
 let lastStatus = stateOf(live);
 setInterval(() => {
   const status = stateOf(live);
-  const staleStream = streamSrc && Date.now() - streamAt > STREAM_FRESH_MS;
-  if (staleStream) streamSrc = '';
-  if (status !== lastStatus || staleStream) { lastStatus = status; render(); }
-}, 1000);
+  const now = streamIsLive();
+  const flipped = now !== streamLive;
+  streamLive = now;
+  if (!now && streamSrc && Date.now() - streamAt > STREAM_FRESH_MS) streamSrc = '';
+  if (status !== lastStatus || flipped) { lastStatus = status; render(); }
+}, 500);
