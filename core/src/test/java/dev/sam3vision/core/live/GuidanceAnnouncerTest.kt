@@ -142,6 +142,16 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
+    fun `poteau qui s approche a droite dit gauche`() {
+        val announcer = GuidanceAnnouncer()
+        fun poteauDroite(meters: Float) = PlacedLabel("poteau", 0.7f, 0.5f, meters)
+
+        assertEquals("Tout droit.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
+        assertNull(announcer.onFrame(250L, listOf(poteauDroite(2.6f))))
+        assertEquals("Gauche.", announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
+    }
+
+    @Test
     fun `couloir bouche prime sur le decalage`() {
         val announcer = GuidanceAnnouncer()
         fun bloque(m: Float) = PlacedLabel("personne", 0.5f, 0.5f, m)
