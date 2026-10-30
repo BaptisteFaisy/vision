@@ -107,6 +107,32 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` vert en local ; `LiveProbe.kt` à 495 lignes
   (compteur `noteDecoded` déménagé dans `MaskPainter.kt`).
 
+## 2026-10-30 — iSee : ordre vocal « Find the X » — SAM + pictogramme Muse (branche `feat/picto-find-voice`)
+
+- **Demande** : sur la page blind person (accueil iSee), quand l'utilisateur dit
+  « Find the keys » (anglais) alors que les clés ne sont pas dans les masques
+  SAM : SAM ajoute l'objet à ses masques, un pictogramme jaune/noir est créé
+  par Muse Image, et il s'affiche à l'emplacement de l'objet sur la caméra.
+- Phrase implémentée : « Find the keys » — verbe `find`/`locate` en premier
+  mot, article optionnel (`the`, `my`…), « please » final ignoré
+  (`PictoVoiceOrder.parseFind`, pur, JVM). « I found my keys » (verbe non
+  initial) n'est pas un ordre.
+- « Find the keys » reste sur iSee (pas de transfert au direct) :
+  `LiveProbe.ensureConcept` ajoute « keys » aux concepts SAM sauf si déjà
+  suivi (insensible à la casse), sauf en Traversée (prompts feu+voitures
+  intouchés, sécurité) ; `IseePicto.findObject` photographie l'objet filmé,
+  génère via `MetaImageClient` (`muse-image-1.0`, jaune/noir, même clé Meta
+  que la dictée), stocke et arme sans relecture ; le matcher local (2 Hz) et
+  `PictoLayer` existants montrent le PNG à son emplacement. Confirmation
+  dite : « Looking for keys. »
+- Preuves : `:core` 2131/2136 (5 échecs préexistants
+  `PrivateFileSettingsStoreTest`, POSIX sous Windows, prouvés identiques sur
+  l'arbre intact), `:app` 1205/1205 (dont 10 nouveaux), `assembleDebug` OK,
+  `check-kotlin-limits` OK. Non rejoué : génération live sur téléphone
+  (~10 s, ~0,01 $, clé Meta à saisir dans Réglages, jamais versionnée).
+- Fichiers : `PictoVoiceOrder.kt` (+tests), `IseePictoVoice.kt` (+tests),
+  `IseeModeOrders.kt`, `IseeViewModel.kt`, `ProbeWiring.kt`
+  (+`ProbeEnsureConceptTest`), `IseePicto.kt` (+tests), `META-IMAGE.md`.
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
 - **Demande** : sur la page caregiver, cesser instantanément d'afficher la caméra

@@ -121,6 +121,27 @@ class IseePicto(
         }
     }
 
+    /**
+     * Ordre « Find the X » : photo de l'objet filmé, pictogramme Muse, puis
+     * stockage direct — sans relecture, l'utilisateur est seul devant la
+     * caméra. Le repère est cherché dès la frame suivante et l'overlay le
+     * montre à son emplacement. Muet si une génération est en vol.
+     */
+    fun findObject(label: String) {
+        if (busy || label.isBlank()) return
+        busy = true
+        update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
+        scope.launch(io) {
+            val shot = shoot()
+            if (shot == null) {
+                fail(IseeStatusText.PICTO_PHOTO_FAILED)
+                return@launch
+            }
+            update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
+            generateAndArm(shot.first, shot.second, label)
+        }
+    }
+
     /** L'aidant valide : le repère est stocké et la détection l'arme aussitôt. */
     fun confirmDraft(label: String) {
         val pending = draft ?: return
@@ -198,6 +219,20 @@ class IseePicto(
                         status = null,
                     )
                 }
+            },
+            onFailure = { fail(IseeStatusText.pictoFailed(it)) },
+        )
+    }
+
+    /** Appel Muse puis stockage direct : pas de relecture, l'overlay parle. */
+    private suspend fun generateAndArm(photo: ByteArray, template: PictoTemplate, label: String) {
+        val result = clientOf(settings()).editToPictogram(photo, label)
+        result.fold(
+            onSuccess = { png ->
+                runCatching { store.save(label, png, template) }
+                load()
+                busy = false
+                update { it.copy(picto = PictoUiState(armed = pictos.size), status = IseeStatusText.PICTO_SAVED) }
             },
             onFailure = { fail(IseeStatusText.pictoFailed(it)) },
         )

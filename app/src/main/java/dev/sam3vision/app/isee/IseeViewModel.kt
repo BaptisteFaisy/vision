@@ -199,7 +199,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun submitTypedVoiceNavDestination(text: String) = voiceNav.submitTyped(text)
 
     /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels)
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder)
 
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
@@ -371,6 +371,12 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
     fun settingsOpened() = update { it.copy(openSettings = false) }
+
+    /** Ordre « Find the X » : X rejoint les masques SAM, son picto se crée et s'arme. */
+    private fun runFindOrder(label: String) {
+        probe.ensureConcept(settings, label)
+        picto.findObject(label)
+    }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */
     private suspend fun handleDictated(text: String, pcm: ByteArray) {

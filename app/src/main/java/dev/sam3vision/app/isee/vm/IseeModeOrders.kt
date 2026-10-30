@@ -4,8 +4,9 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Les ordres de **mode** de l'accueil iSee, dans l'ordre où la dictée les
- * essaie : maison (« maison »), puis pictos (« décris les portes »). Un
- * ordre de mode ne fait aucun appel réseau et ne part jamais au LLM.
+ * essaie : maison (« maison »), puis pictos (« décris les portes », « Find
+ * the X »). Un ordre de mode ne fait aucun appel réseau lui-même (la
+ * génération du picto, elle, en fait un) et ne part jamais au LLM.
  *
  * Construits ensemble parce qu'ils partagent tout (settings, voix, état) et
  * que l'ordre d'essai doit rester écrit à un seul endroit : une phrase qui
@@ -16,10 +17,11 @@ class IseeModeOrders(
     speak: suspend (String) -> Unit,
     update: StateUpdate,
     pictoLabels: () -> List<String>,
+    onFind: (String) -> Unit = {},
 ) {
 
     private val maison = MaisonEnterOrder(settings, speak, update)
-    private val picto = IseePictoVoice(pictoLabels, settings, speak, update)
+    private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind)
 
     /** Vrai si [text] portait un ordre de mode (texte consommé, rien d'autre à faire). */
     suspend fun run(text: String): Boolean =

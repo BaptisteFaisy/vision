@@ -17,12 +17,17 @@ class IseePictoVoiceTest {
     private val spoken = mutableListOf<String>()
     private var state = IseeUiState()
 
-    private fun voice(labels: List<String> = listOf("medics")) = IseePictoVoice(
+    private fun voice(
+        labels: List<String> = listOf("medics"),
+        language: SpeechLanguage = SpeechLanguage.Fr,
+        found: MutableList<String> = mutableListOf(),
+    ) = IseePictoVoice(
         armedLabels = { labels },
-        settings = { Settings.Default.copy(speechLanguage = SpeechLanguage.Fr) },
+        settings = { Settings.Default.copy(speechLanguage = language) },
         speak = { spoken += it },
         update = { fn -> state = fn(state) },
         openLive = { request, prompts -> opened += Pair(request, prompts) },
+        onFind = { found += it },
     )
 
     @Test
@@ -83,5 +88,34 @@ class IseePictoVoiceTest {
     fun `mot inconnu sans repere ni concept ne declenche rien`() = runBlocking {
         assertFalse(voice(emptyList()).run("doudou"))
         assertTrue(opened.isEmpty())
+    }
+
+    @Test
+    fun `find the keys cherche sur place sans ouvrir le direct`() = runBlocking {
+        val found = mutableListOf<String>()
+        assertTrue(voice(language = SpeechLanguage.En, found = found).run("Find the keys"))
+        assertEquals(listOf("keys"), found)
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Looking for keys."), spoken)
+        assertEquals("Looking for keys.", state.status)
+    }
+
+    @Test
+    fun `find prime sur la chasse d un repere arme`() = runBlocking {
+        val found = mutableListOf<String>()
+        assertTrue(voice(listOf("keys"), found = found).run("find the keys"))
+        assertEquals(listOf("keys"), found)
+        assertTrue(opened.isEmpty())
+    }
+
+    @Test
+    fun `find sans objet ne declenche rien`() = runBlocking {
+        val found = mutableListOf<String>()
+        val orders = voice(found = found)
+        assertFalse(orders.run("find"))
+        assertFalse(orders.run("I found my keys"))
+        assertTrue(found.isEmpty())
+        assertTrue(opened.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 }

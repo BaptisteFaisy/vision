@@ -33,11 +33,17 @@ object PictoVoiceOrder {
     /** Noms qui désignent le pictogramme (canoniques, français et anglais). */
     private val PICTO_WORDS = setOf("pictogramme", "picto", "pictogram")
 
+    /** Verbes de l'ordre « Find the X » : anglais seul, en premier mot. */
+    private val FIND_VERBS = setOf("find", "locate")
+
     /** Articles et possessifs retirés devant le label (« de ces médics »). */
     private val LEADERS = setOf(
         "de", "d", "des", "du", "le", "la", "les", "l", "un", "une",
         "ce", "cet", "cette", "ces", "mon", "ma", "mes",
     )
+
+    /** Articles élidés après le verbe de recherche (anglais + [LEADERS]). */
+    private val FIND_LEADERS = LEADERS + setOf("the", "a", "an", "my", "some")
 
     /** Démonstratifs : l'objet est filmé, aucun nom à guider (« de ça »). */
     private val NAMELESS = setOf("ca", "cela")
@@ -60,6 +66,21 @@ object PictoVoiceOrder {
         PictoHit(pictoId = "demo", label = "mur", x = 0.05f, y = 0.05f, w = 0.9f, h = 0.9f, score = 1f),
         PictoHit(pictoId = "demo", label = "fenêtre", x = 0.55f, y = 0.2f, w = 0.3f, h = 0.4f, score = 1f),
     )
+
+    /**
+     * Label brut de l'ordre « Find the X » porté par [text], `null` si ce
+     * n'en est pas un. Le verbe anglais est en premier mot (« Find the keys »
+     * → « keys », « Locate my phone » → « phone ») ; un « please » final est
+     * ignoré. Le label sert tel quel de concept SAM et de nom de repère —
+     * jamais vide (verbe seul ⇒ `null`), jamais traduit.
+     */
+    fun parseFind(text: String): String? {
+        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        if (words.isEmpty() || !FIND_VERBS.contains(words[0])) return null
+        val rest = words.drop(1).dropWhile { FIND_LEADERS.contains(it) }.dropLastWhile { it == "please" }
+        if (rest.isEmpty()) return null
+        return rest.joinToString(" ")
+    }
 
     /**
      * Label brut de l'ordre porté par [text], `null` si ce n'en est pas un
@@ -153,5 +174,11 @@ object PictoVoiceText {
     fun demo(active: Boolean, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
         SpeechLanguage.Fr -> if (active) "Démo picto activée." else "Démo picto coupée."
         SpeechLanguage.En -> if (active) "Picto demo on." else "Picto demo off."
+    }
+
+    /** L'ordre « Find the X » part : SAM suit X, son pictogramme se crée. */
+    fun findStarted(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+        SpeechLanguage.Fr -> "Je cherche $label."
+        SpeechLanguage.En -> "Looking for $label."
     }
 }
