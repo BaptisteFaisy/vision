@@ -382,10 +382,10 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
-        publishStages(shown.frame)
         _state.update { current ->
             current.copy(
                 frame = shown.frame,
+                timings = chronology.snapshot(shown.frame),
                 overlays = overlays,
                 objectsCount = shown.frame.objects.size,
                 transport = transportLabel(trackerEnabled, client),
