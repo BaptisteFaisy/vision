@@ -36,6 +36,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `caregiverAssets`), mais la salle ne prévient qu'après
   `npx wrangler deploy` depuis `suivi-relais/` (connexion wrangler requise ;
   sans redéploiement, aucun avis n'est émis et le repli fraîcheur s'applique).
+## 2026-10-30 — carte blind : tout le trajet piéton cadré (branche `fix/blind-map-trajet-pieton`)
+
+- **Demande** (user) : sur la page Blind person, quand la carte s'affiche,
+  le trajet piéton du point de départ au point d'arrivée est affiché — la
+  caméra suivie (zoom rue sur la position) ne montrait que le tronçon proche.
+- **Carte** (`core/.../nav/GuidanceMapData.kt`) : `cameraFor` cadre le tracé
+  entier (centre + `zoomFor`), position connue incluse (visible même hors
+  tracé, comme la mini-carte de repli) ; `ZOOM_FOLLOW` retiré, nord en haut
+  inchangé. Commentaires `suivi` → `ensemble` côté app (`guidemap/`, `voicenav/`).
+- **Preuves** : `GuidanceMapDataTest` 10/10 (1 test mis à jour, 1 nouveau :
+  position hors tracé incluse dans le cadre) ; `:app` vert ; gardes CI OK
+  (tailles Kotlin, design Portrait, doc navigation vocale) ; `:core` vert
+  hors 5 échecs `PrivateFileSettingsStoreTest` pré-existants sous Windows
+  (permissions POSIX, identiques sans la modif — CI Linux verte).
+- **Fichiers** : `GuidanceMapData.kt`, `GuidanceMapDataTest.kt`,
+  `GuidanceMapView.kt`, `GuideMapLive.kt`, `VoiceNavRoute.kt`,
+  `docs/CARTE-OSM.md` (§4).
 
 ## 2026-10-30 — passage SAM + battement 300 ms (branche `feat/sam-passage-heartbeat`)
 

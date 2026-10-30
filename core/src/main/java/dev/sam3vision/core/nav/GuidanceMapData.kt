@@ -41,9 +41,6 @@ private const val ZOOM_STREET = 16.0
 private const val ZOOM_MIN = 2.0
 private const val ZOOM_MAX = 19.0
 
-/** Zoom suivi : caméra centrée sur la position connue, nord en haut. */
-private const val ZOOM_FOLLOW = 17.0
-
 /**
  * Écart maximal affiché recalé, en mètres : miroir du défaut
  * [NavTuning.offRouteM] — au-delà, le moteur déclare l'écart ([NavState.OffRoute])
@@ -84,8 +81,8 @@ fun snappedPositionOf(fix: NavFix?, shape: List<RoutePoint>): RoutePoint? {
  * - position = [snappedPositionOf] (avec la précision du fix) ;
  * - traversées = manœuvres `crossing` finies ;
  * - une pastille par manœuvre finie, libellé [maneuverLabel] ;
- * - caméra : position connue → suivi (zoom 17), sinon cadrage du tracé
- *   ([zoomFor]), sinon `null` (cadrage auto) ; cap 0 (nord en haut).
+ * - caméra : cadrage du tracé entier ([zoomFor], position incluse
+ *   si connue), sinon `null` (cadrage auto) ; cap 0 (nord en haut).
  *
  * [update] est réservé : [GuidanceUpdate] ne porte aucun index de manœuvre
  * (ni instruction ciblée), donc `upcoming` vaut `false` partout — le moteur
@@ -128,14 +125,14 @@ private fun buildMapState(
 }
 
 /**
- * Caméra suivi : position connue → centrée dessus (zoom 17) ; sinon tracé →
- * cadrage existant (centre + [zoomFor]) ; sinon `null` (cadrage auto).
- * Cap 0 (nord en haut) dans tous les cas.
+ * Caméra d'ensemble : le tracé entier tient dans le cadre (centre +
+ * [zoomFor]), position connue incluse (visible même hors tracé) ;
+ * sinon `null` (cadrage auto). Cap 0 (nord en haut) dans tous les cas.
  */
 private fun cameraFor(points: List<RoutePoint>, position: RoutePoint?): MapCamera? {
-    if (position != null) return MapCamera(target = position, zoom = ZOOM_FOLLOW, bearingDeg = 0f)
-    val target = boundsCenter(points) ?: return null
-    return MapCamera(target = target, zoom = zoomFor(points), bearingDeg = 0f)
+    val framed = if (position != null) points + position else points
+    val target = boundsCenter(framed) ?: return null
+    return MapCamera(target = target, zoom = zoomFor(framed), bearingDeg = 0f)
 }
 
 /** Centre du cadre englobant (miroir de la référence de [MapFit]). */

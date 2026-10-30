@@ -20,7 +20,7 @@ import kotlinx.coroutines.delay
 
 /**
  * État carte vivant : relit (itinéraire, position) à 1 Hz, état pur
- * (tracé shape + position recalée + caméra suivi, sans signaux).
+ * (tracé shape + position recalée + caméra d'ensemble, sans signaux).
  * `null` sans tracé — l'appelant ne compose alors rien.
  */
 @Composable
