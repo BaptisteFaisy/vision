@@ -46,12 +46,43 @@ class CrossingAnnouncerTest {
     }
 
     @Test
-    fun `un etat stable annonce ne se repete pas`() {
+    fun `un vert stable annonce ne se repete pas`() {
         val announcer = CrossingAnnouncer()
+        repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
+        assertNull(announcer.onFrame(3_000L, CrossingState.Green))
+        assertNull(announcer.onFrame(6_000L, CrossingState.Green))
+    }
+
+    @Test
+    fun `un doute stable annonce ne se repete pas`() {
+        val announcer = CrossingAnnouncer()
+        announcer.onFrame(0L, CrossingState.Unknown)
+        announcer.onFrame(200L, CrossingState.Unknown)
+        assertNull(announcer.onFrame(3_000L, CrossingState.Unknown))
+        assertNull(announcer.onFrame(6_000L, CrossingState.Unknown))
+    }
+
+    @Test
+    fun `le rouge se repete toutes les deux secondes`() {
+        val announcer = CrossingAnnouncer()
+        assertNull(announcer.onFrame(0L, CrossingState.Red))
+        assertEquals("Rouge, attendez.", announcer.onFrame(200L, CrossingState.Red)?.phrase)
+        assertNull(announcer.onFrame(1_000L, CrossingState.Red))
+        val repeat = announcer.onFrame(2_200L, CrossingState.Red)
+        assertEquals("Rouge, attendez.", repeat?.phrase)
+        assertFalse(repeat?.urgent ?: true)
+        assertEquals(CrossingState.Red, announcer.lastCue?.state)
+        assertNull(announcer.onFrame(3_000L, CrossingState.Red))
+        assertEquals("Rouge, attendez.", announcer.onFrame(4_200L, CrossingState.Red)?.phrase)
+    }
+
+    @Test
+    fun `la repetition rouge suit le parametre`() {
+        val announcer = CrossingAnnouncer(redRepeatMs = 60_000L)
         announcer.onFrame(0L, CrossingState.Red)
         announcer.onFrame(200L, CrossingState.Red)
-        assertNull(announcer.onFrame(3_000L, CrossingState.Red))
-        assertNull(announcer.onFrame(6_000L, CrossingState.Red))
+        assertNull(announcer.onFrame(30_000L, CrossingState.Red))
+        assertEquals("Rouge, attendez.", announcer.onFrame(60_200L, CrossingState.Red)?.phrase)
     }
 
     @Test

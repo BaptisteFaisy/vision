@@ -32,8 +32,12 @@ object PedLightGate {
     /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
     private const val RED_MAX_FRACTION = 0.02f
 
-    /** Vert minimal dans le cadre (en dessous : reflet ou bruit). */
-    private const val GREEN_MIN_FRACTION = 0.004f
+    /**
+     * Vert minimal dans le cadre (en dessous : reflet ou bruit). Partagé
+     * avec [TrainedLightColor] : mêmes pixels, même plancher, pas de vert
+     * sans vert.
+     */
+    internal const val GREEN_MIN_FRACTION = 0.004f
 
     /** Élancement minimal de la tache verte (un disque est aussi large que haut). */
     private const val ELONGATION_MIN = 1.5f
