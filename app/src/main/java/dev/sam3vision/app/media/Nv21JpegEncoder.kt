@@ -217,6 +217,18 @@ class Nv21JpegEncoder {
         return compress(nv21, size.width, size.height, quality)
     }
 
+    /**
+     * Frame → JPEG **brut** + plan de luminance [LumaPlane] : le compteur de
+     * marches lit la luminance déjà tournée et réduite, sans bitmap. `null`
+     * si le buffer n'est pas en YUV 4:2:0 (repli `Bitmap` de l'appelant, sans
+     * luminance : le compte vieillit jusqu'à expirer).
+     */
+    fun encodeJpegLuma(proxy: ImageProxy, edge: Int, quality: Int): JpegLuma? {
+        val size = pack(proxy, edge) ?: return null
+        val bytes = compress(nv21, size.width, size.height, quality) ?: return null
+        return JpegLuma(bytes, lumaPlan(size))
+    }
+
     /** Recopie NV21 des plans caméra (rotation et réduction) ; `null` si la forme manque. */
     private fun pack(proxy: ImageProxy, edge: Int): Packed? {
         if (proxy.format != ImageFormat.YUV_420_888) return null
@@ -283,6 +295,9 @@ class Nv21JpegEncoder {
 
 /** Frame encodée : JPEG base64 (sans préfixe `data:`) et son plan de luminance. */
 class EncodedFrame(val jpegBase64: String, val luma: ByteArray)
+
+/** Frame JPEG brute et son plan de luminance (compteur de marches). */
+class JpegLuma(val jpeg: ByteArray, val luma: ByteArray)
 
 /** JPEG → base64 sans préfixe `data:` — une seule implémentation pour toute l'app. */
 fun jpegBytesToBase64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)

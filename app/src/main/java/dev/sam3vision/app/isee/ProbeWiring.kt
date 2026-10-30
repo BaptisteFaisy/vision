@@ -198,9 +198,9 @@ internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean, stopRecent: 
  * ([StairLabelSignals]) ; l'annonce est douce (attend le silence) : une info
  * de navigation, jamais une consigne d'évitement. Coupé en mode Traversée.
  * Voix montée : compte à rebours (« Plus que N marches. ») puis dernière
- * marche, par compteur lissé ou par profondeur (< 1 m, lue ici — la voie
- * labels ne compte pas). Lecture séquentielle, comme le trottoir : une alerte
- * confirmée ne s'annule pas.
+ * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
+ * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
+ * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
  */
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
@@ -218,11 +218,14 @@ internal fun LiveProbe.observeStairs(
             val found = StairLabelSignals.of(readings, st.width, st.height)
             // Profondeur du marchement le plus proche : la dernière marche par
             // profondeur (< 1 m) parle même quand le compteur est indisponible
-            // (voie labels : lineCount = 0 = non compté, pas « zéro marche »).
+            // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
             val stairsMeters = readings.filter { StairConcepts.isStairs(it.label) }
                 .mapNotNull { it.meters.takeIf { m -> m.isFinite() } }.minOrNull()
+            // Compte Canny frais de la caméra (0 = non compté) : il nourrit le
+            // compte à rebours de la montée (« Plus que N marches. »).
+            val stairsCount = StairCannyCount.lineCount()
             val signal = if (found.detected) {
-                StairSignal(detected = true, confidence = 1f, lineCount = 0, roiTop = 0, roiBottom = 0)
+                StairSignal(detected = true, confidence = 1f, lineCount = stairsCount, roiTop = 0, roiBottom = 0)
             } else {
                 StairSignal.none()
             }
@@ -413,7 +416,7 @@ internal class ProbeHazards(
     val cycle: CycleWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les sept guetteurs (nouvelle séance). */
+    /** Oublie les sept guetteurs et le compte caméra (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
@@ -422,6 +425,7 @@ internal class ProbeHazards(
         vehicle.reset()
         cycle.reset()
         sidewalk.reset()
+        StairCannyCount.clear()
     }
 }
 
