@@ -32,6 +32,8 @@ class MaskPainter(
     private val scratch = ArrayList<IntArray>()
     private val targets = ArrayList<Array<Bitmap?>>()
     private var front = 0
+    /** Paquets décodés depuis la création (pour le log périodique). */
+    private var decodedFrames = 0
 
     /** Masques coloriés de [frame], dans l'ordre des objets ; un masque illisible est sauté. */
     fun overlays(frame: LiveFrame): List<Bitmap> {
@@ -40,6 +42,16 @@ class MaskPainter(
             val gray = decodeObjectGray(obj, frame.width, frame.height) ?: return@mapIndexedNotNull null
             paint(index, gray, paletteArgb(index))
         }
+    }
+
+    /**
+     * Compte un paquet décodé : une ligne de log tous les [LOG_EVERY_FRAMES]
+     * (ex-`LiveProbe`, plafond 500 lignes : le compteur vit avec le travail).
+     */
+    fun noteDecoded(ms: Long, masks: Int) {
+        decodedFrames += 1
+        if (decodedFrames % LOG_EVERY_FRAMES != 0) return
+        android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms")
     }
 
     /** Colore [gray] de l'emplacement [index] dans le bitmap réutilisé en cours. */

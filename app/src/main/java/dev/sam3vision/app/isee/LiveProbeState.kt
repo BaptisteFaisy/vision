@@ -5,6 +5,7 @@ import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameTimings
+import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.model.Passage
@@ -58,6 +59,11 @@ data class LiveProbeState(
     val steering: SteeringCue? = null,
     /** Passage conseillé par SAM (`null` = backend antérieur ou pas de frame). */
     val samPassage: Passage? = null,
+    /**
+     * Consigne du battement 500 ms (`null` = guidage coupé ou pas encore de
+     * frame) : mot + côté + mètres, lus sur la vidéo ([InstructionLayer]).
+     */
+    val pulse: GuidancePulse? = null,
     /** Détour obstacle subi : le GPS recalcule l'itinéraire s'il dure (faux en Traversée). */
     val detour: Boolean = false,
     /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */
