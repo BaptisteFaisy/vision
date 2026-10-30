@@ -115,6 +115,12 @@ class MaskRobustnessTest {
      * Un en-tête `65535×65535` réclame un corps de 512 Mo (et 4 Go de niveaux 8 bits) :
      * il est écarté **avant** tout décompressage. La sonde vérifie que refuser ne coûte pas
      * plus que la lecture du base64 lui-même.
+     *
+     * Borne haute seule (comme le test 8 Mo ci-dessous) : le net est un delta de
+     * compteur thread, et la comptabilité TLAB le rend parfois négatif (mesuré
+     * −9568 en suite complète pour +184 en isolé, à code inchangé) — un négatif
+     * prouve le bruit, pas une fuite, et le refus lui-même est verrouillé par
+     * les `assertNull` ci-dessus.
      */
     @Test
     fun `un en-tete enorme est refuse sans rien allouer`() {
