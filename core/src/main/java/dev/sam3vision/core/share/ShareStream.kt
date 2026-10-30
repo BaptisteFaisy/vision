@@ -3,16 +3,17 @@ package dev.sam3vision.core.share
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * Cadence du direct : **11 images par seconde**. La page de l'aidant suit une
+ * Cadence du direct : **15 images par seconde**. La page de l'aidant suit une
  * promenade, pas un film — mais sous 10 im/s, le mouvement saccade et l'aidant
- * perd le fil des gestes du proche. 11 im/s à 320 px ≈ 1,8 Mbit/s.
+ * perd le fil des gestes du proche. Le rythme réel est mesuré au log `direct:`
+ * (médiane des envois), pas supposé de cette constante.
  */
-const val STREAM_FRAME_MS = 90L
+const val STREAM_FRAME_MS = 66L
 
 /**
  * Une frame plus vieille que ça n'est plus poussée : caméra fermée ou figée, le
  * direct s'arrête de lui-même au lieu d'envoyer la même image en boucle. À
- * 11 im/s, une frame de plus de 3 tours n'a plus rien du direct.
+ * 15 im/s, une frame de plus de 4 tours n'a plus rien du direct.
  */
 const val STREAM_FRAME_MAX_AGE_MS = 300L
 

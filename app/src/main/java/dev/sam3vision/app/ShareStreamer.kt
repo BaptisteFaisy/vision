@@ -199,7 +199,7 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     }
 
     companion object {
-        /** Une ligne de rythme tous les 60 envois (≈ 5 s à 11 im/s). */
+        /** Une ligne de rythme tous les 60 envois (≈ 4 s à 15 im/s). */
         private const val LOG_EVERY_SENDS = 60
     }
 }

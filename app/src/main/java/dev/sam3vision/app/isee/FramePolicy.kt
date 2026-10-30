@@ -1,8 +1,9 @@
 package dev.sam3vision.app.isee
 
 /**
- * Politique de frame de la page caméra : **une seule taille**, demandée au capteur
- * *et* envoyée à SAM, et jamais agrandie.
+ * Politique de frame SAM de la page caméra : 320 px envoyés, jamais agrandis.
+ * Le capteur peut être demandé plus grand (le direct aidant prend 480 px) :
+ * la réduction vers [EDGE] se fait alors dans la passe NV21.
  *
  * Le 2026-10-26, la conversion d'une frame coûtait 12-42 ms côté téléphone parce que
  * l'on demandait 320 px au capteur qui livrait 640×480, redimensionné ensuite pour rien
@@ -13,7 +14,7 @@ package dev.sam3vision.app.isee
  */
 object FramePolicy {
 
-    /** Côté long de l'image envoyée à SAM (px) — aussi la taille demandée au capteur. */
+    /** Côté long de l'image envoyée à SAM (px). */
     const val EDGE = 320
 
     /** Qualité JPEG de l'image envoyée (55 : invisible à l'œil, ~6 Ko par frame). */
