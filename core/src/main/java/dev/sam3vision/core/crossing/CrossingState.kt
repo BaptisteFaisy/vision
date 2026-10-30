@@ -16,17 +16,25 @@ import dev.sam3vision.core.model.SegObject
 enum class CrossingState { Red, Green, Unknown }
 
 /**
- * Prompts du **mode Traversée** : le feu et les voitures, rien d'autre.
- * Deux concepts exactement, bien sous le plafond [LivePrompts.MAX] : la Traversée
- * n'a besoin que du feu et des voitures.
+ * Prompts du **mode Traversée** : le feu, les voitures, les personnes et le
+ * passage lui-même. Quatre concepts, bien sous le plafond [LivePrompts.MAX] :
+ * le feu dit quand traverser, les voitures forcent l'attente, les personnes
+ * sont annoncées par positions, et le passage vu garde le mode auto actif
+ * (perdu plusieurs frames de suite, retour au mode normal).
  */
 object CrossingPrompts {
 
     /** Concept feu, demandé aussi par le mode traversée du direct. */
     const val LIGHT = "traffic light"
 
+    /** Concept personne, annoncée par positions en mode Traversée. */
+    const val PERSON = "person"
+
+    /** Concept passage, qui garde le mode auto actif tant qu'il est vu. */
+    const val CROSSWALK = "crosswalk"
+
     /** Concepts envoyés à SAM en mode Traversée (anglais, comme les défauts). */
-    val PROMPTS: List<String> = listOf(LIGHT, "car")
+    val PROMPTS: List<String> = listOf(LIGHT, "car", PERSON, CROSSWALK)
 
     /** Étiquettes (canoniques, voir [KnownSizes.canonical]) qui désignent un feu. */
     private val LIGHT_LABELS = setOf(

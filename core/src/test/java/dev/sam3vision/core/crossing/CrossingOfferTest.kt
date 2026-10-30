@@ -88,4 +88,39 @@ class CrossingOfferTest {
         repeat(3) { gate.onFrame(walk, 400L + it * 100L) }
         assertTrue(gate.onFrame(walk, 800))
     }
+
+    @Test
+    fun `quatre frames vides de suite font retomber le mode auto`() {
+        val gate = CrossingLossGate()
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse("4e frame vide : retour au mode normal", gate.onFrame(false))
+    }
+
+    @Test
+    fun `une reapparition remet le compteur de perte a zero`() {
+        val gate = CrossingLossGate()
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.onFrame(false)
+        assertTrue(gate.onFrame(true))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse(gate.onFrame(false))
+    }
+
+    @Test
+    fun `reset efface les frames vides accumulees`() {
+        val gate = CrossingLossGate()
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.reset()
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse(gate.onFrame(false))
+    }
 }

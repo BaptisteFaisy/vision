@@ -4,18 +4,17 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.model.SegObject
 
 /**
- * Proposition de passer en **mode Traversée** quand un passage piéton est dans le
- * champ.
+ * Détection d'un passage piéton dans le champ : le mode Traversée s'arme
+ * **automatiquement** ([CrossingOfferGate], 3 frames sur 5) et retombe seul
+ * quand le passage disparaît ([CrossingLossGate], 4 frames vides de suite).
  *
  * Le concept `crosswalk` est déjà l'un des douze prompts par défaut du direct
  * (`LivePrompts.default`) : SAM le détecte donc déjà, et jusqu'ici l'information
  * n'était affichée nulle part. Rien à ajouter côté serveur, rien à payer en plus.
  *
- * La règle est volontairement lente et **non automatique** : voir un passage
- * piéton ne suffit pas à savoir que l'on veut traverser (on longe souvent un
- * carrefour sur des dizaines de mètres). On *propose*, l'utilisateur décide —
- * entrer en mode Traversée change les concepts suivis et coupe le guidage
- * obstacles, ce n'est pas une décision que l'app doit prendre seule.
+ * La règle reste volontairement lente : une détection isolée est du bruit, et
+ * un refus manuel (bouton, ordre vocal) se tait une minute. Mais l'utilisateur
+ * ne décide plus à chaque passage — il reprend la main en coupant le mode.
  */
 object CrossingOffer {
 
@@ -89,5 +88,40 @@ class CrossingOfferGate(
 
         /** Silence après un refus. */
         const val QUIET_MS = 60_000L
+    }
+}
+
+/**
+ * Mémoire de perte du passage en mode auto : le mode Traversée armé par la
+ * vision ne retombe pas à la première frame vide (une détection qui clignote
+ * n'est pas un départ), il faut [MISS_FRAMES] frames publiées de suite sans
+ * passage. Une seule réapparition remet le compteur à zéro.
+ *
+ * Pur et testé en JVM : aucune horloge, l'appelant compte des frames.
+ */
+class CrossingLossGate(
+    private val missFrames: Int = MISS_FRAMES,
+) {
+
+    private var misses = 0
+
+    /**
+     * Frame publiée : faux quand le mode auto doit retomber ([visible] faux
+     * [missFrames] fois de suite), vrai sinon. [visible] vrai remet le
+     * compteur à zéro.
+     */
+    fun onFrame(visible: Boolean): Boolean {
+        misses = if (visible) 0 else misses + 1
+        return misses < missFrames
+    }
+
+    /** Nouvelle séance, ou mode coupé : le compteur repart de zéro. */
+    fun reset() {
+        misses = 0
+    }
+
+    companion object {
+        /** Frames sans passage de suite avant le retour au mode normal. */
+        const val MISS_FRAMES = 4
     }
 }
