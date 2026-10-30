@@ -1,5 +1,6 @@
 package dev.sam3vision.core.net
 
+import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.TrackFrame
 import dev.sam3vision.core.model.TrackHealth
 import dev.sam3vision.core.model.TrackSessionStart
@@ -16,15 +17,19 @@ internal const val TRACK_USER_AGENT = "$USER_AGENT track"
 /**
  * Implémentation HTTP réelle ([TrackClient]), contrat `docs/LIVE-SPEC.md` du backend
  * `sam3-track` : `POST /session`, `POST /frame`, `DELETE /session/{id}`, `GET /health`.
- * Réutilise le client HTTP unique de `:core` (délai 15 s), `Json.kt` et `Errors.kt`.
+ * Réutilise le client **partagé** [trackHttpClient] (délai 15 s, sans rejeu comme le
+ * direct), `Json.kt` et `Errors.kt`. Le paramètre [client] reste injectable pour les tests.
  *
  * Un 404 sur `/frame` signifie « session inconnue » (backend redémarré, session
  * expirée) : c'est à l'appelant de recréer une session — voir `TrackRunner`.
  */
 class HttpTrackClient(
     private val baseUrl: String,
-    private val client: OkHttpClient = defaultHttpClient(TRACK_TIMEOUT_SECONDS),
+    private val client: OkHttpClient = trackHttpClient(),
 ) : TrackClient {
+
+    /** Client effectif : exposé aux tests, qui prouvent le partage du pool. */
+    internal val httpClient: OkHttpClient get() = client
 
     override suspend fun start(imageB64: String, prompts: List<String>): Result<TrackSessionStart> {
         endpointRefusal("endpoint tracker", baseUrl, "/session")?.let { return Result.failure(it) }
@@ -105,18 +110,35 @@ internal fun parseTrackHealth(raw: String): TrackHealth {
     )
 }
 
-/** `objects` → objets suivis ; l'`id` vient du backend, les autres champs de `Json.kt`. */
-private fun parseTrackedObjects(json: JSONObject): List<TrackedObject> =
-    json.objects("objects").map { obj ->
-        val fields = obj.maskedFields()
-        TrackedObject(
-            id = obj.intOr("id", NO_TRACK_ID),
-            label = fields.label,
-            score = fields.score,
-            box = fields.box,
-            maskPngB64 = fields.maskB64,
-        )
-    }
+/**
+ * `objects` → objets suivis ; l'`id` vient du backend, les autres champs de `Json.kt`.
+ * L'encodage servi (`mask_encoding` de la réponse, `rle`/256 compris) est résolu par
+ * objet comme sur `/live` ([segObject]) : un backend muet garde le décodage `png` d'avant.
+ */
+private fun parseTrackedObjects(json: JSONObject): List<TrackedObject> {
+    val frameEncoding = json.str("mask_encoding", MASK_ENCODING_PNG).lowercase()
+    return json.objects("objects").map { obj -> obj.trackedObject(frameEncoding) }
+}
+
+/**
+ * Un objet suivi, masque compris : **une seule lecture** de `label`/`score`/`box`/
+ * `mask_b64` ([maskedFields]), complétée des champs du codec masques. L'encodage de
+ * l'objet prime sur [frameEncoding] ; `mask_scale` absent vaut 1 et `mask_poly` vide
+ * hors `poly` — miroir exact de [segObject] pour le chemin tracker.
+ */
+private fun JSONObject.trackedObject(frameEncoding: String): TrackedObject {
+    val fields = maskedFields()
+    return TrackedObject(
+        id = intOr("id", NO_TRACK_ID),
+        label = fields.label,
+        score = fields.score,
+        box = fields.box,
+        maskPngB64 = fields.maskB64,
+        maskEncoding = str("mask_encoding", frameEncoding).lowercase(),
+        maskScale = floatOr("mask_scale", 1f),
+        maskPoly = polyRings("mask_poly"),
+    )
+}
 
 /**
  * Valeur d'`id` quand le backend l'omet : objet détecté mais pas encore identifié

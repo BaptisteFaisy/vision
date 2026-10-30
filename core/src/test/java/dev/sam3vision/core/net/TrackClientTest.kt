@@ -9,7 +9,9 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -174,5 +176,77 @@ class TrackClientTest {
         assertEquals(15L, TRACK_TIMEOUT_SECONDS)
         assertEquals(NO_TRACK_ID, TrackedObject(NO_TRACK_ID, "x", 0f, emptyList(), "").id)
         assertTrue(TrackFrame(0, 0, emptyList()).objects.isEmpty())
+    }
+
+    @Test
+    fun `le client du tracker est partage sans rejeu ni delai change`() {
+        // Comme le direct : aucune frame renvoyée (voir OneShotJsonBody), un seul pool.
+        assertEquals(15_000, trackHttpClient().readTimeoutMillis)
+        assertEquals(15_000, trackHttpClient().writeTimeoutMillis)
+        assertEquals(15_000, trackHttpClient().callTimeoutMillis)
+        assertFalse(trackHttpClient().retryOnConnectionFailure)
+        val premier = HttpTrackClient(server.baseUrl)
+        val second = HttpTrackClient(server.baseUrl)
+        assertSame(trackHttpClient(), premier.httpClient)
+        assertSame(premier.httpClient, second.httpClient)
+    }
+
+    @Test
+    fun `frame lit l encodage rle et l echelle servis`() = runBlocking {
+        val rle = TestHttpServer {
+            TestHttpServer.Response(200, """
+                {"width":512,"height":512,"mask_encoding":"RLE","objects":[
+                  {"id":3,"label":"person","score":0.9,"box":[1,2,30,40],"mask_b64":"AQID","mask_scale":0.5},
+                  {"id":4,"label":"dog","score":0.5,"box":[5,6,7,8],"mask_b64":"UV==","mask_encoding":"png","mask_poly":[[0,0,4,0,4,4,0,4]]}
+                ]}
+            """.trimIndent())
+        }
+        try {
+            val frame = HttpTrackClient(rle.baseUrl).frame("s", "Qw==").getOrThrow()
+            assertEquals("rle", frame.objects[0].maskEncoding)
+            assertEquals(0.5f, frame.objects[0].maskScale, 0.001f)
+            assertEquals("png", frame.objects[1].maskEncoding)
+            assertEquals(1f, frame.objects[1].maskScale, 0.001f)
+            assertEquals(listOf(listOf(0, 0, 4, 0, 4, 4, 0, 4)), frame.objects[1].maskPoly)
+        } finally {
+            rle.close()
+        }
+    }
+
+    @Test
+    fun `frame sans encodage garde le decodage png d avant`() = runBlocking {
+        val frame = HttpTrackClient(server.baseUrl).frame("sess-1", "Qw==").getOrThrow()
+
+        frame.objects.forEach { obj ->
+            assertEquals("png", obj.maskEncoding)
+            assertEquals(1f, obj.maskScale, 0.001f)
+            assertEquals(emptyList<List<Int>>(), obj.maskPoly)
+        }
+    }
+
+    @Test
+    fun `session lit l encodage des masques de la frame d ouverture`() {
+        sessionBody = """
+            {"session_id":"s","width":512,"height":512,"mask_encoding":"rle","objects":[
+              {"id":1,"label":"person","score":0.9,"box":[1,2,3,4],"mask_b64":"AQID","mask_scale":0.5}
+            ]}
+        """.trimIndent()
+        val start = runBlocking { HttpTrackClient(server.baseUrl).start("QQ", listOf("person")).getOrThrow() }
+
+        assertEquals("rle", start.objects.single().maskEncoding)
+        assertEquals(0.5f, start.objects.single().maskScale, 0.001f)
+    }
+
+    @Test
+    fun `les corps du tracker restent historiques octet pour octet`() {
+        // Aucun knob ajouté : le backend déployé reçoit exactement ce qu'avant.
+        assertEquals(
+            """{"image_b64":"SUVL","prompts":["person"]}""",
+            trackStartJson("SUVL", listOf("person")),
+        )
+        assertEquals(
+            """{"session_id":"s","image_b64":"Qw=="}""",
+            trackFrameJson("s", "Qw=="),
+        )
     }
 }
