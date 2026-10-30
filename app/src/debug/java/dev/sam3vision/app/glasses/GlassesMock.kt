@@ -60,6 +60,15 @@ internal class GlassesMock(private val context: Context) : GlassesMockDevice {
         return true
     }
 
+    /**
+     * Injection d'invocation vocale : non supportée — le Mock Device Kit
+     * n'expose aucun service d'invocation dans la version référencée (seuls
+     * `camera`, `cameraCapture` et `input` sont simulables). `false` constant :
+     * le contrôleur simule alors « Hey Meta, ouvre iSee » côté app
+     * ([GlassesController.mockVoiceLaunch]), ce qui suffit à la recette aval.
+     */
+    override fun simulateVoiceLaunch(): Boolean = false
+
     override fun stop() {
         val device = glasses ?: return
         MockDeviceKit.getInstance(context).unpairDevice(device)

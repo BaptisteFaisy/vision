@@ -66,6 +66,17 @@ class IseePhotoShot(
         }
     }
 
+    /**
+     * Contexte venu d'ailleurs (photo des lunettes, appui ASK) : la prochaine
+     * question dictée le joint au LLM, même sans caméra téléphone (l'appui long
+     * ne capture rien, le contexte externe survit ; voir `captureForHold`).
+     * Une capture téléphone ultérieure le remplace naturellement.
+     */
+    fun setExternalContext(file: File) {
+        pending = null
+        imageFile = file
+    }
+
     /** Fin de vie du contexte : sortie précoce, question envoyée. */
     fun releaseContext() {
         pending = null

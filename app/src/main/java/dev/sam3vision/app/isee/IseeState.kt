@@ -53,6 +53,12 @@ data class IseeUiState(
     val openSettings: Boolean = false,
     /** Repères visuels : génération en cours, relecture aidant, objets reconnus. */
     val picto: PictoUiState = PictoUiState(),
+    /**
+     * Photo des lunettes en cours d'affichage (`null` = aucune) : plein cadre
+     * sur cet écran ([GlassesPhotoLayer]), posée même depuis un autre écran
+     * (elle attend le retour sur iSee), fermée par retour ou bouton.
+     */
+    val glassesPhoto: IseeGlassesPhoto? = null,
 )
 
 // ————— Sélection : toujours la dernière bulle (aucune navigation entre messages) —————

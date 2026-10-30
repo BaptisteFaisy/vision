@@ -45,6 +45,8 @@ class GlassesFramePolicyTest {
     fun `une image sous la borne n est pas reduite`() {
         // 504x896 = VideoQuality.MEDIUM, le flux que le spike demande.
         assertNull(scaledDimensions(504, 896))
+        // 720x405 = HIGH recadré 16:9, le flux de production : pas de réduction non plus.
+        assertNull(scaledDimensions(720, 405))
         assertNull("la borne elle-même est déjà bonne", scaledDimensions(1024, 1024))
     }
 
@@ -75,6 +77,8 @@ class GlassesFramePolicyTest {
     fun `le portrait des lunettes perd le haut et le bas`() {
         // 504x896 = VideoQuality.MEDIUM : 504 de large → 283 de haut, centré.
         assertEquals(CropRect(0, 306, 504, 283), cropTo16x9(504, 896))
+        // 720x1280 = VideoQuality.HIGH en production : 720 de large → 405 de haut, centré.
+        assertEquals(CropRect(0, 437, 720, 405), cropTo16x9(720, 1280))
     }
 
     @Test

@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
+import dev.sam3vision.app.glasses.EXTRA_GLASSES_TALK
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
@@ -137,6 +138,11 @@ class MainActivity : ComponentActivity() {
         // connecte, sans passer par les Réglages. Sans l'extra, rien ne change.
         if (intent.getBooleanExtra(EXTRA_GLASSES_MOCK_CONNECT, false)) {
             glasses.debugMockConnect()
+        }
+        // Recette mains-libres (debug seul) : `--es glasses_talk "..."` injecte
+        // une question comme si le micro des lunettes l'avait entendue.
+        if (BuildConfig.DEBUG) {
+            intent.getStringExtra(EXTRA_GLASSES_TALK)?.let { glasses.debugTalkTranscript(it) }
         }
         if (intent.hasExtra(EXTRA_MOCK) || intent.hasExtra(EXTRA_ANALYZE)) {
             BenchEntryPoint.request(
