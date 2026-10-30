@@ -78,7 +78,7 @@ depuis, le module a disparu du disque : seule cette page garde la correspondance
 | `glasses-spike/src/main/res/values/themes.xml`, `…/res/xml/network_security.xml` | non copiés : `:app` a déjà les siens | `app/src/main/res/values/themes.xml`, `app/src/main/res/xml/network_security.xml` |
 | `glasses-spike/src/main/AndroidManifest.xml` (activité du banc, schéma `samglasses`) | pas de manifeste de banc : un écran dans la navigation d'iSee | `MODIFY_AUDIO_SETTINGS` ajouté (`app/src/main/AndroidManifest.xml:22`) ; le seul schéma déclaré par `:app` est `samvision` (`:62`) ; aucune activité de banc au manifeste |
 | `glasses-spike/build.gradle.kts` (module `application`, `versionName "0.1-spike"`) | plus rien à créer : `:app` porte déjà `buildConfigField` et `mockdevice` | `app/build.gradle.kts:103-125` (LLM/TTS/SAM31/SAM) et `:186` (`libs.mwdat.mockdevice` en `debugImplementation`) |
-| job CI `spike` (`:glasses-spike:assembleDebug testDebugUnitTest`) | aucun job dédié : le banc compile et se teste dans les jobs de `:app` | `.github/workflows/` : **0** occurrence de `glasses-spike`, **4** jobs (`ci`, `apk`, `apk-release`, `lint`), périmètres `^(app\|core)/…` + `^server/` (`ci.yml:80,85`) |
+| job CI `spike` (`:glasses-spike:assembleDebug testDebugUnitTest`) | aucun job dédié : le banc compile et se teste dans les jobs de `:app` | `.github/workflows/` : **0** occurrence de `glasses-spike`, les jobs (`ci-core`, `ci-app`, `apk`, `lint`), périmètres `^(app\|core)/…` + `^server/` (action `perimetre`) |
 
 Le module totalisait **30 `.kt` / 3 488 lignes** (17 + 2 + 1 + 9 + 1 fichiers). L'ancienne
 version de cette page citait « 21 `.kt`, 2 396 lignes » : compte d'avant l'éclatement en
@@ -221,9 +221,9 @@ telles quelles) :
 Coûts d'exploitation et de CI :
 
 - **CI** : il n'y a **plus** de job `spike` — le fichier `.github/workflows/ci.yml` ne contient
-  aucune occurrence de `glasses-spike` et déclare 4 jobs (`ci`, `apk`, `apk-release`, `lint`),
-  chacun borné à **5 min**. Le banc est donc compilé et testé par les jobs de `:app` (tests JVM
-  du job `ci`, `assembleDebug` du job `apk`). Le coût propre au module — job `spike` mesuré à
+  aucune occurrence de `glasses-spike` et déclare les jobs (`ci-core`, `ci-app`, `ci`, `apk`,
+  `lint`), chacun borné (**5 min** en PR, **10 min** hors PR). Le banc est donc compilé et testé
+  par les jobs de `:app` (tests JVM du job `ci-app`, `assembleDebug` du job `apk`). Le coût propre au module — job `spike` mesuré à
   **50 s** en CI le 26/10 — disparaît avec lui. Détail et historique :
   [`glasses-spike-ci.md`](glasses-spike-ci.md) ;
 - **backend** : rien à allumer pour cette mission — **0 €**, aucune GPU, aucun `modal deploy`.

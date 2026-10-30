@@ -64,16 +64,16 @@ Le runner fait un checkout neuf : il n'a pas de `local.properties`, et un APK
 bâti sans l'étape « Clés du build » part donc **sans clé**. Cette étape (action
 composite unique `.github/actions/cles-build`) écrit ce fichier depuis les
 secrets du dépôt quand ils existent (sinon elle ne fait rien) ; elle est
-présente dans les trois jobs qui bâtissent (`ci.yml` : tests, `ci-native.yml` :
-`apk` debug et `apk-release`), donc **chaque APK téléchargé depuis GitHub
+présente dans les jobs qui bâtissent (`ci.yml` : tests `:core` et `:app`, `ci-native.yml` :
+`apk` debug+release), donc **chaque APK téléchargé depuis GitHub
 embarque les sept clés secrètes** (les autres lignes — Maps, tap, overlay,
 dev lunettes — viennent du `local.properties` du poste qui bâtit, ou restent
 à leur défaut).
 
 ## Garde : prouvé à chaque build
 
-`tools/check-apk-keys.py` tourne après chaque assemblage (`apk` et
-`apk-release`) et fait échouer le job si, les secrets existant : le
+`tools/check-apk-keys.py` tourne après chaque assemblage (debug puis release,
+dans le job `apk`) et fait échouer le job si, les secrets existant : le
 `local.properties` ne reprend pas la clé du secret, la clé est absente du dex
 de l'APK, ou un ping minimal au LLM ne répond pas 200 (secret périmé ou
 mauvais fournisseur — la panne vue avec des secrets restés sur InferHub alors
