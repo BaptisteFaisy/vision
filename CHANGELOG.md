@@ -35,6 +35,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (4 échecs : poteau, voiture, bord-dans-2m, portée 4 m) ;
   `check-kotlin-limits.py` vert. Runs r630 (`build-serveur`), suites
   rejouées (2× `:app` vertes, `:core` verte après durcissement).
+## 2026-10-30 — traversée : rouge répété chaque seconde, vert tranché à 0,50 (branche `feu-rouge-1s-vert`)
+
+- **Demande** : quand le feu est rouge, répéter chaque seconde que la
+  traversée est impossible ; baisser le degré de certitude exigé pour
+  décréter le feu vert.
+- Fait : `CrossingAnnouncer` redit « Rouge, attendez. » toutes les 1 s
+  (au lieu de 2 s) tant que le rouge dure — répétition jamais urgente,
+  vert et doute inchangés (une fois, puis silence) ; `TrainedLightColor`
+  tranche le vert dès 0,50 de pureté (au lieu de 0,65, rouge inchangé à
+  0,80) — les feuilles vertes à 0,54 et 0,50 sont acceptées. Porte
+  anti-confusion (forme du bonhomme) et confirmation temporelle (4 frames
+  vertes) inchangées : aucun crop du corpus `feuxfr/`/`feuxfr2/` ne change
+  de verdict (rejeu local de l'arbre : 0 bascule sur 20 crops).
+- Preuves : échec constaté avant sur les 2 tests visés
+  (`CrossingAnnouncerTest`, `TrainedLightColorTest`), vert après ; `:app`
+  1 271/1 271 sur r630 ; `:core` 2 190/2 191 — le seul échec
+  (`MaskRobustnessTest`, mesure GC `allocation = -9568`) est pré-existant
+  et environnemental, reproduit à l'identique sur `origin/master`
+  pristine ; `check-kotlin-limits.py` vert.
+
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 
