@@ -234,7 +234,9 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   sur l'état d'offre, comme avant — jamais une phrase par frame) ;
 - **sortie** : le passage perdu 4 frames publiées de suite (`CrossingLossGate`,
   une réapparition remet le compteur à zéro) coupe le mode et dit « Mode
-  traversée coupé. » (`observeCrossingLoss`) ;
+  traversée coupé. » (`observeCrossingLoss`, compté sur les frames publiées
+  seules via `crossingSightPerFrame` — l'état ré-émet entre deux frames pour
+  le poste « pixel », sans ce filtre chaque frame compterait double) ;
 - **propriétaire** : seule la vision auto-perd (`IseeSteeringOrders.visionArmed`)
   — un mode armé à la main ou par le GPS reste jusqu'à sa propre coupe (un
   passage sans bandes se traverse sans zébrures), et seul un refus manuel
