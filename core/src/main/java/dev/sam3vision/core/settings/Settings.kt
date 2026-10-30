@@ -74,6 +74,20 @@ data class Settings(
      */
     val boxPredictionEnabled: Boolean = false,
     /**
+     * Poids montant adaptatif (Q8) : le régulateur marche les paliers qualité seule
+     * 0-2 (q65→q55→q45 sur le Direct, q55→q45→q35 sur iSee — jamais le bord, donc
+     * sans rebind CameraX) d'après la part réseau mesurée (aller-retour −
+     * `elapsed_ms`). **`false` par défaut** : éteint, l'encodeur garde sa constante.
+     */
+    val adaptiveUploadEnabled: Boolean = false,
+    /**
+     * Keyframes à la demande (Q9) : le scheduler ne fait envoyer qu'une frame clé
+     * quand les masques en service sont périmés (~2/s au lieu de ~5/s), la
+     * propagation locale ([boxPredictionEnabled]) comblant l'intervalle.
+     * **`false` par défaut** : éteint, chaque frame part comme avant.
+     */
+    val keyframeSchedulerEnabled: Boolean = false,
+    /**
      * Calque local (lane L13) : entre deux keyframes du serveur, le masque du dernier
      * keyframe est propagé sur le téléphone (30 ips visés, budget de peinture 4 ms).
      * `true` par défaut ; sans estimateur de mouvement branché, le calque reste **inerte**
@@ -331,6 +345,7 @@ data class Settings(
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
+            "adaptiveUploadEnabled=$adaptiveUploadEnabled, keyframeSchedulerEnabled=$keyframeSchedulerEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, " +
         "debugRouteMapEnabled=$debugRouteMapEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +

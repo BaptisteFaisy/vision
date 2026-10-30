@@ -27,6 +27,7 @@ import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
+import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
@@ -101,6 +102,12 @@ class LiveProbe(
 
     /** Échéance partagée avec le Direct ; la réserve d'une frame reste locale (ci-dessous). */
     private val cadence = LiveFrameCadence()
+
+    /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, éteints par défaut. */
+    internal val adaptive = LiveAdaptive(baseQuality = ISEE_FRAME_QUALITY)
+
+    /** Qualité JPEG à encoder : la constante éteint, le palier courant allumé. */
+    val jpegQuality: Int get() = adaptive.jpegQuality
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()
@@ -239,6 +246,7 @@ _state.update { it.cleared() }
         crossing.reset()
         traverseVeto.reset()
         meters.reset()
+        adaptive.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
@@ -257,16 +265,6 @@ _state.update { it.cleared() }
         if (_state.value.steeringCap == cap) return
         voice.reset()
         _state.update { it.copy(steeringCap = cap) }
-    }
-
-    /** Cap de l'itinéraire : tant qu'il est posé, la sonde marche son couloir. */
-    fun setRouteCap(cap: SteeringCap) {
-        voice.routeCap = cap
-    }
-
-    /** Fin du guidage route : le cap manuel reprend. */
-    fun clearRouteCap() {
-        voice.routeCap = null
     }
 
     /**
@@ -324,6 +322,7 @@ _state.update { it.cleared() }
         // Créneau libre : `admits` se réduit au garde temporel (`saturated` ⟺ `inFlight`).
         val now = System.currentTimeMillis()
         if (!cadence.admits(active, now)) return
+        if (!adaptive.admit()) return // keyframe : propagation locale, rien à envoyer
         dispatch(active, jpegB64, captureAtNs, encodedAtNs, now)
     }
 
@@ -365,7 +364,9 @@ _state.update { it.cleared() }
     }
 
     private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long) {
-        val result = active.runFrame(jpegB64) ?: return drain()
+        val result = active.runFrame(jpegB64)
+        if (result == null) { adaptive.onDropped(); return drain() }
+        adaptive.onSettled(System.currentTimeMillis() - at, result, jpegB64.length)
         // Réponse complète (corps lu et JSON tourné) : le poste « reçu » est posé ici.
         chronology.markReceived()
         // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
