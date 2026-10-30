@@ -66,7 +66,7 @@ data class LiveProbeState(
     val pulse: GuidancePulse? = null,
     /** Détour obstacle subi : le GPS recalcule l'itinéraire s'il dure (faux en Traversée). */
     val detour: Boolean = false,
-    /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */
+    /** Mode Traversée actif : prompts feu+voitures+personnes+passage, guidage coupé, personnes annoncées. */
     val crossingActive: Boolean = false,
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
     val crossing: dev.sam3vision.core.crossing.CrossingState? = null,
@@ -82,8 +82,10 @@ data class LiveProbeState(
      * « peut traverser », toute autre phase vaut « ne peut pas traverser ».
      */
     val traversePhase: dev.sam3vision.core.traverse.TraversePhase? = null,
-    /** Un passage piéton est dans le champ : proposer le mode Traversée (jamais automatique). */
+    /** Un passage piéton est dans le champ : le mode Traversée s'arme seul (retombe quand le passage disparaît). */
     val crossingOffer: Boolean = false,
+    /** Passage piéton vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
+    val crossingVisible: Boolean = false,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,

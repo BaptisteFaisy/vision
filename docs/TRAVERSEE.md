@@ -219,18 +219,27 @@ Somerset/M5 (Marek Ślusarczyk), Barcelone (Joe Mabel), Beachley (Colin Park).
 
 Le mode Traversée parlait déjà l'état du feu (`CrossingText.phrase` : « Vert,
 traversez. » / « Rouge, attendez. » / « Doute, attendez. ») et confirmait la
-bascule (« Mode traversée activé. »). Il manquait une chose : **la proposition**.
+bascule (« Mode traversée activé. »). Depuis le 29/10, le passage reconnu
+était **proposé** à la voix (« Passage piéton. Dites traverser. ») ; depuis
+le 30/10, il n'est plus proposé — le mode **s'arme seul**, et le dit.
 
-La pastille de carte passe en ambre quand un passage piéton est reconnu — mais
-une personne aveugle ne la voit pas. Depuis le 29/10, la voix la dit **une fois**
-par apparition : « Passage piéton. Dites traverser. »
-(`CrossingText.offer`, `observeCrossingOffer`).
+### Bascule automatique (30/10)
 
-Deux détails de conception :
+Ordre user : plus de proposition manuelle — le passage détecté arme le mode,
+le passage perdu le coupe, et les personnes restent annoncées en traversée.
 
-- l'offre est un **état** (vrai tant que le passage reste dans le champ) ;
-  `distinctUntilChanged` + `filter` en font l'événement de montée, donc **une
-  phrase par apparition**, jamais une par frame — sinon elle devient inaudible ;
-- la phrase dit **quoi faire** (« dites traverser »), pas seulement ce qu'on
-  voit : c'est le seul moyen pour quelqu'un qui ne voit pas la pastille de savoir
-  que le mode existe et comment l'activer.
+- **entrée** : le passage vu 3 frames sur 5 (`CrossingOfferGate`, seuils
+  inchangés) arme le mode et dit « Mode traversée activé. » **une fois**
+  par apparition (`observeCrossingAuto` : `distinctUntilChanged` + `filter`
+  sur l'état d'offre, comme avant — jamais une phrase par frame) ;
+- **sortie** : le passage perdu 4 frames publiées de suite (`CrossingLossGate`,
+  une réapparition remet le compteur à zéro) coupe le mode et dit « Mode
+  traversée coupé. » (`observeCrossingLoss`) ;
+- **propriétaire** : seule la vision auto-perd (`IseeSteeringOrders.visionArmed`)
+  — un mode armé à la main ou par le GPS reste jusqu'à sa propre coupe (un
+  passage sans bandes se traverse sans zébrures), et seul un refus manuel
+  fait taire la proposition une minute (`setCrossingActive(auto = …)`) ;
+- **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
+  (12 concepts, plafond 16 tenu) ; le feu parle en premier, et sur son
+  silence les personnes sont annoncées au cadran (« Personne à 9 heures, à
+  2 mètres », `CrossingPeopleWatch`, débouncé comme toute annonce).
