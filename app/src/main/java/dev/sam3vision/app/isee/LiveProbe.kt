@@ -419,8 +419,9 @@ _state.update { it.cleared() }
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
         )
         val phrase = if (_state.value.crossingActive) {
-            cross?.cue?.phrase
+            cross?.cue?.phrase ?: CrossingPeopleWatch.update(placed, at, speechLanguage)
         } else {
+            CrossingPeopleWatch.reset()
             voice.phrase(at, placed, _state.value.steeringCap, frame.passage)
         }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
@@ -447,6 +448,7 @@ _state.update { it.cleared() }
                 detour = if (_state.value.crossingActive) false else voice.detour,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),
+                crossingVisible = CrossingOfferWatch.lastVisible,
                 transport = transportLabel(active),
                 error = null,
             )
