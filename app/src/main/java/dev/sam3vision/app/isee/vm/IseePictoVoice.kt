@@ -10,10 +10,12 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Ordres vocaux picto et chasse maison sur iSee : transfère au direct.
- * Création (« fais un pictogramme de X »), démo et chasse d'un repère armé
- * partent en [LiveVoiceRequest] ; un mot maison seul part en chasse SAM sur
- * ce seul mot. Tout est confirmé (création, démo) ou muet (chasse, le direct
- * parle) ; le reste passe aux ordres suivants (cap, navigation, LLM).
+ * « Find the X » reste sur place ([onFind] : X rejoint les masques SAM et
+ * son pictogramme se crée) ; création (« fais un pictogramme de X »), démo
+ * et chasse d'un repère armé partent en [LiveVoiceRequest] ; un mot maison
+ * seul part en chasse SAM sur ce seul mot. Tout est confirmé (recherche,
+ * création, démo) ou muet (chasse, le direct parle) ; le reste passe aux
+ * ordres suivants (cap, navigation, LLM).
  *
  * [openLive] ouvre le direct avec la requête et les prompts (`null` =
  * essentiels) ; injecté pour les tests, le défaut parle aux vrais singletons.
@@ -28,6 +30,7 @@ class IseePictoVoice(
         LiveVoiceRequest.push(request)
         RouteRequest.push("live")
     },
+    private val onFind: (String) -> Unit = {},
 ) {
 
     /**
@@ -35,6 +38,11 @@ class IseePictoVoice(
      * L'écran affiche la confirmation, dite par le chemin navigation.
      */
     suspend fun run(text: String): Boolean {
+        PictoVoiceOrder.parseFind(text)?.let { label ->
+            onFind(label)
+            confirm(PictoVoiceText.findStarted(label, settings().speechLanguage))
+            return true
+        }
         PictoVoiceOrder.parse(text)?.let { label ->
             openLive(LiveVoiceRequest.Request(pictoCreate = label), null)
             confirm(PictoVoiceText.started(settings().speechLanguage))

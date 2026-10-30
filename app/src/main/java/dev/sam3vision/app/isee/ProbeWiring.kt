@@ -103,6 +103,26 @@ internal fun LiveProbe.configureFrom(
 }
 
 /**
+ * Ordre « Find the X » : [label] rejoint les concepts SAM de la sonde quand
+ * il n'y est pas déjà (comparaison insensible à la casse) — la session
+ * repart comme à tout changement de prompts. En mode Traversée les prompts
+ * feu+voitures ne sont pas touchés (sécurité) ; un 17e concept ou un label
+ * de plus de 32 caractères est refusé par [LivePrompts.normalize], sans
+ * reconfiguration. Pur hors sonde, testé en JVM.
+ */
+internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
+    if (state.value.crossingActive) return
+    val clean = label.trim()
+    if (clean.isEmpty()) return
+    val current = state.value.conceptsSent
+    if (current.any { it.trim().equals(clean, ignoreCase = true) }) return
+    val next = LivePrompts.normalize(current + clean)
+    if (next == current) return
+    android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM (${next.size} suivis)")
+    configureFrom(settings, next, false)
+}
+
+/**
  * Chaque nouvelle phrase de la sonde est confiée à la voix (une seule fois par
  * phrase). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
  * Dernier-gagnant : une phrase plus fraîche annule la synthèse en cours au lieu

@@ -115,6 +115,38 @@ class IseePictoTest {
     }
 
     @Test
+    fun `find arme le repere sans relecture`() = runTest {
+        val coordinator = picto()(this)
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(1, state.value.picto.armed)
+        assertEquals(IseeStatusText.PICTO_SAVED, state.value.status)
+        assertEquals(listOf("keys"), coordinator.labels())
+        assertEquals("keys", client.lastHint)
+        assertTrue(coordinator.armed())
+    }
+
+    @Test
+    fun `find en echec reseau affiche le motif`() = runTest {
+        client.failure = ApiError.PaymentRequired()
+        picto()(this).findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
+    }
+
+    @Test
+    fun `find ignore le label vide`() = runTest {
+        picto()(this).findObject("  ")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertNull(state.value.status)
+    }
+
+    @Test
     fun `abandonner jette le brouillon`() = runTest {
         val coordinator = picto()(this)
         coordinator.onPictoButton()
