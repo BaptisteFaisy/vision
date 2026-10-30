@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -66,6 +67,9 @@ class GuidanceAnnouncer(
      * décalage chiffré (défaut 67° : l'appelant qui connaît la focale la passe).
      * [sidewalk] est le trottoir vu caméra : sur voie libre, un côté suspend le
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
+     * [samPassage] est le passage conseillé par SAM : bouché et côté du
+     * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
+     * décision locale.
      */
     fun onFrame(
         atMs: Long,
@@ -75,9 +79,11 @@ class GuidanceAnnouncer(
         routeCap: SteeringCap? = null,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         sidewalk: SidewalkPosition = SidewalkPosition.Ahead,
+        samPassage: Passage? = null,
     ): String? {
         val effective = routeCap ?: cap
-        val decision = Guidance.decide(labels, effective, rangeMeters, hfovDeg)
+        val decision = samPassage?.let { samDecision(it, labels, effective, hfovDeg) }
+            ?: Guidance.decide(labels, effective, rangeMeters, hfovDeg)
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
@@ -88,6 +94,39 @@ class GuidanceAnnouncer(
         val word = nudgeOf(atMs, labels)?.let { GuidanceWord.fromCap(it.side) }
             ?: sidewalkWord(sidewalk, decision.cap)
         return speak(atMs, word.key, word.text(language))
+    }
+
+    /**
+     * Décision lue dans le passage SAM : bouché et côté viennent du serveur
+     * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
+     * mesures du téléphone (le mot stop a besoin d'une distance). Sans côté
+     * (contrat rompu), la gauche — comme l'égalité côté serveur.
+     */
+    private fun samDecision(
+        passage: Passage,
+        labels: List<PlacedLabel>,
+        cap: SteeringCap,
+        hfovDeg: Float,
+    ): GuidanceDecision {
+        if (!passage.blocked) return GuidanceDecision(blocked = false, cap = cap)
+        val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
+        val exit = if (side == GuidanceSide.Right) SteeringCap.Right else SteeringCap.Left
+        val obstacle = labels
+            .mapNotNull { label -> label.meters?.takeIf { it.isFinite() }?.let { label to it } }
+            .minByOrNull { it.second }?.first
+        val half = if (cap == SteeringCap.Straight) {
+            Guidance.STRAIGHT_HALF_CORRIDOR
+        } else {
+            Guidance.LATERAL_HALF_CORRIDOR
+        }
+        return GuidanceDecision(
+            blocked = true,
+            obstacle = obstacle,
+            side = if (cap == SteeringCap.Straight) side else null,
+            cap = cap,
+            passage = exit,
+            shiftMeters = Guidance.shiftOf(obstacle?.meters, half, hfovDeg),
+        )
     }
 
     /** Décalage latéral : personne proche qui s'approche — mot du côté où aller. */

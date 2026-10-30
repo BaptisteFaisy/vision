@@ -24,6 +24,17 @@ backend rapide vivait dans `~/builds/prod-backend`, **hors dépôt**. D'où :
 - `.github/workflows/deploy-live-fast.yml` fait la même chose côté GitHub : tout push sur
   `master` qui touche `live_fast/` redéploie (secrets `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`).
 
+## Passage conseillé (`passage`, depuis le 30/10)
+
+Chaque réponse `/live` (HTTP, binaire et WS — un seul chemin,
+`service._live_from_image`) porte `passage` : couloir bouché par une personne
+(`blocked`), côté conseillé (`side`), écho de l'obstacle (`label`, `box`,
+`score`). Calculé sur les boîtes SAM (`backend/passage.py`, miroir vendored
+dans `live_fast/`, `VENDORED_PARITY`), sans GPU ni focale : le téléphone y
+ajoute ses distances et le mot parlé, et rebascule sur sa décision locale si
+le champ est absent (backend antérieur). Personnes seules (FR/EN), bande
+centrale 0,34–0,66 (miroir `PositionText.SIDE_EDGE`), naines < 2 % ignorées.
+
 ## Où va le temps (télémétrie par étage, `FAST_TIMING=1`)
 
     decode 1-2 ms · preprocess 6-9 ms · vision 1,4 ms · tokenize 1 ms

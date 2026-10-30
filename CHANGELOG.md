@@ -3,6 +3,36 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-30 — passage SAM + battement 300 ms (branche `feat/sam-passage-heartbeat`)
+
+- **Demande** (user) : distances aux humains calculées sur le téléphone,
+  décision gauche/droite calculée côté SAM, et une information de guidage
+  toutes les 300 ms adossée aux données les plus fraîches.
+- **Serveur** : `backend/passage.py` (neuf, miroir vendored `live_fast/`,
+  `VENDORED_PARITY`) — `suggest_passage` juge les boîtes personnes SAM
+  (bande centrale 0,34–0,66, naines < 2 % ignorées) et renvoie
+  `blocked`/`side`/`label`/`box`/`score` ; branché dans
+  `live_fast/service.py::_live_from_image` (+2 lignes, 498/500), donc sur
+  `/live` JSON, binaire et WS (un seul chemin). Tests
+  `test_passage_decision` + `test_passage_tolerance` (12 `check`).
+- **Téléphone** : distances humains 100 % on-device inchangées
+  (`DistanceMeter`, sténopé) ; `LiveFrame.passage` + `Passage`
+  (`Models.kt`), parsing tolérant (`passageOf`, `Json.kt`) ; le mot parlé
+  vient de SAM quand le champ est là, obstacle chiffré (stop, décalage) du
+  téléphone, repli local si absent (`GuidanceAnnouncer.samDecision`,
+  `Guidance.shiftOf` passé `internal`, `ProbeVoice.phrase`,
+  `LiveProbeState.samPassage`, `LiveProbe.publish` +1 ligne, 498/500).
+- **Battement** : `GuidanceHeartbeat` (`:core`, pur JVM, horloge explicite) —
+  `onFrame` (décision SAM), `onDistances` (plus proche on-device),
+  `tick` 300 ms qui publie toujours un pulse (mot, côté, décalage,
+  distance, âge, périmé > 2 s). Boucle prod 300 ms + consommateur
+  haptique/UI : suivi explicite, hors de cette PR.
+- **Preuves** : `test_units.py` 346 OK / 0 KO (333 sur `master` propre,
+  +13 : 12 passage + 1 parité vendored) ; `check-kotlin-limits` OK (1071
+  fichiers) ; JVM (`:core` + `:app`, 12 `@Test` neufs :
+  `GuidanceHeartbeatTest` 6, fusion annonceur 4, contrat passage 2) : non
+  rejoués ici (ni JDK ni SDK Android sur ce poste), verdict CI.
+
 ## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
 
 - **Demande** : une branche cohérente depuis `origin/master` `6aaf881`

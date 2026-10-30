@@ -414,3 +414,72 @@ def test_live_fast_ws(live_app_fast) -> None:
     check("/live: doublure ancienne toujours servie",
           status == 200 and legacy.calls == 1 and payload.get("objects") == [],
           f"{status} {legacy.calls}")
+
+
+def _passage_obj(label, box, score=0.9):
+    """Objet SAM factice : les champs lus par ``suggest_passage``."""
+    return {"label": label, "score": score, "box": box}
+
+
+def test_passage_decision(passage) -> None:
+    """Passage SAM : bouché au centre, côté le plus libre conseillé."""
+    from test_units import check
+
+    free = passage.suggest_passage([], 512, 512)
+    check("passage: vide = voie libre",
+          free == {"blocked": False, "side": None, "label": None,
+                   "box": None, "score": None}, str(free))
+    center = passage.suggest_passage(
+        [_passage_obj("person", [200.0, 100.0, 312.0, 400.0], 0.77)], 512, 512)
+    check("passage: personne au centre = bouché à gauche (égalité)",
+          center["blocked"] is True and center["side"] == "left", str(center))
+    check("passage: écho de l'obstacle",
+          center["label"] == "person" and center["score"] == 0.77
+          and center["box"] == [200.0, 100.0, 312.0, 400.0], str(center))
+    left = passage.suggest_passage(
+        [_passage_obj("person", [10.0, 50.0, 100.0, 400.0])], 512, 512)
+    check("passage: personne hors bande = voie libre",
+          left["blocked"] is False, str(left))
+    crowd = passage.suggest_passage(
+        [_passage_obj("person", [200.0, 100.0, 312.0, 400.0]),
+         _passage_obj("person", [50.0, 50.0, 150.0, 400.0]),
+         _passage_obj("person", [360.0, 50.0, 460.0, 400.0]),
+         _passage_obj("person", [362.0, 60.0, 462.0, 400.0])], 512, 512)
+    check("passage: 1 à gauche, 2 à droite = passer à gauche",
+          crowd["blocked"] is True and crowd["side"] == "left", str(crowd))
+    depth = passage.suggest_passage(
+        [_passage_obj("person", [206.0, 100.0, 306.0, 400.0]),
+         _passage_obj("person", [50.0, 0.0, 150.0, 500.0]),
+         _passage_obj("person", [362.0, 200.0, 462.0, 300.0])], 512, 512)
+    check("passage: égalité = côté le plus loin (boîte petite)",
+          depth["side"] == "right", str(depth))
+    offset = passage.suggest_passage(
+        [_passage_obj("person", [180.0, 100.0, 230.0, 400.0])], 512, 512)
+    check("passage: obstacle décalé à gauche = passer à droite",
+          offset["blocked"] is True and offset["side"] == "right", str(offset))
+
+
+def test_passage_tolerance(passage) -> None:
+    """Passage SAM : personnes seules, FR, naines et rebuts tolérés."""
+    from test_units import check
+
+    car = passage.suggest_passage(
+        [_passage_obj("car", [200.0, 100.0, 312.0, 400.0])], 512, 512)
+    check("passage: voiture au centre = voie libre (personnes seules)",
+          car["blocked"] is False, str(car))
+    french = passage.suggest_passage(
+        [_passage_obj("Une Personne", [200.0, 100.0, 312.0, 400.0])], 512, 512)
+    check("passage: libellé français reconnu",
+          french["blocked"] is True and french["label"] == "Une Personne", str(french))
+    tiny = passage.suggest_passage(
+        [_passage_obj("person", [250.0, 100.0, 262.0, 108.0])], 512, 512)
+    check("passage: naine de 8 px ignorée (seuil 2 %)",
+          tiny["blocked"] is False, str(tiny))
+    garbage = passage.suggest_passage(
+        [None, {"label": "person"}, {"label": "person", "box": [1, 2]},
+         {"label": "person", "box": ["x", 0, 1, 2]}, {"box": [1, 2, 30, 40]}], 512, 512)
+    check("passage: objets inexploitables ignorés sans lever",
+          garbage["blocked"] is False, str(garbage))
+    broken = passage.suggest_passage(None, 0, 0)
+    check("passage: entrée invalide = voie libre sans lever",
+          broken["blocked"] is False, str(broken))

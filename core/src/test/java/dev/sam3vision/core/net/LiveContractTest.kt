@@ -138,4 +138,29 @@ class LiveContractTest {
             NetContract.assertError(result, ApiError.Timeout::class.java, "health lent")
         }
     }
+
+    @Test
+    fun `le passage SAM est lu dans la reponse`() = runBlocking {
+        val body = """{"width":512,"height":512,"elapsed_ms":118,"objects":[],""" +
+            """"passage":{"blocked":true,"side":"right","label":"person","box":[200,100,312,400],"score":0.91}}"""
+        NetContract.server(body = body).use { server ->
+            val passage = live(server.baseUrl).getOrThrow().passage
+
+            assertTrue("passage attendu", passage != null)
+            assertEquals(true, passage?.blocked)
+            assertEquals("right", passage?.side)
+            assertEquals("person", passage?.label)
+            assertEquals(listOf(200f, 100f, 312f, 400f), passage?.box)
+            assertEquals(0.91f, passage?.score)
+        }
+    }
+
+    @Test
+    fun `un backend sans passage donne null sans erreur`() = runBlocking {
+        NetContract.server(body = NetContract.frameReply()).use { server ->
+            val frame = live(server.baseUrl).getOrThrow()
+
+            assertEquals(null, frame.passage)
+        }
+    }
 }

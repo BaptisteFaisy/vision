@@ -7,6 +7,7 @@ import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
+import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.nav.RouteSteeringFusion
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -70,15 +71,21 @@ internal class ProbeVoice(
      * positions, sinon silence. [manualCap] est le cap demandé à la voix.
      * Le trottoir vu caméra ([SidewalkKeep]) peut suspendre le cap : l'ordre
      * de retour prime alors sur la consigne, jamais sur le danger.
+     * [passage] est le passage conseillé par SAM (`null` = backend antérieur :
+     * la décision gauche/droite reste locale).
      */
     fun phrase(
         atMs: Long,
         placed: List<PlacedLabel>,
         manualCap: SteeringCap,
+        passage: Passage? = null,
     ): String? {
         if (guide) {
             val sidewalk = SidewalkKeep.positionOf(placed)
-            return guidance.onFrame(atMs, placed, language, manualCap, routeCap, sidewalk = sidewalk)
+            return guidance.onFrame(
+                atMs, placed, language, manualCap, routeCap,
+                sidewalk = sidewalk, samPassage = passage,
+            )
         }
         if (!announce) return null
         return positions.onFrame(atMs, placed, language)

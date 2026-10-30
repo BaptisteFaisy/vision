@@ -124,7 +124,7 @@ object Guidance {
      * d'épaule, arrondi au demi-mètre supérieur. `null` sans distance
      * mesurable — mieux vaut « va à gauche » qu'un chiffre faux.
      */
-    private fun shiftOf(meters: Float?, halfCorridor: Float, hfovDeg: Float): Float? {
+    internal fun shiftOf(meters: Float?, halfCorridor: Float, hfovDeg: Float): Float? {
         val depth = meters?.takeIf { it.isFinite() && it > 0f } ?: return null
         val fov = hfovDeg.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
         val halfTangent = tan(Math.toRadians(fov / 2.0)).toFloat()
