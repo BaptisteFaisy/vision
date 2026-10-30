@@ -43,11 +43,21 @@ class IseePhotoShot(
     private var pending: CompletableDeferred<Boolean>? = null
 
     /**
+     * Photo affichée à l'écran (lunettes, appui court) : contexte de **toutes**
+     * les questions suivantes, jusqu'à son effacement (caméra relancée ou
+     * nouvelle photo). Elle survit aux [releaseContext] de fin de question.
+     */
+    @Volatile
+    private var pinnedFile: File? = null
+
+    /**
      * Appui long : capte la frame courante. Une seule capture à la fois : un
      * second appel pendant le vol du premier ne redemande rien. Muet.
+     * Photo épinglée affichée : rien non plus, elle reste le contexte.
      */
     fun captureForHold() {
         if (pending?.isCompleted == false) return
+        if (validPinned() != null) return
         val cam = camera() ?: return
         val target = media.newPhotoFile()
         val done = CompletableDeferred<Boolean>()
@@ -77,7 +87,24 @@ class IseePhotoShot(
         imageFile = file
     }
 
-    /** Fin de vie du contexte : sortie précoce, question envoyée. */
+    /**
+     * Photo affichée (lunettes, appui court) : elle devient le contexte persistant
+     * des questions, même sans caméra téléphone. La tenue ne capture pas tant
+     * qu'elle est affichée ([captureForHold] inhibée).
+     */
+    fun setPinnedContext(file: File) {
+        pinnedFile = file
+    }
+
+    /** L'affichage est parti (caméra relancée) : plus de contexte persistant. */
+    fun clearPinnedContext() {
+        pinnedFile = null
+    }
+
+    /**
+     * Fin de vie du contexte de tenue : sortie précoce, question envoyée. La
+     * photo épinglée, elle, survit — elle ne part que par [clearPinnedContext].
+     */
     fun releaseContext() {
         pending = null
         imageFile = null
@@ -92,7 +119,7 @@ class IseePhotoShot(
     suspend fun imageBase64(): String? {
         awaitCapture()
         return withContext(io) {
-            val target = validFile() ?: return@withContext null
+            val target = validFile() ?: validPinned() ?: return@withContext null
             runCatching { encode(target) }.getOrNull()?.takeIf { it.isNotEmpty() }
         }
     }
@@ -104,7 +131,7 @@ class IseePhotoShot(
      * infinie sur une caméra en panne.
      */
     private suspend fun awaitCapture() {
-        if (validFile() != null) return
+        if (validFile() != null || validPinned() != null) return
         captureForHold()
         pending?.let {
             val done = withTimeoutOrNull(captureTimeoutMs) { it.join(); true } ?: false
@@ -116,6 +143,9 @@ class IseePhotoShot(
 
     /** Fichier utilisable : présent sur disque et non vide. */
     private fun validFile(): File? = imageFile?.takeIf { it.isFile && it.length() > 0L }
+
+    /** Photo épinglée utilisable : présente sur disque et non vide. */
+    private fun validPinned(): File? = pinnedFile?.takeIf { it.isFile && it.length() > 0L }
 
     companion object {
         /**

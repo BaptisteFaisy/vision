@@ -3,29 +3,28 @@ package dev.sam3vision.app.glasses
 import dev.sam3vision.app.PcmSource
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Question mains-libres ([GlassesTalk]) : micro des lunettes, photo-contexte
- * et transcription, avec des doublures — aucun SDK, aucun Android.
- * `Dispatchers.Unconfined` exécute les coroutines aussitôt : les envois sont
- * observables sans attendre, et le délai auto est neutralisé ([LONG_LISTEN_MS]).
+ * Question mains-libres ([GlassesTalk]) : micro des lunettes et transcription,
+ * avec des doublures — aucun SDK, aucun Android. L'écoute ne prend pas de
+ * photo : questions texte + voix uniquement. `Dispatchers.Unconfined` exécute
+ * les coroutines aussitôt : les envois sont observables sans attendre, et le
+ * délai auto est neutralisé ([LONG_LISTEN_MS]).
  */
 class GlassesTalkTest {
 
     private val scope = CoroutineScope(Dispatchers.Unconfined)
     private val cues = mutableListOf<GlassesTalkCue>()
     private val listeningStates = mutableListOf<Boolean>()
-    private val heard = mutableListOf<Triple<File?, String, ByteArray>>()
+    private val heard = mutableListOf<Pair<String, ByteArray>>()
     private val notes = mutableListOf<GlassesMessage>()
 
     @After
@@ -53,10 +52,20 @@ class GlassesTalkTest {
         assertFalse(talk.listening)
         assertFalse(talk.busy)
         assertEquals(1, heard.size)
-        assertEquals("où sont les toilettes", heard.single().second)
-        assertTrue(heard.single().third.isNotEmpty())
+        assertEquals("où sont les toilettes", heard.single().first)
+        assertTrue(heard.single().second.isNotEmpty())
         assertEquals(listOf(GlassesTalkCue.LISTENING, GlassesTalkCue.SENT), cues)
         assertEquals(listOf(true, false), listeningStates)
+    }
+
+    @Test
+    fun `l ecoute ne prend pas de photo, ni a l ouverture ni a l envoi`() {
+        val talk = talk(mic = fakeMic(), transcript = "où sont les toilettes")
+        talk.press()
+
+        assertEquals(TalkPress.SENDING, talk.press())
+        assertEquals("où sont les toilettes", heard.single().first)
+        assertTrue(heard.single().second.isNotEmpty())
     }
 
     @Test
@@ -84,7 +93,7 @@ class GlassesTalkTest {
         talk.timeout()
 
         assertEquals(1, heard.size)
-        assertEquals("quelle heure est-il", heard.single().second)
+        assertEquals("quelle heure est-il", heard.single().first)
         assertFalse(talk.listening)
     }
 
@@ -117,7 +126,7 @@ class GlassesTalkTest {
         talk.injectTranscript("décris la rue")
 
         assertEquals(1, heard.size)
-        assertEquals("décris la rue", heard.single().second)
+        assertEquals("décris la rue", heard.single().first)
         assertFalse(talk.listening)
     }
 
@@ -129,42 +138,17 @@ class GlassesTalkTest {
         assertTrue(heard.isEmpty())
     }
 
-    @Test
-    fun `la photo-contexte accompagne la question`() {
-        val photo = File.createTempFile("lunettes", ".jpg")
-        try {
-            val talk = talk(mic = fakeMic(), photo = photo)
-            talk.press()
-
-            assertEquals(TalkPress.SENDING, talk.press())
-            assertEquals(photo, heard.single().first)
-        } finally {
-            photo.delete()
-        }
-    }
-
-    @Test
-    fun `sans photo, la question part en texte seul`() {
-        val talk = talk(mic = fakeMic(), photo = null)
-        talk.press()
-
-        assertEquals(TalkPress.SENDING, talk.press())
-        assertNull(heard.single().first)
-    }
-
     private fun talk(
         mic: FakeMic?,
-        photo: File? = null,
         transcript: String = "bonjour",
     ) = GlassesTalk(
         scope = scope,
         audio = { mic },
-        snapPhoto = { photo },
         engine = { FakeSpeech(transcript) },
         settings = { Settings("", "", "", "") },
         beep = cues::add,
         onListening = listeningStates::add,
-        onHeard = { heardPhoto, text, pcm -> heard.add(Triple(heardPhoto, text, pcm)) },
+        onHeard = { text, pcm -> heard.add(text to pcm) },
         onNote = notes::add,
         listenMs = LONG_LISTEN_MS,
     )

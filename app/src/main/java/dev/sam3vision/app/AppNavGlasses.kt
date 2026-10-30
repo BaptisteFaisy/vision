@@ -32,8 +32,8 @@ internal fun GlassesBridge(glasses: GlassesController, isee: IseeViewModel, push
                 }
                 // Écoute ouverte : iSee se tait pour ne pas couvrir la question.
                 GlassesEvent.TalkListening -> isee.onGlassesListening()
-                // Question entendue : photo-contexte + texte, comme une dictée.
-                is GlassesEvent.VoiceHeard -> isee.onGlassesHeard(event.photo, event.text, event.pcm)
+                // Question entendue : texte + voix, comme une dictée (sans photo).
+                is GlassesEvent.VoiceHeard -> isee.onGlassesHeard(event.text, event.pcm)
                 // Fin d'écoute sans question : iSee reprend seul, rien à faire.
                 else -> Unit
             }

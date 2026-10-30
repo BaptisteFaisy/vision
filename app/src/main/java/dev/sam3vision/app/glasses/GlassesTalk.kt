@@ -6,7 +6,6 @@ import dev.sam3vision.app.PcmSource
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.DictationUseCase
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,12 +21,11 @@ data class GlassesTalkHeard(val text: String, val pcm: ByteArray)
  * Une question posée aux lunettes, du premier appui long à la transcription.
  *
  * Le contrôleur ne fait que relayer l'appui long (`press`) : ici vivent le
- * micro des lunettes (ouvert à la première bascule, coupé à la seconde), la
- * photo-contexte (captée en parallèle, comme `IseePhotoShot.captureForHold`),
+ * micro des lunettes (ouvert à la première bascule, coupé à la seconde),
  * le délai d'envoi automatique ([GlassesTalkPolicy.MAX_LISTEN_MS]) et la
  * transcription par le moteur de dictée de l'app (Meta puis Scribe).
  *
- * Testable en JVM : le micro, la photo, le moteur et les signaux sont injectés
+ * Testable en JVM : le micro, le moteur et les signaux sont injectés
  * — aucun SDK, aucun Android. Le délai est injectable ([listenMs]) pour ne pas
  * attendre 20 s dans les tests.
  */
@@ -35,8 +33,6 @@ class GlassesTalk(
     private val scope: CoroutineScope,
     /** Micro utilisable maintenant (`null` = session fermée, flux arrêté). */
     private val audio: () -> PcmSource?,
-    /** Photo des lunettes pour le contexte de la question (`null` = texte seul). */
-    private val snapPhoto: suspend () -> File?,
     /** Moteur de dictée de l'app (Meta puis Scribe, `null` = rien de configuré). */
     private val engine: (Settings) -> SpeechClient?,
     private val settings: () -> Settings,
@@ -44,15 +40,14 @@ class GlassesTalk(
     private val beep: (GlassesTalkCue) -> Unit = {},
     /** Écoute en cours ou terminée : l'écran et iSee suivent. */
     private val onListening: (Boolean) -> Unit = {},
-    /** Question prête : photo-contexte, texte transcrit, PCM capté. */
-    private val onHeard: (photo: File?, text: String, pcm: ByteArray) -> Unit = { _, _, _ -> },
+    /** Question prête : texte transcrit, PCM capté. */
+    private val onHeard: (text: String, pcm: ByteArray) -> Unit = { _, _ -> },
     /** Échec dit à l'utilisateur, jamais silencieux. */
     private val onNote: (GlassesMessage) -> Unit = {},
     private val listenMs: Long = GlassesTalkPolicy.MAX_LISTEN_MS,
 ) {
     private var phase = GlassesTalkPhase.IDLE
     private var mic: PcmSource? = null
-    private var photo: File? = null
     private var timeout: Job? = null
 
     /** Vrai entre le premier appui long et l'envoi (ou l'abandon). */
@@ -63,8 +58,8 @@ class GlassesTalk(
 
     /**
      * Un appui long sur le bouton capture : ouvre l'écoute, ou envoie la
-     * question en cours. [TalkPress.MIC_UNAVAILABLE] = repli sur l'ancien
-     * comportement (photo → chat sur le téléphone), décidé par l'appelant.
+     * question en cours. [TalkPress.MIC_UNAVAILABLE] = micro inutilisable,
+     * dit par l'appelant, sans photo.
      */
     fun press(): TalkPress {
         val source = audio()
@@ -89,7 +84,6 @@ class GlassesTalk(
         timeout = null
         mic?.abort()
         mic = null
-        photo = null
         if (phase != GlassesTalkPhase.IDLE) {
             phase = GlassesTalkPhase.IDLE
             onListening(false)
@@ -107,11 +101,9 @@ class GlassesTalk(
         timeout = null
         mic?.abort()
         mic = null
-        val heardPhoto = photo
-        photo = null
         phase = GlassesTalkPhase.IDLE
         onListening(false)
-        onHeard(heardPhoto, text, SILENCE_PCM)
+        onHeard(text, SILENCE_PCM)
     }
 
     /** Ouvre le micro et l'écoute ; `false` = micro refusé, repli chez l'appelant. */
@@ -128,7 +120,6 @@ class GlassesTalk(
             delay(listenMs)
             timeout()
         }
-        scope.launch { photo = runCatching { snapPhoto() }.getOrNull() }
         return true
     }
 
@@ -140,12 +131,10 @@ class GlassesTalk(
         val active = mic
         mic = null
         scope.launch {
-            val heardPhoto = photo
-            photo = null
             val outcome = transcribe(active)
             phase = GlassesTalkPhase.IDLE
             outcome
-                .onSuccess { onHeard(heardPhoto, it.text, it.pcm) }
+                .onSuccess { onHeard(it.text, it.pcm) }
                 .onFailure { onNote(GlassesMessages.talkFailed(it.message ?: "dictée impossible")) }
             onListening(false)
         }
@@ -175,7 +164,6 @@ class GlassesTalk(
 internal class GlassesTalkHost(
     scope: CoroutineScope,
     audio: () -> PcmSource?,
-    snapPhoto: suspend () -> File?,
     engine: (Settings) -> SpeechClient?,
     settings: () -> Settings,
     beep: (GlassesTalkCue) -> Unit,
@@ -186,7 +174,6 @@ internal class GlassesTalkHost(
     private val talk = GlassesTalk(
         scope = scope,
         audio = audio,
-        snapPhoto = snapPhoto,
         engine = engine,
         settings = settings,
         beep = beep,
@@ -217,8 +204,8 @@ internal class GlassesTalkHost(
         }
     }
 
-    private fun onHeard(photo: File?, text: String, pcm: ByteArray) {
-        events.tryEmit(GlassesEvent.VoiceHeard(photo, text, pcm))
+    private fun onHeard(text: String, pcm: ByteArray) {
+        events.tryEmit(GlassesEvent.VoiceHeard(text, pcm))
     }
 }
 

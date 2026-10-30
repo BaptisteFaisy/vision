@@ -351,7 +351,7 @@ private fun IseeCameraWiring(
         // (Lu au fil de l'eau : l'effet ne redémarre pas, une valeur collectée
         // une fois resterait gelée.)
         glue.host.wantsFrame = {
-            if (GlassesVideoLink.live.value) false
+            if (viewModel.state.value.glassesPhoto != null || GlassesVideoLink.live.value) false
             else (sending(viewModel) && viewModel.probe.wantsFrame()) || picturing(viewModel) ||
                 SharedCameraFrame.audience
         }

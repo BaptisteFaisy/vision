@@ -90,11 +90,10 @@ class GlassesController(
     /** Signaux sonores dans les lunettes (l'écran du téléphone est en poche). */
     private val beeps = GlassesTalkBeeps()
 
-    /** Question mains-libres : micro des lunettes, photo, transcription, événements. */
+    /** Question mains-libres : micro des lunettes, transcription, événements. */
     private val talkHost = GlassesTalkHost(
         scope = scope,
         audio = ::currentAudio,
-        snapPhoto = ::snapPhoto,
         engine = ::speechClient,
         settings = frameSettings,
         beep = beeps::invoke,
@@ -402,10 +401,10 @@ class GlassesController(
         return writeJpegToCache(context, bitmap)
     }
 
-    /** Appui long : question mains-libres, ou envoi si l'écoute est ouverte. */
+    /** Appui long : question mains-libres (écoute seule), ou envoi si elle est ouverte. */
     private fun onAsk() {
-        // Micro des lunettes inutilisable : l'ancien comportement reste (photo → chat).
-        if (talkHost.press() == TalkPress.MIC_UNAVAILABLE) capture(CaptureAction.ASK)
+        // Micro des lunettes inutilisable : dit, sans photo.
+        if (talkHost.press() == TalkPress.MIC_UNAVAILABLE) note(GlassesMessages.talkMicUnavailable())
     }
 
     /** « Hey Meta, ouvre iSee » (flux ou intent) : session puis écoute. */

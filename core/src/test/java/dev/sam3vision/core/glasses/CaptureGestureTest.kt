@@ -47,6 +47,13 @@ class CaptureGestureTest {
     }
 
     @Test
+    fun `seul l appui court prend une photo, l appui long ecoute`() {
+        assertTrue(CaptureAction.PHOTO.takesPhoto)
+        assertFalse(CaptureAction.ASK.takesPhoto)
+        assertFalse(CaptureAction.LIVE.takesPhoto)
+    }
+
+    @Test
     fun `reset vide l attente`() {
         buffer.onPress(CapturePress.SHORT, 1_000)
         assertTrue(buffer.hasPending)
