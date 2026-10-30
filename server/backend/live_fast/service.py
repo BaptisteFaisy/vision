@@ -441,9 +441,9 @@ class Sam3LiveService:
         Le téléphone n'a aucun identifiant du fournisseur : il ne peut que demander.
         L'en-tête `x-sam-release: confirm` évite qu'un scanner ou un préchargement de
         lien éteigne la carte par accident. On répond **avant** de mourir, sinon le
-        client voit un timeout au lieu d'une confirmation ; le processus s'arrête juste
-        après (min_replica=0 ⇒ pas de relance, et le prochain réveil repart d'un
-        snapshot restauré ou d'un conteneur neuf).
+        client voit un timeout au lieu d'une confirmation ; le processus se tue juste
+        après (`os._exit`, pas de gel — voir `docs/LIVE-PERF.md`) : `min_containers=0`
+        ne relance rien, le prochain réveil est un boot complet, jamais un restore.
         """
         from fastapi import HTTPException
 
