@@ -24,7 +24,6 @@ import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.sharedPictosOf
-import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.BenchScreen
@@ -34,7 +33,6 @@ import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.voicenav.VoiceNavRoute
 import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.tap.TapCaptureScreen
-import dev.sam3vision.core.glasses.CaptureAction
 
 /** Extra adb `--es route <nom>` : ouvre l'écran nommé (recettes, comme le banc). */
 const val EXTRA_ROUTE = "route"
@@ -299,34 +297,6 @@ internal fun routeFromName(name: String): Route = when {
     name == "voicenav" -> Route.VoiceNav
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
-}
-
-/**
- * Destination d'une photo prise sur les lunettes : `null`, toujours — elle
- * s'affiche sur l'accueil iSee (personne accompagnée, [IseeViewModel.onGlassesPhoto]),
- * jamais poussée vers une autre page (ni Analyse ni Chat). Pure : verrou anti-régression en JVM.
- */
-internal fun routeForGlassesPhoto(action: CaptureAction): Route? = null
-
-/** Les lunettes nourrissent iSee : photos posées sans changer de page, questions parlées comme des dictées. */
-@Composable
-private fun GlassesBridge(glasses: GlassesController, isee: IseeViewModel, push: (Route) -> Unit) {
-    LaunchedEffect(glasses) {
-        glasses.events.collect { event ->
-            when (event) {
-                is GlassesEvent.PhotoTaken -> {
-                    isee.onGlassesPhoto(event.file, event.action)
-                    routeForGlassesPhoto(event.action)?.let(push)
-                }
-                // Écoute ouverte : iSee se tait pour ne pas couvrir la question.
-                GlassesEvent.TalkListening -> isee.onGlassesListening()
-                // Question entendue : photo-contexte + texte, comme une dictée.
-                is GlassesEvent.VoiceHeard -> isee.onGlassesHeard(event.photo, event.text, event.pcm)
-                // Fin d'écoute sans question : iSee reprend seul, rien à faire.
-                else -> Unit
-            }
-        }
-    }
 }
 
 /** Accueil classique : photo → analyse, ouverture des réglages, mode direct. */

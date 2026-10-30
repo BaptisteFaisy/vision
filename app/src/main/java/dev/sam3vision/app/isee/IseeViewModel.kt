@@ -203,6 +203,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
+    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, { settings }, cameraOps, ::transcribeAndAnswer)
+    private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard)
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
     private val speedOrder = IseeSpeedOrder({ settings }, { updated -> settings = updated; viewModelScope.launch { runCatching { prefs.save(settings) } } }, { player.speed = it }, ::dropHeard, viewModelScope, voice::synthesize, { text, bytes -> playback.speakBytes(SPEED_BUBBLE_ID, text, bytes) })
@@ -227,8 +229,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var settings: Settings = Settings.Default
 
-    /** Compteur des photos lunettes affichées : deux photos n'ont jamais le même `seq`. */
-    private var glassesPhotoSeq = 0L
 
     init {
         // Le texte d'intro est le premier message une fois pour toutes.
@@ -271,13 +271,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
-    fun attachCamera(actions: IseeCameraActions) {
-        camera = actions
-    }
+    fun attachCamera(actions: IseeCameraActions) { camera = actions }
 
-    fun detachCamera() {
-        camera = null
-    }
+    fun detachCamera() { camera = null }
 
     /**
      * Caméra liée ou coupée (remonté par la liaison) : coupée, la sonde est arrêtée
@@ -293,35 +289,13 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         } else probe.stop()
     }
 
-    /**
-     * Photo prise avec les lunettes : elle s'affiche sur cet écran (personne
-     * accompagnée), sans quitter la page courante — posée même depuis un autre
-     * écran, elle attend le retour sur iSee. Doublon (même fichier) ignoré,
-     * photo suivante remplace la précédente ([acceptGlassesPhoto]). ASK :
-     * la photo devient aussi le contexte de la prochaine question dictée.
-     */
-    fun onGlassesPhoto(file: File, action: CaptureAction) {
-        if (!acceptGlassesPhoto(_state.value.glassesPhoto, file)) return
-        glassesPhotoSeq += 1
-        update { it.copy(glassesPhoto = IseeGlassesPhoto(file, action, glassesPhotoSeq), status = glassesPhotoLabel(action)) }
-        if (action == CaptureAction.ASK) shots.setExternalContext(file)
-    }
+    fun onGlassesPhoto(file: File, action: CaptureAction) = glassesInbox.onPhoto(file, action)
+    fun dismissGlassesPhoto() = glassesInbox.dismiss()
+    fun onGlassesListening() = silenceForGlasses()
+    fun onGlassesHeard(photo: File?, text: String, pcm: ByteArray) = glassesInbox.heard(photo, text, pcm)
 
-    /** La photo des lunettes est fermée (retour, bouton) : l'écran iSee reste. */
-    fun dismissGlassesPhoto() {
-        val dismissed = _state.value.glassesPhoto
-        update { it.copy(glassesPhoto = null) }
-        // Question annulée avec sa photo : le contexte ne doit pas fuir vers
-        // la question suivante (déjà consommé, le relâchement est neutre).
-        if (dismissed?.action == CaptureAction.ASK) shots.releaseContext()
-    }
-
-    /**
-     * Écoute mains-libres ouverte aux lunettes : iSee se tait (lecture et
-     * guidage coupés) pour ne pas couvrir la question. Honorée même hors écran
-     * iSee : le téléphone est en poche, l'utilisateur ne peut pas vérifier.
-     */
-    fun onGlassesListening() {
+    /** iSee se tait (lecture + guidage) : la voix du user a priorité. */
+    private fun silenceForGlasses() {
         if (!playerIdle()) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
@@ -329,24 +303,16 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         voiceNav.stopVoice()
     }
 
-    /**
-     * Question entendue aux lunettes : photo-contexte affichée sur cet écran
-     * (comme [onGlassesPhoto] en ASK), puis même traitement qu'une dictée
-     * tenue-relâchée ([handleDictated]). Le téléphone reste en poche.
-     */
-    fun onGlassesHeard(photo: File?, text: String, pcm: ByteArray) {
-        onGlassesListening()
-        if (photo != null) onGlassesPhoto(photo, CaptureAction.ASK)
-        viewModelScope.launch {
-            if (isIntroDisablePhrase(text)) {
-                dropHeard()
-                intro.disable()
-                return@launch
-            }
-            if (speedOrder.run(text)) return@launch
-            if (runSettingsCommand(text)) return@launch
-            handleDictated(text, pcm)
+    /** Texte entendu (lunettes ou dictée) : ordres locaux d'abord, sinon question au LLM. */
+    private suspend fun answerHeard(text: String, pcm: ByteArray) {
+        if (isIntroDisablePhrase(text)) {
+            dropHeard()
+            intro.disable()
+            return
         }
+        if (speedOrder.run(text)) return
+        if (runSettingsCommand(text)) return
+        handleDictated(text, pcm)
     }
 
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */
@@ -365,50 +331,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     // ————— Gestes —————
 
-    /** Appui long : la frame courante devient le contexte (sauf photo gelée), puis le micro s'ouvre. */
-    fun onHoldStart() {
-        if (!active) return
-        // Parler coupe la lecture en cours (sinon la tenue est jetée, le micro reste pris).
-        if (!playerIdle()) {
-            player.stop()
-            update { it.copy(speakingEntryId = null) }
-        }
-        // La voix du user a priorité : le guidage en cours se tait aussi.
-        voiceNav.stopVoice()
-        // Ce qui est filmé devient le contexte de la question : une frame d'une
-        // tenue précédente est périmée et gagnerait sinon la place (question
-        // portant sur une image figée).
-        if (_state.value.recordingVideo) shots.releaseContext()
-        shots.captureForHold()
-        update { it.copy(holding = true, status = null) }
-        haptics.holdStart()
-        if (dictation.start()) liveDictation.start(settings)
-    }
-
-    /** Doigt relâché : micro coupé, transcription, MP3 en cache, réponse IA parlée. */
-    fun onHoldEnd() {
-        if (!active) return
-        haptics.holdEnd()
-        if (!_state.value.holding) return
-        liveDictation.stop()
-        update { it.copy(holding = false) }
-        viewModelScope.launch { transcribeAndAnswer() }
-    }
-
-    /** Tenue annulée (app en arrière-plan ou geste perdu) : micro relâché, rien de transcrit. */
-    fun onHoldCancel() {
-        if (!_state.value.holding) return
-        liveDictation.stop()
-        dictation.discard()
-        haptics.holdEnd()
-        update { it.copy(holding = false) }
-    }
-
-    /** Tap simple n'importe où : démarre la vidéo (fenêtre flottante), ou la ferme. */
-    fun onSingleTap() {
-        if (!active) return
-        if (_state.value.recordingVideo) cameraOps.stopVideo() else cameraOps.startVideo()
-    }
+    fun onHoldStart() = holdTalk.start()
+    fun onHoldEnd() = holdTalk.end()
+    fun onHoldCancel() = holdTalk.cancel()
+    fun onSingleTap() = holdTalk.singleTap()
 
     // ————— Appui long : micro → texte → réponse parlée —————
 
@@ -425,14 +351,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             shots.releaseContext()
             return
         }
-        if (isIntroDisablePhrase(heard.text)) {
-            dropHeard()
-            intro.disable()
-            return
-        }
-        if (speedOrder.run(heard.text)) return
-        if (runSettingsCommand(heard.text)) return
-        handleDictated(heard.text, heard.audio)
+        answerHeard(heard.text, heard.audio)
     }
 
     /**
@@ -448,9 +367,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
-    fun settingsOpened() {
-        update { it.copy(openSettings = false) }
-    }
+    fun settingsOpened() = update { it.copy(openSettings = false) }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */
     private suspend fun handleDictated(text: String, pcm: ByteArray) {
@@ -494,18 +411,15 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun playerIdle(): Boolean = _state.value.speakingEntryId == null
 
-    private fun canAnnounce(): Boolean {
+    private fun speechBusy(): Boolean {
         val state = _state.value
-        val busy = !playerIdle() || state.holding || state.transcribing || state.thinking
-        return !busy && voiceNavVoiceGate.ambientAllowed()
+        return !playerIdle() || state.holding || state.transcribing || state.thinking
     }
 
+    private fun canAnnounce(): Boolean = !speechBusy() && voiceNavVoiceGate.ambientAllowed()
+
     /** Décision d'une voix ambiante (annonce ou voix du sol), urgence mise à part. */
-    private fun maySpeakAmbient(urgent: Boolean): Boolean {
-        val state = _state.value
-        val busy = !playerIdle() || state.holding || state.transcribing || state.thinking
-        return voiceNavVoiceGate.maySpeak(urgent, busy)
-    }
+    private fun maySpeakAmbient(urgent: Boolean): Boolean = voiceNavVoiceGate.maySpeak(urgent, speechBusy())
 
     /** GPS désactivé (ordre) : la fenêtre d'action (photo, caméra) réouvre la voix. */
     private val voiceNavVoiceGate get() = voiceNav.voiceGate
