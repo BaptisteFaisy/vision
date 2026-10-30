@@ -122,7 +122,7 @@ private fun VoiceNavScreen(
 
 /**
  * Guidage actif : écran + carte (tracé shape + position recalée + caméra
- * suivi, repli schéma si les tuiles échouent).
+ * d'ensemble, repli schéma si les tuiles échouent).
  */
 @Composable
 private fun GuidingRoute(

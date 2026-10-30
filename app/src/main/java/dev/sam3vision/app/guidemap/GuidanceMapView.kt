@@ -158,7 +158,7 @@ private fun GuideAttribution(modifier: Modifier = Modifier) {
 /** Annotations vivantes (position + anneau), seules rafraîchies à chaque tick. */
 private class GuideMarks(var position: Marker? = null, var ring: Polygon? = null)
 
-/** Seuil de suivi : en dessous, la caméra ne bouge pas (pas de tremblement). */
+/** Seuil de recentrage : en dessous, la caméra ne bouge pas (pas de tremblement). */
 private const val CAMERA_MOVE_METERS = 10.0
 
 /** Pastille des punaises : diamètre du bitmap, épaisseur du liseré blanc. */
@@ -224,7 +224,7 @@ private fun MapOverlays.staticPart(): MapOverlays = copy(position = null, accura
 /**
  * Vrai s'il faut bouger la caméra : première fois, cadrage auto, zoom ou
  * cap changé, ou cible déplacée de plus de [CAMERA_MOVE_METERS] — sinon le
- * suivi tremblerait à chaque tick GPS.
+ * cadre tremblerait à chaque tick GPS.
  */
 private fun shouldMoveCamera(prev: MapCamera?, next: MapCamera?): Boolean {
     if (next == null || prev == null) return true
