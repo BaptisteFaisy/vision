@@ -179,15 +179,15 @@ class IseeCameraHost(private val context: Context) {
             ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
-                        // On demande la taille du **direct** (480 px) : SAM reçoit
-                        // toujours son 320 px, réduit dans la même passe NV21. Un
-                        // buffer 640×480 pour un JPEG de 320 px coûtait 12-42 ms
-                        // de conversion par frame avec l'ancien chemin (mesuré au
-                        // logcat, 2026-10-26) — le coût actuel est mesuré au log
-                        // `conversion:`. Le repli prend le plus proche en dessous,
-                        // quitte à redimensionner à peine ; sous 480 px, le direct
-                        // part à la taille du buffer, jamais agrandi.
-                        Size(SHARE_FRAME_EDGE, SHARE_FRAME_EDGE),
+                        // On demande 640×480 : à 480×480 demandés, le Redmi ne
+                        // livrait que 320×240 (mesuré au log `conversion:`,
+                        // build 1.0.685) et le direct restait en 320. SAM reçoit
+                        // toujours son 320 px, réduit dans la même passe NV21 —
+                        // la passe est pilotée par la destination, pas la source.
+                        // Le repli prend le plus proche en dessous ; sous 480 px,
+                        // le direct part à la taille du buffer, jamais agrandi.
+                        // Coût actuel mesuré au log `conversion:`.
+                        Size(640, 480),
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
                     ),
                 )
