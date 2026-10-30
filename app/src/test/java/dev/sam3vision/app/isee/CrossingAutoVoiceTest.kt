@@ -110,6 +110,29 @@ class CrossingAutoVoiceTest {
     }
 
     @Test
+    fun `les emissions entre frames ne comptent pas comme des frames`() = runTest {
+        val probe = MutableStateFlow(LiveProbeState(crossingActive = true, frames = 1))
+        val armed = mutableListOf<Boolean>()
+        observeCrossingLoss(probe.crossingSightPerFrame(), backgroundScope, { SpeechLanguage.Fr }, { true }, { armed.add(it) }) {}
+
+        runCurrent() // frames = 1 : 1re vide
+        // Poste « pixel » : l'état ré-émet (timings), même frame — ignoré.
+        probe.value = probe.value.copy(latencyMs = 11)
+        runCurrent()
+        probe.value = probe.value.copy(frames = 2) // 2e vide
+        runCurrent()
+        probe.value = probe.value.copy(latencyMs = 22)
+        runCurrent()
+        probe.value = probe.value.copy(frames = 3) // 3e vide
+        runCurrent()
+        assertTrue("3 frames publiées vides : le mode tient", armed.isEmpty())
+        probe.value = probe.value.copy(frames = 4) // 4e vide : coupe
+        runCurrent()
+
+        assertEquals(listOf(false), armed)
+    }
+
+    @Test
     fun `le mode manuel ne retombe jamais seul`() = runTest {
         val states = MutableSharedFlow<Pair<Boolean, Boolean>>()
         val armed = mutableListOf<Boolean>()
