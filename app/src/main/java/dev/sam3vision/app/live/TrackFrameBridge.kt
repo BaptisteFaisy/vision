@@ -23,11 +23,25 @@ internal suspend fun TrackRunner.runAsFrame(
         submit(jpegB64)?.map { it.asLiveFrame() }
     }
 
-/** Le tracker a ses propres objets ; le rendu du direct attend un [LiveFrame]. */
+/**
+ * Le tracker a ses propres objets ; le rendu du direct attend un [LiveFrame].
+ * L'encodage servi (`rle`/256 compris) est propagé tel quel : le pont ne retombe plus
+ * sur le défaut `png` de [SegObject], le décodeur reçoit ce que le backend a envoyé.
+ */
 internal fun TrackFrame.asLiveFrame(): LiveFrame = LiveFrame(
     width = width,
     height = height,
     // La latence affichée vient du pipeline, mesurée côté téléphone (pas de durée serveur).
     elapsedMs = 0L,
-    objects = objects.map { SegObject(it.label, it.score, it.box, it.maskPngB64) },
+    objects = objects.map {
+        SegObject(
+            label = it.label,
+            score = it.score,
+            box = it.box,
+            maskPngB64 = it.maskPngB64,
+            maskEncoding = it.maskEncoding,
+            maskScale = it.maskScale,
+            maskPoly = it.maskPoly,
+        )
+    },
 )
