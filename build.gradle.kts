@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.Test
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -39,6 +41,16 @@ fun com.android.build.api.dsl.Lint.reglageCommun() {
 }
 
 subprojects {
+    // Tests JVM : 2 forks en parallèle par tâche Test (marge 5 min, 2026-10-30 :
+    // 3 runs tués par le timeout à ~320 s, étape « Tests JVM » à 277-280 s
+    // contre ~125 s en médiane — contention des runners partagés, cache Gradle
+    // restauré, zéro téléchargement). Mêmes tests, même verdict : seule
+    // l'exécution est parallèle. Isolation vérifiée (ports éphémères,
+    // répertoires temporaires uniques ; un seul chemin fixe, intra-classe donc
+    // intra-fork — Gradle répartit par classe, pas de conflit).
+    tasks.withType<Test> {
+        maxParallelForks = 2
+    }
     pluginManager.withPlugin("com.android.application") {
         extensions.configure<com.android.build.api.dsl.ApplicationExtension> { lint { reglageCommun() } }
     }
