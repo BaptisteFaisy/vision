@@ -50,10 +50,9 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   de verdict (rejeu local de l'arbre : 0 bascule sur 20 crops).
 - Preuves : échec constaté avant sur les 2 tests visés
   (`CrossingAnnouncerTest`, `TrainedLightColorTest`), vert après ; `:app`
-  1 271/1 271 sur r630 ; `:core` 2 190/2 191 — le seul échec
-  (`MaskRobustnessTest`, mesure GC `allocation = -9568`) est pré-existant
-  et environnemental, reproduit à l'identique sur `origin/master`
-  pristine ; `check-kotlin-limits.py` vert.
+  1 271/1 271 et `:core` 2 191/2 191 sur r630 (garde-fou 65535 stabilisé
+  entre-temps sur `master`, borne haute seule) ;
+  `check-kotlin-limits.py` vert.
 
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
