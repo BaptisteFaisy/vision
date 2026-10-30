@@ -37,6 +37,36 @@ export function audienceNotice(count) {
 }
 
 /**
+ * Ce que les aidants reçoivent quand la caméra du proche s'allume ou s'éteint :
+ * sans cet avis, une page connectée garderait la dernière image jusqu'à 8 s
+ * après la coupure (photo lente encore « fraîche »), alors que la caméra est
+ * déjà éteinte. Émis par la salle (départ du téléphone) ou relayé depuis lui
+ * (caméra fermée, tuyau encore ouvert).
+ */
+export function cameraNotice(on) {
+  return JSON.stringify({ type: 'camera', on: on === true });
+}
+
+/**
+ * État caméra porté par un message texte, `null` si ce n'en est pas un. Seul
+ * un booléen strict compte : une frame binaire décodée en texte ne doit jamais
+ * éteindre l'image de tous les aidants.
+ */
+export function cameraOnOf(text) {
+  if (typeof text !== 'string') return null;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!parsed || parsed.type !== 'camera') return null;
+  if (parsed.on === true) return true;
+  if (parsed.on === false) return false;
+  return null;
+}
+
+/**
  * Une frame va aux spectateurs, **jamais** à son émetteur : le téléphone n'a rien
  * à se renvoyer à lui-même, et une boucle coûterait des données pour rien.
  */
