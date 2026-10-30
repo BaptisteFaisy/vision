@@ -54,6 +54,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     internal val _state = MutableStateFlow(LiveUiState(latestFrame = latestFrame))
     val state: StateFlow<LiveUiState> = _state
+    /** Sous-flux du poste « pixel », collecté par la seule ligne chrono. */
+    internal val pixel = PixelStages()
     private var session: LiveSession? = null
     private var client: LiveClient? = null
 
@@ -91,7 +93,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * réglage [Settings.boxPredictionEnabled] — **éteint par défaut** — qui décide.
      * Éteinte, la classe ci-dessus n'entre dans aucun chemin : le direct est celui d'avant.
      */
-    private var prediction = LivePrediction(enabled = false)
+    internal var prediction = LivePrediction(enabled = false)
     /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, éteints par défaut. */
     internal val adaptive = LiveAdaptive(baseQuality = LIVE_JPEG_QUALITY)
     private var sensorLens: LensSpec? = null
@@ -163,8 +165,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /** Taille de la dernière frame bien dimensionnée (repli si le backend l'omet). */
-    private var lastKnownWidth = 0
-    private var lastKnownHeight = 0
+    internal var lastKnownWidth = 0
+    internal var lastKnownHeight = 0
 
     /**
      * Ouvre une session de direct. Par défaut (`liveSamEnabled = false`), l'image part
@@ -389,10 +391,12 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
+        val snap = chronology.snapshot(shown.frame)
+        pixel.publish(snap)
         _state.update { current ->
             current.copy(
                 frame = shown.frame,
-                timings = chronology.snapshot(shown.frame),
+                timings = snap,
                 overlays = overlays,
                 objectsCount = shown.frame.objects.size,
                 transport = transportLabel(trackerEnabled, client),
@@ -406,12 +410,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 trails = centerTrails.observeFrame(now, width, height, shown.detections, seen).takeUnless { it.empty },
             ).withCrossing(traverse.active, traverse.local ?: traverse.light)
         }
-    }
-
-    /** Boîtes prédites de la frame caméra, posées si la couche a changé. */
-    private fun publishPrediction() {
-        val layer = prediction.publishableLayer(System.currentTimeMillis(), lastKnownWidth, lastKnownHeight, _state.value.prediction) ?: return
-        _state.update { it.copy(prediction = layer) }
     }
 
     /**
@@ -483,6 +481,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         latestFrame.clear()
         chronology.reset()
         asker.reset()
+        pixel.clear()
         _state.update { LiveUiState(latestFrame = latestFrame) }
     }
 

@@ -16,8 +16,8 @@ import androidx.compose.runtime.withFrameNanos
  */
 fun LiveViewModel.noteDrawn() {
     // L'instantané publié au retour réseau portait la frame en cours ; quand Compose
-    // prévient enfin, le pipeline a déjà entamé la suivante. On republie donc depuis la
-    // frame **dessinée** (postes téléphone) avec les chiffres serveur de l'instantané
+    // prévient enfin, le pipeline a déjà entamé la suivante. On pose donc dans le sous-flux
+    // pixel depuis la frame **dessinée** (postes téléphone) et les chiffres serveur de
     // d'avant — sinon le poste PIXEL tombe sur une frame qui n'est plus la bonne.
     // C'est ce qui affichait `pixel —` sur 12 relevés sur 12 le 2026-10-26.
     if (!chronology.noteDrawn()) return

@@ -27,13 +27,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.HomeModes
+import dev.sam3vision.core.live.TimingsText
 
 /* * Bandeau du haut : retour, réglages, mode de vision, ligne d'état du direct, erreurs.
  * Le bouton « Partager le suivi » vit dans les Réglages, pas ici (suivi permanent). */
 @Composable
 fun LiveTopBar(
     state: LiveUiState,
+    pixel: FrameTimings,
     draft: String,
     onDraftChange: (String) -> Unit,
     onApply: () -> Unit,
@@ -57,7 +60,7 @@ fun LiveTopBar(
             LocalModeChip(state, onToggleLocal)
             TransportChip(state.transport)
         }
-        LiveStatusLines(state)
+        LiveStatusLines(state, pixel)
         state.spoken?.let { phrase ->
             Text(
                 "🔊 $phrase",
@@ -81,7 +84,7 @@ fun LiveTopBar(
  * retour à la ligne) : rien affiché tant qu'aucun poste n'est mesuré.
  */
 @Composable
-private fun LiveStatusLines(state: LiveUiState) {
+private fun LiveStatusLines(state: LiveUiState, pixel: FrameTimings) {
     Text(
         state.statusLine,
         color = AppColors.text,
@@ -92,8 +95,9 @@ private fun LiveStatusLines(state: LiveUiState) {
             .background(AppColors.surface.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
     )
-    if (state.chronologie.isBlank()) return
-    Text(state.chronologie, color = AppColors.success, fontSize = 11.sp, maxLines = 1)
+    val chrono = TimingsText.compact(pixel)
+    if (chrono.isBlank()) return
+    Text(chrono, color = AppColors.success, fontSize = 11.sp, maxLines = 1)
 }
 
 /**
