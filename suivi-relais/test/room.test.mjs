@@ -137,6 +137,19 @@ test('sans aidant connecté, le téléphone ne reçoit qu’un avis d’audience
   assert.deepEqual(phone.recu, []);
 });
 
+test('un téléphone qui rejoint une salle déjà regardée émet tout de suite', async () => {
+  const { room, state } = salle('');
+  const aidant = onglet('aidant');
+  state.acceptWebSocket(aidant, ['watch']);
+  let serveur = null;
+  globalThis.WebSocketPair = class {
+    constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); serveur = this[1]; }
+  };
+  const ok = await room.fetch(ouvre('share=leo&role=push&key=k'));
+  assert.equal(ok.status, 101);
+  assert.deepEqual(serveur.recu, ['{"type":"audience","watch":1}']);
+});
+
 test('un aidant qui arrive prévient le téléphone, un qui part aussi', async () => {
   const { room, state } = salle('');
   const phone = onglet('phone');
