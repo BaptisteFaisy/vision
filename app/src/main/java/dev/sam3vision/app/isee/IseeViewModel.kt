@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.IseeHaptics
+import dev.sam3vision.app.glasses.GlassesSessionControl
 import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
@@ -18,6 +19,7 @@ import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.isee.vm.IseeAnswers
 import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
+import dev.sam3vision.app.isee.vm.IseeGlassesOrder
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseeNavClarify
@@ -205,6 +207,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, { settings }, cameraOps, ::transcribeAndAnswer)
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard)
+    private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
     private val speedOrder = IseeSpeedOrder({ settings }, { updated -> settings = updated; viewModelScope.launch { runCatching { prefs.save(settings) } } }, { player.speed = it }, ::dropHeard, viewModelScope, voice::synthesize, { text, bytes -> playback.speakBytes(SPEED_BUBBLE_ID, text, bytes) })
@@ -226,6 +229,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Caméra de la fenêtre flottante, câblée par le composable à l'attachement. */
     var camera: IseeCameraActions? = null
+
+    /** Bascule de session pour l'ordre vocal « iSee », câblée par AppNav (`GlassesBridge`). */
+    var glassesSession: GlassesSessionControl? = null
 
     private var settings: Settings = Settings.Default
 
@@ -314,6 +320,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (speedOrder.run(text)) return
         if (runSettingsCommand(text)) return
+        if (glassesOrder.run(text)) return
         handleDictated(text, pcm)
     }
 

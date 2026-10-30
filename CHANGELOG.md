@@ -107,6 +107,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` vert en local ; `LiveProbe.kt` à 495 lignes
   (compteur `noteDecoded` déménagé dans `MaskPainter.kt`).
 
+## 2026-10-30 — ordre vocal « iSee » : bascule la session lunettes (branche `feat/isee-ordre-vocal-lunettes`)
+
+- **Demande** : dire « iSee » (lunettes liées en Bluetooth) ouvre la session
+  lunettes ; redire « iSee » l'arrête.
+- L'ordre s'intercepte dans la chaîne vocale avant le LLM (`answerHeard`,
+  micro du téléphone comme des lunettes) : le mot seul, strict — « ici » et
+  les questions contenant « iSee » partent au LLM comme avant. Session en
+  cours (ou en démarrage) → arrêt ; sinon ouverture si une paire est liée,
+  refus dit à voix haute sinon (pas d'attente 30 s pour finir en rouge).
+  Chaque action est confirmée à voix haute + ligne de statut.
+- Preuves : 13 nouveaux tests ciblés verts (`GlassesSessionOrderTest` 5,
+  `GlassesToggleTest` 4, `IseeGlassesOrderTest` 4) ; suites complètes `:app`
+  1221/1221, `:core` 2150/2155 (5 échecs préexistants
+  `PrivateFileSettingsStoreTest`, POSIX sous Windows, hors zone) ;
+  `check-kotlin-limits` OK ; `assembleDebug` OK.
+- Fichiers : `core/speech/GlassesSessionOrder.kt` (+test),
+  `glasses/GlassesSessionControl.kt` (+test `GlassesToggleTest`),
+  `isee/vm/IseeGlassesOrder.kt` (+test), `IseeViewModel.kt` (+7 : ordre +
+  câblage), `AppNavGlasses.kt` (+3 : câblage), `GlassesPolicy.kt` (+18 :
+  3 confirmations).
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
 - **Demande** : sur la page caregiver, cesser instantanément d'afficher la caméra
