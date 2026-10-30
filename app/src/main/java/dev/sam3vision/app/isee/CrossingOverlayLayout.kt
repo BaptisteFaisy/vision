@@ -136,24 +136,23 @@ fun tagRect(
 }
 
 /**
- * Rectangle du bandeau verdict : centré en bas de la vidéo, décollé du bord
- * d'une marge fixe. Le verdict ne dépend d'aucune boîte SAM — même sans feu
- * cadré, « ne peut pas traverser » reste affiché tant que le mode est actif.
+ * Rectangle du bandeau verdict : centré en haut de la vidéo, sous la puce
+ * ([topMarginPx], fourni en px depuis des dp à l'appel). En bas, le panneau
+ * debug le recouvrait (constaté sur téléphone : toujours affiché, devant).
+ * Le verdict ne dépend d'aucune boîte SAM — même sans feu cadré, « ne peut pas
+ * traverser » reste affiché tant que le mode est actif.
  */
 fun verdictRect(
     tagWidth: Float,
     tagHeight: Float,
     boxWidth: Float,
     boxHeight: Float,
+    topMarginPx: Float,
 ): LightMarker {
     val left = ((boxWidth - tagWidth) / 2f).coerceIn(0f, (boxWidth - tagWidth).coerceAtLeast(0f))
-    val top = (boxHeight - tagHeight - VERDICT_MARGIN_PX)
-        .coerceIn(0f, (boxHeight - tagHeight).coerceAtLeast(0f))
+    val top = topMarginPx.coerceIn(0f, (boxHeight - tagHeight).coerceAtLeast(0f))
     return LightMarker(left, top, left + tagWidth, top + tagHeight)
 }
-
-/** Marge (px) entre le bas de la vidéo et le bandeau verdict. */
-private const val VERDICT_MARGIN_PX = 12f
 
 /** Sous cette taille (px), un cadre ne désigne plus rien : on n'affiche rien. */
 private const val MIN_MARKER_PX = 6f
