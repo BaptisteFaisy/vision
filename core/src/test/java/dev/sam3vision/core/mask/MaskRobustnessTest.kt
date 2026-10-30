@@ -123,7 +123,11 @@ class MaskRobustnessTest {
         repeat(4) { decodeBitsMask(ENORME_65535) } // hors coût de compilation JIT
         val octets = JvmAllocations.netAllocated { decodeBitsMask(ENORME_65535) }
         println("en-tête 65535×65535 refusé : $octets octet(s) alloués")
-        assertTrue("allocation = $octets", !JvmAllocations.available || octets in 0..4096)
+        // Plafond seul, sans plancher (30/10) : le compteur thread est monotone, donc un net
+        // négatif est un refill TLAB tombé dans la mesure vide (−9568 observés en suite complète
+        // avec d'autres tests avant), pas une allocation — seul un dépassement du plafond
+        // prouverait un vrai coût (miroir du garde 8 Mo ci-dessous, déjà sans plancher).
+        assertTrue("allocation = $octets", !JvmAllocations.available || octets <= 4096)
     }
 
     /**
