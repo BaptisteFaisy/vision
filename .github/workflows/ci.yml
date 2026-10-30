@@ -9,6 +9,16 @@ name: CI
 # `ci-native.yml` (même timeout). Motif : 4 jobs × N PRs saturaient les
 # 19 runners — file jusqu'à 10 min, budget wall-clock cassé alors que chaque
 # job tenait ses 5 min (mesuré le 28/10).
+# Marge 5 min (2026-10-30) : 3 runs tués par le timeout à ~320 s dans
+# « Tests JVM » (277-280 s contre ~125 s en médiane — contention des runners
+# partagés, cache Gradle restauré, zéro téléchargement). Cinq coupes, verdict
+# inchangé (mêmes gardes, mêmes tests) : `maxParallelForks = 2`
+# (build.gradle.kts racine), `--max-workers=4` sur le seul appel CI (le
+# plafond 2 de gradle.properties reste le défaut des builds partagés),
+# `setup-gradle` après le périmètre (sauté sans code), roues pip en cache,
+# upload scoping `app/`+`core/`. `--offline` refusé : une PR ajoutant une
+# dépendance verrait son build échouer au lieu de télécharger l'artefact
+# absent du cache.
 on:
   pull_request:
   push:
@@ -49,11 +59,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      # Cache Gradle : la VM est neuve à chaque job, sans lui 3-4 min à froid.
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
 
       - name: Cette PR touche-t-elle du code ?
         id: perimetre
@@ -118,6 +123,14 @@ jobs:
           if [ "$lot" = "1" ]; then code=0; backend=0; fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
+
+      # Cache Gradle : la VM est neuve à chaque job, sans lui 3-4 min à froid.
+      # Après le périmètre (2026-10-30) : sans code, ni lecture ni écriture
+      # du cache — le verdict des PR docs/config tombe encore plus vite.
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.perimetre.outputs.code == '1'
+        with:
+          cache-read-only: false
 
       - name: Chaîne d'outils
         run: |
@@ -222,7 +235,17 @@ jobs:
       # self-hosted (Debian 13) n'ont ni pip, ni ensurepip, ni build setup-python
       # (« was not found for Debian 13 »), et pip refuse même `--user`
       # (externally-managed) : venv sans pip + get-pip.py dedans (jamais le
-      # système). ~1 min par run (pas de cache : chaque run repart d'un venv neuf).
+      # système).
+      # Roues pip en cache (2026-10-30) : 15 s → ~4 s quand `server/` est
+      # touché — le venv reste neuf à chaque run (isolation inchangée),
+      # seules les roues sont réutilisées. Clé sur le hash des dépendances :
+      # un requirements modifié invalide le cache tout seul.
+      - name: Cache pip backend
+        if: steps.perimetre.outputs.backend == '1'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-backend-${{ hashFiles('server/scripts/requirements-test.txt') }}
       - name: Tests unitaires backend
         if: steps.perimetre.outputs.backend == '1'
         run: |
@@ -234,20 +257,55 @@ jobs:
 
       # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
       # exigé par la file, il doit rendre son verdict vite.
+      # `--max-workers=4` (2026-10-30) : 3 kills timeout à ~320 s ce jour-là
+      # (contention runners partagés) — 4 ≈ part équitable (19 runners /
+      # 80 cœurs), le plafond 2 de gradle.properties restant le défaut hors
+      # CI. Rollback : retirer le flag. (`--offline` refusé : voir l'en-tête.)
       - name: Tests JVM (:core + :app)
         if: steps.perimetre.outputs.code == '1'
         run: >-
-          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g"
+          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4
           :core:testDebugUnitTest :app:testDebugUnitTest
 
+      # Diagnostic des classes lentes (2026-10-30) : top 20 des suites JUnit
+      # déjà produites — guide la suite (la découpe :core/:app est inconnue
+      # à ce jour). ~1 s, aucune compilation, lecture seule des XML, et ce
+      # pas ne fait jamais échouer le job (tout échec de lecture est ignoré).
+      - name: Top 20 des classes de test lentes
+        if: steps.perimetre.outputs.code == '1'
+        run: |
+          python3 -c "
+          import glob, xml.etree.ElementTree as X
+          def secs(t):
+              try:
+                  return float(t.get('time') or 0)
+              except (TypeError, ValueError):
+                  return 0.0
+          rows = []
+          for f in glob.glob('*/build/test-results/testDebugUnitTest/*.xml'):
+              try:
+                  root = X.parse(f).getroot()
+              except X.ParseError:
+                  continue
+              for t in root.iter('testsuite'):
+                  rows.append((secs(t), t.get('name')))
+          for d, n in sorted(rows, reverse=True)[:20]:
+              print('%8.1fs  %s' % (d, n))"
+
+      # Chemins restreints à app/ et core/ (2026-10-30) : le glob `**/`
+      # scannait l'arbre entier pour un artefact qui ne matche que ces deux
+      # modules (les seuls du settings). Sauté sans code, gardé en échec
+      # Gradle (rapports partiels via `always()`).
       - name: Rapport de tests
-        if: always()
+        if: ${{ always() && steps.perimetre.outputs.code == '1' }}
         uses: actions/upload-artifact@v4
         with:
           name: rapports-tests
           path: |
-            **/build/reports/tests/**
+            app/build/reports/tests/**
+            core/build/reports/tests/**
           retention-days: 3
+          compression-level: 1
           if-no-files-found: ignore
 
   # ── 4. garde-fou de configuration (ex-workflow ci-budget.yml) ───────────────
