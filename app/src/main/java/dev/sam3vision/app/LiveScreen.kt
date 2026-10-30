@@ -387,14 +387,14 @@ private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21
         // NV21 direct (zéro bitmap par frame) **et** luminance du calque local :
         // le plan Y du NV21 est déjà tourné et réduit, donc c'est la même géométrie que
         // l'ancien bitmap `uprightScaled` — sans le payer.
-        val frame = encoder.encodeFrame(proxy, LIVE_EDGE, LIVE_JPEG_QUALITY)
+        val frame = encoder.encodeFrame(proxy, LIVE_EDGE, viewModel.adaptive.jpegQuality)
         if (frame != null) {
             viewModel.onFrame(frame.jpegBase64, proxy.imageInfo.timestamp, frame.luma)
         } else {
             // Repli (buffer non YUV 4:2:0) : la luminance vient du bitmap déjà tourné.
             val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, LIVE_EDGE)
             val luma = viewModel.local.lumaFor(upright)
-            viewModel.onFrame(bitmapToJpegBase64(upright, LIVE_JPEG_QUALITY), proxy.imageInfo.timestamp, luma)
+            viewModel.onFrame(bitmapToJpegBase64(upright, viewModel.adaptive.jpegQuality), proxy.imageInfo.timestamp, luma)
         }
     } catch (_: Throwable) {
         // frame illisible : la suivante part tout de suite
