@@ -20,6 +20,21 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (3 372 tests, 0 échec — dont `CrossingPeopleTest` 14/14) ;
   `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes, inchangé).
 
+## 2026-10-30 — traversée auto : la sortie compte des frames publiées (branche `feat/isee-traversee-auto`)
+
+- **Demande** : près d'un passage piéton le mode Traversée s'arme seul, et
+  retombe seul quand la caméra ne montre plus le passage — déjà livré sur
+  `master` (`ea519b8` : `observeCrossingAuto`/`observeCrossingLoss` + voix).
+  L'audit avant modif a trouvé un écart : l'état sonde ré-émet entre deux
+  frames (poste « pixel », `noteDrawn`), et le compteur de perte comptait
+  chaque émission — la sortie arrivait après ~2 frames analysées au lieu de 4.
+- Correctif : `crossingSightPerFrame` (une émission par `frames`) câblé sur
+  `observeCrossingLoss` (`IseeViewModel`, 1 ligne) ; sans lui le nouveau test
+  échoue (coupe dès la 2e frame + doublons).
+- Preuves : `CrossingAutoVoiceTest` 8/8, `CrossingWiringTest` 7/7
+  (`:app:testDebugUnitTest --offline`), `check-kotlin-limits` OK.
+- Fichiers : `CrossingWiring.kt`, `IseeViewModel.kt`, `CrossingAutoVoiceTest.kt`,
+  `docs/TRAVERSEE.md` (§ sortie), `CHANGELOG.md`.
 
 ## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)
 
