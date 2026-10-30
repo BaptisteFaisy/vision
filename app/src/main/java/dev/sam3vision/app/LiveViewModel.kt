@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.isee.pictosDir
 import dev.sam3vision.app.live.CenterTrails
+import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveAskSession
 import dev.sam3vision.app.live.LiveFrameDispatcher
 import dev.sam3vision.app.live.LiveFpsMeter
@@ -92,6 +93,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * Éteinte, la classe ci-dessus n'entre dans aucun chemin : le direct est celui d'avant.
      */
     private var prediction = LivePrediction(enabled = false)
+    /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, éteints par défaut. */
+    internal val adaptive = LiveAdaptive(baseQuality = LIVE_JPEG_QUALITY)
     private var sensorLens: LensSpec? = null
 
     private var settings: Settings = Settings.Default
@@ -110,6 +113,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         { _state.value.prompts },
         { jpeg, at -> chronology.beginFrame(at); keepFrame(jpeg) },
         { active, era, result -> handleResult(active, era, result) },
+        onSettled = { roundTripMs, result, base64Length -> adaptive.onSettled(roundTripMs, result, base64Length) },
     )
     val local = dev.sam3vision.app.live.LiveLocalOverlayWiring(_state, store) { settings.localOverlayEnabled }
 
@@ -248,6 +252,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         distances.enabled = settings.distanceOverlayEnabled
         distances.reset()
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
+        adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)
         distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
         wake.reset()
         dispatcher.reset()
@@ -308,7 +313,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (traverse.active) { traverse.offerLightFrame(jpegB64); _state.update { it.withCrossing(true, traverse.local ?: traverse.light) } }
-        dispatcher.onFrame(active, jpegB64, captureAtNs, System.currentTimeMillis())
+        if (!adaptive.admit()) { keepFrame(jpegB64); return }
+        if (!dispatcher.onFrame(active, jpegB64, captureAtNs, System.currentTimeMillis())) adaptive.onDropped()
     }
 
     /**
@@ -409,13 +415,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(prediction = layer) }
     }
 
-    /** Instantané de la chronologie dans l'état : l'UI ne lit jamais les marques. */
-    internal fun publishStages(frame: LiveFrame?) =
-        _state.update { it.copy(timings = chronology.snapshot(frame)) }
-
-    internal fun publishDrawnStages() =
-        _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
-
     /**
      * Calibrage des distances dès que la caméra est liée : le champ de vision réglé
      * à la main prime, sinon celui lu sur le capteur, sinon le grand-angle de repli.
@@ -478,6 +477,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { closing?.stop() }
         distances.reset()
         prediction.reset()
+        adaptive.reset()
         wake.reset()
         traverse.deactivate(positions::reset)
         voice.stop()
