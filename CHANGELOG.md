@@ -4,6 +4,21 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)
+
+- **Demande** : augmenter la sensibilité du vert, et répéter qu'il ne faut
+  pas traverser quand le feu est rouge.
+- Fait : `TrainedLightColor` tranche le vert dès 0,65 de pureté (rouge
+  inchangé à 0,80), avec garde-fou « pas de pixels verts, pas de verdict
+  vert » (le noir reste un doute) ; `CrossingAnnouncer` redit
+  « Rouge, attendez. » toutes les 2 s tant que le rouge dure (vert et doute :
+  une fois, puis silence ; répétition jamais urgente). Porte
+  anti-confusion et confirmation temporelle (4 frames vertes) inchangées.
+- Preuves : 5 tests JVM nets ajoutés (`TrainedLightColorTest`,
+  `PedLightGateTest`, `CrossingAnnouncerTest` — échec constaté avant, vert
+  après) ; suites complètes `:core` et `:app` vertes ;
+  `check-kotlin-limits.py` vert.
+
 ## 2026-10-30 — consigne de guidage toutes les 500 ms sur la vidéo (branche `feat/isee-instruction-500ms`)
 
 - **Demande** : une instruction à regarder — dois-je aller à droite ou à

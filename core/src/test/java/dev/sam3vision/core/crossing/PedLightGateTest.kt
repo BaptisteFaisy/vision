@@ -92,6 +92,11 @@ class PedLightGateTest {
     }
 
     @Test
+    fun `verdict - bonhomme vert sombre accepte`() {
+        assertEquals(CrossingState.Green, PedLightGate.verdict(barAt(4), 20, 20))
+    }
+
+    @Test
     fun `seuil fraction - 3px elances passent, 1px refuse`() {
         assertTrue(PedLightGate.acceptGreen(bar(1, 3), 20, 20))
         assertFalse(PedLightGate.acceptGreen(bar(1, 2), 20, 20))

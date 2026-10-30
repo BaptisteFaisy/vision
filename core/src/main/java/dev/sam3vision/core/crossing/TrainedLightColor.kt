@@ -7,14 +7,30 @@ package dev.sam3vision.core.crossing
  * depuis les crops (harnais d'évaluation), mêmes hyperparamètres
  * (profondeur 6, feuille min 20). Traits : [FEATURE_NAMES] dans l'ordre.
  *
- * Sous [MIN_PURITY] de majorité dans la feuille atteinte, la réponse est
+ * Sous le plancher de pureté de la feuille atteinte, la réponse est
  * [CrossingState.Unknown] : un doute vaut mieux qu'une couleur fragile.
- * Reste à valider sur feux français et boîtes SAM réelles (non mesuré).
+ * Le vert se tranche plus large ([GREEN_MIN_PURITY]) que le rouge
+ * ([MIN_PURITY]) — un vert raté fait attendre, mais un vert jamais détecté
+ * ne sert à rien — avec un garde-fou : sans pixels verts
+ * ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert (le noir reste
+ * un doute). Reste à valider sur feux français et boîtes SAM réelles
+ * (non mesuré).
  */
 object TrainedLightColor {
 
-    /** Pureté minimale de la feuille pour trancher (sinon doute). */
+    /** Pureté minimale de la feuille pour trancher rouge (sinon doute). */
     const val MIN_PURITY = 0.80f
+
+    /**
+     * Pureté minimale de la feuille pour trancher vert (30/10/2026, ordre
+     * user : sensibilité du vert augmentée). Plus bas que [MIN_PURITY] :
+     * les seules feuilles concernées sont celles entre les deux planchers
+     * (vert sombre, feuille 6) ; la porte anti-confusion tranche ensuite.
+     */
+    const val GREEN_MIN_PURITY = 0.65f
+
+    /** Indice du trait `green_frac` dans [FEATURE_NAMES] (plancher vert). */
+    private const val GREEN_FRAC_INDEX = 13
 
     private val FEATURE = intArrayOf(3, 8, 15, 15, 15, 16, -2, -2, -2, -2, 10, 15, -2, 15, -2, -2, -2, 15, 0, -2, -2, -2, 10, -2, -2)
     private val THRESHOLD = floatArrayOf(0.020556f, 0.000737f, 0.251779f, 0.235394f, 0.179629f, 0.285050f, -2.000000f, -2.000000f, -2.000000f, -2.000000f, 0.000336f, 0.302868f, -2.000000f, 0.557728f, -2.000000f, -2.000000f, -2.000000f, 0.483485f, 0.966917f, -2.000000f, -2.000000f, -2.000000f, 0.001128f, -2.000000f, -2.000000f)
@@ -37,7 +53,12 @@ object TrainedLightColor {
         while (LEFT[node] >= 0) {
             node = if (features[FEATURE[node]] <= THRESHOLD[node]) LEFT[node] else RIGHT[node]
         }
-        if (LEAF_PURITY[node] < MIN_PURITY) return CrossingState.Unknown
-        return if (LEAF_CLASS[node] == 0) CrossingState.Red else CrossingState.Green
+        val leafGreen = LEAF_CLASS[node] == 1
+        val floor = if (leafGreen) GREEN_MIN_PURITY else MIN_PURITY
+        if (LEAF_PURITY[node] < floor) return CrossingState.Unknown
+        if (leafGreen && features[GREEN_FRAC_INDEX] < PedLightGate.GREEN_MIN_FRACTION) {
+            return CrossingState.Unknown
+        }
+        return if (leafGreen) CrossingState.Green else CrossingState.Red
     }
 }
