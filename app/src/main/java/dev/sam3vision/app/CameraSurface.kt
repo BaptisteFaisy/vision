@@ -3,12 +3,14 @@ package dev.sam3vision.app
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.camera.view.PreviewView
 import androidx.compose.ui.graphics.toArgb
+import java.util.concurrent.Executors
 
 /**
  * Aperçu caméra **et** masques dans la même surface native.
@@ -24,11 +26,27 @@ import androidx.compose.ui.graphics.toArgb
  */
 class CameraSurface(context: Context, private val preview: PreviewView) : FrameLayout(context) {
 
+    companion object {
+        /** Fusions hors thread UI : un seul fil partagé, l'ordre des frames est gardé. */
+        private val mergeWorker = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "CameraSurface-merge").apply { isDaemon = true }
+        }
+    }
+
     private val maskView = ImageView(context).apply {
         scaleType = ImageView.ScaleType.CENTER_CROP
     }
 
     private var shown: List<Bitmap> = emptyList()
+
+    /**
+     * Fusion sans filtre bilinéaire : les masques sont dessinés 1:1 (même taille que la
+     * frame), le filtre ne changerait aucun pixel — il ne coûterait que du CPU.
+     */
+    private val mergePaint = Paint()
+
+    /** Tampon de fusion réutilisé : recréé seulement quand la taille de frame change. */
+    private var mergeBuffer: Bitmap? = null
 
     init {
         // Fond sombre : sans flux ni masque, aucun blanc système ne transparaît.
@@ -62,22 +80,38 @@ class CameraSurface(context: Context, private val preview: PreviewView) : FrameL
         addView(preview, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    /** Remplace les masques affichés ; sans changement de liste, rien n'est redessiné. */
+    /**
+     * Remplace les masques affichés ; sans changement de liste, rien n'est redessiné.
+     * La fusion (plusieurs masques) tourne hors thread UI, le résultat est posé au retour.
+     */
     fun setMasks(masks: List<Bitmap>) {
         if (masks == shown) return
-        android.util.Log.i("sam3vision", "masques affichés : ${masks.size} (${masks.firstOrNull()?.width}x${masks.firstOrNull()?.height})")
         shown = masks
-        maskView.setImageBitmap(merge(masks))
+        if (masks.size <= 1) {
+            maskView.setImageBitmap(masks.firstOrNull())
+            return
+        }
+        mergeWorker.execute {
+            val fused = merge(masks)
+            maskView.post { maskView.setImageBitmap(fused) }
+        }
     }
 
-    /** Fusionne les masques colorisés en une image ; `null` = rien à afficher. */
+    /**
+     * Fusionne les masques colorisés dans le tampon réutilisé ; `null` = rien à afficher.
+     * Un seul fil l'appelle : jamais deux fusions à la fois sur le tampon.
+     */
     private fun merge(masks: List<Bitmap>): Bitmap? {
         val first = masks.firstOrNull() ?: return null
         if (masks.size == 1) return first
-        val merged = Bitmap.createBitmap(first.width, first.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(merged)
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        masks.forEach { mask -> canvas.drawBitmap(mask, 0f, 0f, paint) }
-        return merged
+        var buffer = mergeBuffer
+        if (buffer == null || buffer.width != first.width || buffer.height != first.height) {
+            buffer = Bitmap.createBitmap(first.width, first.height, Bitmap.Config.ARGB_8888)
+            mergeBuffer = buffer
+        }
+        buffer.eraseColor(Color.TRANSPARENT)
+        val canvas = Canvas(buffer)
+        masks.forEach { mask -> canvas.drawBitmap(mask, 0f, 0f, mergePaint) }
+        return buffer
     }
 }
