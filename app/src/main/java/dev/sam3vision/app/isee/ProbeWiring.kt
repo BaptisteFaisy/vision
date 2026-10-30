@@ -317,7 +317,8 @@ internal fun LiveProbe.observeFenceOpening(
  * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
  * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
  * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. L'annonce est
- * douce (attend le silence) : en Traversée, le veto seul parle (coupé ici).
+ * douce (attend le silence) : en Traversée, coupé ici — les états moteurs se
+ * disent dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
  * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
  * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
  */
@@ -345,7 +346,8 @@ internal fun LiveProbe.observeVehicleState(
  * Guetteur cycles de la sonde, miroir des véhicules : vélos et trottinettes,
  * en mouvement ou arrêtés (« Attention, vélo en mouvement, à 2 heures. »),
  * lus dans l'état, sans toucher à `LiveProbe`. Doux et coupé en Traversée,
- * comme les véhicules (le veto seul parle). Lecture séquentielle, comme le
+ * (coupé en Traversée, sans voix douce : le veto seul couvre les cycles).
+ * Lecture séquentielle, comme le
  * trottoir : une alerte confirmée ne s'annule pas.
  */
 internal fun LiveProbe.observeCycles(
