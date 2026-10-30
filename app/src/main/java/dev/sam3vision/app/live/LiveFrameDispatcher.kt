@@ -37,10 +37,25 @@ class LiveFrameDispatcher(
     private val trackerCadence = LiveFrameCadence()
     private val reserved = FramePayload()
 
-    /** Nouvelle séance : échéances et réserve remises à zéro. */
-    fun reset() {
+    /** Bras B de la cadence tracker (continue au lieu d'adaptative), posé à chaque séance. */
+    var continuousCadence: Boolean
+        get() = trackerCadence.continuous
+        set(value) { trackerCadence.continuous = value }
+
+    /** Nouvelle séance : échéances et réserve remises à zéro, bras de cadence posé. */
+    fun reset(continuous: Boolean = false) {
         pump.reset()
         trackerCadence.reset()
+        trackerCadence.continuous = continuous
+    }
+
+    /**
+     * Faut-il encoder la frame qui arrive ? Même admission que [onFrame], en lecture
+     * seule (motif `IseeCameraPane`) : la pompe pour `/live`, la cadence pour le tracker.
+     */
+    fun wantsFrame(pipeline: FramePipeline?, nowMs: Long): Boolean {
+        val active = pipeline ?: return false
+        return if (active is LiveSession) pump.wantsFrame() else trackerCadence.wantsFrame(active, nowMs)
     }
 
     /**

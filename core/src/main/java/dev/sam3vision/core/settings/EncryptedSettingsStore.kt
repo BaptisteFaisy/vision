@@ -57,6 +57,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
+            continuousCadenceEnabled = prefs.getBoolean(KEY_CONTINUOUS_CADENCE, default.continuousCadenceEnabled),
             debugRouteMapEnabled = prefs.getBoolean(KEY_DEBUG_ROUTE_MAP, default.debugRouteMapEnabled),
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             outdoorMode = prefs.getBoolean(KEY_OUTDOOR_MODE, default.outdoorMode),
@@ -100,6 +101,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
+            .putBoolean(KEY_CONTINUOUS_CADENCE, s.continuousCadenceEnabled)
             .putBoolean(KEY_DEBUG_ROUTE_MAP, s.debugRouteMapEnabled)
             .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putBoolean(KEY_OUTDOOR_MODE, s.outdoorMode)
@@ -141,6 +143,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
+        const val KEY_CONTINUOUS_CADENCE = "continuous_cadence"
         const val KEY_DEBUG_ROUTE_MAP = "debug_route_map"
         const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_OUTDOOR_MODE = "outdoor_mode"

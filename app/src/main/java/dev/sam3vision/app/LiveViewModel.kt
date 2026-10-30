@@ -238,7 +238,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
         distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
         wake.reset()
-        dispatcher.reset()
+        dispatcher.reset(settings.continuousCadenceEnabled)
         fps.reset()
         lastKeepAt = 0L
         _state.update {
@@ -285,6 +285,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * pour les questions** — les questions marchent donc même quand SAM est injoignable.
      * Sinon elle part au GPU (elle réveille le conteneur) : `/live` continu, tracker adaptatif.
      */
+    fun wantsFrame(): Boolean = foregroundGate.foreground && (local.wantsLuma() || traverse.active || pipeline == null || dispatcher.wantsFrame(pipeline, System.currentTimeMillis())) // porte d'encodage, motif iSee : un consommateur veut-il la frame ?
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L, frameLuma: ByteArray? = null) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
         narration.narrate(jpegB64)

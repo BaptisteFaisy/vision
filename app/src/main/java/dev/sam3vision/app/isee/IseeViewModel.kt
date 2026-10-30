@@ -328,6 +328,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Les Réglages pilotent la sonde SAM (mode Traversée préservé) et la vitesse de lecture. */
     private fun syncProbe() {
         probe.setCrossingActive(settings, probe.state.value.crossingActive)
+        probe.cadence.continuous = settings.continuousCadenceEnabled
         player.speed = settings.ttsSpeed
     }
 
