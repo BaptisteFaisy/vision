@@ -50,14 +50,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   l'ouverture, y compris à l'intérieur. Ligne d'attente caméra supprimée :
   sans image la section se replie, l'image la rouvre ; seul un lien absent
   s'écrit.
-- Preuves : node 49/49 (`suivi-parent` + `suivi-relais`, dont 2 nouveaux),
+- Salle temps réel : un téléphone qui rejoignait une salle déjà regardée
+  n'apprenait jamais l'audience (avis émis seulement à l'arrivée d'un
+  aidant) et restait muet — le direct ne démarrait que si le téléphone
+  arrivait le premier. Trouvé en validant le déploiement (sonde locale
+  `wrangler dev` + 2 clients). Chaque arrivée republie l'audience.
+- Preuves : node 50/50 (`suivi-parent` + `suivi-relais`, dont 3 nouveaux),
   `:core` 1906/1911 (5 échecs préexistants `PrivateFileSettingsStoreTest`,
   POSIX sous Windows, hors zone), `:app` 1097/1097,
   `check-kotlin-limits` OK. `assembleDebug` : non rejoué.
 - Fichiers : `SharePayload.kt` (+test), `ShareBroadcaster.kt`,
   `SharePosition.kt`, `contrat.js` (+test), `worker.js` (doc),
-  `session.mjs` (+test, `anchorAfter`), `live.mjs`, `index.html`,
-  2 README, `TESTING.md` (compteur `share` recalé 24 → 31).
+  `durable.js` (+test), `session.mjs` (+test, `anchorAfter`), `live.mjs`,
+  `index.html`, 2 README, `TESTING.md` (compteur `share` recalé 24 → 31).
 
 ## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
 

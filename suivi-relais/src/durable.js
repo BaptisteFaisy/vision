@@ -34,7 +34,10 @@ export class RelayRoom {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server, [role]);
-    if (role === 'watch') this.notifyAudience();
+    // Chaque arrivée republie l'audience : un téléphone qui rejoint une salle
+    // déjà regardée doit le savoir tout de suite, sinon il reste muet en
+    // attendant un aidant déjà là.
+    this.notifyAudience();
     return new Response(null, { status: 101, webSocket: client });
   }
 
