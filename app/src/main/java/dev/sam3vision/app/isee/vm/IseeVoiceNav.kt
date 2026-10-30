@@ -11,6 +11,7 @@ import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
 import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.ValhallaRouteLoader
+import dev.sam3vision.app.voicenav.typedDestinationQuery
 import dev.sam3vision.app.voicenav.VoiceNavEngineDriver
 import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
@@ -87,6 +88,10 @@ class IseeVoiceNav(
     }
     private val driver: VoiceNavEngineDriver by driverLazy
 
+    /** Aperçu d'itinéraire de la confirmation (carte d'accueil), `null` hors confirmation. */
+    var confirmPreview: NavRoute? = null
+        private set
+
     /** Porte de la voix ambiante (annonces, voix du sol) : GPS désactivé = fermée. */
     val voiceGate = IseeVoiceGate()
 
@@ -96,6 +101,7 @@ class IseeVoiceNav(
             geocode = { address -> chain.geocode(address) },
             originNow = ::lastKnownOrigin,
             baseUrl = { settings().routeBaseUrl },
+            onPreview = { confirmPreview = it },
         )
         VoiceNavSession(
             launcher = AndroidNavigationLauncher(context),
@@ -130,6 +136,12 @@ class IseeVoiceNav(
         val outcome = runCatching { StopGuidanceParser.parse(text) }.getOrDefault(GuidanceOrder.NONE)
         if (outcome == GuidanceOrder.NONE) return false
         return session.onVoiceTranscript(text)
+    }
+
+    /** Saisie clavier : pseudo-dictée « aller à … » vers la session existante. */
+    fun submitTyped(text: String) {
+        val query = typedDestinationQuery(text) ?: return
+        scope.launch { session.onVoiceTranscript(query) }
     }
 
     /** L'utilisateur prend la parole : la voix du guidage en cours se tait. */

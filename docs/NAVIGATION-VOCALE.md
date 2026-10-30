@@ -62,10 +62,10 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
 Un « mode navigation » sans destination a existé (carte + position GPS à
 l'écran, ordres « navigation », « carte », « où suis-je ») : il affichait la
 carte **sans destination rentrée**, contrairement à l'ordre du 29/10. Retiré :
-la carte OSM n'apparaît que pendant le guidage, avec un tracé
-(`docs/CARTE-OSM.md`). « navigation », « carte », « où suis-je » ne sont plus
-des ordres de mode : sans destination reconnue, ils suivent le chemin normal
-(question → LLM).
+la carte OSM n'apparaît qu'avec un objectif de destination (confirmation,
+aperçu, ou guidage, suivi — `docs/CARTE-OSM.md`). « navigation », « carte »,
+« où suis-je » ne sont plus des ordres de mode : sans destination reconnue,
+ils suivent le chemin normal (question → LLM).
 
 ## 2. Politique d'annonces vocales (phrase exacte par événement)
 

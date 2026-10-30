@@ -37,20 +37,22 @@ import dev.sam3vision.core.nav.NavRoute
  *
  * Affichée par `IseeScenePane` quand la session est en
  * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
- * l'instruction reste).
+ * l'instruction reste). Le bouton d'arrêt publie sa zone ([navZone],
+ * exemption racine), sinon intouchable.
  */
 @Composable
 internal fun IseeGuidanceBlock(
     state: VoiceNavUiState.Guiding,
     snapshot: () -> Pair<NavRoute?, NavFix?>,
     onStop: () -> Unit,
+    zones: NavButtonZones,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OffRouteBanner(state.update.offRoute, Modifier.fillMaxWidth())
         GuidanceMapCard(snapshot, state.update, Modifier.fillMaxWidth().height(150.dp))
         GuidanceInstruction(state)
-        StopGuidanceButton(onStop, Modifier.fillMaxWidth())
+        StopGuidanceButton(onStop, zones, Modifier.fillMaxWidth())
     }
 }
 
@@ -85,10 +87,10 @@ private fun remainingLine(state: VoiceNavUiState.Guiding): String =
 
 /** Bouton d'arrêt : même rouge danger que l'écran de guidage historique. */
 @Composable
-private fun StopGuidanceButton(onStop: () -> Unit, modifier: Modifier = Modifier) {
+private fun StopGuidanceButton(onStop: () -> Unit, zones: NavButtonZones, modifier: Modifier = Modifier) {
     Button(
         onClick = onStop,
-        modifier = modifier.height(48.dp),
+        modifier = modifier.navZone(NAV_STOP_ID, zones).height(48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
     ) {
         Text("Arrêter le guidage", fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -96,8 +98,9 @@ private fun StopGuidanceButton(onStop: () -> Unit, modifier: Modifier = Modifier
 }
 
 /**
- * Sous la caméra : le guidage GPS s'il roule, sinon la boule et la phrase
- * ([orb]). Le choix vit ici (état de session observé) pour garder
+ * Sous la caméra : la navigation quand elle a un objectif (confirmation
+ * avec carte d'aperçu, ou guidage avec carte suivie), sinon la boule et la
+ * phrase ([orb]). Le choix vit ici (état de session observé) pour garder
  * `PortraitScene` sous le plafond de 50 lignes : l'appelant ne fait que
  * passer la hauteur de la rue ([pictureH]).
  */
@@ -109,16 +112,17 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
     orb: @Composable () -> Unit,
 ) {
     val navState by viewModel.voiceNavState.collectAsState()
-    val guiding = navState as? VoiceNavUiState.Guiding
-    if (guiding == null) {
-        orb()
-    } else {
-        val mapTop = if (open > 0.5f) pictureH + 8.dp else 96.dp
-        IseeGuidanceBlock(
-            guiding,
+    val mapTop = if (open > 0.5f) pictureH + 8.dp else 96.dp
+    val placed = Modifier.align(Alignment.TopCenter).padding(top = mapTop).padding(horizontal = 16.dp)
+    when (val nav = navState) {
+        is VoiceNavUiState.Guiding -> IseeGuidanceBlock(
+            nav,
             viewModel::debugNavSnapshot,
             viewModel::dismissVoiceNav,
-            Modifier.align(Alignment.TopCenter).padding(top = mapTop).padding(horizontal = 16.dp),
+            viewModel.navButtons,
+            placed,
         )
+        is VoiceNavUiState.Confirming -> IseeConfirmBlock(nav, viewModel, placed)
+        else -> orb()
     }
 }

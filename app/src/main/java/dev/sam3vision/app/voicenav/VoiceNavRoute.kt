@@ -18,9 +18,9 @@ import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Écran navigation de la pile : confirmation puis arrivée, piloté par
- * l'état ([VoiceNavUiState]). Le guidage vit sur l'accueil iSee (caméra +
- * carte dessous) ; sa branche n'est ici que transitoire.
+ * Écran navigation de la pile : arrivée seule, pilotée par l'état
+ * ([VoiceNavUiState]). La confirmation et le guidage vivent sur l'accueil
+ * iSee (caméra + carte dessous) ; leurs branches ne sont ici que transitoires.
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
  * - dictée sur place ([VoiceNavHoldButton], même moteur que l'accueil iSee) :
