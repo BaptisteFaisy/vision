@@ -56,6 +56,8 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             distanceOverlayEnabled = prefs.getBoolean(KEY_DISTANCE_OVERLAY, default.distanceOverlayEnabled),
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
+            adaptiveUploadEnabled = prefs.getBoolean(KEY_ADAPTIVE_UPLOAD, default.adaptiveUploadEnabled),
+            keyframeSchedulerEnabled = prefs.getBoolean(KEY_KEYFRAME_SCHEDULER, default.keyframeSchedulerEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
             debugRouteMapEnabled = prefs.getBoolean(KEY_DEBUG_ROUTE_MAP, default.debugRouteMapEnabled),
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
@@ -99,6 +101,8 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_DISTANCE_OVERLAY, s.distanceOverlayEnabled)
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
+            .putBoolean(KEY_ADAPTIVE_UPLOAD, s.adaptiveUploadEnabled)
+            .putBoolean(KEY_KEYFRAME_SCHEDULER, s.keyframeSchedulerEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
             .putBoolean(KEY_DEBUG_ROUTE_MAP, s.debugRouteMapEnabled)
             .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
@@ -140,6 +144,8 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_DISTANCE_OVERLAY = "distance_overlay"
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
+        const val KEY_ADAPTIVE_UPLOAD = "adaptive_upload"
+        const val KEY_KEYFRAME_SCHEDULER = "keyframe_scheduler"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
         const val KEY_DEBUG_ROUTE_MAP = "debug_route_map"
         const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"

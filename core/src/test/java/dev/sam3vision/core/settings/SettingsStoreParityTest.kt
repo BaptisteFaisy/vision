@@ -37,6 +37,8 @@ class SettingsStoreParityTest {
         distanceOverlayEnabled = false,
         liveSamEnabled = false,
         boxPredictionEnabled = true,
+        adaptiveUploadEnabled = true,
+        keyframeSchedulerEnabled = true,
         localOverlayEnabled = false,
         debugRouteMapEnabled = false,
         navigationGuidanceEnabled = false,
@@ -65,6 +67,8 @@ class SettingsStoreParityTest {
         assertEquals(false, relu.navigationGuidanceEnabled)
         assertEquals(false, relu.outdoorMode)
         assertEquals(true, relu.boxPredictionEnabled)
+        assertEquals(true, relu.adaptiveUploadEnabled)
+        assertEquals(true, relu.keyframeSchedulerEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.Fr, relu.speechLanguage)
         assertEquals("https://route.test", relu.routeBaseUrl)
