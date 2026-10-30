@@ -1,7 +1,5 @@
 package dev.sam3vision.core.live
 
-import dev.sam3vision.core.distance.KnownSizes
-
 /**
  * Consigne de décalage latéral : une personne proche qui s'approche par un
  * côté conseille de se décaler de l'autre ([side], direction où aller). Le
@@ -51,7 +49,7 @@ class LateralNudgeTracker {
 
     private fun side(atMs: Long, labels: List<PlacedLabel>, side: SteeringCap): LateralNudge? {
         val nearest = labels
-            .filter { isPerson(it.label) && inFront(it.centerX, side) }
+            .filter { PersonLabels.isPerson(it.label) && inFront(it.centerX, side) }
             .mapNotNull { it.meters?.takeIf { m -> m.isFinite() && m <= NUDGE_METERS } }
             .minOrNull()
         val track = tracks.getValue(side)
@@ -105,15 +103,5 @@ class LateralNudgeTracker {
 
         /** Sans observation au-delà, la piste est périmée (miroir véhicules). */
         const val STALE_MS = 1000L
-
-        private val PERSONS = setOf(
-            "person", "persons", "people", "pedestrian", "pedestrians",
-            "child", "children", "personne", "personnes", "humain", "humains",
-            "homme", "hommes", "femme", "femmes", "enfant", "enfants",
-            "pieton", "pietons",
-        )
-
-        private fun isPerson(label: String): Boolean =
-            KnownSizes.canonical(label) in PERSONS
     }
 }

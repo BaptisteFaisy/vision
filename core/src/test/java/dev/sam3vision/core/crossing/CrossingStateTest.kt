@@ -9,15 +9,18 @@ import org.junit.Test
 class CrossingStateTest {
 
     @Test
-    fun `deux prompts exactement, plafond client respecte`() {
-        assertEquals(2, CrossingPrompts.PROMPTS.size)
+    fun `quatre prompts exactement, plafond client respecte`() {
+        assertEquals(4, CrossingPrompts.PROMPTS.size)
         assertTrue(CrossingPrompts.PROMPTS.size <= LivePrompts.MAX)
         assertEquals(CrossingPrompts.PROMPTS, LivePrompts.normalize(CrossingPrompts.PROMPTS))
     }
 
     @Test
-    fun `les prompts suivent le feu et les voitures`() {
-        assertEquals(listOf("traffic light", "car"), CrossingPrompts.PROMPTS)
+    fun `les prompts suivent le feu les voitures les personnes et le passage`() {
+        assertEquals(
+            listOf("traffic light", "car", "person", "crosswalk"),
+            CrossingPrompts.PROMPTS,
+        )
     }
 
     @Test
