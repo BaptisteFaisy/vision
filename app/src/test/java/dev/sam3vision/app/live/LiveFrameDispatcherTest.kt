@@ -195,4 +195,46 @@ class LiveFrameDispatcherTest {
         advanceUntilIdle()
         assertEquals(listOf("f1", "f2"), sent)
     }
+
+    @Test
+    fun `wantsFrame live suit la pompe sans effet de bord`() = runTest {
+        val sent = mutableListOf<String>()
+        val probe = Probe()
+        val now = 1_000L
+        val active = LiveSession(immediateClient(sent), clock = { 0L })
+        val dispatcher = dispatcher({ active }, sent, probe, { now }, this)
+
+        assertTrue(dispatcher.wantsFrame(active, now))
+        assertTrue("lecture seule : l'envoi passe encore", dispatcher.onFrame(active, "f1", 1L, now))
+        advanceUntilIdle()
+        assertFalse("échéance posée : la caméra économise l'encodage", dispatcher.wantsFrame(active, now))
+        assertFalse(dispatcher.wantsFrame(null, now))
+    }
+
+    @Test
+    fun `wantsFrame tracker suit la cadence sans l avancer`() = runTest {
+        val sent = mutableListOf<String>()
+        val probe = Probe()
+        val tracker = FakeTracker(intervalMs = 400L)
+        val dispatcher = dispatcher({ null }, sent, probe, { 1_000L }, this)
+
+        assertTrue(dispatcher.wantsFrame(tracker, 1_000L))
+        assertTrue(dispatcher.onFrame(tracker, "t1", 1L, 1_000L))
+        advanceUntilIdle()
+        assertFalse(dispatcher.wantsFrame(tracker, 1_399L))
+        assertTrue(dispatcher.wantsFrame(tracker, 1_400L))
+    }
+
+    @Test
+    fun `reset pose le bras de cadence tracker`() = runTest {
+        val sent = mutableListOf<String>()
+        val probe = Probe()
+        val dispatcher = dispatcher({ null }, sent, probe, { 1_000L }, this)
+
+        assertFalse("défaut : adaptatif", dispatcher.continuousCadence)
+        dispatcher.reset(continuous = true)
+        assertTrue(dispatcher.continuousCadence)
+        dispatcher.reset()
+        assertFalse(dispatcher.continuousCadence)
+    }
 }

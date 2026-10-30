@@ -357,9 +357,11 @@ private suspend fun bindLiveCamera(
     val analysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setResolutionSelector(
+            // Repli « plus proche en dessous » comme iSee : un capteur qui dépasse 512 px
+            // forçait une réduction coûteuse, en dessous l'encodeur rend le buffer tel quel.
             ResolutionSelector.Builder()
                 .setResolutionStrategy(
-                    ResolutionStrategy(Size(LIVE_EDGE, LIVE_EDGE), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER),
+                    ResolutionStrategy(Size(LIVE_EDGE, LIVE_EDGE), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER),
                 )
                 .build(),
         )
@@ -379,6 +381,9 @@ private suspend fun bindLiveCamera(
  */
 private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21JpegEncoder) {
     try {
+        // Porte d'encodage (motif `IseeCameraPane`) : aucun consommateur (réseau, calque,
+        // traversée, questions) ne veut la frame — on économise le JPEG (le `finally` ferme).
+        if (!viewModel.wantsFrame()) return
         // NV21 direct (zéro bitmap par frame) **et** luminance du calque local :
         // le plan Y du NV21 est déjà tourné et réduit, donc c'est la même géométrie que
         // l'ancien bitmap `uprightScaled` — sans le payer.

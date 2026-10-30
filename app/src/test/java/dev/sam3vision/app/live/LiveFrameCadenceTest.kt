@@ -82,4 +82,63 @@ class LiveFrameCadenceTest {
             active.intervalMsAdaptive(),
         )
     }
+
+    @Test
+    fun `wantsFrame est admits sans effet de bord`() {
+        val active = session()
+        val interval = active.intervalMsAdaptive()
+        val cadence = LiveFrameCadence()
+        assertTrue(cadence.wantsFrame(active, 1_000L))
+        assertTrue("lecture seule : l'échéance n'a pas bougé", cadence.admits(active, 1_000L))
+        assertFalse(cadence.wantsFrame(active, 1_000L + interval - 1))
+        assertTrue(cadence.wantsFrame(active, 1_000L + interval))
+        assertFalse("sans pipeline : rien à encoder", cadence.wantsFrame(null, 1_000L))
+    }
+
+    @Test
+    fun `wantsFrame refuse pendant le vol`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val blocking = object : LiveClient {
+            override suspend fun live(jpegB64: String, prompts: List<String>?, workEdge: Int, maxObjects: Int) =
+                run { gate.await(); Result.success(LiveFrame(100, 100, 10L, emptyList())) }
+
+            override suspend fun health(): Result<LiveHealth> = error("inutilisé")
+        }
+        val active = LiveSession(blocking, clock = { 0L })
+        val job = launch { active.runFrame("jpeg") }
+        advanceUntilIdle()
+        assertTrue("la requête doit être en vol", active.inFlight)
+        assertFalse(LiveFrameCadence().wantsFrame(active, 5_000L))
+        gate.complete(Unit)
+        advanceUntilIdle()
+        job.join()
+    }
+
+    @Test
+    fun `bras continu suit la cadence continue sur LiveSession`() {
+        val active = session()
+        active.stats.record(400L)
+        val cadence = LiveFrameCadence().apply { continuous = true }
+        val step = active.intervalMsContinuous()
+        assertEquals("latence 400 ms : moitié", 200L, step)
+        assertTrue(cadence.admits(active, 1_000L))
+        assertFalse(cadence.admits(active, 1_000L + step - 1))
+        assertTrue(cadence.admits(active, 1_000L + step))
+    }
+
+    @Test
+    fun `bras continu replie sur l adaptatif hors LiveSession`() {
+        val tracker = object : dev.sam3vision.core.live.FramePipeline {
+            override val inFlight: Boolean = false
+            override fun intervalMsAdaptive(): Long = 400L
+            override val generation: Long = 0L
+            override fun isCurrent(era: Long): Boolean = true
+            override val stats: dev.sam3vision.core.live.LiveStats = dev.sam3vision.core.live.LiveStats()
+            override fun reset() {}
+        }
+        val cadence = LiveFrameCadence().apply { continuous = true }
+        assertTrue(cadence.admits(tracker, 1_000L))
+        assertFalse("pas de continue hors session : palier adaptatif", cadence.admits(tracker, 1_399L))
+        assertTrue(cadence.admits(tracker, 1_400L))
+    }
 }
