@@ -17,9 +17,11 @@ import java.text.Normalizer
  * hauteur typique n'est défendable, et la marche de 0,17 m ne vaut que pour
  * une marche isolée, jamais produite par ce concept. Même traitement pour
  * « sidewalk » et « crosswalk » (plans au sol, pas de hauteur) et « pole »
- * (de la borne de 1 m au pylône de 10 m selon le mobilier). La distance de
- * ces défauts vient de la branche profondeur (`DepthReadings`) ou du plan
- * de sol, jamais du sténopé (voir [DEPTH_ONLY] et `StairConcepts`).
+ * (de la borne de 1 m au pylône de 10 m selon le mobilier). Même traitement
+ * pour « curb » (bordure de 10-15 cm vue sous tous les angles : aucune
+ * hauteur typique projetable, le `CurbWatcher` lit la profondeur). La
+ * distance de ces défauts vient de la branche profondeur (`DepthReadings`)
+ * ou du plan de sol, jamais du sténopé (voir [DEPTH_ONLY] et `StairConcepts`).
  */
 object KnownSizes {
 
@@ -95,7 +97,7 @@ object KnownSizes {
      * leur distance vient de la profondeur ou du plan de sol. Clés canoniques
      * anglaises (voir [canonical]).
      */
-    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole", "traffic light")
+    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole", "traffic light", "curb")
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
     private val FIRST_WORD: Map<String, Float> = TABLE

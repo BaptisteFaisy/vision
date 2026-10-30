@@ -101,11 +101,12 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   only the current sentence below the bubble. Tap = video, long-press = speak; the
   whole surface is the interface (`app/src/main/java/dev/sam3vision/app/isee/`,
   `docs/ISEE-DESIGN-PORTRAIT.md`).
-- **Live** — **12 tracked concepts** by default (`person`, `car`, `bicycle`,
-  `electric scooter`, `pole`, `sidewalk`, `crosswalk`, `wall`, `window`, `stairs`,
-  `door`, `barrier`), **16 at most** (`LivePrompts.MAX`), one frame in flight over
-  WebSocket `/live/ws`, pills, distances, and voice announcements
-  (`docs/LIVE-SPEC.md`).
+- **Live** — **16 tracked concepts** by default (`person`, `car`, `bus`, `truck`,
+  `motorcycle`, `bicycle`, `electric scooter`, `traffic light`, `curb`, `sidewalk`,
+  `crosswalk`, `pole`, `stairs`, `barrier`, `fence`, `gate`), **16 at most**
+  (`LivePrompts.MAX`), one frame in flight over WebSocket `/live/ws`, pills,
+  distances, and voice announcements (`docs/LIVE-SPEC.md`). The crossing mode
+  tracks the same list (same masks, crossing voice instead of guidance).
 - **Photo → description → questions** — the legacy screens stay reachable from
   Settings → **"Other screens"**: Direct mode (continuous video) and Classic home
   (photo → analysis → chat) (`app/SettingsClassicScreens.kt`).
