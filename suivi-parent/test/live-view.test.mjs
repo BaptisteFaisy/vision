@@ -23,6 +23,11 @@ test('caméra éteinte : la page n’affiche ni image conservée ni image ancien
   assert.equal(frameOf({ photo }, 'live', now + PHOTO_FRESH_MS + 1), null);
 });
 
+test('caméra éteinte annoncée : même une frame fraîche ne s’affiche plus', () => {
+  assert.equal(frameOf({ photo }, 'live', now, true), null);
+  assert.equal(frameOf({ photo }, 'live', now, false).src, 'data:image/jpeg;base64,AAAA');
+});
+
 test('les repères s’affichent en dessins, data URL comprise', () => {
   const items = pictosOf({ pictos }, 'live', now);
   assert.equal(items.length, 1);

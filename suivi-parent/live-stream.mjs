@@ -20,6 +20,25 @@ export function streamUrl(href) {
   return `${scheme}//${page.host}/ws?share=${encodeURIComponent(share)}&role=watch`;
 }
 
+/**
+ * État caméra porté par un message texte de la salle, `null` si ce n'en est
+ * pas un. Même contrat que `room.js` côté relais : les deux côtés lisent
+ * `{"type":"camera","on":…}` avec un booléen strict, le reste est ignoré.
+ */
+export function cameraOnOf(data) {
+  if (typeof data !== 'string') return null;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!parsed || parsed.type !== 'camera') return null;
+  if (parsed.on === true) return true;
+  if (parsed.on === false) return false;
+  return null;
+}
+
 /** Blob URL d'une frame reçue, `null` si ce n'est pas une image exploitable. */
 export function frameSrcOf(data, create = (blob) => URL.createObjectURL(blob)) {
   if (!data || typeof data.byteLength !== 'number' || data.byteLength === 0) return null;
@@ -29,7 +48,9 @@ export function frameSrcOf(data, create = (blob) => URL.createObjectURL(blob)) {
 /**
  * Ouvre (et rouvre) le flux. `onFrame(src)` reçoit un blob URL par image, et
  * l'ancien est révoqué au tour suivant ; `onState('live' | 'idle')` prévient la
- * page. `onFrame` n'est jamais appelé avec `null`.
+ * page. `onFrame` n'est jamais appelé avec `null`. `onCamera(true | false)`
+ * prévient quand la caméra du proche s'allume ou s'éteint : la page efface
+ * l'image tout de suite, sans attendre que la dernière frame périme.
  *
  * `open` est injectable pour que la logique se teste sans navigateur.
  */
@@ -37,6 +58,7 @@ export function watchStream({
   href,
   onFrame,
   onState = () => {},
+  onCamera = () => {},
   open = (url) => new WebSocket(url),
   create = (blob) => URL.createObjectURL(blob),
   revoke = (src) => URL.revokeObjectURL(src),
@@ -62,7 +84,11 @@ export function watchStream({
     socket.binaryType = 'arraybuffer';
     socket.onopen = () => { attempt = 0; onState('live'); };
     socket.onmessage = (event) => {
-      if (typeof event.data === 'string') return;
+      if (typeof event.data === 'string') {
+        const on = cameraOnOf(event.data);
+        if (on !== null) onCamera(on);
+        return;
+      }
       const src = frameSrcOf(event.data, create);
       if (!src) return;
       const stale = previous;

@@ -3,6 +3,40 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+
+## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
+
+- **Demande** : sur la page caregiver, cesser instantanément d'afficher la caméra
+  quand elle n'est plus active côté blind (le téléphone dont le lien a été partagé).
+- Cause : la page ne connaissait la coupure que par la fraîcheur des images —
+  1,5 s pour le direct, puis la photo lente encore « fraîche » jusqu'à 8 s
+  (re-tamponnée à l'envoi jusqu'à 6 s après la capture) : l'image figée pouvait
+  rester ~14 s après l'extinction. Le départ du téléphone n'envoyait aucun avis
+  aux aidants, et l'écran éteint laissait même le tuyau `push` ouvert (la pompe
+  annulée ne fermait pas le socket).
+- Avis `{"type":"camera","on":…}` de bout en bout : la salle l'émet quand le
+  dernier téléphone s'en va (fermeture, crash, réseau), le transmet depuis le
+  téléphone (caméra fermée, tuyau encore ouvert), et dit `on:false` à tout
+  aidant qui arrive sans téléphone — jamais `on:true` sans preuve (présence ≠
+  caméra). Le téléphone annonce à chaque changement, republie à chaque avis
+  d'audience (un arrivant l'apprend en ~166 ms), dit `false` avant de
+  raccrocher, et ferme vraiment son tuyau à l'arrêt (écran éteint compris).
+  La page efface direct + photo lente dès `on:false`, ignore les doublons,
+  et repart sur `on:true` ou la frame suivante. Compatible des deux côtés :
+  sans salle ni avis, la fraîcheur décide comme avant ; seul un `push` parle
+  au nom de la caméra.
+- Preuves : node 62/62 (`suivi-parent` + `suivi-relais`, dont 12 nouveaux),
+  `:core` 1935/1940 (5 échecs préexistants `PrivateFileSettingsStoreTest`,
+  POSIX sous Windows, hors zone), `:app` 1122/1122,
+  `check-kotlin-limits` OK. `assembleDebug` : voir APK ci-dessous.
+- Fichiers : `room.js` + `durable.js` (+tests), `live-stream.mjs` (+tests),
+  `live-view.mjs` (+test), `live.mjs`, `ShareStream.kt` (+test),
+  `ShareStreamer.kt`, 2 README.
+- Déploiement en deux temps : la page embarquée part avec l'APK (tâche
+  `caregiverAssets`), mais la salle ne prévient qu'après
+  `npx wrangler deploy` depuis `suivi-relais/` (connexion wrangler requise ;
+  sans redéploiement, aucun avis n'est émis et le repli fraîcheur s'applique).
+
 ## 2026-10-30 — passage SAM + battement 300 ms (branche `feat/sam-passage-heartbeat`)
 
 - **Demande** (user) : distances aux humains calculées sur le téléphone,
@@ -32,6 +66,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   fichiers) ; JVM (`:core` + `:app`, 12 `@Test` neufs :
   `GuidanceHeartbeatTest` 6, fusion annonceur 4, contrat passage 2) : non
   rejoués ici (ni JDK ni SDK Android sur ce poste), verdict CI.
+
 ## 2026-10-29 — suivi caregiver : la caméra du proche s'affiche sans GPS (branche `fix/caregiver-camera-sans-gps`)
 
 - **Demande** : quand le proche partage son lien et allume sa caméra iSee,
@@ -119,6 +154,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `isFrankTurn`), `VoiceNavSpeaker.kt` + `VoiceNavEngineDriver.kt` +
   `VoiceNavEngine.kt` (KDoc), 3 tests MAJ (+7 tests), `NAVIGATION.md`,
   `GPS-FUSION.md`, `TESTING.md` (speech 76→83).
+
 ## 2026-10-29 — serveur : plafond /live et /segment à 32 objets
 
 - **Demandé** : rendre effectif le max client à 32 (demande user du 29/10) — le serveur
@@ -193,6 +229,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `GlassesLinkGate.kt` (nouveau), `GlassesController.kt`, `GlassesPolicy.kt`,
   `bench/GlassesSessionPolicy.kt`, `bench/GlassesRegistrationPhase.kt`,
   `GlassesMessagesTest.kt`, `bench/LinkGateTest.kt`, `docs/META-GLASSES.md`.
+
 ## 2026-10-29 — voix : le trottoir SAM est nommé (« Trottoir à gauche. »)
 
 - **Demande** : le téléphone reconnaît les trottoirs (SAM) et le dit — le
@@ -291,6 +328,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (`deploy.json` porte le binding `RELAY_ROOM` et la migration `v1-relay-room` ;
   le token wrangler local est expiré, donc **déploiement non fait**), puis un APK
   neuf. Rien ne change tant que ce n'est pas déployé : la page garde la photo lente.
+
 ## 2026-10-29 — fix(endpoints) : refus actionnable uniforme, seed SAM/route/dictée réparé
 
 - **Demande** : même traitement qu'au LLM pour les autres clients — le jargon
@@ -307,6 +345,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   nouveaux — vus rouges avant le fix), `check-kotlin-limits` OK.
 - Fichiers : `Http.kt`, 8 clients, `SettingsSeed.kt`, `HttpRequestsTest.kt`,
   `SettingsSeedTest.kt`, `CLES-DU-BUILD.md`.
+
 ## 2026-10-29 — suivi caregiver : le relais par défaut est le Worker, plus l'hôte tombé
 
 - **Panne constatée** : `DEFAULT_PARENT_SITE_URL` pointait sur
@@ -328,6 +367,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK.
 - Fichiers : `Settings.kt`, `CaregiverPage.kt`, `CaregiverPageTest.kt`,
   `suivi-relais/README.md`.
+
 ## 2026-10-29 — fix(iSee) : « Question failed: Expected URL scheme… » réparé sans ressaisie
 
 - **Demande** : le user voit `Question failed: Expected URL scheme 'http' or 'https'
@@ -368,6 +408,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `TwinLiteWord.kt`, `GuidanceAnnouncer.kt`, `GuidanceWord.kt`
   (`isStopPhrase`), `ProbeWiring.kt`, `IseeViewModel.kt` (commentaire),
   8 tests, 3 docs (+8 MP3, +12 tests).
+
 ## 2026-10-29 — ménage (2) : l'app Expo sort de l'arbre, la table de permissions morte aussi
 
 - **Demande** : « vire les 2 » — l'app Expo archivée et la table de décision des permissions
@@ -423,6 +464,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `+GuidanceObstaclesTest.kt` (213 lignes), `GUIDAGE-TOUT-DROIT.md`,
   `TESTING.md`, `CHANGELOG.md`. Périmètre voix tenu à l'écart
   (`GuidanceAnnouncer.kt`, TwinLite, `IseeViewModel` : lus, non modifiés).
+
 ## 2026-10-29 — GPS + obstacles : heures du cadran, une voix, recalcul temps réel (ordre user)
 
 - **Demande** : les infos précisent les heures (cadran des aveugles) ; GPS
@@ -512,6 +554,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   isee/IseePortraitOrb.kt,isee/ProbeFrame.kt,perms/PermGate.kt}`,
   `core/.../{mask/MaskCore.kt,net/Json.kt,segment/Segmenter.kt}`,
   `suivi-parent/{live.mjs,session.mjs,test/session.test.mjs}`.
+
 ## 2026-10-29 — voix : le guidage dit quatre mots en moins de 100 ms (ordre user)
 
 - **Demande** : pas assez d'infos/seconde (5 minimum) — dire juste
@@ -557,6 +600,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProbeVoice.kt`, `LiveProbe.kt`, `ProbeWiring.kt`, `IseeViewModel.kt`,
   `AppNav.kt`, `Settings*.kt`, `UiLogicTest.kt` (+35 fichiers supprimés).
 - Recette téléphone (Direct, obstacle réel, logcat sans `twinlite`) après merge.
+
 ## 2026-10-29 — Mode navigation : la carte passe sous la caméra (ordre user)
 
 - **Demande** : « la map navigation doit être sous la caméra et disparaître
@@ -649,6 +693,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   et manifeste compilés, 52 s). Rendu sur téléphone non vérifié ici : aucun APK
   de ce commit n'a été construit ni installé.
 - Fichiers : `app/src/main/res/values/colors.xml`, `themes.xml`.
+
 ## 2026-10-29 — voix : le contournement chiffré remplace le « Stop. » (ordre user)
 
 - **Demande** : devant un obstacle, même au contact, iSee dit où passer
@@ -667,6 +712,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fichiers : `Guidance.kt`, `PositionText.kt`, `FrameRoster.kt`,
   `ProximityVoice.kt`, `ProbeWiring.kt`, `LiveProbe.kt`, `LiveProbeState.kt`,
   `Settings.kt` (+5 tests).
+
 ## 2026-10-29 — Trottoir annoncé à 3 m ou moins (ordre user)
 
 - 1 m = une seconde pour réagir à pied : `CURB_METERS` 1 → 3 m. La bande
@@ -699,6 +745,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   dans les deux autres.
 - Fichiers : `suivi-parent/live-view.mjs`, `live.mjs`, `styles.css`, `README.md`
   (+ `test/live-view.test.mjs`).
+
 ## 2026-10-29 — Trottoir : marcher dessus n'annonce plus « levez la jambe » (ordre user)
 
 - `sidewalk` segmente le plan entier : marcher SUR le trottoir remplissait la
@@ -712,6 +759,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   seuils), `:core` + `:app` verts, `assembleDebug` vert, `check-kotlin-limits`
   OK. Rouge-avant-vérifié (2 échecs voulus).
 - Fichiers : `CurbWatcher.kt` (+ test).
+
 ## 2026-10-29 — iSee : irisation bleu et jaune, très légère, sur le haut du verre
 
 - **Cause** : le verre lisait une seule teinte de la palette (`pal(0.45)`) puis la
@@ -753,6 +801,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` OK. Doc `VOIX-DANGER.md` § 8.
 - Fichiers : `ProbeWiring.kt`, `TwinLiteWiring.kt`, `IseeTwinLite.kt`,
   `IseeViewModel.kt`, `CurbWatcher.kt`, `StairWatcher.kt` (+2 tests).
+
 ## 2026-10-29 — Traversée : la voix annonce le passage piéton reconnu
 
 - La proposition de mode traversée était **visuelle seulement** (pastille ambre) :
@@ -882,6 +931,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Limite dite tout haut** : plus frais n'est pas plus juste. La mesure du
   jour donne 1 vert accepté sur 6 (`docs/MESURES-SAM3-FEUX.md` §6) — c'est ce
   chiffre-là qu'il faut bouger ensuite, pas la cadence.
+
 ## 2026-10-29 — proche : la navigation publie position + trajet au relais
 
 - **Cause (ordre user)** : le trajet ne partait que depuis l'accueil iSee —
@@ -896,6 +946,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   relais (barre du proche en guidage) après merge, avec une vraie session.
 
 ## 2026-10-29 — Traversée : l'état du feu s'affiche sur la vidéo, à côté des masques
+
 ## 2026-10-29 — lunettes : le fichier garde le cadre des lunettes (plus de quart de tour)
 
 - **Objectif** : la vidéo de démonstration ne doit pas montrer une scène couchée.
@@ -1019,6 +1070,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `:core` 1 789 tests + `:app` 995 tests, 0 échec ; `check-kotlin-limits` OK.
 
 ## 2026-10-29 — iSee : la voix dit les obstacles proches, même non mesurés
+
 ## 2026-10-29 — iSee : guidage TwinLiteNet sur la caméra (flèche + voix) ; la voix dit les obstacles proches, même non mesurés ; suivi : le lien se lit dans les Réglages, un lien mort se dit ; voix : fin du guidage surprise, confirmation obligatoire ; direct : portes et barrières reconnues en extérieur (ordre user)
 
 - **Cause** : le user marche avec l'app, elle ne dit plus les obstacles même en
@@ -1131,6 +1183,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Preuves : `:app` `testDebugUnitTest` vert sur r630 (8/8 `TwinLiteWiringTest`
   inchangés — voix `null` en test), `assembleDebug` vert, `check-kotlin-limits`
   OK ; recette flèche + `dit` dues sur master après merge.
+
 ## 2026-10-29 — caregiver : bulle Cacao & caramel
 
 - Palette de la bulle caregiver : `BLUE_GREEN` est remplacé par `CACAO_CARAMEL`
@@ -1162,6 +1215,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   iSee) : cacao 506 → **0** pixel hors palette brun-caramel (8-55°), Portrait
   316 → **0** pixel vert ou magenta. Ancien shader mesuré à l'identique pour
   comparaison.
+
 ## 2026-10-29 — lunettes : la voix de la production sort dans la paire
 
 - **Cause** : le banc savait router la voix vers les lunettes (A2DP constaté sur
@@ -1353,6 +1407,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   sans clé 200, clé étrangère 403, flux inconnu `live:false`.
 - Limite connue : le relais ne sert pas la page HTML, donc un lien ouvert dans un
   navigateur ne montre pas la carte (l'app, elle, l'affiche).
+
 ## 2026-10-28 — direct : escaliers câblés à la ligne d'état + façade sol (ordre user)
 
 - `StairsFeed` (`core/.../stairs/`, pur JVM) : luma 256×103 → `StairDetector` +
@@ -1500,6 +1555,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Gardes rejouées : kotlin-limits, isee-design, budget-derive, voice-nav-doc, ci-budget
   (8 workflows), budget_latence (6 + 14/14), test_scripts (117), goldens (11/11), node
   suivi (10/10), unittest outils (58) — tout vert, aucun `gradlew` lancé.
+
 ## 2026-10-28 — gpu : l'app détecte quand la carte est branchée
 
 - `GpuMonitor` (`core/net/GpuMonitor.kt`, testé) : présence observée (`Unknown` /
@@ -2180,6 +2236,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   tous deux hors dépôt).
 - **Précision de la mesure** : toujours **non mesurée** (voir `docs/DISTANCES.md`) — ce changement ne
   touche que l'affichage.
+
 ## 2026-10-26 (22) — les clés sont dans l'APK, personne n'a rien à saisir
 
 - **Demande user** : « mets de base les clés dans l'app, qu'une autre personne n'ait pas
