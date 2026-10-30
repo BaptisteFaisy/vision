@@ -4,6 +4,21 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-30 — traversée : se décaler à l'opposé des gens, comme en normal (branche `traverse-nudge-people`)
+
+- **Demande** : comme en mode normal, dire d'aller vers la décision opposée
+  là où il y a des gens.
+- Fait : `CrossingPeopleWatch` nourrit le même `LateralNudgeTracker` que le
+  guidage normal — gens proches qui s'approchent à gauche → « Droite. » (mot
+  nouveau seul, clip < 100 ms), qui prime sur les positions comme en normal ;
+  nouveau fichier `CrossingPeopleVoice.kt` (`CrossingWiring.kt` allégé en
+  retour), sonde inchangée à une ligne près (`crossingPhraseOf`). Sécurité :
+  un ordre du feu nouveau fait taire la voix douce 2,5 s (`CUE_QUIET_MS`, les
+  répétitions du rouge ne réarment pas) — sans ce silence, le `collectLatest`
+  jetterait un « Vert, traversez. » dit une seule fois.
+- Preuves : à compléter (run r630 + CI).
+
+
 ## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)
 
 - **Demande** : augmenter la sensibilité du vert, et répéter qu'il ne faut

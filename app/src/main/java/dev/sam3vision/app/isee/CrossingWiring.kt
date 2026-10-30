@@ -20,9 +20,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
-import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.PlacedLabel
-import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.toDetections
@@ -269,29 +267,6 @@ internal fun observeCrossingLoss(
             }
         }
     }
-}
-
-/**
- * Voix des personnes en mode Traversée, une par processus (même garde des
- * 500 lignes que [CrossingOfferWatch]) : le feu parle en premier (l'appelant
- * ne consulte ici que sur son silence), les personnes ensuite — positions au
- * cadran (« Personne à 9 heures, à 2 mètres »), débouncées comme toute
- * annonce ([PositionAnnouncer]).
- */
-internal object CrossingPeopleWatch {
-
-    private val announcer = PositionAnnouncer()
-
-    /**
-     * Phrase des personnes de la frame, `null` = silence (aucune personne ou
-     * scène déjà dite). Seules les personnes parlent ici : les voitures ont
-     * déjà le veto, le feu a déjà sa phrase.
-     */
-    fun update(placed: List<PlacedLabel>, atMs: Long, language: SpeechLanguage): String? =
-        announcer.onFrame(atMs, placed.filter { PersonLabels.isPerson(it.label) }, language)
-
-    /** Mode coupé : la prochaine traversée ré-annonce sa scène. */
-    fun reset() = announcer.reset()
 }
 
 /**
