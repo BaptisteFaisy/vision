@@ -6,7 +6,10 @@ import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionText
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -24,12 +27,21 @@ internal class ProbePulse(
 ) {
     private val heartbeat = GuidanceHeartbeat()
     private var job: Job? = null
+    private var link: DisposableHandle? = null
     private var heard = false
 
-    /** Démarre le battement (idempotent : un seul ticker à la fois). */
+    /**
+     * Démarre le battement (idempotent : un seul ticker à la fois). Le ticker
+     * est détaché du scope reçu (travail + dispatcher propres) : une boucle
+     * infinie enfant bloquerait `runTest` (il attend les enfants, et
+     * `advanceUntilIdle` ne finit jamais) ; le lien ci-dessous garde le
+     * cycle de vie (mort du scope ⇒ arrêt, comme un enfant).
+     */
     fun start() {
         if (job?.isActive == true) return
-        job = scope.launch {
+        link?.dispose()
+        link = scope.coroutineContext[Job]?.invokeOnCompletion { stop() }
+        job = CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             while (isActive) {
                 delay(GuidanceHeartbeat.TICK_MS)
                 publish(current(clockMs()))
@@ -41,6 +53,8 @@ internal class ProbePulse(
     fun stop() {
         job?.cancel()
         job = null
+        link?.dispose()
+        link = null
         reset()
     }
 
