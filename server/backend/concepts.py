@@ -47,8 +47,11 @@ CONCEPT_ALIASES = {
     "tramway": "tram",
     "tram": "tram",
     "métro": "subway",
-    "bateau": "boat",
-    "bateaux": "boat",
+    # « bateau » = bateau de trottoir (curb ramp) en contexte piéton — le sens
+    # « boat » (hors domaine malvoyant) reste via « bateau à voile ».
+    "bateau": "curb ramp",
+    "bateaux": "curb ramp",
+    "bateau à voile": "boat",
     "avion": "airplane",
     "hélicoptère": "helicopter",
     # Animaux
@@ -180,6 +183,14 @@ CONCEPT_ALIASES = {
     "rond-point": "roundabout",
     "trottoir": "sidewalk",
     "trottoirs": "sidewalk",
+    "bordure": "curb",
+    "bordures": "curb",
+    "rebord": "curb",
+    "rebords": "curb",
+    "caniveau": "gutter",
+    "caniveaux": "gutter",
+    "bateau de trottoir": "curb ramp",
+    "bateaux de trottoir": "curb ramp",
     "passage piéton": "crosswalk",
     "passage clouté": "crosswalk",
     "piste cyclable": "bike lane",

@@ -2,6 +2,9 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.CrossingText
+import dev.sam3vision.core.curb.SidewalkPosition
+import dev.sam3vision.core.curb.SidewalkText
+import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.net.TtsClient
 
 /**
@@ -10,7 +13,8 @@ import dev.sam3vision.core.net.TtsClient
  * [TraverseVoice.prewarm] pré-génère en cache hors-ligne au premier lancement.
  *
  * Les libellés sont ceux de [CrossingText] (source unique des phrases
- * traversée) : un état = une phrase, les trois états de [CrossingState].
+ * traversée : un état = une phrase, les trois états de [CrossingState]) plus
+ * le but et l'arrivée ([SidewalkText], [CrossingText.arrived]).
  */
 object TraversePhrases {
     /** Rouge (urgent) : court, impératif — chaque syllabe compte à un passage piéton. */
@@ -22,8 +26,15 @@ object TraversePhrases {
     /** Doute (non urgent) : dit pourquoi on ne traverse pas, comme le rouge. */
     val UNKNOWN: String = CrossingText.phrase(CrossingState.Unknown)
 
+    /** But (non urgent) : le trottoir d'en face, une fois le vert parlé. */
+    val SIDEWALK_ACROSS: String =
+        requireNotNull(SidewalkText.phrase(SidewalkPosition.Across, SpeechLanguage.Fr))
+
+    /** Arrivée (non urgent) : dite une fois, sur le passage. */
+    val ON_CROSSWALK: String = CrossingText.arrived(SpeechLanguage.Fr)
+
     /** Toutes les phrases à pré-générer hors-ligne. */
-    val ALL: List<String> = listOf(RED, GREEN, UNKNOWN)
+    val ALL: List<String> = listOf(RED, GREEN, UNKNOWN, SIDEWALK_ACROSS, ON_CROSSWALK)
 
     /** Préfixe BCP-47 attendu du moteur système (« fr », « fr-FR », …). */
     const val LANGUAGE_PREFIX = "fr"

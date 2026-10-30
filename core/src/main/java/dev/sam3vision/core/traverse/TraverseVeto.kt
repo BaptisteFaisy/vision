@@ -9,17 +9,20 @@ import dev.sam3vision.core.predict.Box
 /**
  * Concepts véhicules du veto trafic : ce que SAM doit suivre en mode traversée.
  *
- * Les cinq véhicules du contrat, en anglais (la forme que SAM segmente le mieux).
+ * Les sept véhicules du contrat, en anglais (la forme que SAM segmente le mieux).
  * Le français reste reconnu côté veto ([isVehicle]) : un label « voiture » bloque
- * comme un « car ».
+ * comme un « car », « trottinette » comme un « scooter ».
  */
 object VehicleConcepts {
 
-    /** Les cinq véhicules du contrat : voiture, bus, camion, moto, vélo. */
-    val PROMPTS: List<String> = listOf("car", "bus", "truck", "motorcycle", "bicycle")
+    /** Les sept véhicules du contrat : voiture, bus, camion, moto, vélo et trottinette. */
+    val PROMPTS: List<String> = listOf(
+        "car", "bus", "truck", "motorcycle", "bicycle", "scooter", "electric scooter",
+    )
 
     private val KEYS = setOf(
         "car", "bus", "buses", "truck", "motorcycle", "bicycle", "bike",
+        "scooter", "electric scooter", "trottinette", "trottinette electrique",
         "voiture", "camion", "moto", "velo",
     )
 
@@ -33,7 +36,7 @@ object VehicleConcepts {
 
     /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — seize concepts, donc les cinq véhicules plus toute
+     * [LivePrompts.MAX] — seize concepts, donc les sept véhicules plus toute
      * la base du direct (dangers, feu, passage…).
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
@@ -87,7 +90,7 @@ data class TraverseDecision(
  * (surface de boîte croissante sur deux frames) **ou** qu'il est proche (distance
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
- * calibré pour les cinq véhicules) et [Pinhole].
+ * calibré pour les sept véhicules) et [Pinhole].
  *
  * Machine d'état : [TraversePhase.ATTENDRE] par défaut et sous veto, `PRET` à la
  * première frame verte sans veto, `TRAVERSER` quand le vert se maintient, `ALERTE`

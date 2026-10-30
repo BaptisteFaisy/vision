@@ -92,4 +92,9 @@ class SidewalkKeepTest {
         assertNull(SidewalkKeep.returnCap(SidewalkPosition.Absent))
     }
 
+    @Test
+    fun `en face = info douce, pas de correction`() {
+        assertNull(SidewalkKeep.returnCap(SidewalkPosition.Across))
+    }
+
 }

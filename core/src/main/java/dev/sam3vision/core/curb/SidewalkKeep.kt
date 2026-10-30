@@ -7,10 +7,11 @@ import dev.sam3vision.core.live.SteeringCap
 /**
  * Position du trottoir vu caméra : devant (dans le couloir marché — l'utilisateur
  * est dessus ou va dessus), à gauche / à droite (l'utilisateur n'y est plus : le
- * guidage suspend le cap et ordonne le retour), ou absent (scène perçue sans
+ * guidage suspend le cap et ordonne le retour), en face (de l'autre côté de la
+ * chaussée : info douce, jamais une consigne), ou absent (scène perçue sans
  * trottoir : doute — consigne prudente, jamais d'ordre vers la chaussée).
  */
-enum class SidewalkPosition { Ahead, Left, Right, Absent }
+enum class SidewalkPosition { Ahead, Left, Right, Across, Absent }
 
 /**
  * Maintien actif sur le trottoir : la boucle fermée du guidage piéton.
@@ -23,7 +24,11 @@ enum class SidewalkPosition { Ahead, Left, Right, Absent }
  *
  * Deux prudences assumées : une scène vide n'est pas une preuve d'absence (SAM
  * muet, trou de frame) — pas de correction, le cap suit son cours ; un trottoir
- * des deux côtés sans distance mesurée, c'est le doute, pas un choix ([Absent]).
+ * des deux côtés sans distance mesurée, c'est le doute, pas un choix ([SidewalkPosition.Absent]).
+ *
+ * [SidewalkPosition.Across] n'est jamais produit ici (la caméra seule ne voit
+ * pas l'autre côté de la chaussée) : c'est l'appelant, qui connaît le contexte
+ * de traversée, qui le nourrit au guetteur.
  *
  * Pur et testé en JVM : aucune image, aucun Android, ne lève jamais.
  */
@@ -53,13 +58,13 @@ object SidewalkKeep {
 
     /**
      * Cap de retour vers le trottoir : gauche/droite quand il est sur un côté,
-     * `null` sinon — devant, rien à corriger ; absent, on ne dévie jamais à
-     * l'aveugle (la voix reste prudente mais la flèche garde le cap).
+     * `null` sinon — devant, en face, rien à corriger ; absent, on ne dévie
+     * jamais à l'aveugle (la voix reste prudente mais la flèche garde le cap).
      */
     fun returnCap(position: SidewalkPosition): SteeringCap? = when (position) {
         SidewalkPosition.Left -> SteeringCap.Left
         SidewalkPosition.Right -> SteeringCap.Right
-        SidewalkPosition.Ahead, SidewalkPosition.Absent -> null
+        SidewalkPosition.Ahead, SidewalkPosition.Across, SidewalkPosition.Absent -> null
     }
 
     /**

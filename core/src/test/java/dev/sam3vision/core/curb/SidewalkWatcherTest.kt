@@ -26,6 +26,18 @@ class SidewalkWatcherTest {
     }
 
     @Test
+    fun `trottoir en face parle apres confirmation`() {
+        val watcher = SidewalkWatcher()
+
+        assertNull(watcher.onPosition(SidewalkPosition.Across, 0L))
+        val cue = watcher.onPosition(SidewalkPosition.Across, 200L)!!
+
+        assertEquals("Trottoir en face.", cue.phrase)
+        assertEquals(SidewalkPosition.Across, cue.position)
+        assertEquals(200L, watcher.lastAlertMs)
+    }
+
+    @Test
     fun `stable egal silence`() {
         val watcher = SidewalkWatcher()
 
@@ -45,6 +57,18 @@ class SidewalkWatcherTest {
 
         assertEquals("Trottoir à gauche.", cue.phrase)
         assertEquals(SidewalkPosition.Left, cue.position)
+    }
+
+    @Test
+    fun `passage en face parle`() {
+        val watcher = SidewalkWatcher()
+
+        repeat(2) { watcher.onPosition(SidewalkPosition.Ahead, it * 200L) }
+        assertNull(watcher.onPosition(SidewalkPosition.Across, 400L))
+        val cue = watcher.onPosition(SidewalkPosition.Across, 600L)!!
+
+        assertEquals("Trottoir en face.", cue.phrase)
+        assertEquals(SidewalkPosition.Across, cue.position)
     }
 
     @Test
@@ -83,6 +107,16 @@ class SidewalkWatcherTest {
         val cue = watcher.onPosition(SidewalkPosition.Right, 200L, SpeechLanguage.En)!!
 
         assertEquals("Sidewalk on the right.", cue.phrase)
+    }
+
+    @Test
+    fun `en face en anglais`() {
+        val watcher = SidewalkWatcher()
+
+        watcher.onPosition(SidewalkPosition.Across, 0L, SpeechLanguage.En)
+        val cue = watcher.onPosition(SidewalkPosition.Across, 200L, SpeechLanguage.En)!!
+
+        assertEquals("Sidewalk across the street.", cue.phrase)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
 import org.junit.Assert.assertEquals
@@ -76,6 +77,36 @@ class ProbeVoiceTest {
         assertEquals(false, cue?.blocked)
         assertEquals(SteeringCap.Left, cue?.arrowDir())
         assertFalse(voice.detour)
+    }
+
+    @Test
+    fun `mur au contact - stop et stop recent deux secondes`() {
+        val voice = guided()
+        val phrase = voice.phrase(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f, 0.5f)), SteeringCap.Straight)
+
+        assertTrue(GuidanceWord.isStopPhrase(phrase!!))
+        assertTrue(voice.stopRecent(1_999L))
+        assertFalse(voice.stopRecent(2_000L))
+        voice.reset()
+        assertFalse(voice.stopRecent(1_000L))
+    }
+
+    @Test
+    fun `mot doux - stop non recent`() {
+        val voice = guided()
+
+        assertEquals("Tout droit.", voice.phrase(0L, libre, SteeringCap.Straight))
+        assertFalse(voice.stopRecent(1_000L))
+    }
+
+    @Test
+    fun `passage pieton filtre avant guidage - jamais stop`() {
+        val voice = guided()
+
+        assertEquals(
+            "Tout droit.",
+            voice.phrase(0L, listOf(PlacedLabel("crosswalk", 0.5f, 0.5f, 0.4f)), SteeringCap.Straight),
+        )
     }
 
     @Test
