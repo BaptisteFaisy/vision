@@ -5,7 +5,6 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.tan
 
 /** Côté vers lequel le guidage envoie l'utilisateur quand le couloir est bouché. */
 enum class GuidanceSide { Left, Right }
@@ -100,10 +99,7 @@ object Guidance {
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): GuidanceDecision {
-        val cleaned = labels.filter {
-            it.label.isNotBlank() && !CurbConcepts.isGround(it.label) && !CurbConcepts.isPathRoad(it.label) &&
-                !SignConcepts.isHighSign(it.label, it.centerY, it.meters)
-        }
+        val cleaned = labels.filter { isObstacle(it) }
         val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg) }
         if (blocking.isEmpty()) return GuidanceDecision(blocked = false, cap = cap)
         val obstacle = blocking.minWith(
@@ -120,6 +116,18 @@ object Guidance {
     }
 
     /**
+     * Vrai si [label] est un obstacle à contourner : ni vide, ni sol
+     * marchable ([CurbConcepts.isGround], [CurbConcepts.isPathRoad]), ni
+     * panneau haut sous lequel on passe ([SignConcepts.isHighSign]). Le
+     * couloir ([decide]) et l'évitement ([LateralNudgeTracker]) partagent ce
+     * filtre — un seul endroit qui définit ce qu'on évite.
+     */
+    internal fun isObstacle(label: PlacedLabel): Boolean =
+        label.label.isNotBlank() && !CurbConcepts.isGround(label.label) &&
+            !CurbConcepts.isPathRoad(label.label) &&
+            !SignConcepts.isHighSign(label.label, label.centerY, label.meters)
+
+    /**
      * Décalage à annoncer : demi-couloir marché en mètres à [meters] de
      * profondeur ([halfCorridor] normalisé × largeur de champ), plus une marge
      * d'épaule, arrondi au demi-mètre supérieur. `null` sans distance
@@ -127,8 +135,7 @@ object Guidance {
      */
     internal fun shiftOf(meters: Float?, halfCorridor: Float, hfovDeg: Float): Float? {
         val depth = meters?.takeIf { it.isFinite() && it > 0f } ?: return null
-        val fov = hfovDeg.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
-        val halfTangent = tan(Math.toRadians(fov / 2.0)).toFloat()
+        val halfTangent = LensSpec.halfTangent(hfovDeg)
         val raw = halfCorridor * 2f * depth * halfTangent + SHOULDER_MARGIN_M
         return ceil(raw / SHIFT_STEP_M) * SHIFT_STEP_M
     }
@@ -190,8 +197,7 @@ object Guidance {
         if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite() || depth == null) {
             return inCorridor(label.centerX, SteeringCap.Straight)
         }
-        val fov = hfovDeg.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
-        val halfTangent = tan(Math.toRadians(fov / 2.0)).toFloat()
+        val halfTangent = LensSpec.halfTangent(hfovDeg)
         val halfWidth = (RAY_HALF_WIDTH_M / (2f * depth * halfTangent)).coerceIn(0f, 0.5f)
         return minOf(x0, x1) <= 0.5f + halfWidth && maxOf(x0, x1) >= 0.5f - halfWidth
     }

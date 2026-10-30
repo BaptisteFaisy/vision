@@ -78,5 +78,16 @@ data class LensSpec(
             val vertical = Math.toDegrees(2.0 * atan(sensorHeightMm / 2.0 / focalMm)).toFloat()
             return LensSpec(horizontal, vertical, sensorLandscape = sensorWidthMm >= sensorHeightMm)
         }
+
+        /**
+         * Demi-tangente du champ [hfovDeg] (degrés, borné caméra) : le facteur
+         * qui projette l'image en mètres (`mètres = normalisé × 2 × profondeur
+         * × tan(fov/2)`). Un seul endroit pour les trois projections (trait du
+         * couloir, décalage chiffré, fenêtre d'évitement).
+         */
+        fun halfTangent(hfovDeg: Float): Float {
+            val fov = hfovDeg.coerceIn(FOV_MIN, FOV_MAX)
+            return tan(Math.toRadians(fov / 2.0)).toFloat()
+        }
     }
 }

@@ -1,7 +1,10 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.distance.LensSpec
+import kotlin.math.abs
+
 /**
- * Consigne de décalage latéral : une personne proche qui s'approche par un
+ * Consigne de décalage latéral : un obstacle proche qui s'approche par un
  * côté conseille de se décaler de l'autre ([side], direction où aller). Le
  * mot parlé est celui du côté ([GuidanceWord]), comme tout le guidage.
  */
@@ -11,11 +14,16 @@ data class LateralNudge(
 )
 
 /**
- * Suit les personnes par côté avant (gauche/droite du couloir marché) : une
+ * Suit les obstacles par côté avant (gauche/droite de l'axe marché) : une
  * distance qui diminue plusieurs frames de suite = approche. Ni association
  * de boîtes ni vélocité lissée (les labels placés n'ont ni boîte ni
  * identité) : le plus proche par côté suffit, la menace la plus proche
  * prime. Pur JVM, horloge explicite.
+ *
+ * Fenêtre d'évitement (ordre user du 30/10) : seuls les obstacles dans les
+ * [AVOID_HALF_WIDTH_M] de l'axe conseillent un décalage — au-delà, ils
+ * passent au large, on se tait. Humains, objets, poteaux : tout obstacle
+ * ([Guidance.isObstacle], le même filtre que le couloir).
  */
 class LateralNudgeTracker {
 
@@ -27,13 +35,15 @@ class LateralNudgeTracker {
     )
 
     /**
-     * Consigne du moment, `null` le plus souvent : personne proche qui
+     * Consigne du moment, `null` le plus souvent : obstacle proche qui
      * s'approche d'un seul côté. Les deux côtés à la fois = ambigu, on se
-     * tait (le couloir bouché parle s'il est bouché).
+     * tait (le couloir bouché parle s'il est bouché). [hfovDeg] calibre la
+     * fenêtre en mètres (défaut 67° : l'appelant qui connaît la focale la
+     * passe).
      */
-    fun onFrame(atMs: Long, labels: List<PlacedLabel>): LateralNudge? {
-        val left = side(atMs, labels, SteeringCap.Left)
-        val right = side(atMs, labels, SteeringCap.Right)
+    fun onFrame(atMs: Long, labels: List<PlacedLabel>, hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG): LateralNudge? {
+        val left = side(atMs, labels, SteeringCap.Left, hfovDeg)
+        val right = side(atMs, labels, SteeringCap.Right, hfovDeg)
         if (left != null && right != null) return null
         return left ?: right
     }
@@ -47,9 +57,9 @@ class LateralNudgeTracker {
         }
     }
 
-    private fun side(atMs: Long, labels: List<PlacedLabel>, side: SteeringCap): LateralNudge? {
+    private fun side(atMs: Long, labels: List<PlacedLabel>, side: SteeringCap, hfovDeg: Float): LateralNudge? {
         val nearest = labels
-            .filter { PersonLabels.isPerson(it.label) && inFront(it.centerX, side) }
+            .filter { Guidance.isObstacle(it) && inFront(it, side, hfovDeg) }
             .mapNotNull { it.meters?.takeIf { m -> m.isFinite() && m <= NUDGE_METERS } }
             .minOrNull()
         val track = tracks.getValue(side)
@@ -71,10 +81,21 @@ class LateralNudgeTracker {
         return LateralNudge(away, nearest)
     }
 
-    private fun inFront(centerX: Float, side: SteeringCap): Boolean {
-        if (centerX < FRONT_MIN || centerX > FRONT_MAX) return false
-        return if (side == SteeringCap.Left) centerX < SIDE_MID else centerX > SIDE_MID
+    /**
+     * Obstacle du côté [side], dans la fenêtre : écart latéral à l'axe
+     * ([lateralMeters]) sous [AVOID_HALF_WIDTH_M], à gauche ou à droite de
+     * l'axe ([SIDE_MID]). Sans distance mesurée, pas de fenêtre en mètres :
+     * on se tait (l'inconnu bloque le couloir, il ne conseille pas).
+     */
+    private fun inFront(label: PlacedLabel, side: SteeringCap, hfovDeg: Float): Boolean {
+        val depth = label.meters?.takeIf { it.isFinite() && it > 0f } ?: return false
+        if (abs(lateralMeters(label.centerX, depth, hfovDeg)) > AVOID_HALF_WIDTH_M) return false
+        return if (side == SteeringCap.Left) label.centerX < SIDE_MID else label.centerX > SIDE_MID
     }
+
+    /** Écart latéral à l'axe (m, signé : négatif à gauche) à [depth] de profondeur. */
+    private fun lateralMeters(centerX: Float, depth: Float, hfovDeg: Float): Float =
+        (centerX - SIDE_MID) * 2f * depth * LensSpec.halfTangent(hfovDeg)
 
     private fun resetTrack(track: SideTrack) {
         track.meters = Float.POSITIVE_INFINITY
@@ -83,16 +104,17 @@ class LateralNudgeTracker {
     }
 
     companion object {
-        /** Au-delà, une personne qui approche est trop loin pour décaler. */
-        const val NUDGE_METERS = 3f
+        /** Portée avant : la même que le couloir (l'évitement le prolonge). */
+        const val NUDGE_METERS = Guidance.RANGE_METERS
 
-        /** Champ avant suivi : en dehors, c'est un passant, pas une menace. */
-        const val FRONT_MIN = 0.25f
+        /**
+         * Demi-fenêtre d'évitement (m) : au-delà de 2 m de l'axe, l'obstacle
+         * passe au large — l'ordre de s'écarter ne s'applique pas (ordre user
+         * du 30/10).
+         */
+        const val AVOID_HALF_WIDTH_M = 2f
 
-        /** Champ avant suivi : en dehors, c'est un passant, pas une menace. */
-        const val FRONT_MAX = 0.75f
-
-        /** Gauche/droite du champ : pile au centre = couloir, pas côté. */
+        /** Gauche/droite de l'axe : pile au centre = couloir, pas côté. */
         const val SIDE_MID = 0.5f
 
         /** Diminutions consécutives pour confirmer (3e frame parle). */
