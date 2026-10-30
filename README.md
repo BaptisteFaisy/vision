@@ -33,6 +33,28 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 > **29/10/2026** on `master`. Figures held over time live in `docs/PERF.md` — the
 > only authoritative reference.
 
+## Meta AI stack
+
+iSee is built on Meta AI, end to end:
+
+- **Segmentation — Meta SAM 3.1** (`facebook/sam3.1`, via the `unsloth/sam3.1`
+  mirror) served from `server/live_fast` on a Modal A100 (`sam3-eu-a100`):
+  `/segment`, `/live`, `/live/ws`, `/release`. App clients:
+  `core/src/main/java/dev/sam3vision/core/net/HttpSamClient.kt`,
+  `HttpLiveClient.kt`, `WsLiveClient.kt`.
+- **Vision LLM — Muse Spark** (`meta-models/muse-spark-open-1026`, the default)
+  over a **Meta Model API-compatible** `chat/completions` endpoint
+  (`core/src/main/java/dev/sam3vision/core/net/InferHubLlmClient.kt`, defaults in
+  `core/src/main/java/dev/sam3vision/core/settings/Settings.kt`). Routing is
+  provider-agnostic; Meta-hosted models are the default, and Llama served over
+  the Meta Model API is the next wiring step.
+- **Speech-to-text — Meta AI API**: `POST https://api.meta.ai/v1/asr/transcribe`
+  with `muse-voice-transcribe-1.0`
+  (`core/src/main/java/dev/sam3vision/core/net/MetaAsrClient.kt`,
+  `docs/META-ASR.md`).
+- **Glasses — Meta Wearables SDK** (`com.meta.wearable:mwdat`): camera and
+  microphone on Ray-Ban Meta glasses (`docs/META-GLASSES.md`).
+
 ## The problem
 
 Seeing means perceiving, understanding, and acting — three things that require
