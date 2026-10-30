@@ -207,14 +207,12 @@ internal object SettingsCodec {
                 ?: default.boxPredictionEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
-            continuousCadenceEnabled = values[K_CONTINUOUS_CADENCE]?.toBooleanStrictOrNull()
-                ?: default.continuousCadenceEnabled,
+            continuousCadenceEnabled = values[K_CONTINUOUS_CADENCE]?.toBooleanStrictOrNull() ?: default.continuousCadenceEnabled,
             debugRouteMapEnabled = values[K_DEBUG_ROUTE_MAP]?.toBooleanStrictOrNull()
                 ?: default.debugRouteMapEnabled,
             navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()
                 ?: default.navigationGuidanceEnabled,
-            outdoorMode = values[K_OUTDOOR_MODE]?.toBooleanStrictOrNull()
-                ?: default.outdoorMode,
+            outdoorMode = values[K_OUTDOOR_MODE]?.toBooleanStrictOrNull() ?: default.outdoorMode,
             routeBaseUrl = values[K_ROUTE_BASE_URL].orEmpty(),
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
