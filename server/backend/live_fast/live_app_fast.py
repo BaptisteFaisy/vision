@@ -36,7 +36,7 @@ Leviers (voir ``fast_core.py`` pour le détail technique) :
 Déploiement (GPU, région, nom d'app en variables — jamais lancé d'ici) :
 
     FAST_APP_NAME=sam3-live FAST_GPU=A100 FAST_REGION=eu-west \
-      modal deploy backend/live_fast.py
+      modal deploy backend/live_fast/live_app_fast.py
 
 Le MÊME service tourne sur Baseten (``backend/baseten/``) : seule la couche d'amorçage
 change, les routes et les leviers sont identiques.
