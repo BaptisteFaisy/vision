@@ -368,10 +368,12 @@ private fun IseeCameraWiring(
                 if (picturing(viewModel)) viewModel.picto.onFrame(jpeg)
             }
         }
+        // Compteur de marches : la luminance part au Canny sur le fil de l'analyse.
+        glue.host.onLuma = { luma -> StairCannyCount.offerLuma(luma) }
     }
     // Carte retirée (fin de la scène) : plus d'image à proposer au partage.
     DisposableEffect(glue.host) {
-        onDispose { SharedCameraFrame.clear() }
+        onDispose { SharedCameraFrame.clear(); StairCannyCount.clear() }
     }
     FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
 }

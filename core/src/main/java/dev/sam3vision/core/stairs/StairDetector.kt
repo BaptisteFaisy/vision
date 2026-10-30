@@ -41,14 +41,14 @@ data class StairSignal(
  * - faux positifs sur stores vénitiens, rayures et zébrures horizontales ;
  * - seuils calibrés webcam 640×480, à recalibrer sur captures du téléphone.
  *
- * Non branché au direct (ni overlay ni voix) : [StairWatcher] (confirmation +
- * cooldown) est l'API prête pour ça. Point d'accroche prévu :
- * `LiveViewModel.onFrame` — `frameLuma` y a la géométrie fixe de `LumaPlane`
- * (256×103), donc `GrayMask(256, 103, frameLuma)` sans changer la signature.
- * Bloqueurs avant branchement : `LiveViewModel` est à 498/500 lignes
- * (extraire d'abord), phrase et cooldown à valider, et surtout seuils à
- * recalibrer sur captures réelles — une fausse annonce « escalier » à un
- * utilisateur aveugle est une décision de sécurité, pas un défaut.
+ * Branché à la voix du direct : l'analyseur caméra offre le plan de luminance
+ * (`StairCannyCount`, ni overlay ni affichage des marches) et le guetteur
+ * escaliers le relit quand SAM nomme l'escalier — le compte à rebours
+ * (« Plus que N marches. ») parle alors, au lieu de l'annonce sèche.
+ * Bloqueur restant : seuils à recalibrer sur captures réelles — une fausse
+ * annonce « escalier » à un utilisateur aveugle est une décision de sécurité,
+ * pas un défaut. En attendant, l'annonce reste conditionnée aux libellés SAM
+ * (le Canny seul ne parle jamais).
  * (NanoDet, un temps envisagé comme hôte on-device, est en cours de
  * suppression de l'app : ne pas câbler vers `app/detect`.)
  *
