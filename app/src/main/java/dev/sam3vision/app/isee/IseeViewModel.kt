@@ -12,6 +12,7 @@ import dev.sam3vision.app.media.MediaDatabase
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.loadedSettings
 import dev.sam3vision.app.speech.NavigationAnnouncer
+import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.VoiceNavSession
@@ -104,6 +105,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
+    /** Voix de sécurité : voiture en mouvement + rebord, dits aussitôt, même en dictée. */
+    private val safety = SafetyVoice(player, SystemTtsEngine.create(getApplication()), { settings })
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -264,7 +267,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
-        hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
+        hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety)
     }
 
     /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
@@ -274,6 +277,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         liveDictation.stop()
         dictation.discard()
         player.release()
+        safety.shutdown()
         voiceNav.shutdown()
         probe.stop()
         super.onCleared()

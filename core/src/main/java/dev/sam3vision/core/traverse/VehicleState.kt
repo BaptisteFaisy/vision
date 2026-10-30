@@ -14,12 +14,15 @@ import kotlin.math.hypot
  * Ordre d'annonce d'état véhicule : [phrase] dans la langue de la voix,
  * [meters] la distance mesurée (`null` = mouvement vu mais non mesuré),
  * [urgent] quand le véhicule s'approche dangereusement (tau < 3 s, proche
- * et au centre — coupe la lecture, sinon douceur).
+ * et au centre — coupe la lecture, sinon douceur), [safetyPhrase] l'alerte
+ * immédiate (« Stop, … ») quand le véhicule est en mouvement (`null` à
+ * l'arrêt — la sécurité ne parle que du danger qui roule).
  */
 data class VehicleStateCue(
     val phrase: String,
     val meters: Float?,
     val urgent: Boolean = false,
+    val safetyPhrase: String? = null,
 )
 
 /**
@@ -77,6 +80,17 @@ object VehicleStateText {
         language = language,
     )
 
+    /**
+     * Alerte immédiate d'un véhicule en mouvement : « Stop, … » dans la
+     * langue de la voix, sans distance ni heure — le danger prime sur la
+     * précision. Parlée par la voix de sécurité, qui coupe tout, dictée du
+     * user comprise.
+     */
+    fun safetyPhrase(name: VehicleName, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "Stop, ${name.fr.replaceFirstChar { it.lowercase() }} en mouvement."
+        SpeechLanguage.En -> "Stop, ${name.en.replaceFirstChar { it.lowercase() }} moving."
+    }
+
     /** « Voiture à l'arrêt… », à la distance mesurée ou à l'heure. */
     fun stoppedPhrase(
         name: VehicleName,
@@ -125,9 +139,10 @@ object VehicleStateText {
  * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS], mesuré ou
  * non — sans focale, seule l'approche compte, comme le veto.
  *
- * Douceur : l'appelant parle avec `urgent = false` sauf
- * [VehicleStateCue.urgent] (approche dangereuse : tau < 3 s, proche et au
- * centre). Pur JVM et testé.
+ * Sécurité : le mouvement parle en alerte immédiate ([VehicleStateCue.safetyPhrase],
+ * « Stop, … », voix de sécurité qui coupe tout, dictée du user comprise) ;
+ * l'arrêt reste doux (`urgent = false`, synthèse réseau, attend le silence).
+ * Pur JVM et testé.
  */
 class VehicleStateWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -210,7 +225,12 @@ class VehicleStateWatcher(
             State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
             State.STOPPED -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
         }
-        return VehicleStateCue(phrase, pick.meters, pick.urgent)
+        val safety = if (pick.state == State.MOVING) {
+            VehicleStateText.safetyPhrase(pick.name, language)
+        } else {
+            null
+        }
+        return VehicleStateCue(phrase, pick.meters, pick.urgent, safety)
     }
 
     /** Oublie pistes, mémoire et annonces (nouvelle traversée, nouveau direct). */
