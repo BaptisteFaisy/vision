@@ -55,10 +55,14 @@ fun decodeScaledExact(file: File, maxEdge: Int = MAX_IMAGE_EDGE): Bitmap? {
 }
 
 /** Bitmap → base64 JPEG sans préfixe `data:` (l'encodage base64 vient de `media`). */
-fun bitmapToJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String {
+fun bitmapToJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String =
+    jpegBytesToBase64(bitmapToJpeg(bitmap, quality))
+
+/** Bitmap → JPEG brut : le direct binaire n'a pas besoin du détour base64. */
+fun bitmapToJpeg(bitmap: Bitmap, quality: Int = JPEG_QUALITY): ByteArray {
     val buffer = ByteArrayOutputStream()
     bitmap.compress(Bitmap.CompressFormat.JPEG, quality, buffer)
-    return jpegBytesToBase64(buffer.toByteArray())
+    return buffer.toByteArray()
 }
 
 /** Mini image monochrome pour tester un endpoint LLM sans consommer de crédit. */

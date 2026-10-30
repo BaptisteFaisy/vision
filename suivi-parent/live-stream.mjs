@@ -3,8 +3,12 @@
 // position et les phrases, l'image passe par ici et n'existe que le temps d'une
 // image à l'écran.
 
-/** Une frame plus vieille que ça n'est plus du direct : on revient à l'état lent. */
-export const STREAM_FRESH_MS = 1_500;
+/**
+ * Une frame plus vieille que ça n'est plus du direct : on revient à l'état lent.
+ * À 10 im/s, 600 ms couvrent 6 frames — assez pour le jitter, assez strict pour
+ * voir une chute de cadence (l'hystérésis du chien de garde évite le flapping).
+ */
+export const STREAM_FRESH_MS = 600;
 
 /** Reconnexion : courte au début (l'aidant regarde), plafonnée ensuite. */
 const RETRY_MS = [500, 1_000, 2_000, 4_000, 8_000];
@@ -39,18 +43,27 @@ export function cameraOnOf(data) {
   return null;
 }
 
-/** Blob URL d'une frame reçue, `null` si ce n'est pas une image exploitable. */
+/**
+ * Blob URL d'une frame reçue, `null` si ce n'est pas une image exploitable. Le
+ * socket livre des `Blob` (`binaryType = 'blob'`) : ils passent tels quels, sans
+ * la copie `new Blob([arraybuffer])` d'avant ; un `ArrayBuffer` reste accepté.
+ */
 export function frameSrcOf(data, create = (blob) => URL.createObjectURL(blob)) {
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    return data.size === 0 ? null : create(data);
+  }
   if (!data || typeof data.byteLength !== 'number' || data.byteLength === 0) return null;
   return create(new Blob([data], { type: 'image/jpeg' }));
 }
 
 /**
  * Ouvre (et rouvre) le flux. `onFrame(src)` reçoit un blob URL par image, et
- * l'ancien est révoqué au tour suivant ; `onState('live' | 'idle')` prévient la
- * page. `onFrame` n'est jamais appelé avec `null`. `onCamera(true | false)`
- * prévient quand la caméra du proche s'allume ou s'éteint : la page efface
- * l'image tout de suite, sans attendre que la dernière frame périme.
+ * seuls les deux derniers survivent (l'affiché + celui en décodage) — l'avant-
+ * dernier est révoqué à la frame suivante, au lieu d'une douzaine en attente ;
+ * `onState('live' | 'idle')` prévient la page. `onFrame` n'est jamais appelé
+ * avec `null`. `onCamera(true | false)` prévient quand la caméra du proche
+ * s'allume ou s'éteint : la page efface l'image tout de suite, sans attendre
+ * que la dernière frame périme.
  *
  * `open` est injectable pour que la logique se teste sans navigateur.
  */
@@ -67,12 +80,14 @@ export function watchStream({
 } = {}) {
   let socket = null;
   let previous = null;
+  let older = null;
   let attempt = 0;
   let timerId = null;
   let closed = false;
 
   const release = () => {
     if (previous) { revoke(previous); previous = null; }
+    if (older) { revoke(older); older = null; }
     onState('idle');
   };
 
@@ -81,7 +96,7 @@ export function watchStream({
     const url = streamUrl(href);
     if (!url.includes('share=') || url.endsWith('share=&role=watch')) return;
     socket = open(url);
-    socket.binaryType = 'arraybuffer';
+    socket.binaryType = 'blob';
     socket.onopen = () => { attempt = 0; onState('live'); };
     socket.onmessage = (event) => {
       if (typeof event.data === 'string') {
@@ -91,10 +106,10 @@ export function watchStream({
       }
       const src = frameSrcOf(event.data, create);
       if (!src) return;
-      const stale = previous;
+      if (older) revoke(older);
+      older = previous;
       previous = src;
       onFrame(src);
-      if (stale) timer.set(() => revoke(stale), 2_000);
     };
     socket.onclose = () => {
       socket = null;

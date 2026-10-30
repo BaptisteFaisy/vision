@@ -1,7 +1,8 @@
 package dev.sam3vision.app
 
-import android.util.Base64
+import android.util.Log
 import dev.sam3vision.app.isee.SharedCameraFrame
+import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.core.net.liveHttpClient
 import dev.sam3vision.core.share.STREAM_FRAME_MS
 import dev.sam3vision.core.share.STREAM_RETRY_MS
@@ -51,11 +52,32 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     @Volatile
     private var announced: Boolean? = null
 
+    /** Frames poussées, tours sans frame fraîche, envois refusés par le tuyau. */
+    @Volatile
+    var sentFrames = 0L
+        private set
+
+    @Volatile
+    var droppedFrames = 0L
+        private set
+
+    @Volatile
+    var sendFailures = 0L
+        private set
+
+    /** Intervalles d'envoi : le rythme **réel** du direct, pas la cadence demandée. */
+    private val fps = LiveFpsMeter()
+    private val gaps = LongArray(LOG_EVERY_SENDS) { 0L }
+
     private val listener = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
             // Chaque avis d'audience (aidant qui arrive ou part) republie l'état
             // caméra : un aidant qui vient d'arriver l'apprend dans le tour suivant.
-            audienceWatching(text)?.let { watching = it; announced = null }
+            audienceWatching(text)?.let {
+                watching = it
+                announced = null
+                SharedCameraFrame.audience = it
+            }
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -86,27 +108,41 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
                 if (socket === ws) socket = null
                 watching = false
                 announced = null
+                SharedCameraFrame.audience = false
             }
             if (!closed) delay(STREAM_RETRY_MS)
         }
     }
 
-    /** Pousse les frames tant que ce tuyau-là vit. */
+    /**
+     * Pousse les frames tant que ce tuyau-là vit, à **échéance absolue** : un envoi
+     * lent ne décale pas les suivants (pas de `delay` fixe qui dérive), le tour
+     * suivant part à l'heure ou saute si l'échéance est déjà passée.
+     */
     private suspend fun pump(ws: WebSocket) {
+        var nextDue = System.currentTimeMillis()
         while (!closed && socket === ws) {
-            delay(STREAM_FRAME_MS)
+            nextDue += STREAM_FRAME_MS
+            val wait = nextDue - System.currentTimeMillis()
+            if (wait > 0) delay(wait) else nextDue = System.currentTimeMillis()
             // Sans spectateur, rien ne part — et le retour de l'audience republie l'état.
             if (!watching) { announced = null; continue }
             // Caméra fermée ou figée : les aidants l'apprennent dans le tour,
             // au lieu de garder la dernière image jusqu'à 8 s.
-            val frame = SharedCameraFrame.latest(System.currentTimeMillis())
-            if (frame == null) { announce(ws, false); continue }
+            val frame = SharedCameraFrame.latestBytes(System.currentTimeMillis())
+            if (frame == null || frame.jpeg.isEmpty()) {
+                droppedFrames += 1
+                announce(ws, false)
+                continue
+            }
             if (frame.seq == sentSeq) continue
             sentSeq = frame.seq
-            val bytes = runCatching { Base64.decode(frame.jpegBase64, Base64.DEFAULT) }.getOrNull() ?: continue
-            if (bytes.isEmpty()) continue
-            if (!ws.send(ByteString.of(*bytes))) return
+            if (!ws.send(ByteString.of(*frame.jpeg))) {
+                sendFailures += 1
+                return
+            }
             announce(ws, true)
+            noteSent(System.currentTimeMillis())
         }
     }
 
@@ -121,6 +157,28 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         runCatching { ws.send(cameraNotice(on)) }
     }
 
+    /** Un envoi de plus : l'intervalle rejoint la fenêtre, le log part tous les 60. */
+    private fun noteSent(nowMs: Long) {
+        val gap = fps.gapAt(nowMs)
+        sentFrames += 1
+        if (gap in 1..LiveFpsMeter.MAX_GAP_MS) gaps[(sentFrames % LOG_EVERY_SENDS).toInt()] = gap
+        if (sentFrames % LOG_EVERY_SENDS == 0L) logFps()
+    }
+
+    /** Rythme réel du direct : médiane et p95 des intervalles d'envoi (N = 60). */
+    private fun logFps() {
+        val valid = gaps.filter { it > 0 }.sorted()
+        if (valid.isEmpty()) return
+        val median = valid[valid.size / 2]
+        val p95 = valid[(valid.size * 95 / 100).coerceAtMost(valid.size - 1)]
+        Log.i(
+            "sam3vision",
+            "direct: ${"%.1f".format(1000f / median)} ips " +
+                "(médiane $median ms, p95 $p95 ms, " +
+                "envoyées $sentFrames, jetées $droppedFrames, refus $sendFailures)",
+        )
+    }
+
     /** Ferme le direct (sortie de l'écran, partage coupé). */
     fun close() {
         closed = true
@@ -128,6 +186,7 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         // Dernier mot avant de raccrocher : la salle préviendra les aidants de
         // toute façon en voyant le tuyau se fermer, mais l'avis part avant.
         runCatching { socket?.send(cameraNotice(false)) }
+        SharedCameraFrame.audience = false
         runCatching { socket?.close(1000, "fin") }
         socket = null
     }
@@ -136,5 +195,11 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         if (socket === webSocket) socket = null
         announced = null
         watching = false
+        SharedCameraFrame.audience = false
+    }
+
+    companion object {
+        /** Une ligne de rythme tous les 60 envois (≈ 5 s à 11 im/s). */
+        private const val LOG_EVERY_SENDS = 60
     }
 }

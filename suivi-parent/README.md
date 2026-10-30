@@ -71,7 +71,7 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   photo lente, sans attendre les 8 s.
 - **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
   connecte (`live-stream.mjs`) et affiche les frames **au fil de l'eau** —
-  6 im/s, une image de moins de 1,5 s vaut « maintenant ». La photo de
+  11 im/s, une image de moins de 600 ms vaut « maintenant ». La photo de
   `/api/state` (une toutes les 2 s) reste le repli si le WebSocket échoue ou
   n'existe pas : la page ne dépend d'aucun déploiement pour fonctionner.
   La salle dit aussi quand la caméra s'allume ou s'éteint
