@@ -8,7 +8,7 @@
 
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
 Android : fond blanc, boule Portrait cacao et caramel en haut, **image du
-téléphone accompagné** en bas (dernière frame caméra, 320 px, pleine largeur
+téléphone accompagné** en bas (dernière frame caméra, 480 px, pleine largeur
 fondue dans le blanc comme la rue côté accompagné), **dessins des objets
 reconnus** et, pendant un trajet guidé, une **barre de progression liquide**
 du départ à l'arrivée. Aucune phrase sous la boule.
@@ -71,7 +71,7 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   photo lente, sans attendre les 8 s.
 - **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
   connecte (`live-stream.mjs`) et affiche les frames **au fil de l'eau** —
-  11 im/s, une image de moins de 600 ms vaut « maintenant ». La photo de
+  15 im/s, une image de moins de 600 ms vaut « maintenant ». La photo de
   `/api/state` (une toutes les 2 s) reste le repli si le WebSocket échoue ou
   n'existe pas : la page ne dépend d'aucun déploiement pour fonctionner.
   La salle dit aussi quand la caméra s'allume ou s'éteint
