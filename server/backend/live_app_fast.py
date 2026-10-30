@@ -41,6 +41,11 @@ helpers restent dans les fonctions côté conteneur, pour que le fichier soit im
 sans stack GPU.
 """
 
+# LEGACY — NON DÉPLOYÉ : la production est `live_fast/live_app_fast.py` (app `sam3-eu-a100`),
+# déployée par `scripts/deploy-live-fast.sh` (CI : `deploy-live-fast.yml`) — ne jamais
+# déployer ce fichier. Il reste importé par `scripts/test_units.py` (contrat, image,
+# fusion) : ne pas supprimer. Source déployée : voir `docs/LIVE-FAST.md`.
+
 # NOTE: pas de `from __future__ import annotations` — FastAPI résout les annotations des
 # modèles de requête au runtime ; avec des strings différées le corps serait pris pour un
 # paramètre de query (400 systématique). Contrat identique à live_app.py.
