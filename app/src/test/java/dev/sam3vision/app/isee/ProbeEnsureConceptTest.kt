@@ -15,9 +15,24 @@ class ProbeEnsureConceptTest {
     @Test
     fun `concept absent rejoint les masques sam`() = runTest {
         val (probe, _) = probeHarness(this)
+        // Liste d'intérieur (7 concepts) : il reste de la place sous le plafond.
+        probe.configure(PROBE_TEST_ENDPOINT, prompts = LivePrompts.indoor)
         probe.ensureConcept(Settings.Default, "keys")
         advanceUntilIdle()
         assertTrue(probe.state.value.conceptsSent.contains("keys"))
+    }
+
+    @Test
+    fun `defauts exterieur au plafond, find the x refuse sans reconfigurer`() = runTest {
+        // Liste unique normal/Traversée (30/10) : 16 concepts, au plafond —
+        // « Find the X » dehors est refusé comme tout 17e concept, sans coupure.
+        val (probe, fake) = probeHarness(this)
+        val closed = fake.closed
+        probe.ensureConcept(Settings.Default, "keys")
+        advanceUntilIdle()
+        assertEquals(closed, fake.closed)
+        assertEquals(16, probe.state.value.conceptsSent.size)
+        assertFalse(probe.state.value.conceptsSent.contains("keys"))
     }
 
     @Test
@@ -31,7 +46,7 @@ class ProbeEnsureConceptTest {
     }
 
     @Test
-    fun `traversee active, prompts feu voitures intouches`() = runTest {
+    fun `traversee activee, prompts intouches`() = runTest {
         val (probe, fake) = probeHarness(this)
         probe.configure(PROBE_TEST_ENDPOINT, crossingActive = true)
         val closed = fake.closed

@@ -1,5 +1,7 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.crossing.CrossingPrompts
+import dev.sam3vision.core.traverse.VehicleConcepts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -8,13 +10,13 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `quatorze dangers exterieur par defaut, plafond client a seize`() {
-        assertEquals(14, LivePrompts.default.size)
+    fun `seize concepts exterieur par defaut, au plafond client`() {
+        assertEquals(16, LivePrompts.default.size)
         assertEquals(
             listOf(
-                "person", "car", "bicycle", "electric scooter", "pole",
-                "sidewalk", "crosswalk", "wall", "window", "stairs",
-                "door", "barrier", "fence", "gate",
+                "person", "car", "bus", "truck", "motorcycle", "bicycle",
+                "electric scooter", "traffic light", "curb", "sidewalk",
+                "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
             ),
             LivePrompts.default,
         )
@@ -23,11 +25,28 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `portes barrieres clotures et portails suivis en exterieur en plus des dangers`() {
-        assertTrue("door" in LivePrompts.default)
+    fun `barrieres clotures et portails suivis en exterieur, porte mur et fenetre sortis`() {
         assertTrue("barrier" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.default)
         assertTrue("gate" in LivePrompts.default)
+        // Unification traversée/normal (30/10) : porte, mur et fenêtre cèdent
+        // leurs slots aux véhicules, au feu et à la bordure.
+        assertFalse("door" in LivePrompts.default)
+        assertFalse("wall" in LivePrompts.default)
+        assertFalse("window" in LivePrompts.default)
+    }
+
+    @Test
+    fun `la traversee est couverte par les defauts, memes masques`() {
+        // Contrat « mêmes masques » : tout ce que la Traversée doit voir est
+        // déjà suivi en mode normal — la bascule ne change plus les prompts.
+        CrossingPrompts.PROMPTS.forEach { concept ->
+            assertTrue(concept, concept in LivePrompts.default)
+        }
+        (VehicleConcepts.PROMPTS - "scooter").forEach { concept ->
+            assertTrue(concept, concept in LivePrompts.default)
+        }
+        assertTrue("curb" in LivePrompts.default)
     }
 
     @Test
@@ -64,7 +83,7 @@ class LivePromptsTest {
     @Test
     fun `le mode exterieur iSee suit les defauts avec clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(14, exterior.size)
+        assertEquals(16, exterior.size)
         assertTrue("fence" in exterior)
         assertTrue("gate" in exterior)
         assertTrue("sidewalk" in exterior)
