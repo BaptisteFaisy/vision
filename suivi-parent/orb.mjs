@@ -2,7 +2,7 @@ import { fragmentShader } from './orb-shader.mjs';
 
 const VERTEX = 'attribute vec2 position; void main() { gl_Position = vec4(position, 0., 1.); }';
 // Cacao & caramel : source unique du liquide, pour le rendu WebGL et pour
-// le repli sans WebGL (variables --orb-color-* lues par styles.css).
+// le repli sans WebGL et la barre de trajet (variables --orb-color-* lues par styles.css).
 const CACAO_CARAMEL = ['#48342F', '#7C5748', '#B88760', '#E1BE8B', '#B29C84'];
 const LIQUID_COLORS = CACAO_CARAMEL.flatMap(color =>
   [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255).concat(1));
