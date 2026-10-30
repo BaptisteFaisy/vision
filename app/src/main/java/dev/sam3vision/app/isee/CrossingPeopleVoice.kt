@@ -38,10 +38,11 @@ internal fun crossingPhraseOf(
 
 /**
  * Voix douce des personnes en mode Traversée, une par processus (même garde
- * des 500 lignes que `CrossingOfferWatch`) : le décalage opposé aux gens
- * proches d'abord (« Droite. », mot nouveau seul, clip < 100 ms — miroir du
- * guidage normal), leurs positions au cadran ensuite (« Personne à 9 heures,
- * à 2 mètres »), débouncées comme toute annonce.
+ * des 500 lignes que `CrossingOfferWatch`) : le décalage opposé aux obstacles
+ * proches d'abord (gens, objets, poteaux — « Droite. », mot nouveau seul,
+ * clip < 100 ms — miroir du guidage normal), les positions des personnes au
+ * cadran ensuite (« Personne à 9 heures, à 2 mètres »), débouncées comme
+ * toute annonce.
  */
 internal object CrossingPeopleWatch {
 

@@ -64,7 +64,8 @@ class GuidanceAnnouncer(
      * demandée à la voix : il change le couloir marché, et sa signature fait
      * reparler dès que le cap change. [routeCap] (cap de l'itinéraire, guidage
      * route actif) prime sur [cap] quand il est renseigné. [hfovDeg] calibre le
-     * décalage chiffré (défaut 67° : l'appelant qui connaît la focale la passe).
+     * décalage chiffré et la fenêtre d'évitement (défaut 67° : l'appelant qui
+     * connaît la focale la passe).
      * [sidewalk] est le trottoir vu caméra : sur voie libre, un côté suspend le
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
@@ -91,7 +92,7 @@ class GuidanceAnnouncer(
             val tl = TwinLiteWord.fromGuidance(Guidance.word(decision))
             return speak(atMs, tl.key, tl.text(language))
         }
-        val word = nudgeOf(atMs, labels)?.let { GuidanceWord.fromCap(it.side) }
+        val word = nudgeOf(atMs, labels, hfovDeg)?.let { GuidanceWord.fromCap(it.side) }
             ?: sidewalkWord(sidewalk, decision.cap)
         return speak(atMs, word.key, word.text(language))
     }
@@ -129,9 +130,9 @@ class GuidanceAnnouncer(
         )
     }
 
-    /** Décalage latéral : personne proche qui s'approche — mot du côté où aller. */
-    private fun nudgeOf(atMs: Long, labels: List<PlacedLabel>): LateralNudge? {
-        val cue = nudge.onFrame(atMs, labels) ?: return null
+    /** Décalage latéral : obstacle proche qui s'approche — mot du côté où aller. */
+    private fun nudgeOf(atMs: Long, labels: List<PlacedLabel>, hfovDeg: Float): LateralNudge? {
+        val cue = nudge.onFrame(atMs, labels, hfovDeg) ?: return null
         lastNudge = cue
         return cue
     }
