@@ -60,12 +60,17 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`. Hors de
   là, aucun cadre, aucune image ni texte : la section se replie et l'image la
   rouvre dès que la caméra tourne. Seul un lien absent s'écrit
-  (« Ouvre le lien de suivi partagé par ton proche. »).
+  (« Ouvre le lien de suivi partagé par ton proche. »). L'avis caméra de la
+  salle (`{"type":"camera","on":false}`) efface l'image aussitôt, direct comme
+  photo lente, sans attendre les 8 s.
 - **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
   connecte (`live-stream.mjs`) et affiche les frames **au fil de l'eau** —
   6 im/s, une image de moins de 1,5 s vaut « maintenant ». La photo de
   `/api/state` (une toutes les 2 s) reste le repli si le WebSocket échoue ou
   n'existe pas : la page ne dépend d'aucun déploiement pour fonctionner.
+  La salle dit aussi quand la caméra s'allume ou s'éteint
+  (`{"type":"camera","on":…}`, émis ou transmis depuis le téléphone) : la page
+  efface l'image dès `on:false` et repart sur `on:true` ou la frame suivante.
 - Repères : les objets reconnus par le téléphone (pictogrammes créés à la voix)
   s'affichent en bandeau, **en dessins** avec leur nom — flux LIVE et détection
   de moins de 8 s, comme l'image. Sans détection, pas de bandeau.

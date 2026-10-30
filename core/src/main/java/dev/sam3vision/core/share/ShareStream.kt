@@ -52,8 +52,15 @@ fun audienceCountOf(text: String): Int? =
  */
 fun audienceWatching(text: String): Boolean? = audienceCountOf(text)?.let { it > 0 }
 
-/** `{"type":"audience","watch":1}` — le seul message texte que le relais envoie. */
+/** `{"type":"audience","watch":1}` — le seul message texte que le relais envoie au téléphone. */
 private val AUDIENCE = Regex("\"watch\"\\s*:\\s*(\\d{1,9})")
+
+/**
+ * Annonce de la caméra au relais : `{"type":"camera","on":…}`, même forme que
+ * l'avis d'audience. La salle le transmet aux aidants, qui effacent l'image
+ * dès `on:false` au lieu d'attendre que la dernière frame périme.
+ */
+fun cameraNotice(on: Boolean): String = "{\"type\":\"camera\",\"on\":$on}"
 
 /** Seul identifiant accepté par le relais ; même forme que `CaregiverPage`. */
 private val SHARE_ID = Regex("[a-z0-9-]{1,32}")

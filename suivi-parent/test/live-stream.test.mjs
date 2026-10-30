@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STREAM_FRESH_MS, streamUrl, frameSrcOf, watchStream } from '../live-stream.mjs';
+import { STREAM_FRESH_MS, streamUrl, frameSrcOf, cameraOnOf, watchStream } from '../live-stream.mjs';
 
 test('le flux est sur la même origine, en wss quand la page est en https', () => {
   assert.equal(
@@ -36,6 +36,7 @@ function fauxSocket(url) {
 function montage() {
   const sockets = [];
   const frames = [];
+  const cameras = [];
   const etats = [];
   const timers = [];
   const ouvertures = [];
@@ -43,6 +44,7 @@ function montage() {
     href: 'https://relais.example/?share=leo',
     onFrame: (src) => frames.push(src),
     onState: (etat) => etats.push(etat),
+    onCamera: (on) => cameras.push(on),
     open: (url) => { const socket = fauxSocket(url); sockets.push(socket); ouvertures.push(url); return socket; },
     create: () => 'blob:' + frames.length,
     revoke: () => {},
@@ -51,7 +53,7 @@ function montage() {
       clear: () => {},
     },
   });
-  return { flux, sockets, frames, etats, timers, ouvertures };
+  return { flux, sockets, frames, etats, cameras, timers, ouvertures };
 }
 
 test('l’aidant ouvre le flux du bon identifiant et passe en direct', () => {
@@ -87,6 +89,25 @@ test('fermer le flux ne relance aucune connexion', () => {
   flux.close();
   assert.equal(timers.length, 0);
   assert.equal(sockets[0].closed, true);
+});
+
+test('l’avis caméra se lit strictement, le reste est ignoré', () => {
+  assert.equal(cameraOnOf('{"type":"camera","on":true}'), true);
+  assert.equal(cameraOnOf('{"type":"camera","on":false}'), false);
+  assert.equal(cameraOnOf('{"type":"audience","watch":1}'), null);
+  assert.equal(cameraOnOf('{"type":"camera","on":"oui"}'), null);
+  assert.equal(cameraOnOf('audience'), null);
+  assert.equal(cameraOnOf(null), null);
+});
+
+test('l’avis caméra prévient la page, un autre texte est ignoré', () => {
+  const { sockets, cameras, frames } = montage();
+  sockets[0].onopen();
+  sockets[0].onmessage({ data: '{"type":"camera","on":false}' });
+  sockets[0].onmessage({ data: 'audience' });
+  sockets[0].onmessage({ data: '{"type":"camera","on":true}' });
+  assert.deepEqual(cameras, [false, true]);
+  assert.equal(frames.length, 0);
 });
 
 test('sans identifiant de flux, aucune connexion n’est tentée', () => {
