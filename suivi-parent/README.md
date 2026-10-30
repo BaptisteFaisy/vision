@@ -7,10 +7,11 @@
 > Gradle `caregiverAssets`) et de référence pour l'ancien contrat.
 
 Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
-Android : fond blanc, petite boule Portrait cacao et caramel, phrase courante,
-**image du téléphone accompagné** (dernière frame caméra, 320 px), **dessins des
-objets reconnus** et, pendant un trajet guidé, une **barre de progression
-liquide** du départ à l'arrivée.
+Android : fond blanc, boule Portrait cacao et caramel en haut, **image du
+téléphone accompagné** en bas (dernière frame caméra, 320 px, pleine largeur
+fondue dans le blanc comme la rue côté accompagné), **dessins des objets
+reconnus** et, pendant un trajet guidé, une **barre de progression liquide**
+du départ à l'arrivée. Aucune phrase sous la boule.
 
 L'interface Android est embarquée dans chaque APK depuis ce dossier (tâche
 Gradle `caregiverAssets`). La WebView intercepte uniquement ces fichiers locaux
@@ -18,11 +19,14 @@ sous `/.isee-caregiver/` ; les appels `/api/state` restent sur l'origine du lien
 partagé. Une ancienne version du site ne peut donc plus remplacer le design
 de l'app installée.
 
-L'écran tient dans la hauteur du téléphone, avec l'image du proche plus haute
-que la boule, sans défilement, barre de retour ni titre Caregiver. L'état LIVE /
-SIGNAL LOST / OFFLINE est dans une pastille arrondie en haut à droite, aux
-dimensions du badge Portrait. La roue dentée noire ouvre les paramètres Android
-(lien reçu), sans aucun réglage de fond de carte : la carte a été retirée.
+L'écran tient dans la hauteur du téléphone, sans défilement, barre de retour
+ni titre Caregiver : la boule en haut, puis les objets et le trajet, puis
+l'image du proche qui occupe le bas jusqu'au bord, sans cadre ni contour,
+fondue dans le blanc vers le haut (miroir de la rue côté accompagné, qui est
+en haut). L'état LIVE / SIGNAL LOST / OFFLINE est dans une pastille arrondie
+en haut à droite, aux dimensions du badge Portrait. La roue dentée noire ouvre
+les paramètres Android (lien reçu), sans aucun réglage de fond de carte : la
+carte a été retirée.
 
 ## Ouvrir la bonne session sur un autre téléphone
 
@@ -47,9 +51,9 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   palette et son or ; ici deux cacao), sans rose ni vert, et sans laver la boule
   de couleur. Repli en verre cacao et caramel si WebGL est indisponible (mêmes
   variables `--orb-color-*`).
-- Texte Portrait, quatre lignes maximum, même cadence d'éclairage mot à mot
-  quand le téléphone indique qu'il parle. La dernière phrase est transmise
-  sans historique ; sinon le site décrit les deux objets reçus les plus proches.
+- Aucune phrase affichée : la narration (`session.mjs`, encore testée) ne
+  remonte plus à l'écran ; seuls le badge d'état et la note de la zone caméra
+  parlent (lien absent, lien mort).
 - Les déplacements GPS distinguent avance, recul et décalage par rapport au
   cap précédent. Le déplacement doit dépasser la somme des incertitudes GPS et
   être compatible avec une marche. Aucun petit pas en intérieur ni contournement
@@ -57,10 +61,12 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   GPS), aucun déplacement n'est affirmé. La précision reste limitée par
   le GPS du téléphone accompagné.
 - Image : la caméra du proche s'affiche **seulement pendant qu'il la fait
-  tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`. Hors de
-  là, aucun cadre, aucune image ni texte : la section se replie et l'image la
-  rouvre dès que la caméra tourne. Seul un lien absent s'écrit
-  (« Ouvre le lien de suivi partagé par ton proche. »). L'avis caméra de la
+  tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`,
+  pleine largeur jusqu'au bord bas, sans cadre ni contour, fondue dans le
+  blanc vers le haut. Hors de là, aucun cadre, aucune image ni texte : la
+  section se replie et l'image la rouvre dès que la caméra tourne. Seuls un
+  lien absent (« Ouvre le lien de suivi partagé par ton proche. ») et un lien
+  mort (`NO_STREAM_TEXT`) s'écrivent dans la zone caméra. L'avis caméra de la
   salle (`{"type":"camera","on":false}`) efface l'image aussitôt, direct comme
   photo lente, sans attendre les 8 s.
 - **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
@@ -79,9 +85,9 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   s'écrit « Encore 300 m · 4 min ». La barre disparaît dès que le guidage
   s'arrête et se fige (atténuée) quand le flux n'est plus LIVE.
 - LIVE avant 12 s ; SIGNAL LOST jusqu'à 2 min (objets et position figés en gris) ;
-  OFFLINE ensuite (aucun repère ni phrase active). Aucune simulation en production.
+  OFFLINE ensuite (aucun repère). Aucune simulation en production.
 - NO STREAM quand le relais ne connaît pas l'identifiant (`{ok:true, live:false}`
-  sans `serverAt`, ou flux purgé après 24 h) : la page le dit et propose de
+  sans `serverAt`, ou flux purgé après 24 h) : la zone caméra le dit et propose de
   redemander le lien, au lieu d'attendre indéfiniment un téléphone qui n'existe
   plus — un lien périmé (app réinstallée, nouvel identifiant) ne ressemble plus
   trait pour trait à un proche pas encore en direct.
