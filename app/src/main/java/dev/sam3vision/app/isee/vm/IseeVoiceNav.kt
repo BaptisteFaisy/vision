@@ -75,7 +75,7 @@ class IseeVoiceNav(
         VoiceNavEngineDriver(
             appContext = context,
             settings = settings,
-            geocode = { address -> chain.geocode(address) },
+            geocode = { address, near -> chain.geocode(address, near = near) },
             originNow = ::lastKnownOrigin,
             scope = scope,
             onUpdate = ::pushGuidanceUpdate,
@@ -98,7 +98,7 @@ class IseeVoiceNav(
     /** Session de navigation (entrée vocale, confirmation, guidage). */
     val session: VoiceNavSession by lazy {
         val loader = ValhallaRouteLoader(
-            geocode = { address -> chain.geocode(address) },
+            geocode = { address, near -> chain.geocode(address, near = near) },
             originNow = ::lastKnownOrigin,
             baseUrl = { settings().routeBaseUrl },
             onPreview = { confirmPreview = it },

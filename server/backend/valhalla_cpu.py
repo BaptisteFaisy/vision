@@ -91,6 +91,11 @@ def _config() -> dict:
     mjolnir["timezone"] = ""
     mjolnir["landmarks"] = ""
     mjolnir["transit_dir"] = ""
+    # Plafond piéton explicite (vol d'oiseau entre étapes) : 25 km observés
+    # en prod — un Cergy→Paris pourtant dans les tuiles est rejeté ; 250 km
+    # = défaut amont Valhalla, couvre l'IdF à pied.
+    limits = cfg.setdefault("service_limits", {}).setdefault("pedestrian", {})
+    limits["max_distance"] = 250000.0
     return cfg
 
 
