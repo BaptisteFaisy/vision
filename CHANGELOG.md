@@ -32,7 +32,10 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   parle en premier, sinon personnes au cadran + distance). `PersonLabels`
   partagé (ex-liste privée de `LateralNudge`, comportement inchangé),
   `CrossingText.offer` supprimée (phrase « Dites traverser » sans appelant).
-- Preuves : à compléter (run r630 + CI).
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 358 tests, 0 échec — dont `CrossingAutoVoiceTest` 7/7, `CrossingPeopleTest`
+  5/5, `IseeSteeringOrdersTest` 5/5, `PersonLabelsTest` 3/3, `CrossingLossGate`
+  3/3) ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes).
 
 
 ## 2026-10-30 — consigne de guidage toutes les 500 ms sur la vidéo (branche `feat/isee-instruction-500ms`)
