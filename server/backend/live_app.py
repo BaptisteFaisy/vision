@@ -11,7 +11,7 @@ reste importable sans stack GPU (``py_compile``, ``scripts/test_units.py``).
 """
 
 # ⚠️ version LENTE (1008 px, 1 forward DETR par concept) : 205-241 ms serveur.
-# Pour la production, déployer `backend/live_app_fast.py` (83-125 ms). Voir docs/LIVE-PERF.md.
+# Production : `backend/live_fast/` (83-125 ms). Voir docs/LIVE-PERF.md.
 # Seule commande de déploiement du direct : scripts/deploy-live-fast.sh
 
 # NOTE: pas de `from __future__ import annotations` ici — FastAPI résout les annotations
