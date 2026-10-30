@@ -126,13 +126,16 @@ data class CurbSignal(
  * Ordre d'annonce « trottoir » : [phrase] dans la langue de la voix, [meters]
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
  * palier, [urgent] vrai pour la seule marche imminente (coupe la voix, comme
- * le stop ; tout le reste attend le silence).
+ * le stop ; tout le reste attend le silence), [safetyPhrase] l'alerte
+ * immédiate (« Stop, … ») pour un bord détecté, pré-alerte comme imminent
+ * (`null` pour le bateau — pas de marche, pas d'alerte).
  */
 data class CurbCue(
     val phrase: String,
     val meters: Float?,
     val tier: CurbTier = CurbTier.FAR,
     val urgent: Boolean = false,
+    val safetyPhrase: String? = null,
 )
 
 /**
@@ -168,6 +171,22 @@ object CurbText {
         SpeechLanguage.Fr -> "Bateau, pas de marche."
         SpeechLanguage.En -> "Dropped curb, no step."
     }
+
+    /**
+     * Alerte immédiate d'un bord détecté : « Stop, … » montant ou descendant,
+     * dans la langue de la voix. Parlée par la voix de sécurité, qui coupe
+     * tout, dictée du user comprise.
+     */
+    fun safetyStepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> when (edge) {
+            CurbEdge.Up -> "Stop, rebord montant."
+            CurbEdge.Down -> "Stop, rebord descendant."
+        }
+        SpeechLanguage.En -> when (edge) {
+            CurbEdge.Up -> "Stop, step up."
+            CurbEdge.Down -> "Stop, step down."
+        }
+    }
 }
 
 /**
@@ -189,8 +208,10 @@ object CurbText {
  * priors, à valider sur captures du téléphone : en cas de doute le bord
  * parle, jamais l'inverse.
  *
- * Pur JVM et testé. Douceur : seule la marche imminente coupe la voix
- * (`urgent = true`, comme le stop) — pré-alerte et bateau attendent le silence.
+ * Pur JVM et testé. Sécurité : un bord détecté (pré-alerte comme
+ * imminent) parle en alerte immédiate ([CurbCue.safetyPhrase], voix de
+ * sécurité qui coupe tout, dictée du user comprise) — seul le bateau
+ * attend le silence (pas de marche, pas d'alerte).
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -259,7 +280,13 @@ class CurbWatcher(
         lastCueAtMs = nowMs
         nearHits = 0
         val edge = signal.edge ?: CurbEdge.Up
-        return CurbCue(CurbText.stepPhrase(edge, language, signal.centerX), signal.meters, CurbTier.NEAR, urgent = true)
+        return CurbCue(
+            CurbText.stepPhrase(edge, language, signal.centerX),
+            signal.meters,
+            CurbTier.NEAR,
+            urgent = true,
+            safetyPhrase = CurbText.safetyStepPhrase(edge, language),
+        )
     }
 
     /** Pré-alerte douce, inchangée ; au-delà du réarmement, l'imminent se ré-arme. */
@@ -272,7 +299,14 @@ class CurbWatcher(
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
-        return CurbCue(CurbText.phrase(language, signal.centerX), signal.meters, CurbTier.FAR, urgent = false)
+        val edge = signal.edge ?: CurbEdge.Up
+        return CurbCue(
+            CurbText.phrase(language, signal.centerX),
+            signal.meters,
+            CurbTier.FAR,
+            urgent = false,
+            safetyPhrase = CurbText.safetyStepPhrase(edge, language),
+        )
     }
 
     /** Oublie les comptes, les verrous et l'annonce (nouvelle séance de direct). */

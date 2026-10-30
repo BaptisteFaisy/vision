@@ -9,9 +9,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Parole des guetteurs : la marche imminente passe même en Traversée (sauf
- * stop parlé il y a moins de 2 s), la pré-alerte et le bateau sont doux et
- * coupés en Traversée — et les détections sont reconstruites des lectures.
+ * Parole des guetteurs : la bordure (imminente comme pré-alerte) passe même
+ * en Traversée pour l'imminente et même après un stop — une alerte de
+ * sécurité ne se tait jamais pour une autre phrase ; le bateau reste doux
+ * et coupé en Traversée — et les détections sont reconstruites des lectures.
  */
 class ProbeWiringWatchersTest {
 
@@ -19,22 +20,16 @@ class ProbeWiringWatchersTest {
 
     @Test
     fun `marche imminente passe meme en traversee`() {
-        assertTrue(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = true, stopRecent = false))
-        assertTrue(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = false, stopRecent = false))
-    }
-
-    @Test
-    fun `stop recent fait taire la marche imminente`() {
-        assertFalse(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = true, stopRecent = true))
-        assertFalse(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = false, stopRecent = true))
+        assertTrue(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = true))
+        assertTrue(shouldSpeakCurb(cue(CurbTier.NEAR), crossingActive = false))
     }
 
     @Test
     fun `pre-alerte et bateau doux, coupes en traversee`() {
-        assertFalse(shouldSpeakCurb(cue(CurbTier.FAR), crossingActive = true, stopRecent = false))
-        assertFalse(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = true, stopRecent = false))
-        assertTrue(shouldSpeakCurb(cue(CurbTier.FAR), crossingActive = false, stopRecent = false))
-        assertTrue(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = false, stopRecent = false))
+        assertFalse(shouldSpeakCurb(cue(CurbTier.FAR), crossingActive = true))
+        assertFalse(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = true))
+        assertTrue(shouldSpeakCurb(cue(CurbTier.FAR), crossingActive = false))
+        assertTrue(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = false))
     }
 
     @Test

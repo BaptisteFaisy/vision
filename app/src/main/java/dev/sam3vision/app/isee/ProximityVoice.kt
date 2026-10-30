@@ -68,8 +68,9 @@ class ProximityVoice(
         if (urgent) player.stop()
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
-        // L'urgence (trottoir, escaliers) parle toujours : la sécurité passe
-        // avant la priorité du user et avant la porte « GPS désactivé ».
+        // L'urgence (stop) parle toujours : la sécurité passe avant la
+        // priorité du user et avant la porte « GPS désactivé ». (Trottoir et
+        // voiture en mouvement parlent par la voix de sécurité, hors d'ici.)
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
             onSpeaking(phrase)
