@@ -242,4 +242,12 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
 - **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
   (12 concepts, plafond 16 tenu) ; le feu parle en premier, et sur son
   silence les personnes sont annoncées au cadran (« Personne à 9 heures, à
-  2 mètres », `CrossingPeopleWatch`, débouncé comme toute annonce).
+  2 mètres », `CrossingPeopleWatch`, débouncé comme toute annonce) ;
+- **décalage opposé** (30/10, après-midi) : des gens proches qui s'approchent
+  d'un côté disent d'aller de l'autre (« Droite. », mot nouveau seul, clip
+  < 100 ms — le même `LateralNudgeTracker` que le guidage normal, qui prime
+  sur les positions comme lui) ; un ordre du feu nouveau fait taire la voix
+  douce 2,5 s (`CUE_QUIET_MS`, les répétitions du rouge ne réarment pas) —
+  sans ce silence, le `collectLatest` côté sonde jetterait l'ordre pas
+  encore joué, et un « Vert, traversez. » dit une seule fois ne se rattrape
+  pas (`CrossingPeopleVoice.kt`, la sonde ne change que d'une ligne).
