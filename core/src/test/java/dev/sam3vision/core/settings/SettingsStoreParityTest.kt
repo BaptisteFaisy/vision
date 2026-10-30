@@ -38,6 +38,7 @@ class SettingsStoreParityTest {
         liveSamEnabled = false,
         boxPredictionEnabled = true,
         localOverlayEnabled = false,
+        continuousCadenceEnabled = true,
         debugRouteMapEnabled = false,
         navigationGuidanceEnabled = false,
         outdoorMode = false,
@@ -65,6 +66,7 @@ class SettingsStoreParityTest {
         assertEquals(false, relu.navigationGuidanceEnabled)
         assertEquals(false, relu.outdoorMode)
         assertEquals(true, relu.boxPredictionEnabled)
+        assertEquals(true, relu.continuousCadenceEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.Fr, relu.speechLanguage)
         assertEquals("https://route.test", relu.routeBaseUrl)

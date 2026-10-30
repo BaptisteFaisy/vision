@@ -100,7 +100,7 @@ class LiveProbe(
     private val rate = FrameRate()
 
     /** Échéance partagée avec le Direct ; la réserve d'une frame reste locale (ci-dessous). */
-    private val cadence = LiveFrameCadence()
+    internal val cadence = LiveFrameCadence()
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
     private val distances = DistanceMeter()

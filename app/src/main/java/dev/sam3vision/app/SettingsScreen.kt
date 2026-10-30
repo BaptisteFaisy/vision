@@ -106,6 +106,7 @@ private fun PerceptionSettings(
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PredictionSettings(draft) { onChange(it) }
+        CadenceSettings(draft) { onChange(it) }
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
         WorldModeSettings(draft) { onChange(it) }
@@ -428,6 +429,23 @@ private fun PredictionSettings(draft: Settings, onChange: (Settings) -> Unit) {
             "Boxes predicted between inferences (experimental, unmeasured)",
             draft.boxPredictionEnabled,
         ) { onChange(draft.copy(boxPredictionEnabled = it)) }
+    }
+}
+
+/** « Direct » cadence A/B : continue (moitié de la latence) au lieu des paliers adaptatifs. */
+@Composable
+private fun CadenceSettings(draft: Settings, onChange: (Settings) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Direct — continuous cadence (A/B, off by default)",
+            color = SettingsLight.text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        SwitchRow(
+            "Continuous cadence instead of adaptive steps (experimental, unmeasured)",
+            draft.continuousCadenceEnabled,
+        ) { onChange(draft.copy(continuousCadenceEnabled = it)) }
     }
 }
 
