@@ -2,6 +2,7 @@ package dev.sam3vision.core.net
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,6 +52,28 @@ class LiveClientFactoryTest {
 
         val sent = org.json.JSONObject(transport.sent.single())
         assertTrue("with_depth dans la trame", sent.getBoolean("with_depth"))
+    }
+
+    @Test
+    fun `la fabrique transmet masks false en none sans knobs`() = runBlocking {
+        val transport = ContractWsTransport { json ->
+            listOf(NetContract.frameReply(json.getInt("id")))
+        }
+        val client = liveClientWith(
+            baseUrl = "https://exemple.invalid",
+            timeoutSeconds = 10L,
+            maskFormat = "rle",
+            maskEdge = 256,
+            masks = false,
+            transportFor = { transport },
+        )
+
+        client.live("QQ==", null, 640, 4)
+
+        val sent = org.json.JSONObject(transport.sent.single())
+        assertEquals("none", sent.getString("mask_encoding"))
+        assertFalse("pas de mask_format sans masque", sent.has("mask_format"))
+        assertFalse("pas de mask_edge sans masque", sent.has("mask_edge"))
     }
 
     /**
