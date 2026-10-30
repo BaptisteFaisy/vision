@@ -41,6 +41,7 @@ private fun sessionLine(state: GlassesUiState): String {
 /** Ligne discrète du micro : ce que la dictée peut réellement prendre, et quand. */
 private fun micLine(state: GlassesUiState): String {
     val status = when {
+        state.talkListening -> "écoute — parle, rappuie pour envoyer"
         state.micActive -> "actif"
         !state.micAllowed -> "non autorisé"
         GlassesAudioPlan.usable(state.connected, state.streaming, state.micAllowed) -> "prêt"

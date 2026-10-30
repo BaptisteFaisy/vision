@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses
 
 import android.graphics.Bitmap
+import android.graphics.Paint
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaFormat
@@ -21,6 +22,32 @@ fun cropTransform(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropTransform {
     if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return CropTransform(1f, 0f, 0f)
     val scale = maxOf(dstW / srcW.toFloat(), dstH / srcH.toFloat())
     return CropTransform(scale, (dstW - srcW * scale) / 2f, (dstH - srcH * scale) / 2f)
+}
+
+/**
+ * Recadrage source « remplit le canvas » : le rectangle centré du bitmap
+ * ([srcW]×[srcH]) qui a exactement le ratio du canvas ([dstW]×[dstH]).
+ *
+ * Le chemin bitmap du direct dessine dans un canvas à taille vidéo (voir
+ * `IseeGlassesLive`) que la matrice « remplit la vue » agrandit ensuite : le
+ * bitmap doit donc y entrer en conservant son ratio, sinon l'image est
+ * étirée puis re-zoomée par la matrice (double mise à l'échelle). Cas
+ * nominal : bitmap et canvas à taille vidéo → rectangle plein, dessin 1:1,
+ * et la matrice fait l'unique upscale. Pur, testé en JVM
+ * (`GlassesBitmapCropTest`) ; dégénéré → bitmap entier, jamais de crash.
+ */
+internal fun bitmapSourceCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropRect {
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return CropRect(0, 0, srcW, srcH)
+    // Comparaison sans flottant : source plus large que le canvas ?
+    val wide = srcW.toLong() * dstH
+    val tall = dstW.toLong() * srcH
+    if (wide == tall) return CropRect(0, 0, srcW, srcH)
+    if (wide > tall) {
+        val w = (srcH.toLong() * dstW / dstH).toInt().coerceIn(1, srcW)
+        return CropRect((srcW - w) / 2, 0, w, srcH)
+    }
+    val h = (srcW.toLong() * dstH / dstW).toInt().coerceIn(1, srcH)
+    return CropRect(0, (srcH - h) / 2, srcW, h)
 }
 
 /** Start code Annex B : sépare les unités NAL dans le flux que le décodeur attend. */
@@ -111,6 +138,8 @@ class GlassesLiveDecoder(
     private var closed = false
     private var noteCount = 0
     private var renders = 0L
+    /** Dessin bitmap filtré : sans `isFilterBitmap`, tout rééchantillonnage aliaserait. */
+    private val bitmapPaint = Paint().apply { isFilterBitmap = true }
     private var bitmapAnnounced = false
     private var csd: ByteArray? = null
     private var csdAnnounced = false
@@ -138,7 +167,14 @@ class GlassesLiveDecoder(
             stashConfig(target, frame)
             return false
         }
-        frame.asSdkFrame().toBitmapOrNull()?.let { return drawBitmap(target, frame, it) }
+        frame.asSdkFrame().toBitmapOrNull()?.let {
+            try {
+                return drawBitmap(target, frame, it)
+            } finally {
+                // Bitmap décodé pour ce seul dessin (15 i/s) : libéré aussitôt.
+                runCatching { it.recycle() }
+            }
+        }
         if (!frame.compressed) {
             // Brut non ARGB (YUV du banc, jamais en production) : rien à en faire ici.
             noteFailure(GlassesMessages.videoUndecodable())
@@ -152,17 +188,21 @@ class GlassesLiveDecoder(
         VideoFrame(ByteBuffer.wrap(bytes), width, height, presentationTimeUs, compressed, codecConfig)
 
     /**
-     * Dessin bitmap : l'image remplit le canvas (le recadrage « remplit la vue » est posé une
-     * seule fois, par la vue elle-même — le chemin `MediaCodec` ne peut pas recadrer seul).
-     * Le verrou du canvas est toujours rendu.
+     * Dessin bitmap : l'image remplit le canvas à taille vidéo en gardant son ratio
+     * ([bitmapSourceCrop], peinture filtrée) ; le recadrage « remplit la vue » est posé
+     * une seule fois, par la vue elle-même. Le verrou du canvas est toujours rendu.
      */
     private fun drawBitmap(target: Surface, frame: GlassesFrame, bitmap: Bitmap): Boolean {
         val canvas = runCatching { target.lockCanvas(null) }.getOrNull() ?: return false
         try {
             if (canvas.width <= 0 || canvas.height <= 0) return false
-            canvas.drawBitmap(bitmap, null, Rect(0, 0, canvas.width, canvas.height), null)
+            // Ratio conservé (recadrage source centré), plein canvas : cas nominal
+            // 1:1, et la matrice de la vue fait ensuite l'unique upscale.
+            val crop = bitmapSourceCrop(bitmap.width, bitmap.height, canvas.width, canvas.height)
+            val src = Rect(crop.x, crop.y, crop.x + crop.width, crop.y + crop.height)
+            canvas.drawBitmap(bitmap, src, Rect(0, 0, canvas.width, canvas.height), bitmapPaint)
             onVideoSize(frame.width, frame.height)
-            announceBitmap(frame)
+            announceBitmap(frame, bitmap)
             return countRender(true)
         } catch (_: Exception) {
             return false
@@ -296,10 +336,10 @@ class GlassesLiveDecoder(
     }
 
     /** Première image bitmap : journalisée une fois (dit le format livré par le flux). */
-    private fun announceBitmap(frame: GlassesFrame) {
+    private fun announceBitmap(frame: GlassesFrame, bitmap: Bitmap) {
         if (bitmapAnnounced) return
         bitmapAnnounced = true
-        Log.i(TAG, "direct lunettes : première image bitmap ${frame.width}×${frame.height}")
+        Log.i(TAG, "direct lunettes : première image bitmap ${bitmap.width}×${bitmap.height} (flux ${frame.width}×${frame.height})")
     }
 
     /**

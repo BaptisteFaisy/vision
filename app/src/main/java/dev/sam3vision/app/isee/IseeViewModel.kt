@@ -33,6 +33,7 @@ import dev.sam3vision.app.isee.vm.IseeModeOrders
 import dev.sam3vision.app.isee.vm.IseeVoiceNav
 import dev.sam3vision.app.isee.vm.MaisonEnterOrder
 import dev.sam3vision.app.isee.vm.NavigationHook
+import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Le chef d'orchestre de l'écran unique (chat, caméra : vidéo du tap, photo
@@ -225,6 +227,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var settings: Settings = Settings.Default
 
+    /** Compteur des photos lunettes affichées : deux photos n'ont jamais le même `seq`. */
+    private var glassesPhotoSeq = 0L
+
     init {
         // Le texte d'intro est le premier message une fois pour toutes.
         update { it.copy(introVisible = true) }
@@ -286,6 +291,62 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             voiceNavVoiceGate.openWindow()
             syncProbe()
         } else probe.stop()
+    }
+
+    /**
+     * Photo prise avec les lunettes : elle s'affiche sur cet écran (personne
+     * accompagnée), sans quitter la page courante — posée même depuis un autre
+     * écran, elle attend le retour sur iSee. Doublon (même fichier) ignoré,
+     * photo suivante remplace la précédente ([acceptGlassesPhoto]). ASK :
+     * la photo devient aussi le contexte de la prochaine question dictée.
+     */
+    fun onGlassesPhoto(file: File, action: CaptureAction) {
+        if (!acceptGlassesPhoto(_state.value.glassesPhoto, file)) return
+        glassesPhotoSeq += 1
+        update { it.copy(glassesPhoto = IseeGlassesPhoto(file, action, glassesPhotoSeq), status = glassesPhotoLabel(action)) }
+        if (action == CaptureAction.ASK) shots.setExternalContext(file)
+    }
+
+    /** La photo des lunettes est fermée (retour, bouton) : l'écran iSee reste. */
+    fun dismissGlassesPhoto() {
+        val dismissed = _state.value.glassesPhoto
+        update { it.copy(glassesPhoto = null) }
+        // Question annulée avec sa photo : le contexte ne doit pas fuir vers
+        // la question suivante (déjà consommé, le relâchement est neutre).
+        if (dismissed?.action == CaptureAction.ASK) shots.releaseContext()
+    }
+
+    /**
+     * Écoute mains-libres ouverte aux lunettes : iSee se tait (lecture et
+     * guidage coupés) pour ne pas couvrir la question. Honorée même hors écran
+     * iSee : le téléphone est en poche, l'utilisateur ne peut pas vérifier.
+     */
+    fun onGlassesListening() {
+        if (!playerIdle()) {
+            player.stop()
+            update { it.copy(speakingEntryId = null) }
+        }
+        voiceNav.stopVoice()
+    }
+
+    /**
+     * Question entendue aux lunettes : photo-contexte affichée sur cet écran
+     * (comme [onGlassesPhoto] en ASK), puis même traitement qu'une dictée
+     * tenue-relâchée ([handleDictated]). Le téléphone reste en poche.
+     */
+    fun onGlassesHeard(photo: File?, text: String, pcm: ByteArray) {
+        onGlassesListening()
+        if (photo != null) onGlassesPhoto(photo, CaptureAction.ASK)
+        viewModelScope.launch {
+            if (isIntroDisablePhrase(text)) {
+                dropHeard()
+                intro.disable()
+                return@launch
+            }
+            if (speedOrder.run(text)) return@launch
+            if (runSettingsCommand(text)) return@launch
+            handleDictated(text, pcm)
+        }
     }
 
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */

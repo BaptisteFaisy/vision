@@ -301,6 +301,8 @@ private fun GlassesBlock(glasses: GlassesController) {
         onDisconnect = glasses::disconnect,
         onStartMock = glasses::startMockDevice,
         onMockPress = { glasses.mockPress() },
+        onMockHold = glasses::mockHold,
+        onMockVoiceLaunch = glasses::mockVoiceLaunch,
         onStopMock = glasses::stopMockDevice,
     )
 }
