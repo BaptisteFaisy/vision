@@ -3,6 +3,7 @@ package dev.sam3vision.core.net
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
+import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.model.SegObject
 import org.json.JSONObject
 
@@ -394,8 +395,30 @@ private fun liveFrameOf(json: JSONObject): LiveFrame {
         height = json.intOr("height"),
         elapsedMs = json.intOr("elapsed_ms").toLong(),
         objects = objects,
+        passage = passageOf(json),
         maskEncoding = encoding,
         timingsMs = timingsMsOf(json),
+    )
+}
+
+/**
+ * Passage conseillé par SAM (`"passage"`) : absent ou illisible ⇒ `null` (un
+ * backend antérieur ne l'envoie pas : repli local, sans erreur). Le côté ne
+ * retient que `"left"`/`"right"`, la boîte que 4 nombres finis.
+ */
+private fun passageOf(json: JSONObject): Passage? {
+    val node = json.optJSONObject("passage") ?: return null
+    val side = (node.opt("side") as? String)?.takeIf { it == "left" || it == "right" }
+    val box = node.optJSONArray("box")
+        ?.let { array -> (0 until array.length()).map { i -> array.optDouble(i, Double.NaN) } }
+        ?.takeIf { coords -> coords.size == 4 && coords.all { it.isFinite() } }
+        ?.map { it.toFloat() }
+    return Passage(
+        blocked = node.optBoolean("blocked", false),
+        side = side,
+        label = node.opt("label") as? String,
+        box = box,
+        score = (node.opt("score") as? Number)?.toFloat()?.takeIf { it.isFinite() },
     )
 }
 

@@ -7,6 +7,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
+import dev.sam3vision.core.model.Passage
 
 /**
  * Ce que la page caméra montre de SAM : les masques décodés de la dernière frame,
@@ -55,6 +56,8 @@ data class LiveProbeState(
     val steeringCap: SteeringCap = SteeringCap.Straight,
     /** Chemin de la dernière frame (`null` = guidage coupé ou mode Traversée). */
     val steering: SteeringCue? = null,
+    /** Passage conseillé par SAM (`null` = backend antérieur ou pas de frame). */
+    val samPassage: Passage? = null,
     /** Détour obstacle subi : le GPS recalcule l'itinéraire s'il dure (faux en Traversée). */
     val detour: Boolean = false,
     /** Mode Traversée actif : prompts feu+voitures, guidage et annonces coupés. */

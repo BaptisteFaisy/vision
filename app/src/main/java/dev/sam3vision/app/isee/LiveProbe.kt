@@ -419,7 +419,7 @@ _state.update { it.cleared() }
         val phrase = if (_state.value.crossingActive) {
             cross?.cue?.phrase
         } else {
-            voice.phrase(at, placed, _state.value.steeringCap)
+            voice.phrase(at, placed, _state.value.steeringCap, frame.passage)
         }
         val steering = steeringCueOf()
         _state.update { current ->
@@ -439,6 +439,7 @@ _state.update { it.cleared() }
                 spoken = phrase ?: current.spoken,
                 spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
                 steering = steering,
+                samPassage = frame.passage,
                 detour = if (_state.value.crossingActive) false else voice.detour,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive),

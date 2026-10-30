@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -196,5 +197,41 @@ class GuidanceAnnouncerTest {
             announcer.onFrame(0L, listOf(personne(0.4f)), SpeechLanguage.En),
         )
         assertNull(announcer.onFrame(200L, listOf(personne(0.45f)), SpeechLanguage.En))
+    }
+
+    @Test
+    fun `passage SAM bouche parle son cote`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = true, side = "right", label = "person")
+
+        assertEquals("droite.", announcer.onFrame(0L, libre, samPassage = sam))
+        assertNull(announcer.onFrame(200L, libre, samPassage = sam))
+    }
+
+    @Test
+    fun `passage SAM libre tait un couloir localement bouche`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = false)
+
+        assertEquals("Tout droit.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
+    }
+
+    @Test
+    fun `passage SAM bouche avec mesure proche dit stop`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = true, side = "left", label = "person")
+
+        assertEquals(
+            "obstacle, arrêtez-vous.",
+            announcer.onFrame(0L, listOf(personne(0.4f)), samPassage = sam),
+        )
+    }
+
+    @Test
+    fun `passage SAM bouche sans cote passe a gauche`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = true)
+
+        assertEquals("gauche.", announcer.onFrame(0L, libre, samPassage = sam))
     }
 }

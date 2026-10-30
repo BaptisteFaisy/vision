@@ -24,6 +24,7 @@ from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, cl
                        gpu_name, levers, load, load_cpu, prepare, run_frame,
                        segment_frame, vision_grid)
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
+from passage import suggest_passage
 from timing import Stage, elapsed_ms, format_server_timing, now
 
 MODEL_LABEL = "sam3.1-fast"
@@ -205,6 +206,7 @@ class Sam3LiveService:
                         "attn": getattr(getattr(self.ctx.get("model"), "config", None),
                                         "_attn_implementation", "?"), "dtype": DTYPE_NAME,
                           "timings": TIMING}
+        result["passage"] = suggest_passage(result.get("objects"), result["width"], result["height"])
         return result
 
     async def _run_live(self, request) -> dict:
