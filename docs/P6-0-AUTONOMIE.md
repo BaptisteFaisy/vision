@@ -3,6 +3,8 @@
 > Statut : **protocole prêt à exécuter, campagne NON exécutée** (aucun
 > matériel disponible à la rédaction).
 > Rédigé le 2026-10-30 depuis `origin/master` (`7c11d40`).
+> Citations revérifiées le 30/10 sur `origin/master` (`892b9fb`, branche
+> `p6-prepa-autonomie`) : toutes exactes, protocole inchangé.
 > P6 reste **backlog** : ce protocole ne demande aucun code P6 — tous les
 > scénarios tournent sur le code de master.
 

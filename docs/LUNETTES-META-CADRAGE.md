@@ -4,6 +4,12 @@
 > Rédigée le 2026-10-29 depuis `origin/master` (`f1f550f`), par lecture du code
 > cité. Aucun matériel (ni lunettes, ni téléphone) n'était disponible : tout ce
 > qui exige du terrain est marqué **à mesurer**.
+> Mise à jour le 2026-10-30 (branche `p6-prepa-autonomie`, `origin/master`
+> `892b9fb`) : P1–P5 intégrés sur master (commit `4023874`, voir §3.1),
+> protocole P6-0 versé (`docs/P6-0-AUTONOMIE.md`), points ouverts n° 1–2
+> instruits (`docs/P6-5-REPLI-POCHE.md`,
+> `docs/P6-3-SERVICE-PREMIER-PLAN.md`). Campagne de mesure et décisions
+> produit : toujours en attente.
 
 Objectif rappelé : en poche / écran éteint, retrouver le guidage obstacles
 depuis la caméra des lunettes — brancher `GlassesVideoLink` (frames DAT) vers
@@ -140,9 +146,17 @@ Fichier : `app/src/main/java/dev/sam3vision/app/MicBus.kt`. Objet purement JVM.
 
 ## 3. Prérequis
 
-1. **P1–P5 verts.** Les cinq autres prompts du lot (traités en parallèle sur
-   leurs propres branches) doivent être terminés et vérifiés avant tout
-   démarrage. Cette note ne les décrit pas : elle ne couvre que le cadrage P6.
+1. **P1–P5 verts.** Contenus intégrés sur `origin/master` par le commit
+   `4023874` (« iSee dehors : intégration P1–P6 », repris de la branche
+   `integration-isee-outdoor-p1p6`, CHANGELOG du 2026-10-29) : arbitre vocal
+   (P1), `outdoorMode` persisté (P2), filtre sign (P3), wording virage (P4),
+   `docs/RECETTE-RUE.md` + `scripts/verify-street.sh` (P5) — tous vérifiés
+   présents sur master le 30/10. Ce ne sont pas des fusions git (aucun commit
+   de merge ; les refs `p1`…`p5` restent ouvertes), mais le contenu est là.
+   Reste à confirmer avant démarrage : CI verte sur master et recette paire
+   réelle OK. Cette note ne décrit pas P1–P5 : elle ne couvre que le cadrage P6.
+
+
    Au minimum, le P6 suppose acquise et stable sur paire réelle toute la chaîne
    décrite en §1 (session, flux 15 i/s, pont écran allumé, arbitrage micro
    téléphone).
@@ -152,6 +166,8 @@ Fichier : `app/src/main/java/dev/sam3vision/app/MicBus.kt`. Objet purement JVM.
    avec le même outillage que `docs/MICRO-VERROUILLE.md` §Preuves
    (`adb`, `MQSserver`, `dumpsys batterystats`). Sans ces chiffres, aucun budget
    (cadence, durée max, seuils) ne peut être fixé autrement qu'au hasard.
+   Protocole versé : `docs/P6-0-AUTONOMIE.md` (prêt à exécuter, campagne
+   non exécutée — en attente du téléphone et de la paire).
 3. **Matériel et accès** : paire réelle + téléphone de recette + Developer Mode
    (rappel : pas de canal public, canal « Beta » sur invitation — §13 de
    `docs/META-GLASSES.md`), et une décision produit sur le §5, point n° 1.
@@ -171,17 +187,28 @@ Fichier : `app/src/main/java/dev/sam3vision/app/MicBus.kt`. Objet purement JVM.
 Ordre contraignant : P6-0 avant tout ; P6-1 avant P6-2 ; P6-5 testé sur coupure
 réelle, jamais seulement sur mock.
 
+Notes d'instruction (branche `p6-prepa-autonomie`, backlog inchangé) :
+P6-0 → `docs/P6-0-AUTONOMIE.md` ; P6-3 (type FGS) →
+`docs/P6-3-SERVICE-PREMIER-PLAN.md` ; P6-5 (repli poche) →
+`docs/P6-5-REPLI-POCHE.md`.
+
 ## 5. Risques et points ouverts
 
 1. **Le repli téléphone en poche ne peut pas « voir ».** Une caméra de téléphone
    en poche filme du noir : basculer dessus enverrait des frames noires à SAM
    (facturées, trompeuses). Le repli réaliste en poche est donc une **pause
    annoncée**, pas une bascule caméra. À trancher avec le produit avant P6-5.
+   Instruit : `docs/P6-5-REPLI-POCHE.md` (recommandation : pause annoncée
+   en poche, bascule téléphone si visible, jamais de caméra en poche ;
+   produit tranche phrases, hystérésis, palier D, `PAUSED`).
 2. **Type de service de premier plan.** Le flux DAT n'est ni `CameraService` ni
    `AudioRecord` : le type FGS qui couvre légalement « streaming BT + réseau +
    voix » écran éteint n'est pas établi. À trancher par la doc Android + un
    essai sur appareil (refus système = échec net, comme pour `microphone` avant
    `LockedMicService`).
+   Instruit : `docs/P6-3-SERVICE-PREMIER-PLAN.md` (recommandation :
+   `connectedDevice` seul, `specialUse` en repli ; preuve sur le Redmi
+   exigée avant P6-3).
 3. **Porte `ForegroundTracker` / coût GPU.** Lever la porte « premier plan »
    pour la source lunettes sans garde-fou, c'est risquer un conteneur Modal
    allumé dans une poche jusqu'à la batterie vide. Le lifecycle P6-2 doit garder
@@ -206,14 +233,20 @@ réelle, jamais seulement sur mock.
 
 ## 6. Critères de démarrage (tous exigés)
 
-- [ ] P1, P2, P3, P4, P5 : branches fusionnées, CI verte, recette paire réelle OK.
-- [ ] P6-0 livré : chiffres d'autonomie lunettes + téléphone versés en doc,
-      budget (cadence, durée max, seuils) validé.
-- [ ] Point ouvert n° 1 tranché (repli poche = pause annoncée ?) et n° 2
-      instruit (type FGS viable démontré sur appareil).
+- [x] P1–P5 : contenus intégrés sur master (`4023874`, vérifié le 30/10).
+- [ ] P1–P5 : CI verte sur master + recette paire réelle OK (à confirmer).
+- [ ] P6-0 : protocole versé (`docs/P6-0-AUTONOMIE.md`) ; campagne NON
+      exécutée (chiffres + budget validé : en attente du téléphone).
+
+- [ ] Point ouvert n° 1 instruit (`docs/P6-5-REPLI-POCHE.md`) : produit
+      tranche (phrases, hystérésis, palier D, `PAUSED`).
+- [ ] Point ouvert n° 2 instruit (`docs/P6-3-SERVICE-PREMIER-PLAN.md`) :
+      type `connectedDevice` à démontrer sur le Redmi.
+
 - [ ] Paire réelle + téléphone de recette disponibles pour la durée du chantier
       (les étapes P6-3/P6-5 ne sont pas valables sur mock seul).
-- [ ] Aucun code P6 écrit avant : cette note est le seul artefact de la branche.
+- [ ] Aucun code P6 écrit avant : docs seules (cette note + `P6-0-AUTONOMIE`,
+      `P6-3-SERVICE-PREMIER-PLAN`, `P6-5-REPLI-POCHE`).
 
 ## 7. Sources lues pour cette note
 
