@@ -115,6 +115,8 @@ internal object SettingsCodec {
     private const val K_DISTANCE_OVERLAY = "distanceOverlayEnabled"
     private const val K_LIVE_SAM = "liveSamEnabled"
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
+    private const val K_ADAPTIVE_UPLOAD = "adaptiveUploadEnabled"
+    private const val K_KEYFRAME_SCHEDULER = "keyframeSchedulerEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_DEBUG_ROUTE_MAP = "debugRouteMapEnabled"
     private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
@@ -153,6 +155,8 @@ internal object SettingsCodec {
         appendLine("$K_DISTANCE_OVERLAY=${s.distanceOverlayEnabled}")
         appendLine("$K_LIVE_SAM=${s.liveSamEnabled}")
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
+        appendLine("$K_ADAPTIVE_UPLOAD=${s.adaptiveUploadEnabled}")
+        appendLine("$K_KEYFRAME_SCHEDULER=${s.keyframeSchedulerEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_DEBUG_ROUTE_MAP=${s.debugRouteMapEnabled}")
         appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
@@ -203,6 +207,10 @@ internal object SettingsCodec {
             liveSamEnabled = values[K_LIVE_SAM]?.toBooleanStrictOrNull() ?: default.liveSamEnabled,
             boxPredictionEnabled = values[K_BOX_PREDICTION]?.toBooleanStrictOrNull()
                 ?: default.boxPredictionEnabled,
+            adaptiveUploadEnabled = values[K_ADAPTIVE_UPLOAD]?.toBooleanStrictOrNull()
+                ?: default.adaptiveUploadEnabled,
+            keyframeSchedulerEnabled = values[K_KEYFRAME_SCHEDULER]?.toBooleanStrictOrNull()
+                ?: default.keyframeSchedulerEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
             debugRouteMapEnabled = values[K_DEBUG_ROUTE_MAP]?.toBooleanStrictOrNull()
