@@ -13,14 +13,14 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
 /**
- * Chargeur de résumé Valhalla pour l'écran de confirmation : destination →
- * géocodage (chaîne GMS puis BAN) → itinéraire piéton depuis [originNow].
+ * Chargeur de résumé Valhalla pour l'écran de confirmation : position lue
+ * d'abord ([originNow]) → géocodage trié par proximité → itinéraire piéton.
  *
- * - géocodage en échec → échec (son message français, affiché tel quel) ;
  * - sans position de départ → échec « position de départ indisponible
- *   (activez la localisation) » ; sans URL Valhalla → échec « service
- *   d'itinéraire non configuré » (jamais de résumé à zéro : des zéros
- *   affichés comme des distances mentent — « Dans 0 m ») ;
+ *   (activez la localisation) » (sans appel réseau) ; sans URL Valhalla →
+ *   échec « service d'itinéraire non configuré » (jamais de résumé à zéro :
+ *   des zéros affichés comme des distances mentent — « Dans 0 m ») ;
+ * - géocodage en échec → échec (son message français, affiché tel quel) ;
  * - appel `/route` : 2 tentatives max (1 essai + 1 reprise), chacune bornée
  *   à [ROUTE_TIMEOUT_SECONDS] ; échec final → échec « itinéraire
  *   indisponible (motif) » (l'écran montre l'adresse + le motif, et
@@ -33,7 +33,7 @@ import kotlinx.coroutines.withTimeout
  * Ne lève jamais : tout collaborateur qui jetterait devient un échec.
  */
 class ValhallaRouteLoader(
-    private val geocode: suspend (String) -> Result<GeocodedPlace>,
+    private val geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace>,
     private val originNow: () -> RoutePoint?,
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val baseUrl: () -> String,
@@ -45,17 +45,19 @@ class ValhallaRouteLoader(
     suspend operator fun invoke(destination: String): Result<RouteSummary> {
         // Nouvelle demande : l'aperçu précédent est périmé (jamais d'ancienne carte).
         runCatching { onPreview(null) }
-        // Appels `suspend` (`runCatching` ne l'est pas) : try/catch directs.
-        val place = try {
-            geocode(destination)
-        } catch (t: Exception) {
-            Result.failure(t)
-        }.getOrElse { return Result.failure(it) }
+        // Position d'abord : sans GPS, échec immédiat sans appel réseau.
         val origin = runCatching { originNow() }.getOrNull()
         val base = runCatching { baseUrl().trim().trimEnd('/') }.getOrDefault("")
         if (origin == null || base.isNullOrBlank()) {
             return Result.failure(missingInputFailure(origin == null))
         }
+        // Appels `suspend` (`runCatching` ne l'est pas) : try/catch directs.
+        // L'origine trie les candidats par proximité (homonymes lointains écartés).
+        val place = try {
+            geocode(destination, origin)
+        } catch (t: Exception) {
+            Result.failure(t)
+        }.getOrElse { return Result.failure(it) }
         val client = try {
             routeClient(base)
         } catch (t: Exception) {
@@ -105,11 +107,17 @@ private fun missingInputFailure(noOrigin: Boolean): Throwable =
         },
     )
 
-/** Échec `/route` final : motif français actionnable pour l'écran. */
+/** Fragment stable du refus Valhalla quand le vol d'oiseau dépasse son plafond (peu importe sa valeur). */
+private const val VALHALLA_DISTANCE_LIMIT = "exceeds the max distance limit"
+
+/** Échec `/route` final : motif français actionnable pour l'écran (jamais du JSON brut). */
 private fun routeFailure(cause: Throwable): Throwable {
     val reason = when (cause) {
         is TimeoutCancellationException -> "délai dépassé"
-        else -> cause.message?.trim().orEmpty().ifEmpty { "réseau inaccessible" }
+        else -> {
+            val raw = cause.message?.trim().orEmpty().ifEmpty { "réseau inaccessible" }
+            if (VALHALLA_DISTANCE_LIMIT in raw) "destination trop éloignée à pied" else raw
+        }
     }
     return IllegalStateException("itinéraire indisponible ($reason)")
 }

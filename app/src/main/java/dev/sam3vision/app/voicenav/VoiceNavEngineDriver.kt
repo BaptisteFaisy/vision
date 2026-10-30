@@ -37,7 +37,7 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * voix système + écran. Le [VoiceNavSession] l'appelle à « Démarrer »
  * (crochet `engineStart`) ; `false` = repli Maps, `true` = guidage in-app.
  *
- * - [geocode] résout la destination (chaîne GMS puis BAN) ;
+ * - [geocode] résout la destination (chaîne GMS puis BAN, triée par proximité) ;
  * - [originNow] donne la position du départ (`null` = repli Maps) ;
  * - [routeClient] joint Valhalla (`POST /route` sur l'URL des Réglages) ;
  * - [onUpdate] reçoit l'état instantané (→ `session.onGuidanceUpdate`) ;
@@ -79,7 +79,7 @@ internal const val WALK_METERS_PER_SECOND = 1.3
 class VoiceNavEngineDriver(
     appContext: Context,
     private val settings: () -> Settings,
-    private val geocode: suspend (String) -> Result<GeocodedPlace>,
+    private val geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace>,
     private val originNow: () -> RoutePoint?,
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val scope: CoroutineScope,
@@ -113,13 +113,16 @@ class VoiceNavEngineDriver(
      * (adresse, position, réseau, itinéraire) — l'appelant bascule sur Maps.
      */
     suspend fun start(destination: String): Boolean {
+        // Origine lue tôt : elle trie les candidats du géocodage par proximité.
+        val origin = runCatching { originNow() }.getOrNull() ?: return false
         // Appels `suspend` (`runCatching` ne l'est pas) : try/catch directs.
         val place = try {
-            geocode(destination)
+            geocode(destination, origin)
         } catch (_: Exception) {
             null
         }?.getOrNull() ?: return false
-        val origin = runCatching { originNow() }.getOrNull() ?: return false
+
+        // Client Valhalla sur l'URL des Réglages.
         val base = runCatching { settings().routeBaseUrl.trim().trimEnd('/') }.getOrDefault("") ?: return false
         if (base.isBlank()) return false
         val trip = try {

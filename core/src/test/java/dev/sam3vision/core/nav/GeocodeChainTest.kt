@@ -1,5 +1,6 @@
 package dev.sam3vision.core.nav
 
+import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.net.ApiError
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -17,9 +18,11 @@ class GeocodeChainTest {
         var result: Result<List<GeocodedPlace>> = Result.success(emptyList()),
         var delayMs: Long = 0,
         val seen: MutableList<String> = mutableListOf(),
+        val limits: MutableList<Int> = mutableListOf(),
     ) : GeocodeSource {
         override suspend fun geocode(query: String, limit: Int): Result<List<GeocodedPlace>> {
             seen += query
+            limits += limit
             if (delayMs > 0) delay(delayMs)
             return result
         }
@@ -111,6 +114,41 @@ class GeocodeChainTest {
         val fallback = FakeSource(delayMs = 30_000L)
         val result = chain(primary, fallback, timeoutMs = 50L).geocode("gare")
         assertFailsWith(result, GeocodeError.TimedOut::class.java)
+    }
+
+    @Test
+    fun `avec une origine le candidat le plus proche gagne, pas le premier`() = runBlocking {
+        // Repro du bug « Sacré-Cœur » : la BAN rend des homonymes lointains
+        // avant le bon (Cité du Sacré-Coeur, Paris) — le tri par proximité
+        // de l'origine (Montmartre) doit le repêcher.
+        val primary = FakeSource(Result.success(listOf(
+            GeocodedPlace(50.512478, 2.622280, "Sacre Coeur, Fouquières-lès-Béthune"),
+            GeocodedPlace(49.420852, 3.954692, "Sacré Cour, Condé-sur-Suippe"),
+            GeocodedPlace(48.887485, 2.342357, "Cité du Sacré-Coeur, Paris"),
+        )))
+        val got = chain(primary, FakeSource()).geocode("sacré-cœur", near = RoutePoint(48.8867, 2.3431))
+
+        assertEquals("Cité du Sacré-Coeur, Paris", got.getOrNull()?.label)
+    }
+
+    @Test
+    fun `avec une origine les fournisseurs sont interroges avec plus de candidats`() = runBlocking {
+        val primary = FakeSource(Result.success(listOf(place())))
+        chain(primary, FakeSource()).geocode("gare", near = RoutePoint(48.8566, 2.3522))
+
+        assertEquals(listOf(GeocodeChain.NEARBY_LIMIT), primary.limits)
+    }
+
+    @Test
+    fun `le cache distingue deux zones d'origine`() = runBlocking {
+        val primary = FakeSource(Result.success(listOf(place("Paris"), GeocodedPlace(47.240304, -1.564190, "Nantes"))))
+        val c = chain(primary, FakeSource())
+
+        assertEquals("Paris", c.geocode("rue", near = RoutePoint(48.8566, 2.3522)).getOrNull()?.label)
+        assertEquals("Nantes", c.geocode("rue", near = RoutePoint(47.240304, -1.564190)).getOrNull()?.label)
+        assertEquals(2, primary.seen.size)
+        assertEquals("Paris", c.geocode("rue", near = RoutePoint(48.8566, 2.3522)).getOrNull()?.label)
+        assertEquals(2, primary.seen.size)
     }
 
     @Test
