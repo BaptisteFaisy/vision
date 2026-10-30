@@ -4,6 +4,33 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
+
+- **Demande** : détecter si les voitures sont en mouvement ou pas et
+  l'indiquer — en mode traversée, dire si elles sont arrêtées ou en
+  mouvement, en anglais.
+- Fait : `CrossingVehicleWatch` (nouveau, `app/isee/CrossingVehicleVoice.kt`)
+  — le même `VehicleStateWatcher` que le mode normal (mouvement confirmé
+  ou croissance jusqu'à 8 m, arrêt mesuré jusqu'à 3 m, 2 frames, silences
+  4 s / 10 s), parlé dans la phrase traversée après le feu et avant les
+  personnes (« Car moving, 5 meters away. » / « Car stopped, 2 meters
+  away. », langue de la voix, anglais par défaut) ; `CrossingCueQuiet`
+  (nouveau, `:core` pur) partage le silence post-ordre entre les deux voix
+  douces (2,5 s, répétitions non réarmantes, `CrossingPeopleWatch`
+  migrée sans changement de comportement) ; les personnes ne sont
+  consultées que sur le silence des véhicules (pas de mot de décalage
+  perdu). Vélos/trottinettes sans voix traversée (veto inchangé, 7
+  véhicules) ; `observeVehicleState` reste coupé en traversée (une seule
+  voix, pas de doublon). Sonde +1 ligne.
+- Preuves : `:core:testDebugUnitTest` 2 179 tests (dont
+  `CrossingCueQuietTest` 6/6), `:app:testDebugUnitTest` 1 242 tests 0 échec
+  (dont `CrossingVehicleTest` 7/7, `CrossingPeopleTest` 14/14) ;
+  `assembleDebug` vert ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à
+  499 lignes). 5 échecs `:core` pré-existants et hors périmètre
+  (`PrivateFileSettingsStoreTest`, permissions POSIX sous Windows +
+  1 assertion — identiques sur master vierge sans ce changement).
+
+
 ## 2026-10-30 — traversée : se décaler à l'opposé des gens, comme en normal (branche `traverse-nudge-people`)
 
 - **Demande** : comme en mode normal, dire d'aller vers la décision opposée

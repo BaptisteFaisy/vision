@@ -152,13 +152,13 @@ class CrossingPeopleTest {
         CrossingPeopleWatch.reset()
         val cue = CrossingCue("Vert, traversez.", false, CrossingState.Green)
 
-        assertEquals("Vert, traversez.", crossingPhraseOf(cue, listOf(person(0.1f)), 0L, SpeechLanguage.Fr))
+        assertEquals("Vert, traversez.", crossingPhraseOf(cue, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
     }
 
     @Test
     fun `silence du feu, les personnes parlent`() {
         CrossingPeopleWatch.reset()
 
-        assertEquals("Personne à 9 heures.", crossingPhraseOf(null, listOf(person(0.1f)), 0L, SpeechLanguage.Fr))
+        assertEquals("Personne à 9 heures.", crossingPhraseOf(null, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
     }
 }

@@ -250,4 +250,17 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   douce 2,5 s (`CUE_QUIET_MS`, les répétitions du rouge ne réarment pas) —
   sans ce silence, le `collectLatest` côté sonde jetterait l'ordre pas
   encore joué, et un « Vert, traversez. » dit une seule fois ne se rattrape
-  pas (`CrossingPeopleVoice.kt`, la sonde ne change que d'une ligne).
+  pas (`CrossingPeopleVoice.kt`, la sonde ne change que d'une ligne) ;
+- **états moteurs** (30/10, soir) : en traversée, les voitures disent si
+  elles roulent ou sont arrêtées (« Car moving, 5 meters away. » /
+  « Car stopped, 2 meters away. », langue de la voix, anglais par défaut) —
+  le même `VehicleStateWatcher` que le mode normal (mouvement confirmé ou
+  croissance jusqu'à 8 m, arrêt mesuré jusqu'à 3 m, 2 frames, silences 4 s /
+  10 s), parlé après le feu et avant les personnes (`CrossingVehicleWatch`,
+  chaîne `crossingPhraseOf`) ; le silence post-ordre est partagé
+  (`CrossingCueQuiet`, `:core` pur, les deux voix douces nourries du même
+  ordre) et les personnes ne sont consultées que sur le silence des
+  véhicules — un mot de décalage ne se perd pas au profit d'une phrase
+  jetée. Vélos et trottinettes sans voix traversée (le veto les couvre) ;
+  `observeVehicleState` reste coupé en traversée (une seule voix, pas de
+  doublon). Sonde +1 ligne (`LiveProbe.kt` à 499).
