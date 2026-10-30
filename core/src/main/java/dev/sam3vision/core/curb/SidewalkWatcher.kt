@@ -28,11 +28,17 @@ object SidewalkText {
             SpeechLanguage.Fr -> when (position) {
                 SidewalkPosition.Ahead -> "Trottoir devant."
                 SidewalkPosition.Left -> "Trottoir à gauche."
+                SidewalkPosition.Right -> "Trottoir à droite."
+                SidewalkPosition.Across -> "Trottoir en face."
+                SidewalkPosition.Absent -> null
                 else -> "Trottoir à droite."
             }
             SpeechLanguage.En -> when (position) {
                 SidewalkPosition.Ahead -> "Sidewalk ahead."
                 SidewalkPosition.Left -> "Sidewalk on the left."
+                SidewalkPosition.Right -> "Sidewalk on the right."
+                SidewalkPosition.Across -> "Sidewalk across the street."
+                SidewalkPosition.Absent -> null
                 else -> "Sidewalk on the right."
             }
         }

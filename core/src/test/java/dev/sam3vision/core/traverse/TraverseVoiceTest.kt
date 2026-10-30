@@ -26,8 +26,13 @@ class TraverseVoiceTest {
         assertEquals(CrossingText.phrase(CrossingState.Red), TraversePhrases.RED)
         assertEquals(CrossingText.phrase(CrossingState.Green), TraversePhrases.GREEN)
         assertEquals(CrossingText.phrase(CrossingState.Unknown), TraversePhrases.UNKNOWN)
+        assertEquals("Trottoir en face.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("Sur le passage.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
-            listOf(TraversePhrases.RED, TraversePhrases.GREEN, TraversePhrases.UNKNOWN),
+            listOf(
+                TraversePhrases.RED, TraversePhrases.GREEN, TraversePhrases.UNKNOWN,
+                TraversePhrases.SIDEWALK_ACROSS, TraversePhrases.ON_CROSSWALK,
+            ),
             TraversePhrases.ALL,
         )
     }
@@ -142,15 +147,15 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `premier lancement - les trois phrases fr pre-generees par le systeme`() = runBlocking {
+    fun `premier lancement - les cinq phrases fr pre-generees par le systeme`() = runBlocking {
         val systemTts = FakeSystemTts(language = "fr-FR", store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
         assertEquals(0, report.ready)
-        assertEquals(3, report.generated)
+        assertEquals(5, report.generated)
         assertTrue(report.missing.isEmpty())
         assertTrue(report.languageOk)
-        assertEquals(3, clips.size)
+        assertEquals(5, clips.size)
     }
 
     @Test
@@ -158,10 +163,12 @@ class TraverseVoiceTest {
         clips[TraversePhrases.RED] = "/cache/rouge.wav"
         clips[TraversePhrases.GREEN] = "/cache/vert.wav"
         clips[TraversePhrases.UNKNOWN] = "/cache/doute.wav"
+        clips[TraversePhrases.SIDEWALK_ACROSS] = "/cache/face.wav"
+        clips[TraversePhrases.ON_CROSSWALK] = "/cache/passage.wav"
         val systemTts = FakeSystemTts(store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
-        assertEquals(3, report.ready)
+        assertEquals(5, report.ready)
         assertEquals(0, report.generated)
         assertEquals(0, systemTts.calls)
         assertTrue(report.languageOk)
@@ -172,7 +179,7 @@ class TraverseVoiceTest {
         val report = voice(systemTts = FakeSystemTts(language = "en-US", store = clips)).prewarm()
 
         assertTrue(!report.languageOk)
-        assertEquals(3, report.generated)
+        assertEquals(5, report.generated)
     }
 
     @Test
@@ -180,7 +187,7 @@ class TraverseVoiceTest {
         val systemTts = FakeSystemTts(failOn = setOf(TraversePhrases.RED), store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
-        assertEquals(2, report.generated)
+        assertEquals(4, report.generated)
         assertEquals(listOf(TraversePhrases.RED), report.missing)
     }
 

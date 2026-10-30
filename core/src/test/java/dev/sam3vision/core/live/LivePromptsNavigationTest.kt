@@ -16,7 +16,7 @@ class LivePromptsNavigationTest {
             listOf(
                 "person", "car", "bicycle", "electric scooter", "pole",
                 "sidewalk", "crosswalk", "wall", "window", "stairs",
-                "door", "barrier",
+                "door", "barrier", "fence", "gate",
             ),
             LivePrompts.default,
         )

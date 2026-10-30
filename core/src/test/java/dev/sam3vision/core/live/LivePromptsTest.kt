@@ -1,19 +1,20 @@
 package dev.sam3vision.core.live
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LivePromptsTest {
 
     @Test
-    fun `douze dangers exterieur par defaut, plafond client a seize`() {
-        assertEquals(12, LivePrompts.default.size)
+    fun `quatorze dangers exterieur par defaut, plafond client a seize`() {
+        assertEquals(14, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "bicycle", "electric scooter", "pole",
                 "sidewalk", "crosswalk", "wall", "window", "stairs",
-                "door", "barrier",
+                "door", "barrier", "fence", "gate",
             ),
             LivePrompts.default,
         )
@@ -22,9 +23,11 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `portes et barrieres suivies en exterieur en plus des dangers`() {
+    fun `portes barrieres clotures et portails suivis en exterieur en plus des dangers`() {
         assertTrue("door" in LivePrompts.default)
         assertTrue("barrier" in LivePrompts.default)
+        assertTrue("fence" in LivePrompts.default)
+        assertTrue("gate" in LivePrompts.default)
     }
 
     @Test
@@ -32,12 +35,19 @@ class LivePromptsTest {
         assertEquals(
             listOf(
                 "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-                "trash can", "dumpster", "animal", "traffic light",
+                "trash can", "sidewalk", "animal", "traffic light",
             ),
             LivePrompts.outdoor,
         )
         assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
         assertEquals(LivePrompts.outdoor, LivePrompts.normalize(LivePrompts.outdoor))
+    }
+
+    @Test
+    fun `trottoir remplace la benne la moins utile dans le preset exterieur`() {
+        assertTrue("sidewalk" in LivePrompts.outdoor)
+        assertFalse("dumpster" in LivePrompts.outdoor)
+        assertEquals(12, LivePrompts.outdoor.size)
     }
 
     @Test
@@ -52,12 +62,34 @@ class LivePromptsTest {
     }
 
     @Test
+    fun `le mode exterieur iSee suit les defauts avec clotures et portails`() {
+        val exterior = LivePrompts.forMode(true)
+        assertEquals(14, exterior.size)
+        assertTrue("fence" in exterior)
+        assertTrue("gate" in exterior)
+        assertTrue("sidewalk" in exterior)
+    }
+
+    @Test
     fun `les deux mondes tiennent sous le plafond et se normalisent a l identique`() {
         assertTrue(LivePrompts.default.size <= LivePrompts.MAX)
         assertTrue(LivePrompts.indoor.size <= LivePrompts.MAX)
+        assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
         assertEquals(LivePrompts.indoor, LivePrompts.normalize(LivePrompts.indoor))
         LivePrompts.indoor.forEach { concept ->
             assertTrue(concept.length <= LivePrompts.MAX_LENGTH)
+        }
+    }
+
+    @Test
+    fun `tous les prompts tiennent en seize concepts de trente deux caracteres au plus`() {
+        listOf(LivePrompts.default, LivePrompts.outdoor, LivePrompts.indoor).forEach { prompts ->
+            assertTrue(prompts.size <= LivePrompts.MAX)
+            assertTrue(prompts.size <= 16)
+            prompts.forEach { concept ->
+                assertTrue(concept.length <= LivePrompts.MAX_LENGTH)
+                assertTrue(concept.length <= 32)
+            }
         }
     }
 

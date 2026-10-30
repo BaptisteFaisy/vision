@@ -150,11 +150,14 @@ class TraversePipelineTest {
     }
 
     @Test
-    fun `prompts - vehicules d abord bornes au plafond`() {
-        assertEquals(VehicleConcepts.PROMPTS, TraversePipeline.promptsFor())
+    fun `prompts - vehicules puis bordure et trottoir, bornes au plafond`() {
+        assertEquals(VehicleConcepts.PROMPTS + listOf("curb", "sidewalk"), TraversePipeline.promptsFor())
         val prompts = TraversePipeline.promptsFor(listOf("traffic light"))
-        assertEquals(VehicleConcepts.PROMPTS, prompts.take(5))
+        assertEquals(VehicleConcepts.PROMPTS, prompts.take(7))
+        assertEquals(listOf("curb", "sidewalk"), prompts.drop(7).take(2))
         assertEquals("traffic light", prompts.last())
         assertTrue(prompts.size <= LivePrompts.MAX)
+        val full = TraversePipeline.promptsFor((1..20).map { "objet$it" })
+        assertEquals(LivePrompts.MAX, full.size)
     }
 }
