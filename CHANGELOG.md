@@ -19,6 +19,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
   (3 372 tests, 0 échec — dont `CrossingPeopleTest` 14/14) ;
   `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes, inchangé).
+## 2026-10-30 — propagation locale branchée en :core + pastilles mémoïsées (branche `perf/local-prop`)
+
+- **Demande** : M4 perf — brancher/mesurer `LocalOverlayEngine` + warp
+  `MaskPropagator` (cible < 8 ms, banc 300 frames) + mémo du `measure` par frame
+  de `DistanceOverlay.kt`.
+- Fait : `LocalPropagator` (`core/…/local/`, pur JVM) — le moteur décide, le warp
+  CPU exécute dans un tampon réutilisé (zéro allocation de grille par frame, coût
+  mesuré rendu au moteur via `notePaint`) ; filtre `NEAREST` par défaut (masques
+  binaires, L13 §7) ; `DistancePills` mémoïse `labels`/`texts`/`pills` (`remember`,
+  clés structurelles, comportement inchangé) ; contrat L13 §1 : B « branché en
+  :core ». Câblage UI du chemin CPU **différé et documenté** (KDoc + PR) :
+  `LiveMaskDecoder` jette le `GrayMask` et le chemin `Bitmap` n'est pas testable
+  en JVM — validation sur téléphone requise.
+- Preuves : `:core` 2 159 tests 0 échec (dont `LocalPropagatorTest` 8/8,
+  `LocalPropagatorBenchTest` 1/1 : tick 0.70 µs, chaîne 250.03 µs = 0,25 ms à
+  512×206, 32× sous la cible 8 ms, 238 o/frame — r630, JVM x86, pas un
+  téléphone) ; `:app` 1 213 tests 0 échec ; `check-kotlin-limits.py` vert ;
+  `budget_latence.py --selftest` 14/14 + `--check-doc` OK.
 
 
 ## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)

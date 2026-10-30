@@ -25,7 +25,7 @@ Aucun fichier de ce type
 | dépendance | mission | artefact attendu | état au 27/10 |
 |---|---|---|---|
 | A motion (`u10`) | M52 | `core/…/motion/` + `MotionSource`/`NoMotion` | **présent, non branché** (`BlockMotionSource`, testé, jamais appelé en prod) |
-| B warp (`u11`) | M53 | `core/…/mask/{MaskMotion,WarpPlan,MaskPropagator}` | **présent, non branché** (`MaskPropagator` sans appelant en prod) |
+| B warp (`u11`) | M53 | `core/…/mask/{MaskMotion,WarpPlan,MaskPropagator}` | **branché en :core** (`LocalPropagator` : décision + warp, banc < 8 ms ; câblage app documenté, non posé — M4) |
 | C scheduler (`u12`) | M54 | `core/…/keyframe/` (`KeyframeScheduler`, `KeyframeConfig`) | **présent** |
 | D calque (`u13`) | M55 | `core/…/local/` + `LiveLocalOverlay` + câblage app | **présent**, inerte (`NoMotion` par défaut) |
 | E budget (`u09`) | M56 | `docs/LATENCE-BUDGET.md` + `scripts/budget_latence.py` | **présent** |
