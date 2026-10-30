@@ -4,6 +4,23 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-30 — consigne de guidage toutes les 500 ms sur la vidéo (branche `feat/isee-instruction-500ms`)
+
+- **Demande** : une instruction à regarder — dois-je aller à droite ou à
+  gauche, et le prochain à combien de mètres droit devant — toutes les 0,5 s.
+- Cause : `GuidanceHeartbeat` (battement livré en `94f84c47`) n'était appelé
+  nulle part : aucune boucle ne publiait le pulse (vérifié par `git log -S`).
+- Fait : `ProbePulse` (battement 500 ms, ordre user du 30/10) nourri par la
+  décision parlée + le plus proche du couloir central ; `LiveProbeState.pulse`
+  ; ligne « Gauche · ≈ 2,1 m » sur la vidéo (`InstructionLayer`, pastille et
+  couleurs de la flèche, « … » + atténuée si périmé). Règle de côté
+  inchangée (côté le moins encombré, `Guidance`/`passage.py`).
+- Preuves : 10 tests JVM ajoutés (`GuidanceInstructionTest` 6,
+  `ProbePulseTest` 4) — **non exécutés ici** (runner self-hosted HS le 30/10
+  au soir, CI à son retour) ; `check-kotlin-limits.py` vert en local ;
+  `LiveProbe.kt` reste à 499 lignes (compteur `noteDecoded` déménagé dans
+  `MaskPainter.kt`).
+
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
 - **Demande** : sur la page caregiver, cesser instantanément d'afficher la caméra

@@ -82,6 +82,7 @@ class LiveProbe(
     private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine }) { alert ->
         _state.update { it.copy(dangerAlert = alert?.line()) }
     }
+    private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
     private val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
@@ -97,9 +98,6 @@ class LiveProbe(
 
     /** Cadence affichée : moyenne sur les 8 dernières frames, pas l'écart deux frames. */
     private val rate = FrameRate()
-
-    /** Paquets de masques décodées depuis la configuration courante (pour le log). */
-    private var decodedFrames = 0
 
     /** Échéance partagée avec le Direct ; la réserve d'une frame reste locale (ci-dessous). */
     private val cadence = LiveFrameCadence()
@@ -181,6 +179,7 @@ resetPipeline()
         if (clean.isNotBlank()) {
             markWarming()
             fireWake(clean)
+            pulse.start()
         }
     }
 
@@ -215,12 +214,14 @@ resetPipeline()
 resetPipeline()
         _state.update { it.cleared() }
         markWarming()
+        pulse.start()
     }
 
     /** Masques et chiffres remis à zéro (sortie d'écran) sans oublier l'endpoint. */
     fun clear() {
         chronology.reset()
 _state.update { it.cleared() }
+        pulse.stop()
     }
 
     /**
@@ -234,6 +235,7 @@ _state.update { it.cleared() }
         chronology.reset()
         rate.reset()
         voice.reset()
+        pulse.reset()
         crossing.reset()
         traverseVeto.reset()
         meters.reset()
@@ -423,6 +425,7 @@ _state.update { it.cleared() }
         }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
+        pulse.feed(at, voice.lastDecision, placed)
         _state.update { current ->
             current.copy(
                 masks = overlays,
@@ -474,15 +477,8 @@ _state.update { it.cleared() }
         val startedAt = android.os.SystemClock.elapsedRealtime()
         val overlays = painter.overlays(frame)
         chronology.markOverlays(shown)
-        logDecoding(android.os.SystemClock.elapsedRealtime() - startedAt, overlays.size)
+        painter.noteDecoded(android.os.SystemClock.elapsedRealtime() - startedAt, overlays.size)
         overlays
-    }
-
-    /** Log périodique du décodage des masques. */
-    private fun logDecoding(ms: Long, masks: Int) {
-        decodedFrames += 1
-        if (decodedFrames % LOG_EVERY_FRAMES != 0) return
-        android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms")
     }
 
     /**

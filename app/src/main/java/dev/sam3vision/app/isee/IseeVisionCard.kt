@@ -186,6 +186,7 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     )
     LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
     SteeringLayer(probe.steering)
+    InstructionLayer(probe.pulse)
     CrossingOnVideo(probe, pump)
 }
 
