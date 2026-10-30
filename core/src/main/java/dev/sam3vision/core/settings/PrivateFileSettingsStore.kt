@@ -116,6 +116,7 @@ internal object SettingsCodec {
     private const val K_LIVE_SAM = "liveSamEnabled"
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
+    private const val K_CONTINUOUS_CADENCE = "continuousCadenceEnabled"
     private const val K_DEBUG_ROUTE_MAP = "debugRouteMapEnabled"
     private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
     private const val K_OUTDOOR_MODE = "outdoorMode"
@@ -154,6 +155,7 @@ internal object SettingsCodec {
         appendLine("$K_LIVE_SAM=${s.liveSamEnabled}")
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
+        appendLine("$K_CONTINUOUS_CADENCE=${s.continuousCadenceEnabled}")
         appendLine("$K_DEBUG_ROUTE_MAP=${s.debugRouteMapEnabled}")
         appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
         appendLine("$K_OUTDOOR_MODE=${s.outdoorMode}")
@@ -205,6 +207,8 @@ internal object SettingsCodec {
                 ?: default.boxPredictionEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
+            continuousCadenceEnabled = values[K_CONTINUOUS_CADENCE]?.toBooleanStrictOrNull()
+                ?: default.continuousCadenceEnabled,
             debugRouteMapEnabled = values[K_DEBUG_ROUTE_MAP]?.toBooleanStrictOrNull()
                 ?: default.debugRouteMapEnabled,
             navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()

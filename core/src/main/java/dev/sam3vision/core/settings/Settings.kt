@@ -81,6 +81,12 @@ data class Settings(
      */
     val localOverlayEnabled: Boolean = true,
     /**
+     * Bras B de la cadence (A/B runtime, Direct tracker + sonde iSee) : l'échéance suit
+     * la cadence continue (moitié de la latence) au lieu des paliers adaptatifs.
+     * **`false` par défaut** : sans mesure téléphone, le comportement est inchangé.
+     */
+    val continuousCadenceEnabled: Boolean = false,
+    /**
      * Carte de debug : tracé schématique de l'itinéraire guidé + position GPS,
      * en fond de l'écran iSee (derrière la boule et les textes). `true` par
      * défaut ; sans guidage actif, rien n'est dessiné et l'écran est inchangé.
@@ -331,7 +337,7 @@ data class Settings(
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
-        "localOverlayEnabled=$localOverlayEnabled, " +
+        "localOverlayEnabled=$localOverlayEnabled, continuousCadenceEnabled=$continuousCadenceEnabled, " +
         "debugRouteMapEnabled=$debugRouteMapEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "outdoorMode=$outdoorMode, " +
