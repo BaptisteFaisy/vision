@@ -63,6 +63,12 @@ class LiveLocalOverlayWiring(
     fun lumaFor(bitmap: Bitmap): ByteArray? = session.lumaFor(bitmap)
 
     /**
+     * Le calque veut-il la frame qui arrive ? Même drapeau effectif que la synchro
+     * d'activation, lu en direct (sans tick) : la porte d'encodage ne doit pas affamer le calque.
+     */
+    fun wantsLuma(): Boolean = localOverlayFlag(BuildConfig.LOCAL_OVERLAY, manual ?: settingEnabled())
+
+    /**
      * Tick d'une frame caméra, **avant** toute décision réseau (contrat de fusion §2.1).
      * Une liste d'overlays neuve vaut keyframe : ses bitmaps coloriés et la luminance
      * courante (copiée, le plan est réutilisé d'une frame à l'autre) deviennent la
