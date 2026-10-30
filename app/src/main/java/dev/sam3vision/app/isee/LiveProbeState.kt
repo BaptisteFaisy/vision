@@ -66,7 +66,7 @@ data class LiveProbeState(
     val pulse: GuidancePulse? = null,
     /** Détour obstacle subi : le GPS recalcule l'itinéraire s'il dure (faux en Traversée). */
     val detour: Boolean = false,
-    /** Mode Traversée actif : prompts feu+voitures+personnes+passage, guidage coupé, personnes annoncées. */
+    /** Mode Traversée actif : mêmes masques, guidage coupé, feu et véhicules annoncés. */
     val crossingActive: Boolean = false,
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
     val crossing: dev.sam3vision.core.crossing.CrossingState? = null,

@@ -270,7 +270,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety)
     }
 
-    /** Bascule du mode Traversée (puce de la carte caméra) : feu+voitures ou retour. */
+    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
     fun toggleCrossing() = steering.toggleCrossing()
 
     override fun onCleared() {

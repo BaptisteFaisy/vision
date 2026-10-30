@@ -74,8 +74,8 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  *
  * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
  * l'appelant a passé les défauts ([LivePrompts.default], [LivePrompts.indoor]
- * ou une liste vide) ; une liste explicite (Traversée feu+voitures, champ
- * « Suivre ») traverse inchangée.
+ * ou une liste vide) ; une liste explicite (champ « Suivre », « Find the X »)
+ * traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
@@ -117,10 +117,10 @@ fun LiveProbe.clearRouteCap() {
 /**
  * Ordre « Find the X » : [label] rejoint les concepts SAM de la sonde quand
  * il n'y est pas déjà (comparaison insensible à la casse) — la session
- * repart comme à tout changement de prompts. En mode Traversée les prompts
- * feu+voitures ne sont pas touchés (sécurité) ; un 17e concept ou un label
- * de plus de 32 caractères est refusé par [LivePrompts.normalize], sans
- * reconfiguration. Pur hors sonde, testé en JVM.
+ * repart comme à tout changement de prompts. En mode Traversée on ne
+ * reconfigure pas (sécurité : pas de coupure en pleine traversée) ; un 17e
+ * concept ou un label de plus de 32 caractères est refusé par
+ * [LivePrompts.normalize], sans reconfiguration. Pur hors sonde, testé en JVM.
  */
 internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
     if (state.value.crossingActive) return
@@ -407,7 +407,7 @@ internal fun LiveProbe.observeDetour(scope: CoroutineScope, onDetour: (Boolean, 
 /**
  * Chemin dessiné sur la vidéo : lu dans la décision parlée à cette frame
  * (la vidéo est en direct, la voix seule est débouncée). `null` en
- * Traversée (ses prompts feu+voitures ne disent pas où marcher).
+ * Traversée (la voix rouge/vert y est propriétaire, pas le guidage).
  */
 internal fun LiveProbe.steeringCueOf(): SteeringCue? =
     if (state.value.crossingActive) null else voice.cue()
