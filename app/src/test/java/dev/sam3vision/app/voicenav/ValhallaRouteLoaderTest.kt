@@ -1,9 +1,11 @@
 package dev.sam3vision.app.voicenav
 
 import dev.sam3vision.core.model.RouteLeg
+import dev.sam3vision.core.model.RouteManeuver
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.model.RouteTrip
 import dev.sam3vision.core.nav.GeocodedPlace
+import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.RouteClient
 import java.io.IOException
 import kotlinx.coroutines.delay
@@ -24,6 +26,7 @@ class ValhallaRouteLoaderTest {
         route: suspend (RoutePoint, RoutePoint) -> Result<RouteTrip> = { _, _ -> Result.success(trip) },
         baseUrl: () -> String = { "https://route.test" },
         routeTimeoutMs: Long = 15_000,
+        onPreview: (NavRoute?) -> Unit = {},
     ) = ValhallaRouteLoader(
         geocode = geocode,
         originNow = originNow,
@@ -35,6 +38,7 @@ class ValhallaRouteLoaderTest {
         },
         baseUrl = baseUrl,
         routeTimeoutMs = routeTimeoutMs,
+        onPreview = onPreview,
     )
 
     @Test
@@ -138,5 +142,47 @@ class ValhallaRouteLoaderTest {
 
         assertEquals(2, attempts)
         assertEquals("itinéraire indisponible (délai dépassé)", failure?.message)
+    }
+
+    @Test
+    fun `apercu publie null au lancement puis l'itineraire au succes`() = runBlocking {
+        val shape = listOf(origin, RoutePoint(place.latitude, place.longitude))
+        val leg = RouteLeg(
+            shape,
+            listOf(
+                RouteManeuver(1, "Partez", "", listOf("Rue de départ"), 400.0, 300.0, 0, 1),
+                RouteManeuver(4, "Arrivée", "", listOf("Rue d'arrivée"), 430.0, 310.0, 1, 1),
+            ),
+            830.0,
+            610.0,
+        )
+        val previews = mutableListOf<NavRoute?>()
+        val full = loader(
+            route = { _, _ -> Result.success(trip.copy(legs = listOf(leg))) },
+            onPreview = { previews.add(it) },
+        )
+
+        val summary = full("la gare").getOrThrow()
+
+        assertEquals("la gare", summary.destination)
+        assertEquals(2, previews.size)
+        assertEquals(null, previews.first())
+        val preview = previews.last()!!
+        assertEquals(2, preview.maneuvers.size)
+        assertEquals("la gare", preview.destinationName)
+        assertEquals(shape, preview.shape)
+    }
+
+    @Test
+    fun `apercu reste null quand la route echoue`() = runBlocking {
+        val previews = mutableListOf<NavRoute?>()
+        val down = loader(
+            route = { _, _ -> Result.failure(IOException("serveur injoignable")) },
+            onPreview = { previews.add(it) },
+        )
+
+        assertTrue(down("la gare").isFailure)
+
+        assertEquals(listOf(null), previews)
     }
 }

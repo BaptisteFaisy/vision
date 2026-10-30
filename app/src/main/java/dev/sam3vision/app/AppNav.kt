@@ -106,9 +106,9 @@ sealed interface Route {
     data class Tap(val autoStart: Boolean = false) : Route
 
     /**
-     * Navigation vocale in-app (URL Valhalla configurée) : confirmation puis
-     * arrivée, poussée par l'état de session — jamais ouverte à la main. Le
-     * guidage vit sur l'accueil iSee (caméra + carte dessous).
+     * Navigation vocale in-app (URL Valhalla configurée) : arrivée seule,
+     * poussée par l'état de session — jamais ouverte à la main. La
+     * confirmation et le guidage vivent sur l'accueil iSee (caméra + carte dessous).
      */
     data object VoiceNav : Route
 }
@@ -150,11 +150,11 @@ private fun NavOrderEffect(isee: IseeViewModel) {
 }
 
 /**
- * L'état de session pilote l'écran navigation : confirmation ou arrivée =
- * poussé (une fois), repos = dépilé (arrivée fermée, arrêt, annulation).
- * Le guidage, lui, vit sur l'accueil iSee (caméra + carte dessous) : s'il
- * est poussé, il est dépilé. Le retour système dépile sans repousse :
- * quitter la confirmation l'annule, quitter l'arrivée la referme.
+ * L'état de session pilote l'écran navigation : arrivée = poussé (une fois),
+ * tout le reste = dépilé (arrivée fermée, arrêt, annulation). La confirmation
+ * et le guidage vivent sur l'accueil iSee (caméra + carte dessous,
+ * questions et tap caméra inchangés) : s'ils sont poussés, ils sont dépilés.
+ * Le retour système dépile sans repousse : quitter l'arrivée la referme.
  */
 @Composable
 private fun VoiceNavStateEffect(
@@ -166,9 +166,9 @@ private fun VoiceNavStateEffect(
     val navState by isee.voiceNavState.collectAsState()
     LaunchedEffect(navState) {
         when {
-            navState is VoiceNavUiState.Idle -> if (route == Route.VoiceNav) pop()
-            navState is VoiceNavUiState.Guiding -> if (route == Route.VoiceNav) pop()
-            route != Route.VoiceNav -> push(Route.VoiceNav)
+            navState is VoiceNavUiState.Arrived -> if (route != Route.VoiceNav) push(Route.VoiceNav)
+            route == Route.VoiceNav -> pop()
+            else -> Unit
         }
     }
 }
