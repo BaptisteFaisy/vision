@@ -15,7 +15,7 @@ import org.junit.Test
  * couper hors délai, et les trois phrases FR sont des littéraux exacts.
  *
  * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
- * rouge répété 2 s) : ce fichier les vérifie, il ne les change pas.
+ * rouge répété 1 s) : ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
 

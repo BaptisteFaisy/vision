@@ -63,17 +63,17 @@ class CrossingAnnouncerTest {
     }
 
     @Test
-    fun `le rouge se repete toutes les deux secondes`() {
+    fun `le rouge se repete toutes les secondes`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Red))
         assertEquals("Rouge, attendez.", announcer.onFrame(200L, CrossingState.Red)?.phrase)
-        assertNull(announcer.onFrame(1_000L, CrossingState.Red))
-        val repeat = announcer.onFrame(2_200L, CrossingState.Red)
+        assertNull(announcer.onFrame(700L, CrossingState.Red))
+        val repeat = announcer.onFrame(1_200L, CrossingState.Red)
         assertEquals("Rouge, attendez.", repeat?.phrase)
         assertFalse(repeat?.urgent ?: true)
         assertEquals(CrossingState.Red, announcer.lastCue?.state)
-        assertNull(announcer.onFrame(3_000L, CrossingState.Red))
-        assertEquals("Rouge, attendez.", announcer.onFrame(4_200L, CrossingState.Red)?.phrase)
+        assertNull(announcer.onFrame(1_700L, CrossingState.Red))
+        assertEquals("Rouge, attendez.", announcer.onFrame(2_200L, CrossingState.Red)?.phrase)
     }
 
     @Test
