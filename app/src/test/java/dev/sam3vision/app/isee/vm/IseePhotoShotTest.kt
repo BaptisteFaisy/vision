@@ -189,6 +189,50 @@ class IseePhotoShotTest {
     }
 
     @Test
+    fun `photo epinglee — jointe sans camera, sans capture`() = runTest {
+        val shots = shots(camera = { null })
+        val pinned = File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) }
+
+        shots.setPinnedContext(pinned)
+
+        assertEquals("la photo affichée est jointe", encoded(pinned.path), shots.imageBase64())
+    }
+
+    @Test
+    fun `photo epinglee — survit au release de fin de question`() = runTest {
+        val shots = shots(camera = { null })
+        val pinned = File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) }
+        shots.setPinnedContext(pinned)
+
+        shots.releaseContext()
+
+        assertEquals("toujours jointe après une question", encoded(pinned.path), shots.imageBase64())
+    }
+
+    @Test
+    fun `photo epinglee puis effacee — plus rien a joindre`() = runTest {
+        val shots = shots(camera = { null })
+        shots.setPinnedContext(File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) })
+
+        shots.clearPinnedContext()
+
+        assertNull("contexte effacé", shots.imageBase64())
+    }
+
+    @Test
+    fun `photo epinglee — captureForHold ne fait rien, l epinglee reste jointe`() = runTest {
+        val camera = FakeCamera()
+        val shots = shots(camera = { camera })
+        val pinned = File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) }
+        shots.setPinnedContext(pinned)
+
+        shots.captureForHold()
+
+        assertEquals("aucune capture demandée", 0, camera.demands)
+        assertEquals("l'épinglée reste jointe", encoded(pinned.path), shots.imageBase64())
+    }
+
+    @Test
     fun `contexte externe puis release — plus rien a joindre`() = runTest {
         val shots = shots(camera = { null })
         shots.setExternalContext(File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) })

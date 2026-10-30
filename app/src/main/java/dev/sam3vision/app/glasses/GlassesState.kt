@@ -55,8 +55,8 @@ sealed interface GlassesEvent {
     /** Question aux lunettes : le micro s'ouvre, iSee se tait et écoute. */
     data object TalkListening : GlassesEvent
 
-    /** Question entendue : photo-contexte, texte transcrit, PCM 16 kHz capté. */
-    data class VoiceHeard(val photo: File?, val text: String, val pcm: ByteArray) : GlassesEvent
+    /** Question entendue : texte transcrit, PCM 16 kHz capté. L'écoute ne prend pas de photo. */
+    data class VoiceHeard(val text: String, val pcm: ByteArray) : GlassesEvent
 
     /** Fin d'écoute sans question (échec, abandon) : iSee reprend sa voix. */
     data object TalkEnded : GlassesEvent

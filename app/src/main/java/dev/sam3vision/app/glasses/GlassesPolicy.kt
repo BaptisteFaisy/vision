@@ -298,8 +298,8 @@ object GlassesMessages {
     fun noMockPress() = GlassesMessage(MessageKind.WARNING, "Aucun appareil simulé actif.")
 
     /**
-     * L'écoute mains-libres est ouverte : ce qui se dit part en question, avec
-     * la photo des lunettes. Le téléphone peut rester en poche.
+     * L'écoute mains-libres est ouverte : ce qui se dit part en question, sans
+     * photo. Le téléphone peut rester en poche.
      */
     fun talkListening() = GlassesMessage(
         MessageKind.INFO,
@@ -307,12 +307,12 @@ object GlassesMessages {
     )
 
     /**
-     * Micro des lunettes inutilisable : l'ancien comportement reste (photo →
-     * chat sur le téléphone), dit comme un repli, pas comme un silence.
+     * Micro des lunettes inutilisable : dit comme un repli, pas comme un
+     * silence. Aucune photo n'est prise.
      */
     fun talkMicUnavailable() = GlassesMessage(
         MessageKind.WARNING,
-        "Micro lunettes indisponible : photo envoyée au chat, comme avant.",
+        "Micro lunettes indisponible : fais un appui long sur le téléphone pour dicter.",
     )
 
     fun talkFailed(reason: String) =

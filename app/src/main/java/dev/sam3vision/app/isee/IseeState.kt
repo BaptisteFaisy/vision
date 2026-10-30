@@ -54,9 +54,9 @@ data class IseeUiState(
     /** Repères visuels : génération en cours, relecture aidant, objets reconnus. */
     val picto: PictoUiState = PictoUiState(),
     /**
-     * Photo des lunettes en cours d'affichage (`null` = aucune) : plein cadre
-     * sur cet écran ([GlassesPhotoLayer]), posée même depuis un autre écran
-     * (elle attend le retour sur iSee), fermée par retour ou bouton.
+     * Photo des lunettes en cours d'affichage (`null` = aucune) : dans la rue,
+     * à l'emplacement caméra ([GlassesPhotoStreet]), posée même depuis un autre
+     * écran (elle attend le retour sur iSee), jusqu'au tap ou à la suivante.
      */
     val glassesPhoto: IseeGlassesPhoto? = null,
 )

@@ -5,15 +5,21 @@ enum class CapturePress { SHORT, HOLD, DOUBLE }
 
 /** Ce que l'app doit déclencher une fois l'appui confirmé. */
 enum class CaptureAction {
-    /** Photo → segmentation → description lue à voix haute. */
+    /** Photo affichée à l'emplacement caméra, contexte des questions suivantes. */
     PHOTO,
 
-    /** Photo → chat ouvert, la question se pose sur le téléphone. */
+    /** Écoute mains-libres : le micro s'ouvre, sans prendre de photo. */
     ASK,
 
     /** Mode Direct : pas encore porté sur lunettes. */
     LIVE,
 }
+
+/**
+ * Seul l'appui court prend une photo : l'appui long ouvre le micro (écoute),
+ * le double appui ne déclenche rien de photographique. Pur : testé en JVM.
+ */
+val CaptureAction.takesPhoto: Boolean get() = this == CaptureAction.PHOTO
 
 /**
  * Lisse les appuis du bouton capture des Ray-Ban Meta.

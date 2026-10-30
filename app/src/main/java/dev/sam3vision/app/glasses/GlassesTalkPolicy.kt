@@ -33,7 +33,7 @@ enum class TalkPress {
     /** L'envoi part (second appui long, ou fin du délai). */
     SENDING,
 
-    /** Le micro des lunettes est indisponible : repli sur l'ancien comportement. */
+    /** Le micro des lunettes est indisponible : dit par l'appelant, sans photo. */
     MIC_UNAVAILABLE,
 
     /** Transcription déjà en cours : l'appui est ignoré, sans bruit. */

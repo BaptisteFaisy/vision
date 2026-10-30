@@ -208,8 +208,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
-    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, { settings }, cameraOps, ::transcribeAndAnswer)
-    private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard)
+    private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
+    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap)
     private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
@@ -304,7 +304,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun onGlassesPhoto(file: File, action: CaptureAction) = glassesInbox.onPhoto(file, action)
     fun dismissGlassesPhoto() = glassesInbox.dismiss()
     fun onGlassesListening() = silenceForGlasses()
-    fun onGlassesHeard(photo: File?, text: String, pcm: ByteArray) = glassesInbox.heard(photo, text, pcm)
+    fun onGlassesHeard(text: String, pcm: ByteArray) = glassesInbox.heard(text, pcm)
 
     /** iSee se tait (lecture + guidage) : la voix du user a priorité. */
     private fun silenceForGlasses() {

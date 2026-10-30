@@ -13,6 +13,8 @@ internal data class IseeSceneLayers(
     val pageDots: Boolean,
     val glassesFeed: Boolean,
     val glassesGhost: Boolean,
+    /** Photo des lunettes affichée : elle occupe la rue à la place de tout direct. */
+    val photoFeed: Boolean,
 ) {
     /** La boule est au repos (grande, au centre) chaque fois que la caméra est fermée. */
     val bubble: Boolean get() = !cameraCard
@@ -22,6 +24,9 @@ internal data class IseeSceneLayers(
  * La caméra est montrée tant qu'une capture est vivante (`captureLive`), quelle que soit la
  * scène : tenir le micro pendant la vidéo ne doit pas cacher ce qu'on filme. `dissolving` est
  * gardé pour le contrat : le design Portrait n'a plus de dissolution en pixels.
+ *
+ * Photo affichée ([photoDisplayed]) : la rue s'ouvre aussi, sans capture ni
+ * direct — la photo figée y prend la place de toute image vivante.
  *
  * Lunettes ([glassesLive]) : la rue s'ouvre aussi, sans capture — dès que les lunettes
  * montrent quelque chose — et c'est leur direct qui l'occupe, pas la caméra du téléphone.
@@ -38,13 +43,15 @@ internal fun iseeSceneLayers(
     captureLive: Boolean,
     glassesLive: Boolean = false,
     glassesStreaming: Boolean = false,
+    photoDisplayed: Boolean = false,
 ): IseeSceneLayers {
     val cameraCard = captureLive && !dissolving
     return IseeSceneLayers(
         cameraCard = cameraCard,
-        pageDots = !captureLive && !glassesLive && bubbles > 1,
+        pageDots = !captureLive && !glassesLive && !photoDisplayed && bubbles > 1,
         glassesFeed = glassesLive,
         glassesGhost = glassesStreaming && !glassesLive,
+        photoFeed = photoDisplayed,
     )
 }
 

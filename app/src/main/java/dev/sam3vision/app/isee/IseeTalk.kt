@@ -29,6 +29,8 @@ internal class IseeHoldTalk(
     private val settings: () -> Settings,
     private val cameraOps: IseeCameraCoordinator,
     private val finishHold: suspend () -> Unit,
+    /** Tap avec photo lunettes affichée : elle part, la caméra repart (`false` = rien). */
+    private val onTapPhoto: () -> Boolean,
 ) {
     /** Appui long : la frame courante devient le contexte (sauf photo gelée), puis le micro s'ouvre. */
     fun start() {
@@ -64,9 +66,10 @@ internal class IseeHoldTalk(
         update { it.copy(holding = false) }
     }
 
-    /** Tap simple n'importe où : démarre la vidéo (fenêtre flottante), ou la ferme. */
+    /** Tap : photo lunettes affichée → elle part et la caméra repart ; sinon la vidéo bascule. */
     fun singleTap() {
         if (!isActive()) return
+        if (onTapPhoto()) return
         if (snapshot().recordingVideo) cameraOps.stopVideo() else cameraOps.startVideo()
     }
 }
@@ -83,6 +86,9 @@ internal class IseeGlassesInbox(
     private val update: ((IseeUiState) -> IseeUiState) -> Unit,
     private val silence: () -> Unit,
     private val answer: suspend (text: String, pcm: ByteArray) -> Unit,
+    private val stopVideo: () -> Unit,
+    private val stopProbe: () -> Unit,
+    private val restartCamera: () -> Unit,
 ) {
     /** Compteur des photos lunettes affichées : deux photos n'ont jamais le même `seq`. */
     private var seq = 0L
@@ -91,33 +97,40 @@ internal class IseeGlassesInbox(
      * Photo prise avec les lunettes : elle s'affiche sur cet écran (personne
      * accompagnée), sans quitter la page courante — posée même depuis un autre
      * écran, elle attend le retour sur iSee. Doublon (même fichier) ignoré,
-     * photo suivante remplace la précédente ([acceptGlassesPhoto]). ASK :
-     * la photo devient aussi le contexte de la prochaine question dictée.
+     * photo suivante remplace la précédente ([acceptGlassesPhoto]), épinglée
+     * en contexte, caméra coupée.
      */
     fun onPhoto(file: File, action: CaptureAction) {
         if (!acceptGlassesPhoto(snapshot().glassesPhoto, file)) return
         seq += 1
         update { it.copy(glassesPhoto = IseeGlassesPhoto(file, action, seq), status = glassesPhotoLabel(action)) }
-        if (action == CaptureAction.ASK) shots.setExternalContext(file)
+        shots.setPinnedContext(file)
+        if (snapshot().recordingVideo) stopVideo()
+        stopProbe()
     }
 
-    /** La photo des lunettes est fermée (retour, bouton) : l'écran iSee reste. */
-    fun dismiss() {
-        val dismissed = snapshot().glassesPhoto
+    /** La photo part (tap, suivante), son contexte avec elle ; `false` = aucune. */
+    fun dismiss(): Boolean {
+        if (snapshot().glassesPhoto == null) return false
         update { it.copy(glassesPhoto = null) }
-        // Question annulée avec sa photo : le contexte ne doit pas fuir vers
-        // la question suivante (déjà consommé, le relâchement est neutre).
-        if (dismissed?.action == CaptureAction.ASK) shots.releaseContext()
+        shots.clearPinnedContext()
+        shots.releaseContext()
+        return true
+    }
+
+    /** Tap avec photo affichée : elle part et la caméra repart. Sinon rien. */
+    fun onTap(): Boolean {
+        if (!dismiss()) return false
+        restartCamera()
+        return true
     }
 
     /**
-     * Question entendue aux lunettes : photo-contexte affichée sur cet écran
-     * (comme [onPhoto] en ASK), puis même traitement qu'une dictée
-     * tenue-relâchée. Le téléphone reste en poche.
+     * Question entendue aux lunettes (écoute seule, sans photo) : même
+     * traitement qu'une dictée tenue-relâchée. Le téléphone reste en poche.
      */
-    fun heard(photo: File?, text: String, pcm: ByteArray) {
+    fun heard(text: String, pcm: ByteArray) {
         silence()
-        if (photo != null) onPhoto(photo, CaptureAction.ASK)
         scope.launch { answer(text, pcm) }
     }
 }
