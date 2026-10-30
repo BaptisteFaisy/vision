@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesEvent
+import dev.sam3vision.app.glasses.sessionControl
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.core.glasses.CaptureAction
 
@@ -21,6 +22,8 @@ internal fun routeForGlassesPhoto(action: CaptureAction): Route? = null
 @Composable
 internal fun GlassesBridge(glasses: GlassesController, isee: IseeViewModel, push: (Route) -> Unit) {
     LaunchedEffect(glasses) {
+        // Ordre vocal « iSee » : iSee peut basculer la session des lunettes.
+        isee.glassesSession = glasses.sessionControl()
         glasses.events.collect { event ->
             when (event) {
                 is GlassesEvent.PhotoTaken -> {
