@@ -24,11 +24,10 @@ from pathlib import Path
 # (``scripts/tests_units/*`` font ``from test_units import check``) : sans cette ligne ils
 # importeraient un second exemplaire du module, avec ses propres compteurs PASSED/FAILED,
 # et leurs vérifications n'apparaîtraient nulle part.
-if __name__ == "__main__":
-    sys.modules.setdefault("test_units", sys.modules["__main__"])
+if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
-from tests_units import (boot_tests, latency_tests, live_fast_tests, live_fast_perf_tests,  # noqa: E402
-                         llm_tests, merge_tests, native_tests, weights_tests)
+from tests_units import (boot_tests, concepts_street_tests, latency_tests, live_fast_tests,  # noqa: E402
+                         live_fast_perf_tests, llm_tests, merge_tests, native_tests, weights_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -465,6 +464,7 @@ RUNNERS = (
     ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
+    ("concepts : bordures et bateaux (rue)", "concepts", concepts_street_tests.test_concepts_street),
     ("natif : source officielle", "segmentation_native", native_tests.test_native_source),
     ("natif : image conteneur (sam3 + deps)", "modal_app", native_tests.test_native_image),
     ("natif : récupération des poids", "segmentation_native", native_tests.test_native_fetch),

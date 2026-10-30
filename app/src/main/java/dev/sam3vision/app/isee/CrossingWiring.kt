@@ -3,15 +3,24 @@ package dev.sam3vision.app.isee
 import android.graphics.RectF
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.crossing.CrossingArrivalWatcher
 import dev.sam3vision.core.crossing.CrossingCue
+import dev.sam3vision.core.crossing.CrossingDistance
+import dev.sam3vision.core.crossing.CrossingGuidance
+import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.PedLightGate
+import dev.sam3vision.core.distance.CameraPose
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -24,6 +33,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Câblage du **mode Traversée** de la sonde : prompts feu+voitures, couleur du
@@ -211,6 +222,174 @@ internal fun observeCrossingOffer(
     scope.launch {
         offers.distinctUntilChanged().filter { it }.collect {
             say(CrossingText.offer(language()))
+        }
+    }
+}
+
+/**
+ * Labels sans passage piéton : le guidage obstacles les reçoit filtrés pour
+ * que le sol peint ne dise jamais « Stop ». Le passage se rejoint (guidage
+ * latéral doux), il ne se contourne pas.
+ */
+internal fun List<PlacedLabel>.withoutCrosswalk(): List<PlacedLabel> =
+    CrossingGuidance.withoutCrosswalk(this)
+
+/**
+ * Ce que le guidage latéral dit sur une frame : le mot ([lateral], `null` =
+ * silence, mot nouveau seul, clip [lateralClip] < 100 ms), l'arrivée
+ * ([arrival], `null` = silence, « Sur le passage. »), et la géométrie qui les
+ * a produits ([centerX], [meters] profondeur/sol, jamais sténopé).
+ */
+internal data class CrossingLateralPatch(
+    val lateral: String?,
+    val lateralClip: String?,
+    val arrival: String?,
+    val centerX: Float?,
+    val meters: Float?,
+)
+
+/** Centre du meilleur passage (pixels → normalisé), `null` si aucun. */
+internal fun crossingCenterXOf(objects: List<SegObject>, width: Int): Float? {
+    val best = CrossingGuidance.selectBest(objects) ?: return null
+    return CrossingGuidance.centerXOf(best.box, width)
+}
+
+/**
+ * Distance courte du passage : profondeur calibrée de [readings] pour [box]
+ * d'abord, plan de sol ([pose]) ensuite, `null` si aucun ne mesure. Jamais de
+ * sténopé (`crosswalk` DEPTH_ONLY).
+ */
+internal fun crossingMetersOf(
+    box: List<Float>,
+    readings: List<DistanceReading>,
+    pose: CameraPose?,
+    focalPx: Float,
+    principalY: Float,
+    imageH: Int,
+): Float? {
+    val depth = readings.firstOrNull { it.box == box }
+        ?.meters?.takeIf { it.isFinite() && it > 0f }
+    val ground = if (box.size >= 4 && pose != null) {
+        CrossingDistance.groundMeters(box[3], pose, focalPx, principalY, imageH)
+    } else null
+    return CrossingDistance.bestMeters(depth, ground)
+}
+
+/**
+ * Signal latéral de la frame : mot nouveau seul + arrivée (2 frames,
+ * changement seul). Sans passage : les deux guetteurs retombent et `null` est
+ * rendu. Pur hors annonceurs (injectés pour les tests JVM).
+ */
+internal fun crossingLateralPatchOf(
+    lateral: CrossingLateralAnnouncer,
+    arrival: CrossingArrivalWatcher,
+    objects: List<SegObject>,
+    width: Int,
+    height: Int,
+    readings: List<DistanceReading>,
+    pose: CameraPose?,
+    lens: LensSpec,
+    atMs: Long,
+    language: SpeechLanguage,
+): CrossingLateralPatch? {
+    if (width <= 0 || height <= 0) return null
+    val best = CrossingGuidance.selectBest(objects)
+    if (best == null) {
+        lateral.onFrame(atMs, null, language)
+        arrival.onFrame(false, language)
+        return null
+    }
+    val centerX = CrossingGuidance.centerXOf(best.box, width) ?: return null
+    val focalPx = lens.focalPx(width, height)
+    val meters = crossingMetersOf(best.box, readings, pose, focalPx, height / 2f, height)
+    val lateralPhrase = lateral.onFrame(atMs, centerX, language)
+    val clip = lateralPhrase?.let { GuidanceWord.clipIdFor(it) }
+    val arrived = CrossingGuidance.isArrivedPx(best.box, height, meters)
+    val arrivalPhrase = arrival.onFrame(arrived, language)?.phrase
+    return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters)
+}
+
+/**
+ * Mémoire latérale, une par processus (même garde des 500 lignes que
+ * [CrossingOfferWatch]) : la sonde l'alimente à chaque frame publiée, l'écran
+ * observe [flow] (mot doux + arrivée douce, jamais de « Stop » ici).
+ */
+internal object CrossingLateralWatch {
+
+    private val lateral = CrossingLateralAnnouncer()
+    private val arrival = CrossingArrivalWatcher()
+    private val _flow = MutableStateFlow<CrossingLateralPatch?>(null)
+
+    /** Dernier signal latéral (`null` = silence ou aucun passage). */
+    val flow: StateFlow<CrossingLateralPatch?> = _flow
+
+    /** Frame publiée : met à jour mot + arrivée, publie le signal. */
+    fun update(
+        objects: List<SegObject>,
+        width: Int,
+        height: Int,
+        readings: List<DistanceReading>,
+        pose: CameraPose?,
+        lens: LensSpec,
+        atMs: Long,
+        language: SpeechLanguage,
+    ): CrossingLateralPatch? {
+        val patch = crossingLateralPatchOf(
+            lateral, arrival, objects, width, height, readings, pose, lens, atMs, language,
+        )
+        _flow.value = patch
+        return patch
+    }
+
+    /** Nouvelle séance. */
+    fun reset() {
+        lateral.reset()
+        arrival.reset()
+        _flow.value = null
+    }
+}
+
+/**
+ * Alimente le guidage latéral depuis la sonde : hors traversée le mot et
+ * l'arrivée suivent chaque frame publiée ; en traversée le veto parle seul
+ * et la mémoire latérale retombe (une ligne côté sonde, plafond respecté).
+ */
+internal fun feedCrossingLateral(
+    traversing: Boolean,
+    objects: List<SegObject>,
+    width: Int,
+    height: Int,
+    readings: List<DistanceReading>,
+    pose: CameraPose?,
+    lens: LensSpec,
+    atMs: Long,
+    language: SpeechLanguage,
+) {
+    if (traversing) CrossingLateralWatch.reset() else CrossingLateralWatch.update(
+        objects, width, height, readings, pose, lens, atMs, language,
+    )
+}
+
+/**
+ * Parole latérale : le mot via [speakWord] (clip local < 100 ms, doux :
+ * appelant `urgent = false`), l'arrivée via [say] (douce aussi). Les deux
+ * guetteurs dédupliquent déjà (mot nouveau seul, arrivée changement seul) :
+ * rien à filtrer de plus, le silence ne dit rien.
+ */
+internal fun observeCrossingLateral(
+    patches: Flow<CrossingLateralPatch?>,
+    scope: CoroutineScope,
+    speakWord: suspend (clipId: String, text: String) -> Unit,
+    say: suspend (String) -> Unit,
+) {
+    scope.launch {
+        patches.filter { it != null && (it.lateral != null || it.arrival != null) }.collect { patch ->
+            patch ?: return@collect
+            val lateral = patch.lateral
+            val clip = patch.lateralClip
+            if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
+            val arrival = patch.arrival
+            if (arrival != null) runCatching { say(arrival) }
         }
     }
 }

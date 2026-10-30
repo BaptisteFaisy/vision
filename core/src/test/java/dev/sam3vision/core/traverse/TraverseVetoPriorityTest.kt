@@ -1,0 +1,156 @@
+package dev.sam3vision.core.traverse
+
+import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.model.Detection
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Le veto prime sur le vert : compléments à [TraverseVetoTest].
+ *
+ * Verrouille le mot d'ordre exact (« attendez », jamais « prêt » ni
+ * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
+ * la chaîne veto→phrase « Rouge, attendez. », les littéraux FR préchauffés
+ * et le doute non urgent tué sur lecteur occupé.
+ *
+ * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN strict, 15 m,
+ * ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
+ */
+class TraverseVetoPriorityTest {
+
+    private val focalPx = 1000f
+    private val mp3 = ByteArray(64) { 0xFF.toByte() }
+    private val nearBox = listOf(0f, 0f, 200f, 200f)
+
+    private fun detection(label: String, score: Float, box: List<Float>): Detection =
+        Detection(label, score, box, width = 640, height = 480)
+
+    @Test
+    fun `veto plus vert donne attendez - mot d ordre exact`() {
+        val veto = TraverseVeto()
+        val decision = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        assertTrue(decision.veto)
+        assertEquals(TraversePhase.ATTENDRE, decision.state)
+        assertEquals("attendez", decision.cue)
+        assertEquals("car", decision.blockingLabel)
+        assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
+    }
+
+    @Test
+    fun `veto prime sur vert prepare - PRET puis ALERTE`() {
+        val veto = TraverseVeto()
+        assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
+        val alert = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        assertEquals(TraversePhase.ALERTE, alert.state)
+        assertEquals("attendez", alert.cue)
+        assertTrue(alert.veto)
+    }
+
+    @Test
+    fun `veto prime sur traversee - ALERTE puis reconfirmation PRET`() {
+        val veto = TraverseVeto()
+        veto.update(true, emptyList(), focalPx)
+        veto.update(true, emptyList(), focalPx)
+        assertEquals(TraversePhase.TRAVERSER, veto.currentState)
+        val alert = veto.update(true, listOf(detection("car", 0.8f, nearBox)), focalPx)
+        assertEquals(TraversePhase.ALERTE, alert.state)
+        assertEquals("attendez", alert.cue)
+        assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
+        assertEquals(TraversePhase.TRAVERSER, veto.update(true, emptyList(), focalPx).state)
+    }
+
+    @Test
+    fun `sans veto le vert fait traverser - temoin`() {
+        val veto = TraverseVeto()
+        val first = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
+        assertEquals(TraversePhase.PRET, first.state)
+        assertEquals("prêt", first.cue)
+        assertFalse(first.veto)
+        val second = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
+        assertEquals(TraversePhase.TRAVERSER, second.state)
+        assertEquals("traversez", second.cue)
+    }
+
+    @Test
+    fun `feu rouge plus veto reste attendre - pas d alerte depuis l attente`() {
+        val veto = TraverseVeto()
+        val decision = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        assertTrue(decision.veto)
+        assertEquals(TraversePhase.ATTENDRE, decision.state)
+        assertEquals("attendez", decision.cue)
+    }
+
+    @Test
+    fun `score limite - 0_5 ignore, 0_51 bloque`() {
+        val ignored = TraverseVeto().update(true, listOf(detection("car", 0.5f, nearBox)), focalPx)
+        assertFalse(ignored.veto)
+        assertEquals(TraversePhase.PRET, ignored.state)
+        val blocked = TraverseVeto().update(true, listOf(detection("car", 0.51f, nearBox)), focalPx)
+        assertTrue(blocked.veto)
+        assertEquals(TraversePhase.ATTENDRE, blocked.state)
+        assertEquals("attendez", blocked.cue)
+    }
+
+    @Test
+    fun `phases vues par l annonceur - veto vaut rouge`() {
+        fun decisionOf(phase: TraversePhase) = TraverseDecision(
+            state = phase,
+            cue = "x",
+            veto = false,
+            blockingLabel = null,
+            blockingMeters = null,
+            keepObstacleGuidance = false,
+        )
+        assertEquals(CrossingState.Red, decisionOf(TraversePhase.ATTENDRE).crossingState())
+        assertEquals(CrossingState.Red, decisionOf(TraversePhase.ALERTE).crossingState())
+        assertEquals(CrossingState.Green, decisionOf(TraversePhase.PRET).crossingState())
+        assertEquals(CrossingState.Green, decisionOf(TraversePhase.TRAVERSER).crossingState())
+    }
+
+    @Test
+    fun `veto plus vert parle rouge apres deux frames - chaine jusqu a la voix`() {
+        val veto = TraverseVeto()
+        val announcer = CrossingAnnouncer()
+        val first = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        assertEquals(CrossingState.Red, first.crossingState())
+        assertNull(announcer.onFrame(0L, first.crossingState()))
+        val second = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        val cue = announcer.onFrame(200L, second.crossingState())
+        assertEquals("Rouge, attendez.", cue?.phrase)
+        assertFalse(cue?.urgent ?: true)
+        assertEquals(CrossingState.Red, cue?.state)
+    }
+
+    @Test
+    fun `phrases prechauffees - litteraux francais exacts`() {
+        assertEquals("Rouge, attendez.", TraversePhrases.RED)
+        assertEquals("Vert, traversez.", TraversePhrases.GREEN)
+        assertEquals("Doute, attendez.", TraversePhrases.UNKNOWN)
+        assertEquals("Trottoir en face.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("Sur le passage.", TraversePhrases.ON_CROSSWALK)
+        assertEquals(
+            listOf(
+                "Rouge, attendez.", "Vert, traversez.", "Doute, attendez.",
+                "Trottoir en face.", "Sur le passage.",
+            ),
+            TraversePhrases.ALL,
+        )
+    }
+
+    @Test
+    fun `doute non urgent sur lecteur occupe - tu sans reseau`() = runBlocking {
+        val clips = mutableMapOf<String, String>()
+        val player = FakePlayer(isBusy = true)
+        val tts = FakeTts(Result.success(mp3))
+        val voice = TraverseVoice(tts, player, FakeSystemTts(store = clips), FakeStore(clips))
+        val outcome = voice.speak(TraversePhrases.UNKNOWN, urgent = false)
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, outcome)
+        assertTrue(player.events.isEmpty())
+        assertEquals(0, tts.calls)
+    }
+}

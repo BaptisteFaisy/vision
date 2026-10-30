@@ -13,40 +13,42 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **12** dangers extérieurs pour un piéton aveugle —
+     * Concepts par défaut : **14** dangers extérieurs pour un piéton aveugle —
      * mobiles (« person », « car », « bicycle », « electric scooter ») puis
      * statiques (« pole », « sidewalk », « crosswalk », « wall », « window »,
-     * « stairs », « door », « barrier »), modifiables à chaud dans le direct
-     * (champ « Suivre »).
+     * « stairs », « door », « barrier », « fence », « gate »), modifiables à
+     * chaud dans le direct (champ « Suivre »).
      *
      * Historique des plafonds : 2 (26/10, le tracker tronquait à
      * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
      * tous les dangers extérieurs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
      * Historique des défauts : 10 (28/10), 12 (29/10, ordre user : portes et
-     * barrières reconnues en plus). Sur `/live` les prompts sont batchés (un
-     * seul forward, mesure du 26/10 : 2 ou 8 concepts = 118 ms médian) ; sur
-     * le tracker chaque concept coûte une inférence par `/frame`, d'où un
-     * coût ×8 assumé sur ce chemin.
+     * barrières reconnues en plus), 14 (30/10 : clôtures et portails reconnus
+     * en plus). Sur `/live` les prompts sont batchés (un seul forward, mesure
+     * du 26/10 : 2 ou 8 concepts = 118 ms médian) ; sur le tracker chaque
+     * concept coûte une inférence par `/frame`, d'où un coût ×8 assumé sur ce
+     * chemin.
      */
     val default: List<String> = listOf(
         "person", "car", "bicycle", "electric scooter", "pole",
         "sidewalk", "crosswalk", "wall", "window", "stairs",
-        "door", "barrier",
+        "door", "barrier", "fence", "gate",
     )
 
     /**
      * Preset extérieur : **12** concepts de cheminement urbain — la personne et
      * le mobilier qui borde le trottoir (poteaux, bornes, clôtures, barrières,
-     * portails, panneaux, arbres), plus les encombrants (poubelles, bennes),
-     * les animaux et le feu tricolore — ordre user du 29/10, détecté en
-     * permanence hors mode traversée pour anticiper les passages protégés.
-     * Bascule depuis la pastille « Extérieur » du direct, sans passer par le
-     * champ « Suivre ». Tient sous [MAX] comme [default], qui reste les
-     * 12 dangers (pastille « Rue »).
+     * portails, panneaux, arbres), plus le trottoir lui-même, les encombrants
+     * (poubelles), les animaux et le feu tricolore — ordre user du 29/10
+     * (30/10 : « sidewalk » remplace « dumpster », benne la moins utile),
+     * détecté en permanence hors mode traversée pour anticiper les passages
+     * protégés. Bascule depuis la pastille « Extérieur » du direct, sans passer
+     * par le champ « Suivre ». Tient sous [MAX] comme [default], qui reste les
+     * 14 dangers (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
         "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-        "trash can", "dumpster", "animal", "traffic light",
+        "trash can", "sidewalk", "animal", "traffic light",
     )
 
     /**
@@ -62,12 +64,12 @@ object LivePrompts {
     )
 
     /**
-     * Liste du monde sensoriel : dehors = [default] (les 12 dangers de la
-     * rue), dedans = [indoor] (les 7 objets d'intérieur). V1 : seuls les
-     * prompts basculent, la portée reste 4 m dans les deux mondes. À ne pas
-     * confondre avec le preset [outdoor] (12 concepts de cheminement, pastille
-     * « Extérieur » du direct) : la bascule monde s'applique à la sonde iSee,
-     * pas aux pastilles.
+     * Liste du monde sensoriel : dehors = [default] (les 14 dangers de la
+     * rue, clôtures et portails inclus), dedans = [indoor] (les 7 objets
+     * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
+     * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
+     * (12 concepts de cheminement, pastille « Extérieur » du direct) : la
+     * bascule monde s'applique à la sonde iSee, pas aux pastilles.
      */
     fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
 

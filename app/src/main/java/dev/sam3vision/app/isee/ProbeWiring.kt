@@ -4,22 +4,31 @@ import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
+import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.curb.SidewalkWatcher
+import dev.sam3vision.core.cycle.CycleWatcher
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.hazard.FenceOpeningSignal
+import dev.sam3vision.core.hazard.FenceOpeningWatcher
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairConcepts
 import dev.sam3vision.core.stairs.StairLabelSignals
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
+import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -127,11 +136,14 @@ internal fun LiveProbe.observeSpoken(
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
- * guetteur pour le `reset()` de début de séance. Coupé en mode Traversée (sa
- * voix rouge/vert est propriétaire du son) ; l'alerte est douce (attend le
- * silence) — seule l'urgence (stop) coupe. Lecture séquentielle (`collect`) :
- * une alerte confirmée est rare, et elle ne doit pas être annulée par la
- * frame suivante.
+ * guetteur pour le `reset()` de début de séance. La marche imminente
+ * ([CurbTier.NEAR]) parle en urgent, même en mode Traversée (un bord sous le
+ * pied ne attend pas le vert) ; la pré-alerte ([CurbTier.FAR]) et le bateau
+ * ([CurbTier.NONE]) sont doux et coupés en Traversée (sa voix rouge/vert est
+ * propriétaire du son). Priorités ([ProbeVoice.stopRecent]) : stop, puis
+ * marche imminente (sauf stop parlé il y a moins de 2 s), puis le reste.
+ * Lecture séquentielle (`collect`) : une alerte confirmée est rare, et elle
+ * ne doit pas être annulée par la frame suivante.
  */
 internal fun LiveProbe.observeCurb(
     scope: CoroutineScope,
@@ -142,14 +154,28 @@ internal fun LiveProbe.observeCurb(
     val watcher = CurbWatcher()
     scope.launch {
         state.collect { st ->
-            if (st.crossingActive) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = CurbSignal.of(readings, st.width, st.height)
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+            val nowMs = System.currentTimeMillis()
+            val cue = watcher.onSignal(signal, nowMs, language()) ?: return@collect
+            if (!shouldSpeakCurb(cue, st.crossingActive, this@observeCurb.voice.stopRecent(nowMs))) return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.tier == CurbTier.NEAR)
         }
     }
     return watcher
+}
+
+/**
+ * Parole bordure : la marche imminente ([CurbTier.NEAR]) passe même en
+ * Traversée, sauf stop parlé il y a moins de 2 s (le stop prime) ; la
+ * pré-alerte ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) sont doux et
+ * coupés en Traversée. Pure, testée en JVM.
+ */
+internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean, stopRecent: Boolean): Boolean = when {
+    cue.tier == CurbTier.NEAR && stopRecent -> false
+    cue.tier == CurbTier.NEAR -> true
+    crossingActive -> false
+    else -> true
 }
 
 /**
@@ -159,7 +185,10 @@ internal fun LiveProbe.observeCurb(
  * libellé (« stairs going up », exact) sinon de la hauteur de la boîte
  * ([StairLabelSignals]) ; l'annonce est douce (attend le silence) : une info
  * de navigation, jamais une consigne d'évitement. Coupé en mode Traversée.
- * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ * Voix montée : compte à rebours (« Plus que N marches. ») puis dernière
+ * marche, par compteur lissé ou par profondeur (< 1 m, lue ici — la voie
+ * labels ne compte pas). Lecture séquentielle, comme le trottoir : une alerte
+ * confirmée ne s'annule pas.
  */
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
@@ -175,12 +204,18 @@ internal fun LiveProbe.observeStairs(
             if (st.crossingActive) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val found = StairLabelSignals.of(readings, st.width, st.height)
+            // Profondeur du marchement le plus proche : la dernière marche par
+            // profondeur (< 1 m) parle même quand le compteur est indisponible
+            // (voie labels : lineCount = 0 = non compté, pas « zéro marche »).
+            val stairsMeters = readings.filter { StairConcepts.isStairs(it.label) }
+                .mapNotNull { it.meters.takeIf { m -> m.isFinite() } }.minOrNull()
             val signal = if (found.detected) {
                 StairSignal(detected = true, confidence = 1f, lineCount = 0, roiTop = 0, roiBottom = 0)
             } else {
                 StairSignal.none()
             }
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language(), found.direction, found.centerX)
+            val cue = watcher.onSignal(
+                signal, System.currentTimeMillis(), language(), found.direction, found.centerX, stairsMeters)
                 ?: return@collect
             voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
         }
@@ -214,6 +249,98 @@ internal fun LiveProbe.observeHazard(
     }
     return watcher
 }
+
+/**
+ * Guetteur grillage de la sonde, miroir du mobilier : les pans suivis
+ * ([dev.sam3vision.core.hazard.FenceOpeningConcepts]) lus dans l'état
+ * (lectures de distance + dimensions, déjà publiées par frame), sans toucher
+ * à `LiveProbe`. L'annonce (« Grillage fermé devant vous. », « Passage au
+ * milieu. ») est douce (attend le silence) : iSee décrit, en douceur. Coupé
+ * en mode Traversée (sa voix rouge/vert est propriétaire du son). Lecture
+ * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeFenceOpening(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): FenceOpeningWatcher {
+    val watcher = FenceOpeningWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val signal = FenceOpeningSignal.of(readings, st.width, st.height)
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
+
+/**
+ * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
+ * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
+ * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. L'annonce est
+ * douce (attend le silence) : en Traversée, le veto seul parle (coupé ici).
+ * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
+ * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeVehicleState(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): VehicleStateWatcher {
+    val watcher = VehicleStateWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val cue = watcher.update(
+                detectionsOf(readings, st.width, st.height), readings, System.currentTimeMillis(), language())
+                ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
+
+/**
+ * Guetteur cycles de la sonde, miroir des véhicules : vélos et trottinettes,
+ * en mouvement ou arrêtés (« Attention, vélo en mouvement, à 2 heures. »),
+ * lus dans l'état, sans toucher à `LiveProbe`. Doux et coupé en Traversée,
+ * comme les véhicules (le veto seul parle). Lecture séquentielle, comme le
+ * trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeCycles(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): CycleWatcher {
+    val watcher = CycleWatcher()
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val cue = watcher.update(
+                detectionsOf(readings, st.width, st.height), readings, System.currentTimeMillis(), language())
+                ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
+
+/**
+ * Détections reconstruites des lectures de distance : boîtes pixels SAM déjà
+ * confirmées (score 1 : le seuil 0,5 du veto garde les brutes, pas les
+ * relues). Les boîtes illisibles sont filtrées (les guetteurs les ignorent
+ * aussi). Pur, testé en JVM.
+ */
+internal fun detectionsOf(readings: List<DistanceReading>, width: Int, height: Int): List<Detection> =
+    readings.filter { it.box.size >= 4 }.map { Detection(it.label, 1f, it.box, width, height) }
 
 /**
  * Détour obstacle de la sonde : le pilote GPS y lit le détour subi (recalcul
@@ -264,24 +391,30 @@ internal fun LiveProbe.observeSidewalk(
     return watcher
 }
 
-/** Les quatre guetteurs de la sonde (bordure + escaliers + mobilier + trottoir), reset commun. */
+/** Les sept guetteurs de la sonde (bordure + escaliers + mobilier + grillage + véhicules + cycles + trottoir), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
     val hazard: HazardWatcher,
+    val fence: FenceOpeningWatcher,
+    val vehicle: VehicleStateWatcher,
+    val cycle: CycleWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les quatre guetteurs (nouvelle séance). */
+    /** Oublie les sept guetteurs (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
         hazard.reset()
+        fence.reset()
+        vehicle.reset()
+        cycle.reset()
         sidewalk.reset()
     }
 }
 
 /**
- * Les quatre guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeCurb`, même contrat).
  */
 internal fun LiveProbe.observeHazards(
@@ -293,5 +426,8 @@ internal fun LiveProbe.observeHazards(
     observeCurb(scope, voice, playerIdle, language),
     observeStairs(scope, voice, playerIdle, language),
     observeHazard(scope, voice, playerIdle, language),
+    observeFenceOpening(scope, voice, playerIdle, language),
+    observeVehicleState(scope, voice, playerIdle, language),
+    observeCycles(scope, voice, playerIdle, language),
     observeSidewalk(scope, voice, playerIdle, language),
 )

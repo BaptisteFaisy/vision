@@ -246,6 +246,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Passage piéton reconnu : la voix le dit, une fois, sinon la proposition
         // n'existe que pour ceux qui voient la pastille.
         observeCrossingOffer(probe.state.map { it.crossingOffer }, viewModelScope, { settings.speechLanguage }) { speakNavigation(it) }
+        // Placement sur le passage (mot doux + « Sur le passage. », jamais Stop).
+        observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false) }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
