@@ -20,7 +20,7 @@ class KnownSizesTest {
 
     @Test
     fun `defauts profondeur sans hauteur stenope`() {
-        listOf("stairs", "sidewalk", "crosswalk", "pole").forEach { concept ->
+        listOf("stairs", "sidewalk", "crosswalk", "pole", "curb").forEach { concept ->
             assertNull(KnownSizes.heightMeters(concept))
             assertTrue(concept in KnownSizes.DEPTH_ONLY)
         }

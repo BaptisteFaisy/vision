@@ -4,10 +4,14 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraverseVeto
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CrossingWiringTest {
@@ -47,6 +51,18 @@ class CrossingWiringTest {
     fun `mode actif libelle l etat du feu`() {
         assertEquals("Traversée : VERT", crossingButtonLabel(true, CrossingState.Green))
         assertEquals("Traversée : ROUGE", crossingButtonLabel(true, CrossingState.Red))
+    }
+
+    @Test
+    fun `bascule traversee garde les memes prompts, memes masques`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val before = probe.state.value.conceptsSent
+        probe.setCrossingActive(Settings.Default, true)
+        assertTrue(probe.state.value.crossingActive)
+        assertEquals(before, probe.state.value.conceptsSent)
+        probe.setCrossingActive(Settings.Default, false)
+        assertFalse(probe.state.value.crossingActive)
+        assertEquals(before, probe.state.value.conceptsSent)
     }
 
     @Test
