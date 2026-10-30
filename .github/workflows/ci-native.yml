@@ -11,6 +11,12 @@ name: CI native (hors PR)
 # setup + lintDebug/assemble dépassent 5 min (vu le 28/10 : 1er run sur
 # master tué à 5 min, cache du nouveau workflow vide) ; à chaud, mesuré
 # ≤ 4m45. Pas de budget 5 min imposé hors PR, mais timeout explicite.
+# Marge 10 min (2026-10-30) : 2 runs tués par le timeout à ~700 s ce jour-là
+# (contention, 40 pushes/2 h — 9 runs natifs sur 12 annulés par le push
+# suivant). Trois coupes, verdict inchangé : `apk` absorbe `apk-release`
+# (debug + release dans le même job, ~6-7 min < 10 — la garde tourne après
+# chaque assemblage, chaque variante reste vérifiée), `paths-ignore` étendu
+# à `server/` et aux sources de test (voir ci-dessous), `--max-workers=4`.
 on:
   push:
     branches: [master]
@@ -20,9 +26,17 @@ on:
     # 29/10 : 10 runs sur la journée, dont 7 annulés par le suivant — la
     # majorité sur des atterrissages de doc/CHANGELOG. (`paths` n'est pas
     # évalué sur un push de tag : les tags construisent toujours.)
+    # Étendu le 2026-10-30 (marge 10 min) : `server/` — l'APK n'en dépend pas
+    # (aucun grep dans les build files, settings = `:core` + `:app`) ; les
+    # sources de test — `assemble` ne les compile pas et lint les ignore déjà
+    # (`ignoreTestSources`, build.gradle.kts racine). Prouvé sans effet sur
+    # le verdict : ces pushes ne peuvent pas casser l'APK ni le lint.
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - 'server/**'
+      - '**/src/test/**'
+      - '**/src/androidTest/**'
   workflow_dispatch: {}
 
 concurrency:
@@ -37,9 +51,13 @@ env:
   GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
 jobs:
-  # ── APK debug ─────────────────────────────────────────────────────────────
-  # Un job par APK : les deux variantes dans le même job ne tenaient pas dans
-  # les 5 minutes (mesuré le 26/10 : coupé au budget). Deux VM = deux budgets.
+  # ── APK debug + release — les deux variantes, un seul job ──────────────────
+  # Fusionnés le 2026-10-30 (marge 10 min : 2 runs tués à ~700 s, 40 pushes /
+  # 2 h) : séparés le 26/10 parce que les deux variantes ne tenaient pas dans
+  # 5 min — à budget 10 min hors PR, debug (~2,5 min) + release (~2,5 min) +
+  # setup tiennent en ~6-7 min. Un runner et un setup économisés par run.
+  # La garde tourne après CHAQUE assemblage (debug puis release, comme les
+  # deux jobs d'avant : chaque variante reste vérifiée, 2 pings comme avant).
   apk:
     name: apk
     runs-on: [self-hosted, linux, x64, vision]
@@ -63,12 +81,22 @@ jobs:
           asr-api-key: ${{ secrets.ASR_API_KEY }}
           llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
       - name: APK debug
-        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleDebug
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4 :app:assembleDebug
       # Garde clés embarquées : tant que les secrets existent, l'APK DOIT les
       # contenir et la clé LLM DOIT répondre — sinon build rouge (déjà vu :
       # secrets restés sur l'ancien fournisseur, APK sans clé valide). Sans
       # secret, comportement inchangé (APK sans clé). Aucune valeur affichée.
-      - name: Garde clés embarquées (dex + ping LLM)
+      - name: Garde clés embarquées debug (dex + ping LLM)
+        env:
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: python3 tools/check-apk-keys.py
+      # Variante release (R8 désactivé) : compile SANS le mock (c'est le stub
+      # `src/release/MockControl.kt` qui prend le relais pour le banc).
+      - name: APK release
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4 :app:assembleRelease
+      - name: Garde clés embarquées release (dex + ping LLM)
         env:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -84,40 +112,6 @@ jobs:
           retention-days: 2
           if-no-files-found: error
 
-  # ── APK release — compile la variante release (R8 désactivé) ───────────────
-  apk-release:
-    name: apk-release
-    runs-on: [self-hosted, linux, x64, vision]
-    timeout-minutes: 10 # hors PR : cache froid possible (voir en-tête)
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - uses: gradle/actions/setup-gradle@v4
-      # Les clés des APK distribués (action composite, même étape que le job
-      # `apk`) : sans elle, la variante release sort sans clé alors que la
-      # debug les embarque. Sans secret, l'APK sort sans clé.
-      - name: Clés du build (secrets → local.properties)
-        uses: ./.github/actions/cles-build
-        with:
-          llm-base-url: ${{ secrets.LLM_BASE_URL }}
-          llm-api-key: ${{ secrets.LLM_API_KEY }}
-          llm-model: ${{ secrets.LLM_MODEL }}
-          tts-api-key: ${{ secrets.TTS_API_KEY }}
-          tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
-          asr-api-key: ${{ secrets.ASR_API_KEY }}
-          llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
-      - name: APK release
-        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:assembleRelease
-      # Garde clés embarquées (même étape que le job `apk`) : l'APK DOIT
-      # contenir la clé du secret et elle DOIT répondre — sinon build rouge.
-      - name: Garde clés embarquées (dex + ping LLM)
-        env:
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: python3 tools/check-apk-keys.py
-
   # ── lint — le poste le plus cher, donc sa propre VM ─────────────────────────
   lint:
     name: lint
@@ -129,13 +123,13 @@ jobs:
           fetch-depth: 1
       - uses: gradle/actions/setup-gradle@v4
       # C'est CE job qui porte le contrôle lint (abortOnError = true : une
-      # erreur échoue ici). Le job `apk-release` n'a plus à le refaire :
+      # erreur échoue ici). Le job `apk` n'a plus à le refaire :
       # `checkReleaseBuilds` est coupé en CI seulement (build.gradle.kts, racine),
       # parce que ce lint-ci analyse déjà les mêmes sources avec les mêmes
       # règles. Mesuré le 26/10 : 85 → 65 tâches sur `assembleRelease`,
       # 17 s → 14 s, APK release toujours produit.
       - name: lintDebug
-        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" :app:lintDebug
+        run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4 :app:lintDebug
       - name: Rapport de lint
         if: always()
         uses: actions/upload-artifact@v4

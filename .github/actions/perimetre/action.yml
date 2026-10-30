@@ -1,0 +1,98 @@
+name: Périmètre code/backend
+description: >-
+  Détermine si la PR/push touche du code Gradle (code=1) et/ou du backend
+  (backend=1). Source unique du pas « Cette PR touche-t-elle du code ? »
+  (jobs ci-core et ci-app) : une seule implémentation, pas de copie.
+inputs:
+  github-token:
+    description: Jeton GitHub (lecture de la liste des fichiers via l'API)
+    required: true
+  pr-number:
+    description: Numéro de PR (événement pull_request, vide sinon)
+    required: false
+    default: ''
+  push-before:
+    description: SHA avant (événement push, vide sinon)
+    required: false
+    default: ''
+  push-sha:
+    description: SHA courant (événement push, vide sinon)
+    required: false
+    default: ''
+  pr-head-ref:
+    description: Branche tête de la PR (détection des lots Mergify)
+    required: false
+    default: ''
+outputs:
+  code:
+    description: "'1' si Gradle doit tourner, '0' sinon"
+    value: ${{ steps.perimetre.outputs.code }}
+  backend:
+    description: "'1' si les tests Python backend doivent tourner, '0' sinon"
+    value: ${{ steps.perimetre.outputs.backend }}
+runs:
+  using: composite
+  steps:
+    - id: perimetre
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        PUSH_BEFORE: ${{ inputs.push-before }}
+        PUSH_SHA: ${{ inputs.push-sha }}
+        PR_HEAD_REF: ${{ inputs.pr-head-ref }}
+      run: |
+        # Une PR de docs/config n'a pas besoin de Gradle : le verdict tombe en
+        # quelques secondes. La liste des fichiers vient de l'API (le checkout
+        # est superficiel, la base n'y est pas).
+        code=1
+        fichiers=""
+        lot=0
+        # PR de lot de la file de merge : le `push` sur la même tête a déjà
+        # fait tourner les tests (même commit, même arbre). Ce passage-ci
+        # existe seulement parce que la file ouvre une PR sur sa branche ;
+        # on le rend vert en quelques secondes au lieu de rejouer Gradle —
+        # sinon chaque lot chargeait deux fois 21 runners pour un verdict.
+        case "${PR_HEAD_REF:-}" in
+          mergify/merge-queue/*)
+            echo "PR de lot de la file de merge : tests déjà exécutés par le push de la branche."
+            lot=1
+            ;;
+        esac
+        if [ -n "$PR_NUMBER" ]; then
+          fichiers="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+            | python3 -c 'import json,sys;print("\n".join(f["filename"] for f in json.load(sys.stdin)))' 2>/dev/null || true)"
+        elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+          fichiers="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/compare/$PUSH_BEFORE...$PUSH_SHA" \
+            | python3 -c 'import json,sys;print("\n".join(f["filename"] for f in json.load(sys.stdin).get("files") or []))' 2>/dev/null || true)"
+        fi
+        # Périmètre « code » : chaque module est nommé, et TOUT ce qui vit
+        # sous un module compte (manifest, res/, schémas Room, règles
+        # ProGuard) — pas seulement les .kt. Avant, un manifest ou un schéma
+        # Room modifié passait pour « sans code » : Gradle ne tournait pas,
+        # donc vert par absence de test. La doc (.md/.txt) reste hors
+        # périmètre, où qu'elle soit. `tools/` n'y est pas : aucun test JVM
+        # ne lit ces scripts (gardes CI + bancs manuels), une PR 100 %
+        # Python n'a pas besoin de Gradle — les gardes tournent toujours.
+        # `server/` a son propre verdict (`backend`) : tests Python, pas Gradle.
+        backend=1
+        if [ -n "$fichiers" ]; then
+          if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' \
+            | grep -qE '^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$'; then
+            code=1; echo "Code touché : Gradle complet."
+          else
+            code=0; echo "Sans code (${fichiers//$'\n'/, }) : étapes Gradle sautées."
+          fi
+          if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' | grep -qE '^server/'; then
+            backend=1; echo "Backend touché : tests Python."
+          else
+            backend=0; echo "Backend intact : tests Python sautés."
+          fi
+        fi
+        # Dernier mot pour une PR de lot : quoi qu'ait décidé la liste de
+        # fichiers ci-dessus, ce passage ne rejoue pas les tests.
+        if [ "$lot" = "1" ]; then code=0; backend=0; fi
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        echo "backend=$backend" >> "$GITHUB_OUTPUT"
