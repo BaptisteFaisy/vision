@@ -83,10 +83,10 @@ internal fun CrossingOverlayLayer(
 }
 
 /**
- * Le verdict **sur la vidéo**, en bas et centré : « peut traverser » (vert)
- * ou « ne peut pas traverser » (rouge). Rien quand le mode est coupé ou
- * qu'aucune phase n'est publiée — le direct ne publiant pas de phase, son
- * overlay reste celui d'avant.
+ * Le verdict **sur la vidéo**, en haut et centré, sous la puce : « peut
+ * traverser » (vert) ou « ne peut pas traverser » (rouge). Rien quand le mode
+ * est coupé ou qu'aucune phase n'est publiée — le direct ne publiant pas de
+ * phase, son overlay reste celui d'avant.
  */
 @Composable
 internal fun TraverseVerdictBanner(
@@ -109,6 +109,7 @@ internal fun TraverseVerdictBanner(
             laid.size.height.toFloat() + VERDICT_PAD_V_PX * 2,
             constraints.maxWidth.toFloat(),
             constraints.maxHeight.toFloat(),
+            with(LocalDensity.current) { VERDICT_TOP_MARGIN_DP.dp.toPx() },
         )
         Canvas(Modifier.fillMaxSize()) {
             drawRoundRect(
@@ -130,6 +131,9 @@ private const val VERDICT_FONT_SP = 14f
 
 private const val VERDICT_PAD_H_PX = 10f
 private const val VERDICT_PAD_V_PX = 4f
+
+/** Décalage du bandeau sous la puce (~46 dp de puce + respiration). */
+private const val VERDICT_TOP_MARGIN_DP = 64f
 
 /** Taille de l'étiquette : petite, mais lisible sur une vidéo qui bouge. */
 private const val TAG_FONT_SP = 11f
