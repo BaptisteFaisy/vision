@@ -51,6 +51,16 @@ class MaskBenchTest {
         assertNotNull(decodePolyMask(poly, width, height))
     }
 
+    @Test
+    fun `l agrandissement de la grille reduite a la frame tient dans le budget`() {
+        val grid = GrayMask(width, height, Shapes.disk(width, height, 40).map { it.toByte() }.toByteArray())
+        val perUpscaleMs = timeBest { upscaleNearest(grid, width * 2, height * 2) }
+        println("upscale %d×%d → %d×%d : %.3f ms/objet".format(width, height, width * 2, height * 2, perUpscaleMs))
+
+        assertTrue("l'agrandissement tables d'axe doit rester sous 5 ms par objet", perUpscaleMs < 5.0)
+        assertNotNull(upscaleNearest(grid, width * 2, height * 2))
+    }
+
     /** Meilleur temps de [rounds] tours, en millisecondes : le premier tour paie la JVM. */
     private fun timeBest(rounds: Int = ROUNDS, block: () -> Unit): Double {
         var best = Double.MAX_VALUE

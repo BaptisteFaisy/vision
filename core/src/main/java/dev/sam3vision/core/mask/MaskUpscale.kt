@@ -37,16 +37,26 @@ fun maskGrid(frameWidth: Int, frameHeight: Int, scale: Float): Pair<Int, Int>? {
 fun upscaleNearest(mask: GrayMask, targetWidth: Int, targetHeight: Int): GrayMask? {
     val total = maskGridSize(targetWidth, targetHeight) ?: return null
     if (mask.width == targetWidth && mask.height == targetHeight) return mask
+    val xMap = axisMap(targetWidth, mask.width)
+    val yMap = axisMap(targetHeight, mask.height)
     val pixels = ByteArray(total)
     for (y in 0 until targetHeight) {
-        val sourceRow = sourceIndex(y, targetHeight, mask.height) * mask.width
+        val sourceRow = yMap[y] * mask.width
         val targetRow = y * targetWidth
         for (x in 0 until targetWidth) {
-            pixels[targetRow + x] = mask.pixels[sourceRow + sourceIndex(x, targetWidth, mask.width)]
+            pixels[targetRow + x] = mask.pixels[sourceRow + xMap[x]]
         }
     }
     return GrayMask(targetWidth, targetHeight, pixels)
 }
+
+/**
+ * Table d'un axe : l'index source de chaque pixel cible, calculé **une fois par axe**
+ * (`targetWidth + targetHeight` divisions) au lieu d'une fois par pixel
+ * (`targetWidth × targetHeight`) : la boucle interne ne fait plus que des lectures.
+ */
+private fun axisMap(target: Int, source: Int): IntArray =
+    IntArray(target) { sourceIndex(it, target, source) }
 
 /** Index source du centre du pixel [index] d'un axe de [target] pixels, borné à [source]. */
 private fun sourceIndex(index: Int, target: Int, source: Int): Int =

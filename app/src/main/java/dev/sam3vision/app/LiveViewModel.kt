@@ -6,12 +6,12 @@ import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sam3vision.app.isee.MaskPainter
 import dev.sam3vision.app.isee.pictosDir
 import dev.sam3vision.app.live.CenterTrails
 import dev.sam3vision.app.live.LiveAskSession
 import dev.sam3vision.app.live.LiveFrameDispatcher
 import dev.sam3vision.app.live.LiveFpsMeter
-import dev.sam3vision.app.live.LiveMaskDecoder
 import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
@@ -19,7 +19,6 @@ import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
 import dev.sam3vision.app.live.LiveWakeGuard
-import dev.sam3vision.app.live.MaskPainter
 import dev.sam3vision.app.traverse.TraverseWiring
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.LensSpec
@@ -29,7 +28,6 @@ import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.TrackRunner
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.ScreenTimings
-import dev.sam3vision.core.mask.colorizedObjectBitmap
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.net.HttpTrackClient
 import dev.sam3vision.core.net.LiveClient
@@ -41,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Orchestration du direct : une frame à la fois, masques recolorés, stats, mémoire [LiveTimeline]. Briques `live/` testables en JVM, API inchangée.
@@ -113,19 +112,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     )
     val local = dev.sam3vision.app.live.LiveLocalOverlayWiring(_state, store) { settings.localOverlayEnabled }
 
-    /**
-     * Masques coloriés hors thread principal ; le poste `overlays` est posé au retour.
-     * Le décodage se fait **par objet** ([colorizedObjectBitmap]) : `rle` et `poly` arrivent
-     * sur la grille réduite annoncée par `mask_scale` et sont agrandis avant coloriage.
-     */
-    private val masks: LiveMaskDecoder<Bitmap> = LiveMaskDecoder(
-        paint = MaskPainter { obj, frameWidth, frameHeight, argb, alpha ->
-            colorizedObjectBitmap(obj, frameWidth, frameHeight, argb, alpha)
-        },
-        colorAt = { maskColorAt(it).toArgb() },
-        alpha = MASK_ALPHA,
-        onDecoded = { chronology.markOverlays() },
-    )
+    /** Masques coloriés sur [MaskPainter] : tampons réutilisés, même peintre que la sonde. */
+    private val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
 
     /** Annonce vocale des positions : une phrase à la fois, jamais superposée. */
     private val voice = VoiceAnnouncer(app, POSITION_VOICE_DIR)
@@ -362,6 +350,16 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         if (!_state.value.hasFrame) _state.update { it.copy(latestFrame = latestFrame) }
     }
 
+    /** Masques coloriés hors thread principal ; poste `overlays` posé juste après. */
+    private suspend fun decodeOverlays(frame: LiveFrame): List<Bitmap> =
+        withContext(Dispatchers.Default) {
+            val startedAt = SystemClock.elapsedRealtime()
+            val overlays = painter.overlays(frame)
+            chronology.markOverlays()
+            painter.noteDecoded(SystemClock.elapsedRealtime() - startedAt, overlays.size)
+            overlays
+        }
+
     /** Publie la frame analysée : masques, statistiques et journal des objets vus. */
     private suspend fun publish(frame: LiveFrame) {
         val now = System.currentTimeMillis()
@@ -379,8 +377,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
         if (!traverse.active || shown.keepGuidance) positions.announce(shown.frame, width, height, now, readings)
         if (!traverse.active) asker.onLiveFrame(width, height, now)
-        // Calcul hors thread principal (voir LiveMaskDecoder) ; le poste `overlays` est posé là-bas.
-        val overlays = masks.decode(shown.frame)
+        // Calcul hors thread principal ; le poste `overlays` est posé juste après.
+        val overlays = decodeOverlays(shown.frame)
         val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
