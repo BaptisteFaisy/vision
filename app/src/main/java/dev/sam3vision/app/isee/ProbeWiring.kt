@@ -18,6 +18,7 @@ import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
@@ -100,6 +101,17 @@ internal fun LiveProbe.configureFrom(
         modelsLine = debugModelsLine(settings),
         depth = settings.depthBackend,
     )
+    adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)
+}
+
+/** Cap de l'itinéraire : tant qu'il est posé, la sonde marche son couloir. */
+fun LiveProbe.setRouteCap(cap: SteeringCap) {
+    voice.routeCap = cap
+}
+
+/** Fin du guidage route : le cap manuel reprend. */
+fun LiveProbe.clearRouteCap() {
+    voice.routeCap = null
 }
 
 /**
