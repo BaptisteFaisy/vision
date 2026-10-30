@@ -31,7 +31,12 @@ class LiveFrameDispatcher(
     private val onDispatch: (jpegB64: String, captureAtNs: Long) -> Unit,
     /** Réponse (ou `null` si jetée) : l'époque est vérifiée avant publication. */
     private val onResult: suspend (active: FramePipeline, era: Long, result: Result<LiveFrame>?) -> Unit,
-    clock: () -> Long = System::currentTimeMillis,
+    private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Point de feed adaptatif (Q8+Q9) : aller-retour mesuré, réponse (`null` = jetée
+     * sans envoi) et poids base64 — le régulateur et le scheduler apprennent ici.
+     */
+    private val onSettled: ((roundTripMs: Long, result: Result<LiveFrame>?, base64Length: Int) -> Unit)? = null,
 ) {
     private val pump = LivePump(session, clock)
     private val trackerCadence = LiveFrameCadence()
@@ -77,7 +82,9 @@ class LiveFrameDispatcher(
         onDispatch(jpegB64, captureAtNs)
         val era = active.generation
         scope.launch(worker) {
+            val startedAt = clock()
             val result = send(active, jpegB64)
+            onSettled?.invoke(clock() - startedAt, result, jpegB64.length)
             // La réserve part **avant** la publication : le décodage des masques ne doit
             // pas laisser le GPU inactif (même ordre que la sonde iSee). Séance close
             // entre-temps : pas de drain, la réponse périmée est filtrée par l'écran.
