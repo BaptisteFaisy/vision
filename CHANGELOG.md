@@ -54,6 +54,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   entre-temps sur `master`, borne haute seule) ;
   `check-kotlin-limits.py` vert.
 
+## 2026-10-30 — photo lunettes dans la rue, appui long = écoute (branche `feat/lunettes-rue-ecoute`)
+
+- **Demande** (user) : l'appui long du bouton capture ne doit plus prendre de
+  photo (il ouvre le micro) ; l'appui court affiche la photo à l'emplacement
+  caméra, sans fond noir ni bouton Fermer, jusqu'au tap ou à la photo suivante ;
+  toute question posée pendant l'affichage a la photo en contexte.
+- **Lunettes** : `GlassesTalk` n'envoie plus de photo-contexte (`VoiceHeard`
+  sans photo) ; micro indisponible = dit, sans photo (`talkMicUnavailable`) ;
+  `CaptureAction.takesPhoto` (`:core`, pur JVM) verrouille « seul l'appui court
+  photographie ».
+- **Affichage** : `GlassesPhotoStreet` remplace le dialogue plein écran ;
+  couche `photoFeed` (pur JVM) ; la rue montre la photo figée, caméra coupée
+  (vidéo stoppée, sonde arrêtée, ponts neutralisés), tap = photo partie +
+  caméra relancée (`IseeGlassesInbox`, `IseeHoldTalk`).
+- **Contexte** : photo épinglée (`IseePhotoShot.setPinnedContext`) jointe à
+  chaque question tant qu'elle est affichée, `captureForHold` inhibée, survit
+  aux `releaseContext` de fin de question.
+- **Preuves** : `:app` 1282 tests JVM, 0 échec (12 neufs : `IseePhotoShotTest` 4,
+  `IseeGlassesInboxTest` 5, `IseeScenePhotoTest` 3 ; `GlassesTalkTest` réécrit
+  sans photo, 10/10) ; `:core` `CaptureGestureTest` 7/7 ;
+  `check-kotlin-limits` et `check-isee-design` OK ; `assembleDebug` OK. Note :
+  6 échecs `:core` identiques sur master intact (heap de test, permissions
+  POSIX Windows), verdict CI.
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 

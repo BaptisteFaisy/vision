@@ -91,8 +91,8 @@ Les gestes, pendant la session :
 
 | Geste sur les lunettes | Ce qui se passe |
 |---|---|
-| appui court | photo → écran d'analyse (masques + description) |
-| appui long | photo → question dans le chat, sur le téléphone |
+| appui court | photo → affichée dans la rue, contexte des questions (tap = caméra repart) |
+| appui long | écoute mains-libres, sans photo (second appui long = envoi, auto à 20 s) |
 | double appui | rien n'est lancé, message « Mode Direct : pas encore porté sur lunettes » |
 
 La voix d'iSee sort **dans les lunettes** quand la session est ouverte, et sur le téléphone

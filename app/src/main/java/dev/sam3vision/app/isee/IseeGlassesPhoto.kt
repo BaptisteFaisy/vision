@@ -4,9 +4,9 @@ import dev.sam3vision.core.glasses.CaptureAction
 import java.io.File
 
 /**
- * Une photo prise avec les lunettes, affichée sur l'accueil iSee (personne
- * accompagnée) : plein cadre, par-dessus la scène, fermée par retour ou tap.
- * Posée par [IseeViewModel.onGlassesPhoto], consommée par [GlassesPhotoLayer].
+ * Une photo prise avec les lunettes (appui court), affichée sur l'accueil iSee
+ * (personne accompagnée) : dans la rue, à l'emplacement caméra, jusqu'au tap
+ * (la caméra repart) ou à la photo suivante. Consommée par [GlassesPhotoStreet].
  */
 data class IseeGlassesPhoto(
     val file: File,
@@ -28,9 +28,9 @@ internal fun acceptGlassesPhoto(current: IseeGlassesPhoto?, file: File): Boolean
 }
 
 /**
- * Ligne de statut posée à l'arrivée d'une photo lunettes : l'appui ASK attend
- * une question dictée (la photo en est déjà le contexte), PHOTO ne fait
- * qu'afficher. Pure : testée en JVM.
+ * Ligne de statut posée à l'arrivée d'une photo lunettes : seul l'appui court
+ * (PHOTO) pose une photo, qui devient le contexte des questions dictées.
+ * Pure : testée en JVM.
  */
 internal fun glassesPhotoLabel(action: CaptureAction): String = when (action) {
     CaptureAction.ASK -> "Photo des lunettes : dictez votre question"

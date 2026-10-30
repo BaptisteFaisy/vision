@@ -4,9 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,24 +16,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.sam3vision.app.decodeScaledExact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * La photo des lunettes sur l'écran de la personne accompagnée : plein cadre,
- * nette ([GLASSES_PHOTO_EDGE] sur le grand bord), sur fond noir.
- *
- * Une `Dialog` plein écran, pas un calque : la racine [dev.sam3vision.app.IseeRootLayout]
- * intercepte tous les gestes quand iSee est actif (un bouton dans la scène ne
- * recevrait aucun tap — seul AlertDialog/zone exemptée y échappe, voir
- * [PictoDialog]). Le retour système et le bouton ferment la photo sans quitter
- * iSee ; aucun tap ne traverse vers la vidéo.
+ * La photo des lunettes dans la rue (emplacement caméra) : elle remplace le
+ * direct, sans fond noir ni bouton — elle reste affichée jusqu'au tap (la
+ * caméra repart) ou à la photo suivante. Les questions posées pendant ce
+ * temps l'ont en contexte (photo épinglée).
  *
  * Décodée hors du fil UI (un JPEG 12 Mpx prend ~200 ms) ; rotation : le
  * ViewModel garde la photo, seul le décodage rejoue. Fichier purgé entre-temps
@@ -43,7 +36,7 @@ import kotlinx.coroutines.withContext
  * cadre vide.
  */
 @Composable
-internal fun GlassesPhotoLayer(photo: IseeGlassesPhoto, onDismiss: () -> Unit) {
+internal fun GlassesPhotoStreet(photo: IseeGlassesPhoto, modifier: Modifier = Modifier) {
     var bitmap by remember(photo) { mutableStateOf<Bitmap?>(null) }
     var failed by remember(photo) { mutableStateOf(false) }
     LaunchedEffect(photo) {
@@ -53,34 +46,26 @@ internal fun GlassesPhotoLayer(photo: IseeGlassesPhoto, onDismiss: () -> Unit) {
         bitmap = decoded
         failed = decoded == null
     }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            val image = bitmap
-            if (image != null) {
-                val picture = remember(image) { image.asImageBitmap() }
-                Image(
-                    bitmap = picture,
-                    contentDescription = "Photo prise avec les lunettes",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else if (failed) {
-                Text(
-                    "Photo des lunettes illisible (fichier effacé ?)",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                )
-            }
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
-            ) {
-                Text("Fermer", color = Color.White, fontSize = 16.sp)
-            }
+    Box(modifier) {
+        val image = bitmap
+        if (image != null) {
+            val picture = remember(image) { image.asImageBitmap() }
+            Image(
+                bitmap = picture,
+                contentDescription = "Photo prise avec les lunettes",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+        } else if (failed) {
+            Text(
+                "Photo des lunettes illisible (fichier effacé ?)",
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color(0xCC1A1F26), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            )
         }
     }
 }

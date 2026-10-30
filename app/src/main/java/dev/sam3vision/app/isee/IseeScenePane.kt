@@ -89,8 +89,9 @@ private fun BoxWithConstraintsScope.PortraitScene(
         captureLive = captureLive,
         glassesLive = glassesLive,
         glassesStreaming = glassesStreaming,
+        photoDisplayed = state.glassesPhoto != null,
     )
-    val open = rememberCameraOpen(layers.cameraCard || layers.glassesFeed)
+    val open = rememberCameraOpen(layers.cameraCard || layers.glassesFeed || layers.photoFeed)
     val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
     val talking = position != null || (state.holding && state.userSpeaking)
     val speech by animateFloatAsState(if (talking) 1f else 0f, tween(420), label = "camera-speech")
@@ -99,7 +100,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
     val time = rememberSceneTime()
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
-    GlassesProbeWiring(viewModel.probe, glassesLive)
+    GlassesProbeWiring(viewModel.probe, glassesLive && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     SceneGuidanceLayer(viewModel, open, with(density) { geo.pictureH.toDp() }) {
         OrbLayer(view.scene, geo, time, open)

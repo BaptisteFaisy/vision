@@ -50,7 +50,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
     showGlasses: Boolean,
     ghost: Boolean,
 ) {
-    if (open <= 0.001f && !ghost) return
+    if (open <= 0.001f && !ghost && state.glassesPhoto == null) return
     val focus = focusPull(open)
     Box(
         Modifier
@@ -102,7 +102,7 @@ private fun BoxScope.CrossingToggle(probe: LiveProbeState, viewModel: IseeViewMo
 }
 
 /**
- * La rue elle-même : les lunettes si [showGlasses], sinon la caméra du téléphone. Les
+ * La rue elle-même : la photo figée si elle est affichée, les lunettes si [showGlasses], sinon la caméra du téléphone. Les
  * deux sources portent les mêmes masques, distances, flèche et pastilles de pictos.
  */
 @Composable
@@ -113,7 +113,10 @@ private fun BoxScope.StreetFeed(
     viewModel: IseeViewModel,
     showGlasses: Boolean,
 ) {
-    if (showGlasses) {
+    val photo = state.glassesPhoto
+    if (photo != null) {
+        GlassesPhotoStreet(photo, Modifier.fillMaxSize())
+    } else if (showGlasses) {
         GlassesLive(Modifier.fillMaxSize())
         GlassesMaskLayer(probe.masks, probe.width, probe.height)
         LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
