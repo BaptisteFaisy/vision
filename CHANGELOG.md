@@ -16,10 +16,10 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   couleurs de la flèche, « … » + atténuée si périmé). Règle de côté
   inchangée (côté le moins encombré, `Guidance`/`passage.py`).
 - Preuves : 10 tests JVM ajoutés (`GuidanceInstructionTest` 6,
-  `ProbePulseTest` 4) — **non exécutés ici** (runner self-hosted HS le 30/10
-  au soir, CI à son retour) ; `check-kotlin-limits.py` vert en local ;
-  `LiveProbe.kt` reste à 499 lignes (compteur `noteDecoded` déménagé dans
-  `MaskPainter.kt`).
+  `ProbePulseTest` 4) ; un run CI a détecté la boucle infinie enfant (3
+  `runTest` sonde en timeout) → ticker détaché du scope reçu ;
+  `check-kotlin-limits.py` vert en local ; `LiveProbe.kt` à 495 lignes
+  (compteur `noteDecoded` déménagé dans `MaskPainter.kt`).
 
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
