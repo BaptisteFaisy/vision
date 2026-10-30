@@ -2,7 +2,7 @@ package dev.sam3vision.app.isee
 
 /**
  * Politique de frame SAM de la page caméra : 320 px envoyés, jamais agrandis.
- * Le capteur peut être demandé plus grand (le direct aidant prend 480 px) :
+ * Le capteur est demandé en 640×480 (le direct aidant prend 480 px) :
  * la réduction vers [EDGE] se fait alors dans la passe NV21.
  *
  * Le 2026-10-26, la conversion d'une frame coûtait 12-42 ms côté téléphone parce que
