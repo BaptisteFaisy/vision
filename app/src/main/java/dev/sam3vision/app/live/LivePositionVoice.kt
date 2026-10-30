@@ -5,6 +5,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.PositionText
+import dev.sam3vision.core.live.VehicleConcepts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.settings.Settings
@@ -57,7 +58,7 @@ class LivePositionVoice(
             PositionText.fromDetection(Detection(label, obj.score, obj.box, width, height))
                 ?.copy(meters = metersByBox[obj.box])
         }
-        val phrase = announcer.onFrame(nowMs, placed, settings().speechLanguage) ?: return
+        val phrase = announcer.onFrame(nowMs, VehicleConcepts.audible(placed), settings().speechLanguage) ?: return
         state.update { it.copy(spoken = phrase) }
         scope.launch { say(phrase) }
     }

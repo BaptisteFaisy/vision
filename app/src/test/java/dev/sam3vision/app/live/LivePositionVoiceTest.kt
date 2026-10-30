@@ -121,6 +121,31 @@ class LivePositionVoiceTest {
     }
 
     @Test
+    fun `voiture a 7 m dite et personne a 6 m tue`() = runTest {
+        val voice = voice(this)
+        val carBox = listOf(10f, 10f, 100f, 200f)
+        val personBox = listOf(110f, 10f, 200f, 200f)
+        val street = LiveFrame(
+            width = 200,
+            height = 200,
+            elapsedMs = 10L,
+            objects = listOf(
+                SegObject("car", 0.9f, carBox, "masque"),
+                SegObject("personne", 0.9f, personBox, "masque"),
+            ),
+        )
+        voice.announce(
+            street, 200, 200, 1_000L,
+            listOf(
+                DistanceReading(trackId = 1, label = "car", meters = 7f, rawMeters = 7f, box = carBox),
+                DistanceReading(trackId = 2, label = "personne", meters = 6f, rawMeters = 6f, box = personBox),
+            ),
+        )
+
+        assertEquals("Car à 7 mètres.", state.value.spoken)
+    }
+
+    @Test
     fun `un label de rue est dit tel quel`() = runTest {
         val voice = voice(this)
         voice.announce(frame(), 200, 200, 1_000L, emptyList())

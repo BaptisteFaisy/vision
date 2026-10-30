@@ -440,3 +440,35 @@ Corpus B — panneaux routiers / pubs hautes (non mesuré) :
 | 8 | | | | | |
 | 9 | | | | | |
 | 10 | | | | | |
+
+## 16. Portée de la voix : 4 m, véhicules dits jusqu'à 10 m (V1, 30/10/2026)
+
+Au-delà de 4 m, la voix se tait — sauf pour les véhicules, dits jusqu'à
+10 m. Nouveau contrat (interprétation B : liste stricte, seuils francs) :
+
+- **mentions informatives** (positions au cadran, sonde iSee et direct) :
+  à 4 m ou moins (`Guidance.RANGE_METERS`), tout se dit (inchangé) ;
+  au-delà et sous `MENTION_RANGE_M = 10 m`
+  (`core/.../live/VehicleConcepts.kt`), seuls les véhicules :
+  `car`, `bicycle`, `electric scooter` + français « voiture », « vélo »
+  (casse, accents, pluriel simple neutralisés, miroir `HazardConcepts`) ;
+  à 10 m et plus, silence total ;
+- **distance inconnue : dite** (prudence, inchangé — comme `Guidance`,
+  qui bloque sur l'inconnu) : photo, chasse picto et objets non mesurés
+  parlent comme avant ;
+- **guidage, traversée, feu, urgent inchangés** : le couloir bloque
+  toujours à 4 m (`Guidance.decide` intouché), les guetteurs (trottoir,
+  escaliers, mobilier ≤ 3 m) et les alertes gardent leurs seuils — seuls
+  les véhicules lointains gagnent une mention anticipée.
+
+Décisions (interprétation B) : `electric scooter` inclus dans les
+véhicules (mobile rapide, concept suivi par défaut) ; camions, bus,
+motos et « trottinette » seule exclus (hors concepts `bicycle`/`car`,
+liste stricte — à élargir sur ordre user) ; seuils francs (≤ 4 m dit,
+< 10 m mentionné, ≥ 10 m tu).
+
+Verrouillé par `VehicleConceptsTest` (7 : véhicules 4-10 m, FR/casse/
+pluriel, non-véhicules tus, ≤ 4 m, ≥ 10 m, inconnu, liste),
+`ProbeVoiceTest` (+3 : voiture 7 m dite et personne 6 m tue, voiture
+10 m tue, 4 m inchangé) et `LivePositionVoiceTest` (+1 : voiture 7 m
+dite, personne 6 m tue).

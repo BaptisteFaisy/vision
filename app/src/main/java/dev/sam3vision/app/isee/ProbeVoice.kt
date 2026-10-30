@@ -7,6 +7,7 @@ import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
+import dev.sam3vision.core.live.VehicleConcepts
 import dev.sam3vision.core.nav.RouteSteeringFusion
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -67,7 +68,8 @@ internal class ProbeVoice(
 
     /**
      * Phrase à dire pour la frame, ou `null` (muet) : guidage d'abord, sinon
-     * positions, sinon silence. [manualCap] est le cap demandé à la voix.
+     * positions filtrées par portée (`VehicleConcepts.audible`), sinon silence.
+     * [manualCap] est le cap demandé à la voix.
      * Le trottoir vu caméra ([SidewalkKeep]) peut suspendre le cap : l'ordre
      * de retour prime alors sur la consigne, jamais sur le danger.
      */
@@ -81,7 +83,7 @@ internal class ProbeVoice(
             return guidance.onFrame(atMs, placed, language, manualCap, routeCap, sidewalk = sidewalk)
         }
         if (!announce) return null
-        return positions.onFrame(atMs, placed, language)
+        return positions.onFrame(atMs, VehicleConcepts.audible(placed), language)
     }
 
     /**

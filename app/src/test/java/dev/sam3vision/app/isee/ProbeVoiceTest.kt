@@ -19,6 +19,8 @@ class ProbeVoiceTest {
 
     private fun guided(): ProbeVoice = ProbeVoice().also { it.guide = true }
 
+    private fun announced(): ProbeVoice = ProbeVoice().also { it.announce = true }
+
     @Test
     fun `guide coupe et annonce coupee restent muets`() {
         val voice = ProbeVoice()
@@ -103,6 +105,39 @@ class ProbeVoiceTest {
 
         assertNull(voice.cue())
         assertFalse(voice.detour)
+    }
+
+    @Test
+    fun `annonce dit la voiture a 7 m et tait la personne a 6 m`() {
+        val voice = announced()
+
+        val phrase = voice.phrase(
+            0L,
+            listOf(
+                PlacedLabel("car", 0.3f, 0.5f, 7f),
+                PlacedLabel("personne", 0.7f, 0.5f, 6f),
+            ),
+            SteeringCap.Straight,
+        )
+
+        assertEquals("Car à 7 mètres.", phrase)
+    }
+
+    @Test
+    fun `annonce tait la voiture a 10 m`() {
+        val voice = announced()
+
+        assertNull(voice.phrase(0L, listOf(PlacedLabel("car", 0.3f, 0.5f, 10f)), SteeringCap.Straight))
+    }
+
+    @Test
+    fun `annonce inchangee a 4 m ou moins`() {
+        val voice = announced()
+
+        assertEquals(
+            "Personne à 4 mètres.",
+            voice.phrase(0L, listOf(PlacedLabel("personne", 0.5f, 0.5f, 4f)), SteeringCap.Straight),
+        )
     }
 
     @Test
