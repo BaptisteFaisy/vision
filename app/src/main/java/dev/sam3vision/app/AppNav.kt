@@ -134,6 +134,22 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
 
 
 /**
+ * Destination dictée sur le direct : la session de navigation de l'accueil la
+ * reçoit **telle quelle** (mêmes parseurs qu'une dictée de l'accueil) ;
+ * l'écran navigation est poussé par [VoiceNavStateEffect] dès que la session
+ * quitte le repos. Sans cette passerelle, « aller gare Montparnasse » dit sur
+ * le direct répondait par une description de la pièce.
+ */
+@Composable
+private fun NavOrderEffect(isee: IseeViewModel) {
+    val request by NavOrderRequest.pending.collectAsState()
+    LaunchedEffect(request) {
+        val transcript = NavOrderRequest.consume() ?: return@LaunchedEffect
+        isee.acceptNavOrder(transcript)
+    }
+}
+
+/**
  * L'état de session pilote l'écran navigation : confirmation ou arrivée =
  * poussé (une fois), repos = dépilé (arrivée fermée, arrêt, annulation).
  * Le guidage, lui, vit sur l'accueil iSee (caméra + carte dessous) : s'il
@@ -176,6 +192,7 @@ fun AppNav(
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     RouteRequestEffect(push)
+    NavOrderEffect(isee)
     VoiceNavStateEffect(isee, route, push, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
 

@@ -23,6 +23,8 @@ import dev.sam3vision.core.nav.GeocodeChain
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
+import dev.sam3vision.core.voicenav.NavClarify
+import dev.sam3vision.core.voicenav.NavClarifyText
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.voicenav.VoiceDestinationParser
 import kotlinx.coroutines.CoroutineScope
@@ -171,6 +173,25 @@ class IseeVoiceNav(
     /** Libération finale (moteur TTS système). */
     fun shutdown() {
         runCatching { driver.shutdown() }
+    }
+
+    /**
+     * Dictée de l'accueil : ordre de navigation (destination → session,
+     * confirmation ou guidage) ou ordre **sans destination comprise** → la
+     * phrase redemande l'adresse au lieu de laisser la question partir au LLM,
+     * qui répondait par une description de la pièce.
+     *
+     * Point d'entrée unique des deux dictées : celle de l'accueil
+     * (`IseeViewModel.handleDictated`) et celle du direct
+     * (`IseeViewModel.acceptNavOrder`, posée par `LiveNavOrders`).
+     *
+     * Vrai si [text] était un ordre de navigation, traité ici.
+     */
+    suspend fun run(text: String): Boolean {
+        if (session.onVoiceTranscript(text)) return true
+        if (!runCatching { NavClarify.isUnclearOrder(text) }.getOrDefault(false)) return false
+        speak(NavClarifyText.ask(settings().speechLanguage))
+        return true
     }
 
     /**
