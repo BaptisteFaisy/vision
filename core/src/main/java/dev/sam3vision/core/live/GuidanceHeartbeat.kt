@@ -1,7 +1,7 @@
 package dev.sam3vision.core.live
 
 /**
- * Pulse de guidage : ce que la boucle 300 ms publie à chaque tick, changée ou
+ * Pulse de guidage : ce que la boucle 500 ms publie à chaque tick, changée ou
  * non. [ageMs] est l'âge des données SAM (pas du tick) : au-delà de
  * [GuidanceHeartbeat.STALE_AFTER_MS], le consommateur dégrade (« ralentissez »)
  * au lieu de guider sur du périmé. [nearestMeters] est la distance mesurée sur
@@ -73,7 +73,7 @@ class GuidanceHeartbeat(
 
     companion object {
         /** Cadence de publication du guidage continu (appelée par la boucle). */
-        const val TICK_MS = 300L
+        const val TICK_MS = 500L
 
         /** Au-delà, les données SAM sont périmées : le consommateur dégrade. */
         const val STALE_AFTER_MS = 2_000L
