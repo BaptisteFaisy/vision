@@ -171,14 +171,14 @@ class TraverseVetoTest {
         val prompts = VehicleConcepts.promptsFor(listOf("traffic light", "person", "door", "zebra"))
         assertEquals(
             listOf(
-                "car", "bus", "truck", "motorcycle", "bicycle",
+                "car", "bus", "truck", "motorcycle", "bicycle", "scooter", "electric scooter",
                 "traffic light", "person", "door", "zebra",
             ),
             prompts,
         )
         val full = VehicleConcepts.promptsFor((1..20).map { "objet$it" })
         assertEquals(LivePrompts.MAX, full.size)
-        assertEquals(VehicleConcepts.PROMPTS, full.take(5))
+        assertEquals(VehicleConcepts.PROMPTS, full.take(7))
         assertEquals(VehicleConcepts.PROMPTS, VehicleConcepts.promptsFor())
     }
 
@@ -190,11 +190,17 @@ class TraverseVetoTest {
         assertTrue(VehicleConcepts.isVehicle("truck"))
         assertTrue(VehicleConcepts.isVehicle("motorcycle"))
         assertTrue(VehicleConcepts.isVehicle("bicycle"))
+        assertTrue(VehicleConcepts.isVehicle("scooter"))
+        assertTrue(VehicleConcepts.isVehicle("Scooters"))
+        assertTrue(VehicleConcepts.isVehicle("electric scooter"))
         assertTrue(VehicleConcepts.isVehicle("voiture"))
         assertTrue(VehicleConcepts.isVehicle("Voitures"))
         assertTrue(VehicleConcepts.isVehicle("camion"))
         assertTrue(VehicleConcepts.isVehicle("moto"))
         assertTrue(VehicleConcepts.isVehicle("vélo"))
+        assertTrue(VehicleConcepts.isVehicle("trottinette"))
+        assertTrue(VehicleConcepts.isVehicle("Trottinettes"))
+        assertTrue(VehicleConcepts.isVehicle("trottinette électrique"))
         assertFalse(VehicleConcepts.isVehicle("person"))
         assertFalse(VehicleConcepts.isVehicle("door"))
         assertFalse(VehicleConcepts.isVehicle(""))

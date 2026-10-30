@@ -1,0 +1,256 @@
+package dev.sam3vision.core.traverse
+
+import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.speech.SpeechLanguage
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * États des véhicules moteurs : en mouvement (tau confirmé ou croissance)
+ * jusqu'à 8 m, à l'arrêt (dérive faible, seau stable) jusqu'à 3 m dans le
+ * couloir, les cycles exclus (annoncés par `CycleWatcher`). Séquences
+ * synthétiques, miroir de `VehicleApproachTest`.
+ */
+class VehicleStateTest {
+
+    private fun det(label: String, box: List<Float>): Detection =
+        Detection(label, 0.9f, box, width = 640, height = 480)
+
+    private fun reading(label: String, meters: Float, box: List<Float>): DistanceReading =
+        DistanceReading(trackId = -1, label = label, meters = meters, rawMeters = meters, box = box)
+
+    private fun box(widthPx: Float, cx: Float = 320f): List<Float> {
+        val heightPx = widthPx * 0.6f
+        return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
+    }
+
+    @Test
+    fun `voiture qui approche - mouvement a la 3e frame, urgent au centre`() {
+        val watcher = VehicleStateWatcher()
+        assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L))
+        assertNull("croissance seule : confirmation en cours", watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L))
+        val third = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 5f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertEquals(5f, third.meters!!, 0.001f)
+        assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
+    }
+
+    @Test
+    fun `sans datation - croissance seule, jamais urgent`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = -1L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = -1L)
+        val third = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 5f, box(120f))),
+            atMs = -1L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertFalse("sans tau : doux", third.urgent)
+    }
+
+    @Test
+    fun `voiture arretee - annonce a la 3e frame`() {
+        val watcher = VehicleStateWatcher()
+        assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 0L))
+        assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 100L))
+        val third = watcher.update(
+            listOf(det("car", box(100f))),
+            listOf(reading("car", 2f, box(100f))),
+            atMs = 200L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertEquals("Voiture à l'arrêt, à 2 mètres.", third!!.phrase)
+        assertFalse(third.urgent)
+    }
+
+    @Test
+    fun `seau instable - doute, silence`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 0L)
+        assertNull(
+            "seau 2 m → 3 m : pas d'arrêt",
+            watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2.6f, box(100f))), atMs = 100L),
+        )
+    }
+
+    @Test
+    fun `sans mesure - mouvement a l'heure, arret muet`() {
+        val moving = VehicleStateWatcher()
+        moving.update(listOf(det("car", box(100f))), emptyList(), atMs = 0L)
+        moving.update(listOf(det("car", box(110f))), emptyList(), atMs = 100L)
+        val third = moving.update(listOf(det("car", box(120f))), emptyList(), atMs = 200L)
+
+        assertEquals("Voiture en mouvement, à midi.", third!!.phrase)
+        assertNull(third.meters)
+        assertFalse(third.urgent)
+
+        val stopped = VehicleStateWatcher()
+        repeat(3) { index ->
+            assertNull(
+                "arrêt non mesuré : jamais inventé",
+                stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = index * 100L),
+            )
+        }
+    }
+
+    @Test
+    fun `cycles confies au CycleWatcher - silence ici`() {
+        val watcher = VehicleStateWatcher()
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            assertNull(
+                watcher.update(
+                    listOf(det("bicycle", box(width))),
+                    listOf(reading("bicycle", 5f, box(width))),
+                    atMs = index * 100L,
+                ),
+            )
+        }
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            assertNull(
+                watcher.update(
+                    listOf(det("trottinette", box(width))),
+                    listOf(reading("trottinette", 5f, box(width))),
+                    atMs = 1_000L + index * 100L,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `hors portee et hors couloir - silence`() {
+        val movingFar = VehicleStateWatcher()
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            assertNull(
+                "mouvement à 9 m : hors portée",
+                movingFar.update(
+                    listOf(det("car", box(width))),
+                    listOf(reading("car", 9f, box(width))),
+                    atMs = index * 100L,
+                ),
+            )
+        }
+        val stoppedFar = VehicleStateWatcher()
+        repeat(3) { index ->
+            assertNull(
+                "arrêt à 3,5 m : hors portée",
+                stoppedFar.update(
+                    listOf(det("car", box(100f))),
+                    listOf(reading("car", 3.5f, box(100f))),
+                    atMs = index * 100L,
+                ),
+            )
+        }
+        val stoppedSide = VehicleStateWatcher()
+        val sideBox = box(100f, cx = 64f)
+        repeat(3) { index ->
+            assertNull(
+                "arrêt hors couloir : silence",
+                stoppedSide.update(
+                    listOf(det("car", sideBox)),
+                    listOf(reading("car", 2f, sideBox)),
+                    atMs = index * 100L,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `urgent exige tau proche et centre`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f, cx = 100f))), listOf(reading("car", 5f, box(100f, cx = 100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f, cx = 100f))), listOf(reading("car", 5f, box(110f, cx = 100f))), atMs = 100L)
+        val third = watcher.update(
+            listOf(det("car", box(120f, cx = 100f))),
+            listOf(reading("car", 5f, box(120f, cx = 100f))),
+            atMs = 200L,
+        )
+
+        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertFalse("approche à 9 h : doux", third.urgent)
+    }
+
+    @Test
+    fun `cooldowns - 4s mouvement, 10s arret`() {
+        val moving = VehicleStateWatcher()
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            moving.update(listOf(det("car", box(width))), listOf(reading("car", 5f, box(width))), atMs = index * 100L)
+        }
+        moving.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 1_000L)
+        assertNull("mouvement : 900 ms < 4 s", moving.update(listOf(det("car", box(140f))), listOf(reading("car", 5f, box(140f))), atMs = 1_100L))
+        val replay = moving.update(listOf(det("car", box(150f))), listOf(reading("car", 5f, box(150f))), atMs = 4_300L)
+        assertEquals("Voiture en mouvement, à 5 mètres.", replay!!.phrase)
+
+        val stopped = VehicleStateWatcher()
+        repeat(3) { index ->
+            stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = index * 100L)
+        }
+        stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 1_000L)
+        assertNull("arrêt : 900 ms < 10 s", stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 1_100L))
+        val replayStopped = stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 10_400L)
+        assertEquals("Voiture à l'arrêt, à 2 mètres.", replayStopped!!.phrase)
+    }
+
+    @Test
+    fun `phrases FR EN`() {
+        val voiture = VehicleStateText.nameOf("voiture")!!
+        val bus = VehicleStateText.nameOf("bus")!!
+        assertEquals("Voiture", voiture.fr)
+        assertEquals("Car", voiture.en)
+        assertEquals(
+            "Voiture en mouvement, à 5 mètres.",
+            VehicleStateText.movingPhrase(voiture, 5f, null, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Voiture en mouvement, à midi.",
+            VehicleStateText.movingPhrase(voiture, null, 0.5f, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Car moving, 5 meters away.",
+            VehicleStateText.movingPhrase(voiture, 5f, null, SpeechLanguage.En),
+        )
+        assertEquals(
+            "Voiture à l'arrêt, à 2 mètres.",
+            VehicleStateText.stoppedPhrase(voiture, 2f, null, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Bus stopped, 3 meters away.",
+            VehicleStateText.stoppedPhrase(bus, 3f, null, SpeechLanguage.En),
+        )
+        assertEquals("Camion", VehicleStateText.nameOf("camion")!!.fr)
+        assertEquals("Motorcycle", VehicleStateText.nameOf("moto")!!.en)
+    }
+
+    @Test
+    fun `noms inconnus - personne et vide ignores`() {
+        assertNull(VehicleStateText.nameOf("person"))
+        assertNull(VehicleStateText.nameOf("door"))
+        assertNull(VehicleStateText.nameOf(""))
+    }
+
+    @Test
+    fun `reset - oublie tout`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
+        watcher.reset()
+
+        assertNull(watcher.lastAlertMs)
+        assertNull(
+            watcher.update(listOf(det("car", box(120f))), listOf(reading("car", 5f, box(120f))), atMs = 200L),
+        )
+    }
+}

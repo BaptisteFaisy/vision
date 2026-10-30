@@ -1,5 +1,8 @@
 package dev.sam3vision.core.crossing
 
+import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.live.PositionText
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -56,5 +59,53 @@ object CrossingText {
         when (language) {
             SpeechLanguage.En -> if (on) "Crossing mode on." else "Crossing mode off."
             SpeechLanguage.Fr -> if (on) "Mode traversée activé." else "Mode traversée coupé."
+        }
+
+    /**
+     * Position du passage piéton sur le trottoir : « Passage piéton à gauche,
+     * à 2 mètres. » ([cap] = côté du passage, [meters] = distance courte
+     * profondeur/sol, jamais sténopé). Sans distance mesurable, la direction
+     * seule (« Passage piéton à gauche. ») — jamais de chiffre deviné.
+     * [withHour] vrai + [centerX] renseigné : le cadran suit
+     * (« …, à 10 heures. »), via [PositionText.withHour].
+     */
+    fun approach(
+        cap: SteeringCap,
+        meters: Float?,
+        language: SpeechLanguage = SpeechLanguage.Fr,
+        centerX: Float? = null,
+        withHour: Boolean = false,
+    ): String {
+        val valid = meters?.takeIf { it.isFinite() && it > 0f }
+        val base = when (language) {
+            SpeechLanguage.En -> {
+                val head = when (cap) {
+                    SteeringCap.Left -> "Crosswalk to the left"
+                    SteeringCap.Right -> "Crosswalk to the right"
+                    SteeringCap.Straight -> "Crosswalk ahead"
+                }
+                if (valid != null) "$head, ${DistanceText.spokenShort(valid, language)} away" else head
+            }
+            SpeechLanguage.Fr -> {
+                val head = when (cap) {
+                    SteeringCap.Left -> "Passage piéton à gauche"
+                    SteeringCap.Right -> "Passage piéton à droite"
+                    SteeringCap.Straight -> "Passage piéton devant"
+                }
+                if (valid != null) "$head, à ${DistanceText.spokenShort(valid, language)}" else head
+            }
+        }
+        if (withHour && centerX != null) return PositionText.withHour(base, centerX, language)
+        return "$base."
+    }
+
+    /**
+     * Arrivée sur le passage (« Sur le passage. ») : douce (appelant :
+     * `urgent = false`, ne coupe rien), dite une fois par [CrossingGuidance].
+     */
+    fun arrived(language: SpeechLanguage = SpeechLanguage.Fr): String =
+        when (language) {
+            SpeechLanguage.En -> "On the crosswalk."
+            SpeechLanguage.Fr -> "Sur le passage."
         }
 }
