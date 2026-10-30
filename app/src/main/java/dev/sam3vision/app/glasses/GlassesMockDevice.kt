@@ -11,6 +11,8 @@ import com.meta.wearable.dat.inputs.types.CapturePressType
 internal interface GlassesMockDevice {
     fun start(): Boolean
     fun press(type: CapturePressType): Boolean
+    /** Injecte « Hey Meta, ouvre iSee » ; `false` si le kit ne sait pas injecter. */
+    fun simulateVoiceLaunch(): Boolean
     fun stop()
 }
 
@@ -33,5 +35,6 @@ internal fun mockDevice(context: Context): GlassesMockDevice = object : GlassesM
 
     override fun start(): Boolean = loaded()?.start() ?: false
     override fun press(type: CapturePressType): Boolean = loaded()?.press(type) ?: false
+    override fun simulateVoiceLaunch(): Boolean = loaded()?.simulateVoiceLaunch() ?: false
     override fun stop() = loaded()?.stop() ?: Unit
 }

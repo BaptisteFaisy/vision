@@ -59,7 +59,7 @@ internal fun GlassesLive(modifier: Modifier) {
                 attached.view = this
             }
         },
-        update = { view -> size?.let { video -> applyCrop(view, video) } },
+        update = { view -> size?.let { video -> applyCrop(view, attached, video) } },
         modifier = modifier,
     )
 }
@@ -71,6 +71,17 @@ private class AttachedSurface {
 
     /** La vue, pour photographier la rue vers la sonde SAM. */
     var view: TextureView? = null
+
+    /**
+     * Taille vidéo connue (0 = pas encore annoncée) : les buffers sont taillés
+     * dessus, et toute surface recréée en plein direct la reprend aussitôt.
+     */
+    var videoW = 0
+    var videoH = 0
+
+    /** Taille des buffers déjà posée (0 = encore la taille initiale de la vue). */
+    var bufferW = 0
+    var bufferH = 0
 
     fun set(surface: Surface) {
         release()
@@ -87,18 +98,32 @@ private class AttachedSurface {
 private fun glassesListener(decoder: GlassesLiveDecoder, attached: AttachedSurface) =
     object : TextureView.SurfaceTextureListener {
         override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-            texture.setDefaultBufferSize(width, height)
+            // Buffers à taille vidéo quand elle est déjà connue (surface recréée en
+            // plein direct), sinon à taille de vue en attendant la première frame.
+            texture.setDefaultBufferSize(
+                attached.videoW.takeIf { it > 0 } ?: width,
+                attached.videoH.takeIf { it > 0 } ?: height,
+            )
             attached.set(Surface(texture))
             decoder.setSurface(attached.current)
         }
 
         override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
-            texture.setDefaultBufferSize(width, height)
+            // La vue change de taille (rotation, multi-fenêtre) : les buffers
+            // restent à taille vidéo quand elle est connue — c'est la matrice
+            // « remplit la vue » qui absorbe le changement, en un seul upscale.
+            texture.setDefaultBufferSize(
+                attached.videoW.takeIf { it > 0 } ?: width,
+                attached.videoH.takeIf { it > 0 } ?: height,
+            )
         }
 
         override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
             decoder.setSurface(null)
             attached.release()
+            // La prochaine texture repartira sur ces tailles (voir ci-dessus).
+            attached.bufferW = 0
+            attached.bufferH = 0
             return true
         }
 
@@ -106,12 +131,40 @@ private fun glassesListener(decoder: GlassesLiveDecoder, attached: AttachedSurfa
     }
 
 /** Recadre la vue sur la vidéo ; reporté après le layout si la vue n'a pas encore de taille. */
-private fun applyCrop(view: TextureView, video: VideoSize) {
+private fun applyCrop(view: TextureView, attached: AttachedSurface, video: VideoSize) {
     if (view.width <= 0 || view.height <= 0) {
-        view.post { applyCrop(view, video) }
+        view.post { applyCrop(view, attached, video) }
         return
     }
+    sizeBuffersToVideo(view, attached, video)
     view.setTransform(cropMatrix(video, view.width, view.height))
+}
+
+/**
+ * Taille les buffers à la vidéo (décodage 1:1), une fois par résolution.
+ *
+ * Avant, les buffers faisaient la taille de la vue : le décodeur y réduisait
+ * d'abord la vidéo (une 720×1280 tenait en ~337×600), puis la matrice
+ * « remplit la vue » agrandissait ce résidu ~3,2× — double rééchantillonnage,
+ * flou permanent. Ici le décodeur rend au pixel près et la matrice fait
+ * l'unique upscale (GPU, filtré), comme tout lecteur `TextureView`.
+ *
+ * Le basculement a lieu à la première taille annoncée (première frame), quand
+ * la rue est encore fantôme ou en fondu : un éventuel glitch transitoire du
+ * redimensionnement y est masqué. À valider sur matériel : rue nette dès la
+ * première seconde, pas de freeze au démarrage du direct.
+ */
+private fun sizeBuffersToVideo(view: TextureView, attached: AttachedSurface, video: VideoSize) {
+    if (video.width <= 0 || video.height <= 0) return
+    attached.videoW = video.width
+    attached.videoH = video.height
+    if (attached.bufferW == video.width && attached.bufferH == video.height) return
+    val texture = view.surfaceTexture ?: return
+    runCatching { texture.setDefaultBufferSize(video.width, video.height) }
+        .onSuccess {
+            attached.bufferW = video.width
+            attached.bufferH = video.height
+        }
 }
 
 /**

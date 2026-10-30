@@ -41,6 +41,8 @@ fun GlassesSection(
     onDisconnect: () -> Unit,
     onStartMock: () -> Unit,
     onMockPress: () -> Unit,
+    onMockHold: () -> Unit,
+    onMockVoiceLaunch: () -> Unit,
     onStopMock: () -> Unit,
 ) {
     Column(
@@ -53,8 +55,9 @@ fun GlassesSection(
         PermissionActions(onRequestCamera, onRequestMic)
         ProductionActions(state, onRegister, onConnect, onCapture, onDisconnect)
         photoHint(state)?.let { Text(it, color = AppColors.warning, fontSize = 12.sp) }
+        talkHint(state)?.let { Text(it, color = AppColors.warning, fontSize = 12.sp) }
         if (debugBuild) {
-            MockControls(state, onStartMock, onMockPress, onStopMock)
+            MockControls(state, onStartMock, onMockPress, onMockHold, onMockVoiceLaunch, onStopMock)
         }
         BenchEntry()
     }
@@ -130,6 +133,8 @@ private fun MockControls(
     state: GlassesUiState,
     onStartMock: () -> Unit,
     onMockPress: () -> Unit,
+    onMockHold: () -> Unit,
+    onMockVoiceLaunch: () -> Unit,
     onStopMock: () -> Unit,
 ) {
     Text("Démo sans matériel", color = SettingsLight.text, fontSize = 13.sp)
@@ -137,6 +142,8 @@ private fun MockControls(
         GlassButton("Simuler des lunettes", true, false, onStartMock)
     } else {
         GlassButton("Simuler un appui sur le bouton capture", state.connected, false, onMockPress)
+        GlassButton("Simuler un appui long (parler)", state.connected, false, onMockHold)
+        GlassButton("Simuler ouvre iSee (voix)", state.mockActive, false, onMockVoiceLaunch)
         GlassButton("Retirer les lunettes simulées", true, false, onStopMock)
     }
 }

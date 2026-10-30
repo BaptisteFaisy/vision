@@ -404,3 +404,25 @@ Paire `RB Meta 01TK`, téléphone `2c6852ac`, app en **Developer Mode** (`APPLIC
 | Le SDK publie son verdict de compatibilité | `Device.compatibility` = `COMPATIBLE` / `DEVICE_UPDATE_REQUIRED` / `SDK_UPDATE_REQUIRED`, déjà affiché par `GlassesRealCheck` |
 | En Developer Mode, la page de permission caméra **n'existe pas** dans la fiche de l'app | ☰ → Lunettes → paire → Paramètres → Applications → « Applications du mode développeur(se) » → app : une seule ligne « Déconnecter » ; les libellés « Always allow » n'existent pas dans l'APK 295. La demande passe donc par le **contrat du SDK** (bouton « Autoriser … (Meta AI) »), pas par cette page ; le chemin manuel n'est que le repli |
 | Pas de canal public | Meta ne propose que le Developer Mode (sans invitation) et un canal privé « Beta », **sur invitation par e-mail du compte Meta** (wearables.meta.com) |
+
+## 14. Parler aux lunettes sans toucher le téléphone
+
+Le téléphone a un « tap maintenu pour parler » ; le bouton capture des lunettes n'envoie
+que des appuis discrets (court, long, double), sans événement de relâchement : il n'y a
+donc pas de vrai « maintenu puis relâché ». L'équivalent retenu est une **bascule** :
+
+- **1er appui long** sur le bouton capture : le micro des lunettes s'ouvre (un bip dans
+  les lunettes, iSee se tait), la photo-contexte est captée en parallèle ;
+- **2e appui long** : la question part aussitôt (deux bips), sinon **envoi auto à 20 s** ;
+- la réponse d'iSee arrive en voix, avec la photo posée sur l'écran blind person.
+
+Sans les mains du tout : **« Hey Meta, ouvre iSee »** ouvre la session (si besoin) puis
+l'écoute — mais exige un projet Developer Center avec la permission Voice Invocation ;
+en pur Developer Mode, l'invocation peut ne jamais arriver et l'appui long reste le seul
+déclencheur. Micro indisponible : repli annoncé (photo → chat, comme avant).
+
+Recette sans matériel (debug) : Réglages → META GLASSES → « Simuler un appui long
+(parler) » et « Simuler ouvre iSee (voix) » ; ou `adb shell am start --es glasses_talk "..."`
+pour injecter une question comme si le micro l'avait entendue. À valider sur matériel :
+bips audibles dans les lunettes (sortie A2DP), rue nette en haute qualité sans freeze,
+et question bout-en-bout avec photo jointe à la réponse.

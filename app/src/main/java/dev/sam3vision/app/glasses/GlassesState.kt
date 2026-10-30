@@ -21,6 +21,8 @@ data class GlassesUiState(
     val micAllowed: Boolean = false,
     /** Vrai pendant que la dictée capte réellement le micro des lunettes. */
     val micActive: Boolean = false,
+    /** Vrai entre les deux appuis longs d'une question posée aux lunettes. */
+    val talkListening: Boolean = false,
     val streaming: Boolean = false,
     /** Nom du fichier en cours d'enregistrement, `null` hors enregistrement. */
     val recordingName: String? = null,
@@ -49,6 +51,15 @@ internal fun DeviceSessionState.toPhase(): SessionPhase = when (this) {
 sealed interface GlassesEvent {
     /** Photo reçue, écrite dans le cache interne : l'app peut l'analyser. */
     data class PhotoTaken(val file: File, val action: CaptureAction) : GlassesEvent
+
+    /** Question aux lunettes : le micro s'ouvre, iSee se tait et écoute. */
+    data object TalkListening : GlassesEvent
+
+    /** Question entendue : photo-contexte, texte transcrit, PCM 16 kHz capté. */
+    data class VoiceHeard(val photo: File?, val text: String, val pcm: ByteArray) : GlassesEvent
+
+    /** Fin d'écoute sans question (échec, abandon) : iSee reprend sa voix. */
+    data object TalkEnded : GlassesEvent
 
     /** Note à annoncer à voix haute (état, refus, conseil). Sa gravité est dans `message.kind`. */
     data class Note(val message: GlassesMessage) : GlassesEvent
