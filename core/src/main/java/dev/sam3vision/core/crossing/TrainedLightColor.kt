@@ -22,12 +22,13 @@ object TrainedLightColor {
     const val MIN_PURITY = 0.80f
 
     /**
-     * Pureté minimale de la feuille pour trancher vert (30/10/2026, ordre
-     * user : sensibilité du vert augmentée). Plus bas que [MIN_PURITY] :
-     * les seules feuilles concernées sont celles entre les deux planchers
-     * (vert sombre, feuille 6) ; la porte anti-confusion tranche ensuite.
+     * Pureté minimale de la feuille pour trancher vert (30/10/2026, ordres
+     * user : sensibilité du vert augmentée, puis degré de certitude baissé
+     * — plancher passé de 0,65 à 0,50). Plus bas que [MIN_PURITY] : les
+     * feuilles vertes entre les deux planchers (0,54 et 0,50) sont
+     * acceptées ; la porte anti-confusion tranche ensuite.
      */
-    const val GREEN_MIN_PURITY = 0.65f
+    const val GREEN_MIN_PURITY = 0.50f
 
     /** Indice du trait `green_frac` dans [FEATURE_NAMES] (plancher vert). */
     private const val GREEN_FRAC_INDEX = 13
