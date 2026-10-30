@@ -18,25 +18,26 @@ jobs de `:app` (§2).
 
 ## 2. Où le banc est vérifié maintenant
 
-`ci.yml` déclare **1 job** `ci` (`:32`), `ci-native.yml` **3 jobs** (`apk` `:35`,
-`apk-release` `:80`, `lint` `:114`) — découpe v9 : le natif est hors PR (mesuré :
+`ci.yml` déclare **4 jobs** (`ci-core`, `ci-app`, `ci`, `ci-budget`),
+`ci-native.yml` **2 jobs** (`apk`, `lint`) — découpe v10 : le natif est hors PR, les tests
+sont coupés en deux moitiés sous un agrégateur `ci` (mesuré :
 `grep -n '^  [a-z-]*:' ci.yml ci-native.yml`). Chacun est borné (`timeout-minutes: 5`
 en PR, 10 hors PR) :
 
-| Job | Fichier : ligne | Ce qu'il fait pour le banc |
+| Job | Fichier | Ce qu'il fait pour le banc |
 |---|---|---|
-| `ci` | `ci.yml:199-203` | `./gradlew :core:testDebugUnitTest :app:testDebugUnitTest` → les **95 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
-| `apk` | `ci-native.yml:58` | `:app:assembleDebug` → compile le banc, y compris `MockGlassesHarness` et le mock (`debugImplementation`) |
-| `apk-release` | `ci-native.yml:103` | `:app:assembleRelease` → compile le banc **sans** le mock : c'est le stub `src/release/MockControl.kt` qui prend le relais |
-| `lint` | `ci-native.yml:129-130` | `:app:lintDebug` → le banc passe au lint comme le reste de l'app |
+| `ci-core` | `ci.yml` | gardes (tailles, design, budget, voix, clés, CI, portes) + `:core:testDebugUnitTest` — rien d'autre pour le banc, qui vit sous `app/` |
+| `ci-app` | `ci.yml` | `:app:testDebugUnitTest` → les **95 annotations `@Test`** de `app/src/test/.../bench/` tournent là, comme les tests de `:app` |
+| `apk` | `ci-native.yml` | `:app:assembleDebug` (compile le banc, y compris `MockGlassesHarness` et le mock `debugImplementation`) puis `:app:assembleRelease` (compile **sans** le mock : le stub `src/release/MockControl.kt` prend le relais) |
+| `lint` | `ci-native.yml` | `:app:lintDebug` → le banc passe au lint comme le reste de l'app |
 
 Trois propriétés à retenir :
 
-- **les périmètres nomment les modules** (`ci.yml:80,85`) :
+- **les périmètres nomment les modules** (`.github/actions/perimetre/action.yml`) :
   `^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$`
   pour Gradle, `^server/` pour les tests backend Python (`tools/` n'est dans aucun périmètre).
   Le banc vivant sous `app/`, toute PR qui le touche déclenche Gradle ; une PR de documentation
-  seule continue de sauter les étapes Gradle du job `ci` ;
+  seule continue de sauter les étapes Gradle des jobs `ci-core`/`ci-app` ;
 - **aucun test d'instrumentation n'est exécuté** : `MockGlassesTest` et l'asset
   `app/src/androidTest/assets/mock_feed.mp4` demandent un appareil. Ce n'est pas une régression
   de la fusion, c'était déjà le cas avant ;
@@ -56,8 +57,9 @@ Trois propriétés à retenir :
 - Les runners sont **auto-hébergés** (`runs-on: [self-hosted, linux, x64, vision]`,
   `ci.yml:28`), pas `ubuntu-latest` : les durées ci-dessus sont celles de cette machine, pas
   d'une VM GitHub.
-- Un seul appel Gradle par job : découper davantage multiplierait checkout et configuration, que
-  le budget de 5 min ne permet pas.
+- Les appels Gradle restent groupés par job : découper davantage multiplierait checkout et
+  configuration, que le budget ne permet pas (le job `apk` fait debug + release justement parce
+  que son budget hors PR de 10 min le permet).
 
 ## 4. Si le banc grossit
 

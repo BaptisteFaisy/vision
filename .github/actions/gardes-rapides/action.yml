@@ -1,0 +1,48 @@
+name: Gardes rapides
+description: >-
+  Chaîne d'outils + gardes sans Gradle (secrets, java.home, tailles Kotlin).
+  Source unique pour les jobs ci-core et ci-app : un dépassement de taille
+  échoue VITE dans les deux moitiés, sinon l'agrégateur `ci` attendrait la
+  moitié lente pour un verdict déjà connu.
+runs:
+  using: composite
+  steps:
+    - name: Chaîne d'outils
+      shell: bash
+      run: |
+        test -n "$JAVA_HOME" || { echo "::error::JAVA_HOME absent de l'image"; exit 1; }
+        test -n "$ANDROID_HOME" || { echo "::error::ANDROID_HOME absent — installer le SDK Android"; exit 1; }
+        "$JAVA_HOME/bin/java" -version
+        ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
+
+    - name: Aucun secret ni fichier local dans le dépôt
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        # Régression déjà vue sur ce projet : des clés API en clair dans un
+        # fichier de config. Ici on refuse tout ajout de ce genre.
+        if git ls-files --error-unmatch local.properties >/dev/null 2>&1; then
+          echo "::error::local.properties ne doit jamais être versionné (clés API)"; exit 1
+        fi
+        if git grep -nEI 'sk-[A-Za-z0-9_-]{24,}|sk_[a-f0-9]{32}|ghp_[A-Za-z0-9]{36}' -- . ':!.github' ':!docs' ':!*.md'; then
+          echo "::error::clé API en clair détectée ci-dessus"; exit 1
+        fi
+        echo "OK — aucun secret versionné"
+
+    - name: Anti-régression — pas de java.home codé en dur
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        # Déjà vu : org.gradle.java.home en dur dans gradle.properties casse
+        # le build. La chaîne d'outils vient de l'environnement, jamais du dépôt.
+        if grep -E '^[[:space:]]*org\.gradle\.java\.home' gradle.properties; then
+          echo "::error::org.gradle.java.home ne doit pas être fixé dans gradle.properties"; exit 1
+        fi
+        echo "OK — java.home non codé en dur"
+
+    - name: Garde de taille Kotlin (< 500 lignes/fichier, < 50 lignes/fonction)
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        python3 tools/check-kotlin-limits.py
+        python3 -m unittest tools/test_check_kotlin_limits.py

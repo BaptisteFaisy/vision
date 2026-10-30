@@ -2,9 +2,10 @@
 
 Relu le **2026-10-28** sur cet arbre (découpe v9 : natif hors PR), mis à jour le
 **2026-10-29** (fluidité v11 : `ci-budget` replié dans `ci.yml`, `stale-base-guard` supprimé,
-un seul balayage par couple tête/base, journal `merge=union`). Chaque affirmation
-ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-budget/`,
-`.github/couche0/`.
+un seul balayage par couple tête/base, journal `merge=union`), puis le **2026-10-30**
+(découpe v10 : `ci` coupé en `ci-core`/`ci-app` + agrégateur, natif en 2 jobs).
+Chaque affirmation ci-dessous vient d'un fichier du dépôt : `.github/workflows/`,
+`.github/ci-budget/`, `.github/couche0/`.
 
 ## 1. La règle : un verdict en 5 minutes
 
@@ -19,37 +20,45 @@ ci-dessous vient d'un fichier du dépôt : `.github/workflows/`, `.github/ci-bud
   d'entrée de la file. Sans lui, une PR pourrait entrer dans la file avec un job de 30 minutes.
   Le nom du check est celui du **job**, pas du fichier : la protection de branche est inchangée.
 
-## 2. Le job `ci` de `ci.yml` (et le natif hors PR)
+## 2. Les jobs `ci-core` / `ci-app` / `ci` (et le natif hors PR)
 
-Déclencheurs : `pull_request` et `push`. La PR ne porte qu'**un seul job**,
-`ci` (`ci.yml:32`) : périmètres, chaîne d'outils, gardes, tests Python (gardes,
-portes, backend), tests JVM `:core` + `:app`, rapport de tests. Runner **auto-hébergé** —
+Déclencheurs : `pull_request` et `push`. La PR porte deux moitiés en parallèle,
+`ci-core` (gardes + backend + tests `:core`) et `ci-app` (tests `:app`), sous un
+agrégateur `ci` vert ssi les deux moitiés sont vertes — le check requis `ci` ne
+change pas (ni ruleset, ni Mergify, ni balayeur). Runner **auto-hébergé** —
 `runs-on: [self-hosted, linux, x64, vision]` —, cache Gradle via
 `gradle/actions/setup-gradle@v4` avec `cache-read-only: false`,
-`timeout-minutes: 5`.
+`timeout-minutes: 5`. Motif de la découpe v10 (2026-10-30) : 4 runs tués par le
+timeout à ~320 s en 48 h dans « Tests JVM », contention des runners partagés.
 
-Les builds natifs (`apk` = `:app:assembleDebug` + artefact sur `master`,
-`apk-release` = `:app:assembleRelease`, `lint` = `:app:lintDebug` + rapport)
-vivaient dans `ci.yml` jusqu'au 2026-10-28 : 4 jobs × N PRs saturaient les
-runners (file jusqu'à 10 min, budget wall-clock cassé). Ils ont déménagé
-dans `ci-native.yml`, vérifiés à chaque push sur `master`, à chaque tag et
-sur demande manuelle — `timeout-minutes: 10` (hors PR : cache froid possible),
-mêmes commandes.
+Les builds natifs (`apk` = `:app:assembleDebug` + `:app:assembleRelease` + artefact
+sur `master`, `lint` = `:app:lintDebug` + rapport) vivaient dans `ci.yml` jusqu'au
+2026-10-28 : 4 jobs × N PRs saturaient les runners (file jusqu'à 10 min, budget
+wall-clock cassé). Ils ont déménagé dans `ci-native.yml`, vérifiés à chaque push sur
+`master` (hors doc, `server/` et tests seuls — prouvé sans effet sur l'APK ni le lint),
+à chaque tag et sur demande manuelle — `timeout-minutes: 10` (hors PR : cache froid
+possible). `apk` et `apk-release` ont fusionné le 2026-10-30 (marge 10 min : 2 runs
+tués à ~700 s) : debug + release tiennent en ~6-7 min < 10, la garde clés embarquées
+tourne après chaque assemblage, chaque variante reste vérifiée.
 
 Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et testé avec `:app`
 (`:app:assembleDebug` au job `apk` de `ci-native.yml`, ses tests JVM dans
-`:app:testDebugUnitTest` au job `ci`).
+`:app:testDebugUnitTest` au job `ci-app`).
 Détail : la page « Le banc lunettes dans la CI » sous `docs/` (nom de fichier inchangé pour ne
 pas casser les liens).
 
-**Périmètres.** Le job `ci` demande d'abord à l'API la liste des fichiers de la PR (le checkout est
-superficiel, la base n'y est pas) et publie `steps.perimetre.outputs.code` (Gradle : `app/`,
-`core/`, `gradle/`, fichiers racine — hors `.md`/`.txt`) et `steps.perimetre.outputs.backend`
-(Python : `server/`). `tools/` n'est dans aucun périmètre : une PR 100 % Python ne fait tourner
-que les gardes. Une PR purement documentaire saute Gradle et le backend : le verdict tombe en
-quelques secondes. Un push est comparé à `github.event.before` par la même mécanique.
+**Périmètres.** Les jobs `ci-core` et `ci-app` demandent d'abord à l'API la liste des fichiers
+de la PR (le checkout est superficiel, la base n'y est pas) via l'action composite unique
+`.github/actions/perimetre`, et publient `code` (Gradle : `app/`, `core/`, `gradle/`, fichiers
+racine — hors `.md`/`.txt`) et `backend` (Python : `server/`). `tools/` n'est dans aucun
+périmètre : une PR 100 % Python ne fait tourner que les gardes. Une PR purement documentaire
+saute Gradle et le backend : le verdict tombe en quelques secondes. Un push est comparé à
+`github.event.before` par la même mécanique.
 
-**Les gardes du job `ci`, dans l'ordre.**
+**Les gardes, dans l'ordre.** Les rapides (1-4) tournent dans les deux moitiés (même action
+composite `.github/actions/gardes-rapides` : un dépassement échoue vite des deux côtés, sinon
+l'agrégateur attendrait la moitié lente) ; les lentes (5-7) dans `ci-core` seul, sur le même
+commit — les rejouer ne changerait pas le verdict.
 
 1. chaîne d'outils : `JAVA_HOME` et `ANDROID_HOME` présents, version Java affichée ;
 2. aucun secret ni fichier local versionné : refus de `local.properties` suivi, et refus des motifs
@@ -79,7 +88,7 @@ succès : l'APK est produit sans clé et l'utilisateur saisit la sienne dans Ré
   gelés — `.github/ci-budget/`, `.github/couche0/`, `.github/workflows/couche0.yml`,
   `.github/workflows/ci-budget.yml`, `.github/workflows/ci.yml` (gelé le 26/10),
   `.github/workflows/ci-native.yml` et `.github/workflows/pr-auto-merge.yml` (gelés le 29/10 :
-  vider `lint`/`apk-release` ou l'auto-merge passerait sinon inaperçu). Les toucher exige une
+  vider `lint`/`apk` ou l'auto-merge passerait sinon inaperçu). Les toucher exige une
   mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
 
 Le juge est **téléchargé depuis `master`**, jamais depuis le head de la PR : une PR ne peut pas
@@ -155,7 +164,7 @@ GitHub annulait le run *en attente* dès qu'un autre se déclenchait, donc le «
 d'une PR pouvait être annulé par le run d'une autre — famine, et attente jusqu'au cron. Le cron de
 filet est passé à 5 min.
 La seule porte reste la CI : les 3 checks `ci`, `ci-budget`, `couche0` verts, puis
-merge en rebase. Le natif (`apk`, `apk-release`, `lint`) est vérifié sur `master`
+merge en rebase. Le natif (`apk`, `lint`) est vérifié sur `master`
 par `ci-native.yml` après chaque atterrissage. Pas de gate humaine, pas de merge
 à la main (sauf amorçage unique de la découpe v9, qui change le contrat du
 balayeur lui-même).

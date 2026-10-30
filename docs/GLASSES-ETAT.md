@@ -97,8 +97,8 @@ la paire simulée puis la première frame du flux (2 délais de 20 s, `:180-181`
 harnais. Ce que la vidéo montre n'a pas été regardé.
 
 **Aucun workflow ne l'exécute** (vérifié : `grep -n 'androidTest\|instrument' .github/workflows/*.yml`
-ne rend rien). La CI a 4 jobs — `ci` (tests JVM `:core` + `:app`, `ci.yml:199-203`), `apk`
-(`ci-native.yml:35`), `apk-release` (`:80`), `lint` (`:114`) — aucun n'a d'appareil. Vert ici = vert sur *cet*
+ne rend rien). La CI a les jobs `ci-core`/`ci-app` (tests JVM `:core` / `:app`), `apk`
+(debug + release), `lint` — aucun n'a d'appareil. Vert ici = vert sur *cet*
 appareil, jamais « vert en CI ».
 
 ## 6. Ce qui reste à prouver — et qui demande le matériel
