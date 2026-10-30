@@ -14,8 +14,8 @@ import org.junit.Test
  * frames, le doute après un vert se tait dans le délai puis parle sans
  * couper hors délai, et les trois phrases FR sont des littéraux exacts.
  *
- * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s) :
- * ce fichier les vérifie, il ne les change pas.
+ * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
+ * rouge répété 2 s) : ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
 
