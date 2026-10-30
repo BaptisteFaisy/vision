@@ -209,10 +209,6 @@ internal object SettingsCodec {
             liveSamEnabled = values[K_LIVE_SAM]?.toBooleanStrictOrNull() ?: default.liveSamEnabled,
             boxPredictionEnabled = values[K_BOX_PREDICTION]?.toBooleanStrictOrNull()
                 ?: default.boxPredictionEnabled,
-            adaptiveUploadEnabled = values[K_ADAPTIVE_UPLOAD]?.toBooleanStrictOrNull()
-                ?: default.adaptiveUploadEnabled,
-            keyframeSchedulerEnabled = values[K_KEYFRAME_SCHEDULER]?.toBooleanStrictOrNull()
-                ?: default.keyframeSchedulerEnabled,
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
             continuousCadenceEnabled = values[K_CONTINUOUS_CADENCE]?.toBooleanStrictOrNull() ?: default.continuousCadenceEnabled,
@@ -228,8 +224,16 @@ internal object SettingsCodec {
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
             depthBackend = DepthBackend.fromName(values[K_DEPTH_BACKEND]),
-        ).let { decodeShare(values, it) }
+        ).let { decodeShare(values, it) }.let { decodeAdaptive(values, it) }
     }
+
+    /** Flags adaptatifs (Q8+Q9) : à part pour que [decode] reste sous 50 lignes. */
+    private fun decodeAdaptive(values: Map<String, String>, default: Settings): Settings = default.copy(
+        adaptiveUploadEnabled = values[K_ADAPTIVE_UPLOAD]?.toBooleanStrictOrNull()
+            ?: default.adaptiveUploadEnabled,
+        keyframeSchedulerEnabled = values[K_KEYFRAME_SCHEDULER]?.toBooleanStrictOrNull()
+            ?: default.keyframeSchedulerEnabled,
+    )
 
     private fun decodeShare(values: Map<String, String>, default: Settings): Settings = default.copy(
         caregiverRole = CaregiverRole.fromName(values[K_CAREGIVER_ROLE]),
