@@ -57,6 +57,14 @@ class SamLifecycleTest {
     }
 
     @Test
+    fun `le client d extinction est partage sans rejeu ni delai change`() {
+        // Une seule requête par appel : un refus ne part jamais deux fois.
+        assertEquals(45_000, releaseHttpClient().readTimeoutMillis)
+        assertEquals(45_000, releaseHttpClient().callTimeoutMillis)
+        assertFalse(releaseHttpClient().retryOnConnectionFailure)
+    }
+
+    @Test
     fun `un refus 400 persistant part une seule fois`() = runBlocking {
         // Réponse vision au cas traverse-perf : aucun rejeu, même persistant —
         // le contrat une-seule-requete (LifecycleContractTest) couvre 500, 404,

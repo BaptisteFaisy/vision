@@ -30,14 +30,16 @@ private val TYPED_REFUSALS = setOf(401, 402, 403, 429)
  * et le prochain réveil est un boot complet (~28 s), jamais un restore (`/release`
  * tue, il ne gèle pas — voir `server/docs/LIVE-PERF.md`).
  *
- * **Une seule requête par appel** : le rejeu d'un refus doublait l'extinction (un 401 ou un
- * 429 partait deux fois). `Result.success(false)` = le serveur a refusé (400, 404, 5xx) ;
- * `failure` = réseau, délai dépassé, ou refus typé ([ApiError.InvalidKey],
- * [ApiError.PaymentRequired], [ApiError.RateLimited]).
+ * **Une seule requête par appel**, imposée à deux niveaux comme sur `/live` : le client
+ * partagé [releaseHttpClient] (`retryOnConnectionFailure(false)`) et le corps
+ * [OneShotJsonBody] (jamais rejoué par OkHttp). Avant, le rejeu d'un refus doublait
+ * l'extinction (un 401 ou un 429 partait deux fois). `Result.success(false)` = le serveur
+ * a refusé (400, 404, 5xx) ; `failure` = réseau, délai dépassé, ou refus typé
+ * ([ApiError.InvalidKey], [ApiError.PaymentRequired], [ApiError.RateLimited]).
  */
 suspend fun releaseSam(
     baseUrl: String,
-    client: OkHttpClient = defaultHttpClient(RELEASE_TIMEOUT_SECONDS),
+    client: OkHttpClient = releaseHttpClient(),
 ): Result<ReleaseOutcome> {
     if (baseUrl.isBlank()) return Result.success(ReleaseOutcome(false, 0, "base vide"))
     endpointRefusal("endpoint SAM", baseUrl, "/release")?.let { return Result.failure(it) }
@@ -47,7 +49,7 @@ suspend fun releaseSam(
             baseUrl,
             "/release",
             "POST",
-            jsonBody(EMPTY_JSON),
+            OneShotJsonBody(EMPTY_JSON),
             headers = mapOf(RELEASE_HEADER to "confirm"),
         )
     }.then { outcome -> outcome.toRelease() }

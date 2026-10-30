@@ -115,6 +115,34 @@ private const val LIVE_CONNECT_SECONDS = 3L
 private const val LIVE_WRITE_SECONDS = 5L
 private const val LIVE_READ_SECONDS = 60L
 
+/**
+ * Client **partagé** du tracker : mêmes délais que [defaultHttpClient] pour 15 s,
+ * mais `retryOnConnectionFailure(false)` comme le direct — une frame du tracker n'est
+ * jamais renvoyée (voir [OneShotJsonBody]) ; `newBuilder()` partage pool + dispatcher.
+ */
+private val trackSharedClient: OkHttpClient by lazy {
+    defaultHttpClient(TRACK_TIMEOUT_SECONDS).newBuilder()
+        .retryOnConnectionFailure(false)
+        .build()
+}
+
+/** Le client HTTP du tracker : **toujours le même** (pool, DNS, TLS partagés). */
+fun trackHttpClient(): OkHttpClient = trackSharedClient
+
+/**
+ * Client **partagé** de l'extinction (`POST /release`) : mêmes délais que
+ * [defaultHttpClient] pour 45 s, mais sans rejeu — le contrat est **une seule
+ * requête par appel**, un refus ne part jamais deux fois.
+ */
+private val releaseSharedClient: OkHttpClient by lazy {
+    defaultHttpClient(RELEASE_TIMEOUT_SECONDS).newBuilder()
+        .retryOnConnectionFailure(false)
+        .build()
+}
+
+/** Le client HTTP de `/release` : **toujours le même**, sans rejeu. */
+fun releaseHttpClient(): OkHttpClient = releaseSharedClient
+
 /** Réponse HTTP brute. */
 internal data class HttpOutcome(val code: Int, val body: String)
 
