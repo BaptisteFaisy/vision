@@ -35,11 +35,16 @@ object LiveMaskTransport {
      * qui parlent à SAM (Direct, mode vidéo iSee) passent par là, donc un format demandé
      * est toujours un format que le client sait relire. [withDepth] demande en plus la
      * médiane de proximité par objet (`false` = corps historique, octet pour octet).
+     * [masks] à `false` ne demande que boîtes et scores (`mask_encoding: none`) : pour
+     * les usages qui ne dessinent jamais de masque (pastilles, guidage) — aucun des
+     * deux écrans actuels, qui affichent tous deux les masques (`LiveScreen`,
+     * `IseeVisionCard`, `GlassesMaskLayer`), donc opt-in explicite.
      */
     fun clientFor(
         base: String,
         timeout: Long = LIVE_TIMEOUT_SECONDS,
         marks: WireMarks? = null,
         withDepth: Boolean = false,
-    ): LiveClient = liveClient(base, timeout, marks, MASK_FORMAT, MASK_EDGE, withDepth)
+        masks: Boolean = true,
+    ): LiveClient = liveClient(base, timeout, marks, MASK_FORMAT, MASK_EDGE, withDepth, masks)
 }

@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.net.liveBinaryUrl
 import dev.sam3vision.core.net.liveFrameJson
 import java.util.Base64
 import org.junit.Assert.assertEquals
@@ -80,6 +81,39 @@ class LiveWireGuardTest {
         val muteWs = org.json.JSONObject(liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12, id = 7))
         assertFalse("POST muet : pas de with_depth", mutePost.has("with_depth"))
         assertFalse("WS muette : pas de with_depth", muteWs.has("with_depth"))
+    }
+
+    @Test
+    fun `par defaut les masques sont demandes en bits avec les knobs`() {
+        val body = org.json.JSONObject(
+            liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12, maskFormat = "rle", maskEdge = 256),
+        )
+        assertEquals("bits", body.getString("mask_encoding"))
+        assertEquals("rle", body.getString("mask_format"))
+        assertEquals(256, body.getInt("mask_edge"))
+    }
+
+    @Test
+    fun `sans masques le corps demande none et tait les knobs`() {
+        val body = org.json.JSONObject(
+            liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = 12, id = 7, maskFormat = "rle", maskEdge = 256, masks = false),
+        )
+        assertEquals("none", body.getString("mask_encoding"))
+        assertFalse("pas de mask_format sans masque", body.has("mask_format"))
+        assertFalse("pas de mask_edge sans masque", body.has("mask_edge"))
+        assertEquals(7, body.getInt("id"))
+        assertEquals(640, body.getInt("work_edge"))
+    }
+
+    @Test
+    fun `l url binaire suit le meme encodage que le JSON`() {
+        val withMasks = liveBinaryUrl("https://exemple.invalid", PROMPTS, 640, 12, "rle", 256)
+        assertTrue(withMasks, withMasks.contains("mask_encoding=bits"))
+        assertTrue(withMasks, withMasks.contains("mask_format=rle"))
+        val boxesOnly = liveBinaryUrl("https://exemple.invalid", PROMPTS, 640, 12, "rle", 256, masks = false)
+        assertTrue(boxesOnly, boxesOnly.contains("mask_encoding=none"))
+        assertFalse("pas de mask_format sans masque", boxesOnly.contains("mask_format"))
+        assertFalse("pas de mask_edge sans masque", boxesOnly.contains("mask_edge"))
     }
 
     private companion object {

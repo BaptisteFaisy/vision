@@ -2,6 +2,7 @@ package dev.sam3vision.core.net
 
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
+import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.model.SegObject
@@ -313,7 +314,7 @@ private fun intAt(text: String, from: Int): Int? {
  * Construction du message de frame, identique pour les deux transports : `null` pour
  * [id] = corps de `POST /live`, un `id` pour la trame WebSocket. Les masques sont demandés
  * au format `bits` par `mask_encoding` — **le corps historique, inchangé**, que le backend
- * déployé honore.
+ * déployé honore — ou pas demandés du tout (`none`, voir [masks]).
  *
  * [maskFormat] et [maskEdge] ajoutent les knobs du codec masques (`mask_format`,
  * `mask_edge`) : `rle`/`poly` sur une grille réduite, que seul un backend à jour sait
@@ -323,6 +324,10 @@ private fun intAt(text: String, from: Int): Int? {
  * [withDepth] ajoute `"with_depth":true` (médiane de proximité par objet en réponse).
  * `false` = octet pour octet le corps d'avant : un serveur qui ne connaît pas ce champ
  * l'ignore et répond sans clé `depth`.
+ *
+ * [masks] à `false` demande `"mask_encoding":"none"` (boîtes et scores seuls, sans
+ * `mask_format`/`mask_edge` : le serveur n'a plus rien à configurer) : pour les usages
+ * qui ne dessinent jamais de masque (pastilles, guidage). `true` = le corps d'avant.
  */
 internal fun liveFrameJson(
     jpegB64: String,
@@ -333,6 +338,7 @@ internal fun liveFrameJson(
     maskFormat: String? = null,
     maskEdge: Int = 0,
     withDepth: Boolean = false,
+    masks: Boolean = true,
 ): String {
     // Concaténation manuelle : `JSONObject` rescanne et échappe les ~28 Ko de base64 à
     // chaque frame, alors que l'alphabet base64 (A-Za-z0-9+/=) n'a rien à échapper.
@@ -354,8 +360,8 @@ internal fun liveFrameJson(
     }
     out.append(",\"work_edge\":").append(workEdge)
     out.append(",\"max_objects\":").append(maxObjects)
-    out.append(",\"mask_encoding\":\"").append(MASK_ENCODING_BITS).append('"')
-    if (maskFormat != null) {
+    out.append(",\"mask_encoding\":\"").append(if (masks) MASK_ENCODING_BITS else MASK_ENCODING_NONE).append('"')
+    if (masks && maskFormat != null) {
         out.append(",\"mask_format\":\"").append(jsonEscape(maskFormat)).append('"')
         if (maskEdge > 0) out.append(",\"mask_edge\":").append(maskEdge)
     }

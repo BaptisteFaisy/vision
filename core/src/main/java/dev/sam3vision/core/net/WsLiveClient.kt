@@ -45,6 +45,8 @@ class WsLiveClient(
     private val maskEdge: Int = 0,
     /** Profondeur fusionnée (`with_depth`) : médiane de proximité par objet en réponse. */
     private val withDepth: Boolean = false,
+    /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
+    private val masks: Boolean = true,
 ) : LiveClient {
 
     private val lock = Any()
@@ -129,7 +131,7 @@ class WsLiveClient(
         prompts: List<String>?,
         workEdge: Int,
         maxObjects: Int,
-    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth)
+    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth, masks)
 
     /**
      * Réponse du serveur : même forme que `POST /live`, ou `error` (connexion maintenue).
