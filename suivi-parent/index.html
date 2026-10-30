@@ -17,13 +17,8 @@
       <span class="pill grey" id="live-badge" role="status">OFFLINE</span>
     </header>
     <main>
-      <section class="scene" aria-label="Description de la session partagée">
+      <section class="scene" aria-label="Boule iSee">
         <div class="orb-frame" aria-hidden="true"><canvas id="orb"></canvas></div>
-        <div class="spoken" hidden><div id="speaker">ISEE</div><p id="spoken-line" aria-live="polite" aria-atomic="true"></p></div>
-      </section>
-      <section id="view" aria-label="Ce que voit ton proche">
-        <img id="view-frame" alt="Dernière image vue par ton proche" hidden>
-        <p id="view-note" role="status" hidden></p>
       </section>
       <section id="pictos" aria-label="Objets reconnus" hidden>
         <div id="picto-strip" role="list"></div>
@@ -35,6 +30,10 @@
           <div id="trip-ball" class="trip-ball" aria-hidden="true"></div>
         </div>
         <p class="trip-ends"><span>Départ</span><span>Arrivée</span></p>
+      </section>
+      <section id="view" aria-label="Ce que voit ton proche">
+        <img id="view-frame" alt="Dernière image vue par ton proche" hidden>
+        <p id="view-note" role="status" hidden></p>
       </section>
     </main>
   </div>
