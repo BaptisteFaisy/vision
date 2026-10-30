@@ -20,7 +20,7 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
    Scribe. Une destination non comprise est redemandée à voix haute (« Je
    n'ai pas compris où tu veux aller… »), jamais remplacée par une
    description de la scène.
-3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'écran
+3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'accueil
    propose un champ de saisie clavier — la saisie vaut une dictée : elle
    ouvre la confirmation, sans redicter.
 4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
@@ -28,21 +28,23 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 
 ## 2. Voir (les écrans)
 
-- **Destination** (toujours, depuis le 29/10) : la dictée n'ouvre que
-  cet écran — adresse géocodée + résumé (distance · durée), boutons
-  « Démarrer » / « Annuler », lien « Dicter une autre destination ».
-  Le départ direct sans bouton (`autoStartOnVoice`) est abandonné : trop de
+- **Destination** (sur l'accueil, depuis le 30/10) : la dictée n'ouvre
+  aucun écran — adresse géocodée + résumé (distance · durée) + carte
+  d'aperçu du tracé, boutons « Démarrer » / « Annuler », « oui » / « non »
+  à la voix, saisie clavier de secours. L'appui long reste une question
+  libre et le tap la vidéo. Le départ direct sans bouton
+  (`autoStartOnVoice`) est abandonné : trop de
   guidages partaient sur une question ou une dictée malentendue
   (« comment aller à… ? » devenait un ordre). Sans position GPS ou sans URL
-  Valhalla : adresse seule (distance et durée à zéro). Si l'itinéraire
+  Valhalla : adresse + motif, ni carte ni résumé. Si l'itinéraire
   échoue : adresse + motif en rouge, et « Démarrer » bascule sur Google
   Maps, **à pied**.
 - **Guidage** : sur l'accueil iSee, sous la caméra — carte (tracé +
   position), prochaine instruction, distances restantes, bouton
   « Arrêter le guidage », dictée « arrête le guidage ». Le guidage est
   **piéton** : ni voiture, ni transport. La caméra et la sonde
-  continuent (évitement d'obstacles préservé) ; la voix iSee parle
-  chaque consigne.
+  continuent (évitement d'obstacles préservé), l'appui long reste une
+  question libre et le tap la vidéo ; la voix iSee parle chaque consigne.
 - **Écart** : en cas de sortie d'itinéraire, bandeau « Écart — recalcul… »
   + annonce « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
   puis « Nouvel itinéraire calculé. » (recalcul depuis la position
@@ -76,8 +78,9 @@ du trajet) : « Nouvelle destination » (retour à la dictée) ou « Fermer »
 Le guidage continue l'app en fond : GPS + voix ininterrompus, **notification
 permanente** avec bouton **Arrêter** (même effet que « arrête le guidage »).
 
-- Retour arrière (quitter l'écran navigation) = **arrêter** : pas de
-  guidage invisible.
+- Retour arrière = **Réglages** (plus d'écran navigation à quitter,
+  l'accueil porte le guidage) : la confirmation et le guidage restent
+  visibles au retour sur l'accueil.
 - Accueil / verrouillage = **maintien** : le service garde le guidage, la
   voix continue, l'écran de guidage se rouvre au retour dans l'app.
 
@@ -88,15 +91,16 @@ SHA du build — règle ISEE-TEST-MASTER-SEUL), APK installé, clés ElevenLabs
 + voix renseignées, interrupteur sur oui, URL Valhalla par défaut,
 téléphone pris sous verrou dur + annonce dans `BOITE-USER.md`.
 
-1. Dicter « je veux aller à la gare de Lyon » → écran Destination
-   (adresse + résumé), « Démarrer » → retour à l'accueil iSee : carte
-   sous la caméra, annonce puis consignes.
-2. Lire le résumé sur l'écran de guidage : distance et durée chiffrées
+1. Dicter « je veux aller à la gare de Lyon » → bloc Destination sur
+   l'accueil (adresse + résumé + carte d'aperçu), « Démarrer » (ou
+   « oui ») → carte suivie sous la caméra, annonce puis consignes.
+   L'appui long reste une question, le tap la vidéo.
+2. Lire le résumé sur le bloc de guidage : distance et durée chiffrées
    (ex. « 2,4 km · 30 min »).
 3. Marcher : consignes suivies, distances décroissantes, grand texte lisible.
 4. S'écarter d'un pâté de maisons → bandeau « Écart — recalcul… » +
    annonce, puis nouvel itinéraire.
-5. Verrouiller 1 min → voix continue ; déverrouiller → écran Guidage
+5. Verrouiller 1 min → voix continue ; déverrouiller → bloc Guidage
    intact, notification permanente visible.
 6. Aller au bout (ou finir près du but) → annonce + écran Arrivée →
    « Fermer » → accueil iSee, silence.

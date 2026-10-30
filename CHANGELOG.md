@@ -133,6 +133,35 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   non rejouée, sans téléphone piloté d'ici.
 - Fichiers : `suivi-parent/index.html`, `suivi-parent/styles.css`,
   `suivi-parent/live.mjs`, `suivi-parent/README.md`.
+## 2026-10-30 — confirmation GPS sur l'accueil iSee (branche `fix/isee-destination-carte-accueil`)
+
+- **Demande** : quand un objectif de destination existe, la carte est sur la
+  page de base (accueil iSee) ; l'appui long reste une question libre, le tap
+  active/arrête la vidéo, sans nouveau bouton caméra.
+- Confirmation (`Confirming`) affichée sur l'accueil sous la caméra
+  (`IseeConfirmBlock`, style Portrait) : destination, résumé/chargement/motif,
+  carte d'aperçu du tracé, boutons « Démarrer » / « Annuler », rappel
+  « oui » / « non », saisie clavier de secours. Seule l'arrivée garde
+  l'écran navigation (`VoiceNavStateEffect` ne pousse que `Arrived`).
+- Aperçu carte sans appel réseau de plus : `ValhallaRouteLoader` publie
+  l'itinéraire guidable (`RouteTrip.toNavRoute`) via `onPreview` (`null` au
+  lancement), gardé par `IseeVoiceNav.confirmPreview`, lu par
+  `IseeViewModel.confirmNavSnapshot`.
+- Boutons navigation cliquables sur l'accueil : `NavButtonZones` + modificateur
+  `navZone` publient les zones tactiles, `IseeRootLayout.navZones` les exempte
+  (le bouton « Arrêter le guidage », déjà sur l'accueil, était intouchable ;
+  réparé au passage). Voix inchangée : la session consomme déjà les
+  transcripts sur l'accueil avant le LLM (`runOrder` + `onVoiceTranscript`).
+- Preuves : `:app` ciblé isee + voicenav **397/397** (dont `NavButtonZonesTest`
+  3/3 et `ValhallaRouteLoaderTest` 10/10, +2 aperçu), `check-kotlin-limits`
+  OK (`IseeViewModel` 491/500), `testDebugUnitTest` BUILD SUCCESSFUL.
+  Recette téléphone : non rejouée, sans téléphone piloté d'ici.
+- Fichiers : `NavButtonZones.kt` + `IseeConfirmBlock.kt` (neufs),
+  `IseeRootLayout.kt`, `MainActivity.kt`, `ValhallaRouteLoader.kt`,
+  `IseeVoiceNav.kt`, `IseeViewModel.kt`, `IseeGuidanceMap.kt`, `AppNav.kt`,
+  `VoiceNavRoute.kt` (KDoc), `NavButtonZonesTest.kt` (neuf),
+  `ValhallaRouteLoaderTest.kt` (+2), `GPS_GUIDE_UTILISATEUR.md`,
+  `CARTE-OSM.md`, `NAVIGATION-VOCALE.md`, `CHANGELOG.md`.
 
 ## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
 

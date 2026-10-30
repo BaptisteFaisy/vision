@@ -53,6 +53,14 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      */
     var crossingZone: (() -> RectF?)? = null
 
+    /**
+     * Zones tactiles des boutons navigation de l'accueil (Démarrer, Annuler,
+     * Arrêter, saisie clavier), mêmes règles que [pictoZone] : un DOWN dedans
+     * descend au bouton — sans ça, la confirmation et l'arrêt sur l'accueil
+     * seraient intouchables (tout partirait en tenue micro ou en vidéo).
+     */
+    var navZones: (() -> List<RectF>)? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private var capturing = false
 
@@ -91,7 +99,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * iSee n'a que deux contrôles tactiles (Picto, Traversée) : hors de leurs
+     * iSee n'a que des contrôles tactiles exemptés (Picto, Traversée, boutons nav) : hors de leurs
      * zones, quand ses panneaux sont à l'écran, la racine prend le geste dès le
      * DOWN. Sans ça, un balayage non consommé remontait au système, qui ouvrait
      * le volet de notifications au milieu d'un swipe (mesuré sur le téléphone).
@@ -105,6 +113,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      */
     private var pictoPass = false
     private var crossingPass = false
+    private var navPass = false
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // DOWN dans une zone de chip : il descend au chip — sinon le tap
@@ -113,15 +122,26 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             pictoPass = inZone(pictoZone?.invoke(), ev)
             crossingPass = inZone(crossingZone?.invoke(), ev)
+            navPass = inZones(navZones?.invoke().orEmpty(), ev)
         }
-        if (pictoPass || crossingPass) {
+        if (pictoPass || crossingPass || navPass) {
             if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
                 pictoPass = false
                 crossingPass = false
+                navPass = false
             }
             return false
         }
         return gesturesEnabled()
+    }
+
+    /** Vrai si le DOWN tombe dans l'une des zones (liste vide = jamais dedans). */
+    private fun inZones(zones: List<RectF>, ev: MotionEvent): Boolean {
+        val at = IntArray(2)
+        getLocationInWindow(at)
+        val x = ev.x + at[0]
+        val y = ev.y + at[1]
+        return zones.any { it.contains(x, y) }
     }
 
     /** Vrai si le DOWN tombe dans la zone (`null` = pas affichée, jamais dedans). */
