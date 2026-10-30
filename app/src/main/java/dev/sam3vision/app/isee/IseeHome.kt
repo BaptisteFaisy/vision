@@ -43,4 +43,9 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Set
         debugMapEnabled = settings.debugRouteMapEnabled,
         modifier = Modifier.fillMaxSize(),
     )
+    // Photo des lunettes : plein cadre par-dessus la scène, fermée par retour
+    // ou bouton — le retour ne quitte pas iSee (la Dialog consomme le geste).
+    state.glassesPhoto?.let { photo ->
+        GlassesPhotoLayer(photo = photo, onDismiss = viewModel::dismissGlassesPhoto)
+    }
 }

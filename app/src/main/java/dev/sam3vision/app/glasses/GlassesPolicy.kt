@@ -298,6 +298,55 @@ object GlassesMessages {
     fun noMockPress() = GlassesMessage(MessageKind.WARNING, "Aucun appareil simulé actif.")
 
     /**
+     * L'écoute mains-libres est ouverte : ce qui se dit part en question, avec
+     * la photo des lunettes. Le téléphone peut rester en poche.
+     */
+    fun talkListening() = GlassesMessage(
+        MessageKind.INFO,
+        "J'écoute (lunettes) : parle, puis rappuie longuement pour envoyer (envoi auto à 20 s).",
+    )
+
+    /**
+     * Micro des lunettes inutilisable : l'ancien comportement reste (photo →
+     * chat sur le téléphone), dit comme un repli, pas comme un silence.
+     */
+    fun talkMicUnavailable() = GlassesMessage(
+        MessageKind.WARNING,
+        "Micro lunettes indisponible : photo envoyée au chat, comme avant.",
+    )
+
+    fun talkFailed(reason: String) =
+        GlassesMessage(MessageKind.ERROR, "Question lunettes : $reason")
+
+    fun voiceLaunchStarted() = GlassesMessage(
+        MessageKind.INFO,
+        "« Hey Meta, ouvre iSee » : connexion, puis j'écoute.",
+    )
+
+    fun voiceLaunchListening() = GlassesMessage(
+        MessageKind.INFO,
+        "« Hey Meta, ouvre iSee » : j'écoute, parle.",
+    )
+
+    fun voiceLaunchNeedsRegistration() = GlassesMessage(
+        MessageKind.ERROR,
+        "Commande vocale reçue mais app non enregistrée : touche « Enregistrer auprès de Meta AI ».",
+    )
+
+    fun voiceInvocationsUnavailable() = GlassesMessage(
+        MessageKind.WARNING,
+        "Invocations vocales indisponibles : l'appui long reste le seul déclencheur.",
+    )
+
+    fun voiceInvocationError(reason: String) =
+        GlassesMessage(MessageKind.WARNING, "Invocation vocale : $reason")
+
+    fun voiceInvocationUnknown() = GlassesMessage(
+        MessageKind.WARNING,
+        "Invocation vocale inconnue : ignorée (seul le lancement est géré).",
+    )
+
+    /**
      * Collecte des frames vidéo active : les descriptions suivent la sortie de la
      * voix ([GlassesVoiceRoute]), donc les lunettes quand la session est ouverte,
      * le haut-parleur en repli (paire hors Bluetooth, sortie refusée).
@@ -399,6 +448,14 @@ fun photoHint(state: GlassesUiState): String? = when {
     !state.streaming -> "Photo : flux caméra inactif."
     else -> null
 }
+
+/**
+ * Indication d'écoute mains-libres — `null` hors écoute. Affichée sous les
+ * boutons avec `photoHint` : l'utilisateur sait que le micro des lunettes
+ * capte, et comment envoyer.
+ */
+fun talkHint(state: GlassesUiState): String? =
+    if (state.talkListening) "Parle, puis rappuie longuement (ou attends 20 s)." else null
 
 /**
  * Libellé du bouton de session : dit l'étape manquante plutôt que de rester grisé sans

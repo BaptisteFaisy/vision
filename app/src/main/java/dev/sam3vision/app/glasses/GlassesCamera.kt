@@ -7,10 +7,8 @@ import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.removeCamera
 import com.meta.wearable.dat.camera.types.AudioCodec
 import com.meta.wearable.dat.camera.types.AudioSampleRate
-import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoFrame
-import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DeviceSessionError
 import android.util.Log
@@ -86,14 +84,8 @@ internal class GlassesCamera(
         return false
     }
 
-    /** 15 i/s et qualité moyenne : au-delà, le lien Bluetooth Classic casserait l'image
-     *  (constat matériel repris tel quel, **non remesuré** : aucun matériel ici). */
-    private fun configuration(choice: AudioChoice) = StreamConfiguration(
-        audioCodec = choice.toCodec(),
-        videoQuality = VideoQuality.MEDIUM,
-        frameRate = FRAME_RATE,
-        compressVideo = true,
-    )
+    /** Flux iSee : qualité haute, 15 i/s, H.265 (réglages commentés dans [glassesStreamConfiguration]). */
+    private fun configuration(choice: AudioChoice) = glassesStreamConfiguration(choice.toCodec())
 
     /** Format du plan → codec du SDK ; `null` = pas de piste audio demandée. */
     private fun AudioChoice.toCodec(): AudioCodec? {
@@ -220,7 +212,6 @@ internal class GlassesCamera(
     }
 
     private companion object {
-        const val FRAME_RATE = 15
         const val HERTZ_44K = 44_100
         const val HERTZ_48K = 48_000
         const val NO_REASON = "refus du SDK"

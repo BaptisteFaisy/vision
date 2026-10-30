@@ -15,13 +15,11 @@ import com.meta.wearable.dat.core.types.RegistrationError
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
 import com.meta.wearable.dat.inputs.types.CapturePressType
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
-import dev.sam3vision.app.VoiceAnnouncer
-import dev.sam3vision.app.llmClient
-import dev.sam3vision.app.samClientOrNull
+import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.usecase.AnalyzeUseCase
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,17 +38,11 @@ import kotlinx.coroutines.launch
 /** WAV des dictées prises avec le micro des lunettes, sous `filesDir`. */
 private const val AUDIO_DIR = "glasses-audio"
 
-/** Journal logcat de la collecte des frames (`adb logcat -s GlassesDirect`). */
-private const val FRAME_LOG_TAG = "GlassesDirect"
-
-/** Dossier des MP3 des descriptions lues sur le haut-parleur. */
-private const val FRAMES_VOICE_DIR = "glasses-frames"
-
 /** Extra adb de recette : lunettes simulées + connexion (`am start --ez glasses_mock_connect true`). */
 const val EXTRA_GLASSES_MOCK_CONNECT = "glasses_mock_connect"
 
-/** La connexion auto attend l'enregistrement jusque-là, puis explique au lieu d'insister. */
-private const val MOCK_CONNECT_TIMEOUT_MS = 10_000L
+/** Extra adb de recette (debug seul) : injecte une question comme si les lunettes l'avaient entendue. */
+const val EXTRA_GLASSES_TALK = "glasses_talk"
 
 /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
 private const val TAG = "GlassesChain"
@@ -79,29 +71,8 @@ class GlassesController(
     private val _state = MutableStateFlow(GlassesUiState())
     private val _events = MutableSharedFlow<GlassesEvent>(extraBufferCapacity = 8)
 
-    /** Voix des descriptions collectées : le haut-parleur, comme le reste de l'app. */
-    private val frameVoice = VoiceAnnouncer(context.applicationContext, FRAMES_VOICE_DIR)
-
-    /**
-     * Maillon « frame → analyse → voix », le même objet que le banc : clients
-     * uniques de l'app ([llmClient], [samClientOrNull]), réglages relus à
-     * chaque frame pour suivre les clés saisies en cours de session.
-     */
-    private val frameStep = GlassesAnalysisStep(
-        analyze = { base64 ->
-            val settings = frameSettings()
-            AnalyzeUseCase(llmClient(settings), samClientOrNull(settings)).invoke(base64)
-        },
-        say = { text ->
-            val settings = frameSettings()
-            frameVoice.say(settings, text)
-            when {
-                settings.ttsApiKey.isBlank() -> "voix coupée (clé TTS absente)"
-                GlassesVoiceRoute.targetsGlasses -> "lunettes"
-                else -> "haut-parleur"
-            }
-        },
-    )
+    /** Voix des descriptions collectées (`GlassesFrameVoice`, mêmes clients que le banc). */
+    private val frameVoice = GlassesFrameVoice(context, frameSettings)
 
     val state: StateFlow<GlassesUiState> = _state
     val events: SharedFlow<GlassesEvent> = _events
@@ -114,7 +85,33 @@ class GlassesController(
 
     // Implémentation (Mock Device Kit) en `app/src/debug/` : la dépendance n'est pas
     // embarquée dans l'APK de release, d'où la fabrique réflexive [mockDevice].
-    private val mock: GlassesMockDevice = mockDevice(context)
+    private val mocks = GlassesMockControls(scope, clock, mockDevice(context), _state, ::note, ::initialize, ::connect)
+
+    /** Signaux sonores dans les lunettes (l'écran du téléphone est en poche). */
+    private val beeps = GlassesTalkBeeps()
+
+    /** Question mains-libres : micro des lunettes, photo, transcription, événements. */
+    private val talkHost = GlassesTalkHost(
+        scope = scope,
+        audio = ::currentAudio,
+        snapPhoto = ::snapPhoto,
+        engine = ::speechClient,
+        settings = frameSettings,
+        beep = beeps::invoke,
+        state = _state,
+        events = _events,
+        note = ::note,
+    )
+
+    /** « Hey Meta, ouvre iSee » : session puis écoute, sans toucher le téléphone. */
+    private val voiceInvocations = GlassesVoiceInvocations(
+        scope = scope,
+        snapshot = { _state.value },
+        connect = ::connect,
+        listen = ::onAsk,
+        busy = { talkHost.busy },
+        onNote = ::note,
+    )
     private var session: DeviceSession? = null
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
@@ -165,6 +162,7 @@ class GlassesController(
         _state.update { current -> current.copy(sdkReady = true, devMode = Wearables.isDevMode) }
         watchRegistration()
         devices.start()
+        voiceInvocations.start()
     }
 
     /**
@@ -261,6 +259,7 @@ class GlassesController(
         }
         if (!linked) {
             _state.update { it.copy(phase = SessionPhase.IDLE) }
+            voiceInvocations.disarm()
             return note(GlassesMessages.noLinkedDevice())
         }
         Wearables.createSession(AutoDeviceSelector()).fold(
@@ -271,6 +270,7 @@ class GlassesController(
             onFailure = { error, _ ->
                 Log.w(TAG, "session refusée : ${error.description}")
                 _state.update { it.copy(phase = SessionPhase.IDLE) }
+                voiceInvocations.disarm()
                 reportSessionError(error, activity, ::note)
             },
         )
@@ -329,11 +329,12 @@ class GlassesController(
                 Log.i(TAG, "flux lunettes streaming=$streaming")
                 _state.update { it.copy(streaming = streaming) }
                 GlassesVideoLink.setStreaming(streaming)
+                voiceInvocations.onStreaming(streaming)
             },
             onMicActive = { active -> _state.update { it.copy(micActive = active) } },
             collectFrames = collectVideoFrames,
-            onFrame = ::onGlassesFrame,
-            onFrameLog = ::frameLog,
+            onFrame = frameVoice::onFrame,
+            onFrameLog = frameVoice::frameLog,
             recorder = recorder,
         )
         // Une caméra qui n'a pas démarré n'est pas retenue : elle bloquerait toute reprise.
@@ -346,16 +347,6 @@ class GlassesController(
             GlassesVideoLink.attachNotes(::note)
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
-    }
-
-    /** Frame collectée → analyse partagée (SAM/LLM) → voix ; le sort est en journal. */
-    private suspend fun onGlassesFrame(frame: JpegFrame) {
-        frameStep.onFrame(frame, ::frameLog)
-    }
-
-    /** Journal de la collecte : logcat, pas le bandeau (une ligne par frame noierait l'écran). */
-    private fun frameLog(line: String) {
-        Log.d(FRAME_LOG_TAG, line)
     }
 
     /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
@@ -387,23 +378,48 @@ class GlassesController(
     /** Action décidée par le buffer d'appuis (logique pure, testée en JVM). */
     private fun onGesture(action: CaptureAction) {
         when (action) {
-            CaptureAction.PHOTO, CaptureAction.ASK -> capture(action)
+            CaptureAction.PHOTO -> capture(action)
+            CaptureAction.ASK -> onAsk()
             CaptureAction.LIVE -> note(GlassesMessages.liveNotOnGlasses())
         }
     }
 
     /** Prend une photo côté lunettes et la pousse à l'app, prête pour la segmentation. */
     fun capture(action: CaptureAction = CaptureAction.PHOTO) {
-        val activeCamera = camera
-        if (activeCamera == null) {
+        if (camera == null) {
             note(GlassesMessages.noCamera())
             return
         }
         scope.launch {
-            val bitmap = activeCamera.capture() ?: return@launch
-            val file = writeJpegToCache(context, bitmap)
+            val file = snapPhoto() ?: return@launch
             _events.emit(GlassesEvent.PhotoTaken(file, action))
         }
+    }
+
+    /** Photo des lunettes écrite dans le cache, sans l'envoyer (`null` = ratée). */
+    private suspend fun snapPhoto(): File? {
+        val bitmap = camera?.capture() ?: return null
+        return writeJpegToCache(context, bitmap)
+    }
+
+    /** Appui long : question mains-libres, ou envoi si l'écoute est ouverte. */
+    private fun onAsk() {
+        // Micro des lunettes inutilisable : l'ancien comportement reste (photo → chat).
+        if (talkHost.press() == TalkPress.MIC_UNAVAILABLE) capture(CaptureAction.ASK)
+    }
+
+    /** « Hey Meta, ouvre iSee » (flux ou intent) : session puis écoute. */
+    fun onVoiceLaunch() = voiceInvocations.onLaunch()
+
+    /**
+     * Recette sans voix (debug seul, `--es glasses_talk "question"`) : injecte
+     * une question comme si le micro des lunettes l'avait entendue — le mock
+     * n'ayant pas de piste audio, c'est le seul chemin qui prouve l'aval.
+     */
+    fun debugTalkTranscript(text: String) {
+        if (!BuildConfig.DEBUG || text.isBlank()) return
+        Log.i(TAG, "recette : question injectée")
+        talkHost.inject(text)
     }
 
     fun disconnect() {
@@ -415,6 +431,8 @@ class GlassesController(
 
     private fun releaseCapabilities() {
         // Plus de flux, donc plus de micro à prêter à la dictée, ni d'image à l'accueil.
+        talkHost.cancel()
+        voiceInvocations.disarm()
         GlassesMicLink.detach()
         GlassesVideoLink.detachNotes()
         GlassesVideoLink.clear()
@@ -423,67 +441,42 @@ class GlassesController(
         camera?.stop()
         camera = null
         frameVoice.stop()
-        _state.update { it.copy(streaming = false, micActive = false, recordingName = null) }
+        _state.update { it.copy(streaming = false, micActive = false, recordingName = null, talkListening = false) }
     }
 
     /** Lunettes simulées : démo sans matériel, et plan B si l'appairage coince. */
-    fun startMockDevice() {
-        initialize()
-        if (!mock.start()) {
-            Log.w(TAG, "recette : mock indisponible")
-            return note(GlassesMessages.mockUnavailable())
-        }
-        Log.i(TAG, "recette : mock actif")
-        _state.update {
-            it.copy(mockActive = true, deviceName = it.deviceName ?: "Ray-Ban Meta (simulées)", registered = true)
-        }
-        note(GlassesMessages.mockReady())
+    fun startMockDevice() = mocks.start()
+
+    fun mockPress(type: CapturePressType = CapturePressType.SHORT_PRESS) = mocks.press(type)
+
+    /** Recette mains-libres : simule l'appui long (parler) sur le mock. */
+    fun mockHold() = mocks.press(CapturePressType.HOLD)
+
+    /** Recette mains-libres : simule « Hey Meta, ouvre iSee » sur le mock. */
+    fun mockVoiceLaunch() {
+        // Injection côté appareil quand le mock la supporte, sinon simulation
+        // côté app (même aval : session puis écoute).
+        if (!mocks.tryVoiceLaunch()) onVoiceLaunch()
     }
 
-    fun mockPress(type: CapturePressType = CapturePressType.SHORT_PRESS) {
-        if (!mock.press(type)) note(GlassesMessages.noMockPress())
-    }
-
-    fun stopMockDevice() {
-        mock.stop()
-        _state.update { it.copy(mockActive = false) }
-    }
+    fun stopMockDevice() = mocks.stop()
 
     /**
      * Raccourci de recette : lunettes simulées, puis connexion dès que l'enregistrement le
      * permet (extra adb [EXTRA_GLASSES_MOCK_CONNECT]). Inerte en release — le mock y est
      * indisponible (`mockUnavailable`) et rien ne se connecte tout seul.
      */
-    fun debugMockConnect() {
-        initialize()
-        startMockDevice()
-        scope.launch {
-            val deadline = clock() + MOCK_CONNECT_TIMEOUT_MS
-            while (clock() < deadline) {
-                val snapshot = _state.value
-                // Une session vit déjà (ou naît) : rien à faire, surtout pas un doublon.
-                if (snapshot.connected || snapshot.phase == SessionPhase.STARTING) {
-                    Log.i(TAG, "recette : session déjà là (${snapshot.phase}), rien à faire")
-                    return@launch
-                }
-                if (snapshot.canConnect) {
-                    Log.i(TAG, "recette : connexion")
-                    connect()
-                    return@launch
-                }
-                delay(250)
-            }
-            note(GlassesMessages.mockConnectTimeout())
-        }
-    }
+    fun debugMockConnect() = mocks.debugConnect()
 
     /** Libère session, capacités et coroutines (activité détruite). */
     fun close() {
         releaseCapabilities()
         session?.stop()
         dropSession()
-        mock.stop()
+        mocks.stop()
+        voiceInvocations.stop()
         frameVoice.release()
+        beeps.release()
         GlassesVoiceRoute.forget()
         scope.cancel()
     }

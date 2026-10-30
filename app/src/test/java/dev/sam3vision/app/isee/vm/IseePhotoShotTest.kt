@@ -166,6 +166,38 @@ class IseePhotoShotTest {
         assertNull(shots.imageBase64())
     }
 
+    @Test
+    fun `contexte externe lunettes — joint sans camera, sans capture`() = runTest {
+        val shots = shots(camera = { null })
+        val external = File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) }
+
+        shots.setExternalContext(external)
+
+        assertEquals("la photo des lunettes est jointe", encoded(external.path), shots.imageBase64())
+    }
+
+    @Test
+    fun `contexte externe puis appui long — la capture telephone gagne`() = runTest {
+        val camera = FakeCamera()
+        val shots = shots(camera = { camera })
+        shots.setExternalContext(File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) })
+
+        shots.captureForHold()
+
+        assertEquals("frame filmée jointe", encoded(camera.lastTarget), shots.imageBase64())
+        assertEquals("une capture", 1, camera.demands)
+    }
+
+    @Test
+    fun `contexte externe puis release — plus rien a joindre`() = runTest {
+        val shots = shots(camera = { null })
+        shots.setExternalContext(File(tempDir(), "lunettes.jpg").apply { writeBytes(byteArrayOf(9, 9)) })
+
+        shots.releaseContext()
+
+        assertNull("contexte annulé", shots.imageBase64())
+    }
+
     /** La photo travaille sur le dispatcheur virtuel : délais et timeouts contrôlés. */
     private fun TestScope.shots(
         camera: () -> IseeCameraActions?,

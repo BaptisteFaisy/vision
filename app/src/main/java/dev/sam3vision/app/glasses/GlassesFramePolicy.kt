@@ -59,9 +59,9 @@ internal data class CropRect(val x: Int, val y: Int, val width: Int, val height:
 /**
  * Recadrage centré au format 16:9 paysage.
  *
- * Les lunettes livrent du portrait 9:16 (`VideoQuality.MEDIUM` = 504×896,
+ * Les lunettes livrent du portrait 9:16 (`VideoQuality.HIGH` = 720×1280 en production,
  * imposé par le SDK Meta : `StreamConfiguration` n'expose ni dimensions ni
- * orientation) ; le banc envoie du 16:9 à l'API en coupant le haut et le bas.
+ * orientation) ; le 16:9 part à l'API en coupant le haut et le bas (720×405 en production).
  *
  * @return `null` quand l'image est déjà au 16:9 exact (rien à couper), quand
  *   ses dimensions sont inexploitables, ou quand le côté coupé tomberait à zéro

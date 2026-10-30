@@ -24,7 +24,6 @@ import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.sharedPictosOf
-import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.BenchScreen
@@ -34,7 +33,6 @@ import dev.sam3vision.app.isee.OnboardingGesturesScreen
 import dev.sam3vision.app.voicenav.VoiceNavRoute
 import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.app.tap.TapCaptureScreen
-import dev.sam3vision.core.glasses.CaptureAction
 
 /** Extra adb `--es route <nom>` : ouvre l'écran nommé (recettes, comme le banc). */
 const val EXTRA_ROUTE = "route"
@@ -197,8 +195,8 @@ fun AppNav(
     BackHandler(enabled = stack.size > 1) { pop() }
 
     Box(Modifier.fillMaxSize()) {
-        // Les lunettes poussent leurs photos directement dans la navigation.
-        GlassesBridge(glasses = glasses, viewModel = viewModel, push = push)
+        // Les lunettes nourrissent iSee : photos posées sans changer de page, questions parlées comme des dictées.
+        GlassesBridge(glasses = glasses, isee = isee, push = push)
         RouteHost(
             route = route,
             state = state,
@@ -299,19 +297,6 @@ internal fun routeFromName(name: String): Route = when {
     name == "voicenav" -> Route.VoiceNav
     name.startsWith("tap:") -> Route.Tap(name.substringAfter(':').toBoolean())
     else -> Route.Isee
-}
-
-/** Une photo prise sur les lunettes s'analyse comme une photo prise à la main. */
-@Composable
-private fun GlassesBridge(glasses: GlassesController, viewModel: AppViewModel, push: (Route) -> Unit) {
-    LaunchedEffect(glasses) {
-        glasses.events.collect { event ->
-            if (event is GlassesEvent.PhotoTaken) {
-                viewModel.onPhoto(event.file)
-                push(if (event.action == CaptureAction.ASK) Route.Chat else Route.Analysis)
-            }
-        }
-    }
 }
 
 /** Accueil classique : photo → analyse, ouverture des réglages, mode direct. */
