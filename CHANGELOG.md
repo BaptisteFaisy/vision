@@ -90,6 +90,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   3/3) ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes).
 
 
+## 2026-10-30 — iSee : marches comptées caméra allumée, « Plus que N marches. » dit à voix haute (branche `fix/isee-compte-marches`)
+
+- **Demande** : caméra allumée, les marches n'étaient pas comptées ; iSee doit
+  dire oralement à l'utilisateur combien de marches il reste à monter.
+- Cause : le guetteur escaliers (`observeStairs`) forçait `lineCount = 0`
+  (« la voie labels ne compte pas ») et le détecteur Canny (`StairDetector`)
+  n'était branché nulle part — le compte à rebours du `StairWatcher`
+  (« Plus que N marches. », « Dernière marche. ») ne pouvait jamais parler.
+- Branché : l'analyseur caméra offre sa luminance à `StairCannyCount` (compte
+  Canny frais, 0 = non compté), relu par `observeStairs` quand SAM nomme
+  l'escalier ; l'annonce reste conditionnée aux libellés (le Canny seul ne
+  parle jamais), le compte s'oublie à chaque nouvelle séance et à la coupure.
+- Preuves : `:app` 1206/1206 (dont 7 nouveaux), `:core` 2135/2140 (5 échecs
+  préexistants `PrivateFileSettingsStoreTest`, POSIX sous Windows),
+  `check-kotlin-limits` OK. Non rejoué : comptage live sur téléphone (seuils
+  Canny à recalibrer sur captures réelles, bloqueur connu inchangé).
+- Fichiers : `StairCannyCount.kt` (+tests), `ProbeWiringStairsCountTest`,
+  `ProbeWiring.kt`, `IseeCameraPane.kt`, `IseeVisionCard.kt`,
+  `Nv21JpegEncoder.kt`, `StairDetector.kt` (KDoc), `GUIDAGE-TOUT-DROIT.md`.
 ## 2026-10-30 — consigne de guidage toutes les 500 ms sur la vidéo (branche `feat/isee-instruction-500ms`)
 
 - **Demande** : une instruction à regarder — dois-je aller à droite ou à
