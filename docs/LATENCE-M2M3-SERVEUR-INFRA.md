@@ -6,7 +6,7 @@ fenêtre 404/500 pendant la bascule). Spécification seule : **aucun code,
 aucun deploy, aucun ordre GPU** dans ce document — l'exécution est pour le
 coordinateur, hors recette téléphone annoncée.
 
-Références vérifiées sur `origin/master` `c3cc4fe2` (2026-10-30). Fichier
+Références vérifiées sur `origin/master` `482c5e18` (2026-10-30). Fichier
 déployé : `server/backend/live_fast/live_app_fast.py` via
 `server/scripts/deploy-live-fast.sh` — **jamais** `backend/live_app.py`
 (version lente, 205-241 ms) ni `backend/live_app_fast.py` (ancien chemin).
