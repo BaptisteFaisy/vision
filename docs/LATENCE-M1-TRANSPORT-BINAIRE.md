@@ -6,7 +6,7 @@ M1 du chantier latence : la frame JPEG (~20,7 Ko) voyage aujourd'hui en base64
 côtés. Spécification seule : aucun code ici, déploiement groupé en M2/M3
 (`docs/LATENCE-M2M3-SERVEUR-INFRA.md`).
 
-Références vérifiées sur `origin/master` `c3cc4fe2` (2026-10-30). Les numéros de
+Références vérifiées sur `origin/master` `482c5e18` (2026-10-30). Les numéros de
 ligne de l'étude d'origine sont suspects (SHAs mixtes) : ceux ci-dessous ont été
 re-localisés sur ce HEAD.
 
