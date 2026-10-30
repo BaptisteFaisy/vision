@@ -3,6 +3,8 @@ package dev.sam3vision.app.voicenav
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.model.RouteTrip
 import dev.sam3vision.core.nav.GeocodedPlace
+import dev.sam3vision.core.nav.NavRoute
+import dev.sam3vision.core.nav.toNavRoute
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.net.HttpRouteClient
 import dev.sam3vision.core.net.ROUTE_TIMEOUT_SECONDS
@@ -24,6 +26,10 @@ import kotlinx.coroutines.withTimeout
  *   indisponible (motif) » (l'écran montre l'adresse + le motif, et
  *   « Démarrer » bascule sur Google Maps).
  *
+ * - aperçu carte ([onPreview]) : `null` au lancement, puis l'itinéraire
+ *   guidable ([RouteTrip.toNavRoute], `null` si inconvertible) — zéro appel
+ *   réseau de plus, le résumé et l'aperçu partagent le même `/route` ;
+ *
  * Ne lève jamais : tout collaborateur qui jetterait devient un échec.
  */
 class ValhallaRouteLoader(
@@ -32,9 +38,13 @@ class ValhallaRouteLoader(
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val baseUrl: () -> String,
     private val routeTimeoutMs: Long = ROUTE_TIMEOUT_SECONDS * 1000,
+    /** Reçoit l'itinéraire guidable (`null` en chargement ou en échec) pour la carte d'aperçu. */
+    private val onPreview: (NavRoute?) -> Unit = {},
 ) {
 
     suspend operator fun invoke(destination: String): Result<RouteSummary> {
+        // Nouvelle demande : l'aperçu précédent est périmé (jamais d'ancienne carte).
+        runCatching { onPreview(null) }
         // Appels `suspend` (`runCatching` ne l'est pas) : try/catch directs.
         val place = try {
             geocode(destination)
@@ -52,6 +62,7 @@ class ValhallaRouteLoader(
             return Result.failure(routeFailure(t))
         }
         val trip = loadRoute(client, origin, RoutePoint(place.latitude, place.longitude))
+            .onSuccess { runCatching { onPreview(it.toNavRoute(destination).getOrNull()) } }
             .getOrElse { return Result.failure(routeFailure(it)) }
         return Result.success(
             RouteSummary(

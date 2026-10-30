@@ -5,9 +5,9 @@ Référence (français) de la carte affichée pendant le guidage vocal in-app
 reste `docs/NAVIGATION.md`, le fonctionnel vocal `docs/NAVIGATION-VOCALE.md`
 — ce document n'y touche pas, il les cite.
 
-**Périmètre** : fond de carte MapLibre + tracé pendant
-`VoiceNavUiState.Guiding`, affiché sur l'accueil iSee sous la caméra
-(`IseeGuidanceBlock`, qui remplace la boule pendant le guidage).
+**Périmètre** : fond de carte MapLibre + tracé quand un objectif de
+destination existe (`Confirming` : aperçu du tracé, `Guiding` : suivi),
+affiché sur l'accueil iSee sous la caméra (qui remplace la boule).
 Hors périmètre : géocodage (§7.1 de `NAVIGATION-VOCALE.md`), itinéraire
 Valhalla, carte plein écran, mode avion avec guidage neuf (impossible :
 ni Valhalla ni BAN ne répondent — § Limites de `NAVIGATION.md`).
@@ -108,13 +108,15 @@ réessaie les tuiles. Pas de boucle de rechargement en tâche de fond.
 ## 4 bis. Pas de carte sans destination (retiré le 29/10/2026)
 
 Un mode navigation sans destination a existé (bande permanente en bas de
-l'écran iSee) : retiré sur ordre user — la carte n'apparaît que pendant le
-guidage, avec un tracé. Voir `NAVIGATION-VOCALE.md` §1 bis.
+l'écran iSee) : retiré sur ordre user — la carte n'apparaît que quand un
+objectif de destination existe (confirmation ou guidage), avec un tracé.
+Voir `NAVIGATION-VOCALE.md` §1 bis.
 
 ## 5. Notes batterie et réseau
 
 - **Surface bornée** : la carte fait 150 dp de haut sur l'accueil
-  (`IseeGuidanceBlock`) — quelques tuiles 256 px par zone, pas une carte
+  (confirmation comme guidage)
+  — quelques tuiles 256 px par zone, pas une carte
   plein écran. Zoom borné (natif 20) : chaque niveau × 4 tuiles.
 - **Pas de pré-chargement** : tuiles de la zone visible uniquement. Le
   polling à 1 Hz (`ROUTE_MAP_POLL_MS`) ne relit que l'itinéraire et la
@@ -159,9 +161,9 @@ Préalables (règles ISEE-TEST-MASTER-SEUL + téléphone) : build du HEAD de
 annonce prise/libération dans `BOITE-USER.md`. Destination IdF
 (guidage Valhalla piéton uniquement).
 
-1. Dicter « je veux aller à la gare de Lyon » → confirmer « Démarrer »
-   → retour à l'accueil : la carte OSM sous la caméra (rues + tracé
-   bleu par-dessus) **et** l'instruction en cours. **Capture 1** :
+1. Dicter « je veux aller à la gare de Lyon » → bloc Destination sur
+   l'accueil (carte d'aperçu), « Démarrer » → carte OSM sous la caméra
+   (rues + tracé bleu par-dessus) **et** l'instruction en cours. **Capture 1** :
    guidage + tuiles.
 2. Vérifier l'attribution « © OpenStreetMap contributors » visible en
    bas à gauche de la carte. **Capture 2** : zoom sur l'attribution.
