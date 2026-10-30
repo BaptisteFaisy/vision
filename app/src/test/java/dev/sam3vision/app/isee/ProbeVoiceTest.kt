@@ -80,23 +80,18 @@ class ProbeVoiceTest {
     }
 
     @Test
-    fun `mur au contact - stop et stop recent deux secondes`() {
+    fun `mur au contact - stop`() {
         val voice = guided()
         val phrase = voice.phrase(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f, 0.5f)), SteeringCap.Straight)
 
         assertTrue(GuidanceWord.isStopPhrase(phrase!!))
-        assertTrue(voice.stopRecent(1_999L))
-        assertFalse(voice.stopRecent(2_000L))
-        voice.reset()
-        assertFalse(voice.stopRecent(1_000L))
     }
 
     @Test
-    fun `mot doux - stop non recent`() {
+    fun `mot doux - phrase parlee`() {
         val voice = guided()
 
         assertEquals("Tout droit.", voice.phrase(0L, libre, SteeringCap.Straight))
-        assertFalse(voice.stopRecent(1_000L))
     }
 
     @Test

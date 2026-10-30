@@ -1,0 +1,51 @@
+package dev.sam3vision.app.isee
+
+import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.speech.SystemTtsEngine
+import dev.sam3vision.core.settings.Settings
+
+/**
+ * Voix de sécurité d'iSee : les alertes vitales (voiture en mouvement,
+ * rebord détecté) parlent ici, pas par la voix ElevenLabs.
+ *
+ * Trois garanties (ordre user du 30/10/2026) :
+ * - immédiat : le TTS système parle sans synthèse réseau ni attente de clé
+ *   — là où une synthèse ElevenLabs met des secondes, l'alerte part aussitôt ;
+ * - coupe tout : la lecture ElevenLabs en cours (chat, guidage doux) est
+ *   arrêtée avant de parler ;
+ * - survit à la dictée : moteur dédié, parlé sans condition de silence — ni
+ *   la parole du user (tenue, transcription), ni `silenceForGlasses` (qui
+ *   coupe le lecteur ElevenLabs et la voix route, pas ce moteur) ne taisent
+ *   une alerte.
+ *
+ * Deux alertes de sécurité ne se coupent jamais : la seconde attend la fin
+ * de la première (mise en file) au lieu de la tronquer. Hors-ligne, parle
+ * quand même (voix système embarquée, aucune clé).
+ *
+ * L'état de parole (`speakingEntryId`) n'est pas touché : le TTS système ne
+ * rend pas de fin de lecture, et un fanion posé sans fin bloquerait la
+ * dictée — l'alerte est orale seule.
+ *
+ * Pur Android (aucune coroutine, moteur injecté) : testé en JVM derrière un
+ * pilote faux. [stopCurrent] coupe la lecture ElevenLabs (`player::stop` en
+ * prod, faux en test).
+ */
+class SafetyVoice(
+    player: SpeechPlayer,
+    private val system: SystemTtsEngine,
+    private val settings: () -> Settings,
+    private val stopCurrent: () -> Unit = player::stop,
+) {
+
+    /** Parle [phrase] aussitôt : coupe, puis TTS système (file si déjà parlé). */
+    fun speak(phrase: String) {
+        if (phrase.isBlank()) return
+        stopCurrent()
+        val current = settings()
+        val flush = !system.speaking
+        system.speak(phrase, flush, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed)
+    }
+
+    /** Libération finale (moteur TTS système). */
+    fun shutdown() = system.close()
+}

@@ -29,6 +29,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   499 lignes). 5 échecs `:core` pré-existants et hors périmètre
   (`PrivateFileSettingsStoreTest`, permissions POSIX sous Windows +
   1 assertion — identiques sur master vierge sans ce changement).
+## 2026-10-30 — iSee : stop sécurité immédiat voiture en mouvement + rebord (branche `fix/isee-stop-voiture-rebord-immediat`)
+
+- **Demande** : quand une voiture en mouvement ou un rebord est détecté, le
+  dire aussitôt à l'oral (« Stop, … » en anglais), même si iSee parle déjà,
+  même si le user parle.
+- Fait : phrases sécurité FR/EN (`VehicleStateText.safetyPhrase`,
+  `CurbText.safetyStepPhrase`, portées par `safetyPhrase` des cues) ; voix
+  de sécurité dédiée TTS système hors-ligne (`SafetyVoice` : coupe la
+  lecture ElevenLabs, parle sans condition de silence, survit à la dictée,
+  deux alertes en file) ; câblée sur les guetteurs mouvement + bordure
+  (`ProbeWiring`, `IseeViewModel`) ; priorité stop > marche supprimée
+  (`ProbeVoice.stopRecent` viré) ; contrat `docs/VOIX-DANGER.md` §16.
+  Gardé : confirmation 2 frames, cooldowns, coupé en Traversée sauf
+  imminent sous le pied, bateau et arrêt doux.
+- Preuves : `:app:testDebugUnitTest` vert (1 225 tests, 0 échec, dont
+  `SafetyVoiceTest` 4/4) ; `:core:testDebugUnitTest` 2 154 tests, 5 échecs
+  préexistants `PrivateFileSettingsStoreTest` (permissions POSIX sous
+  Windows, identiques sur base pristine) ; `check-kotlin-limits.py` vert.
 
 
 ## 2026-10-30 — traversée : se décaler à l'opposé des gens, comme en normal (branche `traverse-nudge-people`)

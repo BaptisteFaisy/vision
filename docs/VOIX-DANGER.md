@@ -440,3 +440,45 @@ Corpus B — panneaux routiers / pubs hautes (non mesuré) :
 | 8 | | | | | |
 | 9 | | | | | |
 | 10 | | | | | |
+
+## 16. Alertes sécurité immédiates : voiture en mouvement + rebord (ordre user du 30/10)
+
+Le user tranche : quand une voiture en mouvement est détectée, ou qu'un
+rebord est détecté, iSee le dit **aussitôt, à l'oral** — même si une autre
+info est en train d'être dite, même si le user parle. Dérogation au § 11
+(douceur) pour ces deux seuls cas : le reste (arrêt, bateau, mobilier,
+escaliers, cycles) parle toujours en douceur.
+
+- **phrases** (langue de la voix, anglais par défaut) :
+  - mouvement : `Stop, car moving.` / `Stop, voiture en mouvement.` (nom du
+    véhicule : bus, camion, moto — `VehicleStateText.safetyPhrase`) ;
+  - rebord : `Stop, step up.` / `Stop, step down.` (`Stop, rebord montant.`
+    / `Stop, rebord descendant.` — `CurbText.safetyStepPhrase`), pré-alerte
+    comme imminent ;
+- **canal** : voix de sécurité dédiée (`SafetyVoice`, TTS système
+  hors-ligne) — pas de synthèse réseau, pas de clé exigée, parle sans
+  condition de silence ; coupe la lecture ElevenLabs en cours avant de
+  parler, et deux alertes ne se coupent jamais (mise en file) ;
+- **survit à la dictée** : moteur séparé du lecteur ElevenLabs et de la
+  voix route — la tenue/transcription du user et `silenceForGlasses` ne
+  taisent pas une alerte ; l'état de parole n'est pas touché (le TTS
+  système ne rend pas de fin, un fanion sans fin bloquerait la dictée) ;
+- **gardes gardées** : confirmation 2 frames (un positif isolé ne crie
+  jamais « Stop »), cooldowns des guetteurs (4 s mouvement, 10 s trottoir,
+  ré-armement imminent à 1,2 m) ; coupé en mode Traversée sauf l'imminent
+  sous le pied (sa voix rouge/vert est propriétaire du son — un « Stop »
+  à 3 m arrêterait le user au milieu) ; le bateau (« Bateau, pas de
+  marche. ») et la voiture à l'arrêt restent doux ;
+- **supprimé** : la priorité stop > marche imminente (`ProbeVoice.stopRecent`,
+  fenêtre 2 s) — une alerte de sécurité ne se tait pour rien.
+
+Verrouillé par `VehicleStateTest` (+2 : stop mouvement EN/FR, arrêt muet),
+`CurbWatcherTest` (+2 : imminent montant/descendant, pré-alerte parlée,
+bateau muet), `SafetyVoiceTest` (4 : coupe + flush, file entre alertes,
+blanc ignoré, locale), `ProbeWiringWatchersTest` (imminent passe toujours)
+et `ProbeVoiceTest` (stopRecent supprimé, phrases gardées).
+
+Recette téléphone : voiture qui roule cadrée → « Stop, car moving. »
+coupe le chat en lecture ; rebord sous le pied en dictée → « Stop, step
+up. » parlé quand même — **non mesuré**, exige un APK de cet arbre sur
+appareil réel.
