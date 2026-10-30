@@ -1,12 +1,10 @@
-import { LIVE_MS, shareIdOf, stateOf, movementBetween, anchorAfter, narrationOf, neverPublished } from './session.mjs';
+import { NO_STREAM_TEXT, shareIdOf, stateOf, neverPublished } from './session.mjs';
 import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
-import { spokenLine } from './spoken-line.mjs';
 import './settings.mjs';
 
 const shareId = shareIdOf(location.href);
-const showWords = spokenLine(document.getElementById('spoken-line'));
 const viewEl = document.getElementById('view');
 const frameEl = document.getElementById('view-frame');
 const noteEl = document.getElementById('view-note');
@@ -18,7 +16,7 @@ const tripLiquid = document.getElementById('trip-liquid');
 const tripBall = document.getElementById('trip-ball');
 const pictoEl = document.getElementById('pictos');
 const pictoStrip = document.getElementById('picto-strip');
-let live = null, anchor = null, movement = '', movementAt = 0, polling = false, frameSrc = '', pictoSig = '';
+let live = null, polling = false, frameSrc = '', pictoSig = '';
 // Direct de la caméra : dernière frame reçue par WebSocket et son instant.
 let streamSrc = '', streamAt = 0;
 // La salle a dit que la caméra est éteinte : le direct comme la photo lente
@@ -37,14 +35,6 @@ function render() {
   const badge = document.getElementById('live-badge');
   badge.textContent = label;
   badge.className = 'pill ' + color;
-  const motion = Date.now() - movementAt < LIVE_MS ? movement : '';
-  showWords(narrationOf(live, status, motion, !!shareId, known), status === 'live' && live?.scene?.speaking);
-  const spoken = document.querySelector('.spoken');
-  spoken.hidden = status === 'offline' || !shareId;
-  spoken.parentElement.classList.toggle('with-text', !spoken.hidden);
-  const fromUser = status === 'live' && live?.scene?.fromUser;
-  document.getElementById('speaker').textContent = fromUser ? 'YOU' : 'ISEE';
-  spoken.dataset.speaker = fromUser ? 'you' : 'isee';
   renderFrame(status);
   renderPictos(status);
   renderTrip(status);
@@ -92,13 +82,14 @@ function renderFrame(status) {
     if (!direct) { streamSrc = ''; }
     frameEl.hidden = true;
     viewEl.classList.add('empty');
-    // Pas de texte d'attente quand le lien est connu : la section se replie et
-    // l'image la rouvre dès que la caméra tourne. Seul un lien absent se dit.
-    if (shareId) {
-      noteEl.hidden = true;
-    } else {
+    // Pas de texte d'attente : sans image, la section se replie. Seuls un lien
+    // absent et un lien mort s'écrivent dans la zone caméra (plus de phrase).
+    if (!shareId || status === 'unknown') {
+      noteEl.textContent = !shareId ? 'Ouvre le lien de suivi partagé par ton proche.' : NO_STREAM_TEXT;
       noteEl.hidden = false;
-      noteEl.textContent = 'Ouvre le lien de suivi partagé par ton proche.';
+      viewEl.classList.remove('empty');
+    } else {
+      noteEl.hidden = true;
     }
     return;
   }
@@ -112,7 +103,7 @@ function renderFrame(status) {
 
 /**
  * Une frame du direct : on ne repeint que l'image. Un `render()` complet à chaque
- * image (8 par seconde) reconstruirait le bandeau et la phrase pour rien.
+ * image (8 par seconde) reconstruirait le bandeau, le trajet et le badge pour rien.
  */
 function paintStream() {
   if (!streamSrc) { render(); return; }
@@ -141,7 +132,7 @@ function renderTrip(status) {
 function receive(snapshot) {
   // Identifiant jamais publié (ou flux purgé) : le dire, au lieu d'attendre à vie.
   if (neverPublished(snapshot)) {
-    known = false; live = null; anchor = null; movement = '';
+    known = false; live = null;
     return;
   }
   // La position peut manquer (téléphone sans GPS) : la caméra, la phrase et les
@@ -149,14 +140,9 @@ function receive(snapshot) {
   if (snapshot.ok && Number.isFinite(snapshot.serverAt)) {
     if (live && snapshot.serverAt < live.serverAt) return;
     known = true;
-    if (stateOf(live) !== 'live') anchor = null;
-    const fix = snapshot.fix || null;
-    const nextMovement = movementBetween(anchor, fix);
-    if (nextMovement) { movement = nextMovement; movementAt = Date.now(); }
-    anchor = anchorAfter(anchor, nextMovement, fix);
     live = snapshot;
   } else if (snapshot.ok && snapshot.live === false) {
-    live = null; anchor = null; movement = '';
+    live = null;
   }
 }
 

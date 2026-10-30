@@ -98,6 +98,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `SharePosition.kt`, `contrat.js` (+test), `worker.js` (doc),
   `durable.js` (+test), `session.mjs` (+test, `anchorAfter`), `live.mjs`,
   `index.html`, 2 README, `TESTING.md` (compteur `share` recalé 24 → 31).
+## 2026-10-30 — caregiver : caméra en bas façon Portrait, phrase retirée (branche `fix/caregiver-camera-portrait-bas`)
+
+- **Demande** : sur la page caregiver, retirer le texte entre la boule iSee et
+  la fenêtre caméra, retirer le contour noir de la fenêtre, et afficher la
+  caméra comme côté accompagné (pleine largeur, fondue dans le blanc) mais en
+  bas de l'écran plutôt qu'en haut.
+- Page (`suivi-parent/`, embarquée par `caregiverAssets`) : plus de bloc
+  `.spoken` (la narration `session.mjs` et `spoken-line.mjs` restent testées,
+  sans remonter à l'écran) ; `#view` en bas, pleine largeur jusqu'au bord,
+  sans cadre ni contour, fondue dans le blanc vers le haut (miroir du fondu
+  `pictureAlpha` Android) ; objets et trajet entre la boule et la caméra. Le
+  message de lien mort (`NO_STREAM_TEXT`) a déménagé dans la note de la zone
+  caméra, seul texte restant.
+- Preuves : `node --test` suivi-parent 25/25 (session, relay, live-view,
+  live-stream), `node --check live.mjs` OK. Recette visuelle sur appareil :
+  non rejouée, sans téléphone piloté d'ici.
+- Fichiers : `suivi-parent/index.html`, `suivi-parent/styles.css`,
+  `suivi-parent/live.mjs`, `suivi-parent/README.md`.
 
 ## 2026-10-29 — intégration iSee dehors P1–P6 (branche `integration-isee-outdoor-p1p6`)
 
