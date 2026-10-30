@@ -34,9 +34,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 
 /**
  * Câblage du **mode Traversée** de la sonde : prompts feu+voitures+personnes+
@@ -239,11 +241,20 @@ internal fun observeCrossingAuto(
 }
 
 /**
+ * Vue traversée par frame publiée : l'état sonde émet aussi entre deux frames
+ * (poste « pixel » de la chronologie, [LiveProbe.noteDrawn]) — sans ce filtre,
+ * le compteur de perte compterait deux fois chaque frame et couperait le mode
+ * deux fois trop tôt. Une émission par valeur de [LiveProbeState.frames].
+ */
+internal fun Flow<LiveProbeState>.crossingSightPerFrame(): Flow<Pair<Boolean, Boolean>> =
+    distinctUntilChangedBy { it.frames }.map { it.crossingActive to it.crossingVisible }
+
+/**
  * Retour **automatique** au mode normal : le passage perdu plusieurs frames de
  * suite ([CrossingLossGate]) coupe le mode armé par la vision et le dit
  * (« Mode traversée coupé. »). [visionArmed] faux (mode manuel ou GPS) = le
  * mode reste, seul son propriétaire le coupe. [states] porte (actif, vu) par
- * frame publiée.
+ * frame publiée (voir [crossingSightPerFrame]).
  */
 internal fun observeCrossingLoss(
     states: Flow<Pair<Boolean, Boolean>>,
