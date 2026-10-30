@@ -9,6 +9,22 @@ name: CI
 # `ci-native.yml` (même timeout). Motif : 4 jobs × N PRs saturaient les
 # 19 runners — file jusqu'à 10 min, budget wall-clock cassé alors que chaque
 # job tenait ses 5 min (mesuré le 28/10).
+# Marge 5 min (2026-10-30) : `maxParallelForks = 2` (build.gradle.kts racine),
+# `--max-workers=4` sur les appels CI (le plafond 2 de gradle.properties reste
+# le défaut des builds partagés), `setup-gradle` après le périmètre (sauté sans
+# code), roues pip en cache, upload scoping par module. `--offline` refusé :
+# une PR ajoutant une dépendance verrait son build échouer au lieu de
+# télécharger l'artefact absent du cache.
+# Découpe v10 (2026-10-30) : le job `ci` unique est coupé en `ci-core`
+# (gardes + backend + tests `:core`) et `ci-app` (tests `:app`), sous un
+# agrégateur `ci` vert ssi les deux moitiés sont vertes — le check requis `ci`
+# ne change pas (ni ruleset, ni Mergify, ni `green()` du balayeur). Motif : 4
+# runs tués par le timeout à ~320 s en 48 h (Tests JVM à 277-280 s contre
+# ~125 s en médiane, contention des runners partagés — cache Gradle restauré,
+# zéro téléchargement) ; le parallélisme seul n'a pas sauvé le run du 30/10 au
+# soir. Mesuré sur 48 h : file quasi nulle hors rafales du balayeur — +1 job
+# par push coûte ~3 créneaux sur 21 au pire pic, contre un cycle complet perdu
+# par kill. Verdict inchangé (mêmes gardes, mêmes tests).
 on:
   pull_request:
   push:
@@ -40,9 +56,9 @@ env:
   GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
 jobs:
-  # ── 1. le check exigé par la file : les tests JVM ────────────────────────────
-  ci:
-    name: ci
+  # ── 1. moitié `:core` : gardes + backend + tests JVM ────────────────────────
+  ci-core:
+    name: ci-core
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
@@ -50,102 +66,28 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Cette PR touche-t-elle du code ?
+        id: perimetre
+        uses: ./.github/actions/perimetre
+        with:
+          github-token: ${{ github.token }}
+          pr-number: ${{ github.event.pull_request.number }}
+          push-before: ${{ github.event.before }}
+          push-sha: ${{ github.sha }}
+          pr-head-ref: ${{ github.event.pull_request.head.ref }}
+
       # Cache Gradle : la VM est neuve à chaque job, sans lui 3-4 min à froid.
+      # Après le périmètre : sans code, ni lecture ni écriture du cache.
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.perimetre.outputs.code == '1'
         with:
           cache-read-only: false
 
-      - name: Cette PR touche-t-elle du code ?
-        id: perimetre
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PUSH_BEFORE: ${{ github.event.before }}
-          PUSH_SHA: ${{ github.sha }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          # Une PR de docs/config n'a pas besoin de Gradle : le verdict tombe en
-          # quelques secondes. La liste des fichiers vient de l'API (le checkout
-          # est superficiel, la base n'y est pas).
-          code=1
-          fichiers=""
-          lot=0
-          # PR de lot de la file de merge : le `push` sur la même tête a déjà
-          # fait tourner les tests (même commit, même arbre). Ce passage-ci
-          # existe seulement parce que la file ouvre une PR sur sa branche ;
-          # on le rend vert en quelques secondes au lieu de rejouer Gradle —
-          # sinon chaque lot chargeait deux fois 21 runners pour un verdict.
-          case "${PR_HEAD_REF:-}" in
-            mergify/merge-queue/*)
-              echo "PR de lot de la file de merge : tests déjà exécutés par le push de la branche."
-              lot=1
-              ;;
-          esac
-          if [ -n "$PR_NUMBER" ]; then
-            fichiers="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
-              | python3 -c 'import json,sys;print("\n".join(f["filename"] for f in json.load(sys.stdin)))' 2>/dev/null || true)"
-          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
-            fichiers="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/compare/$PUSH_BEFORE...$PUSH_SHA" \
-              | python3 -c 'import json,sys;print("\n".join(f["filename"] for f in json.load(sys.stdin).get("files") or []))' 2>/dev/null || true)"
-          fi
-          # Périmètre « code » : chaque module est nommé, et TOUT ce qui vit
-          # sous un module compte (manifest, res/, schémas Room, règles
-          # ProGuard) — pas seulement les .kt. Avant, un manifest ou un schéma
-          # Room modifié passait pour « sans code » : Gradle ne tournait pas,
-          # donc vert par absence de test. La doc (.md/.txt) reste hors
-          # périmètre, où qu'elle soit. `tools/` n'y est pas : aucun test JVM
-          # ne lit ces scripts (gardes CI + bancs manuels), une PR 100 %
-          # Python n'a pas besoin de Gradle — les gardes tournent toujours.
-          # `server/` a son propre verdict (`backend`) : tests Python, pas Gradle.
-          backend=1
-          if [ -n "$fichiers" ]; then
-            if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' \
-              | grep -qE '^(app|core)/|^gradle/|^gradle\.properties$|^settings\.gradle\.kts$|^build\.gradle\.kts$'; then
-              code=1; echo "Code touché : Gradle complet."
-            else
-              code=0; echo "Sans code (${fichiers//$'\n'/, }) : étapes Gradle sautées."
-            fi
-            if printf '%s\n' "$fichiers" | grep -vE '\.(md|txt)$' | grep -qE '^server/'; then
-              backend=1; echo "Backend touché : tests Python."
-            else
-              backend=0; echo "Backend intact : tests Python sautés."
-            fi
-          fi
-          # Dernier mot pour une PR de lot : quoi qu'ait décidé la liste de
-          # fichiers ci-dessus, ce passage ne rejoue pas les tests.
-          if [ "$lot" = "1" ]; then code=0; backend=0; fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "backend=$backend" >> "$GITHUB_OUTPUT"
-
-      - name: Chaîne d'outils
-        run: |
-          test -n "$JAVA_HOME" || { echo "::error::JAVA_HOME absent de l'image"; exit 1; }
-          test -n "$ANDROID_HOME" || { echo "::error::ANDROID_HOME absent — installer le SDK Android"; exit 1; }
-          "$JAVA_HOME/bin/java" -version
-          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
-
-      - name: Aucun secret ni fichier local dans le dépôt
-        run: |
-          # Régression déjà vue sur ce projet : des clés API en clair dans un
-          # fichier de config. Ici on refuse tout ajout de ce genre.
-          if git ls-files --error-unmatch local.properties >/dev/null 2>&1; then
-            echo "::error::local.properties ne doit jamais être versionné (clés API)"; exit 1
-          fi
-          if git grep -nEI 'sk-[A-Za-z0-9_-]{24,}|sk_[a-f0-9]{32}|ghp_[A-Za-z0-9]{36}' -- . ':!.github' ':!docs' ':!*.md'; then
-            echo "::error::clé API en clair détectée ci-dessus"; exit 1
-          fi
-          echo "OK — aucun secret versionné"
-
-      - name: Anti-régression — pas de java.home codé en dur
-        run: |
-          # Déjà vu : org.gradle.java.home en dur dans gradle.properties casse
-          # le build. La chaîne d'outils vient de l'environnement, jamais du dépôt.
-          if grep -E '^[[:space:]]*org\.gradle\.java\.home' gradle.properties; then
-            echo "::error::org.gradle.java.home ne doit pas être fixé dans gradle.properties"; exit 1
-          fi
-          echo "OK — java.home non codé en dur"
+      # Chaîne d'outils + secrets + java.home + tailles Kotlin (action
+      # composite partagée avec `ci-app` : un dépassement échoue vite des
+      # deux côtés).
+      - name: Gardes rapides
+        uses: ./.github/actions/gardes-rapides
 
       # Les clés des APK distribués. Sans secret, l'APK sort sans clé (saisie
       # dans Réglages) : c'est le comportement par défaut d'un dépôt public.
@@ -161,11 +103,6 @@ jobs:
           tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
           asr-api-key: ${{ secrets.ASR_API_KEY }}
           llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
-
-      - name: Garde de taille Kotlin (< 500 lignes/fichier, < 50 lignes/fonction)
-        run: |
-          python3 tools/check-kotlin-limits.py
-          python3 -m unittest tools/test_check_kotlin_limits.py
 
       # Le design Portrait est obligatoire (docs/ISEE-DESIGN-PORTRAIT.md) :
       # l'ancien design reste en quarantaine, le pane assemble la scène.
@@ -183,15 +120,14 @@ jobs:
 
       # Porte anti-dérive de la navigation vocale : les phrases, le catalogue
       # « en place » et les chiffres de docs/NAVIGATION-VOCALE.md doivent être
-      # ceux du code. Quelques secondes, aucune compilation — même motif que
-      # la porte du budget ci-dessus, dans le même job (pas de job neuf).
+      # ceux du code. Quelques secondes, aucune compilation.
       - name: Porte anti-dérive navigation vocale (doc ↔ code)
         run: |
           python3 tools/check-voice-nav-doc.py
           python3 -m unittest tools/test_check_voice_nav_doc.py
 
-      # La garde clés embarquées (`ci-native.yml`, jobs apk/apk-release) a ses
-      # tests ici : quelques secondes, aucune compilation, aucun réseau.
+      # La garde clés embarquées (`ci-native.yml`, job `apk`) a ses tests ici :
+      # quelques secondes, aucune compilation, aucun réseau.
       - name: Tests de la garde clés embarquées
         run: python3 -m unittest tools/test_check_apk_keys.py
 
@@ -222,7 +158,17 @@ jobs:
       # self-hosted (Debian 13) n'ont ni pip, ni ensurepip, ni build setup-python
       # (« was not found for Debian 13 »), et pip refuse même `--user`
       # (externally-managed) : venv sans pip + get-pip.py dedans (jamais le
-      # système). ~1 min par run (pas de cache : chaque run repart d'un venv neuf).
+      # système).
+      # Roues pip en cache (2026-10-30) : 15 s → ~4 s quand `server/` est
+      # touché — le venv reste neuf à chaque run (isolation inchangée),
+      # seules les roues sont réutilisées. Clé sur le hash des dépendances :
+      # un requirements modifié invalide le cache tout seul.
+      - name: Cache pip backend
+        if: steps.perimetre.outputs.backend == '1'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-backend-${{ hashFiles('server/scripts/requirements-test.txt') }}
       - name: Tests unitaires backend
         if: steps.perimetre.outputs.backend == '1'
         run: |
@@ -232,23 +178,149 @@ jobs:
           "$VENV/bin/pip" install --quiet -r server/scripts/requirements-test.txt
           "$VENV/bin/python" server/scripts/test_units.py
 
-      # Un seul appel Gradle, mais SEULEMENT les tests : c'est ce job qui est
-      # exigé par la file, il doit rendre son verdict vite.
-      - name: Tests JVM (:core + :app)
+      # Tests `:core` seuls : c'est la découpe v10 qui éloigne chaque moitié
+      # du couperet de 300 s (voir l'en-tête). `--max-workers=4` : 4 ≈ part
+      # équitable (21 runners / 80 cœurs), le plafond 2 de gradle.properties
+      # restant le défaut hors CI. Rollback : retirer le flag.
+      - name: Tests JVM (:core)
         if: steps.perimetre.outputs.code == '1'
         run: >-
-          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g"
-          :core:testDebugUnitTest :app:testDebugUnitTest
+          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4
+          :core:testDebugUnitTest
+
+      # Diagnostic des classes lentes : top 20 des suites JUnit déjà produites.
+      # ~1 s, aucune compilation, lecture seule des XML, et ce pas ne fait
+      # jamais échouer le job (tout échec de lecture est ignoré).
+      - name: Top 20 des classes de test lentes
+        if: steps.perimetre.outputs.code == '1'
+        run: |
+          python3 -c "
+          import glob, xml.etree.ElementTree as X
+          def secs(t):
+              try:
+                  return float(t.get('time') or 0)
+              except (TypeError, ValueError):
+                  return 0.0
+          rows = []
+          for f in glob.glob('*/build/test-results/testDebugUnitTest/*.xml'):
+              try:
+                  root = X.parse(f).getroot()
+              except X.ParseError:
+                  continue
+              for t in root.iter('testsuite'):
+                  rows.append((secs(t), t.get('name')))
+          for d, n in sorted(rows, reverse=True)[:20]:
+              print('%8.1fs  %s' % (d, n))"
 
       - name: Rapport de tests
-        if: always()
+        if: ${{ always() && steps.perimetre.outputs.code == '1' }}
         uses: actions/upload-artifact@v4
         with:
-          name: rapports-tests
-          path: |
-            **/build/reports/tests/**
+          name: rapports-tests-core
+          path: core/build/reports/tests/**
           retention-days: 3
+          compression-level: 1
           if-no-files-found: ignore
+
+  # ── 2. moitié `:app` : tests JVM seuls ──────────────────────────────────────
+  # Les gardes de propriété du commit (design, budget, voix, clés, gardes CI,
+  # portes, backend) tournent dans `ci-core` sur le même commit : les rejouer
+  # ici ne changerait pas le verdict. Seules les gardes rapides sont
+  # dupliquées (même action composite) pour une rouge VITE des deux côtés.
+  ci-app:
+    name: ci-app
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cette PR touche-t-elle du code ?
+        id: perimetre
+        uses: ./.github/actions/perimetre
+        with:
+          github-token: ${{ github.token }}
+          pr-number: ${{ github.event.pull_request.number }}
+          push-before: ${{ github.event.before }}
+          push-sha: ${{ github.sha }}
+          pr-head-ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.perimetre.outputs.code == '1'
+        with:
+          cache-read-only: false
+
+      - name: Gardes rapides
+        uses: ./.github/actions/gardes-rapides
+
+      # Les tests `:app` lisent les clés via `BuildConfig` : sans cette étape,
+      # ils tourneraient sans clé (verdict différent de la découpe v9).
+      - name: Clés du build (secrets → local.properties)
+        uses: ./.github/actions/cles-build
+        with:
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-model: ${{ secrets.LLM_MODEL }}
+          tts-api-key: ${{ secrets.TTS_API_KEY }}
+          tts-voice-id: ${{ secrets.TTS_VOICE_ID }}
+          asr-api-key: ${{ secrets.ASR_API_KEY }}
+          llm-live-api-key: ${{ secrets.LLM_LIVE_API_KEY }}
+
+      - name: Tests JVM (:app)
+        if: steps.perimetre.outputs.code == '1'
+        run: >-
+          ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4
+          :app:testDebugUnitTest
+
+      - name: Top 20 des classes de test lentes
+        if: steps.perimetre.outputs.code == '1'
+        run: |
+          python3 -c "
+          import glob, xml.etree.ElementTree as X
+          def secs(t):
+              try:
+                  return float(t.get('time') or 0)
+              except (TypeError, ValueError):
+                  return 0.0
+          rows = []
+          for f in glob.glob('*/build/test-results/testDebugUnitTest/*.xml'):
+              try:
+                  root = X.parse(f).getroot()
+              except X.ParseError:
+                  continue
+              for t in root.iter('testsuite'):
+                  rows.append((secs(t), t.get('name')))
+          for d, n in sorted(rows, reverse=True)[:20]:
+              print('%8.1fs  %s' % (d, n))"
+
+      - name: Rapport de tests
+        if: ${{ always() && steps.perimetre.outputs.code == '1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-tests-app
+          path: app/build/reports/tests/**
+          retention-days: 3
+          compression-level: 1
+          if-no-files-found: ignore
+
+  # ── 3. le check exigé par la file : vert ssi les deux moitiés ──────────────
+  # Le nom du check est celui du job : `ci` ne change pas — ni ruleset, ni
+  # Mergify (`check-success = ci`), ni `green()` du balayeur. `if: always()`
+  # + verdict explicite : sans ça, une moitié rouge rendrait ce job `skipped`
+  # au lieu de rouge.
+  ci:
+    name: ci
+    needs: [ci-core, ci-app]
+    if: always()
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - name: Verdict (ci-core et ci-app verts)
+        run: |
+          [ "${{ needs.ci-core.result }}" = "success" ] || { echo "::error::ci-core : ${{ needs.ci-core.result }}"; exit 1; }
+          [ "${{ needs.ci-app.result }}" = "success" ] || { echo "::error::ci-app : ${{ needs.ci-app.result }}"; exit 1; }
+          echo "OK — ci-core et ci-app verts"
 
   # ── 4. garde-fou de configuration (ex-workflow ci-budget.yml) ───────────────
   # Fusionné ici le 29/10 : le check s'appelle toujours `ci-budget` (c'est le

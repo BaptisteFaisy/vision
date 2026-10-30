@@ -44,12 +44,13 @@ queue_rules:
 
 merge_queue:
   # 8 lots testés en parallèle (demande user du 29/10 : « pousse à 8 »).
-  # Pool : 21 runners self-hosted. Par lot, un seul job lourd (`ci`, ~40 s) et
-  # des jobs courts (`ci-budget` 9 s, `couche0` 7 s) ; le doublon `pull_request`
-  # sur la branche de lot ne rejoue plus Gradle (cf. `ci.yml`, pas « Cette PR
-  # touche-t-elle du code ? »). 8 lots ≈ 8 jobs lourds simultanés, très en
-  # dessous des 21 créneaux : le reste du pool garde la CI des PR, qui est la
-  # porte d'entrée de la file.
+  # Pool : 21 runners self-hosted. Par lot, deux jobs lourds (`ci-core` et
+  # `ci-app`, ~1-2 min chacun) et des jobs courts (`ci` ~10 s, `ci-budget` 9 s,
+  # `couche0` 7 s) ; le doublon `pull_request` sur la branche de lot ne rejoue
+  # plus Gradle (cf. action `perimetre`, pas « Cette PR touche-t-elle du
+  # code ? »). 8 lots ≈ 16 jobs lourds simultanés au pire ; mesuré le 30/10 :
+  # +1 job par push ≈ +3 créneaux moyens sur 21 au pire pic, file quasi nulle
+  # — acceptable contre les kills timeout à 320 s de la découpe à 1 job.
   #
   # `mode` et `max_parallel_checks` sont des options de la FILE : les mettre
   # dans une règle de `queue_rules` est refusé par le schéma Mergify
