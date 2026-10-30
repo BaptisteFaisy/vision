@@ -400,7 +400,7 @@ def test_live_pipeline(live_app) -> None:
 # live_app_fast.py sont volontairement forkés (poids extraits, leviers) :
 # exclus de cette parité, voir server/backend/README.md.
 VENDORED_PARITY = ("concepts.py", "http_errors.py", "imaging.py", "live_ws.py",
-                   "schemas.py", "segmentation.py", "timing.py")
+                   "schemas.py", "segmentation.py", "timing.py", "passage.py")
 
 
 def test_live_fast_parity(_) -> None:
@@ -445,6 +445,8 @@ RUNNERS = (
     ("live_fast : contrat POST /live", "live_app_fast", live_fast_tests.test_live_fast_contract),
     ("live_fast : entrée binaire /live", "live_app_fast", live_fast_tests.test_live_fast_binary),
     ("live_fast : contrat /live/ws", "live_app_fast", live_fast_tests.test_live_fast_ws),
+    ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
+    ("live_fast : passage (tolérance)", "passage", live_fast_tests.test_passage_tolerance),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.
     ("poids : comportement historique sans levier", "fast_core", weights_tests.test_weights_default),
     ("poids : lecture locale + local_files_only", "fast_core", weights_tests.test_weights_local),

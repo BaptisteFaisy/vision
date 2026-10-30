@@ -96,6 +96,7 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
 ```json
 {"id":7,"width":512,"height":1138,"elapsed_ms":118,
  "objects":[{"label":"person","score":0.91,"box":[1,2,30,40],"mask_b64":"QUJD"}],
+ "passage":{"blocked":true,"side":"left","label":"person","box":[1,2,30,40],"score":0.91},
  "mask_encoding":"bits","timings_ms":{"total":104.2}}
 ```
 
@@ -108,6 +109,13 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
   (`Json.kt:323`, défaut `MASK_ENCODING_PNG` ; `Models.kt:18`, consts `:59-60`).
 - `timings_ms` est facultatif : postes serveur flottants, carte vide si absent
   (`Json.kt:336-346`).
+- `passage` est facultatif : couloir bouché par une personne (`blocked`), côté
+  conseillé (`side` : `"left"`/`"right"`, `null` sur voie libre) et écho de
+  l'obstacle (`label`, `box` en pixels image, `score`). Absent sur un backend
+  antérieur ⇒ `null`, la décision gauche/droite reste locale (`Models.kt`,
+  `passageOf`, `Json.kt`). Le mot parlé vient de SAM quand le champ est là,
+  l'obstacle chiffré (stop, décalage) restant mesuré sur le téléphone
+  (`GuidanceAnnouncer.kt`, `ProbeVoice.kt`).
 - `elapsed_ms` est la durée serveur annoncée, complétée par `timings_ms` quand le backend
   est instrumenté (`Models.kt:69-82`).
 

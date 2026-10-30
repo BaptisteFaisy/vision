@@ -68,12 +68,34 @@ const val MASK_ENCODING_NONE = "none"
 const val MASK_ENCODING_RLE = "rle"
 const val MASK_ENCODING_POLY = "poly"
 
+/**
+ * Passage conseillé par le serveur SAM (`passage` de la réponse `/live`) : le
+ * couloir est-il bouché par une personne, et par où passer. Absent (`null`)
+ * sur un backend antérieur : la décision gauche/droite reste alors locale.
+ */
+data class Passage(
+    val blocked: Boolean,
+    /** Côté conseillé (`"left"`/`"right"`), `null` sur voie libre. */
+    val side: String? = null,
+    /** Libellé de l'obstacle (écho serveur), `null` sur voie libre. */
+    val label: String? = null,
+    /** Boîte de l'obstacle en pixels image `[x1,y1,x2,y2]`, `null` sur voie libre. */
+    val box: List<Float>? = null,
+    /** Score de l'obstacle, `null` sur voie libre ou non envoyé. */
+    val score: Float? = null,
+)
+
 /** Résultat brut d'un appel /live : une frame du direct, avec sa durée serveur. */
 data class LiveFrame(
     val width: Int,
     val height: Int,
     val elapsedMs: Long,
     val objects: List<SegObject>,
+    /**
+     * Passage conseillé par SAM (`null` = backend antérieur : la décision
+     * gauche/droite reste calculée sur le téléphone, depuis les mêmes boîtes).
+     */
+    val passage: Passage? = null,
     /**
      * Représentation des masques de cette réponse (`"bits"`, `"png"`, `"none"`) : le client
      * décode en conséquence. Défaut `"png"` — le backend déployé, qui ne renvoie pas encore
