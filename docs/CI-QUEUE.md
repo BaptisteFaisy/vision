@@ -171,6 +171,10 @@ Concrètement, à chaque passage, pour chaque PR interne non-brouillon :
   - `ci` / `ci-budget` tombés sur une panne d'infrastructure (job perdu, checkout,
     cache, runner) : les jobs en échec sont relancés, **2 fois maximum par tête de
     PR**, avec un marqueur en commentaire — jamais de boucle ;
+  - run annulé (`cancel` : runner perdu, annulation manuelle — cas réel : #434) :
+    aucun verdict à juger, le run **entier** est rejoué, **2 fois maximum par
+    tête** (un job annulé n'est pas un job en échec : `--failed` ne relancerait
+    rien) ;
   - `ci` / `ci-budget` tombés sur une étape de tests : aucune relance (un test rouge
     ne devient pas vert en le relançant, et le budget est de 5 min par job) ; un
     commentaire dit quelle étape est en cause, une fois par tête ;

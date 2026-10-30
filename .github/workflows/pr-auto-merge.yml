@@ -89,7 +89,10 @@
 #       `strict_required_status_checks_policy: true`, donc chaque merge
 #       invalidait la CI de toutes les autres PR (O(N²), 15 merges/h) ;
 #   v14 câblage de la file (merge_group, puis branche de file Mergify) ;
-#   v15 la file prend la main, le balayeur s'efface (`MERGIFY_QUEUE`).
+#   v15 la file prend la main, le balayeur s'efface (`MERGIFY_QUEUE`) ;
+#   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
+#       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
+#       jamais) — le run entier est rejoué, 2 fois max par tête.
 
 name: pr-auto-merge
 
@@ -260,6 +263,12 @@ jobs:
                         | .name | select(.=="ci" or .=="ci-budget" or .=="couche0")]
                        | join(" ")' || true
           }
+          annules_requis() { # noms des checks requis annulés (aucun verdict), séparés par une espace
+            gh pr checks "$1" --json name,bucket 2>/dev/null \
+              | jq -r '[.[] | select(.bucket=="cancel")
+                        | .name | select(.=="ci" or .=="ci-budget" or .=="couche0")]
+                       | join(" ")' || true
+          }
           marques() { # $1=pr $2=marque → nb de commentaires qui portent la marque
             gh pr view "$1" --json comments --jq '.comments[].body' 2>/dev/null \
               | grep -cF -- "$2" || true
@@ -367,6 +376,33 @@ jobs:
                 echo "  run $run : échec réel dans « $etapes », pas de relance"
                 ECHELLE_ETAPES="$etapes"
                 rc=1
+              fi
+            done
+            return $rc
+          }
+          relancer_annules() { # $1=pr ; 0 = relancé, 1 = rien à relancer
+            local pr="$1" runs run sha_run rc=1
+            runs=$(gh pr checks "$pr" --json name,bucket,link 2>/dev/null \
+              | jq -r '[.[] | select(.bucket=="cancel")
+                         | select(.name=="ci" or .name=="ci-budget" or .name=="couche0") | .link][]
+                       | select(. != null)' \
+              | sed -n 's#.*/runs/\([0-9][0-9]*\).*#\1#p' | sort -u)
+            [ -n "$runs" ] || return 1
+            for run in $runs; do
+              # Même garde que relancer() : jamais de relance d'un run
+              # d'un autre commit (remplacé, il ne changerait rien ici).
+              sha_run=$(gh run view "$run" --json headSha --jq .headSha 2>/dev/null || true)
+              if [ "$sha_run" != "$SHA" ]; then
+                echo "  run $run : autre commit, pas de relance"
+                continue
+              fi
+              # Rejeu COMPLET : un job annulé n'est pas un job en échec,
+              # `--failed` ne relancerait rien.
+              if gh run rerun "$run" >/dev/null 2>&1; then
+                echo "  run $run relancé (run annulé)"
+                rc=0
+              else
+                echo "  run $run : relance refusée"
               fi
             done
             return $rc
@@ -482,6 +518,29 @@ jobs:
               fi
               ;;
             BLOCKED)
+              # Trou v15 (cas réel : #434) : un run ANNULÉ (runner perdu,
+              # annulation manuelle) n'a aucun verdict — bucket `cancel`,
+              # pas `fail` — donc `echecs_requis` le manquait et la PR
+              # restait bloquée à jamais. Un run annulé se rejoue, il ne se
+              # juge pas : pas d'agent de périmètre ici, même si c'est
+              # `couche0` qui est annulé.
+              annules="$(annules_requis "$PR")"
+              if [ -n "${annules:-}" ]; then
+                n="$(marques "$PR" "<!-- automerge-recancel sha=$SHA -->")"
+                n="${n:-0}"
+                if [ "$n" -lt 2 ]; then
+                  if relancer_annules "$PR"; then
+                    printf -v corps '%s\n' \
+                      "<!-- automerge-recancel sha=$SHA -->" \
+                      "Relance automatique ($((n + 1))/2) du run annulé sur \`${SHA:0:7}\` — aucun verdict à juger, on rejoue le run entier."
+                    gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                  else
+                    echo "PR #$PR : run annulé d'un autre commit, pas de relance"
+                  fi
+                else
+                  echo "PR #$PR : 2 relances d'annulation déjà faites pour ce SHA, on s'arrête là"
+                fi
+              fi
               echecs="$(echecs_requis "$PR")"
               if [ -z "${echecs:-}" ]; then
                 echo "PR #$PR : BLOCKED sans check requis en échec (revue demandée ?), rien à faire"
