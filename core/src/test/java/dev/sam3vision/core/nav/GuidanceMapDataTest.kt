@@ -39,7 +39,7 @@ class GuidanceMapDataTest {
     )
 
     @Test
-    fun `mapping complet trace shape position recalee camera suivi`() {
+    fun `mapping complet trace shape position recalee camera ensemble`() {
         // Fix pile sur un sommet du tracé : écart nul, position = fix.
         val fix = NavFix(lat = 48.85655, lon = 2.3463, accM = 8f, atMs = 1_000L)
         val state = guidanceMapStateOf(route, fix, update)
@@ -57,10 +57,28 @@ class GuidanceMapDataTest {
         assertEquals("Arrivée — Gare de Lyon", overlays.maneuvers[2].label)
         assertTrue(overlays.maneuvers.all { !it.upcoming })
 
+        // Caméra d'ensemble : le tracé entier tient dans le cadre (la
+        // position est sur le tracé, le centre est celui du tracé seul).
+
         val camera = state.camera!!
-        assertEquals(overlays.position, camera.target)
-        assertEquals(17.0, camera.zoom, 0.0)
+        assertEquals((48.8606 + 48.8443) / 2.0, camera.target.lat, 1e-9)
+        assertEquals((2.3376 + 2.3730) / 2.0, camera.target.lon, 1e-9)
+        assertTrue(camera.zoom in 2.0..19.0)
         assertEquals(0f, camera.bearingDeg, 0f)
+    }
+
+    @Test
+    fun `camera inclut la position hors trace`() {
+        // Écarté à plus de 30 m : la position brute reste affichée, et le
+        // cadre l'inclut avec le tracé (départ → arrivée toujours visible).
+        val fix = NavFix(lat = 48.8700, lon = 2.3900, accM = 8f, atMs = 1_000L)
+        val state = guidanceMapStateOf(route, fix, update)
+        assertEquals(RoutePoint(48.8700, 2.3900), state.overlays.position)
+        val camera = state.camera!!
+        assertEquals((48.8443 + 48.8700) / 2.0, camera.target.lat, 1e-9)
+        assertEquals((2.3376 + 2.3900) / 2.0, camera.target.lon, 1e-9)
+        assertEquals(0f, camera.bearingDeg, 0f)
+        assertTrue(camera.zoom in 2.0..19.0)
     }
 
     @Test
@@ -72,7 +90,7 @@ class GuidanceMapDataTest {
         assertEquals(points, overlays.route)
         assertEquals(RoutePoint(48.8443, 2.3730), overlays.destination)
         assertNull(overlays.position)
-        // Sans position : cadrage du tracé, pas suivi.
+        // Sans position : cadrage du tracé.
         val camera = state.camera!!
         assertEquals((48.8606 + 48.8443) / 2.0, camera.target.lat, 1e-9)
         assertEquals((2.3376 + 2.3730) / 2.0, camera.target.lon, 1e-9)
@@ -132,7 +150,7 @@ class GuidanceMapDataTest {
     }
 
     @Test
-    fun `fix inexploitable sans position ni suivi`() {
+    fun `fix inexploitable sans position`() {
         val mauvais = listOf(
             NavFix(Double.NaN, 2.3400, 8f, 1_000L),
             NavFix(48.8580, 2.3400, 0f, 1_000L),
