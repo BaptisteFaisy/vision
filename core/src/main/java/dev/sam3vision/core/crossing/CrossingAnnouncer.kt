@@ -118,10 +118,12 @@ class CrossingAnnouncer(
         const val DEFAULT_COOLDOWN_MS = 2_500L
 
         /**
-         * Répétition du rouge déjà annoncé (30/10/2026, ordre user : « il ne
-         * faut pas traverser quand rouge »). Le vert et le doute ne répètent
-         * pas ; la répétition recule le délai comme une annonce normale.
+         * Répétition du rouge déjà annoncé (30/10/2026, ordre user : « quand
+         * le feu est rouge, répéter chaque seconde que la traversée est
+         * impossible », resserré de 2 s à 1 s). Le vert et le doute ne
+         * répètent pas ; la répétition recule le délai comme une annonce
+         * normale.
          */
-        const val RED_REPEAT_MS = 2_000L
+        const val RED_REPEAT_MS = 1_000L
     }
 }
