@@ -355,6 +355,7 @@ private fun IseeCameraWiring(
             else (sending(viewModel) && viewModel.probe.wantsFrame()) || picturing(viewModel) ||
                 SharedCameraFrame.audience
         }
+        glue.host.jpegQuality = { viewModel.probe.jpegQuality }
         glue.host.onFrame = { jpeg, captureAtNs ->
             if (!GlassesVideoLink.live.value) {
                 // La même frame part au proche : sa page montre ce que voit iSee.
