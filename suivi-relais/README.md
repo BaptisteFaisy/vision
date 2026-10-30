@@ -33,9 +33,11 @@ téléphone ──frames binaires──▶ RelayRoom (DO, un par identifiant) �
                                       └─▶ {"type":"audience","watch":n}  (au téléphone)
 ```
 
-- **Le téléphone n'émet que s'il est regardé** : à chaque connexion ou départ
-  d'aidant, la salle envoie `{"type":"audience","watch":n}` aux téléphones ; à
-  `n = 0`, la caméra se tait (forfait, batterie).
+- **Le téléphone n'émet que s'il est regardé** : à chaque arrivée ou départ
+  (aidant comme téléphone), la salle republie `{"type":"audience","watch":n}`
+  aux téléphones connectés ; à `n = 0`, la caméra se tait (forfait, batterie).
+  Un téléphone qui rejoint une salle déjà regardée apprend ainsi tout de
+  suite qu'on le regarde, au lieu de rester muet.
 - **Une frame ne revient jamais à son émetteur** et n'est jamais relue en base ;
   au-delà de 256 Ko (`MAX_FRAME_BYTES`), elle est ignorée.
 - **L'écriture reste protégée** : `role=push` exige la clé du flux quand le flux
