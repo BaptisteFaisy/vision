@@ -21,6 +21,7 @@ import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseeNavClarify
+import dev.sam3vision.app.isee.vm.IseeSpeedOrder
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.isee.vm.IseePictoVoice
@@ -37,7 +38,6 @@ import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
-import dev.sam3vision.core.speech.TtsSpeedCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -190,6 +190,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
+
+    /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
+    private val speedOrder = IseeSpeedOrder({ settings }, { updated -> settings = updated; viewModelScope.launch { runCatching { prefs.save(settings) } } }, { player.speed = it }, ::dropHeard, viewModelScope, voice::synthesize, { text, bytes -> playback.speakBytes(SPEED_BUBBLE_ID, text, bytes) })
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
@@ -351,32 +354,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             intro.disable()
             return
         }
-        if (runSpeedCommand(heard.text)) return
+        if (speedOrder.run(heard.text)) return
         if (runSettingsCommand(heard.text)) return
         handleDictated(heard.text, heard.audio)
-    }
-
-    /**
-     * Ordre vocal de vitesse (« vitesse 1,5 », « parle plus vite ») : réglage
-     * persisté, lecteur à jour, confirmation dite à la nouvelle vitesse.
-     * Vrai si [text] portait un ordre (la dictée ne part pas au LLM).
-     */
-    private fun runSpeedCommand(text: String): Boolean {
-        val speed = TtsSpeedCommand.parse(text, settings.ttsSpeed) ?: return false
-        settings = settings.copy(ttsSpeed = speed)
-        viewModelScope.launch { runCatching { prefs.save(settings) } }
-        player.speed = speed
-        val confirmation = TtsSpeedCommand.spoken(speed, settings.speechLanguage)
-        dropHeard(confirmation)
-        // Sans clé ElevenLabs, le texte reste affiché et la vitesse s'applique
-        // aux prochaines lectures : un ordre vocal n'échoue jamais à voix haute.
-        viewModelScope.launch {
-            val bytes = voice.synthesize(confirmation)
-            if (bytes.isNotEmpty()) {
-                playback.speakBytes(SPEED_BUBBLE_ID, confirmation, bytes)
-            }
-        }
-        return true
     }
 
     /**
