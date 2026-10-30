@@ -153,6 +153,31 @@ class GuidanceTest {
     }
 
     @Test
+    fun `les chemins et la route ne se contournent pas`() {
+        val sols = listOf(
+            "chemin", "chemins", "sentier", "path", "pathway", "walkway", "trail",
+            "route", "routes", "rue", "road", "street", "avenue", "boulevard",
+            "allée", "chaussée", "ruelle", "alley",
+        )
+
+        for (sol in sols) {
+            val decision = Guidance.decide(listOf(placed(sol, 0.5f, 2f)))
+
+            assertFalse(sol, decision.blocked)
+            assertEquals("Tout droit.", Guidance.phrase(decision))
+        }
+    }
+
+    @Test
+    fun `la voie ferree reste un obstacle`() {
+        for (rail in listOf("track", "rail", "voie")) {
+            val decision = Guidance.decide(listOf(placed(rail, 0.5f, 2f)))
+
+            assertTrue(rail, decision.blocked)
+        }
+    }
+
+    @Test
     fun `la bordure bloque toujours, elle se monte`() {
         val decision = Guidance.decide(listOf(placed("curb", 0.5f)))
 
