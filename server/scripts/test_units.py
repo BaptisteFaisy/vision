@@ -24,8 +24,7 @@ from pathlib import Path
 # (``scripts/tests_units/*`` font ``from test_units import check``) : sans cette ligne ils
 # importeraient un second exemplaire du module, avec ses propres compteurs PASSED/FAILED,
 # et leurs vérifications n'apparaîtraient nulle part.
-if __name__ == "__main__":
-    sys.modules.setdefault("test_units", sys.modules["__main__"])
+if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, latency_tests, live_fast_tests,  # noqa: E402
                          live_fast_perf_tests, llm_tests, merge_tests, native_tests, weights_tests)
