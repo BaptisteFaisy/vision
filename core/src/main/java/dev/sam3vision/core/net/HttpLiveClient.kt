@@ -3,6 +3,8 @@ package dev.sam3vision.core.net
 import dev.sam3vision.core.mask.base64Bytes
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
+import dev.sam3vision.core.model.MASK_ENCODING_BITS
+import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import okhttp3.OkHttpClient
 
 /**
@@ -59,6 +61,8 @@ class HttpLiveClient(
      * lire le binaire — à activer après son déploiement, jamais avant.
      */
     private val binaryUpload: Boolean = false,
+    /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
+    private val masks: Boolean = true,
 ) : LiveClient {
 
     /** Client effectif : exposé aux tests, qui prouvent le partage du pool. */
@@ -81,7 +85,7 @@ class HttpLiveClient(
         endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
         if (!binaryUpload) return client.executeBytesBuilt(marks) {
             val body = OneShotJsonBody(
-                liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge),
+                liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge, masks = masks),
             )
             requestTo(baseUrl, "/live", "POST", body, LIVE_USER_AGENT)
         }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
@@ -89,7 +93,7 @@ class HttpLiveClient(
             ?: return Result.failure(ApiError.BadResponse("/live : image_b64 illisible"))
         return client.executeBytesBuilt(marks) {
             request(
-                liveBinaryUrl(baseUrl, prompts, workEdge, maxObjects, maskFormat, maskEdge),
+                liveBinaryUrl(baseUrl, prompts, workEdge, maxObjects, maskFormat, maskEdge, masks),
                 "POST",
                 OneShotBytesBody(jpeg, OCTET_MEDIA),
                 LIVE_USER_AGENT,
@@ -118,6 +122,7 @@ internal fun liveBinaryUrl(
     maxObjects: Int,
     maskFormat: String?,
     maskEdge: Int,
+    masks: Boolean = true,
 ): String {
     val query = StringBuilder()
     fun field(name: String, value: String) {
@@ -127,8 +132,8 @@ internal fun liveBinaryUrl(
     prompts?.forEach { field("prompts", it) }
     field("work_edge", workEdge.toString())
     field("max_objects", maxObjects.toString())
-    field("mask_encoding", dev.sam3vision.core.model.MASK_ENCODING_BITS)
-    if (maskFormat != null) {
+    field("mask_encoding", if (masks) MASK_ENCODING_BITS else MASK_ENCODING_NONE)
+    if (masks && maskFormat != null) {
         field("mask_format", maskFormat)
         if (maskEdge > 0) field("mask_edge", maskEdge.toString())
     }
