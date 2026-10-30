@@ -46,6 +46,7 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import dev.sam3vision.app.live.setFocus
 import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.FrameTimings
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
@@ -87,12 +88,12 @@ fun LiveScreen(
 
     LiveStage(
         state = state,
+        pixel = viewModel.pixel.stages.collectAsState().value,
         previewView = previewView,
         draft = draft,
         onDraftChange = { draft = it },
         failure = failure,
-        onBack = onBack,
-        onAsk = onAsk,
+        onBack = onBack, onAsk = onAsk,
         onOpenSettings = onOpenSettings,
         onApplyPrompts = { viewModel.restartWith(draft) },
         onPreset = { viewModel.restartWith(it.joinToString(", ")) },
@@ -189,13 +190,12 @@ private fun LiveCameraHost(
 @Composable
 private fun LiveStage(
     state: LiveUiState,
+    pixel: FrameTimings,
     previewView: PreviewView,
     draft: String,
     onDraftChange: (String) -> Unit,
-    failure: String?,
-    onBack: () -> Unit,
-    onAsk: () -> Unit,
-    onOpenSettings: () -> Unit,
+    failure: String?, onBack: () -> Unit,
+    onAsk: () -> Unit, onOpenSettings: () -> Unit,
     onApplyPrompts: () -> Unit, onPreset: (List<String>) -> Unit,
     onRecover: () -> Unit,
     memoryOpen: Boolean,
@@ -212,6 +212,7 @@ private fun LiveStage(
         LiveCameraStage(state, previewView, localFrame, onRecover, pictoPng)
         LiveTopBar(
             state = state,
+            pixel = pixel,
             draft = draft,
             onDraftChange = onDraftChange,
             onApply = onApplyPrompts, onPreset = onPreset,
