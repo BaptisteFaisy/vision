@@ -87,6 +87,17 @@ class CrossingPeopleTest {
     }
 
     @Test
+    fun `un poteau proche a gauche dit d aller a droite`() {
+        CrossingPeopleWatch.reset()
+        fun poteau(meters: Float) = PlacedLabel(label = "poteau", centerX = 0.3f, meters = meters)
+
+        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.update(listOf(poteau(2.9f)), 0L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.update(listOf(poteau(2.7f)), 100L, SpeechLanguage.Fr))
+        assertEquals("Droite.", CrossingPeopleWatch.update(listOf(poteau(2.4f)), 200L, SpeechLanguage.Fr))
+    }
+
+    @Test
     fun `le decalage prime sur des positions fraiches`() {
         CrossingPeopleWatch.reset()
 
