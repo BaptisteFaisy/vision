@@ -21,7 +21,7 @@ class ValhallaRouteLoaderTest {
     private val trip = RouteTrip(listOf(RouteLeg(emptyList(), emptyList(), 830.0, 610.0)), 830.0, 610.0)
 
     private fun loader(
-        geocode: suspend (String) -> Result<GeocodedPlace> = { Result.success(place) },
+        geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace> = { _, _ -> Result.success(place) },
         originNow: () -> RoutePoint? = { origin },
         route: suspend (RoutePoint, RoutePoint) -> Result<RouteTrip> = { _, _ -> Result.success(trip) },
         baseUrl: () -> String = { "https://route.test" },
@@ -67,7 +67,7 @@ class ValhallaRouteLoaderTest {
 
     @Test
     fun `geocodage en echec remonte son motif`() = runBlocking {
-        val failure = loader(geocode = { Result.failure(IllegalStateException("adresse introuvable")) })
+        val failure = loader(geocode = { _, _ -> Result.failure(IllegalStateException("adresse introuvable")) })
             .invoke("nulle part").exceptionOrNull()
 
         assertEquals("adresse introuvable", failure?.message)
@@ -75,7 +75,7 @@ class ValhallaRouteLoaderTest {
 
     @Test
     fun `un collaborateur qui jette devient un echec`() = runBlocking {
-        val throwing = loader(geocode = { throw IllegalStateException("panne") })
+        val throwing = loader(geocode = { _, _ -> throw IllegalStateException("panne") })
 
         assertTrue(throwing("la gare").isFailure)
     }
@@ -124,6 +124,26 @@ class ValhallaRouteLoaderTest {
 
         assertEquals(2, attempts)
         assertEquals("itinéraire indisponible (serveur injoignable)", failure?.message)
+    }
+
+    @Test
+    fun `l'origine est transmise au geocodage pour le tri par proximite`() = runBlocking {
+        var askedNear: RoutePoint? = null
+        val full = loader(geocode = { _, near -> askedNear = near; Result.success(place) })
+
+        full("sacré-cœur").getOrThrow()
+
+        assertEquals(origin, askedNear)
+    }
+
+    @Test
+    fun `le plafond distance valhalla devient un motif friendly`() = runBlocking {
+        val body = "{\"Detail\":\"Path distance exceeds the max distance limit: 25000 meters\"}"
+        val down = loader(route = { _, _ -> Result.failure(IOException("erreur HTTP 500 : $body")) })
+
+        val failure = down("loin").exceptionOrNull()
+
+        assertEquals("itinéraire indisponible (destination trop éloignée à pied)", failure?.message)
     }
 
     @Test
