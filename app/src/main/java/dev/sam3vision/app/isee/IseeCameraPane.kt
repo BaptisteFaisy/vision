@@ -116,6 +116,14 @@ class IseeCameraHost(private val context: Context) {
     /** Qualité JPEG lue à chaque frame (`null` = constante) : le palier adaptatif (Q8). */
     var jpegQuality: (() -> Int)? = null
 
+    /**
+     * Luminance de la frame convertie (même cadence que [onFrame]), invoquée
+     * sur le fil de l'analyse : branchée par la fenêtre, consommée par le
+     * compteur de marches. Pas appelée sur le chemin de repli `Bitmap` (pas
+     * de plan Y à lire) : le compte vieillit alors jusqu'à expirer.
+     */
+    var onLuma: ((ByteArray) -> Unit)? = null
+
     /** Caméra liée : sa caractéristique optique sert de calibrage aux distances. */
     private var boundCamera: androidx.camera.core.Camera? = null
 
@@ -244,14 +252,19 @@ class IseeCameraHost(private val context: Context) {
      * Frame JPEG brute : **NV21 direct** (rotation et réduction dans la copie, zéro
      * bitmap) ; repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV 4:2:0 —
      * une seule passe de matrice y remplace les deux rééchantillonnages d'avant.
+     * La luminance NV21 part aussi à [onLuma] (compteur de marches), sur le même fil.
      */
     private fun encodeFrameBytes(proxy: ImageProxy): ByteArray {
         val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
-        return encoder.encodeJpeg(proxy, ISEE_FRAME_EDGE, quality)
-            ?: bitmapToJpeg(
-                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE),
-                quality,
-            )
+        val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
+        if (framed != null) {
+            onLuma?.invoke(framed.luma)
+            return framed.jpeg
+        }
+        return bitmapToJpeg(
+            uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE),
+            quality,
+        )
     }
 
     /**
