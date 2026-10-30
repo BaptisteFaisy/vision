@@ -380,6 +380,24 @@ object GlassesMessages {
         MessageKind.ERROR,
         "Lunettes simulées : enregistrement trop lent, relance la connexion.",
     )
+
+    /** Ordre vocal « iSee » : la session demandée s'ouvre, le lien est là. */
+    fun toggleStarted() = GlassesMessage(
+        MessageKind.INFO,
+        "Session lunettes : j'ouvre la session.",
+    )
+
+    /** Ordre vocal « iSee » : la session en cours s'arrête. */
+    fun toggleStopped() = GlassesMessage(
+        MessageKind.INFO,
+        "Session lunettes arrêtée.",
+    )
+
+    /** Ordre vocal « iSee » sans paire liée : refusé, dit par iSee à voix haute. */
+    fun toggleNotLinked() = GlassesMessage(
+        MessageKind.WARNING,
+        "Lunettes pas connectées en Bluetooth : session non ouverte.",
+    )
 }
 
 /**
