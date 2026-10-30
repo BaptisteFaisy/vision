@@ -253,4 +253,50 @@ class VehicleStateTest {
             watcher.update(listOf(det("car", box(120f))), listOf(reading("car", 5f, box(120f))), atMs = 200L),
         )
     }
+
+    @Test
+    fun `mouvement - phrase securite stop voiture en mouvement`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
+        val moving = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 5f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.En,
+        )
+
+        assertEquals("Stop, car moving.", moving!!.safetyPhrase)
+        assertEquals(
+            "Stop, bus moving.",
+            VehicleStateText.safetyPhrase(VehicleStateText.nameOf("bus")!!, SpeechLanguage.En),
+        )
+    }
+
+    @Test
+    fun `mouvement francais - stop voiture, arret sans phrase securite`() {
+        val moving = VehicleStateWatcher()
+        moving.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
+        moving.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
+        val cue = moving.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 5f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertEquals("Stop, voiture en mouvement.", cue!!.safetyPhrase)
+
+        val stopped = VehicleStateWatcher()
+        stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 0L)
+        stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 100L)
+        val parked = stopped.update(
+            listOf(det("car", box(100f))),
+            listOf(reading("car", 2f, box(100f))),
+            atMs = 200L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertNull(parked!!.safetyPhrase)
+    }
 }

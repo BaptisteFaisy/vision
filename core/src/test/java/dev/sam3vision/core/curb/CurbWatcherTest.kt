@@ -392,4 +392,41 @@ class CurbWatcherTest {
         assertTrue(CurbSignal.of(listOf(sousSeuil), 512, 1138).detected)
         assertFalse(CurbSignal.of(listOf(pleinCadre), 512, 1138).detected)
     }
+
+    @Test
+    fun `imminent - phrase securite stop rebord montant ou descendant`() {
+        val up = CurbWatcher()
+        val upSignal = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f, edge = CurbEdge.Up)
+        up.onSignal(upSignal, 1000L, SpeechLanguage.En)
+        val upCue = up.onSignal(upSignal, 2000L, SpeechLanguage.En)
+
+        assertEquals("Stop, step up.", upCue!!.safetyPhrase)
+
+        val down = CurbWatcher()
+        val downSignal = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f, edge = CurbEdge.Down)
+        down.onSignal(downSignal, 1000L, SpeechLanguage.En)
+        val downCue = down.onSignal(downSignal, 2000L, SpeechLanguage.En)
+
+        assertEquals("Stop, step down.", downCue!!.safetyPhrase)
+        assertEquals("Stop, rebord descendant.", CurbText.safetyStepPhrase(CurbEdge.Down, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `pre-alerte - phrase securite parlee, bateau sans phrase securite`() {
+        val watcher = CurbWatcher()
+        val far = CurbSignal(detected = true, meters = 2.0f, centerX = 0.5f, edge = CurbEdge.Up)
+        watcher.onSignal(far, 1000L, SpeechLanguage.Fr)
+        watcher.onSignal(far, 2000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(far, 3000L, SpeechLanguage.Fr)
+
+        assertEquals("Stop, rebord montant.", cue!!.safetyPhrase)
+
+        val flatWatcher = CurbWatcher()
+        val pass = CurbSignal.of(listOf(flat()), 512, 1138)
+        flatWatcher.onSignal(pass, 1000L, SpeechLanguage.Fr)
+        flatWatcher.onSignal(pass, 2000L, SpeechLanguage.Fr)
+        val flatCue = flatWatcher.onSignal(pass, 3000L, SpeechLanguage.Fr)
+
+        assertNull(flatCue!!.safetyPhrase)
+    }
 }

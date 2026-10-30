@@ -4,7 +4,6 @@ import dev.sam3vision.core.curb.SidewalkKeep
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.GuidanceDecision
-import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
@@ -51,9 +50,6 @@ internal class ProbeVoice(
             guidance.reset()
         }
 
-    /** Instant du dernier mot stop parlé, [Long.MIN_VALUE] si aucun. */
-    private var lastStopMs: Long = Long.MIN_VALUE
-
     /**
      * Détour en cours : le cap n'a pas été suivi à la dernière frame guidée
      * (passage obstacle ou retour trottoir). Faux sans décision (première
@@ -84,7 +80,6 @@ internal class ProbeVoice(
      * de retour prime alors sur la consigne, jamais sur le danger.
      * Le passage piéton est filtré avant le guidage ([withoutCrosswalk]) : le
      * sol peint se rejoint (guidage latéral doux), il ne dit jamais « Stop ».
-     * Un mot stop parlé arme [stopRecent] : la marche imminente attend son tour.
      * [passage] est le passage conseillé par SAM (`null` = backend antérieur :
      * la décision gauche/droite reste locale).
      */
@@ -97,30 +92,13 @@ internal class ProbeVoice(
         if (guide) {
             val safe = placed.withoutCrosswalk()
             val sidewalk = SidewalkKeep.positionOf(safe)
-            return said(
-                atMs,
-                guidance.onFrame(
-                    atMs, safe, language, manualCap, routeCap,
-                    sidewalk = sidewalk, samPassage = passage,
-                ),
+            return guidance.onFrame(
+                atMs, safe, language, manualCap, routeCap,
+                sidewalk = sidewalk, samPassage = passage,
             )
         }
         if (!announce) return null
-        return said(atMs, positions.onFrame(atMs, placed, language))
-    }
-
-    /**
-     * Vrai si un mot stop a été parlé il y a moins de [STOP_QUIET_MS] : le
-     * stop prime sur la marche imminente ([LiveProbe.observeCurb]), qui prime
-     * sur le reste (mots doux, positions). Pur, testé en JVM.
-     */
-    fun stopRecent(atMs: Long): Boolean = lastStopMs != Long.MIN_VALUE &&
-        atMs >= lastStopMs && atMs - lastStopMs < STOP_QUIET_MS
-
-    /** Mémorise [phrase] quand c'est un stop, la rend inchangée. */
-    private fun said(atMs: Long, phrase: String?): String? {
-        if (phrase != null && GuidanceWord.isStopPhrase(phrase)) lastStopMs = atMs
-        return phrase
+        return positions.onFrame(atMs, placed, language)
     }
 
     /**
@@ -139,15 +117,9 @@ internal class ProbeVoice(
         return SteeringCue.from(decision)
     }
 
-    /** Nouvelle session : voix, détour et dernier stop oubliés. */
+    /** Nouvelle session : voix et détour oubliés. */
     fun reset() {
         guidance.reset()
         positions.reset()
-        lastStopMs = Long.MIN_VALUE
-    }
-
-    companion object {
-        /** Silence de la marche imminente après un stop parlé (2 s). */
-        const val STOP_QUIET_MS = 2_000L
     }
 }
