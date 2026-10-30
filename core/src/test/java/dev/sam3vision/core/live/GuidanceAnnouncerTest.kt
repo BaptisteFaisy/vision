@@ -203,9 +203,10 @@ class GuidanceAnnouncerTest {
     fun `passage SAM bouche parle son cote`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true, side = "right", label = "person")
+        val bloque = listOf(personne(2f))
 
-        assertEquals("droite.", announcer.onFrame(0L, libre, samPassage = sam))
-        assertNull(announcer.onFrame(200L, libre, samPassage = sam))
+        assertEquals("droite.", announcer.onFrame(0L, bloque, samPassage = sam))
+        assertNull(announcer.onFrame(200L, bloque, samPassage = sam))
     }
 
     @Test
@@ -232,6 +233,6 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true)
 
-        assertEquals("gauche.", announcer.onFrame(0L, libre, samPassage = sam))
+        assertEquals("gauche.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
     }
 }
