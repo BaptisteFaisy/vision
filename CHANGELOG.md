@@ -21,6 +21,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` vert (`LiveProbe.kt` à 497 lignes, inchangé).
 
 
+## 2026-10-30 — iSee : la voix ne fait plus esquiver les chemins ni la route (branche `fix/isee-chemin-route`)
+
+- **Demande** : sur un trottoir ou un chemin, la voix ordonnait de s'en
+  écarter (« va à gauche », « va à droite ») ; ne jamais faire esquiver les
+  chemins ni la route.
+- Fait : `CurbConcepts.isPathRoad` (15 concepts chemin/route FR/EN : path,
+  pathway, walkway, trail, chemin, sentier, allée, road, route, street, rue,
+  chaussée, avenue, boulevard, alley, ruelle — pluriels et accents
+  neutralisés) ; `Guidance.decide` les ignore comme le plan du trottoir. La
+  détection bordure (`CurbSignal` : montée, descente, bateau) est inchangée,
+  et la voie ferrée (`track`, `rail`, `voie`) reste un obstacle.
+- Preuves : 2 tests JVM ajoutés (`GuidanceTest` — « les chemins et la route
+  ne se contournent pas », « la voie ferree reste un obstacle ») ; ciblés
+  verts (`GuidanceTest` 20/20, `GuidanceAnnouncerSidewalkTest`, `curb.*`) ;
+  suite `:core` 2147/2152 (5 échecs `PrivateFileSettingsStoreTest`
+  pré-existants, identiques sur la base intacte — permissions POSIX sous
+  Windows) ; `check-kotlin-limits.py` vert.
 ## 2026-10-30 — traversée : vert plus sensible, rouge répété toutes les 2 s (branche `feu-vert-sensibilite`)
 
 - **Demande** : augmenter la sensibilité du vert, et répéter qu'il ne faut
