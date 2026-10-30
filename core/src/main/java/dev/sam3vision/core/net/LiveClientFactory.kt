@@ -26,7 +26,9 @@ fun liveClient(
     maskEdge: Int = 0,
     /** Profondeur fusionnée (`with_depth`) : médiane de proximité par objet en réponse. */
     withDepth: Boolean = false,
-): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth) { milliseconds ->
+    /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
+    masks: Boolean = true,
+): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks) { milliseconds ->
     OkHttpWsTransport(liveWsClient(milliseconds / 1000))
 }
 
@@ -38,6 +40,7 @@ internal fun liveClientWith(
     maskFormat: String? = null,
     maskEdge: Int = 0,
     withDepth: Boolean = false,
+    masks: Boolean = true,
     transportFor: (Long) -> WsTransport,
 ): LiveClient = WsLiveClient(
     baseUrl,
@@ -49,4 +52,5 @@ internal fun liveClientWith(
     maskFormat = maskFormat,
     maskEdge = maskEdge,
     withDepth = withDepth,
+    masks = masks,
 )
