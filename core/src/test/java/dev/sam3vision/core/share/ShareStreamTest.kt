@@ -47,6 +47,14 @@ class ShareStreamTest {
     }
 
     @Test
+    fun `le direct vise 10 images par seconde et oublie vite les frames figees`() {
+        // 90 ms ≈ 11 im/s : sous 10 im/s, l'aidant perd le fil des gestes.
+        assertEquals(90L, STREAM_FRAME_MS)
+        // À cette cadence, une frame de plus de 3 tours n'a plus rien du direct.
+        assertEquals(300L, STREAM_FRAME_MAX_AGE_MS)
+    }
+
+    @Test
     fun `un message qui n est pas un avis d audience ne fait rien`() {
         assertNull(audienceCountOf("bonjour"))
         assertNull(audienceCountOf(""))

@@ -16,9 +16,10 @@ import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.app.AppColors
-import dev.sam3vision.app.bitmapToJpegBase64
+import dev.sam3vision.app.bitmapToJpeg
 import dev.sam3vision.app.lensSpecOf
 import dev.sam3vision.app.media.Nv21JpegEncoder
+import dev.sam3vision.app.media.jpegBytesToBase64
 import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
@@ -195,16 +196,19 @@ class IseeCameraHost(private val context: Context) {
         }
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            val jpeg = encodeFrame(proxy)
+            val bytes = encodeFrameBytes(proxy)
+            // Le direct de l'aidant part en binaire : les octets sont offerts tels
+            // quels, sans le détour base64 que le pousseur défaisait aussitôt.
+            SharedCameraFrame.offerBytes(bytes)
             onFrame?.invoke(
-                jpeg,
+                jpegBytesToBase64(bytes),
                 captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()),
             )
             countConversion(
                 frames = ++conversionFrames,
                 ms = SystemClock.elapsedRealtime() - startedAt,
                 size = proxy.width to proxy.height,
-                bytes = jpeg.length,
+                bytes = bytes.size,
             )
         } catch (_: Throwable) {
             // frame illisible : la suivante arrive tout de suite
@@ -214,13 +218,13 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Frame JPEG base64 : **NV21 direct** (rotation et réduction dans la copie, zéro
+     * Frame JPEG brute : **NV21 direct** (rotation et réduction dans la copie, zéro
      * bitmap) ; repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV 4:2:0 —
      * une seule passe de matrice y remplace les deux rééchantillonnages d'avant.
      */
-    private fun encodeFrame(proxy: ImageProxy): String =
-        encoder.encodeBase64(proxy, ISEE_FRAME_EDGE, ISEE_FRAME_QUALITY)
-            ?: bitmapToJpegBase64(
+    private fun encodeFrameBytes(proxy: ImageProxy): ByteArray =
+        encoder.encodeJpeg(proxy, ISEE_FRAME_EDGE, ISEE_FRAME_QUALITY)
+            ?: bitmapToJpeg(
                 uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE),
                 ISEE_FRAME_QUALITY,
             )

@@ -11,7 +11,7 @@ test('le flux est sur la même origine, en wss quand la page est en https', () =
     streamUrl('http://127.0.0.1:8836/?share=leo&x=1'),
     'ws://127.0.0.1:8836/ws?share=leo&role=watch',
   );
-  assert.equal(STREAM_FRESH_MS, 1_500);
+  assert.equal(STREAM_FRESH_MS, 600);
 });
 
 test('une frame vide n’est pas une image', () => {
@@ -21,6 +21,14 @@ test('une frame vide n’est pas une image', () => {
   const view = frameSrcOf(new Uint8Array([1, 2]), create);
   assert.equal(view.blob.type, 'image/jpeg');
   assert.equal(view.blob.size, 2);
+});
+
+test('un Blob du socket passe tel quel, sans copie', () => {
+  const create = (blob) => ({ blob });
+  const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
+  const view = frameSrcOf(blob, create);
+  assert.equal(view.blob, blob);
+  assert.equal(frameSrcOf(new Blob([]), create), null);
 });
 
 /** Onglet factice : on déclenche les évènements à la main. */
@@ -40,6 +48,7 @@ function montage() {
   const etats = [];
   const timers = [];
   const ouvertures = [];
+  const revoques = [];
   const flux = watchStream({
     href: 'https://relais.example/?share=leo',
     onFrame: (src) => frames.push(src),
@@ -47,19 +56,19 @@ function montage() {
     onCamera: (on) => cameras.push(on),
     open: (url) => { const socket = fauxSocket(url); sockets.push(socket); ouvertures.push(url); return socket; },
     create: () => 'blob:' + frames.length,
-    revoke: () => {},
+    revoke: (src) => revoques.push(src),
     timer: {
       set: (fn, ms) => { timers.push({ fn, ms }); return timers.length - 1; },
       clear: () => {},
     },
   });
-  return { flux, sockets, frames, etats, cameras, timers, ouvertures };
+  return { flux, sockets, frames, etats, cameras, timers, ouvertures, revoques };
 }
 
 test('l’aidant ouvre le flux du bon identifiant et passe en direct', () => {
   const { sockets, etats, ouvertures } = montage();
   assert.deepEqual(ouvertures, ['wss://relais.example/ws?share=leo&role=watch']);
-  assert.equal(sockets[0].binaryType, 'arraybuffer');
+  assert.equal(sockets[0].binaryType, 'blob');
   sockets[0].onopen();
   assert.deepEqual(etats, ['live']);
 });
@@ -67,11 +76,24 @@ test('l’aidant ouvre le flux du bon identifiant et passe en direct', () => {
 test('chaque frame binaire devient une image, un texte est ignoré', () => {
   const { sockets, frames } = montage();
   sockets[0].onopen();
-  sockets[0].onmessage({ data: new Uint8Array([1, 2, 3]) });
+  sockets[0].onmessage({ data: new Blob([new Uint8Array([1, 2, 3])]) });
   sockets[0].onmessage({ data: 'audience' });
-  sockets[0].onmessage({ data: new Uint8Array([]) });
+  sockets[0].onmessage({ data: new Blob([]) });
   assert.equal(frames.length, 1);
   assert.equal(frames[0], 'blob:0');
+});
+
+test('seuls les deux derniers blobs survivent, l’avant-dernier est révoqué', () => {
+  const { sockets, revoques } = montage();
+  sockets[0].onopen();
+  const frame = () => sockets[0].onmessage({ data: new Blob([new Uint8Array([1])]) });
+  frame();
+  frame();
+  assert.deepEqual(revoques, []);
+  frame();
+  assert.deepEqual(revoques, ['blob:0']);
+  frame();
+  assert.deepEqual(revoques, ['blob:0', 'blob:1']);
 });
 
 test('une coupure repasse en état lent puis retente, avec un délai qui grandit', () => {
