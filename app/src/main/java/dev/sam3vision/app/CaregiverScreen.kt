@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,9 +48,12 @@ fun CaregiverScreen(link: String, onBack: () -> Unit) {
     DisposableEffect(web) {
         onDispose { web.stopLoading(); web.destroy() }
     }
+    // Pas de navigationBarsPadding : la page gère elle-même l'encoche basse
+    // (caméra plein-bleed jusqu'au bord) ; un padding Compose laisserait une
+    // bande blanche sous l'image.
     Box(
         Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)
-            .statusBarsPadding().navigationBarsPadding(),
+            .statusBarsPadding(),
     ) {
         key(web) { AndroidView(factory = { web }, modifier = Modifier.fillMaxSize()) }
         if (loading) {
