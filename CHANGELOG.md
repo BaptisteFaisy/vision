@@ -4,6 +4,38 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
+
+- **Demande** : quand iSee détecte un humain, un objet ou un poteau en face,
+  dire au user d'aller de l'autre côté ; les 2 m tranchent s'il doit s'écarter
+  ou pas — l'ordre ne s'applique que si l'obstacle n'est pas trop à droite ou
+  à gauche de la ligne droite du user. Voix inchangée (mot du côté), guidage
+  normal + traversée.
+- Fait : `LateralNudgeTracker` (`:core`, partagé guidage normal + traversée)
+  passe de personnes-seules à tout obstacle (`Guidance.isObstacle`, nouveau
+  filtre partagé avec le couloir : sol, chemins/routes et panneaux hauts
+  exclus) ; le champ avant normalisé (0,25–0,75) devient une fenêtre de ±2 m
+  de l'axe (`AVOID_HALF_WIDTH_M`, écart latéral projeté avec le hfov —
+  `GuidanceAnnouncer` passe le sien, la traversée garde 67°), au-delà
+  l'obstacle passe au large et on se tait ; portée 3 → 4 m (`NUDGE_METERS =
+  Guidance.RANGE_METERS`, la même que le couloir — à 3 m tout l'écran tient
+  dans ±2 m, le critère serait vide) ; `LensSpec.halfTangent` nouveau, seul
+  endroit des trois projections (trait, décalage chiffré, fenêtre).
+  Approche confirmée (3 frames), ambiguïté des deux côtés et distance inconnue
+  inchangées. Contrat précédent mis à jour (3 tests : objet, champ, portée).
+- Sonde masque durcie (décision user) : le garde « en-tête énorme » exigeait un
+  net dans 0..4096 — le compteur thread est monotone, un net négatif est un
+  refill TLAB tombé dans la mesure vide (−9568 observés en suite complète),
+  pas une allocation ; plafond seul désormais (`<= 4096`, miroir du garde
+  8 Mo déjà sans plancher), l'intention (refus quasi gratuit) inchangée.
+- Preuves : `:core:testDebugUnitTest` 2 197 tests 0 échec (dont
+  `LateralNudgeTest` 16/16, `GuidanceAnnouncerTest` avec poteau,
+  `MaskRobustnessTest` vert en suite complète), `:app:testDebugUnitTest`
+  1 272 tests 0 échec (dont `CrossingPeopleTest` 15/15) ; rouge-avant observé
+  (4 échecs : poteau, voiture, bord-dans-2m, portée 4 m) ;
+  `check-kotlin-limits.py` vert. Runs r630 (`build-serveur`), suites
+  rejouées (2× `:app` vertes, `:core` verte après durcissement).
+
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 
 - **Demande** : détecter si les voitures sont en mouvement ou pas et
