@@ -11,6 +11,7 @@ import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
@@ -107,12 +108,19 @@ internal data class CrossingPatch(
     val state: CrossingState,
     val box: List<Float>?,
     val phase: TraversePhase,
+    /** Vrai quand un véhicule force l'attente (branche sans-feu : tait le « Traversez. »). */
+    val veto: Boolean = false,
+    /** Vrai une fois l'absence de feu confirmée (voix sans-feu, feu muet). */
+    val noLight: Boolean = false,
 )
 
 /**
  * Signal traversée de la frame, ou `null` quand le mode est coupé : la sonde
  * reste alors muette et ne marque aucun feu. Le veto ne voit un vert que
- * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente.
+ * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente — sauf
+ * absence de feu confirmée ([noLightGate], `null` = voix feu seule, legacy),
+ * où le feu se tait et la phrase vient de la branche sans-feu (véhicules
+ * puis « Traversez. », ordre user du 31/10).
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
@@ -124,12 +132,19 @@ internal fun crossingPatchOf(
     atMs: Long,
     language: SpeechLanguage,
     onCrop: CrossingCropTap? = null,
+    noLightGate: NoLightGate? = null,
 ): CrossingPatch? {
     if (!active) return null
     val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
     val decision = veto.update(light.greenForDecision, detections, focalPx, atMs)
+    if (noLightGate?.onFrame(light.box) == true) {
+        // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
+        // pour un feu absent), l'état publié reste rouge (aucun vert lu —
+        // pastille, bouton et vibrations inchangés).
+        return CrossingPatch(null, CrossingState.Red, null, decision.state, decision.veto, true)
+    }
     val vetoed = decision.crossingState()
     val cue = announcer.onFrame(atMs, vetoed, language)
     // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
@@ -137,7 +152,7 @@ internal fun crossingPatchOf(
     // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
     // sent (ordre user du 31/10, certitude rouge/vert).
     val confirmed = announcer.lastCue?.state ?: CrossingState.Red
-    return CrossingPatch(cue, confirmed, light.box, decision.state)
+    return CrossingPatch(cue, confirmed, light.box, decision.state, decision.veto, false)
 }
 
 /**

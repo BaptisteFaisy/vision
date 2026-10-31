@@ -22,6 +22,12 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * guetteur véhicules l'est avant le scan, qui lit son brut) ; les personnes
  * ne sont consultées que sur le silence des véhicules, pour ne pas perdre un
  * mot de décalage au profit d'une phrase jetée.
+ *
+ * Sans feu ([noLight], absence confirmée par le patch) : pas de scan (le
+ * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — la
+ * voiture en mouvement parle en premier (priorité absolue, même loin), sinon
+ * le verdict ([NoLightCrossWatch]) : « Traversez. » sans danger, « Attendez. »
+ * sur danger ([veto] ou mouvement brut), tous les deux toutes les 2 s.
  */
 internal fun crossingPhraseOf(
     cue: CrossingCue?,
@@ -34,12 +40,22 @@ internal fun crossingPhraseOf(
     width: Int = 0,
     height: Int = 0,
     scanTrigger: Boolean = false,
+    noLight: Boolean = false,
+    veto: Boolean = false,
 ): String? {
     if (cue != null) {
         CrossingVehicleWatch.update(detections, readings, atMs, language, cue)
         CrossingPeopleWatch.update(placed, atMs, language, cue, objects, width, height, readings)
         CrosswalkScanWatch.update(atMs, scanTrigger, movingNow = false, feu = true, language)
         return cue.phrase
+    }
+    if (noLight) {
+        CrosswalkScanWatch.update(atMs, false, movingNow = false, feu = false, language)
+        val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null)
+        val verdict = NoLightCrossWatch.update(
+            atMs, veto || CrossingVehicleWatch.movingNow, language, vehiclePhrase != null,
+        )
+        return vehiclePhrase ?: verdict
     }
     val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null)
     CrosswalkScanWatch.update(atMs, scanTrigger, CrossingVehicleWatch.movingNow, feu = false, language)
