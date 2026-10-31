@@ -15,9 +15,17 @@ import org.junit.Test
 
 /**
  * Bascule manuelle du mode Traversée : puce et ordre vocal (« traverser »,
- * « crossing mode on/off ») — plus aucun armement automatique.
+ * « crossing mode on/off », « crosswalk on/off ») — plus aucun armement
+ * automatique, coupé par défaut.
  */
 class IseeSteeringOrdersTest {
+
+    @Test
+    fun `le mode est coupe au depart`() = runTest {
+        val (probe, _) = probeHarness(this)
+
+        assertFalse(probe.state.value.crossingActive)
+    }
 
     @Test
     fun `la bascule manuelle active puis coupe`() = runTest {
@@ -51,6 +59,18 @@ class IseeSteeringOrdersTest {
 
         orders.runCrossing("crossing mode off")
 
+        assertFalse(probe.state.value.crossingActive)
+    }
+
+    @Test
+    fun `l ordre vocal crosswalk on active crosswalk off coupe`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val orders = orders(probe)
+
+        orders.runCrossing("crosswalk on")
+        assertTrue(probe.state.value.crossingActive)
+
+        orders.runCrossing("crosswalk off")
         assertFalse(probe.state.value.crossingActive)
     }
 

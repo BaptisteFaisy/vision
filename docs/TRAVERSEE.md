@@ -363,3 +363,26 @@ Protocole complet : `docs/COLLECTE-FEUX.md`.
 Matrice d'acceptation A1-A5, seuils (0 faux vert bloquant, rappel vert
 ≥ 50 % provisoire) et checklist vierge : `docs/RECETTE-FEUX-FR.md`.
 Non rejouée sur appareil.
+
+## 12. Traversée 100 % manuelle : « crosswalk on/off », fin de l'auto et de la proposition (31/10)
+
+Ordre user : le § 8 est abrogé — plus d'armement automatique (ni vision,
+ni GPS, ni retombée à la perte de vue) et plus de pastille « Crosswalk —
+cross? ». Le mode est coupé par défaut et ne bascule que par la puce ou
+l'ordre vocal : « crosswalk on » / « crosswalk off » (« crossing mode
+on/off » et « traverser » conservés).
+
+- **voix** : `CrossingVoiceCommand` n'accepte « crosswalk » qu'avec « on » /
+  « off » **après** — « crosswalk » seul, « Find the crosswalk », « Crosswalk
+  in 50 meters » et « On the crosswalk. » (dits par le guidage lui-même, que
+  le micro peut réentendre) ne sont pas des ordres ;
+- **supprimé** : `CrossingOfferWatch`, `CrossingOfferGate`,
+  `observeCrossingAuto`/`observeCrossingLoss`/`crossingSightPerFrame`
+  (ressuscités par erreur par un merge parallèle — morts, sans appelants),
+  `seesCrosswalk`, les champs `LiveProbeState.crossingOffer`/`crossingVisible`,
+  le paramètre `offer` de `crossingButtonLabel` et leurs tests ;
+- **gardé** : `seesNearCrosswalk` + `crossingOfferMeters` pour le guidage
+  latéral doux (« Gauche. », « Sur le passage. »), indépendant du mode ;
+  l'ambre `CROSSING_ACCENT_OFFER` (bandeau de scan) ; `CrossingLossGate`
+  et ses tests (décision de sortie, horloge couverte par
+  `CrossingTriggerExitDecisionTest`).

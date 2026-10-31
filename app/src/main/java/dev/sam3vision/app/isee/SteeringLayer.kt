@@ -13,7 +13,7 @@ import dev.sam3vision.core.live.SteeringCue
 /** Chemin libre : le même vert que le feu Traversée. */
 internal val STEERING_FREE = Color(0xFF2ECC71)
 
-/** Cap bouché : le même ambre que l'offre de traversée ([CROSSING_ACCENT_OFFER]). */
+/** Cap bouché : le même ambre que le bandeau de scan ([CROSSING_ACCENT_OFFER]). */
 internal val STEERING_BLOCKED = Color(0xFFF1C40F)
 
 /**

@@ -22,7 +22,7 @@ const val CROSSING_ACCENT_GREEN = 0xFF2ECC71.toInt()
 /** Rouge « attendez ». */
 const val CROSSING_ACCENT_RED = 0xFFE74C3C.toInt()
 
-/** Ambre « passage repéré, traversée proposée » (pastille d'offre, pas un état de feu). */
+/** Ambre « en cours » : bandeau de scan en attente, cap bouché. */
 const val CROSSING_ACCENT_OFFER = 0xFFF1C40F.toInt()
 
 /** Gris « mode Traversée coupé ». */
