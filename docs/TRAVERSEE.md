@@ -376,9 +376,13 @@ on/off » et « traverser » conservés).
   « off » **après** — « crosswalk » seul, « Find the crosswalk », « Crosswalk
   in 50 meters » et « On the crosswalk. » (dits par le guidage lui-même, que
   le micro peut réentendre) ne sont pas des ordres ;
-- **supprimé** : `CrossingOfferWatch`, `CrossingOfferGate`, `CrossingLossGate`,
+- **supprimé** : `CrossingOfferWatch`, `CrossingOfferGate`,
+  `observeCrossingAuto`/`observeCrossingLoss`/`crossingSightPerFrame`
+  (ressuscités par erreur par un merge parallèle — morts, sans appelants),
   `seesCrosswalk`, les champs `LiveProbeState.crossingOffer`/`crossingVisible`,
-  le paramètre `offer` de `crossingButtonLabel`, la pastille ambre
-  `CROSSING_ACCENT_OFFER` et leurs tests ;
+  le paramètre `offer` de `crossingButtonLabel` et leurs tests ;
 - **gardé** : `seesNearCrosswalk` + `crossingOfferMeters` pour le guidage
-  latéral doux (« Gauche. », « Sur le passage. »), indépendant du mode.
+  latéral doux (« Gauche. », « Sur le passage. »), indépendant du mode ;
+  l'ambre `CROSSING_ACCENT_OFFER` (bandeau de scan) ; `CrossingLossGate`
+  et ses tests (décision de sortie, horloge couverte par
+  `CrossingTriggerExitDecisionTest`).
