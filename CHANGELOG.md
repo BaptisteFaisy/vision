@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : sans feu, le verdict ne rate aucun danger sous quiet (branche `isee-no-light-quiet`)
+
+- **Ordre user** : même une voiture à plus de 15 m en mouvement doit dire de
+  ne pas traverser. Trou trouvé : à la perte du feu, le quiet de transition
+  empêchait de nourrir le guetteur — le verdict pouvait dire « Traversez. »
+  à tort pendant ~2 s.
+- **Fait** : sans feu, le guetteur reste nourri sous quiet (seule la phrase
+  est tue) ; avec feu : inchangé.
+- **Preuve** : `:core:testDebugUnitTest` 2 671 + `:app:testDebugUnitTest`
+  1 509 verts sur r630 (0 échec, dont 1 `NoLightCrossingTest` transition
+  nouveau — rouge prouvé sans le correctif, vert avec) ; UBS : 0 finding.
+
 ## 2026-10-31 — iSee : sans feu, le mouvement se dit à toute portée (branche `isee-traversee-loin-sans-feu`)
 
 - **Ordre user** : sans feu, une voiture en mouvement se dit dès qu'elle est
