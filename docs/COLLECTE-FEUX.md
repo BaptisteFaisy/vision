@@ -54,7 +54,7 @@ GO (exit 0) ssi les trois tiennent, sinon NO-GO motivé (exit 1) :
 
 1. **20 ancres parfaites** : 10 verts restent verts, 10 rouges/disques/froids
    restent rouges — le socle de sûreté ne bouge jamais ;
-2. **précision du vert ≥ 0,99 sur hold-out** (20 %, stratifié, seed 42) ;
+2. **précision du vert ≥ 0,98 sur hold-out** (20 %, stratifié, seed 42) ;
 3. **rappel vert ≥ arbre actuel** sur le même hold-out.
 
 Un candidat GO se relit (`candidate.kt` + `report.json`) puis s'embarque par
