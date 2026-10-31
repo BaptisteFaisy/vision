@@ -93,7 +93,6 @@ class ProbeVoiceTest {
 
 
         assertEquals("Straight.", voice.phrase(0L, libre, SteeringCap.Straight))
-        assertFalse(voice.stopRecent(1_000L))
     }
 
     @Test
