@@ -16,26 +16,62 @@ class CrossingStateTest {
     }
 
     @Test
-    fun `les prompts suivent le feu les voitures les personnes et le passage`() {
+    fun `les prompts suivent le feu pieton les voitures les personnes et le passage`() {
         assertEquals(
-            listOf("traffic light", "car", "person", "crosswalk"),
+            listOf("pedestrian traffic light", "car", "person", "crosswalk"),
             CrossingPrompts.PROMPTS,
         )
     }
 
     @Test
-    fun `les etiquettes anglaises de feu sont reconnues`() {
-        assertTrue(CrossingPrompts.isLightLabel("traffic light"))
-        assertTrue(CrossingPrompts.isLightLabel("Traffic Light"))
+    fun `les etiquettes pietonnes anglaises sont reconnues`() {
+        assertTrue(CrossingPrompts.isLightLabel("pedestrian traffic light"))
+        assertTrue(CrossingPrompts.isLightLabel("Pedestrian Traffic Light"))
         assertTrue(CrossingPrompts.isLightLabel("pedestrian light"))
-        assertTrue(CrossingPrompts.isLightLabel("stoplight"))
+        assertTrue(CrossingPrompts.isLightLabel("pedestrian signal"))
     }
 
     @Test
-    fun `les etiquettes francaises de feu sont reconnues`() {
-        assertTrue(CrossingPrompts.isLightLabel("feu tricolore"))
+    fun `les etiquettes pietonnes francaises sont reconnues`() {
         assertTrue(CrossingPrompts.isLightLabel("Feu piéton"))
-        assertTrue(CrossingPrompts.isLightLabel("  feu  "))
+        assertTrue(CrossingPrompts.isLightLabel("feux piétons"))
+        assertTrue(CrossingPrompts.isLightLabel("  feu pieton  "))
+        assertTrue(CrossingPrompts.isLightLabel("signal piéton"))
+    }
+
+    @Test
+    fun `les feux voiture sont ignores, ordre user`() {
+        assertFalse(CrossingPrompts.isLightLabel("traffic light"))
+        assertFalse(CrossingPrompts.isLightLabel("Traffic Light"))
+        assertFalse(CrossingPrompts.isLightLabel("stoplight"))
+        assertFalse(CrossingPrompts.isLightLabel("traffic signal"))
+        assertFalse(CrossingPrompts.isLightLabel("feu tricolore"))
+        assertFalse(CrossingPrompts.isLightLabel("  feu  "))
+    }
+
+    @Test
+    fun `un passant pieton n est pas un feu`() {
+        assertFalse(CrossingPrompts.isLightLabel("piéton"))
+        assertFalse(CrossingPrompts.isLightLabel("pedestrian"))
+    }
+
+    @Test
+    fun `l abrege oral feu pi reste un feu`() {
+        assertTrue(CrossingPrompts.isLightLabel("feu pi"))
+    }
+
+    @Test
+    fun `un compose pieton plus lampe reste un feu`() {
+        assertTrue(CrossingPrompts.isLightLabel("feu piéton rouge"))
+        assertTrue(CrossingPrompts.isLightLabel("green pedestrian traffic light"))
+        assertTrue(CrossingPrompts.isLightLabel("red pedestrian light"))
+    }
+
+    @Test
+    fun `un passage pieton n est pas un feu`() {
+        assertFalse(CrossingPrompts.isLightLabel("passage piéton"))
+        assertFalse(CrossingPrompts.isLightLabel("pedestrian crossing"))
+        assertFalse(CrossingPrompts.isLightLabel("zebra crossing"))
     }
 
     @Test
@@ -50,8 +86,26 @@ class CrossingStateTest {
     fun `la boite du feu au meilleur score est normalisee`() {
         val objects = listOf(
             light("car", 0.99f, listOf(0f, 0f, 10f, 10f)),
-            light("traffic light", 0.60f, listOf(0f, 0f, 100f, 200f)),
-            light("traffic light", 0.91f, listOf(50f, 100f, 150f, 300f)),
+            light("pedestrian traffic light", 0.60f, listOf(0f, 0f, 100f, 200f)),
+            light("pedestrian traffic light", 0.91f, listOf(50f, 100f, 150f, 300f)),
+        )
+        assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `un feu voiture au meilleur score ne vole pas la boite`() {
+        val objects = listOf(
+            light("traffic light", 0.99f, listOf(0f, 0f, 100f, 200f)),
+            light("pedestrian traffic light", 0.60f, listOf(50f, 100f, 150f, 300f)),
+        )
+        assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `un eclat au meilleur score ne vole pas la boite`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.99f, listOf(0f, 0f, 4f, 6f)),
+            light("pedestrian traffic light", 0.60f, listOf(50f, 100f, 150f, 300f)),
         )
         assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
     }
@@ -60,16 +114,18 @@ class CrossingStateTest {
     fun `sans feu detecte pas de boite`() {
         val objects = listOf(light("car", 0.99f, listOf(0f, 0f, 10f, 10f)))
         assertEquals(null, CrossingPrompts.selectLightBox(objects, 200, 400))
+        val carsOnly = listOf(light("traffic light", 0.99f, listOf(0f, 0f, 100f, 200f)))
+        assertEquals(null, CrossingPrompts.selectLightBox(carsOnly, 200, 400))
         assertEquals(null, CrossingPrompts.selectLightBox(emptyList(), 200, 400))
     }
 
     @Test
     fun `une boite invalide ne passe pas`() {
-        val flat = listOf(light("traffic light", 0.9f, listOf(10f, 10f, 10f, 50f)))
+        val flat = listOf(light("pedestrian traffic light", 0.9f, listOf(10f, 10f, 10f, 50f)))
         assertEquals(null, CrossingPrompts.selectLightBox(flat, 200, 400))
-        val short = listOf(light("traffic light", 0.9f, listOf(10f, 10f)))
+        val short = listOf(light("pedestrian traffic light", 0.9f, listOf(10f, 10f)))
         assertEquals(null, CrossingPrompts.selectLightBox(short, 200, 400))
-        val noSize = listOf(light("traffic light", 0.9f, listOf(0f, 0f, 10f, 10f)))
+        val noSize = listOf(light("pedestrian traffic light", 0.9f, listOf(0f, 0f, 10f, 10f)))
         assertEquals(null, CrossingPrompts.selectLightBox(noSize, 0, 0))
     }
 

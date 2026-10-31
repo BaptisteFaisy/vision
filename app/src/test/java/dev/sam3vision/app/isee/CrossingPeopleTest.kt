@@ -44,7 +44,7 @@ class CrossingPeopleTest {
         CrossingPeopleWatch.reset()
         val placed = listOf(
             PlacedLabel("car", centerX = 0.5f),
-            PlacedLabel("traffic light", centerX = 0.5f),
+            PlacedLabel("pedestrian traffic light", centerX = 0.5f),
             PlacedLabel("crosswalk", centerX = 0.5f),
         )
 

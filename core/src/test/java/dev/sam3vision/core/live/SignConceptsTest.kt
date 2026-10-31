@@ -37,8 +37,10 @@ class SignConceptsTest {
             assertTrue("reconnu $label", SignConcepts.isSign(label))
         }
         assertFalse(SignConcepts.isSign("traffic light"))
+        assertFalse(SignConcepts.isSign("pedestrian traffic light"))
         assertTrue(SignConcepts.isHighSign("stop sign", 0.10f, 2f))
         assertFalse(SignConcepts.isHighSign("traffic light", 0.10f, 2f))
+        assertFalse(SignConcepts.isHighSign("pedestrian traffic light", 0.10f, 2f))
     }
 
     @Test

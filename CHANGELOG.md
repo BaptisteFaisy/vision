@@ -35,6 +35,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
   (3 603 tests, 0 échec — dont `PeoplePathTest` 10/10, T9 rouge avant le
   branchement) ; `check-kotlin-limits.py` vert.
+## 2026-10-31 — Traversée : feux piétons seuls, boîtiers reconnus, voitures ignorées
+
+- **Demande** (ordre user) : SAM ne reconnaît pas les boîtiers des feux
+  piétons ni leur couleur — les reconnaître, et ne traiter que les feux
+  piétons, jamais les feux voiture.
+- **Fait** : `CrossingPrompts.LIGHT` = `pedestrian traffic light` (rappel
+  mesuré 87,5 %, `docs/MESURES-SAM3-FEUX.md` §2) ; `isLightLabel`
+  piéton seul (`traffic light`, `stoplight`, `traffic signal`, `feu`,
+  `feu tricolore` exclus, même suivis à la main) ; `selectLightBox`
+  écarte les éclats (< 1/10 de la plus grande boîte, §5a) avant le tri
+  au score ; `LivePrompts.default`/`outdoor` et `KnownSizes.DEPTH_ONLY`
+  suivent ; alias serveur `feu piéton`/`signal piéton` (+ rouge/vert,
+  couleur lue en local, jamais par prompt d'état) → `pedestrian
+  traffic light` (×2, parité).
+- **Non touché** : `PedLightGate`/`TrainedLightColor` (aucun réglage sans
+  données, `docs/CALIBRAGE-FEU.md` §6) — la couleur se lit sur la bonne
+  boîte, avec la même porte sûre (doute = « attendez »).
+- Preuves : 2286 tests `:core` + 1315 `:app` à 0 échec (r630),
+  `test_units.py` 400/400 (nouveau groupe `concepts : feux piétons
+  (traversée)`), UBS 0 critique, gardes `ci-core` locales OK ; checks PR
+  (`ci`, `ci-budget`, `couche0`) sur la PR.
 
 
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct

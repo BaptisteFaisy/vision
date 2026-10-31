@@ -26,7 +26,8 @@ from pathlib import Path
 # et leurs vérifications n'apparaîtraient nulle part.
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
-from tests_units import (boot_tests, concepts_street_tests, depth_tests, latency_tests,  # noqa: E402
+from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
+                         depth_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
                          native_tests, tracking_tests, weights_tests)
 
@@ -460,6 +461,8 @@ RUNNERS = (
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
     ("concepts : bordures et bateaux (rue)", "concepts", concepts_street_tests.test_concepts_street),
+    ("concepts : feux piétons (traversée)", "concepts",
+     crossing_concepts_tests.test_concepts_crossing),
     ("natif : source officielle", "segmentation_native", native_tests.test_native_source),
     ("natif : image conteneur (sam3 + deps)", "modal_app", native_tests.test_native_image),
     ("natif : récupération des poids", "segmentation_native", native_tests.test_native_fetch),
