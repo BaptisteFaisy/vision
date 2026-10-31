@@ -307,13 +307,16 @@ _state.update { it.cleared() }
     /**
      * Faut-il convertir la frame qui arrive ? Oui si une frame de réserve manque :
      * soit un créneau est libre et la cadence est écoulée, soit une requête est en vol
-     * et on prépare la suivante. Un seul buffer : au-delà, l'encodage serait du gâchis.
+     * et on prépare la suivante. Réserve pleine mais périmée : on ré-encode quand même
+     * (remplacement, jamais de file) pour drainer une frame fraîche (poste `up` divisé
+     * par ~2) au lieu d'une frame âgée d'un RTT.
      */
     fun wantsFrame(): Boolean {
         if (!foregroundGate.foreground) return false
         val active = (if (warmed) session else coldSession) ?: return false
-        // Réserve pleine : convertir une image de plus serait du CPU jeté.
-        if (reserve.pending) return false
+        // Réserve pleine et fraîche : convertir serait du CPU jeté. Périmée
+        // (> 1 période caméra) : la réalimenter, la suivante part au drain.
+        if (reserve.pending && !reserve.stale(clock(), STALE_RESERVE_MS)) return false
         if (active.saturated) return true
         return cadence.isDue(System.currentTimeMillis())
     }
@@ -452,3 +455,10 @@ _state.update { it.cleared() }
     }
 
 }
+
+/**
+ * Âge de la réserve au-delà duquel on ré-encode pendant le vol (~1,5 période
+ * caméra à 30 fps) : drainer une frame fraîche au lieu d'une frame âgée d'un
+ * RTT (poste `up`), pour ~3 encodages jetés par cycle au pire.
+ */
+private const val STALE_RESERVE_MS = 50L

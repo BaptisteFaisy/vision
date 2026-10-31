@@ -95,12 +95,11 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val showGlasses = rememberGlassesFeed(layers, open)
     val density = LocalDensity.current
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
-    val time = rememberSceneTime()
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
     GlassesProbeWiring(viewModel.probe, glassesLive && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     SceneGuidanceLayer(viewModel, open, with(density) { geo.pictureH.toDp() }) {
-        OrbLayer(view.scene, geo, time, open)
+        OrbLayer(view.scene, geo, open)
         with(density) {
             SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
         }
@@ -145,7 +144,9 @@ private fun rememberSceneTime(): Float {
 
 /** La boule, et la couronne de barres ambre quand iSee parle. */
 @Composable
-private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, time: Float, open: Float) {
+private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, open: Float) {
+    // Horloge lue ici et pas au-dessus : à 60 Hz, elle ne réévalue que la boule.
+    val time = rememberSceneTime()
     val look = orbLookOf(scene, time, open)
     val paint = rememberOrbPainter()
     val breathe = 1f + 0.012f * kotlin.math.sin(time * 1.3f) + 0.03f * look.you * look.amp
