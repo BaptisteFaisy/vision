@@ -176,13 +176,15 @@ internal fun LiveProbe.observeSpoken(
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
- * guetteur pour le `reset()` de début de séance. L'imminent ([CurbTier.NEAR],
- * 0,4 m) parle en alerte de sécurité (consigne « Montez le rebord. »,
- * [SafetyVoice], jamais de « Stop » — ordre user du 31/10) ; la pré-alerte
- * à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent doux.
- * L'imminent passe en Traversée, la pré-alerte y est coupée — et la
- * porte précède le watcher (un FAR coupé ne consomme ni confirmation ni
- * cooldown). `collect` séquentiel, voix douce en coroutine fille.
+ * guetteur pour le `reset()` de début de séance. Le palier 0,5 m
+ * ([CurbTier.NEAR]) parle en alerte de sécurité (« Bordure à 0,5 mètre. »,
+ * [SafetyVoice], jamais de « Stop » — ordre user du 31/10) ; la détection,
+ * les paliers 2 / 1,5 / 1 / 0,7 m ([CurbTier.FAR], 0,7 m [CurbTier.NEAR])
+ * et le bateau ([CurbTier.NONE]) restent doux.
+ * Les paliers proches (0,7 / 0,5 m) passent en Traversée, la détection,
+ * les paliers doux et le bateau y sont coupés — et la porte précède le
+ * watcher (un FAR coupé ne consomme ni confirmation ni cooldown).
+ * `collect` séquentiel, voix douce en coroutine fille.
  */
 internal fun LiveProbe.observeCurb(
     scope: CoroutineScope,
@@ -211,10 +213,11 @@ internal fun LiveProbe.observeCurb(
 }
 
 /**
- * Parole bordure : la marche imminente ([CurbTier.NEAR]) passe toujours,
- * même en Traversée et même après un stop (une alerte de sécurité ne se
- * tait pour rien) ; la pré-alerte ([CurbTier.FAR]) et le bateau
- * ([CurbTier.NONE]) sont coupés en Traversée. Pure, testée en JVM.
+ * Parole bordure : les paliers proches 0,7 / 0,5 m ([CurbTier.NEAR])
+ * passent toujours, même en Traversée et même après un stop (une alerte
+ * de sécurité ne se tait pour rien) ; la détection et les paliers doux
+ * ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) sont coupés en
+ * Traversée. Pure, testée en JVM.
  */
 internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
     cue.tier == CurbTier.NEAR || !crossingActive
