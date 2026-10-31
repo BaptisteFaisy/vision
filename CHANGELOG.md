@@ -4,6 +4,15 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Feux : seuil GO 0,99 → 0,98 (ordre user)
+
+- `PRECISION_FLOOR` 0,98 (`tools/train_light.py`) + docs alignées
+  (`COLLECTE-FEUX.md`, `TRAVERSEE.md` §10). Ancres et rappel inchangés.
+- Note : à 200–400 crops le seuil reste binaire en pratique (0 erreur = GO,
+  1 erreur = NO-GO) ; 0,98 mord à partir de ~500 crops.
+- Preuves : parité Python 6/6, limites OK ; checks PR.
+
+
 ## 2026-10-31 — Distances : étalonnage guidé du champ de vision
 
 - **Demande** : encore plus précis — annuler le biais systématique de focale.
