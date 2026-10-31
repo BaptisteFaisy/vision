@@ -111,6 +111,9 @@ class GlassesController(
         busy = { talkHost.busy },
         onNote = ::note,
     )
+
+    /** Écoute auto : armée à l'attache caméra, tirée au premier flux montant. */
+    private val autoListen = GlassesAutoListen(talkHost::autoListen)
     private var session: DeviceSession? = null
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
@@ -329,6 +332,7 @@ class GlassesController(
                 _state.update { it.copy(streaming = streaming) }
                 GlassesVideoLink.setStreaming(streaming)
                 voiceInvocations.onStreaming(streaming)
+                autoListen.onStreaming(streaming)
             },
             onMicActive = { active -> _state.update { it.copy(micActive = active) } },
             collectFrames = collectVideoFrames,
@@ -344,6 +348,8 @@ class GlassesController(
             // La dictée peut prendre le micro des lunettes tant que le flux tourne.
             GlassesMicLink.attach { currentAudio() }
             GlassesVideoLink.attachNotes(::note)
+            // Session ouverte : l'écoute part au premier flux montant.
+            autoListen.arm()
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
     }
@@ -432,6 +438,7 @@ class GlassesController(
         // Plus de flux, donc plus de micro à prêter à la dictée, ni d'image à l'accueil.
         talkHost.cancel()
         voiceInvocations.disarm()
+        autoListen.disarm()
         GlassesMicLink.detach()
         GlassesVideoLink.detachNotes()
         GlassesVideoLink.clear()
