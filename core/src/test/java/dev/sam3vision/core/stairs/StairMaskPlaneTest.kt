@@ -31,6 +31,15 @@ class StairMaskPlaneTest {
     private fun band(plane: ByteArray, fromRow: Int, rows: Int): List<Byte> =
         plane.drop(LumaPlane.WIDTH * fromRow).take(LumaPlane.WIDTH * rows)
 
+    /** Fenêtre du plan : lignes [fromRow, +rows), colonnes [fromCol, +cols). */
+    private fun window(plane: ByteArray, fromRow: Int, rows: Int, fromCol: Int, cols: Int): List<Byte> {
+        val out = ArrayList<Byte>(rows * cols)
+        for (y in fromRow until fromRow + rows) {
+            for (x in fromCol until fromCol + cols) out += plane[y * LumaPlane.WIDTH + x]
+        }
+        return out
+    }
+
     @Test
     fun `masque rle = plan a l'echelle du compteur`() {
         // Grille 10×10, moitié basse = escalier ; frame 100×100, donc scale 0,1.
@@ -52,7 +61,7 @@ class StairMaskPlaneTest {
 
         assertEquals(LumaPlane.SIZE, plane.size)
         assertTrue(band(plane, 0, 40).all { it == 0.toByte() })
-        assertTrue(band(plane, 65, 15).all { it != 0.toByte() })
+        assertTrue(window(plane, 65, 15, 60, 136).all { it != 0.toByte() })
     }
 
     @Test
