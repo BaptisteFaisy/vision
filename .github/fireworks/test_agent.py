@@ -28,7 +28,9 @@ Bibliothèque standard uniquement. Usage :
   python3 test_agent.py fix --repo O/R --pr 12 --branch feat/x --sha <sha>
 
 Codes : 0 = correctif poussé ; 1 = échec (compte rendu sur la PR) ; 2 = rien
-à faire (désactivé, déjà tenté, outil absent, aucun changement proposé).
+à faire (désactivé, déjà tenté, aucun changement proposé) ; 3 = outillage
+absent sur le runner (`zeroclaw` ou sa config) — **aucune tentative consommée**,
+le balayeur réessaiera au passage suivant.
 """
 
 import argparse
@@ -46,6 +48,11 @@ MAX_LIGNES = 1_500
 MAX_JOURNAL_LIGNES = 120
 REFUSES = (".github/", ".mergify.yml")
 MARK = "<!-- test-agent sha=%s -->"
+# Préfixe des sorties d'infrastructure : un runner non provisionné n'est pas un
+# échec de l'agent, donc on ne pose **aucune marque** et l'essai de la tête
+# reste ouvert. Vécu le 31/10 sur #652 : `zeroclaw introuvable` a brûlé l'unique
+# tentative deux minutes avant la pose du binaire sur r630.
+INFRA = "OUTILLAGE: "
 LABEL_OK = "agent-test"
 LABEL_HUMAN = "intervention-humaine"
 PREFIXE = "_fireworks · agent de test (zeroclaw `fw`)_"
@@ -244,12 +251,12 @@ def lancer_agent(prompt, dossier, budget=BUDGET_S):
     """Lance `zeroclaw agent --agent fw -m <prompt>`. Rend (ok, sortie)."""
     binaire = binaire_zeroclaw()
     if binaire is None:
-        return False, ("zeroclaw introuvable sur ce runner (PATH, "
-                       "~/.cargo/bin, /home/baptiste/.cargo/bin, "
-                       "/usr/local/bin)")
+        return False, INFRA + ("zeroclaw introuvable sur ce runner (PATH, "
+                               "~/.cargo/bin, /home/baptiste/.cargo/bin, "
+                               "/usr/local/bin)")
     conf = config_isolee()
     if conf is None:
-        return False, "config ZeroClaw absente (config.toml + .secret_key)"
+        return False, INFRA + "config ZeroClaw absente (config.toml + .secret_key)"
     try:
         proc = subprocess.run([binaire, "--config-dir", conf, "agent",
                                "--agent", "fw", "-m", prompt],
@@ -379,6 +386,9 @@ def lancer_sur_clone(repo, pr, extrait):
     debut = time.time()
     ok, sortie = lancer_agent(prompt, os.getcwd())
     log("agent rendu en %d s (ok=%s)" % (time.time() - debut, ok))
+    if not ok and sortie.startswith(INFRA):
+        # Runner non provisionné : rien n'a été tenté, rien ne doit être marqué.
+        return None, sortie[len(INFRA):]
     return changements(), sortie
 
 
@@ -433,6 +443,11 @@ def cmd_fix(args):
         comment(args.repo, args.pr, "Clone de la PR impossible : %s." % message)
         return 1
     fichiers, sortie = lancer_sur_clone(args.repo, args.pr, extrait)
+    if fichiers is None:
+        # Outillage absent : aucune marque, aucun commentaire (le balayeur le dit
+        # dans son journal), l'unique tentative de la tête reste ouverte.
+        log("outillage absent, rien tenté : %s" % sortie)
+        return 3
     return livrer(args.repo, args.pr, args, fichiers, sortie)
 
 
