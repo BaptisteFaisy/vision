@@ -2,6 +2,7 @@ package dev.sam3vision.app.live
 
 import dev.sam3vision.core.live.FrameTimings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,5 +54,32 @@ class LiveLatencyLogTest {
     @Test
     fun `tag unique du journal`() {
         assertEquals("ISEE_LAT", LiveLatencyLog.TAG)
+    }
+
+    @Test
+    fun `ligne serveur reprend le detail timings`() {
+        val t = complete().copy(server = mapOf("detr" to 52.4, "preprocess" to 7.1))
+        assertEquals("server: preprocess 7 ms · detr 52 ms", LiveLatencyLog.serverLine(t))
+    }
+
+    @Test
+    fun `ligne serveur absente sans detail`() {
+        assertNull(LiveLatencyLog.serverLine(complete()))
+    }
+
+    @Test
+    fun `ligne serveur absente si frame incomplete`() {
+        val t = complete().copy(captureToPixelMs = -1, server = mapOf("detr" to 52.0))
+        assertNull(LiveLatencyLog.serverLine(t))
+    }
+
+    @Test
+    fun `ligne serveur ignoree par le parseur`() {
+        val t = complete().copy(server = mapOf("detr" to 52.4))
+        val line = LiveLatencyLog.serverLine(t)!!
+        assertFalse(
+            "le parseur ne retient que les lignes latency N : $line",
+            line.contains(Regex("""(^| )latency \d""")),
+        )
     }
 }
