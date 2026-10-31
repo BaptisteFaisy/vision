@@ -1,21 +1,19 @@
 package dev.sam3vision.core.crossing
 
 /**
- * Porte anti-confusion du vert piéton : un vert classifié ne devient un ordre
- * de traverser que s'il ressemble à un bonhomme — élancé, pas confiné en
- * haut, sans rouge franc mélangé. Un feu de voiture (disque rond), un reflet
- * ou un bruit retombe en rouge : la porte ne fabrique jamais de vert, elle
- * n'en refuse que (binaire, ordre user du 31/10).
+ * Porte du vert piéton : un vert classifié ne devient un ordre de traverser
+ * que s'il n'est pas confiné en haut et sans rouge franc mélangé. Détection
+ * au plus large (31/10, ordre user) : la forme n'exige qu'une tache au moins
+ * aussi haute que large — bonhommes comme disques ronds passent, seuls les
+ * feux rouges, les feux éteints et le bruit restent refusés. Contrepartie
+ * assumée : un disque voiture vert mal étiqueté par SAM annonce
+ * « traversez » (les prompts piétons restent la seule garde, A2 levé —
+ * voir `docs/RECETTE-FEUX-FR.md`).
  *
- * Seuils calibrés sur feux français (10/2026, corpus Panoramax 235 lampes
- * labellisées, crops ≤ 48 px comme en production) : 0 vert sur 90 rouges,
- * 28/42 bonhommes verts acceptés, 0/47 disques voiture de face acceptés
- * (2 disques de profil passent : vue impossible téléphone en main face au
- * passage, et la confirmation temporelle les filtre). Hypothèse cadrage :
- * la boîte SAM serre la lampe (lampe centrée, le « bas du cadre » d'avant
- * ne sépare plus rien) — [GREEN_BOTTOM_MIN] n'est plus un prior de
- * position mais une garde anti-bruit-haut. Poses larges et pictogrammes
- * non standard : rouge documenté (voir test `pose large`).
+ * Historique (10/2026, corpus Panoramax 235 lampes, crops ≤ 48 px) : à
+ * élancement 1,5, 0 vert sur 90 rouges, 28/42 bonhommes, 0/47 disques de
+ * face — chiffres caducs à 1,0, non remesurés sur les 235 (échantillon
+ * vendu `feuxfr/`, `feuxfr2/` : 11/11 verts, 4 disques admis).
  * Pur Kotlin, testé en JVM (synthétique + échantillons `feuxfr/`, `feuxfr2/`).
  *
  * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : dans la
@@ -41,8 +39,13 @@ object PedLightGate {
      */
     internal const val GREEN_MIN_FRACTION = 0.002f
 
-    /** Élancement minimal de la tache verte (un disque est aussi large que haut). */
-    private const val ELONGATION_MIN = 1.5f
+    /**
+     * Élancement minimal de la tache verte : au moins aussi haute que large.
+     * 1,0 depuis le 31/10 (ordre user : détection au plus large — à 1,5, les
+     * verts cadrés caisson SAM ≤ 1,11 étaient refusés avant les disques
+     * voiture 1,30/1,47 ; les disques passent désormais aussi).
+     */
+    private const val ELONGATION_MIN = 1.0f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     private const val BBOX_MIN_PX = 3
@@ -53,8 +56,8 @@ object PedLightGate {
     /** R1b : fraction max de pixels verts en lisière (un disque n'est que contour). */
     private const val EDGE_MAX = 0.72f
 
-    /** R1b : allongement vertical min du nuage (écart-types, pas bbox). */
-    private const val CLOUD_ELONGATION_MIN = 1.5f
+    /** R1b : allongement vertical min du nuage (1,0 comme la bbox, même ordre). */
+    private const val CLOUD_ELONGATION_MIN = 1.0f
 
     /**
      * R1b : plancher bas — à 20 % ou moins, rejet dur sans appel (contrat
