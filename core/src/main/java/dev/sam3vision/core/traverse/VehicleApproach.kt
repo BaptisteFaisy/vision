@@ -53,12 +53,21 @@ class VehicleApproach {
     var cameraMoved: Boolean = false
         private set
 
+    /**
+     * Clés véhicules ([VehicleConcepts.keyOf]) dont chaque piste évaluée accuse
+     * la caméra : leurs croissances se taisent. Une clé sans piste évaluée
+     * (piste jeune) n'y figure jamais — on ne tait que ce qu'on a jugé.
+     */
+    var cameraMovedKeys: Set<String> = emptySet()
+        private set
+
     /** Oublie toutes les pistes (nouvelle traversée). */
     fun reset() {
         tracks.clear()
         nextId = 0
         lastVerdicts = emptyMap()
         cameraMoved = false
+        cameraMovedKeys = emptySet()
     }
 
     /**
@@ -90,6 +99,7 @@ class VehicleApproach {
         if (motion == null) {
             lastVerdicts = emptyMap()
             cameraMoved = false
+            cameraMovedKeys = emptySet()
             return
         }
         val dtSeconds = motion.dtMs / 1000f
@@ -100,6 +110,10 @@ class VehicleApproach {
             id to VehicleBackground.decide(id, boxDx, boxDy, motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs, 0f)
         }.toMap()
         cameraMoved = lastVerdicts.isNotEmpty() && lastVerdicts.all { it.value.verdict == Verdict.CAMERA_MOVED }
+        cameraMovedKeys = lastVerdicts.entries
+            .groupBy { VehicleConcepts.keyOf(tracks.getValue(it.key).label) }
+            .filterValues { group -> group.all { it.value.verdict == Verdict.CAMERA_MOVED } }
+            .keys
     }
 
     /** Véhicules confiants à boîte saine, seuls suivis. */

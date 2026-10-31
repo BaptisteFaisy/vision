@@ -66,4 +66,33 @@ class LiveStatsTest {
         assertEquals(0L, stats.p50Ms) // {-50 → 0, 50} : le 1er sur 2
         assertEquals(50L, stats.p95Ms)
     }
+
+    @Test
+    fun `ecarts vides valent zero`() {
+        val stats = MotionGapStats()
+        assertEquals(0, stats.samples)
+        assertEquals(0f, stats.averagePx)
+        assertEquals(0f, stats.p95Px)
+    }
+
+    @Test
+    fun `ecarts moyenne et p95 en px sur vingt mesures`() {
+        val stats = MotionGapStats()
+        (1..20).forEach { stats.record(it.toFloat()) } // 1, 2, ..., 20 px
+        assertEquals(20, stats.samples)
+        assertEquals(10.5f, stats.averagePx)
+        assertEquals(19f, stats.p95Px) // 19e sur 20
+    }
+
+    @Test
+    fun `ecarts negatifs bornes et non finis jetes`() {
+        val stats = MotionGapStats()
+        stats.record(-4f)
+        stats.record(Float.NaN)
+        stats.record(6f)
+        assertEquals(2, stats.samples) // NaN jeté, -4 → 0
+        assertEquals(3f, stats.averagePx)
+        stats.reset()
+        assertEquals(0, stats.samples)
+    }
 }
