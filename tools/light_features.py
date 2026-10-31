@@ -22,7 +22,7 @@ from pathlib import Path
 RED_HUE_DEG = 15.0
 GREEN_HUE_MIN, GREEN_HUE_MAX = 80.0, 175.0
 MIN_SAT, MIN_VAL = 0.45, 0.35
-GREEN_MIN_FRACTION = 0.004
+GREEN_MIN_FRACTION = 0.002  # 31/10, ordre user : suit PedLightGate.kt (feux lointains)
 RED_MAX_FRACTION = 0.02
 ELONGATION_MIN = 1.5
 BBOX_MIN_PX = 3
