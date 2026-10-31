@@ -260,7 +260,8 @@ class VehicleStateWatcher(
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections)
         val meters = metersByKey(readings)
-        val pick = pick(current, meters, tau, atMs, approach.cameraMoved)
+        val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
+        val pick = pick(current, meters, tau, atMs, hushed)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs)
         }
@@ -323,10 +324,10 @@ class VehicleStateWatcher(
         meters: Map<String, Float>,
         tau: ApproachVerdict,
         atMs: Long,
-        cameraMoved: Boolean,
+        hushed: Set<String>,
     ): Pick? {
         if (current.isEmpty()) return null
-        movingPick(current, meters, tau, cameraMoved)?.let { return it }
+        movingPick(current, meters, tau, hushed)?.let { return it }
         return stoppedPick(current, meters, atMs)
     }
 
@@ -335,12 +336,12 @@ class VehicleStateWatcher(
         current: Map<String, Current>,
         meters: Map<String, Float>,
         tau: ApproachVerdict,
-        cameraMoved: Boolean,
+        hushed: Set<String>,
     ): Pick? {
-        if (cameraMoved) return null
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
             .filter { candidate ->
+                if (candidate in hushed) return@filter false
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val growth = prev != null && current.getValue(candidate).area > prev.area
@@ -439,11 +440,7 @@ class VehicleStateWatcher(
     private fun isNear(meters: Float?): Boolean = meters == null || meters <= NEAR_MOVING_METERS
 
     /** Clé de suivi entre deux frames, miroir du veto (« Cars » et « car » fusionnent). */
-    private fun vehicleKey(label: String): String {
-        val key = KnownSizes.canonical(label)
-        if (key.endsWith("s") && key.length > 3) return key.dropLast(1)
-        return key
-    }
+    private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
 
     companion object {
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */

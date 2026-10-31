@@ -80,7 +80,7 @@ class LiveProbe(
     }
     /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
     private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
-        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer) } },
+        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } },
         onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
     private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 

@@ -25,12 +25,16 @@ suit le fond, exclue de l'approche) et expose le veto global
 `cameraMoved` (unanimité des pistes évaluées, jamais à l'aveugle).
 
 - Traversée : `TraversePipeline` estime le global sur ses paires de
-  luminance (`BlockMotionSource` réutilisé) et nourrit `TraverseVeto` —
-  le veto instantané (surface, proximité) reste conservateur.
+  luminance (`BlockMotionSource` réutilisé) et nourrit `TraverseVeto`.
+- Suppression **par clé** (`VehicleConcepts.keyOf`) : la croissance
+  (instantanée comme suivie) d'une clé se tait quand chacune de ses
+  pistes évaluées accuse la caméra ; une clé jeune, jamais jugée,
+  parle toujours. La proximité mesurée (< 15 m) ne se tait jamais.
 - Sonde : `LiveProbe.onFrame` offre son JPEG à `ProbeBackgroundMotion`,
   `observeVehicleState` y lit le dernier `FrameMotion` pour le veilleur.
 - Journal : `MotionLog` (`adb logcat -s iSeeMotion`) aux transitions
-  seules, 1/s max ; panneau debug (`state.motion`, écarts) en suivi.
+  seules, 1/s max ; panneau debug (`state.motion`, moy/p95 des écarts
+  via `MotionGapStats`, une frame de retard assumée).
 
 ## Seuils initiaux (à calibrer)
 
