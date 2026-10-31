@@ -333,6 +333,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   verts ; `:app:testDebugUnitTest` ciblé vert. Recette appareil : non rejouée
   (téléphone occupé puis déconnecté pendant la session).
 
+## 2026-10-31 — iSee : « Where are my keys » cherche sur place et montre le picto en grand (branche `feat/isee-where-are-my-keys`)
+
+- **Demande** : quand le user dit « where are my keys », iSee génère le
+  pictogramme jaune/noir via Muse et le met sur l'image, en grand au-dessus
+  de l'emplacement — automatiquement, au lieu de décrire l'image au LLM.
+- Fait : `PictoVoiceOrder.parseWhere` (`:core`) reconnaît « where is/are X »
+  (« where's » compris) pour les objets maison (`HomeModes.CONCEPTS`,
+  singulier/pluriel) ou possédés (« my ») ; toute autre question « where »
+  (« Where is the exit? », « Where am I? ») reste pour le LLM.
+  `IseePictoVoice` route l'ordre sur place comme « Find the X » (concept SAM
+  + génération + armement), après la chasse : un repère déjà armé reste
+  chassé, jamais régénéré. `PictoLayer` affiche le premier reconnu en grand
+  au-dessus de son emplacement (`IseePictoBig`, carte 200×230, image 176,
+  jaune/noir, nom sur une ligne), cadres et étiquette inchangés.
+  Doc `META-IMAGE.md` mise à jour (ordre Where, carte en grand).
+- Preuves : `:core:testDebugUnitTest` 2 248 tests, 5 échecs pré-existants
+  (`PrivateFileSettingsStoreTest`, permissions POSIX sous Windows, reproduits
+  sur la base intacte `dc88114`) dont `PictoVoiceOrderTest` 13/13 ;
+  `:app:testDebugUnitTest` 1 306 tests 0 échec dont `IseePictoVoiceTest`
+  14/14 ; `check-kotlin-limits.py` vert, `check-isee-design.py` vert,
+  `assembleDebug` vert (`app-debug.apk`).
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 
 - **Demande** : quand iSee détecte un humain, un objet ou un poteau en face,
