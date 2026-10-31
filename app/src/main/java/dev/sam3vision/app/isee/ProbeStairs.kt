@@ -2,10 +2,13 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairConcepts
+import dev.sam3vision.core.stairs.StairCountVoice
+import dev.sam3vision.core.stairs.StairLabelSignal
 import dev.sam3vision.core.stairs.StairLabelSignals
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -37,8 +40,7 @@ internal fun LiveProbe.observeStairs(
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
             // repli : un escalier nommé sans mesure reste un escalier.
             val readings = st.distanceLayer?.readings.orEmpty()
-            val found = StairLabelSignals.of(readings, st.width, st.height)
-                .takeIf { it.detected } ?: StairLabelSignals.ofLabels(st.labels)
+            val found = stairsFoundOf(st)
             // Profondeur du marchement le plus proche : la dernière marche par
             // profondeur (< 1 m) parle même quand le compteur est indisponible
             // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
@@ -66,4 +68,49 @@ internal fun LiveProbe.observeStairs(
         }
     }
     return watcher
+}
+
+/**
+ * Escalier nommé par SAM dans l'état : lectures de distance d'abord (sens +
+ * heure par la boîte), libellés bruts en repli (sans mesure : l'escalier n'a
+ * ni hauteur connue, ni pose, ni ancre garantie — mais SAM le nomme, et la
+ * voix compte quand même les marches vues). Pur, partagé par le guetteur et
+ * la voix du compteur.
+ */
+internal fun stairsFoundOf(st: LiveProbeState): StairLabelSignal {
+    val readings = st.distanceLayer?.readings.orEmpty()
+    return StairLabelSignals.of(readings, st.width, st.height)
+        .takeIf { it.detected } ?: StairLabelSignals.ofLabels(st.labels)
+}
+
+/**
+ * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
+ * un escalier et que la caméra voit des marches fraîches, dit combien
+ * (« 5 marches. ») — changements seuls ([StairCountVoice]), doux, coupé en
+ * Traversée. La voix part en coroutine fille : le battement ne s'arrête
+ * jamais pour une synthèse lente (le lecteur coupe le précédent, dernier
+ * gagnant). Sans escalier nommé ou sans compte frais : silence (auto-muet
+ * caméra coupée, séance finie). Rend le compteur pour le `reset()` de séance.
+ */
+internal fun LiveProbe.observeStairsCount(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+    tickMs: Long = StairCountVoice.COUNT_MS,
+): StairCountVoice {
+    val counter = StairCountVoice()
+    scope.launch {
+        while (true) {
+            delay(tickMs)
+            val st = state.value
+            if (st.crossingActive) continue
+            if (!stairsFoundOf(st).detected) continue
+            val phrase = counter.onTick(
+                true, StairCannyCount.lineCount(), System.currentTimeMillis(), language(),
+            ) ?: continue
+            scope.launch { voice.onPhrase(phrase, playerIdle(), urgent = false) }
+        }
+    }
+    return counter
 }
