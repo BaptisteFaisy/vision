@@ -165,16 +165,12 @@ internal fun LiveProbe.observeSpoken(
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
- * guetteur pour le `reset()` de début de séance. Un bord détecté (marche
- * imminente [CurbTier.NEAR] comme pré-alerte [CurbTier.FAR]) parle en alerte
- * de sécurité (« Stop, … », [SafetyVoice] : immédiat, coupe tout, dictée du
- * user comprise) ; seul le bateau ([CurbTier.NONE], pas de marche) reste
- * doux (voix ElevenLabs, attend le silence). L'imminent passe même en mode
- * Traversée (un bord sous le pied n'attend pas le vert) ; la pré-alerte est
- * coupée en Traversée (sa voix rouge/vert est propriétaire du son — un
- * « Stop » à 3 m en pleine traversée arrêterait le user au milieu).
- * Lecture séquentielle (`collect`) : une alerte confirmée est rare, et elle
- * ne doit pas être annulée par la frame suivante.
+ * guetteur pour le `reset()` de début de séance. L'imminent ([CurbTier.NEAR],
+ * 0,4 m) parle en alerte de sécurité (« Stop, … », [SafetyVoice]) ; la
+ * pré-alerte à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent
+ * doux. L'imminent passe en Traversée, la pré-alerte y est coupée — et la
+ * porte précède le watcher (un FAR coupé ne consomme ni confirmation ni
+ * cooldown). `collect` séquentiel, voix douce en coroutine fille.
  */
 internal fun LiveProbe.observeCurb(
     scope: CoroutineScope,
@@ -188,6 +184,7 @@ internal fun LiveProbe.observeCurb(
         state.collect { st ->
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = CurbSignal.of(readings, st.width, st.height)
+            if (st.crossingActive && signal.tier != CurbTier.NEAR) return@collect
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
             if (!shouldSpeakCurb(cue, st.crossingActive)) return@collect
             val alert = cue.safetyPhrase
@@ -195,7 +192,7 @@ internal fun LiveProbe.observeCurb(
                 safety.speak(alert)
                 return@collect
             }
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+            scope.launch { voice.onPhrase(cue.phrase, playerIdle(), urgent = false) }
         }
     }
     return watcher

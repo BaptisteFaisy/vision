@@ -27,6 +27,14 @@ class KnownSizesTest {
     }
 
     @Test
+    fun `famille bordure sans hauteur stenope, distance par profondeur`() {
+        listOf("kerb", "step", "steps", "bordure", "rebord", "curb ramp", "bateau").forEach { concept ->
+            assertNull(KnownSizes.heightMeters(concept))
+            assertTrue(concept in KnownSizes.DEPTH_ONLY)
+        }
+    }
+
+    @Test
     fun `synonymes francais et anglais donnent la meme hauteur`() {
         assertEquals(1.70f, KnownSizes.heightMeters("person")!!, 0.001f)
         assertEquals(1.70f, KnownSizes.heightMeters("Personne")!!, 0.001f)

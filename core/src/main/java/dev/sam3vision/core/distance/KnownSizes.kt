@@ -97,7 +97,11 @@ object KnownSizes {
      * leur distance vient de la profondeur ou du plan de sol. Clés canoniques
      * anglaises (voir [canonical]).
      */
-    val DEPTH_ONLY: Set<String> = setOf("stairs", "sidewalk", "crosswalk", "pole", "traffic light", "curb")
+    val DEPTH_ONLY: Set<String> = setOf(
+        "stairs", "sidewalk", "crosswalk", "pole", "traffic light", "curb",
+        "kerb", "step", "steps", "bordure", "rebord", "curb ramp", "bateau",
+        "ramp", "rampe", "gutter", "caniveau",
+    )
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
     private val FIRST_WORD: Map<String, Float> = TABLE

@@ -27,7 +27,8 @@ from pathlib import Path
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, latency_tests, live_fast_tests,  # noqa: E402
-                         live_fast_perf_tests, llm_tests, merge_tests, native_tests, weights_tests)
+                         live_fast_perf_tests, llm_tests, merge_tests, native_tests, tracking_tests,
+                         weights_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -207,18 +208,6 @@ def test_segmentation_logic(segmentation) -> None:
     check("concept inconnu passes through", segmentation.model_concept("kayak") == "kayak")
     box = segmentation._clamp_box([-10, 5, 9999, 20], 2.0, 2.0, (100, 40))
     check("box bornée dans l'image", box == [0.0, 10.0, 100.0, 40.0], str(box))
-
-
-def test_tracking(tracking) -> None:
-    check("tracker : plafond 16 (décision user 28/10)",
-          tracking.PROMPT_LIMIT == 16, str(tracking.PROMPT_LIMIT))
-    many = [f"c{i}" for i in range(20)]
-    check("tracker : troncature au plafond",
-          tracking.clean_prompts(many) == many[:tracking.PROMPT_LIMIT])
-    check("tracker : dédupliqués",
-          tracking.clean_prompts(["car", "car", "pole"]) == ["car", "pole"])
-    check("tracker : vides → PromptTooLong",
-          raises(lambda: tracking.clean_prompts([]), tracking.PromptTooLong))
 
 
 def test_llm_logic(llm) -> None:
@@ -423,7 +412,7 @@ RUNNERS = (
     ("contrat HTTP (app FastAPI)", "modal_app", test_http_contract),
     ("live_app (contrat /live)", "live_app", test_live_contract),
     ("live_app (pipeline /live)", "live_app", test_live_pipeline),
-    ("tracker (plafond PROMPT_LIMIT)", "tracking", test_tracking),
+    ("tracker (plafond PROMPT_LIMIT + FR→EN)", "tracking", tracking_tests.test_tracking),
     # Portage latence (mission 23) — codecs, cap, dédup, chronos, conteneur de prod.
     ("latence : codec bits", "imaging", latency_tests.test_mask_bits),
     ("latence : négociation mask_encoding", "imaging", latency_tests.test_mask_negotiation),
