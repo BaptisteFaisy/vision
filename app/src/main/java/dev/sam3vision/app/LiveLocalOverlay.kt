@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.os.SystemClock
+import dev.sam3vision.core.local.BlockMotionAdapter
 import dev.sam3vision.core.local.LocalOverlayConfig
 import dev.sam3vision.core.local.LocalOverlayEngine
 import dev.sam3vision.core.local.LocalReason
@@ -223,13 +224,13 @@ fun keyframeConfidence(frame: LiveFrame): Float =
  * l'état du direct — 30 ips dans l'état feraient recomposer les barres 30 fois par
  * seconde (contrat de fusion §2.4).
  *
- * Elle ne fait **aucune** estimation : tant que la lane A (M52) n'a pas livré
- * `core/…/motion/`, le moteur refuse au motif `NO_ESTIMATOR` et l'écran se comporte
- * exactement comme avant.
+ * Elle ne fait **aucune** estimation : le moteur consomme `BlockMotionAdapter`
+ * (PISTE1) et ne refuse au motif `NO_ESTIMATOR` que sans luminance — sinon
+ * l'écran se comporte exactement comme avant.
  */
 class LiveLocalOverlaySession(private val config: LocalOverlayConfig = LocalOverlayConfig()) {
 
-    private val engine = LocalOverlayEngine(config)
+    private val engine = LocalOverlayEngine(config).also { it.setMotion(BlockMotionAdapter()) } // PISTE1
     private val painter = LiveLocalOverlayPainter()
     private val sampler = LumaSampler()
 
