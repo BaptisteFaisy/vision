@@ -4,6 +4,21 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — CI : l'approbation automatique se réveille à chaque fin de `CI`, pas au cron (branche `ci/approve-declencheur`)
+
+- **Constat** : le `schedule` de ce dépôt est étalé par GitHub. Mesure : le cron
+  `*/5` de `pr-auto-merge` n'a produit que **17 passages en 3 jours** (un toutes
+  les 3-5 h). La promesse « approuvé dans les 5 min » de l'entrée précédente
+  était donc fausse en pratique.
+- **Fait** : `auto-approve.yml` se déclenche sur chaque fin de `CI` et de
+  `couche0` (`workflow_run`) — plusieurs fois par heure — et garde le cron en
+  filet pour le cas où plus rien ne tourne (push au jeton d'action : aucun run
+  n'aboutit, donc aucun `workflow_run`). Les branches de lot sont exclues par un
+  `if` de job : leurs fins de `CI` sont ~85 % du trafic et ne passent jamais en
+  `action_required`.
+- **Preuve** : à vérifier sur le premier run déclenché par `workflow_run` après
+  merge (log « runs en attente vus : N — approuvés : M »).
+
 ## 2026-10-31 — CI : l'approbation automatique ne réveille plus le stock de runs périmés (branche `ci/approve-fenetre`)
 
 - **Constat** : premier passage réel de `auto-approve` (17:07) — 30 runs en

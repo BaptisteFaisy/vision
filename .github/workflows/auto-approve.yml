@@ -24,8 +24,18 @@ name: auto-approve
 # propriétaire, `actions: write`), puis le jeton de l'installation en repli
 # (il peut approuver un run du dépôt ; s'il refuse, on le dit et on continue).
 on:
+  # Le vrai déclencheur : chaque fin de `CI` ou de `couche0` dans le dépôt.
+  # Mesuré le 31/10 : le `schedule` de ce dépôt est étalé par GitHub à **3-5 h**
+  # (17 passages en 3 jours pour un cron `*/5` de `pr-auto-merge`), donc un cron
+  # seul ne tient pas la promesse « approuvé dans les 5 min ». Les fins de `CI`
+  # et de `couche0` arrivent plusieurs fois par heure : le balayage est alors
+  # gratuit (un job de ~6 s) et quasi immédiat.
+  workflow_run:
+    workflows: ["CI", "couche0"]
+    types: [completed]
+  # Filet pour le cas où plus rien ne tourne (push au jeton d'action : aucun run
+  # n'aboutit, donc aucun `workflow_run` ne réveille).
   schedule:
-    # Filet : 5 min est la granularité la plus fine du cron GitHub.
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -40,6 +50,11 @@ concurrency:
 jobs:
   approve:
     name: approve
+    # Une branche de lot (`mergify/merge-queue/**`, `gh-readonly-queue/**`) est
+    # pilotée par la file : ses runs ne passent jamais en `action_required`, et
+    # ses fins de `CI` sont les plus fréquentes du dépôt (~85 %, mesuré le 31/10
+    # sur `pr-auto-merge`). On ne se réveille pas pour elles.
+    if: ${{ github.event_name != 'workflow_run' || (!startsWith(github.event.workflow_run.head_branch, 'mergify/merge-queue/') && !startsWith(github.event.workflow_run.head_branch, 'gh-readonly-queue/')) }}
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     steps:
