@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """budget_latence.py — source unique des chiffres du budget de latence perçue (mode Direct).
 
-`docs/LATENCE-BUDGET.md` ne porte aucun chiffre écrit à la main : ses 6 blocs chiffrés sont
+`docs/LATENCE-BUDGET.md` ne porte aucun chiffre écrit à la main : ses 7 blocs chiffrés sont
 générés ici (`--write-doc`) puis comparés ici (`--check-doc`). Corriger un chiffre se fait donc
 dans ce script, jamais dans le markdown : c'est la porte anti-dérive du budget.
 
 Chaque valeur interne est un entier de **dixièmes de milliseconde** : les sommes et les
 comparaisons sont exactes, l'affichage seul arrondit (au dixième, virgule décimale).
+(Seule exception : le bloc `mesures`, relevé en millisecondes entières comme `ISEE_LAT`.)
 
 Usage :
-    python3 scripts/budget_latence.py --selftest     # 14 assertions sur l'arithmétique
-    python3 scripts/budget_latence.py --check-doc    # 6 blocs : doc <-> script
+    python3 scripts/budget_latence.py --selftest     # 17 assertions sur l'arithmétique
+    python3 scripts/budget_latence.py --check-doc    # 7 blocs : doc <-> script
     python3 scripts/budget_latence.py --write-doc    # régénère les blocs du document
     python3 scripts/budget_latence.py --verdict      # verdict chiffré sur les 100 ms
 
@@ -79,6 +80,16 @@ ALLOCATION = (
      "u03 a retiré 6,8 Mo/frame de pression GC ; le reste est à mesurer"),
 )
 ALLOC_TOTAL = sum(cible for _, cible, _ in ALLOCATION)
+
+# --- § 10 : campagnes ISEE_LAT citées (ms entières, comme `parse_isee_lat.py`) --
+# (nom, N, moyenne `latency`, (capt, up, srv, rtt, mask, pixel), max, conditions)
+CAMPAGNES = (
+    ("baseline pré-PR2", 1257, 454, (171, 38, 102, 165, 5, 78), 1677,
+     "référence avant PR2"),
+    ("post-PR2", 1500, 380, (119, 38, 100, 164, 1, 58), 713,
+     "scène vide (0 masque), app à 430 % CPU"),
+)
+CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parseur, objectif
 
 # --- § 2 : étages du chemin Direct ------------------------------------------
 ETAGES_DOC = (
@@ -253,11 +264,41 @@ def table_budget():
     return "\n".join(lignes)
 
 
+def cellule_mesure(moyenne, maxi, cible_moyenne, cible_max):
+    """Verdict d'une campagne : « tenu » ou l'écart à chaque seuil dépassé."""
+    if moyenne <= cible_moyenne and maxi <= cible_max:
+        return "tenu"
+    ecarts = []
+    if moyenne > cible_moyenne:
+        ecarts.append(f"+{moyenne - cible_moyenne} en moyenne")
+    if maxi > cible_max:
+        ecarts.append(f"+{maxi - cible_max} en max")
+    return "non (" + ", ".join(ecarts) + ")"
+
+
+def table_mesures():
+    lignes = ["| campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) "
+              "| 300 / 500 ? | 250 / 500 ? | conditions |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|"]
+    (m1, x1), (m2, x2) = CIBLES_MESURES
+    for nom, n, moyenne, postes, maxi, conditions in CAMPAGNES:
+        lignes.append(
+            f"| {nom} | {n} | {moyenne} | {' | '.join(str(p) for p in postes)} | {maxi} "
+            f"| {cellule_mesure(moyenne, maxi, m1, x1)} "
+            f"| {cellule_mesure(moyenne, maxi, m2, x2)} | {conditions} |")
+    lignes += ["",
+               "Règle des verdicts : celle de `scripts/parse_isee_lat.py` "
+               "(`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; "
+               "`250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms)."]
+    return "\n".join(lignes)
+
+
 def blocs():
-    """Les 6 blocs chiffrés du document, dans l'ordre."""
+    """Les 7 blocs chiffrés du document, dans l'ordre."""
     return {"étages": table_etages(), "serveur": table_serveur(),
             "planchers": table_planchers(), "architectures": table_architectures(),
-            "verdict": table_verdict(), "budget": table_budget()}
+            "verdict": table_verdict(), "budget": table_budget(),
+            "mesures": table_mesures()}
 
 
 def lire_doc(chemin):
@@ -323,9 +364,11 @@ def verdict():
 
 
 def assertions():
-    """Les 14 assertions du `--selftest` : (libellé, prédicat)."""
+    """Les 17 assertions du `--selftest` : (libellé, prédicat)."""
     cloud = [percee_de(ar, client) for _, _, ar, client, _, v in ARCHITECTURES if v == "cloud"]
     local = percee_de(LOCAL_AR, CLIENT_LOCAL)
+    base, post = CAMPAGNES
+    gain_moyenne, gain_max = base[2] - post[2], base[4] - post[4]
     ecart_max = max(abs(client[i] - (base_de(mode)[i] + attente_de(ar, mode)[i]))
                     for _, _, ar, client, mode, _ in ARCHITECTURES
                     for i in (0, 1))
@@ -356,6 +399,13 @@ def assertions():
          lambda: H200_TEL < H200_MESURE[0]),
         (f"débit 30 fps = {dix_str(CIBLE_DIX // 3)} ms/frame",
          lambda: CIBLE_DIX // 3 == 333),
+        (f"campagnes ISEE_LAT : N={base[1]}/{post[1]}, moyennes {base[2]}/{post[2]} ms",
+         lambda: (base[1], base[2], post[1], post[2]) == (1257, 454, 1500, 380)),
+        ("aucune campagne ne tient 300/500 ni 250/500",
+         lambda: all(cellule_mesure(moy, mx, cm, cx).startswith("non")
+                     for _, _, moy, _, mx, _ in CAMPAGNES for cm, cx in CIBLES_MESURES)),
+        (f"gains post-PR2 : −{gain_moyenne} ms en moyenne, −{gain_max} en max",
+         lambda: (gain_moyenne, gain_max) == (74, 964)),
         (f"limites du script : {lignes} l., fonction max {pire[1]} l. ({pire[0]})",
          lambda: lignes < 500 and pire[1] < 50),
     )
