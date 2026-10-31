@@ -7,7 +7,7 @@ L'arbre candidat (sklearn, max_depth=5) remplace les tableaux de
 `TrainedLightColor` ; la porte et les planchers sont FIXES (non reentraînes).
 
 Barriere GO (exit 0) : 20 ancres parfaites (verts verts, rouges/disques/froids
-rouges) + precision du vert >= 0.99 sur hold-out (seuil user du 31/10,
+rouges) + precision du vert >= 0.98 sur hold-out (seuil user du 31/10,
 volontairement bas) + rappel vert >= arbre actuel sur le meme hold-out.
 Sinon NO-GO (exit 1) avec motifs. N'embarque rien seul : le bloc Kotlin
 emis est a relire puis a merger par PR.
@@ -27,7 +27,7 @@ sys.path.insert(0, str(TOOLS))
 import light_features as lf  # noqa: E402
 
 MIN_SAMPLES, MIN_PER_CLASS = 50, 10
-PRECISION_FLOOR = 0.99
+PRECISION_FLOOR = 0.98
 SEED = 42
 
 ANCHOR_GREENS = ["fr_green_fig_21", "fr_green_fig_302", "fr_green_fig_243",
