@@ -57,6 +57,20 @@ class OpticsTest {
     }
 
     @Test
+    fun `telephone cible donne les angles mesures`() {
+        // Redmi Note 13 Pro, caméra 0 (dumpsys media.camera du 2026-10-31) :
+        // focale 6,14 mm, tableau 9,1392×6,8544 mm, zone active = tableau 4080×3060.
+        // La chaîne live lit ces valeurs (CameraLens) : ce test verrouille le bout en bout.
+        val sensor = Optics.activeSensor(9.1392f, 6.8544f, 4080, 3060, 4080, 3060)
+        assertNotNull(sensor)
+        val spec = Optics.lensSpec(6.14f, sensor)!!
+        assertEquals(73.32f, spec.horizontalFovDeg, 0.05f)
+        assertEquals(58.34f, spec.verticalFovDeg, 0.05f)
+        assertEquals(2741.07f, spec.focalPx(4080, 3060), 0.5f)
+        assertEquals(343.98f, spec.focalPx(512, 384), 0.1f)
+    }
+
+    @Test
     fun `focale en pixels ne change pas avec la rotation`() {
         // même optique : redresser une frame ne change pas sa focale en pixels
         assertEquals(refFocalPx(512, 384), refFocalPx(384, 512), 1f)
