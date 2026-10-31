@@ -12,7 +12,7 @@ class GuidanceAnnouncerSteeringTest {
     fun `changement de cap fait reparler aussitot`() {
         val announcer = GuidanceAnnouncer()
 
-        assertEquals("Tout droit.", announcer.onFrame(0L, emptyList()))
+        assertEquals("Straight.", announcer.onFrame(0L, emptyList()))
         assertEquals(
             "Gauche.",
             announcer.onFrame(1_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Left),

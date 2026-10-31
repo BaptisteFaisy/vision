@@ -16,25 +16,25 @@ import dev.sam3vision.core.live.LivePrompts
  * cheminement) + les trois presets maison. [prompts] sont les concepts suivis
  * (l'état du direct) : la pastille active est verte, les autres neutres. Un tap
  * relance le direct sur le preset ([onPreset]), sans quitter l'écran — comme
- * le champ « Suivre », par le même chemin (`restartWith`, `LiveScreen`).
+ * le champ « Follow », par le même chemin (`restartWith`, `LiveScreen`).
  */
 @Composable
 fun HomePresetRow(prompts: List<String>, onPreset: (List<String>) -> Unit) {
     val maison = HomeModes.activeId(prompts)
     Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), Arrangement.spacedBy(8.dp)) {
         Chip(
-            "Rue",
+            "Street",
             if (maison == null && prompts == LivePrompts.default) AppColors.success else AppColors.surfaceHigh,
             { onPreset(LivePrompts.default) },
         )
         Chip(
-            "Extérieur",
+            "Outdoor",
             if (maison == null && prompts == LivePrompts.outdoor) AppColors.success else AppColors.surfaceHigh,
             { onPreset(LivePrompts.outdoor) },
         )
         HomeModes.ALL.forEach { preset ->
             Chip(
-                preset.labelFr,
+                preset.label,
                 if (maison == preset.id) AppColors.success else AppColors.surfaceHigh,
                 { onPreset(preset.prompts) },
                 icon = HomeIcons.presetIcon(preset.id),

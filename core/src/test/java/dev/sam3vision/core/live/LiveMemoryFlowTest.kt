@@ -40,13 +40,13 @@ class LiveMemoryFlowTest {
         val context = TimelineText.context(
             timeline.recent(now, 30_000L),
             timeline.summary(5_000L, 8_000L),
-            "Il y a 5 s",
+            "5 s ago",
         )
 
-        assertTrue(context.contains("Ce que la caméra a vu récemment"))
-        assertTrue(context.contains("Il y a 5 s"))
+        assertTrue(context.contains("What the camera saw recently"))
+        assertTrue(context.contains("5 s ago"))
         assertTrue(context.contains("personne"))
         assertTrue(context.contains("chien"))
-        assertTrue(context.contains("il y a 8 s"))
+        assertTrue(context.contains("8 s ago"))
     }
 }

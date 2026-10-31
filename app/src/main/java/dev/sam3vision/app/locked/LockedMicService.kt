@@ -157,11 +157,11 @@ class LockedMicService : Service() {
         if (state.phase == LockedMicPhase.LISTENING) return
         val rec = DictationRecorder(maxDurationMs = LockedMic.MAX_RECORD_MS)
         if (MicBus.busyFor(MicBus.Owner.DICTATION)) {
-            publish(state.failed("micro déjà occupé par la vidéo"))
+            publish(state.failed("microphone already busy with video"))
             return
         }
         if (!rec.start()) {
-            publish(state.failed("micro indisponible (permission ou matériel)"))
+            publish(state.failed("microphone unavailable (permission or hardware)"))
             return
         }
         Log.i(LockedMic.TAG, "micro ouvert")
@@ -207,7 +207,7 @@ class LockedMicService : Service() {
             publish(
                 outcome.fold(
                     onSuccess = { state.answered(it.answer) },
-                    onFailure = { state.failed(it.message ?: "échec sans message") },
+                    onFailure = { state.failed(it.message ?: "failure without message") },
                 ),
             )
         }
@@ -217,7 +217,7 @@ class LockedMicService : Service() {
      * App retirée des récentes : le service **reste armé**. Mesuré sur ce téléphone (HyperOS) :
      * le processus se fait tuer dès que l'app n'est plus visible, et un service arrêté ici
      * laissait l'écran verrouillé sans aucune notification — donc sans bouton. Il ne s'arrête
-     * plus que sur le geste « Arrêter » ou à la fermeture explicite de l'activité.
+     * plus que sur le geste « Stop » ou à la fermeture explicite de l'activité.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.i(LockedMic.TAG, "tâche retirée : le service reste armé")

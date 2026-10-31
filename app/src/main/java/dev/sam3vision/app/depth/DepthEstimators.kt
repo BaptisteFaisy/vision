@@ -23,12 +23,12 @@ object DepthEstimators {
         val estimator = outcome.getOrNull()
         if (estimator != null) return estimator
         val failure = outcome.exceptionOrNull()
-        var reason = "modèle DA2 absent — bouton Tester pour le télécharger"
+        var reason = "DA2 model missing — press Test to download it"
         if (failure != null) {
             Log.i(DepthBench.TAG, "DA2-OPEN-FAIL " + failure.javaClass.name + " " + failure.message)
             val detail = failure.message
             if (detail != null) {
-                reason = "ouverture DA2 : $detail"
+                reason = "DA2 open: $detail"
             }
         }
         return MissingAssetEstimator(DepthBackend.DA2, reason)
@@ -87,7 +87,7 @@ object DepthBench {
             val outcome = estimator.estimate(argb, width, height)
             val result = outcome.getOrNull()
             if (result == null) {
-                error = outcome.exceptionOrNull()?.message ?: "échec inconnu"
+                error = outcome.exceptionOrNull()?.message ?: "unknown failure"
                 break
             }
             times.add(result.inferenceMs)
@@ -102,7 +102,7 @@ object DepthBench {
 
     /** Une ligne : « DepthBench backend=DA2 medianMs=142 runs=5 map=252x252 ». */
     fun summary(result: DepthBenchResult): String {
-        if (!result.ok) return "backend=${result.backend.code} KO — ${result.error}"
+        if (!result.ok) return "backend=${result.backend.code} FAIL — ${result.error}"
         return "backend=${result.backend.code} medianMs=${result.medianMs} " +
             "runs=${result.runsMs.size} map=${result.mapWidth}x${result.mapHeight}"
     }

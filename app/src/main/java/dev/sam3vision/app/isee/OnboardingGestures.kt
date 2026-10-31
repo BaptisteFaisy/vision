@@ -37,7 +37,7 @@ import dev.sam3vision.app.BigButton
  * filmée part avec la question). Les cartes remplacent les boutons : la page
  * d'accueil n'en a aucun, le geste est la seule interface.
  *
- * L'écran est **rejouable** depuis les Réglages (« Revoir les gestes ») : c'est un
+ * L'écran est **rejouable** depuis les Réglages (« Replay gestures ») : c'est un
  * écran de la pile de navigation ([dev.sam3vision.app.Route.Onboarding]), pas une
  * garde de premier lancement — l'accueil iSee est utilisable tout de suite.
  *
@@ -135,11 +135,11 @@ private fun pose(
 private data class OnboardingCard(val kind: OnboardingGesture, val title: String, val hint: String)
 
 private val ONBOARDING_CARDS = listOf(
-    OnboardingCard(OnboardingGesture.Tap, "1 · Un tap", "La vidéo démarre. Un autre tap l'arrête."),
+    OnboardingCard(OnboardingGesture.Tap, "1 · One tap", "The video starts. Another tap stops it."),
     OnboardingCard(
         OnboardingGesture.Hold,
-        "2 · Appui long",
-        "Parlez en tenant : la photo filmée part avec la question.",
+        "2 · Long press",
+        "Speak while holding: the filmed photo goes with the question.",
     ),
 )
 
@@ -193,7 +193,7 @@ private fun OnboardingGestureCard(card: OnboardingCard) {
 }
 
 /**
- * L'écran complet, dans la pile de navigation (Réglages → « Revoir les gestes ») :
+ * L'écran complet, dans la pile de navigation (Réglages → « Replay gestures ») :
  * fond clair du design iSee, les trois cartes, et un bouton de retour.
  */
 @Composable
@@ -211,25 +211,25 @@ fun OnboardingGesturesScreen(onClose: () -> Unit) {
     ) {
         Text("iSee", color = IseeSceneColors.wordmark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Les deux gestes",
+            "The two gestures",
             color = IseeSceneColors.headingDark,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
         )
         Text(
-            "N'importe où sur l'écran — aucun bouton à viser.",
+            "Anywhere on the screen — no button to aim for.",
             color = IseeSceneColors.label,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
         )
         OnboardingGestureRow(Modifier.fillMaxWidth())
         Text(
-            "Ces gestes pilotent la page d'accueil iSee. Pour revoir cette page : " +
-                "Réglages, puis « Revoir les gestes ».",
+            "These gestures drive the iSee home page. To review this page: " +
+                "Settings, then “Replay gestures”.",
             color = IseeSceneColors.label,
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
         )
-        BigButton("Compris", true, IseeSceneColors.pillActiveBg, onClose)
+        BigButton("Got it", true, IseeSceneColors.pillActiveBg, onClose)
     }
 }

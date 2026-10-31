@@ -4,7 +4,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Ordre de navigation incompris : la dictée commence comme un ordre (« je
- * veux aller », « emmène-moi », « naviguer »…) mais ni
+ * veux aller », « take me », « navigate »…) mais ni
  * [VoiceDestinationParser] ni [dev.sam3vision.core.nav.NavigationIntentParser]
  * n'en tirent une destination (préposition sans suite, destination
  * avalée par la STT, hésitation).
@@ -18,7 +18,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * destination) ; les exclusions miroirs de ses expressions figées (« en
  * savoir plus », « dans le détail » restent des questions LLM). Les
  * questions (« où est X », « où aller ? ») ne portent aucune tête et
- * restent au LLM.
+ * restent au LLM. Miroirs anglais : « I want to go », « take me »,
+ * « navigate », « guide me », « going to », « go to », « directions ».
  *
  * Pur (JVM seule, sans Android ni coroutine) et ne lève jamais.
  */
@@ -78,9 +79,53 @@ object NavClarify {
         RegexOption.IGNORE_CASE,
     )
 
+    /** « I want/wanna/would like to go » (avec ou sans destination). */
+    private val I_WANT_GO_EN = Regex(
+        """\bi\s+(?:want\s+to|wanna|would\s+like\s+to)\s+go\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** « take/bring me » (avec ou sans suite). */
+    private val TAKE_ME_EN = Regex(
+        """\b(?:take|bring)\s+me\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** « navigate » (avec ou sans « to X »). */
+    private val NAVIGATE_EN = Regex("""\bnavigate\b""", RegexOption.IGNORE_CASE)
+
+    /** « guide me » (avec ou sans suite). */
+    private val GUIDE_ME_EN = Regex(
+        """\bguide\s+me\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** « going to » (« I'm going », avec ou sans X). */
+    private val GOING_TO_EN = Regex("""\bgoing\s+to\b""", RegexOption.IGNORE_CASE)
+
+    /** « go to » ancré au début, préposition présente mais X manquant. */
+    private val GO_TO_EN = Regex(
+        """^\s*go\s+to\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** « directions » ancré au début (avec ou sans « to X »). */
+    private val DIRECTIONS_EN = Regex(
+        """^\s*directions?\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** « need/have to go » : intention sans forme parser (demande la destination). */
+    private val NEED_TO_GO = Regex(
+        """\b(?:need|have)\s+to\s+go\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
     private val TETES = listOf(
         JE_ALLER, MENE_MOI, NAVIGUER, CONDUIS_MOI, ITINERAIRE,
         GUIDE_MOI, VA_PREP, ALLER_SEUL, DIRECTION,
+        I_WANT_GO_EN, TAKE_ME_EN, NAVIGATE_EN, GUIDE_ME_EN, GOING_TO_EN,
+        GO_TO_EN, DIRECTIONS_EN, NEED_TO_GO,
     )
 
     /**
@@ -105,7 +150,7 @@ object NavClarify {
 object NavClarifyText {
 
     /** « Je n'ai pas compris où tu veux aller… » (jamais blanche). */
-    fun ask(language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun ask(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr ->
             "Je n'ai pas compris où tu veux aller. Dis par exemple : je veux aller à la gare."
         SpeechLanguage.En ->

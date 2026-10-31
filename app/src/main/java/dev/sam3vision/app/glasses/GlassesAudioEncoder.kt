@@ -54,7 +54,7 @@ internal class GlassesAudioEncoder(
             codec = created
             bytesPerSecond = sampleRate * channels * 2
             true
-        }.onFailure { onLog("encodeur AAC indisponible : ${it.message}") }.getOrDefault(false)
+        }.onFailure { onLog("AAC encoder unavailable: ${it.message}") }.getOrDefault(false)
     }
 
     /**

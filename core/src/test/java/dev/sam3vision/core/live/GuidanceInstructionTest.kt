@@ -23,17 +23,17 @@ class GuidanceInstructionTest {
 
     @Test
     fun `gauche avec mesure donne mot et metres`() {
-        assertEquals("Gauche · ≈ 2,4 m", GuidanceInstruction.text(pulse()))
+        assertEquals("Left · ≈ 2.4 m", GuidanceInstruction.text(pulse()))
     }
 
     @Test
     fun `sans mesure le mot seul`() {
-        assertEquals("Tout droit", GuidanceInstruction.text(pulse(GuidanceWord.Straight, null)))
+        assertEquals("Straight", GuidanceInstruction.text(pulse(GuidanceWord.Straight, null)))
     }
 
     @Test
     fun `perime prefixe points de suspension`() {
-        assertEquals("… Gauche · ≈ 2,4 m", GuidanceInstruction.text(pulse(stale = true)))
+        assertEquals("… Left · ≈ 2.4 m", GuidanceInstruction.text(pulse(stale = true)))
     }
 
     @Test
@@ -42,15 +42,15 @@ class GuidanceInstructionTest {
     }
 
     @Test
-    fun `mot anglais mesure francaise`() {
+    fun `mot anglais mesure anglaise`() {
         assertEquals(
-            "Right · ≈ 2,4 m",
+            "Right · ≈ 2.4 m",
             GuidanceInstruction.text(pulse(GuidanceWord.Right), SpeechLanguage.En),
         )
     }
 
     @Test
     fun `mesure infinie ignoree mot seul`() {
-        assertEquals("Gauche", GuidanceInstruction.text(pulse(nearest = Float.NaN)))
+        assertEquals("Left", GuidanceInstruction.text(pulse(nearest = Float.NaN)))
     }
 }

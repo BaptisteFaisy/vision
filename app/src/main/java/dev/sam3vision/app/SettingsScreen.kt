@@ -242,7 +242,7 @@ private fun RoleSegmentCell(label: String, selected: Boolean, onClick: () -> Uni
     }
 }
 
-/** META GLASSES: the Ray-Ban Meta block on a white card (its tested French strings stay). */
+/** META GLASSES: the Ray-Ban Meta block on a white card. */
 @Composable
 internal fun MetaGlassesSection(glasses: GlassesController) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

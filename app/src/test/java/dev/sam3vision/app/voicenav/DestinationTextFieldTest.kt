@@ -37,19 +37,19 @@ class DestinationTextFieldTest {
     )
 
     @Test
-    fun `texte simple prefixe en aller a`() {
-        assertEquals("aller à gare de Lyon", typedDestinationQuery("gare de Lyon"))
+    fun `texte simple prefixe en go to`() {
+        assertEquals("go to gare de Lyon", typedDestinationQuery("gare de Lyon"))
     }
 
     @Test
     fun `espaces superflus reduits`() {
-        assertEquals("aller à la tour Eiffel", typedDestinationQuery("  la   tour  Eiffel  "))
+        assertEquals("go to la tour Eiffel", typedDestinationQuery("  la   tour  Eiffel  "))
     }
 
     @Test
     fun `ponctuation des bords retiree interieure gardee`() {
-        assertEquals("aller à Saint-Germain-en-Laye", typedDestinationQuery("…Saint-Germain-en-Laye !"))
-        assertEquals("aller à 12, rue de la Paix", typedDestinationQuery("12, rue de la Paix."))
+        assertEquals("go to Saint-Germain-en-Laye", typedDestinationQuery("…Saint-Germain-en-Laye !"))
+        assertEquals("go to 12, rue de la Paix", typedDestinationQuery("12, rue de la Paix."))
     }
 
     @Test

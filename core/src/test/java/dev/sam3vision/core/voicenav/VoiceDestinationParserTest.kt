@@ -106,6 +106,8 @@ class VoiceDestinationParserTest {
         assertIgnored("emmène-moi aux")
         assertIgnored("direction de")
         assertIgnored("direction du")
+        assertIgnored("direction to")
+        assertIgnored("directions to")
     }
 
     @Test
@@ -115,5 +117,20 @@ class VoiceDestinationParserTest {
         assertNull(VoiceDestinationParser.parseExtra("je veux aller à la gare"))
         assertNull(VoiceDestinationParser.parseExtra("aller à Lyon"))
         assertNull(VoiceDestinationParser.parseExtra("bonjour"))
+    }
+
+    @Test
+    fun `english orders render X`() {
+        assertDestination("I want to go to Lyon station", "Lyon station")
+        assertDestination("take me to the airport", "the airport")
+        assertDestination("navigate to Orly airport", "Orly airport")
+        assertDestination("go to the pharmacy", "the pharmacy")
+        assertDestination("direction Lyon station", "Lyon station")
+    }
+
+    @Test
+    fun `english questions stay questions`() {
+        assertIgnored("where is the nearest pharmacy?")
+        assertIgnored("how far is Lyon station?")
     }
 }

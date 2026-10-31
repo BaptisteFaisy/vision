@@ -37,9 +37,9 @@ class TtsLogicTest {
     @Test
     fun `libelle suit l etat et la phrase`() {
         assertNull(speakLabel(SpeakState.Idle, "Bonjour."))
-        assertEquals("voix en cours…", speakLabel(SpeakState.Synthesizing("Bonjour."), "Bonjour."))
-        assertEquals("lecture en cours…", speakLabel(SpeakState.Playing("Bonjour."), "Bonjour."))
-        assertEquals("voix OK", speakLabel(SpeakState.Done("Bonjour."), "Bonjour."))
+        assertEquals("voice running…", speakLabel(SpeakState.Synthesizing("Bonjour."), "Bonjour."))
+        assertEquals("playing…", speakLabel(SpeakState.Playing("Bonjour."), "Bonjour."))
+        assertEquals("voice OK", speakLabel(SpeakState.Done("Bonjour."), "Bonjour."))
         assertNull(speakLabel(SpeakState.Error("Autre.", "402"), "Bonjour."))
         assertEquals("402", speakLabel(SpeakState.Error("Bonjour.", "402"), "Bonjour."))
     }
@@ -75,9 +75,9 @@ class TtsLogicTest {
     }
 
     @Test
-    fun `vitesse affichee en francais`() {
-        assertEquals("×1,9", formatTtsSpeed(1.9f))
+    fun `vitesse affichee en anglais`() {
+        assertEquals("×1.9", formatTtsSpeed(1.9f))
         assertEquals("×2", formatTtsSpeed(2.0f))
-        assertEquals("×0,5", formatTtsSpeed(0.1f))
+        assertEquals("×0.5", formatTtsSpeed(0.1f))
     }
 }

@@ -4,7 +4,7 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.nav.NavigationIntentParser
 
 /**
- * Destination dictée en français oral → adresse brute, ou `null`.
+ * Destination dictée (français ou anglais oral) → adresse brute, ou `null`.
  *
  * Délègue d'abord à [NavigationIntentParser] (« je veux aller à X »,
  * « emmène-moi à X », « naviguer vers X »…), puis couvre les formes courtes
@@ -84,8 +84,8 @@ object VoiceDestinationParser {
         return destination
     }
 
-    /** Prépositions seules : « emmène-moi au », « direction de » sans suite ne sont pas des destinations. */
-    private val PREP_SEULE = setOf("a", "au", "aux", "en", "dans", "vers", "chez", "jusqu a", "de", "d", "du", "des")
+    /** Prépositions seules : « emmène-moi au », « direction de », « directions to » sans suite ne sont pas des destinations. */
+    private val PREP_SEULE = setOf("a", "au", "aux", "en", "dans", "vers", "chez", "jusqu a", "de", "d", "du", "des", "to")
 
     private fun emmeneSansA(text: String): String? {
         val raw = EMMENE_SANS_A.find(text)?.groupValues?.getOrNull(1) ?: return null

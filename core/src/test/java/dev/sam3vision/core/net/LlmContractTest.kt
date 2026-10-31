@@ -268,13 +268,13 @@ class LlmContractTest {
     }
 
     @Test
-    fun `402 — message parle de l IA, pas d ElevenLabs`() = runBlocking {
+    fun `402 — message parle de l AI, pas d ElevenLabs`() = runBlocking {
         NetContract.server(code = 402, body = """{"error":{"code":"no_provider_under_bid"}}""").use { server ->
             val result = client(server.baseUrl).askText("et la ?", emptyList())
 
             NetContract.assertError(result, ApiError.PaymentRequired::class.java, "402 LLM")
             val message = NetContract.errorOf(result).message.orEmpty()
-            assertTrue("message IA attendu, obtenu : $message", message.contains("IA refusée (402)"))
+            assertTrue("message AI attendu, obtenu : $message", message.contains("AI refused (402)"))
             assertFalse(message.contains("ElevenLabs"))
             assertEquals(1, server.requests.size)
         }

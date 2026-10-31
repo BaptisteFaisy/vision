@@ -97,4 +97,32 @@ class StopGuidanceTest {
         assertFalse(StopGuidanceParser.isEnable("désactive le GPS"))
         assertFalse(StopGuidanceParser.isDisable("réactive le GPS"))
     }
+
+    @Test
+    fun `english stop orders recognized`() {
+        assertTrue(StopGuidanceParser.isStop("stop the navigation"))
+        assertTrue(StopGuidanceParser.isStop("cancel the guidance"))
+        assertTrue(StopGuidanceParser.isStop("stop the GPS"))
+        assertTrue(StopGuidanceParser.isStop("okay, please stop the navigation"))
+    }
+
+    @Test
+    fun `english disable and enable recognized`() {
+        assertTrue(StopGuidanceParser.isDisable("disable the GPS"))
+        assertTrue(StopGuidanceParser.isDisable("deactivate the guidance"))
+        assertTrue(StopGuidanceParser.isDisable("turn the GPS off"))
+        assertTrue(StopGuidanceParser.isDisable("switch the navigation off"))
+        assertTrue(StopGuidanceParser.isEnable("enable the guidance"))
+        assertTrue(StopGuidanceParser.isEnable("turn the GPS on"))
+        assertTrue(StopGuidanceParser.isEnable("switch the GPS on"))
+    }
+
+    @Test
+    fun `english bare verbs do not cut`() {
+        assertFalse(StopGuidanceParser.isStop("stop"))
+        assertFalse(StopGuidanceParser.isStop("cancel"))
+        assertFalse(StopGuidanceParser.isDisable("disable"))
+        assertFalse(StopGuidanceParser.isEnable("enable"))
+        assertFalse(StopGuidanceParser.isStop("the navigation is accurate"))
+    }
 }

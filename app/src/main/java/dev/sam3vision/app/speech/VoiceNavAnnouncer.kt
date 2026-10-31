@@ -42,7 +42,7 @@ class VoiceNavAnnouncer(
     fun onEvent(
         atMs: Long,
         event: VoiceNavEvent,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
         if (event is VoiceNavEvent.Started && event.destination.isBlank()) return null
         val key = VoiceNavPolicy.key(event)

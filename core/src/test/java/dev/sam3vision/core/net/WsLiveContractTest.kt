@@ -54,7 +54,7 @@ class WsLiveContractTest {
 
         NetContract.assertError(result, ApiError.Network::class.java, "socket fermé")
         val error = NetContract.errorOf(result)
-        assertTrue("le message doit rester actionnable : ${error.message}", error.message!!.contains("fermé"))
+        assertTrue("le message doit rester actionnable : ${error.message}", error.message!!.contains("closed"))
     }
 
     @Test

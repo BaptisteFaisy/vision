@@ -19,7 +19,7 @@ class LockedMicTile : TileService() {
 
     override fun onClick() {
         if (!LockedMicBridge.armed) {
-            Toast.makeText(this, "Ouvre d'abord iSee", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Open iSee first", Toast.LENGTH_SHORT).show()
             return
         }
         if (!LockedMicBridge.toggle(this)) {
@@ -33,7 +33,7 @@ class LockedMicTile : TileService() {
     private fun refresh() {
         val tile = qsTile ?: return
         val view = LockedMicBridge.state.value.view()
-        tile.label = "iSee micro"
+        tile.label = "iSee mic"
         tile.state = if (LockedMicBridge.armed) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.subtitle = view.action ?: view.title
         tile.updateTile()

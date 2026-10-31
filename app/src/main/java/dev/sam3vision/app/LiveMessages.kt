@@ -11,17 +11,17 @@ import dev.sam3vision.core.speech.SpeechLanguage
  */
 
 /** Direct sans détecteur : l'écran reste utilisable pour les questions sur l'image. */
-const val SAM_ABSENT_LINE = "Détecteur SAM non configuré — questions sur l'image seule"
+const val SAM_ABSENT_LINE = "SAM detector not configured — image questions only"
 
 /** Direct sans détecteur joignable : même repli, avec la raison exacte. */
 fun samUnreachableLine(reason: String): String =
-    "Détecteur SAM injoignable ($reason) — questions sur l'image seule"
+    "SAM detector unreachable ($reason) — image questions only"
 
 /** Direct en WebSocket : une frame par message, sans le surcoût HTTP d'un POST. */
 const val TRANSPORT_WS: String = "WebSocket"
 
 /** Socket tombé : plus aucun transport (le POST a été retiré), à signaler franchement. */
-const val TRANSPORT_WS_KO: String = "WebSocket KO"
+const val TRANSPORT_WS_KO: String = "WebSocket down"
 
 /**
  * Direct sur le **tracker** (`/session` + `/frame`) : les ids d'objets sont stables d'une
@@ -30,7 +30,7 @@ const val TRANSPORT_WS_KO: String = "WebSocket KO"
 const val TRANSPORT_TRACK: String = "Tracker"
 
 /** Aucune clé LLM : rien ne peut fonctionner, ni la vision ni les questions. */
-const val LLM_ABSENT_LINE = "Clé LLM absente — renseigne-la dans Réglages"
+const val LLM_ABSENT_LINE = "LLM key missing — enter it in Settings"
 
 /**
  * Libellé du transport : le tracker prime, sinon WebSocket ou KO selon le socket.
@@ -43,7 +43,7 @@ fun transportLabel(trackerEnabled: Boolean, wsConnected: Boolean): String = when
 }
 
 /** Question posée avant la première frame gardée : on le dit clairement, sans bloquer. */
-const val NO_FRAME_LINE = "Aucune image pour l'instant — recadre et réessaie dans une seconde"
+const val NO_FRAME_LINE = "No image yet — reframe and retry in a second"
 
 /**
  * Contexte du journal pour le LLM, `null` s'il n'y a **aucune piste** : mieux vaut
@@ -54,7 +54,7 @@ fun timelineContextOrNull(
     global: TimelineSummary,
     focus: TimelineSummary?,
     label: String?,
-    language: SpeechLanguage = SpeechLanguage.Fr,
+    language: SpeechLanguage = SpeechLanguage.DEFAULT,
 ): String? {
     if (global.empty && (focus == null || focus.empty)) return null
     return TimelineText.context(global, focus, label, language)

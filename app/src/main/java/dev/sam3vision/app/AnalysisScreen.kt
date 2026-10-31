@@ -45,7 +45,7 @@ fun AnalysisScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         ScreenHeader(
-            title = "Analyse",
+            title = "Analysis",
             subtitle = state.analysis?.tags?.takeIf { it.isNotEmpty() }?.joinToString(" · "),
             onBack = onBack,
             onSettings = onOpenSettings,
@@ -75,7 +75,7 @@ private fun PhaseBlock(phase: Phase, onRetry: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusBanner(phase.message, AppColors.danger)
-            BigButton("Réessayer", true, AppColors.danger, onRetry)
+            BigButton("Retry", true, AppColors.danger, onRetry)
         }
 
         else -> Unit
@@ -90,9 +90,9 @@ private fun AnalysisActions(state: UiState, onOpenChat: () -> Unit, onToggleMask
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BigButton("Poser une question", state.hasPhoto, AppColors.primary, onOpenChat, 0.62f)
+        BigButton("Ask a question", state.hasPhoto, AppColors.primary, onOpenChat, 0.62f)
         BigButton(
-            if (state.showMasks) "Masques on" else "Masques off",
+            if (state.showMasks) "Masks on" else "Masks off",
             state.overlays.isNotEmpty(),
             AppColors.surfaceHigh,
             onToggleMasks,

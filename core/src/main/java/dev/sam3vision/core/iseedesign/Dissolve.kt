@@ -51,7 +51,7 @@ data class SceneGeom(
 const val SATELLITE_SHARE = 0.155f
 
 fun iSeeGeometry(width: Float, height: Float, morph: Float = 1f): SceneGeom {
-    require(width > 0f && height > 0f) { "écran" }
+    require(width > 0f && height > 0f) { "screen" }
     val e = morph.coerceIn(0f, 1f)
     val r = lerp(width * 0.205f, width * 0.335f, e)
     val cx = lerp(width * 0.72f, width * 0.50f, e)

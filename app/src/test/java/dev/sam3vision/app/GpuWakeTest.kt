@@ -57,11 +57,11 @@ class GpuWakeTest {
     @Test
     fun `la ligne de log donne la duree et l'issue`() {
         assertEquals(
-            "réveil GPU (https://g.test) : 4.2 s, carte chaude",
+            "GPU wake (https://g.test): 4.2 s, warm card",
             GpuWake.wakeLine("https://g.test", true, 4200),
         )
         assertEquals(
-            "réveil GPU (https://g.test) : 0.0 s, échec réponse négative",
+            "GPU wake (https://g.test): 0.0 s, failure negative response",
             GpuWake.wakeLine("https://g.test", false, 12),
         )
     }
@@ -69,21 +69,21 @@ class GpuWakeTest {
     @Test
     fun `l'echec porte le code http`() {
         assertEquals(
-            "réveil GPU (https://g.test) : 1.5 s, échec 404",
+            "GPU wake (https://g.test): 1.5 s, failure 404",
             GpuWake.wakeLine("https://g.test", false, 1500, ApiError.BackendStopped()),
         )
         assertEquals(
-            "réveil GPU (https://g.test) : 1.5 s, échec 500",
+            "GPU wake (https://g.test): 1.5 s, failure 500",
             GpuWake.wakeLine("https://g.test", false, 1500, ApiError.Http(500, "boom")),
         )
     }
 
     @Test
     fun `l'echec par timeout dit delai depasse`() {
-        assertEquals("délai dépassé", GpuWake.wakeMotif(ApiError.Timeout()))
-        assertEquals("délai dépassé", GpuWake.wakeMotif(SocketTimeoutException("read timed out")))
+        assertEquals("timed out", GpuWake.wakeMotif(ApiError.Timeout()))
+        assertEquals("timed out", GpuWake.wakeMotif(SocketTimeoutException("read timed out")))
         assertEquals(
-            "réveil GPU (https://g.test) : 180.0 s, échec délai dépassé",
+            "GPU wake (https://g.test): 180.0 s, failure timed out",
             GpuWake.wakeLine("https://g.test", false, 180_000, ApiError.Timeout()),
         )
     }
@@ -107,6 +107,6 @@ class GpuWakeTest {
 
         assertTrue(woken)
         assertEquals(1, lines.size)
-        assertTrue(lines[0], lines[0].endsWith("échec délai dépassé"))
+        assertTrue(lines[0], lines[0].endsWith("failure timed out"))
     }
 }

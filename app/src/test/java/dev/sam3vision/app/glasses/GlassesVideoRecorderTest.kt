@@ -18,15 +18,15 @@ class GlassesVideoRecorderTest {
         val sonore = GlassesMessages.recordingSaved("x.mp4", 12, withSound = true)
         val muet = GlassesMessages.recordingSaved("x.mp4", 12, withSound = false)
 
-        assertTrue(sonore.text, sonore.text.contains("avec le son"))
-        assertTrue(muet.text, muet.text.contains("sans son"))
+        assertTrue(sonore.text, sonore.text.contains("with sound"))
+        assertTrue(muet.text, muet.text.contains("(silent)"))
     }
 
     @Test
     fun `le nom porte la date et l extension`() {
         val name = recordingFileName(1_793_000_000_000)
 
-        assertTrue(name, name.startsWith("isee-lunettes-"))
+        assertTrue(name, name.startsWith("isee-glasses-"))
         assertTrue(name, name.endsWith(".mp4"))
         assertTrue(name, name.contains("-"))
         assertEquals(name, recordingFileName(1_793_000_000_000))

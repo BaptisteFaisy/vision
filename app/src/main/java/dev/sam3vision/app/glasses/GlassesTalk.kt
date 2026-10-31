@@ -135,18 +135,18 @@ class GlassesTalk(
             phase = GlassesTalkPhase.IDLE
             outcome
                 .onSuccess { onHeard(it.text, it.pcm) }
-                .onFailure { onNote(GlassesMessages.talkFailed(it.message ?: "dictée impossible")) }
+                .onFailure { onNote(GlassesMessages.talkFailed(it.message ?: "dictation impossible")) }
             onListening(false)
         }
     }
 
     /** Micro coupé puis transcrit par le moteur de dictée de l'app. */
     private suspend fun transcribe(active: PcmSource?): Result<GlassesTalkHeard> {
-        if (active == null) return Result.failure(IllegalStateException("micro lunettes perdu"))
+        if (active == null) return Result.failure(IllegalStateException("glasses mic lost"))
         val pcm = active.stopAndCollect()
         val client = engine(settings())
             ?: return Result.failure(
-                IllegalStateException("aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"),
+                IllegalStateException("no dictation engine: Meta or ElevenLabs key (Settings)"),
             )
         return DictationUseCase(client).invoke(pcm).map { text -> GlassesTalkHeard(text, pcm) }
     }

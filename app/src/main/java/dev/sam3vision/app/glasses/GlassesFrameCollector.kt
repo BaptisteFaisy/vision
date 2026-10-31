@@ -65,15 +65,15 @@ internal class GlassesFrameCollector(
     private suspend fun emit(frame: VideoFrame) {
         val image = withContext(Dispatchers.IO) { decodeToArgb(frame) }
         if (image == null) {
-            onLog("frame non décodable : ignorée")
+            onLog("frame not decodable: skipped")
             return
         }
         val jpeg = withContext(Dispatchers.IO) { encode(image, nowMs()) }
         if (jpeg == null) {
-            onLog("frame non encodable : ignorée")
+            onLog("frame not encodable: skipped")
             return
         }
-        onLog("frame transmise : ${jpeg.width}x${jpeg.height}")
+        onLog("frame forwarded: ${jpeg.width}x${jpeg.height}")
         onFrame(jpeg)
     }
 

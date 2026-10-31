@@ -23,7 +23,7 @@ internal const val EXTRA_MOCK = "mock"
 internal const val EXTRA_ANALYZE = "analyze"
 
 /** Ligne de journal commune à l'armement automatique et à la bascule manuelle. */
-internal const val ANALYZE_ARMED_MESSAGE = "analyse réseau ACTIVÉE (1 frame / 1,5 s)"
+internal const val ANALYZE_ARMED_MESSAGE = "network analysis ARMED (1 frame / 1.5 s)"
 
 /** Une étape du démarrage, exécutée dans l'ordre rendu par [SpikeLaunch.plan]. */
 internal enum class LaunchStep {

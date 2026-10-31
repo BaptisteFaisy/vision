@@ -6,7 +6,7 @@ import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.StatusBanner
 
 /** Texte du bandeau d'écart, affiché pendant le recalcul qui suit un écart. */
-const val OFF_ROUTE_BANNER_TEXT = "Écart — recalcul…"
+const val OFF_ROUTE_BANNER_TEXT = "Off route — recalculating…"
 
 /**
  * Texte du bandeau selon l'état d'écart : [OFF_ROUTE_BANNER_TEXT] si écart,
@@ -16,7 +16,7 @@ fun offRouteBannerText(offRoute: Boolean): String? =
     if (offRoute) OFF_ROUTE_BANNER_TEXT else null
 
 /**
- * Bandeau « Écart — recalcul… » pendant l'écart de route, rien sinon.
+ * Bandeau « Off route — recalculating… » pendant l'écart de route, rien sinon.
  *
  * Réutilise [StatusBanner] (couleur warning) : un seul bandeau d'état dans
  * l'app, pas un style par écran. Alimenté par `GuidanceUpdate.offRoute`

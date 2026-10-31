@@ -23,6 +23,8 @@ object CrossingManeuver {
         "passage pieton",
         "traversez",
         "crosswalk",
+        "pedestrian crossing",
+        "cross the street",
     )
 
     /**

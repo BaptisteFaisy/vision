@@ -29,14 +29,14 @@ internal class CaregiverWebClient(
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
         if (request.isForMainFrame) {
             onLoading(false)
-            onError("La page n'a pas chargé (${error.errorCode}) : vérifie la connexion, puis rouvre la page.")
+            onError("The page did not load (${error.errorCode}): check the connection, then reopen the page.")
         }
     }
 
     override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
         if (request.isForMainFrame) {
             onLoading(false)
-            onError("Le site répond ${response.statusCode} : le lien de suivi est peut-être faux, puis rouvre la page.")
+            onError("The site answers ${response.statusCode}: the tracking link may be wrong, then reopen the page.")
         }
     }
 

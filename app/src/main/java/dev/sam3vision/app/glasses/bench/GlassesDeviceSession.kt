@@ -21,20 +21,20 @@ private const val FRAME_RATE = 24
 internal suspend fun GlassesRuntime.runSession(session: DeviceSession) {
     this.session = session
     launchSafe(start = CoroutineStart.UNDISPATCHED) {
-        session.errors.collect { error -> onLog("erreur de session : ${describe(error)}") }
+        session.errors.collect { error -> onLog("session error: ${describe(error)}") }
     }
     launchSafe(start = CoroutineStart.UNDISPATCHED) {
         session.state.collect { state -> onSessionState(state, session) }
     }
     io { session.start() }
-    onLog("session démarrée")
+    onLog("session started")
 }
 
 private suspend fun GlassesRuntime.onSessionState(
     state: DeviceSessionState,
     session: DeviceSession,
 ) {
-    onLog("session : $state")
+    onLog("session: $state")
     // La caméra n'a de sens qu'une fois la session réellement connectée.
     if (state == DeviceSessionState.STARTED) addCamera(session)
 }
@@ -48,19 +48,19 @@ private suspend fun GlassesRuntime.addCamera(session: DeviceSession) {
     val result = io { session.addCamera(configuration) }
     result.fold(
         onSuccess = { camera -> launchSafe { startStream(camera) } },
-        onFailure = { error, _ -> onLog("caméra refusée : ${describe(error)}") },
+        onFailure = { error, _ -> onLog("camera refused: ${describe(error)}") },
     )
 }
 
 private suspend fun GlassesRuntime.startStream(camera: Camera) {
     this.camera = camera
-    onLog("caméra ajoutée")
+    onLog("camera added")
     val stream = camera.stream
     this.stream = stream
     // Abonnement avant start() : état et erreurs émis pendant le handshake sont
     // ainsi vus plutôt que perdus.
     launchSafe(start = CoroutineStart.UNDISPATCHED) {
-        stream.state.collect { state -> onLog("flux : $state") }
+        stream.state.collect { state -> onLog("stream: $state") }
     }
     launchSafe(start = CoroutineStart.UNDISPATCHED) {
         stream.errorStream.collect { error -> onStreamError(error) }
@@ -69,7 +69,7 @@ private suspend fun GlassesRuntime.startStream(camera: Camera) {
     launchSafe { collectFrames(stream) }
     val result = io { stream.start() }
     result.fold(
-        onSuccess = { onLog("flux démarré") },
-        onFailure = { error, _ -> onLog("flux refusé : ${describe(error)}") },
+        onSuccess = { onLog("stream started") },
+        onFailure = { error, _ -> onLog("stream refused: ${describe(error)}") },
     )
 }

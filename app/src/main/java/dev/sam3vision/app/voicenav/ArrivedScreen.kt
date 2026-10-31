@@ -21,11 +21,11 @@ import dev.sam3vision.core.nav.RouteSummary
 
 /**
  * Arrivée à destination : nom entendu + résumé du trajet effectué,
- * boutons « Nouvelle destination » / « Fermer ».
+ * boutons « New destination » / « Close ».
  *
  * Gros texte malvoyant (thème sombre [AppColors]), même gabarit que
  * l'écran de confirmation : l'arrivée est dite à voix haute par la
- * session (« Arrivée à destination »), l'écran sert de contrôle visuel.
+ * session (« Arrived at destination »), l'écran sert de contrôle visuel.
  * [onNewDestination] rend la main à la dictée existante, [onClose]
  * referme (la route appelle `session().dismissArrived()`).
  */
@@ -39,7 +39,7 @@ fun ArrivedScreen(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Arrivée", color = AppColors.textMuted, fontSize = 18.sp)
+        Text("Arrival", color = AppColors.textMuted, fontSize = 18.sp)
         Text(
             state.destination,
             color = AppColors.text,
@@ -54,15 +54,15 @@ fun ArrivedScreen(
             modifier = Modifier.fillMaxWidth().height(64.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.success),
         ) {
-            Text("Nouvelle destination", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("New destination", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
         OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("Fermer", fontSize = 20.sp)
+            Text("Close", fontSize = 20.sp)
         }
     }
 }
 
-/** Rappel du trajet effectué : adresse (si connue) + « 2,4 km · 15 min ». */
+/** Rappel du trajet effectué : adresse (si connue) + « 2.4 km · 15 min ». */
 @Composable
 private fun ArrivedSummary(summary: RouteSummary?) {
     if (summary == null) return
@@ -71,7 +71,7 @@ private fun ArrivedSummary(summary: RouteSummary?) {
             Text(address, color = AppColors.text, fontSize = 20.sp)
         }
         Text(
-            "${summary.distanceFr()} · ${summary.durationFr()}",
+            "${summary.distance()} · ${summary.duration()}",
             color = AppColors.primary,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold,

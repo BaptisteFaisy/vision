@@ -52,7 +52,7 @@ class GlassesSession(
     /** Démarre enregistrement + session + caméra. Sans effet si déjà démarré. */
     fun start(activity: Activity) {
         if (runtime != null) {
-            onLog("cycle lunettes déjà démarré")
+            onLog("glasses cycle already started")
             return
         }
         val job = SupervisorJob(scope.coroutineContext[Job])
@@ -67,7 +67,7 @@ class GlassesSession(
             requestStop = ::stop,
         )
         runtime = rt
-        onLog("démarrage du cycle lunettes")
+        onLog("starting the glasses cycle")
         rt.observeRegistration()
     }
 
@@ -75,7 +75,7 @@ class GlassesSession(
     fun stop() {
         val rt = runtime ?: return
         runtime = null
-        onLog("arrêt du cycle lunettes")
+        onLog("stopping the glasses cycle")
         // On coupe d'abord les collecteurs : plus aucune frame ne part pendant
         // la libération des ressources DAT.
         rt.job.cancel()

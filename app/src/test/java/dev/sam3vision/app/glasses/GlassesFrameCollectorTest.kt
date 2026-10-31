@@ -85,7 +85,7 @@ class GlassesFrameCollectorTest {
         collector(FakeDecoder()).run(video)
 
         assertEquals("2 frames dues sur 3", 2, frames.size)
-        assertTrue(journal.any { it.startsWith("frame transmise") })
+        assertTrue(journal.any { it.startsWith("frame forwarded") })
     }
 
     @Test
@@ -95,7 +95,7 @@ class GlassesFrameCollectorTest {
         collector(FakeDecoder()).run(flowOf(csdFrame(), csdFrame()))
 
         assertTrue("aucune image à émettre", frames.isEmpty())
-        assertTrue("aucun décodage demandé", journal.none { it.contains("décodable") })
+        assertTrue("aucun décodage demandé", journal.none { it.contains("decodable") })
     }
 
     @Test
@@ -136,7 +136,7 @@ class GlassesFrameCollectorTest {
         collector(decoder).run(flowOf(compressedFrame()))
 
         assertTrue("rien n'est émis", frames.isEmpty())
-        assertEquals(listOf("frame non décodable : ignorée"), journal)
+        assertEquals(listOf("frame not decodable: skipped"), journal)
     }
 
     @Test
@@ -147,7 +147,7 @@ class GlassesFrameCollectorTest {
         collector(decoder).run(flowOf(broken))
 
         assertTrue(frames.isEmpty())
-        assertEquals(listOf("frame non décodable : ignorée"), journal)
+        assertEquals(listOf("frame not decodable: skipped"), journal)
     }
 
     @Test
@@ -163,7 +163,7 @@ class GlassesFrameCollectorTest {
         muet.run(flowOf(rawFrame()))
 
         assertTrue(frames.isEmpty())
-        assertEquals(listOf("frame non encodable : ignorée"), journal)
+        assertEquals(listOf("frame not encodable: skipped"), journal)
     }
 
     @Test

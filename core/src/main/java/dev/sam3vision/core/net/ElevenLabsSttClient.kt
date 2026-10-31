@@ -8,7 +8,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Repli de dictée : transcription ElevenLabs « Scribe »
- * (`POST {baseUrl}/speech-to-text`, multipart `file` + `model_id`, en-tête `xi-api-key`).
+ * (`POST {baseUrl}/speech-to-text`, multipart `file` + `model_id` + `language_code=en`, en-tête `xi-api-key`).
  *
  * Même contrat que le moteur Meta ([SpeechClient]) : un WAV PCM 16 bits mono en entrée,
  * le texte en sortie. Utilisée quand Meta échoue (facturation, panne, clé absente).
@@ -23,10 +23,10 @@ class ElevenLabsSttClient(
 
     override suspend fun transcribe(wav: ByteArray): Result<String> {
         if (apiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("clé ElevenLabs absente — renseigne-la dans Réglages"))
+            return Result.failure(ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings"))
         }
         if (wav.size <= WAV_HEADER_BYTES) {
-            return Result.failure(ApiError.BadResponse("audio vide"))
+            return Result.failure(ApiError.BadResponse("empty audio"))
         }
         return catchingResult { buildRequest(wav) }
             .then { http.execute(it) }
@@ -37,6 +37,7 @@ class ElevenLabsSttClient(
     private fun buildRequest(wav: ByteArray): Request {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("model_id", modelId)
+            .addFormDataPart("language_code", STT_LANGUAGE)
             .addFormDataPart("file", "audio.wav", wav.toRequestBody("audio/wav".toMediaType()))
             .build()
         return requestTo(baseUrl, STT_PATH, "POST", body, headers = mapOf("xi-api-key" to apiKey))
@@ -44,7 +45,7 @@ class ElevenLabsSttClient(
 
     /** `{"text": "..."}` — même extraction défensive que le moteur Meta. */
     internal fun parseText(raw: String): String =
-        extractTranscript(raw) ?: throw ApiError.BadResponse("champ texte absent : ${raw.take(120)}")
+        extractTranscript(raw) ?: throw ApiError.BadResponse("text field missing: ${raw.take(120)}")
 
     companion object {
         const val DEFAULT_STT_BASE_URL = "https://api.elevenlabs.io/v1"
@@ -53,6 +54,9 @@ class ElevenLabsSttClient(
         const val DEFAULT_STT_MODEL = "scribe_v1"
 
         const val STT_PATH = "/speech-to-text"
+
+        /** App anglaise exclusive : la transcription est forcée en anglais. */
+        const val STT_LANGUAGE = "en"
         private const val WAV_HEADER_BYTES = 44
     }
 }

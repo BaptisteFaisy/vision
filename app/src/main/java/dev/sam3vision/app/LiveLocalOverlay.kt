@@ -47,21 +47,21 @@ fun localOverlayFlag(buildFlag: String, settingEnabled: Boolean): Boolean =
  */
 fun localStatusPart(enabled: Boolean, active: Boolean, fps: Float, note: String = ""): String = when {
     !enabled -> ""
-    active -> " · calque local " + String.format(Locale.FRANCE, "%.1f ips", fps)
-    note.isBlank() -> " · calque local inerte"
-    else -> " · calque local inerte ($note)"
+    active -> " · local layer " + String.format(Locale.US, "%.1f fps", fps)
+    note.isBlank() -> " · local layer idle"
+    else -> " · local layer idle ($note)"
 }
 
-/** Motif affiché du dernier tick : court, en français, sans jargon de la machine d'état. */
+/** Motif affiché du dernier tick : court, en anglais, sans jargon de la machine d'état. */
 fun localReasonNote(reason: LocalReason): String = when (reason) {
     LocalReason.PAINT -> ""
-    LocalReason.DISABLED -> "éteint"
-    LocalReason.NO_KEYFRAME -> "en attente d'un keyframe"
-    LocalReason.STALE_KEYFRAME -> "keyframe périmé"
-    LocalReason.LOW_CONFIDENCE -> "confiance trop basse"
-    LocalReason.NO_ESTIMATOR -> "sans estimateur"
-    LocalReason.ESTIMATOR_FAILED -> "estimateur en échec"
-    LocalReason.TOO_EARLY -> "cadence"
+    LocalReason.DISABLED -> "off"
+    LocalReason.NO_KEYFRAME -> "waiting for a keyframe"
+    LocalReason.STALE_KEYFRAME -> "stale keyframe"
+    LocalReason.LOW_CONFIDENCE -> "confidence too low"
+    LocalReason.NO_ESTIMATOR -> "no estimator"
+    LocalReason.ESTIMATOR_FAILED -> "estimator failing"
+    LocalReason.TOO_EARLY -> "pacing"
 }
 
 /**

@@ -19,8 +19,8 @@ data class GrayImage(val gray: IntArray, val width: Int, val height: Int) {
  */
 data class PictoTemplate(val gray: IntArray, val edge: Int) {
     init {
-        require(edge > 0) { "côté nul" }
-        require(gray.size == edge * edge) { "tampon ${gray.size} pour $edge×$edge" }
+        require(edge > 0) { "null side" }
+        require(gray.size == edge * edge) { "buffer ${gray.size} for $edge×$edge" }
     }
 }
 

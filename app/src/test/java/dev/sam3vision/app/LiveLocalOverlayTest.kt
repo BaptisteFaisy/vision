@@ -65,21 +65,21 @@ class LiveLocalOverlayTest {
     fun `un calque actif annonce sa cadence`() {
         val part = localStatusPart(enabled = true, active = true, fps = 27.8f)
 
-        assertTrue(part.contains("27,8 ips"))
+        assertTrue(part.contains("27.8 fps"))
     }
 
     @Test
     fun `un calque inerte donne son motif`() {
-        val part = localStatusPart(enabled = true, active = false, fps = 0f, note = "sans estimateur")
+        val part = localStatusPart(enabled = true, active = false, fps = 0f, note = "no estimator")
 
-        assertTrue(part.contains("inerte"))
-        assertTrue(part.contains("sans estimateur"))
+        assertTrue(part.contains("idle"))
+        assertTrue(part.contains("no estimator"))
     }
 
     @Test
     fun `le motif du refus est lisible`() {
-        assertEquals("sans estimateur", localReasonNote(LocalReason.NO_ESTIMATOR))
-        assertEquals("keyframe périmé", localReasonNote(LocalReason.STALE_KEYFRAME))
+        assertEquals("no estimator", localReasonNote(LocalReason.NO_ESTIMATOR))
+        assertEquals("stale keyframe", localReasonNote(LocalReason.STALE_KEYFRAME))
         assertEquals("", localReasonNote(LocalReason.PAINT))
     }
 

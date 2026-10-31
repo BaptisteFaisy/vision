@@ -25,7 +25,7 @@ class LiveNarrationClientTest {
             val body = JSONObject(server.requests.single().body)
             val messages = body.getJSONArray("messages")
             assertEquals(2, messages.length())
-            assertTrue(messages.getJSONObject(0).getString("content").contains("direct"))
+            assertTrue(messages.getJSONObject(0).getString("content").contains("live video feed"))
             val parts = messages.getJSONObject(1).getJSONArray("content")
             val prompt = parts.getJSONObject(0).getString("text")
             assertTrue(prompt.contains("personne, porte"))

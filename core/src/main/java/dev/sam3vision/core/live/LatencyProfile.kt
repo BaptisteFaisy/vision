@@ -170,21 +170,21 @@ class LatencySummary(
         }
 
     /**
-     * Ligne d'état : « LatencyProfile perçu 674,7/795,4 ms · A/R 426,2/492,3 · serveur 300,0
-     * · réseau 126,2 · file 27 % · hors écran 15 · échecs 3 ». Vide tant qu'aucune frame
+     * Ligne d'état : « LatencyProfile felt 674.7/795.4 ms · RTT 426.2/492.3 · server 300.0
+     * · network 126.2 · queue 27% · off-screen 15 · failures 3 ». Vide tant qu'aucune frame
      * complète n'est mesurée (pas de zéros affichés).
      */
     fun line(): String {
         if (samples == 0) return ""
         return buildString(LINE_CAPACITY) {
-            append(TAG).append("perçu ").append(pairMs(perceivedP50Us, perceivedP95Us)).append(" ms")
-            append(SEP).append("A/R ").append(pairMs(rttP50Us, rttP95Us))
-            append(SEP).append("serveur ").append(msText(serverP50Us))
-            append(SEP).append("réseau ").append(msText(networkP50Us))
+            append(TAG).append("felt ").append(pairMs(perceivedP50Us, perceivedP95Us)).append(" ms")
+            append(SEP).append("RTT ").append(pairMs(rttP50Us, rttP95Us))
+            append(SEP).append("server ").append(msText(serverP50Us))
+            append(SEP).append("network ").append(msText(networkP50Us))
             val share = queueSharePercent
-            if (share >= 0) append(SEP).append("file ").append(share).append(" %")
-            append(SEP).append("hors écran ").append(offScreenFrames)
-            append(SEP).append("échecs ").append(failedFrames)
+            if (share >= 0) append(SEP).append("queue ").append(share).append("%")
+            append(SEP).append("off-screen ").append(offScreenFrames)
+            append(SEP).append("failures ").append(failedFrames)
         }
     }
 
@@ -206,11 +206,11 @@ private const val SEP = " · "
 /** Largeur d'une ligne d'état : sept étages et quatre totaux, jamais dépassée. */
 private const val LINE_CAPACITY = 240
 
-/** Microsecondes en millisecondes françaises (« 674,7 »), [MISSING] si non mesuré. */
+/** Microsecondes en millisecondes anglaises (« 674.7 »), [MISSING] si non mesuré. */
 private fun msText(us: Long): String {
     if (us < 0L) return MISSING
     val tenths = (us + 50L) / 100L
-    return "${tenths / 10L},${tenths % 10L}"
+    return "${tenths / 10L}.${tenths % 10L}"
 }
 
 /** « p50/p95 » d'une grandeur, dans la même unité. */

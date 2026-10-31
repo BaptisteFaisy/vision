@@ -14,9 +14,9 @@ class LiveStateTest {
     @Test
     fun `ligne d'etat montre cadence latence et gpu`() {
         val line = formatLiveStatus(true, 1.4f, 780, "A100-SXM4-40GB", 8)
-        assertTrue(line.contains("1,4 ips"))
+        assertTrue(line.contains("1.4 fps"))
         assertTrue(line.contains("780 ms"))
-        assertTrue(line.contains("8 objets"))
+        assertTrue(line.contains("8 objects"))
         assertTrue(line.contains("A100-SXM4-40GB"))
     }
 
@@ -31,7 +31,7 @@ class LiveStateTest {
 
     @Test
     fun `direct arrete est explicite`() {
-        assertEquals("Direct arrêté", formatLiveStatus(false, 2f, 300, "A100", 3))
+        assertEquals("Live stopped", formatLiveStatus(false, 2f, 300, "A100", 3))
     }
 
     @Test
@@ -68,8 +68,8 @@ class LiveStateTest {
 
     @Test
     fun `le libelle du point focal annonce l instant`() {
-        assertTrue(focusLabel(5).contains("Il y a 5 s"))
-        assertTrue(focusLabel(0).contains("l'instant"))
+        assertTrue(focusLabel(5, SpeechLanguage.Fr).contains("Il y a 5 s"))
+        assertTrue(focusLabel(0, SpeechLanguage.Fr).contains("l'instant"))
         // La langue de la voix gagne jusqu'au libellé envoyé au modèle : « 2,5 » se lirait
         // « deux virgule cinq » dans une consigne anglaise.
         assertTrue(focusLabel(5, SpeechLanguage.En).contains("5 s ago"))
@@ -151,7 +151,7 @@ class LiveStateTest {
     fun `libelle de transport suit le mode et le socket`() {
         assertEquals("Tracker", transportLabel(trackerEnabled = true, wsConnected = false))
         assertEquals("WebSocket", transportLabel(trackerEnabled = false, wsConnected = true))
-        assertEquals("WebSocket KO", transportLabel(trackerEnabled = false, wsConnected = false))
+        assertEquals("WebSocket down", transportLabel(trackerEnabled = false, wsConnected = false))
     }
 
     @Test

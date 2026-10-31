@@ -82,7 +82,7 @@ fun LiveDebugPanel(
 }
 
 /** Préfixe des lignes d'erreur de [liveProbeDetails] : les seules gardées en mode dense. */
-private const val ERROR_PREFIX = "erreur"
+private const val ERROR_PREFIX = "error"
 
 /**
  * Lignes du détail. En mode [dense] (fenêtre caméra flottante, ~500 px de large), on
@@ -95,6 +95,6 @@ private fun panelDetails(state: LiveProbeState, dense: Boolean): List<String> {
     // En dense, on garde ce qui se lit d'un coup d'œil : la fenêtre est petite et
     // l'endpoint, la taille de frame et le nom du GPU n'y apprennent rien de plus.
     return lines.filterNot { line ->
-        line.startsWith("endpoint") || line.startsWith("frame :") || line.startsWith("gpu :")
+        line.startsWith("endpoint") || line.startsWith("frame:") || line.startsWith("gpu:")
     }
 }

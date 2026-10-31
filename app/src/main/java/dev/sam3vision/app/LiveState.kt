@@ -178,13 +178,13 @@ data class PictoOverlay(
 }
 
 /** Ligne du direct en vision seule : pas de détecteur, donc pas de GPU à attendre. */
-const val VISION_ONLY_LINE: String = "Direct · vision LLM (l'image part au LLM, sans détecteur)"
+const val VISION_ONLY_LINE: String = "Live · LLM vision (image goes to the LLM, no detector)"
 
 /** Ligne affichée pendant le démarrage à froid du conteneur (le clic « Direct » le réveille). */
-const val WAKING_LINE: String = "Réveil du GPU A100 40 Go sur Modal…"
+const val WAKING_LINE: String = "Waking the A100 40GB GPU on Modal…"
 
 /**
- * Barre d'état du direct : « Direct · 1,4 ips · 780 ms · 8 objets · A100-SXM4-40GB ».
+ * Barre d'état du direct : « Live · 1.4 fps · 780 ms · 8 objects · A100-SXM4-40GB ».
  * En vision seule ([samEnabled] = false), il n'y a ni cadence de détection, ni latence
  * de détecteur, ni GPU : la ligne le dit au lieu d'afficher « GPU ? ».
  * Fonction pure, testée en JVM.
@@ -198,15 +198,15 @@ fun formatLiveStatus(
     nearestMeters: Float? = null,
     samEnabled: Boolean = true,
 ): String {
-    if (!running) return "Direct arrêté"
+    if (!running) return "Live stopped"
     if (!samEnabled) return VISION_ONLY_LINE
-    val rate = if (fps <= 0f) "…" else String.format(Locale.FRANCE, "%.1f ips", fps)
+    val rate = if (fps <= 0f) "…" else String.format(Locale.US, "%.1f fps", fps)
     val latency = if (latencyMs <= 0) "…" else "$latencyMs ms"
-    val nearest = nearestMeters?.let { " · plus proche ${DistanceText.format(it)}" }.orEmpty()
+    val nearest = nearestMeters?.let { " · closest ${DistanceText.format(it)}" }.orEmpty()
     // Le nom du GPU venait du /health (supprimé le 26/10) : quand il est inconnu, on
     // n'affiche plus « GPU ? » mais rien du tout.
     val chip = if (gpu.isBlank()) "" else " · $gpu"
-    return "Direct · $rate · $latency · $objects objets$nearest$chip"
+    return "Live · $rate · $latency · $objects objects$nearest$chip"
 }
 
 /** Cadence de mémorisation de la frame pour les questions : une par seconde suffit. */
@@ -228,7 +228,7 @@ fun frameErrorState(current: LiveUiState, waking: Boolean, transport: String, me
         objectsCount = 0,
         transport = transport,
         starting = waking,
-        error = if (waking) null else samUnreachableLine(message ?: "GPU injoignable"),
+        error = if (waking) null else samUnreachableLine(message ?: "GPU unreachable"),
     )
 
 /** Cadence du prochain tick, bornée par les constantes de [LiveSession]. */
@@ -255,7 +255,7 @@ fun focusWindow(nowMs: Long, seconds: Int, halfSpanMs: Long = FOCUS_HALF_SPAN_MS
  */
 fun focusLabel(
     seconds: Int,
-    language: SpeechLanguage = SpeechLanguage.Fr,
+    language: SpeechLanguage = SpeechLanguage.DEFAULT,
     halfSpanMs: Long = FOCUS_HALF_SPAN_MS,
 ): String {
     val locale = if (language == SpeechLanguage.En) Locale.US else Locale.FRANCE
@@ -275,7 +275,7 @@ internal const val MEMORY_WINDOW_MS = 30_000L
 internal const val POSITION_VOICE_DIR = "positions"
 
 /**
- * « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket KO » (aucun repli POST) :
+ * « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket down » (aucun repli POST) :
  * lit l'état du socket sur le client, la table des libellés restant pure et testée en JVM
  * ([transportLabel] à drapeau, dans `LiveMessages`).
  */

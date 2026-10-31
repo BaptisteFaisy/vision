@@ -120,7 +120,7 @@ class HazardWatcher(
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
      * quand le compte de confirmation est atteint hors cooldown, `null` sinon.
      */
-    fun onSignal(signal: HazardSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): HazardCue? {
+    fun onSignal(signal: HazardSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): HazardCue? {
         val name = signal.label?.let(HazardConcepts::nameOf)
         val pole = signal.detected && signal.label?.let(HazardConcepts::isPole) == true
         if (pole) {

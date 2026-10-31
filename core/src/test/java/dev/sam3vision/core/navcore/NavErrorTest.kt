@@ -26,7 +26,7 @@ class NavErrorTest {
         val error = NavError.of(DestinationError.BlankQuery())
         assertTrue(error is NavError.EmptyDestination)
         assertFalse(error.retryable)
-        assertEquals("destination vide : dicte ou saisis une adresse", error.message)
+        assertEquals("empty destination: dictate or type an address", error.message)
     }
 
     @Test
@@ -34,7 +34,7 @@ class NavErrorTest {
         val error = NavError.of(SocketTimeoutException("read timed out"))
         assertTrue(error is NavError.Timeout)
         assertTrue(error.retryable)
-        assertEquals("délai dépassé : réseau", error.message)
+        assertEquals("timed out: network", error.message)
     }
 
     @Test
@@ -42,7 +42,7 @@ class NavErrorTest {
         val error = NavError.of(IOException("connexion refusée"))
         assertTrue(error is NavError.Network)
         assertTrue(error.retryable)
-        assertEquals("réseau injoignable : connexion refusée", error.message)
+        assertEquals("network unreachable: connexion refusée", error.message)
     }
 
     @Test
@@ -77,7 +77,7 @@ class NavErrorTest {
     @Test
     fun `GeocodeFailed cite la requete rognée`() {
         assertEquals(
-            "géocodage impossible pour « Paris » : 404",
+            "geocoding impossible for « Paris »: 404",
             NavError.GeocodeFailed("  Paris ", "404").message,
         )
     }

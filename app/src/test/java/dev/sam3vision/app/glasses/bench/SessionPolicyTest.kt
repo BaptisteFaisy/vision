@@ -25,19 +25,19 @@ class SessionPolicyTest {
     fun `tout est pret, un seul conseil qui dit combien de paires sont vues`() {
         val advice = realStartAdvice(ready())
         assertEquals(1, advice.size)
-        assertTrue(advice.single().startsWith("prêt : 1 paire"))
+        assertTrue(advice.single().startsWith("ready: 1 pair"))
     }
 
     @Test
     fun `sans Developer Mode le conseil dit ou l activer`() {
         val advice = realStartAdvice(ready().copy(devMode = false))
-        assertTrue(advice.any { it.contains("Developer Mode inactif") })
+        assertTrue(advice.any { it.contains("Developer Mode inactive") })
     }
 
     @Test
     fun `aucune paire vue, le conseil dit d appairer dans Meta AI`() {
         val advice = realStartAdvice(ready().copy(devices = 0))
-        assertTrue(advice.any { it.contains("appaire la paire dans l'app Meta AI") })
+        assertTrue(advice.any { it.contains("pair them in the Meta AI app") })
     }
 
     @Test
@@ -50,10 +50,10 @@ class SessionPolicyTest {
     fun `enregistrement a accepter, et aucune ligne pour un etat deja bon`() {
         val waiting = realStartAdvice(ready().copy(registration = RegistrationState.AVAILABLE))
         assertEquals(1, waiting.size)
-        assertTrue(waiting.single().contains("enregistrement à accepter"))
+        assertTrue(waiting.single().contains("registration to accept"))
 
         val registered = realStartAdvice(ready())
-        assertTrue(registered.none { it.contains("enregistrement") })
+        assertTrue(registered.none { it.contains("registration") })
     }
 
     @Test
@@ -68,9 +68,9 @@ class SessionPolicyTest {
         )
         assertEquals(4, advice.size)
         assertTrue(advice[0].contains("Developer Mode"))
-        assertTrue(advice[1].contains("enregistrement"))
-        assertTrue(advice[2].contains("aucune lunette"))
-        assertTrue(advice[3].contains("caméra non accordée"))
+        assertTrue(advice[1].contains("registration"))
+        assertTrue(advice[2].contains("no glasses"))
+        assertTrue(advice[3].contains("camera not granted"))
     }
 
     private fun ready() = RealStartFacts(
@@ -86,35 +86,35 @@ class SessionPolicyTest {
     fun `REGISTERED ouvre la session`() {
         val decision = registrationDecision(RegistrationState.REGISTERED)
         assertEquals(RegistrationStep.OPEN_SESSION, decision.step)
-        assertEquals("lunettes enregistrées", decision.message)
+        assertEquals("glasses registered", decision.message)
     }
 
     @Test
     fun `AVAILABLE demande l enregistrement`() {
         val decision = registrationDecision(RegistrationState.AVAILABLE)
         assertEquals(RegistrationStep.REQUEST_REGISTRATION, decision.step)
-        assertEquals("en attente d'enregistrement", decision.message)
+        assertEquals("waiting for registration", decision.message)
     }
 
     @Test
     fun `un enregistrement en cours ne declenche aucune action`() {
         val decision = registrationDecision(RegistrationState.REGISTERING)
         assertEquals(RegistrationStep.LOG_ONLY, decision.step)
-        assertEquals("enregistrement en cours", decision.message)
+        assertEquals("registration in progress", decision.message)
     }
 
     @Test
     fun `un desenregistrement en cours ne declenche aucune action`() {
         val decision = registrationDecision(RegistrationState.UNREGISTERING)
         assertEquals(RegistrationStep.LOG_ONLY, decision.step)
-        assertEquals("désenregistrement en cours", decision.message)
+        assertEquals("unregistration in progress", decision.message)
     }
 
     @Test
     fun `sans lunettes disponibles on ne tente rien`() {
         val decision = registrationDecision(RegistrationState.UNAVAILABLE)
         assertEquals(RegistrationStep.LOG_ONLY, decision.step)
-        assertEquals("aucune paire de lunettes disponible", decision.message)
+        assertEquals("no glasses pair available", decision.message)
     }
 
     /**

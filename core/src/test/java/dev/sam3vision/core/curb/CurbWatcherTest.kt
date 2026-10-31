@@ -159,7 +159,7 @@ class CurbWatcherTest {
         val cue = watcher.onSignal(positive, 3000L)
 
         assertNotNull(cue)
-        assertEquals("Attention à la marche.", cue!!.phrase)
+        assertEquals("Attention, step.", cue!!.phrase)
         assertEquals(2.0f, cue.meters!!, 0.001f)
         assertEquals(CurbTier.FAR, cue.tier)
         assertFalse(cue.urgent)
@@ -191,7 +191,7 @@ class CurbWatcherTest {
         val cue = watcher.onSignal(near, 2000L)
 
         assertNotNull(cue)
-        assertEquals("Marche, à midi.", cue!!.phrase)
+        assertEquals("Step, at 12 o'clock.", cue!!.phrase)
         assertEquals(CurbTier.NEAR, cue.tier)
         assertTrue(cue.urgent)
     }
@@ -204,7 +204,7 @@ class CurbWatcherTest {
         watcher.onSignal(near, 1000L)
         val cue = watcher.onSignal(near, 2000L)
 
-        assertEquals("Descente, à midi.", cue!!.phrase)
+        assertEquals("Step down, at 12 o'clock.", cue!!.phrase)
         assertTrue(cue.urgent)
     }
 
@@ -216,7 +216,7 @@ class CurbWatcherTest {
         watcher.onSignal(near, 1000L)
         val cue = watcher.onSignal(near, 2000L)
 
-        assertEquals("Marche.", cue!!.phrase)
+        assertEquals("Step.", cue!!.phrase)
     }
 
     @Test
@@ -338,7 +338,7 @@ class CurbWatcherTest {
         val cue = watcher.onSignal(pass, 3000L)
 
         assertNotNull(cue)
-        assertEquals("Bateau, pas de marche.", cue!!.phrase)
+        assertEquals("Dropped curb, no step.", cue!!.phrase)
         assertEquals(CurbTier.NONE, cue.tier)
         assertFalse(cue.urgent)
         // Une fois : la présence continue ne répète pas.

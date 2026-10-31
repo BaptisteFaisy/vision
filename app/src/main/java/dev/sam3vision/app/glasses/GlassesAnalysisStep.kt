@@ -38,14 +38,14 @@ class GlassesAnalysisStep(
      * remonte : un échec réseau devient [FrameOutcome.Muet] avec un message court.
      */
     suspend fun onFrame(frame: JpegFrame, log: (String) -> Unit): FrameOutcome {
-        log("frame ${frame.width}x${frame.height} — ${frame.base64.length / 1024} Ko base64")
+        log("frame ${frame.width}x${frame.height} — ${frame.base64.length / 1024} KB base64")
         val outcome = withContext(Dispatchers.IO) { analyze(frame.base64) }
         val analysis = outcome.getOrNull()
         if (analysis == null || analysis.description.isBlank()) {
             return FrameOutcome.Muet(logCause(outcome.exceptionOrNull(), log))
         }
-        log("objets : ${analysis.objects.map { it.label }.distinct().take(6)}")
-        say(analysis.description)?.let { log("voix : $it") }
+        log("objects: ${analysis.objects.map { it.label }.distinct().take(6)}")
+        say(analysis.description)?.let { log("voice: $it") }
         return FrameOutcome.Dit(analysis.description)
     }
 }
@@ -58,11 +58,11 @@ class GlassesAnalysisStep(
  */
 internal fun logCause(error: Throwable?, log: (String) -> Unit): String {
     if (error == null) {
-        log("analyse échouée : description vide")
-        return "description vide"
+        log("analysis failed: empty description")
+        return "empty description"
     }
     val cause = error.cause
-    val detail = cause?.let { " — cause : ${it.javaClass.simpleName}: ${it.message}" }.orEmpty()
-    log("analyse échouée : ${error.javaClass.simpleName}: ${error.message}$detail")
-    return error.message ?: "description vide"
+    val detail = cause?.let { " — cause: ${it.javaClass.simpleName}: ${it.message}" }.orEmpty()
+    log("analysis failed: ${error.javaClass.simpleName}: ${error.message}$detail")
+    return error.message ?: "empty description"
 }

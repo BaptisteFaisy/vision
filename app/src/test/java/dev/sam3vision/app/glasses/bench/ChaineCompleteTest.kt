@@ -93,7 +93,7 @@ class ChaineCompleteTest {
 
         val outcome = backend.use { step(backend, dits).onFrame(frameJpeg()) {} }
 
-        assertEquals(FrameOutcome.Muet("réponse inattendue : contenu vide"), outcome)
+        assertEquals(FrameOutcome.Muet("unexpected response: empty content"), outcome)
         assertTrue("aucun texte ne doit partir à la voix", dits.isEmpty())
     }
 
@@ -121,7 +121,7 @@ class ChaineCompleteTest {
 
         val outcome = backend.use { step(backend, dits).onFrame(frameJpeg()) {} }
 
-        assertEquals(FrameOutcome.Muet("""erreur HTTP 500 : {"detail":"llm en panne"}"""), outcome)
+        assertEquals(FrameOutcome.Muet("""HTTP error 500: {"detail":"llm en panne"}"""), outcome)
         assertTrue(dits.isEmpty())
     }
 
@@ -133,7 +133,7 @@ class ChaineCompleteTest {
             say = { dits += it; null },
         )
 
-        assertEquals(FrameOutcome.Muet("description vide"), step.onFrame(frameJpeg()) {})
+        assertEquals(FrameOutcome.Muet("empty description"), step.onFrame(frameJpeg()) {})
         assertTrue(dits.isEmpty())
     }
 

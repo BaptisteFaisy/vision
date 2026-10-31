@@ -53,7 +53,7 @@ class WarpPlan {
      * Le centre de la similitude est le centre de la grille.
      */
     fun update(motion: MaskMotion) {
-        require(width > 0 && height > 0) { "grille non préparée" }
+        require(width > 0 && height > 0) { "grid not prepared" }
         motion.offsetsInto(offsets, (width - 1) / 2.0, (height - 1) / 2.0)
         fillAxis(srcX, fracX, width, offsets.tx, offsets.scale)
         fillAxis(srcY, fracY, height, offsets.ty, offsets.scale)

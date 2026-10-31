@@ -11,7 +11,7 @@ import dev.sam3vision.core.distance.KnownSizes
 data class NavigationIntent(val destination: String)
 
 /**
- * Parseur pur d'intention de navigation (français oral).
+ * Parseur pur d'intention de navigation (français et anglais oraux).
  *
  * Formes reconnues (insensibles à la casse et aux accents) : « je veux /
  * voudrais / vais aller … X », « j'aimerais aller … X », « emmène/amène-moi
@@ -20,6 +20,13 @@ data class NavigationIntent(val destination: String)
  * « aller … X » — « … » vaut [PREP] (à, au, aux, en, dans, vers, chez,
  * jusqu'à). La destination rendue est le texte original, pas une forme
  * normalisée.
+ *
+ * Formes anglaises : « I want/wanna/would like to go to X », « take/bring me
+ * to X » (et sans « to », STT qui mange la préposition), « navigate to X »,
+ * « guide me to X », « (I'm) going to X », « let's go to X », « go to X » et
+ * « go X » (ancrés au début), « directions to X » (ancré). Mêmes gardes :
+ * compléments non-lieux refusés (« go fast », « take me back »), « to » en
+ * tête renvoyé aux motifs stricts.
  *
  * Quatre formes orales de plus, ajoutées après une dictée réelle où la
  * phrase est partie au LLM (« décris la pièce ») faute d'être comprise :
@@ -106,6 +113,48 @@ object NavigationIntentParser {
     /** « va X » nu, ancré au début (« va gare Montparnasse ») — « ça va » passe à côté. */
     private val VA_SANS_A = Regex("""^\s*va\s+(.+)""", RegexOption.IGNORE_CASE)
 
+    /** « I want/wanna/would like to go to X ». */
+    private val I_WANT_EN = Regex("""\bi\s+(?:want\s+to|wanna|would\s+like\s+to)\s+go\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « I'd like to go to X » (avec ou sans apostrophe). */
+    private val I_D_LIKE = Regex("""\bi\s*['’‘`]?d\s+like\s+to\s+go\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « I want/wanna/would like to go X » sans « to » (STT qui mange la préposition). */
+    private val I_WANT_SANS_TO = Regex("""\bi\s+(?:want\s+to|wanna|would\s+like\s+to)\s+go\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « take/bring me to X ». */
+    private val TAKE_ME = Regex("""\b(?:take|bring)\s+me\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « take/bring me X » sans « to ». */
+    private val TAKE_ME_SANS_TO = Regex("""\b(?:take|bring)\s+me\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « navigate to X ». */
+    private val NAVIGATE_EN = Regex("""\bnavigate\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « guide me to X ». */
+    private val GUIDE_ME_EN = Regex("""\bguide\s+me\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « going to X » (« I'm going to X » : le « I'm » ne gêne pas). */
+    private val GOING_TO = Regex("""\bgoing\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « let's go to X » (avec ou sans apostrophe). */
+    private val LETS_GO = Regex("""\blet['’‘`]?s\s+go\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « go to X » — ancré au début. */
+    private val GO_TO = Regex("""^\s*go\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « go X » nu, ancré au début (« go Eiffel Tower »). */
+    private val GO_SANS_TO = Regex("""^\s*go\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /** « directions to X » — ancré au début, comme « direction X ». */
+    private val DIRECTIONS_TO = Regex("""^\s*directions?\s+to\s+(.+)""", RegexOption.IGNORE_CASE)
+
+    /**
+     * « to » en tête du texte capturé : les formes anglaises sans préposition
+     * ne valent que quand la STT l'a mangée (miroir de [LEADING_PREP]).
+     */
+    private val LEADING_TO = Regex("""^\s*to\s+""", RegexOption.IGNORE_CASE)
+
     /** Préposition en tête de destination (« au », « vers »…) : elle ne fait pas partie du nom. */
     private val PREPOSITION = Regex("""^(?:au|aux|vers)\s+(.+)""", RegexOption.IGNORE_CASE)
 
@@ -121,18 +170,22 @@ object NavigationIntentParser {
     )
 
     /**
-     * Compléments qui suivent « aller » sans être des lieux : ils ne doivent
-     * jamais partir au géocodeur. Clés canoniques ([KnownSizes.canonical]).
+     * Compléments qui suivent « aller » ou « go » sans être des lieux :
+     * jamais au géocodeur. Clés canoniques ([KnownSizes.canonical]).
      */
     private val NON_LIEUX = setOf(
         "vite", "bien", "mieux", "voir", "chercher", "dormir", "manger", "boire",
         "faire", "dire", "plus", "moins", "tout", "droit", "loin", "chez",
         "avec", "sans", "en", "y", "par", "pour", "sur", "sous",
+        "fast", "faster", "quickly", "slowly", "straight", "back", "there",
+        "see", "get", "fetch",
     )
 
     private val PATTERNS = listOf(
         JE_VEUX, JE_VEUX_SANS_A, J_AIMERAIS, EMMENE, NAVIGUER, CONDUIS,
         ITINERAIRE, GUIDE, VA, ALLER, ALLER_SANS_A, VA_SANS_A,
+        I_WANT_EN, I_D_LIKE, I_WANT_SANS_TO, TAKE_ME, TAKE_ME_SANS_TO,
+        NAVIGATE_EN, GUIDE_ME_EN, GOING_TO, LETS_GO, GO_TO, GO_SANS_TO, DIRECTIONS_TO,
     )
 
     /**
@@ -146,9 +199,13 @@ object NavigationIntentParser {
             val destination = stripPreposition(clean(raw))
             if (destination.isEmpty()) continue
             // Les formes sans préposition attrapent large : un complément qui
-            // n'est pas un lieu (« aller vite ») laisse essayer les suivantes.
+            // n'est pas un lieu (« aller vite », « go fast ») laisse essayer les suivantes.
             if (pattern === JE_VEUX_SANS_A || pattern === ALLER_SANS_A || pattern === VA_SANS_A) {
                 if (LEADING_PREP.containsMatchIn(raw)) continue
+                if (!looksLikePlace(destination)) continue
+            }
+            if (pattern === I_WANT_SANS_TO || pattern === TAKE_ME_SANS_TO || pattern === GO_SANS_TO) {
+                if (LEADING_TO.containsMatchIn(raw)) continue
                 if (!looksLikePlace(destination)) continue
             }
             return NavigationIntent(destination)

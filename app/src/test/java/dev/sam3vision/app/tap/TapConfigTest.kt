@@ -17,7 +17,7 @@ class TapConfigTest {
     @Test
     fun `mode on-device donne la raison explicite`() {
         val reason = TapConfig.sendBlockedReason(endpoint = "https://x", onDevice = true)
-        assertTrue(reason.orEmpty().contains("inférence locale"))
+        assertTrue(reason.orEmpty().contains("on-device inference"))
     }
 
     @Test

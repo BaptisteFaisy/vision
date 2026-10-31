@@ -48,10 +48,10 @@ object GpuWake {
         return true
     }
 
-    /** `réveil GPU (https://…) : 4.2 s, carte chaude` — ou `…, échec 404` (point décimal fixe). */
+    /** `GPU wake (https://…): 4.2 s, warm card` — or `…, failure 404` (fixed decimal point). */
     internal fun wakeLine(endpoint: String, ok: Boolean, ms: Long, error: Throwable? = null): String =
-        "réveil GPU ($endpoint) : ${"%.1f".format(Locale.US, ms / 1000.0)} s, " +
-            if (ok) "carte chaude" else "échec ${wakeMotif(error)}"
+        "GPU wake ($endpoint): ${"%.1f".format(Locale.US, ms / 1000.0)} s, " +
+            if (ok) "warm card" else "failure ${wakeMotif(error)}"
 
     /**
      * Motif court d'un réveil raté : le code HTTP (`404`, app arrêtée ou route
@@ -59,12 +59,12 @@ object GpuWake {
      * savoir pourquoi sans rouvrir l'enquête.
      */
     internal fun wakeMotif(error: Throwable?): String = when (error) {
-        null -> "réponse négative"
+        null -> "negative response"
         is ApiError.BackendStopped -> "404"
         is ApiError.Http -> error.code.toString()
         is ApiError.Timeout,
         is InterruptedIOException,
-        is TimeoutException -> "délai dépassé"
+        is TimeoutException -> "timed out"
         else -> error.message?.lineSequence()?.firstOrNull()?.trim().orEmpty()
             .ifEmpty { error.javaClass.simpleName }
             .take(80)

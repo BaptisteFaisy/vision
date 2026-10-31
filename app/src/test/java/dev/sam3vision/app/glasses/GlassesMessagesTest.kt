@@ -56,8 +56,8 @@ class GlassesMessagesTest {
 
     @Test
     fun `la collecte active annonce la sortie de la voix`() {
-        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("lunettes"))
-        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("haut-parleur"))
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("glasses"))
+        assertTrue(GlassesMessages.framesVoiceRoute().text.contains("speaker"))
     }
 
     @Test
@@ -76,12 +76,12 @@ class GlassesMessagesTest {
         // Mesure du 27/10 : le SDK rend « Aucun appareil éligible » tant que le lien n'est pas
         // monté. Envoyer l'utilisateur ré-appairer était la fausse piste à supprimer.
         val timeout = GlassesMessages.noLinkedDevice().text
-        assertTrue(timeout, timeout.contains("connectées"))
-        assertFalse(timeout, timeout.contains("appaire"))
-        assertFalse(timeout, timeout.contains("enregistre l'app"))
+        assertTrue(timeout, timeout.contains("not connected"))
+        assertFalse(timeout, timeout.contains("pair"))
+        assertFalse(timeout, timeout.contains("register"))
         val refusal = sessionErrorMessage(DeviceSessionError.NO_ELIGIBLE_DEVICE).text
-        assertFalse(refusal, refusal.contains("appaire"))
-        assertTrue(refusal, refusal.contains("déplie"))
+        assertFalse(refusal, refusal.contains("pair them"))
+        assertTrue(refusal, refusal.contains("unfold"))
     }
 
     @Test
@@ -95,9 +95,9 @@ class GlassesMessagesTest {
         // La permission est par paquet et se demande dans Meta AI : d'abord le bouton qui
         // ouvre la page du SDK, et seulement en repli le chemin de la fiche de l'app.
         val text = GlassesMessages.cameraPermissionMissing().text
-        assertTrue(text, text.contains("Caméra non autorisée"))
-        assertTrue(text, text.contains("Autoriser"))
-        assertTrue(text, text.contains("applications du mode développeur"))
+        assertTrue(text, text.contains("Camera not allowed"))
+        assertTrue(text, text.contains("Allow"))
+        assertTrue(text, text.contains("developer mode apps"))
     }
 
     @Test

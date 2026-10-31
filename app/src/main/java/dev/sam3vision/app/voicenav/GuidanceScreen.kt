@@ -65,7 +65,7 @@ fun GuidanceScreen(
             modifier = Modifier.fillMaxWidth().height(64.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
         ) {
-            Text("Arrêter", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Stop", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
         VoiceNavHoldButton(
             hold = hold,
@@ -85,7 +85,7 @@ private fun GuidingHead(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OffRouteBanner(state.update.offRoute)
-        Text("Prochaine instruction", color = AppColors.textMuted, fontSize = 18.sp)
+        Text("Next instruction", color = AppColors.textMuted, fontSize = 18.sp)
         Text(
             state.update.instruction,
             color = AppColors.text,
@@ -107,15 +107,15 @@ private fun GuidingHead(
 private fun GuidanceSummary(state: VoiceNavUiState.Guiding) {
     if (state.summary == null && !state.update.arrived) {
         // Résumé inconnu (chargeur en échec, moteur parti quand même).
-        Text("Calcul de l'itinéraire…", color = AppColors.textMuted, fontSize = 20.sp)
+        Text("Calculating the route…", color = AppColors.textMuted, fontSize = 20.sp)
     } else {
         Text(
-            state.update.maneuverFr(),
+            state.update.maneuver(),
             color = AppColors.primary,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(state.update.remainingFr(), color = AppColors.textMuted, fontSize = 20.sp)
+        Text(state.update.remaining(), color = AppColors.textMuted, fontSize = 20.sp)
     }
 }
 

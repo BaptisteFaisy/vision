@@ -30,21 +30,21 @@ sealed class GeocodeError(message: String, cause: Throwable? = null) : Exception
 
     /** Les deux fournisseurs ont répondu, sans aucun candidat. */
     class NotFound(query: String) : GeocodeError(
-        "adresse introuvable : précise le numéro et la ville (« ${query.take(80)} »)",
+        "address not found: add the house number and city (« ${query.take(80)} »)",
     )
 
     /** Les deux fournisseurs ont dépassé leur délai. */
-    class TimedOut : GeocodeError("géocodage trop lent : réessaie dans un instant")
+    class TimedOut : GeocodeError("geocoding too slow: try again in a moment")
 
     /** Panne réseau (fournisseur injoignable). */
     class Network(
-        message: String = "géocodage impossible : réseau injoignable",
+        message: String = "geocoding impossible: network unreachable",
         cause: Throwable? = null,
     ) : GeocodeError(message, cause)
 
     /** Fournisseur absent ou en erreur (pas de backend géocodeur, HTTP 5xx…). */
     class ServiceUnavailable(
-        message: String = "service d'adresses indisponible",
+        message: String = "address service unavailable",
         cause: Throwable? = null,
     ) : GeocodeError(message, cause)
 }
@@ -68,7 +68,7 @@ internal fun Throwable.toGeocodeError(): GeocodeError = when (this) {
     is ApiError.Timeout -> GeocodeError.TimedOut()
     is ApiError.Network -> GeocodeError.Network(cause = this)
     is ApiError -> GeocodeError.ServiceUnavailable(message.orEmpty(), this)
-    else -> GeocodeError.Network(message ?: "géocodage impossible", this)
+    else -> GeocodeError.Network(message ?: "geocoding impossible", this)
 }
 
 /** Re-typage d'un échec sans toucher au succès. */

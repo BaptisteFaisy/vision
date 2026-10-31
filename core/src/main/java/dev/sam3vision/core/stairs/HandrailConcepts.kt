@@ -14,7 +14,7 @@ import dev.sam3vision.core.live.LivePrompts
  * compte comme un « handrail ».
  *
  * Ce fichier ne touche pas à [LivePrompts] (défauts du direct, hors
- * périmètre) : l'intégrateur ajoute « handrail » par le champ « Suivre » ou
+ * périmètre) : l'intégrateur ajoute « handrail » par le champ « Follow » ou
  * instruction du propriétaire des prompts. [promptsFor] reste disponible
  * pour composer une base (miroir de `StairConcepts.promptsFor` côté
  * traversée).

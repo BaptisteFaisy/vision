@@ -5,7 +5,7 @@ package dev.sam3vision.app.voicenav
  *
  * Pur Kotlin (aucune classe Android) pour rester testable en JVM :
  * le [GuidanceTrackingService] ne fait que brancher ces valeurs sur
- * `NotificationCompat`. Textes en français, formulés pour une annonce
+ * `NotificationCompat`. Textes en anglais, formulés pour une annonce
  * vocale (« suivez les annonces », pas « regardez l'écran »).
  */
 object GuidanceNotification {
@@ -20,10 +20,10 @@ object GuidanceNotification {
     const val ACTION_STOP = "dev.sam3vision.app.voicenav.STOP"
 
     /** Nom du canal affiché dans les réglages système. */
-    fun channelName(): String = "Guidage vocal"
+    fun channelName(): String = "Voice guidance"
 
     /** Titre permanent pendant le guidage. */
-    fun title(): String = "Guidage vocal actif"
+    fun title(): String = "Voice guidance active"
 
     /**
      * Texte permanent : nomme la destination quand elle est connue,
@@ -31,11 +31,11 @@ object GuidanceNotification {
      */
     fun contentText(destinationLabel: String?): String =
         if (destinationLabel.isNullOrBlank()) {
-            "Suivez les annonces vocales."
+            "Follow the voice announcements."
         } else {
-            "Guidage vers ${destinationLabel.trim()} — suivez les annonces vocales."
+            "Guiding to ${destinationLabel.trim()} — follow the voice announcements."
         }
 
     /** Libellé du bouton d'arrêt. */
-    fun stopLabel(): String = "Arrêter le guidage"
+    fun stopLabel(): String = "Stop guidance"
 }

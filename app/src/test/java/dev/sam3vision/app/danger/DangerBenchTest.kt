@@ -23,17 +23,17 @@ class DangerBenchTest {
     @Test
     fun `verdict KO explicite quand le modele est absent`() {
         val verdict = DangerBenchVerdict(emptyList(), 0, 0, 0, "", 0, "modèle absent — asset yolo11n.onnx manquant")
-        assertTrue(DangerBench.summary(verdict).startsWith("model=YOLO11n KO — "))
+        assertTrue(DangerBench.summary(verdict).startsWith("model=YOLO11n FAIL — "))
     }
 
     @Test
     fun `la ligne d'alerte donne le temps-avant-contact arrondi`() {
         assertEquals(
-            "⚠ Personne droit devant — contact dans ~3 s",
+            "⚠ Person straight ahead — contact in ~3 s",
             DangerAlert(7, 3.4f, 2).line(),
         )
         assertEquals(
-            "⚠ Personne droit devant — contact dans ~1 s",
+            "⚠ Person straight ahead — contact in ~1 s",
             DangerAlert(7, 0.2f, 1).line(),
         )
     }

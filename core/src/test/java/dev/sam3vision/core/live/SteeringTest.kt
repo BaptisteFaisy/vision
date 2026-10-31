@@ -62,18 +62,18 @@ class SteeringTest {
     fun `confirmation guidee en francais`() {
         assertEquals(
             "Je te guide vers la gauche.",
-            SteeringText.confirm(SteeringCap.Left, guided = true),
+            SteeringText.confirm(SteeringCap.Left, guided = true, SpeechLanguage.Fr),
         )
         assertEquals(
             "Je te guide tout droit.",
-            SteeringText.confirm(SteeringCap.Straight, guided = true),
+            SteeringText.confirm(SteeringCap.Straight, guided = true, SpeechLanguage.Fr),
         )
     }
 
     @Test
     fun `confirmation dit quand le guidage est coupe`() {
         assertEquals(
-            "Cap à droite. Active le guidage dans les Réglages.",
+            "Heading right. Turn guidance on in Settings.",
             SteeringText.confirm(SteeringCap.Right, guided = false),
         )
     }

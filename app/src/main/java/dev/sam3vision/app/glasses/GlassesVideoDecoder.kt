@@ -123,7 +123,7 @@ internal open class GlassesVideoDecoder(
             failures += 1
             if (failures >= MAX_FAILURES) {
                 broken = true
-                onLog("décodeur H.265 abandonné après $failures échecs")
+                onLog("H.265 decoder given up after $failures failures")
             }
         } else {
             failures = 0
@@ -221,7 +221,7 @@ internal open class GlassesVideoDecoder(
     private fun warnFormatOnce(): ArgbImage? {
         if (!formatWarned) {
             formatWarned = true
-            onLog("format de sortie H.265 non géré (stride=$outStride slice=$outSliceHeight cf=$outColorFormat)")
+            onLog("unsupported H.265 output format (stride=$outStride slice=$outSliceHeight cf=$outColorFormat)")
         }
         return null
     }

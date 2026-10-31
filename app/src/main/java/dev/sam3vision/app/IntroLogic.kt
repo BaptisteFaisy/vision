@@ -47,7 +47,7 @@ private val INTRO_VERBS = setOf("disable", "desactive", "desactiver")
 
 /**
  * Vrai si la dictée demande la coupe de l'intro : « Disable iSee intro » en
- * anglais, « Désactive iSee intro » en français (l'interface est en français).
+ * anglais, « Désactive iSee intro » en français (reconnue, interface en anglais).
  * La reconnaissance vocale écrit « iSee » en deux mots (« I see »), en lettres
  * (« IC », « I.C. », « I C »), garde l'accent de « désactive » et colle la
  * ponctuation : la comparaison passe par la forme canonique (minuscules, sans

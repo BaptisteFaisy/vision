@@ -31,7 +31,7 @@ private const val AUDIO_WAIT_MS = 4_000L
 
 /** Nom du fichier : horodatage lisible, unique à la seconde. */
 fun recordingFileName(nowMs: Long): String =
-    "isee-lunettes-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.FRANCE).format(Date(nowMs)) + ".mp4"
+    "isee-glasses-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(nowMs)) + ".mp4"
 
 /** Une trame déjà copiée, en attente que le fichier soit ouvert. */
 private class Sample(val bytes: ByteArray, val ptsUs: Long)
@@ -194,9 +194,9 @@ internal class GlassesVideoRecorder(
         }
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val target = context.contentResolver.insert(collection, values)
-            ?: error("MediaStore refuse le fichier")
+            ?: error("MediaStore refuses the file")
         val fd = context.contentResolver.openFileDescriptor(target, "rw")
-            ?: error("fichier vidéo inaccessible")
+            ?: error("video file unreachable")
         // Aucune rotation : le capteur des lunettes est portrait natif et son contenu est
         // déjà droit dans ce cadre (720×1280 en qualité haute). Un quart de tour coucherait
         // la scène ; le fichier garde donc exactement ce que l'app affiche.

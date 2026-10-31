@@ -85,7 +85,7 @@ class NavigationHookTest {
         assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
         assertEquals(listOf(TravelMode.WALK), launcher.modes)
         assertTrue(launcher.opened.isEmpty())
-        assertEquals(listOf("Navigation vers la gare"), spoken)
+        assertEquals(listOf("Navigating to la gare"), spoken)
         assertEquals(null, state.status)
     }
 
@@ -98,7 +98,7 @@ class NavigationHookTest {
         assertTrue(consumed)
         assertTrue(launcher.launched.isEmpty())
         assertEquals(listOf("Lyon"), launcher.opened)
-        assertEquals(listOf("Navigation vers Lyon"), spoken)
+        assertEquals(listOf("Navigating to Lyon"), spoken)
     }
 
     @Test
@@ -118,7 +118,7 @@ class NavigationHookTest {
 
         assertTrue(hook(launcher).onTranscript("direction gare de Lyon"))
         assertEquals(listOf(NavDestination.Query("gare de Lyon")), launcher.launched)
-        assertEquals(listOf("Navigation vers gare de Lyon"), spoken)
+        assertEquals(listOf("Navigating to gare de Lyon"), spoken)
     }
 
     @Test

@@ -56,7 +56,7 @@ class LockedMicTest {
         val view = LockedMicState().armed().listen(0L).view()
         assertEquals(LockedMic.TITLE_LISTENING, view.title)
         assertEquals(LockedMic.ACTION_SEND, view.action)
-        assertEquals("J'écoute", view.spoken)
+        assertEquals("Listening", view.spoken)
         assertTrue(view.message.contains(LockedMic.ACTION_SEND))
     }
 
@@ -80,11 +80,11 @@ class LockedMicTest {
 
     @Test
     fun `un echec garde le message exact et le prononce`() {
-        val failed = LockedMicState().armed().failed("clé API absente — renseigne-la dans Réglages")
+        val failed = LockedMicState().armed().failed("API key missing — enter it in Settings")
         val view = failed.view()
         assertEquals(LockedMicPhase.FAILED, failed.phase)
-        assertEquals("clé API absente — renseigne-la dans Réglages", view.message)
-        assertEquals("Échec. clé API absente — renseigne-la dans Réglages", view.spoken)
+        assertEquals("API key missing — enter it in Settings", view.message)
+        assertEquals("Failed. API key missing — enter it in Settings", view.spoken)
         assertEquals(LockedMic.ACTION_LISTEN, view.action)
     }
 

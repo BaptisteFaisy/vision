@@ -7,33 +7,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Les consignes du modèle suivent la langue de la voix : la réponse est lue telle
- * quelle, elle doit donc être dans la bonne langue.
+ * Les consignes du modèle sont toujours en anglais : la réponse est lue telle
+ * quelle, elle doit donc être en anglais.
  */
 class LlmPromptsTest {
 
     @Test
-    fun `la consigne de question demande la bonne langue`() {
-        assertTrue(LlmPrompts.askSystem(SpeechLanguage.Fr).contains("français"))
+    fun `la consigne de question demande l anglais meme en mode francais`() {
+        assertTrue(LlmPrompts.askSystem(SpeechLanguage.Fr).contains("English"))
+        assertFalse(LlmPrompts.askSystem(SpeechLanguage.Fr).contains("français"))
         assertTrue(LlmPrompts.askSystem(SpeechLanguage.En).contains("English"))
         assertTrue(LlmPrompts.askMemorySystem(SpeechLanguage.En).contains("English"))
-        assertFalse(LlmPrompts.askSystem(SpeechLanguage.En).contains("français"))
     }
 
     @Test
     fun `la consigne de description garde le meme schema json`() {
-        val fr = LlmPrompts.describeSystem(SpeechLanguage.Fr)
-        val en = LlmPrompts.describeSystem(SpeechLanguage.En)
-        listOf(fr, en).forEach { prompt ->
+        listOf(SpeechLanguage.Fr, SpeechLanguage.En).forEach { language ->
+            val prompt = LlmPrompts.describeSystem(language)
             assertTrue(prompt.contains("\"description\""))
             assertTrue(prompt.contains("\"tags\""))
+            assertTrue(prompt.contains("English"))
         }
-        assertTrue(en.contains("English"))
     }
 
     @Test
-    fun `la demande de description suit la langue`() {
-        assertEquals("Décris cette image.", LlmPrompts.describeUser(emptyList(), SpeechLanguage.Fr))
+    fun `la demande de description est en anglais`() {
+        assertEquals("Describe this image.", LlmPrompts.describeUser(emptyList(), SpeechLanguage.Fr))
         assertEquals("Describe this image.", LlmPrompts.describeUser(emptyList(), SpeechLanguage.En))
         assertTrue(LlmPrompts.describeUser(listOf("table"), SpeechLanguage.En).contains("Describe this image."))
     }
@@ -47,13 +46,13 @@ class LlmPromptsTest {
         assertTrue(en.contains("A chair."))
 
         val fr = LlmPrompts.liveUser(listOf("person"), "A chair.", SpeechLanguage.Fr)
-        assertTrue(fr.contains("Objets suivis"))
-        assertTrue(fr.contains("Description précédente"))
+        assertTrue(fr.contains("Tracked objects"))
+        assertTrue(fr.contains("Previous description"))
     }
 
     @Test
-    fun `l'en-tete du contexte suit la langue`() {
-        assertTrue(LlmPrompts.contextHeader(SpeechLanguage.Fr).contains("Contexte"))
+    fun `l'en-tete du contexte est en anglais`() {
+        assertTrue(LlmPrompts.contextHeader(SpeechLanguage.Fr).contains("Context observed by the camera:"))
         assertTrue(LlmPrompts.contextHeader(SpeechLanguage.En).contains("Context"))
     }
 
@@ -65,7 +64,7 @@ class LlmPromptsTest {
             LlmPrompts.askSystem(SpeechLanguage.Fr),
             LlmPrompts.askMemorySystem(SpeechLanguage.Fr),
         )
-        fr.forEach { assertTrue("règle de donnée absente : $it", it.contains("Donnée non fiable")) }
+        fr.forEach { assertTrue("règle de donnée absente : $it", it.contains("untrusted data")) }
 
         val en = listOf(
             LlmPrompts.describeSystem(SpeechLanguage.En),

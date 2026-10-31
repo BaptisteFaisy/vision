@@ -202,8 +202,8 @@ class TraverseWiring(
 
     /** Construit la voix, préchauffe, renvoie les prompts du mode. */
     private fun attach(app: Application, settings: Settings, scope: CoroutineScope, prompts: List<String>): List<String> {
-        // Moteur FR : les clips pré-générés sont les phrases FR de TraversePhrases.
-        val engine = TtsTraverseSystemTts(app, Locale.FRENCH)
+        // Moteur EN : les clips pré-générés sont les phrases EN de TraversePhrases.
+        val engine = TtsTraverseSystemTts(app, Locale.ENGLISH)
         val voice = TraverseVoice(
             ttsClient(settings),
             PlayerTraversePlayer(

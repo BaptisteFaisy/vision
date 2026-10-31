@@ -27,10 +27,10 @@ class MetaAsrClient(
 
     override suspend fun transcribe(wav: ByteArray): Result<String> {
         if (apiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("clé Meta absente — renseigne-la dans Réglages"))
+            return Result.failure(ApiError.InvalidKey("Meta key missing — enter it in Settings"))
         }
         if (wav.size <= WAV_HEADER_BYTES) {
-            return Result.failure(ApiError.BadResponse("audio vide"))
+            return Result.failure(ApiError.BadResponse("empty audio"))
         }
         endpointRefusal("endpoint Meta", baseUrl, TRANSCRIBE_PATH)?.let { return Result.failure(it) }
         // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
@@ -58,7 +58,7 @@ class MetaAsrClient(
 
     /** Texte de la réponse ; [ApiError.BadResponse] si le champ est introuvable. */
     internal fun parseTranscript(raw: String): String =
-        extractTranscript(raw) ?: throw ApiError.BadResponse("champ texte absent : ${raw.take(120)}")
+        extractTranscript(raw) ?: throw ApiError.BadResponse("text field missing: ${raw.take(120)}")
 
     companion object {
         const val DEFAULT_MODEL = "muse-voice-transcribe-1.0"

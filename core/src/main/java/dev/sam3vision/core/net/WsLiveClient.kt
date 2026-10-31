@@ -86,7 +86,7 @@ class WsLiveClient(
         val sent = transport.send(message)
         if (!sent) {
             synchronized(lock) { pending.remove(id) }
-            return Result.failure(ApiError.Network("WebSocket /live/ws : envoi refusé"))
+            return Result.failure(ApiError.Network("WebSocket /live/ws: send refused"))
         }
         val raw = awaitReply(reply)
         synchronized(lock) { pending.remove(id) }
@@ -196,8 +196,8 @@ class WsLiveClient(
     }
 
     private companion object {
-        const val WS_UNREACHABLE = "WebSocket /live/ws injoignable"
-        const val WS_CLOSED = "WebSocket /live/ws fermé"
-        const val WS_UNREADABLE = "WebSocket : message illisible"
+        const val WS_UNREACHABLE = "WebSocket /live/ws unreachable"
+        const val WS_CLOSED = "WebSocket /live/ws closed"
+        const val WS_UNREADABLE = "WebSocket: unreadable message"
     }
 }

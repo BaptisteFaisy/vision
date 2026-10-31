@@ -58,8 +58,8 @@ class TapAreaView(
         isClickable = true
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
-        contentDescription = "Écran d'enregistrement : touchez n'importe où pour filmer, " +
-            "touchez de nouveau pour envoyer"
+        contentDescription = "Recording screen: tap anywhere to film, " +
+            "tap again to send"
     }
 
     /** Insets des barres système, en pixels : un tap dans ces bandes ne déclenche jamais la vidéo. */

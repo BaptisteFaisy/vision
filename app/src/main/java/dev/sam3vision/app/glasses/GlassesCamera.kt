@@ -214,6 +214,6 @@ internal class GlassesCamera(
     private companion object {
         const val HERTZ_44K = 44_100
         const val HERTZ_48K = 48_000
-        const val NO_REASON = "refus du SDK"
+        const val NO_REASON = "SDK refusal"
     }
 }

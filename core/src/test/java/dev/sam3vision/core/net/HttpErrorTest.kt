@@ -15,7 +15,7 @@ class HttpErrorTest {
     fun `404 modal app arretee donne BackendStopped`() {
         val error = httpError(404, "modal-http: invalid function call\n")
         assertTrue("attendu BackendStopped, obtenu $error", error is ApiError.BackendStopped)
-        assertTrue(error.message!!.contains("GPU SAM éteint"))
+        assertTrue(error.message!!.contains("SAM GPU off"))
     }
 
     @Test
@@ -38,6 +38,6 @@ class HttpErrorTest {
         val error = httpError(409, """{"detail":"limite atteinte"}""")
         assertTrue("attendu RateLimited, obtenu $error", error is ApiError.RateLimited)
         assertTrue(error.message!!.contains("409"))
-        assertTrue(error.message!!.contains("réessaie"))
+        assertTrue(error.message!!.contains("try again"))
     }
 }

@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * « Modèles effectifs » des Réglages : noms exacts des 2 modèles + bases + statuts de
- * clés (la clé LLM n'est « chauffée » qu'après un « Tester le LLM » OK) +
+ * « Effective models » des Réglages : noms exacts des 2 modèles + bases + statuts de
+ * clés (la clé LLM n'est « chauffée » qu'après un « Test LLM » OK) +
  * avertissement si le build impose un autre modèle que l'épinglé. Lecture seule : le
  * brouillon vaut le réglage seedé à l'ouverture, il bouge ensuite avec la saisie.
  * Textes calculés par [modelPinLines] (pur, testé en JVM).
@@ -23,7 +23,7 @@ internal fun ModelPinBlock(draft: Settings, statusLine: String?) {
     val testLine = statusLine?.takeIf { it.startsWith("LLM ") }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            "Modèles effectifs",
+            "Effective models",
             color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,

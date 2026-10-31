@@ -20,13 +20,13 @@ class DictationUseCase(
         val durationMs = Wav.durationMs(pcm.size, sampleRate)
         if (durationMs < minDurationMs) {
             return Result.failure(
-                ApiError.BadResponse("enregistrement trop court (${durationMs} ms, minimum ${minDurationMs} ms)"),
+                ApiError.BadResponse("recording too short (${durationMs} ms, minimum ${minDurationMs} ms)"),
             )
         }
         return speech.transcribe(Wav.pcm16(pcm, sampleRate)).then { raw ->
             val text = raw.trim()
             if (text.isEmpty()) {
-                Result.failure(ApiError.BadResponse("aucune parole détectée"))
+                Result.failure(ApiError.BadResponse("no speech detected"))
             } else {
                 Result.success(text)
             }

@@ -53,32 +53,32 @@ private fun decodeChunk(shape: String, from: Int): Pair<Int, Int>? {
 }
 
 /**
- * Libellé parlé français d'un `type` de manœuvre Valhalla. **Repli** : quand
- * le serveur envoie ses consignes (`verbal_pre_transition_instruction`, français
+ * Libellé parlé anglais d'un `type` de manœuvre Valhalla. **Repli** : quand
+ * le serveur envoie ses consignes (`verbal_pre_transition_instruction`, anglais
  * demandé), ce sont elles qui sont dites ; ce libellé ne sert que si elles
  * manquent — une consigne courte vaut mieux que le silence au milieu d'un
- * guidage. Les types de transport en commun retombent sur « Continuez. » : le
+ * guidage. Les types de transport en commun retombent sur « Continue. » : le
  * guidage vocal est piéton, il ne prend ni le bus ni le ferry pour l'usager.
  */
-fun maneuverShortFr(type: Int): String = when (type) {
-    1, 2, 3 -> "Départ."
-    4, 5, 6 -> "Arrivée."
-    8, 22 -> "Continuez tout droit."
-    9 -> "Légèrement à droite."
-    10 -> "Tournez à droite."
-    11 -> "Fortement à droite."
-    12, 13 -> "Faites demi-tour."
-    14 -> "Fortement à gauche."
-    15 -> "Tournez à gauche."
-    16 -> "Légèrement à gauche."
-    17, 18, 19 -> "Prenez la rampe."
-    20, 21 -> "Prenez la sortie."
-    23 -> "Restez à droite."
-    24 -> "Restez à gauche."
-    25, 37, 38 -> "Insérez-vous."
-    26 -> "Entrez dans le rond-point."
-    27 -> "Sortez du rond-point."
-    28 -> "Prenez le ferry."
-    29 -> "Quittez le ferry."
-    else -> "Continuez."
+fun maneuverShort(type: Int): String = when (type) {
+    1, 2, 3 -> "Start."
+    4, 5, 6 -> "You have arrived."
+    8, 22 -> "Continue straight ahead."
+    9 -> "Bear right."
+    10 -> "Turn right."
+    11 -> "Sharp right."
+    12, 13 -> "Make a U-turn."
+    14 -> "Sharp left."
+    15 -> "Turn left."
+    16 -> "Bear left."
+    17, 18, 19 -> "Take the ramp."
+    20, 21 -> "Take the exit."
+    23 -> "Stay right."
+    24 -> "Stay left."
+    25, 37, 38 -> "Merge."
+    26 -> "Enter the roundabout."
+    27 -> "Exit the roundabout."
+    28 -> "Take the ferry."
+    29 -> "Leave the ferry."
+    else -> "Continue."
 }

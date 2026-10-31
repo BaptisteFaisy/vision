@@ -17,7 +17,7 @@ import dev.sam3vision.core.speech.LockedMicState
 
 /**
  * La notification qui **est** l'interface du micro verrouillé : une seule ligne lisible par
- * TalkBack, un seul bouton, plus « Arrêter ». Elle vit sur l'écran de verrouillage
+ * TalkBack, un seul bouton, plus « Stop ». Elle vit sur l'écran de verrouillage
  * (`VISIBILITY_PUBLIC`) parce que c'est là qu'on la cherche.
  *
  * Le texte vient de [LockedMicState.view] (`:core`, testé en JVM) : ce fichier ne décide rien,
@@ -40,10 +40,10 @@ object LockedMicNotifications {
     fun ensureChannel(context: Context) {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Micro verrouillé",
+            "Locked mic",
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Écouter et répondre sans déverrouiller le téléphone."
+            description = "Listen and answer without unlocking the phone."
             setSound(null, null)          // visible et dépliable, mais muette
             enableVibration(false)
             setShowBadge(false)
@@ -72,7 +72,7 @@ object LockedMicNotifications {
             // cache leurs boutons, or on ne demande pas à un utilisateur non-voyant d'ouvrir un
             // chevron. Un seul appui, n'importe où sur la carte, ouvre (ou envoie) le micro.
             .setContentIntent(service(context, LockedMicBridge.ACTION_TOGGLE, TOGGLE_REQUEST))
-            .addAction(0, "Arrêter", service(context, LockedMicBridge.ACTION_STOP, STOP_REQUEST))
+            .addAction(0, "Stop", service(context, LockedMicBridge.ACTION_STOP, STOP_REQUEST))
 
         view.action?.let { label -> builder.addAction(0, label, service(context, LockedMicBridge.ACTION_TOGGLE, TOGGLE_REQUEST)) }
         return builder.build()

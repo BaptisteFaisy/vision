@@ -67,7 +67,7 @@ fun CaregiverScreen(link: String, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Carte indisponible", fontSize = 18.sp)
+                Text("Map unavailable", fontSize = 18.sp)
                 Text(error!!, fontSize = 13.sp)
             }
         }

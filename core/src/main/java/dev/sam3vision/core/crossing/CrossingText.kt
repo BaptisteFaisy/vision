@@ -18,7 +18,7 @@ object CrossingText {
      * Phrase pour [state] dans [language]. Le doute parle comme le rouge
      * (« attendez ») : le silence seul ne dit pas pourquoi on ne traverse pas.
      */
-    fun phrase(state: CrossingState, language: SpeechLanguage = SpeechLanguage.Fr): String =
+    fun phrase(state: CrossingState, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.En -> when (state) {
                 CrossingState.Red -> "Red, wait."
@@ -44,7 +44,7 @@ object CrossingText {
      * Confirmation parlée de l'ordre vocal : le mode vient d'être activé
      * ([on] vrai) ou coupé. Courte, dite au TTS système.
      */
-    fun mode(on: Boolean, language: SpeechLanguage = SpeechLanguage.Fr): String =
+    fun mode(on: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.En -> if (on) "Crossing mode on." else "Crossing mode off."
             SpeechLanguage.Fr -> if (on) "Mode traversée activé." else "Mode traversée coupé."
@@ -61,7 +61,7 @@ object CrossingText {
     fun approach(
         cap: SteeringCap,
         meters: Float?,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         centerX: Float? = null,
         withHour: Boolean = false,
     ): String {
@@ -92,7 +92,7 @@ object CrossingText {
      * Arrivée sur le passage (« Sur le passage. ») : douce (appelant :
      * `urgent = false`, ne coupe rien), dite une fois par [CrossingGuidance].
      */
-    fun arrived(language: SpeechLanguage = SpeechLanguage.Fr): String =
+    fun arrived(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.En -> "On the crosswalk."
             SpeechLanguage.Fr -> "Sur le passage."

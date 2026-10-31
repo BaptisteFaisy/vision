@@ -24,11 +24,11 @@ class VoiceNavAnnouncerTest {
             "Do you really want to go to la gare? Answer yes or no.",
             VoiceNavPhrases.confirmQuestion("la gare", null),
         )
-        assertEquals("Voici la fiche de la tour Eiffel", VoiceNavPhrases.placeOpened("la tour Eiffel"))
-        assertEquals("Guidage arrêté", VoiceNavPhrases.STOP_DONE)
-        assertEquals("Arrivée à destination", VoiceNavPhrases.ARRIVED)
-        assertEquals("GPS désactivé", VoiceNavPhrases.GPS_DISABLED)
-        assertEquals("GPS activé", VoiceNavPhrases.GPS_ENABLED)
+        assertEquals("Here is the page for la tour Eiffel", VoiceNavPhrases.placeOpened("la tour Eiffel"))
+        assertEquals("Guidance stopped", VoiceNavPhrases.STOP_DONE)
+        assertEquals("Arrived at destination", VoiceNavPhrases.ARRIVED)
+        assertEquals("GPS disabled", VoiceNavPhrases.GPS_DISABLED)
+        assertEquals("GPS enabled", VoiceNavPhrases.GPS_ENABLED)
         assertEquals("Cancelled.", VoiceNavPhrases.CONFIRM_CANCELLED)
         assertEquals("Your route is still loading, one moment.", VoiceNavPhrases.CONFIRM_LOADING)
     }
@@ -49,11 +49,11 @@ class VoiceNavAnnouncerTest {
         assertEquals(
             listOf(
                 "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no.",
-                "Voici la fiche de la tour Eiffel",
-                "Guidage arrêté",
-                "GPS désactivé",
-                "GPS activé",
-                "Arrivée à destination",
+                "Here is the page for la tour Eiffel",
+                "Guidance stopped",
+                "GPS disabled",
+                "GPS enabled",
+                "Arrived at destination",
                 "Cancelled.",
                 "Your route is still loading, one moment.",
             ),

@@ -7,7 +7,7 @@ import org.junit.Test
 /**
  * Profil de latence : p50/p95 par étage sur la fenêtre de vingt mesures, latence perçue
  * distincte de l'aller-retour, part serveur/réseau, comptes hors écran et échecs, et
- * ligne de journal en français sans locale.
+ * ligne de journal en anglais sans locale.
  */
 class LatencyProfileTest {
 
@@ -80,11 +80,11 @@ class LatencyProfileTest {
     }
 
     @Test
-    fun `la ligne de journal est en francais sans locale`() {
+    fun `la ligne de journal est en anglais sans locale`() {
         profile.record(completeFrame(), FrameOutcome.FAILED)
         assertEquals(
-            "LatencyProfile perçu 684,8/684,8 ms · A/R 426,2/426,2 · serveur 300,0 · réseau 126,2" +
-                " · file 27 % · hors écran 0 · échecs 1",
+            "LatencyProfile felt 684.8/684.8 ms · RTT 426.2/426.2 · server 300.0 · network 126.2" +
+                " · queue 27% · off-screen 0 · failures 1",
             profile.summary().line(),
         )
     }
@@ -94,8 +94,8 @@ class LatencyProfileTest {
         profile.record(completeFrame())
         val lines = profile.summary().stages()
         assertEquals(7, lines.size)
-        assertEquals("LatencyProfile capt 24,5/24,5 ms", lines.first())
-        assertEquals("LatencyProfile aff 17,4/17,4 ms", lines.last())
+        assertEquals("LatencyProfile capt 24.5/24.5 ms", lines.first())
+        assertEquals("LatencyProfile aff 17.4/17.4 ms", lines.last())
     }
 
     @Test

@@ -33,7 +33,7 @@ internal fun acceptGlassesPhoto(current: IseeGlassesPhoto?, file: File): Boolean
  * Pure : testée en JVM.
  */
 internal fun glassesPhotoLabel(action: CaptureAction): String = when (action) {
-    CaptureAction.ASK -> "Photo des lunettes : dictez votre question"
-    CaptureAction.PHOTO -> "Photo des lunettes affichée"
-    CaptureAction.LIVE -> "Photo des lunettes affichée"
+    CaptureAction.ASK -> "Glasses photo: dictate your question"
+    CaptureAction.PHOTO -> "Glasses photo displayed"
+    CaptureAction.LIVE -> "Glasses photo displayed"
 }

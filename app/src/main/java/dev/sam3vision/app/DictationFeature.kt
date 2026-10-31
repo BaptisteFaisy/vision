@@ -40,7 +40,7 @@ data class OverlayState(
 }
 
 /**
- * Toute la dictée de l'app, extraite du [AppViewModel] : bouton « Dicter » du chat,
+ * Toute la dictée de l'app, extraite du [AppViewModel] : bouton « Dictate » du chat,
  * appui long n'importe où, bandeaux plein écran et repli Scribe.
  *
  * Le moteur (`MuseTranscript`, micro gardé ouvert sans limite de durée) est réutilisé
@@ -77,12 +77,12 @@ class DictationFeature(
             return
         }
         if (MicBus.busyFor(MicBus.Owner.DICTATION)) {
-            report(hold, "micro déjà occupé par la vidéo")
+            report(hold, "microphone already busy with video")
             return
         }
         val mic = open(glasses)
         if (mic == null) {
-            report(hold, "micro indisponible")
+            report(hold, "microphone unavailable")
             return
         }
         MicBus.acquire(MicBus.Owner.DICTATION)
@@ -91,7 +91,7 @@ class DictationFeature(
                 dictation = it.dictation.copy(
                     recording = true,
                     hold = hold,
-                    overlay = if (hold) nextOverlay("J'écoute", "Parle, puis relâche pour envoyer.") else null,
+                    overlay = if (hold) nextOverlay("Listening", "Speak, then release to send.") else null,
                 ),
                 statusLine = if (hold) null else recordingLine(),
             )
@@ -115,9 +115,9 @@ class DictationFeature(
 
     /** La ligne d'état dit d'où vient le son : l'utilisateur doit savoir qui écoute. */
     private fun recordingLine(): String = if (fromGlasses) {
-        "Enregistrement (micro lunettes)… parle, puis appuie sur Stop."
+        "Recording (glasses mic)… speak, then press Stop."
     } else {
-        "Enregistrement… parle, puis appuie sur Stop."
+        "Recording… speak, then press Stop."
     }
 
     /** Coupe le micro puis transcrit le PCM capté (Meta, à défaut Scribe). */
@@ -131,15 +131,15 @@ class DictationFeature(
                         recording = false,
                         hold = false,
                         busy = true,
-                        overlay = if (hold) nextOverlay("Transcription", "Un instant…") else it.dictation.overlay,
+                        overlay = if (hold) nextOverlay("Transcription", "One moment…") else it.dictation.overlay,
                     ),
-                    statusLine = if (hold) null else "Transcription en cours…",
+                    statusLine = if (hold) null else "Transcribing…",
                 )
             }
             MicBus.release(MicBus.Owner.DICTATION)
             val client = speechClient(state.value.settings)
             val outcome = if (client == null) {
-                Result.failure(ApiError.InvalidKey("aucun moteur de dictée configuré"))
+                Result.failure(ApiError.InvalidKey("no dictation engine configured"))
             } else {
                 mic.stop(client)
             }
@@ -166,7 +166,7 @@ class DictationFeature(
     private fun blocker(settings: Settings, glasses: Boolean): String? = when {
         // Le micro des lunettes ne passe pas par `AudioRecord` : sa permission ne sert à rien.
         !glasses && !micGranted() -> PermTexts.MIC_DENIED
-        !settings.sttConfigured -> "aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"
+        !settings.sttConfigured -> "no dictation engine: Meta or ElevenLabs key (Settings)"
         else -> null
     }
 
@@ -184,21 +184,21 @@ class DictationFeature(
                         busy = false,
                         text = if (hold) dictation.text else text,
                         seq = if (hold) dictation.seq else dictation.seq + 1,
-                        overlay = if (hold) nextOverlay("Dictée", text) else dictation.overlay,
+                        overlay = if (hold) nextOverlay("Dictation", text) else dictation.overlay,
                     ),
                     statusLine = null,
                 )
             },
-            onFailure = { error -> failed(current, error.message ?: "dictée impossible", hold) },
+            onFailure = { error -> failed(current, error.message ?: "dictation failed", hold) },
         )
 
     /** Refus ou échec : bandeau (appui long) ou simple ligne d'état (bouton du chat). */
     private fun failed(current: UiState, message: String, hold: Boolean): UiState = current.copy(
         dictation = current.dictation.copy(
             busy = false,
-            overlay = if (hold) nextOverlay("Erreur", message, error = true) else current.dictation.overlay,
+            overlay = if (hold) nextOverlay("Error", message, error = true) else current.dictation.overlay,
         ),
-        statusLine = if (hold) null else "Dictée KO — $message",
+        statusLine = if (hold) null else "Dictation failed — $message",
     )
 
     private fun report(hold: Boolean, message: String) = state.update { failed(it, message, hold) }

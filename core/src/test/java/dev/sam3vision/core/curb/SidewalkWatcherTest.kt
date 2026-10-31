@@ -20,7 +20,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Ahead, 0L))
         val cue = watcher.onPosition(SidewalkPosition.Ahead, 200L)!!
 
-        assertEquals("Trottoir devant.", cue.phrase)
+        assertEquals("Sidewalk ahead.", cue.phrase)
         assertEquals(SidewalkPosition.Ahead, cue.position)
         assertEquals(200L, watcher.lastAlertMs)
     }
@@ -32,7 +32,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Across, 0L))
         val cue = watcher.onPosition(SidewalkPosition.Across, 200L)!!
 
-        assertEquals("Trottoir en face.", cue.phrase)
+        assertEquals("Sidewalk across the street.", cue.phrase)
         assertEquals(SidewalkPosition.Across, cue.position)
         assertEquals(200L, watcher.lastAlertMs)
     }
@@ -55,7 +55,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Left, 400L))
         val cue = watcher.onPosition(SidewalkPosition.Left, 600L)!!
 
-        assertEquals("Trottoir à gauche.", cue.phrase)
+        assertEquals("Sidewalk on the left.", cue.phrase)
         assertEquals(SidewalkPosition.Left, cue.position)
     }
 
@@ -67,7 +67,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Across, 400L))
         val cue = watcher.onPosition(SidewalkPosition.Across, 600L)!!
 
-        assertEquals("Trottoir en face.", cue.phrase)
+        assertEquals("Sidewalk across the street.", cue.phrase)
         assertEquals(SidewalkPosition.Across, cue.position)
     }
 

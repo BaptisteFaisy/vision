@@ -82,7 +82,7 @@ class SidewalkWatcher(
     fun onPosition(
         position: SidewalkPosition?,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): SidewalkCue? {
         if (position == null || position == SidewalkPosition.Absent) {
             hits = 0

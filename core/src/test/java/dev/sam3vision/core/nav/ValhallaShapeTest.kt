@@ -36,22 +36,22 @@ class ValhallaShapeTest {
 
     @Test
     fun `les libelles parles couvrent le guidage pieton`() {
-        assertEquals("Départ.", maneuverShortFr(1))
-        assertEquals("Arrivée.", maneuverShortFr(4))
-        assertEquals("Continuez tout droit.", maneuverShortFr(8))
-        assertEquals("Tournez à droite.", maneuverShortFr(10))
-        assertEquals("Tournez à gauche.", maneuverShortFr(15))
-        assertEquals("Légèrement à droite.", maneuverShortFr(9))
-        assertEquals("Légèrement à gauche.", maneuverShortFr(16))
-        assertEquals("Faites demi-tour.", maneuverShortFr(12))
-        assertEquals("Entrez dans le rond-point.", maneuverShortFr(26))
-        assertEquals("Sortez du rond-point.", maneuverShortFr(27))
+        assertEquals("Start.", maneuverShort(1))
+        assertEquals("You have arrived.", maneuverShort(4))
+        assertEquals("Continue straight ahead.", maneuverShort(8))
+        assertEquals("Turn right.", maneuverShort(10))
+        assertEquals("Turn left.", maneuverShort(15))
+        assertEquals("Bear right.", maneuverShort(9))
+        assertEquals("Bear left.", maneuverShort(16))
+        assertEquals("Make a U-turn.", maneuverShort(12))
+        assertEquals("Enter the roundabout.", maneuverShort(26))
+        assertEquals("Exit the roundabout.", maneuverShort(27))
     }
 
     @Test
     fun `un type inconnu ou de transport retombe sur continuer`() {
-        assertEquals("Continuez.", maneuverShortFr(0))
-        assertEquals("Continuez.", maneuverShortFr(30))
-        assertEquals("Continuez.", maneuverShortFr(99))
+        assertEquals("Continue.", maneuverShort(0))
+        assertEquals("Continue.", maneuverShort(30))
+        assertEquals("Continue.", maneuverShort(99))
     }
 }

@@ -29,9 +29,9 @@ internal suspend fun GlassesRuntime.collectFrames(stream: Stream) {
 
 /** Une erreur de flux transitoire (batterie, charnière, thermique) n'arrête rien. */
 internal fun GlassesRuntime.onStreamError(error: StreamError) {
-    onLog("erreur de flux : ${describe(error)}")
+    onLog("stream error: ${describe(error)}")
     if (streamErrorDisposition(error) != StreamErrorDisposition.STOP_CYCLE) return
-    onLog("erreur critique du flux : arrêt du cycle")
+    onLog("critical stream error: stopping the cycle")
     stopCycle()
 }
 
@@ -50,10 +50,10 @@ internal suspend fun GlassesRuntime.consumeFrames() {
         lastSentAt = SystemClock.elapsedRealtime()
         val jpeg = io { encoder.toJpeg(fresh) }
         if (jpeg == null) {
-            onLog("frame non encodable : ignorée")
+            onLog("frame not encodable: skipped")
             continue
         }
-        onLog("frame transmise : ${fresh.width}x${fresh.height}")
+        onLog("frame forwarded: ${fresh.width}x${fresh.height}")
         onFrame(jpeg)
     }
 }

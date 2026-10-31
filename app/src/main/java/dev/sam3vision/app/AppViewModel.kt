@@ -230,7 +230,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun onPhoto(file: File) = viewModelScope.launch {
         photoTimings.begin()
         val loaded = loader.load(file)
-        photoTimings.mark("charge")
+        photoTimings.mark("load")
         if (loaded == null) {
             val line = photoTimings.emit()
             update { it.copy(phase = Phase.Failed(AppStatusText.imageUnreadable(file)), timingsLine = line) }
@@ -326,21 +326,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun testDepth() = viewModelScope.launch {
         val backend = _state.value.settings.depthBackend
         if (backend == DepthBackend.OFF) {
-            _state.update { it.copy(statusLine = "Profondeur coupée — choisis un moteur.") }
+            _state.update { it.copy(statusLine = "Depth off — pick an engine.") }
             return@launch
         }
         val target = backend
-        _state.update { it.copy(statusLine = "Modèle ${target.code} : vérification…") }
+        _state.update { it.copy(statusLine = "Model ${target.code}: checking…") }
         val ensured = ModelDownloader.ensure(getApplication(), target) { done, total ->
             val pct = (done * 100 / total.coerceAtLeast(1)).toInt()
-            _state.update { it.copy(statusLine = "Téléchargement ${target.code}… $pct %") }
+            _state.update { it.copy(statusLine = "Downloading ${target.code}… $pct %") }
         }
         if (ensured.isFailure) {
-            val cause = ensured.exceptionOrNull()?.message ?: "échec inconnu"
-            _state.update { it.copy(statusLine = "Profondeur : téléchargement impossible — $cause") }
+            val cause = ensured.exceptionOrNull()?.message ?: "unknown failure"
+            _state.update { it.copy(statusLine = "Depth: download failed — $cause") }
             return@launch
         }
-        _state.update { it.copy(statusLine = "Test profondeur en cours… (${backend.code})") }
+        _state.update { it.copy(statusLine = "Testing depth… (${backend.code})") }
         val verdict = withContext(Dispatchers.Default) {
             val estimator = DepthEstimators.open(getApplication(), backend)
             try {
@@ -350,7 +350,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 estimator.close()
             }
         }
-        _state.update { it.copy(statusLine = "Profondeur : ${DepthBench.summary(verdict)}") }
+        _state.update { it.copy(statusLine = "Depth: ${DepthBench.summary(verdict)}") }
     }
 
     /**
@@ -360,17 +360,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * `DangerBench`. Le modèle est embarqué en asset, rien à télécharger.
      */
     fun testDanger() = viewModelScope.launch {
-        _state.update { it.copy(statusLine = "Test danger en cours… (YOLO11n)") }
+        _state.update { it.copy(statusLine = "Testing danger… (YOLO11n)") }
         val verdict = withContext(Dispatchers.Default) {
             val image = syntheticGradientArgb(DANGER_BENCH_SIZE, DANGER_BENCH_SIZE)
             DangerBench.run(getApplication(), image, DANGER_BENCH_SIZE, DANGER_BENCH_SIZE)
         }
-        _state.update { it.copy(statusLine = "Danger : ${DangerBench.summary(verdict)}") }
+        _state.update { it.copy(statusLine = "Danger: ${DangerBench.summary(verdict)}") }
     }
 
-    // ————— Dictée (appui long partout, bouton « Dicter » dans le chat) —————
+    // ————— Dictée (appui long partout, bouton « Dictate » dans le chat) —————
 
-    /** Bouton « Dicter » du chat : ouvre le micro jusqu'au prochain Stop. */
+    /** Bouton « Dictate » du chat : ouvre le micro jusqu'au prochain Stop. */
     fun startDictation() = dictation.start(hold = false)
 
     fun stopDictation() = dictation.stop(hold = false)

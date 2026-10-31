@@ -145,11 +145,11 @@ class ShareTrackingService : Service() {
         createChannel()
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("Suivi en direct actif")
-            .setContentText("La position est partagée avec le proche sur le site de suivi.")
+            .setContentTitle("Live tracking active")
+            .setContentText("Your position is shared with your caregiver on the tracking site.")
             .setOngoing(true)
             .setContentIntent(back)
-            .addAction(0, "Arrêter le suivi", stop)
+            .addAction(0, "Stop tracking", stop)
             .build()
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
@@ -163,7 +163,7 @@ class ShareTrackingService : Service() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Suivi en direct",
+            "Live tracking",
             NotificationManager.IMPORTANCE_LOW,
         )
         manager.createNotificationChannel(channel)

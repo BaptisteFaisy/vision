@@ -23,7 +23,7 @@ internal fun GlassesRuntime.observeRegistration() {
     // enchaînement d'états ne révèle pas.
     launchSafe {
         Wearables.registrationErrorStream.collect { error ->
-            onLog("erreur d'enregistrement : ${describe(error)}")
+            onLog("registration error: ${describe(error)}")
         }
     }
 }
@@ -59,13 +59,13 @@ private suspend fun GlassesRuntime.requestRegistration() {
     if (!registrationLatch.arm()) return
     val activity = activity.get()
     if (activity == null) {
-        onLog("activity indisponible : enregistrement impossible")
+        onLog("activity unavailable: registration impossible")
         return
     }
-    onLog("ouverture de l'enregistrement des lunettes")
+    onLog("opening glasses registration")
     // L'app du compagnon peut être absente : on log sans emporter le collecteur.
     runCatching { io { Wearables.startRegistration(activity) } }
-        .onFailure { error -> onLog("enregistrement impossible : ${error.message}") }
+        .onFailure { error -> onLog("registration impossible: ${error.message}") }
 }
 
 private suspend fun GlassesRuntime.openSession() {
@@ -76,7 +76,7 @@ private suspend fun GlassesRuntime.openSession() {
     // Sans cette attente il fallait arrêter puis relancer la session à la main.
     // La porte elle-même est partagée avec l'app (`GlassesLinkGate.kt`).
     if (!awaitLinkedDevice(SystemClock::elapsedRealtime)) {
-        onLog("aucune lunette liée après ${LINK_WAIT_MS / 1_000} s : portez-les, dépliées, puis relancez")
+        onLog("no linked glasses after ${LINK_WAIT_MS / 1_000} s: wear them, unfolded, then restart")
         sessionLatch.disarm()
         return
     }

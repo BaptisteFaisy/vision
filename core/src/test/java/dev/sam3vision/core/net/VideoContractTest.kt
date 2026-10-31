@@ -70,7 +70,7 @@ class VideoContractTest {
     @Test
     fun `une reponse vide devient un message de remplacement`() = runBlocking {
         NetContract.server(body = "").use { server ->
-            assertEquals("réponse vide de SAM 3.1", send(server.baseUrl).getOrThrow())
+            assertEquals("empty SAM 3.1 response", send(server.baseUrl).getOrThrow())
         }
     }
 

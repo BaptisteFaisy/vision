@@ -19,5 +19,5 @@ fun canAskBackground(fgGranted: Boolean): Boolean = fgGranted
 
 /** Textes FR du refus de permission, source unique (les chaînes UI vivent en dur dans le Kotlin). */
 object PermTexts {
-    const val MIC_DENIED = "Micro non autorisé"
+    const val MIC_DENIED = "Microphone not allowed"
 }
