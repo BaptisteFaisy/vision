@@ -424,6 +424,40 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `:app:testDebugUnitTest` 1 306 tests 0 échec dont `IseePictoVoiceTest`
   14/14 ; `check-kotlin-limits.py` vert, `check-isee-design.py` vert,
   `assembleDebug` vert (`app-debug.apk`).
+## 2026-10-31 — iSee : stop seulement en Traversée, voitures en mouvement (branche `fix/isee-stop-voitures-traversee`)
+
+- **Demande** (user) : iSee dit trop souvent « stop » — dire directement
+  ce qu'il faut faire ; ne plus dire stop sauf quand des voitures sont en
+  mouvement ET que le mode traversée est actif ; sinon, devant un
+  obstacle, dire directement comment l'éviter. Rebord : pas de stop, dire
+  de monter ou descendre.
+- Fait : `Guidance.word` ne rend plus jamais stop (`STOP_METERS`
+  supprimé) — un obstacle, même au contact mesuré, dit son côté de
+  sortie (TwinLite) ; `CrossingVehicleWatch` parle l'alerte « Stop, car
+  moving. » / « Stop, voiture en mouvement. » quand le mouvement est
+  proche (≤ 8 m ou non mesuré), la phrase douce sinon ; `spokenUrgentOf`
+  (`ProbeWiring`, `VehicleStateText.isSafetyPhrase` nouveau) rend
+  l'alerte urgente côté sonde (`LiveProbe.kt`, 1 ligne — 499 lignes
+  maintenues) ; `observeVehicleState` ne parle plus qu'en doux en
+  normal (paramètre `safety` retiré) ; `CurbText.safetyStepPhrase`
+  devient la consigne (« Montez/Descendez le rebord. »,
+  `Step up./down.`), toujours par `SafetyVoice`. Mots et clips
+  `guide_stop`/`tl_stop` gardés au catalogue (miroir
+  `tools/voicepack-catalog.json`, inutilisés) ; « Stop. » externe
+  (`reportEmergency`) et veto rouge inchangés. Docs : `VOIX-DANGER.md`
+  § 20 (+ amendements §§ 16/17/19), `TRAVERSEE.md`, `URGENCE-EXTERNE.md`
+  § 2, `GUIDAGE-TOUT-DROIT.md` (§§ 1-6, 8).
+- Preuves : rouge-avant observé (12 échecs : `GuidanceTest`,
+  `GuidanceAnnouncerTest`, `GuidanceObstaclesTest`, `DangerVoiceTest`,
+  `CurbAnnounceTest`) ; `:core:testDebugUnitTest` 2 248 tests, 5 échecs
+  `PrivateFileSettingsStoreTest` (permissions POSIX, Windows uniquement —
+  pré-existants, fichiers hors diff) ; `:app:testDebugUnitTest`
+  1 305/1 305 (dont `CrossingVehicleTest` +1 FR, `ProbeWiringWatchersTest`
+  +1 `spokenUrgentOf`, `ProbeVoiceTest` mur-contact) ;
+  `check-kotlin-limits.py` vert (1 168 fichiers) + ses 28 tests ;
+  voicepack 24/24 littéraux présents (émulation locale, `grep` absent
+  de Windows). Recette téléphone **non mesurée**.
+
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 
 - **Demande** : quand iSee détecte un humain, un objet ou un poteau en face,

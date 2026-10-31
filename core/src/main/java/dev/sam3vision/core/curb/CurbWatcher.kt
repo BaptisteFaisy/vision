@@ -125,9 +125,9 @@ data class CurbSignal(
 /**
  * Ordre d'annonce « trottoir » : [phrase] dans la langue de la voix, [meters]
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
- * palier, [urgent] vrai pour la seule marche imminente (coupe la voix, comme
- * le stop ; tout le reste attend le silence), [safetyPhrase] l'alerte
- * immédiate (« Stop, … ») pour la seule marche imminente (`null` pour la
+ * palier, [urgent] vrai pour la seule marche imminente (coupe la voix ;
+ * tout le reste attend le silence), [safetyPhrase] la consigne immédiate
+ * (« Montez le rebord. ») pour la seule marche imminente (`null` pour la
  * pré-alerte à 1 m comme pour le bateau — info douce, pas d'alerte).
  */
 data class CurbCue(
@@ -181,18 +181,20 @@ object CurbText {
     }
 
     /**
-     * Alerte immédiate d'un bord détecté : « Stop, … » montant ou descendant,
-     * dans la langue de la voix. Parlée par la voix de sécurité, qui coupe
-     * tout, dictée du user comprise.
+     * Consigne immédiate d'un bord détecté : monter ou descendre le
+     * rebord, dans la langue de la voix — jamais de « Stop » (ordre user
+     * du 31/10 : le stop ne se dit qu'en Traversée, voitures en
+     * mouvement). Parlée par la voix de sécurité, qui coupe tout, dictée
+     * du user comprise.
      */
     fun safetyStepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> when (edge) {
-            CurbEdge.Up -> "Stop, rebord montant."
-            CurbEdge.Down -> "Stop, rebord descendant."
+            CurbEdge.Up -> "Montez le rebord."
+            CurbEdge.Down -> "Descendez le rebord."
         }
         SpeechLanguage.En -> when (edge) {
-            CurbEdge.Up -> "Stop, step up."
-            CurbEdge.Down -> "Stop, step down."
+            CurbEdge.Up -> "Step up."
+            CurbEdge.Down -> "Step down."
         }
     }
 }
