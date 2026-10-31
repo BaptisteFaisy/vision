@@ -36,21 +36,34 @@ queue_rules:
     batch_size:
       min: 1
       max: 3
-    batch_max_wait_time: 20 seconds
+    # 60 s (31/10, était 20 s) : la file ne fait pas attendre pour rien, mais
+    # 20 s ne laissaient jamais le temps aux PR voisines d'arriver — mesuré le
+    # 31/10, chaque lot ne portait qu'UNE PR, donc un passage de CI complet
+    # (~90 s une fois le pool rendu au CI) par PR mergée. Un lot de 3 coûte le
+    # même passage : attendre jusqu'à 60 s pour le remplir divise le coût par
+    # trois et fait passer le débit de ~13 à ~3 PR par batch.
+    batch_max_wait_time: 60 seconds
     merge_method: rebase
     update_method: rebase
     checks_timeout: 20 min
     max_checks_retries: 1
 
 merge_queue:
-  # 8 lots testés en parallèle (demande user du 29/10 : « pousse à 8 »).
+  # 6 lots testés en parallèle (31/10 ; 8 depuis le 29/10).
   # Pool : 21 runners self-hosted. Par lot, deux jobs lourds (`ci-core` et
   # `ci-app`, ~1-2 min chacun) et des jobs courts (`ci` ~10 s, `ci-budget` 9 s,
   # `couche0` 7 s) ; le doublon `pull_request` sur la branche de lot ne rejoue
   # plus Gradle (cf. action `perimetre`, pas « Cette PR touche-t-elle du
-  # code ? »). 8 lots ≈ 16 jobs lourds simultanés au pire ; mesuré le 30/10 :
-  # +1 job par push ≈ +3 créneaux moyens sur 21 au pire pic, file quasi nulle
-  # — acceptable contre les kills timeout à 320 s de la découpe à 1 job.
+  # code ? »). 6 lots ≈ 12 jobs lourds simultanés, ce qui laisse ~9 créneaux
+  # à la CI des PR — la porte d'entrée de la file.
+  #
+  # Pourquoi 6 et plus 8 : le débit ne dépend pas du nombre de lots testés en
+  # parallèle mais du temps d'un passage de CI (les merges sur `master` sont
+  # séquentiels de toute façon). Le 31/10, un lot mettait 4 min 25 à obtenir un
+  # runner parce que le balayeur `pr-auto-merge` occupait le pool entier ; le
+  # parallélisme ne compensait pas, il aggravait la pénurie. Une fois le
+  # balayeur calmé (v17 de `pr-auto-merge.yml`), 6 lots suffisent très
+  # largement et laissent respirer les PR.
   #
   # `mode` et `max_parallel_checks` sont des options de la FILE : les mettre
   # dans une règle de `queue_rules` est refusé par le schéma Mergify
@@ -58,14 +71,14 @@ merge_queue:
   # BaptisteFaisy/isee, corrigé ici au bon niveau.
   #
   # isolated (2026-10-29) : chaque lot est testé seul contre `master`, sans
-  # dépendance aux autres lots — les 8 lots ne s'attendent plus. Contrepartie
+  # dépendance aux autres lots — les lots ne s'attendent plus. Contrepartie
   # assumée : plus de test cumulatif, deux PR vertes séparément peuvent casser
   # `master` ensemble ; et `skip_intermediate_results` ne s'applique pas dans
   # ce mode. `parallel` (dépendances par scopes) demanderait un bloc `scopes:`
   # que ce dépôt n'a pas, et `fast-forward` est interdit ici — on merge en
   # `rebase`, donc compatible.
   mode: isolated
-  max_parallel_checks: 8
+  max_parallel_checks: 6
 
 priority_rules:
   - name: urgent
