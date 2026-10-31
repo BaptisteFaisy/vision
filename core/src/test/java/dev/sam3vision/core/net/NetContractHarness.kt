@@ -135,6 +135,7 @@ internal class ContractWsTransport(
     val sent = mutableListOf<String>()
     val received = mutableListOf<String>()
     var openedUrl: String? = null
+    var openedHeaders: Map<String, String> = emptyMap()
     var openResult = true
     var sendResult = true
     var closed = false
@@ -150,8 +151,10 @@ internal class ContractWsTransport(
         onText: (String) -> Unit,
         onClosed: (Throwable?) -> Unit,
         onOpen: () -> Unit,
+        headers: Map<String, String>,
     ): Boolean {
         openedUrl = url
+        openedHeaders = headers
         this.onText = onText
         this.onClosed = onClosed
         if (openResult) {
