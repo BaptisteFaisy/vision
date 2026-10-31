@@ -184,6 +184,7 @@ jobs:
           python3 .github/couche0/test_check_couche0.py
           python3 .github/ci-budget/test_check_timeouts.py
           python3 -m unittest tools/test_mergify_batch_size.py
+          python3 -m unittest tools/test_balayeur_checks.py
 
       # Portes documentées mais jamais branchées : scripts shell, fixtures
       # dorées des masques, chiffres du budget, shader du suivi — secondes,
