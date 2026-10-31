@@ -37,9 +37,10 @@ class LateralNudgeTracker {
     /**
      * Consigne du moment, `null` le plus souvent : obstacle proche qui
      * s'approche d'un seul côté. Les deux côtés à la fois = ambigu, on se
-     * tait (le couloir bouché parle s'il est bouché). [hfovDeg] calibre la
-     * fenêtre en mètres (défaut 67° : l'appelant qui connaît la focale la
-     * passe).
+     * tait (le couloir bouché parle s'il est bouché) ; une personne côté
+     * cible = veto, on se tait aussi (s'écarter, jamais foncer dedans).
+     * [hfovDeg] calibre la fenêtre en mètres (défaut 67° : l'appelant qui
+     * connaît la focale la passe).
      */
     fun onFrame(atMs: Long, labels: List<PlacedLabel>, hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG): LateralNudge? {
         val left = side(atMs, labels, SteeringCap.Left, hfovDeg)
@@ -78,8 +79,17 @@ class LateralNudgeTracker {
         track.lastMs = atMs
         if (track.hits < CONFIRM_DECREASES) return null
         val away = if (side == SteeringCap.Left) SteeringCap.Right else SteeringCap.Left
+        if (personAhead(labels, away, hfovDeg)) return null
         return LateralNudge(away, nearest)
     }
+
+    /**
+     * Vrai si une personne mesurée se tient côté [away], dans la fenêtre :
+     * s'écarter vers elle serait foncer dedans — le décalage se tait (même
+     * fenêtre que l'approche : hors fenêtre, elle passe au large).
+     */
+    private fun personAhead(labels: List<PlacedLabel>, away: SteeringCap, hfovDeg: Float): Boolean =
+        labels.any { PersonLabels.isPerson(it.label) && inFront(it, away, hfovDeg) }
 
     /**
      * Obstacle du côté [side], dans la fenêtre : écart latéral à l'axe
