@@ -100,6 +100,71 @@ class CrosswalkScanTest {
         update(scan, atMs = 5_900L, yaw = 65f)
         assertEquals("Rien à droite.", update(scan, atMs = 8_400L, yaw = 65f))
         assertNull(update(scan, atMs = 10_400L, yaw = 65f))
+        assertNull("libre : pas de re-vérification", update(scan, atMs = 21_000L, yaw = 65f))
+        assertEquals(CrosswalkScanPhase.Done, scan.phase)
+    }
+
+    @Test
+    fun `danger puis vehicule passe - re-verification et constats libres`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        update(scan, atMs = 1_100L, yaw = 0f)
+        update(scan, atMs = 1_200L, yaw = -65f)
+        update(scan, atMs = 1_300L, yaw = -65f, moving = true)
+        update(scan, atMs = 1_400L, yaw = -65f, moving = true)
+        assertEquals("Attention, voiture à gauche.", update(scan, atMs = 3_700L, yaw = -65f))
+        assertEquals("Regardez à droite.", update(scan, atMs = 5_700L, yaw = -65f))
+        update(scan, atMs = 5_900L, yaw = 65f)
+        assertEquals("Rien à droite.", update(scan, atMs = 8_400L, yaw = 65f))
+        assertNull("danger : attente silencieuse", update(scan, atMs = 10_400L, yaw = 65f))
+        assertNull(update(scan, atMs = 15_000L, yaw = 65f))
+        assertEquals("consignes seules, sans Stop.", "Regardez à gauche.", update(scan, atMs = 20_400L, yaw = 65f))
+        update(scan, atMs = 20_500L, yaw = -65f)
+        update(scan, atMs = 20_600L, yaw = -65f)
+        update(scan, atMs = 20_700L, yaw = -65f)
+        assertEquals("véhicule passé : plus de danger", "Rien à gauche.", update(scan, atMs = 23_000L, yaw = -65f))
+        assertEquals("Regardez à droite.", update(scan, atMs = 25_000L, yaw = -65f))
+        update(scan, atMs = 25_100L, yaw = 65f)
+        update(scan, atMs = 25_200L, yaw = 65f)
+        assertEquals("Rien à droite.", update(scan, atMs = 27_600L, yaw = 65f))
+        assertNull(update(scan, atMs = 29_600L, yaw = 65f))
+        assertEquals(CrosswalkScanPhase.Done, scan.phase)
+    }
+
+    @Test
+    fun `danger persistant - 3 cycles puis release`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        assertEquals("Attention, voiture à gauche.", cycleWithDanger(scan, leftAt = 900L, yaw = 0f))
+        assertEquals("Regardez à gauche.", update(scan, atMs = 31_900L, yaw = 0f))
+        assertEquals("cycle 2 : danger constaté à nouveau", "Attention, voiture à gauche.", cycleWithDanger(scan, leftAt = 31_900L, yaw = 0f))
+        assertEquals("Regardez à gauche.", update(scan, atMs = 62_900L, yaw = 0f))
+        cycleWithDanger(scan, leftAt = 62_900L, yaw = 0f, reportLeft = false)
+        assertNull("plafond 3 cycles : release", update(scan, atMs = 83_900L, yaw = 0f))
+        assertEquals(CrosswalkScanPhase.Done, scan.phase)
+        assertNull("pas de 4e cycle", update(scan, atMs = 94_000L, yaw = 0f))
+    }
+
+    /**
+     * Cycle danger temporisé (sans virage) entré en phase gauche à [leftAt] :
+     * timeouts 6 s, mouvement à chaque observation, constats danger. Rend
+     * le constat gauche (ou le droit si [reportLeft] est faux).
+     */
+    private fun cycleWithDanger(scan: CrosswalkScan, leftAt: Long, yaw: Float?, reportLeft: Boolean = true): String? {
+        val checkLeft = leftAt + 6_000L
+        update(scan, atMs = checkLeft, yaw = yaw)
+        update(scan, atMs = checkLeft + 100L, yaw = yaw, moving = true)
+        update(scan, atMs = checkLeft + 200L, yaw = yaw, moving = true)
+        val report = update(scan, atMs = checkLeft + 2_500L, yaw = yaw)
+        val rightAt = checkLeft + 4_500L
+        update(scan, atMs = rightAt, yaw = yaw)
+        val checkRight = rightAt + 6_000L
+        update(scan, atMs = checkRight, yaw = yaw)
+        update(scan, atMs = checkRight + 100L, yaw = yaw, moving = true)
+        update(scan, atMs = checkRight + 200L, yaw = yaw, moving = true)
+        val reportRight = update(scan, atMs = checkRight + 2_500L, yaw = yaw)
+        update(scan, atMs = checkRight + 4_500L, yaw = yaw)
+        return if (reportLeft) report else reportRight
     }
 
     @Test

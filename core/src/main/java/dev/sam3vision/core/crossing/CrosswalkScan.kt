@@ -64,11 +64,10 @@ object CrosswalkScanText {
 
 /**
  * Phase du scan : arrêt, côté gauche (consigne puis constat), côté droit
- * (consigne puis constat), puis silence. `Done` tient tant que le
- * déclencheur tient (un seul scan par traversée) ; la perte du déclencheur
- * ré-arme (`Idle`).
+ * (consigne puis constat), puis re-vérification ou silence. `Done` tient
+ * tant que le déclencheur tient ; la perte du déclencheur ré-arme (`Idle`).
  */
-enum class CrosswalkScanPhase { Idle, Stop, Left, ReportLeft, Right, ReportRight, Done }
+enum class CrosswalkScanPhase { Idle, Stop, Left, ReportLeft, Right, ReportRight, Rewait, Done }
 
 /**
  * Scan « stop, regardez à gauche et à droite » : quand l'utilisateur est
@@ -82,7 +81,12 @@ enum class CrosswalkScanPhase { Idle, Stop, Left, ReportLeft, Right, ReportRight
  * depuis le cap du scan, ou [WAIT_TIMEOUT_MS]) → observation ([CHECK_MS],
  * [CONFIRM_MOVING_FRAMES] frames en mouvement pour un danger) → constat
  * gauche parlé ([REPORT_MS]) → consigne droite → virage à droite prouvé →
- * observation → constat droit parlé → silence.
+ * observation → constat droit parlé → silence si les deux côtés sont
+ * libres, sinon re-vérification obligatoire : attente silencieuse
+ * ([REWAIT_MS], le temps que le véhicule passe) puis nouveau cycle
+ * complet (consignes seules, sans « Stop. »), jusqu'à [MAX_SCAN_CYCLES]
+ * cycles — au-delà, le scan rend la voix (le veto garde la traversée,
+ * les voix douces reprennent).
  *
  * La référence, c'est la route : [refYaw0] est le cap à l'entrée du scan
  * (l'utilisateur face à la traversée), et chaque virage est
@@ -125,7 +129,9 @@ class CrosswalkScan {
     private var prevAtMs = 0L
     private var triggerHits = 0
     private var movingFrames = 0
-    private var reportDanger = false
+    private var dangerLeft = false
+    private var dangerRight = false
+    private var cyclesDone = 0
 
     /**
      * Cap à l'entrée du scan (face à la route) : les deux virages s'y
@@ -165,6 +171,7 @@ class CrosswalkScan {
             CrosswalkScanPhase.ReportLeft -> onReport(atMs, left = true, language)
             CrosswalkScanPhase.Right -> onSide(atMs, movingNow, feuSpeaking, left = false, language)
             CrosswalkScanPhase.ReportRight -> onReport(atMs, left = false, language)
+            CrosswalkScanPhase.Rewait -> onRewait(atMs, language)
             CrosswalkScanPhase.Idle, CrosswalkScanPhase.Done -> null
         }
         return if (feuSpeaking) null else phrase
@@ -183,7 +190,9 @@ class CrosswalkScan {
         prevAtMs = 0L
         triggerHits = 0
         movingFrames = 0
-        reportDanger = false
+        dangerLeft = false
+        dangerRight = false
+        cyclesDone = 0
     }
 
     /**
@@ -227,30 +236,50 @@ class CrosswalkScan {
         return if (left) CrosswalkScanText.left(language) else CrosswalkScanText.right(language)
     }
 
-    /** Fin du côté : le danger est latché, le constat parle aussitôt. */
+    /** Fin du côté : le danger est latché (écrasé, pas cumulé), le constat parle aussitôt. */
     private fun finishSide(atMs: Long, left: Boolean, language: SpeechLanguage): String {
-        reportDanger = movingFrames >= CONFIRM_MOVING_FRAMES
+        val danger = movingFrames >= CONFIRM_MOVING_FRAMES
+        if (left) dangerLeft = danger else dangerRight = danger
         enter(if (left) CrosswalkScanPhase.ReportLeft else CrosswalkScanPhase.ReportRight, atMs)
         return reportPhrase(left, language)
     }
 
-    /** Constat tenu [REPORT_MS], puis consigne droite ou fin du scan. */
+    /** Constat tenu [REPORT_MS], puis consigne droite ou fin de cycle. */
     private fun onReport(atMs: Long, left: Boolean, language: SpeechLanguage): String? {
-        if (atMs - phaseAtMs >= REPORT_MS) {
-            if (!left) {
-                enter(CrosswalkScanPhase.Done, atMs)
-                return null
-            }
+        if (atMs - phaseAtMs < REPORT_MS) return reportPhrase(left, language)
+        if (left) {
             enter(CrosswalkScanPhase.Right, atMs)
             return CrosswalkScanText.right(language)
         }
-        return reportPhrase(left, language)
+        return finishCycle(atMs)
+    }
+
+    /**
+     * Fin de cycle : libres des deux côtés ou plafond atteint ([MAX_SCAN_CYCLES]),
+     * le scan rend la voix ; sinon attente silencieuse puis nouveau cycle.
+     */
+    private fun finishCycle(atMs: Long): String? {
+        cyclesDone += 1
+        if (!dangerLeft && !dangerRight || cyclesDone >= MAX_SCAN_CYCLES) {
+            enter(CrosswalkScanPhase.Done, atMs)
+            return null
+        }
+        enter(CrosswalkScanPhase.Rewait, atMs)
+        return null
+    }
+
+    /** Attente silencieuse : le véhicule passe, puis nouveau cycle (consignes seules). */
+    private fun onRewait(atMs: Long, language: SpeechLanguage): String? {
+        if (atMs - phaseAtMs < REWAIT_MS) return null
+        enter(CrosswalkScanPhase.Left, atMs)
+        return CrosswalkScanText.left(language)
     }
 
     /** Constat du côté : danger latché ou rien vu, dit à haute voix. */
     private fun reportPhrase(left: Boolean, language: SpeechLanguage): String {
         val side = if (left) ScanSide.Left else ScanSide.Right
-        return if (reportDanger) CrosswalkScanText.danger(side, language)
+        val danger = if (left) dangerLeft else dangerRight
+        return if (danger) CrosswalkScanText.danger(side, language)
         else CrosswalkScanText.nothing(side, language)
     }
 
@@ -336,6 +365,21 @@ class CrosswalkScan {
 
         /** Tenue du constat (ms) : le temps de le dire entier, même après le feu. */
         const val REPORT_MS = 2_000L
+
+        /**
+         * Attente silencieuse entre deux cycles (ms) : le temps que le
+         * véhicule constaté passe avant de re-vérifier (prior à valider
+         * rue : une voiture à 50 km/h libère le passage en quelques
+         * secondes, 10 s laissent la marge).
+         */
+        const val REWAIT_MS = 10_000L
+
+        /**
+         * Cycles de scan au plus par traversée (1 initial + re-vérifications) :
+         * au-delà, le scan rend la voix au lieu de rabâcher — le veto garde
+         * la traversée et les voix douces reprennent (prior).
+         */
+        const val MAX_SCAN_CYCLES = 3
 
         /** Vitesse de lacet (degrés/s) sous laquelle le regard compte comme stabilisé. */
         const val SETTLE_DEG_PER_SEC = 20f
