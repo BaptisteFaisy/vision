@@ -33,9 +33,29 @@ fun liveProbeHeadline(state: LiveProbeState): String {
 fun liveProbeTimingsLine(state: LiveProbeState): String = TimingsText.compact(state.timings)
 
 /**
+ * Ligne mouvement V1 **sur une seule ligne** (« motion: caméra bouge · bg 0.83 ·
+ * gap 2.1/5.4 px »), chaîne vide sans estimation. Fonction pure (aucun Android).
+ */
+fun liveProbeMotionLine(state: LiveProbeState): String =
+    state.motion?.let { motionSummary(it) }.orEmpty()
+
+/**
+ * Verdict, score de changement du fond et écart global-boîte (moy/p95, px) :
+ * l'unique formatage du mouvement, partagé par le détail et le panneau.
+ */
+fun motionSummary(motion: MotionDebug): String = buildString {
+    append("motion: ${motion.verdict}")
+    append(" · bg ${DistanceText.decimal(motion.bgChange, 2, Locale.US)}")
+    val mean = DistanceText.decimal(motion.gapMeanPx, 1, Locale.US)
+    val p95 = DistanceText.decimal(motion.gapP95Px, 1, Locale.US)
+    append(" · gap $mean/$p95 px")
+}
+
+/**
  * Détail du panneau de debug : endpoint, résolution, latences (moyenne, p95, serveur),
- * chronologie poste par poste, étages serveur reçus, nombre de frames, concepts reconnus,
- * distances mesurées, phrase annoncée et dernière erreur. Liste vide = rien à montrer.
+ * mouvement V1 (verdict, fond, écart), chronologie poste par poste, étages serveur reçus,
+ * nombre de frames, concepts reconnus, distances mesurées, phrase annoncée et dernière
+ * erreur. Liste vide = rien à montrer.
  */
 fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
     if (state.endpoint.isNotBlank()) add("endpoint: ${shortEndpoint(state.endpoint)}")
@@ -45,6 +65,7 @@ fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
         add("${state.frames} frames · ${state.masks.size} masks")
         add("transport: ${state.transport}")
     }
+    state.motion?.let { add(motionSummary(it)) }
     if (state.timings.known) {
         addAll(TimingsText.detail(state.timings))
         add(TimingsText.servers(state.timings.server))

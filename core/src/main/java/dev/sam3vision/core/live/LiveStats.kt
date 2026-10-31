@@ -36,3 +36,40 @@ class LiveStats(maxSamples: Int = RollingStat.DEFAULT_WINDOW) {
     /** Oublie les mesures de la séance précédente. */
     fun reset() = stat.reset()
 }
+
+/**
+ * Statistiques glissantes de l'écart global-boîte V1 (en px) : moyenne et p95 sur les
+ * [maxSamples] dernières frames, les plus anciennes sortant de la fenêtre.
+ *
+ * Adaptateur de [RollingStat] en virgule fixe (millièmes de px) : l'anneau et les
+ * percentiles n'existent qu'une fois ; les écarts négatifs sont ramenés à zéro, les
+ * mesures non finies jetées. Sûre entre threads (enregistrement depuis le thread IO,
+ * lecture depuis l'UI).
+ */
+class MotionGapStats(maxSamples: Int = RollingStat.DEFAULT_WINDOW) {
+
+    private val stat = RollingStat(maxSamples)
+
+    /** Ajoute un écart (en px), borné à zéro ; ignore les mesures non finies. */
+    fun record(gapPx: Float) {
+        if (!gapPx.isFinite()) return
+        stat.record((gapPx.coerceAtLeast(0f) * SCALE).toLong())
+    }
+
+    /** Nombre de mesures valides dans la fenêtre. */
+    val samples: Int get() = stat.samples
+
+    /** Moyenne de la fenêtre (px), 0 si aucune mesure. */
+    val averagePx: Float get() = stat.average / SCALE
+
+    /** p95 par rang le plus proche (px), 0 si aucune mesure. */
+    val p95Px: Float get() = stat.percentile(Percentiles.P95) / SCALE
+
+    /** Oublie les mesures de la séance précédente. */
+    fun reset() = stat.reset()
+
+    companion object {
+        /** Virgule fixe : millièmes de px dans l'anneau de `long`. */
+        private const val SCALE = 1000f
+    }
+}
