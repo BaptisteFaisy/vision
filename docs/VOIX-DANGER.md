@@ -458,7 +458,7 @@ escaliers, cycles) parle toujours en douceur.
 - **canal** : voix de sécurité dédiée (`SafetyVoice`, TTS système
   hors-ligne) — pas de synthèse réseau, pas de clé exigée, parle sans
   condition de silence ; coupe la lecture ElevenLabs en cours avant de
-  parler, et deux alertes ne se coupent jamais (mise en file) ;
+  parler, et la nouvelle alerte coupe l'alerte en cours (flush, § 20) ;
 - **survit à la dictée** : moteur séparé du lecteur ElevenLabs et de la
   voix route — la tenue/transcription du user et `silenceForGlasses` ne
   taisent pas une alerte ; l'état de parole n'est pas touché (le TTS
@@ -473,7 +473,7 @@ escaliers, cycles) parle toujours en douceur.
 
 Verrouillé par `VehicleStateTest` (+2 : stop mouvement EN/FR, arrêt muet),
 `CurbWatcherTest` (+2 : imminent montant/descendant, pré-alerte parlée,
-bateau muet), `SafetyVoiceTest` (4 : coupe + flush, file entre alertes,
+bateau muet), `SafetyVoiceTest` (4 : coupe + flush, alerte coupe l'ancienne,
 blanc ignoré, locale), `ProbeWiringWatchersTest` (imminent passe toujours)
 et `ProbeVoiceTest` (stopRecent supprimé, phrases gardées).
 
@@ -595,3 +595,27 @@ descente — premier son ≤ 1 s après confirmation, bande 1,0 ± 0,3 m /
 0,4 ± 0,25 m, sens juste 4/4 jour, bateau 0 `Stop`, traversée :
 pré-alerte tuée et imminent passant — **non mesuré**, exige un APK de
 cette branche sur appareil réel.
+## 20. Alertes P1/P2 : la nouvelle coupe l'ancienne, jamais de file (ordre user du 31/10)
+
+Le user marche avec l'app : entre l'obstacle détecté et la parole, des
+latences de plusieurs secondes — une alerte P1/P2 qui arrivait pendant
+qu'une autre parlait attendait sa fin en file TTS (`QUEUE_ADD`,
+contrat § 16). Nouveau contrat, qui amende le § 16 pour les deux
+alertes de sécurité (voiture en mouvement, rebord) :
+
+- **flush toujours** : `SafetyVoice.speak` parle en `QUEUE_FLUSH` même
+  quand le TTS système parle — la nouvelle alerte coupe l'ancienne, un
+  par un, la plus fraîche gagne (une alerte datée ne sert à rien, le
+  danger a changé) ; ne dépend plus du flag `speaking` ;
+- **inchangé** : coupe la lecture ElevenLabs avant de parler
+  (`stopCurrent`), survit à la dictée, parle hors-ligne sans clé ;
+  P3 (poteau) attend toujours P1/P2 en file douce (§ 18) ; le reste
+  parle doux et attend le silence (§ 11).
+
+Verrouillé par `SafetyVoiceTest` (4 : coupe + flush, alerte coupe
+l'ancienne, blanc ignoré, locale).
+
+Recette téléphone : deux alertes rapprochées (voiture qui roule puis
+rebord sous le pied) — la seconde coupe la première, pas de
+chevauchement, pas d'attente — **non mesuré**, exige un APK de cette
+branche sur appareil réel.
