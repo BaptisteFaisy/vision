@@ -18,7 +18,7 @@ class GlassesPhaseMappingTest {
         assertEquals(SessionPhase.STARTING, DeviceSessionState.STARTING.toPhase())
         assertEquals(SessionPhase.STARTED, DeviceSessionState.STARTED.toPhase())
         assertEquals(SessionPhase.STARTING, DeviceSessionState.PAUSED.toPhase())
-        assertEquals(SessionPhase.STOPPED, DeviceSessionState.STOPPING.toPhase())
+        assertEquals(SessionPhase.STARTING, DeviceSessionState.STOPPING.toPhase())
         assertEquals(SessionPhase.STOPPED, DeviceSessionState.STOPPED.toPhase())
     }
 
@@ -26,5 +26,11 @@ class GlassesPhaseMappingTest {
     fun `une session en pause ne propose pas de redemarrage`() {
         val paused = GlassesUiState(registered = true, phase = DeviceSessionState.PAUSED.toPhase())
         assertFalse(paused.canConnect)
+    }
+
+    @Test
+    fun `un arret en cours ne propose pas de redemarrage`() {
+        val stopping = GlassesUiState(registered = true, phase = DeviceSessionState.STOPPING.toPhase())
+        assertFalse(stopping.canConnect)
     }
 }

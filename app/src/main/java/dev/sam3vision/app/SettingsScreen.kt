@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
-import com.meta.wearable.dat.core.types.Permission
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,8 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.sam3vision.app.glasses.GlassesBlock
 import dev.sam3vision.app.glasses.GlassesController
-import dev.sam3vision.app.glasses.GlassesSection
 import dev.sam3vision.core.net.GpuStatus
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
@@ -285,27 +284,6 @@ private fun CaregiverInviteBlock(draft: Settings, onChange: (Settings) -> Unit) 
             onChange(draft.copy(caregiverInvite = it))
         }
     }
-}
-
-/** Bloc « Lunettes Ray-Ban Meta » : lit l'état du contrôleur et délègue ses actions. */
-@Composable
-private fun GlassesBlock(glasses: GlassesController) {
-    val glassesState by glasses.state.collectAsState()
-    GlassesSection(
-        state = glassesState,
-        debugBuild = BuildConfig.DEBUG,
-        onRegister = glasses::register,
-        onRequestCamera = { glasses.requestPermission(Permission.CAMERA) },
-        onRequestMic = { glasses.requestPermission(Permission.MICROPHONE) },
-        onConnect = glasses::connect,
-        onCapture = { glasses.capture() },
-        onDisconnect = glasses::disconnect,
-        onStartMock = glasses::startMockDevice,
-        onMockPress = { glasses.mockPress() },
-        onMockHold = glasses::mockHold,
-        onMockVoiceLaunch = glasses::mockVoiceLaunch,
-        onStopMock = glasses::stopMockDevice,
-    )
 }
 
 /** Navigation sortante de la page, groupée pour la garde des 50 lignes. */

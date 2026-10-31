@@ -38,13 +38,14 @@ data class GlassesUiState(
     val hasDevice: Boolean get() = deviceName != null
 }
 
-/** Phase du SDK → phase affichée. `PAUSED` reste « en cours », la session reprend. */
+/** Phase du SDK → phase affichée. `PAUSED` et `STOPPING` restent « en cours » : la pause reprend, et l'arrêt finit — rouvrir pendant l'arrêt faisait répondre `UNEXPECTED_ERROR` au SDK. */
 internal fun DeviceSessionState.toPhase(): SessionPhase = when (this) {
     DeviceSessionState.IDLE -> SessionPhase.IDLE
     DeviceSessionState.STARTING -> SessionPhase.STARTING
     DeviceSessionState.STARTED -> SessionPhase.STARTED
     DeviceSessionState.PAUSED -> SessionPhase.STARTING
-    DeviceSessionState.STOPPING, DeviceSessionState.STOPPED -> SessionPhase.STOPPED
+    DeviceSessionState.STOPPING -> SessionPhase.STARTING
+    DeviceSessionState.STOPPED -> SessionPhase.STOPPED
 }
 
 /** Ce que les lunettes demandent à l'app. */

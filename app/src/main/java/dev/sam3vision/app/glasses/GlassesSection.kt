@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.meta.wearable.dat.core.types.Permission
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.GlassButton
 import dev.sam3vision.app.SettingsLight
 import dev.sam3vision.app.StatusBanner
@@ -125,6 +129,27 @@ private fun bannerColor(kind: MessageKind): Color = when (kind) {
 @Composable
 private fun GlassesStatusLines(state: GlassesUiState) {
     statusLines(state).forEach { Text(it, color = SettingsLight.muted, fontSize = 12.sp) }
+}
+
+/** Bloc « Lunettes Ray-Ban Meta » : lit l'état du contrôleur et délègue ses actions. */
+@Composable
+internal fun GlassesBlock(glasses: GlassesController) {
+    val glassesState by glasses.state.collectAsState()
+    GlassesSection(
+        state = glassesState,
+        debugBuild = BuildConfig.DEBUG,
+        onRegister = glasses::register,
+        onRequestCamera = { glasses.requestPermission(Permission.CAMERA) },
+        onRequestMic = { glasses.requestPermission(Permission.MICROPHONE) },
+        onConnect = glasses::connect,
+        onCapture = { glasses.capture() },
+        onDisconnect = glasses::disconnect,
+        onStartMock = glasses::startMockDevice,
+        onMockPress = { glasses.mockPress() },
+        onMockHold = glasses::mockHold,
+        onMockVoiceLaunch = glasses::mockVoiceLaunch,
+        onStopMock = glasses::stopMockDevice,
+    )
 }
 
 /** Commandes de simulation, visibles uniquement en debug. */
