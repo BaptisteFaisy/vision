@@ -4,6 +4,19 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — CI : l'approbation automatique ne réveille plus le stock de runs périmés (branche `ci/approve-fenetre`)
+
+- **Constat** : premier passage réel de `auto-approve` (17:07) — 30 runs en
+  attente, dont **14 vieux de plusieurs jours** sur `feat/renommage-isee` et
+  `fix/isee-portrait-orb-shader`. Les approuver a lancé un rattrapage de CI
+  inutile sur des branches abandonnées, sur un pool de 21 runners.
+- **Fait** : fenêtre de 60 min (`AGE_MAX_MIN`) — un run `action_required` est
+  approuvé dans les 5 min qui suivent ; au-delà, plus personne ne l'attend et un
+  push a rendu sa tête obsolète. Le filtre fork (jamais approuvé) ne bouge pas.
+- **Preuves** : logique exercée avec un `gh` simulé — run récent du dépôt →
+  approuvé ; run vieux de 3 jours → « 4320 min d'attente — périmé » ; run de
+  fork → ignoré. `bash -n` et parse YAML verts.
+
 ## 2026-10-31 — CI : plus aucun run en `action_required`, l'approbation est automatique (branche `ci/approve-runs-toujours`)
 
 - **Symptôme** : #634 poussée par l'agent de conflit (`@github-actions[bot]`) →
