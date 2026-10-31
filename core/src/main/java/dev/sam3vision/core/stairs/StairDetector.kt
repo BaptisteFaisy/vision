@@ -48,19 +48,22 @@ data class StairRoi(val left: Float, val top: Float, val right: Float, val botto
  * lignes quasi-horizontales (±25°) → escalier si ≥ 4 lignes.
  *
  * Variante **projection horizontale** au lieu du Hough probabiliste : chaque
- * ligne de l'image compte ses pixels de contour quasi-horizontaux, une ligne
- * est active à 30 % de couverture (miroir du `minLineLength = w * 0,3` MIT),
- * les lignes actives voisines fusionnent en une marche, ≥ 4 marches =
- * escalier. Moins de code (~150 lignes Canny incluses contre ~300 avec Hough),
- * moins de faux positifs (un segment Hough isolé ne suffit plus, il faut une
- * vraie ligne de contour), suffisant pour un signal binaire « escalier devant ».
+ * ligne de l'image compte ses pixels de contour quasi-horizontal **montant**
+ * (un seul côté par nez, voir `StairsCanny`), une ligne est active à 30 % de
+ * couverture (miroir du `minLineLength = w * 0,3` MIT), les lignes actives
+ * voisines fusionnent en une marche, ≥ 4 marches = escalier. Moins de code
+ * (~150 lignes Canny incluses contre ~300 avec Hough), moins de faux positifs
+ * (un segment Hough isolé ne suffit plus, il faut une vraie ligne de
+ * contour), suffisant pour un signal binaire « escalier devant ».
  *
  * Limites héritées du MIT (à documenter, pas à corriger ici) :
  * - sans masque ni [StairRoi] (boîte SAM), ROI fixe (bas 60 %) : un escalier
  *   cadré en haut est invisible ; avec masque, c'est la forme reconnue par
  *   SAM qui borne, au pixel près (la boîte ne sert qu'en repli) ;
  * - aucune distinction montée/descente ;
- * - faux positifs sur stores vénitiens, rayures et zébrures horizontales.
+ * - faux positifs sur stores vénitiens, rayures et zébrures horizontales ;
+ * - marche coupée par le haut de la ROI ou du masque : son côté montant est
+ *   hors champ, elle n'est pas comptée (au plus la plus lointaine partielle).
  * Seuils et flou recalibrés pour la luminance téléphone 256×103 (voir
  * `StairsConfig`) : les valeurs MIT 640×480 laissaient le compteur à 0.
  *
