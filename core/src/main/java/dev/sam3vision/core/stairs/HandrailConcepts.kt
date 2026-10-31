@@ -8,8 +8,8 @@ import dev.sam3vision.core.live.LivePrompts
  * courante (« Rampe, à 2 heures. »).
  *
  * Un seul prompt, en anglais (la forme que SAM segmente le mieux) : 13
- * concepts par défaut sur [LivePrompts.MAX] (17), donc 4 slots libres côté
- * rue/extérieur (10 côté maison) — « handrail » (8 lettres, ≤ 32) y tient.
+ * concepts par défaut sur [LivePrompts.MAX] (18), donc 5 slots libres côté
+ * rue/extérieur (11 côté maison) — « handrail » (8 lettres, ≤ 32) y tient.
  * Le français reste reconnu côté client ([isHandrail]) : un label « rampe »
  * compte comme un « handrail ».
  *

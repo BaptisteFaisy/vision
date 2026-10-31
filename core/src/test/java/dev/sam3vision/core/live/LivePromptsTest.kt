@@ -10,33 +10,35 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `dix sept concepts exterieur par defaut, au plafond client`() {
-        assertEquals(17, LivePrompts.default.size)
+    fun `dix huit concepts exterieur par defaut, au plafond client`() {
+        assertEquals(18, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks",
+                "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
+                "beanie", "socks",
             ),
             LivePrompts.default,
         )
-        assertEquals(17, LivePrompts.MAX)
+        assertEquals(18, LivePrompts.MAX)
         assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
     }
 
     @Test
-    fun `clotures et portails suivis en exterieur, barrier cede son slot a keys`() {
+    fun `murs clotures et portails suivis en exterieur, barrier cede son slot a keys`() {
         // Ordre user du 31/10 : les clés entrent dans les 17, « fence » garde
         // son slot, « barrier » sort (reconnu encore par le preset extérieur).
+        // Ordre user du 31/10 (soir) : iSee détecte les murs — « wall » entre
+        // en 18e (plafond 17 → 18, rien ne sort).
         assertTrue("keys" in LivePrompts.default)
         assertFalse("barrier" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.default)
         assertTrue("gate" in LivePrompts.default)
-        // Unification traversée/normal (30/10) : porte, mur et fenêtre cèdent
+        assertTrue("wall" in LivePrompts.default)
+        // Unification traversée/normal (30/10) : porte et fenêtre cèdent
         // leurs slots aux véhicules, au feu et à la bordure.
         assertFalse("door" in LivePrompts.default)
-        assertFalse("wall" in LivePrompts.default)
         assertFalse("window" in LivePrompts.default)
     }
 
@@ -106,9 +108,10 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `le mode exterieur iSee suit les defauts avec clotures et portails`() {
+    fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(17, exterior.size)
+        assertEquals(18, exterior.size)
+        assertTrue("wall" in exterior)
         assertTrue("fence" in exterior)
         assertTrue("gate" in exterior)
         assertTrue("sidewalk" in exterior)
@@ -126,10 +129,10 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `tous les prompts tiennent en dix sept concepts de trente deux caracteres au plus`() {
+    fun `tous les prompts tiennent en dix huit concepts de trente deux caracteres au plus`() {
         listOf(LivePrompts.default, LivePrompts.outdoor, LivePrompts.indoor).forEach { prompts ->
             assertTrue(prompts.size <= LivePrompts.MAX)
-            assertTrue(prompts.size <= 17)
+            assertTrue(prompts.size <= 18)
             prompts.forEach { concept ->
                 assertTrue(concept.length <= LivePrompts.MAX_LENGTH)
                 assertTrue(concept.length <= 32)
@@ -153,12 +156,12 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `la liste est bornee a dix sept prompts`() {
+    fun `la liste est bornee a dix huit prompts`() {
         val many = (1..20).map { "objet$it" }
         val normalized = LivePrompts.normalize(many)
         assertEquals(LivePrompts.MAX, normalized.size)
         assertEquals("objet1", normalized.first())
-        assertEquals("objet17", normalized.last())
+        assertEquals("objet18", normalized.last())
     }
 
     @Test
@@ -198,7 +201,7 @@ class LivePromptsTest {
     @Test
     fun `find the x au plafond, le dernier concept cede son slot`() {
         // « Find the X » au plafond ne reste plus muet — démontré avec « wallet »
-        // (« keys » est déjà dans les défauts) : « socks », 17e, sort, 17 suivis.
+        // (« keys » est déjà dans les défauts) : « socks », 18e, sort, 18 suivis.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
         assertEquals(LivePrompts.MAX, next.size)
         assertTrue("wallet" in next)
