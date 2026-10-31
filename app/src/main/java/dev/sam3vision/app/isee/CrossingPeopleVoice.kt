@@ -27,9 +27,10 @@ import dev.sam3vision.core.traverse.VehicleStateText
  * nourri avant le scan (qui lit son brut).
  *
  * Sans feu ([noLight], absence confirmée par le patch) : pas de scan (le
- * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — le
- * stop urgent parle en premier, puis l'évitement, puis les véhicules
- * doux, sinon le verdict ([NoLightCrossWatch]) : « Traversez. » sans
+ * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — la
+ * voix véhicules parle en premier, stop comme douce, devant l'évitement
+ * (ordre user du 31/10), puis l'évitement, sinon le verdict
+ * ([NoLightCrossWatch]) : « Traversez. » sans
  * danger, « Attendez. » sur danger (mouvement brut seul — une voiture
  * garée ne bloque jamais, même proche ou sous pan caméra, ordre user du
  * 31/10), tous les deux toutes les 2 s. [motion] (`null` = pas de signal
@@ -65,10 +66,10 @@ internal fun crossingPhraseOf(
         val verdict = NoLightCrossWatch.update(
             atMs, CrossingVehicleWatch.movingNow, language, vehiclePhrase != null,
         )
-        if (vehiclePhrase != null && VehicleStateText.isSafetyPhrase(vehiclePhrase)) return vehiclePhrase
+        vehiclePhrase?.let { return it }
         steering?.let { return it }
         CrossingPeopleWatch.avoidance(placed, atMs, language, objects, width, height, readings)?.let { return it }
-        return vehiclePhrase ?: verdict
+        return verdict
     }
     val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null)
     CrosswalkScanWatch.update(atMs, scanTrigger, CrossingVehicleWatch.movingNow, feu = false, language)
