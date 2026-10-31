@@ -146,4 +146,37 @@ class DistanceMeterTest {
         assertNotNull(reading)
         assertTrue(reading!!.meters in Pinhole.MIN_METERS..Pinhole.MAX_METERS)
     }
+
+    @Test
+    fun `boite masquee par une meilleure detection est ecartee`() {
+        val meter = DistanceMeter()
+        val car = Detection("voiture", 0.95f, listOf(50f, 50f, 450f, 350f), 512, 384)
+        val hidden = Detection("personne", 0.60f, listOf(100f, 100f, 200f, 300f), 512, 384)
+        val readings = meter.measure(512, 384, listOf(car, hidden))
+        assertEquals(1, readings.size)
+        assertEquals("voiture", readings.first().label)
+    }
+
+    @Test
+    fun `recouvrement partiel ou scores egaux, les deux sont mesures`() {
+        val meter = DistanceMeter()
+        val left = Detection("personne", 0.90f, listOf(50f, 100f, 200f, 300f), 512, 384)
+        val right = Detection("personne", 0.90f, listOf(150f, 100f, 300f, 300f), 512, 384)
+        assertEquals(2, meter.measure(512, 384, listOf(left, right)).size)
+        // contenue à 50 % seulement : gardée malgré le score inférieur
+        val big = Detection("voiture", 0.95f, listOf(50f, 50f, 250f, 350f), 512, 384)
+        val half = Detection("personne", 0.60f, listOf(150f, 100f, 350f, 300f), 512, 384)
+        assertEquals(2, meter.measure(512, 384, listOf(big, half)).size)
+    }
+
+    @Test
+    fun `confiance entre 0 et 1, croissante avec la hauteur de boite`() {
+        val meter = DistanceMeter()
+        val small = meter.measure(512, 384, listOf(detection("personne", box(20f)))).first()
+        val tall = meter.measure(512, 384, listOf(detection("personne", box(200f)))).first()
+        assertTrue(small.confidence in 0f..1f)
+        assertTrue(tall.confidence in 0f..1f)
+        assertTrue("une grande boîte vaut mieux qu'une petite", tall.confidence > small.confidence)
+        assertEquals(1f - 1f / 200f, tall.confidence, 0.001f)
+    }
 }

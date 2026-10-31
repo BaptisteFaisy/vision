@@ -103,4 +103,44 @@ class DistanceFusionTest {
         assertTrue(Pinhole.MAX_METERS < 64.4f)
         assertEquals(FOCAL_PX, LensSpec.Default.focalPx(WIDTH, HEIGHT), 0.01f)
     }
+
+    @Test
+    fun `poids inegaux tirent la moyenne vers la branche sure`() {
+        assertEquals(3.05f, DistanceFusion.combine(3.0f, 3.2f, 3f, 1f)!!, 0.001f)
+        assertEquals(3.15f, DistanceFusion.combine(3.0f, 3.2f, 1f, 3f)!!, 0.001f)
+        // poids invalides : repli sur la moyenne simple
+        assertEquals(3.1f, DistanceFusion.combine(3.0f, 3.2f, 0f, -2f)!!, 0.001f)
+    }
+
+    @Test
+    fun `divergence, le stenope garde la main quel que soit son poids`() {
+        assertEquals(3.0f, DistanceFusion.combine(3.0f, 4.8f, 2f, 1f)!!, 0.001f)
+        assertEquals(3.0f, DistanceFusion.combine(3.0f, 4.8f, 1f, 2f)!!, 0.001f)
+        assertEquals(3.0f, DistanceFusion.combine(3.0f, 4.8f)!!, 0.001f)
+    }
+
+    @Test
+    fun `poids stenope suit la tolerance de la classe`() {
+        val fused = meter(CameraPose(1.5f, 0.15f))
+            .measure(WIDTH, HEIGHT, listOf(detection("personne", tallPersonBox())))
+            .firstOrNull()!!
+        // personne : poids 1/1,06 = 0,943 contre 1 au sol — entre les deux branches
+        val standing = 1.70f * FOCAL_PX / 200f
+        val ground = GroundPlane.forwardMeters(300f, CameraPose(1.5f, 0.15f), FOCAL_PX, 191.5f, HEIGHT)!!
+        val expected = (standing * (1f / 1.06f) + ground) / (1f / 1.06f + 1f)
+        assertEquals(expected, fused.meters, 0.01f)
+    }
+
+    @Test
+    fun `centre optique decentre deplace la branche sol, pas le stenope`() {
+        val lens = LensSpec(67f, 52.85f, principalYFrac = 200f / 383f)
+        val offCenter = DistanceMeter(lens).apply { pose = CameraPose(1.5f, 0.2f) }
+        val centered = meter(CameraPose(1.5f, 0.2f))
+        val box = listOf(100f, 100f, 200f, 296f)
+        val moved = offCenter.measure(WIDTH, HEIGHT, listOf(detection("licorne", box))).first()
+        val reference = centered.measure(WIDTH, HEIGHT, listOf(detection("licorne", box))).first()
+        val expected = GroundPlane.forwardMeters(296f, CameraPose(1.5f, 0.2f), lens.focalPx(WIDTH, HEIGHT), 200f, HEIGHT)!!
+        assertEquals(expected, moved.meters, 0.01f)
+        assertTrue("le centre optique change la mesure sol", moved.meters != reference.meters)
+    }
 }
