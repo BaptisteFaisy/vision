@@ -57,17 +57,16 @@ class ProximityVoice(
 
     /**
      * Nouvelle phrase de SAM. [playerIdle] vrai = aucune bulle du chat en cours de lecture ;
-     * sinon on ne dit rien (et la phrase reste mémorisée comme déjà traitée, pour ne pas
-     * la dire en retard une fois le chat terminé). [urgent] coupe la lecture en cours
-     * et parle quand même, dictée ou pas.
-     * Tant que la voix route parle ([routeSpeaking]),
-     * l'obstacle non urgent se tait aussi (mémorisé, pas de rattrapage tardif : une
-     * nouvelle signature réémettra si l'obstacle évolue).
-     * [queue] : la phrase douce tue par le chat ou la route est gardée (une seule,
-     * la plus fraîche) et redite par [flushPending] dès le silence, dans
-     * [PENDING_TTL_MS] — sans file, elle est perdue comme avant.
+     * sinon on ne dit rien — mais la phrase avalée par un garde transitoire n'est
+     * pas mémorisée : réémise, elle se dira une fois la voie libre (seul ce qui a
+     * vraiment parlé est dédupliqué). [urgent] coupe la lecture en cours et parle
+     * quand même, dictée ou pas. Tant que la voix route parle ([routeSpeaking]),
+     * l'obstacle non urgent se tait aussi, puis se dit à la prochaine émission.
+     * [queue] : la phrase douce tuée par le chat, la route ou [busy] est gardée
+     * (une seule, la plus fraîche) et redite par [flushPending] dès le silence,
+     * dans [PENDING_TTL_MS] — sans file, elle se redit à la prochaine émission.
      * [busy] : P1/P2 en cours, vus par l'appelant — la phrase douce part en
-     * file si [queue], est perdue sinon (jamais de chevauchement SafetyVoice).
+     * file si [queue] (jamais de chevauchement SafetyVoice).
      */
     suspend fun onPhrase(
         phrase: String,
@@ -81,7 +80,6 @@ class ProximityVoice(
         if (!current.ttsConfigured) return
         if (!urgent && (!playerIdle || routeSpeaking() || busy())) {
             if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
-            else lastPhrase = phrase
             return
         }
         speak(phrase, current, urgent)
@@ -108,7 +106,6 @@ class ProximityVoice(
 
     /** Synthèse + lecture d'une phrase admise (mémorisée : dite une fois). */
     private suspend fun speak(phrase: String, current: Settings, urgent: Boolean) {
-        lastPhrase = phrase
         if (urgent) player.stop()
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
@@ -117,6 +114,9 @@ class ProximityVoice(
         // voiture en mouvement parlent par la voix de sécurité, hors d'ici.)
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
+            // Mémorisée au moment de parler seulement : un avalement transitoire
+            // (chat, route, porte, synthèse) ne tait pas les réémissions.
+            lastPhrase = phrase
             onSpeaking(phrase)
             player.play(bytes).onFailure { onSpeaking("") }
         }

@@ -186,8 +186,8 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
   `("hole")` = `null`) — la prudence bloque (`:179`). Une vraie distance
   demanderait la profondeur ou le plan de sol : suivi, pas ici.
 - **Suivis notés, non faits** : `StairDetector` (Canny) branché à la voix
-  escaliers (`StairCannyCount`, 30/10), seuils à recalibrer sur captures
-  réelles (`StairDetector.kt:44-51`) ;
+  escaliers (`StairCannyCount`, 30/10), seuils recalibrés téléphone 256×103
+  (30/10, validation live recommandée) ;
   `stairs.StairConcepts` reconnaît « marche » quand `traverse.StairConcepts` le
   refuse (voix, autre agent) ; boîte coupée en haut seul : la ligne des pieds
   reste valide mais `DistanceMeter.readOne` (`DistanceEstimator.kt:156`)

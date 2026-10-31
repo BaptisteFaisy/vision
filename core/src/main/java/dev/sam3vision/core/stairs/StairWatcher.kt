@@ -105,9 +105,8 @@ object StairText {
  *   tardive se ré-annonce en standard, pas en « Plus que N » d'une montée
  *   d'avant.
  *
- * Bloqueur connu : seuils Canny calibrés webcam 640×480, à recalibrer sur
- * captures du téléphone (voir `StairDetector`) — le compteur, donc le compte
- * à rebours, n'est pas fiable avant ce calibrage.
+ * Compteur recalibré pour la luminance téléphone 256×103 (voir
+ * `StairsConfig`) ; validation live sur captures réelles recommandée.
  *
  * Pur JVM et testé : le branchement au direct (`LiveViewModel.onFrame`)
  * n'aura qu'à appeler [onSignal] puis la synthèse existante.

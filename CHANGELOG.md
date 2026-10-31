@@ -114,6 +114,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` vert.
 
 
+## 2026-10-30 — iSee : la voix dit le nombre de marches restantes (branche `fix/isee-voix-nombre-marches`)
+
+- **Demande** : les marches s'affichent en couleurs mais iSee ne dit jamais
+  combien il en reste à monter ; diagnostic par 10 sondes parallèles.
+- Causes : (1) l'escalier nommé par SAM n'a quasiment jamais de lecture de
+  distance (ni hauteur connue, ni pose, ni ancre garantie) donc `detected`
+  restait faux ; (2) les seuils Canny 50/150 + flou 5×5 de la webcam 640×480
+  rendaient le compte 0 quasi-systématique sur luminance 256×103.
+- Branché : détection depuis les libellés SAM bruts en repli des lectures
+  (`StairLabelSignals.ofLabels`, mesures optionnelles) ; seuils Canny 30/90,
+  flou 3×3, tolérance 25° pour la géométrie téléphone ; log `escaliers:`
+  (compte + âge + annonce) et `state.spoken` inchangé.
+- Preuves : `:app` 1303/1303 (dont 6 nouveaux), `:core` 2230/2235
+  (5 échecs préexistants `PrivateFileSettingsStoreTest`, POSIX sous Windows),
+  `check-kotlin-limits` OK. Non rejoué : comptage live sur téléphone.
+- Voix : `lastPhrase` mémorisée au moment de parler seulement — une phrase
+  avalée par un garde transitoire (chat, route, porte, synthèse) n'est plus
+  tue définitivement, elle se dit à la prochaine émission.
+- Fichiers : `StairLabelSignal.kt`, `StairsConfig.kt`, `StairsCanny.kt`,
+  `StairDetector.kt` + `StairWatcher.kt` (KDoc), `StairCannyCount.kt`,
+  `ProbeWiring.kt`, `ProbeStairs.kt` (extraction, plafond 500), `ProximityVoice.kt`, `StairLabelsFallbackTest`,
+  `StairSoftContrastTest`, `ProbeWiringStairsCountTest`, `StairCannyCountTest`,
+  `ProximityVoiceRetryTest`, `GUIDAGE-TOUT-DROIT.md`.
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 
 - **Demande** : détecter si les voitures sont en mouvement ou pas et

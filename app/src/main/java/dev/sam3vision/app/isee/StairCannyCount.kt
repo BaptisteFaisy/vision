@@ -45,6 +45,10 @@ internal object StairCannyCount {
     fun lineCount(nowMs: Long = System.currentTimeMillis()): Int =
         count.takeIf { nowMs - countedAtMs <= FRESH_MS } ?: 0
 
+    /** Âge du dernier compte en ms (`null` = jamais compté) : diagnostic du direct. */
+    fun countAgeMs(nowMs: Long = System.currentTimeMillis()): Long? =
+        (nowMs - countedAtMs).takeIf { countedAtMs > 0L }
+
     /** Nouvelle séance : le compte d'avant ne nourrit pas la montée d'après. */
     fun clear() {
         count = 0

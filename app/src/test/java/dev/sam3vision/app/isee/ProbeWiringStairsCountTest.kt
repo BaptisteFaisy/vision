@@ -52,6 +52,13 @@ class ProbeWiringStairsCountTest {
         override fun reset() {}
     }
 
+    /** Sténopé seul : l'escalier nommé par SAM n'a aucune lecture de distance. */
+    private class PinholeOnly : DepthMeter {
+        override fun offer(jpegB64: String) {}
+        override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>) = pinhole
+        override fun reset() {}
+    }
+
     private fun stairs() = SegObject(
         label = "stairs going up",
         score = 0.9f,
@@ -87,6 +94,23 @@ class ProbeWiringStairsCountTest {
     }
 
     @Test
+    fun `labels seuls sans lecture comptent quand meme`() = runTest {
+        val (probe, fake, watcher, scope) = labelsOnlyHarness(this)
+        try {
+            StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+            val offered = StairCannyCount.lineCount()
+            assertTrue(offered > 0)
+
+            respond(probe, fake, "A", "B")
+            advanceUntilIdle()
+
+            assertEquals(offered, watcher.smoothedLineCount)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun `sans compte frais, annonce non comptee`() = runTest {
         val (probe, fake, watcher, scope) = harness(this)
         try {
@@ -107,14 +131,19 @@ class ProbeWiringStairsCountTest {
     )
 
     /** Sonde sur faux client + profondeur qui nomme l'escalier, guetteur câblé. */
-    private fun harness(scope: TestScope): Wiring {
+    private fun harness(scope: TestScope): Wiring = meterHarness(scope, StairsDepth())
+
+    /** Même sonde, sténopé seul : labels SAM sans aucune lecture escalier. */
+    private fun labelsOnlyHarness(scope: TestScope): Wiring = meterHarness(scope, PinholeOnly())
+
+    private fun meterHarness(scope: TestScope, meter: DepthMeter): Wiring {
         val fake = ProbeTestClient(mutableListOf())
         val probe = LiveProbe(
             scope = scope,
             clock = { 0L },
             background = StandardTestDispatcher(scope.testScheduler),
             clientFor = { _, _, marks -> fake.also { it.marks = marks } },
-            depthMeter = StairsDepth(),
+            depthMeter = meter,
         )
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()

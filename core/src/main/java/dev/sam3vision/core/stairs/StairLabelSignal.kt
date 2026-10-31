@@ -37,6 +37,21 @@ object StairLabelSignals {
     const val UP_BOTTOM_EDGE = 0.8f
 
     /**
+     * Escalier nommé dans les libellés SAM bruts (repli quand l'escalier
+     * n'a pas de lecture de distance : ni hauteur connue, ni pose, ni
+     * ancre de profondeur — la voix compte quand même les marches vues).
+     * Le sens vient des mots du premier libellé qui le dit, sinon
+     * [StairDirection.Unknown] ; le centre est inconnu (pas de boîte).
+     */
+    fun ofLabels(labels: List<String>): StairLabelSignal {
+        val stairs = labels.filter { StairConcepts.isStairs(it) }
+        if (stairs.isEmpty()) return StairLabelSignal.none()
+        val labeled = stairs.firstOrNull { StairConcepts.direction(it) != StairDirection.Unknown }
+        if (labeled != null) return StairLabelSignal(true, StairConcepts.direction(labeled))
+        return StairLabelSignal(true, StairDirection.Unknown)
+    }
+
+    /**
      * Escalier nommé dans [readings] ([width] × [height] : taille de l'image
      * analysée), le plus proche d'abord. Image inconnue ou boîte illisible =
      * [StairLabelSignal.none] (sûr : pas d'annonce sur une géométrie douteuse).
