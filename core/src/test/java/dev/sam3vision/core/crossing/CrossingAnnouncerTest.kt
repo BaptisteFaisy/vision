@@ -42,52 +42,31 @@ class CrossingAnnouncerTest {
     fun `le vert se repete toutes les deux secondes`() {
         val announcer = CrossingAnnouncer()
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
-        assertEquals("Green, cross now.", announcer.lastCue?.phrase)
+        assertEquals("You can cross", announcer.lastCue?.phrase)
         assertNull(announcer.onFrame(1_500L, CrossingState.Green))
         val repeat = announcer.onFrame(2_600L, CrossingState.Green)
-        assertEquals("Green, cross now.", repeat?.phrase)
+        assertEquals("You can cross", repeat?.phrase)
         assertFalse(repeat?.urgent ?: true)
         assertEquals(CrossingState.Green, announcer.lastCue?.state)
         assertNull(announcer.onFrame(3_500L, CrossingState.Green))
-        assertEquals("Green, cross now.", announcer.onFrame(4_600L, CrossingState.Green)?.phrase)
+        assertEquals("You can cross", announcer.onFrame(4_600L, CrossingState.Green)?.phrase)
     }
 
     @Test
     fun `le rouge se repete toutes les deux secondes`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Red))
-        // Les deux libellés sont acceptés : les intentions des deux branches sont conservées.
-        val first = announcer.onFrame(200L, CrossingState.Red)
-        val firstPhrase = first?.phrase
-        assertTrue(
-            firstPhrase == "Don't cross yet" || firstPhrase == "Red, wait.",
-            "phrase inattendue : $firstPhrase"
-        )
+        assertEquals("Don't cross yet", announcer.onFrame(200L, CrossingState.Red)?.phrase)
         assertNull(announcer.onFrame(700L, CrossingState.Red))
         assertNull(announcer.onFrame(1_000L, CrossingState.Red))
-        val repeat = announcer.onFrame(1_200L, CrossingState.Red)
-        val repeatPhrase = repeat?.phrase
-        assertTrue(
-            repeatPhrase == "Don't cross yet" || repeatPhrase == "Red, wait.",
-            "phrase inattendue : $repeatPhrase"
-        )
-        assertFalse(repeat?.urgent ?: true)
-        assertEquals(CrossingState.Red, announcer.lastCue?.state)
         assertNull("pas de répétition à 1 s", announcer.onFrame(1_300L, CrossingState.Red))
         assertNull(announcer.onFrame(1_700L, CrossingState.Red))
+        val repeat = announcer.onFrame(2_200L, CrossingState.Red)
+        assertEquals("Don't cross yet", repeat?.phrase)
+        assertFalse(repeat?.urgent ?: true)
+        assertEquals(CrossingState.Red, announcer.lastCue?.state)
         assertNull(announcer.onFrame(3_000L, CrossingState.Red))
-        val repeat2 = announcer.onFrame(2_200L, CrossingState.Red)
-        val repeat2Phrase = repeat2?.phrase
-        assertTrue(
-            repeat2Phrase == "Don't cross yet" || repeat2Phrase == "Red, wait.",
-            "phrase inattendue : $repeat2Phrase"
-        )
-        val repeat3 = announcer.onFrame(4_200L, CrossingState.Red)
-        val repeat3Phrase = repeat3?.phrase
-        assertTrue(
-            repeat3Phrase == "Don't cross yet" || repeat3Phrase == "Red, wait.",
-            "phrase inattendue : $repeat3Phrase"
-        )
+        assertEquals("Don't cross yet", announcer.onFrame(4_200L, CrossingState.Red)?.phrase)
     }
 
     @Test
@@ -104,7 +83,7 @@ class CrossingAnnouncerTest {
         val announcer = CrossingAnnouncer(greenRepeatMs = 60_000L)
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
         assertNull(announcer.onFrame(30_000L, CrossingState.Green))
-        assertEquals("Green, cross now.", announcer.onFrame(60_600L, CrossingState.Green)?.phrase)
+        assertEquals("You can cross", announcer.onFrame(60_600L, CrossingState.Green)?.phrase)
     }
 
 
