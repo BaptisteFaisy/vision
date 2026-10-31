@@ -91,4 +91,13 @@ class DepthAffineTest {
         val got = out.first { it.label == "cible" }
         assertEquals(6f, got.meters, 0.05f)
     }
+
+    /** La confiance du sténopé traverse l'affinage au lieu de retomber à 1. */
+    @Test
+    fun `confiance stenope propagee, pas rehaussee`() {
+        val a = Detection("a", 0.9f, listOf(0f, 0f, 10f, 10f), 100, 100)
+        val pinhole = listOf(DistanceReading(1, "a", 2f, 2f, a.box, 0.5f))
+        val out = DepthReadings.refineWithCloseness(listOf(a), pinhole, mapOf(a.box to 10f))
+        assertEquals(0.5f, out.first().confidence, 0.001f)
+    }
 }
