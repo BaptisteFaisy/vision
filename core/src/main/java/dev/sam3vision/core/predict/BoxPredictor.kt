@@ -171,6 +171,8 @@ class BoxPredictor(
     }
 
     /** Correction de flot : partielle (poids), et seulement si le block-matching est sûr. */
+    // PISTE3 : quand le masque SAM de l'objet sera retenu par piste, préférer ici
+    // estimateMaskedShift(prev, cur, box, mask) — immunise la mesure contre le fond du rectangle.
     private fun refine(box: Box, prev: GrayMask?, cur: GrayMask?): Box {
         if (prev == null || cur == null) return box
         val shift = estimateShift(prev, cur, box) ?: return box
