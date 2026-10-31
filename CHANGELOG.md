@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : sans feu, une garée ne bloque jamais (branche `isee-no-light-ego`)
+
+- **Ordre user** : seule une voiture en mouvement dit « Attendez. » — une
+  garée ne bloque jamais, même proche, même caméra en mouvement.
+- **Fait** : verdict sans feu sur mouvement brut seul (veto proximité
+  sorti, champ patch supprimé) + signal fond branché sans feu seul
+  (`CAMERA_MOVED` tait le mouvement) ; avec feu / normal : inchangés.
+- **Preuve** : `:core:testDebugUnitTest` 2 676 + `:app:testDebugUnitTest`
+  1 532 verts sur r630 (0 échec, dont 2 `VehicleStateRangeTest` + 3
+  `NoLightCrossingTest` nouveaux/retravaillés) ; UBS : 0 finding nouveau
+  (6 `currentTimeMillis` hors diff, pré-existants).
+
 ## 2026-10-31 — iSee : sans feu, le verdict ne rate aucun danger sous quiet (branche `isee-no-light-quiet`)
 
 - **Ordre user** : même une voiture à plus de 15 m en mouvement doit dire de
