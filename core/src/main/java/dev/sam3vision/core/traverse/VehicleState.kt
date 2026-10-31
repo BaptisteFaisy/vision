@@ -474,6 +474,9 @@ class VehicleStateWatcher(
         /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
         const val NEAR_MOVING_METERS = 8f
 
+        /** Seuil strict des arrêts du veto traversée ([TraverseVeto]) : la voix annonce, elle, jusqu'à [MOVING_METERS]. */
+        const val STOPPED_METERS = 3f
+
         /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (au-delà, c'est un mouvement latéral). */
         const val STILL_SPEED = 0.02f
 
