@@ -2,11 +2,16 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.SystemTtsEngine
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Voix de sécurité d'iSee : les alertes vitales (bordure à 0,5 m —
- * « Bordure à 0,5 mètre. ») parlent ici, pas par la voix ElevenLabs.
+ * Voix de sécurité d'iSee : TOUTE urgence parle ici (bordure, stop, danger
+ * qui s'approche, sortie de trace — jamais la voix ElevenLabs), en grave
+ * ([SystemTtsEngine.SAFETY_PITCH]) : distincte de la voix route (même moteur,
+ * pitch normal) comme de Laure — une urgence ne sonne jamais comme une
+ * phrase normale (ordre user).
  *
  * Trois garanties (ordre user du 30/10/2026) :
  * - immédiat : le TTS système parle sans synthèse réseau ni attente de clé
@@ -39,12 +44,22 @@ class SafetyVoice(
     private val stopCurrent: () -> Unit = player::stop,
 ) {
 
-    /** Parle [phrase] aussitôt : coupe tout, puis TTS système en flush (jamais de file). */
+    /** Parle [phrase] aussitôt : coupe tout, puis TTS système grave en flush (jamais de file). */
     fun speak(phrase: String) {
         if (phrase.isBlank()) return
         stopCurrent()
         val current = settings()
-        system.speak(phrase, true, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed)
+        system.speak(phrase, true, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed, SystemTtsEngine.SAFETY_PITCH)
+    }
+
+    /**
+     * Stop d'urgence injecté par le modèle d'urgence externe (ordre user du
+     * 29/10, contrat `docs/URGENCE-EXTERNE.md`) : « Stop. » dit aussitôt par
+     * la voix de sécurité (système grave, hors-ligne), coupe tout (chat
+     * compris). Un « Stop. » déjà dit ne se répète pas (dédup côté appelant).
+     */
+    fun reportEmergency(language: SpeechLanguage) {
+        speak(GuidanceWord.Stop.text(language))
     }
 
     /** Libération finale (moteur TTS système). */

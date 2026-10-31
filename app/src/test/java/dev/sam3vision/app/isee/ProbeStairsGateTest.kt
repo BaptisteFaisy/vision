@@ -44,7 +44,7 @@ class ProbeStairsGateTest {
     /** Pilote TTS système muet : la sécurité ne parle pas dans ce test. */
     private class SilentDriver : TtsDriver {
         override val speaking: Boolean get() = false
-        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean = true
+        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean = true
         override fun stop() = Unit
         override fun shutdown() = Unit
     }
@@ -110,17 +110,18 @@ class ProbeStairsGateTest {
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
         val spoken = mutableListOf<String>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
-            onSpeaking = { spoken += it },
-            synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
-        )
         val safety = SafetyVoice(
             player = SpeechPlayer(File(tempDir(), "securite")),
             system = SystemTtsEngine(SilentDriver()),
             settings = { Settings.Default },
             stopCurrent = {},
+        )
+        val voice = ProximityVoice(
+            player = SpeechPlayer(File(tempDir(), "play")),
+            settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
+            safety = safety,
+            onSpeaking = { spoken += it },
+            synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
         )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
         probe.observeHazards(watchers, voice, { playerIdle }, { SpeechLanguage.Fr }, safety, { stairsAudible })

@@ -162,6 +162,7 @@ class ProbeStairsCountVoiceTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            safety = testSafetyVoice(),
             onSpeaking = { if (it.isNotEmpty()) spoken += it },
             synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
         )

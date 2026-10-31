@@ -1028,3 +1028,31 @@ des deux côtés, signal perdu, reset, phrases FR/EN).
 Recette téléphone : approche réelle d'un escalier → « Escalier
 montant. », « … à 4 mètres. », « … à 2 mètres. », « … à 1 mètre. » —
 **non mesurée**, exige une sortie rue.
+## 29. Une seule voix de sécurité, grave (ordre user du 31/10)
+
+Le user entend l'urgence dans la même voix que le normal (stop Traversée
+en Laure, bordure comme le guidage GPS). Nouveau contrat, qui amende la
+livraison du § 22 (gardée pour mémoire) : toute urgence parle par la voix
+de sécurité (TTS système, pitch grave 0,75 —
+`SystemTtsEngine.SAFETY_PITCH`), distincte de la voix route (même moteur,
+pitch normal) comme de Laure (ElevenLabs).
+
+- **tout urgent en sécurité** : stop, danger qui s'approche, sortie de
+  trace, recalcul, arrivée (`ProximityVoice` urgent → `SafetyVoice`,
+  `VoiceNavSpeaker` danger en grave) — coupe tout, hors-ligne, oral seul
+  (aucun sous-titre, le TTS système ne rend pas de fin) ;
+- **clips stop en héritage** : `guide_stop`/`tl_stop` restent au catalogue
+  mais ne sont plus joués (l'urgent ne passe plus par les clips) ;
+- **modèle externe** : `SafetyVoice.reportEmergency` (contrat
+  `docs/URGENCE-EXTERNE.md`), « Stop. » grave aussitôt, sans clé.
+
+Verrouillé par `SafetyVoiceTest` (+1 : urgence externe grave),
+`VoiceNavSpeakerTest` (+1 : danger grave, consigne normale),
+`SystemTtsEngineTest` (+2 : pitch transmis, bornes),
+`ProximityVoiceWordTest` (stop en sécurité),
+`ProximityVoiceRepeatTest` (+1 : urgent hors-ligne) et
+`ProximityVoiceRouteTest` (route urgente en sécurité).
+
+Recette téléphone : « Stop, car moving. » en Traversée et sortie de trace
+sonnent graves, distincts du doux et du guidage — **non mesurée**, exige
+un APK de cette branche sur appareil réel.

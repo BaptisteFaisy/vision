@@ -82,7 +82,7 @@ class VoiceNavSpeaker(
     fun onHazard(phrase: String): String? {
         val clean = phrase.trim()
         if (clean.isEmpty()) return null
-        return runCatching { utter(clean, flush = true) }.getOrNull()
+        return runCatching { utter(clean, danger = true) }.getOrNull()
     }
 
     /** Vrai si une phrase route est en cours de lecture (arbitre vocal : l'obstacle attend). */
@@ -111,11 +111,12 @@ class VoiceNavSpeaker(
         }
     }
 
-    /** Parole effective : langue et débit des réglages, puis moteur (l'appelant tait les pannes). */
-    private fun utter(phrase: String, flush: Boolean): String? {
+    /** Parole effective : langue et débit des réglages, danger en grave ([SystemTtsEngine.SAFETY_PITCH], même signature que la voix de sécurité), puis moteur (l'appelant tait les pannes). */
+    private fun utter(phrase: String, danger: Boolean): String? {
         val locale = SystemTtsEngine.localeOf(settings().speechLanguage)
         val rate = settings().ttsSpeed
-        val spoken = engine.speak(phrase, flush, locale, rate)
+        val pitch = if (danger) SystemTtsEngine.SAFETY_PITCH else 1f
+        val spoken = engine.speak(phrase, danger, locale, rate, pitch)
         // Marquée dite même si le moteur a refusé (fermé) : la session est
         // finie, le silence qui suit est voulu — cas documenté, pas une perte.
         return phrase.takeIf { spoken }

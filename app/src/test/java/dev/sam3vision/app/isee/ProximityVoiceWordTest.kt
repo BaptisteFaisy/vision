@@ -12,9 +12,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Mot du guidage : clip local sans synthèse quand le pack l'a, sinon synthèse
- * réseau mise en cache pour la suite. Directions douces redites en continu,
- * stop unique.
+ * Mot du guidage : doux en clip local sans synthèse quand le pack l'a, sinon
+ * synthèse réseau mise en cache pour la suite. Directions douces redites en
+ * continu, stop unique — et l'urgent part en voix de sécurité, jamais en clip.
  */
 class ProximityVoiceWordTest {
 
@@ -24,9 +24,11 @@ class ProximityVoiceWordTest {
         clips: VoicePack?,
         attempts: MutableList<String>,
         spoken: MutableList<String>,
+        safetyDriver: SafetyTestDriver = SafetyTestDriver(),
     ) = ProximityVoice(
         player = SpeechPlayer(File(tempDir(), "play")),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
+        safety = testSafetyVoice(safetyDriver),
         onSpeaking = { spoken += it },
         synthesize = { _, _, text ->
             attempts += text
@@ -88,20 +90,23 @@ class ProximityVoiceWordTest {
     }
 
     @Test
-    fun `meme stop deux fois, parle une fois`() = runTest {
+    fun `meme stop deux fois, securite une fois`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
+        val safetyDriver = SafetyTestDriver()
         val pack = VoicePack(
             filesDir = tempDir(),
             packVoiceId = { "voix-test" },
             bundledClip = { "faux-mp3".toByteArray() },
         )
-        val voice = voice(pack, attempts, spoken)
+        val voice = voice(pack, attempts, spoken, safetyDriver)
 
         voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
         voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
 
-        assertEquals(1, spoken.count { it == "Stop." })
+        assertEquals(listOf("Stop."), safetyDriver.calls.map { it.text })
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test
@@ -142,22 +147,6 @@ class ProximityVoiceWordTest {
         voice.flushPending(playerIdle = true)
 
         assertEquals("Gauche.", spoken.first())
-    }
-
-    @Test
-    fun `urgence externe coupe le chat en clip`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-
-        voice(pack, attempts, spoken).reportEmergency(SpeechLanguage.Fr, playerIdle = false)
-
-        assertTrue(attempts.isEmpty())
-        assertEquals("Stop.", spoken.first())
     }
 
     @Test

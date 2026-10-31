@@ -204,6 +204,7 @@ class ProbeWiringStairsCountTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default },
+            safety = testSafetyVoice(),
         )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
         val watcher = probe.observeStairs(watchers, voice, { true }) { SpeechLanguage.Fr }

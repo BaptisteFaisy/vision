@@ -11,15 +11,15 @@ import org.junit.Test
 
 /** Faux pilote : enregistre les appels, échec programmable. */
 private class FakeSpeakerDriver(var fail: Boolean = false) : TtsDriver {
-    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float)
+    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
 
     val calls = mutableListOf<Call>()
     var stops = 0
     var shutdowns = 0
     override val speaking: Boolean get() = false
 
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
-        calls += Call(text, flush, locale, rate)
+    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
+        calls += Call(text, flush, locale, rate, pitch)
         return !fail
     }
 
@@ -259,6 +259,20 @@ class VoiceNavSpeakerTest {
         val voice = speaker(FakeSpeakerDriver(fail = true))
 
         assertNull(voice.onHazard("Gauche."))
+    }
+
+    @Test
+    fun `danger parle grave, consigne parle normal`() {
+        val driver = FakeSpeakerDriver()
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 100f)
+
+        voice.onOffRoute()
+        voice.onHazard("Gauche.")
+
+        assertEquals(1f, driver.calls[0].pitch, 0f)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[1].pitch, 0f)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[2].pitch, 0f)
     }
 
     @Test

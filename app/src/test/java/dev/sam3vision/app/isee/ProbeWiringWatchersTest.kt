@@ -37,7 +37,7 @@ class ProbeWiringWatchersTest {
     /** Pilote TTS système muet : la sécurité ne parle pas dans ce test (miroir ProbeStairsGateTest). */
     private class SilentDriver : TtsDriver {
         override val speaking: Boolean get() = false
-        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean = true
+        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean = true
         override fun stop() = Unit
         override fun shutdown() = Unit
     }
@@ -99,15 +99,16 @@ class ProbeWiringWatchersTest {
 
     @Test
     fun `reemission meme compteur, confirmation vehicule fige`() = runTest {
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default },
-        )
         val safety = SafetyVoice(
             player = SpeechPlayer(File(tempDir(), "securite")),
             system = SystemTtsEngine(SilentDriver()),
             settings = { Settings.Default },
             stopCurrent = {},
+        )
+        val voice = ProximityVoice(
+            player = SpeechPlayer(File(tempDir(), "play")),
+            settings = { Settings.Default },
+            safety = safety,
         )
         val guetteurs = ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
         val doux = Mutex()
