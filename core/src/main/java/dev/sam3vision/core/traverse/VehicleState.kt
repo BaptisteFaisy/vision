@@ -235,26 +235,32 @@ class VehicleStateWatcher(
     val lastMovingAlertMs: Long?
         get() = lastMovingAtMs.takeIf { it != NO_INSTANT }
 
+    /** Verdicts fond de la dernière frame par piste (vide sans signal fond) : le journal du direct. */
+    val lastMotionVerdicts: Map<Int, MovingVerdict> get() = approach.lastVerdicts
+
+    /** Vrai quand chaque piste évaluée accuse la caméra : le mouvement se tait. */
+    val cameraMoved: Boolean get() = approach.cameraMoved
+
     /**
      * Alimente le lissage avec la frame à [atMs] : l'annonce quand le compte
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]
      * porte les boîtes SAM, [readings] les distances affinées ; [atMs] < 0
      * désactive le suivi temporel (croissance seule, comme le veto).
-     * [background] (`null` = pas de signal fond) met le veto mouvement quand
-     * la caméra bouge avec confiance : la dérive des boîtes ne conclut plus.
+     * [motion] (`null` = pas de signal fond) fait juger chaque piste par le
+     * fond : une piste qui suit la caméra ne conclut plus le mouvement.
      */
     fun update(
         detections: List<Detection>,
         readings: List<DistanceReading>,
         atMs: Long,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
-        background: MovingVerdict? = null,
+        motion: FrameMotion? = null,
     ): VehicleStateCue? {
-        val tau = if (atMs >= 0L) approach.update(detections, atMs, background)
+        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion)
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections)
         val meters = metersByKey(readings)
-        val pick = pick(current, meters, tau, atMs, background.isCameraMoved())
+        val pick = pick(current, meters, tau, atMs, approach.cameraMoved)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs)
         }

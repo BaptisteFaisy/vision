@@ -2,9 +2,11 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +28,27 @@ class VehicleStateTest {
     private fun box(widthPx: Float, cx: Float = 320f): List<Float> {
         val heightPx = widthPx * 0.6f
         return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
+    }
+
+    @Test
+    fun `camera qui suit - croissance sous camera, silence`() {
+        // Dérive seule (vitesse établie), puis croissance : sans fond ça
+        // annoncerait, avec fond la caméra unanime fait taire le mouvement.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val muted = VehicleStateWatcher()
+        val loud = VehicleStateWatcher()
+        repeat(12) { index ->
+            val width = if (index < 8) 100f else 100f + (index - 7) * 10f
+            val frame = box(width, cx = 320f + index * 5f)
+            val atMs = index * 100L
+            val hushed = muted.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs, motion = motion)
+            val spoke = loud.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs)
+            if (index >= 8) assertNull("caméra unanime : le mouvement se tait", hushed)
+            if (index == 9) assertNotNull("sans fond, la croissance parle", spoke)
+        }
+
+        assertTrue(muted.cameraMoved)
+        assertNull(muted.lastMovingAlertMs)
     }
 
     @Test
