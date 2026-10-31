@@ -14,6 +14,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   1 532 verts sur r630 (0 échec, dont 2 `VehicleStateRangeTest` + 3
   `NoLightCrossingTest` nouveaux/retravaillés) ; UBS : 0 finding nouveau
   (6 `currentTimeMillis` hors diff, pré-existants).
+## 2026-10-31 — iSee : évitement 80 cm partout + pastilles des seuls suivis (branche `evitement-80cm-distances`)
+
+- **Ordre user** : tout évitement garantit 80 cm aux personnes, mesurées
+  ou non ; les pastilles de distance n'affichent que les concepts suivis
+  explicitement (Find the X, pictos), le reste restant mesuré mais muet.
+- **Fait (80 cm, § 27)** : prédicat partagé `clearsSide`/`clearsAhead`
+  branché sur repli `freerSide`, passage `bestPassage`, décalage
+  (`LateralNudgeTracker`), passage piéton (`CrossingOnPathTracker`),
+  côté serveur, retour trottoir (`GuidanceAnnouncer`) et veto traversée
+  (`TraverseVeto`) ; égalité de cap au plus grand écart.
+- **Fait (pastilles)** : `screenLabels` filtre au rendu sur les suivis
+  (`LiveProbeState.followed` = envoyés moins liste du monde, vide =
+  tout) ; direct inchangé par construction (prompts = suivis) ; voix,
+  guidage et guetteurs lisent toujours toute la couche.
+- **Preuve** : +21 tests ciblés (`PeoplePathTest`, `GuidanceSteeringTest`,
+  `LateralNudgeTest`, `CrossingOnPathTest`, `GuidanceAnnouncerTest` ×2,
+  `TraverseVetoTest`, `LivePromptsTest`, `DistanceLayoutTest`,
+  `ProbeEnsureConceptTest`), 8 réécrits au nouveau contrat ; suite
+  `:core` + `:app` verte sur serveur (verdict final au merge).
 
 ## 2026-10-31 — iSee : sans feu, le verdict ne rate aucun danger sous quiet (branche `isee-no-light-quiet`)
 

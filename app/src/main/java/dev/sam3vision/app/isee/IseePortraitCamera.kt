@@ -119,7 +119,7 @@ private fun BoxScope.StreetFeed(
     } else if (showGlasses) {
         GlassesLive(Modifier.fillMaxSize())
         GlassesMaskLayer(probe.masks, probe.width, probe.height)
-        LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, modifier = Modifier.fillMaxSize())
+        LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, followed = probe.followed.toSet(), modifier = Modifier.fillMaxSize())
         SteeringLayer(probe.steering)
         InstructionLayer(probe.pulse)
         CrossingOnVideo(probe)

@@ -105,6 +105,7 @@ internal fun LiveProbe.configureFrom(
         crossingActive = crossingActive,
         modelsLine = debugModelsLine(settings),
         depth = settings.depthBackend,
+        followed = LivePrompts.followedOf(effective, settings.outdoorMode),
     )
     adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)
 }

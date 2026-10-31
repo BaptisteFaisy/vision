@@ -39,6 +39,7 @@ fun LiveDistanceLayer(
     layer: DistanceLayer?,
     topInset: Dp = TOP_SAFE_INSET,
     withLabel: Boolean = false,
+    followed: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     if (layer == null || layer.empty) return
@@ -47,6 +48,7 @@ fun LiveDistanceLayer(
             layer = layer,
             topInset = topInset,
             withLabel = withLabel,
+            followed = followed,
             boxWidth = constraints.maxWidth.toFloat(),
             boxHeight = constraints.maxHeight.toFloat(),
         )
@@ -62,6 +64,7 @@ private fun DistancePills(
     layer: DistanceLayer,
     topInset: Dp,
     withLabel: Boolean,
+    followed: Set<String>,
     boxWidth: Float,
     boxHeight: Float,
 ) {
@@ -77,7 +80,7 @@ private fun DistancePills(
     // `measure` refait la mise en page de chaque texte : mémoïsé, il ne rejoue qu'à
     // contenu, style ou géométrie changés — plus une fois par frame du direct. Les clés
     // sont structurelles (`DistanceLayer`, `CropTransform`, `TextStyle` : data classes).
-    val labels = remember(layer, transform, withLabel) { screenLabels(layer, transform, withLabel) }
+    val labels = remember(layer, transform, withLabel, followed) { screenLabels(layer, transform, withLabel, followed) }
     val texts = remember(measurer, labels, style) { labels.map { measurer.measure(it.text, style, maxLines = 1) } }
     val pills = remember(labels, texts, metrics, boxWidth, boxHeight) {
         val widths = texts.map { it.size.width + metrics.dotRadius * 2f + metrics.dotGap + metrics.padH * 2f }

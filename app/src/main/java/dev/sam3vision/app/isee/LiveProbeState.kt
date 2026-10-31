@@ -31,6 +31,12 @@ data class LiveProbeState(
     val labels: List<String> = emptyList(),
     /** Concepts envoyés à SAM (les suivis), pas seulement ceux reconnus. */
     val conceptsSent: List<String> = emptyList(),
+    /**
+     * Concepts suivis explicitement (Find the X, pictos — hors liste du
+     * monde) : seules leurs pastilles s'affichent ; vide = tout s'affiche
+     * (la voix et le guidage lisent toujours tous les concepts envoyés).
+     */
+    val followed: List<String> = emptyList(),
     /** « ws » (WebSocket, le plus rapide) ou « http » (repli automatique). */
     val transport: String = TRANSPORT_WS,
     val objects: Int = 0,
@@ -130,6 +136,7 @@ data class LiveProbeState(
         gpu = gpu,
         modelsLine = modelsLine,
         conceptsSent = conceptsSent,
+        followed = followed,
         crossingActive = crossingActive,
     )
 

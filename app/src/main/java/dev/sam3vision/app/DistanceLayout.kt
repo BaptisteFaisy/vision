@@ -75,13 +75,21 @@ const val PILL_STACK_GAP = 8f
  * [withLabel] préfixe la pastille du concept (« personne ≈ 3,9 m ») : les hôtes
  * sans masques — la photo d'iSee — n'ont que ce texte pour savoir de quel objet
  * elle parle.
+ *
+ * [followed] non vide : seules les pastilles des concepts suivis (comparaison
+ * insensible à la casse) ; vide : tout s'affiche (pas de suivi explicite —
+ * la voix et le guidage lisent toujours toute la couche).
  */
 fun screenLabels(
     layer: DistanceLayer,
     transform: CropTransform,
     withLabel: Boolean = false,
+    followed: Set<String> = emptySet(),
 ): List<ScreenLabel> = layer.readings.mapIndexedNotNull { index, reading ->
     if (reading.box.size < 4) return@mapIndexedNotNull null
+    if (followed.isNotEmpty() && followed.none { it.equals(reading.label.trim(), ignoreCase = true) }) {
+        return@mapIndexedNotNull null
+    }
     ScreenLabel(
         text = labelText(reading, withLabel),
         x = transform.screenX(reading.box[0]).coerceIn(0f, transform.boxWidth),

@@ -212,4 +212,17 @@ class LivePromptsTest {
         assertEquals(LivePrompts.indoor, LivePrompts.withConcept(LivePrompts.indoor, "  "))
         assertEquals(LivePrompts.indoor, LivePrompts.withConcept(LivePrompts.indoor, "x".repeat(33)))
     }
+
+    @Test
+    fun `suivis explicites dehors hors liste du monde`() {
+        assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.default, true))
+        assertEquals(listOf("wallet"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.default, "wallet"), true))
+        assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.default, "Person"), true))
+    }
+
+    @Test
+    fun `suivis explicites dedans hors liste du monde`() {
+        assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.indoor, false))
+        assertEquals(listOf("keys"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "keys"), false))
+    }
 }
