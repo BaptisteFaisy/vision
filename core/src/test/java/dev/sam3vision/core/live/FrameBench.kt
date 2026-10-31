@@ -83,6 +83,42 @@ internal class FrameBench(
         return sample
     }
 
+    /**
+     * Mesure [op] [repetitions] fois et ne garde que le **meilleur** passage.
+     *
+     * Pourquoi pas [measure] seul : les bancs tournent sur des runners partagés (jusqu'à
+     * huit lots de la file de merge en parallèle). Une moyenne sur 250 passes est polluée
+     * par le voisin — le 31/10, `MotionBenchTest` a échoué à 20 596 µs/frame pour une
+     * borne à 20 000, alors que le même code mesure 11 357 µs sur une machine au repos.
+     * Le minimum de plusieurs passages est le seul chiffre qui décrit le code mesuré et
+     * non la charge du runner ; il reste un **coût par opération**, comparable d'une
+     * version à l'autre.
+     *
+     * Le rapport ne garde que le passage gagnant (les essais perdants sont retirés du
+     * tableau), sous le nom [name].
+     */
+    fun measureBest(name: String, repetitions: Int = 3, op: LongSupplier): BenchSample {
+        require(repetitions >= 1) { "repetitions >= 1" }
+        val prefixe = "$name · essai "
+        var best: BenchSample? = null
+        var i = 1
+        while (i <= repetitions) {
+            val sample = measure("$prefixe$i", op)
+            if (best == null || sample.microsPerOp < best.microsPerOp) best = sample
+            i++
+        }
+        samples.removeAll { it.name.startsWith(prefixe) }
+        val garde = BenchSample(
+            name = name,
+            microsPerOp = best!!.microsPerOp,
+            bytesPerOp = best.bytesPerOp,
+            ops = best.ops,
+            checksum = best.checksum,
+        )
+        samples += garde
+        return garde
+    }
+
     /** Tableau lisible de toutes les mesures, prêt à être imprimé par le test. */
     fun report(title: String): String = buildString {
         appendLine(title)
