@@ -144,9 +144,10 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 - **Walking guidance** — "straight ahead" instructions, obstacles and crossings
   announced by voice (`docs/GUIDAGE-TOUT-DROIT.md`, `docs/VOIX-DANGER.md`).
 - **Crossing mode (beta)** — **armed manually** (chip, or voice "traverser" /
-  "crossing mode on"; "crossing mode off" stops it). It never arms itself. Once
-  on, it reads the pedestrian light on-device from the SAM box (binary red/green,
-  confirmed over 4 frames) and vetoes approaching vehicles
+  "crossing mode on" from home or live; "crossing mode off" stops it). It never
+  arms itself. Once on, it announces the crosswalk ahead with its distance when
+  the probe sees it, then reads the pedestrian light on-device from the SAM box
+  (binary red/green, confirmed over 4 frames) and vetoes approaching vehicles
   (`docs/TRAVERSEE.md`). Its green-detection recall is measured below: 1 true
   green out of 6.
 - **Landmark pictograms** — film an object, Meta Muse Image (`muse-image-1.0`)

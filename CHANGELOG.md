@@ -4,6 +4,25 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Voix : « crossing mode on » arme la traversée depuis le direct et annonce le passage (branche `crossing-voix-direct`)
+
+- **Constat** : l'ordre dit sur le direct partait au LLM (qui décrivait la
+  scène) au lieu d'armer le mode — seul l'accueil le routait
+  (`IseeViewModel.handleDictated`), le direct (`LiveNavOrders`) ne connaissait
+  que la navigation. Et à l'activation, aucun « Passage piéton devant, à 5
+  mètres » : `CrossingText.approach` n'était appelée nulle part en production.
+- **Fait** : le direct pousse l'ordre traversée à l'accueil (`LiveNavOrders` →
+  `NavOrderRequest`, après le cap), `acceptNavOrder` l'essaie après la
+  navigation (`steering.runCrossing`) ; à l'activation vocale, le passage en
+  vue est annoncé avec sa distance mesurée (`CrossingLateralWatch`, fraîcheur
+  3 s — une sonde arrêtée ne parle pas d'un vieux passage), silence sinon
+  (jamais de chiffre deviné). La puce et la coupure vocale ne changent pas.
+- **Preuve** : `LiveNavOrdersTest.ordre traversee sur le direct part a
+  l accueil, pas au llm` (rouge avant : `expected:<crossing mode on> but
+  was:<null>`, vert après) + 4 tests `IseeSteeringOrdersTest` (annonce FR « à
+  5 mètres », silence sans passage, silence à la coupure, périmé tu).
+
+
 ## 2026-10-31 — CI : l'approbation automatique se réveille à chaque fin de `CI`, pas au cron (branche `ci/approve-declencheur`)
 
 - **Constat** : le `schedule` de ce dépôt est étalé par GitHub. Mesure : le cron
