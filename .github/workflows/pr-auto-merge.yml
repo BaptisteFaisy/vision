@@ -204,9 +204,8 @@ jobs:
             # sondage borné (6 × 5 s max, jamais de sleep fixe > 30 s).
             # On part dès que plus aucune PR n'est en état transitoire.
             for _ in 1 2 3; do
-              inconnus="$(gh pr list --base master --state open \
-                --json mergeStateStatus \
-                --jq '[.[].mergeStateStatus] | map(select(. == "UNKNOWN")) | length' \
+              inconnus="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&base=master&per_page=100" \
+                --jq '[.[] | select(.mergeable_state == null or .mergeable_state == "unknown")] | length' \
                 2>/dev/null || echo 1)"
               if [ "${inconnus:-1}" = "0" ]; then break; fi
               sleep 5
@@ -254,10 +253,36 @@ jobs:
               end'
           # Une liste illisible doit être ROUGE, pas vide : une matrice vide
           # passait pour « aucune PR à balayer » et la file se taisait.
-          if ! MATRIX=$(gh pr list --base master --state open \
-              --json number,headRefOid,headRefName,mergeStateStatus,isDraft,headRepository,baseRefOid,updatedAt \
-              --jq "$FILTRE" | jq -c .); then
+          # ── inventaire en REST (v19) ────────────────────────────────────
+          # `gh pr list --json` interroge GraphQL ; le seau REST est distinct et
+          # plus large. Une réserve : la liste ne calcule pas `mergeable_state`
+          # (null tant que GitHub n'a pas fait le calcul) ; la fiche de la PR,
+          # elle, le rend — d'où une lecture par PR, dix au pire.
+          inventaire() {
+            local n
+            gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&base=master&per_page=100" \
+              --jq '.[].number' 2>/dev/null \
+              | while read -r n; do
+                  gh api "repos/$GITHUB_REPOSITORY/pulls/$n" --jq '{
+                    number: .number, headRefOid: .head.sha, headRefName: .head.ref,
+                    mergeStateStatus: (if .draft then "DRAFT"
+                      else ({"clean":"CLEAN","dirty":"DIRTY","blocked":"BLOCKED",
+                             "unstable":"UNSTABLE","behind":"BEHIND"}[.mergeable_state] // "UNKNOWN")
+                      end),
+                    isDraft: .draft,
+                    headRepository: {nameWithOwner: (.head.repo.full_name // "")},
+                    baseRefOid: .base.sha, updatedAt: .updated_at }' 2>/dev/null
+                done | jq -s .
+          }
+          if ! MATRIX=$(inventaire | jq -c "$FILTRE"); then
             echo "::error::liste des PR illisible — file en pause (voir le log ci-dessus)"
+            exit 1
+          fi
+          # Un inventaire vide doit être VRAI (aucune PR ouverte), pas le
+          # symptôme d'une lecture ratée : on le vérifie avant de se taire.
+          if [ "$MATRIX" = "[]" ] && \
+            [ "$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&base=master&per_page=1" --jq 'length' 2>/dev/null || echo 1)" != "0" ]; then
+            echo "::error::inventaire des PR vide alors que des PR sont ouvertes — file en pause"
             exit 1
           fi
           [ -n "$MATRIX" ] || MATRIX="[]"
@@ -319,8 +344,42 @@ jobs:
         run: |
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
           ghe() { GH_TOKEN="$GH_ECRITURE" gh "$@"; } # écritures : identité du PAT
+          # ── lectures en REST (v19) ──────────────────────────────────────
+          # `gh pr checks` et `gh pr view --json` interrogent GraphQL. Le jeton
+          # de l'installation (v18) a un quota propre, mais REST en a un autre
+          # encore, plus large, et la même donnée y est : on la lit là. Le
+          # 31/10, une saturation GraphQL a suffi à rendre le balayeur aveugle
+          # une heure entière.
+          tete() { # $1=pr → sha de la tête (une seule lecture par job)
+            if [ -z "${TETE_PR:-}" ]; then
+              TETE_PR=$(gh api "repos/$REPO/pulls/$1" --jq .head.sha 2>/dev/null || echo "${SHA:-}")
+            fi
+            printf '%s' "$TETE_PR"
+          }
+          checks_pr() { # $1=pr → [{name,state,bucket,link}], mêmes clés que `gh pr checks --json`
+            # Un contexte peut avoir plusieurs runs (relance, annulation) : on
+            # ne garde que le plus récent par nom, comme GitHub pour une porte
+            # de fusion — sinon un `couche0` annulé à côté du vert compte deux
+            # fois et la PR n'est jamais « verte ».
+            gh api "repos/$REPO/commits/$(tete "$1")/check-runs?per_page=100" --jq '
+              [ .check_runs[] | { name: .name, conclusion: .conclusion,
+                                  link: .html_url, debut: .started_at } ]
+              | sort_by(.name, .debut)
+              | group_by(.name) | map(.[-1])
+              | map({ name: .name,
+                      state: ((.conclusion // "pending") | ascii_upcase),
+                      bucket: (if .conclusion == null then "pending"
+                               elif (.conclusion == "success" or .conclusion == "neutral") then "pass"
+                               elif .conclusion == "skipped" then "skipping"
+                               elif .conclusion == "cancelled" then "cancel"
+                               else "fail" end),
+                      link: .link })' 2>/dev/null
+          }
+          commentaires() { # $1=pr → un corps de commentaire par ligne
+            gh api "repos/$REPO/issues/$1/comments?per_page=100" --jq '.[].body' 2>/dev/null
+          }
           green() { # 0 si les 3 checks requis de la PR $1 sont SUCCESS
-            gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
+            checks_pr "$1" | jq -e '
               ["ci","ci-budget","couche0"] as $req |
               [ .[] | select(.name as $n | $req | index($n)) ] as $got |
               ($got | length == 3) and
@@ -331,20 +390,19 @@ jobs:
           # `BLOCKED` était le trou de la v9 : le `case` ne le traitait pas,
           # donc la PR restait bloquée pour toujours (cas réel : #215).
           echecs_requis() { # noms des checks requis en échec, séparés par une espace
-            gh pr checks "$1" --json name,bucket 2>/dev/null \
+            checks_pr "$1" \
               | jq -r '[.[] | select(.bucket=="fail")
                         | .name | select(.=="ci" or .=="ci-budget" or .=="couche0")]
                        | join(" ")' || true
           }
           annules_requis() { # noms des checks requis annulés (aucun verdict), séparés par une espace
-            gh pr checks "$1" --json name,bucket 2>/dev/null \
+            checks_pr "$1" \
               | jq -r '[.[] | select(.bucket=="cancel")
                         | .name | select(.=="ci" or .=="ci-budget" or .=="couche0")]
                        | join(" ")' || true
           }
           marques() { # $1=pr $2=marque → nb de commentaires qui portent la marque
-            gh pr view "$1" --json comments --jq '.comments[].body' 2>/dev/null \
-              | grep -cF -- "$2" || true
+            commentaires "$1" | grep -cF -- "$2" || true
           }
           commente_une_fois() { # $1=pr $2=marque $3=corps (le corps porte la marque)
             [ "$(marques "$1" "$2")" -gt 0 ] && return 0
@@ -375,7 +433,7 @@ jobs:
           # où il faut relancer. La signature (nom=état, triée) distingue les
           # deux, et un nouveau verdict change la clé.
           # Signature illisible → « indetermine » → jamais de déduplication.
-          sig="$( { gh pr checks "$PR" --json name,state 2>/dev/null || true; } \
+          sig="$( { checks_pr "$PR" || true; } \
             | jq -er '[.[] | "\(.name)=\(.state)"] | sort | join(",")' 2>/dev/null || true )"
           PF="indetermine"
           if [ -n "${sig:-}" ]; then
@@ -385,15 +443,15 @@ jobs:
           ETAT_MARQUE="<!-- automerge-etat -->"
           deja_balayee() {
             [ "$PF" = "indetermine" ] && return 1
-            gh pr view "$PR" --json comments \
-              --jq '[.comments[] | select(.body | startswith("<!-- automerge-etat -->"))]
+            gh api "repos/$REPO/issues/$PR/comments?per_page=100" \
+              --jq '[.[] | select(.body | startswith("<!-- automerge-etat -->"))]
                     | last | .body // ""' 2>/dev/null \
               | grep -qF "sha=$SHA master=$MASTER state=$STATE pf=$PF"
           }
           noter_etat() { # $1 = ce qui a été fait (une ligne)
             local cid corps
-            cid=$(gh pr view "$PR" --json comments \
-              --jq '[.comments[] | select(.body | startswith("<!-- automerge-etat -->"))]
+            cid=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \
+              --jq '[.[] | select(.body | startswith("<!-- automerge-etat -->"))]
                     | last | .id // ""' 2>/dev/null || true)
             corps=$(printf '%s\nsha=%s master=%s state=%s pf=%s\n\n%s' \
               "$ETAT_MARQUE" "$SHA" "$MASTER" "$STATE" "$PF" "$1")
@@ -427,7 +485,7 @@ jobs:
           ECHELLE_ETAPES=""
           relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
             local pr="$1" runs run sha_run etapes rc=2
-            runs=$(gh pr checks "$pr" --json name,bucket,link 2>/dev/null \
+            runs=$(checks_pr "$pr" \
               | jq -r '[.[] | select(.bucket=="fail")
                          | select(.name=="ci" or .name=="ci-budget") | .link][]
                        | select(. != null)' \
@@ -463,7 +521,7 @@ jobs:
           }
           relancer_annules() { # $1=pr ; 0 = relancé, 1 = rien à relancer
             local pr="$1" runs run sha_run rc=1
-            runs=$(gh pr checks "$pr" --json name,bucket,link 2>/dev/null \
+            runs=$(checks_pr "$pr" \
               | jq -r '[.[] | select(.bucket=="cancel")
                          | select(.name=="ci" or .name=="ci-budget" or .name=="couche0") | .link][]
                        | select(. != null)' \
@@ -556,7 +614,7 @@ jobs:
           # attribuable.
           reattribuer() { # 0 = réattribué et poussé, 1 = échec
             local login id noreply
-            login=$(gh pr view "$PR" --json author --jq .author.login 2>/dev/null || echo "")
+            login=$(gh api "repos/$REPO/pulls/$PR" --jq .user.login 2>/dev/null || echo "")
             id=$(gh api "users/$login" --jq .id 2>/dev/null || echo "")
             [ -n "$login" ] && [ -n "$id" ] || return 1
             noreply="$id+$login@users.noreply.github.com"
@@ -760,7 +818,7 @@ jobs:
               st="$STATE"
               for _ in 1 2; do
                 sleep 5
-                st="$(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus 2>/dev/null || echo UNKNOWN)"
+                st="$(gh api "repos/$REPO/pulls/$PR" --jq '(if .draft then "DRAFT" else ({"clean":"CLEAN","dirty":"DIRTY","blocked":"BLOCKED","unstable":"UNSTABLE","behind":"BEHIND"}[.mergeable_state] // "UNKNOWN") end)' 2>/dev/null || echo UNKNOWN)"
                 if [ "${st:-UNKNOWN}" != "UNKNOWN" ]; then break; fi
               done
               echo "PR #$PR : état $st après sondage, prochain passage"
