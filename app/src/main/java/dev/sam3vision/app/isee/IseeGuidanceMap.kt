@@ -48,7 +48,7 @@ internal fun IseeGuidanceBlock(
         GuidanceMapCard(
             snapshot,
             state.update,
-            Modifier.fillMaxWidth().height(150.dp),
+            Modifier.fillMaxWidth().height(200.dp),
             showAttribution = false,
         )
         GuidanceInstruction(state)
