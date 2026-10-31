@@ -210,6 +210,16 @@ CONCEPT_ALIASES = {
     "feux tricolores": "traffic light",
     "feu rouge": "traffic light",
     "feu vert": "traffic light",
+    # Feux piétons (31/10, ordre user : la Traversée ne suit que ceux-là).
+    # La couleur se lit en local (TrainedLightColor), jamais par un prompt
+    # d'état (rappel 12,5 %, docs/MESURES-SAM3-FEUX.md §2) : les formes
+    # rouge/vert pointent le même concept générique piéton.
+    "feu piéton": "pedestrian traffic light",
+    "feux piétons": "pedestrian traffic light",
+    "feu piéton rouge": "pedestrian traffic light",
+    "feu piéton vert": "pedestrian traffic light",
+    "signal piéton": "pedestrian traffic light",
+    "signaux piétons": "pedestrian traffic light",
     "stop": "stop sign",
     "sens interdit": "no entry sign",
     "panneau de signalisation": "traffic sign",

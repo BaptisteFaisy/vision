@@ -47,7 +47,9 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 - `crossingStateOf()` (extrait de `crossingCueOf`, sonde inchangée) :
   boîte SAM au meilleur score → crop JPEG → `TrainedLightColor` ;
 - `TraverseWiring` relit le vert à chaque frame **active** et demande le
-  concept `traffic light` dans les prompts (5 véhicules + feu, plafond 16) ;
+  concept feu dans les prompts (5 véhicules + feu, plafond 16) —
+  `pedestrian traffic light` depuis le 31/10 (ordre user : piétons seuls,
+  rappel 87,5 %, `docs/MESURES-SAM3-FEUX.md` §2) ;
 - `LiveViewModel` transmet le JPEG (1 ligne, fichier maintenu à 498 lignes).
 - Porte anti-confusion (`PedLightGate`) : le vert classifié ne passe que
   s'il est en bas du cadre, élancé comme un bonhomme, sans rouge franc —
@@ -179,7 +181,8 @@ Quand un passage piéton est vu sur **3 des 5 dernières frames** publiées et
 qu'aucun mode n'est actif, la pastille de carte change de libellé
 (« Passage piéton — traversée ? », ambre) et **un tap** active le mode Traversée —
 le geste qui existait déjà. Rien n'est automatique : entrer en Traversée change
-les concepts suivis (`traffic light` + `car`) et coupe le guidage obstacles, ce
+les concepts suivis (feu piéton + `car` — `pedestrian traffic light` depuis le
+31/10, ordre user : piétons seuls) et coupe le guidage obstacles, ce
 n'est pas une décision que l'app prend seule.
 
 - logique pure : `core/crossing/CrossingOffer.kt` — `isCrosswalkLabel`

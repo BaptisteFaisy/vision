@@ -45,8 +45,8 @@ object SignConcepts {
      * pluriel simple neutralisés). Les composés du backend (« traffic
      * sign », « stop sign », « no entry sign » —
      * `server/backend/concepts.py`) sont reconnus au mot : un seul mot
-     * connu suffit. « traffic light » reste un non-panneau (le feu ne se
-     * filtre jamais).
+     * connu suffit. « traffic light » et « pedestrian traffic light »
+     * restent des non-panneaux (le feu ne se filtre jamais).
      */
     fun isSign(label: String): Boolean {
         val key = KnownSizes.canonical(label)
