@@ -77,6 +77,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits` et `check-isee-design` OK ; `assembleDebug` OK. Note :
   6 échecs `:core` identiques sur master intact (heap de test, permissions
   POSIX Windows), verdict CI.
+## 2026-10-30 — traversée : l'armement auto exige un passage à 2 m ou moins (branche `feat/isee-traversee-2m`)
+
+- **Demande** : passer en mode Traversée automatiquement uniquement quand
+  le passage piéton est à 2 m ou moins.
+- Fait : `CrossingOffer.seesNearCrosswalk` (nouveau, `:core` pur) — un
+  passage ne compte que mesuré à `OFFER_MAX_METERS` (2 m) au plus, ou sans
+  mesure prouvé sous les pieds par sa boîte (`touchesBottom`/`footClose`,
+  miroir de l'arrivée) ; `CrossingOfferGate` compte ces frames proches
+  (3/5, refus, silence inchangés) ; `CrossingOfferWatch.update` reçoit les
+  distances (`crossingOfferMeters`, profondeur puis sol, `null` sans
+  mesure). Visibilité brute (`crossingVisible`), sortie (4 frames vides)
+  et armements manuel, vocal, GPS inchangés. Sonde +0 ligne (appel étendu
+  sur place, fichier au plafond).
+- Preuves : `:app:testDebugUnitTest` 1 272 tests 0 échec (dont lookup
+  offre), `:core:testDebugUnitTest` (`CrossingOfferTest` 19/19, dont 8
+  nouveaux) ; `assembleDebug` vert ; `check-kotlin-limits.py` vert. 5
+  échecs `:core` pré-existants hors périmètre
+  (`PrivateFileSettingsStoreTest`, POSIX sous Windows) + 1 mesure
+  d'allocation flaky (`MaskRobustnessTest`, verte isolément).
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 

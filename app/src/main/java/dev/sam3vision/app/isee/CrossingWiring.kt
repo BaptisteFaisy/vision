@@ -204,10 +204,16 @@ internal object CrossingOfferWatch {
     var lastVisible: Boolean = false
         private set
 
-    /** Vrai si le mode Traversée doit s'armer seul sur cette frame. */
-    fun update(objects: List<SegObject>, nowMs: Long, traversing: Boolean): Boolean {
+    /** Vrai si le mode Traversée doit s'armer seul : passage proche sur cette frame. */
+    fun update(
+        objects: List<SegObject>,
+        nowMs: Long,
+        traversing: Boolean,
+        metersOf: (SegObject) -> Float?,
+        frameH: Int,
+    ): Boolean {
         lastVisible = CrossingOffer.seesCrosswalk(objects)
-        return gate.onFrame(objects, nowMs, traversing)
+        return gate.onFrame(objects, nowMs, traversing, metersOf, frameH)
     }
 
     /** L'utilisateur a coupé le mode : silence d'une minute. */
@@ -329,6 +335,22 @@ internal fun crossingMetersOf(
         CrossingDistance.groundMeters(box[3], pose, focalPx, principalY, imageH)
     } else null
     return CrossingDistance.bestMeters(depth, ground)
+}
+
+/**
+ * Distances des passages d'une frame pour l'armement auto : une mesure par
+ * objet ([crossingMetersOf], profondeur puis sol), `null` sans mesure. Le
+ * tri proche/loin part dans [CrossingOffer.seesNearCrosswalk].
+ */
+internal fun crossingOfferMeters(
+    readings: List<DistanceReading>,
+    pose: CameraPose?,
+    lens: LensSpec,
+    width: Int,
+    height: Int,
+): (SegObject) -> Float? {
+    val focalPx = lens.focalPx(width, height)
+    return { obj -> crossingMetersOf(obj.box, readings, pose, focalPx, height / 2f, height) }
 }
 
 /**
