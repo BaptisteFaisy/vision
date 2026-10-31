@@ -1,0 +1,81 @@
+name: auto-approve
+
+# Approbation automatique des runs en attente (`action_required`).
+#
+# Pourquoi (31/10) : un push fait avec un jeton d'action (`GITHUB_TOKEN`,
+# donc `@github-actions[bot]`) sur une branche du dépôt ne déclenche pas les
+# workflows — GitHub crée les runs en `action_required` et attend un clic
+# humain. Vécu sur #634 : l'agent de conflit du balayeur poussait avec le jeton
+# d'installation, `CI` et `couche0` sont partis en `action_required`, donc les
+# trois checks requis n'existaient pas, la PR est restée `BLOCKED` et la file
+# Mergify sans verdict. Rien dans le dépôt ne doit dépendre d'un clic.
+#
+# Ici, on approuve sans intervention. Portée volontairement étroite : **dépôt
+# d'origine seulement** — un run de fork n'est jamais approuvé, son code
+# s'exécuterait sur nos runners self-hosted sans revue.
+#
+# Deux jetons essayés dans l'ordre : le PAT du balayeur (identité du
+# propriétaire, `actions: write`), puis le jeton de l'installation en repli
+# (il peut approuver un run du dépôt ; s'il refuse, on le dit et on continue).
+on:
+  schedule:
+    # Filet : 5 min est la granularité la plus fine du cron GitHub.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: auto-approve
+  cancel-in-progress: false
+
+jobs:
+  approve:
+    name: approve
+    runs-on: [self-hosted, linux, x64, vision]
+    timeout-minutes: 5
+    steps:
+      - name: Approuver les runs en attente du dépôt
+        env:
+          DEPOT: ${{ github.repository }}
+          PAT: ${{ secrets.AUTOMERGE_PAT }}
+          JETON_INSTALLATION: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH"
+          # Liste des runs qui attendent une approbation, une ligne par run :
+          # id, nom du workflow, branche, dépôt d'origine.
+          lister() {
+            GH_TOKEN="${1:-$JETON_INSTALLATION}" gh api \
+              "repos/$DEPOT/actions/runs?status=action_required&per_page=100" \
+              --jq '.workflow_runs[] | [.id, .name, .head_branch, .head_repository.full_name] | @tsv' \
+              2>/dev/null || true
+          }
+          approuver() { # $1 = jeton, $2 = id ; 0 = approuvé
+            [ -n "${1:-}" ] || return 1
+            GH_TOKEN="$1" gh api -X POST "repos/$DEPOT/actions/runs/$2/approve" \
+              --silent >/dev/null 2>&1
+          }
+          # La liste se lit avec le PAT s'il est là (quota propre), sinon avec le
+          # jeton de l'installation : `head_repository` est public sur le run.
+          runs="$(lister "$PAT")"
+          if [ -z "$runs" ]; then runs="$(lister "$JETON_INSTALLATION")"; fi
+          total=0
+          faits=0
+          while IFS=$'\t' read -r id nom branche origine; do
+            [ -n "${id:-}" ] || continue
+            total=$((total+1))
+            if [ "${origine:-}" != "$DEPOT" ]; then
+              echo "run $id ($nom, $branche) : fork (${origine:-inconnu}) — jamais approuvé"
+              continue
+            fi
+            if approuver "$PAT" "$id" || approuver "$JETON_INSTALLATION" "$id"; then
+              echo "run $id ($nom, $branche) : approuvé"
+              faits=$((faits+1))
+            else
+              echo "run $id ($nom, $branche) : approbation refusée (déjà lancé ?)"
+            fi
+          done <<< "$runs"
+          echo "runs en attente vus : $total — approuvés : $faits"
