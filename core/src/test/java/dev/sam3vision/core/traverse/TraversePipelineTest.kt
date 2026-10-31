@@ -51,15 +51,15 @@ class TraversePipelineTest {
     ): TraverseOutput = onFrame(objects, 640, 480, green, focalPx, index * 1000L)
 
     @Test
-    fun `premiere frame - hysteresis cache, veto sans objet, silence`() = runBlocking {
+    fun `premiere frame - hysteresis cache, vert annonce aussitot`() = runBlocking {
         val out = pipeline().frame(listOf(seg()), green = true, index = 1)
 
         assertTrue(out.objects.isEmpty())
         assertTrue(out.detections.isEmpty())
         assertEquals(TraversePhase.PRET, out.decision.state)
         assertFalse(out.decision.veto)
-        assertNull(out.cue)
-        assertNull(out.voice)
+        assertEquals(CrossingText.phrase(CrossingState.Green), out.cue?.phrase)
+        assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
     }
 
     @Test
@@ -150,7 +150,7 @@ class TraversePipelineTest {
 
         assertTrue(out.objects.isEmpty())
         assertEquals(TraversePhase.PRET, out.decision.state)
-        assertNull(out.cue)
+        assertEquals("annonceur oublié : la 1re frame parle", CrossingText.phrase(CrossingState.Green), out.cue?.phrase)
     }
 
     @Test
