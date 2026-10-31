@@ -17,7 +17,7 @@ import dev.sam3vision.core.traverse.VehicleStateWatcher
  * mêmes confirmations (2 frames), mêmes silences (4 s en mouvement,
  * 10 s à l'arrêt), mêmes entrées (détections reconstruites des lectures).
  *
- * En mode normal, c'est `observeVehicleState` qui parle ; en Traversée, cet
+ * En mode normal, c'est `observeObstacles` qui parle ; en Traversée, cet
  * observateur est coupé (deux voix se marcheraient dessus) et c'est ici que
  * les états moteurs se disent, après le feu et avant les personnes
  * ([crossingPhraseOf]). Vélos et trottinettes exclus, comme en normal

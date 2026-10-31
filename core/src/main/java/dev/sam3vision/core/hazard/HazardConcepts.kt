@@ -51,4 +51,20 @@ object HazardConcepts {
 
     /** Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais une table à part). */
     fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
+
+    /** Vrai si [label] désigne une barrière (P4, après le poteau P3). */
+    fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
+
+    /** Sorte parlée de [label] : poteau, barrière, ou divers (borne, clôture, portail…). */
+    fun kindOf(label: String): HazardKind = when (nameOf(label)?.en) {
+        "pole" -> HazardKind.POLE
+        "barrier" -> HazardKind.BARRIER
+        else -> HazardKind.OTHER
+    }
 }
+
+/**
+ * Sorte de mobilier, dans l'ordre de parole (poteau P3 avant barrière P4,
+ * divers avec le reste) : l'arbitre voix y lit le rang du guetteur mobilier.
+ */
+enum class HazardKind { POLE, BARRIER, OTHER }

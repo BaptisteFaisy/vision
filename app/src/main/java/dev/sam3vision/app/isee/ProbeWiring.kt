@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Câblage de la sonde SAM de la page caméra : réglages, voix, fin d'enregistrement.
@@ -155,7 +157,8 @@ internal fun spokenClipId(text: String): String? =
  * guidage partent en clips (< 100 ms), le reste (positions) en synthèse
  * réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent], mot
  * stop) : seul le stop coupe la lecture en cours, chat compris — les mots
- * doux attendent le silence, en file (`queue`, redits au silence).
+ * doux attendent le silence, en file (`queue`, redits au silence par le
+ * guetteur obstacles).
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -173,6 +176,10 @@ internal fun LiveProbe.observeSpoken(
 }
 
 /**
+ * Les trois guetteurs ordonnés (véhicules + bordure + mobilier) et l'instant
+ * de la dernière alerte de sécurité dite (`null` si aucune : le doux attend
+ * en file pendant [SAFETY_SPEECH_MS] au lieu de chevaucher).
+ *
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
@@ -186,30 +193,97 @@ internal fun LiveProbe.observeSpoken(
  * watcher (un FAR coupé ne consomme ni confirmation ni cooldown).
  * `collect` séquentiel, voix douce en coroutine fille.
  */
-internal fun LiveProbe.observeCurb(
+internal class ObstacleWatchers(
+    val vehicle: VehicleStateWatcher,
+    val curb: CurbWatcher,
+    val hazard: HazardWatcher,
+) {
+    /** Dernière alerte de sécurité dite, `null` si aucune. */
+    var lastSafetyMs: Long? = null
+
+    /** Oublie les trois guetteurs et l'alerte (nouvelle séance). */
+    fun reset() {
+        vehicle.reset()
+        curb.reset()
+        hazard.reset()
+        lastSafetyMs = null
+    }
+}
+
+/**
+ * Guetteur obstacles de la sonde : véhicules, bordure et mobilier calculés
+ * sur la même frame, parlés une fois dans l'ordre P1-P5 (voiture en mouvement
+ * > bordure > poteau > barrière > reste) au lieu de se couper. La sécurité
+ * fusionnée ([SafetyVoice], jamais de « Stop » hors Traversée) part aussitôt,
+ * en direct ; le doux fusionné part en coroutine fille, sérialisé ([Mutex] :
+ * jamais de chevauchement doux, jamais de frame bloquée par une synthèse) et
+ * tenu en file pendant la sécurité ([safetyBusy]) — sauf le danger qui
+ * s'approche (`urgent` véhicule : coupe, comme avant). Sans doux frais (hors
+ * Traversée), la file est redite au silence ([ProximityVoice.flushPending]).
+ * En Traversée, seul l'imminent bordure passe (sa voix rouge/vert est
+ * propriétaire du son) et les guetteurs coupés n'avancent pas. Rend les
+ * guetteurs pour le `reset()` de début de séance. `collect` séquentiel : une
+ * alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeObstacles(
     scope: CoroutineScope,
     voice: ProximityVoice,
     playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
     safety: SafetyVoice,
-    watcher: CurbWatcher = CurbWatcher(),
-): CurbWatcher {
+    vehicle: VehicleStateWatcher = VehicleStateWatcher(),
+    curb: CurbWatcher = CurbWatcher(),
+    hazard: HazardWatcher = HazardWatcher(),
+): ObstacleWatchers {
+    val watchers = ObstacleWatchers(vehicle, curb, hazard)
+    val softSpeech = Mutex()
     scope.launch {
         state.collect { st ->
-            val readings = st.distanceLayer?.readings ?: return@collect
-            val signal = CurbSignal.of(readings, st.width, st.height)
-            if (st.crossingActive && signal.tier != CurbTier.NEAR) return@collect
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            if (!shouldSpeakCurb(cue, st.crossingActive)) return@collect
-            val alert = cue.safetyPhrase
-            if (alert != null) {
-                safety.speak(alert)
-                return@collect
-            }
-            scope.launch { voice.onPhrase(cue.phrase, playerIdle(), urgent = false) }
+            obstacleFrame(st, scope, voice, playerIdle, language, safety, watchers, softSpeech)
         }
     }
-    return watcher
+    return watchers
+}
+
+/**
+ * Une frame d'obstacles : les trois signaux relus dans l'état (lectures de
+ * distance + dimensions, déjà publiées par frame), arbitrés ([decideObstacles])
+ * puis parlés — sécurité aussitôt, doux en fille sérialisée, file au silence.
+ */
+private fun obstacleFrame(
+    st: LiveProbeState,
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+    safety: SafetyVoice,
+    watchers: ObstacleWatchers,
+    softSpeech: Mutex,
+) {
+    val readings = st.distanceLayer?.readings ?: return
+    val nowMs = System.currentTimeMillis()
+    val lang = language()
+    val motion = ProbeBackgroundMotion.lastMotion
+    val vehicleCue = if (st.crossingActive) null else watchers.vehicle.update(
+        detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion)
+        ?.also { logMotionTransition(watchers.vehicle.cameraMoved, watchers.vehicle.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L) }
+    val curbSignal = CurbSignal.of(readings, st.width, st.height)
+    val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
+    else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
+    val hazardCue = if (st.crossingActive) null
+    else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
+    val decision = decideObstacles(vehicleCue, curbCue, hazardCue)
+    decision.safety?.let {
+        safety.speak(it)
+        watchers.lastSafetyMs = nowMs
+    }
+    val soft = decision.soft
+    val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
+    if (soft != null) {
+        scope.launch { softSpeech.withLock { voice.onPhrase(soft, playerIdle(), urgent = decision.urgent, queue = true, busy = busy) } }
+    } else if (!st.crossingActive) {
+        scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
+    }
 }
 
 /**
@@ -221,43 +295,6 @@ internal fun LiveProbe.observeCurb(
  */
 internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
     cue.tier == CurbTier.NEAR || !crossingActive
-
-/**
- * Guetteur mobilier de la sonde, miroir du trottoir : le mobilier suivi
- * ([dev.sam3vision.core.hazard.HazardConcepts]) lu dans l'état, sans toucher
- * à `LiveProbe` (lectures de distance + dimensions, déjà publiées par
- * frame). L'annonce (« Attention à la barrière. ») est douce (attend le
- * silence) : iSee décrit, en douceur — sauf le poteau imminent, urgent sauf
- * P1/P2 en cours ([p1p2Busy] : le poteau est P3). La phrase douce tue part en
- * file ([ProximityVoice.flushPending], redite au silence) : une alerte
- * confirmée ne se perd plus. Coupé en mode Traversée. Lecture séquentielle,
- * comme le trottoir : une alerte confirmée ne s'annule pas.
- */
-internal fun LiveProbe.observeHazard(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
-    p1p2Busy: (nowMs: Long) -> Boolean = { false },
-): HazardWatcher {
-    val watcher = HazardWatcher()
-    scope.launch {
-        state.collect { st ->
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings ?: return@collect
-            val nowMs = System.currentTimeMillis()
-            val cue = watcher.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, language())
-            if (cue == null) {
-                voice.flushPending(playerIdle()) { p1p2Busy(System.currentTimeMillis()) }
-                return@collect
-            }
-            val busyNow = p1p2Busy(nowMs)
-            val urgent = shouldCutForHazard(cue.urgent, busyNow)
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = urgent, queue = true, busy = { busyNow })
-        }
-    }
-    return watcher
-}
 
 /**
  * Guetteur grillage de la sonde, miroir du mobilier : les pans suivis
@@ -282,44 +319,6 @@ internal fun LiveProbe.observeFenceOpening(
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
             voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
-        }
-    }
-    return watcher
-}
-
-/**
- * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
- * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
- * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
- * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
- * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
- * parlent doux (seul l'`urgent` du danger qui s'approche coupe).
- * En Traversée, le veto seul parle (coupé ici) — les états moteurs se disent
- * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
- * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
- * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * Frames SAM seules (`frames`) et détections brutes (le ticker 120 ms rejoue des lectures figées qui casseraient la confirmation).
- */
-internal fun LiveProbe.observeVehicleState(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
-    watcher: VehicleStateWatcher = VehicleStateWatcher(),
-): VehicleStateWatcher {
-    var lastFrames = -1
-    scope.launch {
-        state.collect { st ->
-            if (st.frames == lastFrames) return@collect
-            lastFrames = st.frames
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings.orEmpty()
-            if (st.samDetections.isEmpty() && readings.isEmpty()) return@collect
-            val motion = ProbeBackgroundMotion.lastMotion
-            val cue = watcher.update(st.samDetections, readings, System.currentTimeMillis(), language(), motion)
-                ?: return@collect
-            logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
         }
     }
     return watcher
@@ -462,8 +461,8 @@ internal class ProbeHazards(
 
 /**
  * Les huit guetteurs en un appel : le ViewModel n'y tient qu'une ligne
- * (plafond 500 — voir `observeCurb`, même contrat). Bordure et véhicules sont
- * construits ici pour que le mobilier lise P1/P2 ([p1p2Busy] : le poteau est P3).
+ * (plafond 500 — voir `observeSpoken`, même contrat). Véhicules, bordure et
+ * mobilier partagent le guetteur obstacles (une frame, une parole P1-P5).
  * [stairsAudible] est la porte des deux voix escaliers (GPS coupé : parlent
  * quand même, sécurité — contrat `IseeVoiceGate`).
  */
@@ -475,16 +474,14 @@ internal fun LiveProbe.observeHazards(
     safety: SafetyVoice,
     stairsAudible: () -> Boolean = playerIdle,
 ): ProbeHazards {
-    val curb = CurbWatcher()
-    val vehicle = VehicleStateWatcher()
-    val busy: (Long) -> Boolean = { nowMs -> p1p2Busy(nowMs, vehicle.lastMovingAlertMs, curb.lastNearMs) }
+    val obstacles = observeObstacles(scope, voice, playerIdle, language, safety)
     return ProbeHazards(
-        observeCurb(scope, voice, playerIdle, language, safety, curb),
+        obstacles.curb,
         observeStairs(scope, voice, stairsAudible, language),
         observeStairsCount(scope, voice, stairsAudible, language),
-        observeHazard(scope, voice, playerIdle, language, busy),
+        obstacles.hazard,
         observeFenceOpening(scope, voice, playerIdle, language),
-        observeVehicleState(scope, voice, playerIdle, language, vehicle),
+        obstacles.vehicle,
         observeCycles(scope, voice, playerIdle, language),
         observeSidewalk(scope, voice, playerIdle, language),
     )

@@ -344,6 +344,37 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `:app` 1 378/1 378 sur r630 après rebase, 0 échec) ;
   `check-kotlin-limits.py` vert.
 
+## 2026-10-31 — iSee : annonce orale instantanée des obstacles, hiérarchie P1-P5 (branche `fix/isee-voix-obstacles-priorite`)
+
+- **Demande** : dès que SAM détecte un obstacle, le dire à l'oral
+  instantanément ; si plusieurs choses se disent en même temps, ordre
+  voiture en mouvement > bordure > poteau > barrière > reste.
+- Fait : `ProbePriority.kt` — rangs `ObstacleRank` + `decideObstacles`
+  (sécurités P2-P3 fusionnées, véhicule doux P1 — son stop ne se dit
+  qu'en Traversée, § 22 — reste en ordre de détection, urgent véhicule
+  gardé) + fenêtre `SAFETY_SPEECH_MS` ; `ProbeWiring.observeObstacles`
+  — un seul guetteur véhicules+bordure+mobilier par frame (sécurité en
+  direct, doux sérialisé en fille, file au silence hors Traversée,
+  mouvement caméra + journal conservés) ; `HazardWatcher` — poteau
+  préféré à la barrière même plus proche, repli barrière après poteau
+  dit, compteurs par sorte, poteau imminent ≤ 2 m en consigne sécurité
+  « Poteau, passez à … » (FR/EN, sans « Stop », sans cooldown doux) ;
+  `VehicleStateCue.moving` (roule P1, arrêt avec le reste) ;
+  `docs/VOIX-DANGER.md` § 25. Rebasé sur master du 31/10 (§ 22-24).
+- Preuves : `:app:testDebugUnitTest` complet 0 échec dont
+  `ObstacleArbiterTest` 10/10 (nouveau) ; `:core:testDebugUnitTest`
+  complet, seuls échecs `PrivateFileSettingsStoreTest` (permissions
+  POSIX sous Windows — pré-existants, reproduits sur master intact le
+  31/10, hors périmètre) ; `HazardWatchTest`, `HazardConceptsTest`,
+  `docs/VOIX-DANGER.md` § 23. Rebasé sur master du 31/10 (§ 22).
+- Preuves (rebase 23dea2f4) : `:app:testDebugUnitTest` 1 455 tests
+  0 échec dont `ObstacleArbiterTest` 10/10 (nouveau) ;
+  `:core:testDebugUnitTest` 2 646 tests, 5 échecs
+  `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows —
+  pré-existants, reproduits sur master intact le 31/10, hors
+  périmètre) ; `HazardWatchTest`, `HazardConceptsTest`,
+  `VehicleStateTest` verts ; `check-kotlin-limits.py` vert,
+  `check-isee-design.py` vert, `assembleDebug` vert (`app-debug.apk`).
 ## 2026-10-31 — iSee : pictos Find/Where affichés sur la page blanche, chasse sans Direct (branche `feat/isee-picto-page-blanche`)
 
 - **Demande** : « Find my keys » doit trouver sur l'image, créer le gros
