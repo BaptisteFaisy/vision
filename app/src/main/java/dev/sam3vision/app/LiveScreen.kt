@@ -349,7 +349,7 @@ private suspend fun bindLiveCamera(
     onLens: (LensSpec?) -> Unit,
     onImage: (ImageProxy) -> Unit,
 ) {
-    val owner = previewView.findViewTreeLifecycleOwner() ?: error("Cycle de vie indisponible")
+    val owner = previewView.findViewTreeLifecycleOwner() ?: error("Lifecycle unavailable")
     val provider = withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
     val preview = Preview.Builder()
         .setResolutionSelector(previewResolutionSelector())

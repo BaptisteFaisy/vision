@@ -164,7 +164,7 @@ class GuidanceTest {
             val decision = Guidance.decide(listOf(placed(sol, 0.5f, 2f)))
 
             assertFalse(sol, decision.blocked)
-            assertEquals("Tout droit.", Guidance.phrase(decision))
+            assertEquals("Straight.", Guidance.phrase(decision))
         }
     }
 
