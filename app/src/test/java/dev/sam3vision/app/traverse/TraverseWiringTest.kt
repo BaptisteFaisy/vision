@@ -150,6 +150,25 @@ class TraverseWiringTest {
     }
 
     @Test
+    fun `updateLight - vert sans boite ne traverse pas`() {
+        // Fail-closed (ex-`boxOf()` null) : un vert sans boîte reste une
+        // attente ; seul un vert AVEC boîte arme le pipeline. Seuils inchangés.
+        val wiring = wiring()
+        wiring.updateLight(CrossingLight(null, CrossingState.Green))
+
+        assertFalse(wiring.lightGreen)
+        assertEquals(null, wiring.light?.box)
+    }
+
+    @Test
+    fun `updateLight - vert avec boite traverse`() {
+        val wiring = wiring()
+        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green))
+
+        assertTrue(wiring.lightGreen)
+    }
+
+    @Test
     fun `display - boite lue, etat confirme rouge par defaut`() {
         val wiring = wiring()
         wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green))
