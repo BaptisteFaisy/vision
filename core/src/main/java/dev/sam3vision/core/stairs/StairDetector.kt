@@ -56,8 +56,9 @@ data class StairRoi(val left: Float, val top: Float, val right: Float, val botto
  * vraie ligne de contour), suffisant pour un signal binaire « escalier devant ».
  *
  * Limites héritées du MIT (à documenter, pas à corriger ici) :
- * - sans [StairRoi] (boîte SAM), ROI fixe (bas 60 %) : un escalier cadré en
- *   haut est invisible ; avec ROI, c'est la reconnaissance SAM qui cadre ;
+ * - sans masque ni [StairRoi] (boîte SAM), ROI fixe (bas 60 %) : un escalier
+ *   cadré en haut est invisible ; avec masque, c'est la forme reconnue par
+ *   SAM qui borne, au pixel près (la boîte ne sert qu'en repli) ;
  * - aucune distinction montée/descente ;
  * - faux positifs sur stores vénitiens, rayures et zébrures horizontales.
  * Seuils et flou recalibrés pour la luminance téléphone 256×103 (voir
@@ -81,20 +82,25 @@ object StairDetector {
     private const val CONFIDENCE_RAMP = 3
 
     /**
-     * Détecte un escalier dans [mask] (luminance 8 bits), dans [roi] quand elle
-     * est posée (la boîte SAM de l'escalier : le comptage est calibré sur sa
-     * reconnaissance), sinon dans le bas fixe de l'image. Fonction totale :
-     * image vide, incohérente ou ROI dégénérée = [StairSignal.none].
+     * Détecte un escalier dans [mask] (luminance 8 bits) : dans [maskPlane]
+     * quand il est posé (le masque SAM de l'escalier, au pixel près — prime
+     * sur [roi]), sinon dans [roi] (sa boîte), sinon dans le bas fixe de
+     * l'image. Fonction totale : image vide, incohérente, ROI dégénérée ou
+     * plan incohérent = [StairSignal.none] (un plan de mauvaise taille est
+     * ignoré : repli boîte puis balayage, comme sans masque).
      */
     fun detect(
         mask: GrayMask,
         config: StairsConfig = StairsConfig(),
         roi: StairRoi? = null,
+        maskPlane: ByteArray? = null,
     ): StairSignal {
         val width = mask.width
         val height = mask.height
         if (width < 2 || height < 2 || mask.pixels.size < width * height) return StairSignal.none()
         val effective = config.normalized()
+        val plane = maskPlane?.takeIf { it.size == width * height }
+        if (plane != null) return detectMasked(mask, plane, effective)
         val bounds = roi?.normalized()?.toPixels(width, height)
         if (roi != null && bounds == null) return StairSignal.none()
         val roiTop = bounds?.top ?: (height * effective.roiTopFraction).toInt().coerceIn(0, height)
@@ -108,6 +114,44 @@ object StairDetector {
         }
         val detected = lineCount >= effective.minLines
         return StairSignal(detected, confidenceFor(lineCount, effective.minLines), lineCount, roiTop, roiBottom)
+    }
+
+    /**
+     * Détection bornée au masque SAM ([plane], `1` = escalier) : le Canny ne
+     * balaye que les lignes occupées, chaque ligne s'active à sa couverture
+     * locale. Fonction totale : plan vide ou trop court = [StairSignal.none].
+     */
+    private fun detectMasked(mask: GrayMask, plane: ByteArray, config: StairsConfig): StairSignal {
+        val width = mask.width
+        val height = mask.height
+        val bounds = maskRowBounds(plane, width, height) ?: return StairSignal.none()
+        if (bounds.second - bounds.first < config.minLines) return StairSignal.none()
+        val edges = StairsCanny.horizontalEdges(mask, bounds.first, bounds.second, config)
+        val lineCount = countLinesMasked(edges, width, bounds.first, bounds.second, plane, config)
+        val detected = lineCount >= config.minLines
+        return StairSignal(detected, confidenceFor(lineCount, config.minLines), lineCount, bounds.first, bounds.second)
+    }
+
+    /** Première et dernière (+1) lignes occupées du plan, `null` si vide. */
+    private fun maskRowBounds(plane: ByteArray, width: Int, height: Int): Pair<Int, Int>? {
+        var top = -1
+        var bottom = -1
+        for (y in 0 until height) {
+            if (rowHasMask(plane, y * width, width)) {
+                if (top < 0) top = y
+                bottom = y + 1
+            }
+        }
+        if (top < 0) return null
+        return top to bottom
+    }
+
+    /** Vrai si la ligne a au moins un pixel sous masque. */
+    private fun rowHasMask(plane: ByteArray, offset: Int, width: Int): Boolean {
+        for (x in 0 until width) {
+            if (plane[offset + x] != 0.toByte()) return true
+        }
+        return false
     }
 
     /**
@@ -195,6 +239,60 @@ object StairDetector {
         var count = 0
         for (x in 0 until span) {
             if (edges[offset + x] != 0.toByte()) count++
+        }
+        return count
+    }
+
+    /**
+     * Marches sous le masque SAM : une ligne est active quand ses pixels de
+     * contour sous masque atteignent la couverture minimale **de sa largeur
+     * masquée** (un escalier vu de biais n'a ni la largeur de l'image ni la
+     * même à chaque ligne) ; les lignes sans masque restent inactives.
+     */
+    internal fun countLinesMasked(
+        edges: ByteArray,
+        width: Int,
+        top: Int,
+        bottom: Int,
+        plane: ByteArray,
+        config: StairsConfig,
+    ): Int {
+        var lines = 0
+        var gap = config.maxRowGap + 1
+        var open = false
+        for (y in top until bottom) {
+            val offset = y * width
+            val span = maskedSpan(plane, offset, width)
+            val needed = (span * config.minRowCoverage).toInt().coerceAtLeast(1)
+            val active = span > 0 && maskedCoverage(edges, plane, offset, width) >= needed
+            if (active) {
+                if (!open) {
+                    lines++
+                    open = true
+                }
+                gap = 0
+            } else if (open) {
+                gap++
+                if (gap > config.maxRowGap) open = false
+            }
+        }
+        return lines
+    }
+
+    /** Pixels sous masque sur la ligne commençant à [offset]. */
+    private fun maskedSpan(plane: ByteArray, offset: Int, width: Int): Int {
+        var count = 0
+        for (x in 0 until width) {
+            if (plane[offset + x] != 0.toByte()) count++
+        }
+        return count
+    }
+
+    /** Pixels de contour quasi-horizontaux sous masque sur la même ligne. */
+    private fun maskedCoverage(edges: ByteArray, plane: ByteArray, offset: Int, width: Int): Int {
+        var count = 0
+        for (x in 0 until width) {
+            if (plane[offset + x] != 0.toByte() && edges[offset + x] != 0.toByte()) count++
         }
         return count
     }
