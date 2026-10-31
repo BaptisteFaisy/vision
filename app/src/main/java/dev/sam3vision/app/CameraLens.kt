@@ -33,15 +33,32 @@ fun lensSpecOf(cameraInfo: CameraInfo?): LensSpec? {
 /** Calibrage d'un caméra déjà liée (raccourci de l'écran Direct). */
 fun lensSpecOf(camera: Camera?): LensSpec? = lensSpecOf(camera?.cameraInfo)
 
+/**
+ * Zone de référence de `LENS_INTRINSIC_CALIBRATION` : la calibration est exprimée
+ * dans le repère **avant correction** de la distorsion
+ * (`SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE`), pas la zone active — les deux
+ * diffèrent quand le driver redresse (auquel cas lire contre la zone active
+ * fausserait focale et centre tout en restant « plausible »). Repli sur la zone
+ * active si le driver ne donne pas la zone avant correction.
+ *
+ * Limite connue : le zoom (`SCALER_CROP_REGION`) recadre autour d'un centre qui
+ * n'est plus celui-ci — l'app ne zoome pas, donc le cas ne se présente pas, mais
+ * un futur zoom devra relire le crop ou invalider ce calibrage.
+ */
 @OptIn(markerClass = [ExperimentalCamera2Interop::class])
 private fun readLens(info: Camera2CameraInfo): LensSpec? {
     val active = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
     val intrinsic = info.getCameraCharacteristic(CameraCharacteristics.LENS_INTRINSIC_CALIBRATION)
-    if (active != null && intrinsic != null && intrinsic.size >= 4) {
-        Optics.lensSpecFromIntrinsics(
-            intrinsic[0], intrinsic[1], intrinsic[2], intrinsic[3],
-            active.width(), active.height(),
-        )?.let { return it }
+    if (intrinsic != null && intrinsic.size >= 4) {
+        val reference =
+            info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE)
+                ?: active
+        if (reference != null) {
+            Optics.lensSpecFromIntrinsics(
+                intrinsic[0], intrinsic[1], intrinsic[2], intrinsic[3],
+                reference.width(), reference.height(),
+            )?.let { return it }
+        }
     }
     val focalMm = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
         ?.firstOrNull()
