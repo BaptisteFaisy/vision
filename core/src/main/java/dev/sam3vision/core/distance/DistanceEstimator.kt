@@ -72,9 +72,10 @@ object Pinhole {
  * un meuble). D'où la règle, et une seule :
  *
  * - les deux valeurs **concordent** (rapport ≤ [COHERENCE_RATIO]) : leur moyenne
- *   **pondérée** — deux mesures indépendantes se trompent rarement du même côté,
- *   et la branche la plus sûre (poids [KnownSizes.fusionWeight] côté sténopé)
- *   tire le résultat ;
+ *   **pondérée** — deux mesures indépendantes se trompent rarement du même côté ;
+ *   le sténopé pèse [KnownSizes.fusionWeight] (0,77-0,97 selon sa classe), le sol
+ *   [GroundWeight] (0,25-1 selon la dépression des pieds) : de près le sol tire,
+ *   de loin le sténopé reprend la main ;
  * - elles **divergent** : une hypothèse est cassée, sans qu'on sache laquelle ; le sténopé
  *   garde la main — c'est la branche validée sur le téléphone, elle ne dépend ni de la pose ni
  *   du fait que l'objet soit posé, et les poids ne changent rien à cette prudence ;
@@ -182,9 +183,10 @@ class DistanceMeter(
 
     /**
      * La mesure brute d'une frame : les deux branches de la lane, fusionnées par
-     * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], sol à 1). Un objet
-     * sans hauteur de classe connue peut donc être mesuré s'il est posé au sol et
-     * que la pose est réglée — sans jamais inventer de chiffre.
+     * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], poids sol
+     * [GroundWeight] depuis la dépression des pieds). Un objet sans hauteur de
+     * classe connue peut donc être mesuré s'il est posé au sol et que la pose est
+     * réglée — sans jamais inventer de chiffre.
      */
     private fun rawMeters(
         height: Int,
@@ -195,10 +197,25 @@ class DistanceMeter(
         val standing = KnownSizes.heightMeters(detection.label)
             ?.let { Pinhole.distanceMeters(detection.box, it, focalPx) }
         val ground = groundMeters(detection.box, focalPx, principalY, height)
-        val meters = DistanceFusion.combine(standing, ground, KnownSizes.fusionWeight(detection.label))
-            ?: return null
-        val confidence = ReadingConfidence.of(detection.box, height, standing, ground)
+        val meters = DistanceFusion.combine(
+            standing,
+            ground,
+            KnownSizes.fusionWeight(detection.label),
+            groundWeight(detection.box, focalPx, principalY),
+        ) ?: return null
+        val confidence = ReadingConfidence.of(detection.box, standing, ground)
         return RawReading(meters, confidence)
+    }
+
+    /**
+     * Poids de la branche sol pour cette boîte : plein pot quand les pieds plongent
+     * (dépression franche), plancher vers l'horizon ([GroundWeight]). `1f` sans pose
+     * (poids inutilisé, la branche sol est alors muette).
+     */
+    private fun groundWeight(box: List<Float>, focalPx: Float, principalY: Float): Float {
+        val current = pose ?: return 1f
+        if (box.size < 4) return GroundWeight.MIN_WEIGHT
+        return GroundWeight.of(GroundPlane.depressionRad(box[3], current, focalPx, principalY))
     }
 
     /**
