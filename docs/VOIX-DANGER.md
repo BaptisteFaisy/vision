@@ -595,7 +595,7 @@ descente — premier son ≤ 1 s après confirmation, bande 1,0 ± 0,3 m /
 0,4 ± 0,25 m, sens juste 4/4 jour, bateau 0 `Stop`, traversée :
 pré-alerte tuée et imminent passant — **non mesuré**, exige un APK de
 cette branche sur appareil réel.
-## 20. Voitures au pluriel, poteau qui dit comment l'éviter, rebord à 0,7 m (ordre user du 31/10)
+## 21. Voitures au pluriel, poteau qui dit comment l'éviter, rebord à 0,7 m (ordre user du 31/10)
 
 Le user marche avec l'app : plusieurs voitures en mouvement n'étaient dites
 qu'au singulier (la plus proche), le poteau ne disait pas comment l'éviter,
