@@ -6,14 +6,13 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
 
 /**
- * État d'un feu piéton vu par la caméra : [Red] (« attendez »), [Green]
- * (« traversez », annoncé seulement après confirmation, voir [CrossingAnnouncer])
- * ou [Unknown] (pas de feu détecté, boîte invalide ou couleur indécise).
- *
- * Le silence et le doute valent « ne traversez pas » : seul un vert confirmé
- * autorise la traversée.
+ * État d'un feu piéton vu par la caméra : [Red] (« attendez ») ou [Green]
+ * (« traversez », annoncé seulement après confirmation, voir
+ * [CrossingAnnouncer]). Binaire (ordre user du 31/10, fini le doute) : pas
+ * de feu détecté, boîte invalide ou couleur indécise valent [Red] — seul
+ * un vert confirmé autorise la traversée, tout le reste attend.
  */
-enum class CrossingState { Red, Green, Unknown }
+enum class CrossingState { Red, Green }
 
 /**
  * Concepts **minimaux** de la Traversée : le feu, les voitures, les personnes

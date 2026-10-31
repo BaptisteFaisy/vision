@@ -231,9 +231,10 @@ private fun RecordingChip() {
 }
 
 /**
- * Bouton du mode Traversée : pastille d'état (grise = coupé ou doute, rouge,
- * verte) et libellé. Ex-posé en bas de l'ancienne carte, aujourd'hui en haut
- * de la rue Portrait (le bas-centre est pris par le debug et le verdict).
+ * Bouton du mode Traversée : pastille d'état (grise = coupé, rouge, verte ;
+ * ambre = passage repéré, traversée proposée) et libellé. Ex-posé en bas de
+ * l'ancienne carte, aujourd'hui en haut de la rue Portrait (le bas-centre
+ * est pris par le debug et le verdict).
  */
 @Composable
 internal fun BoxScope.CrossingChip(
@@ -244,7 +245,7 @@ internal fun BoxScope.CrossingChip(
 ) {
     // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
     val offering = probe.crossingOffer && !probe.crossingActive
-    val dot = if (offering) Color(CROSSING_ACCENT_DOUBT) else Color(crossingAccent(probe.crossingActive, probe.crossing))
+    val dot = if (offering) Color(CROSSING_ACCENT_OFFER) else Color(crossingAccent(probe.crossingActive, probe.crossing))
     // La racine intercepte tous les taps : le chip publie sa zone fenêtre pour
     // en être exempté, et la retire en partant (sinon taps fantômes).
     DisposableEffect(Unit) { onDispose { onBounds(null) } }

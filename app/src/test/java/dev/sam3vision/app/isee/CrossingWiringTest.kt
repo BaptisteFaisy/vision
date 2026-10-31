@@ -23,9 +23,8 @@ class CrossingWiringTest {
     }
 
     @Test
-    fun `mode actif sans etat libelle points`() {
-        assertEquals("Crossing: …", crossingButtonLabel(true, null))
-        assertEquals("Crossing: …", crossingButtonLabel(true, CrossingState.Unknown))
+    fun `mode actif sans lecture dit rouge, binaire`() {
+        assertEquals("Crossing: RED", crossingButtonLabel(true, null))
     }
 
     @Test

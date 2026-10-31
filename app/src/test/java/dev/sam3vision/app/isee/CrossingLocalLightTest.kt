@@ -86,9 +86,9 @@ class CrossingLocalLightTest {
     }
 
     @Test
-    fun `le doute se publie comme un etat`() {
-        val light = pump(state = CrossingState.Unknown)
+    fun `le rouge se publie comme un etat`() {
+        val light = pump(state = CrossingState.Red)
         light.offerFrame("jpeg", nowMs = 1_000)
-        assertEquals(CrossingState.Unknown, light.ui.value?.state)
+        assertEquals(CrossingState.Red, light.ui.value?.state)
     }
 }

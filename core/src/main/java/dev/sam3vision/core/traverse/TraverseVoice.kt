@@ -13,7 +13,7 @@ import dev.sam3vision.core.net.TtsClient
  * [TraverseVoice.prewarm] pré-génère en cache hors-ligne au premier lancement.
  *
  * Les libellés sont ceux de [CrossingText] (source unique des phrases
- * traversée : un état = une phrase, les trois états de [CrossingState]) plus
+ * traversée : un état = une phrase, les deux états de [CrossingState]) plus
  * le but et l'arrivée ([SidewalkText], [CrossingText.arrived]).
  */
 object TraversePhrases {
@@ -23,9 +23,6 @@ object TraversePhrases {
     /** Vert (non urgent) : l'autorisation de traverser, jamais préemptive. */
     val GREEN: String = CrossingText.phrase(CrossingState.Green)
 
-    /** Doute (non urgent) : dit pourquoi on ne traverse pas, comme le rouge. */
-    val UNKNOWN: String = CrossingText.phrase(CrossingState.Unknown)
-
     /** But (non urgent) : le trottoir d'en face, une fois le vert parlé. */
     val SIDEWALK_ACROSS: String =
         requireNotNull(SidewalkText.phrase(SidewalkPosition.Across, SpeechLanguage.En))
@@ -34,7 +31,7 @@ object TraversePhrases {
     val ON_CROSSWALK: String = CrossingText.arrived(SpeechLanguage.En)
 
     /** Toutes les phrases à pré-générer hors-ligne. */
-    val ALL: List<String> = listOf(RED, GREEN, UNKNOWN, SIDEWALK_ACROSS, ON_CROSSWALK)
+    val ALL: List<String> = listOf(RED, GREEN, SIDEWALK_ACROSS, ON_CROSSWALK)
 
     /** Préfixe BCP-47 attendu du moteur système (« en », « en-US », …). */
     const val LANGUAGE_PREFIX = "en"

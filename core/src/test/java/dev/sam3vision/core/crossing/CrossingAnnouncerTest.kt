@@ -39,27 +39,11 @@ class CrossingAnnouncerTest {
     }
 
     @Test
-    fun `le doute parle comme le rouge`() {
-        val announcer = CrossingAnnouncer()
-        assertNull(announcer.onFrame(0L, CrossingState.Unknown))
-        assertEquals("Unsure, wait.", announcer.onFrame(200L, CrossingState.Unknown)?.phrase)
-    }
-
-    @Test
     fun `un vert stable annonce ne se repete pas`() {
         val announcer = CrossingAnnouncer()
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
         assertNull(announcer.onFrame(3_000L, CrossingState.Green))
         assertNull(announcer.onFrame(6_000L, CrossingState.Green))
-    }
-
-    @Test
-    fun `un doute stable annonce ne se repete pas`() {
-        val announcer = CrossingAnnouncer()
-        announcer.onFrame(0L, CrossingState.Unknown)
-        announcer.onFrame(200L, CrossingState.Unknown)
-        assertNull(announcer.onFrame(3_000L, CrossingState.Unknown))
-        assertNull(announcer.onFrame(6_000L, CrossingState.Unknown))
     }
 
     @Test
