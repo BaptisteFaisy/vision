@@ -70,7 +70,7 @@ enum class LinkDrop {
 /**
  * Statistiques glissantes du lien lunettes → téléphone (µs) : le retard variable du
  * lien ([GlassesClockOffset]), le décodage, l'affichage, et le perçu (les trois
- * additionnés), en p50/p95/**p99** sur les [maxSamples] dernières frames.
+ * additionnés), en p50/p95/p99 sur les [maxSamples] dernières frames.
  *
  * Fenêtre de 100 par défaut (contre 20 ailleurs) : le p99 y est la 99e mesure, pas le
  * max. Adaptateur de [RollingStat] (miroir de [LiveStats]) : l'anneau et les
