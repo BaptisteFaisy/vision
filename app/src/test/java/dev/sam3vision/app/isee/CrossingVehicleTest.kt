@@ -153,4 +153,22 @@ class CrossingVehicleTest {
             CrossingVehicleWatch.update(detections, readings, 500L, SpeechLanguage.En),
         )
     }
+
+    @Test
+    fun `mouvement loin annonce en anglais en traversee`() {
+        CrossingVehicleWatch.reset()
+        val at = { width: Float, ms: Long ->
+            val frame = box(width)
+            CrossingVehicleWatch.update(
+                listOf(det("car", frame)),
+                listOf(reading("car", 12f, frame)),
+                ms,
+                SpeechLanguage.En,
+            )
+        }
+
+        assertNull(at(100f, 0L))
+        assertNull(at(110f, 100L))
+        assertEquals("Car moving, 12 meters away.", at(120f, 200L))
+    }
 }

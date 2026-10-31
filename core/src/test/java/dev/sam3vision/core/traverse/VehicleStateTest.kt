@@ -131,14 +131,14 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `hors portee et hors couloir - silence`() {
+    fun `hors portee 15m et hors couloir - silence`() {
         val movingFar = VehicleStateWatcher()
         listOf(100f, 110f, 120f).forEachIndexed { index, width ->
             assertNull(
-                "mouvement à 9 m : hors portée",
+                "mouvement à 16 m : hors portée",
                 movingFar.update(
                     listOf(det("car", box(width))),
-                    listOf(reading("car", 9f, box(width))),
+                    listOf(reading("car", 16f, box(width))),
                     atMs = index * 100L,
                 ),
             )
@@ -298,5 +298,79 @@ class VehicleStateTest {
         )
 
         assertNull(parked!!.safetyPhrase)
+    }
+
+    @Test
+    fun `mouvement loin - info anglaise douce sans stop`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 12f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 12f, box(110f))), atMs = 100L)
+        val cue = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 12f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.En,
+        )
+
+        assertEquals("Car moving, 12 meters away.", cue!!.phrase)
+        assertNull(cue.safetyPhrase)
+        assertFalse("loin du centre du danger : doux", cue.urgent)
+    }
+
+    @Test
+    fun `mouvement proche apres info - stop sans attendre le cooldown`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 12f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 12f, box(110f))), atMs = 100L)
+        val info = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 12f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.En,
+        )
+        assertNull(info!!.safetyPhrase)
+
+        watcher.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 300L)
+        val stop = watcher.update(
+            listOf(det("car", box(140f))),
+            listOf(reading("car", 5f, box(140f))),
+            atMs = 400L,
+            language = SpeechLanguage.En,
+        )
+        assertEquals("Stop, car moving.", stop!!.safetyPhrase)
+
+        watcher.update(listOf(det("car", box(150f))), listOf(reading("car", 12f, box(150f))), atMs = 500L)
+        assertNull(
+            "info juste après un stop : silence",
+            watcher.update(listOf(det("car", box(160f))), listOf(reading("car", 12f, box(160f))), atMs = 600L),
+        )
+    }
+
+    @Test
+    fun `mouvement proche - cooldown 4s entre deux stops`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
+        val first = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 5f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.En,
+        )
+        assertEquals("Stop, car moving.", first!!.safetyPhrase)
+
+        watcher.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 300L)
+        assertNull(
+            "stop en cooldown : silence",
+            watcher.update(listOf(det("car", box(140f))), listOf(reading("car", 5f, box(140f))), atMs = 400L),
+        )
+
+        val second = watcher.update(
+            listOf(det("car", box(150f))),
+            listOf(reading("car", 5f, box(150f))),
+            atMs = 4_400L,
+            language = SpeechLanguage.En,
+        )
+        assertEquals("Stop, car moving.", second!!.safetyPhrase)
     }
 }

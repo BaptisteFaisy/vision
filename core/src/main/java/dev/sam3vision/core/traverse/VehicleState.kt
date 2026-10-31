@@ -15,8 +15,10 @@ import kotlin.math.hypot
  * [meters] la distance mesurée (`null` = mouvement vu mais non mesuré),
  * [urgent] quand le véhicule s'approche dangereusement (tau < 3 s, proche
  * et au centre — coupe la lecture, sinon douceur), [safetyPhrase] l'alerte
- * immédiate (« Stop, … ») quand le véhicule est en mouvement (`null` à
- * l'arrêt — la sécurité ne parle que du danger qui roule).
+ * immédiate (« Stop, … ») quand le véhicule en mouvement est proche (sous
+ * [VehicleStateWatcher.NEAR_MOVING_METERS], ou non mesuré — jamais prouvé
+ * loin) ; `null` sinon
+ * (mouvement loin, arrêt — la sécurité ne parle que du danger qui roule).
  */
 data class VehicleStateCue(
     val phrase: String,
@@ -139,10 +141,13 @@ object VehicleStateText {
  * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS], mesuré ou
  * non — sans focale, seule l'approche compte, comme le veto.
  *
- * Sécurité : le mouvement parle en alerte immédiate ([VehicleStateCue.safetyPhrase],
- * « Stop, … », voix de sécurité qui coupe tout, dictée du user comprise) ;
- * l'arrêt reste doux (`urgent = false`, synthèse réseau, attend le silence).
- * Pur JVM et testé.
+ * Sécurité : le mouvement proche (sous [NEAR_MOVING_METERS], ou non mesuré —
+ * on ne prouve pas qu'il est loin) parle en alerte immédiate
+ * ([VehicleStateCue.safetyPhrase], « Stop, … », voix de sécurité qui coupe
+ * tout, dictée du user comprise), avec son propre cooldown : un stop ne se
+ * tait jamais pour une info lointaine. Le mouvement loin (jusqu'à
+ * [MOVING_METERS]) et l'arrêt restent doux (`urgent = false`, synthèse
+ * réseau, attendent le silence). Pur JVM et testé.
  */
 class VehicleStateWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -178,6 +183,7 @@ class VehicleStateWatcher(
     private var hits = 0
     private var armed: State? = null
     private var lastMovingAtMs: Long = NO_INSTANT
+    private var lastNearMovingAtMs: Long = NO_INSTANT
     private var lastStoppedAtMs: Long = NO_INSTANT
 
     /** Dernière annonce, `null` si aucune. */
@@ -216,16 +222,21 @@ class VehicleStateWatcher(
             hits += 1
         }
         if (hits < confirmFrames) return null
+        val near = pick.state == State.MOVING && isNear(pick.meters)
+        if (near) {
+            if (lastNearMovingAtMs != NO_INSTANT && atMs - lastNearMovingAtMs < movingCooldownMs) return null
+            lastNearMovingAtMs = atMs
+        }
         val lastAt = if (pick.state == State.MOVING) lastMovingAtMs else lastStoppedAtMs
         val cooldown = if (pick.state == State.MOVING) movingCooldownMs else stoppedCooldownMs
-        if (lastAt != NO_INSTANT && atMs - lastAt < cooldown) return null
+        if (!near && lastAt != NO_INSTANT && atMs - lastAt < cooldown) return null
         if (pick.state == State.MOVING) lastMovingAtMs = atMs else lastStoppedAtMs = atMs
         hits = 0
         val phrase = when (pick.state) {
             State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
             State.STOPPED -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
         }
-        val safety = if (pick.state == State.MOVING) {
+        val safety = if (near) {
             VehicleStateText.safetyPhrase(pick.name, language)
         } else {
             null
@@ -240,6 +251,7 @@ class VehicleStateWatcher(
         hits = 0
         armed = null
         lastMovingAtMs = NO_INSTANT
+        lastNearMovingAtMs = NO_INSTANT
         lastStoppedAtMs = NO_INSTANT
     }
 
@@ -274,7 +286,7 @@ class VehicleStateWatcher(
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
         val measured = meters[key]
-        val urgent = tau.approaching && tauKey == key && measured != null && measured <= MOVING_METERS &&
+        val urgent = tau.approaching && tauKey == key && measured != null && measured <= NEAR_MOVING_METERS &&
             seen.cx != null && seen.cx in CENTER_LO..CENTER_HI
         return Pick(State.MOVING, name, measured, seen.cx, urgent)
     }
@@ -358,6 +370,9 @@ class VehicleStateWatcher(
     /** Portée du mouvement : mesuré sous le seuil, ou non mesuré (l'heure situe). */
     private fun inMovingRange(meters: Float?): Boolean = meters == null || meters <= MOVING_METERS
 
+    /** Mouvement proche : mesuré sous la bande sécurité, ou non mesuré (jamais prouvé loin). */
+    private fun isNear(meters: Float?): Boolean = meters == null || meters <= NEAR_MOVING_METERS
+
     /** Clé de suivi entre deux frames, miroir du veto (« Cars » et « car » fusionnent). */
     private fun vehicleKey(label: String): String {
         val key = KnownSizes.canonical(label)
@@ -376,7 +391,10 @@ class VehicleStateWatcher(
         const val STOPPED_COOLDOWN_MS = 10_000L
 
         /** Au-delà de cette distance (m), un véhicule en mouvement ne fait pas parler. */
-        const val MOVING_METERS = 8f
+        const val MOVING_METERS = 15f
+
+        /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
+        const val NEAR_MOVING_METERS = 8f
 
         /** Au-delà de cette distance (m), un véhicule à l'arrêt ne fait pas parler. */
         const val STOPPED_METERS = 3f
