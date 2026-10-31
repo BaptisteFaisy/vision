@@ -82,7 +82,9 @@ Chaque lecture porte sa **confiance** (`ReadingConfidence`, 0..1) : `1 − 1 px 
 (quantification : 0,995 à 200 px, 0,90 à 10 px), multipliée par l'accord des branches quand les deux
 parlent (1 si elles coïncident, 0 si leur rapport atteint 2). La voie profondeur propage la
 confiance de ses ancres au lieu de la remettre à 1 (`DepthReadings`, calibration affine
-`mètres = échelle/proximité + décalage`, moindres carrés robustes dès 3 ancres).
+`mètres = échelle/proximité + décalage`, moindres carrés robustes dès 3 ancres) et lit sa
+médiane sur la fenêtre centrale de la boîte (25 % rognés par côté : les bords portent le
+fond, le cœur porte l'objet ; repli boîte entière si dégénérée).
 
 ## Suivi et fraîcheur (≤ 150 ms)
 
