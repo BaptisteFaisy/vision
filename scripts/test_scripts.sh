@@ -15,7 +15,8 @@ VERIFY_PORT="${HERE}/verify-longpress-port.sh"
 LATEST="${HERE}/install-phone-latest.sh"
 VERIFY_NAV="${HERE}/verify-voice-nav.sh"
 VERIFY_STREET="${HERE}/verify-street.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET")
+MESURE="${HERE}/mesure-distances.sh"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET" "$MESURE")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -251,6 +252,38 @@ for phrase in 'je veux aller à' 'Passage protégé dans' 'Mode traversée activ
 done
 run grep -q -F 'PHONE_WAIT' "$VERIFY_STREET"
 expect_status 0 'verify-street passe par le verrou téléphone (PHONE_WAIT)'
+
+# --- 9. mesure-distances.sh ----------------------------------------------
+echo "== 9. mesure-distances.sh : relevés terrain =="
+cat >"${TMP}/releves-ok.csv" <<'CSV'
+objet,vraie_m,affichee_m
+personne debout,2.0,2.1
+porte,5.0,4.8
+chien,3.0,3.3
+borne,1.0,1.0
+voiture,10.0,10.5
+CSV
+run bash "$MESURE" "${TMP}/releves-ok.csv"
+expect_status 0 'mesure-distances accepte un CSV valide sous les seuils'
+expect_grep 'biais médian' 'mesure-distances imprime le biais médian'
+expect_grep 'p90' 'mesure-distances imprime le p90'
+cat >"${TMP}/releves-ko.csv" <<'CSV'
+objet,vraie_m,affichee_m
+porte,cinq,4.8
+CSV
+run bash "$MESURE" "${TMP}/releves-ko.csv"
+expect_nonzero 'mesure-distances refuse un CSV malformé'
+expect_grep 'ligne 2' 'mesure-distances nomme la ligne fautive'
+cat >"${TMP}/releves-seuils.csv" <<'CSV'
+objet,vraie_m,affichee_m
+arbre,10.0,25.0
+panneau,5.0,12.0
+CSV
+run bash "$MESURE" "${TMP}/releves-seuils.csv"
+expect_nonzero 'mesure-distances signale des seuils ratés'
+expect_grep 'SEUILS NON ATTEINTS' 'mesure-distances rend le verdict seuils'
+run bash "$MESURE" --help
+expect_status 0 'mesure-distances --help sort 0'
 
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"
