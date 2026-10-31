@@ -528,7 +528,7 @@ redite). Nouveau contrat, qui amende le § 11 pour le seul poteau :
 - **3e priorité** : le poteau ne coupe ni ne chevauche P1/P2 (alertes
   `SafetyVoice`, § 16) — `ProbeWiring.p1p2Busy` (mouvement dit il y a
   moins de 4 s, marche imminente dite il y a moins de 2 s) tient la
-  phrase en file (`shouldCutForHazard`, `busy`) ;
+  phrase en file (`ProbePriority`, `busy`) ;
 - **dit une fois puis ré-armé** : après l'annonce, silence jusqu'à 3
   frames sans poteau (`POLE_REARM_FRAMES`) — un poteau qui clignote à la
   frontière ne rabâche pas ; cooldown 10 s inchangé ;

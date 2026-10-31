@@ -124,6 +124,20 @@ class ProximityVoiceQueueTest {
     }
 
     @Test
+    fun `p1p2 en cours, phrase en file puis redite`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val voice = voice(attempts, spoken)
+
+        voice.onPhrase("Attention au poteau.", playerIdle = true, queue = true, busy = { true })
+        assertTrue(spoken.isEmpty())
+
+        voice.flushPending(playerIdle = true, busy = { false })
+
+        assertEquals(listOf("Attention au poteau."), spoken)
+    }
+
+    @Test
     fun `reset vide la file`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
