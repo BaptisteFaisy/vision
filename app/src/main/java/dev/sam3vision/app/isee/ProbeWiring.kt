@@ -401,7 +401,8 @@ internal fun LiveProbe.phraseOf(
 ): String? {
     if (state.value.crossingActive) {
         return crossingPhraseOf(cross?.cue, placed, detections,
-            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger)
+            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger,
+            cross?.noLight == true, cross?.veto == true)
     }
     resetCrossingWatches()
     return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)

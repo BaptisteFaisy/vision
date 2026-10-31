@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceWord
@@ -122,6 +123,9 @@ class LiveProbe(
 
     /** Veto trafic du mode Traversée : un véhicule qui approche force l'attente. */
     private val traverseVeto = TraverseVeto()
+
+    /** Porte « sans feu » : 4 frames sans boîte de feu → voix véhicules + « Traversez. ». */
+    private val noLightGate = NoLightGate()
 
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
     private val chronology = ScreenTimings(clock)
@@ -253,6 +257,7 @@ _state.update { it.cleared() }
         pulse.reset()
         crossing.reset()
         traverseVeto.reset()
+        noLightGate.reset()
         meters.reset()
         adaptive.reset()
         ProbeBackgroundMotion.reset()
@@ -430,7 +435,7 @@ _state.update { it.cleared() }
             dangerPlaced(distances, meters.dangerSnapshot())
         val cross = crossingPatchOf(
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
-            onCrop = cropLogger?.tap(),
+            onCrop = cropLogger?.tap(), noLightGate = noLightGate,
         )
         val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec)
         val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
