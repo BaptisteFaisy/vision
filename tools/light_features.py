@@ -4,7 +4,7 @@ Reproduit a l'identique : `CrossingFeatures.extract`, `TrainedLightColor`
 (tableaux courants), `PedLightGate` (porte + R1b) et le verdict binaire.
 Sources : `core/.../crossing/{CrossingFeatures,TrainedLightColor,PedLightGate,PedLightColor}.kt`.
 
-La parite est verrouillee par `tools/test_train_light.py` (20 ancres
+La parite est verrouillee par `tools/test_train_light.py` (31 ancres
 `feuxfr/` + `feuxfr2/`, joue en CI) : tout ecart Kotlin/Python casse le test.
 Le trainer (`tools/train_light.py`) s'appuie dessus pour evaluer un
 arbre candidat avant de l'embarquer.
@@ -20,8 +20,9 @@ from pathlib import Path
 
 # --- Seuils (copies de PedLightGate.kt / PedLightColor.kt / TrainedLightColor.kt) ---
 RED_HUE_DEG = 15.0
-GREEN_HUE_MIN, GREEN_HUE_MAX = 80.0, 175.0
+GREEN_HUE_MIN, GREEN_HUE_MAX = 80.0, 195.0
 MIN_SAT, MIN_VAL = 0.45, 0.35
+WASHOUT_MIN_SAT, WASHOUT_MIN_VAL = 0.15, 0.90
 GREEN_MIN_FRACTION = 0.002  # 31/10, ordre user : suit PedLightGate.kt (feux lointains)
 RED_MAX_FRACTION = 0.02
 ELONGATION_MIN = 1.0  # 31/10, ordre user : suit PedLightGate.kt (détection au plus large)
@@ -35,16 +36,12 @@ MIN_PURITY = 0.80
 GREEN_MIN_PURITY = 0.50
 GREEN_FRAC_INDEX = 13
 
-FEATURE = [3, 8, 15, 15, 15, 16, -2, -2, -2, -2, 10, 15, -2, 15, -2, -2, -2, 15, 0, -2, -2, -2, 10, -2, -2]
-THRESHOLD = [0.020556, 0.000737, 0.251779, 0.235394, 0.179629, 0.285050, -2.0, -2.0, -2.0, -2.0,
-             0.000336, 0.302868, -2.0, 0.557728, -2.0, -2.0, -2.0, 0.483485, 0.966917, -2.0,
-             -2.0, -2.0, 0.001128, -2.0, -2.0]
-LEFT = [1, 2, 3, 4, 5, 6, -1, -1, -1, -1, 11, 12, -1, 14, -1, -1, -1, 18, 19, -1, -1, -1, 23, -1, -1]
-RIGHT = [22, 17, 10, 9, 8, 7, -1, -1, -1, -1, 16, 13, -1, 15, -1, -1, -1, 21, 20, -1, -1, -1, 24, -1, -1]
-LEAF_CLASS = [0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
-LEAF_PURITY = [0.6256, 0.9034, 0.5590, 0.5970, 0.5614, 0.6250, 0.7179, 0.5366, 0.5882, 0.8000,
-               0.6136, 0.5994, 0.7895, 0.5772, 0.5030, 0.6624, 0.8571, 0.9974, 0.9995, 1.0000,
-               0.9500, 0.8000, 0.9963, 1.0000, 0.8519]
+FEATURE = [13, -2, -2]
+THRESHOLD = [0.004812047118321061, -2.0, -2.0]
+LEFT = [1, -1, -1]
+RIGHT = [2, -1, -1]
+LEAF_CLASS = [0, 0, 1]
+LEAF_PURITY = [0.0, 1.0, 1.0]
 
 
 def _rgb(px: int) -> tuple:
@@ -85,7 +82,14 @@ def _is_green(h: float) -> bool:
 
 
 def _lit(px: int) -> bool:
-    return saturation(px) >= MIN_SAT and value(px) >= MIN_VAL
+    """Miroir de PedLightColor.isLit : franc ou delave brillant."""
+    v = value(px)
+    if v < MIN_VAL:
+        return False
+    s = saturation(px)
+    if s >= MIN_SAT:
+        return True
+    return s >= WASHOUT_MIN_SAT and v >= WASHOUT_MIN_VAL
 
 
 def extract(argb: list, w: int, h: int) -> list:
@@ -100,7 +104,7 @@ def extract(argb: list, w: int, h: int) -> list:
         hue, s, v = hue_deg(px), saturation(px), value(px)
         vsum += v
         ssum += s
-        if s < MIN_SAT or v < MIN_VAL:
+        if not _lit(px):
             continue
         sat += 1
         bins[min(7, int(hue / 45.0))] += 1.0

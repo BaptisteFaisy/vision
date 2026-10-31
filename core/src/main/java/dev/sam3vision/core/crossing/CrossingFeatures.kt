@@ -2,12 +2,13 @@ package dev.sam3vision.core.crossing
 
 /**
  * Traits d'un crop de feu pour [TrainedLightColor] : histogramme de teinte
- * (8 cases, pixels saturés), fractions rouge/vert globale et par moitié
+ * (8 cases, pixels retenus), fractions rouge/vert globale et par moitié
  * verticale (le bonhomme rouge est en haut, le vert en bas), part de pixels
- * saturés, valeur et saturation moyennes.
+ * retenus, valeur et saturation moyennes.
  *
  * Formules strictement identiques au harnais d'entraînement (hors dépôt) :
- * tout écart fausse l'arbre. Conversions HSV partagées avec [PedLightColor].
+ * tout écart fausse l'arbre. Conversions HSV, seuils et pixels retenus
+ * partagés avec [PedLightColor] (référencés, pas copiés).
  */
 object CrossingFeatures {
 
@@ -15,11 +16,6 @@ object CrossingFeatures {
     const val COUNT = 17
 
     private const val BIN_COUNT = 8
-    private const val RED_HUE_DEG = 15f
-    private const val GREEN_HUE_MIN_DEG = 80f
-    private const val GREEN_HUE_MAX_DEG = 175f
-    private const val MIN_SATURATION = 0.45f
-    private const val MIN_VALUE = 0.35f
 
     /**
      * Traits du crop [argb] ([width] x [height], ARGB 32 bits, ligne majeure).
@@ -48,18 +44,16 @@ object CrossingFeatures {
         private var valueSum = 0f
         private var satSum = 0f
 
-        /** Un pixel du crop ([top] = moitié haute) : moyennes toujours, couleur si saturé. */
+        /** Un pixel du crop ([top] = moitié haute) : moyennes toujours, couleur si retenu. */
         fun add(pixel: Int, top: Boolean) {
-            val hue = PedLightColor.hueDeg(pixel)
-            val sat = PedLightColor.saturation(pixel)
-            val value = PedLightColor.value(pixel)
-            valueSum += value
-            satSum += sat
-            if (sat < MIN_SATURATION || value < MIN_VALUE) return
+            valueSum += PedLightColor.value(pixel)
+            satSum += PedLightColor.saturation(pixel)
+            if (!PedLightColor.isLit(pixel)) return
             saturated += 1
+            val hue = PedLightColor.hueDeg(pixel)
             bins[minOf(BIN_COUNT - 1, (hue / 45f).toInt())] += 1f
-            val isRed = hue <= RED_HUE_DEG || hue >= 360f - RED_HUE_DEG
-            val isGreen = hue in GREEN_HUE_MIN_DEG..GREEN_HUE_MAX_DEG
+            val isRed = hue <= PedLightColor.RED_HUE_DEG || hue >= 360f - PedLightColor.RED_HUE_DEG
+            val isGreen = hue in PedLightColor.GREEN_HUE_MIN_DEG..PedLightColor.GREEN_HUE_MAX_DEG
             when {
                 isRed -> {
                     red += 1
