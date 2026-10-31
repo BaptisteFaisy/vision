@@ -99,7 +99,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     GlassesProbeWiring(viewModel.probe, glassesLive && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     SceneGuidanceLayer(viewModel, open, with(density) { geo.pictureH.toDp() }) {
-        OrbLayer(view.scene, geo, open)
+        OrbClockLayer(view.scene, geo, open)
         with(density) {
             SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
         }
@@ -142,11 +142,20 @@ private fun rememberSceneTime(): Float {
     return time
 }
 
+/**
+ * Lit l'horloge de la scène au plus près de son unique lecteur, la boule : lue plus haut
+ * (dans [PortraitScene]), chaque tick à 60 Hz réévaluait tout le sous-arbre de la scène.
+ * Ce relais garde [OrbLayer] gelée à l'octet (`tools/orb-frozen-baseline.json`,
+ * docs/ISEE-DESIGN-PORTRAIT.md §6) tout en n'invalidant que la couche de la boule.
+ */
+@Composable
+private fun OrbClockLayer(scene: IseeScene, geo: PortraitGeometry, open: Float) {
+    OrbLayer(scene, geo, rememberSceneTime(), open)
+}
+
 /** La boule, et la couronne de barres ambre quand iSee parle. */
 @Composable
-private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, open: Float) {
-    // Horloge lue ici et pas au-dessus : à 60 Hz, elle ne réévalue que la boule.
-    val time = rememberSceneTime()
+private fun OrbLayer(scene: IseeScene, geo: PortraitGeometry, time: Float, open: Float) {
     val look = orbLookOf(scene, time, open)
     val paint = rememberOrbPainter()
     val breathe = 1f + 0.012f * kotlin.math.sin(time * 1.3f) + 0.03f * look.you * look.amp
