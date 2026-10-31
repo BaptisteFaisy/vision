@@ -230,4 +230,41 @@ class CrossingLateralTest {
         assertTrue(words.isEmpty())
         assertEquals(listOf("Passage piéton devant.", "Sur le passage."), said)
     }
+
+    @Test
+    fun `observe arrivee par sayArrival, annonce par say`() = runTest {
+        val patches = MutableStateFlow<CrossingLateralPatch?>(null)
+        val said = mutableListOf<String>()
+        val arrived = mutableListOf<String>()
+        observeCrossingLateral(
+            patches, backgroundScope,
+            { _, _ -> }, { said.add(it) },
+            sayArrival = { arrived.add(it) },
+        )
+
+        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Passage piéton devant.")
+        runCurrent()
+
+        assertEquals(listOf("Passage piéton devant."), said)
+        assertEquals(listOf("Sur le passage."), arrived)
+    }
+
+    @Test
+    fun `observe flush a chaque emission, meme vide`() = runTest {
+        val patches = MutableStateFlow<CrossingLateralPatch?>(null)
+        var flushes = 0
+        observeCrossingLateral(
+            patches, backgroundScope,
+            { _, _ -> }, { _ -> },
+            flush = { flushes += 1 },
+        )
+        runCurrent()
+
+        patches.value = CrossingLateralPatch(null, null, null, 0.5f, 5f)
+        runCurrent()
+        patches.value = null
+        runCurrent()
+
+        assertEquals(3, flushes)
+    }
 }

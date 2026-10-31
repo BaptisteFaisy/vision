@@ -27,7 +27,6 @@ import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -355,25 +354,52 @@ internal fun feedCrossingLateral(
 
 /**
  * Parole latérale : le mot via [speakWord] (clip local < 100 ms, doux :
- * appelant `urgent = false`), l'annonce et l'arrivée via [say] (douces
- * aussi). Les guetteurs dédupliquent déjà : rien à filtrer, le silence ne dit rien.
+ * appelant `urgent = false`), l'annonce localisée via [say], l'arrivée via
+ * [sayArrival] (voie séparée : l'arrivée passe en dernier — ordre user du
+ * 31/10 — donc jamais par la même voix que l'annonce). Les guetteurs
+ * dédupliquent déjà : le silence ne dit rien. [flush] (rattrapage au
+ * silence) tourne à chaque émission, même vide.
  */
 internal fun observeCrossingLateral(
     patches: Flow<CrossingLateralPatch?>,
     scope: CoroutineScope,
     speakWord: suspend (clipId: String, text: String) -> Unit,
     say: suspend (String) -> Unit,
+    sayArrival: suspend (String) -> Unit = say,
+    flush: (suspend () -> Unit)? = null,
 ) {
     scope.launch {
-        patches.filter { it != null && (it.lateral != null || it.arrival != null || it.approach != null) }.collect { patch ->
-            patch ?: return@collect
-            val lateral = patch.lateral
-            val clip = patch.lateralClip
-            if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
-            val approach = patch.approach
-            if (approach != null) runCatching { say(approach) }
-            val arrival = patch.arrival
-            if (arrival != null) runCatching { say(arrival) }
+        patches.collect { patch ->
+            if (patch != null) {
+                val lateral = patch.lateral
+                val clip = patch.lateralClip
+                if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
+                val approach = patch.approach
+                if (approach != null) runCatching { say(approach) }
+                val arrival = patch.arrival
+                if (arrival != null) runCatching { sayArrival(arrival) }
+            }
+            if (flush != null) runCatching { flush() }
         }
     }
 }
+
+/**
+ * Voix du guidage latéral sur [ProximityVoice] : mot en clip doux (file au
+ * silence), annonce localisée en doux obstacle (file au silence), arrivée
+ * (« Sur le passage. ») en file dernière — jamais devant une autre annonce
+ * (ordre user du 31/10) — et rattrapage arrivée à chaque frame, aussi en
+ * Traversée (où la file obstacles est coupée). Rien ne coupe ici.
+ */
+internal fun observeCrossingVoice(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+) = observeCrossingLateral(
+    CrossingLateralWatch.flow, scope,
+    speakWord = { clip, text -> voice.speakWord(clip, text, language(), playerIdle(), urgent = false, queue = true) },
+    say = { voice.onPhrase(it, playerIdle(), queue = true) },
+    sayArrival = { voice.onArrivalPhrase(it, playerIdle()) },
+    flush = { voice.flushArrival(playerIdle()) },
+)
