@@ -1,6 +1,7 @@
 package dev.sam3vision.core.motion
 
 import dev.sam3vision.core.mask.GrayMask
+import dev.sam3vision.core.predict.Box
 
 /**
  * Scènes de luminance synthétiques du banc de mouvement : fond sombre et taches claires
@@ -17,6 +18,12 @@ internal object MotionScenes {
     const val HEIGHT = 103
 
     private const val BACKGROUND = 40
+
+    /** Niveau du rectangle d'avant-plan : entre le fond (40) et les taches (170 à 220). */
+    private const val FOREGROUND = 120
+
+    /** Boîte d'avant-plan des scènes véhicule : 64×40, centrée sur le plan 256×103. */
+    val VEHICLE_BOX = Box(96f, 32f, 160f, 72f)
 
     /** Trame de référence 256×103 : cinq taches asymétriques, niveaux 170 à 220. */
     fun scene(): GrayMask {
@@ -79,5 +86,47 @@ internal object MotionScenes {
         for (y in y0 until y1) {
             for (x in x0 until x1) mask.pixels[y * mask.width + x] = level.toByte()
         }
+    }
+
+    /**
+     * Paire d'images + boîtes d'un cas véhicule/fond : [prev] et [cur] portent le même
+     * rectangle d'avant-plan (le « véhicule ») à [prevBox] et [curBox], sur fond texturé.
+     */
+    data class VehicleScene(val prev: GrayMask, val cur: GrayMask, val prevBox: Box, val curBox: Box)
+
+    /** Copie de [source] avec le rectangle d'avant-plan peint à [box] ([level] par défaut). */
+    fun withForeground(source: GrayMask, box: Box, level: Int = FOREGROUND): GrayMask {
+        val mask = GrayMask(source.width, source.height, source.pixels.copyOf())
+        val x0 = box.x1.toInt().coerceIn(0, source.width)
+        val y0 = box.y1.toInt().coerceIn(0, source.height)
+        val x1 = box.x2.toInt().coerceIn(x0, source.width)
+        val y1 = box.y2.toInt().coerceIn(y0, source.height)
+        fillRect(mask, x0, y0, x1, y1, level)
+        return mask
+    }
+
+    /** Fond fixe, boîte déplacée de ([dx], [dy]) : le véhicule bouge, la caméra est fixe. */
+    fun vehicleMoving(box: Box = VEHICLE_BOX, dx: Int = 12, dy: Int = 0): VehicleScene {
+        val moved = box.translated(dx.toFloat(), dy.toFloat())
+        return VehicleScene(withForeground(scene(), box), withForeground(scene(), moved), box, moved)
+    }
+
+    /** Fond décalé de ([dx], [dy]), boîte fixe : la caméra suit le véhicule (filmer-suivi). */
+    fun cameraMoving(box: Box = VEHICLE_BOX, dx: Int = 6, dy: Int = 2): VehicleScene {
+        val background = shifted(scene(), dx, dy)
+        return VehicleScene(withForeground(scene(), box), withForeground(background, box), box, box)
+    }
+
+    /** Fond décalé de ([bgDx], [bgDy]) et boîte déplacée de ([boxDx], [boxDy]) : les deux bougent. */
+    fun bothMoving(
+        box: Box = VEHICLE_BOX,
+        bgDx: Int = 6,
+        bgDy: Int = 2,
+        boxDx: Int = -10,
+        boxDy: Int = 4,
+    ): VehicleScene {
+        val moved = box.translated(boxDx.toFloat(), boxDy.toFloat())
+        val background = shifted(scene(), bgDx, bgDy)
+        return VehicleScene(withForeground(scene(), box), withForeground(background, moved), box, moved)
     }
 }
