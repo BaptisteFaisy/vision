@@ -49,6 +49,32 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `action_required`.
 - **Preuve** : à vérifier sur le premier run déclenché par `workflow_run` après
   merge (log « runs en attente vus : N — approuvés : M »).
+## 2026-10-31 — iSee : la voix du guidage ne se tait plus sans raison (branche `fix/voix-guidage-coupe`)
+
+- **Symptôme** : en marchant, écran allumé, le guidage (right/left/straight)
+  s'arrête d'un coup, ne dit plus rien, puis reprend tout seul (relevé user
+  du 31/10, sans logcat).
+- **Causes** (lues dans le code) : (1) régression §7 — le `spokenSeq`
+  (directions en continu) faisait passer chaque ré-émission identique dans
+  `collectLatest`, qui annulait la synthèse réseau en vol de la même phrase ;
+  (2) `canAnnounce` (transcription, réflexion LLM, synthèse — jusqu'à 75 s)
+  taisait la voix de sécurité sans qu'aucun son ne joue, et l'état parlant du
+  chat lu en continu couvrait les synthèses ; (3) famine de boucle
+  (panne SAM/réseau, conteneur froid) = `spoken` figé, silence sans
+  explication.
+- **Fait** : `observeSpokenEmissions` (répétition identique en vol gardée,
+  phrase fraîche dernier-gagnant, clips rejoués) ; `canGuideSpeech` (le
+  guidage cède au son réel — lecture chat, tenue user — jamais aux attentes
+  silencieuses) ; `IseePlayback` (état parlant = lecture réelle, tranche par
+  tranche) ; `GuidanceStarvation` + `observeStarvation` (passé 6 s sans
+  consigne fraîche en guidage : « Guidance paused. Reconnecting. » puis
+  « Guidance resumed. », voix de sécurité hors-ligne).
+- **Preuves** : `GuidanceStarvationTest` (7), `ProbeSpokenFlowTest` (5),
+  `IseePlaybackTest` (+1), `ProbeWiringSpokenTest` inchangé vert ;
+  `:core` + `:app` JVM verts, `check-kotlin-limits.py` vert. Recette
+  téléphone **non mesurée** (froid → alerte + reprise, question en marchant,
+  voix non-Laure).
+
 
 ## 2026-10-31 — CI : l'approbation automatique ne réveille plus le stock de runs périmés (branche `ci/approve-fenetre`)
 
