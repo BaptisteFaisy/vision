@@ -171,4 +171,35 @@ class PositionTextTest {
             PositionText.withHour("Attention à la barrière", null, SpeechLanguage.Fr),
         )
     }
+    @Test
+    fun `spotlight dit l'objet devant toi avec sa position`() {
+        assertEquals(
+            "Les clés sont devant toi, à 9 heures.",
+            PositionText.spotlight(PlacedLabel("clés", 0.1f), SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Les clés sont devant toi, à midi.",
+            PositionText.spotlight(PlacedLabel("Clés", 0.5f), SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Téléphone devant toi, à 3 heures.",
+            PositionText.spotlight(PlacedLabel("téléphone", 0.9f), SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Les clés sont devant toi, à 2 mètres.",
+            PositionText.spotlight(PlacedLabel("clés", 0.1f, meters = 2f), SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "The keys are in front of you, at 9 o'clock.",
+            PositionText.spotlight(PlacedLabel("keys", 0.1f), SpeechLanguage.En),
+        )
+        assertEquals(
+            "The phone is in front of you, 3 meters away.",
+            PositionText.spotlight(PlacedLabel("phone", 0.9f, meters = 3f), SpeechLanguage.En),
+        )
+        assertEquals(
+            "The glass is in front of you, at 12 o'clock.",
+            PositionText.spotlight(PlacedLabel("glass", 0.5f), SpeechLanguage.En),
+        )
+    }
 }

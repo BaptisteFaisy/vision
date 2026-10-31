@@ -5,15 +5,16 @@ import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Ordre vocal « fais un pictogramme de X » : le direct photographié part
- * en génération, le repère armé guide ensuite vers X. Appelé sur le texte
+ * Ordre vocal de création (« fais un pictogramme de X », « create a picto
+ * for X ») : la photo part en génération, le repère armé guide ensuite
+ * vers X. Appelé sur le texte
  * dicté avant le LLM — une commande ne fait jamais d'appel réseau elle-même
  * (la génération, elle, en fait un).
  *
  * Le mot « pictogramme » (ou « picto ») seul ne suffit pas : « c'est quoi
  * ce pictogramme ? » reste une question pour le LLM. Il faut un verbe de
  * création (« fais », « crée », « dessine »…). Le label rendu est la suite
- * brute après « de », sans ses articles (« ces médics » → « medics ») ;
+ * brute après « de » / « for » / « of », sans ses articles (« ces médics » → « medics ») ;
  * « de ça » rend vide (objet filmé sans nom, overlay seul, jamais guidé).
  *
  * Tolérant : casse, accents et ponctuation neutralisés par
@@ -48,6 +49,9 @@ object PictoVoiceOrder {
 
     /** Articles élidés après le verbe de recherche (anglais + [LEADERS]). */
     private val FIND_LEADERS = LEADERS + setOf("the", "a", "an", "my", "some")
+
+    /** Mots élidés après « picto » : articles FR/EN ([FIND_LEADERS]) et prépositions anglaises (« for », « of »). */
+    private val CREATE_LEADERS = FIND_LEADERS + setOf("for", "of")
 
     /** Démonstratifs : l'objet est filmé, aucun nom à guider (« de ça »). */
     private val NAMELESS = setOf("ca", "cela")
@@ -116,12 +120,13 @@ object PictoVoiceOrder {
     /**
      * Label brut de l'ordre porté par [text], `null` si ce n'en est pas un
      * (le texte part alors au LLM comme avant). Vide = objet sans nom.
+     * Anglais accepté (« create a picto for my keys » → « keys »).
      */
     fun parse(text: String): String? {
         val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
         val at = words.indexOfFirst { PICTO_WORDS.contains(it) }
         if (at < 0 || words.none { CREATE_VERBS.contains(it) }) return null
-        val rest = words.drop(at + 1).dropWhile { LEADERS.contains(it) }
+        val rest = words.drop(at + 1).dropWhile { CREATE_LEADERS.contains(it) }
         if (rest.isEmpty() || (rest.size == 1 && NAMELESS.contains(rest[0]))) return ""
         return rest.joinToString(" ")
     }

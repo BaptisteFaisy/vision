@@ -226,6 +226,21 @@ class IseePictoTest {
         assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
     }
 
+    @Test
+    fun `le repere survit a la reouverture de l'ecran`() = runTest {
+        val root = tempDir("isee-picto-reopen")
+        val first = picto(storeRoot = root)(this)
+        first.findObject("keys")
+        advanceUntilIdle()
+        assertTrue(first.armed())
+        val second = picto(storeRoot = root)(this)
+        second.refresh()
+        advanceUntilIdle()
+        assertTrue(second.armed())
+        assertEquals(listOf("keys"), second.labels())
+        assertEquals(1, state.value.picto.armed)
+    }
+
     private fun tempDir(prefix: String): File =
         Files.createTempDirectory(prefix).toFile().apply { deleteOnExit() }
 
