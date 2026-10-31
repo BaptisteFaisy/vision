@@ -1,0 +1,69 @@
+package dev.sam3vision.app.isee
+
+import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairConcepts
+import dev.sam3vision.core.stairs.StairLabelSignals
+import dev.sam3vision.core.stairs.StairSignal
+import dev.sam3vision.core.stairs.StairWatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+
+/**
+ * Guetteur escaliers de la sonde, miroir du trottoir : l'escalier nommé par
+ * SAM, lu dans les lectures de distance d'abord (boîte → sens + heure),
+ * sinon dans les libellés bruts (sans mesure : l'escalier n'a ni hauteur
+ * connue, ni pose, ni ancre garantie — mais SAM le nomme, et la voix
+ * compte quand même les marches vues). Le sens vient des mots du libellé
+ * (« stairs going up », exact) sinon de la hauteur de la boîte
+ * ([StairLabelSignals]) ; l'annonce est douce (attend le silence) : une info
+ * de navigation, jamais une consigne d'évitement. Coupé en mode Traversée.
+ * Voix montée : compte à rebours (« Plus que N marches. ») puis dernière
+ * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
+ * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
+ * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeStairs(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+): StairWatcher {
+    // Deux frames suffisent côté voix (le flux Canny d'affichage garde trois) :
+    // un escalier nommé deux fois de suite n'est plus un clignotement.
+    val watcher = StairWatcher(confirmFrames = 2)
+    scope.launch {
+        state.collect { st ->
+            if (st.crossingActive) return@collect
+            // Lectures d'abord (sens + heure par la boîte), libellés bruts en
+            // repli : un escalier nommé sans mesure reste un escalier.
+            val readings = st.distanceLayer?.readings.orEmpty()
+            val found = StairLabelSignals.of(readings, st.width, st.height)
+                .takeIf { it.detected } ?: StairLabelSignals.ofLabels(st.labels)
+            // Profondeur du marchement le plus proche : la dernière marche par
+            // profondeur (< 1 m) parle même quand le compteur est indisponible
+            // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
+            val stairsMeters = readings.filter { StairConcepts.isStairs(it.label) }
+                .mapNotNull { it.meters.takeIf { m -> m.isFinite() } }.minOrNull()
+            // Compte Canny frais de la caméra (0 = non compté) : il nourrit le
+            // compte à rebours de la montée (« Plus que N marches. »).
+            val stairsCount = StairCannyCount.lineCount()
+            val signal = if (found.detected) {
+                StairSignal(detected = true, confidence = 1f, lineCount = stairsCount, roiTop = 0, roiBottom = 0)
+            } else {
+                StairSignal.none()
+            }
+            val cue = watcher.onSignal(
+                signal, System.currentTimeMillis(), language(), found.direction, found.centerX, stairsMeters)
+            if (found.detected) {
+                android.util.Log.d(
+                    "sam3vision",
+                    "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} " +
+                        "m=$stairsMeters annonce=${cue?.phrase}",
+                )
+            }
+            cue ?: return@collect
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+        }
+    }
+    return watcher
+}
