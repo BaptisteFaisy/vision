@@ -16,7 +16,6 @@ import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
-import dev.sam3vision.app.pose.CameraHeightStore
 import dev.sam3vision.app.pose.PitchMeter
 import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveTrackFallback
@@ -86,7 +85,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Distances caméra→objets : sténopé + hauteurs connues, lissées par piste. */
     private val distances = DistanceMeter()
-    private val pitch = PitchMeter(app, distances, CameraHeightStore(app)) // IMU → pose, null sans capteur
+    private val pitch = PitchMeter(app, distances) // IMU → pose, null sans capteur
 
     /** Chemins centraux des objets suivis : le centre de chaque boîte allonge sa piste. */
     private val centerTrails = CenterTrails()
@@ -482,7 +481,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         traverse.deactivate(positions::reset)
         voice.stop()
         latestFrame.clear()
-        chronology.reset(); asker.reset()
+        chronology.reset()
+        asker.reset()
         pixel.clear()
         _state.update { LiveUiState(latestFrame = latestFrame) }
     }
