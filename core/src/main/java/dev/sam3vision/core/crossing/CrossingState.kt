@@ -15,24 +15,41 @@ import dev.sam3vision.core.model.SegObject
 enum class CrossingState { Red, Green }
 
 /**
- * Concepts **minimaux** de la Traversée : le feu, les voitures, les personnes
- * et le passage lui-même. Quatre concepts, garantis inclus dans
- * [LivePrompts.default] (liste unique normal/Traversée, ordre user du 30/10 —
- * la bascule ne change plus les prompts) : le feu dit quand traverser, les
- * voitures forcent l'attente, les personnes sont annoncées par positions, et
- * le passage vu garde le mode auto actif (perdu plusieurs frames de suite,
- * retour au mode normal).
+ * Concepts **minimaux** de la Traversée : le feu (en trois variantes), les
+ * voitures, les personnes et le passage lui-même. Six concepts : le feu dit
+ * quand traverser, les voitures forcent l'attente, les personnes sont
+ * annoncées par positions, et le passage vu garde le mode auto actif (perdu
+ * plusieurs frames de suite, retour au mode normal).
+ *
+ * Couverture « mêmes masques » : [LIGHT] est dans [LivePrompts.default],
+ * les variantes ([LIGHT_SHORT], [LIGHT_SIGNAL]) désignent les mêmes masques
+ * — le mode traversée actif les envoie en plus ([LIGHTS], câblage `:app`),
+ * sans nouveau concept visuel à couvrir.
  */
 object CrossingPrompts {
 
     /**
-     * Concept feu : le feu **piéton** seul (`docs/MESURES-SAM3-FEUX.md` §2 :
-     * rappel 87,5 % sur 16 photos réelles, contre 43,8 % pour
-     * `pedestrian signal` et 12,5 % pour un prompt d'état). Les feux voiture
-     * ne sont jamais suivis (ordre user du 31/10) : un vert voiture ne doit
-     * jamais devenir un ordre de traverser.
+     * Concept feu principal : le feu **piéton** seul
+     * (`docs/MESURES-SAM3-FEUX.md` §2 : rappel 87,5 % sur 16 photos réelles,
+     * contre 43,8 % pour `pedestrian signal` et 12,5 % pour un prompt
+     * d'état). Les feux voiture ne sont jamais suivis (ordre user du
+     * 31/10) : un vert voiture ne doit jamais devenir un ordre de
+     * traverser. Variantes d'union : [LIGHT_SHORT], [LIGHT_SIGNAL].
      */
     const val LIGHT = "pedestrian traffic light"
+
+    /**
+     * Variantes courtes du feu piéton, envoyées avec [LIGHT] en mode
+     * traversée actif : l'union des trois wordings ne peut qu'ajouter des
+     * détections du même caisson (mêmes masques). Jamais de wording voiture
+     * (`traffic light`, `traffic signal`, `stoplight`) : un vert voiture ne
+     * doit jamais devenir un ordre de traverser (A2 bloquant).
+     */
+    const val LIGHT_SHORT = "pedestrian light"
+    const val LIGHT_SIGNAL = "pedestrian signal"
+
+    /** Wordings feu envoyés en mode traversée actif, [LIGHT] d'abord. */
+    val LIGHTS: List<String> = listOf(LIGHT, LIGHT_SHORT, LIGHT_SIGNAL)
 
     /** Concept personne, annoncée par positions en mode Traversée. */
     const val PERSON = "person"
@@ -41,7 +58,7 @@ object CrossingPrompts {
     const val CROSSWALK = "crosswalk"
 
     /** Concepts envoyés à SAM en mode Traversée (anglais, comme les défauts). */
-    val PROMPTS: List<String> = listOf(LIGHT, "car", PERSON, CROSSWALK)
+    val PROMPTS: List<String> = LIGHTS + listOf("car", PERSON, CROSSWALK)
 
     /**
      * Étiquettes (canoniques, voir [KnownSizes.canonical]) qui désignent un
@@ -49,12 +66,11 @@ object CrossingPrompts {
      * `traffic signal`, `feu` et `feu tricolore` sont des feux voiture (ou
      * ambigus) : exclus (ordre user du 31/10), même suivis à la main dans
      * le champ « Follow ». Pas de `pieton` seul : un passant étiqueté
-     * « piéton » n'est pas un feu (voir [PersonLabels]).
+     * « piéton » n'est pas un feu (voir [PersonLabels]). Les wordings
+     * anglais sont [LIGHTS] (alignement structurel : tout wording envoyé
+     * est reconnu).
      */
-    private val LIGHT_LABELS = setOf(
-        "pedestrian traffic light",
-        "pedestrian light",
-        "pedestrian signal",
+    private val LIGHT_LABELS = LIGHTS.toSet() + setOf(
         "feu pieton",
         "feux pieton",
         "feu pietons",
