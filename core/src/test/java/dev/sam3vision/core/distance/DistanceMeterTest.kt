@@ -251,4 +251,27 @@ class DistanceMeterTest {
         meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(7))
         assertTrue(meter.predictions(2_000L).isEmpty())
     }
+
+    @Test
+    fun `spec mesuree redresse la boite avant de mesurer`() {
+        val spec = LensSpec.fromMeasured(4.3f, 5.76f, 4.32f, 4000, 3000)!!
+        val plain = DistanceMeter(spec)
+            .measure(512, 384, listOf(detection("personne", box(200f)))).first()
+        // distorsion nulle : la mesure est au bit près celle sans distorsion
+        val zero = DistanceMeter(spec.copy(distortion = RadialDistortion(0f, 0f)))
+            .measure(512, 384, listOf(detection("personne", box(200f)))).first()
+        assertEquals(plain.rawMeters, zero.rawMeters, 0f)
+        // barillet : la hauteur redressée (centre x = 150 px) porte la mesure
+        val distortion = RadialDistortion(-0.1f)
+        val corrected = DistanceMeter(spec.copy(distortion = distortion))
+            .measure(512, 384, listOf(detection("personne", box(200f)))).first()
+        val focal = spec.focalPx(512, 384)
+        val (cx, cy) = spec.principalPx(512, 384)
+        val norm = Distortion.normPx(512, 384)
+        val top = Distortion.undistortY(150f, 100f, cx, cy, norm, distortion)
+        val bottom = Distortion.undistortY(150f, 300f, cx, cy, norm, distortion)
+        assertEquals(1.70f * focal / (bottom - top), corrected.rawMeters, 0.001f)
+        assertTrue("une boîte redressée plus petite éloigne", corrected.rawMeters > plain.rawMeters)
+        assertEquals(box(200f), corrected.box)
+    }
 }

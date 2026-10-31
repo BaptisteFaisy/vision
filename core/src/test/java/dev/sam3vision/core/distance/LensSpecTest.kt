@@ -106,4 +106,25 @@ class LensSpecTest {
         assertEquals(null, LensSpec.fromFocalPx(2986f, 2986f, 5000f, 1499f, 4000, 3000))
         assertEquals(null, LensSpec.fromFocalPx(2986f, 2986f, 1999f, 1499f, 0, 3000))
     }
+
+    @Test
+    fun `mesure mire delegue au capteur pleine zone`() {
+        val measured = LensSpec.fromMeasured(4.3f, 5.76f, 4.32f, 4000, 3000)!!
+        assertEquals(LensSpec.fromSensor(4.3f, 5.76f, 4.32f), measured)
+        assertEquals(67.7f, measured.horizontalFovDeg, 0.5f)
+        assertEquals(53.4f, measured.verticalFovDeg, 0.5f)
+        assertTrue(measured.usable)
+        assertEquals(null, measured.distortion)
+        assertEquals(null, LensSpec.fromMeasured(0f, 5.76f, 4.32f, 4000, 3000))
+        assertEquals(null, LensSpec.fromMeasured(4.3f, 5.76f, 4.32f, 0, 3000))
+        assertEquals(null, LensSpec.fromMeasured(4.3f, 5.76f, 4.32f, 4000, -1))
+    }
+
+    @Test
+    fun `distorsion non finie rend le calibrage inutilisable`() {
+        assertFalse(LensSpec(67f, 53f, distortion = RadialDistortion(Float.NaN)).usable)
+        assertFalse(LensSpec(67f, 53f, distortion = RadialDistortion(0f, Float.POSITIVE_INFINITY)).usable)
+        assertTrue(LensSpec(67f, 53f, distortion = RadialDistortion(-0.1f, 0.01f)).usable)
+        assertTrue(LensSpec(67f, 53f, distortion = RadialDistortion(0f, 0f)).usable)
+    }
 }
