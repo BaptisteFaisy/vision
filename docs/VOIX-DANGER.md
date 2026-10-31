@@ -699,7 +699,7 @@ et amende les §§ 16/17/19 et le § 21 pluriel :
 
 Verrouillé par `GuidanceTest` + `GuidanceAnnouncerTest` +
 `GuidanceObstaclesTest` + `DangerVoiceTest` (contact ⇒ côté),
-`VehicleStateTest` (+2 : `isSafetyPhrase`, singulier + pluriel),
+`VehicleStateTextTest` (+2 : `isSafetyPhrase`, singulier + pluriel),
 `CurbAnnounceTest` (consigne sans stop), `CrossingVehicleTest` (stop
 EN/FR en Traversée), `LiveProbeGuidanceTest` (contact ⇒ côté non
 urgent) et `ProbeWiringWatchersTest` (+1 : `spokenUrgentOf`).
