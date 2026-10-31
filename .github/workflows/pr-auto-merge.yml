@@ -93,6 +93,17 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v17 (31/10) débit : le balayeur ne se réveille plus pour les branches de
+#       lot, ne se réveille plus sur un run annulé, et ne clone plus que la
+#       PR qui a parlé. Mesure sur 62 min (31/10, 14h → 15h) : 291 runs de ce
+#       workflow, dont ~85 % déclenchés par les fins de `CI`/`couche0` des
+#       branches `mergify/merge-queue/**`, à 262 s de runner par run (matrice
+#       = toutes les PR ouvertes, un clone de 134 Mo chacune) — soit ~85 % du
+#       pool de 21 runners. Conséquence mesurée : les checks d'un lot
+#       attendaient 4 min 25 un runner (14:52:47 créé → 14:57:12 démarré), un
+#       lot coûtait ~4,5 min au lieu de ~90 s, et le débit plafonnait à
+#       11-19 merges/h. Un run annulé n'apprend rien : un check annulé ne se
+#       relance pas (v16 s'en occupe depuis la PR), donc le balayage est sauté.
 
 name: pr-auto-merge
 
@@ -128,6 +139,12 @@ permissions:
 
 jobs:
   discover:
+    # v17 — filtres de déclenchement, avant même de prendre un runner :
+    #   - une branche de lot (`mergify/merge-queue/**`, `gh-readonly-queue/**`)
+    #     est pilotée par la file, pas par le balayeur : ses fins de `CI` et de
+    #     `couche0` ne doivent réveiller aucun balayage (c'était ~85 % des runs) ;
+    #   - un run `cancelled`/`skipped` ne laisse aucun verdict à traiter.
+    if: ${{ github.event_name != 'workflow_run' || (!startsWith(github.event.workflow_run.head_branch, 'mergify/merge-queue/') && !startsWith(github.event.workflow_run.head_branch, 'gh-readonly-queue/') && github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.conclusion != 'skipped') }}
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 5
     outputs:
@@ -140,6 +157,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
           EVENT: ${{ github.event_name }}
+          # v17 — la tête qui a déclenché le balayage (vide hors `workflow_run`).
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           # Interrupteur de la file Mergify. Le ruleset ne peut pas porter la
           # règle `merge_queue` (dépôt d'utilisateur, l'API la refuse), donc la
           # présence de la file ne se lit pas dans le ruleset : c'est cette
@@ -214,6 +233,26 @@ jobs:
             exit 1
           fi
           [ -n "$MATRIX" ] || MATRIX="[]"
+          # ── ciblage v17 ─────────────────────────────────────────────────
+          # Une fin de CI de la PR X ne justifie pas de cloner les 10 autres
+          # PR ouvertes : une matrice de 10 clones de 134 Mo par déclenchement,
+          # c'est ce qui asséchait le pool. On ne garde donc que la tête qui a
+          # parlé, plus la plus ancienne `BEHIND` (la seule à qui v13 accorde un
+          # rebase). La matrice entière reste pour `push` sur `master` et pour
+          # le cron, qui sont les deux filets de sécurité.
+          # `unique_by(.pr)` : la tête ciblée peut aussi être la `BEHIND`.
+          # `MATRIX` illisible ou sans tête connue → matrice entière (jamais
+          # moins de travail que nécessaire, jamais de silence).
+          if [ "${EVENT:-}" = "workflow_run" ] && [ -n "${HEAD_SHA:-}" ] && [ "$MATRIX" != "[]" ]; then
+            CIBLE=$(printf '%s' "$MATRIX" | jq -c --arg s "$HEAD_SHA" '
+              [ .[] | select(.sha == $s) ]
+              + ([ .[] | select(.state == "BEHIND") ] | sort_by(.maj) | .[0:1])
+              | unique_by(.pr)' 2>/dev/null || echo "")
+            if [ -n "${CIBLE:-}" ]; then
+              echo "balayage ciblé sur $HEAD_SHA : $(printf '%s' "$MATRIX" | jq 'length') PR → $(printf '%s' "$CIBLE" | jq 'length')"
+              MATRIX="$CIBLE"
+            fi
+          fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | jq -r '.[] | "PR #\(.pr) \(.state) (maj \(.maj))"'
 
