@@ -98,7 +98,7 @@ class HazardWatchTest {
         assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention au poteau.", cue!!.phrase)
+        assertEquals("Attention au poteau, passez à droite.", cue!!.phrase)
         assertFalse(cue.urgent)
     }
 
@@ -109,7 +109,7 @@ class HazardWatchTest {
 
         val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention au poteau.", cue!!.phrase)
+        assertEquals("Attention au poteau, passez à droite.", cue!!.phrase)
         assertTrue(cue.urgent)
     }
 
@@ -126,7 +126,35 @@ class HazardWatchTest {
         assertNull(watcher.onSignal(signal, 18_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(signal, 19_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention au poteau.", cue!!.phrase)
+        assertEquals("Attention au poteau, passez à droite.", cue!!.phrase)
+    }
+
+    @Test
+    fun `poteau dit comment l'eviter - cote oppose, FR EN`() {
+        val pole = HazardConcepts.nameOf("poteau")!!
+        assertEquals(
+            "Attention au poteau, à 11 heures, passez à droite.",
+            HazardText.polePhrase(pole, SpeechLanguage.Fr, 0.4f),
+        )
+        assertEquals(
+            "Attention au poteau, à 2 heures, passez à gauche.",
+            HazardText.polePhrase(pole, SpeechLanguage.Fr, 0.8f),
+        )
+        assertEquals(
+            "Attention, pole, at 2 o'clock, pass on the left.",
+            HazardText.polePhrase(pole, SpeechLanguage.En, 0.8f),
+        )
+        assertEquals(
+            "Attention au poteau, passez à droite.",
+            HazardText.polePhrase(pole, SpeechLanguage.Fr),
+        )
+
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole", centerX = 0.8f)
+        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau, à 2 heures, passez à gauche.", cue!!.phrase)
     }
 
     @Test

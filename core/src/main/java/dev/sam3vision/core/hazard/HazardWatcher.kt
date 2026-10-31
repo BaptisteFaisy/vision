@@ -73,9 +73,39 @@ data class HazardCue(
  * Phrases « Attention … », FR/EN comme les positions (`PositionText`) :
  * « Attention à la barrière, à 2 heures. » / « Attention, barrier, at 2
  * o'clock. » — une info de description, jamais une consigne (l'ordre user :
- * iSee décrit, en douceur, au cadran des aveugles).
+ * iSee décrit, en douceur, au cadran des aveugles) — sauf le poteau,
+* qui dit aussi comment l'éviter (ordre user du 31/10, voir [polePhrase]).
  */
 object HazardText {
+    /** Axe marché : en deçà, le poteau est à gauche — on passe à droite. */
+    private const val AXIS_MID = 0.5f
+
+    /**
+     * « Attention au poteau, à 2 heures, passez à gauche. » : le poteau dit
+     * aussi comment l'éviter — le côté conseillé est l'opposé du poteau
+     * (poteau à gauche de l'axe = on passe à droite). Axe pile ou heure
+     * inconnue = droite par défaut (prior, à valider rue : on serre à
+     * droite). Doux comme imminent, poteau seul (les autres mobiliers
+     * restent descriptifs, voir [phrase]).
+     */
+    fun polePhrase(
+        name: HazardConcepts.HazardName,
+        language: SpeechLanguage,
+        centerX: Float? = null,
+    ): String {
+        val situated = phrase(name, language, centerX).dropLast(1)
+        return "$situated, ${avoidText(centerX, language)}."
+    }
+
+    /** Consigne d'évitement : le côté opposé au poteau (droite par défaut). */
+    private fun avoidText(centerX: Float?, language: SpeechLanguage): String {
+        val right = centerX == null || centerX < AXIS_MID
+        return when (language) {
+            SpeechLanguage.Fr -> if (right) "passez à droite" else "passez à gauche"
+            SpeechLanguage.En -> if (right) "pass on the right" else "pass on the left"
+        }
+    }
+
     /** « Attention … » pour [name] selon [language], située à [centerX] (`null` = sans heure). */
     fun phrase(
         name: HazardConcepts.HazardName,
@@ -94,7 +124,8 @@ object HazardText {
  *
  * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence) ;
  * le poteau imminent (à [POLE_FAST_METERS] ou moins) sort urgent : il coupe,
- * sauf P1/P2 en cours (voir `ProbeWiring`).
+ * sauf P1/P2 en cours (voir `ProbeWiring`). Le poteau dit aussi comment
+* l'éviter ([HazardText.polePhrase]), doux comme imminent.
  */
 class HazardWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -143,7 +174,7 @@ class HazardWatcher(
             poleQuiet = 0
             lastCueAtMs = nowMs
             hits = 0
-            return HazardCue(HazardText.phrase(name, language, signal.centerX), meters, urgent = true)
+            return HazardCue(HazardText.polePhrase(name, language, signal.centerX), meters, urgent = true)
         }
         hits++
         if (hits < confirmFrames) return null
@@ -154,7 +185,9 @@ class HazardWatcher(
             poleSpoken = true
             poleQuiet = 0
         }
-        return HazardCue(HazardText.phrase(name, language, signal.centerX), signal.meters)
+        val text = if (pole) HazardText.polePhrase(name, language, signal.centerX)
+        else HazardText.phrase(name, language, signal.centerX)
+        return HazardCue(text, signal.meters)
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */
