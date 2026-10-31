@@ -117,3 +117,78 @@ def test_detr_clone(_timing) -> None:
         else:
             sys.modules["torch"] = saved_torch
         sys.path.remove(live_fast)
+
+
+class _ShapeTensor:
+    """Tensor factice avec forme seule (miroir minimal pour `DetrGraphs._shape`)."""
+
+    def __init__(self, shape) -> None:
+        self.shape = shape
+
+
+def _detr_module():
+    """`detr_graph` déployé avec un faux torch (que `is_tensor`), sys.path géré."""
+    import sys
+    import types
+
+    from test_units import BACKEND_DIR
+
+    live_fast = str(BACKEND_DIR / "live_fast")
+    saved_torch = sys.modules.get("torch")
+    fake_torch = types.ModuleType("torch")
+    fake_torch.is_tensor = lambda value: isinstance(value, (_CloneTensor, _ShapeTensor))
+    sys.path.insert(0, live_fast)
+    sys.modules["torch"] = fake_torch
+    import detr_graph
+
+    return detr_graph, live_fast, saved_torch
+
+
+def _release_detr(live_fast, saved_torch) -> None:
+    import sys
+
+    if saved_torch is None:
+        sys.modules.pop("torch", None)
+    else:
+        sys.modules["torch"] = saved_torch
+    sys.path.remove(live_fast)
+
+
+def test_detr_shape_scalars(_timing) -> None:
+    """`DetrGraphs._shape` distingue les scalaires : pas de collision de graphe."""
+    from test_units import check
+
+    detr_graph, live_fast, saved_torch = _detr_module()
+    try:
+        tenseur = _ShapeTensor((2, 3))
+        vrai = detr_graph.DetrGraphs._shape((tenseur,), {"flag": True})
+        faux = detr_graph.DetrGraphs._shape((tenseur,), {"flag": False})
+        check("shape : scalaire distinct → clé distincte", vrai != faux, f"{vrai} vs {faux}")
+        check("shape : entrées égales → clé égale",
+              detr_graph.DetrGraphs._shape((tenseur,), {"flag": True}) == vrai)
+        check("shape : None vs scalaire → clé distincte",
+              detr_graph.DetrGraphs._shape((tenseur,), {"flag": None}) != vrai)
+    finally:
+        _release_detr(live_fast, saved_torch)
+
+
+def test_detr_coords_key(_timing) -> None:
+    """Clé coords : même stockage + H/W distincts → clés distinctes.
+
+    Non-régression de la mort prod du 29/10 (replay à 0,3 ms puis plus rien,
+    sans traceback) : la clé `data_ptr` seul resservait une grille périmée
+    quand l'allocateur réutilisait le stockage pour d'autres H/W.
+    """
+    from test_units import check
+
+    detr_graph, live_fast, saved_torch = _detr_module()
+    try:
+        base = detr_graph._coords_key(12345, 10, 20, "torch.float32", "cuda:0")
+        check("coords : H distinct → clé distincte",
+              detr_graph._coords_key(12345, 11, 20, "torch.float32", "cuda:0") != base)
+        check("coords : W distinct → clé distincte",
+              detr_graph._coords_key(12345, 10, 21, "torch.float32", "cuda:0") != base)
+        check("coords : mêmes entrées → clé égale",
+              detr_graph._coords_key(12345, 10, 20, "torch.float32", "cuda:0") == base)
+    finally:
+        _release_detr(live_fast, saved_torch)

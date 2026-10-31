@@ -23,21 +23,18 @@ import dev.sam3vision.core.live.FrameRate
 import dev.sam3vision.core.live.LatestFrameSlot
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
-import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.app.live.MotionLog
-import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
 import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.stairs.stairsMaskPlaneOf
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +58,7 @@ class LiveProbe(
     /** Horloge monotone en ns (même base qu'`imageInfo.timestamp`) ; injectable en test. */
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
-    private val background: CoroutineDispatcher = Dispatchers.Default,
+    internal val background: CoroutineDispatcher = Dispatchers.Default,
     /** Moteur (Réglages) : lu via this@LiveProbe (un défaut y verrait le paramètre OFF). */
     @Volatile
     private var depthEngine: DepthBackend = DepthBackend.DA2,
@@ -72,7 +69,7 @@ class LiveProbe(
      */
     clientFor: ((String, Long, WireMarks?) -> LiveClient)? = null,
     /** Contexte app (profondeur + collecte crops) ; `null` = désactivés (tests). */
-    private val appContext: Context? = null,
+    internal val appContext: Context? = null,
     /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
     depthMeter: DepthMeter? = null,
 ) {
@@ -81,12 +78,12 @@ class LiveProbe(
         LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
     /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
-    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
+    internal val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
         onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } },
         onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
-    private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
+    internal val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
-    private val _state = MutableStateFlow(LiveProbeState())
+    internal val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
 
     internal var session: LiveSession? = null
@@ -99,7 +96,7 @@ class LiveProbe(
     private var warmed = false
 
     /** Cadence affichée : moyenne sur les 8 dernières frames, pas l'écart deux frames. */
-    private val rate = FrameRate()
+    internal val rate = FrameRate()
 
     /** Échéance partagée avec le Direct ; la réserve d'une frame reste locale (ci-dessous). */
     internal val cadence = LiveFrameCadence()
@@ -116,19 +113,19 @@ class LiveProbe(
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
     internal val voice = ProbeVoice()
     /** Déclencheur du mode Traversée : vert confirmé (4 frames), rouge vite (2 frames). */
-    private val crossing = CrossingAnnouncer()
+    internal val crossing = CrossingAnnouncer()
 
     /** Collecte des crops (voir [LightCropLogger]) : `null` = interrupteur coupé. */
-    private var cropLogger: LightCropLogger? = null
+    internal var cropLogger: LightCropLogger? = null
 
     /** Veto trafic du mode Traversée : un véhicule qui approche force l'attente. */
-    private val traverseVeto = TraverseVeto()
+    internal val traverseVeto = TraverseVeto()
 
     /** Porte « sans feu » : 4 frames sans boîte de feu → voix véhicules + « Traversez. ». */
-    private val noLightGate = NoLightGate()
+    internal val noLightGate = NoLightGate()
 
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
-    private val chronology = ScreenTimings(clock)
+    internal val chronology = ScreenTimings(clock)
 
     /**
      * Coloriage des masques avec tampons réutilisés : une table de 256 niveaux par
@@ -136,10 +133,10 @@ class LiveProbe(
      * 0,66 ms pour 12 masques et −12,8 Mo par frame, là où le chemin direct réalloue
      * tout à chaque image.
      */
-    private val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
+    internal val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
 
     /** Langue de la voix : l'anglais est le défaut partout (produit anglophone seul). */
-    private var speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT
+    internal var speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT
 
     /** Un réveil `/health` est en cours (un seul à la fois). */
     private var warming = false
@@ -297,7 +294,7 @@ _state.update { it.cleared() }
     private val reserved = FramePayload()
 
     /** Étiquettes de la frame, sans doublon : un ensemble réutilisé à chaque publication. */
-    private val labels = FrameLabels()
+    internal val labels = FrameLabels()
 
     /**
      * Faut-il convertir la frame qui arrive ? Oui si une frame de réserve manque :
@@ -421,55 +418,6 @@ _state.update { it.cleared() }
         if (warming) {
             warming = false
             _state.update { it.copy(warming = false) }
-        }
-    }
-
-    /** Publie une frame analysée : masques recolorés, objets, distances, cadence et latences. */
-    private suspend fun publish(
-        active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
-    ) {
-        val overlays = overlaysFor(frame, shown, background, painter, chronology)
-        val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame)
-        val readings = meters.readingsFor(frame, pinhole)
-        val placed = placedLabels(frame, readings) +
-            dangerPlaced(distances, meters.dangerSnapshot())
-        val cross = crossingPatchOf(
-            crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
-            onCrop = cropLogger?.tap(), noLightGate = noLightGate,
-        )
-        val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec)
-        val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
-            distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger)
-        feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
-        pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
-        // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
-        StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
-        _state.update { current ->
-            current.copy(
-                masks = overlays,
-                labels = labelsOf(labels, frame),
-                objects = frame.objects.size,
-                latencyMs = active.stats.averageMs,
-                p95Ms = active.stats.p95Ms,
-                serverMs = frame.elapsedMs,
-                timings = chronology.snapshot(shown, frame),
-                width = frame.width,
-                height = frame.height,
-                frames = current.frames + 1,
-                fps = rate.rate,
-                distanceLayer = distanceLayerOf(frame, readings),
-                samDetections = rawDetections,
-                spoken = phrase ?: current.spoken,
-                spokenSeq = if (phrase != null) current.spokenSeq + 1 else current.spokenSeq,
-                spokenUrgent = if (phrase != null) spokenUrgentOf(phrase) else current.spokenUrgent,
-                steering = steeringCueOf(),
-                samPassage = frame.passage,
-                detour = if (_state.value.crossingActive) false else voice.detour,
-                crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
-                scanLines = CrosswalkScanWatch.display(speechLanguage),
-                transport = transportLabel(active),
-                error = null,
-            )
         }
     }
 
