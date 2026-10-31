@@ -28,7 +28,7 @@ class CrossingVehicleTest {
         return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
     }
 
-    private fun red() = CrossingCue("Red, wait.", false, CrossingState.Red)
+    private fun red() = CrossingCue("Don't cross yet", false, CrossingState.Red)
 
     private fun stoppedCar(widthPx: Float = 100f): Pair<List<Detection>, List<DistanceReading>> {
         val frame = box(widthPx)
@@ -89,10 +89,10 @@ class CrossingVehicleTest {
         CrossingPeopleWatch.reset()
         val (detections, readings) = stoppedCar()
         val placed = listOf(PlacedLabel("person", centerX = 0.1f))
-        val cue = CrossingCue("Green, cross now.", false, CrossingState.Green)
+        val cue = CrossingCue("You can cross", false, CrossingState.Green)
 
         assertEquals(
-            "Green, cross now.",
+            "You can cross",
             crossingPhraseOf(cue, placed, detections, readings, 0L, SpeechLanguage.En),
         )
     }

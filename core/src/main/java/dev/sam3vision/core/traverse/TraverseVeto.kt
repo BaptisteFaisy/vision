@@ -3,8 +3,10 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
+import kotlin.math.hypot
 
 /**
  * Concepts véhicules du veto trafic : ce que SAM doit suivre en mode traversée.
@@ -101,7 +103,9 @@ data class TraverseDecision(
  * (surface de boîte croissante sur deux frames) **ou** qu'il est proche (distance
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
- * calibré pour les sept véhicules) et [Pinhole].
+ * calibré pour les sept véhicules) et [Pinhole]. Un véhicule confirmé à
+ * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ne
+ * bloque plus : le vert seul décide alors ; en mouvement ou doute bloque.
  *
  * Machine d'état : [TraversePhase.ATTENDRE] par défaut et sous veto, `PRET` à la
  * première frame verte sans veto, `TRAVERSER` quand le vert se maintient, `ALERTE`
@@ -120,6 +124,9 @@ class TraverseVeto {
     /** Surface max par véhicule à la frame précédente (clé : label singulier canonique). */
     private var previousAreas: Map<String, Float> = emptyMap()
 
+    /** Dernier centre/seau/date par véhicule (clé : label singulier canonique). */
+    private var previousStill: Map<String, StillMemory> = emptyMap()
+
     /** Suivi temporel des véhicules (IoU + TTC) — ceinture et bretelles du veto. */
     private val approach = VehicleApproach()
 
@@ -127,6 +134,7 @@ class TraverseVeto {
     fun reset() {
         currentState = TraversePhase.ATTENDRE
         previousAreas = emptyMap()
+        previousStill = emptyMap()
         approach.reset()
     }
 
@@ -146,10 +154,12 @@ class TraverseVeto {
         atMs: Long = -1L,
         motion: FrameMotion? = null,
     ): TraverseDecision {
-        val tracked = approachVerdict(detections, atMs, motion)
+        val stopped = stoppedKeys(detections, focalPx, atMs)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
-        val blocking = findBlocking(detections, focalPx, hushed)
+        val blocking = findBlocking(detections, focalPx, stopped + hushed)
         previousAreas = vehicleAreas(detections)
+        previousStill = stillMemoryOf(detections, focalPx, atMs)
+        val tracked = approachVerdict(detections, atMs)
         val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
@@ -170,23 +180,83 @@ class TraverseVeto {
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */
-    private fun findBlocking(detections: List<Detection>, focalPx: Float, hushed: Set<String>): Blocking? =
-        detections.mapNotNull { vetoCandidate(it, focalPx, hushed) }
+    private fun findBlocking(detections: List<Detection>, focalPx: Float, stopped: Set<String>): Blocking? =
+        detections.mapNotNull { vetoCandidate(it, focalPx, stopped) }
             .minByOrNull { it.meters ?: Float.MAX_VALUE }
 
-    /** Candidature d'une détection au veto : véhicule confiant qui approche ou proche. */
-    private fun vetoCandidate(detection: Detection, focalPx: Float, hushed: Set<String>): Blocking? {
+    /**
+     * Candidature d'une détection au veto : véhicule confiant qui approche ou proche.
+     *
+     * @param stopped ensemble des identifiants de piste neutralisés (piste à l'arrêt / piste
+     *                « hushed »), écartés de la sélection du veto.
+     */
+    private fun vetoCandidate(detection: Detection, focalPx: Float, stopped: Set<String>): Blocking? {
         if (!VehicleConcepts.isVehicle(detection.label)) return null
         if (detection.score <= SCORE_MIN) return null
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
         val growing = area != null && previous != null && area > previous
         val approaching = growing && vehicleKey(detection.label) !in hushed
+        if (!approaching && vehicleKey(detection.label) in stopped) return null
         val meters = distanceOf(detection, focalPx)
         val near = meters != null && meters < VETO_METERS
         if (!approaching && !near) return null
         return Blocking(detection.label, meters)
     }
+
+    /**
+     * Clés des véhicules confirmés à l'arrêt : mesurés au sténopé sous
+     * [VehicleStateWatcher.STOPPED_METERS], dans le couloir marché, quasi
+     * immobiles et à seau-mètre stable depuis la frame précédente datée
+     * (miroir de la voix [VehicleStateWatcher], au sténopé près — iSee et
+     * direct en profitent sans changer leurs signatures). Sans date
+     * ([atMs] < 0) : vide, le doute bloque.
+     */
+    private fun stoppedKeys(detections: List<Detection>, focalPx: Float, atMs: Long): Set<String> {
+        if (atMs < 0L || focalPx <= 0f) return emptySet()
+        return detections.mapNotNull { detection ->
+            if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
+            if (detection.score <= SCORE_MIN) return@mapNotNull null
+            val box = Box.fromProto(detection.box) ?: return@mapNotNull null
+            if (!box.isSane) return@mapNotNull null
+            val key = vehicleKey(detection.label)
+            val prev = previousStill[key] ?: return@mapNotNull null
+            if (prev.atMs < 0L) return@mapNotNull null
+            val dtSeconds = (atMs - prev.atMs) / 1000f
+            if (dtSeconds <= 0f || dtSeconds > STILL_STALE_SECONDS) return@mapNotNull null
+            val meters = distanceOf(detection, focalPx) ?: return@mapNotNull null
+            if (meters > VehicleStateWatcher.STOPPED_METERS) return@mapNotNull null
+            val center = detection.normalizedBox() ?: return@mapNotNull null
+            val cx = (center[0] + center[2]) / 2f
+            val cy = (center[1] + center[3]) / 2f
+            if (cx < PositionText.SIDE_EDGE || cx > 1f - PositionText.SIDE_EDGE) return@mapNotNull null
+            val px = prev.cx ?: return@mapNotNull null
+            val py = prev.cy ?: return@mapNotNull null
+            if (hypot(cx - px, cy - py) / dtSeconds > VehicleStateWatcher.STILL_SPEED) return@mapNotNull null
+            if (PositionText.sceneBucket(meters) != prev.bucket) return@mapNotNull null
+            key
+        }.toSet()
+    }
+
+    /** Mémoire d'immobilité de la frame (boîte max par label, miroir du veto). */
+    private fun stillMemoryOf(detections: List<Detection>, focalPx: Float, atMs: Long): Map<String, StillMemory> =
+        detections.mapNotNull { detection ->
+            if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
+            if (detection.score <= SCORE_MIN) return@mapNotNull null
+            val box = Box.fromProto(detection.box) ?: return@mapNotNull null
+            if (!box.isSane) return@mapNotNull null
+            vehicleKey(detection.label) to detection
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, same) ->
+                val seen = same.maxBy { Box.fromProto(it.box)?.area ?: -1f }
+                val center = seen.normalizedBox()
+                StillMemory(
+                    cx = center?.let { (it[0] + it[2]) / 2f },
+                    cy = center?.let { (it[1] + it[3]) / 2f },
+                    bucket = PositionText.sceneBucket(distanceOf(seen, focalPx)),
+                    atMs = atMs,
+                )
+            }
 
     /** Surface max par véhicule de la frame (les doublons de label fusionnent). */
     private fun vehicleAreas(detections: List<Detection>): Map<String, Float> =
@@ -232,6 +302,14 @@ class TraverseVeto {
     /** Clé de suivi d'un véhicule entre deux frames (« Cars » et « car » fusionnent). */
     private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
 
+    /** Immobilité mémorisée : centre normalisé, seau-mètre et date de la frame. */
+    private data class StillMemory(
+        val cx: Float?,
+        val cy: Float?,
+        val bucket: String,
+        val atMs: Long,
+    )
+
     /** Un véhicule qui bloque : son label et sa distance si elle est mesurable. */
     private data class Blocking(val label: String, val meters: Float?)
 
@@ -241,5 +319,8 @@ class TraverseVeto {
 
         /** Sous cette distance sténopé (m), un véhicule bloque même sans approche visible. */
         const val VETO_METERS = 15f
+
+        /** Fraîcheur exigée de la frame précédente pour conclure à l'arrêt (s). */
+        const val STILL_STALE_SECONDS = 1.0f
     }
 }

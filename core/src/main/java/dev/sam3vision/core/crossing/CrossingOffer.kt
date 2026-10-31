@@ -131,13 +131,17 @@ class CrossingOfferGate(
  * n'est pas un départ), il faut [MISS_FRAMES] frames publiées de suite sans
  * passage. Une seule réapparition remet le compteur à zéro.
  *
- * Pur et testé en JVM : aucune horloge, l'appelant compte des frames.
+ * Pur et testé en JVM : l'instant passe en argument, aucune horloge implicite.
+ * [onFrame] compte les frames vides, [noteFrame]+[expired] bornent l'absence
+ * par l'horloge (le réseau figé ne coince plus le mode).
  */
 class CrossingLossGate(
     private val missFrames: Int = MISS_FRAMES,
+    private val exitTimeoutMs: Long = EXIT_TIMEOUT_MS,
 ) {
 
     private var misses = 0
+    private var lastVisibleAtMs = NO_SEEN
 
     /**
      * Frame publiée : faux quand le mode auto doit retomber ([visible] faux
@@ -149,13 +153,38 @@ class CrossingLossGate(
         return misses < missFrames
     }
 
+    /**
+     * Frame publiée à [nowMs] : mémorise la dernière scène vue (la première
+     * frame cale l'horloge même vide — un mode armé sur du vide expire).
+     */
+    fun noteFrame(visible: Boolean, nowMs: Long) {
+        if (visible || lastVisibleAtMs == NO_SEEN) lastVisibleAtMs = nowMs
+    }
+
+    /** Vrai quand la scène manque depuis [exitTimeoutMs] ou plus. */
+    fun expired(nowMs: Long): Boolean {
+        val last = lastVisibleAtMs
+        if (last == NO_SEEN) return false
+        return nowMs - last >= exitTimeoutMs
+    }
+
     /** Nouvelle séance, ou mode coupé : le compteur repart de zéro. */
     fun reset() {
         misses = 0
+        lastVisibleAtMs = NO_SEEN
     }
 
     companion object {
         /** Frames sans passage de suite avant le retour au mode normal. */
         const val MISS_FRAMES = 4
+
+        /** Absence de scène au-delà de laquelle le mode retombe (ms). */
+        const val EXIT_TIMEOUT_MS = 4_000L
+
+        /** Réveil du guetteur de sortie entre deux frames publiées (ms). */
+        const val TICK_MS = 500L
+
+        /** Aucune frame mémorisée : l'horloge seule ne sort pas. */
+        private const val NO_SEEN = Long.MIN_VALUE
     }
 }

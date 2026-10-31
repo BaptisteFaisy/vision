@@ -33,7 +33,7 @@ class CrossingVoiceHysteresisTest {
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
         assertNull("une seule frame rouge ne suffit pas", announcer.onFrame(800L, CrossingState.Red))
         val cue = announcer.onFrame(1_000L, CrossingState.Red)
-        assertEquals("Red, wait.", cue?.phrase)
+        assertEquals("Don't cross yet", cue?.phrase)
         assertTrue(cue?.urgent ?: false)
     }
 
@@ -43,7 +43,7 @@ class CrossingVoiceHysteresisTest {
         announcer.onFrame(0L, CrossingState.Red)
         announcer.onFrame(200L, CrossingState.Red)
         repeat(4) { announcer.onFrame(3_000L + it * 200L, CrossingState.Green) }
-        assertEquals("Green, cross now.", announcer.lastCue?.phrase)
+        assertEquals("You can cross", announcer.lastCue?.phrase)
         assertFalse(announcer.lastCue?.urgent ?: true)
     }
 

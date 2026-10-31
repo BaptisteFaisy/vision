@@ -10,9 +10,9 @@ import org.junit.Test
  */
 class CrossingCueQuietTest {
 
-    private fun red() = CrossingCue("Red, wait.", false, CrossingState.Red)
+    private fun red() = CrossingCue("Don't cross yet", false, CrossingState.Red)
 
-    private fun green() = CrossingCue("Green, cross now.", false, CrossingState.Green)
+    private fun green() = CrossingCue("You can cross", false, CrossingState.Green)
 
     @Test
     fun `la frame de l ordre est muette`() {

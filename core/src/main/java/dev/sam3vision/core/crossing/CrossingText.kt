@@ -21,8 +21,8 @@ object CrossingText {
     fun phrase(state: CrossingState, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.En -> when (state) {
-                CrossingState.Red -> "Red, wait."
-                CrossingState.Green -> "Green, cross now."
+                CrossingState.Red -> "Don't cross yet"
+                CrossingState.Green -> "You can cross"
             }
             SpeechLanguage.Fr -> when (state) {
                 CrossingState.Red -> "Rouge, attendez."
