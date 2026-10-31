@@ -8,6 +8,8 @@ import androidx.compose.runtime.LaunchedEffect
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.uprightScaled
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit et que la sonde
@@ -28,15 +30,19 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesLive: Boolean) {
         if (!glassesLive) return@LaunchedEffect
         GlassesVideoLink.frames.collect { box ->
             if (box == null || !probe.wantsFrame()) return@collect
-            val jpeg = snapshotJpeg() ?: return@collect
-            probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
+            // La photo vient de la vue (fil UI) ; tout le reste — redressement, JPEG,
+            // Canny, sonde — tourne en fond, comme le fil d'analyse du téléphone.
+            val bitmap = GlassesVideoLink.takeSnapshot() ?: return@collect
+            withContext(Dispatchers.Default) {
+                val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
+                probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
+            }
         }
     }
 }
 
-/** Photo de la rue → JPEG d'envoi ; les bitmaps jetables sont recyclés aussitôt. */
-private fun snapshotJpeg(): String? {
-    val bitmap = GlassesVideoLink.takeSnapshot() ?: return null
+/** Bitmap de la rue → JPEG d'envoi (hors fil UI) ; les bitmaps jetables sont recyclés aussitôt. */
+private fun bitmapToProbeJpeg(bitmap: Bitmap): String? {
     val upright = uprightScaled(bitmap, 0, FramePolicy.EDGE)
     feedStairCounter(upright)
     val jpeg = runCatching { bitmapToJpegBase64(upright, FramePolicy.QUALITY) }.getOrNull()

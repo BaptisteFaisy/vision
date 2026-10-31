@@ -4,8 +4,10 @@ import dev.sam3vision.app.glasses.CropRect
 import dev.sam3vision.app.glasses.FRAME_THROTTLE_MS
 import dev.sam3vision.app.glasses.FrameVerdict
 import dev.sam3vision.app.glasses.cropTo16x9
+import dev.sam3vision.app.glasses.fpsSuffix
 import dev.sam3vision.app.glasses.frameTimestampMs
 import dev.sam3vision.app.glasses.frameVerdict
+import dev.sam3vision.app.glasses.measuredFps
 import dev.sam3vision.app.glasses.scaledDimensions
 import dev.sam3vision.app.glasses.throttleDelayMs
 import org.junit.Assert.assertEquals
@@ -183,5 +185,25 @@ class GlassesFramePolicyTest {
         assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, 0, 480))
         assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, 640, 0))
         assertEquals(FrameVerdict.DROP_DIMENSIONS, frameVerdict(false, false, -2, -2))
+    }
+
+    // ---- Cadence mesurée --------------------------------------------------------
+
+    @Test
+    fun `trois cents images en vingt secondes font quinze images par seconde`() {
+        assertEquals(15f, measuredFps(frames = 300L, elapsedMs = 20_000L))
+        assertEquals(7.5f, measuredFps(frames = 150L, elapsedMs = 20_000L)!!, 1e-4f)
+    }
+
+    @Test
+    fun `un compteur pas parti ne donne pas de cadence`() {
+        assertNull(measuredFps(frames = 0L, elapsedMs = 20_000L))
+        assertNull(measuredFps(frames = 300L, elapsedMs = 0L))
+    }
+
+    @Test
+    fun `le suffixe journalise une decimale, ou rien`() {
+        assertEquals(" (15.0 i/s)", fpsSuffix(frames = 300L, elapsedMs = 20_000L))
+        assertEquals("", fpsSuffix(frames = 0L, elapsedMs = 20_000L))
     }
 }

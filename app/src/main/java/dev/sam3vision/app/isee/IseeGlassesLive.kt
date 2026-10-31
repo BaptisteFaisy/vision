@@ -15,7 +15,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.sam3vision.app.glasses.GlassesLiveDecoder
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.glasses.VideoSize
-import dev.sam3vision.app.glasses.cropTransform
+import dev.sam3vision.app.glasses.textureViewCrop
 import dev.sam3vision.app.targetSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -178,10 +178,13 @@ private fun attachedSnapshot(view: TextureView?): android.graphics.Bitmap? {
     return runCatching { view.getBitmap(targetWidth, targetHeight) }.getOrNull()
 }
 
-/** Matrice « remplit la vue » depuis le recadrage pur (même géométrie que le dessin). */
+/**
+ * Matrice « remplit la vue » : la vue étire déjà le buffer plein cadre, la matrice ne
+ * fait que corriger l'étirement autour du centre (voir [textureViewCrop]) — pas un
+ * placage échelle + décalage, qui déformait la rue.
+ */
 private fun cropMatrix(video: VideoSize, viewW: Int, viewH: Int): Matrix =
     Matrix().apply {
-        val crop = cropTransform(video.width, video.height, viewW, viewH)
-        setScale(crop.scale, crop.scale)
-        postTranslate(crop.dx, crop.dy)
+        val crop = textureViewCrop(video.width, video.height, viewW, viewH)
+        setScale(crop.scaleX, crop.scaleY, viewW / 2f, viewH / 2f)
     }
