@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "date": "2026-10-31",
+  "sha": "50ca1ada",
+  "pipeline": "CrossingPrompts.selectLightBox -> crop JVM 48px (miroir CrossingPixels.crop) -> PedLightGate.verdict",
+  "note": "V2 (31/10, ordre user : detection au plus large, elancement 1,0) : 3/6 verts synthetiques (h32/h24/h16), h64 refuse par l'arbre (gros disque), h12/h08 trop petits ; car-disc synthetique refuse par l'arbre, 0 vert sur rouge/eteint.",
+  "cases": [
+    {"id": "green-h64", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h32", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h24", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h16", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h12", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h08", "truth": "Green", "verdict": "Red"},
+    {"id": "red-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "off-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "car-disc", "truth": "Red", "verdict": "Red"},
+    {"id": "real-green", "truth": "Green", "verdict": "Green"},
+    {"id": "real-red", "truth": "Red", "verdict": "Red"},
+    {"id": "real-r1b", "truth": "Green", "verdict": "Green"}
+  ],
+  "recall": [
+    {"id": "synthetic_green", "value": "3/6"},
+    {"id": "synthetic_green_grand", "value": "1/2"},
+    {"id": "synthetic_green_petit", "value": "2/4"},
+    {"id": "false_green", "value": "0/4"}
+  ]
+}
