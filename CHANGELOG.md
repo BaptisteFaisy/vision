@@ -4,6 +4,18 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : écart mini aux humains 0,5 → 0,8 m (branche `isee-clearance-80`)
+
+- **Demande** : monter la marge du chemin optimal à 80 cm (la latence ~0,5 s
+  peut manger les 50 cm quand une personne marche vers le cap).
+- Fait : `PeoplePath.MIN_CLEARANCE_M` à 0,8 m, seule constante touchée (stop
+  0,6 m, marge objets et quarts de mètre inchangés) ; attentes des tests
+  recalculées en double précision (16 flips, tous dans `PeoplePathTest`,
+  aucun ailleurs — le côté mono-obstacle est indépendant de la marge).
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 731 tests, 0 échec) ; `check-kotlin-limits.py` vert.
+
+
 ## 2026-10-31 — iSee : durcissement du chemin optimal avant recette (branche `isee-chemin-durci`)
 
 - **Demande** : être quasiment certain que le chemin optimal (50 cm) fonctionne
