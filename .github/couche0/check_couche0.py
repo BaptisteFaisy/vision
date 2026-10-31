@@ -26,11 +26,13 @@ MAX_ERREURS_AFFICHEES = 12
 
 # Fichiers de garde : les modifier exige une mention explicite dans le corps.
 GUARD_FILES = (".github/ci-budget/", ".github/couche0/",
-               ".github/workflows/couche0.yml", ".github/workflows/ci-budget.yml",
+               ".github/workflows/couche0.yml",
                # Fermé le 26/10 : sans ça une PR pouvait retirer les tests du job
                # `ci` sans le déclarer — la porte ouverte derrière la garde.
                # Même motif le 29/10 pour le natif hors PR et la file de merge :
                # vider `lint`/`apk-release` ou l'auto-merge passerait inaperçu.
+               # (`ci-budget.yml` retiré le 31/10 : le garde-fou est un job de
+               # `ci.yml` depuis le 29/10, le fichier n'existe plus.)
                ".github/workflows/ci.yml", ".github/workflows/ci-native.yml",
                ".github/workflows/pr-auto-merge.yml")
 GUARD_FLAG = "SAMVISION_ALLOW_GUARD_BUMP"

@@ -130,8 +130,10 @@ jobs:
       # 17 s → 14 s, APK release toujours produit.
       - name: lintDebug
         run: ./gradlew --console=plain -Dorg.gradle.jvmargs="-Xmx2g" --max-workers=4 :app:lintDebug
+      # Sur échec seul (2026-10-31) : en vert, le HTML ne sert à rien ;
+      # en rouge, il est là pour le diagnostic. L'APK debug reste publiée.
       - name: Rapport de lint
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: rapports-lint

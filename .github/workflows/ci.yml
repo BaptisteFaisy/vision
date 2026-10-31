@@ -25,6 +25,11 @@ name: CI
 # soir. Mesuré sur 48 h : file quasi nulle hors rafales du balayeur — +1 job
 # par push coûte ~3 créneaux sur 21 au pire pic, contre un cycle complet perdu
 # par kill. Verdict inchangé (mêmes gardes, mêmes tests).
+# Marge 5 min (2026-10-31) : cache pip backend supprimé (restauration 104-210 s
+# mesurée, supérieure à l'économie — voir le pas « Tests unitaires backend »),
+# rapports de tests téléversés sur échec seul (`failure()` au lieu de
+# `always()` : le diagnostic reste disponible quand les tests sont rouges, le
+# « Top 20 » reste dans le journal en vert). Verdict inchangé.
 on:
   pull_request:
   push:
@@ -188,16 +193,12 @@ jobs:
       # (« was not found for Debian 13 »), et pip refuse même `--user`
       # (externally-managed) : venv sans pip + get-pip.py dedans (jamais le
       # système).
-      # Roues pip en cache (2026-10-30) : 15 s → ~4 s quand `server/` est
-      # touché — le venv reste neuf à chaque run (isolation inchangée),
-      # seules les roues sont réutilisées. Clé sur le hash des dépendances :
-      # un requirements modifié invalide le cache tout seul.
-      - name: Cache pip backend
-        if: steps.perimetre.outputs.backend == '1'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-backend-${{ hashFiles('server/scripts/requirements-test.txt') }}
+      # Pas de cache pip (2026-10-31) : le cache `actions/cache` des roues a
+      # été retiré — mesuré 104 à 210 s de RESTAURATION (256 Mo à 1-2 Mo/s
+      # depuis le service de cache vers les runners) pour ~5 s d'économie sur
+      # `pip install` (venv + get-pip ~4 s, install + tests ~5 s). Le verdict
+      # backend retombe à ~10-20 s quand `server/` est touché, au lieu de 2 à
+      # 4 min de mur. Le venv reste neuf à chaque run (isolation inchangée).
       - name: Tests unitaires backend
         if: steps.perimetre.outputs.backend == '1'
         run: |
@@ -241,8 +242,10 @@ jobs:
           for d, n in sorted(rows, reverse=True)[:20]:
               print('%8.1fs  %s' % (d, n))"
 
+      # Sur échec seul (2026-10-31) : en vert, le HTML ne sert à rien (le
+      # « Top 20 » reste dans le journal) ; en rouge, il est là pour le diagnostic.
       - name: Rapport de tests
-        if: ${{ always() && steps.perimetre.outputs.code == '1' }}
+        if: ${{ failure() && steps.perimetre.outputs.code == '1' }}
         uses: actions/upload-artifact@v4
         with:
           name: rapports-tests-core
@@ -323,8 +326,10 @@ jobs:
           for d, n in sorted(rows, reverse=True)[:20]:
               print('%8.1fs  %s' % (d, n))"
 
+      # Sur échec seul (2026-10-31) : en vert, le HTML ne sert à rien (le
+      # « Top 20 » reste dans le journal) ; en rouge, il est là pour le diagnostic.
       - name: Rapport de tests
-        if: ${{ always() && steps.perimetre.outputs.code == '1' }}
+        if: ${{ failure() && steps.perimetre.outputs.code == '1' }}
         uses: actions/upload-artifact@v4
         with:
           name: rapports-tests-app

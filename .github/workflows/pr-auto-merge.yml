@@ -56,8 +56,9 @@
 #     commentaire par passage). Quand les checks passent, l'état change
 #     (BLOCKED → CLEAN) — ou qu'un check change de verdict — et le balayage
 #     suivant est un vrai travail ;
-#   - cron de filet passé de 10 à 15 min : `workflow_run` reste la voie rapide,
-#     et `ci-budget` a rejoint `ci.yml`, donc deux déclencheurs suffisent.
+#   - cron de filet passé de 10 à 15 min, puis revenu à `*/5` (Historique v11) :
+#     `workflow_run` reste la voie rapide, et `ci-budget` a rejoint `ci.yml`,
+#     donc deux déclencheurs suffisent.
 # File de merge — état au 29/10 (v15).
 #
 # Rôle : chaque PR interne est poussée vers la fusion sans main humaine. La
