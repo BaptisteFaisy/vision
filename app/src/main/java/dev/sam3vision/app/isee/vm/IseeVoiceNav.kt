@@ -50,8 +50,6 @@ class IseeVoiceNav(
     private val settings: () -> Settings,
     private val scope: CoroutineScope,
     private val speak: suspend (String) -> Unit,
-    /** Le pilote y arme/coupe le mode traversée (rappel proche / passage). */
-    private val onAutoCrossing: (Boolean) -> Unit = {},
     /** Parole route via Laure (manœuvres GPS, même voix que les obstacles). */
     private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
     /** Coupe la parole route (fin de guidage). */
@@ -78,7 +76,6 @@ class IseeVoiceNav(
             originNow = ::lastKnownOrigin,
             scope = scope,
             onUpdate = ::pushGuidanceUpdate,
-            onAutoCrossing = onAutoCrossing,
             speakRoute = speakRoute,
             stopRoute = stopRoute,
             onRouteCap = onRouteCap,
@@ -193,17 +190,6 @@ class IseeVoiceNav(
         if (!runCatching { NavClarify.isUnclearOrder(text) }.getOrDefault(false)) return false
         speak(NavClarifyText.ask(settings().speechLanguage))
         return true
-    }
-
-    /**
-     * La sonde signale l'état du mode traversée (coupe manuelle : le
-     * guidage reprend). Sans effet si le pilote n'a jamais démarré (il ne
-     * s'initialise pas pour une bascule hors guidage).
-     */
-    fun onTraverseModeChanged(active: Boolean) {
-        if (driverLazy.isInitialized()) {
-            runCatching { driver.onTraverseModeChanged(active) }
-        }
     }
 
     /**
