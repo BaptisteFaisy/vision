@@ -8,11 +8,12 @@ import org.junit.Test
 
 /**
  * Porte anti-confusion du vert piéton : pixels synthétiques (frontières des
- * seuils) + échantillon réel `feuxfr/` (9 crops Panoramax ≤ 48 px, voir
- * ATTRIBUTION.md). Les seuils sont calibrés sur feux français (10/2026) :
- * ces tests verrouillent 0 vert sur rouge et le rappel bonhomme.
- * Détection au plus large (31/10, ordre user) : les disques verts sont
- * admis, seuls les rouges, les éteints et le bruit restent refusés.
+ * seuils) + échantillons réels (`feuxfr/` et `feuxfr2/` Panoramax, `feuxfr3/`
+ * téléphone, voir ATTRIBUTION.md). Les seuils sont calibrés sur feux
+ * français (10/2026) : ces tests verrouillent 0 vert sur rouge et le rappel
+ * bonhomme. Détection au plus large (31/10, ordre user) : élancés comme
+ * ronds passent l'élancement 1,0 ; les disques au contour cyan complet
+ * (tache plus large que haute) restent refusés — réalité par ancre.
  */
 class PedLightGateTest {
 
@@ -146,9 +147,13 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `feux fr - disques voiture admis (31-10, A2 leve)`() {
+    fun `feux fr - disque proche admis (detection au plus large)`() {
         assertEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.ppm"))
-        assertEquals(CrossingState.Green, verdictOf("fr_cardisc_367.ppm"))
+    }
+
+    @Test
+    fun `feux fr - disque rond refuse (tache plus large que haute)`() {
+        assertEquals(CrossingState.Red, verdictOf("fr_cardisc_367.ppm"))
     }
 
     @Test
@@ -176,9 +181,32 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `r1b - disques admis (detection au plus large)`() {
+    fun `r1b - disque elance admis (detection au plus large)`() {
         assertEquals(CrossingState.Green, verdict2Of("st_c01.ppm"))
-        assertEquals(CrossingState.Green, verdict2Of("st_c02.ppm"))
+    }
+
+    @Test
+    fun `r1b - disque rond refuse (tache plus large que haute)`() {
+        assertEquals(CrossingState.Red, verdict2Of("st_c02.ppm"))
+    }
+
+    @Test
+    fun `tel - bonhommes verts telephone acceptes (cyan et delaves)`() {
+        assertEquals(CrossingState.Green, verdict3Of("tel_g01.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g02.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g03.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g04.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g05.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g06.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g07.ppm"))
+    }
+
+    @Test
+    fun `tel - bonhommes rouges telephone refuses`() {
+        assertEquals(CrossingState.Red, verdict3Of("tel_r01.ppm"))
+        assertEquals(CrossingState.Red, verdict3Of("tel_r02.ppm"))
+        assertEquals(CrossingState.Red, verdict3Of("tel_r03.ppm"))
+        assertEquals(CrossingState.Red, verdict3Of("tel_r04.ppm"))
     }
 
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
@@ -226,6 +254,12 @@ class PedLightGateTest {
     /** Verdict sur un crop réel `feuxfr2/` (lot R1b, voir ATTRIBUTION.md). */
     private fun verdict2Of(name: String): CrossingState {
         val (pixels, width, height) = pixelsOf(javaClass.classLoader, "feuxfr2", name)
+        return PedLightGate.verdict(pixels, width, height)
+    }
+
+    /** Verdict sur un crop réel `feuxfr3/` (lot téléphone, voir ATTRIBUTION.md). */
+    private fun verdict3Of(name: String): CrossingState {
+        val (pixels, width, height) = pixelsOf(javaClass.classLoader, "feuxfr3", name)
         return PedLightGate.verdict(pixels, width, height)
     }
 }

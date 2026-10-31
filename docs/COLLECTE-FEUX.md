@@ -43,7 +43,7 @@ uv run --with-requirements tools/requirements-train.txt \
 ```
 
 - Traits : port fidèle de `CrossingFeatures` (`tools/light_features.py`,
-  parité verrouillée en CI sur les 20 ancres).
+  parité verrouillée en CI sur les 31 ancres).
 - Arbre : `DecisionTreeClassifier(gini, max_depth=5, min_samples_leaf=5,
   seed=42)` — hyperparamètres choisis (l'original est hors dépôt), porte et
   planchers FIXES (non réentraînés).
@@ -53,8 +53,10 @@ uv run --with-requirements tools/requirements-train.txt \
 
 GO (exit 0) ssi les trois tiennent, sinon NO-GO motivé (exit 1) :
 
-1. **20 ancres parfaites** : 10 verts restent verts, 10 rouges/disques/froids
-   restent rouges — le socle de sûreté ne bouge jamais ;
+1. **ancres parfaites** (20 Panoramax + 11 `feuxfr3/` téléphone) : chaque
+   ancre garde son verdict mesuré (listes `ANCHOR_GREENS`/`ANCHOR_REDS` de
+   `tools/train_light.py`, disques mixtes documentés par ancre) — le socle
+   de sûreté ne bouge jamais sans mesure ;
 2. **précision du vert ≥ 0,98 sur hold-out** (20 %, stratifié, seed 42) ;
 3. **rappel vert ≥ arbre actuel** sur le même hold-out.
 

@@ -51,7 +51,7 @@ class TrainedLightColorTest {
         assertEquals(0.50f, TrainedLightColor.GREEN_MIN_PURITY, 0f)
     }
 
-    /** Barre verte 4x10 sur fond noir : petit bonhomme sombre (feuille 6 de l'arbre). */
+    /** Barre verte 4x10 sur fond noir : petit bonhomme sombre (fraction verte 0,10). */
     private fun bar(): IntArray {
         val pixels = IntArray(20 * 20) { BLACK }
         for (y in 4 until 14) {

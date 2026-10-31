@@ -2,13 +2,13 @@
 """Reentraine l'arbre couleur feu sur crops telephone labellises.
 
 Entree : labels.csv (name,label R/G/BAD) + dossier de PNG (voir
-`tools/review_light_crops.py`), ancres `feuxfr/` + `feuxfr2/` (+ `feuxfr3/`
-quand il sera peuple, voir son README) (garde-fou).
+`tools/review_light_crops.py`), ancres `feuxfr/` + `feuxfr2/` + `feuxfr3/`
+(garde-fou, listes ANCHOR_GREENS/ANCHOR_REDS ci-dessous).
 L'arbre candidat (sklearn, max_depth=5) remplace les tableaux de
 `TrainedLightColor` ; la porte et les planchers sont FIXES (non reentraînes).
 
-Barriere GO (exit 0) : 20 ancres parfaites (verts verts, rouges/disques/froids
-rouges) + precision du vert >= 0.98 sur hold-out (seuil user du 31/10,
+Barriere GO (exit 0) : ancres parfaites (verdicts stables par ancre, voir
+les listes) + precision du vert >= 0.98 sur hold-out (seuil user du 31/10,
 volontairement bas) + rappel vert >= arbre actuel sur le meme hold-out.
 Sinon NO-GO (exit 1) avec motifs. N'embarque rien seul : le bloc Kotlin
 emis est a relire puis a merger par PR.
@@ -31,12 +31,19 @@ MIN_SAMPLES, MIN_PER_CLASS = 50, 10
 PRECISION_FLOOR = 0.98
 SEED = 42
 
+# Socle de surete (verdicts complets, cf. test_train_light.ANCHORS) : 20 verts
+# admis (bonhommes + pose large + 2 disques elances), 11 rouges (rouges +
+# 2 disques ronds + 4 tel). 01/11 : widepose/close_183/st_c01 passent en
+# verts (A2 leve 31/10), 367/st_c02 restent rouges (mesure), 11 tel lotfinal.
 ANCHOR_GREENS = ["fr_green_fig_21", "fr_green_fig_302", "fr_green_fig_243",
+                 "fr_green_widepose_355", "fr_cardisc_close_183",
                  "r1b_g01", "r1b_g02", "r1b_g03", "r1b_g04", "r1b_g05",
-                 "st_g01", "st_g02"]
+                 "st_g01", "st_g02", "st_c01",
+                 "tel_g01", "tel_g02", "tel_g03", "tel_g04", "tel_g05",
+                 "tel_g06", "tel_g07"]
 ANCHOR_REDS = ["fr_red_fig_548", "fr_red_dim_138", "fr_red_noise_732",
-               "fr_cardisc_close_183", "fr_cardisc_367", "fr_green_widepose_355",
-               "st_r01", "st_r02", "st_c01", "st_c02"]
+               "fr_cardisc_367", "st_r01", "st_r02", "st_c02",
+               "tel_r01", "tel_r02", "tel_r03", "tel_r04"]
 
 
 def load_png(path):
@@ -102,7 +109,7 @@ def tree_fn_of(clf):
 
 
 def check_anchors(new_tree, anchors_dir):
-    """20 ancres parfaites sous le candidat (verdicts complets)."""
+    """Ancres parfaites sous le candidat (verdicts complets, listes stables)."""
     res = Path(anchors_dir)
     fails = []
     for stem in ANCHOR_GREENS:
