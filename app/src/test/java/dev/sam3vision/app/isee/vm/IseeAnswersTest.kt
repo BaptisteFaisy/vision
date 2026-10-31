@@ -1,25 +1,14 @@
 package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.PlaybackEnd
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.app.isee.IseeCameraActions
-import dev.sam3vision.app.isee.IseePlayback
-import dev.sam3vision.app.isee.IseeUiState
-import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
 import dev.sam3vision.core.model.ChatTurn
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
-import java.io.File
-import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,53 +23,10 @@ import org.junit.Test
  *
  * La photo-contexte, elle, est **toujours** relâchée (succès, échec, clé absente) :
  * un contexte oublié joindrait une vieille frame à la question suivante.
+ *
+ * Socle (état, base, média, caméra, fabriques) : [IseeAnswersTestBase].
  */
-class IseeAnswersTest {
-
-    private val state = MutableStateFlow(IseeUiState())
-    private val dao = FakeMessageDao()
-    private val media = MediaCacheStore(tempDir(), dao)
-    private val transcript = IseeTranscript(dao, ::update)
-    private val settings = Settings.Default.copy(llmApiKey = "test-key")
-    private val camera = FakeCamera()
-    private val shots = photoShot(encode = { null })
-
-    private fun answers(
-        ask: suspend (String, String, List<ChatTurn>) -> Result<String>,
-        synthesize: suspend (String) -> ByteArray = { ByteArray(0) },
-        photo: IseePhotoShot = shots,
-        askTimeoutMs: Long = IseeAnswers.ASK_TIMEOUT_MS,
-        destination: String? = null,
-        onContext: ((String?) -> Unit)? = null,
-        testSettings: Settings = settings,
-    ): IseeAnswers = IseeAnswers(
-        media = media,
-        settings = { testSettings },
-        update = ::update,
-        transcript = transcript,
-        playback = playback(synthesize),
-        photo = photo,
-        prune = {},
-        destination = { destination },
-        ask = { image, question, history, context -> onContext?.invoke(context); ask(image, question, history) },
-        askTimeoutMs = askTimeoutMs,
-    )
-
-    /** Réponses branchées sur une clé LLM absente : le contexte photo doit partir aussi. */
-    private fun answersWithoutKey(
-        photo: IseePhotoShot = shots,
-        ask: suspend (String, String, List<ChatTurn>) -> Result<String> = { _, _, _ -> Result.success("ok") },
-    ): IseeAnswers = IseeAnswers(
-        media = media,
-        settings = { Settings.Default },
-        update = ::update,
-        transcript = transcript,
-        playback = playback(),
-        photo = photo,
-        prune = {},
-        destination = { null },
-        ask = { image, question, history, _ -> ask(image, question, history) },
-    )
+class IseeAnswersTest : IseeAnswersTestBase() {
 
     @Test
     fun `question dictee — la ligne porte le texte et son audio`() = runBlocking {
@@ -358,70 +304,6 @@ class IseeAnswersTest {
     }
 
     @Test
-    fun `deux questions en meme temps — la seconde ecrase la premiere, jamais deux appels a la fois`() = runBlocking {
-        val concurrent = AtomicInteger()
-        val maxConcurrent = AtomicInteger()
-        val gate = CompletableDeferred<Unit>()
-        val answers = answers({ _, _, _ ->
-            maxConcurrent.accumulateAndGet(concurrent.incrementAndGet()) { a, b -> maxOf(a, b) }
-            try {
-                gate.await()
-                Result.success("Devant toi")
-            } finally {
-                concurrent.decrementAndGet()
-            }
-        })
-        val row = seedRow()
-        val first = launch { answers.answer(row, "première") }
-        // Le premier appel est en vol : la seconde parole l'écrase au lieu d'être jetée.
-        withTimeout(2_000) { while (concurrent.get() == 0) delay(5) }
-
-        val second = launch { answers.answer(row, "seconde") }
-        withTimeout(2_000) { first.join() }
-
-        gate.complete(Unit)
-        withTimeout(2_000) { second.join() }
-
-        assertTrue("la première est coupée", first.isCancelled)
-        assertEquals("la seconde passe", "Devant toi", dao.byId(row.id)?.texteIA)
-        assertEquals("jamais deux appels à la fois", 1, maxConcurrent.get())
-        assertFalse("aucune erreur busy/thinking", state.value.status == IseeStatusText.ANSWER_PENDING)
-    }
-
-    @Test
-    fun `reponse qui ignore l'annulation — la suivante renonce sans second appel`() = runBlocking {
-        val calls = AtomicInteger()
-        val never = CompletableDeferred<Unit>()
-        val answers = IseeAnswers(
-            media = media,
-            settings = { settings },
-            update = ::update,
-            transcript = transcript,
-            playback = playback(),
-            photo = shots,
-            prune = {},
-            ask = { _, _, _, _ ->
-                calls.incrementAndGet()
-                withContext(NonCancellable) { never.await() }
-                Result.success("jamais")
-            },
-            preemptTimeoutMs = 100L,
-        )
-        val row = seedRow()
-        val first = launch { answers.answer(row, "première") }
-        withTimeout(2_000) { while (calls.get() == 0) delay(5) }
-
-        // La précédente est coincée : passé le plafond, la suivante renonce plutôt
-        // que de lancer un second appel (409 « limite atteinte »).
-        answers.answer(row, "seconde")
-
-        assertEquals(IseeStatusText.ANSWER_PENDING, state.value.status)
-        assertEquals("un seul appel LLM", 1, calls.get())
-        never.complete(Unit)
-        withTimeout(2_000) { first.join() }
-    }
-
-    @Test
     fun `nouvel appui pendant la question — la precedente est coupee, la suivante passe`() = runBlocking {
         val calls = AtomicInteger()
         val gate = CompletableDeferred<Result<String>>()
@@ -471,69 +353,5 @@ class IseeAnswersTest {
 
         assertFalse("le « … » est retiré après la coupe", state.value.thinking)
         assertNull("l'état parlant est rendu", state.value.speakingEntryId)
-    }
-
-    private fun seedRow(): MessageMultimedia =
-        dao.seed(MessageMultimedia(timestamp = 1L, texteUtilisateur = "question"))
-
-    /**
-     * Vrai quand une image est en mains. La sonde relit le contexte, ce qui
-     * redéclenche une capture quand il est vide : les tests de fin de vie
-     * coupent la caméra (`accept = false`) avant de sonder après `answer`.
-     */
-    private fun imageHeld(photo: IseePhotoShot): Boolean =
-        runBlocking { photo.imageBase64() } != null
-
-    private fun update(fn: (IseeUiState) -> IseeUiState) {
-        state.value = fn(state.value)
-    }
-
-    private fun playback(
-        synthesize: suspend (String) -> ByteArray = { ByteArray(0) },
-        playSlice: suspend (ByteArray) -> Result<PlaybackEnd> = { Result.success(PlaybackEnd.Done) },
-    ): IseePlayback = IseePlayback(
-        dao = dao,
-        media = media,
-        player = SpeechPlayer(File(tempDir(), "play")),
-        update = ::update,
-        synthesize = synthesize,
-        playSlice = playSlice,
-    )
-
-    /** Contexte photo de test : [encode] simule le décodage JPEG, absent sur JVM. */
-    private fun photoShot(encode: (File) -> String?): IseePhotoShot = IseePhotoShot(
-        media = media,
-        camera = { camera },
-        encode = encode,
-    )
-
-    /** PCM muet de 100 ms (16 kHz, 16 bits, mono) : l'encodeur MP3 a de quoi écrire. */
-    private fun pcm(): ByteArray = ByteArray(3_200)
-
-    private fun tempDir(): File =
-        Files.createTempDirectory("isee-vm-answers").toFile().apply { deleteOnExit() }
-
-    /** Caméra factice : photo écrite sur disque et réussie, sauf `accept = false`. */
-    private class FakeCamera : IseeCameraActions {
-        var accept = true
-
-        override val ready: Boolean = true
-
-        override fun startRecording(file: File): Boolean = false
-
-        override suspend fun stopRecording(): File? = null
-
-        override fun takePhoto(target: File, onSaved: (Boolean) -> Unit): Boolean {
-            if (!accept) return false
-            target.parentFile?.mkdirs()
-            target.writeBytes(PHOTO_BYTES)
-            onSaved(true)
-            return true
-        }
-
-        private companion object {
-            /** Quatre octets suffisent : le contenu de la photo n'est jamais décodé ici. */
-            val PHOTO_BYTES = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
-        }
     }
 }
