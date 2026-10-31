@@ -2,6 +2,21 @@
 
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
+
+
+## 2026-10-31 — Feux : purge des restes « doute » (docs + KDoc)
+
+- **Fait** : `TRAVERSEE.md` §§1–4, 7–8 alignés sur le binaire
+  (`DOUTE`/`« … »`/`« Doute, attendez. »` supprimés, sans-lecture = rouge
+  partout) ; KDoc `CrossingPixels` (appelant annonce rouge) et
+  `SteeringLayer` (ambre = offre, plus doute) corrigées. Zéro code.
+- Laissé volontairement : « doute » des autres domaines (trottoir, cycles,
+  véhicules, nav — leur prudence est à eux), notes historiques
+  « fini le doute », comparaisons et tests expliqués.
+- Preuves : `git grep` sans reste dans le périmètre feux/traversée
+  (voix, pastille, cadre, bouton, docs) ; checks PR.
+
+
 ## 2026-10-31 — iSee : pluriel véhicules, poteau qui dit comment l'éviter, rebord à 0,7 m (branche `fix/isee-alertes-voitures-poteau-rebord`)
 
 - **Demande** (ordre user) : dire les voitures en mouvement même à plusieurs,
