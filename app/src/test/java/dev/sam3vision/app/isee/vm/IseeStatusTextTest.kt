@@ -46,7 +46,6 @@ class IseeStatusTextTest {
     fun `motifs deja vus sur le telephone — identiques apres decoupe`() {
         assertEquals("Microphone unavailable", IseeStatusText.MIC_UNAVAILABLE)
         assertEquals("Camera not ready — try again", IseeStatusText.CAMERA_NOT_READY)
-        assertEquals("Busy speaking — try again", IseeStatusText.BUSY_SPEAKING)
         assertEquals("Nothing heard", IseeStatusText.NOTHING_HEARD)
         assertEquals("Answer still coming — ask again after it", IseeStatusText.ANSWER_PENDING)
         assertEquals("No LLM key configured (Settings)", IseeStatusText.NO_LLM_KEY)

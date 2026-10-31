@@ -14,7 +14,6 @@ object IseeStatusText {
 
     const val MIC_UNAVAILABLE = "Microphone unavailable"
     const val CAMERA_NOT_READY = "Camera not ready — try again"
-    const val BUSY_SPEAKING = "Busy speaking — try again"
     const val NOTHING_HEARD = "Nothing heard"
     const val ANSWER_PENDING = "Answer still coming — ask again after it"
     const val NO_LLM_KEY = "No LLM key configured (Settings)"
