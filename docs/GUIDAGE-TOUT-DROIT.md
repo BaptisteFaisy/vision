@@ -84,7 +84,7 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
    Une seule porte : un seul parle à la fois, jamais de doublon. Le bouché
    prime toujours : la sécurité ne négocie jamais.
 5. **urgence** — seul le stop coupe la lecture en cours, chat compris
-   (`LiveProbeState.spokenUrgent`, `ProbeWiring.spokenUrgentOf`) : les mots
+   (`LiveProbeState.spokenUrgent`, `spokenUrgentOf`) : les mots
    doux (gauche/tout droit/droite) et le feu de Traversée attendent le
    silence (`ProbeWiring.observeSpoken`). « Stop. » (urgence externe) et
    « Stop, car moving. » (Traversée, voitures en mouvement) coupent.
