@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * Évitement des personnes SUR le passage piéton en mode Traversée : le côté
- * occupé (pieds dans la boîte du passage) conseille de passer de l'autre
+ * occupé (corps qui touche la boîte du passage) conseille de passer de l'autre
  * côté — statique compris, contrairement au nudge d'approche
  * ([dev.sam3vision.core.live.LateralNudgeTracker], verrou « statique → rien »
  * intact, autre tracker, autre condition).
@@ -161,10 +161,21 @@ class CrossingOnPathTest {
     }
 
     @Test
-    fun `pieds dans boite avec tolerance`() {
-        assertTrue(CrossingOnPath.feetOnCrosswalk(0.3f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertTrue(CrossingOnPath.feetOnCrosswalk(0.09f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertFalse(CrossingOnPath.feetOnCrosswalk(0.05f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertFalse(CrossingOnPath.feetOnCrosswalk(0.3f, 0.5f, 0.1f, 0.6f, 0.9f, 0.95f))
+    fun `personne proche pieds coupes parle quand meme`() {
+        val person = obj("person", box = listOf(250f, 500f, 350f, 1000f))
+        val objects = listOf(crosswalk(), person)
+        val track = tracker()
+
+        assertNull(track.onFrame(0L, objects, width, height))
+        assertEquals(SteeringCap.Right, track.onFrame(200L, objects, width, height))
+    }
+
+    @Test
+    fun `corps qui touche la boite avec tolerance`() {
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.4f, 0.35f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.09f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.5f, 0.35f, 1.0f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertFalse(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.05f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertFalse(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.1f, 0.35f, 0.5f, 0.1f, 0.6f, 0.9f, 0.95f))
     }
 }
