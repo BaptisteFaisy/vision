@@ -246,17 +246,19 @@ mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 12 (plafond 16)
+## 5. Concepts suivis : 17 (plafond 17)
 
-- Liste par défaut : `["person", "car", "bicycle", "electric scooter", "pole", "sidewalk",
-  "crosswalk", "wall", "window", "stairs", "door", "barrier"]` (dangers extérieurs,
-  ordre user du 28/10 + portes et barrières le 29/10) —
+- Liste par défaut : `["person", "car", "bus", "truck", "motorcycle", "bicycle",
+  "electric scooter", "pedestrian traffic light", "pedestrian signal head",
+  "curb", "sidewalk", "crosswalk", "pole", "stairs", "barrier", "fence", "gate"]`
+  (17 dangers extérieurs, ordres user des 28-31/10 : la tête du feu piéton
+  suit le caisson depuis le 31/10, la couleur s'y lit en local) —
   `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
 - Preset extérieur : `["person", "pole", "bollard", "fence", "barrier", "gate", "sign",
-  "tree", "trash can", "dumpster", "animal", "traffic light"]` (12 concepts de
-  cheminement : mobilier + poubelles, bennes, animaux, feu tricolore — ordre user
-  du 29/10, détecté en permanence hors traversée ; pastille « Extérieur » du
-  direct, `LivePrompts.outdoor`) — le défaut rue (12 dangers) reste inchangé.
+  "tree", "trash can", "sidewalk", "animal", "pedestrian traffic light",
+  "pedestrian signal head"]` (13 concepts de cheminement : mobilier +
+  trottoir, animaux, feu piéton et sa tête — détecté en permanence hors
+  traversée ; pastille « Extérieur » du direct, `LivePrompts.outdoor`).
 - Liste d'intérieur : `["person", "door", "chair", "table", "stairs", "wall",
   "window"]` (7 objets d'appartement, `LivePrompts.indoor`) — la sonde iSee
   la suit quand le monde est « dedans » (`Settings.outdoorMode = false`,
@@ -265,9 +267,9 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
   champ « Suivre ») traverse inchangée
   (`app/src/main/java/dev/sam3vision/app/isee/ProbeWiring.kt`). V1 : seuls
   les prompts basculent, la portée reste 4 m dans les deux mondes.
-- Plafond : `LivePrompts.MAX = 16`. Le client n'en envoie jamais plus,
-  le commentaire indiquant que le backend tronque déjà à `PROMPT_LIMIT = 16`
-  (`server/backend/tracking.py:53`).
+- Plafond : `LivePrompts.MAX = 17`. Le client n'en envoie jamais plus ;
+  le backend suit (`MAX_PROMPTS = 17` sur `/live`, `PROMPT_LIMIT = 17`
+  côté tracker).
 - Longueur maximale d'un concept : 32 caractères (`LivePrompts.kt:37`).
 - `normalize()` retire les espaces, les vides et les doublons, rejette les concepts trop
   longs, borne à `MAX`, et retombe sur la liste par défaut si le résultat est vide
@@ -328,6 +330,6 @@ identités dans le cas courant, et le serveur seulement quand le tracker est act
   (`git grep -n '"/video"' server/backend` vide) : aucun contrat de réponse n'est écrit,
   seulement la lecture tolérante du client (`HttpSam31VideoClient.kt:89-95`). La question
   « cloud ou on-device ? » reste ouverte (`TapConfig.kt:48`).
-- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 16`, affirmé par le commentaire
+- **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 17`, affirmé par le commentaire
   (`LivePrompts.kt`) **et** le code du tracker (`server/backend/tracking.py:53`) — mais
   le plafond du déploiement `/live` ne se lit que sur le serveur.
