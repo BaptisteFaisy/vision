@@ -210,4 +210,9 @@ class CrossingGuidanceTest {
             CrossingText.approach(SteeringCap.Straight, 2.0f),
         )
     }
+
+    @Test
+    fun `guidage traverse jusqu a 3 m, borne incluse`() {
+        assertEquals(3.0f, CrossingGuidance.GUIDE_METERS, 0f)
+    }
 }
