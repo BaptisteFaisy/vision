@@ -15,7 +15,7 @@ import org.junit.Test
  * frames puis coupe (urgent), et les phrases exactes des deux langues sont
  * verrouillées. Binaire (ordre user du 31/10) : tout non-vert est rouge.
  *
- * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
+ * Seuils lus dans [CrossingAnnouncer] (2f vert / 2f rouge / 2,5 s /
  * rouge et vert répétés 2 s) : ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
