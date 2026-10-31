@@ -467,14 +467,17 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `VOIX-DANGER.md` § 22 (+ amendements §§ 16/17/19, § 21 pluriel),
   `TRAVERSEE.md`, `URGENCE-EXTERNE.md` § 2, `GUIDAGE-TOUT-DROIT.md`.
 - Preuves : rouge-avant observé sur l'ancienne base (12 échecs) ;
-  rebase sur master `916ce104` (67 commits : cap droit sans stop,
-  pluriel véhicules, rebord 0,7 m, flush P1/P2 — § 20 devenu § 22) ;
-  `:core:testDebugUnitTest` 2 436 tests, 5 échecs
-  `PrivateFileSettingsStoreTest` (permissions POSIX, Windows uniquement —
-  pré-existants, fichiers hors diff) ; `:app:testDebugUnitTest`
-  1 354/1 354 ; `check-kotlin-limits.py` vert (1 215 fichiers) ;
-  voicepack 24/24 littéraux présents (émulation locale, `grep` absent
-  de Windows). Recette téléphone **non mesurée**.
+  rebases sur master `916ce104` (67 commits : cap droit sans stop,
+  pluriel véhicules, rebord 0,7 m, flush P1/P2 — § 20 devenu § 22)
+  puis `3e95b54d` (20 commits : veto fond caméra VBG — `motion` et
+  `logMotionTransition` gardés, branche `safety.speak` en normal
+  écartée, ordre user inchangé) ; `:core:testDebugUnitTest`
+  2 505/2 510, 5 échecs `PrivateFileSettingsStoreTest` (permissions
+  POSIX, Windows uniquement — pré-existants, fichiers hors diff) ;
+  `:app:testDebugUnitTest` 1 393/1 393 ; `check-kotlin-limits.py`
+  vert (1 234 fichiers, `spokenUrgentOf` et tests `isSafetyPhrase`
+  extraits) ; voicepack 24/24 littéraux présents (émulation locale,
+  `grep` absent de Windows). Recette téléphone **non mesurée**.
 
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 
