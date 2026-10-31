@@ -18,6 +18,20 @@ data class ApproachReading(
 )
 
 /**
+ * Seuils d'expansion par type d'objet (PISTE2) : le grossissement minimal,
+ * le couloir central et le TTC maximal alerté s'ajustent par label
+ * (véhicules + personnes). Les défauts sont les seuils personnes historiques.
+ */
+data class ApproachThresholds(
+    /** Taux minimal de grossissement (taille normalisée par seconde). */
+    val minGrowthPerSec: Float = 0.03f,
+    /** Demi-largeur du couloir central (|cx − 0,5| ≤ marge). */
+    val centerMargin: Float = 0.25f,
+    /** TTC maximal alerté (`null` = pas de filtre — personnes inchangées). */
+    val maxTtcSec: Float? = null,
+)
+
+/**
  * Lit l'approche sur l'historique des tailles d'une piste : on garde les
  * (instant, taille) de la fenêtre ([windowMs]), le taux vient de la plus
  * vieille à la plus récente. Pur Kotlin, sans Android.
@@ -34,6 +48,8 @@ class ApproachEstimator(
     private val centerMargin: Float = 0.25f,
     /** Écart minimal oldest→newest : sous 300 ms, pas de taux fiable. */
     private val minDtMs: Long = 300L,
+    // PISTE2 : seuils par label — défaut = seuils personnes ci-dessus pour tous (appelants inchangés).
+    private val thresholdsForLabel: (String) -> ApproachThresholds = { ApproachThresholds(minGrowthPerSec, centerMargin) },
 ) {
     private data class Sample(val atMs: Long, val size: Float)
 
@@ -48,9 +64,13 @@ class ApproachEstimator(
         samples.addLast(Sample(nowMs, sizeOf(track)))
         prune(samples, nowMs)
         val rate = growthRate(samples)
-        val centered = kotlin.math.abs(track.centerX - 0.5f) <= centerMargin
-        val approaching = rate != null && rate >= minGrowthPerSec && centered
+        val thresholds = thresholdsForLabel(track.label) // PISTE2
+        val centered = kotlin.math.abs(track.centerX - 0.5f) <= thresholds.centerMargin
+        val approaching = rate != null && rate >= thresholds.minGrowthPerSec && centered
         val ttc = if (approaching) sizeOf(track) / rate!! else null
+        // PISTE2 : TTC au-delà du plafond du type = pas d'alerte (personnes : pas de plafond).
+        val held = ttc != null && thresholds.maxTtcSec != null && ttc > thresholds.maxTtcSec
+        if (held) return ApproachReading(track.id, false, centered, rate ?: 0f, null)
         return ApproachReading(track.id, approaching, centered, rate ?: 0f, ttc)
     }
 
