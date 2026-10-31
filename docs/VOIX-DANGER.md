@@ -482,7 +482,6 @@ Recette téléphone : voiture qui roule cadrée → « Stop, car moving. »
 coupe le chat en lecture ; rebord sous le pied en dictée → « Stop, step
 up. » parlé quand même — **non mesuré**, exige un APK de cet arbre sur
 appareil réel.
-
 ## 17. Véhicules : mouvement annoncé à 15 m, stop sous 8 m (ordre user du 30/10)
 
 Le user veut entendre les voitures en mouvement jusqu'à 15 m, et en
@@ -514,3 +513,36 @@ Recette téléphone : voiture qui roule à ~12 m → « Car moving, 12 meters
 away. » doux ; qui s'approche sous 8 m → « Stop, car moving. » coupe tout ;
 en Traversée idem en doux + « Car stopped… » — **non mesuré**, exige un
 APK de cet arbre sur appareil réel.
+## 18. Poteau à 4 m, 3e priorité, rattrapage (ordre user du 30/10)
+
+Le user marche avec l'app : les poteaux ne sont pas dits, ou trop tard —
+un poteau entre 3 et 4 m était ignoré (`HAZARD_METERS = 3 m`), et la phrase
+douce tue par le chat ou la route était mémorisée puis perdue (jamais
+redite). Nouveau contrat, qui amende le § 11 pour le seul poteau :
+
+- **portée 4 m** : un poteau dans le couloir à 4 m ou moins est détecté
+  (`HazardConcepts.isPole`, `HazardWatcher.POLE_METERS`) ; les autres
+  mobiliers restent à 3 m ;
+- **imminent ≤ 2 m** : annonce dès la 1re frame, urgente (miroir de la
+  marche imminente, `CurbWatcher.onNear`) ;
+- **3e priorité** : le poteau ne coupe ni ne chevauche P1/P2 (alertes
+  `SafetyVoice`, § 16) — `ProbeWiring.p1p2Busy` (mouvement dit il y a
+  moins de 4 s, marche imminente dite il y a moins de 2 s) tient la
+  phrase en file (`shouldCutForHazard`, `busy`) ;
+- **dit une fois puis ré-armé** : après l'annonce, silence jusqu'à 3
+  frames sans poteau (`POLE_REARM_FRAMES`) — un poteau qui clignote à la
+  frontière ne rabâche pas ; cooldown 10 s inchangé ;
+- **rattrapage** : la phrase douce tue part en file (une seule, la plus
+  fraîche) et est redite au silence dans les 3 s
+  (`ProximityVoice.flushPending`, `PENDING_TTL_MS`) — une alerte
+  confirmée ne se perd plus.
+
+Fenêtres 4 s / 2 s / 3 s provisoires, non mesurées : à valider rue (si P3
+parle sur P1/P2, élargir ; s'il se tait trop, resserrer).
+
+Verrouillé par `HazardWatchTest` (+5 : poteau 3,5 m détecté, 4,5 m muet,
+2 frames doux, imminent urgent, ré-armement), `HazardConceptsTest` (+1 :
+`isPole`), `VehicleStateTest` (+1 : `lastMovingAlertMs`),
+`CurbWatcherTest` (+1 : `lastNearMs`), `ProbeWiringWatchersTest` (+2 :
+`p1p2Busy`, `shouldCutForHazard`) et `ProximityVoiceQueueTest` (8 : file,
+péremption, P1/P2, fraîcheur, route, reset, sans-file-perdu, busy).

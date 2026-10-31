@@ -75,6 +75,61 @@ class HazardWatchTest {
     }
 
     @Test
+    fun `poteau a 3m5 = detecte`() {
+        val signal = HazardSignal.of(listOf(furniture("pole", 3.5f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(3.5f, signal.meters!!, 0.001f)
+        assertEquals("pole", signal.label)
+    }
+
+    @Test
+    fun `poteau a 4m5 = silence`() {
+        val signal = HazardSignal.of(listOf(furniture("pole", 4.5f)), 512, 1138)
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `poteau annonce en 2 frames, doux`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole")
+
+        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau.", cue!!.phrase)
+        assertFalse(cue.urgent)
+    }
+
+    @Test
+    fun `poteau imminent = annonce immediate urgente`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 1.5f, label = "poteau")
+
+        val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau.", cue!!.phrase)
+        assertTrue(cue.urgent)
+    }
+
+    @Test
+    fun `poteau deja dit = silence jusqu'au rearmement`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole")
+
+        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+        watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        assertNull(watcher.onSignal(signal, 13_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(signal, 14_000L, SpeechLanguage.Fr))
+        repeat(3) { watcher.onSignal(HazardSignal.none(), 15_000L + it * 1_000L, SpeechLanguage.Fr) }
+        assertNull(watcher.onSignal(signal, 18_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 19_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau.", cue!!.phrase)
+    }
+
+    @Test
     fun `deux positifs parlent, un isole non`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier")

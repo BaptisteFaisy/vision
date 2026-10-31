@@ -33,6 +33,22 @@ class ProbeWiringWatchersTest {
     }
 
     @Test
+    fun `p1p2 recent = occupe, ancien = libre`() {
+        assertTrue(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = 4_000L, lastNearMs = null))
+        assertTrue(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = null, lastNearMs = 4_500L))
+        assertFalse(p1p2Busy(nowMs = 9_000L, lastMovingAlertMs = 4_000L, lastNearMs = null))
+        assertFalse(p1p2Busy(nowMs = 7_000L, lastMovingAlertMs = null, lastNearMs = 4_500L))
+        assertFalse(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = null, lastNearMs = null))
+    }
+
+    @Test
+    fun `poteau coupe seulement si imminent et p1p2 silencieux`() {
+        assertTrue(shouldCutForHazard(cueUrgent = true, busy = false))
+        assertFalse(shouldCutForHazard(cueUrgent = true, busy = true))
+        assertFalse(shouldCutForHazard(cueUrgent = false, busy = false))
+    }
+
+    @Test
     fun `detections reconstruites des lectures, boites illisibles filtrees`() {
         val readings = listOf(
             DistanceReading(1, "car", 5f, 5f, listOf(10f, 20f, 110f, 80f)),

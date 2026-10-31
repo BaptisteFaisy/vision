@@ -166,6 +166,23 @@ class CurbWatcherTest {
     }
 
     @Test
+    fun `imminent expose lastNearMs, pre-alerte non`() {
+        val watcher = CurbWatcher()
+        assertNull(watcher.lastNearMs)
+        val far = CurbSignal(detected = true, meters = 2.0f)
+        repeat(3) { watcher.onSignal(far, 1_000L + it * 1_000L) }
+        assertNull("pré-alerte : pas d'imminent", watcher.lastNearMs)
+
+        val near = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f, edge = CurbEdge.Up)
+        watcher.onSignal(near, 4_000L)
+        watcher.onSignal(near, 5_000L)
+        assertEquals(5_000L, watcher.lastNearMs)
+
+        watcher.reset()
+        assertNull(watcher.lastNearMs)
+    }
+
+    @Test
     fun `imminent deux frames = marche urgente`() {
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f, edge = CurbEdge.Up)

@@ -29,6 +29,33 @@ class VehicleStateTest {
     }
 
     @Test
+    fun `alerte mouvement exposee, arret seul = rien`() {
+        val moving = VehicleStateWatcher()
+        assertNull(moving.lastMovingAlertMs)
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            moving.update(
+                listOf(det("car", box(width))),
+                listOf(reading("car", 5f, box(width))),
+                atMs = index * 100L,
+            )
+        }
+        assertEquals(200L, moving.lastMovingAlertMs)
+
+        val stopped = VehicleStateWatcher()
+        repeat(3) { index ->
+            stopped.update(
+                listOf(det("car", box(100f))),
+                listOf(reading("car", 2f, box(100f))),
+                atMs = index * 100L,
+            )
+        }
+        assertNull("arrêt seul : pas d'alerte mouvement", stopped.lastMovingAlertMs)
+
+        moving.reset()
+        assertNull(moving.lastMovingAlertMs)
+    }
+
+    @Test
     fun `voiture qui approche - mouvement a la 3e frame, urgent au centre`() {
         val watcher = VehicleStateWatcher()
         assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L))

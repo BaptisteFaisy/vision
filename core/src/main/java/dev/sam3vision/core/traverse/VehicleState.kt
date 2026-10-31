@@ -190,6 +190,10 @@ class VehicleStateWatcher(
     val lastAlertMs: Long?
         get() = listOf(lastMovingAtMs, lastStoppedAtMs).filter { it != NO_INSTANT }.maxOrNull()
 
+    /** Dernière annonce de mouvement, `null` si aucune (P1 : le poteau attend quand elle est fraîche). */
+    val lastMovingAlertMs: Long?
+        get() = lastMovingAtMs.takeIf { it != NO_INSTANT }
+
     /**
      * Alimente le lissage avec la frame à [atMs] : l'annonce quand le compte
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]

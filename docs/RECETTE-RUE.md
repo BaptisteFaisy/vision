@@ -29,7 +29,7 @@ temps**) ; sinon repli Google Maps piéton (`TravelMode.WALK`) décrit dans
 | Dictée | « je veux aller à X » consommé avant le LLM, X transmis tel quel | `NavigationIntentParser.kt`, `NavigationRouter.kt` |
 | Confirmation | question « Do you really want to go to X? Travel time: Y. Answer yes or no. », puis « Navigation vers X » au « yes »/« Démarrer » | `VoiceNavPolicy.kt:293-297`, `NavigationAnnouncer.kt:18` |
 | Consigne loin/près | préavis à 100 m (« Continuez dans cette direction[, rue X]. »), ordre sec à 25 m (« Tournez à gauche[, rue X]. », sans distance), une fois chacun (front moteur + signature `ahead`/`now`) | `VoiceNavEngine.kt:7-17,228-241`, `VoiceNavPolicy.kt:113-129,342-350,392-398` |
-| Poteau | « Attention au poteau, à … heure. » après 2 frames confirmées, silence 10 s, en douceur (ne coupe rien) | `HazardConcepts.kt:29-30`, `HazardWatcher.kt:92-95,132-135`, `HazardText.phrase` |
+| Poteau | « Attention au poteau, à … heure. » ≤ 4 m après 2 frames (1ʳᵉ si ≤ 2 m, urgent sauf P1/P2 — P3), silence 10 s + ré-armement, rattrapage au silence ≤ 3 s | `HazardConcepts.kt:53`, `HazardWatcher.kt:123,179-185`, `ProbeWiring.kt:193-203`, `ProximityVoice.flushPending` |
 | Poubelle | position chiffrée (« … à N mètres », 0,90 m sténopé, « poubelle »/« trash can ») et/ou mot de côté « gauche. »/« droite. » (couloir bloqué) | `KnownSizes.kt:70-71`, `Guidance.kt`, `TwinLiteWord` |
 | Benne | position chiffrée (« … à N mètres », 1,50 m sténopé, « benne »/« dumpster ») et/ou mot de côté (couloir bloqué) | `KnownSizes.kt:71`, `Guidance.kt`, `TwinLiteWord` |
 | Panneau bas | position (« … à N mètres », 2,20 m sténopé) et/ou mot de côté ; panneau haut ignoré (filtre tête : centre < 0,22 et mesuré < 4 m) | `KnownSizes.kt:69`, `SignConcepts.kt:30-36,61-66` |
@@ -48,7 +48,7 @@ arrivée.
 
 Le « délai annonce < 1 s après confirmation » reprend le seuil déjà
 pratiqué pour le trottoir (`docs/VOIX-DANGER.md` § 4) : la confirmation,
-c'est la 2ᵉ frame (`HazardWatcher`), le chronomètre part là.
+c'est la 2ᵉ frame (`HazardWatcher`, 1ʳᵉ si poteau ≤ 2 m), le chronomètre part là.
 
 ## Prérequis
 
@@ -78,7 +78,7 @@ c'est la 2ᵉ frame (`HazardWatcher`), le chronomètre part là.
 2. **Confirmation.** Attendu : question vocale
    « Do you really want to go to X? Travel time: … » ; répondre « yes »
    (ou « Démarrer »). Attendu ensuite : voix « Navigation vers X ».
-3. **Poteau.** Marcher vers X, approcher un poteau dans le couloir.
+3. **Poteau.** Marcher vers X, approcher un poteau dans le couloir (≤ 4 m).
    Attendu : « Attention au poteau, à … heure. » **< 1 s après
    confirmation**, éventuellement doublé d'un mot de côté (« gauche. » /
    « droite. »). Noter la phrase exacte + l'heure. Capture écran.
@@ -146,8 +146,8 @@ Comptés sur cet arbre (`@Test` par fichier) :
 - `core/.../nav/VoiceNavEngineTest` (**6**) : fronts loin/près,
   traversée, écart, arrivée ; `VoiceNavCrossingTest` (**3**),
   `CrossingManeuverTest` (**4**).
-- `core/.../hazard/HazardConceptsTest` (**5** : « au poteau » reconnu),
-  `HazardWatchTest` (**9** : 2 frames, cooldown 10 s, douceur).
+- `core/.../hazard/HazardConceptsTest` (**6** : « au poteau » reconnu, `isPole`),
+  `HazardWatchTest` (**14** : 2 frames, cooldown 10 s, douceur, poteau 4 m + imminent + ré-armement).
 - `core/.../live/GuidanceWordTest` (**6**), `TwinLiteWordTest` (**9**),
   `GuidanceAnnouncerTest` (**18**, arbitrage une seule voix),
   `PositionTextTest` (**14**, cadran + distances).
