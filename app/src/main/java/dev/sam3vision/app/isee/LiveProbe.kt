@@ -424,8 +424,7 @@ _state.update { it.cleared() }
         } else {
             CrossingPeopleWatch.reset()
             CrossingVehicleWatch.reset()
-            val hfov = distances.lensSpec.widthFovDeg(frame.width, frame.height)
-            voice.phrase(at, placed, _state.value.steeringCap, frame.passage, hfovDeg = hfov)
+            voice.phrase(at, placed, _state.value.steeringCap, frame.passage, hfovDeg = distances.lensSpec.widthFovDeg(frame.width, frame.height))
         }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
