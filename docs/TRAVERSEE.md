@@ -481,3 +481,14 @@ même si l'user bouge/panote la caméra.
 - **limites** : une trottinette/un vélo reste muet en traversée (politique
   cycles) ; avance franche vers une garée (zoom) : décote via
   `EgoCompensator`, à valider rue.
+
+## 16. Réveil backend et déplois conditionnels (31/10)
+
+Avant une prise : le backend dort quand personne ne s'en sert — `GET /warm`
+le réveille SANS inférence (boot complet 25-38 s à froid, restauration
+snapshot 2-7 s ensuite) et `/health` confirme la version servie (leviers
+`batch_prompts/cuda_graph/edge:512/snapshot/attn:sdpa`, `vision_accel: ok`).
+Depuis le 31/10 le déploiement CI est conditionnel (marqueur `[deploy-gpu]`
+dans le message du push, `deploy-live-fast.yml`) : chaque deploy invalide le
+snapshot, donc une prise qui suit un deploy de peu paie le boot complet —
+prévoir le `/warm` dans le temps d'installation, pas dans la minute de prise.

@@ -64,7 +64,7 @@ class StairConceptsTest {
         )
         assertEquals(18, LivePrompts.MAX)
         assertEquals(
-            listOf("car", "bus", "bicycle"),
+            listOf("car", "bus", "bicycle", "truck", "motorcycle"),
             VehicleConcepts.PROMPTS,
         )
         assertTrue("stairs" in LivePrompts.default)

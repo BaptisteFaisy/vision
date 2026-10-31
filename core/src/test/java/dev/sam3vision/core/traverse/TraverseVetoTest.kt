@@ -12,7 +12,9 @@ import org.junit.Test
 
 /**
  * Le veto trafic force « attendez » même sur vert confirmé ; le vert seul fait
- * traverser. Focale de test : 1000 px (une voiture de 200 px de haut sort à 7,25 m).
+ * traverser. Seule une approche confirmée (croissance, tau suivi) bloque — la
+ * proximité seule ne bloque plus (garée exclue). Focale de test : 1000 px
+ * (une voiture de 200 px de haut sort à 7,25 m).
  */
 class TraverseVetoTest {
 
@@ -35,12 +37,23 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `vert plus voiture proche force attendez`() {
+    fun `voiture proche sans approche - pas de veto, garee exclue`() {
         val veto = TraverseVeto()
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
         val decision = veto.update(true, listOf(nearCar), focalPx)
+        assertFalse("proximité seule : pas de veto", decision.veto)
+        assertEquals(TraversePhase.PRET, decision.state)
+        assertNull(decision.blockingLabel)
+        assertTrue("objet proche : guidage gardé", decision.keepObstacleGuidance)
+    }
+
+    @Test
+    fun `voiture proche en croissance - veto avec distance`() {
+        val veto = TraverseVeto()
+        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 100f, 100f))), focalPx)
+        val decision = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx)
         assertTrue(decision.veto)
-        assertEquals(TraversePhase.ATTENDRE, decision.state)
+        assertEquals(TraversePhase.ALERTE, decision.state)
         assertEquals("wait", decision.cue)
         assertEquals("car", decision.blockingLabel)
         assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
@@ -75,13 +88,17 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `score faible ne declenche pas de veto`() {
-        val veto = TraverseVeto()
-        val nearCar = detection("car", 0.5f, listOf(0f, 0f, 200f, 200f))
-        val decision = veto.update(true, listOf(nearCar), focalPx)
-        assertFalse(decision.veto)
-        assertEquals(TraversePhase.PRET, decision.state)
-        assertNull(decision.blockingLabel)
+    fun `score limite - 0_35 ignore meme en croissance, 0_36 bloque`() {
+        val weak = TraverseVeto()
+        weak.update(true, listOf(detection("car", 0.35f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        val ignored = weak.update(true, listOf(detection("car", 0.35f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        assertFalse("au seuil : ignoré malgré la croissance", ignored.veto)
+        assertNull(ignored.blockingLabel)
+        val strong = TraverseVeto()
+        strong.update(true, listOf(detection("car", 0.36f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        val blocked = strong.update(true, listOf(detection("car", 0.36f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        assertTrue("au-dessus du seuil + croissance : veto", blocked.veto)
+        assertEquals("car", blocked.blockingLabel)
     }
 
     @Test
@@ -95,11 +112,22 @@ class TraverseVetoTest {
     }
 
     @Test
+    fun `guidage - vehicule non mesure garde, objet non mesure coupe`() {
+        val veto = TraverseVeto()
+        val car = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx = 0f)
+        assertFalse("statique : pas de veto", car.veto)
+        assertTrue("véhicule non mesuré : guidage gardé", car.keepObstacleGuidance)
+        val person = TraverseVeto().update(true, listOf(detection("person", 0.9f, listOf(0f, 0f, 150f, 200f))), focalPx = 0f)
+        assertFalse(person.keepObstacleGuidance)
+    }
+
+    @Test
     fun `veto pendant la traversee donne alerte puis reconfirmation`() {
         val veto = TraverseVeto()
         veto.update(true, emptyList(), focalPx)
         veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
+        veto.update(true, listOf(detection("bus", 0.8f, listOf(0f, 0f, 100f, 120f))), focalPx)
         val alert = veto.update(
             true,
             listOf(detection("bus", 0.8f, listOf(0f, 0f, 200f, 250f))),
@@ -117,7 +145,7 @@ class TraverseVetoTest {
     @Test
     fun `veto juste avant de partir donne alerte puis reconfirmation`() {
         val veto = TraverseVeto()
-        veto.update(true, emptyList(), focalPx)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 100f, 100f))), focalPx)
         assertEquals(TraversePhase.PRET, veto.currentState)
         val alert = veto.update(
             true,
@@ -153,7 +181,7 @@ class TraverseVetoTest {
         )
         assertTrue(growing.veto)
         assertNull(growing.blockingMeters)
-        assertFalse(growing.keepObstacleGuidance)
+        assertTrue("approche non mesurée : guidage gardé, annoncé sans distance", growing.keepObstacleGuidance)
     }
 
     @Test
@@ -172,14 +200,14 @@ class TraverseVetoTest {
         val prompts = VehicleConcepts.promptsFor(listOf("traffic light", "person", "door", "zebra"))
         assertEquals(
             listOf(
-                "car", "bus", "bicycle",
+                "car", "bus", "bicycle", "truck", "motorcycle",
                 "traffic light", "person", "door", "zebra",
             ),
             prompts,
         )
         val full = VehicleConcepts.promptsFor((1..20).map { "objet$it" })
         assertEquals(LivePrompts.MAX, full.size)
-        assertEquals(VehicleConcepts.PROMPTS, full.take(3))
+        assertEquals(VehicleConcepts.PROMPTS, full.take(5))
         assertEquals(VehicleConcepts.PROMPTS, VehicleConcepts.promptsFor())
     }
 
@@ -243,18 +271,19 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `fond qui defile - la proximite mesuree ne se tait jamais`() {
-        // Même sous caméra, un véhicule mesuré sous 15 m bloque toujours.
+    fun `fond qui defile - proximite sans approche, jamais de veto`() {
+        // Même mesurée sous 15 m, une boîte qui ne grandit pas ne bloque pas (garée).
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val veto = TraverseVeto()
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
-        repeat(3) { index ->
-            veto.update(true, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
+        var last: TraverseDecision? = null
+        repeat(4) { index ->
+            last = veto.update(true, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
         }
-        val last = veto.update(true, listOf(nearCar), focalPx, atMs = 300L, motion = motion)
 
-        assertTrue("proximité 7,25 m : veto", last.veto)
-        assertEquals("car", last.blockingLabel)
+        assertFalse("7,25 m sans croissance : pas de veto", last!!.veto)
+        assertNull(last.blockingLabel)
+        assertTrue("objet proche : guidage gardé", last.keepObstacleGuidance)
     }
 
     @Test

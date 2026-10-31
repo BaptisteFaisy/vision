@@ -200,4 +200,21 @@ class CrossingOnPathTest {
         assertFalse(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.05f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
         assertFalse(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.1f, 0.35f, 0.5f, 0.1f, 0.6f, 0.9f, 0.95f))
     }
+
+    @Test
+    fun `meilleur passage miroir du guidage, sans dimensions au score`() {
+        val off = obj("crosswalk", 0.90f, listOf(700f, 100f, 800f, 900f))
+        val on = obj("crosswalk", 0.50f, cross)
+        assertEquals(0, CrossingOnPath.bestCrosswalk(listOf(off, on)))
+        assertEquals(1, CrossingOnPath.bestCrosswalk(listOf(off, on), frameW = width, frameH = height))
+        assertEquals(-1, CrossingOnPath.bestCrosswalk(listOf(off), frameW = width, frameH = height))
+    }
+
+    @Test
+    fun `traqueur muet quand le seul passage est hors axe`() {
+        val off = obj("crosswalk", 0.90f, listOf(700f, 100f, 800f, 900f))
+        val track = tracker()
+        assertNull(track.onFrame(0L, listOf(off, personOn(0.75f)), width, height))
+        assertNull(track.onFrame(200L, listOf(off, personOn(0.75f)), width, height))
+    }
 }

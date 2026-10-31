@@ -17,6 +17,8 @@ class LiveProbeStateTest {
             frames = 10,
             error = "boom",
             spoken = "Personne à gauche.",
+            skippedFrames = 5,
+            timeoutSec = 60,
         )
         val cleared = state.cleared()
         assertEquals("https://gpu.example", cleared.endpoint)
@@ -26,5 +28,7 @@ class LiveProbeStateTest {
         assertEquals(0, cleared.frames)
         assertNull(cleared.error)
         assertNull(cleared.spoken)
+        assertEquals(0, cleared.skippedFrames)
+        assertEquals(0, cleared.timeoutSec)
     }
 }

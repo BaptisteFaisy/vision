@@ -17,14 +17,15 @@ import org.junit.Test
  * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
  * la chaîne veto→phrase « Don't cross yet » et les littéraux FR préchauffés.
  *
- * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN strict, 15 m,
- * ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
+ * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN 0,35 strict, approche
+ * confirmée, ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
  */
 class TraverseVetoPriorityTest {
 
     private val focalPx = 1000f
     private val mp3 = ByteArray(64) { 0xFF.toByte() }
     private val nearBox = listOf(0f, 0f, 200f, 200f)
+    private val smallBox = listOf(0f, 0f, 60f, 50f)
 
     private fun detection(label: String, score: Float, box: List<Float>): Detection =
         Detection(label, score, box, width = 640, height = 480)
@@ -32,6 +33,7 @@ class TraverseVetoPriorityTest {
     @Test
     fun `veto plus vert donne attendez - mot d ordre exact`() {
         val veto = TraverseVeto()
+        veto.update(false, listOf(detection("car", 0.9f, smallBox)), focalPx)
         val decision = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
@@ -43,7 +45,7 @@ class TraverseVetoPriorityTest {
     @Test
     fun `veto prime sur vert prepare - PRET puis ALERTE`() {
         val veto = TraverseVeto()
-        assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
+        assertEquals(TraversePhase.PRET, veto.update(true, listOf(detection("car", 0.9f, smallBox)), focalPx).state)
         val alert = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
@@ -56,6 +58,7 @@ class TraverseVetoPriorityTest {
         veto.update(true, emptyList(), focalPx)
         veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
+        veto.update(true, listOf(detection("car", 0.8f, smallBox)), focalPx)
         val alert = veto.update(true, listOf(detection("car", 0.8f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
@@ -78,6 +81,7 @@ class TraverseVetoPriorityTest {
     @Test
     fun `feu rouge plus veto reste attendre - pas d alerte depuis l attente`() {
         val veto = TraverseVeto()
+        veto.update(false, listOf(detection("car", 0.9f, smallBox)), focalPx)
         val decision = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
@@ -85,13 +89,17 @@ class TraverseVetoPriorityTest {
     }
 
     @Test
-    fun `score limite - 0_5 ignore, 0_51 bloque`() {
-        val ignored = TraverseVeto().update(true, listOf(detection("car", 0.5f, nearBox)), focalPx)
+    fun `score limite - 0_35 ignore, 0_36 bloque`() {
+        val weak = TraverseVeto()
+        weak.update(true, listOf(detection("car", 0.35f, smallBox)), focalPx)
+        val ignored = weak.update(true, listOf(detection("car", 0.35f, nearBox)), focalPx)
         assertFalse(ignored.veto)
-        assertEquals(TraversePhase.PRET, ignored.state)
-        val blocked = TraverseVeto().update(true, listOf(detection("car", 0.51f, nearBox)), focalPx)
+        assertEquals(TraversePhase.TRAVERSER, ignored.state)
+        val strong = TraverseVeto()
+        strong.update(true, listOf(detection("car", 0.36f, smallBox)), focalPx)
+        val blocked = strong.update(true, listOf(detection("car", 0.36f, nearBox)), focalPx)
         assertTrue(blocked.veto)
-        assertEquals(TraversePhase.ATTENDRE, blocked.state)
+        assertEquals(TraversePhase.ALERTE, blocked.state)
         assertEquals("wait", blocked.cue)
     }
 

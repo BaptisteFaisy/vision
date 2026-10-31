@@ -7,7 +7,7 @@ import org.junit.Test
 class CrossingTextTest {
 
     @Test
-    fun `phrases francaises courtes, binaire rouge vert`() {
+    fun `phrases francaises courtes, rouge vert`() {
         assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
         assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
     }
@@ -16,6 +16,27 @@ class CrossingTextTest {
     fun `phrases anglaises courtes, binaire rouge vert`() {
         assertEquals("Don't cross yet", CrossingText.phrase(CrossingState.Red, SpeechLanguage.En))
         assertEquals("You can cross", CrossingText.phrase(CrossingState.Green, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `le clignotant dit ne pas s'engager`() {
+        assertEquals("Vert clignotant, ne pas s'engager.", CrossingText.blinking(SpeechLanguage.Fr))
+        assertEquals("Flashing green, do not cross.", CrossingText.blinking(SpeechLanguage.En))
+        assertEquals("Flashing green, do not cross.", CrossingText.blinking())
+    }
+
+    @Test
+    fun `le pret dit pret, pas traversez`() {
+        assertEquals("Prêt.", CrossingText.ready(SpeechLanguage.Fr))
+        assertEquals("Ready.", CrossingText.ready(SpeechLanguage.En))
+        assertEquals("Ready.", CrossingText.ready())
+    }
+
+    @Test
+    fun `la contradiction dit feux contradictoires, attendez`() {
+        assertEquals("Feux contradictoires, attendez.", CrossingText.contradiction(SpeechLanguage.Fr))
+        assertEquals("Conflicting lights, wait.", CrossingText.contradiction(SpeechLanguage.En))
+        assertEquals("Conflicting lights, wait.", CrossingText.contradiction())
     }
 
     @Test

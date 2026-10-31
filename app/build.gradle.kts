@@ -100,9 +100,29 @@ android {
         manifestPlaceholders["mwdat_client_token"] = localProp("mwdat.client.token").ifBlank { "0" }
 
         // Valeurs lues depuis local.properties (jamais commité) ; vides si absent.
-        buildConfigField("String", "LLM_BASE_URL", "\"${localProp("llm.base.url")}\"")
-        buildConfigField("String", "LLM_API_KEY", "\"${localProp("llm.api.key")}\"")
-        buildConfigField("String", "LLM_MODEL", "\"${localProp("llm.model")}\"")
+        // Trio LLM : partiel (1-2/3) = BuildConfig silencieusement inutilisable,
+        // donc erreur claire au lieu d'un APK qui semble configuré ; vide = APK
+        // sans clé (saisie dans Réglages), le défaut assumé — sauf SAM_REQUIRE_KEYS=1.
+        val llmBase = localProp("llm.base.url")
+        val llmKey = localProp("llm.api.key")
+        val llmModel = localProp("llm.model")
+        val llmKeysSet = listOf(llmBase, llmKey, llmModel).count { it.isNotBlank() }
+        if (llmKeysSet in 1..2) {
+            error("clés LLM incomplètes ($llmKeysSet/3 dans local.properties : " +
+                "llm.base.url, llm.api.key, llm.model se posent ensemble) — " +
+                "un BuildConfig partiel ne répondrait jamais.")
+        }
+        if (llmKeysSet == 0 && System.getenv("SAM_REQUIRE_KEYS") == "1") {
+            error("SAM_REQUIRE_KEYS=1 mais aucune clé LLM dans local.properties " +
+                "(llm.base.url, llm.api.key, llm.model) — voir docs/CLES-DU-BUILD.md.")
+        }
+        if (llmKeysSet == 0) {
+            logger.warn("APK sans clé LLM : questions et narration exigeront une saisie " +
+                "dans Réglages (SAM_REQUIRE_KEYS=1 refuse ce build).")
+        }
+        buildConfigField("String", "LLM_BASE_URL", "\"$llmBase\"")
+        buildConfigField("String", "LLM_API_KEY", "\"$llmKey\"")
+        buildConfigField("String", "LLM_MODEL", "\"$llmModel\"")
         // Voix ElevenLabs : défauts de debug, la saisie dans Réglages prime.
         buildConfigField("String", "TTS_API_KEY", "\"${localProp("tts.api.key")}\"")
         buildConfigField("String", "TTS_VOICE_ID", "\"${localProp("tts.voice.id")}\"")

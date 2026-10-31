@@ -9,8 +9,12 @@ package dev.sam3vision.core.predict
  * l'autre). C'est ce classeur qui comble ce trou.
  *
  * Méthode : glouton par IoU décroissant, un objet serveur ne peut prendre qu'un id,
- * un id ne peut prendre qu'un objet. Au-delà de [maxIou], l'objet serveur est
+ * un id ne peut prendre qu'un objet. En deçà de [maxIou], l'objet serveur est
  * « nouveau » (id libre) et l'ancien suivi finit par expirer.
+ *
+ * Cohérent avec le re-keyframe à 1 s de [dev.sam3vision.core.live.TrackRunner] : le
+ * tracker `/session` n'a pas besoin d'association (ids stables du serveur, sessions
+ * re-détectées à la seconde) ; ce classeur ne sert qu'au point-à-frame `/live`.
  */
 class ObjectAssociator(private val maxIou: Float = DEFAULT_MAX_IOU) {
 

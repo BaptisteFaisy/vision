@@ -10,7 +10,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * partagée avec les consignes de guidage : ici, pas d'urgence — une scène vide fait
  * retomber la mémoire, pour que le retour des objets parle. Une scène nouvelle parle
  * dès la première frame (pas de stabilité : un objet qui s'approche change de clé
- * à chaque frame) ; le délai de 4 s reste, qui borne le bavardage.
+ * à chaque frame) ; le délai de 3 s reste, qui borne le bavardage. La clé est
+ * signée au seau stable ([StableBucket], hystérésis) : un tremblé de mesure ne
+ * change pas de signature, seule une vraie approche reparle.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -21,6 +23,7 @@ class PositionAnnouncer(
 ) {
 
     private val gate = AnnouncementGate(minFrames, cooldownMs)
+    private val buckets = StableBucket()
 
     /** Dernière phrase produite (`null` tant que rien n'a été annoncé). */
     val lastPhrase: String? get() = gate.lastPhrase
@@ -35,9 +38,10 @@ class PositionAnnouncer(
         labels: List<PlacedLabel>,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
-        val key = PositionText.key(labels)
+        val key = PositionText.key(labels) { id, meters -> buckets.bucketOf(id, meters) }
         if (key.isEmpty()) {
             gate.clearScene()
+            buckets.reset()
             return null
         }
         if (!gate.admit(atMs, key, firstSight = true)) return null
@@ -47,5 +51,8 @@ class PositionAnnouncer(
     }
 
     /** Nouvelle session de direct : tout est oublié (la première scène sera annoncée). */
-    fun reset() = gate.reset()
+    fun reset() {
+        gate.reset()
+        buckets.reset()
+    }
 }

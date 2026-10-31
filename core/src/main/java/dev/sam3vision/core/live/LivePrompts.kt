@@ -21,12 +21,13 @@ object LivePrompts {
      * les murs) et les clés (« keys », ordre user du 31/10 :
      * « barrier » cède son slot, « fence » garde le sien) puis souvenirs (« souvenir shop »,
      * « beanie », « socks », boutique du square, ordre user du 31/10),
-     * modifiables à chaud dans le direct (champ « Follow »).
+     * modifiables à chaud dans le direct (champ « Follow »), slot « curb » réservé.
      *
      * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
      * dans les deux modes) : tout ce que la Traversée doit voir (voiture,
      * bus, vélo, feu, bordure, trottoir, passage, personnes) est déjà suivi
-     * ici, la bascule ne change plus les prompts. « truck », « motorcycle »,
+     * ici, la bascule ne change plus les prompts — sauf la traversée active,
+     * qui ajoute camion et moto (reel audit 31/10, voir `VehicleConcepts`).
      * « scooter » et « electric scooter » n'y sont plus (ordre user du 31/10,
      * boutique du square) : le veto les reconnaît encore par le champ
      * « Follow », mais la traversée ne les suit plus. « door » et « window »
@@ -57,33 +58,34 @@ object LivePrompts {
     )
 
     /**
-     * Preset extérieur : **13** concepts de cheminement urbain — la personne et
-     * le mobilier qui borde le trottoir (poteaux, bornes, clôtures, barrières,
-     * portails, panneaux, arbres), plus le trottoir lui-même, les encombrants
-     * (poubelles), les animaux et le feu piéton — ordre user du 29/10
-     * (31/10 : piétons seuls, plus de feux voiture, tête du feu suivie)
-     * (30/10 : « sidewalk » remplace « dumpster », benne la moins utile),
-     * détecté en permanence hors mode traversée pour anticiper les passages
-     * protégés. Bascule depuis la pastille « Extérieur » du direct, sans passer
-     * par le champ « Follow ». Tient sous [MAX] comme [default], qui reste les
-     * 18 concepts (pastille « Rue »).
+     * Preset extérieur : **15** concepts de cheminement urbain — la personne et
+     * le mobilier qui borde le trottoir (poteaux, lampadaires, bornes, clôtures,
+     * barrières, portails, panneaux, arbres), plus le trottoir lui-même et le
+     * passage piéton, les encombrants (poubelles), les animaux et le feu piéton
+     * — ordre user du 29/10 (31/10 : piétons seuls, plus de feux voiture, tête
+     * du feu suivie) (30/10 : « sidewalk » remplace « dumpster ») (reel audit
+     * 31/10 : « crosswalk » et « street lamp » en plus, « bollard » et « sign »
+     * déjà suivis, non dupliqués), détecté en permanence hors mode traversée
+     * pour anticiper les passages protégés. Bascule depuis la pastille
+     * « Extérieur » du direct, sans passer par le champ « Follow ». Tient sous
+     * [MAX] comme [default], qui reste les 18 concepts (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
-        "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-        "trash can", "sidewalk", "animal", "pedestrian traffic light",
-        "pedestrian signal head",
+        "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
+        "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
+        "pedestrian traffic light", "pedestrian signal head",
     )
 
     /**
-     * Concepts d'intérieur : **7** objets d'appartement pour la sonde iSee en
+     * Concepts d'intérieur : **8** objets d'appartement pour la sonde iSee en
      * mode maison — la personne et ce qui structure une pièce (portes,
-     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables).
-     * Bien sous [MAX] ; les pastilles du mode Maison ([HomeModes]) gardent
-     * leurs petits objets (clés, médicaments…), ici c'est le décor qui est
-     * suivi, pas la chasse au mot parlé.
+     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables)
+     * et le passage piéton (reel audit 31/10). Bien sous [MAX] ; les pastilles
+     * du mode Maison ([HomeModes]) gardent leurs petits objets (clés,
+     * médicaments…) : ici le décor est suivi, pas le mot parlé.
      */
     val indoor: List<String> = listOf(
-        "person", "door", "chair", "table", "stairs", "wall", "window",
+        "person", "door", "chair", "table", "stairs", "wall", "window", "crosswalk",
     )
 
     /**

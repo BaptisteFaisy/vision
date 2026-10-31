@@ -18,6 +18,18 @@ import org.junit.Test
 class SerialRunGuardTest {
 
     @Test
+    fun `l_attente du verrou est mesuree`() {
+        val guard = SerialRunGuard()
+        runBlocking(Dispatchers.Default) {
+            (0 until 16).map { async { guard.run { Thread.sleep(5); "ok" } } }.awaitAll()
+        }
+        assertEquals(16, guard.runs)
+        assertTrue("au moins 15 runs ont attendu, vu ${guard.contendedRuns}", guard.contendedRuns >= 15)
+        assertTrue("attente cumulée mesurée", guard.totalWaitMs > 0)
+        assertTrue("pire attente mesurée", guard.maxWaitMs > 0)
+    }
+
+    @Test
     fun `runs concurrents serialises sans chevauchement`() {
         val guard = SerialRunGuard()
         val inside = AtomicInteger(0)

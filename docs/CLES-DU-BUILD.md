@@ -78,13 +78,53 @@ dans le job `apk`) et fait échouer le job si, les secrets existant : le
 de l'APK, ou un ping minimal au LLM ne répond pas 200 (secret périmé ou
 mauvais fournisseur — la panne vue avec des secrets restés sur InferHub alors
 que le produit parlait à Baseten). Sans secret, la garde reste inactive et
-l'APK sort sans clé, comme avant. Ses tests (`tools/test_check_apk_keys.py`,
+l'APK sort sans clé, comme avant — mais elle émet un avertissement
+(`::warning::`, visible dans le résumé du job) au lieu de se taire : un build
+sans clé est un choix, pas un oubli. Ses tests (`tools/test_check_apk_keys.py`,
 faux APK + faux LLM local, aucun réseau) tournent dans le job `ci`.
 
 Secrets à créer — Settings → Secrets and variables → Actions → *New repository secret* :
 `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_LIVE_API_KEY`, `TTS_API_KEY`,
 `TTS_VOICE_ID` (facultatif), `ASR_API_KEY` (facultatif). Aucune valeur n'est jamais
 affichée par la CI.
+
+Tous les secrets CI (31/10) :
+
+| Secret | Consommé par | Effet si absent |
+| --- | --- | --- |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | `cles-build` → `local.properties` → `BuildConfig` | APK sans LLM (saisie Réglages) ; garde inactive + avertissement |
+| `LLM_LIVE_API_KEY` | idem (`LIVE_LLM_API_KEY`) | narration du Direct coupée (repli § « Clé narration vide ») |
+| `TTS_API_KEY`, `TTS_VOICE_ID` | idem | voix ElevenLabs absente (repli TTS système) |
+| `ASR_API_KEY` | idem | dictée Meta absente (repli Scribe) |
+| `GOOGLE_MAPS_API_KEY` | `app/build.gradle.kts` (env ou `local.properties`) | clé Maps vide |
+| `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET` | `deploy-live-fast.yml` (auth Modal) | pas de déploiement GPU |
+
+## Build sans clé : erreur ou avertissement (31/10)
+
+`app/build.gradle.kts` refuse un trio LLM **partiel** (1-2 clés sur 3 dans
+`local.properties`) : erreur claire à la configuration, pas de `BuildConfig`
+silencieusement inutilisable. Trio entièrement vide = APK sans clé assumé
+(saisie dans Réglages), avec un avertissement Gradle ; `SAM_REQUIRE_KEYS=1`
+transforme ce cas en erreur (le message renvoie ici).
+
+## Clé narration vide : le Direct se tait (31/10)
+
+`LIVE_LLM_API_KEY` vide (ni build, ni Réglages : `liveLlmConfigured == false`)
+coupe la narration du Direct — « Direct narration key (empty = muted
+narration) ». Questions, description photo et voix inchangées : seule la
+phrase du Direct manque. Le repli **runtime** (file d'attente, nouvelle
+demande quand la clé arrive) est un autre agent ; ici, seul le contrat est
+documenté : vide = muet, jamais d'erreur, jamais de clé d'un autre rôle
+réutilisée en douce.
+
+## Trafic en clair : debug seulement (31/10)
+
+`network_security.xml` du `main` interdit le clair partout (release = HTTPS
+obligatoire) ; l'exception vers les bacs d'essai locaux (10.0.2.2, localhost,
+127.0.0.1) vit dans `src/debug/res/xml/network_security.xml`, qui recouvre le
+`main` en build debug. Vérifié : le manifeste référence `@xml/network_security`
+et seul le source-set debug porte un `domain-config` en clair — une URL
+`http://` en release est refusée par le système, pas par le code.
 
 ## Avertissement
 

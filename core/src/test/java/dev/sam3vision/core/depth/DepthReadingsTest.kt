@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -188,5 +189,72 @@ class DepthReadingsTest {
         val s = out.first { it.label == "trottoir" }
         assertEquals(8f, s.meters, 0.01f)
         assertTrue(out.none { it.label == "reflet" })
+    }
+
+    @Test
+    fun `colonne centrale - geometrie exacte`() {
+        assertEquals(listOf(25f, 0f, 75f, 100f), DepthReadings.centralColumn(listOf(0f, 0f, 100f, 100f)))
+        assertEquals(listOf(48.5f, 45f, 51.5f, 55f), DepthReadings.centralColumn(listOf(47f, 45f, 53f, 55f)))
+        // largeur nulle : la ligne centrale mesure encore (±1 px)
+        assertEquals(listOf(3f, 4f, 5f, 6f), DepthReadings.centralColumn(listOf(4f, 4f, 4f, 6f)))
+        assertNull(DepthReadings.centralColumn(listOf(0f, 0f, 10f)))
+        assertNull(DepthReadings.centralColumn(listOf(4f, 6f, 6f, 6f)))
+        assertNull(DepthReadings.centralColumn(listOf(0f, 0f, Float.NaN, 10f)))
+    }
+
+    @Test
+    fun `fenetre robuste - erodee quand elle tient, colonne sinon`() {
+        assertEquals(listOf(25f, 25f, 75f, 75f), DepthReadings.robustWindow(listOf(0f, 0f, 100f, 100f)))
+        // érodée 3x5 px : trop petite, colonne centrale pleine hauteur
+        assertEquals(listOf(48.5f, 45f, 51.5f, 55f), DepthReadings.robustWindow(listOf(47f, 45f, 53f, 55f)))
+        assertEquals(listOf(3f, 4f, 5f, 6f), DepthReadings.robustWindow(listOf(4f, 4f, 4f, 6f)))
+        assertNull(DepthReadings.robustWindow(listOf(4f, 6f, 6f, 6f)))
+    }
+
+    @Test
+    fun `boite fine - la colonne centrale lit l'objet, pas le fond erode`() {
+        // moitié haute fond 1.0, moitié basse objet 9.0 : la fenêtre érodée
+        // (3 px de large, lignes 47..52) est moitié fond, la colonne centrale
+        // (lignes 45..55) est majoritairement objet
+        val values = FloatArray(100 * 100) { i -> if (i / 100 < 50) 1f else 9f }
+        val map = DepthMap(100, 100, values)
+        assertEquals(9f, DepthReadings.boxCloseness(map, listOf(47f, 45f, 53f, 55f), 100, 100)!!, 0.001f)
+    }
+
+    @Test
+    fun `profondeur hors bornes - omise, pas bornee deguisee`() {
+        // ancre : 2 m à 0,8 → échelle 1,6 ; la cible à 0,01 sortirait à 160 m
+        val person = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val far = Detection("montagne", 0.9f, listOf(50f, 0f, 99f, 99f), 100, 100)
+        val pinhole = listOf(DistanceReading(7, "personne", 2f, 2f, person.box))
+        val close = mapOf(person.box to 0.8f, far.box to 0.01f)
+        val out = DepthReadings.refineWithCloseness(listOf(person, far), pinhole, close)
+        assertEquals(1, out.size)
+        assertEquals("personne", out.single().label)
+    }
+
+    @Test
+    fun `statut - calibre avec ancres, non calibre sans`() {
+        val person = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val pinhole = listOf(DistanceReading(7, "personne", 2f, 2f, person.box))
+        val ok = DepthReadings.refineStatusWithCloseness(listOf(person), pinhole, mapOf(person.box to 0.8f))
+        assertTrue(ok.calibrated)
+        assertEquals(2f, ok.readings.single().meters, 0.01f)
+        val broken = DepthMap(100, 100, FloatArray(100 * 100) { Float.NaN })
+        val ko = DepthReadings.refineWithStatus(100, 100, listOf(person), pinhole, broken)
+        assertFalse(ko.calibrated)
+        assertEquals(pinhole, ko.readings)
+    }
+
+    @Test
+    fun `repli bas-au-contact - jamais une ancre`() {
+        val person = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val biased = DistanceReading(7, "personne", 50f, 50f, person.box, 0.5f, true)
+        val out = DepthReadings.refineStatusWithCloseness(listOf(person), listOf(biased), mapOf(person.box to 0.8f))
+        assertFalse(out.calibrated)
+        assertEquals(listOf(biased), out.readings)
+        val honest = biased.copy(cutFallback = false)
+        val ok = DepthReadings.refineStatusWithCloseness(listOf(person), listOf(honest), mapOf(person.box to 0.8f))
+        assertTrue(ok.calibrated)
     }
 }

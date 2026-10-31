@@ -65,6 +65,7 @@ fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
         add("${state.frames} frames · ${state.masks.size} masks")
         add("transport: ${state.transport}")
     }
+    if (state.skippedFrames > 0) add("skipped: ${state.skippedFrames} refused")
     state.motion?.let { add(motionSummary(it)) }
     if (state.timings.known) {
         addAll(TimingsText.detail(state.timings))
@@ -109,6 +110,7 @@ fun shortEndpoint(endpoint: String): String {
 fun liveProbeNotice(state: LiveProbeState): String? {
     if (state.frames > 0) return null
     state.error?.let { return it }
+    if (state.warming && state.timeoutSec > 0) return "waking the SAM GPU… (up to ${state.timeoutSec} s)"
     if (state.warming) return "waking the SAM GPU… (≈ 30 s on first launch)"
     return "waiting for the first analysis…"
 }

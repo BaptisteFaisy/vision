@@ -39,8 +39,9 @@ data class LightMarker(val left: Float, val top: Float, val right: Float, val bo
 }
 
 /**
- * Couleur du cadre et de l'étiquette pour [state] : binaire, rouge ou vert —
- * pas encore de lecture (`null`) attend comme un rouge (ordre user du 31/10).
+ * Couleur du cadre et de l'étiquette pour [state] : vert pour traverser,
+ * rouge pour attendre — pas encore de lecture (`null`) attend comme un
+ * rouge (fail-safe, reel audit 31/10).
  */
 fun crossingAccent(active: Boolean, state: CrossingState?): Int {
     if (!active) return CROSSING_ACCENT_OFF

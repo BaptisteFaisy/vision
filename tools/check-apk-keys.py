@@ -13,7 +13,8 @@ C. la clé RÉPOND : ping `POST {base}/chat/completions` minimal (`max_tokens=5`
    seuls les tokens émis sont facturés) — un secret périmé échoue ici.
 
 Usage : LLM_BASE_URL=... LLM_API_KEY=... LLM_MODEL=... python3 tools/check-apk-keys.py [--root .]
-Sortie : 0 si conforme ou sans secret, 1 sinon.
+Sortie : 0 si conforme ou sans secret, 1 sinon. Sans secret, la garde émet un
+avertissement `::warning::` (visible dans le résumé du job) au lieu de se taire.
 """
 import argparse
 import glob
@@ -109,6 +110,8 @@ def main(argv):
     modele = os.environ.get("LLM_MODEL", "")
     if not cle:
         print("Pas de secret LLM : garde inactive (APK sans clé).")
+        print("::warning::check-apk-keys : aucun secret LLM — APK sans clé, "
+              "garde inactive (saisie dans Réglages).")
         return 0
     erreurs = verifier(args.root, base, cle, modele)
     for erreur in erreurs:

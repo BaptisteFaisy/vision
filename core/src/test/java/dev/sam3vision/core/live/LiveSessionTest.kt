@@ -161,10 +161,13 @@ class LiveSessionTest {
     }
 
     @Test
-    fun `la cadence rapide garde un seul creneau, le backend serialise`() {
+    fun `la cadence rapide ouvre deux creneaux, refermes a un si le backend serialise`() {
         val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
-        assertEquals(1, session.slots)
+        assertEquals(2, session.slots)
         assertFalse(session.saturated)
+        (1..3).forEach { _ -> session.stats.record(344L) }
+        session.regulate()
+        assertEquals("budget dépassé : retour à un créneau", 1, session.slots)
     }
 
     @Test
@@ -173,7 +176,7 @@ class LiveSessionTest {
     }
 
     @Test
-    fun `le regulateur ne touche a rien quand la cadence n_a qu_un creneau`() {
+    fun `le regulateur referme la cadence rapide a un creneau au dessus du budget`() {
         val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
         (1..3).forEach { _ -> session.stats.record(344L) }
         session.regulate()
@@ -207,7 +210,7 @@ class LiveSessionTest {
         assertEquals(2, session.slots)
     }
 
-    /** Cadence à deux créneaux : ce que l'app ne demande plus, mais que le régulateur sait gérer. */
+    /** Cadence à deux créneaux explicite : le même profil que [Cadence.Fast], écrit en dur. */
     private fun twoSlots() = Cadence(
         fastMs = 0L,
         targetMs = 0L,

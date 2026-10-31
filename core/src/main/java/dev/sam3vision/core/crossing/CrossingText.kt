@@ -7,8 +7,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Phrases du **mode Traversée** : ce que dit iSee à une personne aveugle au
- * bord du trottoir. Deux phrases seulement, une par [CrossingState], courtes
- * (le vert piéton ne dure pas) et sans distance (la couleur suffit).
+ * bord du trottoir. Deux phrases ([phrase]), une par [CrossingState],
+ * courtes (le vert piéton ne dure pas) et sans distance (la couleur
+ * suffit), plus les cas temporels ([blinking], [ready], [contradiction]).
  *
  * Comme [dev.sam3vision.core.live.GuidanceText], tout est pur et testé en JVM.
  */
@@ -28,6 +29,37 @@ object CrossingText {
                 CrossingState.Red -> "Rouge, attendez."
                 CrossingState.Green -> "Vert, traversez."
             }
+        }
+
+    /**
+     * Vert clignotant (fin de vert) : ne pas s'engager — parlé par
+     * [CrossingAnnouncer] avec veto du vert, urgent si un vert était annoncé.
+     */
+    fun blinking(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        when (language) {
+            SpeechLanguage.En -> "Flashing green, do not cross."
+            SpeechLanguage.Fr -> "Vert clignotant, ne pas s'engager."
+        }
+
+    /**
+     * Vert confirmé mais pas encore maintenu (phase PRET du veto, voir
+     * câblage `:app`) : « prêt », pas « traversez » — la voix et le bandeau
+     * disent tous deux « pas encore ».
+     */
+    fun ready(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        when (language) {
+            SpeechLanguage.En -> "Ready."
+            SpeechLanguage.Fr -> "Prêt."
+        }
+
+    /**
+     * Deux feux lus en contradiction (un rouge, un vert) : attendre, en le
+     * disant — parlé à la place du rouge tant que ça dure.
+     */
+    fun contradiction(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        when (language) {
+            SpeechLanguage.En -> "Conflicting lights, wait."
+            SpeechLanguage.Fr -> "Feux contradictoires, attendez."
         }
 
 

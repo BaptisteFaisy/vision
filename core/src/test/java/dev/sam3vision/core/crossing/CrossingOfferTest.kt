@@ -1,6 +1,7 @@
 package dev.sam3vision.core.crossing
 
 import dev.sam3vision.core.model.SegObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +24,13 @@ class CrossingOfferTest {
     private val walk = frame(obj("person"), obj("crosswalk"))
 
     @Test
+    fun `le seuil client aligne le seuil serveur 035`() {
+        assertEquals(0.35f, CrossingOffer.MIN_SCORE, 0f)
+        assertTrue(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.35f))))
+        assertFalse(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.34f))))
+    }
+
+    @Test
     fun `les etiquettes de passage sont reconnues telles que SAM les rend`() {
         assertTrue(CrossingOffer.isCrosswalkLabel("crosswalk"))
         assertTrue(CrossingOffer.isCrosswalkLabel("Crosswalk"))
@@ -32,6 +40,20 @@ class CrossingOfferTest {
         assertFalse(CrossingOffer.isCrosswalkLabel("sidewalk"))
         assertFalse(CrossingOffer.isCrosswalkLabel("crossing"))
         assertFalse(CrossingOffer.isCrosswalkLabel("person"))
+    }
+
+    @Test
+    fun `zebra et bandes elargissent les etiquettes, sans le crossing nu`() {
+        assertTrue(CrossingOffer.isCrosswalkLabel("zebra"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("Zebra"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("zèbre"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("zebra crossing la nuit"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bandes"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bandes blanches"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bande blanche"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("crossing"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("crossing the street"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("bandes dessinees"))
     }
 
     @Test

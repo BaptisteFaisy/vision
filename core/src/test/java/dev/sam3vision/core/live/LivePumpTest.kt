@@ -16,6 +16,22 @@ import org.junit.Test
  */
 class LivePumpTest {
 
+    @Test
+    fun `a deux creneaux la frame part aussitot au lieu d_attendre en reserve`() {
+        val gate = FrameGate(2)
+        assertTrue(gate.tryStart()) // un vol en cours, un créneau libre
+        val stats = LiveStats().apply { record(240L) }
+        val session = LiveSession(client, gate, stats = stats, cadence = Cadence.Fast, clock = { now })
+        val pump = LivePump({ session }, { now })
+
+        assertTrue("créneau libre : envoi immédiat, pas de réserve", pump.offer("A", 1L, 2L))
+        assertFalse(pump.pending)
+        assertTrue(gate.tryStart()) // deuxième vol : saturé
+        assertFalse("saturé : en réserve", pump.offer("B", 3L, 4L))
+        assertTrue(pump.pending)
+        assertEquals(0, client.liveCalls)
+    }
+
     /** Le client de test compte les appels : zéro attendu, la pompe ne parle pas au réseau. */
     private val client = RecordingLiveClient()
 

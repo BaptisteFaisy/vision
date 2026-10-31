@@ -20,7 +20,7 @@ class IseeVoice(
     suspend fun synthesize(text: String): ByteArray {
         if (!speakable(text)) return ByteArray(0)
         val current = settings()
-        return ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId)
+        return ElevenLabsTtsClient(current.ttsApiKey, current.ttsVoiceId, cache = ElevenLabsTtsClient.sharedPhrases)
             .synthesize(text)
             .getOrElse { error ->
                 update { it.copy(status = IseeStatusText.voiceFailed(error)) }

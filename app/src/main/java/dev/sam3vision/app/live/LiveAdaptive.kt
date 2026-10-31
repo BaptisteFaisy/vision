@@ -24,9 +24,10 @@ import dev.sam3vision.core.model.LiveFrame
  * jusqu'à 500 ms. Le signal est neutre (pas d'estimateur branché) plus la présence
  * d'objets de la dernière réponse : `STARTUP`/`EXPIRED`/`LOST` décident seuls.
  *
- * Les deux sont **éteints par défaut** (`configure`) : éteint, [admit] laisse tout
- * passer et [jpegQuality] rend la constante — le direct est exactement celui d'avant.
- * C'est ce qui permet l'A/B runtime depuis les Réglages.
+ * Les deux sont **allumés par défaut** : [admit] ne laisse passer que les keyframes
+ * et [jpegQuality] suit le palier courant. `configure` suit les Réglages (A/B
+ * runtime) : éteint, le direct est exactement celui d'avant (tout passe, qualité
+ * constante).
  *
  * Une seule instance par écran, nourrie aux points de feed (`onFrame`/`runFrame` du
  * Direct comme de la sonde iSee) : aucune logique d'envoi n'est dupliquée.
@@ -39,12 +40,12 @@ class LiveAdaptive(
     private val scheduler: KeyframeScheduler = KeyframeScheduler(),
 ) {
 
-    /** Poids montant adaptatif allumé (Réglages, A/B runtime). */
-    var uploadEnabled: Boolean = false
+    /** Poids montant adaptatif, allumé par défaut (Réglages, A/B runtime). */
+    var uploadEnabled: Boolean = true
         private set
 
-    /** Keyframes à la demande allumés (Réglages, A/B runtime). */
-    var keyframesEnabled: Boolean = false
+    /** Keyframes à la demande, allumés par défaut (Réglages, A/B runtime). */
+    var keyframesEnabled: Boolean = true
         private set
 
     /** Objets présents à la dernière réponse (le signal du scheduler, défaut : oui). */

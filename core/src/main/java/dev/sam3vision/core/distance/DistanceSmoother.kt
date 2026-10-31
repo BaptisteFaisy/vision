@@ -40,6 +40,16 @@ class DistanceSmoother(
         return next
     }
 
+    /**
+     * Dernière valeur lissée de [trackId] à [atMs], `null` si la piste est
+     * inconnue ou périmée (même [timeoutMs] que l'oubli). Ne modifie rien :
+     * relire n'est pas mesurer.
+     */
+    @Synchronized
+    fun last(trackId: Int, atMs: Long = clock()): Float? {
+        return states[trackId]?.takeIf { atMs - it.atMs <= timeoutMs }?.meters
+    }
+
     /** Oublie toutes les pistes (nouvelle session). */
     @Synchronized
     fun reset() {

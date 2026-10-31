@@ -11,10 +11,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * États des véhicules moteurs : en mouvement (tau confirmé ou croissance)
- * jusqu'à 8 m, à l'arrêt (dérive faible, seau stable) jusqu'à 3 m dans le
- * couloir, les cycles exclus (annoncés par `CycleWatcher`). Séquences
- * synthétiques, miroir de `VehicleApproachTest`.
+ * États des véhicules moteurs : en mouvement (tau confirmé ou croissance), à
+ * l'arrêt (dérive compensée, seau stable) jusqu'à 5 m, garé de 5 à 15 m, les
+ * cycles exclus (annoncés par `CycleWatcher`). Séquences synthétiques, miroir
+ * de `VehicleApproachTest`.
  */
 class VehicleStateTest {
 
@@ -176,6 +176,32 @@ class VehicleStateTest {
     }
 
     @Test
+    fun `portees - 4m et lateral proche arretes, gare a 16m tu`() {
+        val stoppedMid = VehicleStateWatcher()
+        repeat(2) { index ->
+            stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = index * 100L)
+        }
+        val mid = stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = 200L)
+        assertEquals("Car stopped, 4 meters away.", mid!!.phrase)
+
+        val stoppedSide = VehicleStateWatcher()
+        val sideBox = box(100f, cx = 64f)
+        repeat(2) { index ->
+            stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = index * 100L)
+        }
+        val side = stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = 200L)
+        assertEquals("Car stopped, 2 meters away.", side!!.phrase)
+
+        val parkedFar = VehicleStateWatcher()
+        repeat(3) { index ->
+            assertNull(
+                "immobile à 16 m : hors portée",
+                parkedFar.update(listOf(det("car", sideBox)), listOf(reading("car", 16f, sideBox)), atMs = index * 100L),
+            )
+        }
+    }
+
+    @Test
     fun `voiture garee a 5m et sur le cote - annonce a l'arret`() {
         val mid = VehicleStateWatcher()
         repeat(2) { index ->
@@ -215,6 +241,45 @@ class VehicleStateTest {
             else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
             else assertNull("cooldown mouvement", cue)
         }
+    }
+
+    @Test
+    fun `vehicule gare - annonce entre 5 et 15m, silence partage avec l arret`() {
+        val watcher = VehicleStateWatcher()
+        assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 0L))
+        assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 100L))
+        val third = watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 200L)
+
+        assertEquals("Car parked, 8 meters away.", third!!.phrase)
+        assertFalse(third.urgent)
+        assertNull(third.safetyPhrase)
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 300L)
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 400L)
+        assertNull(
+            "stationnement et arrêt partagent le silence de 10 s",
+            watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 500L),
+        )
+    }
+
+    @Test
+    fun `still compense - derive qui suit la camera, arret annonce`() {
+        // Caméra qui avance (+5 px/frame comme le fond) : sans fond, silence ; avec fond,
+        // la dérive compensée prouve l'arrêt (5 m, seau stable) — jamais du mouvement.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val bare = VehicleStateWatcher()
+        repeat(3) { index ->
+            val frame = box(100f, cx = 320f + index * 5f)
+            assertNull(bare.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L))
+        }
+        val watcher = VehicleStateWatcher()
+        var cue: VehicleStateCue? = null
+        repeat(3) { index ->
+            val frame = box(100f, cx = 320f + index * 5f)
+            cue = watcher.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L, motion = motion)
+        }
+
+        assertEquals("Car stopped, 5 meters away.", cue!!.phrase)
+        assertNull("jamais de mouvement : pas d'alerte", watcher.lastMovingAlertMs)
     }
 
     @Test
@@ -278,6 +343,14 @@ class VehicleStateTest {
         assertEquals(
             "Bus stopped, 3 meters away.",
             VehicleStateText.stoppedPhrase(bus, 3f, null, SpeechLanguage.En),
+        )
+        assertEquals(
+            "Voiture en stationnement, à 8 mètres.",
+            VehicleStateText.parkedPhrase(voiture, 8f, null, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Car parked, 8 meters away.",
+            VehicleStateText.parkedPhrase(voiture, 8f, null, SpeechLanguage.En),
         )
         assertEquals("Camion", VehicleStateText.nameOf("camion")!!.fr)
         assertEquals("Motorcycle", VehicleStateText.nameOf("moto")!!.en)

@@ -127,4 +127,16 @@ class LensSpecTest {
         assertTrue(LensSpec(67f, 53f, distortion = RadialDistortion(-0.1f, 0.01f)).usable)
         assertTrue(LensSpec(67f, 53f, distortion = RadialDistortion(0f, 0f)).usable)
     }
+
+    @Test
+    fun `distorsion null signifie sans mesure, pas sans distorsion`() {
+        assertFalse(LensSpec.Default.hasMeasuredDistortion)
+        assertTrue(LensSpec.Default.usable)
+        val measuredFlat = LensSpec(67f, 53f, distortion = RadialDistortion(0f, 0f))
+        assertTrue(measuredFlat.hasMeasuredDistortion)
+        assertTrue(measuredFlat.usable)
+        val measured = LensSpec(67f, 53f, distortion = RadialDistortion(-0.1f, 0.01f))
+        assertTrue(measured.hasMeasuredDistortion)
+        assertTrue(measured.usable)
+    }
 }

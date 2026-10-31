@@ -1,8 +1,14 @@
 package dev.sam3vision.app.isee
 
 import android.content.Context
+import android.hardware.camera2.CameraMetadata
+import android.hardware.camera2.CaptureRequest
 import android.os.SystemClock
 import android.util.Size
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -24,6 +30,7 @@ import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.captureStamp
+import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.share.STREAM_FRAME_MS
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -34,28 +41,28 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Côté long de la frame envoyée à SAM par la page caméra (px).
+ * Côté long de la frame envoyée à SAM par la page caméra (px) : [FramePolicy.EDGE].
  *
- * Mesuré depuis le téléphone (POST /live, 8 concepts, frame entière) : le coût
- * **serveur** ne bouge pas (86-93 ms à 256, 320 comme 448 px), mais l'upload et le
- * téléchargement des masques sont proportionnels — les masques reviennent à la taille
- * exacte de l'image envoyée. À 320 px le corps fait 18 Ko contre 32 Ko à 448, soit
- * ~15-20 ms de moins par frame : c'est la marge qui compte quand on vise 150 ms.
+ * Monté de 320 à 480 : SAM reçoit la même géométrie que le direct aidant, donc la
+ * passe NV21 ne packe qu'une fois pour les deux (`encodeJpegPair`). Mesure d'époque
+ * (à 320 px) : le coût **serveur** ne bougeait pas entre 256 et 448 px, mais les
+ * masques reviennent à la taille envoyée — 18 Ko à 320 contre 32 Ko à 448 — et
+ * chaque octet compte quand on vise 150 ms par frame.
  */
-const val ISEE_FRAME_EDGE = 320
+const val ISEE_FRAME_EDGE = FramePolicy.EDGE
 
-/** Qualité JPEG de la frame iSee : 55 suffit très bien à SAM, et allège l'upload. */
-const val ISEE_FRAME_QUALITY = 55
+/** Qualité JPEG de la frame iSee : [FramePolicy.QUALITY], allégée par le palier adaptatif. */
+const val ISEE_FRAME_QUALITY = FramePolicy.QUALITY
 
 /**
- * Côté long de la frame du **direct aidant** (px) : le 320 px de SAM, étiré
- * plein écran par la page, restait flou ; à 480 px l'image redevient lisible.
- * Le capteur est demandé à cette taille (voir `newAnalysis`) : SAM continue
- * de recevoir son 320 px, réduit dans la même passe NV21.
+ * Côté long de la frame du **direct aidant** (px) : alias de [ISEE_FRAME_EDGE].
+ *
+ * Le 320 px de SAM, étiré plein écran par la page, restait flou ; à 480 px l'image
+ * redevient lisible — et la passe NV21 unique impose la même géométrie aux deux.
  */
-const val SHARE_FRAME_EDGE = 480
+const val SHARE_FRAME_EDGE = ISEE_FRAME_EDGE
 
-/** Qualité JPEG du direct aidant : 70 efface les aplats visibles à q55. */
+/** Qualité JPEG du direct aidant : 70 efface les aplats visibles à q65. */
 const val SHARE_FRAME_QUALITY = 70
 
 /**
@@ -78,11 +85,29 @@ class IseeCameraHost(private val context: Context) {
     /** Frames converties depuis la liaison caméra (le log de coût ne tire qu'un coup sur 20). */
     private var conversionFrames = 0
 
+    /** Frames jetées par la porte `wantsFrame` (KEEP_ONLY_LATEST gardé) : comptées, loguées. */
+    @Volatile
+    var droppedFrames = 0L
+        private set
+
+    /** Frames vetoées par la garde nuit/noir (jamais envoyées à SAM) : comptées, loguées. */
+    @Volatile
+    var lowLightVetoes = 0L
+        private set
+
+    /** Frames floues (diagnostic seul, sans veto) : comptées dans le log de conversion. */
+    @Volatile
+    var blurryFrames = 0L
+        private set
+
     /** Dernier encodage du direct : la cadence du direct, pas celle du capteur. */
     private var lastShareEncodeMs = 0L
 
     /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
     private val encoder = Nv21JpegEncoder()
+
+    /** Vrai quand la dernière frame était nuit/noir : la phrase ne part qu'à la transition. */
+    private var wasDark = false
 
     /** L'implémentation [IseeCameraActions] exposée au ViewModel. */
     val actions: IseeCameraActions = object : IseeCameraActions {
@@ -101,7 +126,7 @@ class IseeCameraHost(private val context: Context) {
     private var boundPreview: PreviewView? = null
 
     /**
-     * Frame convertie (JPEG base64, 320 px) et **instant d'exposition** du capteur
+     * Frame convertie (JPEG base64, 480 px) et **instant d'exposition** du capteur
      * (`imageInfo.timestamp`, ns monotones, même base que `elapsedRealtimeNanos`) :
      * branchée par la fenêtre, consommée par SAM. L'horodatage alimente la chronologie.
      */
@@ -117,12 +142,19 @@ class IseeCameraHost(private val context: Context) {
     var jpegQuality: (() -> Int)? = null
 
     /**
-     * Luminance de la frame convertie (même cadence que [onFrame]), invoquée
-     * sur le fil de l'analyse : branchée par la fenêtre, consommée par le
+     * Luminance de la frame convertie (y compris vetoée : le veto nuit/noir ne coupe
+     * que [onFrame]), sur le fil de l'analyse : branchée par la fenêtre, consommée par le
      * compteur de marches. Pas appelée sur le chemin de repli `Bitmap` (pas
      * de plan Y à lire) : le compte vieillit alors jusqu'à expirer.
      */
     var onLuma: ((ByteArray) -> Unit)? = null
+
+    /**
+     * Nuit/noir détecté : invoquée sur le fil de l'analyse avec [LOW_LIGHT_PHRASE],
+     * une fois par passage au noir (pas de spam). Branchée par la fenêtre ; la frame
+     * vetoée ne part ni à SAM ni au picto, le direct aidant la montre quand même.
+     */
+    var onLowLight: ((String) -> Unit)? = null
 
     /** Caméra liée : sa caractéristique optique sert de calibrage aux distances. */
     private var boundCamera: androidx.camera.core.Camera? = null
@@ -169,7 +201,7 @@ class IseeCameraHost(private val context: Context) {
         )
         return runCatching {
             provider.unbindAll()
-            boundCamera = provider.bindToLifecycle(
+            val camera = provider.bindToLifecycle(
                 owner,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 preview,
@@ -177,6 +209,8 @@ class IseeCameraHost(private val context: Context) {
                 video,
                 analysis,
             )
+            boundCamera = camera
+            applySensorTuning(camera)
             imageCapture = image
             videoCapture = video
             null
@@ -192,11 +226,11 @@ class IseeCameraHost(private val context: Context) {
                     ResolutionStrategy(
                         // On demande 640×480 : à 480×480 demandés, le Redmi ne
                         // livrait que 320×240 (mesuré au log `conversion:`,
-                        // build 1.0.685) et le direct restait en 320. SAM reçoit
-                        // toujours son 320 px, réduit dans la même passe NV21 —
+                        // build 1.0.685) et le direct restait en 320. SAM et le direct
+                        // partagent leur 480 px, packé une fois dans la passe NV21 —
                         // la passe est pilotée par la destination, pas la source.
                         // Le repli prend le plus proche en dessous ; sous 480 px,
-                        // le direct part à la taille du buffer, jamais agrandi.
+                        // SAM et le direct partent à la taille du buffer, jamais agrandis.
                         // Coût actuel mesuré au log `conversion:`.
                         Size(640, 480),
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
@@ -221,25 +255,31 @@ class IseeCameraHost(private val context: Context) {
      */
     private fun analyse(proxy: ImageProxy) {
         if (wantsFrame?.invoke() == false) {
+            noteDropped()
             proxy.close()
             return
         }
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            val bytes = encodeFrameBytes(proxy)
-            // Le direct de l'aidant a son propre encodage (480 px q70) : la
-            // frame SAM (320 px q55) ne le nourrit plus.
-            val shareBytes = offerShareFrame(proxy, startedAt)
-            onFrame?.invoke(
-                jpegBytesToBase64(bytes),
-                captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()),
+            // Passe unique : un seul pack NV21 (ou un seul Bitmap de repli) pour SAM
+            // et le direct aidant — plus un encodage JPEG par consommateur.
+            val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
+            val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
+            val encoded = encodeSinglePass(
+                proxy,
+                quality, shareDue,
             )
+            encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
+            val shareBytes = offerEncodedShare(encoded, startedAt)
+            if (lightVerdict(encoded.mean) == LightVerdict.LOW_LIGHT) {
+                noteLowLight()
+                countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt, proxy.width to proxy.height, encoded.sam.size, shareBytes)
+                return
+            }
+            wasDark = false
+            onFrame?.invoke(jpegBytesToBase64(encoded.sam), captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()))
             countConversion(
-                frames = ++conversionFrames,
-                ms = SystemClock.elapsedRealtime() - startedAt,
-                size = proxy.width to proxy.height,
-                bytes = bytes.size,
-                shareBytes = shareBytes,
+                ++conversionFrames, SystemClock.elapsedRealtime() - startedAt, proxy.width to proxy.height, encoded.sam.size, shareBytes,
             )
         } catch (_: Throwable) {
             // frame illisible : la suivante arrive tout de suite
@@ -249,49 +289,84 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Frame JPEG brute : **NV21 direct** (rotation et réduction dans la copie, zéro
-     * bitmap) ; repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV 4:2:0 —
-     * une seule passe de matrice y remplace les deux rééchantillonnages d'avant.
+     * Passe unique : un seul pack NV21 (ou un seul `Bitmap` de repli) pour SAM et le
+     * direct aidant — la rotation et la réduction ne sont payées qu'une fois, seule
+     * la compression JPEG est doublée quand le direct est dû.
      * La luminance NV21 part aussi à [onLuma] (compteur de marches), sur le même fil.
      */
-    private fun encodeFrameBytes(proxy: ImageProxy): ByteArray {
-        val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
-        val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
-        if (framed != null) {
-            onLuma?.invoke(framed.luma)
-            return framed.jpeg
+    private fun encodeSinglePass(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
+        if (shareDue) {
+            val pair = encoder.encodeJpegPair(
+                proxy, ISEE_FRAME_EDGE, quality, SHARE_FRAME_QUALITY,
+            )
+            if (pair != null) return SinglePass(pair.first, pair.luma, pair.second, meanLuma(pair.luma))
         }
-        return bitmapToJpeg(
-            uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE),
-            quality,
+        val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
+        if (framed != null) return SinglePass(framed.jpeg, framed.luma, null, meanLuma(framed.luma))
+        return bitmapFallback(
+            proxy, quality, shareDue,
         )
     }
 
     /**
-     * Frame du direct aidant : encodée à la cadence du direct, seulement quand
-     * un aidant regarde — sinon ce deuxième JPEG brûlerait du CPU pour rien.
+     * Offre la frame du direct aidant, déjà encodée par la passe unique.
      * Retourne la taille offerte (−1 si rien n'est parti).
+     * La cadence du direct est testée avant l'encodage, pas ici.
      */
-    private fun offerShareFrame(proxy: ImageProxy, nowMs: Long): Int {
-        if (!SharedCameraFrame.audience) return -1
-        if (nowMs - lastShareEncodeMs < STREAM_FRAME_MS) return -1
+    private fun offerEncodedShare(encoded: SinglePass, nowMs: Long): Int {
+        val share = encoded.share
+        // Nul sans aidant ou hors cadence : la passe unique ne compresse que ce qui sert.
+        if (share == null) return -1
         lastShareEncodeMs = nowMs
-        val share = encodeShareBytes(proxy)
         SharedCameraFrame.offerBytes(share)
         return share.size
     }
 
     /**
-     * Frame JPEG brute du direct : même chaîne NV21 que SAM, à 480 px q70. Sur
-     * un buffer plus petit (capteur 320), l'encodeur rend le buffer tel quel,
-     * jamais agrandi — pas de fausse qualité ni d'octets gaspillés.
+     * Repli `Bitmap` unique (buffer non YUV 4:2:0) : décodé une fois, compressé une
+     * fois pour SAM plus une fois pour le direct si dû — jamais deux `toBitmap`.
+     * La luminance vient des pixels ARGB (même garde nuit/noir que la passe NV21).
      */
-    private fun encodeShareBytes(proxy: ImageProxy): ByteArray =
-        encoder.encodeJpeg(proxy, SHARE_FRAME_EDGE, SHARE_FRAME_QUALITY)
-            ?: bitmapToJpeg(
-                uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, SHARE_FRAME_EDGE),
-                SHARE_FRAME_QUALITY,
+    private fun bitmapFallback(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
+        val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE)
+        val pixels = IntArray(upright.width * upright.height)
+        upright.getPixels(
+            pixels, 0, upright.width, 0, 0, upright.width, upright.height,
             )
+
+        val share = if (shareDue) bitmapToJpeg(upright, SHARE_FRAME_QUALITY) else null
+        return SinglePass(bitmapToJpeg(upright, quality), null, share, meanLumaFromArgb(pixels))
+    }
+
+    /**
+     * Porte `wantsFrame` fermée : la frame est jetée (KEEP_ONLY_LATEST gardé), comptée
+     * dans [droppedFrames] et loguée tous les [LOG_EVERY_DROPS] — pas de perte silencieuse.
+     */
+    private fun noteDropped() {
+        droppedFrames += 1
+        if (droppedFrames % LOG_EVERY_DROPS == 0L) {
+            android.util.Log.i("sam3vision", "analyse: $droppedFrames frames jetées (porte fermée), veto nuit $lowLightVetoes")
+        }
+    }
+
+    /**
+     * Garde nuit/noir : la frame ne part ni à SAM ni au picto (veto conservateur —
+     * pas de description inventée sur du noir), comptée dans [lowLightVetoes]. La
+     * phrase ne part qu'à la transition ([wasDark]) ; le direct aidant montre la
+     * frame quand même (des pixels noirs honnêtes valent mieux que le silence).
+     */
+    private fun noteLowLight() {
+        lowLightVetoes += 1
+        if (!wasDark) {
+            wasDark = true
+            onLowLight?.invoke(LOW_LIGHT_PHRASE)
+        }
+    }
+
+    /** Piqué de la frame (diagnostic seul) : floue sous [BLUR_VAR_MIN], sans veto. */
+    private fun noteSharpness(luma: ByteArray) {
+        if (laplacianVariance(luma, LumaPlane.WIDTH, LumaPlane.HEIGHT) < BLUR_VAR_MIN) blurryFrames += 1
+    }
 
     /** Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames. */
     private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int, shareBytes: Int) {
@@ -299,8 +374,28 @@ class IseeCameraHost(private val context: Context) {
         val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
         android.util.Log.i(
             "sam3vision",
-            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct)",
+            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)",
         )
+    }
+
+    /**
+     * Réglage capteur : exposition verrouillée (pas de pompage entre frames), 50 Hz
+     * (pas de bandes sous l'éclairage secteur), autofocus continu (la rue nette sans
+     * tap). Appliqué après la liaison, ignoré si le HAL refuse — la caméra marche
+     * quand même, avec l'automatisme par défaut.
+     */
+    @OptIn(markerClass = [ExperimentalCamera2Interop::class])
+    private fun applySensorTuning(camera: androidx.camera.core.Camera) {
+        runCatching {
+            val options = CaptureRequestOptions.Builder()
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, true)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                .build()
+            Camera2CameraControl.from(camera.cameraControl).setCaptureRequestOptions(options)
+        }.onFailure {
+            android.util.Log.w("sam3vision", "réglage capteur refusé: ${it.message}")
+        }
     }
 
     /** Démarre l'enregistrement du MP4 dans [file] ; `false` si non prêt ou déjà lancé. */
@@ -366,10 +461,20 @@ class IseeCameraHost(private val context: Context) {
         executor.shutdown()
     }
 
+    /**
+     * SAM + direct aidant issus d'une seule passe : [sam] part à SAM (sauf veto
+     * nuit/noir), [share] au direct quand il est dû, [luma] au compteur de marches
+     * (`null` sur le repli `Bitmap`), [mean] alimente la garde lumière.
+     */
+    private class SinglePass(val sam: ByteArray, val luma: ByteArray?, val share: ByteArray?, val mean: Double)
+
     companion object {
         private const val FINALIZE_TIMEOUT_MS = 4_000L
 
         /** Une ligne de log de conversion toutes N frames (mesure, pas trace complète). */
         private const val LOG_EVERY_FRAMES = 20
+
+        /** Une ligne de frames jetées tous les 60 (même cadence que le direct). */
+        private const val LOG_EVERY_DROPS = 60L
     }
 }

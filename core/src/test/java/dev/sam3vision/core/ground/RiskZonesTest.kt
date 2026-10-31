@@ -10,7 +10,7 @@ class RiskZonesTest {
     private val config = GroundConfig()
 
     @Test
-    fun `compute cote obstacle et drop-off par zones ignore plafond`() {
+    fun `compute cote obstacle drop-off et plafond par zones`() {
         val labels = intArrayOf(
             SceneLabels.OBSTACLE, SceneLabels.OBSTACLE, SceneLabels.OBSTACLE, SceneLabels.OBSTACLE,
             SceneLabels.DROPOFF, SceneLabels.GROUND, SceneLabels.CEILING, SceneLabels.INVALID,
@@ -21,7 +21,7 @@ class RiskZonesTest {
 
         val expected = intArrayOf(
             RiskZones.CRITICAL, RiskZones.WARNING, RiskZones.AWARE, RiskZones.SAFE,
-            RiskZones.CRITICAL, RiskZones.SAFE, RiskZones.SAFE, RiskZones.SAFE,
+            RiskZones.CRITICAL, RiskZones.SAFE, RiskZones.CRITICAL, RiskZones.SAFE,
         )
         for (i in expected.indices) {
             assertEquals("pixel $i", expected[i], risk[i])

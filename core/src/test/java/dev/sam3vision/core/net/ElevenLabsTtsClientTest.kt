@@ -106,6 +106,45 @@ class ElevenLabsTtsClientTest {
     }
 
     @Test
+    fun `phrase redite servie par le cache, un seul appel`() = runBlocking {
+        NetContract.audioServer().use { server ->
+            val cache = mutableMapOf<String, ByteArray>()
+            val client = ElevenLabsTtsClient(NetContract.KEY, NetContract.VOICE, baseUrl = server.baseUrl, cache = cache)
+
+            val first = client.synthesize("Bonjour.").getOrThrow()
+            val second = client.synthesize("Bonjour.").getOrThrow()
+
+            assertArrayEquals(first, second)
+            assertEquals(1, server.requests.size)
+        }
+    }
+
+    @Test
+    fun `echecs jamais mis en cache, voix et modele segregent`() = runBlocking {
+        NetContract.server(code = 429).use { server ->
+            val cache = mutableMapOf<String, ByteArray>()
+            val client = ElevenLabsTtsClient(NetContract.KEY, NetContract.VOICE, baseUrl = server.baseUrl, cache = cache)
+
+            assertTrue(client.synthesize("Bonjour.").isFailure)
+            assertTrue(client.synthesize("Bonjour.").isFailure)
+
+            assertEquals(2, server.requests.size)
+            assertTrue(cache.isEmpty())
+        }
+        NetContract.audioServer().use { server ->
+            val cache = mutableMapOf<String, ByteArray>()
+            ElevenLabsTtsClient(NetContract.KEY, NetContract.VOICE, baseUrl = server.baseUrl, cache = cache)
+                .synthesize("Bonjour.").getOrThrow()
+
+            val other = ElevenLabsTtsClient(NetContract.KEY, "autre-voix", baseUrl = server.baseUrl, cache = cache)
+                .synthesize("Bonjour.").getOrThrow()
+
+            assertArrayEquals(NetContract.AUDIO, other)
+            assertEquals(2, server.requests.size)
+        }
+    }
+
+    @Test
     fun `le voice id est echappe dans l URL`() = runBlocking {
         NetContract.audioServer().use { server ->
             ElevenLabsTtsClient(NetContract.KEY, "voix bizarro/../x", baseUrl = server.baseUrl)

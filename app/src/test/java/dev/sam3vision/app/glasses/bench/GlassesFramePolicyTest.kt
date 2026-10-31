@@ -4,6 +4,7 @@ import dev.sam3vision.app.glasses.CropRect
 import dev.sam3vision.app.glasses.FRAME_THROTTLE_MS
 import dev.sam3vision.app.glasses.FrameVerdict
 import dev.sam3vision.app.glasses.cropTo16x9
+import dev.sam3vision.app.glasses.cropTo4x3
 import dev.sam3vision.app.glasses.fpsSuffix
 import dev.sam3vision.app.glasses.frameTimestampMs
 import dev.sam3vision.app.glasses.frameVerdict
@@ -105,6 +106,45 @@ class GlassesFramePolicyTest {
         assertNull(cropTo16x9(0, 480))
         assertNull(cropTo16x9(640, 0))
         assertNull("1 px de large ne fait pas un 16:9", cropTo16x9(1, 100))
+    }
+
+    // ---- Recadrage 4:3 (production) --------------------------------------------
+
+    @Test
+    fun `le portrait des lunettes garde les trois quarts de sa hauteur`() {
+        // 720x1280 = VideoQuality.HIGH en production : 720 de large → 960 de haut, centré.
+        assertEquals(CropRect(0, 160, 720, 960), cropTo4x3(720, 1280))
+        // 504x896 = VideoQuality.MEDIUM : 504 de large → 672 de haut, centré.
+        assertEquals(CropRect(0, 112, 504, 672), cropTo4x3(504, 896))
+    }
+
+    @Test
+    fun `un 4-3 exact ne bouge pas, dans les deux orientations`() {
+        assertNull(cropTo4x3(640, 480))
+        assertNull(cropTo4x3(6, 8))
+    }
+
+    @Test
+    fun `un carre devient un 4-3 paysage centre`() {
+        assertEquals(CropRect(0, 62, 500, 375), cropTo4x3(500, 500))
+    }
+
+    @Test
+    fun `un paysage plus large que 4-3 perd les cotes`() {
+        assertEquals(CropRect(427, 0, 1066, 800), cropTo4x3(1920, 800))
+    }
+
+    @Test
+    fun `un portrait plus large que 3-4 perd les cotes`() {
+        assertEquals(CropRect(50, 0, 600, 800), cropTo4x3(700, 800))
+    }
+
+    @Test
+    fun `un recadrage 4-3 impossible garde l image entiere`() {
+        assertNull(cropTo4x3(0, 480))
+        assertNull(cropTo4x3(640, 0))
+        // 1 px de large : le recadrage 3:4 existe (1x1), on le rend.
+        assertEquals(CropRect(0, 49, 1, 1), cropTo4x3(1, 100))
     }
 
     // ---- Étranglement du flux ----------------------------------------------

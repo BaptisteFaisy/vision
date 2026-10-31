@@ -174,8 +174,8 @@ class GuidanceObstaclesTest {
 
     /**
      * Escaliers et marches : sans hauteur sténopé (volontaire, voir
-     * `KnownSizes`), ils bloquent par prudence. « marche » est en plus hors
-     * reconnaissance (`StairConcepts`, `CurbConcepts`) — le couloir bloque
+     * `KnownSizes`), ils bloquent par prudence. « marche » est reconnu bordure
+     * côté `CurbConcepts` (audit 31/10), pas escalier — le couloir bloque
      * tout label, la reco ne le conditionne pas.
      */
     @Test

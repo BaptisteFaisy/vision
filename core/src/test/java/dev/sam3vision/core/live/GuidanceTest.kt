@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.CurbEdge
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -191,6 +192,70 @@ class GuidanceTest {
 
         assertTrue(decision.blocked)
         assertEquals("Left.", Guidance.phrase(decision))
+    }
+
+    @Test
+    fun `contact bordure + obstacle au contact cap droit = stop`() {
+        val labels = listOf(placed("curb", 0.5f, 0.5f), placed("mur", 0.5f, 0.5f))
+        val decision = Guidance.decide(labels)
+
+        assertTrue(decision.blocked)
+        assertTrue(decision.curbContact)
+        assertTrue(decision.contactStop)
+        assertEquals("Stop.", Guidance.phrase(decision))
+        assertEquals("Stop.", Guidance.phrase(decision, SpeechLanguage.Fr))
+        assertEquals("w|stop", Guidance.key(decision))
+    }
+
+    @Test
+    fun `bordure seule au contact = pas de stop, consigne attention`() {
+        val decision = Guidance.decide(listOf(placed("curb", 0.5f, 0.5f)))
+
+        assertTrue(decision.blocked)
+        assertTrue(decision.curbContact)
+        assertFalse(decision.contactStop)
+        assertEquals("Attention bordure.", Guidance.curbPhrase(decision, SpeechLanguage.Fr))
+        assertEquals("Attention, curb.", Guidance.curbPhrase(decision, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `sens connu = consigne monter ou descendre`() {
+        val labels = listOf(placed("marche", 0.5f, 0.5f))
+        val up = Guidance.decide(labels, curbEdge = CurbEdge.Up)
+        val down = Guidance.decide(labels, curbEdge = CurbEdge.Down)
+
+        assertTrue(up.curbContact)
+        assertEquals("Marche, maintenant.", Guidance.curbPhrase(up, SpeechLanguage.Fr))
+        assertEquals("Descente, maintenant.", Guidance.curbPhrase(down, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `cap lateral = pas de stop au contact`() {
+        val labels = listOf(placed("curb", 0.2f, 0.5f), placed("mur", 0.2f, 0.5f))
+        val decision = Guidance.decide(labels, SteeringCap.Left)
+
+        assertTrue(decision.blocked)
+        assertTrue(decision.curbContact)
+        assertFalse(decision.contactStop)
+    }
+
+    @Test
+    fun `obstacle a 70 cm = pas de stop`() {
+        val labels = listOf(placed("curb", 0.5f, 0.5f), placed("mur", 0.5f, 0.7f))
+        val decision = Guidance.decide(labels)
+
+        assertTrue(decision.curbContact)
+        assertFalse(decision.contactStop)
+    }
+
+    @Test
+    fun `sans consigne bordure hors contact`() {
+        val loin = Guidance.decide(listOf(placed("curb", 0.5f, 2f)))
+        val libre = Guidance.decide(emptyList())
+
+        assertFalse(loin.curbContact)
+        assertNull(Guidance.curbPhrase(loin))
+        assertNull(Guidance.curbPhrase(libre))
     }
 
     @Test

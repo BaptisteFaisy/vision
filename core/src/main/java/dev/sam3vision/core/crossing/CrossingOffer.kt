@@ -18,23 +18,31 @@ import dev.sam3vision.core.model.SegObject
  */
 object CrossingOffer {
 
-    /** Score minimal d'un objet pour compter comme passage piéton. */
-    const val MIN_SCORE = 0.40f
+    /**
+     * Score minimal d'un objet pour compter comme passage piéton : 0,35, miroir
+     * du seuil serveur (`SCORE_THRESHOLD`, `segmentation.py`) — le serveur ne
+     * renvoie rien sous 0,35, exiger 0,40 côté client jetait des passages que
+     * le modèle avait vus (reel audit 31/10 : seuils client/serveur alignés).
+     */
+    const val MIN_SCORE = 0.35f
 
     /** Au-delà (m), un passage vu ne compte plus comme proche (ordre user 30/10). */
     const val NEAR_MAX_METERS = 2.0f
 
     /** Étiquettes acceptées, après canonicalisation (casse, accents, ponctuation). */
     private val LABELS = setOf(
-        "crosswalk", "cross walk", "zebra crossing", "zebra crossing", "pedestrian crossing",
-        "passage pieton", "passage cloute", "cloutage",
+        "crosswalk", "cross walk", "zebra crossing", "pedestrian crossing",
+        "zebra", "zebre", "passage pieton", "passage cloute", "cloutage",
+        "bande", "bandes", "bande blanche", "bandes blanches",
     )
 
     /** Vrai si [label] (brut, tel que renvoyé par SAM) désigne un passage piéton. */
     fun isCrosswalkLabel(label: String): Boolean {
         val key = KnownSizes.canonical(label)
         if (LABELS.contains(key)) return true
-        return key.split(' ').any { it == "crosswalk" || it == "cloutage" }
+        return key.split(' ').any {
+            it == "crosswalk" || it == "cloutage" || it == "zebra" || it == "zebre"
+        }
     }
 
     /**

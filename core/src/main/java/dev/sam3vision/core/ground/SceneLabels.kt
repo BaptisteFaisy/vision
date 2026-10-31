@@ -21,7 +21,7 @@ object SceneLabels {
     /** Drop-off : plus de 20 cm sous le plan. */
     const val DROPOFF = 3
 
-    /** Plafond : au-delà de 2 m, pas un danger de marche. */
+    /** Plafond : au-delà de 2 m (hauts de grands véhicules compris — [RiskZones] le côte). */
     const val CEILING = 4
 
     /**

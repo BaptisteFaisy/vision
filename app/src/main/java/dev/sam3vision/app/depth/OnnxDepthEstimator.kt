@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import android.util.Log
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.DepthEstimator
 import dev.sam3vision.core.depth.DepthMap
@@ -40,7 +41,8 @@ class OnnxDepthEstimator private constructor(
                 val started = android.os.SystemClock.elapsedRealtime()
                 // Sérialisé : `OrtSession.run` n'est pas thread-safe (SIGABRT
                 // Scudo du 2026-10-28 sur runs concurrents / close en vol).
-                val map = guard.run { runSession(input) }.getOrThrow()
+                val (map, guardWaitMs) = guard.runMeasured { runSession(input) }.getOrThrow()
+                if (guardWaitMs > 0) Log.d("DepthLive", "verrou ORT : attente $guardWaitMs ms")
                 val elapsed = android.os.SystemClock.elapsedRealtime() - started
                 DepthResult(map, DepthBackend.DA2, elapsed)
             }
@@ -77,7 +79,10 @@ class OnnxDepthEstimator private constructor(
          * en repli dev), `null` si le modèle est absent : le sélecteur rend
          * alors un estimateur « modèle manquant » explicite. NNAPI essayé le
          * 2026-10-28 : session OK et bit-identique au CPU, mais jamais plus
-         * rapide en dos-à-dos — CPU seul.
+         * rapide en dos-à-dos — CPU seul (+ 4 threads intra-op) tant qu'un
+         * banc ne prouve pas le contraire. Budget suivi par [DepthBench]
+         * (médiane sur [DepthBench.RUNS] runs) ; l'attente du verrou est
+         * mesurée ([SerialRunGuard]) et loguée quand elle est non nulle.
          */
         fun open(context: Context): DepthEstimator? {
             val weights = readStoreFile(context) ?: readAsset(context, ASSET_NAME) ?: return null

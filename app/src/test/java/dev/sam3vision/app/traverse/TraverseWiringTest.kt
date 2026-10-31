@@ -191,7 +191,8 @@ class TraverseWiringTest {
         val tts = FakeTts()
         val wiring = voicedWiring(tts)
         wiring.updateLight(CrossingState.Green)
-        repeat(5) { wiring.at(emptyList(), it + 1) }
+        // 4 frames : confirmation à la 3e, répétition à 2 s non atteinte (5e frame).
+        repeat(4) { wiring.at(emptyList(), it + 1) }
 
         assertEquals(listOf("Vert, traversez.", "Vert, traversez.", "Vert, traversez."), tts.asked)
     }

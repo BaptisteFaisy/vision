@@ -64,6 +64,10 @@ c'est la 2ᵉ frame (`HazardWatcher`, 1ʳᵉ si poteau ≤ 2 m), le chronomètre
   pas de guidage in-app : le repli Maps prend le relais).
 - Terrain : **Île-de-France** (tuiles Valhalla), GPS fixé, réseau OK, **de
   jour** (la traversée ne traite que le jour, `docs/CALIBRAGE-FEU.md` § 9).
+- Backend `/live` déployé et réveillé : `GET /warm` (boot complet 25-38 s à
+  froid après un deploy, restauration snapshot 2-7 s sinon), puis `/health`
+  (leviers `batch_prompts/cuda_graph/edge:512/snapshot/attn:sdpa`,
+  `vision_accel: ok`) — sans boîtes SAM, ni obstacles ni traversée.
 - Parcours repéré à l'avance (~200 m) : un **poteau** dans le couloir, une
   **poubelle** (ou benne), un **panneau bas**, un **passage piéton sur
   l'itinéraire** (pour la traversée auto), un animal si possible, et au
@@ -137,7 +141,9 @@ pas en commentaire.
 verrou `~/bin/phone` absent de cette machine). La checklist ci-dessus
 est prête ; la première prise l'archive (procès-verbal +
 `shot-*.png` du script) et remplit chaque verdict — aucun n'est
-pré-rempli ici.
+pré-rempli ici. Protocole à rejouer après tout changement build/deploy (clés,
+`network_security`, deploy GPU) : §7 (0 chevauchement) et §8 (traversée) au
+minimum, budget serveur (`/warm` + `/health`) inclus.
 
 ## Ce qui est vérifié sans appareil (tests JVM)
 

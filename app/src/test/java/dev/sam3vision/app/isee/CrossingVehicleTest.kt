@@ -5,15 +5,18 @@ import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Voix des véhicules moteurs en mode Traversée : en mouvement ou à l'arrêt,
- * dans la langue de la voix (anglais par défaut) — devant l'évitement et
- * le statut, même sur un ordre du feu nouveau (ordre user du 31/10).
+ * Voix des véhicules en mode Traversée : moteurs puis 2-roues, en mouvement
+ * ou à l'arrêt, dans la langue de la voix (anglais par défaut) — devant
+ * l'évitement et le statut, jamais tus, même sur un ordre du feu nouveau
+ * (ordre user du 31/10 : un stop ne se tait pour rien).
  */
 class CrossingVehicleTest {
 
@@ -118,6 +121,25 @@ class CrossingVehicleTest {
     }
 
     @Test
+    fun `le stop vehicule preempte le feu vert`() {
+        CrossingVehicleWatch.reset()
+        CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
+        CrossingLightDueWatch.reset()
+        val placed = listOf(PlacedLabel("person", centerX = 0.1f))
+        val cue = CrossingCue("You can cross", false, CrossingState.Green)
+        val language = SpeechLanguage.En
+        val at = { width: Float, ms: Long ->
+            val frame = box(width)
+            crossingPhraseOf(cue, placed, listOf(det("car", frame)), listOf(reading("car", 5f, frame)), ms, language)
+        }
+
+        assertEquals("You can cross", at(100f, 0L))
+        assertEquals("You can cross", at(110f, 100L))
+        assertEquals("Stop, car moving.", at(120f, 200L))
+    }
+
+    @Test
     fun `les vehicules priment, puis tout droit`() {
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
@@ -140,20 +162,77 @@ class CrossingVehicleTest {
     }
 
     @Test
-    fun `cycles muets comme en normal`() {
+    fun `velo en mouvement parle en traversee`() {
         CrossingVehicleWatch.reset()
-
-        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+        val at = { width: Float, ms: Long ->
             val frame = box(width)
-            assertNull(
-                CrossingVehicleWatch.update(
-                    listOf(det("bicycle", frame)),
-                    listOf(reading("bicycle", 5f, frame)),
-                    index * 100L,
-                    SpeechLanguage.En,
-                ),
+            CrossingVehicleWatch.update(
+                listOf(det("bicycle", frame)),
+                listOf(reading("bicycle", 5f, frame)),
+                ms,
+                SpeechLanguage.En,
             )
         }
+
+        assertNull(at(100f, 0L))
+        assertNull(at(110f, 100L))
+        assertNull("vitesse non établie : silence", at(120f, 200L))
+        assertEquals("Attention, bicycle moving, at 12 o'clock.", at(130f, 300L))
+    }
+
+    @Test
+    fun `trottinette arretee parle en traversee`() {
+        CrossingVehicleWatch.reset()
+        val frame = box(100f)
+        val at = { ms: Long ->
+            CrossingVehicleWatch.update(
+                listOf(det("scooter", frame)),
+                listOf(reading("scooter", 2f, frame)),
+                ms,
+                SpeechLanguage.En,
+            )
+        }
+
+        assertNull(at(0L))
+        assertNull(at(100L))
+        assertNull("vitesse non établie : silence", at(200L))
+        assertEquals("Scooter stopped, at 12 o'clock.", at(300L))
+    }
+
+    @Test
+    fun `moteurs avant cycles sans perdre le mot cycle`() {
+        CrossingVehicleWatch.reset()
+        val at = { width: Float, ms: Long ->
+            val frame = box(width)
+            CrossingVehicleWatch.update(
+                listOf(det("car", frame), det("bicycle", frame)),
+                listOf(reading("car", 5f, frame), reading("bicycle", 5f, frame)),
+                ms,
+                SpeechLanguage.En,
+            )
+        }
+
+        assertNull(at(100f, 0L))
+        assertNull(at(110f, 100L))
+        assertEquals("Stop, car moving.", at(120f, 200L))
+        // Moteur en cooldown ; le cycle ne voit que sa 3e frame (la 200 ms est
+        // partie au moteur) : vitesse établie, confirmation en cours.
+        assertNull(at(130f, 300L))
+        assertEquals("Attention, bicycle moving, at 12 o'clock.", at(140f, 400L))
+    }
+
+    @Test
+    fun `motion nul ou statique - meme annonce, param compatible`() {
+        CrossingVehicleWatch.reset()
+        val (detections, readings) = stoppedCar()
+        val static = FrameMotion(MotionSample(0f, 0f, 1f, 1f), 96, 96, 100L)
+
+        assertNull(CrossingVehicleWatch.update(detections, readings, 0L, SpeechLanguage.En, motion = static))
+        assertNull(CrossingVehicleWatch.update(detections, readings, 100L, SpeechLanguage.En, motion = static))
+        assertEquals(
+            "Car stopped, 2 meters away.",
+            CrossingVehicleWatch.update(detections, readings, 200L, SpeechLanguage.En, motion = static),
+        )
     }
 
     @Test

@@ -19,7 +19,7 @@ import org.junit.Test
  * Le pipeline assemble hystérésis, veto et voix : la première frame cache,
  * la deuxième montre, le vert maintenu fait traverser, le veto en pleine
  * traversée coupe tout en urgent. Focale de test : 1000 px (une voiture de
- * 200 px de haut sort à 7,25 m, sous le seuil veto).
+ * 200 px de haut sort à 7,25 m ; le veto exige une approche confirmée).
  */
 class TraversePipelineTest {
 
@@ -28,8 +28,8 @@ class TraversePipelineTest {
     private val nearBox = listOf(0f, 0f, 200f, 200f)
     private val clips = mutableMapOf<String, String>()
 
-    private fun seg(label: String = "car", score: Float = 0.9f): SegObject =
-        SegObject(label, score, nearBox, "")
+    private fun seg(label: String = "car", score: Float = 0.9f, box: List<Float> = nearBox): SegObject =
+        SegObject(label, score, box, "")
 
     private fun pipeline(
         player: FakePlayer = FakePlayer(),
@@ -63,15 +63,29 @@ class TraversePipelineTest {
     }
 
     @Test
-    fun `deuxieme frame - piste confirmee, veto voit le vehicule proche`() = runBlocking {
+    fun `deuxieme frame - piste confirmee, sans approche pas de veto`() = runBlocking {
         val pipe = pipeline()
-        pipe.frame(listOf(seg()), green = true, index = 1)
-        val out = pipe.frame(listOf(seg()), green = true, index = 2)
+        val small = listOf(0f, 0f, 100f, 100f)
+        pipe.frame(listOf(seg(box = small)), green = true, index = 1)
+        val out = pipe.frame(listOf(seg(box = small)), green = true, index = 2)
 
         assertEquals(1, out.objects.size)
         assertEquals(1, out.detections.size)
         assertEquals(640, out.detections.single().width)
         assertEquals(480, out.detections.single().height)
+        assertFalse("première frame vue : pas d'approche", out.decision.veto)
+        assertEquals(TraversePhase.TRAVERSER, out.decision.state)
+        assertTrue(out.decision.keepObstacleGuidance)
+        assertNull("vert non confirmé : silence", out.cue)
+    }
+
+    @Test
+    fun `troisieme frame - croissance confirmee, veto alerte`() = runBlocking {
+        val pipe = pipeline()
+        pipe.frame(listOf(seg(box = listOf(0f, 0f, 100f, 100f))), green = true, index = 1)
+        pipe.frame(listOf(seg(box = listOf(0f, 0f, 150f, 150f))), green = true, index = 2)
+        val out = pipe.frame(listOf(seg(box = nearBox)), green = true, index = 3)
+
         assertTrue(out.decision.veto)
         assertEquals(TraversePhase.ALERTE, out.decision.state)
         assertEquals("car", out.decision.blockingLabel)
@@ -188,8 +202,8 @@ class TraversePipelineTest {
     fun `prompts - vehicules puis bordure et trottoir, bornes au plafond`() {
         assertEquals(VehicleConcepts.PROMPTS + listOf("curb", "sidewalk"), TraversePipeline.promptsFor())
         val prompts = TraversePipeline.promptsFor(listOf("traffic light"))
-        assertEquals(VehicleConcepts.PROMPTS, prompts.take(3))
-        assertEquals(listOf("curb", "sidewalk"), prompts.drop(3).take(2))
+        assertEquals(VehicleConcepts.PROMPTS, prompts.take(5))
+        assertEquals(listOf("curb", "sidewalk"), prompts.drop(5).take(2))
         assertEquals("traffic light", prompts.last())
         assertTrue(prompts.size <= LivePrompts.MAX)
         val full = TraversePipeline.promptsFor((1..20).map { "objet$it" })

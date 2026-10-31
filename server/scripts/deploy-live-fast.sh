@@ -27,11 +27,17 @@
 # Piège appris le 26/10 : un `modal deploy` ne prend pas le trafic tant que l'ancien
 # conteneur vit — la vérification lisait donc l'ancienne config et échouait à tort.
 # Le script attend la nouvelle version, et à défaut arrête l'app (dernier recours).
+#
+# Après un déploiement réussi, le script appelle /warm : le premier boot crée le
+# snapshot mémoire (25-38 s à froid), les réveils suivants restaurent (2-7 s).
+# Le déploiement CI est conditionnel (`[deploy-gpu]` dans le message, voir
+# `.github/workflows/deploy-live-fast.yml`) : chaque deploy invalide le snapshot.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODAL="${MODAL_BIN:-modal}"
 URL="${LIVE_HEALTH_URL:-https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/health}"
+WARM_URL="${URL%/health}warm"  # réveil explicite, sans inférence (voir `/warm`)
 
 APP_NAME="${LIVE_APP_NAME:-sam3-eu-a100}"
 GPU="${FAST_GPU:-A100-40GB}"
@@ -140,11 +146,20 @@ wait_for_new_version() { # essais, délai
   return 1
 }
 
+# Crée le snapshot mémoire dès le deploy (le conteneur est déjà chaud : réponse
+# immédiate, sans inférence). Best-effort : /health reste le verdict, un /warm
+# en échec n'invalide pas un deploy sain (avertissement, pas KO).
+warmup_snapshot() {
+  timeout 120 curl -fsS --max-time 110 "$WARM_URL" 2>/dev/null \
+    | python3 -c 'import json, sys; h = json.load(sys.stdin); print("warm:", h.get("warm"), "| restore:", h.get("restored"), "| boot:", h.get("load_seconds"), "s")'
+}
+
 if (( deploy )); then
   echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, detr_graph=1, attn=sdpa, scaledown=60, edge=512)"
   deploy_once || { echo "KO : le déploiement a échoué" >&2; exit 1; }
   echo "== attente de la nouvelle version"
   if wait_for_new_version 6 10; then
+    warmup_snapshot || echo "avertissement : /warm sans réponse (snapshot non prouvé)" >&2
     echo "OK : app rapide en place, graphe vision actif"
     exit 0
   fi
@@ -152,6 +167,7 @@ if (( deploy )); then
   timeout 120 "$MODAL" app stop "$APP_NAME" -y "${profile_arg[@]}" >/dev/null 2>&1 || true
   deploy_once || { echo "KO : redéploiement impossible" >&2; exit 1; }
   if wait_for_new_version 12 10; then
+    warmup_snapshot || echo "avertissement : /warm sans réponse (snapshot non prouvé)" >&2
     echo "OK : app rapide en place après arrêt (graphe vision actif)"
     exit 0
   fi

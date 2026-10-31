@@ -123,6 +123,13 @@ data class LiveProbeState(
      * global-boîte, lus par le panneau debug ([liveProbeMotionLine]).
      */
     val motion: MotionDebug? = null,
+    /**
+     * Frames refusées à la conversion (réserve pleine), par séance : comptées, jamais
+     * silencieuses — chaque refus arme la priorité de la suivante.
+     */
+    val skippedFrames: Long = 0,
+    /** Délai de la session active, en secondes (60 froid, 10 chaud ; 0 = aucune session). */
+    val timeoutSec: Long = 0,
 ) {
     /** Rien à afficher : ni frame analysée, ni erreur. */
     val idle: Boolean get() = frames == 0 && error == null

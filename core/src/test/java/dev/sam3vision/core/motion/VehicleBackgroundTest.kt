@@ -5,6 +5,8 @@ import dev.sam3vision.core.traverse.MovingVerdict
 import dev.sam3vision.core.traverse.VehicleBackground
 import dev.sam3vision.core.traverse.Verdict
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -166,6 +168,18 @@ class VehicleBackgroundTest {
             bgChangeScore = 0f,
             gyro = gyro,
         )
+
+
+    @Test
+    fun `isStatic - lent et confiant vrai, sinon faux`() {
+        assertTrue(VehicleBackground.isStatic(0.01f, 0.5f))
+        assertTrue("bornes incluses", VehicleBackground.isStatic(VehicleBackground.STILL_SPEED, VehicleBackground.TRUST_MIN))
+        assertFalse("trop vite", VehicleBackground.isStatic(0.05f, 0.5f))
+        assertFalse("fond flou", VehicleBackground.isStatic(0.01f, 0.05f))
+        assertFalse("vitesse négative", VehicleBackground.isStatic(-0.01f, 0.5f))
+        assertFalse("vitesse non finie", VehicleBackground.isStatic(Float.NaN, 0.5f))
+        assertFalse("confiance non finie", VehicleBackground.isStatic(0.01f, Float.NaN))
+    }
 
     /** Verdict V1 d'une scène : fond estimé à l'estimateur réel, boîte en fractions d'image. */
     private fun decideOf(scene: MotionScenes.VehicleScene, dtMs: Long): MovingVerdict {

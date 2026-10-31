@@ -23,15 +23,20 @@ class VoicePack(
 ) {
 
     /**
-     * Clip frais pour ([id], [language]) sous la voix [voiceId] : cache
-     * d'abord, clip embarqué ensuite (voix du pack uniquement), sinon `null`
-     * (l'appelant synthétise en borné, puis [put]).
+     * Clip pour ([id], [language]) sous la voix [voiceId] : cache frais
+     * d'abord, clip embarqué ensuite (voix du pack uniquement), sinon le
+     * cache périmé tel quel (un vieux clip parlé vaut mieux qu'une synthèse
+     * lente — ou qu'un silence), sinon `null` (l'appelant synthétise en
+     * borné, puis [put]). Le dossier ségréguant déjà par voix, le périmé
+     * servi est toujours de la voix demandée ; la comparaison de voix est
+     * insensible à la casse et aux blancs (tolérance de saisie).
      */
     fun clipFor(id: String, language: SpeechLanguage, voiceId: String): File? {
         val file = File(dirFor(voiceId), fileNameFor(id, language))
         if (fresh(file)) return file
-        if (packVoiceId()?.trim() != voiceId.trim()) return null
-        return bundledClip(file.name)?.let { writeClip(file, it) }
+        val stale = file.takeIf { it.isFile && it.length() > 0L }
+        if (!sameVoice(packVoiceId(), voiceId)) return stale
+        return bundledClip(file.name)?.let { writeClip(file, it) } ?: stale
     }
 
     /** Met en cache une synthèse runtime (voix courante, dossier dédié). */
@@ -43,6 +48,10 @@ class VoicePack(
     /** Dossier des clips de [voiceId] (8 premiers, comme les annonces). */
     fun dirFor(voiceId: String): File =
         File(filesDir, dirNameFor(voiceId.trim()))
+
+    /** La voix réglée est-elle celle du pack (casse et blancs ignorés) ? */
+    private fun sameVoice(packVoiceId: String?, voiceId: String): Boolean =
+        packVoiceId != null && packVoiceId.trim().equals(voiceId.trim(), ignoreCase = true)
 
     private fun fresh(file: File): Boolean =
         file.isFile && file.length() > 0 && nowMs() - file.lastModified() < CLIP_TTL_MS

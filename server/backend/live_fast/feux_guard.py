@@ -1,16 +1,24 @@
-"""Garde serveur des feux FR : petit feu jamais évincé, labels acheminés.
+"""Garde serveur des feux FR et du passage piéton : petits objets jamais évincés.
 
-Trois gardes, sans GPU ni poids (testées par ``scripts/tests_units/``) :
+Cinq gardes, sans GPU ni poids (testées par ``scripts/tests_units/``) :
 
 * **anti-éviction** — :func:`finalize_guarded` enveloppe ``segmentation.finalize`` :
-  si des objets « feu » sont détectés mais qu'aucun n'entre dans le top
-  ``max_objects`` (petit feu lointain, score faible), le meilleur feu prend la
-  dernière place gardée. Les seuils globaux (``SCORE_THRESHOLD``,
-  ``MASK_THRESHOLD``) sont inchangés : on réserve une place, on ne baisse rien ;
+  si des objets « feu » ou « passage piéton » sont détectés mais qu'aucun n'entre
+  dans le top ``max_objects`` (petit feu lointain, zébrures à 0,36), le meilleur
+  de chaque famille prend une place réservée. Les seuils globaux
+  (``SCORE_THRESHOLD``, ``MASK_THRESHOLD``) sont inchangés : on réserve des
+  places, on ne baisse rien ;
 * **routage des labels** — :func:`routed_concept` mappe les variantes anglaises
   « pedestrian light/signal » (que la table ``concepts`` ne connaît pas) vers
   ``pedestrian traffic light`` pour le modèle, les labels renvoyés restant tels
   que saisis. :func:`is_feu_label` reconnaît la même famille pour l'anti-éviction ;
+* **famille bordure** — :func:`is_curb_label` reconnaît le rebord et le
+  bateau (« curb », « curb ramp », « step » + variantes FR/EN) pour la même
+  réserve : le relief de 10 cm ne se fait plus évincer par les gros objets ;
+* **famille passage** — :func:`is_crosswalk_label` reconnaît les variantes que la
+  table ``concepts`` laisse passer telles quelles (« zebra crossing », « zebra »,
+  « bandes »…) pour l'anti-éviction — sans toucher au routage modèle (le CLIP
+  reçoit les prompts inchangés, seule la réserve s'élargit) ;
 * **cohérence work_edge** — :func:`coherent_work_edge` ramène le ``work_edge``
   déclaré au plus grand côté de l'image reçue (le resize n'agrandit jamais, donc
   c'est la taille réellement appliquée) et loggue l'écart.
@@ -38,6 +46,40 @@ ROUTED_LABELS = {
     "signals": "pedestrian traffic light",
 }
 
+# Concept « passage piéton » côté modèle (la table ``concepts`` y mène déjà
+# « passage piéton » et « passage clouté »).
+CROSSWALK_CONCEPTS = frozenset({"crosswalk"})
+
+# Concept « bordure » côté modèle : le rebord, le bateau et la marche
+# (la table ``concepts`` y mène déjà bordure/rebord/bateau/marche).
+# « sidewalk » exclu : le plan entier, pas le bord — le réserver
+# gaspillerait la place (miroir de ``CurbConcepts`` côté client).
+CURB_CONCEPTS = frozenset({"curb", "curb ramp", "step"})
+
+# Variantes brutes reconnues pour la réserve (tri serveur seul).
+CURB_ROUTED = {
+    "steps": "step",
+    "curb cut": "curb",
+}
+
+
+# Variantes que la table ``concepts`` laisse passer telles quelles, reconnues
+# pour la réserve anti-éviction (clés = sortie de ``model_concept`` : minuscules
+# désaccentuées). Miroir de ``CrossingOffer.LABELS`` côté client — ici pour le
+# tri serveur seul, jamais pour le modèle (voir ``is_crosswalk_label``).
+CROSSWALK_ROUTED = {
+    "cross walk": "crosswalk",
+    "zebra crossing": "crosswalk",
+    "pedestrian crossing": "crosswalk",
+    "zebra": "crosswalk",
+    "zebre": "crosswalk",
+    "cloutage": "crosswalk",
+    "bande": "crosswalk",
+    "bandes": "crosswalk",
+    "bande blanche": "crosswalk",
+    "bandes blanches": "crosswalk",
+}
+
 
 def routed_concept(prompt: str) -> str:
     """Concept modèle d'un prompt, variantes EN « pedestrian light/signal » routées.
@@ -55,6 +97,27 @@ def is_feu_label(label: object) -> bool:
     if not isinstance(label, str) or not label.strip():
         return False
     return routed_concept(label) in FEU_CONCEPTS
+
+
+def is_curb_label(label: object) -> bool:
+    """Vrai si [label] désigne une bordure/bateau/marche (FR/EN, tolérant)."""
+    if not isinstance(label, str) or not label.strip():
+        return False
+    norm = model_concept(label)
+    return CURB_ROUTED.get(norm, norm) in CURB_CONCEPTS
+
+
+def is_crosswalk_label(label: object) -> bool:
+    """Vrai si [label] désigne un passage piéton (FR/EN, casse/accents tolérés).
+
+    La table ``concepts`` couvre « passage piéton/clouté » ; ``CROSSWALK_ROUTED``
+    ajoute les variantes brutes (« zebra », « bandes »…). Ce routage ne sert
+    qu'à la réserve anti-éviction : le CLIP reçoit les prompts inchangés.
+    """
+    if not isinstance(label, str) or not label.strip():
+        return False
+    norm = model_concept(label)
+    return CROSSWALK_ROUTED.get(norm, norm) in CROSSWALK_CONCEPTS
 
 
 def coherent_work_edge(work: int, image_size) -> int:
@@ -76,38 +139,58 @@ def coherent_work_edge(work: int, image_size) -> int:
     return longest
 
 
-def _split_feu(entries: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Entrées partagées en (autres, feux), ordre stable conservé des deux côtés."""
-    others, feu = [], []
+def _split_guarded(entries):
+    """Entrées partagées en (autres, feux, passages, bordures), ordre stable."""
+    others, feu, walk, curb = [], [], [], []
     for entry in entries:
-        (feu if is_feu_label(entry.get("label")) else others).append(entry)
-    return others, feu
+        label = entry.get("label")
+        if is_feu_label(label):
+            feu.append(entry)
+        elif is_crosswalk_label(label):
+            walk.append(entry)
+        elif is_curb_label(label):
+            curb.append(entry)
+        else:
+            others.append(entry)
+    return others, feu, walk, curb
 
 
-def _top_keeps_feu(entries: list[dict], max_objects: int) -> bool:
-    """Le tri pur de ``finalize`` garde-t-il déjà un feu dans les ``max_objects`` ?"""
+def _top_keeps(entries: list[dict], max_objects: int, is_guarded) -> bool:
+    """Le tri pur de ``finalize`` garde-t-il déjà un objet gardé dans le top ?"""
     top = sorted(entries, key=lambda item: item["score"], reverse=True)[:max_objects]
-    return any(is_feu_label(item.get("label")) for item in top)
+    return any(is_guarded(item.get("label")) for item in top)
 
 
 def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int,
                      mask_encoding: str, mask_format=None, mask_edge: int = 0) -> dict:
-    """``finalize`` + une place réservée au meilleur feu s'il serait évincé.
+    """``finalize`` + une place réservée par famille gardée qui serait évincée.
 
-    Sans feu détecté, feu déjà dans le top, ou ``max_objects < 2`` (pas de place
-    à réserver) : ``finalize`` pur, réponse strictement identique. Sinon deux
-    appels (autres à ``max_objects - 1``, feux à 1) fusionnés par score
-    décroissant — mêmes masques, mêmes ``mask_scale`` RLE, mêmes clés ``depth``.
+    Une famille (feux, passages, bordures) absente des détections, déjà dans
+    le top, ou
+    ``max_objects`` trop petit pour réserver sans tout évincer (≤ une place par
+    famille manquante) : ``finalize`` pur, réponse strictement identique. Sinon
+    un appel par famille manquante (première place de chacune) plus les autres
+    sur le reste, fusionnés par score décroissant — mêmes masques, mêmes
+    ``mask_scale`` RLE, mêmes clés ``depth``.
     """
-    others, feu = _split_feu(entries)
-    if not feu or max_objects < 2 or _top_keeps_feu(entries, max_objects):
+    others, feu, walk, curb = _split_guarded(entries)
+    missing = []
+    if feu and not _top_keeps(entries, max_objects, is_feu_label):
+        missing.append(feu)
+    if walk and not _top_keeps(entries, max_objects, is_crosswalk_label):
+        missing.append(walk)
+    if curb and not _top_keeps(entries, max_objects, is_curb_label):
+        missing.append(curb)
+    if not missing or max_objects <= len(missing):
         return finalize(entries, image_size, max_objects, mask_encoding,
                         mask_format=mask_format, mask_edge=mask_edge)
-    kept_others = finalize(others, image_size, max_objects - 1, mask_encoding,
-                           mask_format=mask_format, mask_edge=mask_edge)
-    kept_feu = finalize(feu, image_size, 1, mask_encoding,
+    kept = finalize(others, image_size, max_objects - len(missing), mask_encoding,
+                    mask_format=mask_format, mask_edge=mask_edge)
+    merged = list(kept["objects"])
+    for family in missing:
+        part = finalize(family, image_size, 1, mask_encoding,
                         mask_format=mask_format, mask_edge=mask_edge)
-    merged = sorted(kept_others["objects"] + kept_feu["objects"],
-                    key=lambda item: item["score"], reverse=True)
-    return {"width": kept_others["width"], "height": kept_others["height"],
-            "mask_encoding": kept_others["mask_encoding"], "objects": merged}
+        merged.extend(part["objects"])
+    merged = sorted(merged, key=lambda item: item["score"], reverse=True)
+    return {"width": kept["width"], "height": kept["height"],
+            "mask_encoding": kept["mask_encoding"], "objects": merged}

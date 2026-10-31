@@ -12,16 +12,15 @@ import kotlin.math.hypot
 /**
  * Concepts véhicules du veto trafic : ce que SAM doit suivre en mode traversée.
  *
- * Les trois véhicules du contrat (31/10, ordre user : camion, moto et
- * trottinettes sortis, voiture/bus/vélo gardés), en anglais (la forme que
- * SAM segmente le mieux).
+ * Les cinq véhicules du contrat (audit réel 31/10 : camion et moto réintégrés,
+ * trottinettes toujours sorties), en anglais (la forme que SAM segmente le mieux).
  * Le français reste reconnu côté veto ([isVehicle]) : un label « voiture » bloque
  * comme un « car », « trottinette » comme un « scooter ».
  */
 object VehicleConcepts {
 
-    /** Les trois véhicules du contrat : voiture, bus et vélo. */
-    val PROMPTS: List<String> = listOf("car", "bus", "bicycle")
+    /** Les cinq véhicules du contrat : voiture, bus, vélo, camion et moto (audit réel 31/10). */
+    val PROMPTS: List<String> = listOf("car", "bus", "bicycle", "truck", "motorcycle")
 
     private val KEYS = setOf(
         "car", "bus", "buses", "truck", "motorcycle", "bicycle", "bike",
@@ -50,8 +49,8 @@ object VehicleConcepts {
 
     /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — dix-huit concepts, donc les trois véhicules plus toute
-     * la base du direct (dangers, feu, passage…).
+     * [LivePrompts.MAX] — dix-huit concepts, donc les cinq véhicules plus le
+     * début de la base (la queue de la base est coupée en traversée).
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
         LivePrompts.normalize(PROMPTS + base)
@@ -89,9 +88,9 @@ data class TraverseDecision(
     /** Temps-avant-collision du plus dangereux (`null` sans approche suivie). */
     val approachTtcSeconds: Float? = null,
     /**
-     * Vrai quand un objet proche (véhicule ou non) est mesuré : le guidage
-     * obstacles doit rester actif malgré le mode traversée — on ne coupe jamais
-     * tout le guidage devant un objet proche, l'exclusion est levée.
+     * Vrai quand un objet proche (véhicule ou non) est mesuré, ou qu'un véhicule confiant
+     * est non mesuré : le guidage obstacles reste actif malgré le mode traversée — on ne coupe
+     * jamais tout le guidage devant un danger possible, l'exclusion est levée.
      */
     val keepObstacleGuidance: Boolean,
 )
@@ -105,8 +104,11 @@ data class TraverseDecision(
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
  * calibré pour les sept véhicules) et [Pinhole]. Un véhicule confirmé à
- * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ne
- * bloque plus : le vert seul décide alors ; en mouvement ou doute bloque.
+ * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ou qui
+ * suit la caméra (pan — voir `VehicleApproach.cameraMovedKeys`) ne bloque plus :
+ * le vert seul décide alors ; en mouvement ou doute bloque. L'approche suivie
+ * (IoU + tau < 3 s — voir [approachVerdict]) bloque aussi, en ceinture et
+ * bretelles.
  *
  * Machine d'état : [TraversePhase.ATTENDRE] par défaut et sous veto, `PRET` à la
  * première frame verte sans veto, `TRAVERSER` quand le vert se maintient, `ALERTE`
@@ -146,7 +148,7 @@ class TraverseVeto {
      * la date de la frame (< 0 : suivi temporel désactivé, veto instantané seul).
      * [motion] (`null` = pas de signal fond) fait taire l'approche suivie des
      * pistes qui suivent la caméra, ainsi que la croissance instantanée de
-     * leur clé — la proximité (mesurée) ne se tait jamais.
+     * leur clé — le guidage obstacles, lui, reste actif devant un objet proche.
      */
     fun update(
         lightGreen: Boolean,
@@ -189,8 +191,9 @@ class TraverseVeto {
     /**
      * Candidature d'une détection au veto : véhicule confiant qui approche ou proche.
      *
-     * @param stopped ensemble des identifiants de piste neutralisés (piste à l'arrêt / piste
-     *                « hushed »), écartés de la sélection du veto.
+     * @param stopped pistes neutralisées (arrêt confirmé [stoppedKeys] + suivi
+     * caméra `VehicleApproach.cameraMovedKeys`), écartées de la sélection du
+     * veto — les deux granularités (label, instance) sont honorées.
      */
     private fun vetoCandidate(detection: Detection, focalPx: Float, stopped: Set<String>): Blocking? {
         if (!VehicleConcepts.isVehicle(detection.label)) return null
@@ -198,11 +201,12 @@ class TraverseVeto {
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
         val growing = area != null && previous != null && area > previous
-        val approaching = growing && vehicleKey(detection.label) !in stopped
-        if (!approaching && vehicleKey(detection.label) in stopped) return null
+        val centerX = detection.normalizedBox()?.let { (it[0] + it[2]) / 2f } ?: 0.5f
+        if (vehicleKey(detection.label) in stopped) return null
+        if (VehicleApproach.instanceKeyOf(detection.label, centerX) in stopped) return null
         val meters = distanceOf(detection, focalPx)
         val near = meters != null && meters < VETO_METERS
-        if (!approaching && !near) return null
+        if (!growing && !near) return null
         return Blocking(detection.label, meters)
     }
 
@@ -279,14 +283,16 @@ class TraverseVeto {
     /**
      * Un objet calibré proche (véhicule ou non) : le guidage obstacles reste
      * actif. Une personne non mesurable compte comme proche (prudence :
-     * l'inconnu ne coupe jamais le guidage devant un humain).
+     * l'inconnu ne coupe jamais le guidage devant un humain), comme un
+     * véhicule confiant non mesuré (jamais prouvé loin — annoncé sans
+     * distance, pas coupé).
      */
     private fun hasNearObject(detections: List<Detection>, focalPx: Float): Boolean =
         detections.any { detection ->
             if (detection.score <= SCORE_MIN) return@any false
             val meters = distanceOf(detection, focalPx)
             meters?.let { it < VETO_METERS } == true ||
-                (meters == null && PersonLabels.isPerson(detection.label))
+                (meters == null && (PersonLabels.isPerson(detection.label) || VehicleConcepts.isVehicle(detection.label)))
         }
 
     /** Transition : le veto prime sur le vert, l'alerte exige une reconfirmation. */
@@ -323,9 +329,9 @@ class TraverseVeto {
 
     companion object {
         /** Score de confiance minimal d'un véhicule pris au sérieux (strictement dépassé). */
-        const val SCORE_MIN = 0.5f
+        const val SCORE_MIN = 0.35f
 
-        /** Sous cette distance sténopé (m), un véhicule bloque même sans approche visible. */
+        /** Sous cette distance sténopé (m), un objet proche garde le guidage obstacles actif. */
         const val VETO_METERS = 15f
 
         /** Fraîcheur exigée de la frame précédente pour conclure à l'arrêt (s). */

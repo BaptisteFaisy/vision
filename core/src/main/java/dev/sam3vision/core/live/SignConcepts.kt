@@ -25,7 +25,8 @@ object SignConcepts {
     /**
      * Haut de la zone tête : un panneau centré au-dessus (coordonée
      * normalisée, 0 = haut de l'image) est hors de portée de tête —
-     * téléphone tenu à hauteur de poitrine, tangage neutre.
+     * téléphone tenu à hauteur de poitrine, tangage neutre. Valeur provisoire,
+     * non mesurée : à calibrer au téléphone (corpus § 14 de `docs/VOIX-DANGER.md`).
      */
     const val HEAD_TOP = 0.22f
 

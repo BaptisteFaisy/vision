@@ -169,4 +169,34 @@ class KnownSizesTest {
         assertEquals(1f / 1.03f, door, 0.001f)
         assertTrue(tree > 0f)
     }
+
+    @Test
+    fun `lampadaire et street lamp partagent 5 m`() {
+        assertEquals(5.00f, KnownSizes.heightMeters("lampadaire")!!, 0.001f)
+        assertEquals(5.00f, KnownSizes.heightMeters("street lamp")!!, 0.001f)
+        assertEquals(5.00f, KnownSizes.heightMeters("Street Lamp")!!, 0.001f)
+    }
+
+    @Test
+    fun `panneau de signalisation calibre comme panneau`() {
+        assertEquals(2.20f, KnownSizes.heightMeters("traffic sign")!!, 0.001f)
+        assertEquals(2.20f, KnownSizes.heightMeters("Traffic Sign")!!, 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("traffic sign"), 0.001f)
+    }
+
+    @Test
+    fun `dernier mot anglais en repli, premier mot francais d'abord`() {
+        assertEquals(2.20f, KnownSizes.heightMeters("a traffic sign")!!, 0.001f)
+        assertEquals(5.00f, KnownSizes.heightMeters("vieux lampadaire")!!, 0.001f)
+        // le français garde la priorité : « sac » avant « dos »
+        assertEquals(0.40f, KnownSizes.heightMeters("sac à dos")!!, 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("a traffic sign"), 0.001f)
+    }
+
+    @Test
+    fun `pole reste profondeur meme avec street lamp calibre`() {
+        assertNull(KnownSizes.heightMeters("pole"))
+        assertTrue("pole" in KnownSizes.DEPTH_ONLY)
+        assertEquals(5.00f, KnownSizes.heightMeters("street lamp")!!, 0.001f)
+    }
 }

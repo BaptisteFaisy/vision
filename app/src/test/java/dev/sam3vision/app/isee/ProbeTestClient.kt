@@ -54,8 +54,12 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
     /** Appels `/health` (réveil explicite) reçus par le faux client. */
     var healthCalls = 0
 
+    /** Quand non-null, `/health` attend ce résultat : le réveil précoce est suspendu. */
+    var healthGate: CompletableDeferred<Result<LiveHealth>>? = null
+
     override suspend fun health(): Result<LiveHealth> {
         healthCalls += 1
+        healthGate?.let { return it.await() }
         return Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
     }
 

@@ -12,9 +12,9 @@ import kotlinx.coroutines.sync.Semaphore
  *
  * **Non branché** (aucun appelant prod, voulu) : mesuré sur le téléphone, deux frames en
  * vol ne gagnent aucun débit — le backend sérialise sur un verrou GPU et la latence par
- * frame double (417 ms contre 185 ms, voir [Cadence.Fast]). [LiveSession] (un créneau,
- * sans plancher artificiel) est donc l'optimum mesuré des deux chemins live. Le jour où
- * le serveur pipelinera vraiment, ce pipeline redeviendra le chemin.
+ * frame double (417 ms contre 185 ms). [LiveSession] ([Cadence.Fast] à deux créneaux,
+ * refermés à un si le backend sérialise) est l'optimum mesuré ; le jour où le serveur
+ * pipelinera vraiment, ce pipeline redeviendra le chemin.
  *
  * `/live` est sans état : l'ordre des réponses n'a donc aucun sens métier, seule la
  * fraîcheur du résultat compte. D'où deux règles, et elles suffisent :
@@ -29,7 +29,7 @@ import kotlinx.coroutines.sync.Semaphore
  * en vol = 150 ms d'aller-retour, 8 en vol = 300 ms pour 5,9 ips. Le multi-frames coûtait
  * +150 ms et rendait 8× le débit. Le serveur actuel sérialise ses inférences
  * (`max_containers=1` + verrou GPU) : au-delà d'une frame en vol, on ne gagne plus de
- * débit, on ne fabrique que de la latence — d'où [Cadence.Fast] à un créneau.
+ * débit, on ne fabrique que de la latence — d'où le régulateur de [Cadence.Fast].
  */
 class LivePipeline(
     private val client: LiveClient,
