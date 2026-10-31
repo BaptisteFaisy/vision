@@ -5,6 +5,7 @@ import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseePhotoShot
+import dev.sam3vision.app.isee.vm.IseeStreamDictation
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.settings.Settings
 import java.io.File
@@ -26,6 +27,7 @@ internal class IseeHoldTalk(
     private val haptics: IseeHaptics,
     private val dictation: IseeDictation,
     private val liveDictation: IseeLiveDictation,
+    private val streamDictation: IseeStreamDictation,
     private val settings: () -> Settings,
     private val cameraOps: IseeCameraCoordinator,
     private val finishHold: suspend () -> Unit,
@@ -44,7 +46,16 @@ internal class IseeHoldTalk(
         shots.captureForHold()
         update { it.copy(holding = true, status = null) }
         haptics.holdStart()
-        if (dictation.start()) liveDictation.start(settings())
+        if (dictation.start()) {
+            // Stream temps réel d'abord ; pas de clé / drapeau coupé / mort
+            // en route ⇒ les aperçus batch reprennent (même moteur final).
+            // Une mort après le relâchement ne relance rien : le moteur final
+            // a déjà choisi, un aperçu fantôme tournerait pour personne.
+            val attempting = streamDictation.start(settings()) {
+                if (snapshot().holding) liveDictation.start(settings())
+            }
+            if (!attempting) liveDictation.start(settings())
+        }
     }
 
     /** Doigt relâché : micro coupé, transcription, MP3 en cache, réponse IA parlée. */
@@ -61,6 +72,7 @@ internal class IseeHoldTalk(
     fun cancel() {
         if (!snapshot().holding) return
         liveDictation.stop()
+        streamDictation.stop()
         dictation.discard()
         haptics.holdEnd()
         update { it.copy(holding = false) }

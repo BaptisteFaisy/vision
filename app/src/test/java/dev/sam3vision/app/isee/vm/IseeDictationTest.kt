@@ -154,6 +154,19 @@ class IseeDictationTest {
     }
 
     @Test
+    fun `micro rendu — le rappel de fin part en succes comme en echec`() = runBlocking {
+        var settled = 0
+        val hooked = IseeDictation(mic, { engine }, { fn -> state.value = fn(state.value) }, onSettled = { settled++ })
+        hooked.start()
+        hooked.finish(Settings.Default)
+        mic.failure = IllegalStateException("panne")
+        hooked.start()
+        hooked.finish(Settings.Default)
+
+        assertEquals("succès + échec", 2, settled)
+    }
+
+    @Test
     fun `transcription qui depasse le plafond — motif d'etape, micro rendu`() = runBlocking {
         mic.gate = CompletableDeferred()
         val slow = IseeDictation(mic, { engine }, { fn -> state.value = fn(state.value) }, transcribeTimeoutMs = 50)
