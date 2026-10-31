@@ -108,17 +108,21 @@ fun GuidanceMapView(
                     applyGuideState(target, view, prev, state, marks, pins)
                 }
             },
-            // Sortie d'écran : la MapView est détruite (sans ça, la GL
-            // fuyait et les guidages suivants affichaient une carte figée).
-            onRelease = { view ->
-                runCatching { view.onPause() }
-                runCatching { view.onStop() }
-                runCatching { view.onDestroy() }
-            },
+            onRelease = ::releaseGuideMap,
             modifier = Modifier.fillMaxSize(),
         )
         if (showAttribution) GuideAttribution(Modifier.align(Alignment.BottomStart))
     }
+}
+
+/**
+ * Sortie d'écran : la MapView est détruite (sans ça, la GL fuyait et les
+ * guidages suivants affichaient une carte figée). Ne lève jamais.
+ */
+private fun releaseGuideMap(view: MapView) {
+    runCatching { view.onPause() }
+    runCatching { view.onStop() }
+    runCatching { view.onDestroy() }
 }
 
 /** MapView mémorisée : SDK initialisé (sans clé) avant création, cycle ouvert. */
