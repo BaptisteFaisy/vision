@@ -16,6 +16,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `DistanceLayoutTest` +2 (saisie, résolution) ; garde Kotlin verte.
 - Protocole : aidant à distance ruban (2 m conseillés) + taille exacte →
   « Calibrate from last sighting » → ±0,5° à 340 px ; « Clear » revient au capteur.
+## 2026-10-31 — Distances : médiane profondeur sur fenêtre centrale (anti-fond)
+
+- **Demande** : encore plus précis — la médiane lisait le fond des bords de boîte.
+- Fait (`DepthReadings.boxCloseness`) : érosion 25 % par côté avant la médiane
+  (le cœur porte l'objet) ; repli boîte entière si la fenêtre dégénère.
+- Preuves : `DepthReadingsTest` +2 (contraste centre/fond, dégénérescence) ;
+  garde Kotlin verte.
 
 
 ## 2026-10-31 — iSee : cap droit contourne toujours, jamais stop (branche `isee-droit-sans-stop`)
