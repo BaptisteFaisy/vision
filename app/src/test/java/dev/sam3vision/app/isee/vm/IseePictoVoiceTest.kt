@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.LiveVoiceRequest
 import dev.sam3vision.app.isee.IseeUiState
+import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
@@ -20,6 +21,8 @@ class IseePictoVoiceTest {
         labels: List<String> = listOf("medics"),
         language: SpeechLanguage = SpeechLanguage.Fr,
         found: MutableList<String> = mutableListOf(),
+        created: MutableList<String> = mutableListOf(),
+        hits: List<PictoHit> = emptyList(),
     ) = IseePictoVoice(
         armedLabels = { labels },
         settings = { Settings.Default.copy(speechLanguage = language) },
@@ -27,14 +30,36 @@ class IseePictoVoiceTest {
         update = { fn -> state = fn(state) },
         openLive = { request, prompts -> opened += Pair(request, prompts) },
         onFind = { found += it },
+        onCreate = { created += it },
+        hits = { hits },
     )
 
     @Test
-    fun `pictogramme de x ouvre le direct en creation et confirme`() = runBlocking {
-        assertTrue(voice().run("fais un pictogramme de ces médics"))
-        assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoCreate = "medics"), null)), opened)
+    fun `pictogramme de x cree sur place et confirme`() = runBlocking {
+        val created = mutableListOf<String>()
+        assertTrue(voice(created = created).run("fais un pictogramme de ces médics"))
+        assertEquals(listOf("medics"), created)
+        assertTrue(opened.isEmpty())
         assertEquals(listOf("Je crée le pictogramme."), spoken)
         assertEquals("Je crée le pictogramme.", state.status)
+    }
+
+    @Test
+    fun `pictogramme sans nom part au direct`() = runBlocking {
+        val created = mutableListOf<String>()
+        assertTrue(voice(created = created).run("fais un pictogramme de ça"))
+        assertTrue(created.isEmpty())
+        assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoCreate = ""), null)), opened)
+        assertEquals(listOf("Je crée le pictogramme."), spoken)
+    }
+
+    @Test
+    fun `create a picto for my keys cree sur place`() = runBlocking {
+        val created = mutableListOf<String>()
+        assertTrue(voice(language = SpeechLanguage.En, created = created).run("create a picto for my keys"))
+        assertEquals(listOf("keys"), created)
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Creating the pictogram."), spoken)
     }
 
     @Test
@@ -64,6 +89,15 @@ class IseePictoVoiceTest {
         assertTrue(voice(listOf("clés")).run("clé"))
         assertTrue(opened.isEmpty())
         assertEquals(listOf("Je cherche cle."), spoken)
+    }
+
+    @Test
+    fun `chasse d'un repere visible dit ou il est`() = runBlocking {
+        val hits = listOf(PictoHit(pictoId = "p1", label = "clés", x = 0f, y = 0.4f, w = 0.2f, h = 0.2f, score = 0.9f))
+        assertTrue(voice(labels = listOf("clés"), hits = hits).run("clé"))
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Les clés sont devant toi, à 9 heures."), spoken)
+        assertEquals("Les clés sont devant toi, à 9 heures.", state.status)
     }
 
     @Test
