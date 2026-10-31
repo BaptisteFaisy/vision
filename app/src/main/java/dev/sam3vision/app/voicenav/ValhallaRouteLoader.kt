@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeout
  * - appel `/route` : 2 tentatives max (1 essai + 1 reprise), chacune bornée
  *   à [ROUTE_TIMEOUT_SECONDS] ; échec final → échec « itinéraire
  *   indisponible (motif) » (l'écran montre l'adresse + le motif, et
- *   « Démarrer » bascule sur Google Maps).
+ *   « Démarrer » annonce l'indisponibilité).
  *
  * - aperçu carte ([onPreview]) : `null` au lancement, puis l'itinéraire
  *   guidable ([RouteTrip.toNavRoute], `null` si inconvertible) — zéro appel
@@ -34,7 +34,7 @@ import kotlinx.coroutines.withTimeout
  */
 class ValhallaRouteLoader(
     private val geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace>,
-    private val originNow: () -> RoutePoint?,
+    private val originNow: suspend () -> RoutePoint?,
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val baseUrl: () -> String,
     private val routeTimeoutMs: Long = ROUTE_TIMEOUT_SECONDS * 1000,
@@ -45,8 +45,12 @@ class ValhallaRouteLoader(
     suspend operator fun invoke(destination: String): Result<RouteSummary> {
         // Nouvelle demande : l'aperçu précédent est périmé (jamais d'ancienne carte).
         runCatching { onPreview(null) }
-        // Position d'abord : sans GPS, échec immédiat sans appel réseau.
-        val origin = runCatching { originNow() }.getOrNull()
+        // Position d'abord (attend un fix frais si besoin) : sans GPS, échec sans appel réseau.
+        val origin = try {
+            originNow()
+        } catch (_: Exception) {
+            null
+        }
         val base = runCatching { baseUrl().trim().trimEnd('/') }.getOrDefault("")
         if (origin == null || base.isNullOrBlank()) {
             return Result.failure(missingInputFailure(origin == null))

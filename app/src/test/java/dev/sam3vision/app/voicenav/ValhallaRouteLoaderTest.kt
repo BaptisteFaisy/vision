@@ -22,7 +22,7 @@ class ValhallaRouteLoaderTest {
 
     private fun loader(
         geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace> = { _, _ -> Result.success(place) },
-        originNow: () -> RoutePoint? = { origin },
+        originNow: suspend () -> RoutePoint? = { origin },
         route: suspend (RoutePoint, RoutePoint) -> Result<RouteTrip> = { _, _ -> Result.success(trip) },
         baseUrl: () -> String = { "https://route.test" },
         routeTimeoutMs: Long = 15_000,
@@ -204,5 +204,19 @@ class ValhallaRouteLoaderTest {
         assertTrue(down("la gare").isFailure)
 
         assertEquals(listOf(null), previews)
+    }
+
+    @Test
+    fun `origine suspendue attendue avant le resume`() = runBlocking {
+        var asked: Pair<RoutePoint, RoutePoint>? = null
+        val waited = loader(
+            originNow = { delay(50); origin },
+            route = { from, to -> asked = from to to; Result.success(trip) },
+        )
+
+        val summary = waited("la gare").getOrThrow()
+
+        assertEquals(830L, summary.distanceMeters)
+        assertEquals(origin, asked?.first)
     }
 }
