@@ -177,10 +177,10 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   concept modèle) ; porte traversée avant le watcher ; voix douce en
   coroutine fille ; trottoir latéral = plan seul (`isGround`).
   Contrat `docs/VOIX-DANGER.md` §19.
-- Preuves : `:core:testDebugUnitTest` 2 230 tests, 5 échecs préexistants
+- Preuves : `:core:testDebugUnitTest` 2 240 tests, 5 échecs préexistants
   `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows,
   identiques sur base pristine) ; `:app:testDebugUnitTest` vert
-  (1 300 tests, 0 échec) ; `check-kotlin-limits.py` vert ;
+  (1 297 tests, 0 échec) ; `check-kotlin-limits.py` vert ;
   `test_units.py` 311 OK, 6 KO `fastapi` absent (env, groupes
   HTTP seuls, sans rapport).
 
