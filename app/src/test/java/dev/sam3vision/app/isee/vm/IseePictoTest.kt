@@ -51,13 +51,14 @@ class IseePictoTest {
 
     private fun picto(
         decodeCalls: MutableList<String>? = null,
+        storeRoot: File? = null,
         now: () -> Long = { 0L },
     ) = { scope: kotlinx.coroutines.test.TestScope ->
         IseePicto(
             media = MediaCacheStore(tempDir("isee-picto-media"), dao),
             camera = { camera },
             settings = { Settings.Default },
-            store = PictoStore(tempDir("isee-picto-store")),
+            store = PictoStore(storeRoot ?: tempDir("isee-picto-store")),
             clientOf = { client },
             update = { fn -> state.update(fn) },
             scope = scope,
@@ -200,15 +201,42 @@ class IseePictoTest {
         assertNull(coordinator.chipZone())
     }
 
+    @Test
+    fun `photo qui leve rend un motif et libere le bouton`() = runTest {
+        camera.throwOnTake = true
+        val coordinator = picto()(this)
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
+        camera.throwOnTake = false
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.armed)
+        assertEquals(IseeStatusText.PICTO_SAVED, state.value.status)
+    }
+
+    @Test
+    fun `sauvegarde impossible affiche le motif sans armer`() = runTest {
+        val fileRoot = Files.createTempFile("isee-picto-file", null).toFile().apply { deleteOnExit() }
+        picto(storeRoot = fileRoot)(this).findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
+    }
+
     private fun tempDir(prefix: String): File =
         Files.createTempDirectory(prefix).toFile().apply { deleteOnExit() }
 
     /** Caméra factice : photo écrite et réussie. */
     private class FakeCamera : IseeCameraActions {
+        var throwOnTake: Boolean = false
         override val ready: Boolean = true
         override fun startRecording(file: File): Boolean = false
         override suspend fun stopRecording(): File? = null
         override fun takePhoto(target: File, onSaved: (Boolean) -> Unit): Boolean {
+            if (throwOnTake) throw IllegalStateException("camera closed")
             target.parentFile?.mkdirs()
             target.writeBytes(byteArrayOf(1, 2, 3, 4))
             onSaved(true)

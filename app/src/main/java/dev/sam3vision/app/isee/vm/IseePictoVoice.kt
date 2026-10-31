@@ -9,15 +9,15 @@ import dev.sam3vision.core.picto.PictoVoiceText
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Ordres vocaux picto et chasse maison sur iSee : transfère au direct.
- * « Find the X » reste sur place ([onFind] : X rejoint les masques SAM et
- * son pictogramme se crée), comme « Where are my keys » sans repère armé
- * (armé, il reste chassé, jamais régénéré) ; création
- * (« fais un pictogramme de X »), démo et chasse d'un repère armé partent
- * en [LiveVoiceRequest] ; un mot maison seul part en chasse SAM sur ce
- * seul mot. Tout est confirmé (recherche, création, démo) ou muet
- * (chasse, le direct parle) ; le reste passe aux ordres suivants (cap,
- * navigation, LLM).
+ * Ordres vocaux picto et chasse maison sur iSee : recherche et chasse restent
+ * sur place, création, démo et mot maison seul partent au direct.
+ * « Find the X » et « Where are my keys » sans repère armé restent sur place
+ * ([onFind] : X rejoint les masques SAM et son pictogramme se crée) ; armé,
+ * le repère est chassé sur place (l'overlay le montre, la voix confirme),
+ * jamais régénéré. Création (« fais un pictogramme de X »), démo et mot
+ * maison seul (chasse SAM) partent en [LiveVoiceRequest]. Tout est confirmé
+ * (recherche, chasse, création, démo) ; le reste passe aux ordres suivants
+ * (cap, navigation, LLM).
  *
  * [openLive] ouvre le direct avec la requête et les prompts (`null` =
  * essentiels) ; injecté pour les tests, le défaut parle aux vrais singletons.
@@ -41,6 +41,7 @@ class IseePictoVoice(
      */
     suspend fun run(text: String): Boolean {
         PictoVoiceOrder.parseFind(text)?.let { label ->
+            PictoVoiceOrder.huntWord(text, armedLabels())?.let { word -> return hunt(word) }
             onFind(label)
             confirm(PictoVoiceText.findStarted(label, settings().speechLanguage))
             return true
@@ -55,10 +56,7 @@ class IseePictoVoice(
             confirm(PictoVoiceText.demo(true, settings().speechLanguage))
             return true
         }
-        PictoVoiceOrder.huntWord(text, armedLabels())?.let { word ->
-            openLive(LiveVoiceRequest.Request(pictoHunt = word), null)
-            return true
-        }
+        PictoVoiceOrder.huntWord(text, armedLabels())?.let { word -> return hunt(word) }
         PictoVoiceOrder.parseWhere(text)?.let { label ->
             onFind(label)
             confirm(PictoVoiceText.findStarted(label, settings().speechLanguage))
@@ -69,6 +67,16 @@ class IseePictoVoice(
             return true
         }
         return false
+    }
+
+    /**
+     * Chasse d'un repère armé, sur place : l'overlay montre déjà le repère,
+     * la voix le confirme — le direct n'est plus ouvert (31/10 : tout se
+     * passe sur la page blanche).
+     */
+    private suspend fun hunt(word: String): Boolean {
+        confirm(PictoVoiceText.findStarted(word, settings().speechLanguage))
+        return true
     }
 
     private suspend fun confirm(line: String) {
