@@ -458,7 +458,7 @@ def _decorate(ctx, result: dict, edge, edge_ok: bool, timers: dict) -> dict:
 
 def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, batch: bool,
               edge=None, mask_encoding=None, gpu_lock=None, timers: dict | None = None,
-              mask_format=None, mask_edge: int = 0) -> dict:
+              mask_format=None, mask_edge: int = 0, with_depth: bool = False) -> dict:
     """UNE frame de bout en bout : CPU hors verrou, GPU sous verrou, encodage hors verrou.
 
     Chemin chaud unique de ``/live`` (HTTP et WebSocket) — les deux routes appellent ici,
@@ -466,8 +466,8 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
     historique (l'appelant sérialise déjà, comme ``_segment_sync``). ``timings`` partagé
     permet à l'appelant d'ajouter ses propres postes (``decode_ms``) à la même carte.
     """
+    from depth import attach_frame_depth
     from segmentation import model_concept
-
     timers = {} if timers is None else timers
     # `use_edge` peut réécrire la grille RoPE du ViT (FAST_EDGE_RUNTIME=1) : hors verrou, ce
     # serait une course avec une 2e entrée concurrente. En prod le levier est éteint et
@@ -481,6 +481,7 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
         vision = _vision(ctx, pixels, timers)
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,
                            max_objects, timers)
+        entries = attach_frame_depth(ctx, image, entries, with_depth, timers)
     result = _payload(entries, image_size, max_objects, mask_encoding, timers,
                       mask_format=mask_format, mask_edge=mask_edge)
     return _decorate(ctx, result, edge, edge_ok, timers)

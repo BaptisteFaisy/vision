@@ -21,6 +21,7 @@ consommés dans la même frame).
 
 from __future__ import annotations
 
+import os
 import time
 
 # Une décimale : la précision utile est le dixième de ms, le bruit de mesure est du
@@ -106,3 +107,21 @@ def format_boot_cpu(stage: str, ms: float, total_ms: float) -> str:
     """
     return (f"{BOOT_CPU_PREFIX} stage={stage} ms={ms:.{DIGITS}f} "
             f"total_ms={total_ms:.{DIGITS}f}")
+
+
+def container_age_seconds():
+    """Âge du conteneur en secondes (uptime machine - début du processus).
+
+    Après une restauration de snapshot, le processus est neuf mais ``/proc`` voit
+    son vrai âge — là où le chrono du code ne verrait que la phase GPU rejouée.
+    """
+    try:
+        with open("/proc/uptime", "r", encoding="utf-8") as handle:
+            uptime = float(handle.read().split()[0])
+        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
+            fields = handle.read().rsplit(") ", 1)[1].split()
+        start_ticks = int(fields[19])
+        hertz = os.sysconf("SC_CLK_TCK")
+        return round(uptime - start_ticks / hertz, 1)
+    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
+        return None

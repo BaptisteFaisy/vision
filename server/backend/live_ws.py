@@ -5,16 +5,19 @@ brancher ce protocole sur le pipeline existant (``Sam3Live._live_sync``), une fr
 fois par connexion. La forme de la réponse est **celle de ``POST /live``**, plus l'``id``.
 
     entrée  {"id": 7, "image_b64": "...", "prompts": ["person", "door"],
-             "max_objects": 4, "work_edge": 640, "mask_encoding": "bits"}
+             "max_objects": 4, "work_edge": 640, "mask_encoding": "bits",
+             "with_depth": true}
     sortie  {"id": 7, "width": 512, "height": 1138, "elapsed_ms": 118,
              "mask_encoding": "bits",
              "objects": [{"label": "person", "score": 0.91, "box": [x1, y1, x2, y2],
-                          "mask_b64": "..."}]}
+                          "mask_b64": "...", "depth": 0.83}]}
     erreur  {"id": 7, "error": {"status": 400, "detail": "..."}}
 
 ``mask_encoding`` (``png`` par défaut, ``bits`` ou ``none``) est hérité de
 ``schemas.LiveWsRequest`` : le message WS et le corps de ``POST /live`` décrivent donc
 exactement la même requête, et la réponse porte la représentation **appliquée**.
+``with_depth`` (``false`` par défaut) ajoute à chaque objet sa médiane de proximité
+(``depth``, 0..1, grand = proche) ; absent, la clé n'existe pas.
 
 Une erreur de frame ne ferme jamais la connexion : ``id`` vaut ``-1`` quand il est
 illisible (JSON invalide, ``id`` absent ou non entier).

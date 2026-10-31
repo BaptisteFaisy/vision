@@ -43,6 +43,11 @@ Coût du `scaledown_window=60` : au pire une minute de A100 en plus par session 
   seulement si `FAST_TIMING=1`.
 - `mask_encoding` inconnu ⇒ 400 (validation `Literal`). `none` ⇒ `mask_b64` vide, le client
   dessine la boîte.
+- `with_depth` (défaut `false`, POST `/live` **et** message WS, query `with_depth=1` en
+  binaire) : chaque objet porte `"depth"` (médiane de proximité 0..1, grand = proche,
+  même convention que la carte on-device). Absent ⇒ aucune clé, aucun coût. Modèle
+  indisponible ⇒ repli gracieux (pas de clé, jamais d'erreur) ; `/health` porte `"depth"`
+  (id du modèle chargé, vérifié par `deploy-live-fast.sh`).
 
 ## Vérification après déploiement
 

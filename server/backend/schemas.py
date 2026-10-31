@@ -33,6 +33,10 @@ class LiveRequest(BaseModel):
     prompts: list[str] | None = None
     max_objects: int | None = None
     work_edge: int | None = None
+    # Profondeur fusionnée : chaque objet porte sa médiane de proximité
+    # (``depth``, 0..1, grand = proche). Absent = False : un client muet est
+    # servi exactement comme avant, sans clé et sans coût GPU.
+    with_depth: bool = False
     mask_encoding: Literal["bits", "png", "none"] | None = None
     # Codec compact : "rle" (+ mask_edge, défaut 256) ; toute autre valeur est
     # ignorée (chemin historique), jamais rejetée — un knob ne vaut pas un 400.

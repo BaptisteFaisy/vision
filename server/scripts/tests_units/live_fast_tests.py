@@ -278,10 +278,11 @@ def test_run_frame_end_to_end(fast_core) -> None:
 
 
 def _pipeline(captured: dict, timings=None):
-    """Doublure de ``_live_sync`` à la signature courante (7 paramètres)."""
+    """Doublure de ``_live_sync`` à la signature courante (7 paramètres + knobs)."""
     def run(image_b64, prompts, max_objects, work_edge, batch_prompts=None, edge=None,
-            mask_encoding=None):
-        captured.update(mask_encoding=mask_encoding, prompts=prompts, max_objects=max_objects)
+            mask_encoding=None, with_depth=False):
+        captured.update(mask_encoding=mask_encoding, prompts=prompts, max_objects=max_objects,
+                        with_depth=with_depth)
         result = {"width": 64, "height": 40, "elapsed_ms": 12, "objects": [],
                   "mask_encoding": mask_encoding or "png"}
         if timings is not None:
@@ -357,10 +358,10 @@ def test_live_fast_binary(live_app_fast) -> None:
     captured: dict = {}
 
     def from_image(image, prompts, max_objects, work_edge, batch_prompts, edge,
-                   mask_encoding, mask_format, mask_edge, timers, started):
+                   mask_encoding, mask_format, mask_edge, timers, started, with_depth=False):
         captured.update(size=image.size, prompts=prompts, max_objects=max_objects,
                         work_edge=work_edge, mask_encoding=mask_encoding,
-                        mask_format=mask_format, mask_edge=mask_edge)
+                        mask_format=mask_format, mask_edge=mask_edge, with_depth=with_depth)
         return {"width": 64, "height": 40, "elapsed_ms": 12, "objects": [],
                 "mask_encoding": mask_encoding or "png"}
 
