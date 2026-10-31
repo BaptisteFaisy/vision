@@ -96,6 +96,11 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v21 (31/10) états qui attendent une action : `DIRTY`, `BLOCKED` et
+#       `UNSTABLE` ne se dédupliquent plus pour toujours — la déduplication v11
+#       les figeait (même tête, même base, mêmes checks) et une PR dont l'agent
+#       de conflit avait échoué une fois n'était plus jamais reprise (#634).
+#       Nouvelle tentative au plus toutes les 10 min, par PR.
 #   v20 (31/10) échec attribuable : quand la tête en échec a été poussée par
 #       l'agent de conflit (`<!-- agent-conflit sha=<tête> -->`), le compte
 #       rendu dit que c'est la **résolution** qui casse et pose le label
@@ -469,14 +474,25 @@ jobs:
             cid=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \
               --jq '[.[] | select(.body | startswith("<!-- automerge-etat -->"))]
                     | last | .id // ""' 2>/dev/null || true)
-            corps=$(printf '%s\nsha=%s master=%s state=%s pf=%s\n\n%s' \
-              "$ETAT_MARQUE" "$SHA" "$MASTER" "$STATE" "$PF" "$1")
+            corps=$(printf '%s\nsha=%s master=%s state=%s pf=%s ts=%s\n\n%s' \
+              "$ETAT_MARQUE" "$SHA" "$MASTER" "$STATE" "$PF" \
+              "$(date -u +%s)" "$1")
             if [ -n "${cid:-}" ] && [ "$cid" != "null" ]; then
               ghe api -X PATCH "repos/$REPO/issues/comments/$cid" \
                 -f body="$corps" >/dev/null 2>&1 || true
             else
               ghe pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
             fi
+          }
+          age_etat_minutes() { # minutes depuis la dernière note d'état (999 si aucune)
+            local quand secs
+            quand=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \
+              --jq '[.[] | select(.body | startswith("<!-- automerge-etat -->"))]
+                    | last | .updated_at // ""' 2>/dev/null || true)
+            [ -n "${quand:-}" ] || { echo 999; return 0; }
+            secs=$(( $(date -u +%s) - $(date -u -d "$quand" +%s) )) || secs=0
+            [ "$secs" -ge 0 ] || secs=0
+            echo $(( secs / 60 ))
           }
           # ── fusion sans rebase ──────────────────────────────────────────
           # Une PR `BEHIND` peut être mergée telle quelle : `strict` est à
@@ -721,9 +737,33 @@ jobs:
                 ;;
             esac
           fi
+          # v21 (31/10) — la déduplication v11 ne doit pas figer un état qui
+          # *attend une action*. Vécu : une PR `DIRTY` dont l'agent de conflit a
+          # échoué une fois (quota, modèle, porte de compilation) garde le même
+          # couple (tête, base, état, empreinte de checks) — donc le balayage la
+          # croyait « déjà faite » à chaque passage et ne la reprenait JAMAIS
+          # (#634 le 31/10, et #615 avant qu'un humain ne s'en mêle). Même
+          # chose pour `BLOCKED`, dont les relances sont bornées par marqueur :
+          # sans cette fenêtre, une PR dont la porte a refusé le push restait
+          # morte jusqu'à un mouvement de `master`.
+          # On reprend donc `DIRTY` et `BLOCKED` au plus toutes les 10 min par
+          # PR : assez pour ne pas cloner 134 Mo à chaque réveil du balayeur,
+          # assez court pour qu'une PR ne pourrisse pas une demi-journée.
           if deja_balayee; then
-            echo "PR #$PR : balayée pour ${SHA:0:7} sur ${MASTER:0:7} en état $STATE (rien de neuf)"
-            exit 0
+            case "$STATE" in
+              DIRTY|BLOCKED)
+                age="$(age_etat_minutes)"
+                if [ "${age:-999}" -lt 10 ]; then
+                  echo "PR #$PR : $STATE, dernière tentative il y a ${age} min (< 10), on attend"
+                  exit 0
+                fi
+                echo "PR #$PR : $STATE depuis ${age} min — nouvelle tentative"
+                ;;
+              *)
+                echo "PR #$PR : balayée pour ${SHA:0:7} sur ${MASTER:0:7} en état $STATE (rien de neuf)"
+                exit 0
+                ;;
+            esac
           fi
           # ── chemin rapide : en retard sur la base, vert, fichiers disjoints ──
           # Aucun clone : c'est ce cas qui fait le débit. Chaque merge déplace
