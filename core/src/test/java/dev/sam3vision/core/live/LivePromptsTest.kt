@@ -54,8 +54,13 @@ class LivePromptsTest {
     fun `la traversee est couverte par les defauts, memes masques`() {
         // Contrat « mêmes masques » : tout ce que la Traversée doit voir est
         // déjà suivi en mode normal — la bascule ne change plus les prompts.
+        // Les variantes du feu (« pedestrian light », « pedestrian signal »,
+        // voir CrossingPrompts.LIGHTS) désignent les mêmes masques que LIGHT
+        // déjà suivi : couverture visuelle, pas égalité de chaînes.
         CrossingPrompts.PROMPTS.forEach { concept ->
-            assertTrue(concept, concept in LivePrompts.default)
+            val covered = concept in LivePrompts.default ||
+                (CrossingPrompts.isLightLabel(concept) && CrossingPrompts.LIGHT in LivePrompts.default)
+            assertTrue(concept, covered)
         }
         (VehicleConcepts.PROMPTS - "scooter").forEach { concept ->
             assertTrue(concept, concept in LivePrompts.default)
