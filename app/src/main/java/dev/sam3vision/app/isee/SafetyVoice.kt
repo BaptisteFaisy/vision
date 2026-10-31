@@ -5,8 +5,8 @@ import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Voix de sécurité d'iSee : les alertes vitales (rebord imminent —
- * « Montez le rebord. ») parlent ici, pas par la voix ElevenLabs.
+ * Voix de sécurité d'iSee : les alertes vitales (bordure à 0,5 m —
+ * « Bordure à 0,5 mètre. ») parlent ici, pas par la voix ElevenLabs.
  *
  * Trois garanties (ordre user du 30/10/2026) :
  * - immédiat : le TTS système parle sans synthèse réseau ni attente de clé
