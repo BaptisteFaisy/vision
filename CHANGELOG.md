@@ -155,6 +155,12 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Tests : `:core` 2270/2275 verts ; 5 échecs `PrivateFileSettingsStoreTest`
   pré-existants sur l'arbre vierge (permissions fichiers Windows, hors scope).
 
+## 2026-10-31 — iSee : alertes P1/P2 immédiates, la nouvelle coupe l'ancienne (branche `fix/isee-alertes-voitures-rebords-immediates`)
+
+- **Demande** : latences de plusieurs secondes entre les obstacles détectés et la parole ; tout doit être dit au plus vite, un par un, priorité aux voitures et aux rebords.
+- Cause : `SafetyVoice.speak` parlait en `QUEUE_ADD` quand le TTS système parlait déjà — une alerte P1/P2 attendait la fin de la précédente en file (contrat § 16 de `docs/VOIX-DANGER.md`).
+- Fait : `SafetyVoice.speak` parle en `QUEUE_FLUSH` toujours — la nouvelle alerte (voiture en mouvement, rebord) coupe l'alerte en cours, un par un, la plus fraîche gagne ; coupe toujours la lecture ElevenLabs avant, survit à la dictée, hors-ligne sans clé inchangés. § 16 amendé + § 20.
+- Preuves : `SafetyVoiceTest` (4, vert) ; suite `:app` complète (1314 tests, 0 échec) ; `check-kotlin-limits.py` vert. **Non mesuré** : recette téléphone (deux alertes rapprochées → la seconde coupe la première) exige un APK de cette branche sur appareil réel.
 
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct
 
