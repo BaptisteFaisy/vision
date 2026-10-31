@@ -41,7 +41,6 @@ class SettingsStoreParityTest {
         keyframeSchedulerEnabled = true,
         localOverlayEnabled = false,
         continuousCadenceEnabled = true,
-        debugRouteMapEnabled = false,
         navigationGuidanceEnabled = false,
         outdoorMode = false,
         cameraFovDeg = 63.5f,
