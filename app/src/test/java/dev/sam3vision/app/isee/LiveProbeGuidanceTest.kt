@@ -48,11 +48,11 @@ class LiveProbeGuidanceTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
-    /** Personne centrée à ~4 m (sténopé 1,70 m / 219 px sur frame portrait). */
+    /** Personne centrée à ~3,8 m (sténopé 1,70 m / 231 px sur frame portrait). */
     private fun personneLoin() = SegObject(
         label = "person",
         score = 0.9f,
-        box = listOf(206f, 400f, 306f, 619f),
+        box = listOf(206f, 400f, 306f, 631f),
         maskPngB64 = "",
         maskEncoding = MASK_ENCODING_NONE,
     )
