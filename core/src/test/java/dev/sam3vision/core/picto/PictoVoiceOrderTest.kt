@@ -53,6 +53,32 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `where is are rend le label maison ou possede`() {
+        assertEquals("keys", PictoVoiceOrder.parseWhere("Where are my keys"))
+        assertEquals("keys", PictoVoiceOrder.parseWhere("Where are the keys"))
+        assertEquals("key", PictoVoiceOrder.parseWhere("Where is my key"))
+        assertEquals("phone", PictoVoiceOrder.parseWhere("Where's my phone?"))
+        assertEquals("tv remote", PictoVoiceOrder.parseWhere("Where is the tv remote"))
+        assertEquals("bag", PictoVoiceOrder.parseWhere("Where is my bag"))
+        assertEquals("keys", PictoVoiceOrder.parseWhere("Where are my keys please"))
+    }
+
+    @Test
+    fun `where hors maison sans my reste une question llm`() {
+        assertNull(PictoVoiceOrder.parseWhere("Where is the exit?"))
+        assertNull(PictoVoiceOrder.parseWhere("Where is Gare de Lyon?"))
+        assertNull(PictoVoiceOrder.parseWhere("Where am I?"))
+        assertNull(PictoVoiceOrder.parseWhere("Where is it?"))
+        assertNull(PictoVoiceOrder.parseWhere("Where are you?"))
+        assertNull(PictoVoiceOrder.parseWhere("Where are mine"))
+        assertNull(PictoVoiceOrder.parseWhere("Where is"))
+        assertNull(PictoVoiceOrder.parseWhere("Where are my"))
+        assertNull(PictoVoiceOrder.parseWhere("I wonder where my keys are"))
+        assertNull(PictoVoiceOrder.parseWhere("où sont mes clés ?"))
+        assertNull(PictoVoiceOrder.parseWhere(""))
+    }
+
+    @Test
     fun `le mot vise le repere - egalite pluriel prefixe`() {
         assertTrue(PictoVoiceOrder.matches("médics", "medics"))
         assertTrue(PictoVoiceOrder.matches("médicament", "medics"))
