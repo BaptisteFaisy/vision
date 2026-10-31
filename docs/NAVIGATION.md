@@ -66,29 +66,23 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 
 ## Navigation vocale in-app (Valhalla)
 
-Depuis le 29/10, `app/.../voicenav/` n'ouvre que la confirmation :
-dictée → `VoiceNavSession.onVoiceTranscript` → écran `DestinationConfirmScreen`
-(question vocale « Do you really want to go to X? … » + résumé +
-« Démarrer » / « Annuler ») ; le moteur Valhalla ne démarre qu'au « yes »
-vocal ou au bouton « Démarrer ». Le départ direct sans bouton
-(`autoStartOnVoice = true`, du 28/10) est abandonné : une question ou une
-dictée malentendue devenait un guidage, sans recours autre que l'ordre stop.
-Si le moteur ne peut pas démarrer (adresse, GPS, réseau, itinéraire), repli
-Google Maps **piéton** (`TravelMode.WALK`) et retour au repos : iSee n'affiche
-pas d'écran de guidage qu'il ne conduit pas.
-
-L'écran de confirmation est l'API par défaut (`autoStartOnVoice = false`) :
-adresse + résumé, bouton « Démarrer ». `IseeVoiceNav` garde ce défaut — plus
-aucun chemin produit ne démarre sans bouton ; `autoStartOnVoice = true`
-subsiste pour les tests de session (`VoiceNavSessionTest`).
+Depuis le 31/10, `app/.../voicenav/` démarre directement : dictée →
+`VoiceNavSession.onVoiceTranscript` → chargement (« Finding the best
+route », boule iSee en rotation rapide) → guidage moteur, sans question
+ni bouton (`autoStartOnVoice = true` câblé par `IseeVoiceNav`). L'écran
+de confirmation (`autoStartOnVoice = false`) subsiste comme API
+historique pour les tests de session (`VoiceNavSessionTest`) ; aucun
+chemin produit ne l'ouvre. Si le moteur ne peut pas démarrer (adresse,
+GPS, réseau, itinéraire), repos + annonce « I can't open the guidance » :
+aucun repli externe, iSee n'ouvre jamais Google Maps.
 
 Deux voix se partagent une session : les consignes du moteur (virages,
 écart, arrivée) passent par `SystemTtsEngine` — le TTS Android, français,
 gratuit et hors-ligne, car un virage n'attend pas le réseau ; les annonces de
-session (`VoiceNavAnnouncer` : repli Maps, fiche lieu, « Guidage arrêté »,
+session (`VoiceNavAnnouncer` : fiche lieu, « Guidage arrêté »,
 « Arrivée à destination ») passent par `speakNavigation`, la voix ElevenLabs
 de l'app. Aucune annonce n'est doublée : au démarrage vocal, seule la voix du
-moteur (ou celle du repli Maps) dit « Navigation vers X ».
+moteur dit « Navigation vers X ».
 
 Dans ce chemin historique, le résumé est fourni par `ValhallaRouteLoader`
 (géocodage GMS puis BAN + `POST /route` piéton, adresse seule sans position ni

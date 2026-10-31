@@ -103,8 +103,8 @@ private fun StopGuidanceButton(onStop: () -> Unit, zones: NavButtonZones, modifi
 }
 
 /**
- * Sous la caméra : la navigation quand elle a un objectif (confirmation
- * avec carte d'aperçu, ou guidage avec carte suivie), sinon la boule et la
+ * Sous la caméra : la navigation quand elle a un objectif (calcul
+ * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
  * phrase ([orb]). Le choix vit ici (état de session observé) pour garder
  * `PortraitScene` sous le plafond de 50 lignes : l'appelant ne fait que
  * passer la hauteur de la rue ([pictureH]).
@@ -127,7 +127,7 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
             viewModel.navButtons,
             placed,
         )
-        is VoiceNavUiState.Confirming -> IseeConfirmBlock(nav, viewModel, placed)
+        is VoiceNavUiState.Confirming -> IseeRouteLoading(nav, placed)
         else -> orb()
     }
 }

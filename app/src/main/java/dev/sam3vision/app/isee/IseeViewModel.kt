@@ -198,12 +198,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
-    /** Bouton « Start » de la confirmation sur l'accueil. */
-    fun confirmVoiceNavDestination() = viewModelScope.launch { voiceNav.session.confirmDestination() }
-    /** Bouton « Cancel » de la confirmation sur l'accueil. */
-    fun cancelVoiceNavConfirmation() = voiceNav.session.cancelConfirmation()
-    /** Saisie clavier sur l'accueil : pseudo-dictée « aller à … » vers la session. */
-    fun submitTypedVoiceNavDestination(text: String) = voiceNav.submitTyped(text)
 
     /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
     private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder)
@@ -219,8 +213,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Itinéraire guidé + dernier fix GPS pour les cartes (`null` au repos). */
     fun debugNavSnapshot(): Pair<NavRoute?, NavFix?> = runCatching { voiceNav.debugRoute() to voiceNav.debugFix() }.getOrDefault(null to null)
-    /** Aperçu d'itinéraire de la confirmation pour la carte (`null` hors confirmation). */
-    fun confirmNavSnapshot(): Pair<NavRoute?, NavFix?> = voiceNav.confirmPreview to null
     /** Recette adb : guidage debug vers [destination] (debug seul, voir [IseeVoiceNav]). */
     fun debugNavTo(destination: String) = voiceNav.debugNavTo(destination)
 

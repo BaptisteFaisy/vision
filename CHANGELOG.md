@@ -44,6 +44,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Demande** : dire « I want to go to the Sacré Coeur » doit guider vers le 35 Rue du Chevalier de la Barre (Paris 18e), pas vers un homonyme lointain du géocodeur (le repli BAN rend le Sacré-Cœur du Pas-de-Calais).
 - Fait : `KnownPlaces` nouveau (:core, `core/nav/`) — table nom usuel → adresse, égalité stricte insensible à la casse, aux accents, aux ligatures (« œ » vaut « oe ») et à l'article initial (« the », « le/la/les/l' ») ; `DestinationQuery.normalize` y résout chaque destination, donc voix (routeur + « direction X »), saisie clavier et géocodage moteur partent tous vers l'adresse — confirmation et repli Maps inclus.
 - Preuves : `KnownPlacesTest` (4 tests), `NavigationRouterTest` +1, `VoiceNavSessionTest` +1 ; suites :core (2251 tests, 5 échecs pré-existants `PrivateFileSettingsStoreTest`, permissions POSIX sous Windows, identiques hors changement) et :app (1304, 0 échec) ; `check-kotlin-limits.py` et `check-voice-nav-doc.py` verts.
+## 2026-10-31 — iSee : GPS en départ direct, sans confirmation ni repli Maps (branche `feat/isee-gps-sans-confirmation`)
+
+- **Demande** : un ordre GPS ne demande plus confirmation (ni question
+  vocale, ni destination affichée, ni boutons Start/Cancel, ni « Say yes or
+  no », ni saisie clavier) et n'ouvre plus Google Maps en repli ; pendant
+  le calcul, « Finding the best route » en noir + boule iSee en rotation
+  rapide à la place de l'indicateur bleu.
+- Fait : `IseeVoiceNav` passe `autoStartOnVoice = true` ; `VoiceNavSession`
+  affiche le chargement dès la dictée puis démarre le moteur — en panne,
+  repos + « I can't open the guidance », lanceur externe jamais appelé
+  (`launchMaps` supprimé, fiche lieu guidage-éteint inchangée) ;
+  `RouteLoadingBlock` partagé (accueil : encre noire ; écran navigation :
+  texte clair) ; écrans `DestinationConfirmScreen` / `DestinationTextField`
+  et saisie clavier supprimés ; diagnostic appareil : Maps s'ouvrait par
+  `ACTION_VIEW google.navigation:…&mode=w` depuis `dev.sam3vision.app`
+  (repli `launchMaps`, prouvé par les tâches récentes).
+- Preuves : `VoiceNavSessionTest` (nouveau : chargement visible puis
+  démarrage sans question ; 5 tests repli Maps réécrits au contrat
+  moteur-ou-rien), `VoiceNavSessionWiringTest` (2 réécrits),
+  `RouteLoadingSpinTest` (3, rotation 800 ms/tour),
+  `DestinationTextFieldTest` supprimé (fonction retirée) ;
+  `check-kotlin-limits.py` + `check-isee-design.py` + `check-voice-nav-doc.py`
+  verts ; `:app:testDebugUnitTest` ciblé vert. Recette appareil : non rejouée
+  (téléphone occupé puis déconnecté pendant la session).
 
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 

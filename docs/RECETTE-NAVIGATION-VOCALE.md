@@ -17,6 +17,12 @@ d'ici, aucune commande `adb` n'a été lancée. Ce qui suit décrit ce que le
 > « Do you really want to go to X? Travel time: Y. Answer yes or no. »,
 > boutons « Démarrer »/« Annuler » en secours). Le repli Maps décrit ici
 > est inchangé.
+>
+> **Mise à jour 31/10** : le départ direct est rétabli (décision user) et
+> le repli Maps est supprimé — la dictée affiche « Finding the best
+> route » (boule en rotation) puis guide, sans question ni boutons ; le
+> moteur en panne rend le repos + « I can't open the guidance ». La
+> recette du repli Maps ci-dessous est obsolète.
 
 Le script `scripts/verify-voice-nav.sh` déroule cette fiche en une prise :
 l'intégrateur parle (phrases § Recette, recopiées à l'identique), le script
