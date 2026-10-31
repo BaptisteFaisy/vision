@@ -198,6 +198,7 @@ class LockedMicService : Service() {
                 speech = speechClient(settings),
                 llm = llmClient(settings),
                 speak = { answer -> voice.say(settings, answer) },
+                settings = { settings },
             )
             val outcome = chain.run(pcm)
             outcome.fold(
