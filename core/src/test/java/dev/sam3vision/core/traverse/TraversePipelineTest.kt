@@ -93,8 +93,8 @@ class TraversePipelineTest {
                 assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
             }
         }
-        assertEquals("annonce à 4 s, répétition à 6 s", 2, cues)
-        assertEquals(listOf("play", "play"), player.events)
+        assertEquals("annonce à 2 s, répétitions à 4 s et 6 s", 3, cues)
+        assertEquals(listOf("play", "play", "play"), player.events)
     }
 
     @Test
@@ -118,7 +118,7 @@ class TraversePipelineTest {
         assertTrue(out.cue!!.urgent)
         assertEquals(CrossingText.phrase(CrossingState.Red), out.cue.phrase)
         assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
-        assertEquals(listOf("play", "play", "stop", "play"), player.events)
+        assertEquals(listOf("play", "play", "play", "stop", "play"), player.events)
     }
 
     @Test
