@@ -1,14 +1,12 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.cycle.CycleConcepts
-import dev.sam3vision.core.depth.DepthConfirm
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
-import dev.sam3vision.core.predict.EgoCompensator // PISTE1
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.hypot
 
@@ -372,11 +370,9 @@ class VehicleStateWatcher(
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
-                // PISTE1+2 : croissance décotée du zoom du fond ET confirmée en profondeur
-                // (repli brut sans fond prouvé ; pan/zoom à profondeur constante = pas un véhicule qui roule).
-                val growth = prev != null && EgoCompensator.areaGrowing(
-                    prev.area, current.getValue(candidate).area, atMs - prev.atMs, approach.lastGlobal) &&
-                    DepthConfirm.confirmsGrowth(prev.closeness, current.getValue(candidate).closeness)
+                val growth = prev != null && isVehicleGrowth( // FUSION P1+2 : décote zoom + confirmation profondeur.
+                    prev.area, prev.atMs, prev.closeness, current.getValue(candidate).area,
+                    current.getValue(candidate).closeness, atMs, approach.lastGlobal)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
