@@ -93,11 +93,13 @@ object Guidance {
      * contourne ni le trottoir, ni le chemin, ni la route
      * sur lesquels on marche (la bordure,
      * elle, reste un obstacle), ni une enseigne sous laquelle on passe.
-     * Cap droit : à égalité des côtés, on passe à l'opposé du décalage de
-     * l'obstacle (pilier légèrement à gauche ⇒ on passe à droite) ; pile au
-     * centre ⇒ à gauche. Cap latéral : le passage est le plus libre des deux
-     * autres secteurs, le centre en premier à égalité — on y marche droit,
-     * c'est le plus naturel.
+     * Ni le côté ni le passage ne mènent vers une personne quand l'autre
+     * côté est libre ([freerSide], [bestPassage] : veto personne). Cap droit :
+     * à égalité, on passe à l'opposé du décalage de l'obstacle (pilier
+     * légèrement à gauche ⇒ on passe à droite) ; pile au centre ⇒ à gauche.
+     * Cap latéral : le passage est le plus libre des deux autres secteurs,
+     * le centre en premier à égalité — on y marche droit, c'est le plus
+     * naturel.
      *
      * Cap droit : le côté conseillé vient du chemin optimal ([PeoplePath.plan]) —
      * le cap hors des bandes interdites le plus proche de tout droit — quand il
@@ -247,7 +249,12 @@ object Guidance {
         return if (meters == null || !meters.isFinite()) 0f else meters
     }
 
-    /** Côté le moins encombré : moins d'objets, sinon obstacle le plus loin, sinon décalage. */
+    /**
+     * Côté le moins encombré : sans personne d'abord (on ne contourne jamais
+     * vers quelqu'un), sinon moins d'objets, sinon obstacle le plus loin,
+     * sinon décalage. À égalité de personnes des deux côtés, l'ancien
+     * départage s'applique : dans une foule on se faufile, on ne s'arrête pas.
+     */
     private fun freerSide(
         labels: List<PlacedLabel>,
         obstacle: PlacedLabel,
@@ -256,6 +263,11 @@ object Guidance {
         val edge = PositionText.SIDE_EDGE
         val left = labels.filter { it.centerX < edge && inRange(it, rangeMeters) }
         val right = labels.filter { it.centerX > 1f - edge && inRange(it, rangeMeters) }
+        val leftPeople = left.count { PersonLabels.isPerson(it.label) }
+        val rightPeople = right.count { PersonLabels.isPerson(it.label) }
+        if (leftPeople != rightPeople) {
+            return if (leftPeople < rightPeople) GuidanceSide.Left else GuidanceSide.Right
+        }
         if (left.size != right.size) return if (left.size < right.size) GuidanceSide.Left else GuidanceSide.Right
         val leftClear = nearestKnown(left) ?: 0f
         val rightClear = nearestKnown(right) ?: 0f
@@ -267,8 +279,9 @@ object Guidance {
 
     /**
      * Passage conseillé quand un cap latéral est bouché : le plus libre des
-     * deux autres secteurs (moins d'objets à portée, sinon obstacle connu le
-     * plus loin), le centre en premier à égalité.
+     * deux autres secteurs (sans personne d'abord, sinon moins d'objets à
+     * portée, sinon obstacle connu le plus loin), le centre en premier à
+     * égalité.
      */
     private fun bestPassage(
         labels: List<PlacedLabel>,
@@ -281,13 +294,21 @@ object Guidance {
             listOf(SteeringCap.Straight, SteeringCap.Left)
         }
         return others.minWith(
-            compareBy({ sectorCount(labels, it, rangeMeters) }, { -(sectorNearest(labels, it, rangeMeters) ?: 0f) }),
+            compareBy(
+                { sectorPersons(labels, it, rangeMeters) },
+                { sectorCount(labels, it, rangeMeters) },
+                { -(sectorNearest(labels, it, rangeMeters) ?: 0f) },
+            ),
         )
     }
 
     /** Objets du secteur [cap] à portée (les mêmes seuils que le couloir). */
     private fun sectorCount(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Int =
         labels.count { inSector(it.centerX, cap) && inRange(it, rangeMeters) }
+
+    /** Personnes du secteur [cap] à portée : le passage les évite en premier. */
+    private fun sectorPersons(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Int =
+        labels.count { inSector(it.centerX, cap) && inRange(it, rangeMeters) && PersonLabels.isPerson(it.label) }
 
     /** Distance du plus proche objet mesuré du secteur, `null` si aucun. */
     private fun sectorNearest(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Float? =
