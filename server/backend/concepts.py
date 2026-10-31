@@ -220,6 +220,13 @@ CONCEPT_ALIASES = {
     "feu piéton vert": "pedestrian traffic light",
     "signal piéton": "pedestrian traffic light",
     "signaux piétons": "pedestrian traffic light",
+    # Petites boîtes (31/10, ordre user : SAM cadre la tête du feu,
+    # la couleur s'y lit en local). Concept distinct du caisson : deux
+    # prompts, deux jeux de boîtes, jamais dédoublonnés.
+    "boîtier feu piéton": "pedestrian signal head",
+    "boîtiers feu piéton": "pedestrian signal head",
+    "petit feu piéton": "pedestrian signal head",
+    "petits feux piétons": "pedestrian signal head",
     "stop": "stop sign",
     "sens interdit": "no entry sign",
     "panneau de signalisation": "traffic sign",
