@@ -138,7 +138,9 @@ object DepthReadings {
         }
         if (meters != null) {
             val id = base?.trackId ?: DistanceMeter.UNTRACKED_ID
-            return DistanceReading(id, detection.label, meters, meters, detection.box)
+            // La confiance du sténopé traverse : les mètres viennent de la profondeur,
+            // calibrée par ces mêmes ancres — pas une certitude neuve.
+            return DistanceReading(id, detection.label, meters, meters, detection.box, base?.confidence ?: 1f)
         }
         return base
     }
