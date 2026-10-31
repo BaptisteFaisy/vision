@@ -167,9 +167,9 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `seuils de palier 04 et 30`() {
-        assertEquals(CurbTier.NEAR, CurbSignal(detected = true, meters = 0.4f).tier)
-        assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 0.41f).tier)
+    fun `seuils de palier 07 et 30`() {
+        assertEquals(CurbTier.NEAR, CurbSignal(detected = true, meters = 0.7f).tier)
+        assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 0.71f).tier)
         assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 3.0f).tier)
         assertEquals(CurbTier.NONE, CurbSignal.none().tier)
         assertEquals(CurbTier.FAR, CurbSignal.of(listOf(curb(3.0f)), 512, 1138).tier)

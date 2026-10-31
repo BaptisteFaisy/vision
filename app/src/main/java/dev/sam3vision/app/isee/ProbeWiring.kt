@@ -16,6 +16,7 @@ import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.hazard.FenceOpeningWatcher
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
+import dev.sam3vision.core.live.ContinueWord
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.SteeringCap
@@ -92,6 +93,7 @@ internal fun LiveProbe.configureFrom(
         guide = settings.guideStraight,
         lens = LensSpec.fromSettings(settings.cameraFovDeg),
         distancesOn = settings.distanceOverlayEnabled,
+        collectCrops = settings.collectLightCrops,
         maxObjects = settings.objectsOnScreen,
         language = settings.speechLanguage,
         crossingActive = crossingActive,
@@ -132,13 +134,21 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
 }
 
 /**
+ * Entrée clip d'une phrase de la sonde (`null` = synthèse réseau) : mots SAM,
+ * rappels de suivi ([ContinueWord], cache runtime — synthèse à la 1re
+ * occurrence, clip ensuite), mots TwinLite. Pur, testé en JVM.
+ */
+internal fun spokenClipId(text: String): String? =
+    GuidanceWord.clipIdFor(text) ?: ContinueWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
+
+/**
  * Chaque nouvelle phrase de la sonde est confiée à la voix (une seule fois par
  * phrase). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
  * Dernier-gagnant : une phrase plus fraîche annule la synthèse en cours au lieu
  * de faire la queue derrière — une consigne datée ne sert à rien. La même phrase
  * ré-émise par les frames suivantes n'annule rien (`distinctUntilChanged`) :
  * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
- * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
+ * Les mots du guidage (rappels de suivi inclus) partent en clips (< 100 ms), le reste (positions) en
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
  * mot stop) : seul le stop coupe la lecture en cours, chat compris
  * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » SAM urgence externe) —
@@ -154,7 +164,7 @@ internal fun LiveProbe.observeSpoken(
     scope.launch {
         state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
             val text = phrase ?: return@collectLatest
-            val clipId = GuidanceWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
+            val clipId = spokenClipId(text)
             if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent)
             else voice.onPhrase(text, playerIdle(), urgent = urgent)
         }

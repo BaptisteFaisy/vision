@@ -1,7 +1,6 @@
 package dev.sam3vision.app.isee
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
@@ -43,7 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
 /**
@@ -70,8 +68,8 @@ class LiveProbe(
      * réduite demandée au serveur est alors celle que le client sait relire.
      */
     clientFor: ((String, Long, WireMarks?) -> LiveClient)? = null,
-    /** Contexte app (moteur de profondeur) ; `null` = profondeur désactivée (tests). */
-    appContext: Context? = null,
+    /** Contexte app (profondeur + collecte crops) ; `null` = désactivés (tests). */
+    private val appContext: Context? = null,
     /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
     depthMeter: DepthMeter? = null,
 ) {
@@ -114,8 +112,11 @@ class LiveProbe(
 
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
     internal val voice = ProbeVoice()
-    /** Déclencheur du mode Traversée : vert confirmé, rouge vite, doute une fois. */
+    /** Déclencheur du mode Traversée : vert confirmé (4 frames), rouge vite (2 frames). */
     private val crossing = CrossingAnnouncer()
+
+    /** Collecte des crops (voir [LightCropLogger]) : `null` = interrupteur coupé. */
+    private var cropLogger: LightCropLogger? = null
 
     /** Veto trafic du mode Traversée : un véhicule qui approche force l'attente. */
     private val traverseVeto = TraverseVeto()
@@ -156,6 +157,7 @@ class LiveProbe(
         crossingActive: Boolean = false,
         modelsLine: String = "",
         depth: DepthBackend = DepthBackend.DA2,
+        collectCrops: Boolean = false,
     ) {
         val clean = baseUrl.trim()
         closeSessions()
@@ -171,7 +173,9 @@ class LiveProbe(
         depthEngine = depth
         distances.enabled = distancesOn
         distances.setLens(lens)
-resetPipeline()
+        // Un fichier par configuration : recouper l'interrupteur change de fichier.
+        cropLogger = if (collectCrops) appContext?.let { LightCropLogger(java.io.File(it.filesDir, "lightcrops"), dev.sam3vision.app.BuildConfig.VERSION_NAME) } else null
+        resetPipeline()
         _state.update {
             LiveProbeState(
                 endpoint = clean,
@@ -411,13 +415,14 @@ _state.update { it.cleared() }
     private suspend fun publish(
         active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
-        val overlays = overlaysFor(frame, shown)
+        val overlays = overlaysFor(frame, shown, background, painter, chronology)
         val pinhole = readingsOf(distances, frame)
         val readings = meters.readingsFor(frame, pinhole)
         val placed = placedLabels(frame, readings) +
             dangerPlaced(distances, meters.dangerSnapshot())
         val cross = crossingPatchOf(
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
+            onCrop = cropLogger?.tap(),
         )
         val phrase = if (_state.value.crossingActive) {
             crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height), readings, at, speechLanguage, frame.objects, frame.width, frame.height)
@@ -465,24 +470,6 @@ _state.update { it.cleared() }
     fun noteDrawn() {
         if (!chronology.noteDrawn()) return
         _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
-    }
-
-    /**
-     * Masques colorisés de la frame, calculés hors du thread principal : décodage selon
-     * l'encodage **de l'objet** (`rle`/`poly` sur la grille réduite, `bits` = 1 bit + zlib,
-     * sinon PNG gris) puis coloriage par table de 256 niveaux — jamais de luminance sur un masque déjà gris.
-     *
-     * Le coût est mesuré (une ligne tous les [LOG_EVERY_FRAMES] paquets) : c'est du temps
-     * mural entre la réponse réseau et ce qui arrive à l'écran, et il n'est pas dans `latence`.
-     */
-    private suspend fun overlaysFor(
-        frame: LiveFrame, shown: LiveTimings,
-    ): List<Bitmap> = withContext(background) {
-        val startedAt = android.os.SystemClock.elapsedRealtime()
-        val overlays = painter.overlays(frame)
-        chronology.markOverlays(shown)
-        painter.noteDecoded(android.os.SystemClock.elapsedRealtime() - startedAt, overlays.size)
-        overlays
     }
 
     /**

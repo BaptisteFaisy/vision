@@ -2,6 +2,35 @@
 
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
+## 2026-10-31 — iSee : pluriel véhicules, poteau qui dit comment l'éviter, rebord à 0,7 m (branche `fix/isee-alertes-voitures-poteau-rebord`)
+
+- **Demande** (ordre user) : dire les voitures en mouvement même à plusieurs,
+  dire comment éviter un poteau à moins de 4 m, dire le rebord à 1 m puis à
+  70 cm, et détecter s'il se monte ou se descend.
+- **Fait** (`core.traverse`, `core.hazard`, `core.curb`, `docs/VOIX-DANGER.md`
+  § 21) : annonce pluriel générique (« 2 vehicles moving… », pistes par
+  type — deux voitures sous le même label comptent pour une, limite connue)
+  avec « Stop » pluriel, singulier inchangé ; phrase poteau avec évitement
+  côté opposé (« …, passez à gauche. », droite par défaut), doux comme
+  imminent, autres mobiliers inchangés ; marche imminente à 0,7 m
+  (hystérésis 0,7/0,9), pré-alerte 1 m et phrases inchangées ; sens
+  montée/descente confirmé (géométrie de boîte, montant par défaut).
+- Preuves : ciblés verts (`VehicleStateTest` 19, `HazardWatchTest` 15,
+  `CurbAnnounceTest` 25, `CurbWatcherTest` 18 — 77 tests, 0 échec) ;
+  `check-kotlin-limits.py` vert ; `:app` 1317/1317 + `assembleDebug` verts ;
+  `:core` 2357 tests : seuls 7 échecs, tous hors périmètre et prouvés
+  pré-existants (5 `PrivateFileSettingsStoreTest` POSIX-sous-Windows,
+  identiques sur master intact 24b341e5 ; 2 bancs µs verts en re-run —
+  charge machine).
+
+
+## 2026-10-31 — Feux : seuil GO 0,99 → 0,98 (ordre user)
+
+- `PRECISION_FLOOR` 0,98 (`tools/train_light.py`) + docs alignées
+  (`COLLECTE-FEUX.md`, `TRAVERSEE.md` §10). Ancres et rappel inchangés.
+- Note : à 200–400 crops le seuil reste binaire en pratique (0 erreur = GO,
+  1 erreur = NO-GO) ; 0,98 mord à partir de ~500 crops.
+- Preuves : parité Python 6/6, limites OK ; checks PR.
 
 
 ## 2026-10-31 — Distances : étalonnage guidé du champ de vision
@@ -50,6 +79,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (3 731 tests, 0 échec — 13 flips constatés rouge avant, tous dans le
   périmètre prédit, réécrits en conséquences correctes) ;
   `check-kotlin-limits.py` vert.
+## 2026-10-31 — Feux : collecte crops + réentraînement + barrière GO (rappel vert)
+
+- **Demande** (ordre user) : construire le collecteur (interrupteur OFF +
+  logging), barre de précision basse (0,99).
+- **Fait** : `Settings.collectLightCrops` (TECHNICAL SETTINGS, coupé par
+  défaut) ; `LightCropLogger` (JSONL par activation, PNG exact vu par le
+  classifieur + boîte + verdict, 2000/session max, crops seuls) branché
+  sonde + direct ; `review_light_crops.py` (HTML R/G/BAD, stdlib) ;
+  `train_light.py` (sklearn épinglé, porte/planchers fixes, émet un
+  candidat à relire) ; miroir Python paritaire en CI (20 ancres) ;
+  protocole `docs/COLLECTE-FEUX.md`.
+- **Barrière GO** : 20 ancres parfaites + précision vert ≥ 0,99 hold-out +
+  rappel ≥ actuel, sinon NO-GO motivé (vérifié : NO-GO honnête sur
+  données synthétiques).
+- Preuves : tests JVM `:core` 2406 + `:app` 1343 à 0 échec (r630),
+  parité Python 6/6, smoke trainer + reviewer OK (NO-GO honnête identique
+  avant/après découpage), limites <500/<50 OK, UBS 0 critique sur les
+  fichiers touchés (3 faux positifs scanner préexistants sur `LiveProbe`
+  hors de mes lignes) ; checks PR.
 
 
 ## 2026-10-31 — iSee : écart mini aux humains 0,5 → 0,8 m (branche `isee-clearance-80`)
@@ -119,6 +167,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   masques compacts en production, précision chiffrée, profondeur sur masque, sol non plan.
 
 
+## 2026-10-31 — iSee : suivi du chemin parlé quand il n'y a rien à dire (branche `feat/isee-suivi-chemin-silence`)
+
+- **Demande** (ordre user) : quand iSee n'a rien à dire, détecter le chemin
+  sur lequel marche l'utilisateur (comme aujourd'hui : couloir libre + flèche)
+  et lui dire comment le suivre — par exemple « continue tout droit ».
+- Fait (`core.live`, `app.isee`, `docs/GUIDAGE-TOUT-DROIT.md`) :
+  `ContinueWord` nouveau (3 rappels FR/EN, entrées cache `guide_continue_*`,
+  hors catalogue embarqué) ; `GuidanceAnnouncer` reparle sur voie libre
+  stable toutes les 8 s (`DEFAULT_IDLE_REPEAT_MS`), rappel et mot en
+  alternance (chaque émission reste distincte pour les déduplications aval) ;
+  le bouché ne se rappelle jamais. Routage `spokenClipId` (`ProbeWiring`) :
+  les rappels partent en `speakWord` (synthèse à la 1re occurrence, clip
+  cache 30 j ensuite). Ni la décision, ni les directions, ni les mots
+  réactifs ne changent : le rappel reformule la consigne stable, il ne
+  l'invente pas.
+- Preuves : `:core` `GuidanceAnnouncerTest` 30/30 (dont 7 rappel : échéance,
+  alternance, bouché muet, mot nouveau relance, retour trottoir FR,
+  bouché-puis-libre, langue courante) + `ContinueWordTest` 7/7 (nouveau) ;
+  `:app` `ProbeWiringSpokenTest` 4/4 (dont routage clip) ;
+  `check-kotlin-limits.py` et `check-voicepack.py` verts.
+- Reste : embarquer les 6 MP3 `vp_guide_continue_*` au catalogue (1re
+  occurrence < 100 ms, zéro réseau) ; rappel paramétrable (délai, on/off) ;
+  suivi des virages du chemin (géométrie du sol, distinction
+  chemin-suivable / route-circulée — jamais d'ordre vers la chaussée).
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)
 
 - **Demande** : calcul des distances beaucoup plus précis, le plus précis possible.

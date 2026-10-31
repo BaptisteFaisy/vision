@@ -19,12 +19,15 @@ import kotlin.math.hypot
  * [VehicleStateWatcher.NEAR_MOVING_METERS], ou non mesuré — jamais prouvé
  * loin) ; `null` sinon
  * (mouvement loin, arrêt — la sécurité ne parle que du danger qui roule).
+ * [movingCount] compte les types mobiles à l'annonce (1 = singulier,
+ * 2+ = pluriel générique « N vehicles moving »).
  */
 data class VehicleStateCue(
     val phrase: String,
     val meters: Float?,
     val urgent: Boolean = false,
     val safetyPhrase: String? = null,
+    val movingCount: Int = 1,
 )
 
 /**
@@ -83,6 +86,27 @@ object VehicleStateText {
     )
 
     /**
+     * « 2 vehicles moving… » : le pluriel est générique ([count] types
+     * mobiles distincts — pistes par type, pas par instance : deux voitures
+     * sous le même label comptent pour une, limite connue), situé comme le
+     * singulier (distance du plus proche, heure sinon).
+     */
+    fun movingPluralPhrase(
+        count: Int,
+        meters: Float?,
+        centerX: Float?,
+        language: SpeechLanguage,
+    ): String = situate(
+        base = when (language) {
+            SpeechLanguage.Fr -> "$count véhicules en mouvement"
+            SpeechLanguage.En -> "$count vehicles moving"
+        },
+        meters = meters,
+        centerX = centerX,
+        language = language,
+    )
+
+    /**
      * Alerte immédiate d'un véhicule en mouvement : « Stop, … » dans la
      * langue de la voix, sans distance ni heure — le danger prime sur la
      * précision. Parlée par la voix de sécurité, qui coupe tout, dictée du
@@ -91,6 +115,15 @@ object VehicleStateText {
     fun safetyPhrase(name: VehicleName, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> "Stop, ${name.fr.replaceFirstChar { it.lowercase() }} en mouvement."
         SpeechLanguage.En -> "Stop, ${name.en.replaceFirstChar { it.lowercase() }} moving."
+    }
+
+    /**
+     * Alerte immédiate pluriel : « Stop, 2 vehicles moving. » — même canal
+     * sécurité que le singulier (coupe tout, dictée du user comprise).
+     */
+    fun safetyPluralPhrase(count: Int, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "Stop, $count véhicules en mouvement."
+        SpeechLanguage.En -> "Stop, $count vehicles moving."
     }
 
     /** « Voiture à l'arrêt… », à la distance mesurée ou à l'heure. */
@@ -141,6 +174,11 @@ object VehicleStateText {
  * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS], mesuré ou
  * non — sans focale, seule l'approche compte, comme le veto.
  *
+ * Le pluriel est générique : deux types mobiles ou plus dans la même frame
+ * disent « 2 vehicles moving… » (distance du plus proche), pas le nom du
+ * type — les pistes sont par type, pas par instance, et deux voitures sous
+ * le même label comptent pour une (limite connue).
+ *
  * Sécurité : le mouvement proche (sous [NEAR_MOVING_METERS], ou non mesuré —
  * on ne prouve pas qu'il est loin) parle en alerte immédiate
  * ([VehicleStateCue.safetyPhrase], « Stop, … », voix de sécurité qui coupe
@@ -169,13 +207,14 @@ class VehicleStateWatcher(
         val atMs: Long,
     )
 
-    /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence. */
+    /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile. */
     private data class Pick(
         val state: State,
         val name: VehicleStateText.VehicleName,
         val meters: Float?,
         val centerX: Float?,
         val urgent: Boolean,
+        val movingCount: Int = 1,
     )
 
     private val approach = VehicleApproach()
@@ -236,16 +275,24 @@ class VehicleStateWatcher(
         if (!near && lastAt != NO_INSTANT && atMs - lastAt < cooldown) return null
         if (pick.state == State.MOVING) lastMovingAtMs = atMs else lastStoppedAtMs = atMs
         hits = 0
-        val phrase = when (pick.state) {
-            State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
-            State.STOPPED -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
+        return cueFor(pick, near, language)
+    }
+
+    /** Ordre d'annonce du candidat : pluriel générique à 2+ types mobiles. */
+    private fun cueFor(pick: Pick, near: Boolean, language: SpeechLanguage): VehicleStateCue {
+        val movingPlural = pick.state == State.MOVING && pick.movingCount >= 2
+        val phrase = when {
+            movingPlural -> VehicleStateText.movingPluralPhrase(pick.movingCount, pick.meters, pick.centerX, language)
+            pick.state == State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
+            else -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
         }
         val safety = if (near) {
-            VehicleStateText.safetyPhrase(pick.name, language)
+            if (movingPlural) VehicleStateText.safetyPluralPhrase(pick.movingCount, language)
+            else VehicleStateText.safetyPhrase(pick.name, language)
         } else {
             null
         }
-        return VehicleStateCue(phrase, pick.meters, pick.urgent, safety)
+        return VehicleStateCue(phrase, pick.meters, pick.urgent, safety, pick.movingCount)
     }
 
     /** Oublie pistes, mémoire et annonces (nouvelle traversée, nouveau direct). */
@@ -278,21 +325,21 @@ class VehicleStateWatcher(
         tau: ApproachVerdict,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
-        val key = current.keys
+        val moving = current.keys
             .filter { candidate ->
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val growth = prev != null && current.getValue(candidate).area > prev.area
                 (tauHit || growth) && inMovingRange(meters[candidate])
             }
-            .minByOrNull { meters[it] ?: Float.MAX_VALUE }
+        val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
         val measured = meters[key]
         val urgent = tau.approaching && tauKey == key && measured != null && measured <= NEAR_MOVING_METERS &&
             seen.cx != null && seen.cx in CENTER_LO..CENTER_HI
-        return Pick(State.MOVING, name, measured, seen.cx, urgent)
+        return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size)
     }
 
     /** Véhicule à l'arrêt : dérive faible, seau stable, mesuré, dans le couloir. */

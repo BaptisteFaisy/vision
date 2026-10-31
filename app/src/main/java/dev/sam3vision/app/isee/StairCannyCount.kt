@@ -8,10 +8,11 @@ import dev.sam3vision.core.stairs.StairWatcher
 /**
  * Dernier compte de marches vu par la caméra, pour la voix escaliers.
  *
- * L'analyseur offre le plan de luminance de chaque frame convertie
- * ([offerLuma], fil de l'analyse : le Canny y tourne, ~26 000 pixels) et le
- * guetteur escaliers (`observeStairs`) relit le compte frais à
- * chaque réponse SAM — une seule écriture d'entier transite entre les deux
+ * Le téléphone offre le plan de luminance de chaque frame convertie
+ * ([offerLuma], fil de l'analyse : le Canny y tourne, ~26 000 pixels), les
+ * lunettes offrent les pixels de leur photo ([offerPixels], même plan
+ * rééchantillonné) et le guetteur escaliers (`observeStairs`) relit le compte
+ * frais à chaque réponse SAM — une seule écriture d'entier transite entre les
  * fils, jamais une image. Frais, le compte nourrit le compte à rebours de la
  * montée (« Plus que N marches. ») ; périmé (caméra coupée, repli bitmap sans
  * luminance), il vaut 0 et l'annonce reste standard.
@@ -26,6 +27,17 @@ internal object StairCannyCount {
 
     @Volatile
     private var countedAtMs: Long = 0L
+
+    /**
+     * Compte les marches vues par les lunettes : [pixels] est la photo du pont
+     * (ARGB_8888, déjà redressée), rééchantillonnée au plan [LumaPlane] au plus
+     * proche voisin. Dimensions incohérentes = ignorées, comme un plan incomplet.
+     */
+    fun offerPixels(pixels: IntArray, width: Int, height: Int) {
+        val luma = lumaPlaneFromPixels(pixels, width, height) ?: return
+        count = cannyLineCount(luma)
+        countedAtMs = System.currentTimeMillis()
+    }
 
     /**
      * Compte les marches de [luma] (plan [LumaPlane] de l'analyseur, déjà
@@ -54,6 +66,28 @@ internal object StairCannyCount {
         count = 0
         countedAtMs = 0L
     }
+}
+
+/**
+ * Pixels ARGB_8888 ([width]×[height]) → plan [LumaPlane], au plus proche voisin
+ * (miroir de l'échantillonneur NV21 : mêmes bornes, même ordre) ; `null` si les
+ * dimensions sont incohérentes. Pur JVM, testé sans appareil.
+ */
+internal fun lumaPlaneFromPixels(pixels: IntArray, width: Int, height: Int): ByteArray? {
+    if (width <= 0 || height <= 0 || pixels.size < width * height) return null
+    val out = ByteArray(LumaPlane.SIZE)
+    var index = 0
+    for (y in 0 until LumaPlane.HEIGHT) {
+        val row = (y.toLong() * height / LumaPlane.HEIGHT).toInt() * width
+        for (x in 0 until LumaPlane.WIDTH) {
+            val pixel = pixels[row + (x.toLong() * width / LumaPlane.WIDTH).toInt()]
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            out[index++] = ((299 * r + 587 * g + 114 * b) / 1000).toByte()
+        }
+    }
+    return out
 }
 
 /**
