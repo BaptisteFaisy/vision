@@ -6,7 +6,9 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
+import dev.sam3vision.core.model.MASK_ENCODING_RLE
 import dev.sam3vision.core.model.SegObject
+import java.util.Base64
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairWatcher
@@ -118,6 +120,34 @@ class ProbeWiringStairsCountTest {
             advanceUntilIdle()
 
             assertNull(watcher.smoothedLineCount)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `masque sam borne le comptage au pixel pres`() = runTest {
+        val (probe, fake, _, scope) = harness(this)
+        try {
+            // Masque RLE 5×11 (frame 512×1138, scale 0,01) : 5 lignes basses = escalier.
+            val b64 = Base64.getEncoder().encodeToString(byteArrayOf(30, 25))
+            val masked = SegObject(
+                label = "stairs going up", score = 0.9f, box = listOf(100f, 200f, 400f, 900f),
+                maskPngB64 = b64, maskEncoding = MASK_ENCODING_RLE, maskScale = 0.01f,
+            )
+            probe.onFrame("M", captureAtNs = 8_000_000L)
+            advanceTimeBy(1_000L)
+            fake.respond("M", LiveFrame(width = 512, height = 1138, elapsedMs = 120L, objects = listOf(masked)))
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
+
+            // Haut de l'image (hors masque) : ignoré.
+            StairCannyCount.offerLuma(stairsLuma(5, 13))
+            assertEquals(0, StairCannyCount.lineCount())
+
+            // Bas de l'image (sous masque, dont 2 lignes hors boîte) : compté.
+            StairCannyCount.offerLuma(stairsLuma(70, 78, 86, 94))
+            assertTrue(StairCannyCount.lineCount() >= 4)
         } finally {
             scope.cancel()
         }
