@@ -99,8 +99,11 @@ object StairText {
  * - `lineCount = 0` sur un positif = compteur indisponible (voie labels SAM,
  *   qui nomme sans compter) : annonce standard, jamais de compte à rebours —
  *   0 n'est pas « zéro marche », c'est « non compté » ;
- * - dernière marche si compte lissé ≤ [LAST_STEP_LINES] **ou** profondeur
- *   [LAST_STEP_METERS] (mètres du palier, branche profondeur) ;
+ * - dernière marche seulement **après** l'annonce standard (jamais en
+ *   première rencontre) : compte lissé ≤ [LAST_STEP_LINES] après une montée
+ *   vue (pic lissé > 1, sinon un compte bas vu du haut ne conclut pas) **ou**
+ *   profondeur [LAST_STEP_METERS] quand le compteur est indisponible (la
+ *   proximité ne préempte jamais un compte qui montre des marches restantes) ;
  * - la séance expire après [cooldownMs] sans annonce : une rencontre plus
  *   tardive se ré-annonce en standard, pas en « Plus que N » d'une montée
  *   d'avant.
@@ -135,6 +138,12 @@ class StairWatcher(
     /** Dernière marche déjà dite pour cette approche (dite une fois, pas en boucle). */
     private var lastStepSaid: Boolean = false
 
+    /** Montée ouverte : l'annonce standard a été dite, le compte peut décroître. */
+    private var opened: Boolean = false
+
+    /** Plus haut compte lissé vu depuis l'ouverture (un pic isolé n'arme rien). */
+    private var peakSmoothed: Int? = null
+
     /** Dernière annonce, `null` si aucune. */
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
@@ -166,13 +175,23 @@ class StairWatcher(
             while (trend.size > window) trend.removeFirst()
         }
         val smoothed = median()
+        if (opened && smoothed != null && smoothed > 0) {
+            peakSmoothed = maxOf(peakSmoothed ?: 0, smoothed)
+        }
         val nearDepth = meters != null && meters.isFinite() && meters < LAST_STEP_METERS
         val announced = climbCount
-        val lastStep = !lastStepSaid && (nearDepth || (smoothed != null && smoothed <= LAST_STEP_LINES))
+        // Dernière marche verrouillée : jamais en première rencontre (l'annonce
+        // standard ouvre toujours), jamais sur un compte bas sans montée vue
+        // (vu du haut ou occulté n'est pas arrivé), profondeur seule quand le
+        // compteur est indisponible (proche n'est pas fini quand il reste des marches).
+        val countLast = opened && !lastStepSaid && smoothed != null &&
+            smoothed <= LAST_STEP_LINES && (peakSmoothed ?: 0) > LAST_STEP_LINES
+        val depthLast = opened && !lastStepSaid && nearDepth && smoothed == null
+        val lastStep = countLast || depthLast
         val countdown = !lastStep && smoothed != null && announced != null &&
             smoothed < announced && smoothed > LAST_STEP_LINES
         if (lastStep || countdown) {
-            return climbCue(signal, lastStep, smoothed, announced, nowMs, language, direction, meters)
+            return climbCue(signal, lastStep, depthLast, smoothed, announced, nowMs, language, direction, meters)
         }
         if (!signal.detected) {
             hits = 0
@@ -183,7 +202,9 @@ class StairWatcher(
         lastCueAtMs = nowMs
         hits = 0
         lastStepSaid = false
+        opened = true
         climbCount = smoothed
+        peakSmoothed = smoothed?.takeIf { it > 0 }
         return StairCue(
             StairText.phrase(language, direction, centerX), signal.confidence, signal.lineCount, direction, meters,
         )
@@ -192,11 +213,13 @@ class StairWatcher(
     /**
      * Annonce de montée (dernière marche ou compte à rebours) : `null` = pas
      * encore (tendance ou porte standard non confirmée, cooldown montée).
-     * [announced] est le compte déjà annoncé (`null` = première annonce).
+     * [announced] est le compte déjà annoncé (`null` = sans compteur, voie
+     * labels : seule la profondeur confirmée peut alors conclure).
      */
     private fun climbCue(
         signal: StairSignal,
         lastStep: Boolean,
+        depthLast: Boolean,
         smoothed: Int?,
         announced: Int?,
         nowMs: Long,
@@ -204,11 +227,11 @@ class StairWatcher(
         direction: StairDirection,
         meters: Float?,
     ): StairCue? {
-        // En montée, la tendance confirmée (2-3 frames) vaut confirmation ;
-        // hors montée, la porte standard (positifs consécutifs) s'applique.
+        // En montée comptée, la tendance confirmée (2-3 frames) vaut confirmation ;
+        // sans compteur, la profondeur exige la porte standard après l'annonce.
         val trendOk = announced != null && trend.size >= TREND_MIN
-        val freshOk = announced == null && signal.detected && hits >= confirmFrames
-        if (!trendOk && !freshOk) {
+        val depthOk = depthLast && signal.detected && hits >= confirmFrames
+        if (!trendOk && !depthOk) {
             if (!signal.detected) hits = 0
             return null
         }
@@ -217,6 +240,8 @@ class StairWatcher(
         hits = 0
         if (lastStep) {
             lastStepSaid = true
+            opened = false
+            peakSmoothed = null
             climbCount = null
             trend.clear()
             return StairCue(
@@ -234,6 +259,8 @@ class StairWatcher(
 
     /** Oublie le compte, la tendance et l'annonce (nouvelle séance de direct). */
     fun reset() {
+        opened = false
+        peakSmoothed = null
         hits = 0
         lastCueAtMs = NO_INSTANT
         trend.clear()
@@ -247,6 +274,8 @@ class StairWatcher(
             trend.clear()
             climbCount = null
             lastStepSaid = false
+            opened = false
+            peakSmoothed = null
         }
     }
 
