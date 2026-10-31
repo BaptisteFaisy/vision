@@ -164,12 +164,7 @@ class LiveProbe(
         followed: List<String> = emptyList(),
     ) {
         val clean = baseUrl.trim()
-        closeSessions()
-        session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
-        // Session « froide » : même transport, délai long (60 s) — c'est le réveil du
-        // conteneur qui parle, pas la frame. Une fois la première analyse passée, on
-        // repart sur la session normale à délai court (10 s).
-        coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
+        openSessions(clean, prompts, maxObjects)
         voice.guide = guide
         voice.announce = announce
         voice.language = language
@@ -202,6 +197,17 @@ class LiveProbe(
     /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod). */
     internal fun fireWake(url: String) {
         scope.launch { GpuWake.wake(url, health = { openClient(it, COLD_TIMEOUT_SECONDS, null).health().map { h -> h.ok } }) }
+    }
+
+    /**
+     * (Re)ouvre la session normale et la session froide sur [clean] : même transport,
+     * délai long (60 s) pour la froide — c'est le réveil du conteneur qui parle, pas
+     * la frame. Une fois la première analyse passée, on repart sur la normale (10 s).
+     */
+    private fun openSessions(clean: String, prompts: List<String>, maxObjects: Int) {
+        closeSessions()
+        session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
+        coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
     }
 
     /**
