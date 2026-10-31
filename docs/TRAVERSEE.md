@@ -232,6 +232,10 @@ traversez. » / « Rouge, attendez. ») et confirmait la
 bascule (« Mode traversée activé. »). Depuis le 29/10, le passage reconnu
 était **proposé** à la voix (« Passage piéton. Dites traverser. ») ; depuis
 le 30/10, il n'est plus proposé — le mode **s'arme seul**, et le dit.
+Depuis le 31/10, l'ordre vocal (« traverser », « crossing mode on/off »)
+vaut aussi sur le direct (il partait au LLM), et l'activation annonce le
+passage en vue avec sa distance (« Passage piéton devant, à 5 mètres. »)
+quand la sonde le voit — silence sinon, jamais de chiffre deviné.
 
 ### Bascule automatique (30/10)
 
