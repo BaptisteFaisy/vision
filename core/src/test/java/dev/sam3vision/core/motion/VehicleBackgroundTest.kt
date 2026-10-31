@@ -99,6 +99,74 @@ class VehicleBackgroundTest {
         assertEquals("$verdict", Verdict.UNKNOWN, verdict.verdict)
     }
 
+    // PISTE4 : repli gyro quand le bloc-matching sature en pan rapide.
+
+    @Test
+    fun `piste4 - fond muet mais boite qui suit le gyro, la camera bouge`() {
+        // Pan rapide : le fond visuel est muet, le gyro dit (12, 4) px et la boîte
+        // le suit exactement — résidu boîte − gyro nul sur fond franc.
+        val verdict = decideWithGyro(TRACK_DX.toFloat() / MotionScenes.WIDTH, TRACK_DY.toFloat() / MotionScenes.HEIGHT, null)
+        assertEquals("$verdict", Verdict.CAMERA_MOVED, verdict.verdict)
+    }
+
+    @Test
+    fun `piste4 - fond muet, boite contre le gyro, le vehicule bouge`() {
+        // Boîte fixe pendant que le gyro défile : poursuite caméra d'un mobile.
+        val verdict = decideWithGyro(0f, 0f, null)
+        assertEquals("$verdict", Verdict.VEHICLE_MOVED, verdict.verdict)
+    }
+
+    @Test
+    fun `piste4 - fond peu confiant, le gyro prend le relais`() {
+        val weak = MotionSample(TRACK_DX.toFloat(), TRACK_DY.toFloat(), 1f, VehicleBackground.TRUST_MIN - 0.01f)
+        val verdict = decideWithGyro(TRACK_DX.toFloat() / MotionScenes.WIDTH, TRACK_DY.toFloat() / MotionScenes.HEIGHT, weak)
+        assertEquals("$verdict", Verdict.CAMERA_MOVED, verdict.verdict)
+    }
+
+    @Test
+    fun `piste4 - visuel utilisable, le gyro contradictoire est ignore`() {
+        // Ordre : résidu visuel d'abord — le gyro ne contredit jamais un fond sûr.
+        val global = MotionSample(TRACK_DX.toFloat(), TRACK_DY.toFloat(), 1f, CONFIDENT)
+        val verdict = decideWithGyro(
+            TRACK_DX.toFloat() / MotionScenes.WIDTH,
+            TRACK_DY.toFloat() / MotionScenes.HEIGHT,
+            global,
+            gyro = GyroHint(0f, 0f, CONFIDENT),
+        )
+        assertEquals("$verdict", Verdict.CAMERA_MOVED, verdict.verdict)
+    }
+
+    @Test
+    fun `piste4 - fond muet et gyro douteux, pas d avis`() {
+        val verdict = decideWithGyro(0f, 0f, null, gyro = GyroHint(12f, 4f, VehicleBackground.TRUST_MIN - 0.01f))
+        assertEquals("$verdict", Verdict.UNKNOWN, verdict.verdict)
+    }
+
+    @Test
+    fun `piste4 - gyro nul et boite nulle, a l arret`() {
+        val verdict = decideWithGyro(0f, 0f, null, gyro = GyroHint(0f, 0f, CONFIDENT))
+        assertEquals("$verdict", Verdict.STATIC, verdict.verdict)
+    }
+
+    /** Verdict avec repli gyro : [gyro] par défaut = pan (12, 4) px sûr, [TRACK_DT_MS]. */
+    private fun decideWithGyro(
+        boxDx: Float,
+        boxDy: Float,
+        global: MotionSample?,
+        gyro: GyroHint = GyroHint(TRACK_DX.toFloat(), TRACK_DY.toFloat(), CONFIDENT),
+    ): MovingVerdict =
+        VehicleBackground.decide(
+            trackId = 0,
+            boxDx = boxDx,
+            boxDy = boxDy,
+            global = global,
+            lumaWidth = MotionScenes.WIDTH,
+            lumaHeight = MotionScenes.HEIGHT,
+            dtMs = TRACK_DT_MS,
+            bgChangeScore = 0f,
+            gyro = gyro,
+        )
+
     /** Verdict V1 d'une scène : fond estimé à l'estimateur réel, boîte en fractions d'image. */
     private fun decideOf(scene: MotionScenes.VehicleScene, dtMs: Long): MovingVerdict {
         val (boxDx, boxDy) = boxMotion(scene)

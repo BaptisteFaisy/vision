@@ -80,6 +80,42 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   local ; chemin d'échec vérifié avec un budget forcé à 0,02 µs/op → « meilleur
   de 5 rounds : 0,25 / 0,18 / 0,18 / 0,68 / 1,02 » ; `check-kotlin-limits.py`
   vert (139 lignes, fonctions < 50).
+## 2026-10-31 — traversée : fusion ego-motion, 4 pistes contre les faux « approche » au pan/zoom (branche `feat/motion-fusion`)
+
+- **Problème** : un pan ou un zoom caméra fait gonfler et défiler les boîtes
+  comme un véhicule qui approche — iSee annonçait un danger quand c'était le
+  porteur qui bougeait. Quatre voies indépendantes, toutes conservatrices (le
+  doute ne tait ni ne tranche jamais ; sans preuve, comportement V1 inchangé).
+- Piste 1, vote fond vs objet : `EgoCompensator` (`decide`, `projectedEgo`,
+  `discountGrowth`, `areaGrowing`) — le résidu boîte − fond projeté dit le
+  mouvement propre ; fusionné dans `isVehicleGrowth` (`VehicleGrowth.kt`) via
+  `VehicleStateWatcher.movingPick`, fond reçu dans `VehicleApproach`
+  (`lastGlobal`) ; `BlockMotionAdapter` ponte l'estimateur vers le calque live.
+- Piste 2, confirmation profondeur : `DepthConfirm` (embarqué prioritaire,
+  serveur en repli, veto pan/zoom) threadé `TraversePipeline` (`serverCloseness`)
+  → `TraverseVeto` → `VehicleApproach` (`first/lastCloseness`, growth-only
+  invalidé à profondeur constante) ; seuils d'expansion par label
+  (`ApproachEstimator.thresholdsForLabel`, véhicules 0,02/0,30/TTC 4 s).
+- Piste 3, résidu SAM : `estimateMaskedShift` (SAD restreint au masque) +
+  `SamResidu.decide` (masque keyframe warpé par l'ego-motion, verdict sur IoU)
+  + `toMaskMotion` ; `BlockShift.kt` ouvre ses internes sans duplication ;
+  hooks `// PISTE3` posés, décisionnel reporté (masque non retenu par piste).
+- Piste 4, gyro : `GyroCompensation` (`expectedShift` f·Δθ, `residual`,
+  garde-fous) + `GyroSource` app (vecteur de rotation GAME, `deltaBetween`) ;
+  hook `VehicleBackground.decide(gyro = …)` en repli seul (fond visuel
+  d'abord) ; câblage app reporté (signes à valider). Fusion des vocabulaires :
+  `EgoVerdict`/`ResiduDecision.toVerdict` → `traverse.Verdict` (`VerdictFusionTest`).
+- **Reportés** : (1) câblage gyro app (recette en commentaire `FUSION P4` dans
+  `TraverseWiring.kt`), (2) `depthByBox` sonde embarquée (`boxCloseness` non
+  branché, seul le repli serveur alimente), (3) `SamResidu.decide` décisionnel
+  (prérequis : masque SAM + id stable par piste). **Téléphone restant** : signes
+  gyro (pan gauche, tilt haut), scénarios pan+garée / suivi / latéral, recaler
+  les priors (IoU 0,75–0,85, ego 1 px — détail : `docs/MOTION-EGO.md`).
+- Preuves : ~30 fichiers core+app, suites `EgoCompensatorTest`,
+  `EgoVoteWatcherTest`, `DepthConfirmTest`, `*DepthTest` (veto/approche/état/
+  pipeline), `ApproachThresholdsTest`, `MaskShiftTest`, `SamResiduTest` (14),
+  `GyroCompensationTest`, `VehicleBackgroundTest`, `VerdictFusionTest` ;
+  `VehicleState` 503→499 lignes (`isVehicleGrowth` extrait).
 
 ## 2026-10-31 — CI : un lot de la file ne peut plus être éjecté par un `ci` en échec fantôme (branche `ci/fix-doublon-check-file`)
 
