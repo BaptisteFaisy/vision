@@ -26,6 +26,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `:core:testDebugUnitTest` 2 671 + `:app:testDebugUnitTest`
   1 509 verts sur r630 (0 échec, dont 1 `NoLightCrossingTest` transition
   nouveau — rouge prouvé sans le correctif, vert avec) ; UBS : 0 finding.
+## 2026-10-31 — iSee : suppression de YOLO et du pipeline danger (branche `rm-yolo`)
+
+- **Ordre user** : YOLO ne servait qu'en logcat (alerte TTC jamais lue ni
+  affichée) — le retirer avec tout le pipeline danger, et mettre le README
+  à jour.
+- **Fait** : `yolo11n.onnx` (10 Mo) + `NOTICE-detect.txt`, `app/danger/`
+  (`PersonDetector`, `DangerPipeline`, `DangerAlert`, `DangerBench`),
+  `DangerSettings` + bouton « Test YOLO11n » + `testDanger`, `core/danger/`
+  (`YoloDecode`, `PersonTracker`, `ApproachEstimator`, `DangerLabels`,
+  `Hungarian`, `KalmanXyah`) et 12 fichiers de tests supprimés ; la sonde et
+  la voix ne reçoivent plus que les labels SAM (`dangerPlaced`, `dangerAlert`,
+  `onDangerAlert` retirés) ; `ApproachThresholds` déménage dans `traverse`
+  (seuils PISTE2 de `VehicleApproach` conservés) ; README sans YOLO (notice,
+  fonctionnalité, modules, stack ONNX, benchmark) ; `docs/MOTION-EGO.md`,
+  `docs/VOIX-DANGER.md` et `noCompress onnx` nettoyés.
+- **Preuve** : `:core:testDebugUnitTest` 2 638 + `:app:testDebugUnitTest`
+  1 502 verts sur r630 (0 échec) ; `check-kotlin-limits.py` vert (1271
+  fichiers, aucun dépassement) ; UBS : findings `LiveProbe` identiques à
+  master (faux positifs pré-existants, erreur scanner inchangée).
 
 ## 2026-10-31 — iSee : sans feu, le mouvement se dit à toute portée (branche `isee-traversee-loin-sans-feu`)
 
