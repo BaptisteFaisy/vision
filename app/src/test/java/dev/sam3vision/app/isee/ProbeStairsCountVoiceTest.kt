@@ -166,7 +166,7 @@ class ProbeStairsCountVoiceTest {
             synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
         )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        probe.observeStairsCount(watchers, voice, { true }) { SpeechLanguage.Fr }
+        probe.observeStairsCount(watchers, voice, { true }, { SpeechLanguage.Fr })
         return Wiring(probe, fake, spoken, watchers)
     }
 
