@@ -29,8 +29,7 @@ data class TraverseOutput(
  * 3. [TraverseVeto] : un véhicule qui approche ou proche force « attendez » ;
  * 4. [CrossingAnnouncer] : le signal vocal, confirmé sur plusieurs frames —
  *    [TraversePhase.PRET] et [TraversePhase.TRAVERSER] valent vert, `ATTENDRE`
- *    et `ALERTE` valent rouge (le doute parle comme le rouge, voir
- *    [CrossingAnnouncer]) ;
+ *    et `ALERTE` valent rouge (binaire, voir [CrossingAnnouncer]) ;
  * 5. [TraverseVoice.speak] avec `cue.phrase` et `cue.urgent` : le retour au
  *    rouge après un vert annoncé coupe la lecture en cours.
  *
@@ -99,8 +98,8 @@ class TraversePipeline(
 
 /**
  * Phase du veto vue par l'annonceur : vert confirmé ou maintenu = vert,
- * attente ou alerte = rouge (le doute parle comme le rouge). Publique :
- * la sonde iSee y lit le même verdict que le direct.
+ * attente ou alerte = rouge (binaire). Publique : la sonde iSee y lit le
+ * même verdict que le direct.
  */
 fun TraverseDecision.crossingState(): CrossingState = when (state) {
     TraversePhase.PRET, TraversePhase.TRAVERSER -> CrossingState.Green

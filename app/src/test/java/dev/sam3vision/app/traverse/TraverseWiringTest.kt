@@ -125,8 +125,6 @@ class TraverseWiringTest {
         assertTrue(wiring.lightGreen)
         wiring.updateLight(CrossingState.Red)
         assertFalse(wiring.lightGreen)
-        wiring.updateLight(CrossingState.Unknown)
-        assertFalse(wiring.lightGreen)
     }
 
     @Test

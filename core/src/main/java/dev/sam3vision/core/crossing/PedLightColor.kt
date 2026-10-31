@@ -2,8 +2,8 @@ package dev.sam3vision.core.crossing
 
 /**
  * Couleur d'un feu piéton lue dans ses pixels : compte les pixels rouges et
- * verts (teinte HSV) dans [argb] et tranche [CrossingState.Red],
- * [CrossingState.Green] ou [CrossingState.Unknown].
+ * verts (teinte HSV) dans [argb] et tranche [CrossingState.Red] ou
+ * [CrossingState.Green] — binaire, tout non-vert attend (ordre user du 31/10).
  *
  * L'appelant a déjà cadré le feu (crop de la boîte SAM, voir `:app`) : ce
  * classifieur ne fait que la couleur, sans Android ni Bitmap — pur Kotlin,
@@ -34,10 +34,11 @@ object PedLightColor {
 
     /**
      * État du feu cadré par [argb] ([width] × [height], ARGB 32 bits, ligne
-     * majeure). Tableau vide ou dimensions incohérentes ⇒ [CrossingState.Unknown].
+     * majeure). Tableau vide ou dimensions incohérentes ⇒ [CrossingState.Red]
+     * (une entrée illisible attend, comme un doute).
      */
     fun classify(argb: IntArray, width: Int, height: Int): CrossingState {
-        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Unknown
+        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Red
         var red = 0
         var green = 0
         for (pixel in argb) {
@@ -57,7 +58,7 @@ object PedLightColor {
         if (greenFraction >= MIN_FRACTION && greenFraction >= redFraction * MARGIN_RATIO) {
             return CrossingState.Green
         }
-        return CrossingState.Unknown
+        return CrossingState.Red
     }
 
     /** Teinte 0..360° (conversion maison : pas d'Android en `:core`). */

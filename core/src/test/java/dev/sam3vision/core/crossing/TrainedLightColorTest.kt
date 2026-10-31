@@ -19,26 +19,26 @@ class TrainedLightColorTest {
     }
 
     @Test
-    fun `le noir est un doute`() {
+    fun `le noir attend rouge, binaire`() {
         assertEquals(
-            CrossingState.Unknown,
+            CrossingState.Red,
             TrainedLightColor.classify(IntArray(100) { BLACK }, 10, 10),
         )
     }
 
     @Test
-    fun `le gris est un doute`() {
+    fun `le gris attend rouge, binaire`() {
         assertEquals(
-            CrossingState.Unknown,
+            CrossingState.Red,
             TrainedLightColor.classify(IntArray(100) { GRAY }, 10, 10),
         )
     }
 
     @Test
-    fun `un tableau incoherent est un doute`() {
-        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(0), 0, 0))
-        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(10), 10, 10))
-        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(100), -1, 10))
+    fun `un tableau incoherent attend rouge, binaire`() {
+        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(0), 0, 0))
+        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(10), 10, 10))
+        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(100), -1, 10))
     }
 
     @Test

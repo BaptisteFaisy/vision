@@ -61,10 +61,10 @@ class CrossingLocalLight(
 
 /**
  * Lecture plateforme : crop de la boîte dans le JPEG, puis porte anti-confusion.
- * `Unknown` quand l'image ou la boîte est illisible — le doute vaut « attendez ».
+ * `Red` quand l'image ou la boîte est illisible — binaire, tout non-vert attend.
  */
 internal fun readLight(jpegB64: String, box: List<Float>): CrossingState {
-    val crop = CrossingPixels.frame(jpegB64, box) ?: return CrossingState.Unknown
+    val crop = CrossingPixels.frame(jpegB64, box) ?: return CrossingState.Red
     return PedLightGate.verdict(crop.argb, crop.width, crop.height)
 }
 

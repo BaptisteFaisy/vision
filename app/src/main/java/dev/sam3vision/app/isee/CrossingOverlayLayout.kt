@@ -22,8 +22,8 @@ const val CROSSING_ACCENT_GREEN = 0xFF2ECC71.toInt()
 /** Rouge « attendez ». */
 const val CROSSING_ACCENT_RED = 0xFFE74C3C.toInt()
 
-/** Ambre « doute » : on ne sait pas, donc on attend. */
-const val CROSSING_ACCENT_DOUBT = 0xFFF1C40F.toInt()
+/** Ambre « passage repéré, traversée proposée » (pastille d'offre, pas un état de feu). */
+const val CROSSING_ACCENT_OFFER = 0xFFF1C40F.toInt()
 
 /** Gris « mode Traversée coupé ». */
 const val CROSSING_ACCENT_OFF = 0xFF808080.toInt()
@@ -39,16 +39,14 @@ data class LightMarker(val left: Float, val top: Float, val right: Float, val bo
 }
 
 /**
- * Couleur du cadre et de l'étiquette pour [state] : le doute est un état à part
- * entière (ambre), pas un rouge déguisé — c'est la distinction que la voix fait
- * déjà (« Unsure, wait. »).
+ * Couleur du cadre et de l'étiquette pour [state] : binaire, rouge ou vert —
+ * pas encore de lecture (`null`) attend comme un rouge (ordre user du 31/10).
  */
 fun crossingAccent(active: Boolean, state: CrossingState?): Int {
     if (!active) return CROSSING_ACCENT_OFF
     return when (state) {
         CrossingState.Green -> CROSSING_ACCENT_GREEN
-        CrossingState.Red -> CROSSING_ACCENT_RED
-        CrossingState.Unknown, null -> CROSSING_ACCENT_DOUBT
+        CrossingState.Red, null -> CROSSING_ACCENT_RED
     }
 }
 
@@ -57,8 +55,7 @@ fun crossingTag(active: Boolean, state: CrossingState?): String {
     if (!active) return ""
     return when (state) {
         CrossingState.Green -> "GREEN"
-        CrossingState.Red -> "RED"
-        CrossingState.Unknown, null -> "UNSURE"
+        CrossingState.Red, null -> "RED"
     }
 }
 

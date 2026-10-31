@@ -25,12 +25,11 @@ class TraverseVoiceTest {
     fun `phrases - libelles uniques de crossing, un etat une phrase`() {
         assertEquals(CrossingText.phrase(CrossingState.Red), TraversePhrases.RED)
         assertEquals(CrossingText.phrase(CrossingState.Green), TraversePhrases.GREEN)
-        assertEquals(CrossingText.phrase(CrossingState.Unknown), TraversePhrases.UNKNOWN)
         assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
         assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
-                TraversePhrases.RED, TraversePhrases.GREEN, TraversePhrases.UNKNOWN,
+                TraversePhrases.RED, TraversePhrases.GREEN,
                 TraversePhrases.SIDEWALK_ACROSS, TraversePhrases.ON_CROSSWALK,
             ),
             TraversePhrases.ALL,
@@ -98,15 +97,6 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `doute sans reseau - clip hors-ligne du troisieme etat`() = runBlocking {
-        clips[TraversePhrases.UNKNOWN] = "/cache/doute.wav"
-        val tts = FakeTts(Result.failure(ApiError.Network()))
-        val outcome = voice(tts = tts).speak(TraversePhrases.UNKNOWN, urgent = false)
-
-        assertEquals(TraverseVoiceOutcome.OFFLINE, outcome)
-    }
-
-    @Test
     fun `ni reseau ni clip - indisponible meme en urgent`() = runBlocking {
         val tts = FakeTts(Result.failure(ApiError.PaymentRequired()))
         val outcome = voice(tts = tts).speak(TraversePhrases.RED, urgent = true)
@@ -147,28 +137,27 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `premier lancement - les cinq phrases en pre-generees par le systeme`() = runBlocking {
+    fun `premier lancement - les quatre phrases en pre-generees par le systeme`() = runBlocking {
         val systemTts = FakeSystemTts(language = "en-US", store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
         assertEquals(0, report.ready)
-        assertEquals(5, report.generated)
+        assertEquals(4, report.generated)
         assertTrue(report.missing.isEmpty())
         assertTrue(report.languageOk)
-        assertEquals(5, clips.size)
+        assertEquals(4, clips.size)
     }
 
     @Test
     fun `second lancement - clips presents, aucun rendu systeme`() = runBlocking {
         clips[TraversePhrases.RED] = "/cache/rouge.wav"
         clips[TraversePhrases.GREEN] = "/cache/vert.wav"
-        clips[TraversePhrases.UNKNOWN] = "/cache/doute.wav"
         clips[TraversePhrases.SIDEWALK_ACROSS] = "/cache/face.wav"
         clips[TraversePhrases.ON_CROSSWALK] = "/cache/passage.wav"
         val systemTts = FakeSystemTts(store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
-        assertEquals(5, report.ready)
+        assertEquals(4, report.ready)
         assertEquals(0, report.generated)
         assertEquals(0, systemTts.calls)
         assertTrue(report.languageOk)
@@ -179,7 +168,7 @@ class TraverseVoiceTest {
         val report = voice(systemTts = FakeSystemTts(language = "fr-FR", store = clips)).prewarm()
 
         assertTrue(!report.languageOk)
-        assertEquals(5, report.generated)
+        assertEquals(4, report.generated)
     }
 
     @Test
@@ -187,7 +176,7 @@ class TraverseVoiceTest {
         val systemTts = FakeSystemTts(failOn = setOf(TraversePhrases.RED), store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
-        assertEquals(4, report.generated)
+        assertEquals(3, report.generated)
         assertEquals(listOf(TraversePhrases.RED), report.missing)
     }
 

@@ -117,7 +117,7 @@ class TraverseWiring(
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }
 
-    /** Seul un vert tranché autorise la traversée ; rouge et doute attendent. */
+    /** Seul un vert tranché autorise la traversée ; tout le reste attend (binaire). */
     fun updateLight(state: CrossingState) {
         lightGreen = state == CrossingState.Green
     }
