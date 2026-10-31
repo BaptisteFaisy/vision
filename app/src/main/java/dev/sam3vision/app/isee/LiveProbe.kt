@@ -420,7 +420,7 @@ _state.update { it.cleared() }
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
         )
         val phrase = if (_state.value.crossingActive) {
-            crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height), readings, at, speechLanguage)
+            crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height), readings, at, speechLanguage, frame.objects, frame.width, frame.height)
         } else {
             CrossingPeopleWatch.reset()
             CrossingVehicleWatch.reset()
