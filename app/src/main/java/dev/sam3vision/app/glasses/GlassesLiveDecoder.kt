@@ -60,7 +60,7 @@ private val ANNEX_B_START = byteArrayOf(0, 0, 0, 1)
  * incohérente ou reste inexpliqué, et les octets repartent tels quels. Pur, testé en JVM.
  */
 fun annexB(bytes: ByteArray): ByteArray {
-    if (bytes.size < 8 || hasStartCode(bytes)) return bytes
+    if (bytes.size < 8 || startsWithAnnexB(bytes)) return bytes
     val out = ByteArrayOutputStream(bytes.size + 16)
     var pos = 0
     while (pos + 4 <= bytes.size) {
@@ -78,12 +78,25 @@ fun annexB(bytes: ByteArray): ByteArray {
 }
 
 /** Vrai si les octets commencent par un start code Annex B (long ou court). */
-private fun hasStartCode(bytes: ByteArray): Boolean {
+internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
     if (bytes.size >= 4 && bytes[0] == 0.toByte() && bytes[1] == 0.toByte()) {
         if (bytes[2] == 1.toByte()) return true
         if (bytes[2] == 0.toByte() && bytes[3] == 1.toByte()) return true
     }
     return false
+}
+
+/**
+ * Faut-il tenter le décodage bitmap avant le codec ? Non pour un bitstream déjà en
+ * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (15 i/s, c'est ~45 ms
+ * de CPU jetées par seconde). Les images fixes (JPEG/PNG/WebP, jamais `00 00 01…` en
+ * tête) et le brut non compressé gardent la sonde ; le longueur-préfixé ambigu aussi
+ * (prudence : [annexB] tranche déjà ce cas vers Annex B, la sonde reste le repli sûr).
+ * Pur, testé en JVM.
+ */
+internal fun shouldProbeBitmap(frame: GlassesFrame): Boolean {
+    if (!frame.compressed) return true
+    return !startsWithAnnexB(frame.bytes)
 }
 
 /** Premiers octets en hexadécimal (une ligne de diagnostic, jamais le flux entier). */
@@ -167,12 +180,14 @@ class GlassesLiveDecoder(
             stashConfig(target, frame)
             return false
         }
-        frame.asSdkFrame().toBitmapOrNull()?.let {
-            try {
-                return drawBitmap(target, frame, it)
-            } finally {
-                // Bitmap décodé pour ce seul dessin (15 i/s) : libéré aussitôt.
-                runCatching { it.recycle() }
+        if (shouldProbeBitmap(frame)) {
+            frame.asSdkFrame().toBitmapOrNull()?.let {
+                try {
+                    return drawBitmap(target, frame, it)
+                } finally {
+                    // Bitmap décodé pour ce seul dessin (15 i/s) : libéré aussitôt.
+                    runCatching { it.recycle() }
+                }
             }
         }
         if (!frame.compressed) {
