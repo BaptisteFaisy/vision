@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee.vm
 import dev.sam3vision.app.LiveVoiceRequest
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.core.picto.PictoHit
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
@@ -23,6 +24,7 @@ class IseePictoVoiceTest {
         found: MutableList<String> = mutableListOf(),
         created: MutableList<String> = mutableListOf(),
         hits: List<PictoHit> = emptyList(),
+        placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,
     ) = IseePictoVoice(
         armedLabels = { labels },
         settings = { Settings.Default.copy(speechLanguage = language) },
@@ -32,6 +34,7 @@ class IseePictoVoiceTest {
         onFind = { found += it },
         onCreate = { created += it },
         hits = { hits },
+        placeMode = { placeMode },
     )
 
     @Test
@@ -105,7 +108,7 @@ class IseePictoVoiceTest {
         val orders = voice()
         assertFalse(orders.run("pourquoi ?"))
         assertFalse(orders.run("va à la pharmacie"))
-        assertFalse(orders.run("où sont les clés ?"))
+        assertFalse(orders.run("où est la sortie ?"))
         assertFalse(orders.run(""))
         assertTrue(opened.isEmpty())
         assertTrue(spoken.isEmpty())
@@ -171,6 +174,33 @@ class IseePictoVoiceTest {
         assertTrue(opened.isEmpty())
         assertEquals(listOf("Looking for keys."), spoken)
         assertEquals("Looking for keys.", state.status)
+    }
+
+    @Test
+    fun `dehors aucun ordre picto n'est consomme ni dit`() = runBlocking {
+        val found = mutableListOf<String>()
+        val created = mutableListOf<String>()
+        val orders = voice(found = found, created = created, placeMode = PictoPlaceMode.DEHORS)
+        assertFalse(orders.run("Find the keys"))
+        assertFalse(orders.run("où sont mes clés"))
+        assertFalse(orders.run("fais un pictogramme de ces médics"))
+        assertFalse(orders.run("démo picto"))
+        assertFalse(orders.run("médicament"))
+        assertTrue(found.isEmpty())
+        assertTrue(created.isEmpty())
+        assertTrue(opened.isEmpty())
+        assertTrue(spoken.isEmpty())
+        assertTrue(state.status == null)
+    }
+
+    @Test
+    fun `ou sont mes cles cherche sur place comme where`() = runBlocking {
+        val found = mutableListOf<String>()
+        assertTrue(voice(found = found).run("où sont mes clés"))
+        assertEquals(listOf("keys"), found)
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Je cherche keys."), spoken)
+        assertEquals("Je cherche keys.", state.status)
     }
 
     @Test

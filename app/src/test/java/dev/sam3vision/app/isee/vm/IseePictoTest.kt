@@ -8,6 +8,7 @@ import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.picto.buildTemplate
 import dev.sam3vision.core.settings.Settings
@@ -53,6 +54,7 @@ class IseePictoTest {
         decodeCalls: MutableList<String>? = null,
         storeRoot: File? = null,
         now: () -> Long = { 0L },
+        placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
     ) = { scope: kotlinx.coroutines.test.TestScope ->
         IseePicto(
             media = MediaCacheStore(tempDir("isee-picto-media"), dao),
@@ -67,6 +69,7 @@ class IseePictoTest {
             frameGray = { jpeg -> decodeCalls?.add(jpeg); FRAME },
             io = Dispatchers.Unconfined,
             clock = now,
+            placeMode = placeMode,
         )
     }
 
@@ -162,7 +165,7 @@ class IseePictoTest {
     fun `frame contenant l'objet reconnu, au plus a 2 Hz`() = runTest {
         var now = 1_000L
         val calls = mutableListOf<String>()
-        val coordinator = picto(calls) { now }(this)
+        val coordinator = picto(calls, now = { now })(this)
         coordinator.onPictoButton()
         advanceUntilIdle()
         coordinator.confirmDraft("Objet")
@@ -179,6 +182,33 @@ class IseePictoTest {
         coordinator.onFrame("frame-3")
         advanceUntilIdle()
         assertEquals(2, calls.size)
+    }
+
+    @Test
+    fun `dehors le bouton et find restent muets`() = runTest {
+        val coordinator = picto(placeMode = { PictoPlaceMode.DEHORS })(this)
+        coordinator.onPictoButton()
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertNull(state.value.status)
+        assertTrue(client.lastPhoto.isEmpty())
+    }
+
+    @Test
+    fun `dehors la frame ne cherche rien`() = runTest {
+        var mode = PictoPlaceMode.DEDANS
+        val calls = mutableListOf<String>()
+        val coordinator = picto(calls, now = { 10_000L }, placeMode = { mode })(this)
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.armed)
+        mode = PictoPlaceMode.DEHORS
+        coordinator.onFrame("frame-1")
+        advanceUntilIdle()
+        assertTrue(calls.isEmpty())
+        assertTrue(state.value.picto.hits.isEmpty())
     }
 
     @Test

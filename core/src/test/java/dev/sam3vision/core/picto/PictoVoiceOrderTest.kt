@@ -87,6 +87,26 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `ou sont mes cles rend le concept maison anglais`() {
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où sont mes clés ?"))
+        assertEquals("phone", PictoVoiceOrder.parseOuSont("où est mon téléphone"))
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("Où sont les clés"))
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où est ma clé"))
+        assertEquals("glasses", PictoVoiceOrder.parseOuSont("où sont les lunettes"))
+    }
+
+    @Test
+    fun `ou sont refuse l anglais l inconnu le compose et le vide`() {
+        assertNull(PictoVoiceOrder.parseOuSont("Where are my keys"))
+        assertNull(PictoVoiceOrder.parseOuSont("où est mon doudou"))
+        assertNull(PictoVoiceOrder.parseOuSont("où est la boîte de médicaments"))
+        assertNull(PictoVoiceOrder.parseOuSont("où est"))
+        assertNull(PictoVoiceOrder.parseOuSont("où sont mes"))
+        assertNull(PictoVoiceOrder.parseOuSont("les clés sont où ?"))
+        assertNull(PictoVoiceOrder.parseOuSont(""))
+    }
+
+    @Test
     fun `le mot vise le repere - egalite pluriel prefixe`() {
         assertTrue(PictoVoiceOrder.matches("médics", "medics"))
         assertTrue(PictoVoiceOrder.matches("médicament", "medics"))

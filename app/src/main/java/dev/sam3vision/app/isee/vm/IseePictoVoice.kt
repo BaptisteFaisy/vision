@@ -7,6 +7,7 @@ import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.picto.PictoHit
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.picto.PictoVoiceOrder
 import dev.sam3vision.core.picto.PictoVoiceText
 import dev.sam3vision.core.settings.Settings
@@ -14,7 +15,8 @@ import dev.sam3vision.core.settings.Settings
 /**
  * Ordres vocaux picto et chasse maison sur iSee : recherche, chasse et
  * création restent sur place, démo et mot maison seul partent au direct.
- * « Find the X » et « Where are my keys » sans repère armé restent sur place
+ * « Find the X », « Where are my keys » et « où sont mes clés » sans repère
+ * armé restent sur place
  * ([onFind] : X rejoint les masques SAM et son pictogramme se crée) ; armé,
  * le repère est chassé sur place (l'overlay le montre, la voix dit où il est),
  * jamais régénéré. Création (« fais un pictogramme de X », « create a picto
@@ -22,7 +24,8 @@ import dev.sam3vision.core.settings.Settings
  * seul le sans-nom (« de ça ») part au direct. Démo et mot maison seul
  * (chasse SAM) partent en [LiveVoiceRequest]. Tout est confirmé (recherche,
  * chasse, création, démo) ; le reste passe aux ordres suivants (cap,
- * navigation, LLM).
+ * navigation, LLM). Dehors, rien n'est consommé : `false` aussitôt, sans
+ * voix ni état — dehors, c'est tout sauf le picto.
  *
  * [openLive] ouvre le direct avec la requête et les prompts (`null` =
  * essentiels) ; injecté pour les tests, le défaut parle aux vrais singletons.
@@ -40,6 +43,7 @@ class IseePictoVoice(
     private val onFind: (String) -> Unit = {},
     private val onCreate: (String) -> Unit = {},
     private val hits: () -> List<PictoHit> = { emptyList() },
+    private val placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
 ) {
 
     /**
@@ -47,6 +51,7 @@ class IseePictoVoice(
      * L'écran affiche la confirmation, dite par le chemin navigation.
      */
     suspend fun run(text: String): Boolean {
+        if (!placeMode().pictoEnabled) return false
         PictoVoiceOrder.parseFind(text)?.let { label ->
             PictoVoiceOrder.huntWord(text, armedLabels())?.let { word -> return hunt(word) }
             onFind(label)
@@ -69,6 +74,11 @@ class IseePictoVoice(
         }
         PictoVoiceOrder.huntWord(text, armedLabels())?.let { word -> return hunt(word) }
         PictoVoiceOrder.parseWhere(text)?.let { label ->
+            onFind(label)
+            confirm(PictoVoiceText.findStarted(label, settings().speechLanguage))
+            return true
+        }
+        PictoVoiceOrder.parseOuSont(text)?.let { label ->
             onFind(label)
             confirm(PictoVoiceText.findStarted(label, settings().speechLanguage))
             return true

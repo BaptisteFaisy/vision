@@ -96,7 +96,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         settings = { settings },
         store = PictoStore(pictosDir(app.filesDir)),
-        clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) },
+        clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode },
         update = ::update,
         scope = viewModelScope,
     )
@@ -206,7 +206,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder, picto::findObject, { _state.value.picto.hits })
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode })
 
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
