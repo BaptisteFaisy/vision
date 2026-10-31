@@ -11,7 +11,7 @@ Règles de lecture :
   **hypothèse** (valeur de travail, à remplacer par une mesure) ;
 - la grandeur de référence est la **latence perçue** (§ 1) : un A/R serveur de 41 ms ne dit rien de
   ce que l'utilisateur voit ;
-- les **6 blocs chiffrés** de ce document sont **générés** par `scripts/budget_latence.py`, la source
+- les **7 blocs chiffrés** de ce document sont **générés** par `scripts/budget_latence.py`, la source
   unique des chiffres. `--check-doc` échoue si ce document et le script divergent, `--selftest`
   vérifie l'arithmétique, `--verdict` imprime le verdict sur les 100 ms.
 
@@ -217,7 +217,7 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 
 ## 9. Ce que ce document n'affirme pas
 
-- Aucune mesure n'a été faite sur un téléphone pour ce document. Les coûts client sont des
+- Hors § 10, aucune mesure n'a été faite sur un téléphone pour ce document. Les coûts client sont des
   simulations ou des estimations reprises de la campagne, pas des relevés d'appareil.
 - Les chiffres marqués `uNN` viennent de notes **hors de ce dépôt** : ils décrivent le backend et
   les patchs de la vague 1, pas le code d'ici.
@@ -226,7 +226,34 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 - La latence « affichée » par l'app (1 220–1 260 ms) mesure une file de 6 frames : elle ne se
   compare pas directement à la latence perçue d'une frame et ne doit pas servir de référence.
 - `docs/PERF.md` § 3 dit l'inverse et a raison : **aucune latence n'est mesurée dans cet arbre**.
-  Ce document ne change pas ce constat, il chiffre des planchers et des hypothèses.
+  Ce document ne change pas ce constat : hors § 10 (deux campagnes citées telles quelles),
+  il chiffre des planchers et des hypothèses.
+
+## 10. Campagnes ISEE_LAT mesurées
+
+Deux campagnes `ISEE_LAT` (une ligne logcat par frame complète, `LiveLatencyLog`) : la moyenne
+et le max portent sur `latency`, les postes sont les moyennes par poste. Les verdicts suivent
+la règle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`), sous les
+seuils par défaut (300 / 500) et sous l'objectif (moyenne < 250 ms, max ≤ 500 ms).
+
+<!-- table:mesures -->
+| campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) | 300 / 500 ? | 250 / 500 ? | conditions |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
+| baseline pré-PR2 | 1257 | 454 | 171 | 38 | 102 | 165 | 5 | 78 | 1677 | non (+154 en moyenne, +1177 en max) | non (+204 en moyenne, +1177 en max) | référence avant PR2 |
+| post-PR2 | 1500 | 380 | 119 | 38 | 100 | 164 | 1 | 58 | 713 | non (+80 en moyenne, +213 en max) | non (+130 en moyenne, +213 en max) | scène vide (0 masque), app à 430 % CPU |
+
+Règle des verdicts : celle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; `250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms).
+<!-- /table:mesures -->
+
+Lecture :
+
+- la campagne post-PR2 divise le max par 2,4 (1 677 → 713 ms) et retire 74 ms à la moyenne
+  (454 → 380 ms), mais reste au-dessus des deux seuils — moyenne comme max ;
+- les postes ne s'additionnent pas à la moyenne : `rtt` (envoi → réponse) recouvre `srv`
+  plus la radio et le parse (`LiveTimings.kt`), et chaque moyenne de poste ignore les frames
+  où il vaut `—` (`parse_isee_lat.py`) ;
+- la campagne post-PR2 est une scène vide (0 masque) avec l'app à 430 % CPU : un contenu
+  réel (masques à décoder, § 2 `DECODE`) coûterait plus cher.
 
 ## Annexe A — où retrouver chaque chiffre
 
