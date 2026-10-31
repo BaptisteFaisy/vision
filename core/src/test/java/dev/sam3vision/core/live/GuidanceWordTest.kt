@@ -72,4 +72,18 @@ class GuidanceWordTest {
         assertFalse(GuidanceWord.isStopPhrase("gauche."))
         assertFalse(GuidanceWord.isStopPhrase("Personne à 9 heures."))
     }
+
+    @Test
+    fun `virage gauche droite, pas tout droit ni stop`() {
+        assertTrue(GuidanceWord.isTurnWord("Gauche."))
+        assertTrue(GuidanceWord.isTurnWord("Droite."))
+        assertTrue(GuidanceWord.isTurnWord("Left."))
+        assertTrue(GuidanceWord.isTurnWord("Right."))
+        assertFalse(GuidanceWord.isTurnWord("Tout droit."))
+        assertFalse(GuidanceWord.isTurnWord("Straight."))
+        assertFalse(GuidanceWord.isTurnWord("Stop."))
+        assertFalse(GuidanceWord.isTurnWord("gauche."))
+        assertFalse(GuidanceWord.isTurnWord("Personne à 9 heures."))
+        assertFalse(GuidanceWord.isTurnWord(""))
+    }
 }

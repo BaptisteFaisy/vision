@@ -725,10 +725,11 @@ Nouveau contrat, en mode Traversée seul :
   (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à
   droite (« Regardez à droite. », virage à droite prouvé, constat) →
   silence si libre (re-vérification sinon, voir ci-dessous) ;
-- **priorité** : feu > scan > véhicules > personnes (`crossingPhraseOf`)
-  — le feu parle, les horloges du scan gèlent et le mouvement n'est pas
-  compté : stop, consignes et constats se disent entiers après (jamais
-  couverts ni tronqués) ;
+- **priorité** : feu > scan > véhicules > personnes (`crossingPhraseOf`,
+  amendé par le § 25 : l'évitement passe devant le feu, le scan garde la
+  voix pendant sa procédure) — le feu parle, les horloges du scan gèlent
+  et le mouvement n'est pas compté : stop, consignes et constats se disent
+  entiers après (jamais couverts ni tronqués) ;
 - **re-vérification obligatoire** : un constat danger relance un cycle
   complet après 3 s d'attente silencieuse (le temps que le véhicule
   passe — consignes seules, sans « Stop. »), jusqu'à 3 cycles par
@@ -843,6 +844,50 @@ question posée en marchant → le guidage continue pendant la réflexion
 et entre les tranches lues ; voix non-Laure → les mots finissent par
 se dire puis partent en clips — **non mesuré**, exige un APK de cette
 branche sur appareil réel.
+## 25. Évitement prioritaire en Traversée : gauche/droite d'abord (ordre user du 31/10)
+
+Le user marche avec l'app : en Traversée, le guidage est coupé et
+l'évitement des personnes parle en dernier — l'app dit le feu pendant
+qu'on fonce sur quelqu'un. Nouveau contrat, qui amende le § 23 : dire
+gauche/droite et éviter les humains passe devant tout, même en
+Traversée. Combiné à la traversée muette (même jour : personnes jamais
+décrites, silence sinon) : seuls les mots d'évitement parlent, en
+premier.
+
+- **ordre traversée** (`crossingPhraseOf`) : consigne du scan quand il
+  parle (procédure entière, jamais tronquée) > stop urgent « voiture en
+  mouvement » (§ 22, absolu devant l'évitement doux : on ne s'écarte pas
+  devant une voiture qui arrive) > ordre d'évitement (mot du guidage
+  d'abord, puis mot des personnes) > feu > véhicules doux > silence
+  (personnes jamais décrites) ; sans feu : stop urgent > évitement >
+  véhicules doux > verdict ;
+- **mots prioritaires** : virages SAM (« Gauche. », « Droite. ») et
+  TwinLite (« gauche. », « droite. ») + stop (`preemptsCrossing`) —
+  « Tout droit. » ne couvre jamais le feu (voie libre, pas évitement) ;
+- **procédure scan** (`scanRunning`) : l'user est arrêté sur les zébrures,
+  le scan garde la voix (ordre § 23 — feu > scan > véhicules) — un
+  « Gauche. » marché au milieu du « Regardez à gauche. » ferait confondre
+  marcher et regarder ;
+- **guidage coupé** : le réglage est respecté (pas de consultation) —
+  l'évitement des personnes, lui, parle avec ou sans guidage (sécurité,
+  comme le rebord imminent) ;
+- **mots jamais tus** : l'évitement n'est plus tu par l'ordre du feu
+  (`wordsMuted`, tu seulement pendant la procédure scan — le silence
+  doux 2,5 s ne couvre plus que les véhicules).
+
+Verrouillé par `GuidanceWordTest` + `TwinLiteWordTest` (+1 :
+`isTurnWord`), `CrossingSteeringTest` (8 : préemption, mot devant le
+feu, décalage sonde, voie libre, guidage coupé, scan), `CrossingPeopleTest`
+(mot devant le feu, mots tus, personne seule muette) et
+`CrosswalkScanWiringTest` (+2 : scan tait le guidage, stop devant le
+guidage).
+
+Recette téléphone : personne sur le passage en Traversée → « Droite. »
+ou « Gauche. » au lieu du feu, puis le feu entre deux mots ; sur les
+zébrures, le scan parle entier sans mot marché ; voiture qui roule sous
+8 m → « Stop, voiture en mouvement. » même avec un évitement ; sans
+feu : évitement devant le verdict — **non mesuré**, exige un APK de
+cette branche sur appareil réel.
 *Note de fusion : les deux sections « 24 » concurrentes sont conservées
 en entier — celle de la branche reste le §24 (priorité en cas de
 doute), celle de master est renumérotée §26 (ex-§24, le §25 restant

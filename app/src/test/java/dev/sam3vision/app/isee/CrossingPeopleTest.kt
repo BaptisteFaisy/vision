@@ -10,10 +10,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Voix douce des personnes en mode Traversée : le feu parle en premier, le
- * décalage opposé aux obstacles proches ensuite (miroir du guidage normal),
- * silence sinon — les personnes ne sont jamais décrites, seulement évitées
- * (ordre user du 31/10) — et silence doux après un ordre du feu nouveau.
+ * Voix des personnes en mode Traversée : l'évitement parle en premier
+ * (§ 25 — mot nouveau jamais tu par le feu), silence sinon — les
+ * personnes ne sont jamais décrites, seulement évitées (ordre user du
+ * 31/10).
  */
 class CrossingPeopleTest {
 
@@ -122,45 +122,18 @@ class CrossingPeopleTest {
     }
 
     @Test
-    fun `une personne seule se tait meme apres le quiet`() {
+    fun `une personne seule se tait toujours`() {
         CrossingPeopleWatch.reset()
         val placed = listOf(person(0.1f))
 
         assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr))
-        assertNull(CrossingPeopleWatch.update(placed, 100L, SpeechLanguage.Fr, red()))
-        // Une personne seule ne parle jamais, pendant comme après le quiet.
+        assertNull(CrossingPeopleWatch.update(placed, 100L, SpeechLanguage.Fr))
         assertNull(CrossingPeopleWatch.update(placed, 200L, SpeechLanguage.Fr))
         assertNull(CrossingPeopleWatch.update(placed, 2700L, SpeechLanguage.Fr))
     }
 
     @Test
-    fun `la repetition du rouge ne rearme pas le silence`() {
-        CrossingPeopleWatch.reset()
-        val objects = onPathLeft()
-
-        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertNull(CrossingPeopleWatch.update(emptyList(), 300L, SpeechLanguage.Fr, red(), objects, 1000, 1000))
-        // Répétition du même ordre : pas de réarmement — l'évitement reparle
-        // dès la fin du premier quiet (il se tairait si le rouge de 2900
-        // avait réarmé).
-        assertNull(CrossingPeopleWatch.update(emptyList(), 2900L, SpeechLanguage.Fr, red(), objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 3100L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-    }
-
-    @Test
-    fun `le decalage traverse le silence et parle apres`() {
-        CrossingPeopleWatch.reset()
-
-        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr))
-        assertNull(CrossingPeopleWatch.update(listOf(person(0.3f, 2.9f)), 0L, SpeechLanguage.Fr, red()))
-        assertNull(CrossingPeopleWatch.update(listOf(person(0.3f, 2.7f)), 100L, SpeechLanguage.Fr))
-        assertNull(CrossingPeopleWatch.update(listOf(person(0.3f, 2.4f)), 200L, SpeechLanguage.Fr))
-        assertEquals("Droite.", CrossingPeopleWatch.update(listOf(person(0.3f, 2.2f)), 2700L, SpeechLanguage.Fr))
-    }
-
-    @Test
-    fun `le feu prime sur la voix douce`() {
+    fun `le feu prime sur le silence`() {
         CrossingPeopleWatch.reset()
         val cue = CrossingCue("Vert, traversez.", false, CrossingState.Green)
 
@@ -187,8 +160,8 @@ class CrossingPeopleTest {
         CrossingPeopleWatch.reset()
         val objects = onPathLeft()
 
-        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 
     @Test
@@ -197,20 +170,8 @@ class CrossingPeopleTest {
         val placed = listOf(person(0.1f))
         val objects = onPathLeft()
 
-        assertNull(CrossingPeopleWatch.update(placed, 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(placed, 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-    }
-
-    @Test
-    fun `ordre du feu neuf tait l evitement puis le rend`() {
-        CrossingPeopleWatch.reset()
-        val objects = onPathLeft()
-
-        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertNull(CrossingPeopleWatch.update(emptyList(), 300L, SpeechLanguage.Fr, red(), objects, 1000, 1000))
-        assertNull(CrossingPeopleWatch.update(emptyList(), 2900L, SpeechLanguage.Fr, null, objects, 1000, 1000))
-        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 3100L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.update(placed, 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(placed, 200L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 
     @Test
@@ -220,5 +181,25 @@ class CrossingPeopleTest {
 
         assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
         assertEquals("Droite.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `le mot evitement passe devant le feu`() {
+        CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", crossingPhraseOf(red(), emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `mots tus - l evitement se tait puis reparle frais`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000, wordsMuted = true))
+        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 400L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 }
