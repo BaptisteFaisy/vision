@@ -368,11 +368,10 @@ class CrosswalkScan {
 
         /**
          * Attente silencieuse entre deux cycles (ms) : le temps que le
-         * véhicule constaté passe avant de re-vérifier (prior à valider
-         * rue : une voiture à 50 km/h libère le passage en quelques
-         * secondes, 10 s laissent la marge).
+         * véhicule constaté passe avant de re-vérifier (ordre user : 3 s
+         * exactement — une voiture qui passe libère le champ en ~1-2 s).
          */
-        const val REWAIT_MS = 10_000L
+        const val REWAIT_MS = 3_000L
 
         /**
          * Cycles de scan au plus par traversée (1 initial + re-vérifications) :
