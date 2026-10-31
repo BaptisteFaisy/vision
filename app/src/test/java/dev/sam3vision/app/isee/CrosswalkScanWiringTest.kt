@@ -141,7 +141,8 @@ class CrosswalkScanWiringTest {
         assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
         assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
         assertEquals(
-            "Voiture en mouvement, à 5 mètres.",
+            "mouvement proche (5 m ≤ 8 m) : alerte stop en Traversée (contrat § 22)",
+            "Stop, voiture en mouvement.",
             crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(120f))), listOf(carReading(5f, carBox(120f))), 200L, language),
         )
         assertEquals(CrosswalkScanPhase.Idle, CrosswalkScanWatch.phase())
