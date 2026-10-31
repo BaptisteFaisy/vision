@@ -57,6 +57,20 @@ class OpticsTest {
     }
 
     @Test
+    fun `telephone cible donne les angles mesures`() {
+        // Redmi Note 13 Pro, caméra 0 (dumpsys media.camera du 2026-10-31) :
+        // focale 6,14 mm, tableau 9,1392×6,8544 mm, zone active = tableau 4080×3060.
+        // La chaîne live lit ces valeurs (CameraLens) : ce test verrouille le bout en bout.
+        val sensor = Optics.activeSensor(9.1392f, 6.8544f, 4080, 3060, 4080, 3060)
+        assertNotNull(sensor)
+        val spec = Optics.lensSpec(6.14f, sensor)!!
+        assertEquals(73.32f, spec.horizontalFovDeg, 0.05f)
+        assertEquals(58.34f, spec.verticalFovDeg, 0.05f)
+        assertEquals(2741.07f, spec.focalPx(4080, 3060), 0.5f)
+        assertEquals(343.98f, spec.focalPx(512, 384), 0.1f)
+    }
+
+    @Test
     fun `focale en pixels ne change pas avec la rotation`() {
         // même optique : redresser une frame ne change pas sa focale en pixels
         assertEquals(refFocalPx(512, 384), refFocalPx(384, 512), 1f)
@@ -211,6 +225,19 @@ class OpticsTest {
     }
 
     @Test
+    fun `intrinseques du Redmi de test donnent 73,32 par 58,34 degres`() {
+        // Mesuré le 31/10/2026 (`dumpsys media.camera`, cam 0 arrière du 2c6852ac) :
+        // LENS_INTRINSIC_CALIBRATION = [2741,07, 2741,07, 2040, 1530], zone 4080×3060.
+        val spec = Optics.lensSpecFromIntrinsics(2741.0713f, 2741.0713f, 2040f, 1530f, 4080, 3060)!!
+        assertEquals(73.32f, spec.horizontalFovDeg, 0.02f)
+        assertEquals(58.34f, spec.verticalFovDeg, 0.02f)
+        assertEquals(0.5f, spec.principalXFrac, 0.001f)
+        assertEquals(0.5f, spec.principalYFrac, 0.001f)
+        assertEquals(344f, spec.focalPx(512, 384), 0.5f)
+        assertTrue(spec.usable)
+    }
+
+    @Test
     fun `calibration intrinseque decentree garde son centre`() {
         val spec = Optics.lensSpecFromIntrinsics(2986.1f, 2986.1f, 2050f, 1450f, ARRAY_W, ARRAY_H)!!
         assertEquals(2050f / 3999f, spec.principalXFrac, 0.0001f)
@@ -227,5 +254,12 @@ class OpticsTest {
         assertNull(Optics.lensSpecFromIntrinsics(2986f, 2986f, 1999f, 1499f, 0, ARRAY_H))
         // téléobjectif : 3,8° horizontaux, hors bornes comme par la voie mm
         assertNull(Optics.lensSpecFromIntrinsics(60000f, 60000f, 1999f, 1499f, ARRAY_W, ARRAY_H))
+    }
+
+    @Test
+    fun `mesure mire sur zone active pleine rejoint la voie millimetres`() {
+        val sensor = Optics.activeSensor(PHYS_W, PHYS_H, ARRAY_W, ARRAY_H, ARRAY_W, ARRAY_H)!!
+        val measured = LensSpec.fromMeasured(FOCAL, sensor.widthMm, sensor.heightMm, ARRAY_W, ARRAY_H)
+        assertEquals(Optics.lensSpec(FOCAL, sensor), measured)
     }
 }

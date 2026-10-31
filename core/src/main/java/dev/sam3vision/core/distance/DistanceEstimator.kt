@@ -208,10 +208,10 @@ class DistanceMeter(
         if (!enabled) return emptyList()
         val focalPx = lens.focalPx(width, height)
         if (focalPx <= 0f) return emptyList()
-        val principalY = lens.principalPx(width, height).second
+        val (principalX, principalY) = lens.principalPx(width, height)
         val readings = detections.mapIndexedNotNull { index, detection ->
             if (Occlusion.isOccluded(detections, index)) null
-            else readOne(height, detection, trackIds.getOrNull(index), focalPx, principalY)
+            else readOne(width, height, detection, trackIds.getOrNull(index), focalPx, principalX, principalY)
         }
         untracked = readings.filter { it.trackId == UNTRACKED_ID }
         untrackedAtMs = System.currentTimeMillis()
@@ -219,10 +219,12 @@ class DistanceMeter(
     }
 
     private fun readOne(
+        width: Int,
         height: Int,
         detection: Detection,
         trackId: Int?,
         focalPx: Float,
+        principalX: Float,
         principalY: Float,
     ): DistanceReading? {
         // La bbox du masque, quand elle est fiable, remplace la boîte détecteur pour
@@ -230,7 +232,11 @@ class DistanceMeter(
         // détecteur (overlay, appariement profondeur).
         val box = detection.maskBox?.takeIf { it.size >= 4 } ?: detection.box
         if (Pinhole.isVerticallyCut(box, height)) return null
-        val raw = rawMeters(detection.label, box, focalPx, principalY, height) ?: return null
+        // Boîte redressée (identité sans distorsion mesurée) : les deux branches
+        // — sténopé via [rawMeters], plan de sol via [groundMeters] — lisent des
+        // bords haut/bas sur leurs rayons idéaux.
+        val measured = undistortedBox(box, width, height, principalX, principalY)
+        val raw = rawMeters(detection.label, measured, focalPx, principalY, height) ?: return null
         val id = trackId ?: UNTRACKED_ID
         val smoothed = if (trackId == null) {
             raw.meters
@@ -281,10 +287,37 @@ class DistanceMeter(
     }
 
     /**
+     * Boîte redressée pour la mesure ([Distortion], centre optique du calibrage) :
+     * seuls les bords haut/bas bougent — ce sont eux que lisent les deux branches —
+     * l'abscisse des points redressés étant le centre horizontal de la boîte. Les
+     * bords gauche/droit restent intacts, et la lecture garde la boîte détecteur
+     * brute (overlay). Identité sans distorsion mesurée (`lens.distortion == null`).
+     */
+    private fun undistortedBox(
+        box: List<Float>,
+        width: Int,
+        height: Int,
+        principalX: Float,
+        principalY: Float,
+    ): List<Float> {
+        val distortion = lens.distortion ?: return box
+        if (box.size < 4) return box
+        val norm = Distortion.normPx(width, height)
+        val centerX = (box[0] + box[2]) / 2f
+        return listOf(
+            box[0],
+            Distortion.undistortY(centerX, box[1], principalX, principalY, norm, distortion),
+            box[2],
+            Distortion.undistortY(centerX, box[3], principalX, principalY, norm, distortion),
+        )
+    }
+
+    /**
      * Plan de sol : la ligne des **pieds** (bas de la boîte) donne la distance sans rien savoir
      * de la classe. Le centre optique est celui du calibrage ([LensSpec.principalPx],
-     * centre de l'image par défaut) et la ligne des pieds vient d'une boîte non coupée :
-     * c'est [Pinhole.isVerticallyCut], en amont, qui l'a garanti.
+     * centre de l'image par défaut) et la ligne des pieds vient d'une boîte non coupée
+     * et déjà redressée : c'est [readOne], en amont, qui l'a garanti (coupe sur la
+     * boîte brute, mesure sur la boîte redressée).
      */
     private fun groundMeters(
         box: List<Float>,

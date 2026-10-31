@@ -17,6 +17,10 @@ import kotlin.math.tan
  * `LENS_INTRINSIC_CALIBRATION` quand il le connaît. Le plan de sol et le nuage
  * de points le lisent ([principalPx]) ; le sténopé, qui ne voit que des
  * hauteurs, n'en a pas besoin.
+ *
+ * La **distorsion radiale** ([distortion], mesurée sur mire, `null` sans mesure)
+ * redresse les boîtes avant toute mesure ([Distortion]) : le sténopé et le plan
+ * de sol travaillent alors sur des rayons droits.
  */
 data class LensSpec(
     val horizontalFovDeg: Float,
@@ -26,13 +30,16 @@ data class LensSpec(
     val principalXFrac: Float = 0.5f,
     /** Centre optique vertical, en fraction de hauteur (0,5 = centré). */
     val principalYFrac: Float = 0.5f,
+    /** Distorsion radiale mesurée, `null` sans mesure (le sténopé travaille brut). */
+    val distortion: RadialDistortion? = null,
 ) {
 
-    /** Vrai si les deux angles et le centre optique sont plausibles. */
+    /** Vrai si les deux angles, le centre optique et la distorsion sont plausibles. */
     val usable: Boolean
         get() = horizontalFovDeg in FOV_MIN..FOV_MAX && verticalFovDeg in FOV_MIN..FOV_MAX &&
             principalXFrac.isFinite() && principalYFrac.isFinite() &&
-            principalXFrac in 0f..1f && principalYFrac in 0f..1f
+            principalXFrac in 0f..1f && principalYFrac in 0f..1f &&
+            (distortion == null || (distortion.k1.isFinite() && distortion.k2.isFinite()))
 
     /** Champ de vision porté par la largeur d'une image `[width]`×`[height]`. */
     fun widthFovDeg(width: Int, height: Int): Float {
@@ -98,6 +105,25 @@ data class LensSpec(
             val horizontal = Math.toDegrees(2.0 * atan(sensorWidthMm / 2.0 / focalMm)).toFloat()
             val vertical = Math.toDegrees(2.0 * atan(sensorHeightMm / 2.0 / focalMm)).toFloat()
             return LensSpec(horizontal, vertical, sensorLandscape = sensorWidthMm >= sensorHeightMm)
+        }
+
+        /**
+         * Calibrage mesuré sur mire : focale (mm) et capteur (mm) relevés pour une
+         * image `[imageWidth]`×`[imageHeight]`. Délègue à [fromSensor] en supposant
+         * que la **zone active couvre toute l'image** (pas de recadrage capteur :
+         * les millimètres du tableau valent pour l'image entière) — sinon passer
+         * par [Optics.activeSensor]. `null` si une entrée est incohérente.
+         * La distorsion mesurée en même temps se pose ensuite par `.copy(distortion = …)`.
+         */
+        fun fromMeasured(
+            focalMm: Float,
+            sensorWidthMm: Float,
+            sensorHeightMm: Float,
+            imageWidth: Int,
+            imageHeight: Int,
+        ): LensSpec? {
+            if (imageWidth <= 0 || imageHeight <= 0) return null
+            return fromSensor(focalMm, sensorWidthMm, sensorHeightMm)
         }
 
         /**

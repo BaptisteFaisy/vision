@@ -2,6 +2,34 @@
 
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
+
+
+## 2026-10-31 — Distances : intrinsèques du téléphone mesurées et verrouillées
+
+- **Demande** : étudier la caméra du téléphone pour exploiter ses caractéristiques réelles.
+- Dump `dumpsys media.camera` (caméra 0, Redmi Note 13 Pro) : focale 6,14 mm,
+  tableau 9,1392×6,8544 mm / 4080×3060, H 73,32° · V 58,34°, distorsion nulle
+  (HAL), centre optique exact — recoupé avec les specs HP3 publiées (< 1 %).
+- Conclusions : la chaîne live n'a pas d'erreur de focale (elle lit le driver) ;
+  le repli 67° ne sert que driver muet ; pas de recadrage EIS ; frame analysée
+  homothétique (grand côté 512).
+- Preuves : `OpticsTest` +1 (angles 73,32/58,34 + `f_px` 2741,07/343,98) ;
+  section « Téléphone cible » dans `docs/DISTANCES.md`.
+
+
+## 2026-10-31 — Feux : purge des restes « doute » (docs + KDoc)
+
+- **Fait** : `TRAVERSEE.md` §§1–4, 7–8 alignés sur le binaire
+  (`DOUTE`/`« … »`/`« Doute, attendez. »` supprimés, sans-lecture = rouge
+  partout) ; KDoc `CrossingPixels` (appelant annonce rouge) et
+  `SteeringLayer` (ambre = offre, plus doute) corrigées. Zéro code.
+- Laissé volontairement : « doute » des autres domaines (trottoir, cycles,
+  véhicules, nav — leur prudence est à eux), notes historiques
+  « fini le doute », comparaisons et tests expliqués.
+- Preuves : `git grep` sans reste dans le périmètre feux/traversée
+  (voix, pastille, cadre, bouton, docs) ; checks PR.
+
+
 ## 2026-10-31 — iSee : pluriel véhicules, poteau qui dit comment l'éviter, rebord à 0,7 m (branche `fix/isee-alertes-voitures-poteau-rebord`)
 
 - **Demande** (ordre user) : dire les voitures en mouvement même à plusieurs,
@@ -333,6 +361,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   verts ; `:app:testDebugUnitTest` ciblé vert. Recette appareil : non rejouée
   (téléphone occupé puis déconnecté pendant la session).
 
+## 2026-10-31 — iSee : « Where are my keys » cherche sur place et montre le picto en grand (branche `feat/isee-where-are-my-keys`)
+
+- **Demande** : quand le user dit « where are my keys », iSee génère le
+  pictogramme jaune/noir via Muse et le met sur l'image, en grand au-dessus
+  de l'emplacement — automatiquement, au lieu de décrire l'image au LLM.
+- Fait : `PictoVoiceOrder.parseWhere` (`:core`) reconnaît « where is/are X »
+  (« where's » compris) pour les objets maison (`HomeModes.CONCEPTS`,
+  singulier/pluriel) ou possédés (« my ») ; toute autre question « where »
+  (« Where is the exit? », « Where am I? ») reste pour le LLM.
+  `IseePictoVoice` route l'ordre sur place comme « Find the X » (concept SAM
+  + génération + armement), après la chasse : un repère déjà armé reste
+  chassé, jamais régénéré. `PictoLayer` affiche le premier reconnu en grand
+  au-dessus de son emplacement (`IseePictoBig`, carte 200×230, image 176,
+  jaune/noir, nom sur une ligne), cadres et étiquette inchangés.
+  Doc `META-IMAGE.md` mise à jour (ordre Where, carte en grand).
+- Preuves : `:core:testDebugUnitTest` 2 248 tests, 5 échecs pré-existants
+  (`PrivateFileSettingsStoreTest`, permissions POSIX sous Windows, reproduits
+  sur la base intacte `dc88114`) dont `PictoVoiceOrderTest` 13/13 ;
+  `:app:testDebugUnitTest` 1 306 tests 0 échec dont `IseePictoVoiceTest`
+  14/14 ; `check-kotlin-limits.py` vert, `check-isee-design.py` vert,
+  `assembleDebug` vert (`app-debug.apk`).
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 
 - **Demande** : quand iSee détecte un humain, un objet ou un poteau en face,

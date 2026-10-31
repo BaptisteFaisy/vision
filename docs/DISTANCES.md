@@ -233,13 +233,35 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   « ≈ 2,0 m / ≈ 2,1 m / ≈ 2,3 m » superposées aux masques, section Réglages « Distances » rendue.
   Mesure datée, format relevé à l'époque ; la ligne du direct s'écrit aujourd'hui via `LiveState.line`.
 
+## Téléphone cible (mesuré 2026-10-31)
+
+Redmi Note 13 Pro (`2c6852ac`), caméra 0 (celle qu'ouvre le direct) —
+`adb shell dumpsys media.camera`, recoupé avec les specs publiées du capteur Samsung HP3 :
+
+| Paramètre | Valeur driver | Recoupement |
+|---|---|---|
+| Focale | 6,14 mm | 23 mm éq. / 3,78 ≈ 6,1 (web) |
+| Tableau | 9,1392 × 6,8544 mm, 4080 × 3060 px | 16320 × 0,56 µm binné 16:1 |
+| Zone active | = tableau (pas de recadrage) | `preCorrection` identique |
+| Champ | H 73,32° · V 58,34° · `f_px` 2741,07 (512 px : 343,98) | verrouillé par `OpticsTest` |
+| Distorsion | 0, 0, 0, 0, 0 (corrigée par le HAL) | rien à redresser en live |
+| Centre optique | (2040, 1530) = centre exact | hypothèse `cx, cy` validée |
+
+Conséquences : la chaîne live lit ces valeurs (`CameraLens` → `Optics.lensSpec`) et n'a
+pas d'erreur de focale ; le repli `LensSpec.Default` (67°) ne sert que si le driver est
+muet (≈ +12 % sur les distances dans ce cas). Pas de stabilisation électronique côté app
+(`grep` vide : pas de recadrage FOV), l'OIS est optique. La frame analysée est une
+réduction homothétique sans recadrage (`targetSize`, grand côté 512) : `f_px` suit
+linéairement et le centre reste centré.
+
 ## Pistes (non faites)
 
 Fait depuis : pose IMU temps réel (`PitchMeter`, `docs/POSE-IMU.md`), hauteur/pieds du masque
 (`Detection.maskBox`, `bits` demandés par le client — actives si le serveur déployé suit),
 profondeur affine (`AffineScale`), Kalman par piste + ticker 120 ms, protocole et script de
 recette (`docs/RECETTE-DISTANCES.md`, `scripts/mesure-distances.sh`), étalonnage guidé
-(`CalibrationSolver`, section Réglages — voir « Étalonnage »).
+(`CalibrationSolver`, section Réglages — voir « Étalonnage »), intrinsèques du téléphone
+mesurées et verrouillées (voir « Téléphone cible »).
 - **Masques compacts en production** : demander `bits`/`poly` au direct (au lieu du PNG) pour
   activer les étendues de masque partout — ou cache de décodage partagé overlay↔distances
   (pas de double décodage PNG par frame).

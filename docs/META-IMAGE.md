@@ -58,14 +58,18 @@ anglais `find`/`locate` en premier mot) ajoute « keys » aux concepts SAM de
 la sonde (`LiveProbe.ensureConcept`, sauf en Traversée) puis crée le
 pictogramme (`IseePicto.findObject`, routé par `IseePictoVoice`) : même appel
 Muse (`muse-image-1.0`, jaune/noir), mais stocké et armé sans relecture —
-l'utilisateur est seul. Le matcher local le reconnaît dès la frame suivante
-et `PictoLayer` le montre sur la caméra iSee, à son emplacement.
+l'utilisateur est seul. « Where are my keys » (`parseWhere`, objets maison
+ou « my ») prend le même chemin, sauf repère déjà armé (chassé, jamais
+régénéré) ; toute autre question « where » reste pour le LLM. Le matcher
+local le reconnaît dès la frame suivante et `PictoLayer` le montre sur la
+caméra iSee, à son emplacement — le premier reconnu aussi en grand au-dessus
+(`IseePictoBig`).
 
 ## Où ça vit dans le code
 
 | Rôle | Fichier |
 |---|---|
-| Ordre vocal « Find the X » | `core/.../picto/PictoVoiceOrder.kt` (`parseFind`, `PictoVoiceText.findStarted`) |
+| Ordre vocal « Find the X » / « Where… » | `core/.../picto/PictoVoiceOrder.kt` (`parseFind`, `parseWhere`, `PictoVoiceText.findStarted`) |
 | Ajout du concept SAM | `app/.../isee/ProbeWiring.kt` (`LiveProbe.ensureConcept`) |
 | Création + armement sur iSee | `app/.../isee/vm/IseePicto.kt` (`findObject`), routé par `IseePictoVoice` |
 | Client HTTP Meta Image | `core/.../net/MetaImageClient.kt` (+ `PictoImageClient` dans `Clients.kt`) |
