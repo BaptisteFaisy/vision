@@ -41,10 +41,11 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (seuils PISTE2 de `VehicleApproach` conservés) ; README sans YOLO (notice,
   fonctionnalité, modules, stack ONNX, benchmark) ; `docs/MOTION-EGO.md`,
   `docs/VOIX-DANGER.md` et `noCompress onnx` nettoyés.
-- **Preuve** : `:core:testDebugUnitTest` 2 638 + `:app:testDebugUnitTest`
-  1 502 verts sur r630 (0 échec) ; `check-kotlin-limits.py` vert (1271
-  fichiers, aucun dépassement) ; UBS : findings `LiveProbe` identiques à
-  master (faux positifs pré-existants, erreur scanner inchangée).
+- **Preuve** : `:core:testDebugUnitTest` 2 640 + `:app:testDebugUnitTest`
+  1 518 verts sur r630 (0 échec, arbre rebasé) ; `check-kotlin-limits.py`
+  vert (1275 fichiers, aucun dépassement) ; UBS : findings `LiveProbe`
+  identiques à master (faux positifs pré-existants, erreur scanner
+  inchangée).
 
 ## 2026-10-31 — iSee : sans feu, le mouvement se dit à toute portée (branche `isee-traversee-loin-sans-feu`)
 
