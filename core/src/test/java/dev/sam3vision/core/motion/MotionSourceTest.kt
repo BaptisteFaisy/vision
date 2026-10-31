@@ -81,6 +81,27 @@ class MotionSourceTest {
     }
 
     @Test
+    fun `confiance - le fond qui defile parle, l'image plate se tait`() {
+        // Vocabulaire V1 : la confiance ordonne « fond change » et « fond identique ».
+        val scene = MotionScenes.scene()
+        val moving = source.estimateSince(scene, MotionScenes.shifted(scene, 4, -2))
+        assertNotNull(moving)
+        val motion = moving!!
+        assertTrue(
+            "défilement franc : confiance ${motion.confidence}",
+            motion.confidence > BlockMotionSource.TRUST_MIN,
+        )
+
+        val flat = GrayMask(MotionScenes.WIDTH, MotionScenes.HEIGHT, ByteArray(MotionScenes.WIDTH * MotionScenes.HEIGHT) { 90 })
+        val drifted = GrayMask(MotionScenes.WIDTH, MotionScenes.HEIGHT, ByteArray(MotionScenes.WIDTH * MotionScenes.HEIGHT) { 91 })
+        val flatAvis = source.estimateSince(flat, drifted)
+        assertTrue(
+            "image plate : silence ou doute, jamais franc",
+            flatAvis == null || flatAvis.confidence < motion.confidence,
+        )
+    }
+
+    @Test
     fun `scaledBy convertit vers la grille du masque`() {
         val sample = MotionSample(dx = 2f, dy = -1f, scale = 1.02f, confidence = 0.8f)
         val mask = sample.scaledBy(2f)
