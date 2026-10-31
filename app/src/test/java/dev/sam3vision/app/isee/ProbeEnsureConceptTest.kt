@@ -24,14 +24,14 @@ class ProbeEnsureConceptTest {
 
     @Test
     fun `defauts exterieur au plafond, find the x refuse sans reconfigurer`() = runTest {
-        // Liste unique normal/Traversée (30/10) : 16 concepts, au plafond —
-        // « Find the X » dehors est refusé comme tout 17e concept, sans coupure.
+        // Liste unique normal/Traversée (30/10) : 17 concepts, au plafond —
+        // « Find the X » dehors est refusé comme tout 18e concept, sans coupure.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "keys")
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
-        assertEquals(16, probe.state.value.conceptsSent.size)
+        assertEquals(17, probe.state.value.conceptsSent.size)
         assertFalse(probe.state.value.conceptsSent.contains("keys"))
     }
 
@@ -59,13 +59,13 @@ class ProbeEnsureConceptTest {
     @Test
     fun `plafond ou label trop long, pas de reconfiguration`() = runTest {
         val (probe, fake) = probeHarness(this)
-        val sixteen = (1..16).map { "concept$it" }
-        probe.configure(PROBE_TEST_ENDPOINT, prompts = sixteen)
+        val seventeen = (1..17).map { "concept$it" }
+        probe.configure(PROBE_TEST_ENDPOINT, prompts = seventeen)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "keys")
         probe.ensureConcept(Settings.Default, "x".repeat(33))
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
-        assertEquals(sixteen, probe.state.value.conceptsSent)
+        assertEquals(seventeen, probe.state.value.conceptsSent)
     }
 }
