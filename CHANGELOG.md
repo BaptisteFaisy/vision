@@ -15,6 +15,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   1 508 verts sur r630 (0 échec, dont 3 `VehicleStateRangeTest` + 1
   `NoLightCrossingTest` + 1 `CrossingVehicleTest` nouveaux) ; UBS : 0
   finding ; fichiers < 500 lignes (`VehicleState.kt` 498).
+## 2026-10-31 — iSee : évitement prioritaire en Traversée, gauche/droite d'abord (branche `priorite-guidage-traversee`)
+
+- **Ordre user** : dire gauche/droite et éviter les humains passe devant
+  tout, même en mode Traversée — combiné à la traversée muette (même
+  jour) : seuls les mots d'évitement parlent, en premier.
+- **Fait** : `crossingPhraseOf` parle scan > stop urgent voiture >
+  évitement (mot du guidage `steeringOf`, puis mot personnes) > feu >
+  véhicules doux > silence (sans feu : stop > évitement > doux >
+  verdict) ; procédure scan en cours : le scan garde la voix
+  (`scanRunning`) ; mots d'évitement jamais tus par le feu
+  (`wordsMuted`, `isTurnWord`, `preemptsCrossing`) ; `docs/VOIX-DANGER.md`
+  § 25, `docs/TRAVERSEE.md` amendé.
+- **Preuve** : `CrossingSteeringTest` (8 nouveaux),
+  `CrossingPeopleTest` + `CrosswalkScanWiringTest` (+2 chacun),
+  `GuidanceWordTest` + `TwinLiteWordTest` (+1 chacun) ; suite
+  `:core` + `:app` verte sur serveur (verdict final au merge).
 
 ## 2026-10-31 — iSee : le micro verrouillé reçoit la destination GPS (branche `feat/isee-micro-verrouille-destination`)
 
