@@ -45,18 +45,25 @@ internal fun rememberGuidanceMapState(
  * Carte de l'écran de guidage : fond vectoriel quand le style charge,
  * schéma sinon (repli jusqu'à la sortie d'écran — rouvrir pour réessayer
  * les tuiles). Rien sans tracé (repos).
+ * [showAttribution] `false` masque la mention légale (pages blind).
  */
 @Composable
 fun GuidanceMapCard(
     snapshot: () -> Pair<NavRoute?, NavFix?>,
     update: GuidanceUpdate,
     modifier: Modifier = Modifier,
+    showAttribution: Boolean = true,
 ) {
     val mapState by rememberGuidanceMapState(snapshot, update)
     val current = mapState ?: return
     var tilesOk by remember { mutableStateOf(true) }
     if (tilesOk) {
-        GuidanceMapView(current, modifier, onTilesError = { tilesOk = false })
+        GuidanceMapView(
+            current,
+            modifier,
+            onTilesError = { tilesOk = false },
+            showAttribution = showAttribution,
+        )
     } else {
         MiniRouteMap(snapshot, modifier)
     }

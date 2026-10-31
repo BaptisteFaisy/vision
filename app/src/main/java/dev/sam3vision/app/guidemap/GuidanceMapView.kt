@@ -56,6 +56,8 @@ import org.maplibre.android.maps.Style
  * arrivée, position + précision, passages, manœuvres).
  * [onTilesError] est appelé une fois si le style ou les tuiles sont
  * injoignables. Ne lève jamais.
+ * [showAttribution] `false` masque la mention légale (pages blind,
+ * demande explicite) ; `true` par défaut partout ailleurs.
  *
  * Sans scintillement : le fond statique (tracé, pastilles) n'est redessiné
  * que quand il change ; à chaque tick, seule la position est rafraîchie et
@@ -67,6 +69,7 @@ fun GuidanceMapView(
     state: GuidanceMapState,
     modifier: Modifier = Modifier,
     onTilesError: () -> Unit = {},
+    showAttribution: Boolean = true,
 ) {
     val mapView = rememberGuideMapView()
     GuideMapLifecycle(mapView)
@@ -107,7 +110,7 @@ fun GuidanceMapView(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        GuideAttribution(Modifier.align(Alignment.BottomStart))
+        if (showAttribution) GuideAttribution(Modifier.align(Alignment.BottomStart))
     }
 }
 
@@ -142,8 +145,9 @@ private fun GuideMapLifecycle(mapView: MapView) {
 }
 
 /**
- * Mention légale OpenFreeMap/OpenMapTiles/OSM, toujours visible en bas à
- * gauche (contrat du fond gratuit : attribution obligatoire).
+ * Mention légale OpenFreeMap/OpenMapTiles/OSM en bas à gauche (contrat
+ * du fond gratuit : attribution obligatoire, masquée sur les pages
+ * blind uniquement, sur demande explicite).
  */
 @Composable
 private fun GuideAttribution(modifier: Modifier = Modifier) {
