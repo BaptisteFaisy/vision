@@ -240,7 +240,8 @@ quand la sonde le voit — silence sinon, jamais de chiffre deviné.
 ### Bascule automatique (30/10)
 
 Ordre user : plus de proposition manuelle — le passage détecté arme le mode,
-le passage perdu le coupe, et les personnes restent annoncées en traversée.
+le passage perdu le coupe ; les personnes ne sont plus annoncées (31/10) —
+seuls les mots d'évitement parlent.
 
 - **entrée** : le passage proche 3 frames sur 5 (`CrossingOfferGate`,
   ≤ 2 m mesurés (`OFFER_MAX_METERS`, sinon boîte prouvée sous les pieds —
@@ -259,14 +260,15 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   fait taire la proposition une minute (`setCrossingActive(auto = …)`) ;
 - **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
   (12 concepts, plafond 16 tenu) ; le feu parle en premier, et sur son
-  silence les personnes sont annoncées au cadran (« Personne à 9 heures, à
-  2 mètres », `CrossingPeopleWatch`, débouncé comme toute annonce) ;
+  silence seuls les mots d'évitement parlent (« Droite. » / « Gauche. »,
+  `CrossingPeopleWatch`) — les annonces au cadran (« Personne à 9 heures »)
+  sont coupées depuis le 31/10 (ordre user : esquiver au maximum, sans décrire) ;
 - **décalage opposé** (30/10, après-midi, étendu le soir aux obstacles) : des
   gens proches qui s'approchent d'un côté disent d'aller de l'autre
   (« Droite. », mot nouveau seul, clip < 100 ms — le même `LateralNudgeTracker`
-  que le guidage normal, qui prime sur les positions comme lui), et depuis le
-  soir tout obstacle proche qui s'approche (objet, poteau — même filtre que le
-  couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
+  que le guidage normal, sans positions en traversée — supprimées le 31/10) ;
+  depuis le soir, tout obstacle proche qui s'approche (objet, poteau — même
+  filtre que le couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
   (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; un ordre du feu nouveau
   fait taire la voix
   douce 2,5 s (`CUE_QUIET_MS`, les répétitions — même phrase, rouge ou
