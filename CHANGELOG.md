@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : le micro verrouillé reçoit la destination GPS (branche `feat/isee-micro-verrouille-destination`)
+
+- **Constat** : écran verrouillé, les questions partaient au LLM sans la
+  destination guidée (`LockedMicAnswer` appelait `askText` sans contexte) —
+  « c'est encore loin ? » restait sans réponse utile, téléphone dans la poche.
+- **Fait** : `LockedMicAnswer` joint la destination (`GpsDestinationMemory`,
+  ligne `GpsDestinationText` EN/FR selon la langue de la voix) au contexte
+  `askText`, comme iSee et le direct ; un fournisseur qui jette = pas de
+  contexte, jamais d'échec.
+- **Preuve** : 4 tests nouveaux (`LockedMicAnswerTest`, 10/10 avec les 6
+  existants) ; `check-kotlin-limits.py` vert (1284 fichiers, aucun dépassement).
+
 ## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
 
 - **Constat sur #688** : l'agent de périmètre avait écrit le `## Scope`
