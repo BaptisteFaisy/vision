@@ -29,6 +29,15 @@ class StairCannyCountTest {
         return luma
     }
 
+    /** Pixels ARGB 256×103 : fond sombre, une ligne blanche par marche, dans la ROI. */
+    private fun stairsPixels(vararg rows: Int): IntArray {
+        val pixels = IntArray(LumaPlane.SIZE) { 0xFF141414.toInt() }
+        for (y in rows) {
+            for (x in 0 until LumaPlane.WIDTH) pixels[y * LumaPlane.WIDTH + x] = 0xFFFFFFFF.toInt()
+        }
+        return pixels
+    }
+
     @Test
     fun `marches vues = compte positif`() {
         StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
@@ -72,6 +81,39 @@ class StairCannyCountTest {
 
         StairCannyCount.clear()
         assertEquals(null, StairCannyCount.countAgeMs())
+    }
+
+    @Test
+    fun `pixels lunettes = compte positif`() {
+        StairCannyCount.offerPixels(
+            stairsPixels(50, 58, 66, 74, 82, 90), LumaPlane.WIDTH, LumaPlane.HEIGHT)
+
+        assertTrue(StairCannyCount.lineCount() > 0)
+    }
+
+    @Test
+    fun `pixels incoherents ignores sans ecraser`() {
+        StairCannyCount.offerPixels(
+            stairsPixels(50, 58, 66, 74, 82, 90), LumaPlane.WIDTH, LumaPlane.HEIGHT)
+        assertTrue(StairCannyCount.lineCount() > 0)
+
+        StairCannyCount.offerPixels(IntArray(10), LumaPlane.WIDTH, LumaPlane.HEIGHT)
+        StairCannyCount.offerPixels(IntArray(0), 0, 0)
+
+        assertTrue(StairCannyCount.lineCount() > 0)
+    }
+
+    @Test
+    fun `echantillonneur pur au plus proche voisin`() {
+        // Source 2×2 : le quart supérieur gauche survit seul en 256×103.
+        val pixels = IntArray(4) { 0xFF000000.toInt() }
+        pixels[0] = 0xFFFFFFFF.toInt()
+        val luma = lumaPlaneFromPixels(pixels, 2, 2)!!
+
+        assertEquals(LumaPlane.SIZE, luma.size)
+        assertEquals(255.toByte(), luma[0])
+        // Ligne 52 (moitié basse) : échantillonnée sur la rangée 1, noire.
+        assertEquals(0.toByte(), luma[52 * LumaPlane.WIDTH])
     }
 
     @Test
