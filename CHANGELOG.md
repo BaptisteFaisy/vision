@@ -50,6 +50,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (3 731 tests, 0 échec — 13 flips constatés rouge avant, tous dans le
   périmètre prédit, réécrits en conséquences correctes) ;
   `check-kotlin-limits.py` vert.
+## 2026-10-31 — Feux : collecte crops + réentraînement + barrière GO (rappel vert)
+
+- **Demande** (ordre user) : construire le collecteur (interrupteur OFF +
+  logging), barre de précision basse (0,99).
+- **Fait** : `Settings.collectLightCrops` (TECHNICAL SETTINGS, coupé par
+  défaut) ; `LightCropLogger` (JSONL par activation, PNG exact vu par le
+  classifieur + boîte + verdict, 2000/session max, crops seuls) branché
+  sonde + direct ; `review_light_crops.py` (HTML R/G/BAD, stdlib) ;
+  `train_light.py` (sklearn épinglé, porte/planchers fixes, émet un
+  candidat à relire) ; miroir Python paritaire en CI (20 ancres) ;
+  protocole `docs/COLLECTE-FEUX.md`.
+- **Barrière GO** : 20 ancres parfaites + précision vert ≥ 0,99 hold-out +
+  rappel ≥ actuel, sinon NO-GO motivé (vérifié : NO-GO honnête sur
+  données synthétiques).
+- Preuves : tests JVM `:core` 2406 + `:app` 1343 à 0 échec (r630),
+  parité Python 6/6, smoke trainer + reviewer OK (NO-GO honnête identique
+  avant/après découpage), limites <500/<50 OK, UBS 0 critique sur les
+  fichiers touchés (3 faux positifs scanner préexistants sur `LiveProbe`
+  hors de mes lignes) ; checks PR.
 
 
 ## 2026-10-31 — iSee : écart mini aux humains 0,5 → 0,8 m (branche `isee-clearance-80`)

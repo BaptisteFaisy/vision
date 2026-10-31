@@ -23,6 +23,17 @@ class CrossingWiringTest {
     }
 
     @Test
+    fun `collecte - sans boite, pas de crop`() {
+        // Pas de feu en vue : la collecte ne journalise rien (le rappel avec
+        // boîte exige le décodage Bitmap, sur appareil seul).
+        var calls = 0
+        val light = crossingLightOf(LiveFrame(100, 100, 0L, emptyList()), "") { _, _, _ -> calls++ }
+
+        assertEquals(CrossingState.Red, light.state)
+        assertEquals(0, calls)
+    }
+
+    @Test
     fun `mode actif sans lecture dit rouge, binaire`() {
         assertEquals("Crossing: RED", crossingButtonLabel(true, null))
     }
