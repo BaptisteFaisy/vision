@@ -1,14 +1,9 @@
 """Service SAM 3.1 « live » — la logique du conteneur GPU, sans fournisseur.
 
-Tout ce qui fait tourner le backend vit ici : chargement du modèle, frame de direct,
-``/segment``, ``/live``, ``WS /live/ws``, ``/release`` et la construction de l'app
-FastAPI. Les deux hôtes ne fournissent que l'amorçage et le transport :
-
-* ``live_app_fast.py`` — Modal (``@modal.enter`` + ``@modal.asgi_app``)
-* ``../baseten/src/server.py`` — Baseten (uvicorn sur l'image Truss)
-
-Le contrat HTTP est décrit dans ``docs/SPEC.md`` et ``docs/LIVE-SPEC.md`` ; il ne change
-pas d'un hôte à l'autre, c'est ce qui permet de basculer l'un pour l'autre.
+Modèle, direct (``/live``, ``WS /live/ws``), ``/segment``, ``/release`` et l'app
+FastAPI vivent ici ; les hôtes (``live_app_fast.py`` Modal, ``server.py`` Baseten)
+ne fournissent que l'amorçage et le transport. Contrat : ``docs/SPEC.md``,
+``docs/LIVE-SPEC.md`` — identique d'un hôte à l'autre, d'où la bascule possible.
 """
 
 import asyncio
@@ -43,12 +38,10 @@ LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")
 
 
 async def call(pipeline, *args, **kwargs):
-    """Lance le blocage GPU dans un thread ; mappe les erreurs vers les codes HTTP.
+    """Blocage GPU dans un thread, erreurs mappées vers les codes HTTP.
 
-    Point de vérité unique des statuts : ``POST /live`` laisse remonter l'``HTTPException``
-    (400 décodage/prompt, 500 interne), ``/live/ws`` l'attrape et en fait un message
-    d'erreur — même code, même détail borné, aucune logique dupliquée. ``kwargs`` porte
-    ``mask_encoding`` (les arguments optionnels du pipeline ne sont pas positionnels).
+    Vérité unique des statuts : ``POST /live`` laisse remonter l'``HTTPException``,
+    ``/live/ws`` en fait un message d'erreur — même code, même détail borné.
     """
     from fastapi import HTTPException
     from imaging import ImageDecodeError, MaskEncodingError
@@ -64,12 +57,10 @@ async def call(pipeline, *args, **kwargs):
 
 
 def accepts_param(pipeline, name: str) -> bool:
-    """Le pipeline accepte-t-il le paramètre ``name`` ?
+    """Le pipeline accepte-t-il le paramètre ``name`` ? (Par signature, pas par essai.)
 
-    Les doublures de test de ``/live`` (``scripts/test_live_ws.py``) ont la signature
-    historique à six paramètres : on ne leur impose pas les suivants, on les leur demande.
-    Même motif que la référence ``accepts_text_cache`` — une vérification par signature,
-    pas un ``try/except TypeError`` qui avalerait les vraies erreurs du pipeline.
+    Les doublures de test à six paramètres ignorent les suivants : on les leur
+    demande au lieu de les leur imposer.
     """
     try:
         return name in inspect.signature(pipeline).parameters
@@ -239,6 +230,24 @@ class Sam3LiveService:
 
         return await call(run)
 
+    async def _run_live_binary_ws(self, request, jpeg: bytes) -> dict:
+        """``WS /live/ws`` binaire : JPEG brut + knobs de l'en-tête, même réponse que le texte."""
+        from imaging import decode_jpeg_bytes
+
+        def run():
+            timers: dict = {}
+            started = now()
+            with Stage(timers, "decode_ms"):
+                image = decode_jpeg_bytes(jpeg)
+            return self._live_from_image(
+                image, request.prompts, request.max_objects, request.work_edge,
+                request.batch_prompts, request.edge, request.mask_encoding,
+                getattr(request, "mask_format", None),
+                getattr(request, "mask_edge", None) or 0, timers, started,
+                bool(getattr(request, "with_depth", False)))
+
+        return await call(run)
+
     def _segment_sync(self, image_b64, prompts) -> dict:
         """Route historique /segment : concepts choisis par le serveur (docs/SPEC.md)."""
         from imaging import decode_image
@@ -256,23 +265,28 @@ class Sam3LiveService:
         result.pop("_edge_ok", None)
         return result
 
-    async def _ws_frame(self, raw: str) -> dict:
-        """Un message texte → un message texte (résultat ou erreur) ; ne lève jamais.
+    async def _ws_frame(self, raw) -> dict:
+        """Un message texte ou binaire → un message texte (résultat ou erreur) ; ne lève jamais.
 
-        Une frame invalide (JSON cassé, ``id`` absent, base64 illisible, GPU en vrac) ne
-        ferme pas la connexion : elle repart en message d'erreur, avec l'``id`` connu.
+        Une frame invalide (JSON cassé, ``id`` absent, base64/JPEG illisible, GPU en
+        vrac) ne ferme pas la connexion : elle repart en message d'erreur, avec l'``id``
+        connu (``-1`` si l'en-tête est illisible).
         """
         from fastapi import HTTPException
 
-        from live_ws import error_message, parse_frame, success_message
+        from live_ws import error_message, parse_frame, parse_frame_bytes, success_message
 
-        parsed = parse_frame(raw)
+        binary = isinstance(raw, (bytes, bytearray))
+        parsed = parse_frame_bytes(bytes(raw)) if binary else parse_frame(raw)
         if parsed["error"] is not None:
             return error_message(parsed["id"], parsed["error"]["status"],
                                  parsed["error"]["detail"])
         request = parsed["request"]
         try:
-            result = await self._run_live(request)
+            if binary:
+                result = await self._run_live_binary_ws(request, parsed["jpeg"])
+            else:
+                result = await self._run_live(request)
         except HTTPException as exc:
             return error_message(parsed["id"], exc.status_code, exc.detail)
         except Exception as exc:  # noqa: BLE001 — le contrat interdit la fermeture
@@ -280,27 +294,23 @@ class Sam3LiveService:
         return success_message(result, parsed["id"])
 
     async def _ws_answer(self, websocket, raw, frame_seconds) -> bool:
-        """Traite un message reçu : inférence bornée, réponse bornée, envoi.
+        """Traite un message reçu : inférence et réponse bornées, envoi.
 
-        Renvoie False quand la boucle doit s'arrêter (réponse trop grosse,
-        client déconnecté, socket cassé), True pour attendre le message suivant.
+        Renvoie False quand la boucle doit s'arrêter, True pour continuer.
         """
         from fastapi import WebSocketDisconnect
 
-        from live_ws import UNKNOWN_ID, error_message, frame_id
+        from live_ws import UNKNOWN_ID, error_message, stuck_id
 
         try:
             if raw is None:
-                reply = error_message(UNKNOWN_ID, 400, "expected a JSON text message")
+                reply = error_message(UNKNOWN_ID, 400, "expected a text or binary message")
             else:
                 try:
                     reply = await asyncio.wait_for(self._ws_frame(raw),
                                                    timeout=frame_seconds)
                 except asyncio.TimeoutError:
-                    try:
-                        stuck = frame_id(json.loads(raw).get("id"))
-                    except Exception:  # noqa: BLE001 — frame illisible, id inconnu
-                        stuck = UNKNOWN_ID
+                    stuck = stuck_id(raw)
                     print(f"ws: frame id={stuck} > {frame_seconds:g} s, erreur 503",
                           flush=True)
                     reply = error_message(stuck, 503, "inference timeout, retry")
@@ -325,28 +335,28 @@ class Sam3LiveService:
 
         Anti-zombie : réception bornée (45 s d'inactivité → fermeture 1011),
         inférence bornée (180 s → erreur 503 à la frame, connexion gardée),
-        réponse bornée (4 Mo → fermeture 1009) et fermeture explicite sur tous
-        les chemins. Sans ces bornes, chaque timeout client laisse une connexion
-        pendante 300 s, et deux zombies saturent le conteneur (toute reconnexion
-        queue alors indéfiniment : c'est le freeze observé). Les seuils sont des
-        paramètres pour que les tests les exercent en millisecondes.
+        réponse bornée (4 Mo → fermeture 1009) et fermeture explicite partout.
+        Sans ces bornes, chaque timeout client laisse une connexion pendante 300 s,
+        et deux zombies saturent le conteneur (toute reconnexion queue alors
+        indéfiniment : c'est le freeze observé). Seuils en paramètres pour les tests.
         """
         from fastapi import WebSocketDisconnect
-
-        from live_ws import UNKNOWN_ID, error_message, frame_id
 
         try:
             while True:
                 try:
-                    raw = await asyncio.wait_for(websocket.receive_text(),
-                                                 timeout=idle_seconds)
+                    message = await asyncio.wait_for(websocket.receive(),
+                                                     timeout=idle_seconds)
+                    if message["type"] == "websocket.disconnect":
+                        return
+                    raw = message.get("text", message.get("bytes"))
                 except asyncio.TimeoutError:
                     print(f"ws: inactif depuis {idle_seconds:g} s, fermeture 1011", flush=True)
                     await websocket.close(code=1011, reason="idle")
                     return
                 except WebSocketDisconnect:
                     return
-                except Exception:  # noqa: BLE001 — message binaire ou socket déjà fermé
+                except Exception:  # noqa: BLE001 — socket déjà fermé
                     raw = None
                 if not await self._ws_answer(websocket, raw, frame_seconds):
                     return
@@ -359,10 +369,8 @@ class Sam3LiveService:
     def health(self) -> dict:
         """État du conteneur : modèle, carte, région, boot, leviers appliqués.
 
-        Les variables de région diffèrent selon l'hôte (``MODAL_*`` / ``BASETEN_*``) : on
-        les lit toutes, le client ne voit qu'un champ ``region``/``cloud`` stable.
-        ``load_seconds`` = phase GPU seule ; ``restored``/``load_breakdown`` disent comment
-        ce conteneur a booté (restore vs complet), ``memory_snapshot`` si le levier est armé.
+        Région/cloud lus sur les deux hôtes (``MODAL_*`` / ``BASETEN_*``) vers un champ
+        stable ; ``load_seconds`` = phase GPU seule, ``restored``/``load_breakdown`` le boot.
         """
         return {"ok": True, "model": MODEL_LABEL, "device": self.ctx.get("device_label", "cpu"),
                 "depth": self.ctx.get("depth_model_id"),
@@ -484,7 +492,7 @@ class Sam3LiveService:
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
-            """Même pipeline que POST /live, un message texte JSON par frame."""
+            """Même pipeline que POST /live : un message texte JSON ou binaire (M1) par frame."""
             await websocket.accept()
             await service._ws_loop(websocket)
 
