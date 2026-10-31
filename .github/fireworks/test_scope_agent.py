@@ -256,5 +256,39 @@ class PuceToleranteTest(unittest.TestCase):
                          {"app/A.kt": "x"})
 
 
+class InvocationSweepTest(unittest.TestCase):
+    """Le sweep doit appeler l'agent avec le PAT, pas le token bot.
+
+    Non-régression v27 (31/10) : l'édition du corps avec le token de
+    l'installation ne déclenche aucun workflow (anti-boucle GitHub), donc
+    `couche0` ne rejugeait jamais le corps corrigé et la PR restait BLOCKED
+    sur un verdict périmé (#688). Le sweep invoque `scope_agent` via
+    `fw-scope.py` : cette invocation doit porter `GH_TOKEN="$GH_ECRITURE"`.
+    """
+
+    SWEEP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "..", "workflows", "pr-auto-merge.yml")
+
+    def test_scope_agent_appele_avec_pat(self):
+        with open(self.SWEEP, encoding="utf-8") as fh:
+            contenu = fh.read()
+        invocations = [l for l in contenu.splitlines()
+                       if "fw-scope.py" in l and "python3" in l]
+        self.assertTrue(invocations,
+                        "aucune invocation de fw-scope.py dans pr-auto-merge.yml")
+        for ligne in invocations:
+            self.assertIn('GH_TOKEN="$GH_ECRITURE"', ligne,
+                          "l'agent de périmètre doit écrire avec le PAT : %s"
+                          % ligne.strip())
+
+    def test_filet_verdict_perime(self):
+        with open(self.SWEEP, encoding="utf-8") as fh:
+            contenu = fh.read()
+        self.assertIn("relancer_couche0", contenu,
+                      "le filet de relance couche0 a disparu du sweep")
+        self.assertIn("automerge-scope-rerun", contenu,
+                      "la marque de relance couche0 a disparu du sweep")
+
+
 if __name__ == "__main__":
     unittest.main()
