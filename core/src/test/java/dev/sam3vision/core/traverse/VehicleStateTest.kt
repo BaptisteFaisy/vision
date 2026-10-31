@@ -402,6 +402,44 @@ class VehicleStateTest {
     }
 
     @Test
+    fun `traversee laterale - mouvement annonce, brut des la 3e frame`() {
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f, cx = 200f))), listOf(reading("car", 5f, box(100f, cx = 200f))), atMs = 0L)
+        assertFalse(watcher.movingThisFrame)
+        watcher.update(listOf(det("car", box(100f, cx = 230f))), listOf(reading("car", 5f, box(100f, cx = 230f))), atMs = 100L)
+        assertFalse("vitesse pas encore établie", watcher.movingThisFrame)
+        assertNull(watcher.update(listOf(det("car", box(100f, cx = 260f))), listOf(reading("car", 5f, box(100f, cx = 260f))), atMs = 200L))
+        assertTrue("latéral confirmé : brut vrai avant l'annonce", watcher.movingThisFrame)
+        val fourth = watcher.update(
+            listOf(det("car", box(100f, cx = 290f))),
+            listOf(reading("car", 5f, box(100f, cx = 290f))),
+            atMs = 300L,
+            language = SpeechLanguage.Fr,
+        )
+
+        assertEquals("Voiture en mouvement, à 5 mètres.", fourth!!.phrase)
+    }
+
+    @Test
+    fun `brut par frame - vrai en croissance, faux gare, reset efface`() {
+        val watcher = VehicleStateWatcher()
+        assertFalse("aucune frame vue", watcher.movingThisFrame)
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
+        assertFalse(watcher.movingThisFrame)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
+        assertTrue("croissance : brut vrai avant l'annonce", watcher.movingThisFrame)
+
+        val parked = VehicleStateWatcher()
+        repeat(3) { index ->
+            parked.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = index * 100L)
+        }
+        assertFalse("arrêt : brut faux", parked.movingThisFrame)
+
+        watcher.reset()
+        assertFalse("reset : brut effacé", watcher.movingThisFrame)
+    }
+
+    @Test
     fun `deux types en mouvement - pluriel generique et stop pluriel`() {
         val watcher = VehicleStateWatcher()
         var cue: VehicleStateCue? = null
