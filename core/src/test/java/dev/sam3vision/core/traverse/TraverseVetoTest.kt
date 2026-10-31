@@ -221,18 +221,16 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `fond qui defile - le suivi se tait, l instantane reste conservateur`() {
-        // Croissance + dérive suivies de la caméra : l'approche suivie se
-        // tait (TTC nul), mais le veto instantané de surface tient toujours.
+    fun `fond qui defile - croissance tue, pas de veto`() {
+        // Croissance + dérive suivies de la caméra : suivi et instantané de
+        // surface se taisent (focale nulle : pas de distance).
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val bare = TraverseVeto()
         val aided = TraverseVeto()
         var bareLast: TraverseDecision? = null
         var aidedLast: TraverseDecision? = null
         repeat(13) { index ->
-            val width = 100f + index * 10f
-            val cx = 320f + index * 5f
-            val box = listOf(cx - width / 2f, 240f - width * 0.3f, cx + width / 2f, 240f + width * 0.3f)
+            val box = growingBox(index)
             val atMs = index * 100L
             bareLast = bare.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs)
             aidedLast = aided.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs, motion = motion)
@@ -240,6 +238,58 @@ class TraverseVetoTest {
 
         assertNotNull("sans fond, le suivi voit l'approche", bareLast!!.approachTtcSeconds)
         assertNull("avec fond, la piste suit la caméra", aidedLast!!.approachTtcSeconds)
-        assertTrue("l'instantané (surface) reste conservateur", aidedLast.veto)
+        assertFalse("croissance de clé tue : pas de veto", aidedLast.veto)
+        assertNull(aidedLast.blockingLabel)
+    }
+
+    @Test
+    fun `fond qui defile - la proximite mesuree ne se tait jamais`() {
+        // Même sous caméra, un véhicule mesuré sous 15 m bloque toujours.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val veto = TraverseVeto()
+        val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
+        repeat(3) { index ->
+            veto.update(true, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
+        }
+        val last = veto.update(true, listOf(nearCar), focalPx, atMs = 300L, motion = motion)
+
+        assertTrue("proximité 7,25 m : veto", last.veto)
+        assertEquals("car", last.blockingLabel)
+    }
+
+    @Test
+    fun `fond qui defile - jeune piste non evaluee, veto maintenu`() {
+        // Bus évalué caméra + voiture qui apparaît en croissance : la clé
+        // jeune, jamais jugée, ne figure pas aux tues — son veto tient.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val veto = TraverseVeto()
+        var last: TraverseDecision? = null
+        repeat(13) { index ->
+            val detections = mutableListOf(driftingBusDetection(index))
+            if (index >= 11) detections.add(0, youngCarDetection(index - 11))
+            last = veto.update(true, detections, focalPx = 0f, atMs = index * 100L, motion = motion)
+        }
+
+        assertTrue("croissance jeune non jugée : veto", last!!.veto)
+        assertEquals("car", last.blockingLabel)
+    }
+
+    /** Boîte qui grandit (+10 px/frame) en dérivant (+5 px/frame). */
+    private fun growingBox(index: Int): List<Float> {
+        val width = 100f + index * 10f
+        val cx = 320f + index * 5f
+        return listOf(cx - width / 2f, 240f - width * 0.3f, cx + width / 2f, 240f + width * 0.3f)
+    }
+
+    /** Bus à largeur constante qui dérive comme le fond (+5 px/frame). */
+    private fun driftingBusDetection(index: Int): Detection {
+        val cx = 500f + index * 5f
+        return detection("bus", 0.9f, listOf(cx - 50f, 300f, cx + 50f, 360f))
+    }
+
+    /** Voiture qui apparaît en croissance (2 frames : piste jeune, jamais évaluée). */
+    private fun youngCarDetection(frame: Int): Detection {
+        val width = 100f + frame * 20f
+        return detection("car", 0.9f, listOf(320f - width / 2f, 240f - width * 0.3f, 320f + width / 2f, 240f + width * 0.3f))
     }
 }

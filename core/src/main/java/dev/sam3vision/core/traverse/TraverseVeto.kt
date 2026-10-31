@@ -35,6 +35,17 @@ object VehicleConcepts {
     }
 
     /**
+     * Clé de suivi d'un véhicule entre deux frames (« Cars » et « car »
+     * fusionnent) : même clé côté veto instantané et pistes suivies, pour que
+     * le veto fond sache quelles croissances taire.
+     */
+    fun keyOf(label: String): String {
+        val key = KnownSizes.canonical(label)
+        if (key.endsWith("s") && key.length > 3) return key.dropLast(1)
+        return key
+    }
+
+    /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
      * [LivePrompts.MAX] — seize concepts, donc les trois véhicules plus toute
      * la base du direct (dangers, feu, passage…).
@@ -125,8 +136,8 @@ class TraverseVeto {
      * analysée (≤ 0 : distance indisponible, seule l'approche compte), [atMs]
      * la date de la frame (< 0 : suivi temporel désactivé, veto instantané seul).
      * [motion] (`null` = pas de signal fond) fait taire l'approche suivie des
-     * pistes qui suivent la caméra — le veto instantané (surface, proximité)
-     * reste conservateur et n'en dépend pas.
+     * pistes qui suivent la caméra, ainsi que la croissance instantanée de
+     * leur clé — la proximité (mesurée) ne se tait jamais.
      */
     fun update(
         lightGreen: Boolean,
@@ -135,9 +146,10 @@ class TraverseVeto {
         atMs: Long = -1L,
         motion: FrameMotion? = null,
     ): TraverseDecision {
-        val blocking = findBlocking(detections, focalPx)
-        previousAreas = vehicleAreas(detections)
         val tracked = approachVerdict(detections, atMs, motion)
+        val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
+        val blocking = findBlocking(detections, focalPx, hushed)
+        previousAreas = vehicleAreas(detections)
         val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
@@ -158,17 +170,18 @@ class TraverseVeto {
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */
-    private fun findBlocking(detections: List<Detection>, focalPx: Float): Blocking? =
-        detections.mapNotNull { vetoCandidate(it, focalPx) }
+    private fun findBlocking(detections: List<Detection>, focalPx: Float, hushed: Set<String>): Blocking? =
+        detections.mapNotNull { vetoCandidate(it, focalPx, hushed) }
             .minByOrNull { it.meters ?: Float.MAX_VALUE }
 
     /** Candidature d'une détection au veto : véhicule confiant qui approche ou proche. */
-    private fun vetoCandidate(detection: Detection, focalPx: Float): Blocking? {
+    private fun vetoCandidate(detection: Detection, focalPx: Float, hushed: Set<String>): Blocking? {
         if (!VehicleConcepts.isVehicle(detection.label)) return null
         if (detection.score <= SCORE_MIN) return null
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
-        val approaching = area != null && previous != null && area > previous
+        val growing = area != null && previous != null && area > previous
+        val approaching = growing && vehicleKey(detection.label) !in hushed
         val meters = distanceOf(detection, focalPx)
         val near = meters != null && meters < VETO_METERS
         if (!approaching && !near) return null
@@ -217,11 +230,7 @@ class TraverseVeto {
     }
 
     /** Clé de suivi d'un véhicule entre deux frames (« Cars » et « car » fusionnent). */
-    private fun vehicleKey(label: String): String {
-        val key = KnownSizes.canonical(label)
-        if (key.endsWith("s") && key.length > 3) return key.dropLast(1)
-        return key
-    }
+    private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
 
     /** Un véhicule qui bloque : son label et sa distance si elle est mesurable. */
     private data class Blocking(val label: String, val meters: Float?)
