@@ -4,15 +4,22 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
 import dev.sam3vision.core.predict.MotionModel
+import kotlin.math.abs
 
 /**
  * Verdict d'approche : un véhicule fonce-t-il ([label] du plus dangereux) et
  * l'impact est-il dans [ttcSeconds] secondes (`null` sans approche) ?
+ * [lateralMoving] vrai quand un véhicule traverse le champ à distance
+ * (quasi) constante ([lateralLabel] le plus rapide) — le danger n° 1 d'un
+ * piéton sur un passage, invisible au tau (taille stable). Le veto ne suit
+ * que l'approche ; le scan traversée et les annonces d'état suivent les deux.
  */
 data class ApproachVerdict(
     val approaching: Boolean,
     val ttcSeconds: Float?,
     val label: String?,
+    val lateralMoving: Boolean = false,
+    val lateralLabel: String? = null,
 )
 
 /**
@@ -169,6 +176,13 @@ class VehicleApproach {
 
     /** Le plus dangereux des rapprochements francs, silence sinon. */
     private fun verdict(frameWidth: Int): ApproachVerdict {
+        val approach = approachOf(frameWidth)
+        val lateral = lateralOf(frameWidth)
+        return ApproachVerdict(approach.first, approach.second, approach.third, lateral.first, lateral.second)
+    }
+
+    /** Rapprochement franc : plus petit tau sous [TTC_SECONDS] (`false` sinon). */
+    private fun approachOf(frameWidth: Int): Triple<Boolean, Float?, String?> {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
         for ((id, track) in tracks) {
@@ -183,8 +197,31 @@ class VehicleApproach {
                 bestLabel = track.label
             }
         }
-        if (bestLabel == null || bestTtc >= TTC_SECONDS) return ApproachVerdict(false, null, null)
-        return ApproachVerdict(true, bestTtc, bestLabel)
+        if (bestLabel == null || bestTtc >= TTC_SECONDS) return Triple(false, null, null)
+        return Triple(true, bestTtc, bestLabel)
+    }
+
+    /**
+     * Mouvement latéral franc : le plus rapide au-delà de [LATERAL_RATIO].
+     * Comme l'approche, une piste embarquée par la caméra
+     * ([Verdict.CAMERA_MOVED]) ne conclut pas — un panoramique n'est pas
+     * une voiture qui roule.
+     */
+    private fun lateralOf(frameWidth: Int): Pair<Boolean, String?> {
+        var bestLabel: String? = null
+        var bestSpeed = 0f
+        for ((id, track) in tracks) {
+            if (!track.motion.velocityReliable) continue
+            if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            if (track.motion.anchorBox.width < frameWidth * MIN_WIDTH_FRACTION) continue
+            val speed = abs(track.motion.velocity.x)
+            if (speed <= frameWidth * LATERAL_RATIO) continue
+            if (speed > bestSpeed) {
+                bestSpeed = speed
+                bestLabel = track.label
+            }
+        }
+        return (bestLabel != null) to bestLabel
     }
 
     companion object {
@@ -202,6 +239,14 @@ class VehicleApproach {
 
         /** Croissance minimale (fraction d'image/s) : en dessous, c'est du bruit. */
         const val MIN_GROWTH_RATIO = 0.005f
+
+        /**
+         * Vitesse latérale minimale (fraction d'image/s) : une voiture qui
+         * traverse le champ à 50 km/h à 20 m fait ~2/3 d'image par seconde,
+         * le tremblé de boîte lissée reste sous ~2 %/s — 8 % sépare les deux
+         * (prior à valider sur téléphone, comme les autres seuils).
+         */
+        const val LATERAL_RATIO = 0.08f
 
         /** Largeur d'image de repli quand les détections ne la donnent pas. */
         const val FALLBACK_WIDTH = 1000

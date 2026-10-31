@@ -708,3 +708,55 @@ Recette téléphone : obstacle au contact → côté de sortie, pas de stop ;
 voiture qui roule sous 8 m → doux en normal, « Stop, car moving. » en
 Traversée ; rebord imminent → « Montez le rebord. » — **non mesuré**,
 exige un APK de cette branche sur appareil réel.
+## 23. Scan traversée : stop, regardez à gauche et à droite (ordre user du 31/10)
+
+Le user veut qu'iSee, sur le passage piéton, dise à l'utilisateur de
+s'arrêter et de regarder à gauche puis à droite, et vérifie qu'aucune
+voiture n'est en mouvement — consigne à l'user + verdict explicite.
+Nouveau contrat, en mode Traversée seul :
+
+- **déclencheur** : arrivé sur le passage (bas touché, pieds proches ou
+  profondeur ≤ 1,5 m, `CrossingGuidance`) **et** passage à moins de 2 m
+  (profondeur/sol, jamais sténopé — `scanTriggerOf`), 2 frames de suite
+  (un positif isolé ne dit jamais « Stop ») ;
+- **séquence** (`CrosswalkScan`, core pur) : « Stop. » (mot du guidage,
+  clip < 100 ms, seul urgent — § 11) → « Regardez à gauche. » → virage à
+  gauche prouvé (60° de lacet signés depuis le cap du scan — face à la
+  route —, `YawMeter`, ou 6 s) → observation 2,5 s → constat parlé
+  (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à
+  droite (« Regardez à droite. », virage à droite prouvé, constat) →
+  silence si libre (re-vérification sinon, voir ci-dessous) ;
+- **priorité** : feu > scan > véhicules > personnes (`crossingPhraseOf`)
+  — le feu parle, les horloges du scan gèlent et le mouvement n'est pas
+  compté : stop, consignes et constats se disent entiers après (jamais
+  couverts ni tronqués) ;
+- **re-vérification obligatoire** : un constat danger relance un cycle
+  complet après 10 s d'attente silencieuse (le temps que le véhicule
+  passe — consignes seules, sans « Stop. »), jusqu'à 3 cycles par
+  traversée ; au-delà, le scan rend la voix (le veto garde la traversée,
+  les voix douces reprennent) ;
+- **mouvement latéral** : une voiture qui traverse le champ à taille
+  stable est désormais « en mouvement » (vitesse x lissée > 8 %/s,
+  `VehicleApproach`, prior à valider rue) — le tau ne la voyait pas, et
+  c'est le danger n° 1 d'un piéton ; le veto ne suit que l'approche
+  (inchangé), les annonces d'état et le scan suivent les deux ;
+- **regard stabilisé seul** : l'observation ne compte que le lacet lent
+  (≤ 20°/s — un téléphone en rotation fait glisser les boîtes garées,
+  qui ressembleraient à du mouvement) ; sans capteur, repli temporisé
+  (le verdict vaut pour les deux fenêtres d'observation, limite connue).
+
+Verrouillé par `CrosswalkScanTest` (17 : séquence, virages signés,
+bouclage ±180°, repli temporisé, constats par côté, gel feu, regard
+tournant ignoré, re-vérification, plafond 3 cycles),
+`VehicleApproachTest` (+4 : latéral franc, dérive lente,
+approche muette, panoramique tuée par le fond), `VehicleStateLateralTest`
+(2 : latéral annoncé, brut par frame) et `CrosswalkScanWiringTest`
+(10 : déclencheur 2 m, priorités).
+
+Recette téléphone : fumée Redmi OK (install + lancement + pid vivant,
+capteur rotation présent sur les deux téléphones) ; sur un passage,
+téléphone tenu face — « Stop. Regardez à gauche. … Rien à gauche.
+Regardez à droite. … Rien à droite. » ; virage à droite quand on a
+demandé la gauche : attente (pas de validation) ; voiture qui passe
+pendant un côté → « Attention, voiture à … » puis re-vérification —
+recette passage réel **non mesurée**, exige une sortie rue.

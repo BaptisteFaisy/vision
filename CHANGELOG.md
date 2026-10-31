@@ -4,6 +4,29 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : scan traversée « stop, regardez à gauche et à droite » (branche `feat/scan-traversee`)
+
+- **Demande** : « si iSee détecte un passage piéton à moins de 2 m et si l'user est sur le
+  passage, dire stop et regarder à droite et à gauche pour vérifier qu'une voiture n'est pas en
+  mouvement » — consigne à l'user + verdict explicite (choix user du 31/10).
+- Fait : `CrosswalkScan` (machine core pure : « Stop. » → consigne gauche → virage à gauche
+  prouvé, 60° signés depuis le cap du scan, ou timeout 6 s → observation 2,5 s → constat parlé
+  (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à droite → silence si
+  libre, sinon re-vérification obligatoire (attente 10 s + nouveau cycle, max 3 cycles, puis
+  release au veto), horloges gelées pendant le feu) ; mouvement latéral véhicules
+  (`VehicleApproach` : vitesse x lissée > 8 %/s — le tau ne voyait pas la traversée du champ
+  à taille stable, suivi par les annonces d'état, pas par le veto, tué par le véto fond
+  caméra comme l'approche) ; `YawMeter` (lacet écouté le temps du scan seul, helper
+  `RotationVector` partagé avec `PitchMeter`) ; priorité feu > scan > véhicules > personnes
+  (`crossingPhraseOf` via `phraseOf`).
+- Preuves : `:core:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanTest`
+  17/17, `VehicleApproachTest` 16/16, `VehicleStateLateralTest` 2/2) ;
+  `:app:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanWiringTest`
+  10/10, suites traversée sans régression) ;
+  `check-kotlin-limits.py` vert ; `assembleDebug` vert (`app-debug.apk`). Recette téléphone :
+  fumée Redmi OK (install + lancement + pid vivant) ; recette passage réel **non mesurée**
+  (constats, virages et re-vérification à valider rue).
+
 ## 2026-10-31 — iSee : écoute auto à l'ouverture de la session lunettes (branche `feat/isee-ecoute-auto-session`)
 
 - **Demande** : au démarrage d'une session lunettes, le mode speech (écoute
