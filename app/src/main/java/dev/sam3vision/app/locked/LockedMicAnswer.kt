@@ -1,8 +1,11 @@
 package dev.sam3vision.app.locked
 
+import dev.sam3vision.app.voicenav.GpsDestinationMemory
+import dev.sam3vision.core.nav.GpsDestinationText
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SpeechClient
+import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.DictationUseCase
 
 /**
@@ -14,13 +17,17 @@ import dev.sam3vision.core.usecase.DictationUseCase
  *
  * Aucune image ne part au modèle : écran verrouillé, la caméra est fermée. La consigne
  * système le dit explicitement (`LlmPrompts.askVoiceSystem`), pour que le modèle ne fasse pas
- * semblant de voir.
+ * semblant de voir. La destination GPS en cours, elle, rejoint la question en contexte
+ * ([GpsDestinationMemory]) : « c'est encore loin ? » recoit une reponse sur le trajet.
  */
 class LockedMicAnswer(
     private val speech: SpeechClient?,
     private val llm: LlmClient,
     private val speak: suspend (String) -> Result<Unit>,
     private val dictation: (SpeechClient) -> DictationUseCase = { DictationUseCase(it) },
+    private val settings: () -> Settings = { Settings.Default },
+    /** Destination GPS en cours (`null` hors guidage) : rejoint la question en contexte. */
+    private val destination: () -> String? = { GpsDestinationMemory.destination.value },
 ) {
 
     /** Texte entendu et réponse dite : les deux sont affichés dans la notification. */
@@ -36,8 +43,12 @@ class LockedMicAnswer(
         val engine = speech
             ?: return Result.failure(ApiError.InvalidKey("no dictation engine: Meta or ElevenLabs key (Settings)"))
         val transcript = dictation(engine).invoke(pcm).getOrElse { return Result.failure(it) }
-        val answer = llm.askText(transcript, emptyList()).getOrElse { return Result.failure(it) }
+        val answer = llm.askText(transcript, emptyList(), destinationContext()).getOrElse { return Result.failure(it) }
         speak(answer).getOrElse { return Result.failure(it) }
         return Result.success(Done(transcript = transcript, answer = answer))
     }
+
+    /** Contexte de la question : la destination GPS guidée, `null` hors guidage (sans lever). */
+    private fun destinationContext(): String? =
+        GpsDestinationText.line(runCatching { destination() }.getOrNull(), settings().speechLanguage)
 }

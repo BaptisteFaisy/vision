@@ -5,6 +5,8 @@ import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.SpeechClient
+import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,6 +33,7 @@ class LockedMicAnswerTest {
 
     private class Llm(private val result: Result<String>) : LlmClient {
         var questions = mutableListOf<String>()
+        val contexts = mutableListOf<String?>()
         var texts = 0
             private set
 
@@ -47,6 +50,7 @@ class LockedMicAnswerTest {
         override suspend fun askText(question: String, history: List<ChatTurn>, context: String?): Result<String> {
             texts++
             questions += question
+            contexts += context
             return result
         }
     }
@@ -130,5 +134,59 @@ class LockedMicAnswerTest {
 
         assertTrue("attendu PaymentRequired, obtenu $error", error is ApiError.PaymentRequired)
         assertEquals("paiement requis (402)", error?.message)
+    }
+    @Test
+    fun `destination en cours, la ligne GPS rejoint la question`() = runBlocking {
+        val speech = Speech(Result.success("c'est encore loin"))
+        val llm = Llm(Result.success("encore 800 metres"))
+
+        val done = LockedMicAnswer(
+            speech, llm,
+            speak = { Result.success(Unit) },
+            destination = { "la gare" },
+        ).run(pcm).getOrThrow()
+
+        assertEquals("encore 800 metres", done.answer)
+        assertEquals(listOf("Active GPS destination: \"la gare\"."), llm.contexts)
+    }
+
+    @Test
+    fun `destination en francais, la ligne suit la langue de la voix`() = runBlocking {
+        val speech = Speech(Result.success("c'est encore loin"))
+        val llm = Llm(Result.success("encore 800 metres"))
+        val vocal = Settings.Default.copy(speechLanguage = SpeechLanguage.Fr)
+
+        LockedMicAnswer(
+            speech, llm,
+            speak = { Result.success(Unit) },
+            settings = { vocal },
+            destination = { "la gare" },
+        ).run(pcm).getOrThrow()
+
+        assertEquals(listOf("Destination GPS en cours : « la gare »."), llm.contexts)
+    }
+
+    @Test
+    fun `sans destination, aucun contexte`() = runBlocking {
+        val speech = Speech(Result.success("ou est la porte"))
+        val llm = Llm(Result.success("la porte est a droite"))
+
+        LockedMicAnswer(speech, llm, speak = { Result.success(Unit) }).run(pcm).getOrThrow()
+
+        assertEquals(listOf(null), llm.contexts)
+    }
+
+    @Test
+    fun `fournisseur qui jette, la question part sans contexte`() = runBlocking {
+        val speech = Speech(Result.success("ou est la porte"))
+        val llm = Llm(Result.success("la porte est a droite"))
+
+        LockedMicAnswer(
+            speech, llm,
+            speak = { Result.success(Unit) },
+            destination = { error("memoire en panne") },
+        ).run(pcm).getOrThrow()
+
+        assertEquals(listOf(null), llm.contexts)
     }
 }

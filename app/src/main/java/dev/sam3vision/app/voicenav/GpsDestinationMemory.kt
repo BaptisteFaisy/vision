@@ -11,8 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Les écrans ne partagent pas la session (`IseeVoiceNav` vit dans
  * `IseeViewModel`, le direct n'en a pas) : cet objet est le point unique
- * que les deux chemins question → LLM consultent (`IseeAnswers`, vécu
- * iSee, et `LiveAskSession`, vécu direct).
+ * que les trois chemins question → LLM consultent (`IseeAnswers`, vécu
+ * iSee, `LiveAskSession`, vécu direct, et `LockedMicAnswer`, micro
+ * verrouillé).
  */
 object GpsDestinationMemory {
 
