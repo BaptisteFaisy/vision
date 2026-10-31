@@ -49,13 +49,15 @@ class StairsFeedVoiceTest {
     }
 
     @Test
-    fun `profondeur traverse jusqu'au guetteur - derniere marche`() {
+    fun `profondeur traverse sans preempter le compte`() {
         val feed = StairsFeed()
         val luma = stairsLuma(50, 60, 70, 80, 90)
 
         assertEquals("", feed.observe(luma, 0L, meters = 0.8f, speak = {}))
         assertEquals("", feed.observe(luma, 33L, meters = 0.8f, speak = {}))
-        assertEquals("Last step.", feed.observe(luma, 66L, meters = 0.8f, speak = {}))
+        // Cinq marches comptées : l'annonce standard ouvre, pas la fin.
+        assertEquals("Stairs ahead.", feed.observe(luma, 66L, meters = 0.8f, speak = {}))
+        assertEquals(0.8f, feed.lastCue!!.meters!!, 0f)
     }
 
     @Test
