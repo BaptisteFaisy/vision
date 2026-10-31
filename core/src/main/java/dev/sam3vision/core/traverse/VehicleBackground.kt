@@ -2,6 +2,9 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.motion.GyroHint
 import dev.sam3vision.core.motion.MotionSample
+import dev.sam3vision.core.predict.EgoVerdict
+import dev.sam3vision.core.predict.ResiduDecision
+import dev.sam3vision.core.predict.ResiduVerdict
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -180,4 +183,36 @@ object VehicleBackground {
         bgChangeScore = bg,
         verdict = Verdict.UNKNOWN,
     )
+}
+
+// FUSION : [Verdict] est le seul vocabulaire du chemin véhicule — les verdicts
+// génériques des pistes s'y convertissent ici, jamais l'inverse (`predict`
+// n'importe pas `traverse`). `null` = doute : l'appelant garde son verdict.
+
+/**
+ * Seuil « ego ≈ 0 » ([ResiduDecision.egoPx], pixels de masque) : sous 1 px, le
+ * résidu nul du masque dit l'arrêt ([Verdict.STATIC]) plutôt que la caméra
+ * mobile — prior à recaler sur téléphone, comme les seuils IoU du résidu.
+ */
+const val RESIDU_STILL_EGO_PX = 1f
+
+/**
+ * [EgoVerdict] (PISTE1) → [Verdict] : le résidu boîte−fond franc dit le
+ * véhicule ([Verdict.VEHICLE_MOVED]), le résidu nul l'arrêt ([Verdict.STATIC]).
+ */
+fun EgoVerdict.toVerdict(): Verdict? = when (this) {
+    EgoVerdict.MOVING -> Verdict.VEHICLE_MOVED
+    EgoVerdict.STATIC -> Verdict.STATIC
+    EgoVerdict.UNCERTAIN -> null
+}
+
+/**
+ * [ResiduDecision] (PISTE3) → [Verdict], mapping proposé par la piste 3 : objet
+ * franc → [Verdict.VEHICLE_MOVED] ; résidu nul + ego ≈ 0 ([egoStillPx]) →
+ * [Verdict.STATIC], + ego franc → [Verdict.CAMERA_MOVED].
+ */
+fun ResiduDecision.toVerdict(egoStillPx: Float = RESIDU_STILL_EGO_PX): Verdict? = when (verdict) {
+    ResiduVerdict.OBJECT_MOVED -> Verdict.VEHICLE_MOVED
+    ResiduVerdict.CAMERA_MOVED -> if (egoPx <= egoStillPx) Verdict.STATIC else Verdict.CAMERA_MOVED
+    ResiduVerdict.UNCERTAIN -> null
 }
