@@ -129,6 +129,23 @@ class NoLightCrossingTest {
     }
 
     @Test
+    fun `sans feu - voiture au-dela de 15 m parle quand elle bouge`() {
+        resetWatches()
+        val language = SpeechLanguage.En
+        fun far(widthPx: Float, atMs: Long): String? {
+            val frame = carBox(widthPx)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(30f, frame)),
+                atMs, language, noLight = true,
+            )
+        }
+
+        assertNull(far(100f, 0L))
+        assertNull(far(110f, 100L))
+        assertEquals("Car moving, 30 meters away.", far(120f, 200L))
+    }
+
+    @Test
     fun `sans feu - cooldown mouvement dit attendez, jamais traversez`() {
         resetWatches()
         val language = SpeechLanguage.En

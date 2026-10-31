@@ -49,7 +49,7 @@ internal fun crossingPhraseOf(
     }
     if (noLight) {
         CrosswalkScanWatch.update(atMs, false, movingNow = false, feu = false, language)
-        val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null)
+        val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null, noLight = true)
         val verdict = NoLightCrossWatch.update(
             atMs, veto || CrossingVehicleWatch.movingNow, language, vehiclePhrase != null,
         )
