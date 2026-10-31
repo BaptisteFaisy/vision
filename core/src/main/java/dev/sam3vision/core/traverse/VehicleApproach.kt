@@ -135,6 +135,8 @@ class VehicleApproach {
         lastGlobal = motion.global // PISTE1
         lastGlobalDtMs = motion.dtMs // PISTE1
         val dtSeconds = motion.dtMs / 1000f
+        // PISTE3 : corroborer ici par SamResidu.decide (résidu masque compensé ego-motion) —
+        // OBJECT_MOVED → VEHICLE_MOVED, CAMERA_MOVED + ego ≈ 0 → STATIC, UNCERTAIN → garder le verdict V1.
         lastVerdicts = tracks.mapNotNull { (id, track) ->
             if (!track.motion.velocityReliable) return@mapNotNull null
             val boxDx = track.motion.velocity.x / frameWidth * dtSeconds
