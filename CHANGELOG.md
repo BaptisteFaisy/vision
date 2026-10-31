@@ -4,6 +4,23 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : durcissement du chemin optimal avant recette (branche `isee-chemin-durci`)
+
+- **Demande** : être quasiment certain que le chemin optimal (50 cm) fonctionne
+  avant la recette téléphone.
+- Fait : `PeoplePath` refuse la géométrie non finie (champ/visée/bande NaN →
+  `null`, repli ancien comportement) ; `Guidance` dit « Stop » dès qu'un
+  bloquant quelconque est au contact (l'inconnu élu ne masque plus) ; le
+  couloir projette avec le champ de l'axe image (`widthFovDeg`, ~52,8° en
+  portrait au lieu de 67° — le « 50 cm » annoncé en valait ~31) ; mot doux
+  avalé par le chat redit à l'émission suivante. Voix, caps latéraux,
+  traversée et constantes (50 cm, stop 0,6 m) inchangés.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 682 tests, 0 échec — dont fuzz déterministe 2 000 scènes, 12 cas de
+  bruit chiffrés avec seuils de falaise, chaque correctif rouge avant / vert
+  après) ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à 499 lignes).
+
+
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)
 
 - **Demande** : calcul des distances beaucoup plus précis, le plus précis possible.
