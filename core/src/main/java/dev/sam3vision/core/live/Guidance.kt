@@ -32,9 +32,9 @@ data class GuidanceDecision(
      */
     val shiftMeters: Float? = null,
     /**
-     * Contact mesuré : un bloquant à [STOP_METERS] ou moins — le mot est
-     * « stop » même quand l'obstacle élu n'est pas mesuré (l'inconnu passe
-     * devant par prudence, il ne doit pas masquer un contact mesuré).
+     * Contact mesuré : un bloquant à [STOP_METERS] ou moins. Le mot n'est
+     * « stop » que sur les caps latéraux (le cap droit contourne toujours) ;
+     * l'inconnu élu ne masque plus un contact mesuré.
      */
     val stop: Boolean = false,
 )
@@ -155,20 +155,23 @@ object Guidance {
     }
 
     /**
-     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie,
-     * contact mesuré ([STOP_METERS] ou moins, sur un bloquant quelconque)
-     * ⇒ stop. Sans mesure, le mot reste le côté de sortie (on ne juge pas
-     * le contact sans distance).
+     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie.
+     * Cap droit : toujours le côté de contournement, jamais « stop » — dans
+     * une foule on se faufile, on ne s'arrête pas (ordre user ; le danger
+     * imminent reste couvert par la voix de sécurité, hors d'ici). Caps
+     * latéraux : contact mesuré ([STOP_METERS] ou moins, sur un bloquant
+     * quelconque) ⇒ stop. Sans mesure, le mot reste le côté de sortie (on
+     * ne juge pas le contact sans distance).
      */
     fun word(decision: GuidanceDecision): GuidanceWord {
-        if (decision.stop) return GuidanceWord.Stop
         val obstacle = decision.obstacle
         if (!decision.blocked || obstacle == null) return GuidanceWord.fromCap(decision.cap)
-        val meters = obstacle.meters?.takeIf { it.isFinite() }
-        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
         if (decision.cap == SteeringCap.Straight) {
             return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left)
         }
+        if (decision.stop) return GuidanceWord.Stop
+        val meters = obstacle.meters?.takeIf { it.isFinite() }
+        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
         return GuidanceWord.fromCap(decision.passage ?: SteeringCap.Straight)
     }
 
