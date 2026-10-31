@@ -11,7 +11,7 @@ usage réel. Code : `core/.../traverse/`, `app/.../traverse/`,
 
 Dix agents ont passé le mode traversée en revue : détection des feux,
 trafic, décision, suivi temporel, UX malvoyants, capteurs, archi temps réel,
-données, sécurité, roadmap. Verdict : fail-safe de base sain (doute =
+données, sécurité, roadmap. Verdict : fail-safe de base sain (non-vert =
 attendre), mais 3 trous critiques — feu vert **voiture** confondu avec le
 feu piéton, **grille-feu** non détecté (les boîtes `car` n'étaient pas lues),
 voix **muette ou préemptée** (flag `urgent` non câblé, ElevenLabs seul).
@@ -70,7 +70,7 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
   hystérésis, veto, annonceur, voix de repli (clips + TTS système).
 - **Processus extérieur** : les **boîtes d'objets** (feu + véhicules) viennent
   de SAM via le backend `/live` (GPU Modal, réseau) — sans lui, pas de boîtes,
-  donc doute, donc « attendez » (défaut sûr, jamais de vert inventé). La voix
+  donc rouge, donc « attendez » (défaut sûr, jamais de vert inventé). La voix
   ElevenLabs primaire est aussi réseau, avec repli cache automatique.
 
 ## 5. Preuves (28/10, `master`)
@@ -102,7 +102,7 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 
 L'état du feu n'est plus seulement une pastille en bas de carte et une phrase :
 il est **posé sur l'image**, au même endroit que les masques SAM. Un cadre de la
-couleur de l'état et une étiquette courte (`VERT`, `ROUGE`, `DOUTE`) désignent
+couleur de l'état et une étiquette courte (`VERT`, `ROUGE`) désignent
 le feu qui vient d'être lu.
 
 - placement : `isee/CrossingOverlayLayout.kt` — `lightMarker` reprend la
@@ -118,9 +118,9 @@ le feu qui vient d'être lu.
 - rien de dessiné quand le mode est coupé ou qu'aucun feu n'est dans le champ :
   un cadre vide mentirait sur la position du feu.
 
-Le doute est le seul écart de vocabulaire assumé : la pastille écrit « … » (rien
-d'annoncé pour l'instant), le cadre écrit `DOUTE` (un feu est là, on ne sait pas
-lequel des trois états). Vérifié par `CrossingOverlayLayoutTest`.
+Depuis §9 (binaire), plus d'écart de vocabulaire : sans lecture, pastille,
+cadre et bouton attendent comme un rouge (« … » et `DOUTE` supprimés le
+31/10). Vérifié par `CrossingOverlayLayoutTest`.
 
 **Ce que ça ne prouve pas** : que le cadre tombe juste sur un téléphone réel. Le
 placement est testé en JVM sur des cadres simulés, pas sur une frame capturée —
@@ -221,7 +221,7 @@ Somerset/M5 (Marek Ślusarczyk), Barcelone (Joe Mabel), Beachley (Colin Park).
 ### Ce que la voix dit maintenant
 
 Le mode Traversée parlait déjà l'état du feu (`CrossingText.phrase` : « Vert,
-traversez. » / « Rouge, attendez. » / « Doute, attendez. ») et confirmait la
+traversez. » / « Rouge, attendez. ») et confirmait la
 bascule (« Mode traversée activé. »). Depuis le 29/10, le passage reconnu
 était **proposé** à la voix (« Passage piéton. Dites traverser. ») ; depuis
 le 30/10, il n'est plus proposé — le mode **s'arme seul**, et le dit.

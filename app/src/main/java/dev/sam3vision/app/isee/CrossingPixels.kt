@@ -25,7 +25,8 @@ object CrossingPixels {
     /**
      * Frame JPEG (base64) décodée puis croppée sur [normBox] (`x1,y1,x2,y2` en
      * 0..1, voir `CrossingPrompts.selectLightBox`), réduite à [MAX_EDGE] px.
-     * `null` = image illisible ou boîte hors champ (l'appelant annonce un doute).
+     * `null` = image illisible ou boîte hors champ (l'appelant annonce rouge,
+     * « attendez » — binaire depuis le 31/10, plus de doute).
      */
     fun frame(jpegB64: String, normBox: List<Float>): CrossingFrame? {
         if (jpegB64.isBlank() || normBox.size != 4) return null
