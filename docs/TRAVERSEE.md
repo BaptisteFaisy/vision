@@ -344,3 +344,9 @@ max), étiquetage (`review_light_crops.py`), réentraînement
 (`train_light.py`, porte et planchers fixes) et barrière GO (20 ancres
 parfaites + précision vert ≥ 0,98 sur hold-out + rappel ≥ actuel).
 Protocole complet : `docs/COLLECTE-FEUX.md`.
+
+## 11. Recette feux FR (31/10)
+
+Matrice d'acceptation A1-A5, seuils (0 faux vert bloquant, rappel vert
+≥ 50 % provisoire) et checklist vierge : `docs/RECETTE-FEUX-FR.md`.
+Non rejouée sur appareil.
