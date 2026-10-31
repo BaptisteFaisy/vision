@@ -256,7 +256,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             picto.refresh()
             intro.playIfPending()
         }
-        probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
+        probe.observeSpoken(viewModelScope, proximity, { canGuideSpeech(playerIdle(), _state.value.holding, voiceNavVoiceGate.ambientAllowed()) }, { settings.speechLanguage })
+        probe.observeStarvation(viewModelScope, safety, { _state.value.recordingVideo && probe.voice.guide && !probe.state.value.crossingActive }, { settings.speechLanguage })
         // Placement sur le passage (mot doux + « Sur le passage. », jamais Stop).
         observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false, queue = true) }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)

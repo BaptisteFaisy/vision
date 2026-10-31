@@ -123,6 +123,41 @@ class IseePlaybackTest {
     }
 
     @Test
+    fun `tranches — l'etat parlant ne couvre que la lecture reelle`() = runBlocking {
+        val flagsDuringPlay = mutableListOf<Long?>()
+        val playGate = CompletableDeferred<Unit>()
+        val synthGate = CompletableDeferred<Unit>()
+        var synthCalls = 0
+        var plays = 0
+        val streaming = playback(
+            synthesize = { part ->
+                synthCalls++
+                if (synthCalls == 2) synthGate.await()
+                part.toByteArray()
+            },
+            playSlice = { bytes ->
+                plays++
+                flagsDuringPlay += state.value.speakingEntryId
+                if (plays == 1) playGate.await()
+                Result.success(PlaybackEnd.Done)
+            },
+        )
+        val job = launch { streaming.speakStreaming(seedRow(), LONG_ANSWER) }
+        withTimeout(2_000) { while (flagsDuringPlay.isEmpty()) delay(5) }
+        withTimeout(2_000) { while (synthCalls < 2) delay(5) }
+        playGate.complete(Unit)
+        delay(100)
+
+        assertNull("état rendu pendant la synthèse suivante (lecteur libre)", state.value.speakingEntryId)
+        synthGate.complete(Unit)
+        job.join()
+
+        assertEquals("3 tranches jouées", 3, flagsDuringPlay.size)
+        assertTrue("parlant pendant chaque lecture", flagsDuringPlay.all { it != null })
+        assertNull("état parlant rendu", state.value.speakingEntryId)
+    }
+
+    @Test
     fun `lecture en continu — le MP3 rejouable concatene les tranches`() = runBlocking {
         val parts = SentenceChunker.chunk(LONG_ANSWER)
         val row = seedRow()

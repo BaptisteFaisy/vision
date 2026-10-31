@@ -44,6 +44,9 @@ class IseePlayback(
      * Couper ([SpeechPlayer.stop] extérieur) arrête proprement sans erreur ; une synthèse
      * qui dépasse son plafond lève [StepTimeout], une lecture en échec remonte son motif.
      * L'étape posée par l'appelant reste affichée pendant tout le flux.
+     * L'état parlant ne couvre que la lecture réelle, tranche par tranche : pendant
+     * les synthèses (jusqu'à 25 s chacune), le lecteur est libre et le guidage
+     * peut parler — sinon une synthèse pendue taisait toute la voix douce.
      */
     suspend fun speakStreaming(row: MessageMultimedia, text: String, synthTimeoutMs: Long = SYNTH_SLICE_TIMEOUT_MS) {
         val parts = SentenceChunker.chunk(text)
@@ -52,9 +55,8 @@ class IseePlayback(
             return
         }
         val id = bubbleId(row.id, true)
-        update { it.copy(speakingEntryId = id) }
         try {
-            val bytes = streamSlices(parts, synthTimeoutMs)
+            val bytes = streamSlices(id, parts, synthTimeoutMs)
             if (bytes.isNotEmpty()) saveStreamed(row, bytes)
         } finally {
             // Comme le `onComplete` d'une lecture simple : l'état parlant et l'étape
@@ -119,8 +121,10 @@ class IseePlayback(
      * Tranches jouées dans l'ordre, la synthèse suivante tournant pendant la lecture
      * en cours : un cran d'avance suffit, la lecture est le goulot. Rend les octets
      * joués, partiels si un [SpeechPlayer.stop] extérieur a coupé entre deux tranches.
+     * L'état parlant ([id]) est posé autour de chaque lecture et rendu aussitôt
+     * après : entre deux tranches (synthèse), le lecteur est libre.
      */
-    private suspend fun streamSlices(parts: List<String>, synthTimeoutMs: Long): ByteArray = coroutineScope {
+    private suspend fun streamSlices(id: Long, parts: List<String>, synthTimeoutMs: Long): ByteArray = coroutineScope {
         val played = mutableListOf<ByteArray>()
         var prefetch: Deferred<ByteArray?>? = null
         for ((index, part) in parts.withIndex()) {
@@ -131,16 +135,33 @@ class IseePlayback(
             val bytes = if (pending != null) pending.await() else synthSlice(part, synthTimeoutMs)
             if (index + 1 < parts.size) prefetch = async { synthSlice(parts[index + 1], synthTimeoutMs) }
             if (bytes == null) continue
+            markSpeaking(id)
             when (playSlice(bytes).getOrThrow()) {
-                PlaybackEnd.Done -> played += bytes
+                PlaybackEnd.Done -> {
+                    played += bytes
+                    clearSpeaking(id)
+                }
                 PlaybackEnd.Stopped -> {
                     prefetch?.cancel()
+                    clearSpeaking(id)
                     break
                 }
             }
         }
         prefetch?.cancel()
         played.fold(ByteArray(0)) { acc, slice -> acc + slice }
+    }
+
+    /** Pose l'état parlant, sans voler celui d'une lecture plus récente. */
+    private fun markSpeaking(id: Long) {
+        update { st ->
+            if (st.speakingEntryId == null || st.speakingEntryId == id) st.copy(speakingEntryId = id) else st
+        }
+    }
+
+    /** Rend l'état parlant s'il est encore le nôtre. */
+    private fun clearSpeaking(id: Long) {
+        update { st -> if (st.speakingEntryId == id) st.copy(speakingEntryId = null) else st }
     }
 
     /**
