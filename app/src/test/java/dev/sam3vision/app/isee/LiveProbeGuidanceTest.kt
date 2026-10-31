@@ -129,7 +129,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `stop interne au contact mesure = urgent`() = runTest {
+    fun `contact mesure contourne, non urgent`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -140,8 +140,8 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame(listOf(gobelet())))
         advanceUntilIdle()
 
-        assertEquals("obstacle, stop.", probe.state.value.spoken)
-        assertTrue(probe.state.value.spokenUrgent)
+        assertEquals("left.", probe.state.value.spoken)
+        assertFalse(probe.state.value.spokenUrgent)
     }
 
     @Test
