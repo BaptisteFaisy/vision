@@ -105,10 +105,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
-    /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
-    /** Voix de sécurité : voiture en mouvement + rebord, dits aussitôt, même en dictée. */
+    /** Voix de sécurité : toute urgence, dite aussitôt en grave, même en dictée. */
     private val safety = SafetyVoice(player, SystemTtsEngine.create(getApplication()), { settings }, stopCurrent = { player.stop(); update { it.cutSpeaking() } })
+    /** Voix de proximité : doux en Laure, urgences déléguées à la sécurité. */
+    private val proximity = ProximityVoice(player, { settings }, safety, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null

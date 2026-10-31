@@ -21,10 +21,12 @@ class ProximityVoiceRouteTest {
     private fun voice(
         attempts: MutableList<String>,
         spoken: MutableList<String>,
+        safetyDriver: SafetyTestDriver = SafetyTestDriver(),
         nowMs: () -> Long = { 0L },
     ) = ProximityVoice(
         player = SpeechPlayer(File(tempDir(), "play")),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
+        safety = testSafetyVoice(safetyDriver),
         onSpeaking = { if (it.isNotEmpty()) spoken += it },
         synthesize = { _, _, text ->
             attempts += text
@@ -66,14 +68,17 @@ class ProximityVoiceRouteTest {
     }
 
     @Test
-    fun `route urgente coupe et parle aussitot`() = runTest {
+    fun `route urgente coupe et parle aussitot, en securite`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+        val safetyDriver = SafetyTestDriver()
+        val voice = voice(attempts, spoken, safetyDriver)
 
         voice.onRoutePhrase("Écart de route.", playerIdle = false, urgent = true)
 
-        assertEquals(listOf("Écart de route."), spoken)
+        assertEquals(listOf("Écart de route."), safetyDriver.calls.map { it.text })
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test

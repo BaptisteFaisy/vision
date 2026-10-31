@@ -24,10 +24,12 @@ class ProximityVoiceRepeatTest {
     private fun voice(
         attempts: MutableList<String>,
         spoken: MutableList<String>,
+        safetyDriver: SafetyTestDriver = SafetyTestDriver(),
         nowMs: () -> Long = { 0L },
     ) = ProximityVoice(
         player = SpeechPlayer(File(tempDir(), "play")),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
+        safety = testSafetyVoice(safetyDriver),
         onSpeaking = { if (it.isNotEmpty()) spoken += it },
         synthesize = { _, _, text ->
             attempts += text
@@ -65,18 +67,44 @@ class ProximityVoiceRepeatTest {
     }
 
     @Test
-    fun `urgent persistant redit apres le delai`() = runTest {
+    fun `urgent persistant redit apres le delai, en securite`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
+        val safetyDriver = SafetyTestDriver()
         var now = 0L
-        val voice = voice(attempts, spoken, nowMs = { now })
+        val voice = voice(attempts, spoken, safetyDriver, nowMs = { now })
 
         voice.onPhrase("Voiture en mouvement.", playerIdle = true, urgent = true)
         now = REPEAT_GAP_MS
         voice.onPhrase("Voiture en mouvement.", playerIdle = true, urgent = true)
 
-        assertEquals(listOf("Voiture en mouvement.", "Voiture en mouvement."), spoken)
-        assertEquals(2, attempts.size)
+        assertEquals(listOf("Voiture en mouvement.", "Voiture en mouvement."), safetyDriver.calls.map { it.text })
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `urgent parle sans cle, hors-ligne`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val safetyDriver = SafetyTestDriver()
+        val voice = ProximityVoice(
+            player = SpeechPlayer(File(tempDir(), "play")),
+            settings = { Settings.Default },
+            safety = testSafetyVoice(safetyDriver),
+            onSpeaking = { if (it.isNotEmpty()) spoken += it },
+            synthesize = { _, _, text ->
+                attempts += text
+                Result.success("$text-audio".toByteArray())
+            },
+        )
+
+        voice.onPhrase("Voiture en mouvement.", playerIdle = false, urgent = true)
+        voice.onPhrase("Voiture arrêtée.", playerIdle = true)
+
+        assertEquals(listOf("Voiture en mouvement."), safetyDriver.calls.map { it.text })
+        assertTrue(spoken.isEmpty())
+        assertTrue(attempts.isEmpty())
     }
 
     @Test
@@ -113,18 +141,19 @@ class ProximityVoiceRepeatTest {
     fun `stop jamais repete meme apres le delai`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
+        val safetyDriver = SafetyTestDriver()
         var now = 0L
-        val voice = voice(attempts, spoken, nowMs = { now })
+        val voice = voice(attempts, spoken, safetyDriver, nowMs = { now })
         val stop = GuidanceWord.Stop
         val text = stop.text(SpeechLanguage.En)
 
-        voice.speakWord(stop.clipId, text, SpeechLanguage.En, playerIdle = true)
+        voice.speakWord(stop.clipId, text, SpeechLanguage.En, playerIdle = true, urgent = true)
         now = REPEAT_GAP_MS
-        voice.speakWord(stop.clipId, text, SpeechLanguage.En, playerIdle = true)
+        voice.speakWord(stop.clipId, text, SpeechLanguage.En, playerIdle = true, urgent = true)
 
-        assertEquals(listOf(text), spoken)
-        assertEquals(1, attempts.size)
-        assertTrue(spoken.isNotEmpty())
+        assertEquals(listOf(text), safetyDriver.calls.map { it.text })
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     companion object {

@@ -26,6 +26,7 @@ class ProximityVoiceRetryTest {
     ) = ProximityVoice(
         player = SpeechPlayer(File(tempDir(), "play")),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
+        safety = testSafetyVoice(),
         onSpeaking = { spoken += it },
         canPlay = canPlay,
         synthesize = synthesize,

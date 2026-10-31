@@ -10,37 +10,41 @@ import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
 /**
- * Voix de proximité de la fenêtre caméra : directions dites en continu
- * ([speakWord], sauf le stop unique), positions et obstacles doux redits
- * après [REPEAT_TTL_MS] tant qu'ils durent ([onPhrase] : un danger présent
- * ne se tait pas, le retour d'une scène parle).
+ * Voix de proximité de la fenêtre caméra : directions douces dites en continu
+ * ([speakWord]), positions et obstacles doux redits après [REPEAT_TTL_MS]
+ * tant qu'ils durent ([onPhrase] : un danger présent ne se tait pas, le
+ * retour d'une scène parle) — en voix Laure (ElevenLabs).
  *
- * Cinq garde-fous : rien n'est dit sans clé ElevenLabs, rien par-dessus la
- * réponse du chat (une seule source sonore à la fois — c'est l'appelant qui
- * dit si le lecteur est libre), rien par-dessus la voix route (sauf urgence :
- * l'obstacle attend la fin du virage), et une synthèse annulée (phrase plus
- * fraîche arrivée entre-temps, `collectLatest` côté sonde) n'est jamais
- * jouée. Le stop seul ne se répète jamais ; les directions douces reparlent
- * à chaque émission (ordre user du 31/10).
+ * L'urgence ([urgent] : stop, danger qui s'approche, sortie de trace) ne
+ * parle jamais Laure : elle part par [safety] (voix de sécurité, système
+ * grave, hors-ligne — ordre user : une urgence ne sonne jamais comme une
+ * phrase normale), coupe tout (chat compris, dictée ou pas) et reste orale
+ * seule (aucun sous-titre, aucun fanion parlant — le TTS système ne rend
+ * pas de fin). Les clips stop (`guide_stop`, `tl_stop`) sont l'héritage
+ * d'avant : l'urgent ne les joue plus.
  *
- * [urgent] = stop (mot du guidage, alerte mouvement en Traversée ou modèle
- * d'urgence externe) : coupe la lecture en cours et parle quand même,
- * y compris pendant une dictée — la
- * sécurité passe avant le sous-titre (miroir de `TraverseVoice`, qui
- * préempte la verte par la rouge). Les mots doux et les « Attention … »
- * attendent le silence. [synthesize] injecte le moteur (ElevenLabs en prod,
- * faux en test — miroir `IseePlayback`). [clips] est le pack voix (mots du
- * guidage) : clip local quand il existe (< 100 ms, zéro réseau), synthèse
- * + mise en cache sinon (`null` = synthèse seule, comme avant).
- * [routeSpeaking] dit si la voix route parle : l'obstacle non urgent se tait tant
- * qu'elle parle, le danger urgent coupe toujours. [flushPending] redit la phrase
- * douce gardée ([onPhrase] avec file) dès le silence, dans [PENDING_TTL_MS].
- * L'arrivée sur le passage ([onArrivalPhrase]) passe en dernier, derrière la
- * route et les doux — la plus basse priorité de toutes les annonces.
+ * Garde-fous du doux : rien sans clé ElevenLabs, rien par-dessus la réponse
+ * du chat (une seule source sonore à la fois — c'est l'appelant qui dit si
+ * le lecteur est libre), rien par-dessus la voix route (le doux attend la
+ * fin du virage), et une synthèse annulée (phrase plus fraîche arrivée
+ * entre-temps, `collectLatest` côté sonde) n'est jamais jouée. Le stop seul
+ * ne se répète jamais ; les directions douces reparlent à chaque émission
+ * (ordre user du 31/10).
+ *
+ * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test —
+ * miroir `IseePlayback`). [clips] est le pack voix des mots doux : clip
+ * local quand il existe (< 100 ms, zéro réseau), synthèse + mise en cache
+ * sinon (`null` = synthèse seule, comme avant). [routeSpeaking] dit si la
+ * voix route parle : le doux se tait tant qu'elle parle. [flushPending]
+ * redit la phrase douce gardée ([onPhrase] avec file) dès le silence, dans
+ * [PENDING_TTL_MS]. L'arrivée sur le passage ([onArrivalPhrase]) passe en
+ * dernier, derrière la route et les doux — la plus basse priorité de
+ * toutes les annonces.
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
+    private val safety: SafetyVoice,
     private val onSpeaking: (String) -> Unit = {},
     private val canPlay: () -> Boolean = { true },
     private val synthesize: suspend (apiKey: String, voiceId: String, text: String) -> Result<ByteArray> =
@@ -75,11 +79,12 @@ class ProximityVoice(
 
     /**
      * Nouvelle phrase de SAM. [playerIdle] vrai = aucune bulle du chat en cours de lecture ;
-     * sinon on ne dit rien — mais la phrase avalée par un garde transitoire n'est
+     * sinon le doux ne dit rien — mais la phrase avalée par un garde transitoire n'est
      * pas mémorisée : réémise, elle se dira une fois la voie libre (seul ce qui a
-     * vraiment parlé est dédupliqué, pendant [REPEAT_TTL_MS]). [urgent] coupe la lecture en cours et parle
-     * quand même, dictée ou pas. Tant que la voix route parle ([routeSpeaking]),
-     * l'obstacle non urgent se tait aussi, puis se dit à la prochaine émission.
+     * vraiment parlé est dédupliqué, pendant [REPEAT_TTL_MS]). [urgent] part par
+     * la voix de sécurité ([speakUrgent], grave, hors-ligne, coupe tout),
+     * dictée ou pas. Tant que la voix route parle ([routeSpeaking]),
+     * le doux se tait aussi, puis se dit à la prochaine émission.
      * [queue] : la phrase douce tuée par le chat, la route ou [busy] est gardée
      * (une seule, la plus fraîche) et redite par [flushPending] dès le silence,
      * dans [PENDING_TTL_MS] — sans file, elle se redit à la prochaine émission.
@@ -94,18 +99,23 @@ class ProximityVoice(
         busy: () -> Boolean = { false },
     ) {
         if (saidRecently(phrase)) return
+        if (urgent) {
+            speakUrgent(phrase)
+            return
+        }
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && (!playerIdle || routeSpeaking() || busy())) {
+        if (!playerIdle || routeSpeaking() || busy()) {
             if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
-        speak(phrase, current, urgent)
+        speak(phrase, current)
     }
 
     /**
-     * Consigne de guidage GPS (manœuvres, même voix Laure que les obstacles) :
-     * l'urgence coupe, la douce attend le silence en file dédiée (une seule,
+     * Consigne de guidage GPS (manœuvres douces en voix Laure) : l'urgence
+     * (sortie de trace, recalcul) part en voix de sécurité ([speakUrgent],
+     * grave, coupe), la douce attend le silence en file dédiée (une seule,
      * la plus fraîche — une consigne périme vite) et se redit par
      * [flushPending] avant toute douce d'obstacle (danger > route > doux >
      * arrivée). La route ne s'attend pas elle-même ([routeSpeaking] ignoré :
@@ -117,13 +127,17 @@ class ProximityVoice(
         urgent: Boolean = false,
     ) {
         if (saidRecently(phrase)) return
+        if (urgent) {
+            speakUrgent(phrase)
+            return
+        }
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && !playerIdle) {
+        if (!playerIdle) {
             pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
-        speak(phrase, current, urgent)
+        speak(phrase, current)
     }
 
     /**
@@ -142,7 +156,7 @@ class ProximityVoice(
             pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
-        speak(phrase, current, urgent = false)
+        speak(phrase, current)
     }
 
     /**
@@ -197,20 +211,30 @@ class ProximityVoice(
             return false
         }
         clear()
-        speak(due.phrase, current, urgent = false)
+        speak(due.phrase, current)
         return true
     }
 
-    /** Synthèse + lecture d'une phrase admise (mémorisée : dite une fois). */
-    private suspend fun speak(phrase: String, current: Settings, urgent: Boolean) {
-        if (urgent) player.stop()
+    /**
+     * Urgence admise (jamais dite récemment, jamais un stop déjà dit) : voix
+     * de sécurité aussitôt (grave, hors-ligne, coupe tout — [SafetyVoice]),
+     * mémorisée comme le doux (redite après [REPEAT_TTL_MS] si elle dure).
+     * Orale seule : aucun sous-titre ni fanion (le TTS système ne rend pas
+     * de fin, un fanion sans fin muterait la voix douce — voir `cutSpeaking`).
+     */
+    private fun speakUrgent(phrase: String) {
+        if (phrase.isBlank()) return
+        safety.speak(phrase)
+        lastPhrase = phrase
+        lastPhraseAtMs = nowMs()
+    }
+
+    /** Synthèse + lecture d'une phrase douce admise (mémorisée : dite une fois). */
+    private suspend fun speak(phrase: String, current: Settings) {
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
-        // L'urgence (stop) parle toujours : la sécurité passe avant la
-        // priorité du user et avant la porte « GPS désactivé ». (Le rebord
-        // imminent parle par la voix de sécurité, hors d'ici.)
         coroutineContext.ensureActive()
-        if (bytes.isNotEmpty() && (urgent || canPlay())) {
+        if (bytes.isNotEmpty() && canPlay()) {
             // Mémorisée au moment de parler seulement : un avalement transitoire
             // (chat, route, porte, synthèse) ne tait pas les réémissions.
             lastPhrase = phrase
@@ -221,32 +245,36 @@ class ProximityVoice(
     }
 
     /**
-     * Mot du guidage (`GuidanceWord`) : clip local quand le pack l'a (< 100
-     * ms, zéro réseau), sinon synthèse réseau mise en cache pour la suite.
-     * Directions douces redites en continu (ordre user du 31/10) : le même
-     * mot reparle à chaque émission, sauf le stop (unique, jamais répété).
-     * Mêmes garde-fous que [onPhrase] (clé exigée, urgent coupe) : seul ce
-     * qui a vraiment parlé est mémorisé — un mot avalé par un garde
-     * transitoire ne tait pas ses réémissions. [queue] : le mot doux tué
-     * part en file et se redit par [flushPending] (en synthèse, pas en
-     * clip : parlé lentement vaut mieux que perdu).
+     * Mot du guidage (`GuidanceWord`) : doux en clip local quand le pack l'a
+     * (< 100 ms, zéro réseau), sinon synthèse réseau mise en cache pour la
+     * suite. Directions douces redites en continu (ordre user du 31/10) : le
+     * même mot reparle à chaque émission ; le stop part en voix de sécurité
+     * ([speakUrgent], unique, jamais répété — ses clips sont l'héritage
+     * d'avant, l'urgent ne les joue plus). Mêmes garde-fous que [onPhrase]
+     * (clé exigée pour le doux) : seul ce qui a vraiment parlé est mémorisé
+     * — un mot avalé par un garde transitoire ne tait pas ses réémissions.
+     * [queue] : le mot doux tué part en file et se redit par [flushPending]
+     * (en synthèse, pas en clip : parlé lentement vaut mieux que perdu).
      */
     suspend fun speakWord(
         clipId: String,
         text: String,
         language: SpeechLanguage,
         playerIdle: Boolean,
-        urgent: Boolean = true,
+        urgent: Boolean = false,
         queue: Boolean = false,
     ) {
         if (text == lastPhrase && GuidanceWord.isStopPhrase(text)) return
+        if (urgent) {
+            speakUrgent(text)
+            return
+        }
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && !playerIdle) {
+        if (!playerIdle) {
             if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
             return
         }
-        if (urgent) player.stop()
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
             coroutineContext.ensureActive()
@@ -259,26 +287,13 @@ class ProximityVoice(
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text)
             .getOrElse { return }
         coroutineContext.ensureActive()
-        if (bytes.isNotEmpty() && (urgent || canPlay())) {
+        if (bytes.isNotEmpty() && canPlay()) {
             clips?.put(clipId, language, current.ttsVoiceId, bytes)
             lastPhrase = text
             lastPhraseAtMs = nowMs()
             onSpeaking(text)
             player.play(bytes).onFailure { onSpeaking("") }
         }
-    }
-
-    /**
-     * Stop d'urgence injecté par le modèle d'urgence externe (ordre user du
-     * 29/10, contrat `docs/URGENCE-EXTERNE.md`) : « Stop. » dit aussitôt, en
-     * clip local (< 100 ms) quand le pack l'a, coupe tout (chat compris).
-     * Dédupliqué comme le reste : un « Stop. » déjà dit ne se répète pas
-     * (le stop interne du guidage est supprimé depuis l'ordre user du
-     * 31/10 : jamais de stop pour un obstacle).
-     */
-    suspend fun reportEmergency(language: SpeechLanguage, playerIdle: Boolean) {
-        val stop = GuidanceWord.Stop
-        speakWord(stop.clipId, stop.text(language), language, playerIdle, urgent = true)
     }
 
     /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs]. */

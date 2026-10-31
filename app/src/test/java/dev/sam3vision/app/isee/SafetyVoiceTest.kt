@@ -15,14 +15,14 @@ import org.junit.Test
 
 /** Faux pilote : enregistre les appels, parole programmable. */
 private class FakeSafetyDriver(var speakingValue: Boolean = false) : TtsDriver {
-    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float)
+    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
 
     val calls = mutableListOf<Call>()
 
     override val speaking: Boolean get() = speakingValue
 
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
-        calls += Call(text, flush, locale, rate)
+    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
+        calls += Call(text, flush, locale, rate, pitch)
         return true
     }
 
@@ -33,7 +33,8 @@ private class FakeSafetyDriver(var speakingValue: Boolean = false) : TtsDriver {
 
 /**
  * Voix de sécurité : l'alerte coupe la lecture ElevenLabs et parle aussitôt
- * au TTS système — sans condition de silence, même quand l'app parlait déjà.
+ * au TTS système, en grave — sans condition de silence, même quand l'app
+ * parlait déjà.
  */
 class SafetyVoiceTest {
 
@@ -60,6 +61,7 @@ class SafetyVoiceTest {
         assertEquals("Stop, car moving.", driver.calls.single().text)
         assertTrue(driver.calls.single().flush)
         assertEquals(Locale.ENGLISH, driver.calls.single().locale)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls.single().pitch, 0f)
     }
 
     @Test
@@ -93,5 +95,18 @@ class SafetyVoiceTest {
         safety(driver, stops, SpeechLanguage.Fr).speak("Stop, voiture en mouvement.")
 
         assertEquals(Locale.FRENCH, driver.calls.single().locale)
+    }
+
+    @Test
+    fun `urgence externe dit Stop grave et coupe`() {
+        val driver = FakeSafetyDriver()
+        val stops = mutableListOf<Unit>()
+
+        safety(driver, stops, SpeechLanguage.Fr).reportEmergency(SpeechLanguage.Fr)
+
+        assertEquals(listOf(Unit), stops)
+        assertEquals("Stop.", driver.calls.single().text)
+        assertTrue(driver.calls.single().flush)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls.single().pitch, 0f)
     }
 }

@@ -16,9 +16,11 @@ interface TtsDriver {
     /**
      * Prononce [text] : [flush] vrai coupe la phrase en cours (`QUEUE_FLUSH`),
      * faux met en file derrière (`QUEUE_ADD`, jamais de chevauchement).
-     * [locale] et [rate] sont appliqués avant de parler. Renvoie faux si refusé.
+     * [locale], [rate] et [pitch] sont appliqués avant de parler ([pitch] 1 =
+     * voix normale, [SystemTtsEngine.SAFETY_PITCH] = voix de sécurité, grave).
+     * Renvoie faux si refusé.
      */
-    fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean
+    fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float = 1f): Boolean
 
     /** Coupe la parole (file vidée, moteur gardé). */
     fun stop()
@@ -56,13 +58,14 @@ class SystemTtsEngine(private val driver: TtsDriver) {
 
     /**
      * Prononce [text] : [urgent] coupe la phrase en cours, sinon mise en file.
+     * [pitch] grave ([SAFETY_PITCH]) = voix de sécurité, 1 = voix normale.
      * Faux si le texte est blanc, le moteur fermé, ou le pilote en échec.
      */
-    fun speak(text: String, urgent: Boolean, locale: Locale, rate: Float): Boolean {
+    fun speak(text: String, urgent: Boolean, locale: Locale, rate: Float, pitch: Float = 1f): Boolean {
         if (closed || text.isBlank()) return false
         val clean = text.trim()
         if (clean.isEmpty()) return false
-        return runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate)) }
+        return runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate), clampPitch(pitch)) }
             .getOrDefault(false)
     }
 
@@ -99,6 +102,16 @@ class SystemTtsEngine(private val driver: TtsDriver) {
             SpeechLanguage.Fr -> Locale.FRENCH
             SpeechLanguage.En -> Locale.ENGLISH
         }
+
+        /**
+         * Signature de la voix de sécurité : grave (0,75), distincte de la
+         * voix route (1,0, même moteur) comme de Laure (ElevenLabs) — une
+         * urgence ne sonne jamais comme une phrase normale (ordre user).
+         */
+        const val SAFETY_PITCH = 0.75f
+
+        /** Borne le pitch 0,5..2 (`TextToSpeech` exige > 0, 1 = normal). */
+        fun clampPitch(pitch: Float): Float = pitch.coerceIn(0.5f, 2f)
     }
 }
 
@@ -128,8 +141,8 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
 
     private val pending = ArrayDeque<Pending>()
 
-    /** Phrase en attente d'initialisation : texte, coupe, locale, débit. */
-    private data class Pending(val text: String, val flush: Boolean, val locale: Locale, val rate: Float)
+    /** Phrase en attente d'initialisation : texte, coupe, locale, débit, pitch. */
+    private data class Pending(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float)
 
     override fun onInit(status: Int) {
         val ok = status == TextToSpeech.SUCCESS
@@ -139,20 +152,20 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
             backlog = pending.toList()
             pending.clear()
         }
-        if (ok) backlog.forEach { utter(it.text, it.flush, it.locale, it.rate) }
+        if (ok) backlog.forEach { utter(it.text, it.flush, it.locale, it.rate, it.pitch) }
     }
 
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
+    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
         if (down || text.isBlank()) return false
         synchronized(lock) {
             if (!ready) {
                 if (flush) pending.clear()
                 if (pending.size >= PENDING_MAX) pending.removeFirst()
-                pending.add(Pending(text, flush, locale, rate))
+                pending.add(Pending(text, flush, locale, rate, pitch))
                 return true
             }
         }
-        return utter(text, flush, locale, rate)
+        return utter(text, flush, locale, rate, pitch)
     }
 
     override fun stop() {
@@ -170,11 +183,12 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
     override val speaking: Boolean
         get() = !down && runCatching { tts.isSpeaking }.getOrDefault(false)
 
-    /** Parole immédiate : langue + débit appliqués, puis file ou coupe. */
-    private fun utter(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean =
+    /** Parole immédiate : langue + débit + pitch appliqués, puis file ou coupe. */
+    private fun utter(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean =
         runCatching {
             runCatching { tts.language = locale }
             runCatching { tts.setSpeechRate(Settings.clampTtsSpeed(rate)) }
+            runCatching { tts.setPitch(SystemTtsEngine.clampPitch(pitch)) }
             val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             tts.speak(text, mode, Bundle(), UUID.randomUUID().toString()) == TextToSpeech.SUCCESS
         }.getOrDefault(false)

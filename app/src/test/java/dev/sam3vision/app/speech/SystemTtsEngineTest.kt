@@ -13,7 +13,7 @@ private class FakeDriver(
     var throwOnSpeak: Boolean = false,
     var throwOnSpeaking: Boolean = false,
 ) : TtsDriver {
-    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float)
+    data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
 
     val calls = mutableListOf<Call>()
     var stops = 0
@@ -23,9 +23,9 @@ private class FakeDriver(
     override val speaking: Boolean
         get() = if (throwOnSpeaking) throw IllegalStateException("pilote en panne") else speakingValue
 
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
+    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
         if (throwOnSpeak) throw IllegalStateException("pilote en panne")
-        calls += Call(text, flush, locale, rate)
+        calls += Call(text, flush, locale, rate, pitch)
         return !fail
     }
 
@@ -129,5 +129,24 @@ class SystemTtsEngineTest {
     fun `langue de la voix vers locale du moteur`() {
         assertEquals(Locale.FRENCH, SystemTtsEngine.localeOf(SpeechLanguage.Fr))
         assertEquals(Locale.ENGLISH, SystemTtsEngine.localeOf(SpeechLanguage.En))
+    }
+
+    @Test
+    fun `pitch transmis au pilote, normal par defaut`() {
+        val driver = FakeDriver()
+        val engine = SystemTtsEngine(driver)
+
+        engine.speak("Bordure à 0,5 mètre.", urgent = true, Locale.FRENCH, 1f, SystemTtsEngine.SAFETY_PITCH)
+        engine.speak("Tournez à gauche.", urgent = false, Locale.FRENCH, 1f)
+
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[0].pitch, 0f)
+        assertEquals(1f, driver.calls[1].pitch, 0f)
+    }
+
+    @Test
+    fun `pitch borne 0_5_2`() {
+        assertEquals(0.5f, SystemTtsEngine.clampPitch(0f), 0f)
+        assertEquals(2f, SystemTtsEngine.clampPitch(9.9f), 0f)
+        assertEquals(0.75f, SystemTtsEngine.clampPitch(SystemTtsEngine.SAFETY_PITCH), 0f)
     }
 }

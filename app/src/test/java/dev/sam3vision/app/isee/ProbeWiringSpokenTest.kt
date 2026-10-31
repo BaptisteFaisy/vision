@@ -69,6 +69,7 @@ class ProbeWiringSpokenTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            safety = testSafetyVoice(),
             synthesize = { _, _, text ->
                 attempts += text
                 gate.await()
@@ -95,6 +96,7 @@ class ProbeWiringSpokenTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            safety = testSafetyVoice(),
             synthesize = { _, _, text ->
                 attempts += text
                 gate.await()
@@ -131,6 +133,7 @@ class ProbeWiringSpokenTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            safety = testSafetyVoice(),
             onSpeaking = { if (it.isNotEmpty()) spoken += it },
             synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
         )
@@ -150,6 +153,7 @@ class ProbeWiringSpokenTest {
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            safety = testSafetyVoice(),
             onSpeaking = { if (it.isNotEmpty()) spoken += it },
             synthesize = { _, _, text ->
                 attempts += text
