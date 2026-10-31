@@ -119,6 +119,11 @@ class TraverseWiring(
         if (active) updateLight(crossingLightOf(frame, jpegB64, onCrop = cropLogger?.tap()))
         // Fond V1 : la luminance courante part au pipeline, qui la paire au prev et
         // appelle decide() — verdict log-only (voir logBackground).
+        // FUSION P4 (câblage gyro reporté) : le hook existe (VehicleBackground.decide(gyro = …),
+        // repli seul quand le fond visuel est inutilisable — recette : GyroSource (lifecycle du mode,
+        // start sur thread main) → deltaBetween(prevAtMs, atMs) → GyroCompensation.expectedShift(delta,
+        // focale luma LensSpec.focalPx) → GyroHint → pipeline → veto → decide. Prérequis : signes
+        // YAW/PITCH validés sur téléphone (pan gauche, tilt haut) avant tout usage décisionnel.
         val background = if (active) backgroundOf(jpegB64) else null
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language, background)
         CalibrationSnapshots.note(out.detections, width, height, atMs)
