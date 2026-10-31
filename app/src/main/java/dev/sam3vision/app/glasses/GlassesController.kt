@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
-import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.session.DeviceSessionState
 import com.meta.wearable.dat.core.types.DeviceSessionError
@@ -14,7 +13,6 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationError
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
-import com.meta.wearable.dat.inputs.types.CapturePressType
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
 import dev.sam3vision.app.speechClient
@@ -34,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 /** WAV des dictées prises avec le micro des lunettes, sous `filesDir`. */
 private const val AUDIO_DIR = "glasses-audio"
@@ -85,7 +84,7 @@ class GlassesController(
 
     // Implémentation (Mock Device Kit) en `app/src/debug/` : la dépendance n'est pas
     // embarquée dans l'APK de release, d'où la fabrique réflexive [mockDevice].
-    private val mocks = GlassesMockControls(scope, clock, mockDevice(context), _state, ::note, ::initialize, ::connect)
+    internal val mocks = GlassesMockControls(scope, clock, mockDevice(context), _state, ::note, ::initialize, ::connect)
 
     /** Signaux sonores dans les lunettes (l'écran du téléphone est en poche). */
     private val beeps = GlassesTalkBeeps()
@@ -114,6 +113,23 @@ class GlassesController(
 
     /** Écoute auto : armée à l'attache caméra, tirée au premier flux montant. */
     private val autoListen = GlassesAutoListen(talkHost::autoListen)
+
+    /** Ouverture de session : attente du lien, création, un seul rejou (fichier dédié). */
+    private val opener = GlassesSessionOpener(
+        scope = scope,
+        clock = clock,
+        snapshot = { _state.value },
+        idle = {
+            _state.update { it.copy(phase = SessionPhase.IDLE) }
+            voiceInvocations.disarm()
+        },
+        note = ::note,
+        report = { error -> reportSessionError(error, activity, ::note) },
+        onCreated = { created -> startSession(created) },
+    )
+
+    /** Attache caméra/bouton : un seul attachement à la fois. */
+    private val attachMutex = Mutex()
     private var session: DeviceSession? = null
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
@@ -240,6 +256,10 @@ class GlassesController(
 
     fun connect() {
         initialize()
+        // Une seule ouverture à la fois : un doublon faisait répondre `UNEXPECTED_ERROR`.
+        if (_state.value.phase == SessionPhase.STARTING) {
+            return note(GlassesMessages.sessionAlreadyRunning())
+        }
         // Une session terminée (paire retirée, Bluetooth perdu) ne tient pas lieu de session :
         // sans cet oubli, le bouton restait grisé et l'utilisateur n'avait plus aucune prise.
         if (session != null && !_state.value.phase.allowsConnect()) {
@@ -247,38 +267,15 @@ class GlassesController(
         }
         dropSession()
         _state.update { it.copy(phase = SessionPhase.STARTING) }
-        scope.launch { openSession() }
-    }
-
-    /**
-     * `createSession` refuse une paire pas encore `CONNECTED` — le « Aucune paire éligible »
-     * affiché sur des lunettes pourtant appairées : on attend le lien ([GlassesLinkGate]).
-     */
-    private suspend fun openSession() {
-        // Paire simulée : aucun lien Bluetooth à attendre.
-        val linked = _state.value.mockActive || awaitLinkedDevice(clock) {
-            note(GlassesMessages.waitingForLink())
-        }
-        if (!linked) {
-            _state.update { it.copy(phase = SessionPhase.IDLE) }
-            voiceInvocations.disarm()
-            return note(GlassesMessages.noLinkedDevice())
-        }
-        Wearables.createSession(AutoDeviceSelector()).fold(
-            onSuccess = { created ->
-                Log.i(TAG, "session créée, démarrage")
-                startSession(created)
-            },
-            onFailure = { error, _ ->
-                Log.w(TAG, "session refusée : ${error.description}")
-                _state.update { it.copy(phase = SessionPhase.IDLE) }
-                voiceInvocations.disarm()
-                reportSessionError(error, activity, ::note)
-            },
-        )
+        opener.open()
     }
 
     private fun startSession(created: DeviceSession) {
+        if (_state.value.phase != SessionPhase.STARTING) {
+            // Arrêt demandé pendant la création : la session SDK ne démarre pas.
+            runCatching { created.stop() }
+            return
+        }
         session = created
         // Les deux collecteurs meurent avec la session, sinon une session passée
         // réécrit l'état de la nouvelle (et chaque reconnexion en laissait deux de plus).
@@ -311,6 +308,18 @@ class GlassesController(
     }
 
     private suspend fun attachCapabilities(created: DeviceSession) {
+        if (!attachMutex.tryLock()) {
+            Log.i(TAG, "attache déjà en cours, doublon ignoré")
+            return
+        }
+        try {
+            attachLocked(created)
+        } finally {
+            attachMutex.unlock()
+        }
+    }
+
+    private suspend fun attachLocked(created: DeviceSession) {
         if (camera != null) return
         if (!ensureCameraPermission()) return
         val micAllowed = ensureMicPermission()
@@ -363,6 +372,13 @@ class GlassesController(
 
     private suspend fun ensureCameraPermission(): Boolean {
         val status = Wearables.checkPermissionStatus(Permission.CAMERA).getOrNull()
+        if (status == null) {
+            // Lecture impossible (lien instable) : on garde l'état connu au lieu de révoquer
+            // à tort — un vrai refus se dira à l'attache (`CAPABILITY_DENIED`).
+            Log.w(TAG, "permission caméra illisible, état gardé")
+            if (!_state.value.cameraAllowed) note(GlassesMessages.cameraPermissionMissing())
+            return _state.value.cameraAllowed
+        }
         val granted = status is PermissionStatus.Granted
         _state.update { it.copy(cameraAllowed = granted) }
         if (!granted) {
@@ -374,6 +390,13 @@ class GlassesController(
     /** Micro côté app Meta AI : refusé, la session continue mais sans piste audio. */
     private suspend fun ensureMicPermission(): Boolean {
         val status = Wearables.checkPermissionStatus(Permission.MICROPHONE).getOrNull()
+        if (status == null) {
+            // Lecture impossible (lien instable) : on garde l'état connu au lieu de révoquer
+            // à tort — un vrai refus se dira à l'attache (palier audio).
+            Log.w(TAG, "permission micro illisible, état gardé")
+            if (!_state.value.micAllowed) note(GlassesMessages.micPermissionMissing())
+            return _state.value.micAllowed
+        }
         val granted = status is PermissionStatus.Granted
         _state.update { it.copy(micAllowed = granted) }
         if (!granted) note(GlassesMessages.micPermissionMissing())
@@ -428,10 +451,12 @@ class GlassesController(
     }
 
     fun disconnect() {
+        // L'arrêt d'abord : une ouverture en cours s'interrompt au lieu d'aboutir.
+        opener.cancel()
+        _state.update { it.copy(phase = SessionPhase.IDLE, streaming = false) }
         releaseCapabilities()
         session?.stop()
         dropSession()
-        _state.update { it.copy(phase = SessionPhase.IDLE, streaming = false) }
     }
 
     private fun releaseCapabilities() {
@@ -450,32 +475,9 @@ class GlassesController(
         _state.update { it.copy(streaming = false, micActive = false, recordingName = null, talkListening = false) }
     }
 
-    /** Lunettes simulées : démo sans matériel, et plan B si l'appairage coince. */
-    fun startMockDevice() = mocks.start()
-
-    fun mockPress(type: CapturePressType = CapturePressType.SHORT_PRESS) = mocks.press(type)
-
-    /** Recette mains-libres : simule l'appui long (parler) sur le mock. */
-    fun mockHold() = mocks.press(CapturePressType.HOLD)
-
-    /** Recette mains-libres : simule « Hey Meta, ouvre iSee » sur le mock. */
-    fun mockVoiceLaunch() {
-        // Injection côté appareil quand le mock la supporte, sinon simulation
-        // côté app (même aval : session puis écoute).
-        if (!mocks.tryVoiceLaunch()) onVoiceLaunch()
-    }
-
-    fun stopMockDevice() = mocks.stop()
-
-    /**
-     * Raccourci de recette : lunettes simulées, puis connexion dès que l'enregistrement le
-     * permet (extra adb [EXTRA_GLASSES_MOCK_CONNECT]). Inerte en release — le mock y est
-     * indisponible (`mockUnavailable`) et rien ne se connecte tout seul.
-     */
-    fun debugMockConnect() = mocks.debugConnect()
-
     /** Libère session, capacités et coroutines (activité détruite). */
     fun close() {
+        opener.cancel()
         releaseCapabilities()
         session?.stop()
         dropSession()

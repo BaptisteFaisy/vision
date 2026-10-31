@@ -28,6 +28,7 @@ import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
 import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
 import dev.sam3vision.app.glasses.bench.SpikeLaunch
+import dev.sam3vision.app.glasses.debugMockConnect
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.locked.LockedMicBridge
 import dev.sam3vision.app.perms.canAskBackground
@@ -243,7 +244,10 @@ class MainActivity : ComponentActivity() {
         // carte A100 reste facturée jusqu'à sa fenêtre de réduintage.
         if (isFinishing) viewModel.releaseGpu()
         if (!isChangingConfigurations) isee.onAppClosed()
-        if (isFinishing) glasses.close()
+        // Rotation comprise : sans ça, l'ancien contrôleur (et sa session SDK) survivait
+        // en fantôme et la session suivante butait dessus (`SESSION_ALREADY_EXISTS`,
+        // `UNEXPECTED_ERROR`). La session tombe à la rotation, puis se rouvre proprement.
+        if (isFinishing || isChangingConfigurations) glasses.close()
         // App fermée pour de bon : le service du micro verrouillé n'a plus de raison de vivre.
         if (isFinishing) LockedMicBridge.disarm(this)
         super.onDestroy()

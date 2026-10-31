@@ -169,6 +169,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `GyroCompensationTest`, `VehicleBackgroundTest`, `VerdictFusionTest` ;
   `VehicleState` 503→499 lignes (`isVehicleGrowth` extrait).
 
+## 2026-10-31 — iSee : fin de l'« unexpected SDK error » impromptu à l'ouverture de session (branche `fix/isee-session-unexpected-error`)
+
+- **Demande** : « unexpected SDK error: restart the session, then the app » à
+  l'ouverture d'une session, et autorisations caméra/micro à refaire sans réinstaller.
+- Causes trouvées (lecture du code + signatures SDK au `javap`) : ouvertures de
+  session en doublon (bouton + voix, bascule rapide, arrêt pendant l'attente du
+  lien) ; réouverture pendant `STOPPING` ; attachements concurrents ; relecture
+  de permission ratée prise pour un refus ; session fantôme après rotation.
+- Fait : une seule ouverture à la fois (`GlassesSessionOpener`, portes de phase,
+  `disconnect`/`close` annulent l'ouverture) ; un seul attachement (mutex) ;
+  `STOPPING` affiché « en cours » ; un seul rejou sur `UNEXPECTED_ERROR` et
+  `SESSION_ALREADY_EXISTS` (`SessionRetry`) ; relecture ratée = état gardé ;
+  session fermée à la rotation ; collecteur d'appuis annulé à l'arrêt ;
+  `registered` relu à l'arrêt du mock ; délégués mock sortis du contrôleur.
+- Preuves : `:app:testDebugUnitTest` ciblé — 47/47 (Retry 3/3 nouveau, Mapping
+  3/3, Permission 6/6, Toggle 4/4, Talk 14/14, TalkPolicy 8/8, AutoListen 5/5,
+  GlassesOrder 4/4 ; rapports XML du 31/10) ; `check-kotlin-limits.py` vert.
+
 ## 2026-10-31 — CI : un lot de la file ne peut plus être éjecté par un `ci` en échec fantôme (branche `ci/fix-doublon-check-file`)
 
 - **Symptôme** : #634 (16:30) et #637 (16:36) sortaient de la file Mergify avec

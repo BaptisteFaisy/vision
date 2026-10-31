@@ -35,6 +35,7 @@ internal class GlassesInputs(
     private val gesture = CaptureGestureBuffer()
     private var attached = false
     private var pump: Job? = null
+    private var listenJob: Job? = null
 
     fun start(): Boolean {
         if (attached) return true
@@ -55,7 +56,8 @@ internal class GlassesInputs(
     }
 
     private fun listen(inputs: Inputs) {
-        scope.launch {
+        listenJob?.cancel()
+        listenJob = scope.launch {
             inputs.events.collect { event -> handle(event) }
         }
     }
@@ -78,6 +80,8 @@ internal class GlassesInputs(
     fun stop() {
         pump?.cancel()
         pump = null
+        listenJob?.cancel()
+        listenJob = null
         if (attached) session.removeInputs()
         attached = false
         gesture.reset()

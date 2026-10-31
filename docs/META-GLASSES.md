@@ -120,9 +120,10 @@ AAC sorte bien de `MediaMuxer` sur ce téléphone. À constater au premier enreg
 | `STARTING` | `STARTING` | bouton « Session en cours de démarrage… » |
 | `STARTED` | `STARTED` | caméra + bouton capture attachés |
 | `PAUSED` | `STARTING` | reste « en cours » : une pause reprend, on ne propose pas de redémarrer |
-| `STOPPING`, `STOPPED` | `STOPPED` | capacités libérées (`releaseCapabilities`, `:249`) |
+| `STOPPING` | `STARTING` | arrêt en cours : pas de redémarrage avant la retombée (rouvrir entre-temps faisait répondre `UNEXPECTED_ERROR` au SDK) |
+| `STOPPED` | `STOPPED` | capacités libérées (`releaseCapabilities`) |
 
-Mapping : `GlassesController.kt:293` (`toPhase`), testé en JVM.
+Mapping : `GlassesState.kt` (`toPhase`), testé en JVM (`GlassesPhaseMappingTest`).
 
 Règles de cycle de vie, toutes dans `GlassesController` :
 
@@ -137,8 +138,17 @@ Règles de cycle de vie, toutes dans `GlassesController` :
 - Les deux collecteurs d'une session (`state`, `errors`) sont liés à **cette** session
   (`:168-180`) et annulés avec elle : une session passée ne peut plus réécrire l'état de la
   nouvelle (`if (created !== session) return`, `:190`).
-- `disconnect()` (`:242`) libère les capacités, arrête puis oublie la session, et remet la
-  phase à `IDLE`. `close()` (`:277`) fait la même chose et annule le scope.
+- Une seule **ouverture** à la fois (`GlassesSessionOpener`) : un doublon (bouton + voix,
+  bascule rapide) faisait répondre `UNEXPECTED_ERROR` au SDK. Chaque étape revérifie la
+  phase : un arrêt demandé pendant l'attente du lien ou la création n'ouvre pas de
+  session impromptue, et `disconnect()`/`close()` annule l'ouverture en cours.
+- Un refus de création transitoire (`UNEXPECTED_ERROR`, `SESSION_ALREADY_EXISTS`) se
+  rejoue **une fois** (`SessionRetry`, testé en JVM) ; l'échec suivant se dit comme avant.
+- Un seul **attachement** à la fois (mutex) : `STARTED` répété et autorisation caméra
+  accordée entre-temps ne doublent plus l'attache.
+- `disconnect()` annule l'ouverture en cours, repasse à `IDLE` d'abord (les portes
+  s'interrompent au lieu d'ouvrir après coup), puis libère les capacités, arrête et
+  oublie la session. `close()` fait la même chose et annule le scope.
 - **Pas de garde-fou de durée** : si le SDK n'émet ni `STARTED` ni `STOPPED` après `start()`,
   la phase reste `STARTING` indéfiniment. Aucun délai n'a été ajouté (ce serait une règle
   non vérifiable sans matériel) — c'est un point ouvert, §12.
@@ -162,6 +172,10 @@ Le refus de caméra côté Meta AI **n'est pas silencieux** : il produit
 « Caméra non autorisée : app Meta AI → App connections → SAM Vision → Always allow. »
 (`GlassesMessages.cameraPermissionMissing`, `GlassesPolicy.kt:55`) et le libellé photo
 l'explique à l'écran (`photoHint`, `GlassesPolicy.kt:131`).
+
+Une relecture de permission qui échoue (lien instable) garde l'état connu au lieu de
+révoquer à tort : un vrai refus se dit à l'attache (`CAPABILITY_DENIED`), pas sur une
+lecture ratée.
 
 ## 5. Flux d'images : 15 i/s, photo à la demande
 
