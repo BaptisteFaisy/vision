@@ -110,9 +110,10 @@ internal fun crossingLightOf(frame: LiveFrame, jpegB64: String): CrossingLight {
 
 /**
  * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
- * ([cue], `null` = rester muet), l'état affiché et la boîte à marquer sur la
- * vidéo. Un seul aller-retour, pour que l'étiquette ne désigne jamais un autre
- * feu que celui qui vient d'être annoncé.
+ * ([cue], `null` = rester muet), l'état confirmé affiché (dernier annoncé,
+ * rouge par défaut) et la boîte lue sur la frame. Un seul aller-retour,
+ * pour que l'étiquette ne désigne jamais un autre feu que celui qui vient
+ * d'être annoncé.
  */
 internal data class CrossingPatch(
     val cue: CrossingCue?,
@@ -141,12 +142,20 @@ internal fun crossingPatchOf(
     val focalPx = lens.focalPx(frame.width, frame.height)
     val decision = veto.update(light.state == CrossingState.Green, detections, focalPx, atMs)
     val vetoed = decision.crossingState()
-    return CrossingPatch(announcer.onFrame(atMs, vetoed, language), light.state, light.box, decision.state)
+    val cue = announcer.onFrame(atMs, vetoed, language)
+    // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
+    // publié est le dernier annoncé (rouge tant que rien n'est annoncé), jamais
+    // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
+    // sent (ordre user du 31/10, certitude rouge/vert).
+    val confirmed = announcer.lastCue?.state ?: CrossingState.Red
+    return CrossingPatch(cue, confirmed, light.box, decision.state)
 }
 
 /**
- * Chaque nouvel état du feu fait vibrer le téléphone (vert = double salve,
- * rouge = créneau long), en plus de la voix déjà câblée par `observeSpoken`.
+ * Chaque nouvel état **confirmé** du feu fait vibrer le téléphone (vert =
+ * double salve, rouge = créneau long), en plus de la voix déjà câblée par
+ * `observeSpoken` — l'état publié étant le dernier annoncé, un glitch
+ * d'une frame ne vibre jamais.
  */
 internal fun LiveProbe.observeCrossing(scope: CoroutineScope, haptics: IseeHaptics) {
     var last: CrossingState? = null
