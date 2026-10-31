@@ -325,43 +325,6 @@ internal fun LiveProbe.observeFenceOpening(
 }
 
 /**
-/**
- * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
- * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
- * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
- * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
- * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
- * parlent doux (seul l'`urgent` du danger qui s'approche coupe).
- * En Traversée, le veto seul parle (coupé ici) — les états moteurs se disent
- * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
- * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
- * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * Frames SAM seules (`frames`) et détections brutes (le ticker 120 ms rejoue des lectures figées qui casseraient la confirmation).
- */
-internal fun LiveProbe.observeVehicleState(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
-    watcher: VehicleStateWatcher = VehicleStateWatcher(),
-): VehicleStateWatcher {
-    var lastFrames = -1
-    scope.launch {
-        state.collect { st ->
-            if (st.frames == lastFrames) return@collect
-            lastFrames = st.frames
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings.orEmpty()
-            if (st.samDetections.isEmpty() && readings.isEmpty()) return@collect
-            val motion = ProbeBackgroundMotion.lastMotion
-            val cue = watcher.update(st.samDetections, readings, System.currentTimeMillis(), language(), motion)
-                ?: return@collect
-            logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
-        }
-    }
-    return watcher
-}
  * Guetteur cycles de la sonde, miroir des véhicules : vélos et trottinettes,
  * en mouvement ou arrêtés (« Attention, vélo en mouvement, à 2 heures. »),
  * lus dans l'état, sans toucher à `LiveProbe`. Doux et coupé en Traversée,
