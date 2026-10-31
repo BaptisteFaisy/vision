@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : escaliers jalonnés à 4 / 2 / 1 m (branche `feat/escaliers-jalons`)
+
+- **Ordre user** : quand iSee détecte un escalier, le dire à 4 m, 2 m et 1 m.
+- **Fait (§ 28)** : compte à rebours d'approche `StairWatcher` (miroir §24
+  bordure) — détection puis « Escalier montant à 4 mètres. » / « à 2
+  mètres. » / « à 1 mètre. » (FR/EN, sens gardé, distance entière via
+  `DistanceText.spokenShort`) ; un palier ne parle que traversé
+  (l'entrée directe reste standard sans distance, verrou dernière-marche
+  gardé) ; hystérésis +0,2 m, survol sauté, signal perdu ré-armé,
+  doux partout ; câblage sonde inchangé.
+- **Preuve** : `:core:testDebugUnitTest` 2 692 + `:app:testDebugUnitTest`
+  1 558 verts sur r630 (0 échec, 0 sauté, dont 9 `StairWatcherTest`
+  nouveaux, rouge-avant/vert-après constaté) ; `check-kotlin-limits.py`
+  OK (453 + 238 lignes) ; UBS : 0 finding (pas de scanner Kotlin).
+
 ## 2026-10-31 — iSee : sans feu, une garée ne bloque jamais (branche `isee-no-light-ego`)
 
 - **Ordre user** : seule une voiture en mouvement dit « Attendez. » — une

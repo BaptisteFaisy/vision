@@ -994,3 +994,37 @@ mesure → « Droite. » ; approche gauche + personne à droite (même non
 mesurée) → silence, pas de « Droite. » ; retour trottoir vers une
 personne proche → le cap au lieu du retour — **non mesuré**, exige un
 APK de cette branche sur appareil réel.
+## 28. Escaliers jalonnés à 4 / 2 / 1 m (ordre user du 31/10)
+
+Le user veut entendre l'escalier à 4 m, 2 m et 1 m en s'approchant.
+Nouveau contrat, miroir du §24 bordure (détection puis compte à rebours) :
+
+- **phrases** (`StairText`, FR/EN) : détection inchangée (« Escalier
+  montant, à 11 heures. ») ; jalons « Escalier montant à 4 mètres. » /
+  « à 2 mètres. » / « à 1 mètre. » (`Stairs up at 4 meters.` / `2
+  meters` / `1 meter`) — le sens (montant/descendant/devant) est gardé,
+  la distance entière (`DistanceText.spokenShort`) remplace le cadran,
+  sans heure (miroir §5 positions) ;
+- **paliers** (`StairWatcher`) : chaque palier dit une fois par approche
+  dès N frames sous le seuil (N = confirmation du watcher, 2 voix
+  sonde), **sans** cooldown entre paliers (l'approche à pied les
+  enchaîne) ; hystérésis +0,2 m par palier (recul au-delà = le palier
+  reparle, prior à valider rue comme le §24) ; palier survolé entre
+  deux frames = sauté sans rattrapage (jamais de distance périmée) ;
+  signal perdu = détection et paliers ré-armés ;
+- **traversée seule** (différence bordure) : un palier ne parle que
+  traversé (vu d'au-delà d'abord) — l'entrée directe (caméra allumée en
+  haut des marches) parle standard sans distance puis « Dernière
+  marche. » (verrou `StairLastStepGateTest` gardé) ;
+- **montée gardée** : le jalon ouvre la montée comme la détection (le
+  compte à rebours puis la dernière marche suivent) ; doux partout
+  (`urgent = false`, §11) ; câblage sonde inchangé (`ProbeStairs` passe
+  déjà la profondeur).
+
+Verrouillé par `StairWatcherTest` (+9 : détection puis jalon 4 m,
+compte à rebours 4/2/1, entrée directe, palier survolé, hystérésis
+des deux côtés, signal perdu, reset, phrases FR/EN).
+
+Recette téléphone : approche réelle d'un escalier → « Escalier
+montant. », « … à 4 mètres. », « … à 2 mètres. », « … à 1 mètre. » —
+**non mesurée**, exige une sortie rue.
