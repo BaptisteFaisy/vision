@@ -4,6 +4,19 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Distances : intrinsèques du téléphone mesurées et verrouillées
+
+- **Demande** : étudier la caméra du téléphone pour exploiter ses caractéristiques réelles.
+- Dump `dumpsys media.camera` (caméra 0, Redmi Note 13 Pro) : focale 6,14 mm,
+  tableau 9,1392×6,8544 mm / 4080×3060, H 73,32° · V 58,34°, distorsion nulle
+  (HAL), centre optique exact — recoupé avec les specs HP3 publiées (< 1 %).
+- Conclusions : la chaîne live n'a pas d'erreur de focale (elle lit le driver) ;
+  le repli 67° ne sert que driver muet ; pas de recadrage EIS ; frame analysée
+  homothétique (grand côté 512).
+- Preuves : `OpticsTest` +1 (angles 73,32/58,34 + `f_px` 2741,07/343,98) ;
+  section « Téléphone cible » dans `docs/DISTANCES.md`.
+
+
 ## 2026-10-31 — Feux : purge des restes « doute » (docs + KDoc)
 
 - **Fait** : `TRAVERSEE.md` §§1–4, 7–8 alignés sur le binaire
