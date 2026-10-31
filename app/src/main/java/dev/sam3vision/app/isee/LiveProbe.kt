@@ -482,8 +482,7 @@ _state.update { it.cleared() }
     fun noteDrawn() {
         if (!chronology.noteDrawn()) return
         val snap = chronology.snapshot(_state.value.timings)
-        _state.update { current -> current.copy(timings = snap) }
-        LiveLatencyLog.frame(snap)
+        _state.update { current -> current.copy(timings = snap) }.also { LiveLatencyLog.frame(snap) }
     }
 
     /**
