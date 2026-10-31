@@ -50,6 +50,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             asrApiKey = prefs.getString(KEY_ASR_API_KEY, default.asrApiKey).orEmpty(),
             asrModel = prefs.getString(KEY_ASR_MODEL, default.asrModel).orEmpty()
                 .ifBlank { default.asrModel },
+            scribeRealtime = prefs.getBoolean(KEY_SCRIBE_REALTIME, default.scribeRealtime),
             liveLlmApiKey = prefs.getString(KEY_LIVE_LLM_API_KEY, default.liveLlmApiKey).orEmpty(),
             introEnabled = prefs.getBoolean(KEY_INTRO_ENABLED, default.introEnabled),
             introPlayed = prefs.getBoolean(KEY_INTRO_PLAYED, default.introPlayed),
@@ -96,6 +97,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putString(KEY_ASR_BASE_URL, s.asrBaseUrl)
             .putString(KEY_ASR_API_KEY, s.asrApiKey)
             .putString(KEY_ASR_MODEL, s.asrModel)
+            .putBoolean(KEY_SCRIBE_REALTIME, s.scribeRealtime)
             .putString(KEY_LIVE_LLM_API_KEY, s.liveLlmApiKey)
             .putBoolean(KEY_INTRO_ENABLED, s.introEnabled)
             .putBoolean(KEY_INTRO_PLAYED, s.introPlayed)
@@ -140,6 +142,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_ASR_BASE_URL = "asr_base_url"
         const val KEY_ASR_API_KEY = "asr_api_key"
         const val KEY_ASR_MODEL = "asr_model"
+        const val KEY_SCRIBE_REALTIME = "scribe_realtime"
         const val KEY_LIVE_LLM_API_KEY = "live_llm_api_key"
         const val KEY_INTRO_ENABLED = "intro_enabled"
         const val KEY_INTRO_PLAYED = "intro_played"

@@ -38,4 +38,27 @@ class SettingsAsrTest {
         assertFalse(relu.asrConfigured)
         assertTrue("le repli ElevenLabs suffit pour dicter", relu.sttConfigured)
     }
+
+    @Test
+    fun `codec conserve le drapeau temps réel`() {
+        val settings = Settings.Default.copy(ttsApiKey = "sk-tts", scribeRealtime = false)
+
+        val relu = SettingsCodec.decode(SettingsCodec.encode(settings))
+
+        assertFalse(relu.scribeRealtime)
+        assertFalse("drapeau coupé : pas de stream", relu.scribeRealtimeReady)
+        assertTrue("le batch reste configuré", relu.sttConfigured)
+    }
+
+    @Test
+    fun `ancien fichier sans drapeau stream par défaut avec une clé`() {
+        val legacy = "llmBaseUrl=x\nllmApiKey=y\nllmModel=m\nsamBaseUrl=\n" +
+            "ttsApiKey=sk-tts\nttsVoiceId=v\n"
+
+        val relu = SettingsCodec.decode(legacy)
+
+        assertTrue(relu.scribeRealtime)
+        assertTrue(relu.scribeRealtimeReady)
+        assertFalse(Settings.Default.scribeRealtimeReady)
+    }
 }
