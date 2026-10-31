@@ -1,9 +1,11 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.app.live.CalibrationSnap
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -176,5 +178,27 @@ class DistanceLayoutTest {
         assertEquals("≈ 3.2 m", labelText(lecture, withLabel = false))
         assertEquals("personne ≈ 3.2 m", labelText(lecture, withLabel = true))
         assertEquals("objet ≈ 3.2 m", labelText(lecture.copy(label = "   "), withLabel = true))
+    }
+
+    @Test
+    fun `saisie etalonnage tolere la virgule, refuse hors bornes sans clamper`() {
+        assertEquals(1.78f, parseCalibrationMeters("1,78", 0.5f, 2.5f)!!, 0.001f)
+        assertEquals(2f, parseCalibrationMeters(" 2.00 ", 0.5f, 10f)!!, 0.001f)
+        assertNull(parseCalibrationMeters("", 0.5f, 2.5f))
+        assertNull(parseCalibrationMeters("n'importe quoi", 0.5f, 2.5f))
+        assertNull(parseCalibrationMeters("5", 0.5f, 2.5f))
+        assertNull(parseCalibrationMeters("0,2", 0.5f, 2.5f))
+    }
+
+    @Test
+    fun `resolution refuse visee perimee ou saisie fausse`() {
+        val now = System.currentTimeMillis()
+        val fresh = CalibrationSnap(344.2f, 512, now)
+        val solved = calibrationResult("1,78", "2.00", fresh)!!
+        assertEquals(67f, solved.fovDeg, 0.1f)
+        assertNull(calibrationResult("1,78", "2.00", null))
+        assertNull(calibrationResult("1,78", "2.00", fresh.copy(atMs = now - 600_000L)))
+        assertNull(calibrationResult("5", "2.00", fresh))
+        assertNull(calibrationResult("1,78", "", fresh))
     }
 }

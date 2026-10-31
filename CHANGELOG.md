@@ -4,6 +4,20 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Distances : étalonnage guidé du champ de vision
+
+- **Demande** : encore plus précis — annuler le biais systématique de focale.
+- Fait (solveur + visée + UI) : `CalibrationSolver` (focale depuis taille et
+  distance connues, refus < 20 px / hors bornes, tolérance ±(1 px + 0,5 %)) ;
+  `CalibrationSnapshots` (plus grande personne du direct, score ≥ 0,5, entière) ;
+  section Réglages (visée, taille, distance ruban, résolution, effacement) ;
+  valeur mesurée dans `cameraFovDeg` (prioritaire), témoin `CalibrationStore`.
+- Preuves : `CalibrationSolverTest` 3, `CalibrationSnapshotsTest` 3,
+  `DistanceLayoutTest` +2 (saisie, résolution) ; garde Kotlin verte.
+- Protocole : aidant à distance ruban (2 m conseillés) + taille exacte →
+  « Calibrate from last sighting » → ±0,5° à 340 px ; « Clear » revient au capteur.
+
+
 ## 2026-10-31 — iSee : cap droit contourne toujours, jamais stop (branche `isee-droit-sans-stop`)
 
 - **Demande** : couloir bouché = toujours un côté de contournement, jamais
