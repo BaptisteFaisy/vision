@@ -61,7 +61,7 @@ import org.maplibre.android.maps.Style
  *
  * Sans scintillement : le fond statique (tracé, pastilles) n'est redessiné
  * que quand il change ; à chaque tick, seule la position est rafraîchie et
- * la caméra ne bouge que si la cible a vraiment bougé (10 m) ou si le zoom
+ * la caméra ne bouge que si la cible a vraiment bougé (2 m) ou si le zoom
  * change — sinon le doigt de l'utilisateur serait arraché à chaque seconde.
  */
 @Composable
@@ -108,6 +108,13 @@ fun GuidanceMapView(
                     applyGuideState(target, view, prev, state, marks, pins)
                 }
             },
+            // Sortie d'écran : la MapView est détruite (sans ça, la GL
+            // fuyait et les guidages suivants affichaient une carte figée).
+            onRelease = { view ->
+                runCatching { view.onPause() }
+                runCatching { view.onStop() }
+                runCatching { view.onDestroy() }
+            },
             modifier = Modifier.fillMaxSize(),
         )
         if (showAttribution) GuideAttribution(Modifier.align(Alignment.BottomStart))
@@ -124,18 +131,25 @@ private fun rememberGuideMapView(): MapView {
     }
 }
 
-/** Relaye le cycle Compose vers la MapView (surfaces libérées à la sortie). */
+/**
+ * Relaye le cycle Compose vers la MapView (surfaces libérées à la sortie).
+ * Rattrapage à l'attache : la carte composée alors que le cycle est déjà
+ * démarré ne recevrait jamais `ON_START`/`ON_RESUME` (pas de rejeu) et
+ * resterait noire — la vue est donc amenée à l'état courant aussitôt.
+ */
 @Composable
 private fun GuideMapLifecycle(mapView: MapView) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, mapView) {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) runCatching { mapView.onStart() }
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) runCatching { mapView.onResume() }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                Lifecycle.Event.ON_START -> runCatching { mapView.onStart() }
+                Lifecycle.Event.ON_RESUME -> runCatching { mapView.onResume() }
+                Lifecycle.Event.ON_PAUSE -> runCatching { mapView.onPause() }
+                Lifecycle.Event.ON_STOP -> runCatching { mapView.onStop() }
+                Lifecycle.Event.ON_DESTROY -> runCatching { mapView.onDestroy() }
                 else -> {}
             }
         }
@@ -163,7 +177,7 @@ private fun GuideAttribution(modifier: Modifier = Modifier) {
 private class GuideMarks(var position: Marker? = null, var ring: Polygon? = null)
 
 /** Seuil de recentrage : en dessous, la caméra ne bouge pas (pas de tremblement). */
-private const val CAMERA_MOVE_METERS = 10.0
+private const val CAMERA_MOVE_METERS = 2.0
 
 /** Pastille des punaises : diamètre du bitmap, épaisseur du liseré blanc. */
 private const val PIN_SIZE_PX = 48

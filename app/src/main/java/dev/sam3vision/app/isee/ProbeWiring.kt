@@ -154,7 +154,9 @@ internal fun spokenClipId(text: String): String? =
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
  * mot stop) : seul le stop coupe la lecture en cours, chat compris
  * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » SAM urgence externe) —
- * les mots doux attendent le silence. Le flag ne change qu'avec la phrase,
+ * les mots doux attendent le silence, en file (`queue`, redits au silence
+ * par le guetteur mobilier : sans file, `distinctUntilChanged` les perdait
+ * dès que la route ou le chat parlait). Le flag ne change qu'avec la phrase,
  * donc la paire reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
@@ -167,8 +169,8 @@ internal fun LiveProbe.observeSpoken(
         state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
             val text = phrase ?: return@collectLatest
             val clipId = spokenClipId(text)
-            if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent)
-            else voice.onPhrase(text, playerIdle(), urgent = urgent)
+            if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
+            else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
         }
     }
 }

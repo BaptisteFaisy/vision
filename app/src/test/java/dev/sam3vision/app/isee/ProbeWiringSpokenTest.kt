@@ -144,6 +144,34 @@ class ProbeWiringSpokenTest {
         assertTrue(spoken.isEmpty())
     }
 
+    @Test
+    fun `phrase douce tuee puis rattrapee au silence`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val voice = ProximityVoice(
+            player = SpeechPlayer(File(tempDir(), "play")),
+            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            onSpeaking = { if (it.isNotEmpty()) spoken += it },
+            synthesize = { _, _, text ->
+                attempts += text
+                Result.success("$text-audio".toByteArray())
+            },
+        )
+        val (probe, fake) = harness(this)
+        avecVoix(probe, voice, { false }) {
+            respond(personne(), fake, probe, "A", "B")
+            advanceUntilIdle()
+        }
+        assertTrue(spoken.isEmpty())
+        assertTrue(attempts.isEmpty())
+
+        // Silence revenu : la file rejoue la phrase tuée, une seule fois.
+        voice.flushPending(playerIdle = true)
+
+        assertEquals(1, spoken.size)
+        assertEquals(attempts, spoken)
+    }
+
     /** Sonde guidée branchée sur le faux client partagé, prête à recevoir des frames. */
     private fun harness(scope: TestScope): Pair<LiveProbe, ProbeTestClient> {
         val fake = ProbeTestClient(mutableListOf())
