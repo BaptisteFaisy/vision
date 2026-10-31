@@ -344,6 +344,7 @@ internal fun TechnicalSection(
         ObjectsSettings(draft) { onChange(it) }
         GpuRegionSettings(draft, gpu) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
+        LightCropCollectSettings(draft) { onChange(it) }
         PerceptionSettings(draft, onTestDepth, onTestDanger) { onChange(it) }
         TtsSettings(
             draft = draft,

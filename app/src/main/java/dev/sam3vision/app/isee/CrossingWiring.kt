@@ -12,9 +12,7 @@ import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingLossGate
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingOfferGate
-import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
-import dev.sam3vision.core.crossing.PedLightGate
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
@@ -92,23 +90,6 @@ data class CrossingLight(
 )
 
 /**
- * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
- * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
- * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
- * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10).
- *
- * Appelée **une fois par frame** par la sonde : le décodage du crop est le poste
- * coûteux, le refaire pour l'affichage doublerait le travail.
- */
-internal fun crossingLightOf(frame: LiveFrame, jpegB64: String): CrossingLight {
-    val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-        ?: return CrossingLight(null, CrossingState.Red)
-    val crop = CrossingPixels.frame(jpegB64, box)
-        ?: return CrossingLight(box, CrossingState.Red)
-    return CrossingLight(box, PedLightGate.verdict(crop.argb, crop.width, crop.height))
-}
-
-/**
  * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
  * ([cue], `null` = rester muet), l'état confirmé affiché (dernier annoncé,
  * rouge par défaut) et la boîte lue sur la frame. Un seul aller-retour,
@@ -135,9 +116,10 @@ internal fun crossingPatchOf(
     jpegB64: String,
     atMs: Long,
     language: SpeechLanguage,
+    onCrop: CrossingCropTap? = null,
 ): CrossingPatch? {
     if (!active) return null
-    val light = crossingLightOf(frame, jpegB64)
+    val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
     val decision = veto.update(light.state == CrossingState.Green, detections, focalPx, atMs)

@@ -131,6 +131,11 @@ jobs:
       - name: Tests de la garde clés embarquées
         run: python3 -m unittest tools/test_check_apk_keys.py
 
+      # Parité du miroir Python du pipeline couleur feu (traits + arbre +
+      # porte) avec le Kotlin : 20 ancres, stdlib, < 5 s, aucun réseau.
+      - name: Parité harnais couleur feu
+        run: python3 -m unittest tools/test_train_light.py
+
       # Les gardes de la CI se testent elles-mêmes : agents de conflit et de
       # périmètre, union des journaux, quota, couche0, budget — stdlib,
       # quelques secondes, aucun réseau.

@@ -93,6 +93,7 @@ internal fun LiveProbe.configureFrom(
         guide = settings.guideStraight,
         lens = LensSpec.fromSettings(settings.cameraFovDeg),
         distancesOn = settings.distanceOverlayEnabled,
+        collectCrops = settings.collectLightCrops,
         maxObjects = settings.objectsOnScreen,
         language = settings.speechLanguage,
         crossingActive = crossingActive,
