@@ -180,7 +180,7 @@ class CrossingPeopleTest {
 
     private fun onPathLeft() = listOf(
         seg("crosswalk", listOf(100f, 600f, 900f, 950f)),
-        seg("person", listOf(250f, 400f, 350f, 800f)),
+        seg("person", listOf(350f, 400f, 450f, 800f)),
     )
 
     @Test
