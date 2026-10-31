@@ -20,7 +20,7 @@ data class PeoplePath(
     companion object {
 
         /** Écart mini au corps d'une personne (m) : on ne frôle pas les gens. */
-        const val MIN_CLEARANCE_M = 0.5f
+        const val MIN_CLEARANCE_M = 0.8f
 
         /**
          * Demi-largeur de corps (m) quand la boîte est inconnue : les épaules
