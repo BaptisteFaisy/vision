@@ -37,29 +37,34 @@ object CrosswalkScanText {
 
     /** Constat libre du côté : aucun véhicule en mouvement vu. */
     fun nothing(side: ScanSide, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
-        when (language) {
-            SpeechLanguage.Fr -> when (side) {
-                ScanSide.Left -> "Rien à gauche."
-                ScanSide.Right -> "Rien à droite."
-            }
-            SpeechLanguage.En -> when (side) {
-                ScanSide.Left -> "Nothing on the left."
-                ScanSide.Right -> "Nothing on the right."
-            }
-        }
+        sided(side, language, "Rien à gauche.", "Rien à droite.", "Nothing on the left.", "Nothing on the right.")
 
     /** Constat danger du côté : un véhicule en mouvement vu. */
     fun danger(side: ScanSide, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
-        when (language) {
-            SpeechLanguage.Fr -> when (side) {
-                ScanSide.Left -> "Attention, voiture à gauche."
-                ScanSide.Right -> "Attention, voiture à droite."
-            }
-            SpeechLanguage.En -> when (side) {
-                ScanSide.Left -> "Caution, car on the left."
-                ScanSide.Right -> "Caution, car on the right."
-            }
+        sided(side, language, "Attention, voiture à gauche.", "Attention, voiture à droite.", "Caution, car on the left.", "Caution, car on the right.")
+
+    /** Consigne corrigée : l'utilisateur tourne du mauvais côté. */
+    fun wrongWay(side: ScanSide, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        sided(side, language, "Non, regardez à gauche.", "Non, regardez à droite.", "No, look left.", "No, look right.")
+
+    /** Phrase déclinée par côté et par langue : une seule implémentation. */
+    private fun sided(
+        side: ScanSide,
+        language: SpeechLanguage,
+        frLeft: String,
+        frRight: String,
+        enLeft: String,
+        enRight: String,
+    ): String = when (language) {
+        SpeechLanguage.Fr -> when (side) {
+            ScanSide.Left -> frLeft
+            ScanSide.Right -> frRight
         }
+        SpeechLanguage.En -> when (side) {
+            ScanSide.Left -> enLeft
+            ScanSide.Right -> enRight
+        }
+    }
 }
 
 /**
@@ -91,9 +96,12 @@ enum class CrosswalkScanPhase { Idle, Stop, Left, ReportLeft, Right, ReportRight
  * La référence, c'est la route : [refYaw0] est le cap à l'entrée du scan
  * (l'utilisateur face à la traversée), et chaque virage est
  * **directionnel** — tourner à droite quand on a demandé la gauche ne
- * valide pas la gauche (signe du delta exigé, ±[LOOK_DEG]). Un virage
- * insuffisant ou un capteur absent bascule sur le repli temporisé (le
- * constat vaut alors pour les fenêtres d'observation, limite documentée).
+ * valide pas la gauche (signe du delta exigé, ±[LOOK_DEG]). Tourner
+ * franchement du mauvais côté (±[WRONG_DEG] depuis le cap d'entrée du
+ * côté) déclenche aussitôt la consigne corrigée (« Non, regardez à… »)
+ * au lieu d'attendre le timeout en silence. Un virage insuffisant ou un
+ * capteur absent bascule sur le repli temporisé (le constat vaut alors
+ * pour les fenêtres d'observation, limite documentée).
  *
  * Entrées par frame : [trigger] le déclencheur, [yawDeg] le cap du
  * téléphone (degrés, `null` = sans capteur), [movingNow] « un véhicule est
@@ -140,6 +148,12 @@ class CrosswalkScan {
     private var refYaw0: Float? = null
 
     /**
+     * Cap à l'entrée du côté en cours : le mauvais sens s'y mesure (le
+     * virage correct, lui, se mesure à [refYaw0], face à la route).
+     */
+    private var entryYaw: Float? = null
+
+    /**
      * Phrase du scan à [atMs] (`null` = silence — le feu parle, le scan est
      * fini, ou pas de scan). Émise à chaque frame du pas courant : la sonde
      * déduplique (`distinctUntilChanged`), un pas ne se répète jamais.
@@ -184,6 +198,7 @@ class CrosswalkScan {
         checkAtMs = NO_CHECK
         lastFrameAtMs = 0L
         refYaw0 = null
+        entryYaw = null
         lastYaw = null
         lastAtMs = 0L
         prevYaw = null
@@ -226,9 +241,15 @@ class CrosswalkScan {
     ): String {
         val yaw = lastYaw
         if (yaw != null && refYaw0 == null) refYaw0 = yaw
+        if (yaw != null && entryYaw == null) entryYaw = yaw
         if (checkAtMs == NO_CHECK) {
             val turned = if (left) turnedLeft(refYaw0, yaw) else turnedRight(refYaw0, yaw)
-            if (turned || atMs - phaseAtMs >= WAIT_TIMEOUT_MS) checkAtMs = atMs
+            if (turned || atMs - phaseAtMs >= WAIT_TIMEOUT_MS) {
+                checkAtMs = atMs
+            } else if (turnedWrong(entryYaw, yaw, left)) {
+                val side = if (left) ScanSide.Left else ScanSide.Right
+                return CrosswalkScanText.wrongWay(side, language)
+            }
         } else {
             observe(movingNow, feuSpeaking)
             if (atMs - checkAtMs >= CHECK_MS) return finishSide(atMs, left, language)
@@ -289,12 +310,16 @@ class CrosswalkScan {
         if (movingNow) movingFrames += 1
     }
 
-    /** Entrée de phase : horloge et observation ré-armées. */
+    /** Entrée de phase : horloge et observation ré-armées, cap du côté mémorisé. */
     private fun enter(phase: CrosswalkScanPhase, atMs: Long) {
         this.phase = phase
         phaseAtMs = atMs
         checkAtMs = NO_CHECK
         movingFrames = 0
+        entryYaw = when (phase) {
+            CrosswalkScanPhase.Left, CrosswalkScanPhase.Right -> lastYaw
+            else -> null
+        }
     }
 
     /**
@@ -312,6 +337,18 @@ class CrosswalkScan {
     private fun turnedRight(refYaw: Float?, yaw: Float?): Boolean {
         if (refYaw == null || yaw == null) return false
         return normAngleDeg(yaw - refYaw) >= LOOK_DEG
+    }
+
+    /**
+     * Mauvais sens prouvé : [WRONG_DEG] ou plus vers le côté opposé au
+     * demandé, depuis le cap d'entrée du côté — pas [refYaw0], sinon
+     * l'arrivée sur la phase droite (utilisateur encore tourné à gauche)
+     * déclencherait à tort.
+     */
+    private fun turnedWrong(entry: Float?, yaw: Float?, left: Boolean): Boolean {
+        if (entry == null || yaw == null) return false
+        val delta = normAngleDeg(yaw - entry)
+        return if (left) delta >= WRONG_DEG else delta <= -WRONG_DEG
     }
 
     /** Regard stabilisé : lacet lent (ou inconnu — repli temporisé). */
@@ -353,6 +390,14 @@ class CrosswalkScan {
          * côté de la route (prior à valider rue : 90° idéal, 60° tenable).
          */
         const val LOOK_DEG = 60f
+
+        /**
+         * Mauvais sens prouvé : écart de lacet (degrés, signé) vers le côté
+         * opposé au demandé, depuis le cap d'entrée du côté — 30° déclenche
+         * la consigne corrigée (prior à valider rue : corriger tôt sans
+         * accuser les hésitations).
+         */
+        const val WRONG_DEG = 30f
 
         /** Sans virage prouvé, l'observation part quand même (repli temporisé). */
         const val WAIT_TIMEOUT_MS = 6_000L

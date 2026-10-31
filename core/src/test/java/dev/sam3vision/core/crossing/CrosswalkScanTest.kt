@@ -41,6 +41,10 @@ class CrosswalkScanTest {
         assertEquals("Attention, voiture à droite.", CrosswalkScanText.danger(ScanSide.Right, Fr))
         assertEquals("Caution, car on the left.", CrosswalkScanText.danger(ScanSide.Left, En))
         assertEquals("Caution, car on the right.", CrosswalkScanText.danger(ScanSide.Right, En))
+        assertEquals("Non, regardez à gauche.", CrosswalkScanText.wrongWay(ScanSide.Left, Fr))
+        assertEquals("Non, regardez à droite.", CrosswalkScanText.wrongWay(ScanSide.Right, Fr))
+        assertEquals("No, look left.", CrosswalkScanText.wrongWay(ScanSide.Left, En))
+        assertEquals("No, look right.", CrosswalkScanText.wrongWay(ScanSide.Right, En))
     }
 
     @Test
@@ -73,7 +77,10 @@ class CrosswalkScanTest {
         val scan = CrosswalkScan()
         arm(scan)
         assertEquals("Regardez à gauche.", update(scan, atMs = 1_100L, yaw = 0f))
-        assertEquals("mauvais sens : attente", "Regardez à gauche.", update(scan, atMs = 1_150L, yaw = 35f))
+        // Nouveau comportement voulu : +35° à droite alors qu'on a demandé la gauche,
+        // c'est un mauvais sens prouvé (WRONG_DEG) — iSee corrige aussitôt (« Non, … »)
+        // au lieu d'attendre le timeout en silence face à une personne aveugle perdue.
+        assertEquals("mauvais sens : consigne corrigée", "Non, regardez à gauche.", update(scan, atMs = 1_150L, yaw = 35f))
         assertEquals("Regardez à gauche.", update(scan, atMs = 1_200L, yaw = -65f))
         assertEquals("Regardez à gauche.", update(scan, atMs = 1_300L, yaw = -65f, moving = true))
         assertEquals("Regardez à gauche.", update(scan, atMs = 1_400L, yaw = -65f, moving = true))
@@ -278,6 +285,57 @@ class CrosswalkScanTest {
         assertNull(update(scan, atMs = 2_000L))
         assertEquals("Stop.", update(scan, atMs = 2_100L))
         assertEquals(CrosswalkScanPhase.Stop, scan.phase)
+    }
+
+    @Test
+    fun `mauvais sens a gauche - correction tenue puis virage correct et constat`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        update(scan, atMs = 1_100L, yaw = 0f)
+        assertEquals("Non, regardez à gauche.", update(scan, atMs = 1_200L, yaw = 35f))
+        assertEquals("correction level-triggered, chaque frame", "Non, regardez à gauche.", update(scan, atMs = 1_300L, yaw = 40f))
+        assertEquals("virage correct : consigne", "Regardez à gauche.", update(scan, atMs = 1_400L, yaw = -65f))
+        assertEquals("Regardez à gauche.", update(scan, atMs = 1_500L, yaw = -65f, moving = true))
+        assertEquals("Regardez à gauche.", update(scan, atMs = 1_600L, yaw = -65f, moving = true))
+        assertEquals("observation normale après correction", "Attention, voiture à gauche.", update(scan, atMs = 3_900L, yaw = -65f))
+    }
+
+    @Test
+    fun `mauvais sens a droite - correction puis virage correct et constat`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        update(scan, atMs = 1_100L, yaw = 0f)
+        update(scan, atMs = 1_200L, yaw = -65f)
+        assertEquals("Rien à gauche.", update(scan, atMs = 3_700L, yaw = -65f))
+        assertEquals("Regardez à droite.", update(scan, atMs = 5_700L, yaw = -65f))
+        assertEquals("tourne encore à gauche : corrigé", "Non, regardez à droite.", update(scan, atMs = 5_800L, yaw = -100f))
+        assertEquals("virage correct : consigne", "Regardez à droite.", update(scan, atMs = 5_900L, yaw = 65f))
+        assertEquals("observation normale après correction", "Rien à droite.", update(scan, atMs = 8_400L, yaw = 65f))
+    }
+
+    @Test
+    fun `entree phase droite user encore a gauche - pas de faux mauvais sens`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        update(scan, atMs = 1_100L, yaw = 0f)
+        update(scan, atMs = 1_200L, yaw = -65f)
+        assertEquals("Rien à gauche.", update(scan, atMs = 3_700L, yaw = -65f))
+        assertEquals("Regardez à droite.", update(scan, atMs = 5_700L, yaw = -65f))
+        // -65° depuis refYaw0 mais 0° depuis le cap d'entrée du côté : la
+        // référence du mauvais sens est l'entrée du côté, pas le scan.
+        assertEquals("pas de correction à l'entrée", "Regardez à droite.", update(scan, atMs = 5_800L, yaw = -65f))
+        assertEquals("hésitation sous WRONG_DEG : consigne", "Regardez à droite.", update(scan, atMs = 5_900L, yaw = -70f))
+    }
+
+    @Test
+    fun `mauvais sens tenu - correction jusqu au timeout puis observation`() {
+        val scan = CrosswalkScan()
+        arm(scan)
+        update(scan, atMs = 1_100L, yaw = 0f)
+        assertEquals("Non, regardez à gauche.", update(scan, atMs = 1_200L, yaw = 35f))
+        assertEquals("Non, regardez à gauche.", update(scan, atMs = 2_000L, yaw = 35f))
+        assertEquals("timeout 6 s : observation partie", "Regardez à gauche.", update(scan, atMs = 6_900L, yaw = 35f))
+        assertEquals("Rien à gauche.", update(scan, atMs = 9_400L, yaw = 35f))
     }
 
     /** Amorce un scan : 2 frames de déclencheur + « Stop. » + consigne gauche. */
