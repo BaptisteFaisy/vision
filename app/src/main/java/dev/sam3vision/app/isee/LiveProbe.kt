@@ -28,6 +28,7 @@ import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.app.live.MotionLog
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
@@ -428,7 +429,9 @@ _state.update { it.cleared() }
      */
     fun noteDrawn() {
         if (!chronology.noteDrawn()) return
-        _state.update { current -> current.copy(timings = chronology.snapshot(current.timings)) }
+        val snap = chronology.snapshot(_state.value.timings)
+        _state.update { current -> current.copy(timings = snap) }
+        LiveLatencyLog.frame(snap)
     }
 
     /**
