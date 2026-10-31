@@ -185,8 +185,8 @@ object VehicleStateText {
  * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
  * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
  * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
- * stable (deux transitions stables, trois frames) — mesuré et dans le
- * couloir marché. Le reste est doute/silence : jamais d'arrêt inventé.
+ * stable (deux transitions stables, trois frames) — mesuré, dans le
+ * couloir marché, hors fond franc (le suivi coupe l'arrêt). Le reste est doute/silence.
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
@@ -256,8 +256,8 @@ class VehicleStateWatcher(
     /** Verdicts fond de la dernière frame par piste (vide sans signal fond) : le journal du direct. */
     val lastMotionVerdicts: Map<Int, MovingVerdict> get() = approach.lastVerdicts
 
-    /** Vrai quand chaque piste évaluée accuse la caméra : le mouvement se tait. */
-    val cameraMoved: Boolean get() = approach.cameraMoved
+    /** Caméra prouvée mobile : suivi unanime ou fond franc (le suivi coupe l'arrêt). */
+    val cameraMoved: Boolean get() = approach.cameraMoved || approach.fondFranc
 
     /** Brut de la dernière frame (`pick == MOVING`, lu par le scan traversée). */
     var movingThisFrame: Boolean = false
@@ -283,7 +283,7 @@ class VehicleStateWatcher(
         val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
-        val pick = pick(current, meters, tau, atMs, hushed)
+        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness) // PISTE2
         }
@@ -349,10 +349,10 @@ class VehicleStateWatcher(
         tau: ApproachVerdict,
         atMs: Long,
         hushed: Set<String>,
+        fondFranc: Boolean,
     ): Pick? {
         if (current.isEmpty()) return null
-        movingPick(current, meters, tau, hushed, atMs)?.let { return it }
-        return stoppedPick(current, meters, atMs, hushed) // PISTE1 : hushed coupe aussi l'arrêt
+        return movingPick(current, meters, tau, hushed, atMs) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -370,9 +370,8 @@ class VehicleStateWatcher(
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
-                val growth = prev != null && isVehicleGrowth( // FUSION P1+2 : décote zoom + confirmation profondeur.
-                    prev.area, prev.atMs, prev.closeness, current.getValue(candidate).area,
-                    current.getValue(candidate).closeness, atMs, approach.lastGlobal)
+                val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
+                    current.getValue(candidate).area, current.getValue(candidate).closeness, atMs, approach.lastGlobal)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -390,11 +389,12 @@ class VehicleStateWatcher(
         current: Map<String, Current>,
         meters: Map<String, Float>,
         atMs: Long,
-        hushed: Set<String>, // PISTE1 : suivi-caméra — pas de faux « à l'arrêt » quand le fond défile
+        hushed: Set<String>,
+        fondFranc: Boolean, // FUSION : + fond franc — pas de faux « à l'arrêt » sous suivi sans piste suiveuse
     ): Pick? {
         val key = current.keys
             .filter { candidate ->
-                if (candidate in hushed) return@filter false // PISTE1
+                if (candidate in hushed || fondFranc) return@filter false // PISTE1+FUSION
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
                 val measured = meters[candidate] ?: return@filter false
