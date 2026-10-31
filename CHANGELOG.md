@@ -65,6 +65,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   5 mètres », silence sans passage, silence à la coupure, périmé tu).
 
 
+## 2026-10-31 — iSee : bordure dite dès détection puis à 2 / 1,5 / 1 / 0,7 / 0,5 m (branche `feat/isee-bordures-paliers-annonce`)
+
+- **Demande** : dès qu'iSee détecte une bordure à l'image, la dire au user,
+  puis la redire à 2 m, 1,5 m, 1 m, 0,7 m et 0,5 m de la bordure.
+- **Fait** : `CurbWatcher` remplace la double annonce 1 m / 0,7 m par une
+  détection (`Bordure détectée.` / `Curb detected.`, avec l'heure, une fois
+  par approche, cooldown 10 s) puis un compte à rebours 2 / 1,5 / 1 / 0,7 /
+  0,5 m (`Bordure à ….`, 2 frames par palier, sans cooldown entre paliers,
+  hystérésis +0,2 m, palier survolé sauté sans rattrapage, signal perdu =
+  ré-armé) ; 0,7 / 0,5 m urgents (`NEAR`, passent en Traversée), 0,5 m par
+  la voix de sécurité (coupe tout) avec le même texte — `phrase`,
+  `stepPhrase` et `safetyStepPhrase` supprimés (`Montez le rebord.` disparaît) ;
+  détection et géométrie (`CurbSignal`, `CurbConcepts`), bateau et câblage
+  (`observeCurb`, `shouldSpeakCurb`) inchangés. Contrat `docs/VOIX-DANGER.md` § 24.
+- Preuves : ciblés verts (`CurbAnnounceTest` 20, `CurbWatcherTest` 18,
+  `SidewalkKeepTest` 12, `SidewalkWatcherTest` 11 — 61 tests, 0 échec,
+  rouge-avant vérifié) ; `:app` ciblé vert (`ProbeHazardsTest` 8,
+  `ProbeWiringWatchersTest` 6) ; `check-kotlin-limits.py` vert
+  (1245 fichiers, aucun dépassement).
+- Fichiers : `core/.../curb/CurbWatcher.kt`, `CurbAnnounceTest.kt`,
+  `CurbWatcherTest.kt`, `ProbeWiring.kt` + `SafetyVoice.kt` (commentaires),
+  `docs/VOIX-DANGER.md` (§ 24).
+
 ## 2026-10-31 — CI : l'approbation automatique se réveille à chaque fin de `CI`, pas au cron (branche `ci/approve-declencheur`)
 
 - **Constat** : le `schedule` de ce dépôt est étalé par GitHub. Mesure : le cron

@@ -136,34 +136,39 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `phrases FR et EN`() {
-        assertEquals("Marche dans 1 mètre.", CurbText.phrase(CurbEdge.Up, SpeechLanguage.Fr))
-        assertEquals("Descente dans 1 mètre.", CurbText.phrase(CurbEdge.Down, SpeechLanguage.Fr))
-        assertEquals("Step up in 1 meter.", CurbText.phrase(CurbEdge.Up, SpeechLanguage.En))
-        assertEquals("Step down in 1 meter.", CurbText.phrase(CurbEdge.Down, SpeechLanguage.En))
+    fun `phrases detection et compte a rebours FR et EN`() {
+        assertEquals("Bordure détectée.", CurbText.detectedPhrase(SpeechLanguage.Fr))
+        assertEquals("Curb detected.", CurbText.detectedPhrase(SpeechLanguage.En))
+        assertEquals("Bordure à 2 mètres.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
+        assertEquals("Bordure à 1,5 mètre.", CurbText.distancePhrase(1.5f, SpeechLanguage.Fr))
+        assertEquals("Bordure à 1 mètre.", CurbText.distancePhrase(1.0f, SpeechLanguage.Fr))
+        assertEquals("Bordure à 0,7 mètre.", CurbText.distancePhrase(0.7f, SpeechLanguage.Fr))
+        assertEquals("Bordure à 0,5 mètre.", CurbText.distancePhrase(0.5f, SpeechLanguage.Fr))
+        assertEquals("Curb at 2 meters.", CurbText.distancePhrase(2.0f, SpeechLanguage.En))
+        assertEquals("Curb at 1.5 meters.", CurbText.distancePhrase(1.5f, SpeechLanguage.En))
+        assertEquals("Curb at 1 meter.", CurbText.distancePhrase(1.0f, SpeechLanguage.En))
+        assertEquals("Curb at 0.7 meters.", CurbText.distancePhrase(0.7f, SpeechLanguage.En))
+        assertEquals("Curb at 0.5 meters.", CurbText.distancePhrase(0.5f, SpeechLanguage.En))
     }
 
     @Test
-    fun `phrases imminentes et bateau FR et EN`() {
-        assertEquals("Marche, maintenant.", CurbText.stepPhrase(CurbEdge.Up, SpeechLanguage.Fr))
-        assertEquals("Descente, maintenant.", CurbText.stepPhrase(CurbEdge.Down, SpeechLanguage.Fr))
-        assertEquals("Step up now.", CurbText.stepPhrase(CurbEdge.Up, SpeechLanguage.En))
-        assertEquals("Step down now.", CurbText.stepPhrase(CurbEdge.Down, SpeechLanguage.En))
+    fun `phrases bateau FR et EN`() {
         assertEquals("Bateau, pas de marche.", CurbText.flatPhrase(SpeechLanguage.Fr))
         assertEquals("Dropped curb, no step.", CurbText.flatPhrase(SpeechLanguage.En))
     }
 
     @Test
-    fun `pre-alerte avec heure, imminent sans heure`() {
+    fun `detection avec heure, paliers sans heure`() {
         assertEquals(
-            "Marche dans 1 mètre, à midi.",
-            CurbText.phrase(CurbEdge.Up, SpeechLanguage.Fr, 0.5f),
+            "Bordure détectée, à midi.",
+            CurbText.detectedPhrase(SpeechLanguage.Fr, 0.5f),
         )
         assertEquals(
-            "Step down in 1 meter, at 12 o'clock.",
-            CurbText.phrase(CurbEdge.Down, SpeechLanguage.En, 0.5f),
+            "Curb detected, at 12 o'clock.",
+            CurbText.detectedPhrase(SpeechLanguage.En, 0.5f),
         )
-        assertEquals("Step up now.", CurbText.stepPhrase(CurbEdge.Up, SpeechLanguage.En))
+        assertEquals("Bordure détectée.", CurbText.detectedPhrase(SpeechLanguage.Fr))
+        assertEquals("Bordure à 2 mètres.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
     }
 
     @Test
