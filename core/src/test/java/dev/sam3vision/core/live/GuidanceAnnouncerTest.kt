@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Déclencheur du guidage : direction dite en continu toutes les 2 s, sauf overwrite (mot nouveau aussitôt), stop unique. */
+/** Déclencheur du guidage : direction dite en continu toutes les 2 s, sauf overwrite (mot nouveau aussitôt), jamais de stop. */
 class GuidanceAnnouncerTest {
 
     private val libre = emptyList<PlacedLabel>()
@@ -291,17 +291,18 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `cote bouche stable redit en continu, stop unique`() {
+    fun `cote bouche stable redit en continu, plus de stop au contact`() {
         val announcer = GuidanceAnnouncer()
         val bloque = listOf(personne(2f))
 
         assertEquals("left.", announcer.onFrame(0L, bloque))
         assertEquals("left.", announcer.onFrame(2_000L, bloque))
-        // stop latéral : parlé une fois, jamais répété (cap droit contourne toujours)
+        // Contact latéral : plus de stop (ordre user du 31/10 — on se faufile, on
+        // ne s'arrête pas devant un obstacle). Le contact se contourne comme le
+        // reste, et la direction se redit toutes les 2 s.
         val contact = listOf(PlacedLabel("personne", 0.2f, 0.5f, 0.4f))
-        val stopAnnouncer = GuidanceAnnouncer()
-        stopAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left)
-        assertNull(stopAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
-        assertNull(stopAnnouncer.onFrame(4_000L, contact, cap = SteeringCap.Left))
+        val contactAnnouncer = GuidanceAnnouncer()
+        assertEquals("straight ahead.", contactAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left))
+        assertEquals("straight ahead.", contactAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
     }
 }
