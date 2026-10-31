@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaFormat
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import com.meta.wearable.dat.camera.types.VideoFrame
@@ -12,16 +13,25 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 /**
- * Recadrage « remplit la vue » (centré, sans déformation) : l'échelle et le décalage qui
- * appliquent une source [srcW]×[srcH] sur une destination [dstW]×[dstH]. Pur, testé en JVM ;
- * la vue du direct (`TextureView`) l'applique aux deux chemins de rendu (bitmap et codec).
+ * Recadrage « remplit la vue » pour un `TextureView` : les facteurs à passer à
+ * `setTransform` via `setScale(scaleX, scaleY, viewW / 2f, viewH / 2f)` (pivot = centre
+ * de la vue), pour une vidéo [srcW]×[srcH] dans une vue [dstW]×[dstH].
+ *
+ * Un `TextureView` étire d'abord son buffer pour remplir la vue, **puis** applique la
+ * matrice en coordonnées vue : la matrice n'est donc pas le placage complet
+ * (échelle uniforme + décalage — qui sur-zoomait et déformait la rue, constaté sur
+ * téléphone), mais la **correction** qui rend le total uniforme et centré. L'un des
+ * deux facteurs vaut toujours 1 (l'axe déjà rempli par l'étirement), l'autre ≥ 1
+ * (l'axe à recadrer). Pur, testé en JVM (`GlassesVideoCropTest`).
  */
-data class CropTransform(val scale: Float, val dx: Float, val dy: Float)
+data class TextureCrop(val scaleX: Float, val scaleY: Float)
 
-fun cropTransform(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropTransform {
-    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return CropTransform(1f, 0f, 0f)
-    val scale = maxOf(dstW / srcW.toFloat(), dstH / srcH.toFloat())
-    return CropTransform(scale, (dstW - srcW * scale) / 2f, (dstH - srcH * scale) / 2f)
+fun textureViewCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): TextureCrop {
+    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return TextureCrop(1f, 1f)
+    val baseX = dstW / srcW.toFloat()
+    val baseY = dstH / srcH.toFloat()
+    val fill = maxOf(baseX, baseY)
+    return TextureCrop(fill / baseX, fill / baseY)
 }
 
 /**
@@ -151,6 +161,7 @@ class GlassesLiveDecoder(
     private var closed = false
     private var noteCount = 0
     private var renders = 0L
+    private var firstRenderMs = 0L
     /** Dessin bitmap filtré : sans `isFilterBitmap`, tout rééchantillonnage aliaserait. */
     private val bitmapPaint = Paint().apply { isFilterBitmap = true }
     private var bitmapAnnounced = false
@@ -342,11 +353,15 @@ class GlassesLiveDecoder(
         surface = null
     }
 
-    /** Un rendu sur 300 journalisé (preuve de vie au logcat). */
+    /** Un rendu sur 300 journalisé (preuve de vie au logcat, avec la cadence mesurée). */
     private fun countRender(rendered: Boolean): Boolean {
         if (!rendered) return false
         renders += 1
-        if (renders % LOG_EVERY_RENDERS == 0L) Log.i(TAG, "direct lunettes : $renders images rendues")
+        if (renders == 1L) firstRenderMs = SystemClock.elapsedRealtime()
+        if (renders % LOG_EVERY_RENDERS == 0L) {
+            val elapsed = SystemClock.elapsedRealtime() - firstRenderMs
+            Log.i(TAG, "direct lunettes : $renders images rendues" + fpsSuffix(renders, elapsed))
+        }
         return true
     }
 
