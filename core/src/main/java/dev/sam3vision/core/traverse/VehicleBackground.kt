@@ -1,0 +1,137 @@
+package dev.sam3vision.core.traverse
+
+import dev.sam3vision.core.motion.MotionSample
+import kotlin.math.abs
+import kotlin.math.hypot
+
+/**
+ * Verdict fond/boîte (V1) : qui a bougé entre deux frames — le véhicule suivi
+ * ([VEHICLE_MOVED]), la caméra ([CAMERA_MOVED]), personne ([STATIC]), ou on ne
+ * sait pas ([UNKNOWN], le doute ne parle jamais d'arrêt).
+ */
+enum class Verdict {
+    /** Le résidu (boîte − fond) dépasse le seuil : le véhicule bouge vraiment. */
+    VEHICLE_MOVED,
+
+    /** Résidu nul mais fond franc : la boîte suit la caméra, le véhicule est fixe. */
+    CAMERA_MOVED,
+
+    /** Boîte et fond immobiles : le véhicule est à l'arrêt, caméra fixe. */
+    STATIC,
+
+    /** Fond plat, confiance basse, doute : jamais d'arrêt inventé. */
+    UNKNOWN,
+}
+
+/**
+ * Verdict daté d'une piste : [trackId] l'id suivi, [globalDx]/[globalDy] et
+ * [boxDx]/[boxDy] les vitesses comparées (fractions d'image par seconde),
+ * [globalScale]/[globalConf] le zoom et la confiance du fond, [bgChangeScore]
+ * la part de fond changé (0..1, preuve enregistrée, non décisive en V1).
+ */
+data class MovingVerdict(
+    val trackId: Int,
+    val globalDx: Float,
+    val globalDy: Float,
+    val globalScale: Float,
+    val globalConf: Float,
+    val boxDx: Float,
+    val boxDy: Float,
+    val bgChangeScore: Float,
+    val verdict: Verdict,
+)
+
+/**
+ * Qui bouge, le véhicule ou la caméra (V1, règle produit : le fond qui change
+ * pendant que la boîte s'en écarte, c'est le véhicule qui roule ; le fond qui
+ * défile pendant que la boîte le suit, c'est la caméra).
+ *
+ * On compare deux vitesses (fractions d'image par seconde) : le fond global
+ * ([MotionSample], pixels du plan de luminance) et la boîte suivie (fractions
+ * d'image). Le résidu = boîte − fond est le mouvement propre du véhicule :
+ * au-delà de [LATERAL_RATIO], il roule ([Verdict.VEHICLE_MOVED]) ; résidu nul
+ * et fond franc, la caméra bouge ([Verdict.CAMERA_MOVED]) ; les deux faibles,
+ * arrêt ([Verdict.STATIC]). Le reste — confiance sous [TRUST_MIN], fond plat
+ * (estimateur muet, `null`), temps ou dimensions invalides, bande de doute —
+ * dit [Verdict.UNKNOWN] : on ne tranche jamais sans preuve.
+ *
+ * Seuils = priors à recaler sur téléphone, direction sûre : une piste jeune,
+ * floue ou perdue ne déclenche jamais. Pur JVM, zéro allocation hors verdict.
+ */
+object VehicleBackground {
+
+    /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (miroir de `VehicleStateWatcher`). */
+    const val STILL_SPEED = 0.02f
+
+    /** Au-delà (fraction d'image/s), le résidu ou le fond est franc (bande morte au-dessus de l'arrêt). */
+    const val LATERAL_RATIO = 0.03f
+
+    /** Confiance minimale du fond, reprise de `Shift.TRUST_MIN` : en dessous, le fond est plat ou flou. */
+    const val TRUST_MIN = 0.12f
+
+    /**
+     * Verdict de la piste [trackId] : [boxDx]/[boxDy] le déplacement de la
+     * boîte entre les deux frames (fractions de largeur/hauteur d'image),
+     * [global] le mouvement du fond (`null` = estimateur muet, fond plat),
+     * [lumaWidth]/[lumaHeight] la grille du plan de luminance (unités de
+     * [global]), [dtMs] le délai inter-frames (> 0), [bgChangeScore] la part
+     * de fond changé (0..1, hors bornes = ramené, non fini = 0).
+     */
+    fun decide(
+        trackId: Int,
+        boxDx: Float,
+        boxDy: Float,
+        global: MotionSample?,
+        lumaWidth: Int,
+        lumaHeight: Int,
+        dtMs: Long,
+        bgChangeScore: Float,
+    ): MovingVerdict {
+        val bg = bgChangeScore.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+        val sample = global
+        if (sample == null || dtMs <= 0L || lumaWidth <= 0 || lumaHeight <= 0) {
+            return unknown(trackId, sample, bg)
+        }
+        if (!sample.confidence.isFinite() || sample.confidence < TRUST_MIN) {
+            return unknown(trackId, sample, bg)
+        }
+        if (!sample.dx.isFinite() || !sample.dy.isFinite() || !sample.scale.isFinite()) {
+            return unknown(trackId, sample, bg)
+        }
+        if (!boxDx.isFinite() || !boxDy.isFinite()) return unknown(trackId, sample, bg)
+        val dtSeconds = dtMs / 1000f
+        val gx = sample.dx / lumaWidth / dtSeconds
+        val gy = sample.dy / lumaHeight / dtSeconds
+        val scaleRate = abs(sample.scale - 1f) / dtSeconds
+        val bx = boxDx / dtSeconds
+        val by = boxDy / dtSeconds
+        if (!gx.isFinite() || !gy.isFinite() || !scaleRate.isFinite()) {
+            return unknown(trackId, sample, bg)
+        }
+        if (!bx.isFinite() || !by.isFinite()) return unknown(trackId, sample, bg)
+        val residual = hypot(bx - gx, by - gy)
+        val ground = hypot(gx, gy) + scaleRate
+        return MovingVerdict(trackId, gx, gy, sample.scale, sample.confidence, bx, by, bg, classify(residual, ground))
+    }
+
+    /** Résidu franc = le véhicule roule ; résidu nul + fond franc = la caméra ; sinon doute ou arrêt. */
+    private fun classify(residual: Float, ground: Float): Verdict = when {
+        residual > LATERAL_RATIO -> Verdict.VEHICLE_MOVED
+        residual <= STILL_SPEED && ground > LATERAL_RATIO -> Verdict.CAMERA_MOVED
+        residual <= STILL_SPEED && ground <= STILL_SPEED -> Verdict.STATIC
+        else -> Verdict.UNKNOWN
+    }
+
+    /** Verdict de doute : vitesses à zéro, preuves du fond conservées quand elles sont finies. */
+    private fun unknown(trackId: Int, sample: MotionSample?, bg: Float): MovingVerdict = MovingVerdict(
+        trackId = trackId,
+        globalDx = 0f,
+        globalDy = 0f,
+        globalScale = sample?.scale?.takeIf { it.isFinite() } ?: 1f,
+        globalConf = sample?.confidence?.takeIf { it.isFinite() } ?: 0f,
+        boxDx = 0f,
+        boxDy = 0f,
+        bgChangeScore = bg,
+        verdict = Verdict.UNKNOWN,
+    )
+}
