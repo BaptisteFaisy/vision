@@ -115,14 +115,26 @@ on:
     workflows: ["CI", "couche0"]
     types: [completed]
 
-# Un groupe par **événement et par tête** (v12). Un groupe unique annulait le
-# run *en attente* dès qu'un autre se déclenchait : le « CI verte, merge-moi »
-# d'une PR était annulé par le run d'une autre, et la PR attendait le cron —
-# c'était la queue p90. Deux têtes différentes ne s'annulent plus ; deux
-# déclencheurs de la même tête (fin de `CI`, fin de `couche0`) restent un
-# doublon que l'empreinte v11 déduplique de toute façon.
+# Un seul balayage à la fois (v16), sans annulation.
+#
+# v12 avait éclaté le groupe par (événement, tête) pour qu'un run *en attente*
+# ne soit plus annulé par un autre — c'était juste, mais le remède a un coût
+# devenu visible le 31/10 : chaque fin de `CI` déclenche un run, chaque run
+# ouvre une matrice de 8 jobs, et les runs se chevauchent. Mesuré en pleine
+# journée de PR : 15 runs `pr-auto-merge` non terminés contre 10 runs `CI` et
+# 28 runs en file sur un pool de 21 runners — le balayage affamait la CI qu'il
+# attend, les `ci-core` passaient de 2 à 5 minutes et les lots de la file
+# frôlaient leur `checks_timeout` de 20 min.
+#
+# Un groupe unique **sans annulation** règle ça sans perdre de travail : un
+# balayage examine de toute façon *toutes* les PR ouvertes (`discover` les
+# liste), donc deux runs concurrents font le même travail ; les sérialiser ne
+# coûte que l'attente, et l'empreinte v11 fait sortir en quelques secondes un
+# run dont tout a déjà été fait. `cancel-in-progress` reste à `false` : couper
+# un run au milieu d'un rebase ou d'un merge ne gagne rien et peut laisser un
+# push à moitié fait.
 concurrency:
-  group: pr-auto-merge-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.sha }}
+  group: pr-auto-merge
   cancel-in-progress: false
 
 permissions:
