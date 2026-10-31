@@ -30,22 +30,27 @@ name: CI
 # rapports de tests téléversés sur échec seul (`failure()` au lieu de
 # `always()` : le diagnostic reste disponible quand les tests sont rouges, le
 # « Top 20 » reste dans le journal en vert). Verdict inchangé.
+# Un seul passage par arbre (2026-10-31) : le même contenu était testé trois
+# fois (PR, puis PR de lot de la file, puis `push: master`). Il ne reste que le
+# passage de la PR, porte d'entrée de la file ; le lot d'UNE PR ne rejoue plus
+# Gradle (arbre identique, cf. `.github/actions/perimetre`), un lot de 2 PR ou
+# plus teste la combinaison ; le `push: master` est parti (cf. `on:`).
 on:
   pull_request:
-  push:
-    branches:
-      - master
-      # PAS de `mergify/merge-queue/**` ici (retiré le 31/10) : le verdict du
-      # lot vient de la PR que Mergify ouvre sur sa branche de lot, pas du
-      # `push`. Mergify poussait le lot ET ouvrait la PR, donc deux suites pour
-      # la même tête ; la concurrency annulait celle du `push`, et l'agrégateur
-      # `ci` (`if: always()`) voyait ses deux moitiés `cancelled` → il publiait
-      # `ci = FAILURE` sur le SHA du lot. Mergify lisait ce FAILURE — même une
-      # fois le `ci = SUCCESS` du run `pull_request` publié sur le même SHA —
-      # et éjectait la PR (`CHECKS_FAILED`, « ci fails with this pull
-      # request ») : #634 à 16:30, #637 à 16:36 le 31/10, boucle sans fin.
-      # Vérifié sur les lots du 31/10 : la suite `pull_request` publie bien
-      # `ci`, `ci-budget` et `couche0` sur l'arbre fusionné, seule.
+  # PAS de `push` sur `master` (retiré le 31/10) — le contenu de master est
+  # TOUJOURS un arbre déjà testé : chaque atterrissage passe par la file de
+  # merge, qui publie `ci` sur l'arbre fusionné avant de merger. Rejouer la
+  # même suite après coup payait un créneau de runner pour un verdict connu.
+  # Mesuré du 28 au 31/10 sur `push: master` : 131 runs `CI`, 0 échec, 68
+  # annulés en vol par le push suivant — 2,3 min de pool par atterrissage
+  # dépensées à re-tester l'arbre que la file venait de valider.
+  # `ci-native.yml` reste sur `push: master`, lui : il porte `apk`,
+  # `apk-release` et `lint`, absents de la file. C'est la seule vérification
+  # post-atterrissage qui apprend quelque chose, et elle rougit master.
+  # Filet : un passage complet par nuit, pour la dérive qui ne vient d'aucun
+  # commit (image de runner, JDK, SDK, secrets, cache) — 0 PR en vol à 3h30.
+  schedule:
+    - cron: '30 3 * * *'  # 03:30 UTC = 04:30 Paris
   # File de merge native (29/10) : le groupe construit un commit temporaire
   # (`master` + les PR de la file) et rejoue **les mêmes** checks dessus.
   # Sans ce déclencheur, `ci` et `ci-budget` n'existent jamais sur
@@ -53,10 +58,11 @@ on:
   # n'arrive pas. Le pas « Cette PR touche-t-elle du code ? » retombe alors sur
   # `code=1` (aucune liste de fichiers) : dans la file, on teste toujours.
   merge_group:
+  workflow_dispatch:
 
 concurrency:
   # Depuis le 31/10 il n'y a plus qu'UNE suite par tête sur une branche de
-  # file (le `push` sur `mergify/merge-queue/**` a été retiré, cf. `on.push`).
+  # file (aucun `push` ne se déclenche sur `mergify/merge-queue/**`, cf. `on:`).
   # La clé reste par TÊTE pour ce cas : la concurrency de GitHub ne suit pas
   # le SHA des événements `pull_request` d'une PR de lot (elle suit
   # `refs/pull/N/merge`), donc sans cette clé le run d'un lot pourrait être
@@ -103,6 +109,7 @@ jobs:
           push-before: ${{ github.event.before }}
           push-sha: ${{ github.sha }}
           pr-head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
 
       # Cache Gradle : la VM est neuve à chaque job, sans lui 3-4 min à froid.
       # Après le périmètre : sans code, ni lecture ni écriture du cache.
@@ -176,6 +183,7 @@ jobs:
           python3 .github/fireworks/test_quota.py
           python3 .github/couche0/test_check_couche0.py
           python3 .github/ci-budget/test_check_timeouts.py
+          python3 -m unittest tools/test_mergify_batch_size.py
 
       # Portes documentées mais jamais branchées : scripts shell, fixtures
       # dorées des masques, chiffres du budget, shader du suivi — secondes,
@@ -277,6 +285,7 @@ jobs:
           push-before: ${{ github.event.before }}
           push-sha: ${{ github.sha }}
           pr-head-ref: ${{ github.event.pull_request.head.ref }}
+          pr-body: ${{ github.event.pull_request.body }}
 
       - uses: gradle/actions/setup-gradle@v4
         if: steps.perimetre.outputs.code == '1'

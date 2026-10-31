@@ -22,7 +22,8 @@ Chaque affirmation ci-dessous vient d'un fichier du dépôt : `.github/workflows
 
 ## 2. Les jobs `ci-core` / `ci-app` / `ci` (et le natif hors PR)
 
-Déclencheurs : `pull_request` et `push`. La PR porte deux moitiés en parallèle,
+Déclencheurs : `pull_request`, `merge_group` (file native, inutilisée ici) et un
+`schedule` nocturne — **plus de `push` sur `master`** (retiré le 2026-10-31). La PR porte deux moitiés en parallèle,
 `ci-core` (gardes + backend + tests `:core`) et `ci-app` (tests `:app`), sous un
 agrégateur `ci` vert ssi les deux moitiés sont vertes — le check requis `ci` ne
 change pas (ni ruleset, ni Mergify, ni balayeur). Runner **auto-hébergé** —
@@ -40,6 +41,22 @@ wall-clock cassé). Ils ont déménagé dans `ci-native.yml`, vérifiés à chaq
 possible). `apk` et `apk-release` ont fusionné le 2026-10-30 (marge 10 min : 2 runs
 tués à ~700 s) : debug + release tiennent en ~6-7 min < 10, la garde clés embarquées
 tourne après chaque assemblage, chaque variante reste vérifiée.
+
+**Un seul passage par arbre (2026-10-31).** Le même contenu était testé trois fois : la PR, la PR
+de lot de la file (qui reconstruit la même chose), puis `push: master` juste après le merge. Mesuré
+du 28 au 31/10 : 131 runs `CI` sur `push: master`, **0 échec**, 68 annulés en vol par le push
+suivant — 2,3 min de pool par atterrissage pour un verdict déjà connu. Désormais :
+
+- la PR fait **le** passage réel, et c'est la porte d'entrée de la file (`check-success = ci`) ;
+- un lot Mergify d'**une** PR ne rejoue plus Gradle : `update_method: rebase` fait que l'arbre du
+  lot est celui de la tête de PR qui vient d'être verte. La taille du lot est lue dans le bloc
+  machine `pull_requests:` du corps de la PR de lot (`tools/mergify_batch_size.py`) ; un lot de
+  **deux PR ou plus** rejoue les tests, car cette combinaison-là n'a jamais été vérifiée, et une
+  taille illisible fait aussi tourner les tests (défaut sûr) ;
+- `push: master` ne déclenche plus `ci.yml` : `ci-native.yml` reste, lui, sur chaque atterrissage
+  (`apk`, `apk-release`, `lint` — absents de la file) et rougit master si un atterrissage casse le
+  build. Un contrôle complet par nuit (`cron '30 3 * * *'`) attrape la dérive qui ne vient d'aucun
+  commit : image de runner, JDK, SDK, secrets, cache.
 
 Il n'y a **pas** de job dédié au banc lunettes : le banc est compilé et testé avec `:app`
 (`:app:assembleDebug` au job `apk` de `ci-native.yml`, ses tests JVM dans

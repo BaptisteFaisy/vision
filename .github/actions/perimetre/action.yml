@@ -23,6 +23,13 @@ inputs:
     description: Branche tête de la PR (détection des lots Mergify)
     required: false
     default: ''
+  pr-body:
+    description: >-
+      Corps de la PR. Sert uniquement sur une PR de lot Mergify : il porte le
+      bloc machine `pull_requests:` qui donne la TAILLE du lot, donc si l'arbre
+      testé est déjà celui d'une PR verte (lot de 1) ou une combinaison neuve.
+    required: false
+    default: ''
 outputs:
   code:
     description: "'1' si Gradle doit tourner, '0' sinon"
@@ -41,6 +48,7 @@ runs:
         PUSH_BEFORE: ${{ inputs.push-before }}
         PUSH_SHA: ${{ inputs.push-sha }}
         PR_HEAD_REF: ${{ inputs.pr-head-ref }}
+        PR_BODY: ${{ inputs.pr-body }}
       run: |
         # Une PR de docs/config n'a pas besoin de Gradle : le verdict tombe en
         # quelques secondes. La liste des fichiers vient de l'API (le checkout
@@ -48,15 +56,33 @@ runs:
         code=1
         fichiers=""
         lot=0
-        # PR de lot de la file de merge : le `push` sur la même tête a déjà
-        # fait tourner les tests (même commit, même arbre). Ce passage-ci
-        # existe seulement parce que la file ouvre une PR sur sa branche ;
-        # on le rend vert en quelques secondes au lieu de rejouer Gradle —
-        # sinon chaque lot chargeait deux fois 21 runners pour un verdict.
+        # PR de lot de la file de merge. Un lot d'UNE PR est l'arbre de cette
+        # PR : Mergify la rebase sur `master` (`update_method: rebase`) et
+        # reconstruit exactement le même contenu — la CI de la PR vient de
+        # rendre son verdict sur cette tête. Rejouer Gradle ne teste donc rien
+        # de neuf et coûte un créneau de runner entier pour un verdict connu :
+        # on rend ce passage-ci vert en quelques secondes.
+        # Un lot de DEUX PR ou plus, lui, teste une combinaison que personne
+        # n'a vue (chaque PR n'a été vérifiée que seule sur `master`) : là, les
+        # tests tournent pour de vrai.
+        # Taille inconnue (bloc absent, script absent, corps vide) : on teste.
+        # Défaut sûr, jamais l'inverse.
         case "${PR_HEAD_REF:-}" in
           mergify/merge-queue/*)
-            echo "PR de lot de la file de merge : tests déjà exécutés par le push de la branche."
-            lot=1
+            lot_prs=$(printf '%s' "${PR_BODY:-}" \
+              | python3 "$GITHUB_WORKSPACE/tools/mergify_batch_size.py" 2>/dev/null || echo 0)
+            case "${lot_prs:-0}" in
+              1)
+                lot=1
+                echo "Lot Mergify d'UNE PR : arbre identique à la tête déjà testée, étapes Gradle sautées."
+                ;;
+              0|'')
+                echo "Taille du lot illisible : tests lancés (défaut sûr)."
+                ;;
+              *)
+                echo "Lot Mergify de ${lot_prs} PR : combinaison jamais testée, tests lancés."
+                ;;
+            esac
             ;;
         esac
         if [ -n "$PR_NUMBER" ]; then
@@ -91,8 +117,10 @@ runs:
             backend=0; echo "Backend intact : tests Python sautés."
           fi
         fi
-        # Dernier mot pour une PR de lot : quoi qu'ait décidé la liste de
-        # fichiers ci-dessus, ce passage ne rejoue pas les tests.
+        # Dernier mot pour un lot d'UNE PR : la liste de fichiers ci-dessus
+        # verrait bien du code (le lot rebasé), mais c'est exactement la tête
+        # déjà testée. Seul ce cas saute ; un lot de plusieurs PR garde son
+        # verdict complet par l'arbre fusionné.
         if [ "$lot" = "1" ]; then code=0; backend=0; fi
         echo "code=$code" >> "$GITHUB_OUTPUT"
         echo "backend=$backend" >> "$GITHUB_OUTPUT"
