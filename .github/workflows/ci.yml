@@ -165,6 +165,7 @@ jobs:
       - name: Tests des gardes CI (conflits, périmètre, couche0, budget)
         run: |
           python3 .github/fireworks/test_conflict_agent.py
+          python3 .github/fireworks/test_test_agent.py
           python3 .github/fireworks/test_scope_agent.py
           python3 .github/fireworks/test_union_journal.py
           python3 .github/fireworks/test_quota.py
