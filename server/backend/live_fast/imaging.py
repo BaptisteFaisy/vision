@@ -210,20 +210,21 @@ def _encode_varint(value: int) -> bytes:
 
 
 def encode_mask_rle_b64(mask, grid: tuple[int, int]) -> str:
-    """Encode un masque en runs LEB128 sur ``grid`` (w, h), base64, sans perte."""
+    """Encode un masque en runs LEB128 sur ``grid`` (w, h), base64, sans perte.
+
+    Les frontières 0/1 sont trouvées par différences numpy, pas par une boucle
+    Python sur les ~65 000 cellules : même suite de runs, même base64, ~100×
+    moins d'itérations. Un masque commençant par 1 s'ouvre par un run 0
+    (éventuellement nul), comme le décodeur Kotlin l'attend.
+    """
     cells = (mask_to_uint8(mask, grid) > 0).reshape(-1)
-    runs = bytearray()
-    level = False
-    count = 0
-    for filled in cells:
-        if bool(filled) == level:
-            count += 1
-        else:
-            runs += _encode_varint(count)
-            level = not level
-            count = 1
-    runs += _encode_varint(count)
-    return base64.b64encode(bytes(runs)).decode("ascii")
+    changes = np.flatnonzero(np.diff(cells.astype(np.int8))).tolist()
+    bounds = [0] + [change + 1 for change in changes] + [cells.size]
+    lengths = [stop - start for start, stop in zip(bounds, bounds[1:])]
+    if cells.size and cells[0]:
+        lengths = [0] + lengths
+    runs = b"".join(_encode_varint(length) for length in lengths)
+    return base64.b64encode(runs).decode("ascii")
 
 
 def decode_mask_rle_b64(payload: str, grid: tuple[int, int]) -> np.ndarray:
