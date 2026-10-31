@@ -41,24 +41,32 @@ class SettingsAsrTest {
 
     @Test
     fun `codec conserve le drapeau temps réel`() {
-        val settings = Settings.Default.copy(ttsApiKey = "sk-tts", scribeRealtime = false)
+        val settings = Settings.Default.copy(asrApiKey = "sk-asr", museRealtime = false)
 
         val relu = SettingsCodec.decode(SettingsCodec.encode(settings))
 
-        assertFalse(relu.scribeRealtime)
-        assertFalse("drapeau coupé : pas de stream", relu.scribeRealtimeReady)
-        assertTrue("le batch reste configuré", relu.sttConfigured)
+        assertFalse(relu.museRealtime)
+        assertFalse("drapeau coupé : pas de stream", relu.museRealtimeReady)
+        assertTrue("le batch Meta reste configuré", relu.asrConfigured)
     }
 
     @Test
-    fun `ancien fichier sans drapeau stream par défaut avec une clé`() {
+    fun `ancien fichier sans drapeau stream par défaut avec la dictée Meta`() {
         val legacy = "llmBaseUrl=x\nllmApiKey=y\nllmModel=m\nsamBaseUrl=\n" +
-            "ttsApiKey=sk-tts\nttsVoiceId=v\n"
+            "asrApiKey=sk-asr\n"
 
         val relu = SettingsCodec.decode(legacy)
 
-        assertTrue(relu.scribeRealtime)
-        assertTrue(relu.scribeRealtimeReady)
-        assertFalse(Settings.Default.scribeRealtimeReady)
+        assertTrue(relu.museRealtime)
+        assertTrue(relu.museRealtimeReady)
+        assertFalse(Settings.Default.museRealtimeReady)
+    }
+
+    @Test
+    fun `sans dictée Meta pas de stream même avec la clé ElevenLabs`() {
+        val settings = Settings.Default.copy(ttsApiKey = "sk-tts")
+
+        assertFalse("le stream est Meta, pas Scribe", settings.museRealtimeReady)
+        assertTrue("le batch Scribe reste un repli", settings.sttConfigured)
     }
 }

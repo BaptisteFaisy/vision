@@ -489,8 +489,8 @@ private fun DictationSettings(draft: Settings, onChange: (Settings) -> Unit) {
         }
         LabeledField("Meta dictation — model", draft.asrModel, false) { onChange(draft.copy(asrModel = it)) }
         SwitchRow(
-            "Realtime dictation over WebSocket (ElevenLabs Scribe, batch fallback)",
-            draft.scribeRealtime,
-        ) { onChange(draft.copy(scribeRealtime = it)) }
+            "Realtime dictation over WebSocket (Meta Muse, batch fallback)",
+            draft.museRealtime,
+        ) { onChange(draft.copy(museRealtime = it)) }
     }
 }

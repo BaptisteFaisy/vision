@@ -1,7 +1,7 @@
 package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.isee.IseeUiState
-import dev.sam3vision.core.net.ScribeStreamSession
+import dev.sam3vision.core.net.MuseStreamSession
 import dev.sam3vision.core.net.SpeechClient
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CoroutineScope
@@ -17,21 +17,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Dictée temps réel de l'appui long : la session se nourrit des morceaux du
- * micro, les partiels s'affichent sous la boule, et toute mort (ouverture,
- * réseau, repli) redémarre les aperçus batch — le moteur final retombe
- * alors sur le batch, sans régression.
+ * Dictée temps réel Muse de l'appui long : la session se nourrit des
+ * morceaux du micro, les partiels s'affichent sous la boule, et toute mort
+ * (ouverture, réseau, repli) redémarre les aperçus batch — le moteur final
+ * retombe alors sur le batch, sans régression.
  */
 class IseeStreamDictationTest {
 
+    private fun ready() = Settings.Default.copy(asrApiKey = "k")
+
     @Test
-    fun `le stream démarre avec une clé et nourrit la session`() {
+    fun `le stream démarre avec la dictée Meta et nourrit la session`() {
         val h = Harness()
         try {
-            val attempting = h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            val attempting = h.stream.start(ready()) { h.fallbacks++ }
 
             assertTrue(attempting)
             assertTrue(h.session.started)
+            assertEquals(Settings.DEFAULT_ASR_BASE_URL, h.usedBase)
+            assertEquals("muse-voice-transcribe-1.0", h.usedModel)
             h.listener!!(ByteArray(1_000), 1_000)
             assertEquals(listOf(1_000), h.session.chunks)
             h.partial!!("where is")
@@ -41,11 +45,11 @@ class IseeStreamDictationTest {
     }
 
     @Test
-    fun `sans clé ou drapeau coupé le batch reprend aussitôt`() {
+    fun `sans dictée Meta ou drapeau coupé le batch reprend aussitôt`() {
         val h = Harness()
         try {
             assertFalse(h.stream.start(Settings.Default) { h.fallbacks++ })
-            assertFalse(h.stream.start(Settings.Default.copy(ttsApiKey = "k", scribeRealtime = false)) { h.fallbacks++ })
+            assertFalse(h.stream.start(ready().copy(museRealtime = false)) { h.fallbacks++ })
             assertNull(h.listener)
             assertFalse(h.session.started)
         } finally { h.close() }
@@ -55,7 +59,7 @@ class IseeStreamDictationTest {
     fun `un partiel après relâchement est ignoré`() {
         val h = Harness()
         try {
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.stream.start(ready()) { h.fallbacks++ }
             h.state.value = h.state.value.copy(holding = false)
 
             h.partial!!("trop tard")
@@ -68,7 +72,7 @@ class IseeStreamDictationTest {
     fun `une mort de session redémarre les aperçus batch`() {
         val h = Harness()
         try {
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.stream.start(ready()) { h.fallbacks++ }
             h.partial!!("where is")
 
             h.death!!()
@@ -86,7 +90,7 @@ class IseeStreamDictationTest {
         try {
             h.session.startResult = Result.failure(IllegalStateException("refusé"))
 
-            val attempting = h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            val attempting = h.stream.start(ready()) { h.fallbacks++ }
 
             assertTrue("la tentative a bien eu lieu", attempting)
             assertEquals(1, h.fallbacks)
@@ -96,25 +100,25 @@ class IseeStreamDictationTest {
     }
 
     @Test
-    fun `le moteur final commite et rend le texte`() = runBlocking {
+    fun `le moteur final finit le tour et rend le texte`() = runBlocking {
         val h = Harness()
         try {
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.stream.start(ready()) { h.fallbacks++ }
 
             val text = h.stream.finalClient(h.batch)!!.transcribe(ByteArray(44)).getOrThrow()
 
             assertEquals("final words", text)
-            assertTrue(h.session.committed)
-            assertNull("commit réussi : le batch ne part pas", h.batch.heard)
+            assertTrue(h.session.ended)
+            assertNull("tour réussi : le batch ne part pas", h.batch.heard)
         } finally { h.close() }
     }
 
     @Test
-    fun `un commit en échec retombe sur le batch avec le wav complet`() = runBlocking {
+    fun `une fin de tour en échec retombe sur le batch avec le wav complet`() = runBlocking {
         val h = Harness()
         try {
-            h.session.commitResult = Result.failure(IllegalStateException("socket mort"))
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.session.endResult = Result.failure(IllegalStateException("socket mort"))
+            h.stream.start(ready()) { h.fallbacks++ }
             val wav = ByteArray(1_000)
 
             val text = h.stream.finalClient(h.batch)!!.transcribe(wav).getOrThrow()
@@ -128,7 +132,7 @@ class IseeStreamDictationTest {
     fun `stop est idempotent et coupe tout`() {
         val h = Harness()
         try {
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.stream.start(ready()) { h.fallbacks++ }
 
             h.stream.stop()
             h.stream.stop()
@@ -143,7 +147,7 @@ class IseeStreamDictationTest {
     fun `les morceaux d'une tentative périmée sont ignorés`() {
         val h = Harness()
         try {
-            h.stream.start(Settings.Default.copy(ttsApiKey = "k")) { h.fallbacks++ }
+            h.stream.start(ready()) { h.fallbacks++ }
             val stale = h.listener!!
             h.stream.stop()
 
@@ -160,13 +164,17 @@ class IseeStreamDictationTest {
         var listener: ((ByteArray, Int) -> Unit)? = null
         var partial: ((String) -> Unit)? = null
         var death: (() -> Unit)? = null
+        var usedBase: String? = null
+        var usedModel: String? = null
         var fallbacks = 0
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val stream = IseeStreamDictation(
             scope,
             { listener = it },
             { state.value = it(state.value) },
-        ) { _, onPartial, onDeath ->
+        ) { baseUrl, _, model, onPartial, onDeath ->
+            usedBase = baseUrl
+            usedModel = model
             partial = onPartial
             death = onDeath
             session
@@ -178,12 +186,12 @@ class IseeStreamDictationTest {
         }
     }
 
-    private class FakeSession : ScribeStreamSession {
+    private class FakeSession : MuseStreamSession {
         var startResult: Result<Unit> = Result.success(Unit)
-        var commitResult: Result<String> = Result.success("final words")
+        var endResult: Result<String> = Result.success("final words")
         val chunks = mutableListOf<Int>()
         var started = false
-        var committed = false
+        var ended = false
         var aborted = false
         private var live = true
 
@@ -199,9 +207,9 @@ class IseeStreamDictationTest {
             return true
         }
 
-        override suspend fun commitAndFinal(): Result<String> {
-            committed = true
-            return commitResult
+        override suspend fun endStreamAndFinal(): Result<String> {
+            ended = true
+            return endResult
         }
 
         override fun abort() {
