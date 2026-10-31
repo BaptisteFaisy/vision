@@ -41,6 +41,18 @@ class CrossingWiringTest {
     }
 
     @Test
+    fun `aucun libelle ne pose de question`() {
+        // Bascule manuelle, plus aucune demande : l'ecran ne demande jamais << cross? >>.
+        listOf(
+            crossingButtonLabel(false, null),
+            crossingButtonLabel(false, CrossingState.Green),
+            crossingButtonLabel(true, null),
+            crossingButtonLabel(true, CrossingState.Red),
+            crossingButtonLabel(true, CrossingState.Green),
+        ).forEach { assertFalse(it.contains("?")) }
+    }
+
+    @Test
     fun `mode actif libelle l etat du feu`() {
         assertEquals("Crossing: GREEN", crossingButtonLabel(true, CrossingState.Green))
         assertEquals("Crossing: RED", crossingButtonLabel(true, CrossingState.Red))

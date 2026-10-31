@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import android.graphics.RectF
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.crossing.CrossingApproachWatcher
 import dev.sam3vision.core.crossing.CrossingArrivalWatcher
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingDistance
@@ -179,10 +180,9 @@ internal fun List<PlacedLabel>.withoutCrosswalk(): List<PlacedLabel> =
     CrossingGuidance.withoutCrosswalk(this)
 
 /**
- * Ce que le guidage latéral dit sur une frame : le mot ([lateral], `null` =
- * silence, mot nouveau seul, clip [lateralClip] < 100 ms), l'arrivée
- * ([arrival], `null` = silence, « Sur le passage. »), et la géométrie qui les
- * a produits ([centerX], [meters] profondeur/sol, jamais sténopé).
+ * Ce que le guidage latéral dit sur une frame : le mot ([lateral], mot nouveau seul, clip
+ * [lateralClip] < 100 ms), l'annonce ([approach], « Passage piéton … » localisé), l'arrivée
+ * ([arrival], « Sur le passage. »), et la géométrie ([centerX], [meters]). `null` = silence.
  */
 internal data class CrossingLateralPatch(
     val lateral: String?,
@@ -190,6 +190,7 @@ internal data class CrossingLateralPatch(
     val arrival: String?,
     val centerX: Float?,
     val meters: Float?,
+    val approach: String? = null,
     /** Horodatage de la frame (ms) : l'annonce d'activation n'en parle que fraîche. */
     val atMs: Long = 0L,
 )
@@ -237,9 +238,9 @@ internal fun crossingOfferMeters(
 }
 
 /**
- * Signal latéral de la frame : mot nouveau seul + arrivée (2 frames,
- * changement seul). Sans passage : les deux guetteurs retombent et `null` est
- * rendu. Pur hors annonceurs (injectés pour les tests JVM).
+ * Signal latéral de la frame : mot nouveau seul + annonce localisée + arrivée (2 frames,
+ * changement seul). Sans passage : les trois guetteurs retombent et `null` est rendu.
+ * Pur hors annonceurs (injectés pour les tests JVM).
  */
 internal fun crossingLateralPatchOf(
     lateral: CrossingLateralAnnouncer,
@@ -252,12 +253,14 @@ internal fun crossingLateralPatchOf(
     lens: LensSpec,
     atMs: Long,
     language: SpeechLanguage,
+    approach: CrossingApproachWatcher = CrossingApproachWatcher(),
 ): CrossingLateralPatch? {
     if (width <= 0 || height <= 0) return null
     val best = CrossingGuidance.selectBest(objects)
     if (best == null) {
         lateral.onFrame(atMs, null, language)
         arrival.onFrame(false, language)
+        approach.onFrame(null, null, language)
         return null
     }
     val centerX = CrossingGuidance.centerXOf(best.box, width) ?: return null
@@ -267,19 +270,21 @@ internal fun crossingLateralPatchOf(
     val clip = lateralPhrase?.let { GuidanceWord.clipIdFor(it) }
     val arrived = CrossingGuidance.isArrivedPx(best.box, height, meters)
     val arrivalPhrase = arrival.onFrame(arrived, language)?.phrase
-    return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters, atMs)
+    val approachPhrase = approach.onFrame(centerX, meters, language)
+    return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters, approachPhrase, atMs)
 }
 
 /**
  * Mémoire latérale, une par processus (la garde des 500 lignes ne laisse
  * pas de place à un champ de plus dans `LiveProbe`) : la sonde l'alimente
  * à chaque frame publiée, l'écran
- * observe [flow] (mot doux + arrivée douce, jamais de « Stop » ici).
+ * observe [flow] (mot + annonce + arrivée, doux, jamais de « Stop » ici).
  */
 internal object CrossingLateralWatch {
 
     private val lateral = CrossingLateralAnnouncer()
     private val arrival = CrossingArrivalWatcher()
+    private val approach = CrossingApproachWatcher()
     private val _flow = MutableStateFlow<CrossingLateralPatch?>(null)
 
     /** Dernier signal latéral (`null` = silence ou aucun passage). */
@@ -297,7 +302,7 @@ internal object CrossingLateralWatch {
         language: SpeechLanguage,
     ): CrossingLateralPatch? {
         val patch = crossingLateralPatchOf(
-            lateral, arrival, objects, width, height, readings, pose, lens, atMs, language,
+            lateral, arrival, objects, width, height, readings, pose, lens, atMs, language, approach,
         )
         _flow.value = patch
         return patch
@@ -307,6 +312,7 @@ internal object CrossingLateralWatch {
     fun reset() {
         lateral.reset()
         arrival.reset()
+        approach.reset()
         _flow.value = null
     }
 }
@@ -349,9 +355,8 @@ internal fun feedCrossingLateral(
 
 /**
  * Parole latérale : le mot via [speakWord] (clip local < 100 ms, doux :
- * appelant `urgent = false`), l'arrivée via [say] (douce aussi). Les deux
- * guetteurs dédupliquent déjà (mot nouveau seul, arrivée changement seul) :
- * rien à filtrer de plus, le silence ne dit rien.
+ * appelant `urgent = false`), l'annonce et l'arrivée via [say] (douces
+ * aussi). Les guetteurs dédupliquent déjà : rien à filtrer, le silence ne dit rien.
  */
 internal fun observeCrossingLateral(
     patches: Flow<CrossingLateralPatch?>,
@@ -360,11 +365,13 @@ internal fun observeCrossingLateral(
     say: suspend (String) -> Unit,
 ) {
     scope.launch {
-        patches.filter { it != null && (it.lateral != null || it.arrival != null) }.collect { patch ->
+        patches.filter { it != null && (it.lateral != null || it.arrival != null || it.approach != null) }.collect { patch ->
             patch ?: return@collect
             val lateral = patch.lateral
             val clip = patch.lateralClip
             if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
+            val approach = patch.approach
+            if (approach != null) runCatching { say(approach) }
             val arrival = patch.arrival
             if (arrival != null) runCatching { say(arrival) }
         }
