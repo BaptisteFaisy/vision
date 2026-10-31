@@ -63,9 +63,40 @@ class CrossingOverlayLayoutTest {
     }
 
     @Test
-    fun `une boite plus petite qu un point ne designe rien`() {
-        // 2 x 2 px : un cadre de cette taille ne se distingue pas d'une poussière.
-        assertNull(lightMarker(listOf(0.10f, 0.10f, 0.12f, 0.12f), 100, 100, 100f, 100f))
+    fun `un petit feu garde un marqueur minimal centre sur sa position`() {
+        // 2 x 2 px, centre (11, 11) : effacé avant, élargi au minimum maintenant.
+        // La position reste celle de la détection — seule la taille est relevée.
+        val half = MIN_MARKER_PX / 2f
+        assertMarker(
+            lightMarker(listOf(0.10f, 0.10f, 0.12f, 0.12f), 100, 100, 100f, 100f),
+            11f - half, 11f - half, 11f + half, 11f + half,
+        )
+    }
+
+    @Test
+    fun `un petit feu au bord garde un marqueur ramene dans la carte`() {
+        // Coin haut-gauche : le marqueur élargi est calé à (0, 0), pas coupé.
+        val marker = lightMarker(listOf(0f, 0f, 0.01f, 0.01f), 100, 100, 100f, 100f)
+        assertMarker(marker, 0f, 0f, MIN_MARKER_PX, MIN_MARKER_PX)
+    }
+
+    @Test
+    fun `un feu a moitie hors champ garde un marqueur cale au bord`() {
+        // Visible : x 95..100, y 40..60 — 5 px de large, élargi à 12 calé à droite.
+        val marker = lightMarker(listOf(0.95f, 0.4f, 1.2f, 0.6f), 100, 100, 100f, 100f)
+        assertMarker(marker, 100f - MIN_MARKER_PX, 50f - MIN_MARKER_PX / 2f, 100f, 50f + MIN_MARKER_PX / 2f)
+    }
+
+    @Test
+    fun `boite vide inversee hors champ ou NaN - toujours rien`() {
+        // Le marqueur minimal ne s'applique qu'à une détection réelle : sans
+        // détection, pas de marqueur — on ne montre jamais un feu imaginaire.
+        assertNull(lightMarker(listOf(0.3f, 0.3f, 0.3f, 0.5f), 100, 100, 100f, 100f))
+        assertNull(lightMarker(listOf(0.5f, 0.5f, 0.1f, 0.1f), 100, 100, 100f, 100f))
+        assertNull(lightMarker(listOf(1.2f, 0.1f, 1.5f, 0.5f), 100, 100, 100f, 100f))
+        assertNull(lightMarker(listOf(-0.5f, 0.1f, -0.2f, 0.5f), 100, 100, 100f, 100f))
+        assertNull(lightMarker(listOf(0.1f, Float.NaN, 0.3f, 0.4f), 100, 100, 100f, 100f))
+        assertNull(lightMarker(listOf(0.1f, 0.2f, Float.POSITIVE_INFINITY, 0.4f), 100, 100, 100f, 100f))
     }
 
     @Test
