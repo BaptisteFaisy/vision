@@ -415,7 +415,23 @@ danger. Avec feu : inchangé (feu > scan > véhicules > personnes).
 - **câblage** : `crossingPatchOf` tait le feu et publie rouge (aucun vert lu —
   pastille, bouton et vibrations inchangés), `crossingPhraseOf` coupe le scan
   et parle véhicules d'abord (`NoLightCrossWatch`, reset avec les autres voix) ;
-- **limites** : portée véhicules 15 m mesurés (non mesuré = parlé comme
-  proche, « Stop, … » urgent comme avant) ; un feu cadré hors champ 4 frames
-  passe en sans-feu — viser le feu quand il y en a un ; écran Direct
-  inchangé (fail-closed : « attendez » sans vert).
+- **limites** : un feu cadré hors champ 4 frames passe en sans-feu —
+  viser le feu quand il y en a un ; écran Direct inchangé (fail-closed :
+  « attendez » sans vert).
+
+## 14. Sans feu : le mouvement se dit à toute portée (31/10)
+
+Ordre user : sans feu, une voiture en mouvement se dit **dès qu'elle est
+détectée, même au-delà de 15 m** (« Car moving, 30 meters away. »). Seul le
+mouvement est illimité : l'arrêt garde 15 m (une voiture garée loin ne
+bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
+15 m.
+
+- **noyau** : `VehicleStateWatcher.update` prend `movingMeters` (défaut
+  `MOVING_METERS`) — la portée ne touche que le mouvement, jamais l'arrêt ;
+- **câblage** : `CrossingVehicleWatch.update(noLight = true)` passe l'infini
+  (branche sans-feu seule) ; le brut `movingNow` qui tait le verdict suit la
+  même portée — au-delà de 15 m, « Attendez. » toutes les 2 s aussi ;
+- **urgence inchangée** : loin = doux mais premier, proche ou non mesuré =
+  « Stop, … » qui coupe tout (une voiture lointaine non mesurée reste dite
+  comme proche, règle conservatrice existante).
