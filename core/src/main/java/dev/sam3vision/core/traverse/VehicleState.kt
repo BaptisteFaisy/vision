@@ -183,14 +183,15 @@ object VehicleStateText {
  * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
  * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
  * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
- * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
- * stable (deux transitions stables, trois frames) — mesuré, dans le
- * couloir marché, hors fond franc (le suivi coupe l'arrêt). Le reste est doute/silence.
+ * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre stable,
+ * mesuré ou non (l'heure situe), partout dans le champ, hors fond franc
+ * (le suivi coupe l'arrêt). Le reste est doute : piste jeune, seau instable,
+ * hors portée.
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
  * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS], mesuré ou
- * non — sans focale, seule l'approche compte, comme le veto.
+ * non — toute voiture vue se dit, en mouvement ou à l'arrêt.
  *
  * Le pluriel est générique : deux types mobiles ou plus dans la même frame
  * disent « 2 vehicles moving… » (distance du plus proche), pas le nom du
@@ -366,11 +367,12 @@ class VehicleStateWatcher(
         val moving = current.keys
             .filter { candidate ->
                 if (candidate in hushed) return@filter false
+                val seen = current.getValue(candidate)
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
-                    current.getValue(candidate).area, current.getValue(candidate).closeness, atMs, approach.lastGlobal)
+                    seen.area, seen.closeness, atMs, approach.lastGlobal)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -383,7 +385,7 @@ class VehicleStateWatcher(
         return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size)
     }
 
-    /** Véhicule à l'arrêt : dérive faible, seau stable, mesuré, dans le couloir. */
+    /** Véhicule à l'arrêt : dérive faible et seau stable, mesuré ou non, partout dans le champ. */
     private fun stoppedPick(
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -396,20 +398,16 @@ class VehicleStateWatcher(
                 if (candidate in hushed || fondFranc) return@filter false // PISTE1+FUSION
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
-                val measured = meters[candidate] ?: return@filter false
-                if (measured > STOPPED_METERS) return@filter false
-                val centerX = seen.cx ?: return@filter false
-                if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) {
-                    return@filter false
-                }
+                val measured = meters[candidate]
+                if (measured != null && measured > MOVING_METERS) return@filter false
                 if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
-            .minByOrNull { meters.getValue(it) }
+            .minByOrNull { meters[it] ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
-        return Pick(State.STOPPED, name, meters.getValue(key), seen.cx, false)
+        return Pick(State.STOPPED, name, meters[key], seen.cx, false)
     }
 
     /** Véhicules moteurs vus par clé (surface max, miroir du veto). */
@@ -476,10 +474,7 @@ class VehicleStateWatcher(
         /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
         const val NEAR_MOVING_METERS = 8f
 
-        /** Au-delà de cette distance (m), un véhicule à l'arrêt ne fait pas parler. */
-        const val STOPPED_METERS = 3f
-
-        /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (bande morte sous 3 %). */
+        /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (au-delà, c'est un mouvement latéral). */
         const val STILL_SPEED = 0.02f
 
         /** Bande centrale de l'urgence : entre 30 % et 70 % de la largeur. */
