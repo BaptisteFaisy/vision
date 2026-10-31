@@ -9,6 +9,7 @@ import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
@@ -47,15 +48,19 @@ class IseeAnswersTest {
         synthesize: suspend (String) -> ByteArray = { ByteArray(0) },
         photo: IseePhotoShot = shots,
         askTimeoutMs: Long = IseeAnswers.ASK_TIMEOUT_MS,
+        destination: String? = null,
+        onContext: ((String?) -> Unit)? = null,
+        testSettings: Settings = settings,
     ): IseeAnswers = IseeAnswers(
         media = media,
-        settings = { settings },
+        settings = { testSettings },
         update = ::update,
         transcript = transcript,
         playback = playback(synthesize),
         photo = photo,
         prune = {},
-        ask = ask,
+        destination = { destination },
+        ask = { image, question, history, context -> onContext?.invoke(context); ask(image, question, history) },
         askTimeoutMs = askTimeoutMs,
     )
 
@@ -71,7 +76,8 @@ class IseeAnswersTest {
         playback = playback(),
         photo = photo,
         prune = {},
-        ask = ask,
+        destination = { null },
+        ask = { image, question, history, _ -> ask(image, question, history) },
     )
 
     @Test
@@ -105,8 +111,71 @@ class IseeAnswersTest {
 
         answers.answer(row, "maintenant")
 
-        // Zéro mémoire : ni les messages précédents, ni rien de la base.
+        // Zéro historique : ni les messages précédents, ni rien de la base.
         assertTrue("aucun tour envoyé au LLM", history?.isEmpty() == true)
+    }
+
+    @Test
+    fun `guidage actif — la destination part en contexte, l'historique reste vide`() = runBlocking {
+        var history: List<ChatTurn>? = null
+        var context: String? = "non appelé"
+        val answers = answers(
+            { _, _, turns -> history = turns; Result.success("ok") },
+            destination = "la gare",
+            onContext = { context = it },
+        )
+
+        answers.answer(seedRow(), "c'est encore loin ?")
+
+        assertEquals("Active GPS destination: \"la gare\".", context)
+        assertTrue("aucun tour envoyé au LLM", history?.isEmpty() == true)
+    }
+
+    @Test
+    fun `hors guidage — aucun contexte`() = runBlocking {
+        var context: String? = "non appelé"
+        val answers = answers({ _, _, _ -> Result.success("ok") }, onContext = { context = it })
+
+        answers.answer(seedRow(), "question")
+
+        assertNull("aucun contexte hors guidage", context)
+    }
+
+    @Test
+    fun `destination en francais — la ligne suit la langue de la voix`() = runBlocking {
+        var context: String? = null
+        val answers = answers(
+            { _, _, _ -> Result.success("ok") },
+            destination = "la gare",
+            onContext = { context = it },
+            testSettings = settings.copy(speechLanguage = SpeechLanguage.Fr),
+        )
+
+        answers.answer(seedRow(), "question")
+
+        assertEquals("Destination GPS en cours : « la gare ».", context)
+    }
+
+    @Test
+    fun `fournisseur de destination qui jette — la question part sans contexte`() = runBlocking {
+        var context: String? = "non appelé"
+        val answers = IseeAnswers(
+            media = media,
+            settings = { settings },
+            update = ::update,
+            transcript = transcript,
+            playback = playback(),
+            photo = shots,
+            prune = {},
+            destination = { error("mémoire en panne") },
+            ask = { _, _, _, received -> context = received; Result.success("ok") },
+        )
+        val row = seedRow()
+
+        answers.answer(row, "question")
+
+        assertNull("pas de contexte", context)
+        assertEquals("la question part quand même", "ok", dao.byId(row.id)?.texteIA)
     }
 
     @Test
@@ -275,7 +344,7 @@ class IseeAnswersTest {
             playback = streaming,
             photo = shots,
             prune = {},
-            ask = { _, _, _ -> Result.success("Devant toi") },
+            ask = { _, _, _, _ -> Result.success("Devant toi") },
         )
         val job = launch { answers.answer(seedRow(), "question") }
         withTimeout(2_000) { entered.await() }
@@ -348,7 +417,7 @@ class IseeAnswersTest {
             playback = streaming,
             photo = shots,
             prune = {},
-            ask = { _, _, _ -> Result.success("Devant toi") },
+            ask = { _, _, _, _ -> Result.success("Devant toi") },
         )
         val job = launch { answers.answer(seedRow(), "question") }
         withTimeout(2_000) { entered.await() }
