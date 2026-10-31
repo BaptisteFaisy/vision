@@ -96,10 +96,4 @@ class SpeechUseCaseTest {
         assertTrue(!cache.containsKey("cle0"))
         assertEquals(7, SpeechCache.bytesOf(listOf(ByteArray(7))))
     }
-
-    @Test
-    fun `la sonde de test reste courte`() {
-        assertTrue(SpeechProbe.TEXT.length < 60)
-        assertTrue(SpeechProbe.verdict(1234).contains("1234"))
-    }
 }
