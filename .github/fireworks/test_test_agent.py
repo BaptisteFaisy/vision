@@ -107,6 +107,15 @@ class ChangementsTest(unittest.TestCase):
         self.assertEqual(fichiers, ["core/a.kt", "app/b.kt",
                                     "core/nouveau.kt", "docs/note.md"])
 
+    def test_sorties_doutils_ignorees(self):
+        sortie = (" M core/a.kt\n"
+                  "?? .kotlin/sessions/s1.bin\n"
+                  "?? build/tmp/x\n"
+                  "?? app/build/y\n")
+        faux = mock.Mock(returncode=0, stdout=sortie, stderr="")
+        with mock.patch.object(test_agent.subprocess, "run", return_value=faux):
+            self.assertEqual(test_agent.changements(), ["core/a.kt"])
+
     def test_git_muet_rend_vide(self):
         faux = mock.Mock(returncode=1, stdout="", stderr="boom")
         with mock.patch.object(test_agent.subprocess, "run", return_value=faux):
@@ -203,6 +212,29 @@ class FixTest(unittest.TestCase):
         rc, actifs = self._lancer(patchs)
         self.assertEqual(rc, 1)
         actifs["pousser"].assert_not_called()
+
+    def test_outillage_absent_ne_consomme_pas_l_essai(self):
+        """Runner non provisionné : code 3, aucune marque, aucun label, aucun push."""
+        patchs = self._patchs()
+        patchs["lancer_agent"] = mock.patch.object(
+            test_agent, "lancer_agent",
+            return_value=(False, test_agent.INFRA + "zeroclaw introuvable"))
+        rc, actifs = self._lancer(patchs)
+        self.assertEqual(rc, 3)
+        actifs["comment"].assert_not_called()
+        actifs["add_label"].assert_not_called()
+        actifs["pousser"].assert_not_called()
+
+    def test_echec_agent_hors_infra_reste_livre(self):
+        """Un vrai échec de l'agent (pas l'outillage) garde son compte rendu."""
+        patchs = self._patchs()
+        patchs["lancer_agent"] = mock.patch.object(
+            test_agent, "lancer_agent", return_value=(False, "ABANDON raison"))
+        patchs["changements"] = mock.patch.object(test_agent, "changements",
+                                                  return_value=[])
+        rc, actifs = self._lancer(patchs)
+        self.assertEqual(rc, 2)
+        actifs["comment"].assert_called()
 
     def test_correctif_pousse(self):
         patchs = self._patchs()
