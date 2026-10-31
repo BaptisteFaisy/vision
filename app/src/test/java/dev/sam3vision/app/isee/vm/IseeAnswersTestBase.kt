@@ -19,7 +19,7 @@ import kotlinx.coroutines.runBlocking
  * fabriques partagées. Les suites ([IseeAnswersTest], [IseeAnswersPreemptTest]) n'y
  * ajoutent que leurs tests (garde 500 lignes).
  */
-internal open class IseeAnswersTestBase {
+open class IseeAnswersTestBase {
 
     protected val state = MutableStateFlow(IseeUiState())
     protected val dao = FakeMessageDao()
@@ -108,7 +108,7 @@ internal open class IseeAnswersTestBase {
 }
 
 /** Caméra factice : photo écrite sur disque et réussie, sauf `accept = false`. */
-internal class FakeCamera : IseeCameraActions {
+class FakeCamera : IseeCameraActions {
     var accept = true
 
     override val ready: Boolean = true
