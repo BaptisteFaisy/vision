@@ -595,7 +595,47 @@ descente — premier son ≤ 1 s après confirmation, bande 1,0 ± 0,3 m /
 0,4 ± 0,25 m, sens juste 4/4 jour, bateau 0 `Stop`, traversée :
 pré-alerte tuée et imminent passant — **non mesuré**, exige un APK de
 cette branche sur appareil réel.
-## 20. Alertes P1/P2 : la nouvelle coupe l'ancienne, jamais de file (ordre user du 31/10)
+## 20. Voitures au pluriel, poteau qui dit comment l'éviter, rebord à 0,7 m (ordre user du 31/10)
+
+Le user marche avec l'app : plusieurs voitures en mouvement n'étaient dites
+qu'au singulier (la plus proche), le poteau ne disait pas comment l'éviter,
+et la marche imminente parlait à 0,4 m — trop tard pour lever le pied.
+Nouveau contrat, qui amende les § 16-19 :
+
+- **pluriel véhicules** : deux types mobiles ou plus dans la même frame =
+  « 2 vehicles moving, 5 meters away. » / « 2 véhicules en mouvement, à 5
+  mètres. » (générique : les pistes sont par type, pas par instance —
+  deux voitures sous le même label comptent pour une, limite connue,
+  distance du plus proche) ; le « Stop » suit (« Stop, 2 vehicles
+  moving. ») ; le singulier est inchangé (`VehicleStateText`,
+  `VehicleStateCue.movingCount`) ;
+- **poteau + évitement** : « Attention au poteau, à 2 heures, passez à
+  gauche. » / « Attention, pole, at 2 o'clock, pass on the left. » — le
+  côté conseillé est l'opposé du poteau (poteau à gauche de l'axe = on
+  passe à droite) ; axe pile ou heure inconnue = droite par défaut
+  (prior, à valider rue : on serre à droite) ; doux comme imminent
+  (`HazardText.polePhrase`) ; les autres mobiliers restent descriptifs ;
+- **rebord à 0,7 m** : la marche imminente parle à 0,7 m
+  (`STEP_NEAR_METERS`), hystérésis 0,7 / 0,9 m (`STEP_REARM_METERS`) ; la
+  pré-alerte à 1 m, les phrases (« …, maintenant. » ≈ un pas), le sens
+  montant/descendant et le bateau sont inchangés ;
+- **montée/descente confirmée** : le sens reste la géométrie de boîte
+  (§ 19, priors 0,95 / 0,5) — bord `curb`/`step` lu montant par défaut,
+  en cas de doute ça parle montant, jamais l'inverse ; verrouillé par les
+  tests ci-dessous, à valider rue (sens juste 4/4 jour).
+
+Verrouillé par `VehicleStateTest` (+1 : deux types mobiles = pluriel EN/FR,
+stop pluriel), `HazardWatchTest` (+1 : évitement côté opposé FR/EN, défaut
+droite ; 3 attentes poteau mises au nouveau contrat), `CurbWatcherTest`
+(palier 0,7) et `CurbAnnounceTest` (double annonce 1 m / 0,7 m, ré-armement
+0,9, frontière 0,65 parlé / 0,75 doux).
+
+Recette téléphone : deux voitures qui roulent → « 2 vehicles moving… » ;
+poteau à 3 m à 11 h → « …, passez à droite. » ; marques craie à 1,0 m et
+0,7 m, montée puis descente — sens juste 4/4 jour — **non mesuré**, exige
+un APK de cette branche sur appareil réel.
+
+## 21. Alertes P1/P2 : la nouvelle coupe l'ancienne, jamais de file (ordre user du 31/10)
 
 Le user marche avec l'app : entre l'obstacle détecté et la parole, des
 latences de plusieurs secondes — une alerte P1/P2 qui arrivait pendant
@@ -609,8 +649,9 @@ alertes de sécurité (voiture en mouvement, rebord) :
   danger a changé) ; ne dépend plus du flag `speaking` ;
 - **inchangé** : coupe la lecture ElevenLabs avant de parler
   (`stopCurrent`), survit à la dictée, parle hors-ligne sans clé ;
-  P3 (poteau) attend toujours P1/P2 en file douce (§ 18) ; le reste
-  parle doux et attend le silence (§ 11).
+  P3 (poteau — qui dit désormais aussi par quel côté passer, § 20) attend
+  toujours P1/P2 en file douce (§ 18) ; le reste parle doux et attend
+  le silence (§ 11).
 
 Verrouillé par `SafetyVoiceTest` (4 : coupe + flush, alerte coupe
 l'ancienne, blanc ignoré, locale).

@@ -141,7 +141,7 @@ data class CurbCue(
 /**
  * Phrases trottoir, FR/EN comme les positions (`PositionText`) : la pré-alerte
  * douce à 1 m (« Marche dans 1 mètre » / « Step up in 1 meter », avec l'heure),
- * l'imminent à 0,4 m (« Marche, maintenant. » / « Step up now. », urgent, sans
+ * l'imminent à 0,7 m (« Marche, maintenant. » / « Step up now. », urgent, sans
  * heure : à un pas, l'heure retarde la consigne) et le bateau (« Bateau, pas
  * de marche », doux, une fois). Liste fermée : le préchauffage hors-ligne
  * sait quels clips générer.
@@ -162,7 +162,7 @@ object CurbText {
         return PositionText.withHour(base, centerX, language)
     }
 
-    /** Marche imminente à 0,4 m, sans heure : « Step up now. » en montée, « Step down now. » sinon. */
+    /** Marche imminente à 0,7 m, sans heure : « Step up now. » en montée, « Step down now. » sinon. */
     fun stepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> when (edge) {
             CurbEdge.Up -> "Marche, maintenant."
@@ -204,10 +204,10 @@ object CurbText {
  * (un trottoir ne bouge pas).
  *
  * Deux paliers annoncés : la pré-alerte [CurbTier.FAR] à 1 m (douce, une fois
- * par approche) puis la marche imminente [CurbTier.NEAR] à 0,4 m (compteur
+ * par approche) puis la marche imminente [CurbTier.NEAR] à 0,7 m (compteur
  * séparé, parole urgente même en cooldown : la première vue parle). Le suivi
  * reste actif jusqu'à [CURB_METERS] mais n'annonce plus au-delà de
- * [FAR_ANNOUNCE_METERS]. Hystérésis 1,0 / 1,4 m (pré-alerte) et 0,4 / 0,6 m
+ * [FAR_ANNOUNCE_METERS]. Hystérésis 1,0 / 1,4 m (pré-alerte) et 0,7 / 0,9 m
  * (imminent) : après une annonce, il faut s'éloigner au-delà de
  * [FAR_REARM_METERS] / [STEP_REARM_METERS] ou perdre le signal pour ré-armer.
  * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence, jamais
@@ -239,7 +239,7 @@ class CurbWatcher(
     /** Bateaux consécutifs en cours (autre chose remet à zéro). */
     private var flatHits: Int = 0
 
-    /** Imminent déjà dit, en attente de ré-armement (> 0,6 m ou signal perdu). */
+    /** Imminent déjà dit, en attente de ré-armement (> 0,9 m ou signal perdu). */
     private var nearSpoken: Boolean = false
 
     /** Pré-alerte déjà dite, en attente de ré-armement (> 1,4 m ou signal perdu). */
@@ -295,7 +295,7 @@ class CurbWatcher(
         return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false)
     }
 
-    /** Imminent à 0,4 m : parle vite, urgent, même en cooldown (la première vue parle). */
+    /** Imminent à 0,7 m : parle vite, urgent, même en cooldown (la première vue parle). */
     private fun onNear(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
         hits = 0
         nearHits++
@@ -383,10 +383,10 @@ class CurbWatcher(
         const val PLANE_TOP_MIN = 0.5f
 
         /** Sous cette distance lissée (m), le bord est imminent : parole urgente. */
-        const val STEP_NEAR_METERS = 0.4f
+        const val STEP_NEAR_METERS = 0.7f
 
-        /** Au-delà (m), l'imminent se ré-arme : hystérésis 0,4 / 0,6. */
-        const val STEP_REARM_METERS = 0.6f
+        /** Au-delà (m), l'imminent se ré-arme : hystérésis 0,7 / 0,9. */
+        const val STEP_REARM_METERS = 0.9f
 
         /** Sous cette distance (m), la pré-alerte parle ; au-delà, suivi silencieux. */
         const val FAR_ANNOUNCE_METERS = 1.0f

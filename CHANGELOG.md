@@ -2,6 +2,26 @@
 
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
+## 2026-10-31 — iSee : pluriel véhicules, poteau qui dit comment l'éviter, rebord à 0,7 m (branche `fix/isee-alertes-voitures-poteau-rebord`)
+
+- **Demande** (ordre user) : dire les voitures en mouvement même à plusieurs,
+  dire comment éviter un poteau à moins de 4 m, dire le rebord à 1 m puis à
+  70 cm, et détecter s'il se monte ou se descend.
+- **Fait** (`core.traverse`, `core.hazard`, `core.curb`, `docs/VOIX-DANGER.md`
+  § 20) : annonce pluriel générique (« 2 vehicles moving… », pistes par
+  type — deux voitures sous le même label comptent pour une, limite connue)
+  avec « Stop » pluriel, singulier inchangé ; phrase poteau avec évitement
+  côté opposé (« …, passez à gauche. », droite par défaut), doux comme
+  imminent, autres mobiliers inchangés ; marche imminente à 0,7 m
+  (hystérésis 0,7/0,9), pré-alerte 1 m et phrases inchangées ; sens
+  montée/descente confirmé (géométrie de boîte, montant par défaut).
+- Preuves : ciblés verts (`VehicleStateTest` 19, `HazardWatchTest` 15,
+  `CurbAnnounceTest` 25, `CurbWatcherTest` 18 — 77 tests, 0 échec) ;
+  `check-kotlin-limits.py` vert ; `:app` 1317/1317 + `assembleDebug` verts ;
+  `:core` 2357 tests : seuls 7 échecs, tous hors périmètre et prouvés
+  pré-existants (5 `PrivateFileSettingsStoreTest` POSIX-sous-Windows,
+  identiques sur master intact 24b341e5 ; 2 bancs µs verts en re-run —
+  charge machine).
 
 
 ## 2026-10-31 — Distances : étalonnage guidé du champ de vision
