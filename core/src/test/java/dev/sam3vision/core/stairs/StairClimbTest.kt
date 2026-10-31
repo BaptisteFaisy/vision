@@ -96,7 +96,16 @@ class StairClimbTest {
 
         assertNull(watcher.onSignal(near, 0L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
         assertNull(watcher.onSignal(near, 100L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
-        val cue = watcher.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)
+        // L'annonce standard ouvre toujours : la proximité ne conclut jamais seule.
+        assertEquals(
+            "Escalier montant.",
+            watcher.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)!!.phrase,
+        )
+
+        // Profondeur confirmée après l'annonce : la fin peut se dire.
+        assertNull(watcher.onSignal(near, 2700L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 2800L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        val cue = watcher.onSignal(near, 2900L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)
         assertNotNull(cue)
         assertEquals("Dernière marche.", cue!!.phrase)
         assertEquals(0.8f, cue.meters!!, 0f)
@@ -111,7 +120,13 @@ class StairClimbTest {
         val near = StairSignal(detected = true, confidence = 1f, lineCount = 0, roiTop = 0, roiBottom = 0)
         down.onSignal(near, 0L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
         down.onSignal(near, 100L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
-        val landed = down.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        assertEquals(
+            "Escalier descendant.",
+            down.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)!!.phrase,
+        )
+        down.onSignal(near, 2700L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 2800L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        val landed = down.onSignal(near, 2900L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
         assertEquals("Dernière marche, palier.", landed!!.phrase)
 
         assertEquals("Dernière marche.", StairText.lastStep(SpeechLanguage.Fr, StairDirection.Up))
