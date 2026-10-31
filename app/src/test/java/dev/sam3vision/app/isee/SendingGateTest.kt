@@ -30,3 +30,30 @@ class SendingGateTest {
         assertFalse(sendingToSam(cameraActive = false, recordingVideo = false, crossingActive = false))
     }
 }
+
+/**
+ * Porte picto : les repères armés sont cherchés dès que la caméra montre
+ * quelque chose (page blanche) ou que la vidéo tourne — sinon rien ne part.
+ */
+class PicturingGateTest {
+
+    @Test
+    fun `camera active cherche sans enregistrement`() {
+        assertTrue(picturingToMatcher(armed = true, cameraActive = true, recordingVideo = false))
+    }
+
+    @Test
+    fun `enregistrement seul cherche`() {
+        assertTrue(picturingToMatcher(armed = true, cameraActive = false, recordingVideo = true))
+    }
+
+    @Test
+    fun `sans repere arme rien ne part`() {
+        assertFalse(picturingToMatcher(armed = false, cameraActive = true, recordingVideo = true))
+    }
+
+    @Test
+    fun `sans camera ni enregistrement rien ne part`() {
+        assertFalse(picturingToMatcher(armed = true, cameraActive = false, recordingVideo = false))
+    }
+}

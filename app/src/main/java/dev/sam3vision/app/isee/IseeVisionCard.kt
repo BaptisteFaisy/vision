@@ -368,10 +368,23 @@ private fun sending(viewModel: IseeViewModel): Boolean = sendingToSam(
 
 /**
  * Vrai quand les frames partent au matcher picto : des repères sont armés et
- * la vidéo tourne — le téléphone seul, jamais les lunettes ni le réseau.
+ * la caméra montre la scène (page blanche) ou la vidéo tourne — le téléphone
+ * seul, jamais les lunettes ni le réseau.
  */
 private fun picturing(viewModel: IseeViewModel): Boolean =
-    viewModel.picto.armed() && viewModel.state.value.recordingVideo
+    picturingToMatcher(
+        armed = viewModel.picto.armed(),
+        cameraActive = viewModel.state.value.cameraActive,
+        recordingVideo = viewModel.state.value.recordingVideo,
+    )
+
+/**
+ * Porte picto, pure et testée : les repères armés sont cherchés dès que la
+ * caméra montre quelque chose (page blanche) ou que la vidéo tourne — sans
+ * repère armé, ni caméra ni vidéo, rien ne part (zéro conso).
+ */
+internal fun picturingToMatcher(armed: Boolean, cameraActive: Boolean, recordingVideo: Boolean): Boolean =
+    armed && (cameraActive || recordingVideo)
 
 /**
  * Porte d'envoi vers SAM, pure et testée : la caméra active allume la carte, et
