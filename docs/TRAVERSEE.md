@@ -436,4 +436,7 @@ bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
   même portée — au-delà de 15 m, « Attendez. » toutes les 2 s aussi ;
 - **urgence inchangée** : loin = doux mais premier, proche ou non mesuré =
   « Stop, … » qui coupe tout (une voiture lointaine non mesurée reste dite
-  comme proche, règle conservatrice existante).
+  comme proche, règle conservatrice existante) ;
+- **transition feu→sans-feu** : le guetteur reste nourri sous quiet (seule
+  la phrase est tue) — le verdict « Attendez. » ne rate aucun danger, même
+  à plus de 15 m, dès la perte du feu.
