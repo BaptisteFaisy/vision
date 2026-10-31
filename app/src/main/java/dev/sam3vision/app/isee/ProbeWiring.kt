@@ -295,8 +295,7 @@ internal fun LiveProbe.observeFenceOpening(
  * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
  * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
  * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * Frames SAM seules (`frames`) et détections brutes : le ticker 120 ms rejoue
- * des lectures figées qui remettraient la confirmation du mouvement à zéro.
+ * Frames SAM seules (`frames`) et détections brutes (le ticker 120 ms rejoue des lectures figées qui casseraient la confirmation).
  */
 internal fun LiveProbe.observeVehicleState(
     scope: CoroutineScope,
@@ -314,13 +313,8 @@ internal fun LiveProbe.observeVehicleState(
             val readings = st.distanceLayer?.readings.orEmpty()
             if (st.samDetections.isEmpty() && readings.isEmpty()) return@collect
             val motion = ProbeBackgroundMotion.lastMotion
-            val cue = watcher.update(
-                st.samDetections,
-                readings,
-                System.currentTimeMillis(),
-                language(),
-                motion,
-            ) ?: return@collect
+            val cue = watcher.update(st.samDetections, readings, System.currentTimeMillis(), language(), motion)
+                ?: return@collect
             logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
             voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
         }
