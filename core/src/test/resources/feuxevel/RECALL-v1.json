@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "date": "2026-10-31",
+  "sha": "08876eaf7362e6ecc32dda01059fcb0c869ba962",
+  "pipeline": "CrossingPrompts.selectLightBox -> crop JVM 48px (miroir CrossingPixels.crop) -> PedLightGate.verdict",
+  "note": "Rappel nul sur lentilles rondes synthetiques : ecart de domaine connu (boite SAM = caisson, porte calibree lampe), voir docs/MESURES-SAM3-FEUX.md §6. Toute evolution de la porte qui change un verdict bump la version.",
+  "cases": [
+    {"id": "green-h64", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h32", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h24", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h16", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h12", "truth": "Green", "verdict": "Red"},
+    {"id": "green-h08", "truth": "Green", "verdict": "Red"},
+    {"id": "red-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "off-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "car-disc", "truth": "Red", "verdict": "Red"},
+    {"id": "real-green", "truth": "Green", "verdict": "Green"},
+    {"id": "real-red", "truth": "Red", "verdict": "Red"},
+    {"id": "real-r1b", "truth": "Green", "verdict": "Green"}
+  ],
+  "recall": {
+    "synthetic_green": "0/6",
+    "synthetic_green_grand": "0/2",
+    "synthetic_green_petit": "0/4",
+    "false_green": "0/4"
+  }
+}
