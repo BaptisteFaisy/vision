@@ -96,6 +96,12 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v22 (31/10) réparation des tests : un échec RÉEL déclenche l'agent
+#       zeroclaw `fw` (`test_agent.py`) — il lit le journal, corrige dans le
+#       clone et le pilote ne pousse qu'un diff borné qui compile. Une
+#       tentative par tête, coupe-circuit variable `TEST_AGENT=0`. Avant, un
+#       test rouge laissait la PR à une main humaine : c'est ce qui a tué
+#       #615 pendant deux heures.
 #   v21 (31/10) états qui attendent une action : `DIRTY`, `BLOCKED` et
 #       `UNSTABLE` ne se dédupliquent plus pour toujours — la déduplication v11
 #       les figeait (même tête, même base, mêmes checks) et une PR dont l'agent
@@ -350,6 +356,8 @@ jobs:
           FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
           FIREWORKS_AGENT_RESOLVE: ${{ vars.FIREWORKS_AGENT_RESOLVE }}
           FIREWORKS_AGENT_SCOPE: ${{ vars.FIREWORKS_AGENT_SCOPE }}
+          # v22 — agent de réparation des tests (zeroclaw `fw`) : `0` coupe.
+          TEST_AGENT: ${{ vars.TEST_AGENT }}
           REPO: BaptisteFaisy/vision
           PR: ${{ matrix.pr }}
           SHA: ${{ matrix.sha }}
@@ -896,6 +904,28 @@ jobs:
                             corps="$motif"
                             ghe pr edit "$PR" --add-label intervention-humaine >/dev/null 2>&1 || true
                             echo "PR #$PR : échec sur une tête de l'agent de conflit, label intervention-humaine"
+                          fi
+                          # v22 (31/10) — un échec RÉEL déclenche l'agent de
+                          # test zeroclaw `fw` (ordre user) : il lit le journal
+                          # du/des run(s) en échec, corrige dans le clone, et le
+                          # pilote (test_agent.py) refuse de pousser ce qui
+                          # touche un fichier de garde, dépasse 20 fichiers ou
+                          # 1 500 lignes, ou ne compile pas. Une seule tentative
+                          # par tête (marque) : jamais de boucle d'agent.
+                          if [ "$(marques "$PR" "<!-- test-agent sha=$SHA -->")" -eq 0 ] \
+                             && [ "${TEST_AGENT:-1}" != "0" ]; then
+                            rc2=0
+                            git show origin/master:.github/fireworks/test_agent.py \
+                              > /tmp/fw-test-agent.py 2>/dev/null \
+                              && python3 /tmp/fw-test-agent.py fix --repo "$REPO" \
+                                   --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc2=$?
+                            case "$rc2" in
+                              0) printf -v corps '%s\n%s' "$corps" \
+                                   "Correctif de l'agent \`fw\` poussé (compilation vérifiée) : la CI rejuge." ;;
+                              2) echo "PR #$PR : agent de test sans proposition (voir son commentaire)" ;;
+                              *) printf -v corps '%s\n%s' "$corps" \
+                                   "L'agent \`fw\` n'a pas pu corriger (voir son commentaire) — main humaine." ;;
+                            esac
                           fi
                           commente_une_fois "$PR" "<!-- automerge-echec sha=$SHA -->" "$corps"
                           ;;
