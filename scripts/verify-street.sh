@@ -264,7 +264,7 @@ main() {
 
   note "### 3. poteau (« Attention au poteau, à … heure »)"
   require_phone
-  printf '\n  Marchez vers la destination. Approchez un poteau dans le couloir (≤ 3 m).\n'
+  printf '\n  Marchez vers la destination. Approchez un poteau dans le couloir (≤ 4 m).\n'
   printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
   _junk=""
   read -r _junk || _junk=""

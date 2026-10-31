@@ -342,6 +342,14 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `isee/vm/IseeGlassesOrder.kt` (+test), `IseeViewModel.kt` (+7 : ordre +
   câblage), `AppNavGlasses.kt` (+3 : câblage), `GlassesPolicy.kt` (+18 :
   3 confirmations).
+## 2026-10-30 — poteau dit à 4 m, 3e priorité, rattrapage au silence (branche `fix/poteau-4m-p3-au-plus-tot`)
+
+- **Demande** : les poteaux n'étaient pas dits, ou trop tard — les dire à moins de 4 m, au plus tôt, sauf info prioritaire (P1 voiture en mouvement, P2 rebord), le poteau étant P3.
+- Causes : seuil dur 3 m (poteau 3-4 m ignoré) ; phrase douce tuée par le chat ou la route mémorisée puis perdue ; `VehicleStateCue.urgent` ignoré par le câblage.
+- Portée poteau 4 m (`POLE_METERS`, autres mobiliers à 3 m), imminent ≤ 2 m dès la 1re frame urgent, dit une fois puis ré-armé (3 frames sans poteau), cooldown 10 s inchangé ; `p1p2Busy` + `shouldCutForHazard` (P3 ne coupe jamais P1/P2) ; file voix 1 phrase TTL 3 s redite au silence (`flushPending`) ; P1 coupe.
+- Docs : `VOIX-DANGER.md` § 16, recette rue ≤ 4 m (`RECETTE-RUE.md`, `verify-street.sh`), verrou `≤ 4 m` dans `test_scripts.sh`.
+- Preuves : `:app` 1158/1158, `:core` 2134/2139 (5 `PrivateFileSettingsStoreTest` préexistants, POSIX sous Windows, hors zone), `assembleDebug` OK, `check-kotlin-limits` OK (1107 fichiers), `test_scripts.sh` 130/130.
+
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
 - **Demande** : sur la page caregiver, cesser instantanément d'afficher la caméra

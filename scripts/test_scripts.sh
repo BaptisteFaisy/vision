@@ -243,7 +243,7 @@ echo "== 8. recette rue : phrases E2E =="
 STREET_DOC="${HERE}/../docs/RECETTE-RUE.md"
 run test -f "$STREET_DOC"
 expect_status 0 "RECETTE-RUE.md existe"
-for phrase in 'je veux aller à' 'Passage protégé dans' 'Mode traversée activé.' 'Traversée terminée.' 'Attention au poteau' 'Vous êtes arrivé à' 'Continuez dans cette direction' 'Tournez à'; do
+for phrase in 'je veux aller à' 'Passage protégé dans' 'Mode traversée activé.' 'Traversée terminée.' 'Attention au poteau' 'Vous êtes arrivé à' 'Continuez dans cette direction' 'Tournez à' '≤ 4 m'; do
   run grep -q -F "$phrase" "$VERIFY_STREET"
   expect_status 0 "verify-street cite $phrase"
   run grep -q -F "$phrase" "$STREET_DOC"
