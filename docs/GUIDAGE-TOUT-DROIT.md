@@ -17,8 +17,7 @@ continu toutes les 2 s**, un mot dit **en moins de 100 ms** (ordre user du
 sortie, même au contact — jamais de stop), mots SAM sur voie libre
 (cap, décalage, retour trottoir) — calculé **sur le téléphone depuis les
 seuls objets SAM** — **aucun appel LLM**, le mot part en clip
-pré-synthétisé, jamais de synthèse réseau au moment de parler — sauf le rappel
-de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
+pré-synthétisé, jamais de synthèse réseau au moment de parler.
 
 ## 2. Le trait et la portée
 
@@ -73,29 +72,22 @@ de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
 1. **mot nouveau (overwrite)** — un mot différent du précédent parle **dès la
    1re frame** (`firstSight`), **sans délai ni stabilité** : à 5 ips, attendre,
    c'est rater le pas. Il parle aussitôt, sans attendre l'échéance de
-   répétition. Le même mot bouché ne se répète jamais (scène bouchée stable =
-   silence, pas de bégaiement) ; la voie libre stable rappelle (voir 2).
+   répétition.
 2. **répétition** — la même direction se redit toutes les 2 s
    (`GuidanceAnnouncer.DEFAULT_REPEAT_MS`, comme le rouge répété) tant qu'elle
-   dure, libre comme bouchée (côtés TwinLite inclus) ; la voie libre stable
-   rappelle. Exception : le même mot bouché ne se répète jamais (scène
-   bouchée stable = silence, pas de bégaiement). Seul le stop ne se répète
+   dure, libre comme bouchée (côtés TwinLite inclus). Seul le stop ne se répète
    jamais : parlé une fois, il ne se rabâche pas.
 3. **signature** — le mot (`w|left` SAM, `tl|left` TwinLite,
-   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil, seule
-   une consigne différente fait reparler ;
+   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil ;
 4. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact —
    jamais de stop), libre ⇒ mots SAM (décalage, retour trottoir, cap marché).
    Une seule porte : un seul parle à la fois, jamais de doublon. Le bouché
    prime toujours : la sécurité ne négocie jamais.
 5. **urgence** — seul le stop coupe la lecture en cours, chat compris
-   (`LiveProbeState.spokenUrgent`, `ProbeWiring.spokenUrgentOf`, vrai pour le
-   seul mot stop : « obstacle, arrêtez-vous. » TwinLite sur caps latéraux au
-   contact, « Stop. » SAM pour l'urgence externe) : les mots doux
-   (gauche/tout droit/droite) et le feu de Traversée attendent le silence
-   (`ProbeWiring.observeSpoken`). « Stop. » (urgence externe) et « Stop, car
-   moving. » (Traversée, voitures en mouvement) coupent. Le cap droit ne dit
-   jamais stop (`docs/URGENCE-EXTERNE.md` pour l'urgence externe).
+   (`LiveProbeState.spokenUrgent`, `ProbeWiring.spokenUrgentOf`) : les mots
+   doux (gauche/tout droit/droite) et le feu de Traversée attendent le
+   silence (`ProbeWiring.observeSpoken`). « Stop. » (urgence externe) et
+   « Stop, car moving. » (Traversée, voitures en mouvement) coupent.
 
 Différence assumée avec les positions : **la voie libre se dit** (« Tout droit. »,
 puis redit toutes les 2 s) là où une scène vide reste muette
@@ -144,12 +136,11 @@ stop unique, urgence externe coupe le chat en clip).
 2. page caméra, champ vide → « Straight. » (ou « Tout droit. »), redit toutes
    les 2 s tant que le champ reste vide ;
 3. une personne entre au centre à ~2 m → « gauche. » (TwinLite — ou à droite
-   si la gauche est encombrée), **aussitôt** (overwrite) ;
-4. la personne s'approche → silence (même mot) ;
-5. la personne est à ~0,5 m → « gauche. » (même mot, silence si déjà dit —
-   jamais de stop) ; main devant l'objectif (boîte coupée,
-   non mesurée) → « gauche. » ;
-6. le couloir se dégage → « Tout droit. » aussitôt ;
+   si la gauche est encombrée), **aussitôt** (overwrite), puis redit toutes les 2 s ;
+4. la personne s'approche → même mot redit toutes les 2 s (continu) ;
+5. la personne est à ~0,5 m → « gauche. » redit (jamais de stop) ;
+   main devant l'objectif (boîte coupée, non mesurée) → « gauche. » ;
+6. le couloir se dégage → « Tout droit. » aussitôt, puis redit toutes les 2 s ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
 ## 7. État des mesures (28/10/2026, appareil Redmi 2312DRA50G)
