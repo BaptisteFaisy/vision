@@ -56,6 +56,17 @@ class LiveNavOrdersTest {
     }
 
     @Test
+    fun `ordre traversee sur le direct part a l accueil, pas au llm`() = runTest {
+        val llm = FakeLlm(Result.success("un passage piéton"))
+        val (session, _) = harness(this, llm)
+
+        session.ask("crossing mode on")
+
+        assertEquals(0, llm.calls)
+        assertEquals("crossing mode on", NavOrderRequest.consume())
+    }
+
+    @Test
     fun `un cap n est pas une destination`() = runTest {
         val pris = LiveNavOrders.handle("va à gauche", Settings.Default, this) { _, _ -> }
 
