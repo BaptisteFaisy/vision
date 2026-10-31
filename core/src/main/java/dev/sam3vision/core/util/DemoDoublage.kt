@@ -7,5 +7,5 @@ package dev.sam3vision.core.util
 object DemoDoublage {
 
     /** Double [x]. */
-    fun doubler(x: Int): Int = x + x + 1
+    fun doubler(x: Int): Int = x + x
 }
