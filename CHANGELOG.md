@@ -4,6 +4,20 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : cap droit contourne toujours, jamais stop (branche `isee-droit-sans-stop`)
+
+- **Demande** : couloir bouché = toujours un côté de contournement, jamais
+  « stop » — dans une foule on se faufile, on ne s'arrête pas.
+- Fait : `Guidance.word` cap droit rend le côté (chemin optimal ou repli),
+  même au contact mesuré ; `STOP_METERS` ne vaut plus que pour les caps
+  latéraux ; voix de sécurité (danger imminent) inchangée, hors d'ici.
+  Docs `GUIDAGE-TOUT-DROIT.md` et `URGENCE-EXTERNE.md` alignées.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 731 tests, 0 échec — 13 flips constatés rouge avant, tous dans le
+  périmètre prédit, réécrits en conséquences correctes) ;
+  `check-kotlin-limits.py` vert.
+
+
 ## 2026-10-31 — iSee : écart mini aux humains 0,5 → 0,8 m (branche `isee-clearance-80`)
 
 - **Demande** : monter la marge du chemin optimal à 80 cm (la latence ~0,5 s
