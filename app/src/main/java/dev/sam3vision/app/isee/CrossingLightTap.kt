@@ -15,7 +15,9 @@ internal typealias CrossingCropTap = (box: List<Float>, crop: CrossingFrame, ver
  * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
  * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
  * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
- * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10).
+ * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10),
+ * l'équivalent sûr de l'ancien « Doute » : jamais de vert sans boîte lue puis
+ * crop classifié vert. Seuils inchangés (arbre + porte intacts).
  *
  * Appelée **une fois par frame** par la sonde : le décodage du crop est le poste
  * coûteux, le refaire pour l'affichage doublerait le travail.
