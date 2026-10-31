@@ -179,19 +179,6 @@ internal fun LiveProbe.observeSpoken(
  * Les trois guetteurs ordonnés (véhicules + bordure + mobilier) et l'instant
  * de la dernière alerte de sécurité dite (`null` si aucune : le doux attend
  * en file pendant [SAFETY_SPEECH_MS] au lieu de chevaucher).
- *
- * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
- * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
- * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
- * guetteur pour le `reset()` de début de séance. Le palier 0,5 m
- * ([CurbTier.NEAR]) parle en alerte de sécurité (« Bordure à 0,5 mètre. »,
- * [SafetyVoice], jamais de « Stop » — ordre user du 31/10) ; la détection,
- * les paliers 2 / 1,5 / 1 / 0,7 m ([CurbTier.FAR], 0,7 m [CurbTier.NEAR])
- * et le bateau ([CurbTier.NONE]) restent doux.
- * Les paliers proches (0,7 / 0,5 m) passent en Traversée, la détection,
- * les paliers doux et le bateau y sont coupés — et la porte précède le
- * watcher (un FAR coupé ne consomme ni confirmation ni cooldown).
- * `collect` séquentiel, voix douce en coroutine fille.
  */
 internal class ObstacleWatchers(
     val vehicle: VehicleStateWatcher,
@@ -201,12 +188,21 @@ internal class ObstacleWatchers(
     /** Dernière alerte de sécurité dite, `null` si aucune. */
     var lastSafetyMs: Long? = null
 
+    /**
+     * Dernier compteur de frames SAM vu par les véhicules : une réémission
+     * sans nouvelle frame rejoue des lectures figées et casserait la
+     * confirmation (garde reprise de l'ex-`observeVehicleState`, perdue au
+     * merge de la PR #690).
+     */
+    var lastVehicleFrames: Int = -1
+
     /** Oublie les trois guetteurs et l'alerte (nouvelle séance). */
     fun reset() {
         vehicle.reset()
         curb.reset()
         hazard.reset()
         lastSafetyMs = null
+        lastVehicleFrames = -1
     }
 }
 
@@ -250,7 +246,7 @@ internal fun LiveProbe.observeObstacles(
  * distance + dimensions, déjà publiées par frame), arbitrés ([decideObstacles])
  * puis parlés — sécurité aussitôt, doux en fille sérialisée, file au silence.
  */
-private fun obstacleFrame(
+internal fun obstacleFrame(
     st: LiveProbeState,
     scope: CoroutineScope,
     voice: ProximityVoice,
@@ -264,7 +260,11 @@ private fun obstacleFrame(
     val nowMs = System.currentTimeMillis()
     val lang = language()
     val motion = ProbeBackgroundMotion.lastMotion
-    val vehicleCue = if (st.crossingActive) null else watchers.vehicle.update(
+    // Frames SAM seules pour les véhicules (ex-`observeVehicleState`) : la
+    // porte avance à chaque compteur vu, Traversée ou non.
+    val freshFrame = st.frames != watchers.lastVehicleFrames
+    watchers.lastVehicleFrames = st.frames
+    val vehicleCue = if (!freshFrame || st.crossingActive) null else watchers.vehicle.update(
         detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion)
         ?.also { logMotionTransition(watchers.vehicle.cameraMoved, watchers.vehicle.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L) }
     val curbSignal = CurbSignal.of(readings, st.width, st.height)
