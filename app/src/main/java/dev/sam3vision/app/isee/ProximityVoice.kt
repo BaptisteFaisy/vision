@@ -34,6 +34,8 @@ import kotlin.coroutines.coroutineContext
  * [routeSpeaking] dit si la voix route parle : l'obstacle non urgent se tait tant
  * qu'elle parle, le danger urgent coupe toujours. [flushPending] redit la phrase
  * douce gardée ([onPhrase] avec file) dès le silence, dans [PENDING_TTL_MS].
+ * L'arrivée sur le passage ([onArrivalPhrase]) passe en dernier, derrière la
+ * route et les doux — la plus basse priorité de toutes les annonces.
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -55,11 +57,15 @@ class ProximityVoice(
     /** Consigne route gardée ([onRoutePhrase] douce), `null` si aucune. */
     private var pendingRoute: Pending? = null
 
+    /** Arrivée sur le passage gardée ([onArrivalPhrase]), `null` si aucune. */
+    private var pendingArrival: Pending? = null
+
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
         pending = null
         pendingRoute = null
+        pendingArrival = null
     }
 
     /**
@@ -96,9 +102,9 @@ class ProximityVoice(
      * Consigne de guidage GPS (manœuvres, même voix Laure que les obstacles) :
      * l'urgence coupe, la douce attend le silence en file dédiée (une seule,
      * la plus fraîche — une consigne périme vite) et se redit par
-     * [flushPending] avant toute douce d'obstacle (danger > route > doux).
-     * La route ne s'attend pas elle-même ([routeSpeaking] ignoré : en mode
-     * Laure la voix route part d'ici, pas du haut-parleur paresseux).
+     * [flushPending] avant toute douce d'obstacle (danger > route > doux >
+     * arrivée). La route ne s'attend pas elle-même ([routeSpeaking] ignoré :
+     * en mode Laure la voix route part d'ici, pas du haut-parleur paresseux).
      */
     suspend fun onRoutePhrase(
         phrase: String,
@@ -116,19 +122,58 @@ class ProximityVoice(
     }
 
     /**
+     * Arrivée sur le passage (« Sur le passage. ») : la plus basse priorité
+     * de toutes les annonces (ordre user du 31/10) — parlée au silence seul
+     * (chat tu et route tue), sinon gardée (une seule, la plus fraîche) et
+     * redite en dernier par [flushPending] (route, puis doux, puis arrivée)
+     * ou par [flushArrival] (rattrapage Traversée, où la file obstacles est
+     * coupée). Ne coupe jamais rien : aucun `urgent` ici.
+     */
+    suspend fun onArrivalPhrase(phrase: String, playerIdle: Boolean) {
+        if (phrase == lastPhrase) return
+        val current = settings()
+        if (!current.ttsConfigured) return
+        if (!playerIdle || routeSpeaking()) {
+            pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            return
+        }
+        speak(phrase, current, urgent = false)
+    }
+
+    /**
      * Redit les phrases gardées dès que plus rien ne parle : chat silencieux
      * ([playerIdle]), route tue et [busy] faux (P1/P2 en cours, vu par
-     * l'appelant) — la consigne route d'abord, puis la douce d'obstacle (une
-     * seule par appel, jamais de rafale). Périmée ([PENDING_TTL_MS]) ou déjà
-     * dite : jetée. À appeler à chaque frame par le guetteur en file.
+     * l'appelant) — la consigne route d'abord, puis la douce d'obstacle, puis
+     * l'arrivée sur le passage (une seule par appel, jamais de rafale).
+     * Périmée ([PENDING_TTL_MS]) ou déjà dite : jetée. À appeler à chaque
+     * frame par le guetteur en file.
      */
     suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
         if (!playerIdle || routeSpeaking() || busy()) return
         val current = settings()
         if (!current.ttsConfigured) return
         if (flushOne(pendingRoute, current) { pendingRoute = null }) return
-        flushOne(pending, current) { pending = null }
+        if (flushOne(pending, current) { pending = null }) return
+        flushOne(pendingArrival, current) { pendingArrival = null }
     }
+
+    /**
+     * Redit l'arrivée gardée seule, au silence (chat tu, route tue) et sans
+     * route ni doux frais devant elle : l'arrivée reste la dernière, même
+     * hors [flushPending] (Traversée, où la file obstacles est coupée mais
+     * pas le rattrapage latéral). Périmée ou déjà dite : jetée.
+     */
+    suspend fun flushArrival(playerIdle: Boolean) {
+        if (!playerIdle || routeSpeaking()) return
+        val current = settings()
+        if (!current.ttsConfigured) return
+        if (hasFresh(pendingRoute) || hasFresh(pending)) return
+        flushOne(pendingArrival, current) { pendingArrival = null }
+    }
+
+    /** Vrai si [due] attend encore d'être dite (fraîche et jamais parlée). */
+    private fun hasFresh(due: Pending?): Boolean =
+        due != null && due.phrase != lastPhrase && nowMs() < due.expiresAtMs
 
     /** Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée. */
     private suspend fun flushOne(due: Pending?, current: Settings, clear: () -> Unit): Boolean {
