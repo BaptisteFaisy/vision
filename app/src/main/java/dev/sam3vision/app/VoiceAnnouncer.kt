@@ -38,7 +38,7 @@ class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
             return Result.failure(ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings"))
         }
         player.speed = settings.ttsSpeed
-        val audio = ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId)
+        val audio = ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId, cache = ElevenLabsTtsClient.sharedPhrases)
             .synthesize(clean).getOrElse { return Result.failure(it) }
         return player.play(audio)
     }

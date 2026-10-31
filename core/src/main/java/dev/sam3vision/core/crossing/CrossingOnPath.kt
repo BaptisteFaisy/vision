@@ -28,15 +28,26 @@ object CrossingOnPath {
     /**
      * Index du meilleur passage (score max, [CrossingOffer.MIN_SCORE] min),
      * `-1` si aucun. Miroir de [CrossingGuidance.selectBest] en index, sans
-     * allocation (boucle manuelle, premier max gagne comme `maxByOrNull`).
+     * allocation (boucle manuelle, premier max gagne comme `maxByOrNull`) :
+     * avec dimensions, le score ne départage que les boîtes plausibles
+     * ([CrossingGuidance.isPlausibleCrosswalk]) ; sans dimensions, repli au
+     * seul meilleur score.
      */
-    fun bestCrosswalk(objects: List<SegObject>, minScore: Float = CrossingOffer.MIN_SCORE): Int {
+    fun bestCrosswalk(
+        objects: List<SegObject>,
+        minScore: Float = CrossingOffer.MIN_SCORE,
+        frameW: Int = 0,
+        frameH: Int = 0,
+    ): Int {
+        val geometric = frameW > 0 && frameH > 0
         var best = -1
         var i = 0
         while (i < objects.size) {
             val obj = objects[i]
             if (obj.score >= minScore && obj.box.size >= 4 &&
-                CrossingOffer.isCrosswalkLabel(obj.label) && (best < 0 || obj.score > objects[best].score)
+                CrossingOffer.isCrosswalkLabel(obj.label) &&
+                (!geometric || CrossingGuidance.isPlausibleCrosswalk(obj.box, frameW, frameH)) &&
+                (best < 0 || obj.score > objects[best].score)
             ) {
                 best = i
             }
@@ -116,7 +127,9 @@ class CrossingOnPathTracker(
         height: Int,
         readings: List<DistanceReading> = emptyList(),
     ): SteeringCap? {
-        val crossIdx = if (width > 0 && height > 0) CrossingOnPath.bestCrosswalk(objects) else -1
+        val crossIdx =
+            if (width > 0 && height > 0) CrossingOnPath.bestCrosswalk(objects, frameW = width, frameH = height)
+            else -1
         if (crossIdx < 0) {
             leftHits = 0
             rightHits = 0

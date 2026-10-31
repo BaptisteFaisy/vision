@@ -4,6 +4,7 @@ import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.TtsClient
+import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,12 +59,12 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `non urgent sur lecteur occupe - tu sans preempter ni reseau`() = runBlocking {
+    fun `non urgent sur lecteur occupe - garde sans preempter ni reseau`() = runBlocking {
         val player = FakePlayer(isBusy = true)
         val tts = FakeTts(Result.success(mp3))
         val outcome = voice(tts = tts, player = player).speak(TraversePhrases.GREEN, urgent = false)
 
-        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, outcome)
+        assertEquals(TraverseVoiceOutcome.QUEUED, outcome)
         assertTrue(player.events.isEmpty())
         assertEquals(0, tts.calls)
     }
@@ -199,5 +200,89 @@ class TraverseVoiceTest {
         val okUpper = voice(systemTts = FakeSystemTts(language = "ENG", store = upper)).prewarm()
 
         assertTrue(okUpper.languageOk)
+    }
+
+    @Test
+    fun `file - le doublon ne se garde pas deux fois`() = runBlocking {
+        val player = FakePlayer(isBusy = true)
+        val v = voice(player = player)
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
+        player.isBusy = false
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.GREEN, urgent = false))
+
+        assertEquals(listOf("play"), player.events)
+    }
+
+    @Test
+    fun `file - la gardee se dit au silence avant la courante`() = runBlocking {
+        val player = FakePlayer(isBusy = true)
+        val tts = FakeTts(Result.success(mp3))
+        val v = voice(tts = tts, player = player)
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        player.isBusy = false
+        val outcome = v.speak(TraversePhrases.RED, urgent = false)
+
+        assertEquals(TraverseVoiceOutcome.PRIMARY, outcome)
+        assertEquals(listOf("play", "play"), player.events)
+        assertEquals(2, tts.calls)
+        assertEquals(TraversePhrases.RED, tts.lastText)
+    }
+
+    @Test
+    fun `file - la plus fraiche seule, l ancienne est remplacee`() = runBlocking {
+        val player = FakePlayer(isBusy = true)
+        val tts = FakeTts(Result.success(mp3))
+        val v = voice(tts = tts, player = player)
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.ON_CROSSWALK, urgent = false))
+        player.isBusy = false
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.ON_CROSSWALK, urgent = false))
+
+        assertEquals(listOf("play"), player.events)
+        assertEquals(1, tts.calls)
+        assertEquals(TraversePhrases.ON_CROSSWALK, tts.lastText)
+    }
+
+    @Test
+    fun `urgent - la file est jetee, jamais de traversez apres coup`() = runBlocking {
+        val player = FakePlayer(isBusy = true)
+        val v = voice(player = player)
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.RED, urgent = true))
+        player.isBusy = false
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.RED, urgent = false))
+
+        assertEquals(listOf("stop", "play", "play"), player.events)
+    }
+
+    @Test
+    fun `prewarm - vide la file d une session precedente`() = runBlocking {
+        val player = FakePlayer(isBusy = true)
+        val v = voice(player = player)
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        v.prewarm()
+        player.isBusy = false
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.RED, urgent = false))
+
+        assertEquals(listOf("play"), player.events)
+    }
+
+    @Test
+    fun `stationnement - distance mesuree en francais et anglais (source guetteur)`() {
+        assertEquals("Voiture en stationnement, à 2 mètres.", TraverseParkedText.parkedPhrase(2f, null, SpeechLanguage.Fr))
+        assertEquals("Car parked, 2 meters away.", TraverseParkedText.parkedPhrase(2f, null, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `stationnement - heure du cadran sans mesure, seule sans geometrie`() {
+        assertEquals("Voiture en stationnement, à 9 heures.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.Fr))
+        assertEquals("Car parked, at 9 o'clock.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.En))
+        assertEquals("Car parked.", TraverseParkedText.parkedPhrase(null, null, SpeechLanguage.En))
     }
 }

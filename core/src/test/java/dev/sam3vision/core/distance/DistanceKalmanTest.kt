@@ -120,6 +120,17 @@ class DistanceKalmanTest {
     }
 
     @Test
+    fun `velocityOf expose la vitesse sans mesurer`() {
+        val kalman = DistanceKalman()
+        assertEquals(null, kalman.velocityOf(1, t0))
+        kalman.filter(1, 10f, atMs = t0)
+        repeat(5) { step -> kalman.filter(1, 10f - (step + 1), atMs = t0 + (step + 1) * 1_000L) }
+        assertEquals(-1f, kalman.velocityOf(1, t0 + 5_000L)!!, 0.3f)
+        assertEquals(null, kalman.velocityOf(99, t0 + 5_000L))
+        assertEquals(null, kalman.velocityOf(1, t0 + 5_000L + 2_001L))
+    }
+
+    @Test
     fun `prediction inconnue perimee ou passee rend null`() {
         val kalman = DistanceKalman(timeoutMs = 2_000L)
         kalman.filter(1, 5f, atMs = t0)

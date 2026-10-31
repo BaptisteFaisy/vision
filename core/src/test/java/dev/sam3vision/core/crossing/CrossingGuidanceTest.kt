@@ -17,6 +17,9 @@ import org.junit.Test
 /** Guidage latéral vers le passage : couloir, mot nouveau seul, distance courte, Stop exclu. */
 class CrossingGuidanceTest {
 
+    private val frameW = 512
+    private val frameH = 1138
+
     private fun obj(label: String, score: Float = 0.8f, box: List<Float> = listOf(0f, 0f, 512f, 800f)) =
         SegObject(label = label, score = score, box = box, maskPngB64 = "")
 
@@ -48,7 +51,7 @@ class CrossingGuidanceTest {
     }
 
     @Test
-    fun `meilleur passage au meilleur score, seuil 040`() {
+    fun `meilleur passage au meilleur score, seuil 035`() {
         val low = obj("crosswalk", 0.20f)
         val mid = obj("crosswalk", 0.55f, listOf(0f, 0f, 100f, 100f))
         val top = obj("Crosswalk", 0.89f, listOf(0f, 0f, 200f, 200f))
@@ -56,6 +59,54 @@ class CrossingGuidanceTest {
         assertEquals(top, CrossingGuidance.selectBest(listOf(low, mid, top, other)))
         assertNull(CrossingGuidance.selectBest(listOf(low, other)))
         assertNull(CrossingGuidance.selectBest(emptyList()))
+    }
+
+    @Test
+    fun `sans dimensions le meilleur score gagne, repli historique`() {
+        val off = obj("crosswalk", 0.90f, listOf(400f, 700f, 500f, 900f))
+        val on = obj("crosswalk", 0.50f, listOf(100f, 700f, 412f, 1000f))
+        assertEquals(off, CrossingGuidance.selectBest(listOf(off, on)))
+    }
+
+    @Test
+    fun `avec dimensions le hors axe fort ne vole plus le guidage`() {
+        val off = obj("crosswalk", 0.90f, listOf(400f, 700f, 500f, 900f))
+        val on = obj("crosswalk", 0.50f, listOf(100f, 700f, 412f, 1000f))
+        assertEquals(on, CrossingGuidance.selectBest(listOf(off, on), frameW = frameW, frameH = frameH))
+    }
+
+    @Test
+    fun `avec dimensions le vertical est rejete`() {
+        val tall = obj("crosswalk", 0.90f, listOf(200f, 400f, 280f, 1000f))
+        assertNull(CrossingGuidance.selectBest(listOf(tall), frameW = frameW, frameH = frameH))
+    }
+
+    @Test
+    fun `avec dimensions le minuscule est rejete`() {
+        val tiny = obj("crosswalk", 0.90f, listOf(250f, 900f, 270f, 920f))
+        assertNull(CrossingGuidance.selectBest(listOf(tiny), frameW = frameW, frameH = frameH))
+    }
+
+    @Test
+    fun `avec dimensions le haut du cadre est rejete`() {
+        val high = obj("crosswalk", 0.90f, listOf(100f, 100f, 412f, 300f))
+        assertNull(CrossingGuidance.selectBest(listOf(high), frameW = frameW, frameH = frameH))
+    }
+
+    @Test
+    fun `avec dimensions le meilleur score departage les plausibles`() {
+        val small = obj("crosswalk", 0.50f, listOf(100f, 700f, 412f, 1000f))
+        val big = obj("crosswalk", 0.70f, listOf(50f, 800f, 462f, 1100f))
+        assertEquals(big, CrossingGuidance.selectBest(listOf(small, big), frameW = frameW, frameH = frameH))
+    }
+
+    @Test
+    fun `plausible - geometrie illisible fausse`() {
+        assertFalse(CrossingGuidance.isPlausibleCrosswalk(listOf(1f, 2f), frameW, frameH))
+        assertFalse(CrossingGuidance.isPlausibleCrosswalk(listOf(0f, 0f, 100f, 100f), 0, frameH))
+        assertFalse(CrossingGuidance.isPlausibleCrosswalk(listOf(0f, 0f, 100f, 100f), frameW, 0))
+        assertFalse(CrossingGuidance.isPlausibleCrosswalk(listOf(0f, 0f, Float.NaN, 100f), frameW, frameH))
+        assertFalse(CrossingGuidance.isPlausibleCrosswalk(listOf(300f, 700f, 100f, 1000f), frameW, frameH))
     }
 
     @Test

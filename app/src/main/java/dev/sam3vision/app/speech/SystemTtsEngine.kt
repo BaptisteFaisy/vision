@@ -116,17 +116,62 @@ class SystemTtsEngine(private val driver: TtsDriver) {
 }
 
 /**
+ * Tampon borné des phrases prononcées avant l'init du moteur système :
+ * [AndroidTtsDriver] y garde ([add]) puis y rejoue ([drain]) à l'arrivée de
+ * `onInit` — sans lui, la première alerte (moteur pas encore prêt) serait
+ * perdue. Pur et testé en JVM : le pilote Android n'y délègue que le
+ * stockage (l'ordre et la borne), sous son verrou.
+ */
+class TtsInitBuffer(private val max: Int = PENDING_MAX) {
+
+    private val items = ArrayDeque<BufferedPhrase>()
+
+    /** Phrase en attente d'initialisation : texte, coupe, locale, débit, pitch. */
+    data class BufferedPhrase(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
+
+    /**
+     * Garde [text] : une urgente vide le tampon (la plus fraîche gagne),
+     * au-delà de [max] les plus vieilles tombent.
+     */
+    fun add(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float = 1f) {
+        if (flush) items.clear()
+        while (items.size >= max) items.removeFirst()
+        items.add(BufferedPhrase(text, flush, locale, rate, pitch))
+    }
+
+    /** Rend le tampon dans l'ordre et le vide (rejoué à l'init). */
+    fun drain(): List<BufferedPhrase> {
+        val backlog = items.toList()
+        items.clear()
+        return backlog
+    }
+
+    /** Jette le tampon (coupe, fermeture). */
+    fun clear() {
+        items.clear()
+    }
+
+    /** Phrases en attente. */
+    val size: Int get() = items.size
+
+    companion object {
+        /** Phrases gardées avant l'init : au-delà, les plus vieilles tombent. */
+        const val PENDING_MAX = 5
+    }
+}
+
+/**
  * Pilote [TextToSpeech] : initialisation asynchrone avec tampon borné.
  *
  * Le moteur met quelques centaines de millisecondes à s'initialiser : les
- * phrases prononcées avant sont gardées ([PENDING_MAX], les plus vieilles
+ * phrases prononcées avant sont gardées ([TtsInitBuffer], les plus vieilles
  * tombent, une urgente vide le tampon) puis parlées dans l'ordre à l'arrivée
  * de [onInit]. Échec d'init (`CHECK_VOICE_DATA` manquant…) = pilote condamné :
  * tout est jeté et [speak] refuse ensuite, sans lever.
  *
  * Adaptateur fin, comme [dev.sam3vision.app.SpeechPlayer] : instanciable
- * uniquement sur Android, donc sans test JVM — la file et le cycle de vie
- * sont testés dans [SystemTtsEngine] derrière un faux.
+ * uniquement sur Android, donc sans test JVM — le tampon ([TtsInitBuffer]),
+ * la file et le cycle de vie sont testés dans [SystemTtsEngine] derrière un faux.
  */
 class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitListener {
 
@@ -139,18 +184,14 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
     @Volatile
     private var down = false
 
-    private val pending = ArrayDeque<Pending>()
-
-    /** Phrase en attente d'initialisation : texte, coupe, locale, débit, pitch. */
-    private data class Pending(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float)
+    private val pending = TtsInitBuffer()
 
     override fun onInit(status: Int) {
         val ok = status == TextToSpeech.SUCCESS
-        val backlog: List<Pending>
+        val backlog: List<TtsInitBuffer.BufferedPhrase>
         synchronized(lock) {
             if (ok) ready = true else down = true
-            backlog = pending.toList()
-            pending.clear()
+            backlog = pending.drain()
         }
         if (ok) backlog.forEach { utter(it.text, it.flush, it.locale, it.rate, it.pitch) }
     }
@@ -159,9 +200,7 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
         if (down || text.isBlank()) return false
         synchronized(lock) {
             if (!ready) {
-                if (flush) pending.clear()
-                if (pending.size >= PENDING_MAX) pending.removeFirst()
-                pending.add(Pending(text, flush, locale, rate, pitch))
+                pending.add(text, flush, locale, rate, pitch)
                 return true
             }
         }
@@ -192,9 +231,4 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
             val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             tts.speak(text, mode, Bundle(), UUID.randomUUID().toString()) == TextToSpeech.SUCCESS
         }.getOrDefault(false)
-
-    companion object {
-        /** Phrases gardées avant l'init : au-delà, les plus vieilles tombent. */
-        const val PENDING_MAX = 5
-    }
 }

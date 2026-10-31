@@ -13,9 +13,11 @@ name: deploy-live-fast
 #     `MODAL_TOKEN_SECRET`) : jamais dans un fichier, jamais affichés (GitHub les masque
 #     dans les logs). `gh secret list` ne montre que leur nom et leur date.
 #
-# ACTIF : tout push sur la branche protégée qui touche le backend ou ce fichier
-# redéploie l'app — donc réveille la carte GPU (facturé). Pas de `schedule:`,
-# jamais de ping périodique : seul un changement déploie.
+# CONDITIONNEL : un push sur la branche protégée ne redéploie que si son message
+# contient `[deploy-gpu]` — chaque deploy réveille la carte (facturé) ET invalide
+# le snapshot mémoire (le réveil suivant retombe à 25-38 s). Sans le marqueur le
+# job passe sans rien faire ; `workflow_dispatch` déploie toujours (manuel).
+# Pas de `schedule:`, jamais de ping périodique : seul un changement voulu déploie.
 on:
   push:
     branches: [master]
@@ -34,6 +36,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy-gpu]')
     runs-on: ubuntu-latest
     # Hors PR : déploiement Modal + attente que la nouvelle version serve
     # (jusqu'à quelques minutes si l'ancien conteneur vit encore).

@@ -35,7 +35,10 @@ inventé, mais un mode qui ne dit jamais « traversez » ne sert à rien.
 - Terrain : **France**, **de jour**, 3+ carrefours à feux piétons variés
   (centre dense, résidentiel, LED + lampes), à pied face aux feux.
 - Backend `/live` joignable (GPU) : sans boîtes SAM, pas de lecture — rouge
-  par défaut, la recette ne peut pas se jouer.
+  par défaut, la recette ne peut pas se jouer. Réveil : `GET /warm` (25-38 s
+  à froid après un deploy `[deploy-gpu]`, 2-7 s sur restauration snapshot),
+  puis `/health` (leviers `batch_prompts/cuda_graph/edge:512/snapshot/attn:sdpa`,
+  `vision_accel: ok`) — noter la version servie au procès-verbal.
 
 ## Recette (une prise par carrefour, ~10 min chacun)
 
@@ -77,7 +80,9 @@ A1-A5 part en **issue GitHub**, pas en commentaire. **Un vert sur rouge
 
 **Non rejouée** : pas d'appareil piloté d'ici. La checklist ci-dessus
 est prête ; la première prise l'archive (procès-verbal + captures) et
-remplit chaque verdict — aucun n'est pré-rempli ici.
+remplit chaque verdict — aucun n'est pré-rempli ici. Protocole à rejouer après
+tout changement build/deploy (clés, `network_security`, deploy GPU) : A2
+(0 faux vert, bloquant) et A4 (sorties confirmées, veto) au minimum.
 
 ## Ce qui est vérifié sans appareil (tests JVM)
 

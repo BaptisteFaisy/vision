@@ -201,6 +201,8 @@ class ProbeWiringStairsCountTest {
         )
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
+        // Scheduler coupé : ce test verrouille le guetteur, pas les keyframes (voir LiveAdaptiveTest).
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default },

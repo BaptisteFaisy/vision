@@ -37,7 +37,9 @@ data class HazardSignal(
 
         /**
          * Signal des lectures affinées : un label [HazardConcepts] dans le
-         * couloir ([PositionText.SIDE_EDGE]), mesuré sous le seuil. Le poteau
+         * couloir ([PositionText.SIDE_EDGE]) — plein axe pour un poteau
+         * imminent ([HazardWatcher.POLE_FAST_METERS], le proche percute
+         * même au bord du cadre) — mesuré sous le seuil. Le poteau
          * prime sur tout non-poteau (P3 avant P4, gardé en [HazardSignal.alt]) ;
          * à sorte égale le plus proche gagne ; boîte illisible ou dimensions
          * nulles = ignoré.
@@ -69,13 +71,16 @@ data class HazardSignal(
         private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
             if (!HazardConcepts.isHazard(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
-            val limit = if (HazardConcepts.isPole(reading.label)) HazardWatcher.POLE_METERS
+            val pole = HazardConcepts.isPole(reading.label)
+            val limit = if (pole) HazardWatcher.POLE_METERS
             else HazardWatcher.HAZARD_METERS
             if (meters > limit) return null
             val box = reading.box
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
-            if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
+            // Poteau imminent : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
+            val nearPole = pole && meters <= HazardWatcher.POLE_FAST_METERS
+            if (!nearPole && (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE)) return null
             return Hit(meters, reading.label, centerX)
         }
     }

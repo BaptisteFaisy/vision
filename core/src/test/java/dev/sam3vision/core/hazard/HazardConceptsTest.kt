@@ -15,6 +15,9 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("bollard"))
         assertTrue(HazardConcepts.isHazard("fence"))
         assertTrue(HazardConcepts.isHazard("gate"))
+        assertTrue(HazardConcepts.isHazard("street lamp"))
+        assertTrue(HazardConcepts.isHazard("sign"))
+        assertTrue(HazardConcepts.isHazard("traffic sign"))
     }
 
     @Test
@@ -24,6 +27,12 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("borne"))
         assertTrue(HazardConcepts.isHazard("Clôture"))
         assertTrue(HazardConcepts.isHazard("portail"))
+        assertTrue(HazardConcepts.isHazard("Lampadaire"))
+        assertTrue(HazardConcepts.isHazard("RÉVERBÈRE"))
+        assertTrue(HazardConcepts.isHazard("Panneau"))
+        assertTrue(HazardConcepts.isHazard("panneaux"))
+        assertTrue(HazardConcepts.isHazard("Potelet"))
+        assertTrue(HazardConcepts.isHazard("plot"))
     }
 
     @Test
@@ -31,6 +40,12 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("barriers"))
         assertTrue(HazardConcepts.isHazard("poteaux"))
         assertTrue(HazardConcepts.isHazard("portails"))
+        assertTrue(HazardConcepts.isHazard("street lamps"))
+        assertTrue(HazardConcepts.isHazard("lampadaires"))
+        assertTrue(HazardConcepts.isHazard("signs"))
+        assertTrue(HazardConcepts.isHazard("traffic signs"))
+        assertTrue(HazardConcepts.isHazard("potelets"))
+        assertTrue(HazardConcepts.isHazard("plots"))
     }
 
     @Test
@@ -39,6 +54,12 @@ class HazardConceptsTest {
         assertEquals("au poteau", HazardConcepts.nameOf("poteau")!!.fr)
         assertEquals("barrier", HazardConcepts.nameOf("barrier")!!.en)
         assertEquals("pole", HazardConcepts.nameOf("poteau")!!.en)
+        assertEquals("au lampadaire", HazardConcepts.nameOf("street lamp")!!.fr)
+        assertEquals("street lamp", HazardConcepts.nameOf("lampadaire")!!.en)
+        assertEquals("au panneau", HazardConcepts.nameOf("sign")!!.fr)
+        assertEquals("au panneau de signalisation", HazardConcepts.nameOf("traffic sign")!!.fr)
+        assertEquals("au potelet", HazardConcepts.nameOf("potelet")!!.fr)
+        assertEquals("bollard", HazardConcepts.nameOf("plot")!!.en)
     }
 
     @Test

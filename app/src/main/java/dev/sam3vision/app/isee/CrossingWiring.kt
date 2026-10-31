@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import android.graphics.RectF
 import dev.sam3vision.app.IseeHaptics
+import dev.sam3vision.app.live.LensOrigin
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingApproachWatcher
 import dev.sam3vision.core.crossing.CrossingArrivalWatcher
@@ -11,6 +12,7 @@ import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
@@ -72,8 +74,9 @@ internal fun LiveProbe.setCrossingActive(
     settings: Settings,
     active: Boolean,
     sensorLens: LensSpec? = null,
+    onLens: ((LensOrigin) -> Unit)? = null,
 ) {
-    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens)
+    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens)
 }
 
 /**
@@ -98,6 +101,36 @@ internal val CrossingLight.greenForDecision: Boolean
     get() = state == CrossingState.Green && box != null
 
 /**
+ * Fusion de deux lectures de feux (câblage 2 feux) : accord → l'état lu,
+ * désaccord → [CrossingState.Red] (attendre, la voix dédiée vient de
+ * [CrossingText.contradiction]). Pur, testé en JVM.
+ */
+internal fun combineLightStates(first: CrossingState, second: CrossingState): CrossingState {
+    if (first == second) return first
+    return CrossingState.Red
+}
+
+/**
+ * Phrase du signal [cue] (`null` = silence gardé) : contradiction [contradiction]
+ * (lue 2 feux) → phrase dédiée ; phase PRET du veto + signal vert →
+ * « prêt », pas « traversez » (la voix et le bandeau disent tous deux « pas
+ * encore »). L'état et l'urgence sont intacts : seule la phrase s'aligne.
+ */
+internal fun crossingCueOf(
+    cue: CrossingCue?,
+    phase: TraversePhase,
+    language: SpeechLanguage,
+    contradiction: Boolean = false,
+): CrossingCue? {
+    if (cue == null) return null
+    if (contradiction) return cue.copy(phrase = CrossingText.contradiction(language))
+    if (phase == TraversePhase.PRET && cue.state == CrossingState.Green) {
+        return cue.copy(phrase = CrossingText.ready(language))
+    }
+    return cue
+}
+
+/**
  * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
  * ([cue], `null` = rester muet), l'état confirmé affiché (dernier annoncé,
  * rouge par défaut) et la boîte lue sur la frame. Un seul aller-retour,
@@ -119,7 +152,9 @@ internal data class CrossingPatch(
  * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente — sauf
  * absence de feu confirmée ([noLightGate], `null` = voix feu seule, legacy),
  * où le feu se tait et la phrase vient de la branche sans-feu (véhicules
- * puis « Traversez. », ordre user du 31/10).
+ * puis « Traversez. », ordre user du 31/10). [contradiction] vrai (deux feux
+ * lus en désaccord, câblage 2 feux) : la phrase dédiée remplace, l'état
+ * reste fail-safe (voir [crossingCueOf]).
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
@@ -132,6 +167,7 @@ internal fun crossingPatchOf(
     language: SpeechLanguage,
     onCrop: CrossingCropTap? = null,
     noLightGate: NoLightGate? = null,
+    contradiction: Boolean = false,
 ): CrossingPatch? {
     if (!active) return null
     val light = crossingLightOf(frame, jpegB64, onCrop)
@@ -145,7 +181,7 @@ internal fun crossingPatchOf(
         return CrossingPatch(null, CrossingState.Red, null, decision.state, true)
     }
     val vetoed = decision.crossingState()
-    val cue = announcer.onFrame(atMs, vetoed, language)
+    val cue = crossingCueOf(announcer.onFrame(atMs, vetoed, language), decision.state, language, contradiction)
     // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
     // publié est le dernier annoncé (rouge tant que rien n'est annoncé), jamais
     // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se

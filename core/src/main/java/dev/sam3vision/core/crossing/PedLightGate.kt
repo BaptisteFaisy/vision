@@ -20,14 +20,16 @@ package dev.sam3vision.core.crossing
  * tranche — allongé, avec de l'intérieur, masse non entassée en haut.
  * Mesuré : rappel vert 81/183 → 90/183, fuites inchangées (0 rouge,
  * 100 voiture, 6 éteints), seuils existants intacts.
+ *
+ * Seuils publics (surface de calibrage, voir aussi [PedLightColor]).
  */
 object PedLightGate {
 
     /** Le vert ne doit pas être confiné en haut (bruit sur un rouge). */
-    private const val GREEN_BOTTOM_MIN = 0.35f
+    const val GREEN_BOTTOM_MIN = 0.35f
 
-    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, rouge). */
-    private const val RED_MAX_FRACTION = 0.02f
+    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
+    const val RED_MAX_FRACTION = 0.02f
 
     /**
      * Vert minimal dans le cadre (en dessous : reflet ou bruit). Partagé
@@ -47,13 +49,13 @@ object PedLightGate {
     private const val ELONGATION_MIN = 1.0f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
-    private const val BBOX_MIN_PX = 3
+    const val BBOX_MIN_PX = 3
 
     /** R1b : masse verte max du tiers haut de bbox (bonhomme non entassé en haut). */
-    private const val TOP3_MAX = 0.38f
+    const val TOP3_MAX = 0.38f
 
     /** R1b : fraction max de pixels verts en lisière (un disque n'est que contour). */
-    private const val EDGE_MAX = 0.72f
+    const val EDGE_MAX = 0.72f
 
     /** R1b : allongement vertical min du nuage (1,0 comme la bbox, même ordre). */
     private const val CLOUD_ELONGATION_MIN = 1.0f
@@ -63,7 +65,7 @@ object PedLightGate {
      * historique : la garde bas garde ses dents, la forme ne tranche que
      * dans la bande 20-35 %, les quasi-ratés).
      */
-    private const val R1B_BOTTOM_FLOOR = 0.20f
+    const val R1B_BOTTOM_FLOOR = 0.20f
 
     /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne

@@ -130,6 +130,18 @@ class DistanceKalman(
     fun predictions(atMs: Long = clock()): List<KalmanPrediction> =
         tracks.keys.mapNotNull { predict(it, atMs) }
 
+    /**
+     * Vitesse radiale estimée de [trackId] à [atMs] (m/s, négative en
+     * approche), `null` si la piste est inconnue ou périmée. Ne modifie pas
+     * la piste : lire n'est pas mesurer. Consommée par `VehicleApproach`.
+     */
+    @Synchronized
+    fun velocityOf(trackId: Int, atMs: Long = clock()): Float? {
+        val track = tracks[trackId]?.takeIf { atMs - it.atMs <= timeoutMs } ?: return null
+        if (atMs < track.atMs) return null
+        return track.vel
+    }
+
     private fun initTrack(
         trackId: Int,
         raw: Float,

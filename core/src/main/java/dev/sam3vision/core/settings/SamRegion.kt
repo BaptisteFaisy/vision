@@ -6,6 +6,7 @@ package dev.sam3vision.core.settings
  * Ce réglage ne fait qu'**élire** l'endpoint appelé : il n'allume aucune carte. La règle
  * Modal reste « une seule GPU à la fois », toutes régions confondues — l'app US doit être
  * déployée et réveillée à la demande (`~/bin/sam3-gpu-us on --reason …`).
+ * Bail GPU (la carte dort, la première frame réveille) : [GPU_LEASE_LINE].
  */
 enum class SamRegion(
     /** Libellé des Réglages : tient sur une ligne, en pleine largeur. */
@@ -27,6 +28,16 @@ enum class SamRegion(
     );
 
     companion object {
+        /**
+         * Bail GPU, une ligne à afficher sous le choix de région : la carte dort
+         * quand personne ne s'en sert (extinction 60 s après la dernière frame,
+         * `POST /release`), la première frame la réveille — à froid 25-38 s, sur
+         * restauration snapshot 2-7 s. Seule la chaîne stable vit ici (+ sa doc) ;
+         * l'affichage appartient à l'écran région des Réglages (autre agent).
+         */
+        const val GPU_LEASE_LINE =
+            "GPU sleeps when idle - first frame wakes it (cold 25-38 s, warm 2-7 s)."
+
         /** Nom persisté (`sam_region`) → région ; valeur inconnue ou absente ⇒ [Eu]. */
         fun fromName(name: String?): SamRegion =
             entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: Eu

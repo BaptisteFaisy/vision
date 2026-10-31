@@ -3,6 +3,7 @@ package dev.sam3vision.core.curb
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.live.SteeringCap
+import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Position du trottoir vu caméra : devant (dans le couloir marché — l'utilisateur
@@ -24,7 +25,8 @@ enum class SidewalkPosition { Ahead, Left, Right, Across, Absent }
  *
  * Deux prudences assumées : une scène vide n'est pas une preuve d'absence (SAM
  * muet, trou de frame) — pas de correction, le cap suit son cours ; un trottoir
- * des deux côtés sans distance mesurée, c'est le doute, pas un choix ([SidewalkPosition.Absent]).
+ * des deux côtés sans distance mesurée, c'est le doute, pas un choix
+ * ([SidewalkPosition.Absent], muet — [cautionPhrase] le dit prudemment).
  *
  * [SidewalkPosition.Across] n'est jamais produit ici (la caméra seule ne voit
  * pas l'autre côté de la chaussée) : c'est l'appelant, qui connaît le contexte
@@ -39,7 +41,8 @@ object SidewalkKeep {
      * inclus) : couloir central ([PositionText.SIDE_EDGE], comme
      * [dev.sam3vision.core.live.Guidance]) → [SidewalkPosition.Ahead] ; un seul
      * côté → ce côté ; les deux → le plus proche ([SidewalkPosition.Absent] si
-     * aucun n'est mesuré) ; scène perçue sans trottoir → [SidewalkPosition.Absent].
+     * aucun n'est mesuré, voir [cautionPhrase]) ; scène sans trottoir
+     * → [SidewalkPosition.Absent].
      * Les labels blancs sont ignorés, comme dans le guidage.
      */
     fun positionOf(labels: List<PlacedLabel>): SidewalkPosition {
@@ -65,6 +68,34 @@ object SidewalkKeep {
         SidewalkPosition.Left -> SteeringCap.Left
         SidewalkPosition.Right -> SteeringCap.Right
         SidewalkPosition.Ahead, SidewalkPosition.Across, SidewalkPosition.Absent -> null
+    }
+
+    /**
+     * Consigne prudente quand le trottoir est des deux côtés sans distance
+     * mesurée ([positionOf] y rend [SidewalkPosition.Absent], muet) : le doute
+     * se dit, sans dévier ([returnCap] reste `null`). `null` sinon (un côté,
+     * une distance mesurée, ou pas de trottoir).
+     */
+    fun cautionPhrase(
+        labels: List<PlacedLabel>,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
+    ): String? {
+        if (!bothSidesWithoutDistance(labels)) return null
+        return when (language) {
+            SpeechLanguage.Fr -> "Attention, trottoir des deux côtés."
+            SpeechLanguage.En -> "Attention, sidewalk on both sides."
+        }
+    }
+
+    /** Trottoir des deux côtés du couloir, aucune distance mesurée : le doute. */
+    private fun bothSidesWithoutDistance(labels: List<PlacedLabel>): Boolean {
+        val walks = labels.filter { it.label.isNotBlank() && CurbConcepts.isGround(it.label) }
+        if (walks.isEmpty()) return false
+        val edge = PositionText.SIDE_EDGE
+        if (walks.any { it.centerX >= edge && it.centerX <= 1f - edge }) return false
+        val left = walks.any { it.centerX < edge }
+        val right = walks.any { it.centerX > 1f - edge }
+        return left && right && nearestSide(walks) == null
     }
 
     /**

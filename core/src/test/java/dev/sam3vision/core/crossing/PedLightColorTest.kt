@@ -1,6 +1,8 @@
 package dev.sam3vision.core.crossing
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PedLightColorTest {
@@ -73,6 +75,14 @@ class PedLightColorTest {
         assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(0), 0, 0))
         assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(10), 10, 10))
         assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100), -1, 10))
+    }
+
+    @Test
+    fun `pixel lampe - franc oui, pastel et noir non`() {
+        assertTrue(PedLightColor.isLampPixel(RED))
+        assertTrue(PedLightColor.isLampPixel(GREEN))
+        assertFalse(PedLightColor.isLampPixel(GRAY))
+        assertFalse(PedLightColor.isLampPixel(BLACK))
     }
 
     private fun redFrame(w: Int, h: Int) = IntArray(w * h) { RED }

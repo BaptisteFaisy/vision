@@ -89,7 +89,12 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - noir et gris attendent rouge, binaire`() {
+    fun `verdict - disque vert admis (detection au plus large)`() {
+        assertEquals(CrossingState.Green, PedLightGate.verdict(disc(10, 10, 5), 20, 20))
+    }
+
+    @Test
+    fun `verdict - noir et gris attendent (binaire)`() {
         assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
         assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
     }

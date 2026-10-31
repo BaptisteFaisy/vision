@@ -52,7 +52,7 @@ from pathlib import Path
 import modal
 
 from fast_core import clamp_int
-from service import Sam3LiveService
+from service import MODEL_LABEL, Sam3LiveService
 
 APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-eu-a100")
 GPU_TYPE = os.environ.get("FAST_GPU", "A100")
@@ -166,5 +166,21 @@ class Sam3Live(Sam3LiveService):
 
     @modal.asgi_app()
     def web(self):
-        """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws."""
-        return self.api()
+        """FastAPI : /health, /segment (SPEC), /live (LIVE-SPEC + knobs), /live/ws, /warm."""
+        api = self.api()
+        service = self
+
+        @api.get("/warm")
+        async def warm():
+            """Réveil explicite du conteneur : le deploy l'appelle pour créer le snapshot.
+
+            N'importe quelle requête réveille la carte (boot complet 25-38 s, puis
+            restauration snapshot 2-7 s) ; /warm le fait SANS inférence — la réponse
+            ne coûte que le boot. Pas dans LIVE-SPEC (chauffage Modal seul) : le
+            client n'a rien à changer, /health reste la sonde d'état.
+            """
+            return {"ok": True, "warm": True, "model": MODEL_LABEL,
+                    "restored": getattr(service, "restored", None),
+                    "load_seconds": getattr(service, "load_seconds", None)}
+
+        return api

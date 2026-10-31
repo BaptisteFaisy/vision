@@ -4,9 +4,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Ips du direct : calculés sur l'intervalle **réel** entre deux frames publiées, et
- * rejetés hors `1..20 000 ms` — sinon une frame tombée dans la même milliseconde
- * afficherait 1000 ips, et un retour de veille 0,03 ips.
+ * Ips du direct : calculés sur l'intervalle **réel** entre deux frames publiées, 0
+ * passé 20 000 ms (un trou ne garde pas l'ancien chiffre) — seule une frame tombée
+ * dans la même milliseconde garde l'affichage (sinon 1000 ips inventés).
  */
 class LiveFpsMeterTest {
 
@@ -32,8 +32,8 @@ class LiveFpsMeterTest {
     }
 
     @Test
-    fun `trou de veille au dela de vingt secondes rejete`() {
-        assertEquals(1.25f, LiveFpsMeter.fpsFor(20_001L, 1.25f), 0f)
+    fun `trou de veille au dela de vingt secondes affiche zero`() {
+        assertEquals(0f, LiveFpsMeter.fpsFor(20_001L, 1.25f), 0f)
         assertEquals(0.05f, LiveFpsMeter.fpsFor(20_000L, 1.25f), 0.0001f)
     }
 

@@ -195,6 +195,42 @@ def _service_wiring(check) -> None:
     check("feux: cap max_objects transmis", captured.get("cap") == 5, str(captured))
 
 
+def _curb(guard, seg, check) -> None:
+    """Bordure/bateau/marche réservés comme le feu ; trottoir (plan) exclu."""
+    for label in ["curb", "Curb", "bordure", "rebord du trottoir", "kerb",
+                  "curb ramp", "bateau", "passage bateau", "step", "marche",
+                  "steps", "curb cut"]:
+        check(f"bordure: label bord reconnu ({label})",
+              guard.is_curb_label(label), label)
+    for label in ["sidewalk", "trottoir", "car", "road", "route", "chemin",
+                  "person", "", "   ", None, 42]:
+        check(f"bordure: pas un bord ({label!r})",
+              not guard.is_curb_label(label), repr(label))
+    import numpy as np
+
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+    entries = [{"label": f"car{index}", "score": 0.9 - 0.05 * index,
+                "box": [0.0, 0.0, 8.0, 8.0], "mask": mask} for index in range(5)]
+    entries.append({"label": "bordure", "score": 0.12,
+                    "box": [1.0, 1.0, 4.0, 4.0], "mask": mask})
+    direct = seg.finalize(entries, (16, 16), 3, "none")
+    check("bordure: sans garde le rebord est évincé",
+          all(item["label"] != "bordure" for item in direct["objects"]),
+          str([item["label"] for item in direct["objects"]]))
+    kept = guard.finalize_guarded(seg.finalize, entries, (16, 16), 3, "none")
+    check("bordure: garde réserve la dernière place au rebord",
+          [item["label"] for item in kept["objects"]] == ["car0", "car1", "bordure"],
+          str([item["label"] for item in kept["objects"]]))
+    both = [dict(item) for item in entries]
+    both.append({"label": "zebra", "score": 0.10,
+                 "box": [1.0, 1.0, 4.0, 4.0], "mask": mask})
+    kept2 = guard.finalize_guarded(seg.finalize, both, (16, 16), 4, "none")
+    labels = [item["label"] for item in kept2["objects"]]
+    check("passage: garde réserve aussi le zébrures évincées",
+          "zebra" in labels and "bordure" in labels, str(labels))
+
+
 def test_feux_guard(_) -> None:
     """Garde feux : point d'entrée unique (un seul slot RUNNERS, harnais à 497 l)."""
     from test_units import check
@@ -204,5 +240,6 @@ def test_feux_guard(_) -> None:
     _routing(guard, check)
     _work_edge(guard, check)
     _finalize(guard, _live_fast_module("segmentation"), check)
+    _curb(guard, _live_fast_module("segmentation"), check)
     _payload_wiring(check)
     _service_wiring(check)

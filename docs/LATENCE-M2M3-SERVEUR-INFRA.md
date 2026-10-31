@@ -140,6 +140,12 @@ Deploy groupé UNIQUE (les § 2–6 partent ensemble) :
 bash server/scripts/deploy-live-fast.sh
 ```
 
+En CI, seul un push dont le message contient `[deploy-gpu]` déploie
+(`deploy-live-fast.yml`, 31/10 : chaque deploy invalide le snapshot mémoire) ;
+hors CI, le script déploie toujours. Après le deploy, le script appelle `GET
+/warm` : le premier boot crée le snapshot (25-38 s à froid), les réveils
+suivants restaurent (2-7 s) — `/health` reste le verdict, `/warm` le chauffage.
+
 Le script : garde anti-stale → `modal deploy backend/live_fast/live_app_fast.py`
 (leviers `FAST_BATCH_PROMPTS=1 FAST_EDGE=512 FAST_CUDA_GRAPH=1 FAST_ATTN=sdpa
 FAST_SCALEDOWN=60 FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1

@@ -1,8 +1,10 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -23,13 +25,21 @@ import kotlin.coroutines.coroutineContext
  * pas de fin). Les clips stop (`guide_stop`, `tl_stop`) sont l'héritage
  * d'avant : l'urgent ne les joue plus.
  *
- * Garde-fous du doux : rien sans clé ElevenLabs, rien par-dessus la réponse
- * du chat (une seule source sonore à la fois — c'est l'appelant qui dit si
- * le lecteur est libre), rien par-dessus la voix route (le doux attend la
- * fin du virage), et une synthèse annulée (phrase plus fraîche arrivée
+ * Garde-fous du doux : rien par-dessus la réponse du chat (une seule source
+ * sonore à la fois — c'est l'appelant qui dit si le lecteur est libre),
+ * rien par-dessus la voix route (le doux attend la fin du virage), rien
+ * par-dessus le TTS système ([systemBusy] : une alerte de sécurité ne se
+ * chevauche pas), et une synthèse annulée (phrase plus fraîche arrivée
  * entre-temps, `collectLatest` côté sonde) n'est jamais jouée. Le stop seul
  * ne se répète jamais ; les directions douces reparlent à chaque émission
  * (ordre user du 31/10).
+ *
+ * Sans clé ElevenLabs (ou voix réseau en panne : 401/402/429), pas de
+ * silence : la phrase douce part au TTS système ([system], en file),
+ * précédée une fois par session du signal [networkVoiceDown]. Le repli est
+ * oral seul (ni sous-titre, ni fanion — miroir `SafetyVoice` : sans fin de
+ * lecture, un fanion bloquerait la voix douce pour toujours), mais mémorisé
+ * (pas de répétition).
  *
  * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test —
  * miroir `IseePlayback`). [clips] est le pack voix des mots doux : clip
@@ -44,14 +54,18 @@ import kotlin.coroutines.coroutineContext
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
-    private val safety: SafetyVoice,
+    private val safety: SafetyVoice? = null,
     private val onSpeaking: (String) -> Unit = {},
     private val canPlay: () -> Boolean = { true },
     private val synthesize: suspend (apiKey: String, voiceId: String, text: String) -> Result<ByteArray> =
-        { apiKey, voiceId, text -> ElevenLabsTtsClient(apiKey, voiceId).synthesize(text) },
+        { apiKey, voiceId, text ->
+            ElevenLabsTtsClient(apiKey, voiceId, cache = ElevenLabsTtsClient.sharedPhrases).synthesize(text)
+        },
     private val clips: VoicePack? = null,
     private val routeSpeaking: () -> Boolean = { false },
     private val nowMs: () -> Long = { System.currentTimeMillis() },
+    private val system: SystemTtsEngine? = null,
+    private val systemBusy: () -> Boolean = { false },
 ) {
 
     private var lastPhrase: String? = null
@@ -68,6 +82,9 @@ class ProximityVoice(
     /** Arrivée sur le passage gardée ([onArrivalPhrase]), `null` si aucune. */
     private var pendingArrival: Pending? = null
 
+    /** Signal « voix réseau indisponible » déjà parlé (une fois par session). */
+    private var networkAlertSpoken = false
+
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
@@ -75,6 +92,7 @@ class ProximityVoice(
         pending = null
         pendingRoute = null
         pendingArrival = null
+        networkAlertSpoken = false
     }
 
     /**
@@ -83,13 +101,14 @@ class ProximityVoice(
      * pas mémorisée : réémise, elle se dira une fois la voie libre (seul ce qui a
      * vraiment parlé est dédupliqué, pendant [REPEAT_TTL_MS]). [urgent] part par
      * la voix de sécurité ([speakUrgent], grave, hors-ligne, coupe tout),
-     * dictée ou pas. Tant que la voix route parle ([routeSpeaking]),
-     * le doux se tait aussi, puis se dit à la prochaine émission.
-     * [queue] : la phrase douce tuée par le chat, la route ou [busy] est gardée
-     * (une seule, la plus fraîche) et redite par [flushPending] dès le silence,
-     * dans [PENDING_TTL_MS] — sans file, elle se redit à la prochaine émission.
-     * [busy] : P1/P2 en cours, vus par l'appelant — la phrase douce part en
-     * file si [queue] (jamais de chevauchement SafetyVoice).
+     * dictée ou pas. Tant que la voix route parle ([routeSpeaking]) ou que
+     * le TTS système parle ([systemBusy]), le doux se tait aussi, puis se
+     * dit à la prochaine émission.
+     * [queue] : la phrase douce tuée par le chat, la route, le système ou [busy]
+     * est gardée (une seule, la plus fraîche) et redite par [flushPending] dès
+     * le silence, dans [PENDING_TTL_MS] — sans file, elle se redit à la
+     * prochaine émission. [busy] : P1/P2 en cours, vus par l'appelant — la
+     * phrase douce part en file si [queue] (jamais de chevauchement SafetyVoice).
      */
     suspend fun onPhrase(
         phrase: String,
@@ -104,8 +123,7 @@ class ProximityVoice(
             return
         }
         val current = settings()
-        if (!current.ttsConfigured) return
-        if (!playerIdle || routeSpeaking() || busy()) {
+        if (!playerIdle || routeSpeaking() || busy() || systemBusy()) {
             if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
@@ -119,7 +137,8 @@ class ProximityVoice(
      * la plus fraîche — une consigne périme vite) et se redit par
      * [flushPending] avant toute douce d'obstacle (danger > route > doux >
      * arrivée). La route ne s'attend pas elle-même ([routeSpeaking] ignoré :
-     * en mode Laure la voix route part d'ici, pas du haut-parleur paresseux).
+     * en mode Laure la voix route part d'ici, pas du haut-parleur paresseux) ;
+     * elle attend le TTS système ([systemBusy], jamais de chevauchement d'alerte).
      */
     suspend fun onRoutePhrase(
         phrase: String,
@@ -132,8 +151,7 @@ class ProximityVoice(
             return
         }
         val current = settings()
-        if (!current.ttsConfigured) return
-        if (!playerIdle) {
+        if (!playerIdle || systemBusy()) {
             pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
@@ -151,8 +169,7 @@ class ProximityVoice(
     suspend fun onArrivalPhrase(phrase: String, playerIdle: Boolean) {
         if (saidRecently(phrase)) return
         val current = settings()
-        if (!current.ttsConfigured) return
-        if (!playerIdle || routeSpeaking()) {
+        if (!playerIdle || routeSpeaking() || systemBusy()) {
             pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
         }
@@ -161,16 +178,17 @@ class ProximityVoice(
 
     /**
      * Redit les phrases gardées dès que plus rien ne parle : chat silencieux
-     * ([playerIdle]), route tue et [busy] faux (P1/P2 en cours, vu par
-     * l'appelant) — la consigne route d'abord, puis la douce d'obstacle, puis
-     * l'arrivée sur le passage (une seule par appel, jamais de rafale).
-     * Périmée ([PENDING_TTL_MS]) ou déjà dite : jetée. À appeler à chaque
-     * frame par le guetteur en file.
+     * ([playerIdle]), route tue, système tu ([systemBusy]) et [busy] faux
+     * (P1/P2 en cours, vu par l'appelant) — la consigne route d'abord, puis
+     * la douce d'obstacle, puis l'arrivée sur le passage (une seule par appel,
+     * jamais de rafale). Périmée ([PENDING_TTL_MS]) ou déjà dite : jetée. En
+     * échec (synthèse, porte) : gardée pour le prochain silence — la file ne
+     * perd pas. À appeler à chaque frame par le guetteur en file, Traversée
+     * comprise.
      */
     suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
-        if (!playerIdle || routeSpeaking() || busy()) return
+        if (!playerIdle || routeSpeaking() || busy() || systemBusy()) return
         val current = settings()
-        if (!current.ttsConfigured) return
         if (flushOne(pendingRoute, current) { pendingRoute = null }) return
         if (flushOne(pending, current) { pending = null }) return
         flushOne(pendingArrival, current) { pendingArrival = null }
@@ -183,9 +201,8 @@ class ProximityVoice(
      * pas le rattrapage latéral). Périmée ou déjà dite : jetée.
      */
     suspend fun flushArrival(playerIdle: Boolean) {
-        if (!playerIdle || routeSpeaking()) return
+        if (!playerIdle || routeSpeaking() || systemBusy()) return
         val current = settings()
-        if (!current.ttsConfigured) return
         if (hasFresh(pendingRoute) || hasFresh(pending)) return
         flushOne(pendingArrival, current) { pendingArrival = null }
     }
@@ -203,15 +220,19 @@ class ProximityVoice(
     private fun saidRecently(phrase: String): Boolean =
         phrase == lastPhrase && nowMs() - lastPhraseAtMs < REPEAT_TTL_MS
 
-    /** Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée. */
+    /**
+     * Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée.
+     * Marquée dite après parole moteur : en échec, la phrase reste en file
+     * (l'appelant garde son `Pending`) au lieu d'être perdue.
+     */
     private suspend fun flushOne(due: Pending?, current: Settings, clear: () -> Unit): Boolean {
         if (due == null) return false
         if (due.phrase == lastPhrase || nowMs() >= due.expiresAtMs) {
             clear()
             return false
         }
+        if (!speak(due.phrase, current)) return false
         clear()
-        speak(due.phrase, current)
         return true
     }
 
@@ -221,40 +242,94 @@ class ProximityVoice(
      * mémorisée comme le doux (redite après [REPEAT_TTL_MS] si elle dure).
      * Orale seule : aucun sous-titre ni fanion (le TTS système ne rend pas
      * de fin, un fanion sans fin muterait la voix douce — voir `cutSpeaking`).
+     * Sans sécurité câblée (tests) : synthèse immédiate, sans garde — une
+     * urgence ne se perd jamais.
      */
-    private fun speakUrgent(phrase: String) {
+    private suspend fun speakUrgent(phrase: String) {
         if (phrase.isBlank()) return
-        safety.speak(phrase)
-        lastPhrase = phrase
-        lastPhraseAtMs = nowMs()
-    }
-
-    /** Synthèse + lecture d'une phrase douce admise (mémorisée : dite une fois). */
-    private suspend fun speak(phrase: String, current: Settings) {
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
-            .getOrElse { return }
-        coroutineContext.ensureActive()
-        if (bytes.isNotEmpty() && canPlay()) {
-            // Mémorisée au moment de parler seulement : un avalement transitoire
-            // (chat, route, porte, synthèse) ne tait pas les réémissions.
+        val cut = safety
+        if (cut != null) {
+            cut.speak(phrase)
             lastPhrase = phrase
             lastPhraseAtMs = nowMs()
-            onSpeaking(phrase)
-            player.play(bytes).onFailure { onSpeaking("") }
+            return
         }
+        player.stop()
+        coroutineContext.ensureActive()
+        val current = settings()
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase).getOrElse { return }
+        coroutineContext.ensureActive()
+        if (bytes.isEmpty()) return
+        lastPhrase = phrase
+        lastPhraseAtMs = nowMs()
+        onSpeaking(phrase)
+        player.play(bytes).onFailure { onSpeaking("") }
+    }
+
+    /**
+     * Synthèse + lecture d'une phrase douce admise ; `true` si parlée (ou
+     * confiée au TTS système). Sans clé, ou voix réseau en panne (401/402/429) :
+     * repli système ([speakOffline]), jamais de silence quand un moteur est
+     * câblé. Mémorisée au moment de parler seulement.
+     */
+    private suspend fun speak(phrase: String, current: Settings): Boolean {
+        coroutineContext.ensureActive()
+        if (!current.ttsConfigured) return speakOffline(phrase, current)
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
+            .getOrElse { error ->
+                return if (isNetworkVoiceDown(error)) speakOffline(phrase, current) else false
+            }
+        coroutineContext.ensureActive()
+        if (bytes.isEmpty() || !canPlay() || systemBusy()) return false
+        // Mémorisée au moment de parler seulement : un avalement transitoire
+        // (chat, route, système, porte, synthèse) ne tait pas les réémissions.
+        lastPhrase = phrase
+        lastPhraseAtMs = nowMs()
+        onSpeaking(phrase)
+        player.play(bytes).onFailure { onSpeaking("") }
+        return true
+    }
+
+    /**
+     * Repli TTS système (hors-ligne) : [phrase] douce dite sans ElevenLabs,
+     * en file. Le premier repli de la session est précédé du signal
+     * [networkVoiceDown] (combiné en une seule parole : l'ordre est
+     * atomique). `true` si confié au moteur (mémorisé, oral seul : ni
+     * sous-titre ni fanion — sans fin de lecture, un fanion bloquerait la
+     * voix douce) ; `false` si aucun moteur câblé (non mémorisé : réémis,
+     * il se dira).
+     */
+    private fun speakOffline(phrase: String, current: Settings): Boolean {
+        val alerted = networkAlertSpoken
+        val utterance =
+            if (alerted) phrase else "${networkVoiceDown(current.speechLanguage)} $phrase"
+        val engine = system ?: return false
+        val locale = SystemTtsEngine.localeOf(current.speechLanguage)
+        if (!engine.speak(utterance, false, locale, current.ttsSpeed, 1f)) return false
+        networkAlertSpoken = true
+        lastPhrase = phrase
+        lastPhraseAtMs = nowMs()
+        return true
+    }
+
+    /** Voix réseau en panne durable (clé, crédits, cadence) : le repli système prend le relais. */
+    private fun isNetworkVoiceDown(error: Throwable): Boolean = when (error) {
+        is ApiError.InvalidKey, is ApiError.PaymentRequired, is ApiError.RateLimited -> true
+        else -> false
     }
 
     /**
      * Mot du guidage (`GuidanceWord`) : doux en clip local quand le pack l'a
      * (< 100 ms, zéro réseau), sinon synthèse réseau mise en cache pour la
-     * suite. Directions douces redites en continu (ordre user du 31/10) : le
-     * même mot reparle à chaque émission ; le stop part en voix de sécurité
+     * suite (repli système sans clé ou sur 401/402/429, comme [onPhrase]).
+     * Directions douces redites en continu (ordre user du 31/10) : le même
+     * mot reparle à chaque émission ; le stop part en voix de sécurité
      * ([speakUrgent], unique, jamais répété — ses clips sont l'héritage
      * d'avant, l'urgent ne les joue plus). Mêmes garde-fous que [onPhrase]
-     * (clé exigée pour le doux) : seul ce qui a vraiment parlé est mémorisé
-     * — un mot avalé par un garde transitoire ne tait pas ses réémissions.
-     * [queue] : le mot doux tué part en file et se redit par [flushPending]
-     * (en synthèse, pas en clip : parlé lentement vaut mieux que perdu).
+     * (urgent coupe) : seul ce qui a vraiment parlé est mémorisé — un mot
+     * avalé par un garde transitoire ne tait pas ses réémissions. [queue] :
+     * le mot doux tué part en file et se redit par [flushPending] (en
+     * synthèse, pas en clip : parlé lentement vaut mieux que perdu).
      */
     suspend fun speakWord(
         clipId: String,
@@ -270,30 +345,34 @@ class ProximityVoice(
             return
         }
         val current = settings()
-        if (!current.ttsConfigured) return
-        if (!playerIdle) {
+        if (!playerIdle || systemBusy()) {
             if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
             return
         }
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
-            coroutineContext.ensureActive()
             lastPhrase = text
             lastPhraseAtMs = nowMs()
             onSpeaking(text)
             player.playFile(file).onFailure { onSpeaking("") }
             return
         }
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text)
-            .getOrElse { return }
-        coroutineContext.ensureActive()
-        if (bytes.isNotEmpty() && canPlay()) {
-            clips?.put(clipId, language, current.ttsVoiceId, bytes)
-            lastPhrase = text
-            lastPhraseAtMs = nowMs()
-            onSpeaking(text)
-            player.play(bytes).onFailure { onSpeaking("") }
+        if (!current.ttsConfigured) {
+            speakOffline(text, current)
+            return
         }
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text)
+            .getOrElse { error ->
+                if (isNetworkVoiceDown(error)) speakOffline(text, current)
+                return
+            }
+        coroutineContext.ensureActive()
+        if (bytes.isEmpty() || !canPlay() || systemBusy()) return
+        clips?.put(clipId, language, current.ttsVoiceId, bytes)
+        lastPhrase = text
+        lastPhraseAtMs = nowMs()
+        onSpeaking(text)
+        player.play(bytes).onFailure { onSpeaking("") }
     }
 
     /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs]. */
@@ -301,7 +380,7 @@ class ProximityVoice(
 
     companion object {
         /** Rattrapage borné : au-delà, la scène a changé, la phrase est périmée. */
-        const val PENDING_TTL_MS = 3_000L
+        const val PENDING_TTL_MS = 5_000L
 
         /**
          * Redite d'une phrase identique : 4 s, le temps de dire une phrase
@@ -310,5 +389,15 @@ class ProximityVoice(
          * présent se redit et le retour d'une scène parle.
          */
         const val REPEAT_TTL_MS = 4_000L
+
+        /**
+         * Signal unique de repli (« Voix réseau indisponible. » /
+         * « Network voice unavailable. ») : parlé une fois par session devant
+         * la première phrase dite au TTS système.
+         */
+        fun networkVoiceDown(language: SpeechLanguage): String = when (language) {
+            SpeechLanguage.Fr -> "Voix réseau indisponible."
+            SpeechLanguage.En -> "Network voice unavailable."
+        }
     }
 }

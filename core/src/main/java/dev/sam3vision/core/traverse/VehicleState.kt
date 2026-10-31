@@ -32,11 +32,9 @@ data class VehicleStateCue(
 )
 
 /**
- * Noms parlés des véhicules et phrases d'état, FR/EN : « Voiture en
- * mouvement, à 5 mètres. » / « Car moving, 5 meters away. » et « Voiture à
- * l'arrêt, à 2 mètres. » / « Car stopped, 2 meters away. » — la distance au
- * mètre entier quand elle est mesurée, l'heure du cadran sinon (jamais
- * d'heure devinée sans géométrie).
+ * Noms parlés des véhicules et phrases d'état FR/EN (« Voiture en mouvement, à 5 mètres. »,
+ * « Car stopped, 2 meters away. », « Bus en stationnement… ») : distance au mètre entier
+ * si mesurée, heure du cadran sinon (jamais d'heure devinée sans géométrie).
  */
 object VehicleStateText {
 
@@ -90,10 +88,8 @@ object VehicleStateText {
     )
 
     /**
-     * « 2 vehicles moving… » : le pluriel est générique ([count] types
-     * mobiles distincts — pistes par type, pas par instance : deux voitures
-     * sous le même label comptent pour une, limite connue), situé comme le
-     * singulier (distance du plus proche, heure sinon).
+     * « 2 vehicles moving… » : pluriel générique ([count] types mobiles, pistes par type),
+     * situé comme le singulier (distance du plus proche, heure sinon).
      */
     fun movingPluralPhrase(
         count: Int,
@@ -111,31 +107,22 @@ object VehicleStateText {
     )
 
     /**
-     * Alerte immédiate d'un véhicule en mouvement : « Stop, … » dans la
-     * langue de la voix, sans distance ni heure — le danger prime sur la
-     * précision. Parlée par la voix de sécurité, qui coupe tout, dictée du
-     * user comprise.
+     * Alerte immédiate « Stop, … » (sans distance ni heure, voix de sécurité qui coupe tout).
      */
     fun safetyPhrase(name: VehicleName, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> "Stop, ${name.fr.replaceFirstChar { it.lowercase() }} en mouvement."
         SpeechLanguage.En -> "Stop, ${name.en.replaceFirstChar { it.lowercase() }} moving."
     }
 
-    /**
-     * Alerte immédiate pluriel : « Stop, 2 vehicles moving. » — même canal
-     * sécurité que le singulier (coupe tout, dictée du user comprise).
-     */
+    /** Alerte immédiate pluriel : « Stop, 2 vehicles moving. » — même canal sécurité. */
     fun safetyPluralPhrase(count: Int, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> "Stop, $count véhicules en mouvement."
         SpeechLanguage.En -> "Stop, $count vehicles moving."
     }
 
     /**
-     * Vrai si [phrase] est une alerte mouvement (« Stop, car moving. »,
-     * « Stop, 2 vehicles moving. », …) : le [safetyPhrase] de chaque nom
-     * (FR/EN) ou le [safetyPluralPhrase] quel que soit le compte. La sonde
-     * y lit l'urgence parlée en Traversée — le seul mode où le stop se dit
-     * (ordre user du 31/10). Pure, testée en JVM.
+     * Vrai si [phrase] est une alerte mouvement (chaque [safetyPhrase] FR/EN ou [safetyPluralPhrase]) :
+     * la sonde y lit l'urgence parlée en Traversée (seul mode où le stop se dit). Pure, testée en JVM.
      */
     fun isSafetyPhrase(phrase: String): Boolean {
         if (PLURAL_ALERT.matches(phrase)) return true
@@ -161,6 +148,19 @@ object VehicleStateText {
         language = language,
     )
 
+    /** « Voiture en stationnement… », à la distance mesurée ou à l'heure. */
+    fun parkedPhrase(
+        name: VehicleName,
+        meters: Float?,
+        centerX: Float?,
+        language: SpeechLanguage,
+    ): String = situate(
+        base = if (language == SpeechLanguage.Fr) "${name.fr} en stationnement" else "${name.en} parked",
+        meters = meters,
+        centerX = centerX,
+        language = language,
+    )
+
     /** Situe [base] : distance au mètre entier si mesurée, heure sinon. */
     private fun situate(
         base: String,
@@ -177,18 +177,17 @@ object VehicleStateText {
 }
 
 /**
- * Annonces d'état des véhicules moteurs (voiture, bus, camion, moto), miroir
- * de `HazardWatcher` : un positif isolé ne parle pas, il faut
- * [confirmFrames] positifs consécutifs, puis silence pendant le cooldown de
- * l'état (4 s en mouvement, 10 s à l'arrêt).
+ * Annonces d'état des véhicules moteurs (voiture, bus, camion, moto), miroir de `HazardWatcher` :
+ * [confirmFrames] positifs consécutifs pour parler, puis silence pendant le cooldown de l'état.
  *
  * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
  * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
  * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
  * À l'arrêt = boîte figée (dérive sous [STILL_SPEED], taille stable) et
  * seau-mètre stable, mesuré ou non (l'heure situe), partout, hors fond franc
- * (le suivi coupe l'arrêt). Le reste est doute : piste jeune, seau instable,
- * hors portée.
+ * (le suivi coupe l'arrêt). En stationnement = même immobilité mesurée
+ * entre [STOPPED_METERS] et [PARKED_METERS] m (même silence que l'arrêt).
+ * Le reste est doute : piste jeune, seau instable, hors portée.
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
@@ -213,8 +212,8 @@ class VehicleStateWatcher(
     private val movingCooldownMs: Long = MOVING_COOLDOWN_MS,
     private val stoppedCooldownMs: Long = STOPPED_COOLDOWN_MS,
 ) {
-    /** État annoncé : ce qui roule, ce qui est à l'arrêt. */
-    private enum class State { MOVING, STOPPED }
+    /** État annoncé : ce qui roule, ce qui est à l'arrêt, ce qui est garé. */
+    private enum class State { MOVING, STOPPED, PARKED }
 
     /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité. */
     private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?)
@@ -270,6 +269,7 @@ class VehicleStateWatcher(
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]
      * porte les boîtes SAM, [readings] les distances affinées ; [atMs] < 0
      * désactive le suivi temporel (croissance seule, comme le veto).
+     * [motion] (`null` = pas de signal fond) fait juger chaque piste par le
      * fond : une piste qui suit la caméra ne conclut plus le mouvement.
      * [movingMeters] borne la portée du mouvement (sans-feu : infini — toute voiture qui bouge se dit).
      */
@@ -322,7 +322,8 @@ class VehicleStateWatcher(
         val phrase = when {
             movingPlural -> VehicleStateText.movingPluralPhrase(pick.movingCount, pick.meters, pick.centerX, language)
             pick.state == State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
-            else -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
+            pick.state == State.STOPPED -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
+            else -> VehicleStateText.parkedPhrase(pick.name, pick.meters, pick.centerX, language)
         }
         val safety = if (near) {
             if (movingPlural) VehicleStateText.safetyPluralPhrase(pick.movingCount, language)
@@ -348,7 +349,7 @@ class VehicleStateWatcher(
         movingThisFrame = false
     }
 
-    /** Le candidat de la frame : le mouvement d'abord (le plus proche), l'arrêt ensuite. */
+    /** Le candidat de la frame : le mouvement d'abord, l'arrêt ensuite, le stationnement enfin. */
     private fun pick(
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -359,7 +360,7 @@ class VehicleStateWatcher(
         movingMeters: Float,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, hushed, atMs, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -367,16 +368,17 @@ class VehicleStateWatcher(
         current: Map<String, Current>,
         meters: Map<String, Float>,
         tau: ApproachVerdict,
+        atMs: Long,
         hushed: Set<String>,
-        atMs: Long, // PISTE1 : date la croissance pour la décote zoom
         movingMeters: Float,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
             .filter { candidate ->
                 if (candidate in hushed) return@filter false
-                val seen = current.getValue(candidate)
                 val prev = previous[candidate]
+                val seen = current.getValue(candidate)
+                if (VehicleApproach.instanceKeyOf(seen.label, seen.cx ?: 0.5f) in hushed) return@filter false
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
@@ -407,7 +409,7 @@ class VehicleStateWatcher(
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
                 val measured = meters[candidate]
-                if (measured != null && measured > MOVING_METERS) return@filter false
+                if (measured != null && measured > PARKED_METERS) return@filter false
                 if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs) || seen.area > prev.area) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
@@ -415,7 +417,23 @@ class VehicleStateWatcher(
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
-        return Pick(State.STOPPED, name, meters[key], seen.cx, false)
+        val measured = meters[key]
+        val state = if (measured != null && measured > STOPPED_METERS) State.PARKED else State.STOPPED
+        return Pick(state, name, measured, seen.cx, false)
+    }
+
+    /** Verdict fond de la dérive [prev]→[seen] ([Verdict.UNKNOWN] sans datation ni géométrie). */
+    private fun backgroundVerdict(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion): Verdict {
+        if (atMs < 0L || prev.atMs < 0L) return Verdict.UNKNOWN
+        val dtSeconds = (atMs - prev.atMs) / 1000f
+        if (dtSeconds <= 0f) return Verdict.UNKNOWN
+        val dx = (seen.cx ?: Float.NaN) - (prev.cx ?: Float.NaN)
+        val dy = (seen.cy ?: Float.NaN) - (prev.cy ?: Float.NaN)
+        val frameScale = motion.dtMs / 1000f / dtSeconds
+        return VehicleBackground.decide(
+            -1, dx * frameScale, dy * frameScale,
+            motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs, 0f,
+        ).verdict
     }
 
     /** Véhicules moteurs vus par clé (surface max, miroir du veto). */
@@ -473,7 +491,7 @@ class VehicleStateWatcher(
         /** Silence entre deux annonces de mouvement (le mobile reparle vite). */
         const val MOVING_COOLDOWN_MS = 4_000L
 
-        /** Silence entre deux annonces d'arrêt (l'immobile attend). */
+        /** Silence entre deux annonces d'immobile (l'arrêt et le stationnement partagent). */
         const val STOPPED_COOLDOWN_MS = 10_000L
 
         /** Au-delà de cette distance (m), un véhicule en mouvement ne fait pas parler. */
@@ -482,8 +500,11 @@ class VehicleStateWatcher(
         /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
         const val NEAR_MOVING_METERS = 8f
 
-        /** Seuil strict des arrêts du veto traversée ([TraverseVeto]) : la voix annonce, elle, jusqu'à [MOVING_METERS]. */
-        const val STOPPED_METERS = 3f
+        /** Sous ce seuil (m), l'immobile se dit « à l'arrêt » (et ne bloque plus le veto, arrêt confirmé) ; au-delà, « en stationnement ». */
+        const val STOPPED_METERS = 5f
+
+        /** Au-delà (m), un véhicule immobile ne fait pas parler (stationnement lointain tu). */
+        const val PARKED_METERS = 15f
 
         /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (au-delà, c'est un mouvement latéral). */
         const val STILL_SPEED = 0.02f

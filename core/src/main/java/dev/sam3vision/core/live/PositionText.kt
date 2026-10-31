@@ -178,14 +178,22 @@ object PositionText {
     }
 
     /**
-     * Signature de scène (labels + heures + distance **arrondie au mètre**),
-     * insensible à l'ordre : sert à ne pas répéter la même scène. Arrondir est ce
-     * qui fait parler un objet qui s'approche (3 m → 2 m → 1 m) sans le faire
-     * bavarder à chaque frame. Indépendante de la langue de la voix.
+     * Signature de scène (labels + heures + distance **au seau**),
+     * insensible à l'ordre : sert à ne pas répéter la même scène. Le seau
+     * ([bucketOf], [StableBucket] en usage : arrondi au mètre avec
+     * hystérésis) est ce qui fait parler un objet qui s'approche (3 m → 2 m
+     * → 1 m) sans le faire bavarder à chaque frame ni à chaque tremblé de
+     * mesure. Indépendante de la langue de la voix.
      */
-    fun key(labels: List<PlacedLabel>): String = labels
+    fun key(
+        labels: List<PlacedLabel>,
+        bucketOf: (id: String, meters: Float?) -> String = { _, meters -> sceneBucket(meters) },
+    ): String = labels
         .filter { it.label.isNotBlank() }
-        .map { "${it.label.trim().lowercase()}|${it.position}|${sceneBucket(it.meters)}" }
+        .map {
+            val id = "${it.label.trim().lowercase()}|${it.position}"
+            "$id|${bucketOf(id, it.meters)}"
+        }
         .distinct()
         .sorted()
         .joinToString(";")
@@ -208,4 +216,57 @@ object PositionText {
      */
     fun sceneBucket(meters: Float?): String =
         if (meters == null || !meters.isFinite()) "?" else meters.roundToInt().toString()
+}
+
+/**
+ * Seau de distance avec hystérésis : la mémoire anti-tremblé de la
+ * déduplication ([PositionText.key]).
+ *
+ * Le seau brut ([PositionText.sceneBucket], mètre arrondi) bascule à chaque
+ * passage de frontière : un objet immobile mesuré 1,49 m puis 1,51 m
+ * changerait de signature à chaque frame et se réannoncerait à chaque
+ * délai. Ici, une fois le seau N adopté, on n'en sort qu'au-delà de
+ * N ± (0,5 + [marginM]) : le tremblé de mesure reste dans le seau, une
+ * vraie approche d'un mètre en sort (et parle).
+ *
+ * Pur et testé en JVM. Une instance par annonceur ([PositionAnnouncer] en
+ * détient une) : la mémoire est par libellé ([id] « label|heure »), une
+ * scène vide ou une nouvelle session l'oublie ([reset]).
+ */
+class StableBucket(private val marginM: Float = STABLE_BUCKET_MARGIN_M) {
+
+    private val last: MutableMap<String, Int> = mutableMapOf()
+
+    /**
+     * Seau de [meters] pour [id] : « ? » si inconnue (sans toucher la
+     * mémoire — une mesure perdue une frame ne ré-arme rien), sinon le seau
+     * adopté (mémorisé).
+     */
+    fun bucketOf(id: String, meters: Float?): String {
+        val measured = meters?.takeIf { it.isFinite() } ?: return "?"
+        val rounded = measured.roundToInt()
+        val previous = last[id]
+        val kept = if (previous != null && abs(measured - previous) <= 0.5f + marginM) {
+            previous
+        } else {
+            rounded
+        }
+        last[id] = kept
+        return kept.toString()
+    }
+
+    /** Nouvelle scène / session : les seaux adoptés sont oubliés. */
+    fun reset() {
+        last.clear()
+    }
+
+    companion object {
+        /**
+         * Marge d'hystérésis (mètres) : un tremblé de ±5 cm autour d'une
+         * frontière ne change pas de seau, un pas franc vers le mètre
+         * suivant (0,6 m dès 2,4 m) en change — la ré-annonce « au mètre
+         * près » est préservée.
+         */
+        const val STABLE_BUCKET_MARGIN_M = 0.05f
+    }
 }

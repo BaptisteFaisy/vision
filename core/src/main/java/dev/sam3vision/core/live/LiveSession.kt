@@ -35,16 +35,17 @@ data class Cadence(
 
         /**
          * iSee : pas de plancher artificiel (on repart dès qu'un créneau se libère) et
-         * **un seul créneau**, budget 150 ms. Mesuré sur le téléphone : le backend
-         * sérialise les inférences sur un verrou GPU, donc deux frames en vol ne gagnent
-         * aucun débit — la seconde attend la première et la latence par frame double
-         * (417 ms à deux créneaux contre 185 ms à un seul, serveur inchangé à ~120 ms).
+         * **deux créneaux**, budget 150 ms. Le second créneau laisse partir une frame
+         * fraîche pendant qu'une analyse est en vol ; si le backend sérialise vraiment
+         * (mesuré : 417 ms à deux créneaux contre 185 ms à un seul), [LiveSession.regulate]
+         * referme à un seul dès que la moyenne dépasse le budget — le pire cas reste
+         * celui d'avant, le lien qui pipeline vraiment gagne le double vol.
          */
         val Fast = Cadence(
             fastMs = 0L,
             targetMs = 0L,
             slowMs = 900L,
-            concurrency = 1,
+            concurrency = 2,
             latencyBudgetMs = 150L,
         )
     }
@@ -52,8 +53,9 @@ data class Cadence(
 
 /**
  * Orchestration du direct : frame → [FrameGate] → [LiveClient.live] → statistiques.
- * Une frame en vol maximum : si le créneau est pris, [runFrame] renvoie `null`
- * (frame jetée) — l'appelant caméra n'est jamais mis en attente ni bloqué.
+ * Au plus [Cadence.concurrency] frames en vol (une pour le Direct) : si tous les
+ * créneaux sont pris, [runFrame] renvoie `null` (frame jetée) — l'appelant caméra
+ * n'est jamais mis en attente ni bloqué.
  *
  * [stats] porte la latence bout-en-bout (celle qui cadence la capture),
  * [serverStats] la durée serveur `elapsed_ms` annoncée par `/live`.

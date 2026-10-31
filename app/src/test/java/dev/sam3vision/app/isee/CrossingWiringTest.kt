@@ -1,12 +1,14 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.crossing.CrossingAnnouncer
+import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraverseVeto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -118,6 +120,47 @@ class CrossingWiringTest {
         assertFalse(CrossingLight(null, CrossingState.Red).greenForDecision)
         assertFalse(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Red).greenForDecision)
         assertTrue(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green).greenForDecision)
+    }
+
+    @Test
+    fun `fusion deux feux - accord garde, desaccord attend`() {
+        assertEquals(CrossingState.Red, combineLightStates(CrossingState.Red, CrossingState.Red))
+        assertEquals(CrossingState.Green, combineLightStates(CrossingState.Green, CrossingState.Green))
+        assertEquals(CrossingState.Red, combineLightStates(CrossingState.Red, CrossingState.Green))
+        assertEquals(CrossingState.Red, combineLightStates(CrossingState.Green, CrossingState.Red))
+    }
+
+    @Test
+    fun `signal - le PRET vert dit pret, pas traversez`() {
+        val cue = CrossingCue("Vert, traversez.", false, CrossingState.Green)
+        val ready = crossingCueOf(cue, TraversePhase.PRET, SpeechLanguage.Fr)
+        assertEquals("Prêt.", ready?.phrase)
+        assertEquals(CrossingState.Green, ready?.state)
+        assertFalse(ready?.urgent ?: true)
+    }
+
+    @Test
+    fun `signal - hors PRET vert, phrase inchangee, silence garde`() {
+        val green = CrossingCue("Vert, traversez.", false, CrossingState.Green)
+        assertEquals(
+            "Vert, traversez.",
+            crossingCueOf(green, TraversePhase.TRAVERSER, SpeechLanguage.Fr)?.phrase,
+        )
+        val red = CrossingCue("Rouge, attendez.", true, CrossingState.Red)
+        assertEquals(
+            "Rouge, attendez.",
+            crossingCueOf(red, TraversePhase.PRET, SpeechLanguage.Fr)?.phrase,
+        )
+        assertNull(crossingCueOf(null, TraversePhase.PRET, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `signal - la contradiction remplace la phrase, urgence gardee`() {
+        val cue = CrossingCue("Rouge, attendez.", true, CrossingState.Red)
+        val out = crossingCueOf(cue, TraversePhase.ATTENDRE, SpeechLanguage.Fr, contradiction = true)
+        assertEquals("Feux contradictoires, attendez.", out?.phrase)
+        assertEquals(CrossingState.Red, out?.state)
+        assertTrue(out?.urgent ?: false)
     }
 
     @Test

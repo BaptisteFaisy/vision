@@ -26,7 +26,9 @@ object LiveMaskTransport {
     /**
      * Côté long de la grille réduite (`mask_edge`) : 256 px, la valeur du contrat. Le serveur
      * l'annonce dans `mask_scale` (ratio grille/frame), sans quoi le client agrandirait au
-     * mauvais facteur — la grille 256 d'une frame de 512 vaut 0,5.
+     * mauvais facteur — la grille 256 d'une frame de 512 vaut 0,5. Une grille 384
+     * aiderait les verticaux fins (poteaux) mais coûte × 2,25 cellules : passage
+     * conditionné à la mesure RLE sur corpus (octets/latence), voir unresolved.
      */
     const val MASK_EDGE = 256
 

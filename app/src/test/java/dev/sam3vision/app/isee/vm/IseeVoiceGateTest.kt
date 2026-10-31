@@ -6,8 +6,9 @@ import org.junit.Test
 
 /**
  * Porte de la voix ambiante d'iSee : GPS actif → ouverte ; ordre « désactive
- * le GPS » → fermée ; photo/caméra → fenêtre de parole rouverte ; le
- * réglage rallumé (« active le GPS ») → rouverte. Pur, horloge injectée.
+ * le GPS » → fermée pour le doux (l'urgence passe toujours) ; photo/caméra →
+ * fenêtre de parole rouverte ; le réglage rallumé (« active le GPS ») →
+ * rouverte. Pur, horloge injectée.
  */
 class IseeVoiceGateTest {
 
@@ -25,23 +26,24 @@ class IseeVoiceGateTest {
     }
 
     @Test
-    fun `gps desactive la voix ambiante se tait`() {
+    fun `gps desactive la voix douce se tait, l urgence passe`() {
         val g = gate()
         g.muteGps()
 
         assertFalse(g.ambientAllowed())
         assertFalse(g.maySpeak(urgent = false, busy = false))
-        // Urgence comprise : la désactivation est une demande de silence.
-        assertFalse(g.maySpeak(urgent = true, busy = false))
+        // Urgence mise à part : la sécurité passe avant le silence demandé.
+        assertTrue(g.maySpeak(urgent = true, busy = false))
     }
 
     @Test
-    fun `gpu desactive urgent non prioritaire`() {
+    fun `gps desactive l urgence passe occupee ou pas`() {
         val g = gate()
         g.muteGps()
 
-        // Une urgence seule ne rouvre pas la porte : seul le user décide.
-        assertFalse(g.maySpeak(urgent = true, busy = true))
+        // L'urgence coupe tout, même occupé : seule la douce respecte la porte.
+        assertTrue(g.maySpeak(urgent = true, busy = true))
+        assertTrue(g.maySpeak(urgent = true, busy = false))
     }
 
     @Test

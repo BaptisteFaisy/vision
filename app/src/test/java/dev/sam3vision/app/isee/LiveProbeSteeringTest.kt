@@ -127,6 +127,8 @@ class LiveProbeSteeringTest {
             clientFor = { _, _, marks -> fake.also { it.marks = marks } },
         )
         probe.configure("https://sam.test", announce = announce, guide = guide)
+        // Scheduler coupé : ce test verrouille le cap, pas les keyframes (voir LiveAdaptiveTest).
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         probe.begin()
         return probe to fake
     }

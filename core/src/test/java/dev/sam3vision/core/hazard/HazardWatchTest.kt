@@ -207,6 +207,27 @@ class HazardWatchTest {
     }
 
     @Test
+    fun `poteau imminent au bord du cadre = detecte plein axe`() {
+        val signal = HazardSignal.of(
+            listOf(reading("pole", 1.5f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertTrue(signal.detected)
+        assertEquals("pole", signal.label)
+    }
+
+    @Test
+    fun `poteau lointain au bord du cadre = silence`() {
+        val signal = HazardSignal.of(
+            listOf(reading("pole", 3.5f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
     fun `barriere parle en repli quand le poteau est deja dit`() {
         val watcher = HazardWatcher()
         val both = HazardSignal.of(

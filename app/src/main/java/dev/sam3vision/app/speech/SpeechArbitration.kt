@@ -42,9 +42,11 @@ object SpeechArbitration {
 
     /**
      * [incoming] coupe-t-elle [current] ? Oui si et seulement si elle est
-     * strictement plus prioritaire : le danger coupe la consigne, jamais
+     * prioritaire — sauf le danger, qui coupe tout, y compris un danger en
+     * cours (la plus fraîche gagne, miroir `SafetyVoice`) : le danger coupe
+     * la consigne, jamais
      * l'inverse, et deux phrases de même niveau s'enchaînent.
      */
     fun interrupts(current: SpeechPriority, incoming: SpeechPriority): Boolean =
-        incoming > current
+        incoming == SpeechPriority.Danger || incoming > current
 }

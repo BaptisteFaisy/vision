@@ -82,6 +82,19 @@ class PositionAnnouncerTest {
     }
 
     @Test
+    fun `tremble de mesure ne reannonce pas, vraie approche oui`() {
+        val announcer = PositionAnnouncer(cooldownMs = 1_000L)
+        fun personne(meters: Float) = PlacedLabel("personne", 0.5f, 0.5f, meters = meters)
+
+        assertEquals("Personne 3 meters away.", announcer.onFrame(0L, listOf(personne(3.4f))))
+        // Tremblé autour de la frontière 2,5 m : même seau, silence.
+        assertNull(announcer.onFrame(1_500L, listOf(personne(2.51f))))
+        assertNull(announcer.onFrame(3_000L, listOf(personne(2.49f))))
+        // Vraie approche : nouveau seau, parlé.
+        assertEquals("Personne 2 meters away.", announcer.onFrame(4_500L, listOf(personne(2.4f))))
+    }
+
+    @Test
     fun `phrase retenue pour l affichage`() {
         val announcer = PositionAnnouncer()
 

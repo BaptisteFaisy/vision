@@ -161,6 +161,42 @@ class PositionTextTest {
     }
 
     @Test
+    fun `seau stable absorbe le tremble, adopte l approche`() {
+        val buckets = StableBucket()
+
+        assertEquals("3", buckets.bucketOf("personne|midi", 3.4f))
+        assertEquals("3", buckets.bucketOf("personne|midi", 3.1f))
+        assertEquals("3", buckets.bucketOf("personne|midi", 2.51f))
+        assertEquals("3", buckets.bucketOf("personne|midi", 2.49f))
+        assertEquals("2", buckets.bucketOf("personne|midi", 2.4f))
+        assertEquals("2", buckets.bucketOf("personne|midi", 2.49f))
+    }
+
+    @Test
+    fun `seau inconnu neutre, memoires independantes, reset oublie`() {
+        val buckets = StableBucket()
+
+        assertEquals("?", buckets.bucketOf("personne|midi", null))
+        assertEquals("?", buckets.bucketOf("personne|midi", Float.NaN))
+        assertEquals("3", buckets.bucketOf("personne|midi", 3.4f))
+        assertEquals("1", buckets.bucketOf("chien|midi", 1.2f))
+        assertEquals("3", buckets.bucketOf("personne|midi", 3.1f))
+
+        buckets.reset()
+
+        assertEquals("2", buckets.bucketOf("personne|midi", 2.4f))
+    }
+
+    @Test
+    fun `cle avec seaux stables, defaut inchange`() {
+        val labels = listOf(PlacedLabel("personne", 0.5f, 0.5f, meters = 2.4f))
+        val buckets = StableBucket()
+
+        assertEquals("personne|at 12 o'clock|2", PositionText.key(labels) { id, m -> buckets.bucketOf(id, m) })
+        assertEquals("personne|at 12 o'clock|2", PositionText.key(labels))
+    }
+
+    @Test
     fun `withHour anglais et sans heure`() {
         assertEquals(
             "Attention, barrier, at 2 o'clock.",

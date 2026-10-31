@@ -4,6 +4,8 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,7 +23,7 @@ class CurbWatcherTest {
         reading("sidewalk", meters, listOf(156f, 200f, 356f, 1130f))
 
     @Test
-    fun `concepts trottoir reconnus, marche et voiture non`() {
+    fun `concepts trottoir reconnus, voiture non`() {
         assertTrue(CurbConcepts.isCurb("curb"))
         assertTrue(CurbConcepts.isCurb("sidewalk"))
         assertTrue(CurbConcepts.isCurb("Trottoir"))
@@ -34,7 +36,8 @@ class CurbWatcherTest {
         assertTrue(CurbConcepts.isCurb("gutter"))
         assertTrue(CurbConcepts.isCurb("caniveau"))
 
-        assertFalse(CurbConcepts.isCurb("marche"))
+        assertTrue(CurbConcepts.isCurb("marche"))
+        assertTrue(CurbConcepts.isCurb("marches"))
         assertFalse(CurbConcepts.isCurb("bateau à voile"))
         assertFalse(CurbConcepts.isCurb("car"))
         assertFalse(CurbConcepts.isCurb("person"))
@@ -57,7 +60,8 @@ class CurbWatcherTest {
 
     @Test
     fun `trottoir proche en bas du couloir = detecte imminent descente`() {
-        val signal = CurbSignal.of(listOf(curb(0.3f)), 512, 1138)
+        val descente = reading("sidewalk", 0.3f, listOf(156f, 700f, 356f, 1130f))
+        val signal = CurbSignal.of(listOf(descente), 512, 1138)
 
         assertTrue(signal.detected)
         assertEquals(0.3f, signal.meters!!, 0.001f)
@@ -218,11 +222,81 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `seuils du plan bas sous 095 ou haut bascule`() {
+    fun `marche francaise = bord confiance pleine`() {
+        assertTrue(CurbConcepts.isCurb("marche"))
+        assertTrue(CurbConcepts.isCurb("marches"))
+        assertEquals(1f, CurbConcepts.curbConfidence("marche"), 0.001f)
+        assertEquals(1f, CurbConcepts.curbConfidence("step"), 0.001f)
+    }
+
+    @Test
+    fun `chemin et route = bord incertain confiance basse, jamais silencieux`() {
+        assertEquals(0.3f, CurbConcepts.curbConfidence("road"), 0.001f)
+        assertEquals(0.3f, CurbConcepts.curbConfidence("chemin"), 0.001f)
+        assertEquals(0f, CurbConcepts.curbConfidence("car"), 0.001f)
+
+        val route = reading("road", 0.8f, listOf(156f, 700f, 356f, 1100f))
+        val signal = CurbSignal.of(listOf(route), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(CurbEdge.Uncertain, signal.edge)
+        assertEquals(0.3f, signal.confidence, 0.001f)
+        assertEquals("road", signal.label)
+    }
+
+    @Test
+    fun `marche francaise detectee comme bordure nette`() {
+        val marche = reading("marche", 0.5f, listOf(206f, 800f, 306f, 1130f))
+        val signal = CurbSignal.of(listOf(marche), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(CurbEdge.Up, signal.edge)
+        assertEquals(1f, signal.confidence, 0.001f)
+        assertEquals("marche", signal.label)
+    }
+
+    @Test
+    fun `sens incertain dit attention bordure FR et EN`() {
+        assertEquals("Attention bordure.", CurbText.stepPhrase(CurbEdge.Uncertain, SpeechLanguage.Fr))
+        assertEquals("Attention, curb.", CurbText.stepPhrase(CurbEdge.Uncertain, SpeechLanguage.En))
+        assertEquals("Attention bordure, à midi.", CurbText.phrase(CurbEdge.Uncertain, SpeechLanguage.Fr, 0.5f))
+        assertEquals("Attention, curb.", CurbText.safetyStepPhrase(CurbEdge.Uncertain, SpeechLanguage.En))
+
+        val watcher = CurbWatcher()
+        val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Uncertain)
+        watcher.onSignal(near, 1000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention bordure.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals("Attention bordure.", cue.safetyPhrase)
+    }
+
+    @Test
+    fun `cooldown bordures quatre secondes`() {
+        val watcher = CurbWatcher()
+        val positive = CurbSignal(detected = true, meters = 0.8f)
+
+        watcher.onSignal(positive, 1000L)
+        assertNotNull(watcher.onSignal(positive, 2000L))
+        watcher.onSignal(CurbSignal.none(), 3000L)
+        assertNull(watcher.onSignal(positive, 4000L))
+        assertNull(watcher.onSignal(positive, 5000L))
+        assertNotNull("cooldown 4 s écoulé", watcher.onSignal(positive, 6000L))
+    }
+
+    @Test
+    fun `zone grise pres des seuils = incertain prudent`() {
         val sousSeuil = reading("sidewalk", 0.8f, listOf(156f, 341f, 356f, 1070f))
         val pleinCadre = reading("sidewalk", 0.8f, listOf(156f, 341f, 356f, 1093f))
 
-        assertTrue(CurbSignal.of(listOf(sousSeuil), 512, 1138).detected)
-        assertFalse(CurbSignal.of(listOf(pleinCadre), 512, 1138).detected)
+        val sous = CurbSignal.of(listOf(sousSeuil), 512, 1138)
+        val plein = CurbSignal.of(listOf(pleinCadre), 512, 1138)
+
+        assertTrue(sous.detected)
+        assertEquals(CurbEdge.Uncertain, sous.edge)
+        assertTrue(plein.detected)
+        assertEquals(CurbEdge.Uncertain, plein.edge)
+        assertEquals("Attention bordure, à midi.", CurbText.phrase(plein.edge!!, SpeechLanguage.Fr, plein.centerX))
     }
 }

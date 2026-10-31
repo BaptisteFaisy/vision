@@ -252,4 +252,58 @@ class LateralNudgeTest {
 
         assertEquals(SteeringCap.Right, nudge!!.side)
     }
+
+    @Test
+    fun `obstacle proche conseille des la 1re frame`() {
+        val suivi = LateralNudgeTracker()
+
+        val nudge = suivi.onFrame(0L, listOf(personne(0.65f, 1.2f)))
+
+        assertEquals(SteeringCap.Left, nudge!!.side)
+        assertEquals(1.2f, nudge.meters, 0.001f)
+    }
+
+    @Test
+    fun `obstacle proche statique conseille aussitot`() {
+        val suivi = LateralNudgeTracker()
+
+        val premier = suivi.onFrame(0L, listOf(personne(0.35f, 1.0f)))
+        val second = suivi.onFrame(250L, listOf(personne(0.35f, 1.0f)))
+
+        assertEquals(SteeringCap.Right, premier!!.side)
+        assertEquals(SteeringCap.Right, second!!.side)
+    }
+
+    @Test
+    fun `a 1,5 m on conseille, a 1,6 m on attend la confirmation`() {
+        val proche = LateralNudgeTracker()
+        assertEquals(SteeringCap.Left, proche.onFrame(0L, listOf(personne(0.65f, 1.5f)))!!.side)
+
+        val loin = LateralNudgeTracker()
+        assertNull(loin.onFrame(0L, listOf(personne(0.65f, 1.6f))))
+    }
+
+    @Test
+    fun `proche des deux cotes on ne conseille rien`() {
+        val suivi = LateralNudgeTracker()
+        val deux = listOf(PlacedLabel("mur", 0.35f, 0.5f, 1.2f), PlacedLabel("mur", 0.65f, 0.5f, 1.2f))
+
+        assertNull(suivi.onFrame(0L, deux))
+    }
+
+    @Test
+    fun `proche on ne s ecarte pas vers une personne`() {
+        val suivi = LateralNudgeTracker()
+        val frame = listOf(PlacedLabel("mur", 0.35f, 0.5f, 1.2f), personne(0.65f, 2.0f))
+
+        assertNull(suivi.onFrame(0L, frame))
+    }
+
+    @Test
+    fun `loin une seule diminution ne suffit pas`() {
+        val suivi = LateralNudgeTracker()
+        suivi.onFrame(0L, listOf(personne(0.65f, 3.0f)))
+
+        assertNull(suivi.onFrame(250L, listOf(personne(0.65f, 2.9f))))
+    }
 }

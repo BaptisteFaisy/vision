@@ -1,6 +1,7 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.depth.DepthConfirm
+import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.Box
@@ -16,6 +17,9 @@ import kotlin.math.abs
  * (quasi) constante ([lateralLabel] le plus rapide) — le danger n° 1 d'un
  * piéton sur un passage, invisible au tau (taille stable). Le veto ne suit
  * que l'approche ; le scan traversée et les annonces d'état suivent les deux.
+ * [lateralTtcSeconds] expose le temps-avant-croisement latéral (largeur /
+ * vitesse latérale, `null` sans latéral franc) : informatif seul, il ne
+ * déclenche jamais.
  */
 data class ApproachVerdict(
     val approaching: Boolean,
@@ -23,13 +27,18 @@ data class ApproachVerdict(
     val label: String?,
     val lateralMoving: Boolean = false,
     val lateralLabel: String? = null,
+    val lateralTtcSeconds: Float? = null,
 )
 
 /**
  * Approche véhicules sur boîtes SAM : le direct `/live` ne donnant pas d'ids
  * stables, l'association se fait ici par IoU entre frames, puis chaque piste
  * porte un [MotionModel] réutilisé (vitesse de largeur lissée) dont on tire
- * le temps-avant-collision tau = largeur / vitesse (Lee 1976).
+ * le temps-avant-collision tau = largeur / vitesse (Lee 1976), plus le
+ * TTC latéral (largeur / vitesse latérale) exposé au veto et la vitesse
+ * radiale Kalman consommée en interne (confirmation, jamais suppression).
+ * Pistes par instance (clé label + seau de position, voir [instanceKeyOf]),
+ * purge à [STALE_MS] avec réactivation courte ([REACTIVATE_MS]).
  *
  * Seuils = priors à recaler sur téléphone ([TTC_SECONDS] & co), direction
  * sûre : une piste jeune, floue ou perdue ne déclenche jamais — seul un
@@ -49,8 +58,12 @@ class VehicleApproach {
     // PISTE2 : [key] = boîte proto, clé des proximités ([DepthConfirm]).
     private data class VehicleBox(val label: String, val box: Box, val key: List<Float>)
 
+    private data class DroppedTrack(val track: Track, val droppedAtMs: Long)
+
     private val tracks = LinkedHashMap<Int, Track>()
     private var nextId = 0
+
+    private val dropped = LinkedHashMap<Int, DroppedTrack>()
 
     /** Pistes en cours (après purge) — exposé pour les tests. */
     val trackCount: Int get() = tracks.size
@@ -68,7 +81,7 @@ class VehicleApproach {
         private set
 
     /**
-     * Clés véhicules ([VehicleConcepts.keyOf]) dont chaque piste évaluée accuse
+     * Clés d'instance ([instanceKeyOf]) dont chaque piste évaluée accuse
      * la caméra : leurs croissances se taisent. Une clé sans piste évaluée
      * (piste jeune) n'y figure jamais — on ne tait que ce qu'on a jugé.
      */
@@ -95,6 +108,7 @@ class VehicleApproach {
     fun reset() {
         tracks.clear()
         nextId = 0
+        dropped.clear()
         lastVerdicts = emptyMap()
         cameraMoved = false
         cameraMovedKeys = emptySet()
@@ -111,19 +125,24 @@ class VehicleApproach {
      * restent suivies, seul le verdict se tait. [depthByBox] (PISTE2,
      * `null` = pas de profondeur : repli géométrie) invalide les pistes
      * dont la proximité ne suit pas l'expansion (pan/zoom caméra).
+     * [radialMpsByKey] porte les vitesses radiales Kalman (m/s, négatif en
+     * approche) par clé d'instance (`null` = pas de signal distance :
+     * comportement inchangé) : une radiale franche confirme l'approche,
+     * jamais elle ne supprime un tau.
      */
     fun update(
         detections: List<Detection>,
         atMs: Long,
         motion: FrameMotion? = null,
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2
+        radialMpsByKey: Map<String, Float>? = null,
     ): ApproachVerdict {
         val frameWidth = detections.maxOfOrNull { it.width }?.takeIf { it > 0 } ?: FALLBACK_WIDTH
         val frameHeight = detections.maxOfOrNull { it.height }?.takeIf { it > 0 } ?: FALLBACK_HEIGHT
         associate(vehiclesOf(detections), atMs, frameWidth, depthByBox)
         dropStale(atMs)
         evaluateMotion(motion, frameWidth, frameHeight)
-        return verdict(frameWidth)
+        return verdict(frameWidth, radialMpsByKey)
     }
 
     /**
@@ -158,7 +177,10 @@ class VehicleApproach {
         }.toMap()
         cameraMoved = lastVerdicts.isNotEmpty() && lastVerdicts.all { it.value.verdict == Verdict.CAMERA_MOVED }
         cameraMovedKeys = lastVerdicts.entries
-            .groupBy { VehicleConcepts.keyOf(tracks.getValue(it.key).label) }
+            .groupBy { entry ->
+                val track = tracks.getValue(entry.key)
+                instanceKeyOf(track.label, track.motion.anchorBox.centerX / frameWidth)
+            }
             .filterValues { group -> group.all { it.value.verdict == Verdict.CAMERA_MOVED } }
             .keys
     }
@@ -179,10 +201,18 @@ class VehicleApproach {
         val claimed = HashSet<Int>()
         for (vehicle in vehicles) {
             val id = bestTrack(vehicle.box, atMs, claimed)
+                ?: bestDropped(vehicle.box, atMs, claimed)
             if (id == null) {
                 val closeness = closenessOf(depthByBox, vehicle.key) // PISTE2
                 tracks[nextId] = Track(vehicle.label, MotionModel(vehicle.box, atMs), atMs, closeness, closeness)
                 nextId += 1
+            } else if (id in dropped) {
+                claimed += id
+                val revived = dropped.remove(id)!!
+                revived.track.label = vehicle.label
+                revived.track.motion.observe(vehicle.box, atMs, maxSpeed)
+                revived.track.lastSeenMs = atMs
+                tracks[id] = revived.track
             } else {
                 claimed += id
                 val track = tracks.getValue(id)
@@ -215,23 +245,53 @@ class VehicleApproach {
         return bestId
     }
 
+    /** Piste purgée la plus proche dans la fenêtre de réactivation, `null` sinon. */
+    private fun bestDropped(box: Box, atMs: Long, claimed: Set<Int>): Int? {
+        var bestId: Int? = null
+        var bestIou = 0f
+        for ((id, entry) in dropped) {
+            if (id in claimed) continue
+            if (atMs - entry.droppedAtMs > REACTIVATE_MS) continue
+            val iou = box.iou(entry.track.motion.predictAt(atMs))
+            if (iou > bestIou) {
+                bestIou = iou
+                bestId = id
+            }
+        }
+        if (bestIou < IOU_MIN) return null
+        return bestId
+    }
+
     /** Oublie les pistes sans observation récente (objet sorti ou perdu). */
     private fun dropStale(atMs: Long) {
         val stale = tracks.filterValues { atMs - it.lastSeenMs > STALE_MS }.keys
-        stale.forEach { tracks.remove(it) }
+        stale.forEach { id ->
+            dropped[id] = DroppedTrack(tracks.getValue(id), atMs)
+            tracks.remove(id)
+        }
+        dropped.entries.removeAll { atMs - it.value.droppedAtMs > REACTIVATE_MS }
     }
 
     /** Le plus dangereux des rapprochements francs, silence sinon. */
-    private fun verdict(frameWidth: Int): ApproachVerdict {
-        val approach = approachOf(frameWidth)
+    private fun verdict(frameWidth: Int, radialMpsByKey: Map<String, Float>?): ApproachVerdict {
+        val approach = approachOf(frameWidth, radialMpsByKey)
         val lateral = lateralOf(frameWidth)
-        return ApproachVerdict(approach.first, approach.second, approach.third, lateral.first, lateral.second)
+        return ApproachVerdict(
+            approach.first, approach.second, approach.third,
+            lateral.first, lateral.second, lateralTtcOf(frameWidth),
+        )
     }
 
-    /** Rapprochement franc : plus petit tau sous [TTC_SECONDS] (`false` sinon). */
-    private fun approachOf(frameWidth: Int): Triple<Boolean, Float?, String?> {
+    /**
+     * Rapprochement franc : plus petit tau sous [TTC_SECONDS], ou radiale
+     * Kalman franche ([radialMpsByKey]) sans tau — la distance confirme,
+     * jamais elle ne supprime.
+     */
+    private fun approachOf(frameWidth: Int, radialMpsByKey: Map<String, Float>?): Triple<Boolean, Float?, String?> {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
+        var radialLabel: String? = null
+        var radialBest = Float.MAX_VALUE
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
@@ -239,17 +299,24 @@ class VehicleApproach {
             if (DepthConfirm.contradicts(track.firstCloseness, track.lastCloseness)) continue
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
+            radialHit(track, frameWidth, radialMpsByKey)?.let { radial ->
+                if (radial < radialBest) {
+                    radialBest = radial
+                    radialLabel = track.label
+                }
+            }
             if (track.motion.velocity.width <= frameWidth * MIN_GROWTH_RATIO) continue
             // PISTE1 : croissance expliquée par le zoom du fond — pas une approche.
             if (EgoCompensator.discountGrowth(track.motion.velocity.width / width, lastGlobal, lastGlobalDtMs).discounted) continue
             val tau = width / track.motion.velocity.width
-            if (tau < bestTtc) {
+            if (tau.isFinite() && tau < bestTtc) {
                 bestTtc = tau
                 bestLabel = track.label
             }
         }
-        if (bestLabel == null || bestTtc >= TTC_SECONDS) return Triple(false, null, null)
-        return Triple(true, bestTtc, bestLabel)
+        if (bestLabel != null && bestTtc < TTC_SECONDS) return Triple(true, bestTtc, bestLabel)
+        if (radialLabel != null) return Triple(true, null, radialLabel)
+        return Triple(false, null, null)
     }
 
     /**
@@ -275,15 +342,43 @@ class VehicleApproach {
         return (bestLabel != null) to bestLabel
     }
 
+    /** TTC latéral (largeur / vitesse latérale), `null` sans latéral franc ([MIN_LATERAL_RATIO]). */
+    private fun lateralTtcOf(frameWidth: Int): Float? {
+        var lateralTtc: Float? = null
+        for ((id, track) in tracks) {
+            if (!track.motion.velocityReliable) continue
+            if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            val width = track.motion.anchorBox.width
+            if (width < frameWidth * MIN_WIDTH_FRACTION) continue
+            lateralTtcOf(track, width, frameWidth)?.let { ttc ->
+                if (lateralTtc == null || ttc < lateralTtc!!) lateralTtc = ttc
+            }
+        }
+        return lateralTtc
+    }
+
+    /** TTC latéral d'une piste (largeur / |vitesse x|), `null` sans latéral franc. */
+    private fun lateralTtcOf(track: Track, width: Float, frameWidth: Int): Float? {
+        val lateral = abs(track.motion.velocity.x)
+        if (lateral <= frameWidth * MIN_LATERAL_RATIO) return null
+        return (width / lateral).takeIf { it.isFinite() }
+    }
+
+    /** Vitesse radiale d'une piste par sa clé d'instance, `null` sans signal franc. */
+    private fun radialHit(track: Track, frameWidth: Int, radialMpsByKey: Map<String, Float>?): Float? {
+        val radial = radialMpsByKey?.get(instanceKeyOf(track.label, track.motion.anchorBox.centerX / frameWidth))
+        return radial?.takeIf { it.isFinite() && it <= RADIAL_APPROACH_MPS }
+    }
+
     companion object {
         /** Sous ce temps-avant-collision (s), le véhicule force le veto. */
         const val TTC_SECONDS = 3.0f
 
         /** IoU minimal pour rattacher une boîte à une piste. */
-        const val IOU_MIN = 0.3f
+        const val IOU_MIN = 0.2f
 
         /** Au-delà sans observation, la piste est oubliée. */
-        const val STALE_MS = 1000L
+        const val STALE_MS = 1500L
 
         /** Largeur minimale d'une boîte prise au sérieux (fraction d'image). */
         const val MIN_WIDTH_FRACTION = 0.02f
@@ -304,6 +399,31 @@ class VehicleApproach {
 
         /** Hauteur d'image de repli (même rôle pour la dérive verticale). */
         const val FALLBACK_HEIGHT = 1000
+
+        /** Piste purgée réactivable si elle réapparaît dans ce délai (retour rapide). */
+        const val REACTIVATE_MS = 500L
+
+        /** Vitesse radiale (m/s) sous laquelle l'approche est confirmée par la distance. */
+        const val RADIAL_APPROACH_MPS = -1.0f
+
+        /** Vitesse latérale minimale (fraction d'image/s) pour un TTC latéral. */
+        const val MIN_LATERAL_RATIO = 0.01f
+
+        /**
+         * Clé d'instance d'un véhicule : label canonique + seau de position
+         * stable (gauche/centre/droite, frontières [PositionText.SIDE_EDGE]) —
+         * deux voitures à deux endroits ne fusionnent plus. [centerX01] hors
+         * bornes ou non fini = centre (doute stable).
+         */
+        fun instanceKeyOf(label: String, centerX01: Float): String {
+            val x = centerX01.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f
+            val bucket = when {
+                x < PositionText.SIDE_EDGE -> "L"
+                x > 1f - PositionText.SIDE_EDGE -> "R"
+                else -> "C"
+            }
+            return "${VehicleConcepts.keyOf(label)}@$bucket"
+        }
     }
 }
 

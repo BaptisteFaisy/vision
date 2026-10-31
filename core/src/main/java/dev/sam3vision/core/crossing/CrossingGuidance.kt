@@ -50,6 +50,15 @@ object CrossingGuidance {
     /** Frames positives de suite avant « Sur le passage. ». */
     const val ARRIVAL_CONFIRM_FRAMES = 2
 
+    /** Allongement minimal d'un passage (largeur / hauteur) : jamais vertical. */
+    const val CROSSWALK_MIN_ASPECT = 0.8f
+
+    /** Aire normalisée minimale d'un passage (sous ce seuil : bruit lointain). */
+    const val CROSSWALK_MIN_AREA = 0.002f
+
+    /** Bas de boîte normalisé minimal d'un passage (zébrures au sol, bas du cadre). */
+    const val CROSSWALK_MIN_BOTTOM = 0.5f
+
     /** Direction du passage depuis son centre normalisé (0..1). */
     fun directionOf(centerX: Float): SteeringCap = when {
         centerX < LEFT_EDGE -> SteeringCap.Left
@@ -61,16 +70,54 @@ object CrossingGuidance {
     fun wordOf(centerX: Float): GuidanceWord = GuidanceWord.fromCap(directionOf(centerX))
 
     /**
-     * Passage au meilleur score ([CrossingOffer.MIN_SCORE] min), `null` si
-     * aucun. Le score et les étiquettes sont ceux de [CrossingOffer] : l'offre
-     * existante (0,40, 3/5 frames) ne change pas.
+     * Passage dans l'axe au meilleur score ([CrossingOffer.MIN_SCORE] min),
+     * `null` si aucun. Le score et les étiquettes sont ceux de [CrossingOffer]
+     * (0,35, 2/5 frames + hystérésis).
+     *
+     * Sans dimensions (`frameW`/`frameH` ≤ 0) : repli historique au seul
+     * meilleur score. Sinon le score ne départage que les candidats
+     * géométriquement plausibles ([isPlausibleCrosswalk]) — un faux positif
+     * hors axe, vertical ou minuscule ne vole plus le guidage au vrai passage.
      */
     fun selectBest(
         objects: List<SegObject>,
         minScore: Float = CrossingOffer.MIN_SCORE,
-    ): SegObject? = objects
-        .filter { it.score >= minScore && CrossingOffer.isCrosswalkLabel(it.label) }
-        .maxByOrNull { it.score }
+        frameW: Int = 0,
+        frameH: Int = 0,
+    ): SegObject? {
+        val candidates = objects
+            .filter { it.score >= minScore && CrossingOffer.isCrosswalkLabel(it.label) }
+        if (frameW <= 0 || frameH <= 0) return candidates.maxByOrNull { it.score }
+        return candidates
+            .filter { it.box.size >= 4 && isPlausibleCrosswalk(it.box, frameW, frameH) }
+            .maxByOrNull { it.score }
+    }
+
+    /**
+     * Boîte pixels crédible pour un passage piéton dans une frame
+     * `frameW` x `frameH` : elle chevauche le couloir de marche ([LEFT_EDGE]–
+     * [RIGHT_EDGE], ROI axe), pas verticale ([CROSSWALK_MIN_ASPECT], sous le
+     * carré : un piéton debout (0,4-0,6) est rejeté, un passage proche gardé),
+     * ni minuscule ([CROSSWALK_MIN_AREA]), bas sous la moitié du cadre
+     * ([CROSSWALK_MIN_BOTTOM], zébrures au sol — proxy : le comptage des
+     * bandes demanderait les pixels, indisponibles en pur JVM).
+     * Géométrie illisible = faux, jamais de consigne devinée.
+     */
+    fun isPlausibleCrosswalk(boxPx: List<Float>, frameW: Int, frameH: Int): Boolean {
+        if (boxPx.size < 4 || frameW <= 0 || frameH <= 0) return false
+        val x0 = boxPx[0] / frameW
+        val y0 = boxPx[1] / frameH
+        val x1 = boxPx[2] / frameW
+        val y1 = boxPx[3] / frameH
+        if (!x0.isFinite() || !y0.isFinite() || !x1.isFinite() || !y1.isFinite()) return false
+        val w = x1 - x0
+        val h = y1 - y0
+        if (w <= 0f || h <= 0f) return false
+        if (x1 < LEFT_EDGE || x0 > RIGHT_EDGE) return false
+        if (w / h < CROSSWALK_MIN_ASPECT) return false
+        if (w * h < CROSSWALK_MIN_AREA) return false
+        return y1 >= CROSSWALK_MIN_BOTTOM
+    }
 
     /**
      * Centre normalisé d'une boîte pixels ([LiveFrame]), `null` si illisible.

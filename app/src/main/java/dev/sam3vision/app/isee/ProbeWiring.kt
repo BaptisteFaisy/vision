@@ -3,7 +3,8 @@ package dev.sam3vision.app.isee
 import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
-import dev.sam3vision.app.live.chosenLens
+import dev.sam3vision.app.live.LensOrigin
+import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
@@ -32,6 +33,8 @@ import dev.sam3vision.core.settings.resolveSamEndpoint
 import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -72,18 +75,20 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
  * EU/US > URL du build), monde sensoriel (dehors/dedans), guidage « tout droit »
  * (il prime sur l'annonce), annonce vocale des objets et de leur distance,
- * focale de la caméra, distances on/off, plafond d'objets.
+ * focale de la caméra, distances on/off, plafond d'objets. L'annonce et le
+ * guidage suivent les bascules brutes (clé non exigée) : sans clé, la voix de
+ * proximité parle au TTS système (repli + alerte unique) au lieu de se taire.
  *
  * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
- * l'appelant a passé les défauts ([LivePrompts.default], [LivePrompts.indoor]
- * ou une liste vide) ; une liste explicite (Traversée feu+voitures, champ
- * « Follow », « Find the X ») traverse inchangée.
+ * l'appelant a passé les défauts (`default`, `indoor`, vide) ; une liste
+ * explicite (Traversée, « Follow », « Find the X ») traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
     prompts: List<String> = LivePrompts.default,
     crossingActive: Boolean = false,
     sensorLens: LensSpec? = null,
+    onLens: ((LensOrigin) -> Unit)? = null,
 ) {
     android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
@@ -91,12 +96,14 @@ internal fun LiveProbe.configureFrom(
     } else {
         prompts
     }
+    val chosen = chooseLens(settings.cameraFovDeg, sensorLens)
+    onLens?.invoke(chosen.origin)
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
         prompts = effective,
-        announce = settings.announcePositions,
-        guide = settings.guideStraight,
-        lens = chosenLens(settings.cameraFovDeg, sensorLens),
+        announce = settings.ttsAnnouncePositions,
+        guide = settings.ttsGuidanceStraight,
+        lens = chosen.spec,
         distancesOn = settings.distanceOverlayEnabled,
         collectCrops = settings.collectLightCrops,
         maxObjects = settings.objectsOnScreen,
@@ -128,7 +135,7 @@ fun LiveProbe.clearRouteCap() {
  * ([LivePrompts.withConcept]), seul un label vide ou de plus de 32
  * caractères est refusé, sans reconfiguration. Pur hors sonde, testé en JVM.
  */
-internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
+internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLens: LensSpec? = null, onLens: ((LensOrigin) -> Unit)? = null) {
     if (state.value.crossingActive) return
     val clean = label.trim()
     if (clean.isEmpty()) return
@@ -139,7 +146,7 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
     val evicted = if (current.size >= LivePrompts.MAX) current.lastOrNull() else null
     val detail = if (evicted == null) "${next.size} suivis" else "${next.size} suivis, « $evicted » sorti"
     android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM ($detail)")
-    configureFrom(settings, next, false)
+    configureFrom(settings, next, false, sensorLens, onLens)
 }
 
 /**
@@ -319,6 +326,44 @@ internal fun LiveProbe.observeFenceOpening(
 }
 
 /**
+=======
+ * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
+ * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
+ * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
+ * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
+ * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
+ * parlent doux (seul l'`urgent` du danger qui s'approche coupe). Parle en
+ * Traversée comme ailleurs (audit voix 31/10 : les états moteurs ne sont
+ * plus coupés — le feu garde sa voix, sans couvrir les moteurs).
+ * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
+ * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ */
+internal fun LiveProbe.observeVehicleState(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+    watcher: VehicleStateWatcher = VehicleStateWatcher(),
+): VehicleStateWatcher {
+    scope.launch {
+        state.collect { st ->
+            val readings = st.distanceLayer?.readings ?: return@collect
+            val motion = ProbeBackgroundMotion.lastMotion
+            val cue = watcher.update(
+                detectionsOf(readings, st.width, st.height),
+                readings,
+                System.currentTimeMillis(),
+                language(),
+                motion,
+            ) ?: return@collect
+            logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
+        }
+    }
+    return watcher
+}
+
+/**
  * Guetteur cycles de la sonde, miroir des véhicules : vélos et trottinettes,
  * en mouvement ou arrêtés (« Attention, vélo en mouvement, à 2 heures. »),
  * lus dans l'état, sans toucher à `LiveProbe`. Doux et coupé en Traversée,
@@ -483,5 +528,3 @@ internal fun LiveProbe.observeHazards(
         observeSidewalk(scope, voice, playerIdle, language),
     )
 }
-
-

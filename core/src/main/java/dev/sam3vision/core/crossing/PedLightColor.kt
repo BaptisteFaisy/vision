@@ -12,29 +12,30 @@ package dev.sam3vision.core.crossing
  * Les seuils ci-dessous sont des ordres de grandeur **non calibrés sur
  * appareil** (aucune mesure téléphone dans cet arbre) : une passe de calibrage
  * sur feux français (jour, nuit, pluie) reste à faire avant tout usage réel.
+ * Ils sont publics (surface de calibrage, voir aussi [PedLightGate]).
  */
 object PedLightColor {
 
     /** Teinte rouge : en dessous (côté 0°) ou au dessus (côté 360°). */
-    internal const val RED_HUE_DEG = 15f
+    const val RED_HUE_DEG = 15f
 
     /** Plage de teinte du vert piéton : les LED françaises montent au cyan (~180°, lot téléphone 31/10), le bleu (240°) restant exclu. */
     internal const val GREEN_HUE_MIN_DEG = 80f
     internal const val GREEN_HUE_MAX_DEG = 195f
 
     /** Saturation et valeur minimales : un feu allumé est franc, pas pastel. */
-    internal const val MIN_SATURATION = 0.45f
-    internal const val MIN_VALUE = 0.35f
+    const val MIN_SATURATION = 0.45f
+    const val MIN_VALUE = 0.35f
 
     /** Délavage du jour : une lampe surexposée (valeur ≥ 0,90) compte dès 0,15 de saturation — les gris (sat 0) restant exclus. */
     internal const val WASHOUT_MIN_SATURATION = 0.15f
     internal const val WASHOUT_MIN_VALUE = 0.90f
 
     /** Fraction de pixels colorés exigée pour trancher (un bonhomme dans sa boîte). */
-    private const val MIN_FRACTION = 0.06f
+    const val MIN_FRACTION = 0.06f
 
     /** Marge exigée entre les deux camps : pas de verdict sur un match nul. */
-    private const val MARGIN_RATIO = 2.0f
+    const val MARGIN_RATIO = 2.0f
 
     /**
      * État du feu cadré par [argb] ([width] × [height], ARGB 32 bits, ligne
@@ -77,6 +78,12 @@ object PedLightColor {
         if (sat >= MIN_SATURATION) return true
         return sat >= WASHOUT_MIN_SATURATION && value >= WASHOUT_MIN_VALUE
     }
+
+    /**
+     * Pixel de lampe allumée vu de `:app` (recentrage) : le même
+     * prédicat que [isLit], exposé public — une seule définition.
+     */
+    fun isLampPixel(pixel: Int): Boolean = isLit(pixel)
 
     /** Teinte 0..360° (conversion maison : pas d'Android en `:core`). */
     internal fun hueDeg(pixel: Int): Float {

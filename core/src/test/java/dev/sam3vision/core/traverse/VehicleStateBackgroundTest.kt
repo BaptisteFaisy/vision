@@ -11,29 +11,34 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Veilleur état sous signal fond V1 : silence quand la caméra embarque la
- * piste, annonce maintenue pour les clés jeunes jamais jugées. Séquences
+ * Veilleur état sous signal fond V1 : la dérive qui suit la caméra prouve
+ * l'arrêt (compensée), la croissance sous caméra ne parle jamais en mouvement,
+ * annonce maintenue pour les clés jeunes jamais jugées. Séquences
  * synthétiques, miroir de `VehicleStateTest`.
  */
 class VehicleStateBackgroundTest {
 
     @Test
-    fun `camera qui suit - croissance sous camera, silence`() {
-        // Dérive seule (vitesse établie), puis croissance : sans fond ça
-        // annoncerait, avec fond la caméra unanime fait taire le mouvement.
+    fun `camera qui suit - arret compense annonce, mouvement tu`() {
+        // Dérive qui suit le fond, puis croissance : sans fond la croissance
+        // annoncerait du mouvement ; avec fond, la dérive compensée prouve
+        // l'arrêt — et la croissance sous caméra se tait toujours.
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val muted = VehicleStateWatcher()
         val loud = VehicleStateWatcher()
+        var stopped: VehicleStateCue? = null
         repeat(12) { index ->
             val width = if (index < 8) 100f else 100f + (index - 7) * 10f
             val frame = box(width, cx = 320f + index * 5f)
             val atMs = index * 100L
             val hushed = muted.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs, motion = motion)
             val spoke = loud.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs)
-            if (index >= 8) assertNull("caméra unanime : le mouvement se tait", hushed)
+            if (index == 2) stopped = hushed
+            if (index >= 8) assertNull("croissance sous caméra : pas de mouvement", hushed)
             if (index == 9) assertNotNull("sans fond, la croissance parle", spoke)
         }
 
+        assertEquals("Car stopped, 5 meters away.", stopped!!.phrase)
         assertTrue(muted.cameraMoved)
         assertNull(muted.lastMovingAlertMs)
     }

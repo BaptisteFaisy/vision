@@ -10,19 +10,24 @@ import dev.sam3vision.core.distance.KnownSizes
  * client ([isCurb]) quand le backend les segmente. Le français reste reconnu :
  * « trottoir », « bordure », « rebord » et « bateau » comptent (le serveur
  * renvoie le label saisi, voir `concepts.py`). Les chemins et les routes
- * ([isPathRoad]) n'y signalent aucun bord : seul le guidage obstacles les
- * ignore, comme le plan du trottoir.
+ * ([isPathRoad]) y signalent un bord incertain, confiance basse
+ * ([curbConfidence]) : seul le guidage obstacles les ignore, comme le plan
+ * du trottoir.
  *
  * `sidewalk` segmente le plan entier, pas le bord : la géométrie du signal
  * ([CurbSignal]) n'en retient que le proche (bande basse, ≤ 1 m). « marche »
- * seul n'est **pas** reconnu : ambigu avec la marche à pied, comme côté
- * [dev.sam3vision.core.traverse.StairConcepts] — seul « step » anglais compte.
+ * compte comme « step » (audit 31/10 : le backend segmente la marche comme
+ * bord ; le contexte couloir/bande/distance lève l'ambiguïté avec la marche
+ * à pied, assumée côté [dev.sam3vision.core.traverse.StairConcepts]).
  */
 object CurbConcepts {
 
+    /** Confiance d'un bord chemin/route ([isPathRoad]) : incertain, mais signalé. */
+    const val PATH_ROAD_CONFIDENCE = 0.3f
+
     private val KEYS = setOf(
         "curb", "kerb", "sidewalk", "pavement", "footpath", "step", "steps",
-        "trottoir", "bordure", "rebord",
+        "trottoir", "bordure", "rebord", "marche",
         "curb ramp", "bateau", "ramp", "rampe", "gutter", "caniveau",
     )
 
@@ -57,11 +62,22 @@ object CurbConcepts {
 
     /**
      * Vrai si [label] désigne un chemin ou une route : le guidage obstacles
-     * l'ignore, comme le plan du trottoir. Hors détection bordure
-     * ([CurbSignal]) : un chemin ou une route n'y est jamais un bord à
-     * monter, seul le plan trottoir y parle (montée, descente, bateau).
+     * l'ignore, comme le plan du trottoir. Détection bordure ([CurbSignal]) :
+     * un chemin ou une route y est un bord incertain, confiance basse
+     * ([curbConfidence]) — jamais exclu silencieusement (audit 31/10).
      */
     fun isPathRoad(label: String): Boolean = matches(label, PATH_ROAD)
+
+    /**
+     * Confiance bordure de [label] : 1 pour un bord ([isCurb]),
+     * [PATH_ROAD_CONFIDENCE] pour un chemin ou une route ([isPathRoad], bord
+     * incertain), 0 sinon.
+     */
+    fun curbConfidence(label: String): Float = when {
+        isCurb(label) -> 1f
+        isPathRoad(label) -> PATH_ROAD_CONFIDENCE
+        else -> 0f
+    }
 
     /** [label] canonique dans [keys] (pluriel simple toléré). */
     private fun matches(label: String, keys: Set<String>): Boolean {

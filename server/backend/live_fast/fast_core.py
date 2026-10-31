@@ -26,6 +26,13 @@ patchs de 14 px : la taille demandée est arrondie au multiple de 14 le plus pro
 
 torch / transformers / PIL ne sont importés que dans les fonctions : ce module reste
 importable et testable sans stack GPU.
+
+Budget GPU (une seule carte, un seul verrou) : ``run_frame`` ne tient le verrou
+que sur l'encodeur vision (1 passe/frame) et les passes DETR — le pré-traitement
+CPU et l'encodage des masques sont hors verrou et se recouvrent avec la frame
+suivante. ``FAST_BATCH_PROMPTS=1`` groupe les N concepts en UN forward DETR
+(``repeat_vision`` réplique les embeddings vision sur le batch) au lieu de N
+passes ; ``queue_ms`` (levier ``FAST_TIMING``) publie l'attente au verrou.
 """
 
 from __future__ import annotations

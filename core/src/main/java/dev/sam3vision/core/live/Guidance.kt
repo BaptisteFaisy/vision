@@ -1,6 +1,8 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.CurbConcepts
+import dev.sam3vision.core.curb.CurbEdge
+import dev.sam3vision.core.curb.CurbText
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -31,6 +33,22 @@ data class GuidanceDecision(
      * sur voie libre ou distance inconnue (la consigne reste alors non chiffrée).
      */
     val shiftMeters: Float? = null,
+    /**
+     * Bordure au contact mesuré (≤ [CONTACT_METERS]) dans le couloir marché :
+     * monter/descendre ([curbPhrase]), pas contourner.
+     */
+    val curbContact: Boolean = false,
+    /**
+     * Sens du bord au contact, `null` = incertain (« Attention bordure »). Le
+     * guidage ne le devine jamais : l'appelant qui connaît le sens (détection
+     * bordure) le passe à [decide].
+     */
+    val curbEdge: CurbEdge? = null,
+    /**
+     * Stop au contact : cap droit, bordure au contact ET obstacle mesuré au
+     * contact (≤ [CONTACT_METERS]) — on ne monte pas dans un obstacle.
+     */
+    val contactStop: Boolean = false,
 )
 
 /**
@@ -53,6 +71,9 @@ object Guidance {
 
     /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
     const val RANGE_METERS = 4f
+
+    /** Contact mesuré (m) : à cette distance ou moins, on touche presque. */
+    const val CONTACT_METERS = 0.6f
 
     /**
      * Demi-largeur du marcheur (m) : le trait droit a l'épaisseur du corps —
@@ -92,29 +113,44 @@ object Guidance {
      * le cap hors des bandes interdites le plus proche de tout droit — quand il
      * existe et tient ([PeoplePath.fits]) ; sinon, repli sur le côté le moins
      * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
-     * sans issue, ou aucun obstacle à portée).
+     * sans issue, ou aucun obstacle à portée). Bordure au contact, cap droit,
+     * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
+     * audit 31/10 : on ne monte pas une bordure dans un obstacle) ; [curbEdge]
+     * porte le sens connu du bord (`null` = incertain).
      */
     fun decide(
         labels: List<PlacedLabel>,
         cap: SteeringCap = SteeringCap.Straight,
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        curbEdge: CurbEdge? = null,
     ): GuidanceDecision {
         val cleaned = labels.filter { isObstacle(it) }
         val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg) }
-        if (blocking.isEmpty()) return GuidanceDecision(blocked = false, cap = cap)
+        val curbContact = curbAtContact(labels, cap)
+        if (blocking.isEmpty()) {
+            return GuidanceDecision(blocked = false, cap = cap, curbContact = curbContact, curbEdge = curbEdge)
+        }
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
         if (cap == SteeringCap.Straight) {
+            val threat = contactThreat(blocking)
+            if (curbContact && threat != null) {
+                return GuidanceDecision(
+                    blocked = true, obstacle = threat, cap = cap,
+                    shiftMeters = shiftOf(threat.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg),
+                    curbContact = true, curbEdge = curbEdge, contactStop = true,
+                )
+            }
             val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
             val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters, hfovDeg)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
+            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, curbContact, curbEdge)
         }
         val passage = bestPassage(cleaned, cap, rangeMeters, hfovDeg)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift)
+        return GuidanceDecision(true, obstacle, null, cap, passage, shift, curbContact, curbEdge)
     }
 
     /**
@@ -128,6 +164,22 @@ object Guidance {
         label.label.isNotBlank() && !CurbConcepts.isGround(label.label) &&
             !CurbConcepts.isPathRoad(label.label) &&
             !SignConcepts.isHighSign(label.label, label.centerY, label.meters)
+
+    /**
+     * Consigne bordure au contact, `null` sans bordure au contact : monter /
+     * descendre ([CurbText.stepPhrase], sens connu passé à [decide]) ou
+     * « Attention bordure » (sens incertain — le guidage ne devine jamais le
+     * sens, sans géométrie verticale). À dire avec le mot ([phrase]) : la
+     * bordure se monte, l'obstacle au contact arrête.
+     */
+    fun curbPhrase(
+        decision: GuidanceDecision,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
+    ): String? {
+        if (!decision.curbContact) return null
+        val edge = decision.curbEdge ?: CurbEdge.Uncertain
+        return CurbText.stepPhrase(edge, language)
+    }
 
     /**
      * Décalage à annoncer : demi-couloir marché en mètres à [meters] de
@@ -146,9 +198,11 @@ object Guidance {
      * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie —
      * même au contact mesuré (ordres user : dans une foule on se faufile,
      * et jamais de stop pour un obstacle — la voix dit directement
-     * comment l'éviter, cap droit comme caps latéraux).
+     * comment l'éviter, cap droit comme caps latéraux) — sauf bordure au
+     * contact + obstacle au contact, cap droit : stop ([GuidanceDecision.contactStop]).
      */
     fun word(decision: GuidanceDecision): GuidanceWord {
+        if (decision.contactStop) return GuidanceWord.Stop
         val obstacle = decision.obstacle
         if (!decision.blocked || obstacle == null) return GuidanceWord.fromCap(decision.cap)
         if (decision.cap == SteeringCap.Straight) {
@@ -159,7 +213,8 @@ object Guidance {
 
     /**
      * Consigne prononcée, jamais `null` : l'un des mots ([GuidanceWord],
-     * jamais stop — ordre user du 31/10), langue de la voix. Ni nom
+     * stop seulement bordure au contact + obstacle au contact, cap droit —
+     * audit 31/10), langue de la voix. Ni nom
      * d'obstacle, ni cadran, ni distance, ni décalage : le mot seul, dit
      * en moins de 100 ms (clips pré-synthétisés).
      */
@@ -217,6 +272,30 @@ object Guidance {
         val meters = label.meters
         return meters == null || !meters.isFinite() || meters <= rangeMeters
     }
+
+    /**
+     * Bordure à monter dans le couloir marché, mesurée au contact
+     * (≤ [CONTACT_METERS]) — le plan ([CurbConcepts.isGround]) n'en est pas un.
+     */
+    private fun curbAtContact(labels: List<PlacedLabel>, cap: SteeringCap): Boolean =
+        labels.any { label ->
+            isCurbStep(label.label) && inCorridor(label.centerX, cap) &&
+                label.meters?.takeIf { it.isFinite() }?.let { it <= CONTACT_METERS } == true
+        }
+
+    /**
+     * Obstacle non-bordure mesuré au contact (≤ [CONTACT_METERS]), le plus proche
+     * — `null` si le seul contact est la bordure elle-même (on la monte).
+     */
+    private fun contactThreat(blocking: List<PlacedLabel>): PlacedLabel? =
+        blocking.mapNotNull { hit ->
+            hit.meters?.takeIf { it.isFinite() && it <= CONTACT_METERS && !isCurbStep(hit.label) }
+                ?.let { hit to it }
+        }.minByOrNull { it.second }?.first
+
+    /** Bordure à monter (`curb`, `step`, `marche`…) : bord [CurbConcepts], pas le plan. */
+    private fun isCurbStep(label: String): Boolean =
+        label.isNotBlank() && CurbConcepts.isCurb(label) && !CurbConcepts.isGround(label)
 
     /** Rang de proximité : l'inconnu passe devant (prudence), puis le plus près. */
     private fun nearRank(label: PlacedLabel): Float {

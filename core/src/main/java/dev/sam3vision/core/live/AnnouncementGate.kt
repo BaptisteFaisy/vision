@@ -105,7 +105,13 @@ class AnnouncementGate(
         /** Clés consécutives identiques avant de parler (≈ 1 s à 2 ips). */
         const val DEFAULT_MIN_FRAMES = 2
 
-        /** Délai minimal entre deux annonces : le temps de dire une phrase courte. */
-        const val DEFAULT_COOLDOWN_MS = 4_000L
+        /**
+         * Délai minimal entre deux annonces (3 s) : le temps de dire une phrase
+         * courte à ×1,9. Passé de 4 s à 3 s (audit voix 31/10) : à 1,2 m/s,
+         * 4 s de silence valent 5 m de marche sans voix — trop pour un
+         * obstacle qui s'approche ; 3 s gardent une annonce par pas sans
+         * chevaucher la phrase précédente.
+         */
+        const val DEFAULT_COOLDOWN_MS = 3_000L
     }
 }

@@ -30,9 +30,18 @@ data class LensSpec(
     val principalXFrac: Float = 0.5f,
     /** Centre optique vertical, en fraction de hauteur (0,5 = centré). */
     val principalYFrac: Float = 0.5f,
-    /** Distorsion radiale mesurée, `null` sans mesure (le sténopé travaille brut). */
+    /**
+     * Distorsion radiale mesurée sur mire, `null` **sans mesure** (le redressement
+     * est alors l'identité : sténopé et plan de sol lisent des boîtes brutes,
+     * biais de quelques pixels aux bords sur grand-angle). À ne pas confondre
+     * avec des coeffs nuls (objectif *mesuré* sans distorsion).
+     */
     val distortion: RadialDistortion? = null,
 ) {
+
+    /** Vrai quand une mesure mire est posée (`false` = `distortion == null`, boîtes lues brutes). */
+    val hasMeasuredDistortion: Boolean
+        get() = distortion != null
 
     /** Vrai si les deux angles, le centre optique et la distorsion sont plausibles. */
     val usable: Boolean
@@ -93,8 +102,8 @@ data class LensSpec(
 
         /**
          * Calibrage des Réglages : le champ horizontal forcé par l'utilisateur prime
-         * (`cameraFovDeg > 0`), sinon le grand-angle de repli. Un seul endroit à changer
-         * pour les deux écrans qui mesurent des distances (Direct et page caméra iSee).
+         * (borné caméra, sinon ignoré), sinon le grand-angle de repli. Même règle que
+         * le choix capteur côté app : forcé valide, sinon capteur réel, sinon repli 67°.
          */
         fun fromSettings(forcedFovDeg: Float): LensSpec =
             if (forcedFovDeg in FOV_MIN..FOV_MAX) fromHorizontalFov(forcedFovDeg) else Default

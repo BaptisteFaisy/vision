@@ -16,7 +16,8 @@ private class FakeSpeakerDriver(var fail: Boolean = false) : TtsDriver {
     val calls = mutableListOf<Call>()
     var stops = 0
     var shutdowns = 0
-    override val speaking: Boolean get() = false
+    var speakingValue = false
+    override val speaking: Boolean get() = speakingValue
 
     override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
         calls += Call(text, flush, locale, rate, pitch)
@@ -273,6 +274,85 @@ class VoiceNavSpeakerTest {
         assertEquals(1f, driver.calls[0].pitch, 0f)
         assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[1].pitch, 0f)
         assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[2].pitch, 0f)
+    }
+
+    @Test
+    fun `douce admise en parole part en file, dite au silence`() {
+        val driver = FakeSpeakerDriver().apply { speakingValue = true }
+        val voice = speaker(driver)
+
+        assertNull(voice.onTurn(SteeringCap.Left, 100f))
+        assertTrue(driver.calls.isEmpty())
+
+        driver.speakingValue = false
+        // Le créneau est pris par la file : l'événement courant se réessaiera.
+        assertNull(voice.onTurn(SteeringCap.Right, 100f))
+        assertEquals(1, driver.calls.size)
+        assertEquals("Continuez dans cette direction.", driver.calls.single().text)
+
+        now += 5_000L
+        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Right, 100f))
+        assertEquals(2, driver.calls.size)
+    }
+
+    @Test
+    fun `file garde la plus fraiche seule`() {
+        val driver = FakeSpeakerDriver().apply { speakingValue = true }
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 100f)
+        voice.onLiteral("Au giratoire, prenez la deuxième sortie.")
+
+        driver.speakingValue = false
+        voice.onTurn(SteeringCap.Right, 100f)
+
+        assertEquals(1, driver.calls.size)
+        assertEquals("Au giratoire, prenez la deuxième sortie.", driver.calls.single().text)
+    }
+
+    @Test
+    fun `file perimee jetee sans parler`() {
+        assertEquals(5_000L, VoiceNavSpeaker.PENDING_TTL_MS)
+        val driver = FakeSpeakerDriver().apply { speakingValue = true }
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 100f)
+
+        driver.speakingValue = false
+        now += 6_000L
+        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Right, 100f))
+
+        assertEquals(1, driver.calls.size)
+    }
+
+    @Test
+    fun `danger vide la file et coupe`() {
+        val driver = FakeSpeakerDriver().apply { speakingValue = true }
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 100f)
+
+        val phrase = voice.onOffRoute()
+
+        assertEquals("Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", phrase)
+        assertEquals(1, driver.calls.size)
+        assertTrue(driver.calls.single().flush)
+
+        driver.speakingValue = false
+        voice.onTurn(SteeringCap.Right, 100f)
+
+        assertEquals(1, driver.calls.size)
+    }
+
+    @Test
+    fun `refus moteur non marque, reemission reparle`() {
+        val driver = FakeSpeakerDriver(fail = true)
+        val voice = speaker(driver)
+
+        assertNull(voice.onTurn(SteeringCap.Left, 100f))
+
+        driver.fail = false
+        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Left, 100f))
+        // Deux tentatives tracées (refusée puis réussie) : « non marqué » vise la
+        // mémoire anti-répétition (la réémission reparle), pas le journal pilote.
+        assertEquals(2, driver.calls.size)
     }
 
     @Test
