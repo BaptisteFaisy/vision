@@ -93,7 +93,7 @@ class TraversePipelineTest {
                 assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
             }
         }
-        assertEquals("annonce à 2 s, répétitions à 4 s et 6 s", 3, cues)
+        assertEquals("annonce à 1 s, répétitions à 3 s et 5 s", 3, cues)
         assertEquals(listOf("play", "play", "play"), player.events)
     }
 
@@ -103,13 +103,9 @@ class TraversePipelineTest {
         val pipe = pipeline(player = player)
         repeat(5) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
         val repeat = pipe.frame(listOf(seg()), green = true, index = 6)
-        assertEquals(
-            "piste non confirmée : le vert se répète à 6 s",
-            CrossingText.phrase(CrossingState.Green), repeat.cue?.phrase,
-        )
-        assertFalse(repeat.cue?.urgent ?: true)
+        assertNull("piste non confirmée : vert maintenu, répétition pas encore due", repeat.cue)
         val alert = pipe.frame(listOf(seg()), green = true, index = 7)
-        assertNull(alert.cue)
+        assertNull("piste confirmée : veto force le rouge, une seule frame ne suffit pas", alert.cue)
         val out = pipe.frame(listOf(seg()), green = true, index = 8)
 
         assertTrue(out.decision.veto)
@@ -124,8 +120,8 @@ class TraversePipelineTest {
     @Test
     fun `sans voix - signal calcule mais rien de parle`() = runBlocking {
         val pipe = pipeline(withVoice = false)
-        repeat(3) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val out = pipe.frame(emptyList(), green = true, index = 4)
+        repeat(2) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
+        val out = pipe.frame(emptyList(), green = true, index = 3)
 
         assertNotNull(out.cue)
         assertNull(out.voice)
@@ -137,8 +133,8 @@ class TraversePipelineTest {
         val player = FakePlayer()
         val tts = FakeTts(Result.failure(RuntimeException("402")))
         val pipe = pipeline(player = player, tts = tts)
-        repeat(3) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val out = pipe.frame(emptyList(), green = true, index = 4)
+        repeat(2) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
+        val out = pipe.frame(emptyList(), green = true, index = 3)
 
         assertEquals(TraverseVoiceOutcome.OFFLINE, out.voice)
         assertEquals("/cache/vert.wav", player.playedPath)

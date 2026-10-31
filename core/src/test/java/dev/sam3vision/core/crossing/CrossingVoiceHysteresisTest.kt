@@ -15,7 +15,7 @@ import org.junit.Test
  * frames puis coupe (urgent), et les phrases exactes des deux langues sont
  * verrouillées. Binaire (ordre user du 31/10) : tout non-vert est rouge.
  *
- * Seuils lus dans [CrossingAnnouncer] (2f vert / 2f rouge / 2,5 s /
+ * Seuils lus dans [CrossingAnnouncer] (1f vert / 2f rouge / 2,5 s /
  * rouge et vert répétés 2 s) : ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
@@ -54,11 +54,11 @@ class CrossingVoiceHysteresisTest {
     }
 
     @Test
-    fun `un scintillement vert-rouge-vert ne parle pas`() {
+    fun `un vert-rouge-vert annonce des le premier vert`() {
         val announcer = CrossingAnnouncer()
-        assertNull(announcer.onFrame(0L, CrossingState.Green))
-        assertNull(announcer.onFrame(200L, CrossingState.Red))
-        assertNull(announcer.onFrame(400L, CrossingState.Green))
-        assertNull(announcer.lastCue)
+        assertEquals(CrossingState.Green, announcer.onFrame(0L, CrossingState.Green)?.state)
+        assertNull("un seul rouge ne coupe pas", announcer.onFrame(200L, CrossingState.Red))
+        assertNull("répétition pas encore due", announcer.onFrame(400L, CrossingState.Green))
+        assertEquals(CrossingState.Green, announcer.lastCue?.state)
     }
 }

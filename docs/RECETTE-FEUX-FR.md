@@ -17,7 +17,7 @@ depuis le 31/10 (`docs/TRAVERSEE.md` §9) : tout non-vert attend rouge.
 | A1 | Détection | Feu piéton vu par SAM (`pedestrian traffic light`, rappel 87,5 % sur 16 photos) ; face au feu, le cadre + l'étiquette (`VERT`/`ROUGE`) tombent sur le caisson | `docs/MESURES-SAM3-FEUX.md` §2, `docs/TRAVERSEE.md` §7 |
 | A2 | Sûreté — **0 faux vert, bloquant** | Aucun feu rouge, éteint, disque voiture ni boîtier d'appel n'est annoncé vert — ni à la voix, ni en vibration, ni à l'overlay. Un seul faux vert = recette **refusée** | `PedLightGate`, `docs/TRAVERSEE.md` §9 (fuzz anti-inversion) |
 | A3 | Rappel vert ≥ 50 % — **provisoire** | Au moins un feu vert réel sur deux est annoncé « Vert, traversez. ». Seuil provisoire en attendant la collecte (état actuel : 1/6 sur crops SAM) ; il monte sur données (`docs/COLLECTE-FEUX.md`), pas par réglage de la porte — exception 31/10, ordre user : plancher vert 0,004 → 0,002 (feux lointains), fuzz anti-inversion exigé vert | `docs/MESURES-SAM3-FEUX.md` §6 |
-| A4 | Sorties confirmées | Annonce après 2 frames concordantes ; voix, vibration et overlay disent la même chose ; un véhicule qui approche force « attendez » même sur vert (veto) | `docs/TRAVERSEE.md` §2 (veto), §9 (sorties confirmées) |
+| A4 | Sorties confirmées | Annonce dès la 1re frame verte ; voix, vibration et overlay disent la même chose ; un véhicule qui approche force « attendez » même sur vert (veto) | `docs/TRAVERSEE.md` §2 (veto), §9 (sorties confirmées) |
 | A5 | Domaine jour | Recette de jour, face au feu à distance de traversée. Nuit et pluie hors verdict ; contre-jour noté au procès-verbal, non bloquant (un feu à contre-jour de jour est aussi sombre qu'un feu de nuit) | `docs/CALIBRAGE-FEU.md` §9, `docs/MESURES-SAM3-FEUX.md` §9 |
 
 A2 est le seul axe bloquant à zéro : la sûreté ne se négocie pas. A3 est
@@ -43,7 +43,7 @@ inventé, mais un mode qui ne dit jamais « traversez » ne sert à rien.
    « Rouge, attendez. », pastille et cadre rouges sur le caisson. Noter
    la phrase exacte + l'heure. Capture écran.
 2. **Attendre le vert.** Sans bouger. Attendu : « Vert, traversez. »
-   dans les 2 frames qui suivent le basculement réel (A4), cadre vert.
+   dès la 1re frame qui suit le basculement réel (A4), cadre vert.
    Si le vert réel reste annoncé rouge : noter (A3), pas d'échec
    sauf sous le seuil de 50 % en fin de prise.
 3. **Feu voiture à côté.** Quand un disque voiture vert est dans le champ
@@ -68,7 +68,7 @@ A1-A5 part en **issue GitHub**, pas en commentaire. **Un faux vert
 | A2 | 0 faux vert voix/vibration/overlay (**bloquant**) | | | |
 | A2b | Disque voiture vert dans le champ : jamais annoncé vert | | | |
 | A3 | Verts réels annoncés verts : …/… (≥ 50 %) | | | |
-| A4 | Annonce après 2 frames, une seule voix (voix = vibration = overlay) | | | |
+| A4 | Annonce dès la 1re frame, une seule voix (voix = vibration = overlay) | | | |
 | A4b | Veto : voiture qui approche force « attendez » sur vert | | | |
 | A5 | De jour, face aux feux ; contre-jour noté : … | | | |
 
@@ -89,7 +89,7 @@ Comptés sur cet arbre (`@Test` par fichier) :
   `TraverseVoiceTest`, `TraversePipelineTest`, `TraverseWiringTest`,
   `CrossingWiringTest`, `CrossingOverlayLayoutTest` (placement du cadre).
 - Binaire + voix : `CrossingTextTest` (phrases exactes), `CrossingAnnouncerTest`
-  (2 frames), `CrossingPeopleVoiceTest`, `VehicleStateWatcherTest`.
+  (1 frame), `CrossingPeopleVoiceTest`, `VehicleStateWatcherTest`.
 
 ## Non mesuré (à ne pas vendre comme vérifié)
 
