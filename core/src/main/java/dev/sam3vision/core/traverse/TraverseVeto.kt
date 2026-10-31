@@ -153,13 +153,14 @@ class TraverseVeto {
         focalPx: Float,
         atMs: Long = -1L,
         motion: FrameMotion? = null,
+        depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
     ): TraverseDecision {
         val stopped = stoppedKeys(detections, focalPx, atMs)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
         val blocking = findBlocking(detections, focalPx, stopped + hushed)
         previousAreas = vehicleAreas(detections)
         previousStill = stillMemoryOf(detections, focalPx, atMs)
-        val tracked = approachVerdict(detections, atMs, motion)
+        val tracked = approachVerdict(detections, atMs, motion, depthByBox)
         val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
@@ -174,9 +175,9 @@ class TraverseVeto {
     }
 
     /** Approche suivie, ou silence si la frame n'est pas datée. */
-    private fun approachVerdict(detections: List<Detection>, atMs: Long, motion: FrameMotion?): ApproachVerdict {
+    private fun approachVerdict(detections: List<Detection>, atMs: Long, motion: FrameMotion?, depthByBox: Map<List<Float>, Float>?): ApproachVerdict {
         if (atMs < 0L) return ApproachVerdict(false, null, null)
-        return approach.update(detections, atMs, motion)
+        return approach.update(detections, atMs, motion, depthByBox)
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */
