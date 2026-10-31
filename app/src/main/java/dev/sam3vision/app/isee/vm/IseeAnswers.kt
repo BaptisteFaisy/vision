@@ -9,6 +9,8 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -48,6 +50,19 @@ class IseeAnswers(
     private val asking = AtomicBoolean(false)
 
     /**
+     * Job de la réponse en vol, posé après le drapeau et rendu dans le `finally` :
+     * un nouvel appui l'annule pour couper la question précédente au lieu de
+     * jeter la nouvelle avec [IseeStatusText.ANSWER_PENDING].
+     */
+    @Volatile
+    private var inFlight: Job? = null
+
+    /** Nouvel appui pendant une réponse : la précédente est coupée, le micro prend la main. */
+    fun cancelInFlight() {
+        inFlight?.cancel()
+    }
+
+    /**
      * Question dictée : ligne Room avec son MP3, repli sans audio si l'encodage échoue —
      * l'échange reste consultable plutôt que perdu.
      */
@@ -66,6 +81,8 @@ class IseeAnswers(
         }
         // Posé avant le premier point de suspension : l'écran montre le « … » tout de
         // suite et le ViewModel sait qu'une question est en vol.
+        val self = currentCoroutineContext()[Job]
+        inFlight = self
         update { it.copy(thinking = true) }
         try {
             if (!settings().llmConfigured) {
@@ -87,6 +104,7 @@ class IseeAnswers(
             photo.releaseContext()
             update { it.copy(thinking = false) }
             asking.set(false)
+            if (inFlight === self) inFlight = null
         }
     }
 
