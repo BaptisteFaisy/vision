@@ -146,6 +146,47 @@ class StairDetectorTest {
     }
 
     @Test
+    fun `roi sam : marches dedans comptees, dehors ignorees`() {
+        // 24,25 dans le bas fixe mais hors ROI (top 0,5) ; 36,44,52,58 dedans.
+        val mask = stairsLike(24, 25, 36, 44, 52, 58)
+        val full = StairDetector.detect(mask)
+        val bounded = StairDetector.detect(mask, roi = StairRoi(0f, 0.5f, 1f, 1f))
+
+        assertEquals(5, full.lineCount)
+        assertEquals(4, bounded.lineCount)
+        assertTrue(bounded.detected)
+        assertEquals(30, bounded.roiTop)
+        assertEquals(60, bounded.roiBottom)
+    }
+
+    @Test
+    fun `roi etroite : couverture proportionnee a la largeur`() {
+        // Marches sur le tiers central seul : invisibles à l'échelle image,
+        // comptées à l'échelle de la boîte SAM.
+        val width = 64
+        val height = 60
+        val pixels = ByteArray(width * height) { 20 }
+        for (y in listOf(30, 38, 46, 54)) {
+            for (x in 24 until 40) pixels[y * width + x] = 255.toByte()
+        }
+        val mask = GrayMask(width, height, pixels)
+        val full = StairDetector.detect(mask)
+        val bounded = StairDetector.detect(mask, roi = StairRoi(24f / 64, 0f, 40f / 64, 1f))
+
+        assertEquals(0, full.lineCount)
+        assertEquals(4, bounded.lineCount)
+        assertTrue(bounded.detected)
+    }
+
+    @Test
+    fun `roi degeneree = signal vide, coordonnees triees`() {
+        val mask = stairsLike(30, 38, 46, 54)
+        assertEquals(StairSignal.none(), StairDetector.detect(mask, roi = StairRoi(0.5f, 0.5f, 0.5f, 0.5f)))
+        assertEquals(StairRoi(0.2f, 0.2f, 0.8f, 0.8f), StairRoi(0.8f, 0.8f, 0.2f, 0.2f).normalized())
+        assertEquals(null, StairRoi(2f, 2f, 3f, 3f).normalized())
+    }
+
+    @Test
     fun `confiance en rampe 0 puis tiers`() {
         assertEquals(0f, StairDetector.confidenceFor(0, 4), 0f)
         assertEquals(0f, StairDetector.confidenceFor(3, 4), 0f)

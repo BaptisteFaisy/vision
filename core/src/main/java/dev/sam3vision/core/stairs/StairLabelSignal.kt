@@ -21,6 +21,8 @@ data class StairLabelSignal(
     val direction: StairDirection = StairDirection.Unknown,
     /** Centre normalisé de l'escalier retenu (l'heure du cadran, `null` = inconnu). */
     val centerX: Float? = null,
+    /** Boîte pixels (`x1,y1,x2,y2`) de l'escalier retenu, vide si inconnue (repli libellés). */
+    val box: List<Float> = emptyList(),
 ) {
     companion object {
         /** Aucun escalier nommé dans les lectures. */
@@ -64,12 +66,15 @@ object StairLabelSignals {
         if (stairs.isEmpty()) return StairLabelSignal.none()
         val labeled = stairs.firstOrNull { StairConcepts.direction(it.label) != StairDirection.Unknown }
         if (labeled != null) {
-            return StairLabelSignal(true, StairConcepts.direction(labeled.label), centerOf(labeled, width))
+            return StairLabelSignal(
+                true, StairConcepts.direction(labeled.label), centerOf(labeled, width), labeled.box)
         }
         val nearest = stairs.first()
         val bottom = (nearest.box[3] / height).coerceIn(0f, 1f)
-        if (bottom < UP_BOTTOM_EDGE) return StairLabelSignal(true, StairDirection.Up, centerOf(nearest, width))
-        return StairLabelSignal(true, StairDirection.Unknown, centerOf(nearest, width))
+        if (bottom < UP_BOTTOM_EDGE) {
+            return StairLabelSignal(true, StairDirection.Up, centerOf(nearest, width), nearest.box)
+        }
+        return StairLabelSignal(true, StairDirection.Unknown, centerOf(nearest, width), nearest.box)
     }
 
     /** Centre normalisé de la boîte (l'heure du cadran). */
