@@ -53,16 +53,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   prouvé, 60° signés depuis le cap du scan, ou timeout 6 s → observation 2,5 s → constat parlé
   (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à droite → silence si
   libre, sinon re-vérification obligatoire (attente 3 s + nouveau cycle, max 3 cycles, puis
-  release au veto), horloges gelées pendant le feu) ; mouvement latéral véhicules
+  release au veto), horloges gelées pendant le feu, consigne corrigée « Non, regardez à … »
+  si l'user tourne du mauvais côté) ; bandeau écran miroir (consigne + constats latéraux
+  « Pas de voiture à … en mouvement » / « Voiture à … ! ») ; mouvement latéral véhicules
   (`VehicleApproach` : vitesse x lissée > 8 %/s — le tau ne voyait pas la traversée du champ
   à taille stable, suivi par les annonces d'état, pas par le veto, tué par le véto fond
   caméra comme l'approche) ; `YawMeter` (lacet écouté le temps du scan seul, helper
   `RotationVector` partagé avec `PitchMeter`) ; priorité feu > scan > véhicules > personnes
   (`crossingPhraseOf` via `phraseOf`).
 - Preuves : `:core:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanTest`
-  17/17, `VehicleApproachTest` 16/16, `VehicleStateLateralTest` 2/2) ;
+  21/21, `VehicleApproachTest` 16/16, `VehicleStateLateralTest` 2/2) ;
   `:app:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanWiringTest`
-  10/10, suites traversée sans régression) ;
+  10/10, `CrosswalkScanDisplayTest` 10/10, suites traversée sans régression) ;
   `check-kotlin-limits.py` vert ; `assembleDebug` vert (`app-debug.apk`). Recette téléphone :
   fumée Redmi OK (install + lancement + pid vivant) ; recette passage réel **non mesurée**
   (constats, virages et re-vérification à valider rue).

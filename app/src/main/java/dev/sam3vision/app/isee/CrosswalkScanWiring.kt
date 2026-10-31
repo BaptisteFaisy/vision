@@ -5,6 +5,7 @@ import dev.sam3vision.app.pose.YawMeter
 import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrosswalkScan
 import dev.sam3vision.core.crossing.CrosswalkScanPhase
+import dev.sam3vision.core.crossing.ScanSide
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
@@ -72,6 +73,9 @@ internal object CrosswalkScanWatch {
 
     private val scan = CrosswalkScan()
     private var meter: YawMeter? = null
+    /** Danger latché par côté ce cycle (`null` = pas encore constaté), lu des phrases. */
+    private var leftDanger: Boolean? = null
+    private var rightDanger: Boolean? = null
 
     /** Fraîcheur exigée du lacet (ms) : au-delà, repli temporisé. */
     const val YAW_FRESH_MS = 1_000L
@@ -103,7 +107,9 @@ internal object CrosswalkScanWatch {
         feu: Boolean,
         language: SpeechLanguage,
     ): String? {
+        val prev = scan.phase
         val phrase = scan.update(atMs, trigger, yawDeg(atMs), movingNow, feu, language)
+        noteScanReport(prev, scan.phase, phrase, language)
         if (trigger && scan.phase != CrosswalkScanPhase.Idle && scan.phase != CrosswalkScanPhase.Done) {
             meter?.start()
         } else {
@@ -115,9 +121,42 @@ internal object CrosswalkScanWatch {
     /** Phase courante (cycle capteur, tests). */
     fun phase(): CrosswalkScanPhase = scan.phase
 
-    /** Mode coupé : machine ré-armée, capteur coupé. */
+    /**
+     * Lignes affichées du scan (`null` = inactif : rien à l'écran), langue de
+     * la voix : la sonde les publie à chaque frame ([LiveProbeState.scanLines]).
+     */
+    fun display(language: SpeechLanguage): CrosswalkScanLines? =
+        crosswalkScanLinesOf(scan.phase, leftDanger, rightDanger, language)
+
+    /** Mode coupé : machine ré-armée, constats oubliés, capteur coupé. */
     fun reset() {
         scan.reset()
+        leftDanger = null
+        rightDanger = null
         meter?.stop()
+    }
+
+    /**
+     * Constats affichés : un nouveau scan (`Idle` → `Stop`) et chaque nouveau
+     * cycle (`Rewait` → `Left`) effacent les latches, puis la phrase parlée
+     * latchée ([scanReportOf]) — la machine ne publiant pas ses dangers, l'écran
+     * les lit dans la voix (même source, jamais de désaccord).
+     */
+    private fun noteScanReport(
+        prev: CrosswalkScanPhase,
+        next: CrosswalkScanPhase,
+        phrase: String?,
+        language: SpeechLanguage,
+    ) {
+        if (next == CrosswalkScanPhase.Stop && prev == CrosswalkScanPhase.Idle ||
+            next == CrosswalkScanPhase.Left && prev == CrosswalkScanPhase.Rewait
+        ) {
+            leftDanger = null
+            rightDanger = null
+        }
+        scanReportOf(phrase, language)?.let { (side, danger) ->
+            if (side == ScanSide.Left) leftDanger = danger
+            else rightDanger = danger
+        }
     }
 }
