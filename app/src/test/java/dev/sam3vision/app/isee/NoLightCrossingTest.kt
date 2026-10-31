@@ -146,6 +146,30 @@ class NoLightCrossingTest {
     }
 
     @Test
+    fun `sans feu - transition feu tait la phrase mais le verdict dit attendez`() {
+        resetWatches()
+        // Ordre feu nouveau : le quiet tait les voix douces 2,5 s.
+        val cue = CrossingCue("Rouge, attendez.", false, CrossingState.Red)
+        assertEquals(
+            "Rouge, attendez.",
+            crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr),
+        )
+        // Le feu sort du champ, une voiture à 30 m roule : la phrase est tue
+        // (quiet) mais le guetteur reste nourri — le verdict dit « Wait. ».
+        fun far(widthPx: Float, atMs: Long): String? {
+            val frame = carBox(widthPx)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(30f, frame)),
+                atMs, SpeechLanguage.En, noLight = true,
+            )
+        }
+
+        assertNull(far(100f, 100L))
+        assertNull(far(110f, 200L))
+        assertEquals("Wait.", far(120f, 300L))
+    }
+
+    @Test
     fun `sans feu - cooldown mouvement dit attendez, jamais traversez`() {
         resetWatches()
         val language = SpeechLanguage.En
