@@ -146,6 +146,28 @@ class StairDetectorTest {
     }
 
     @Test
+    fun `nez epais = une marche par bande, pas deux`() {
+        // Régression 31/10 : un nez clair de 5-6 px donnait deux contours
+        // (haut + bas de bande) comptés deux marches — 5 marches vues comme
+        // 10. Seul le côté montant compte : une bande = une marche.
+        assertEquals(5, StairDetector.detect(phoneStairs(5)).lineCount)
+        assertEquals(5, StairDetector.detect(phoneStairs(6)).lineCount)
+    }
+
+    /** Plan téléphone 256×103 : 5 nez clairs épais sur fond sombre. */
+    private fun phoneStairs(thickness: Int): GrayMask {
+        val width = 256
+        val height = 103
+        val pixels = ByteArray(width * height) { 40 }
+        for (start in listOf(48, 58, 68, 78, 88)) {
+            for (y in start until (start + thickness).coerceAtMost(height)) {
+                for (x in 0 until width) pixels[y * width + x] = 200.toByte()
+            }
+        }
+        return GrayMask(width, height, pixels)
+    }
+
+    @Test
     fun `roi sam = marches dedans comptees, dehors ignorees`() {
         // 24,25 dans le bas fixe mais hors ROI (top 0,5) ; 36,44,52,58 dedans.
         val mask = stairsLike(24, 25, 36, 44, 52, 58)

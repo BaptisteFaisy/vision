@@ -6,12 +6,15 @@ import kotlin.math.tan
 /**
  * Canny pur JVM (flou gaussien 3×3 séparable, Sobel, suppression des
  * non-maxima, hystérésis), restreint à la ROI et aux contours
- * quasi-horizontaux — le port des étapes 3-4 de `stair_detector.py`
+ * quasi-horizontaux **montants** — le port des étapes 3-4 de `stair_detector.py`
  * (`GaussianBlur` + Canny, MIT, voir `NOTICE` racine), recalibré téléphone.
  *
  * Un contour quasi-horizontal a son gradient quasi-vertical : le test se fait
  * sur le rapport `|gy| / |gx|`, sans `atan2` par pixel. La magnitude est la
- * norme L1 (`|gx| + |gy|`, comme OpenCV sans `L2gradient`).
+ * norme L1 (`|gx| + |gy|`, comme OpenCV sans `L2gradient`). Seule la polarité
+ * montante est gardée (plus clair en dessous : le haut d'un nez clair, le bas
+ * d'un nez sombre) : une marche = un contour, quelle que soit l'épaisseur du
+ * nez — les deux côtés d'un nez épais ne se comptent plus deux fois.
  *
  * Fonction totale : image vide ou incohérente = carte vide, jamais d'exception.
  */
@@ -34,10 +37,10 @@ object StairsCanny {
     private const val STRONG = -1
 
     /**
-     * Contours quasi-horizontaux de [mask] entre les lignes [top] (inclus) et
-     * [bottom] (exclu) : tableau plein format, `1` sur un contour retenu, `0`
-     * ailleurs (dont hors ROI). [config] fournit les seuils de Canny et la
-     * tolérance d'angle.
+     * Contours quasi-horizontaux montants de [mask] entre les lignes [top]
+     * (inclus) et [bottom] (exclu) : tableau plein format, `1` sur un contour
+     * retenu, `0` ailleurs (dont hors ROI). [config] fournit les seuils de
+     * Canny et la tolérance d'angle.
      */
     fun horizontalEdges(mask: GrayMask, top: Int, bottom: Int, config: StairsConfig): ByteArray {
         val width = mask.width
@@ -211,9 +214,11 @@ object StairsCanny {
     }
 
     /**
-     * Ne garde dans [out] que les contours quasi-horizontaux : gradient à moins
-     * de [StairsConfig.angleToleranceDeg] de la verticale, soit
-     * `|gy| >= tan(90° - tolérance) * |gx|`.
+     * Ne garde dans [out] que les contours quasi-horizontaux montants :
+     * gradient à moins de [StairsConfig.angleToleranceDeg] de la verticale,
+     * soit `|gy| >= tan(90° - tolérance) * |gx|`, et `gy > 0` (plus clair en
+     * dessous). Un nez de marche, clair ou sombre, épais ou fin, n'a qu'un
+     * seul côté montant : le comptage ne se dédouble plus sur les nez épais.
      */
     private fun flagHorizontal(
         gradients: Gradients,
@@ -231,7 +236,7 @@ object StairsCanny {
                 if (out[index] == 0.toByte()) continue
                 val vertical = kotlin.math.abs(gradients.gy[index])
                 val lateral = kotlin.math.abs(gradients.gx[index])
-                if (vertical < slope * lateral) out[index] = 0
+                if (vertical < slope * lateral || gradients.gy[index] <= 0) out[index] = 0
             }
         }
     }
