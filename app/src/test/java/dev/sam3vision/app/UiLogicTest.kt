@@ -159,6 +159,17 @@ class UiLogicTest {
     }
 
     @Test
+    fun `seul l'accueil isee garde l'ecran allume`() {
+        assertTrue(keepsScreenOn(Route.Isee))
+        val autres = listOf(
+            Route.Capture, Route.Analysis, Route.Chat,
+            Route.Live, Route.Settings, Route.Caregiver, Route.Onboarding,
+            Route.Bench, Route.Tap(true), Route.Tap(false), Route.VoiceNav,
+        )
+        autres.forEach { assertFalse("route ${routeToName(it)}", keepsScreenOn(it)) }
+    }
+
+    @Test
     fun `la demande de route exterieure se pousse et se consomme une fois`() {
         RouteRequest.push("voicenav")
         assertEquals("voicenav", RouteRequest.pending.value)
