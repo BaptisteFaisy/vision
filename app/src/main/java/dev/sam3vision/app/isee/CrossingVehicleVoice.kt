@@ -41,10 +41,13 @@ internal object CrossingVehicleWatch {
      * ou ordre du feu à laisser entier). [cue] non nul = le feu parle sur
      * cette frame : l'ordre est mémorisé et la voix se tait. Mouvement
      * proche ⇒ l'alerte « Stop, … » (urgente côté sonde, lue dans la
-     * phrase), sinon la phrase douce. Le guetteur n'est nourri que hors
-     * silence (miroir de l'annonceur des personnes) : une annonce mûrie
-     * pendant le quiet ne part pas en cooldown sourd — elle se reconfirme
-     * sur les frames suivantes et parle dès la parole rendue.
+     * phrase), sinon la phrase douce. [noLight] vrai = traversée sans feu :
+     * le mouvement se dit à toute portée (ordre user du 31/10 — même au-delà
+     * de 15 m, dès qu'une voiture en mouvement est détectée), sinon 15 m.
+     * Le guetteur n'est nourri que hors silence (miroir de l'annonceur des
+     * personnes) : une annonce mûrie pendant le quiet ne part pas en
+     * cooldown sourd — elle se reconfirme sur les frames suivantes et parle
+     * dès la parole rendue.
      */
     fun update(
         detections: List<Detection>,
@@ -52,9 +55,11 @@ internal object CrossingVehicleWatch {
         atMs: Long,
         language: SpeechLanguage,
         cue: CrossingCue? = null,
+        noLight: Boolean = false,
     ): String? {
         if (quiet.hush(cue, atMs)) return null
-        val found = watcher.update(detections, readings, atMs, language) ?: return null
+        val range = if (noLight) Float.POSITIVE_INFINITY else VehicleStateWatcher.MOVING_METERS
+        val found = watcher.update(detections, readings, atMs, language, movingMeters = range) ?: return null
         return found.safetyPhrase ?: found.phrase
     }
 
