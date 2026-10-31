@@ -179,8 +179,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
         onAutoCrossing = { steering.setAutoCrossing(it) },
-        speakRoute = { text, urgent -> proximity.onPhrase(text, canAnnounce(), urgent) },
-        stopRoute = player::stop,
+        speakRoute = { text, urgent -> proximity.onRoutePhrase(text, canAnnounce(), urgent) },
+        // Fin de guidage : le lecteur coupé ne termine jamais (`onComplete`
+        // ne part pas) — le flag est remis à zéro ici, sinon toute la voix
+        // douce resterait muette (lecteur cru occupé pour toujours).
+        stopRoute = { player.stop(); update { it.copy(speakingEntryId = null, speakingText = "") } },
         onRouteCap = { cap -> if (cap == null) probe.clearRouteCap() else probe.setRouteCap(cap) },
         userSpeaking = { _state.value.holding || _state.value.transcribing },
         setGuidance = { enabled ->
@@ -259,7 +262,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         observeCrossingAuto(probe.state.map { it.crossingOffer }, viewModelScope, { settings.speechLanguage }, { steering.setAutoCrossing(it, vision = true) }) { speakNavigation(it) }
         observeCrossingLoss(probe.state.crossingSightPerFrame(), viewModelScope, { settings.speechLanguage }, { steering.visionArmed }, { steering.setAutoCrossing(it, vision = true) }) { speakNavigation(it) }
         // Placement sur le passage (mot doux + « Sur le passage. », jamais Stop).
-        observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false) }) { speakNavigation(it) }
+        observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false, queue = true) }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
