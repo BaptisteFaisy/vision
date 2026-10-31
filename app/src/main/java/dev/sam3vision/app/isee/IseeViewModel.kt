@@ -196,8 +196,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La session sous-jacente (boutons de l'écran navigation). */
     fun voiceNav(): VoiceNavSession = voiceNav.session
 
-    /** Destination dictée sur le direct : passe par la session de navigation. */
-    suspend fun acceptNavOrder(transcript: String) = voiceNav.run(transcript)
+    /** Ordre dicté sur le direct : navigation puis traversée (mêmes parseurs que l'accueil). */
+    suspend fun acceptNavOrder(transcript: String): Boolean {
+        if (voiceNav.run(transcript)) return true
+        return steering.runCrossing(transcript)
+    }
 
     /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
