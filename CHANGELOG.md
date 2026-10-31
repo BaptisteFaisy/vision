@@ -16,6 +16,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `NoLightCrossingTest` + 1 `CrossingVehicleTest` nouveaux) ; UBS : 0
   finding ; fichiers < 500 lignes (`VehicleState.kt` 498).
 
+## 2026-10-31 — iSee : obstacles et positions se redisent (branche `isee-muet`)
+
+- **Demande** : iSee muet (« plus de son »), puis incomplet (« pas tout, pas
+  tout le temps ») — le user veut les deux voix et l'esquive objets/personnes
+  en priorité maximale.
+- **Constat** : deux causes. 1) Porte GPS fermée persistée
+  (`navigation_guidance=false` après « désactive le GPS ») : voix ambiante
+  muette jusqu'à « active le GPS » — vérifié avec le user (la voix est
+  revenue à l'ordre, le chat n'a jamais été coupé). 2) Déduplication aval
+  infinie : `ProximityVoice` jetait toute phrase identique à la dernière
+  dite, pour toujours — un danger présent ne se redisait jamais et le retour
+  d'une scène restait muet.
+- **Fait** : déduplication bornée (`REPEAT_TTL_MS` 4 s : redite au-delà,
+  anti-bégaiement en deçà) sur `onPhrase`/`onRoutePhrase`/`onArrivalPhrase`
+  ; le stop garde sa règle (jamais répété). Les Réglages « Guider tout
+  droit » / « Annoncer les objets » sont déjà à `true` par défaut : rien à
+  forcer.
+- **Preuve** : 6 tests nouveaux (`ProximityVoiceRepeatTest`, 4 échouaient
+  sans le fix) ; suite `:app` 1502/1502 sur r630 ; `check-kotlin-limits.py`
+  vert (1288 fichiers, aucun dépassement).
 ## 2026-10-31 — iSee : le micro verrouillé reçoit la destination GPS (branche `feat/isee-micro-verrouille-destination`)
 
 - **Constat** : écran verrouillé, les questions partaient au LLM sans la

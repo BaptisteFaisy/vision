@@ -11,8 +11,9 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * Voix de proximité de la fenêtre caméra : directions dites en continu
- * ([speakWord], sauf le stop unique), positions dites une fois par scène
- * ([onPhrase], « Personne à 1 mètre. »).
+ * ([speakWord], sauf le stop unique), positions et obstacles doux redits
+ * après [REPEAT_TTL_MS] tant qu'ils durent ([onPhrase] : un danger présent
+ * ne se tait pas, le retour d'une scène parle).
  *
  * Cinq garde-fous : rien n'est dit sans clé ElevenLabs, rien par-dessus la
  * réponse du chat (une seule source sonore à la fois — c'est l'appelant qui
@@ -51,6 +52,9 @@ class ProximityVoice(
 
     private var lastPhrase: String? = null
 
+    /** Instant de la dernière phrase dite ([nowMs]) : la déduplication est bornée ([REPEAT_TTL_MS]). */
+    private var lastPhraseAtMs: Long = 0L
+
     /** Phrase douce gardée ([onPhrase] avec file), `null` si aucune. */
     private var pending: Pending? = null
 
@@ -63,6 +67,7 @@ class ProximityVoice(
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
+        lastPhraseAtMs = 0L
         pending = null
         pendingRoute = null
         pendingArrival = null
@@ -72,7 +77,7 @@ class ProximityVoice(
      * Nouvelle phrase de SAM. [playerIdle] vrai = aucune bulle du chat en cours de lecture ;
      * sinon on ne dit rien — mais la phrase avalée par un garde transitoire n'est
      * pas mémorisée : réémise, elle se dira une fois la voie libre (seul ce qui a
-     * vraiment parlé est dédupliqué). [urgent] coupe la lecture en cours et parle
+     * vraiment parlé est dédupliqué, pendant [REPEAT_TTL_MS]). [urgent] coupe la lecture en cours et parle
      * quand même, dictée ou pas. Tant que la voix route parle ([routeSpeaking]),
      * l'obstacle non urgent se tait aussi, puis se dit à la prochaine émission.
      * [queue] : la phrase douce tuée par le chat, la route ou [busy] est gardée
@@ -88,7 +93,7 @@ class ProximityVoice(
         queue: Boolean = false,
         busy: () -> Boolean = { false },
     ) {
-        if (phrase == lastPhrase) return
+        if (saidRecently(phrase)) return
         val current = settings()
         if (!current.ttsConfigured) return
         if (!urgent && (!playerIdle || routeSpeaking() || busy())) {
@@ -111,7 +116,7 @@ class ProximityVoice(
         playerIdle: Boolean,
         urgent: Boolean = false,
     ) {
-        if (phrase == lastPhrase) return
+        if (saidRecently(phrase)) return
         val current = settings()
         if (!current.ttsConfigured) return
         if (!urgent && !playerIdle) {
@@ -130,7 +135,7 @@ class ProximityVoice(
      * coupée). Ne coupe jamais rien : aucun `urgent` ici.
      */
     suspend fun onArrivalPhrase(phrase: String, playerIdle: Boolean) {
-        if (phrase == lastPhrase) return
+        if (saidRecently(phrase)) return
         val current = settings()
         if (!current.ttsConfigured) return
         if (!playerIdle || routeSpeaking()) {
@@ -175,6 +180,15 @@ class ProximityVoice(
     private fun hasFresh(due: Pending?): Boolean =
         due != null && due.phrase != lastPhrase && nowMs() < due.expiresAtMs
 
+    /**
+     * Vrai si [phrase] vient d'être dite (moins de [REPEAT_TTL_MS]) : la
+     * déduplication est bornée — un danger présent se redit, le retour
+     * d'une scène parle, et rien ne bégaie. Le stop garde sa règle propre
+     * (jamais répété, [speakWord]).
+     */
+    private fun saidRecently(phrase: String): Boolean =
+        phrase == lastPhrase && nowMs() - lastPhraseAtMs < REPEAT_TTL_MS
+
     /** Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée. */
     private suspend fun flushOne(due: Pending?, current: Settings, clear: () -> Unit): Boolean {
         if (due == null) return false
@@ -200,6 +214,7 @@ class ProximityVoice(
             // Mémorisée au moment de parler seulement : un avalement transitoire
             // (chat, route, porte, synthèse) ne tait pas les réémissions.
             lastPhrase = phrase
+            lastPhraseAtMs = nowMs()
             onSpeaking(phrase)
             player.play(bytes).onFailure { onSpeaking("") }
         }
@@ -236,6 +251,7 @@ class ProximityVoice(
         if (file != null) {
             coroutineContext.ensureActive()
             lastPhrase = text
+            lastPhraseAtMs = nowMs()
             onSpeaking(text)
             player.playFile(file).onFailure { onSpeaking("") }
             return
@@ -246,6 +262,7 @@ class ProximityVoice(
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
             clips?.put(clipId, language, current.ttsVoiceId, bytes)
             lastPhrase = text
+            lastPhraseAtMs = nowMs()
             onSpeaking(text)
             player.play(bytes).onFailure { onSpeaking("") }
         }
@@ -270,5 +287,13 @@ class ProximityVoice(
     companion object {
         /** Rattrapage borné : au-delà, la scène a changé, la phrase est périmée. */
         const val PENDING_TTL_MS = 3_000L
+
+        /**
+         * Redite d'une phrase identique : 4 s, le temps de dire une phrase
+         * courte (comme le délai amont) — les directions en clips tournent
+         * à 2 s, la synthèse réseau coûte plus cher. Au-delà, un danger
+         * présent se redit et le retour d'une scène parle.
+         */
+        const val REPEAT_TTL_MS = 4_000L
     }
 }
