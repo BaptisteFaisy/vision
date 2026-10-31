@@ -1,6 +1,8 @@
 package dev.sam3vision.app.glasses
 
 import android.util.Log
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.inputs.types.CapturePressType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -55,7 +57,12 @@ internal class GlassesMockControls(
 
     fun stop() {
         mock.stop()
-        state.update { it.copy(mockActive = false) }
+        // `start()` force `registered` à vrai : à l'arrêt, on relit la vérité du SDK,
+        // sinon une session réelle partirait sur un enregistrement fictif.
+        val registered = runCatching {
+            Wearables.registrationState.value == RegistrationState.REGISTERED
+        }.getOrDefault(false)
+        state.update { it.copy(mockActive = false, registered = registered) }
     }
 
     /**
