@@ -68,13 +68,13 @@ class GuidanceTest {
     }
 
     @Test
-    fun `contact mesure dit stop`() {
+    fun `contact mesure dit le cote, jamais stop`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f, 0.4f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Stop.", Guidance.phrase(decision))
-        assertEquals("Stop.", Guidance.phrase(decision, SpeechLanguage.En))
-        assertEquals("w|stop", Guidance.key(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
+        assertEquals("Gauche.", Guidance.phrase(decision, SpeechLanguage.Fr))
+        assertEquals("w|left", Guidance.key(decision))
     }
 
     @Test
@@ -194,12 +194,12 @@ class GuidanceTest {
     }
 
     @Test
-    fun `contact mesure dit stop meme devant un inconnu elu`() {
+    fun `contact mesure avec inconnu dit le cote`() {
         val labels = listOf(placed("mur", 0.5f), placed("personne", 0.5f, 0.4f))
         val decision = Guidance.decide(labels)
 
         assertTrue(decision.blocked)
-        assertEquals("Stop.", Guidance.phrase(decision))
-        assertEquals("w|stop", Guidance.key(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
+        assertEquals("w|left", Guidance.key(decision))
     }
 }

@@ -57,10 +57,10 @@ class DangerVoiceTest {
     }
 
     @Test
-    fun `un obstacle au contact fait dire le stop twinlite`() {
+    fun `un obstacle au contact fait dire le contournement twinlite`() {
         val voice = GuidanceAnnouncer()
         val phrase = voice.onFrame(0L, listOf(PlacedLabel("personne", 0.5f, 0.5f, 0.5f)), SpeechLanguage.Fr)
-        assertEquals("obstacle, arrêtez-vous.", phrase)
+        assertEquals("gauche.", phrase)
     }
 
     @Test
