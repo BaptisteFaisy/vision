@@ -108,7 +108,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Voix de proximité : dit les objets et leur distance une fois par scène. */
     private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
     /** Voix de sécurité : voiture en mouvement + rebord, dits aussitôt, même en dictée. */
-    private val safety = SafetyVoice(player, SystemTtsEngine.create(getApplication()), { settings })
+    private val safety = SafetyVoice(player, SystemTtsEngine.create(getApplication()), { settings }, stopCurrent = { player.stop(); update { it.cutSpeaking() } })
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -315,7 +315,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         answers.cancelInFlight()
         if (!playerIdle()) {
             player.stop()
-            update { it.copy(speakingEntryId = null) }
+            update { it.cutSpeaking() }
         }
         voiceNav.stopVoice()
     }
