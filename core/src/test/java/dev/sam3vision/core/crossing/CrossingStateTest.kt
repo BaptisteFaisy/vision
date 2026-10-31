@@ -9,8 +9,8 @@ import org.junit.Test
 class CrossingStateTest {
 
     @Test
-    fun `six prompts exactement, plafond client respecte`() {
-        assertEquals(6, CrossingPrompts.PROMPTS.size)
+    fun `sept prompts exactement, plafond client respecte`() {
+        assertEquals(7, CrossingPrompts.PROMPTS.size)
         assertTrue(CrossingPrompts.PROMPTS.size <= LivePrompts.MAX)
         assertEquals(CrossingPrompts.PROMPTS, LivePrompts.normalize(CrossingPrompts.PROMPTS))
     }
@@ -20,7 +20,7 @@ class CrossingStateTest {
         assertEquals(
             listOf(
                 "pedestrian traffic light", "pedestrian light", "pedestrian signal",
-                "car", "person", "crosswalk",
+                "pedestrian signal head", "car", "person", "crosswalk",
             ),
             CrossingPrompts.PROMPTS,
         )
@@ -62,6 +62,24 @@ class CrossingStateTest {
         assertFalse(CrossingPrompts.isLightLabel("traffic signal"))
         assertFalse(CrossingPrompts.isLightLabel("feu tricolore"))
         assertFalse(CrossingPrompts.isLightLabel("  feu  "))
+    }
+
+    @Test
+    fun `les etiquettes tete sont des tetes, toujours des feux`() {
+        assertTrue(CrossingPrompts.isHeadLabel("pedestrian signal head"))
+        assertTrue(CrossingPrompts.isHeadLabel("Pedestrian Signal Head"))
+        assertTrue(CrossingPrompts.isHeadLabel("boîtier feu piéton"))
+        assertTrue(CrossingPrompts.isHeadLabel("petits feux piétons"))
+        assertTrue(CrossingPrompts.isHeadLabel("tête de feu piéton"))
+    }
+
+    @Test
+    fun `le caisson et le reste ne sont pas des tetes`() {
+        assertFalse(CrossingPrompts.isHeadLabel("pedestrian traffic light"))
+        assertFalse(CrossingPrompts.isHeadLabel("feu piéton"))
+        assertFalse(CrossingPrompts.isHeadLabel("traffic light"))
+        assertFalse(CrossingPrompts.isHeadLabel("car"))
+        assertFalse(CrossingPrompts.isHeadLabel(""))
     }
 
     @Test
@@ -161,6 +179,33 @@ class CrossingStateTest {
         assertEquals(null, CrossingPrompts.selectLightBox(short, 200, 400))
         val noSize = listOf(light("pedestrian traffic light", 0.9f, listOf(0f, 0f, 10f, 10f)))
         assertEquals(null, CrossingPrompts.selectLightBox(noSize, 0, 0))
+    }
+
+    @Test
+    fun `la petite boite tete gagne sur le caisson meme a score inferieur`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.91f, listOf(50f, 100f, 150f, 300f)),
+            light("pedestrian signal head", 0.60f, listOf(80f, 120f, 120f, 200f)),
+        )
+        assertEquals(listOf(0.4f, 0.3f, 0.6f, 0.5f), CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `une petite tete seule n est pas ecartee comme un eclat du caisson`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.91f, listOf(0f, 0f, 200f, 400f)),
+            light("pedestrian signal head", 0.60f, listOf(90f, 180f, 110f, 220f)),
+        )
+        assertEquals(listOf(0.45f, 0.45f, 0.55f, 0.55f), CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `une tete invalide bascule sur le caisson`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.60f, listOf(50f, 100f, 150f, 300f)),
+            light("pedestrian signal head", 0.99f, listOf(10f, 10f, 10f, 50f)),
+        )
+        assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
     }
 
     private fun light(label: String, score: Float, box: List<Float>) =

@@ -15,11 +15,11 @@ import dev.sam3vision.core.model.SegObject
 enum class CrossingState { Red, Green }
 
 /**
- * Concepts **minimaux** de la Traversée : le feu (en trois variantes), les
- * voitures, les personnes et le passage lui-même. Six concepts : le feu dit
- * quand traverser, les voitures forcent l'attente, les personnes sont
- * annoncées par positions, et le passage vu garde le mode auto actif (perdu
- * plusieurs frames de suite, retour au mode normal).
+ * Concepts **minimaux** de la Traversée : le feu (en trois variantes), la
+ * tête du feu, les voitures, les personnes et le passage lui-même. Sept
+ * concepts : le feu dit quand traverser, les personnes sont annoncées par
+ * positions, et le passage vu garde le mode auto actif (perdu plusieurs
+ * frames de suite, retour au mode normal).
  *
  * Couverture « mêmes masques » : [LIGHT] est dans [LivePrompts.default],
  * les variantes ([LIGHT_SHORT], [LIGHT_SIGNAL]) désignent les mêmes masques
@@ -48,6 +48,16 @@ object CrossingPrompts {
     const val LIGHT_SHORT = "pedestrian light"
     const val LIGHT_SIGNAL = "pedestrian signal"
 
+    /**
+     * Concept tête : la **petite boîte** du feu piéton (31/10, ordre user :
+     * SAM cadre la tête, la couleur s'y lit en local). [LIGHT] trouve le
+     * caisson (rappel 87,5 %) ; [HEAD] resserre sur la tête, et c'est sa
+     * boîte qui part au classifieur entraîné ([selectLightBox] la préfère).
+     * Un prompt d'objet, pas d'état : la couleur reste lue en local
+     * (`TrainedLightColor` + `PedLightGate`), jamais devinée par SAM.
+     */
+    const val HEAD = "pedestrian signal head"
+
     /** Wordings feu envoyés en mode traversée actif, [LIGHT] d'abord. */
     val LIGHTS: List<String> = listOf(LIGHT, LIGHT_SHORT, LIGHT_SIGNAL)
 
@@ -58,7 +68,7 @@ object CrossingPrompts {
     const val CROSSWALK = "crosswalk"
 
     /** Concepts envoyés à SAM en mode Traversée (anglais, comme les défauts). */
-    val PROMPTS: List<String> = LIGHTS + listOf("car", PERSON, CROSSWALK)
+    val PROMPTS: List<String> = LIGHTS + listOf(HEAD, "car", PERSON, CROSSWALK)
 
     /**
      * Étiquettes (canoniques, voir [KnownSizes.canonical]) qui désignent un
@@ -80,6 +90,21 @@ object CrossingPrompts {
     )
 
     /**
+     * Étiquettes (canoniques) qui désignent la **tête** du feu, le cadrage
+     * serré que la couleur préfère : le concept envoyé ([HEAD] et son
+     * pluriel) plus les alias français du serveur (`server/backend/
+     * concepts.py`, « boîtier… » et « petit… »).
+     */
+    private val HEAD_LABELS = setOf(
+        "pedestrian signal head",
+        "pedestrian signal heads",
+        "boitier feu pieton",
+        "boitiers feu pieton",
+        "petit feu pieton",
+        "petits feux pietons",
+    )
+
+    /**
      * Vrai si [label] (brut, tel que renvoyé par SAM) désigne un feu piéton :
      * phrase connue ([LIGHT_LABELS], dont l'abrégé oral `feu pi`) ou composé
      * piéton + lampe ([isPedestrianLamp]) — « feu piéton rouge » saisi à la
@@ -95,27 +120,62 @@ object CrossingPrompts {
 
     /** Composé piéton + lampe : les deux mots exigés, dans n'importe quel ordre. */
     private fun isPedestrianLamp(words: List<String>): Boolean {
-        val pedestrian = words.any { it == "pieton" || it == "pietons" || it == "pedestrian" || it == "pedestrians" }
-        if (!pedestrian) return false
+        if (!hasPedestrianWord(words)) return false
         return words.any { it == "feu" || it == "feux" || it == "signal" || it == "signaux" || it == "light" || it == "lights" }
     }
 
     /**
-     * Boîte normalisée (`x1,y1,x2,y2` en 0..1) du feu piéton au meilleur
-     * score, `null` si aucun n'est détecté ou si la boîte est invalide. Les
-     * éclats (boîte sous le dixième de la plus grande — un reflet de 384 px
-     * ne bat jamais un caisson, `docs/MESURES-SAM3-FEUX.md` §5a) sont
-     * écartés avant le tri au score. La normalisation suit
+     * Vrai si [label] désigne la tête du feu : un feu ([isLightLabel]) au
+     * cadrage serré — étiquette connue ([HEAD_LABELS]) ou composé
+     * piéton + tête (« tête de feu piéton », « boîte de signal piéton »
+     * saisis à la main). Une tête est toujours un feu : la préférence de
+     * [selectLightBox] ne peut jamais router un non-feu au classifieur.
+     */
+    fun isHeadLabel(label: String): Boolean {
+        if (!isLightLabel(label)) return false
+        val key = KnownSizes.canonical(label)
+        if (HEAD_LABELS.contains(key)) return true
+        val words = key.split(' ')
+        if (!hasPedestrianWord(words)) return false
+        return words.any { it == "head" || it == "heads" || it == "boitier" || it == "boitiers" || it == "boite" || it == "boites" || it == "tete" }
+    }
+
+    /** Mot piéton (FR/EN, canonique) : partagé par lampe et tête. */
+    private fun hasPedestrianWord(words: List<String>): Boolean =
+        words.any { it == "pieton" || it == "pietons" || it == "pedestrian" || it == "pedestrians" }
+
+    /**
+     * Boîte normalisée (`x1,y1,x2,y2` en 0..1) du feu piéton dont la couleur
+     * sera lue, `null` si aucun n'est détecté ou si la boîte est invalide.
+     * Les boîtes **tête** ([isHeadLabel], cadrage serré du 31/10) passent
+     * devant : la lampe y remplit le crop 48 px et le classifieur entraîné
+     * retrouve son domaine (`docs/MESURES-SAM3-FEUX.md` §6). Sans tête, le
+     * caisson ([LIGHT]) prend le relais au meilleur score. Les éclats
+     * (boîte sous le dixième de la plus grande de sa classe — un reflet
+     * de 384 px ne bat jamais un caisson, §5a) sont écartés avant le tri
+     * au score, **par classe** : une petite tête ne se fait jamais écarter
+     * comme un éclat du caisson. La normalisation suit
      * [Detection.normalizedBox] : la boîte se reporte sur le Bitmap décodé
      * côté `:app`, quelle que soit sa taille.
      */
     fun selectLightBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
         if (width <= 0 || height <= 0) return null
         val lights = objects.filter { isLightLabel(it.label) }
-        val areas = lights.map { boxArea(it.box) }
+        if (lights.isEmpty()) return null
+        val (heads, housings) = lights.partition { isHeadLabel(it.label) }
+        return bestBox(heads, width, height) ?: bestBox(housings, width, height)
+    }
+
+    /**
+     * Meilleure boîte d'une classe (tête ou caisson) : éclats écartés sous
+     * le dixième de la plus grande, tri au score, normalisée. `null` sans
+     * candidat valide — l'appelant bascule sur l'autre classe.
+     */
+    private fun bestBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
+        val areas = objects.map { boxArea(it.box) }
         val biggest = areas.maxOrNull() ?: return null
         if (biggest <= 0f) return null
-        return lights.asSequence()
+        return objects.asSequence()
             .filterIndexed { index, _ -> areas[index] >= biggest / SLIVER_RATIO }
             .maxByOrNull { it.score }
             ?.let { Detection(it.label, it.score, it.box, width, height).normalizedBox() }
