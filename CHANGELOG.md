@@ -140,6 +140,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   nouveaux) ; UBS : 0 finding nouveau (6 critiques `currentTimeMillis` sur
   `LiveProbe.kt` hors diff, faux positifs pré-existants ; exit 2 Kotlin
   connu) ; fichiers < 500 lignes (`LiveProbe.kt` 497).
+## 2026-10-31 — iSee : traversée bavarde — tout droit toutes les 300 ms (branche `crossing-tout-droit-300ms`)
+
+- **Ordre user** : en Traversée, la voix ne se tait jamais — une info toutes
+  les 300 ms : évitement (« Droite. » / « Gauche. »), sinon « Tout droit. ».
+- **Fait** : `CrossingPeopleWatch.avoidance` répète son mot toutes les
+  300 ms (`HEARTBEAT_MS`, parole immédiate au changement) et
+  `CrossingPeopleWatch.straight` parle « Tout droit. » en queue de chaîne
+  hors scan (jamais pendant la procédure : user arrêté, attente silencieuse
+  intacte). `docs/TRAVERSEE.md` § 8, `docs/VOIX-DANGER.md` § 25.
+- **Preuve** : `CrossingPeopleTest` (25 tests : repli, battements,
+  attente scan silencieuse), `CrossingVehicleTest` (10),
+  `CrosswalkScanWiringTest` (12) ; suite `:app` 1538/1538,
+  garde tailles OK.
+
 ## 2026-10-31 — iSee : traversée sans annonces de personnes, évitement seul (branche `crossing-sans-personnes`)
 
 - **Ordre user** : en mode Traversée, ne plus décrire les humains

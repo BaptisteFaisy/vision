@@ -107,7 +107,7 @@ class CrosswalkScanWiringTest {
         val language = SpeechLanguage.Fr
 
         val first = crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language, scanTrigger = true)
-        assertNull("scan en confirmation, véhicule en confirmation", first)
+        assertEquals("scan et véhicule en confirmation : le repli tout droit parle", "Tout droit.", first)
         val second = crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language, scanTrigger = true)
         assertEquals("Stop.", second)
         val third = crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(120f))), listOf(carReading(5f, carBox(120f))), 200L, language, scanTrigger = true)
@@ -154,8 +154,8 @@ class CrosswalkScanWiringTest {
         resetWatches()
         val language = SpeechLanguage.Fr
 
-        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
-        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
+        assertEquals("Tout droit.", crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
+        assertNull("même mot, battement pas écoulé", crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
         assertEquals(
             "Stop, voiture en mouvement.",
             crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(120f))), listOf(carReading(5f, carBox(120f))), 200L, language, steering = "Gauche."),
@@ -168,8 +168,8 @@ class CrosswalkScanWiringTest {
         resetWatches()
         val language = SpeechLanguage.Fr
 
-        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
-        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
+        assertEquals("Tout droit.", crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
+        assertNull("même mot, battement pas écoulé", crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
         assertEquals(
             "mouvement proche (5 m ≤ 8 m) : alerte stop en Traversée (contrat § 22)",
             "Stop, voiture en mouvement.",

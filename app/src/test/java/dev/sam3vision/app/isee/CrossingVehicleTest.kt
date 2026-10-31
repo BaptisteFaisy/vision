@@ -98,7 +98,7 @@ class CrossingVehicleTest {
     }
 
     @Test
-    fun `les vehicules priment, puis les personnes se taisent`() {
+    fun `les vehicules priment, puis tout droit`() {
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
         val (detections, readings) = stoppedCar()
@@ -112,9 +112,9 @@ class CrossingVehicleTest {
             "Car stopped, 2 meters away.",
             crossingPhraseOf(null, placed, detections, readings, 200L, SpeechLanguage.En),
         )
-        // 4e frame : l'arrêt est en cooldown, et les personnes ne se
-        // décrivent plus en traversée — seuls les mots d'évitement parlent.
-        assertNull(
+        // 4e frame : l'arrêt est en cooldown, le repli tout droit parle.
+        assertEquals(
+            "Straight.",
             crossingPhraseOf(null, placed, detections, readings, 300L, SpeechLanguage.En),
         )
     }

@@ -7,13 +7,15 @@ import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Voix des personnes en mode Traversée : l'évitement parle en premier
- * (§ 25 — mot nouveau jamais tu par le feu), silence sinon — les
- * personnes ne sont jamais décrites, seulement évitées (ordre user du
- * 31/10).
+ * (§ 25 — mot jamais tu par le feu, répété toutes les 300 ms), « Tout
+ * droit. » sinon (queue de chaîne hors scan) — la voix ne se tait jamais
+ * (ordre user du 31/10) — et les personnes ne sont jamais décrites,
+ * seulement évitées.
  */
 class CrossingPeopleTest {
 
@@ -141,10 +143,11 @@ class CrossingPeopleTest {
     }
 
     @Test
-    fun `silence du feu, les personnes se taisent`() {
+    fun `silence du feu, tout droit parle`() {
         CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
 
-        assertNull(crossingPhraseOf(null, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
+        assertEquals("Tout droit.", crossingPhraseOf(null, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
     }
 
     private fun seg(label: String, box: List<Float>) =
@@ -177,9 +180,10 @@ class CrossingPeopleTest {
     @Test
     fun `evitement parle via crossingPhraseOf`() {
         CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
         val objects = onPathLeft()
 
-        assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Tout droit.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
         assertEquals("Droite.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 
@@ -189,7 +193,7 @@ class CrossingPeopleTest {
         CrosswalkScanWatch.reset()
         val objects = onPathLeft()
 
-        assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Tout droit.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
         assertEquals("Droite.", crossingPhraseOf(red(), emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 
@@ -201,5 +205,93 @@ class CrossingPeopleTest {
         assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
         assertNull(CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000, wordsMuted = true))
         assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 400L, SpeechLanguage.Fr, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `le repli tout droit parle aussitot`() {
+        CrossingPeopleWatch.reset()
+
+        assertEquals("Tout droit.", CrossingPeopleWatch.straight(0L, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `le repli tout droit parle anglais aussi`() {
+        CrossingPeopleWatch.reset()
+
+        assertEquals("Straight.", CrossingPeopleWatch.straight(0L, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `le tout droit se repete toutes les 300 ms`() {
+        CrossingPeopleWatch.reset()
+
+        assertEquals("Tout droit.", CrossingPeopleWatch.straight(0L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.straight(100L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.straight(200L, SpeechLanguage.Fr))
+        assertEquals("Tout droit.", CrossingPeopleWatch.straight(300L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.straight(400L, SpeechLanguage.Fr))
+        assertEquals("Tout droit.", CrossingPeopleWatch.straight(600L, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `l evitement se repete toutes les 300 ms`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.avoidance(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 300L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.avoidance(emptyList(), 500L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 600L, SpeechLanguage.Fr, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `entre deux battements d evitement, le tout droit se tait`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.avoidance(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.straight(300L, SpeechLanguage.Fr))
+        assertEquals("Droite.", CrossingPeopleWatch.avoidance(emptyList(), 500L, SpeechLanguage.Fr, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `le tout droit reprend quand l evitement s efface`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.avoidance(emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.avoidance(emptyList(), 400L, SpeechLanguage.Fr))
+        assertNull(CrossingPeopleWatch.straight(400L, SpeechLanguage.Fr))
+        assertEquals("Tout droit.", CrossingPeopleWatch.straight(500L, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `procedure scan - le repli se tait pendant l attente silencieuse`() {
+        CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
+        val fr = SpeechLanguage.Fr
+        fun scan(at: Long) = CrosswalkScanWatch.update(at, trigger = true, movingNow = true, feu = false, fr)
+
+        // Confirmation + Stop.
+        assertNull(scan(0L))
+        assertEquals("Stop.", scan(100L))
+        // Côté gauche : consigne, timeout, observation mouvement, constat danger.
+        assertEquals("Regardez à gauche.", scan(900L))
+        assertEquals("Regardez à gauche.", scan(6900L))
+        assertEquals("Regardez à gauche.", scan(8000L))
+        assertEquals("Attention, voiture à gauche.", scan(9400L))
+        // Côté droit pareil.
+        assertEquals("Regardez à droite.", scan(11400L))
+        assertEquals("Regardez à droite.", scan(17400L))
+        assertEquals("Regardez à droite.", scan(18500L))
+        assertEquals("Attention, voiture à droite.", scan(19900L))
+        // Fin de cycle danger → attente silencieuse : le repli se tait.
+        assertNull(scan(21900L))
+        assertTrue(scanRunning())
+        assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 22000L, fr, scanTrigger = true))
+        CrosswalkScanWatch.reset()
     }
 }
