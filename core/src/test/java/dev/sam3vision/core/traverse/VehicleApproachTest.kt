@@ -105,9 +105,49 @@ class VehicleApproachTest {
         assertFalse(approach.update(listOf(car(200f)), atMs = 100L).approaching)
     }
 
+    @Test
+    fun `croissance lente sous le seuil - pas de veto`() {
+        // V1 (signal fond absent) : sans fond, seule une croissance franche parle.
+        val approach = VehicleApproach()
+        approach.update(listOf(car(100f)), atMs = 0L)
+        approach.update(listOf(car(100.25f)), atMs = 100L)
+        val third = approach.update(listOf(car(100.5f)), atMs = 200L)
+
+        assertFalse("2,5 px/s lissés sous 3,2 px/s : bruit", third.approaching)
+        assertNull(third.ttcSeconds)
+        assertEquals("piste suivie mais muette", 1, approach.trackCount)
+    }
+
+    @Test
+    fun `glissade laterale sans croissance - pas de veto approche`() {
+        // V1 (signal fond absent) : la boîte qui glisse à largeur constante
+        // n'est pas une approche — sur fond immobile, ce sera une caméra.
+        val approach = VehicleApproach()
+        approach.update(listOf(carAt(100f, 300f)), atMs = 0L)
+        approach.update(listOf(carAt(100f, 320f)), atMs = 100L)
+        val third = approach.update(listOf(carAt(100f, 340f)), atMs = 200L)
+
+        assertFalse("latéral franc mais largeur stable", third.approaching)
+        assertNull(third.ttcSeconds)
+        assertNull(third.label)
+        assertEquals(1, approach.trackCount)
+    }
+
     /** Voiture centrée de [widthPx] de large (ratio voiture 5:3). */
     private fun car(widthPx: Float): Detection =
         Detection("car", 0.9f, box(widthPx), width = 640, height = 480)
+
+    /** Voiture de [widthPx] de large centrée en [cx] (glissade à largeur constante). */
+    private fun carAt(widthPx: Float, cx: Float): Detection {
+        val heightPx = widthPx * 0.6f
+        return Detection(
+            "car",
+            0.9f,
+            listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f),
+            width = 640,
+            height = 480,
+        )
+    }
 
     /** Bus statique à droite, loin de la voiture (IoU nulle entre les deux). */
     private fun busStatic(): Detection =
