@@ -440,3 +440,20 @@ bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
 - **transition feu→sans-feu** : le guetteur reste nourri sous quiet (seule
   la phrase est tue) — le verdict « Attendez. » ne rate aucun danger, même
   à plus de 15 m, dès la perte du feu.
+
+## 15. Sans feu : une garée ne bloque jamais, même caméra en mouvement (31/10)
+
+Ordre user : seule une voiture **en mouvement** dit « Attendez. » — une
+voiture garée (immobile) ne bloque jamais le « Traversez. », même proche,
+même si l'user bouge/panote la caméra.
+
+- **danger = mouvement brut seul** : le veto proximité (< 15 m) ne tait
+  plus le verdict sans feu (champ `veto` du patch supprimé) — une garée
+  proche se dit (« Voiture à l'arrêt… », info douce) sans bloquer ;
+- **pan compensé** : le signal fond (`ProbeBackgroundMotion`, déjà utilisé
+  en mode normal) juge les pistes sans feu seul — une boîte qui suit la
+  caméra conclut `CAMERA_MOVED`, pas le mouvement ; avec feu : inchangé
+  (`null`, aucun comportement modifié) ;
+- **limites** : une trottinette/un vélo reste muet en traversée (politique
+  cycles) ; avance franche vers une garée (zoom) : décote via
+  `EgoCompensator`, à valider rue.
