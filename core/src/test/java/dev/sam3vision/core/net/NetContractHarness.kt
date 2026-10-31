@@ -133,6 +133,7 @@ internal class ContractWsTransport(
 ) : WsTransport {
 
     val sent = mutableListOf<String>()
+    val sentBytes = mutableListOf<ByteArray>()
     val received = mutableListOf<String>()
     var openedUrl: String? = null
     var openedHeaders: Map<String, String> = emptyMap()
@@ -169,6 +170,12 @@ internal class ContractWsTransport(
         if (!sendResult) return false
         reply(JSONObject(text)).forEach { message -> deliver(message) }
         return true
+    }
+
+    /** Trame binaire : enregistrée, jamais rejouée (le serveur n'y répond pas en sync). */
+    override fun sendBytes(bytes: ByteArray): Boolean {
+        sentBytes += bytes
+        return sendResult
     }
 
     /** Message serveur injecté hors d'un envoi (trame tardive, réponse asynchrone). */

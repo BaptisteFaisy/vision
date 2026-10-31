@@ -5,6 +5,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 
 /**
  * Transport texte minimal du direct : une abstraction, deux implémentations —
@@ -29,9 +31,20 @@ interface WsTransport {
     /** Envoie un message texte ; `false` = socket fermé ou envoi refusé. */
     fun send(text: String): Boolean
 
+    /** Envoie une trame binaire (PCM brut Muse) ; `false` = socket fermé ou envoi refusé. */
+    fun sendBytes(bytes: ByteArray): Boolean
+
     /** Ferme la connexion (idempotent). */
     fun close()
 }
+
+/**
+ * Fermeture anormale du socket (code ≠ 1000) : le transport la distingue
+ * d'une fermeture propre (`onClosed(null)`) pour que l'appelant type
+ * (repli limité, quota…) au lieu de voir un « fermé » générique.
+ */
+class WsClosedAbnormally(val code: Int, reason: String) :
+    java.io.IOException("WebSocket fermé ($code)${if (reason.isBlank()) "" else " : $reason"}")
 
 /** Chemin du WebSocket du direct, à côté de `POST /live`. */
 internal const val LIVE_WS_PATH = "/live/ws"
@@ -86,6 +99,9 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
 
     override fun send(text: String): Boolean = socket?.send(text) ?: false
 
+    override fun sendBytes(bytes: ByteArray): Boolean =
+        socket?.send(bytes.toByteString()) ?: false
+
     override fun close() {
         socket?.close(NORMAL_CLOSE, "fin du direct")
         socket = null
@@ -103,9 +119,17 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
 
         override fun onMessage(webSocket: WebSocket, text: String) = onText(text)
 
+        /** Trame binaire descendante : ignorée (recette Muse : jamais du texte). */
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) = Unit
+
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = onClosed(t)
 
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = onClosed(null)
+        /**
+         * Fermeture propre (1000, fin de session normale) : `null`, comme
+         * avant. Anormale (1008/1011/1013…) : typée pour l'appelant.
+         */
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) =
+            onClosed(if (code == NORMAL_CLOSE) null else WsClosedAbnormally(code, reason))
     }
 
     private companion object {
