@@ -112,11 +112,6 @@ data class LiveProbeState(
     val warming: Boolean = false,
     val error: String? = null,
     /**
-     * Alerte danger du pipeline urgence (« ⚠ Personne droit devant — contact
-     * dans ~3 s »), `null` quand personne ne vient. La voix la lira plus tard.
-     */
-    val dangerAlert: String? = null,
-    /**
      * Chiffres mouvement V1 (fond contre boîte) de la dernière frame (`null` = pas
      * d'estimation publiée) : verdict, score de changement du fond et écart
      * global-boîte, lus par le panneau debug ([liveProbeMotionLine]).

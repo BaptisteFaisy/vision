@@ -3,10 +3,6 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.app.TRANSPORT_WS_KO
-import dev.sam3vision.core.danger.DANGER_SMOOTHER_OFFSET
-import dev.sam3vision.core.danger.DangerSnapshot
-import dev.sam3vision.core.danger.dangerPlacedLabels
-import dev.sam3vision.core.danger.toDetection
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameLabels
@@ -46,20 +42,6 @@ internal fun detectionsAndReadingsOf(
         .map { it.copy(score = 1f) }
     if (detections.isEmpty()) return detections to emptyList()
     return detections to distances.measure(frame.width, frame.height, detections)
-}
-
-/**
- * Labels danger (YOLO) pour la voix : pistes mesurées au sténopé (personne
- * 1,70 m) et lissées par id décalé. Vide sans piste, sans dimensions, ou
- * distances coupées — la voix existante parle alors comme avant.
- */
-internal fun dangerPlaced(distances: DistanceMeter, snapshot: DangerSnapshot): List<PlacedLabel> {
-    if (snapshot.tracks.isEmpty() || snapshot.width <= 0 || snapshot.height <= 0) return emptyList()
-    val detections = snapshot.tracks.map { it.toDetection(snapshot.width, snapshot.height) }
-    val ids = snapshot.tracks.map { it.id + DANGER_SMOOTHER_OFFSET }
-    val readings = distances.measure(snapshot.width, snapshot.height, detections, ids)
-    if (readings.isEmpty()) return emptyList()
-    return dangerPlacedLabels(snapshot.tracks, readings)
 }
 
 /** Couche des pastilles ; `null` quand aucune distance n'est exploitable. */

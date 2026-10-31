@@ -82,8 +82,7 @@ internal suspend fun LiveProbe.publishPixels(
 internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long): ProbeRest {
     val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame)
     val readings = meters.readingsFor(frame, pinhole)
-    val placed = placedLabels(frame, readings) +
-        dangerPlaced(distances, meters.dangerSnapshot())
+    val placed = placedLabels(frame, readings)
     val cross = crossingPatchOf(
         crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
         onCrop = cropLogger?.tap(), noLightGate = noLightGate,
