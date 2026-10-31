@@ -23,16 +23,20 @@ class ProbeEnsureConceptTest {
     }
 
     @Test
-    fun `defauts exterieur au plafond, find the x refuse sans reconfigurer`() = runTest {
+    fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
         // Liste unique normal/Traversée (30/10) : 17 concepts, au plafond —
-        // « Find the X » dehors est refusé comme tout 18e concept, sans coupure.
+        // « Find the X » dehors fait sortir le 17e (« socks ») puis reconfigure
+        // (« keys » est déjà dans les défauts depuis le 31/10, démontré avec
+        // « wallet ») : sans ça iSee dit « Looking for … » puis reste muet.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
-        probe.ensureConcept(Settings.Default, "keys")
+        probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
-        assertEquals(closed, fake.closed)
-        assertEquals(17, probe.state.value.conceptsSent.size)
-        assertFalse(probe.state.value.conceptsSent.contains("keys"))
+        assertTrue(fake.closed > closed)
+        val sent = probe.state.value.conceptsSent
+        assertEquals(17, sent.size)
+        assertTrue(sent.contains("wallet"))
+        assertFalse(sent.contains("socks"))
     }
 
     @Test
@@ -40,6 +44,8 @@ class ProbeEnsureConceptTest {
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "Person")
+        // « keys » est dans les défauts (31/10) : déjà suivi, pas de reconfiguration.
+        probe.ensureConcept(Settings.Default, "keys")
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
         assertEquals(LivePrompts.normalize(LivePrompts.default), probe.state.value.conceptsSent)
@@ -50,22 +56,27 @@ class ProbeEnsureConceptTest {
         val (probe, fake) = probeHarness(this)
         probe.configure(PROBE_TEST_ENDPOINT, crossingActive = true)
         val closed = fake.closed
-        probe.ensureConcept(Settings.Default, "keys")
+        probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
-        assertFalse(probe.state.value.conceptsSent.contains("keys"))
+        assertFalse(probe.state.value.conceptsSent.contains("wallet"))
     }
 
     @Test
-    fun `plafond ou label trop long, pas de reconfiguration`() = runTest {
+    fun `plafond, find the x remplace le dernier, trop long refuse`() = runTest {
         val (probe, fake) = probeHarness(this)
         val seventeen = (1..17).map { "concept$it" }
         probe.configure(PROBE_TEST_ENDPOINT, prompts = seventeen)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "keys")
+        advanceUntilIdle()
+        assertTrue(fake.closed > closed)
+        val expected = seventeen.dropLast(1) + "keys"
+        assertEquals(expected, probe.state.value.conceptsSent)
+        val closedAfterKeys = fake.closed
         probe.ensureConcept(Settings.Default, "x".repeat(33))
         advanceUntilIdle()
-        assertEquals(closed, fake.closed)
-        assertEquals(seventeen, probe.state.value.conceptsSent)
+        assertEquals(closedAfterKeys, fake.closed)
+        assertEquals(expected, probe.state.value.conceptsSent)
     }
 }

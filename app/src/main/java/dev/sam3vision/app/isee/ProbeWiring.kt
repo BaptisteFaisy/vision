@@ -121,9 +121,10 @@ fun LiveProbe.clearRouteCap() {
  * Ordre « Find the X » : [label] rejoint les concepts SAM de la sonde quand
  * il n'y est pas déjà (comparaison insensible à la casse) — la session
  * repart comme à tout changement de prompts. En mode Traversée on ne
- * reconfigure pas (sécurité : pas de coupure en pleine traversée) ; un 17e
- * concept ou un label de plus de 32 caractères est refusé par
- * [LivePrompts.normalize], sans reconfiguration. Pur hors sonde, testé en JVM.
+ * reconfigure pas (sécurité : pas de coupure en pleine traversée) ; au
+ * plafond, le dernier concept cède son slot à l'ordre explicite
+ * ([LivePrompts.withConcept]), seul un label vide ou de plus de 32
+ * caractères est refusé, sans reconfiguration. Pur hors sonde, testé en JVM.
  */
 internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
     if (state.value.crossingActive) return
@@ -131,9 +132,11 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
     if (clean.isEmpty()) return
     val current = state.value.conceptsSent
     if (current.any { it.trim().equals(clean, ignoreCase = true) }) return
-    val next = LivePrompts.normalize(current + clean)
+    val next = LivePrompts.withConcept(current, clean)
     if (next == current) return
-    android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM (${next.size} suivis)")
+    val evicted = if (current.size >= LivePrompts.MAX) current.lastOrNull() else null
+    val detail = if (evicted == null) "${next.size} suivis" else "${next.size} suivis, « $evicted » sorti"
+    android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM ($detail)")
     configureFrom(settings, next, false)
 }
 

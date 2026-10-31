@@ -116,7 +116,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   `docs/ISEE-DESIGN-PORTRAIT.md`).
 - **Live** — **17 tracked concepts** by default (`person`, `car`, `bus`, `bicycle`,
   `pedestrian traffic light`, `pedestrian signal head`, `curb`, `sidewalk`,
-  `crosswalk`, `pole`, `stairs`, `barrier`, `fence`, `gate`, `souvenir shop`,
+  `crosswalk`, `pole`, `stairs`, `keys`, `fence`, `gate`, `souvenir shop`,
   `beanie`, `socks`), **17 at most**
   (`LivePrompts.MAX`), one frame in flight (WebSocket `/live/ws`, or tracker sessions
   when the *Tracker* chip is on), pills, distances, and voice announcements

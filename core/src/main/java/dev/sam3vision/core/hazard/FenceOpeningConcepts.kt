@@ -6,10 +6,10 @@ import dev.sam3vision.core.distance.KnownSizes
  * Concepts grillage : ce que SAM doit suivre pour dire si la clôture qui
  * barre le chemin est fermée ou ouverte ([FenceOpeningSignal]).
  *
- * `fence`, `barrier` et `gate` sont déjà suivis en preset extérieur
- * ([dev.sam3vision.core.live.LivePrompts.outdoor], `barrier` aussi dans les
- * défauts) : aucun prompt à ajouter, [PROMPTS] ne sert qu'au branchement. Le
- * français reste reconnu : un label « grillage » compte comme « fence ».
+ * `fence` et `gate` sont déjà suivis en preset extérieur et dans les défauts,
+ * `barrier` en preset extérieur seul (31/10 : plus dans les défauts, slot à
+ * « keys », ordre user) : aucun prompt à ajouter, [PROMPTS] ne sert qu'au
+ * branchement. Le français reste reconnu : « grillage » compte comme « fence ».
  *
  * Distances : le sténopé ([KnownSizes], barrière 1,00 m, clôture 1,50 m,
  * portail 1,75 m) mesure ces trois concepts — un grillage sans mesure reste
