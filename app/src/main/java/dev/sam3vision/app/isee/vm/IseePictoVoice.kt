@@ -4,20 +4,25 @@ import dev.sam3vision.app.HomePresetRequest
 import dev.sam3vision.app.LiveVoiceRequest
 import dev.sam3vision.app.RouteRequest
 import dev.sam3vision.core.live.HomeModes
+import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.live.PositionText
+import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.picto.PictoVoiceOrder
 import dev.sam3vision.core.picto.PictoVoiceText
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Ordres vocaux picto et chasse maison sur iSee : recherche et chasse restent
- * sur place, création, démo et mot maison seul partent au direct.
+ * Ordres vocaux picto et chasse maison sur iSee : recherche, chasse et
+ * création restent sur place, démo et mot maison seul partent au direct.
  * « Find the X » et « Where are my keys » sans repère armé restent sur place
  * ([onFind] : X rejoint les masques SAM et son pictogramme se crée) ; armé,
- * le repère est chassé sur place (l'overlay le montre, la voix confirme),
- * jamais régénéré. Création (« fais un pictogramme de X »), démo et mot
- * maison seul (chasse SAM) partent en [LiveVoiceRequest]. Tout est confirmé
- * (recherche, chasse, création, démo) ; le reste passe aux ordres suivants
- * (cap, navigation, LLM).
+ * le repère est chassé sur place (l'overlay le montre, la voix dit où il est),
+ * jamais régénéré. Création (« fais un pictogramme de X », « create a picto
+ * for X ») : [onCreate] photographie et arme sur place, sans relecture —
+ * seul le sans-nom (« de ça ») part au direct. Démo et mot maison seul
+ * (chasse SAM) partent en [LiveVoiceRequest]. Tout est confirmé (recherche,
+ * chasse, création, démo) ; le reste passe aux ordres suivants (cap,
+ * navigation, LLM).
  *
  * [openLive] ouvre le direct avec la requête et les prompts (`null` =
  * essentiels) ; injecté pour les tests, le défaut parle aux vrais singletons.
@@ -33,6 +38,8 @@ class IseePictoVoice(
         RouteRequest.push("live")
     },
     private val onFind: (String) -> Unit = {},
+    private val onCreate: (String) -> Unit = {},
+    private val hits: () -> List<PictoHit> = { emptyList() },
 ) {
 
     /**
@@ -47,7 +54,11 @@ class IseePictoVoice(
             return true
         }
         PictoVoiceOrder.parse(text)?.let { label ->
-            openLive(LiveVoiceRequest.Request(pictoCreate = label), null)
+            if (label.isBlank()) {
+                openLive(LiveVoiceRequest.Request(pictoCreate = label), null)
+            } else {
+                onCreate(label)
+            }
             confirm(PictoVoiceText.started(settings().speechLanguage))
             return true
         }
@@ -71,11 +82,18 @@ class IseePictoVoice(
 
     /**
      * Chasse d'un repère armé, sur place : l'overlay montre déjà le repère,
-     * la voix le confirme — le direct n'est plus ouvert (31/10 : tout se
-     * passe sur la page blanche).
+     * la voix dit où il est quand il est visible (« Les clés sont devant
+     * toi, à 9 heures »), sinon elle confirme sans position (« Je cherche
+     * X ») — le direct n'est plus ouvert (tout se passe sur la page blanche).
      */
     private suspend fun hunt(word: String): Boolean {
-        confirm(PictoVoiceText.findStarted(word, settings().speechLanguage))
+        val target = hits().firstOrNull { PictoVoiceOrder.matches(word, it.label) }
+        if (target == null) {
+            confirm(PictoVoiceText.findStarted(word, settings().speechLanguage))
+            return true
+        }
+        val placed = PlacedLabel(target.label, target.x + target.w / 2f, x0 = target.x, x1 = target.x + target.w)
+        confirm(PositionText.spotlight(placed, settings().speechLanguage))
         return true
     }
 
