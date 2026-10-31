@@ -297,6 +297,10 @@ jobs:
             gh api "repos/$REPO/pulls/$1/commits?per_page=100" \
               --jq '[.[] | select((.parents | length) > 1)] | length' 2>/dev/null || echo 0
           }
+          commits_non_attribues() { # nb de commits dont l'auteur n'est rattaché à aucun compte
+            gh api "repos/$REPO/pulls/$1/commits?per_page=100" \
+              --jq '[.[] | select(.author == null)] | length' 2>/dev/null || echo 0
+          }
           etapes_cassees() { # $1=run id → étapes en échec (vide = job perdu)
             gh run view "$1" --json jobs --jq '
               [.jobs[] | select(.conclusion=="failure")
@@ -483,6 +487,29 @@ jobs:
                 esac
               fi
           }
+          # Réattribution : un commit dont l'auteur n'est rattaché à aucun compte
+          # GitHub (« *@local » des agents : freebuff-exec, muse-integration…)
+          # déclenche `require_extra_approval_for_unattributed_changes` du
+          # ruleset — une approbation supplémentaire que personne ne peut
+          # donner quand le propriétaire du dépôt est lui-même l'auteur de la
+          # PR. Résultat : tous les checks verts, PR `BLOCKED` pour toujours
+          # (vécu le 31/10 sur #576 et #525). On réécrit l'auteur sur l'identité
+          # noreply de l'auteur de la PR : le commit reste le sien, il devient
+          # attribuable.
+          reattribuer() { # 0 = réattribué et poussé, 1 = échec
+            local login id noreply
+            login=$(gh pr view "$PR" --json author --jq .author.login 2>/dev/null || echo "")
+            id=$(gh api "users/$login" --jq .id 2>/dev/null || echo "")
+            [ -n "$login" ] && [ -n "$id" ] || return 1
+            noreply="$id+$login@users.noreply.github.com"
+            git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null || return 1
+            git checkout -q "pr-$PR" 2>/dev/null || return 1
+            FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --env-filter "
+              case \"\$GIT_AUTHOR_EMAIL\" in
+                *@local) export GIT_AUTHOR_NAME=\"$login\"; export GIT_AUTHOR_EMAIL=\"$noreply\" ;;
+              esac" origin/master..HEAD >/dev/null 2>&1 || return 1
+            git push -q --force-with-lease="$BRANCH:$SHA" "$AUTH_URL" "HEAD:$BRANCH" 2>&1 || return 1
+          }
           # ── file de merge (Mergify) ──────────────────────────────────────
           # Quand une file est active, le balayeur ne merge plus et ne rebase
           # plus : c'est la file qui met en file, qui met à jour la PR contre
@@ -517,6 +544,25 @@ jobs:
                   fi
                   echo "PR #$PR : $FUSIONS commit(s) de fusion — linéarisation avant la file"
                   rebaser
+                  exit 0
+                fi
+                # Attribution ensuite : un commit d'auteur non rattaché rend la
+                # PR définitivement `BLOCKED` malgré des checks verts (règle
+                # `require_extra_approval_for_unattributed_changes`). On
+                # réattribue une fois par tête, puis la CI rejoue.
+                NON_ATTRIBUES="$(commits_non_attribues "$PR")"
+                case "$NON_ATTRIBUES" in ''|*[!0-9]*) NON_ATTRIBUES=0 ;; esac
+                if [ "$DRAFT" != "true" ] && [ "$NON_ATTRIBUES" -gt 0 ] \
+                  && [ "$(marques "$PR" "<!-- automerge-attribution sha=$SHA -->")" -eq 0 ]; then
+                  if preparer_clone && reattribuer; then
+                    printf -v corps '%s\n' \
+                      "<!-- automerge-attribution sha=$SHA -->" \
+                      "$NON_ATTRIBUES commit(s) dont l'auteur n'était rattaché à aucun compte GitHub : réattribués à l'auteur de la PR (\`$SHA\`), CI relancée. Sans ça la règle \`require_extra_approval_for_unattributed_changes\` laissait la PR \`BLOCKED\` avec tous ses checks verts."
+                    gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                    echo "PR #$PR : $NON_ATTRIBUES commit(s) réattribués, CI relancée"
+                  else
+                    echo "PR #$PR : $NON_ATTRIBUES commit(s) non attribués, réattribution impossible"
+                  fi
                   exit 0
                 fi
                 if [ "$DRAFT" != "true" ] && green "$PR" && ! deja_balayee; then
