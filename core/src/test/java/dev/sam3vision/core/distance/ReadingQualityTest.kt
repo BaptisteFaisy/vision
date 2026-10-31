@@ -51,21 +51,69 @@ class ReadingQualityTest {
     }
 
     @Test
+    fun `masqueur moins bien score, la boite est gardee par prudence`() {
+        val detections = listOf(
+            detection("voiture", 0.60f, listOf(50f, 50f, 450f, 350f)),
+            detection("personne", 0.90f, listOf(100f, 100f, 200f, 300f)),
+        )
+        assertFalse(Occlusion.isOccluded(detections, 1))
+    }
+
+    @Test
+    fun `scores non finis, on mesure plutot qu'ecarter`() {
+        val nanScore = listOf(
+            detection("voiture", 0.95f, listOf(50f, 50f, 450f, 350f)),
+            detection("personne", Float.NaN, listOf(100f, 100f, 200f, 300f)),
+        )
+        assertFalse(Occlusion.isOccluded(nanScore, 1))
+        val nanRival = listOf(
+            detection("voiture", Float.NaN, listOf(50f, 50f, 450f, 350f)),
+            detection("personne", 0.60f, listOf(100f, 100f, 200f, 300f)),
+        )
+        assertFalse(Occlusion.isOccluded(nanRival, 1))
+    }
+
+    @Test
+    fun `seuil de contenance exact et candidat malforme`() {
+        // 60 % pile : écartée (>=) ; candidat malformé : ignoré
+        val exact = listOf(
+            detection("voiture", 0.95f, listOf(0f, 0f, 60f, 100f)),
+            detection("personne", 0.60f, listOf(0f, 0f, 100f, 100f)),
+        )
+        assertTrue(Occlusion.isOccluded(exact, 1))
+        val brokenRival = listOf(
+            detection("voiture", 0.95f, listOf(1f, 2f)),
+            detection("personne", 0.60f, listOf(100f, 100f, 200f, 300f)),
+        )
+        assertFalse(Occlusion.isOccluded(brokenRival, 1))
+    }
+
+    @Test
     fun `confiance d'un pixel sur la hauteur de boite`() {
-        assertEquals(0.995f, ReadingConfidence.of(listOf(0f, 0f, 10f, 200f), 384, 3.3f, null), 0.001f)
-        assertEquals(0.9f, ReadingConfidence.of(listOf(0f, 0f, 10f, 10f), 384, 33f, null), 0.001f)
-        assertEquals(0f, ReadingConfidence.of(listOf(1f, 2f), 384, 3f, null), 0f)
-        assertEquals(0f, ReadingConfidence.of(listOf(0f, 0f, 10f, 200f), 0, 3f, null), 0f)
+        assertEquals(0.995f, ReadingConfidence.of(listOf(0f, 0f, 10f, 200f), 3.3f, null), 0.001f)
+        assertEquals(0.9f, ReadingConfidence.of(listOf(0f, 0f, 10f, 10f), 33f, null), 0.001f)
+        assertEquals(0f, ReadingConfidence.of(listOf(1f, 2f), 3f, null), 0f)
+        assertEquals(0f, ReadingConfidence.of(listOf(0f, 200f, 10f, 100f), 3f, null), 0f)
     }
 
     @Test
     fun `accord des branches multiplie la confiance`() {
         val box = listOf(0f, 0f, 10f, 200f)
-        val agreed = ReadingConfidence.of(box, 384, 3.0f, 3.0f)
-        val coherent = ReadingConfidence.of(box, 384, 3.0f, 3.3f)
-        val split = ReadingConfidence.of(box, 384, 3.0f, 6.0f)
+        val agreed = ReadingConfidence.of(box, 3.0f, 3.0f)
+        val coherent = ReadingConfidence.of(box, 3.0f, 3.3f)
+        val split = ReadingConfidence.of(box, 3.0f, 6.0f)
         assertEquals(0.995f, agreed, 0.001f)
         assertTrue(coherent in 0f..agreed)
         assertEquals(0f, split, 0.001f)
+    }
+
+    @Test
+    fun `poids sol plein de pres, plancher vers l'horizon`() {
+        assertEquals(1f, GroundWeight.of(0.42f), 0.001f)
+        assertEquals(1f, GroundWeight.of(0.2f), 0.001f)
+        assertEquals(0.5f, GroundWeight.of(0.1f), 0.001f)
+        assertEquals(0.25f, GroundWeight.of(0.02f), 0.001f)
+        assertEquals(GroundWeight.MIN_WEIGHT, GroundWeight.of(0f), 0f)
+        assertEquals(GroundWeight.MIN_WEIGHT, GroundWeight.of(Float.NaN), 0f)
     }
 }

@@ -20,7 +20,11 @@ class DistanceBenchmarkTest {
         const val CAM_HEIGHT = 1.5f
     }
 
-    /** Boîte de [heightPx] plein cadre vertical, loin des bords coupés. */
+    /**
+     * Boîte de [heightPx] pour la formule pure : elle peut dépasser du cadre (2720 px
+     * à 0,5 m), `Pinhole` ne vérifie pas les bords — c'est `isVerticallyCut`, en amont
+     * dans `DistanceMeter`, qui écarte les boîtes coupées.
+     */
     private fun box(heightPx: Float): List<Float> = listOf(100f, 100f, 200f, 100f + heightPx)
 
     @Test

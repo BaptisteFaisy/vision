@@ -8,6 +8,11 @@ import dev.sam3vision.core.model.Detection
  * **contenue** dans celle d'une détection **mieux scorée** : la personne derrière
  * la voiture, pas les deux portières côte à côte (recouvrement partiel, gardé).
  * À scores égaux, rien n'est écarté : le tri est indécidable, on mesure les deux.
+ *
+ * Choix conservateur assumé : un masqueur **moins bien scoré** n'écarte rien (on
+ * préfère une pastille de trop qu'une pastille manquante), au prix d'une boîte
+ * tronquée mesurée trop loin dans ce cas. La fragmentation du masque (phase 2)
+ * traitera ces restes.
  */
 object Occlusion {
 
@@ -16,7 +21,8 @@ object Occlusion {
 
     /**
      * Vrai si la détection [index] est masquée par une autre de [detections].
-     * `false` si l'index est hors liste ou la boîte malformée.
+     * `false` si l'index est hors liste, la boîte malformée, ou un score non fini
+     * (on mesure plutôt que d'écarter sur un tri indécidable).
      */
     fun isOccluded(detections: List<Detection>, index: Int): Boolean {
         val box = detections.getOrNull(index)?.box ?: return false
@@ -24,8 +30,11 @@ object Occlusion {
         val area = area(box)
         if (area <= 0f) return false
         val score = detections[index].score
+        if (!score.isFinite()) return false
         for (other in detections.indices) {
-            if (other == index || detections[other].score <= score) continue
+            if (other == index) continue
+            val rival = detections[other].score
+            if (!rival.isFinite() || rival <= score) continue
             val candidate = detections[other].box
             if (candidate.size < 4) continue
             if (intersectionArea(box, candidate) / area >= CONTAINMENT_RATIO) return true
@@ -65,18 +74,16 @@ object ReadingConfidence {
     const val DISAGREEMENT_RATIO = 2f
 
     /**
-     * Confiance de la mesure portée par [box] ([imageHeight] : hauteur de
-     * l'image analysée), avec l'accord optionnel des deux branches ([standingMeters],
-     * [groundMeters], `null` quand une branche est muette). `0f` si la boîte est
-     * inexploitable.
+     * Confiance de la mesure portée par [box], avec l'accord optionnel des deux
+     * branches ([standingMeters], [groundMeters], `null` quand une branche est
+     * muette). `0f` si la boîte est inexploitable.
      */
     fun of(
         box: List<Float>,
-        imageHeight: Int,
         standingMeters: Float?,
         groundMeters: Float?,
     ): Float {
-        if (box.size < 4 || imageHeight <= 0) return 0f
+        if (box.size < 4) return 0f
         val heightPx = box[3] - box[1]
         if (heightPx <= 0f) return 0f
         var confidence = (1f - 1f / heightPx).coerceIn(0f, 1f)
@@ -85,5 +92,29 @@ object ReadingConfidence {
             confidence *= (DISAGREEMENT_RATIO - ratio.coerceIn(1f, DISAGREEMENT_RATIO))
         }
         return confidence.coerceIn(0f, 1f)
+    }
+}
+
+/**
+ * Poids de la branche sol dans [DistanceFusion], depuis la **dépression** de la
+ * ligne des pieds sous l'horizon : `d = h / tan(θ)` — à θ petit (objet loin, près
+ * de l'horizon), un pixel d'erreur sur les pieds vaut des mètres, la branche sol
+ * doit peser peu ; à θ franc (objet proche), la ligne des pieds est précise.
+ * `θ / 0,2`, borné à [0,25, 1] : plein poids dès 0,2 rad (~11°), quart de poids
+ * vers l'horizon. Le sténopé garde son poids [KnownSizes.fusionWeight] (0,77-0,97) :
+ * de près le sol tire (justifié), de loin le sténopé reprend la main.
+ */
+object GroundWeight {
+
+    /** Dépression (rad) au-delà de laquelle le sol pèse plein pot. */
+    const val REFERENCE_RAD = 0.2f
+
+    /** Poids plancher vers l'horizon : le sol ne tombe jamais à zéro. */
+    const val MIN_WEIGHT = 0.25f
+
+    /** Poids du sol pour une dépression [depressionRad], [MIN_WEIGHT] si incalculable. */
+    fun of(depressionRad: Float): Float {
+        if (!depressionRad.isFinite() || depressionRad <= 0f) return MIN_WEIGHT
+        return (depressionRad / REFERENCE_RAD).coerceIn(MIN_WEIGHT, 1f)
     }
 }

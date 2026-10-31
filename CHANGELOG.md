@@ -16,9 +16,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   banc `DistanceBenchmarkTest` (aller-retour au cm, enveloppe ±1 px :
   ±0,5 % à 2 m, ±1 % à 5 m, ±2 % à 10 m, ±4 % à 20 m).
 - Preuves : `:core` tests distance — `LensSpecTest` 12, `OpticsTest` 27,
-  `KnownSizesTest` 16, `DistanceMeterTest` 15, `DistanceFusionTest` 13,
-  `ReadingQualityTest` 6 (nouveau), `DistanceBenchmarkTest` 5 (nouveau),
+  `KnownSizesTest` 16, `DistanceMeterTest` 15, `DistanceFusionTest` 14,
+  `ReadingQualityTest` 10 (nouveau), `DistanceBenchmarkTest` 5 (nouveau),
   `GroundPlaneTest` 17 ; garde `check-kotlin-limits.py` verte.
+- Revue adversariale (6 corrigés, 1 reporté) : calibration lue contre la zone
+  avant correction, poids sol selon la dépression, garde NaN, commentaires et
+  comptages redressés ; confiance de la voie profondeur propagée à l'intégration
+  affine (même fichier, pas de conflit).
 - Reste (pistes `docs/DISTANCES.md`) : pose IMU temps réel, hauteur/pieds du
   masque, profondeur affine, Kalman par piste.
 ## 2026-10-31 — iSee : chemin optimal parmi les humains, passage à 50 cm (branche `isee-chemin-humains`)
