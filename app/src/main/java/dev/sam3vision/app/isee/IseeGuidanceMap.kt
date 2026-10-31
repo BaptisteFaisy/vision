@@ -50,7 +50,12 @@ internal fun IseeGuidanceBlock(
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OffRouteBanner(state.update.offRoute, Modifier.fillMaxWidth())
-        GuidanceMapCard(snapshot, state.update, Modifier.fillMaxWidth().height(150.dp))
+        GuidanceMapCard(
+            snapshot,
+            state.update,
+            Modifier.fillMaxWidth().height(150.dp),
+            showAttribution = false,
+        )
         GuidanceInstruction(state)
         StopGuidanceButton(onStop, zones, Modifier.fillMaxWidth())
     }

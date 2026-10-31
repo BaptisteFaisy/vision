@@ -41,8 +41,10 @@ pour une carte de 170 dp — disproportionné.
 
 Données © les contributeurs OpenStreetMap (**ODbL**, attribution
 obligatoire), fond : OpenStreetMap France (CC BY-SA). Mentions dans le
-style (`attribution`) et en surimpression permanente bas-gauche
-(« © OpenStreetMap contributors »).
+style (`attribution`) et en surimpression bas-gauche
+(« © OpenStreetMap contributors ») — sauf sur les pages blind
+(`showAttribution = false`, demande explicite : la mention n'y est
+pas affichée).
 
 **Règles appliquées** : URL exacte en HTTPS ; tuiles de la zone visible
 uniquement (pas de pré-chargement, pas de scraping, pas de pré-cache
