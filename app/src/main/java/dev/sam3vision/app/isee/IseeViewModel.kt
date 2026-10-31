@@ -11,6 +11,8 @@ import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MediaDatabase
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.loadedSettings
+import dev.sam3vision.app.pose.CameraHeightStore
+import dev.sam3vision.app.pose.PitchMeter
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speechClient
@@ -85,6 +87,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
+    private val pitch = PitchMeter(app, probe.distances, CameraHeightStore(app)) // IMU → pose, null sans capteur
 
     /** Ordres cap/Traversée + guidage auto, extraits du ViewModel (limite 500). */
     private val steering = IseeSteeringOrders(probe, { settings }, ::speakNavigation, ::update)
@@ -274,7 +277,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         player.release()
         safety.shutdown()
         voiceNav.shutdown()
-        probe.stop()
+        probe.stop(); pitch.stop()
         super.onCleared()
     }
 
@@ -290,10 +293,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun setCameraActive(active: Boolean) {
         if (_state.value.cameraActive == active) return
         update { it.copy(cameraActive = active) }
-        if (active) {
-            voiceNavVoiceGate.openWindow()
-            syncProbe()
-        } else probe.stop()
+        if (active) { pitch.start(); voiceNavVoiceGate.openWindow(); syncProbe() } else { pitch.stop(); probe.stop() }
     }
 
     fun onGlassesPhoto(file: File, action: CaptureAction) = glassesInbox.onPhoto(file, action)

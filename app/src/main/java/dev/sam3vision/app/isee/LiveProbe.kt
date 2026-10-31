@@ -110,7 +110,7 @@ class LiveProbe(
     val jpegQuality: Int get() = adaptive.jpegQuality
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
-    private val distances = DistanceMeter()
+    internal val distances = DistanceMeter()
 
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
     internal val voice = ProbeVoice()
