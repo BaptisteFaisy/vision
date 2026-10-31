@@ -851,16 +851,18 @@ l'évitement des personnes parle en dernier — l'app dit le feu pendant
 qu'on fonce sur quelqu'un. Nouveau contrat, qui amende le § 23 : dire
 gauche/droite et éviter les humains passe devant tout, même en
 Traversée. Combiné à la traversée muette (même jour : personnes jamais
-décrites, silence sinon) : seuls les mots d'évitement parlent, en
-premier.
+décrites) : les mots d'évitement parlent en premier, « Tout droit. » en
+queue de chaîne (battement 300 ms — la voix ne se tait jamais hors
+procédure scan).
 
 - **ordre traversée** (`crossingPhraseOf`) : consigne du scan quand il
   parle (procédure entière, jamais tronquée) > stop urgent « voiture en
   mouvement » (§ 22, absolu devant l'évitement doux : on ne s'écarte pas
   devant une voiture qui arrive) > ordre d'évitement (mot du guidage
-  d'abord, puis mot des personnes) > feu > véhicules doux > silence
-  (personnes jamais décrites) ; sans feu : stop urgent > évitement >
-  véhicules doux > verdict ;
+  d'abord, puis mot des personnes) > feu > véhicules doux > « Tout
+  droit. » (battement 300 ms, jamais muet hors scan ; personnes jamais
+  décrites) ; sans feu : stop urgent > évitement > véhicules doux >
+  verdict ;
 - **mots prioritaires** : virages SAM (« Gauche. », « Droite. ») et
   TwinLite (« gauche. », « droite. ») + stop (`preemptsCrossing`) —
   « Tout droit. » ne couvre jamais le feu (voie libre, pas évitement) ;
@@ -878,9 +880,10 @@ premier.
 Verrouillé par `GuidanceWordTest` + `TwinLiteWordTest` (+1 :
 `isTurnWord`), `CrossingSteeringTest` (8 : préemption, mot devant le
 feu, décalage sonde, voie libre, guidage coupé, scan), `CrossingPeopleTest`
-(mot devant le feu, mots tus, personne seule muette) et
+(mot devant le feu, mots tus, personne seule muette, repli tout droit,
+battement évitement 300 ms, attente scan silencieuse) et
 `CrosswalkScanWiringTest` (+2 : scan tait le guidage, stop devant le
-guidage).
+guidage ; repli tout droit aux frames d'attente).
 
 Recette téléphone : personne sur le passage en Traversée → « Droite. »
 ou « Gauche. » au lieu du feu, puis le feu entre deux mots ; sur les

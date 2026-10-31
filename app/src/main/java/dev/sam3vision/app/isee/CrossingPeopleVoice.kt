@@ -17,11 +17,13 @@ import dev.sam3vision.core.traverse.VehicleStateText
  * il parle (procédure entière, jamais tronquée), le stop urgent « voiture
  * en mouvement » ensuite (§ 22, absolu devant l'évitement doux), puis
  * l'ordre d'évitement ([steering] du guidage, puis le mot des personnes —
- * « Gauche. », « Droite. »), le feu, les véhicules doux, silence sinon —
- * les personnes ne sont jamais décrites (ordre user du 31/10, traversée
- * muette). Procédure scan en cours ([scanRunning]) : le scan garde la voix
- * (ordre § 23 — feu > scan > véhicules), l'user étant arrêté sur les
- * zébrures. Le véhicules est nourri avant le scan (qui lit son brut).
+ * « Gauche. », « Droite. », répété toutes les 300 ms), le feu, les
+ * véhicules doux, « Tout droit. » sinon (battement 300 ms, jamais muet
+ * hors procédure scan) — les personnes ne sont jamais décrites (ordre
+ * user du 31/10, traversée muette). Procédure scan en cours
+ * ([scanRunning]) : le scan garde la voix (ordre § 23 — feu > scan >
+ * véhicules), l'user étant arrêté sur les zébrures. Le véhicules est
+ * nourri avant le scan (qui lit son brut).
  *
  * Sans feu ([noLight], absence confirmée par le patch) : pas de scan (le
  * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — le
@@ -75,6 +77,7 @@ internal fun crossingPhraseOf(
         CrossingPeopleWatch.avoidance(placed, atMs, language, objects, width, height, readings)?.let { return it }
     }
     vehiclePhrase?.let { return it }
+    if (!muted) CrossingPeopleWatch.straight(atMs, language)?.let { return it }
     return null
 }
 
@@ -102,17 +105,21 @@ internal fun LiveProbe.steeringOf(
 /**
  * Voix douce des personnes en mode Traversée, une par processus (même garde
  * des 500 lignes que `CrossingLateralWatch`) : l'évitement des personnes sur le
- * passage d'abord (statiques comprises — « Droite. », mot nouveau seul, clip
- * < 100 ms), le décalage opposé aux approches ensuite (miroir du guidage
- * normal), silence sinon. Les positions au cadran (« Personne à 9 heures »)
- * ne se disent plus en traversée (ordre user du 31/10) : seuls les mots
- * d'évitement parlent, pour esquiver au maximum.
+ * passage d'abord (statiques comprises — « Droite. », clip < 100 ms), le
+ * décalage opposé aux approches ensuite (miroir du guidage normal),
+ * « Tout droit. » sinon ([straight], queue de chaîne hors scan). Les
+ * positions au cadran (« Personne à 9 heures ») ne se disent plus en
+ * traversée (ordre user du 31/10) : la voix ne se tait jamais — une info
+ * toutes les 300 ms au pire ([HEARTBEAT_MS], parole immédiate au
+ * changement de mot), pour esquiver au maximum.
  */
 internal object CrossingPeopleWatch {
 
     private val nudge = LateralNudgeTracker()
     private val onPath = CrossingOnPathTracker()
     private var lastWord: String? = null
+    private var lastSpeakMs: Long = Long.MIN_VALUE
+    private var lastAvoidSpeakMs: Long = Long.MIN_VALUE
 
     /**
      * Mot d'évitement de la frame ([avoidance]) : `null` = rien à éviter
@@ -140,11 +147,11 @@ internal object CrossingPeopleWatch {
     /**
      * Mot d'évitement de la frame (`null` = rien ou déjà dit) : personnes
      * sur le passage d'abord (statiques comprises), décalage opposé aux
-     * approches ensuite — mot nouveau seul. Jamais tu par le feu (§ 25 :
-     * [crossingPhraseOf] le place devant). [objects] ([width] x [height],
-     * boîtes SAM brutes — pas les détections reconstruites des lectures,
-     * qui perdent le score et les non-mesurés) nourrit l'évitement,
-     * [readings] sa portée.
+     * approches ensuite — mot répété toutes les 300 ms ([HEARTBEAT_MS]).
+     * Jamais tu par le feu (§ 25 : [crossingPhraseOf] le place devant).
+     * [objects] ([width] x [height], boîtes SAM brutes — pas les détections
+     * reconstruites des lectures, qui perdent le score et les non-mesurés)
+     * nourrit l'évitement, [readings] sa portée.
      */
     fun avoidance(
         placed: List<PlacedLabel>,
@@ -158,20 +165,42 @@ internal object CrossingPeopleWatch {
         val push = nudge.onFrame(atMs, placed)
         val avoid = onPath.onFrame(atMs, objects, width, height, readings)
         val side = avoid ?: push?.side
-        if (side == null) {
-            lastWord = null
-            return null
-        }
+        // Rien à éviter : `null` sans toucher la mémoire (le battement
+        // temporel suffit — l'effacer ferait reparler le repli à chaque
+        // frame au lieu de le cadencer).
+        if (side == null) return null
         val word = GuidanceWord.fromCap(side).text(language)
-        if (word == lastWord) return null
+        if (word == lastWord && atMs - lastSpeakMs < HEARTBEAT_MS) return null
         lastWord = word
+        lastSpeakMs = atMs
+        lastAvoidSpeakMs = atMs
         return word
     }
 
-    /** Mode coupé : la prochaine traversée repart vierge. */
+    /**
+     * Repli tout droit ([crossingPhraseOf], queue de chaîne hors scan) :
+     * « Tout droit. », battu comme l'évitement — `null` entre deux
+     * battements ou juste après un évitement parlé (son battement couvre
+     * encore). Jamais nourri ici : [avoidance] a déjà vu la frame.
+     */
+    fun straight(atMs: Long, language: SpeechLanguage): String? {
+        if (lastAvoidSpeakMs != Long.MIN_VALUE && atMs - lastAvoidSpeakMs < HEARTBEAT_MS) return null
+        val word = GuidanceWord.Straight.text(language)
+        if (word == lastWord && atMs - lastSpeakMs < HEARTBEAT_MS) return null
+        lastWord = word
+        lastSpeakMs = atMs
+        return word
+    }
+
+    /** Mode coupé : la prochaine traversée repart vierge et parle aussitôt. */
     fun reset() {
         nudge.reset()
         onPath.reset()
         lastWord = null
+        lastSpeakMs = Long.MIN_VALUE
+        lastAvoidSpeakMs = Long.MIN_VALUE
     }
+
+    /** Battement de la voix traversée : une info toutes les 300 ms au pire. */
+    const val HEARTBEAT_MS = 300L
 }

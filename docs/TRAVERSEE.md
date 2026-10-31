@@ -243,7 +243,7 @@ quand la sonde le voit — silence sinon, jamais de chiffre deviné.
 
 Ordre user : plus de proposition manuelle — le passage détecté arme le mode,
 le passage perdu le coupe ; les personnes ne sont plus annoncées (31/10) —
-seuls les mots d'évitement parlent.
+la voix ne se tait jamais : évitement, sinon tout droit toutes les 300 ms.
 
 - **entrée** : le passage proche 3 frames sur 5 (`CrossingOfferGate`,
   ≤ 2 m mesurés (`OFFER_MAX_METERS`, sinon boîte prouvée sous les pieds —
@@ -262,12 +262,14 @@ seuls les mots d'évitement parlent.
   fait taire la proposition une minute (`setCrossingActive(auto = …)`) ;
 - **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
   (12 concepts, plafond 16 tenu) ; les mots d'évitement passent devant le
-  feu (§ 25 : ordre d'évitement d'abord, feu ensuite), les annonces au
-  cadran (« Personne à 9 heures ») sont coupées depuis le 31/10 (ordre
-  user : esquiver au maximum, sans décrire) ;
+  feu (§ 25 : ordre d'évitement d'abord, feu ensuite), répétés toutes les
+  300 ms, et « Tout droit. » parle en queue de chaîne hors scan
+  (`CrossingPeopleWatch.straight`, battement 300 ms — la voix ne se tait
+  jamais) ; les annonces au cadran (« Personne à 9 heures ») sont coupées
+  depuis le 31/10 (ordre user : esquiver au maximum, sans décrire) ;
 - **décalage opposé** (30/10, après-midi, étendu le soir aux obstacles) : des
   gens proches qui s'approchent d'un côté disent d'aller de l'autre
-  (« Droite. », mot nouveau seul, clip < 100 ms — le même `LateralNudgeTracker`
+  (« Droite. », répété toutes les 300 ms, clip < 100 ms — le même `LateralNudgeTracker`
   que le guidage normal, sans positions en traversée — supprimées le 31/10) ;
   depuis le soir, tout obstacle proche qui s'approche (objet, poteau — même
   filtre que le couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
