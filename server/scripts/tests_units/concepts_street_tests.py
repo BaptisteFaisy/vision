@@ -35,6 +35,14 @@ def test_concepts_street(concepts) -> None:
           concepts.model_concept("bordures") == "curb")
     check("rue : rebord -> curb",
           concepts.model_concept("rebord") == "curb")
+    # Formes longues et synonymes voirie (30/10, §17) : une passe modèle par objet.
+    for fr, en in [("bordure de trottoir", "curb"), ("bordure du trottoir", "curb"),
+                   ("rebord de trottoir", "curb"), ("rebord du trottoir", "curb"),
+                   ("bord de trottoir", "curb"), ("bord du trottoir", "curb"),
+                   ("kerb", "curb"), ("marche d'escalier", "step"),
+                   ("marches d'escalier", "steps"), ("rigole", "gutter"),
+                   ("passage bateau", "curb ramp")]:
+        check(f"rue : {fr} -> {en}", concepts.model_concept(fr) == en)
     check("rue : caniveau -> gutter",
           concepts.model_concept("caniveau") == "gutter")
     check("rue : bateau -> curb ramp (bateau de trottoir)",

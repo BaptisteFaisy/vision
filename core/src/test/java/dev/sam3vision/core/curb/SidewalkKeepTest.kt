@@ -76,12 +76,24 @@ class SidewalkKeepTest {
         assertTrue(CurbConcepts.isGround("footpath"))
         assertTrue(CurbConcepts.isGround("Trottoir"))
         assertTrue(CurbConcepts.isGround("sidewalks"))
+        assertTrue(CurbConcepts.isGround("curb ramp"))
+        assertTrue(CurbConcepts.isGround("bateau"))
 
         assertFalse(CurbConcepts.isGround("curb"))
         assertFalse(CurbConcepts.isGround("step"))
         assertFalse(CurbConcepts.isGround("bordure"))
+        assertFalse(CurbConcepts.isGround("rebord"))
         assertFalse(CurbConcepts.isGround("car"))
         assertFalse(CurbConcepts.isGround("  "))
+    }
+
+    @Test
+    fun `marches et bordures seules = absent, pas un trottoir`() {
+        val marches = listOf(PlacedLabel("steps", 0.1f, 0.7f, 2f), personne(0.9f))
+        val bordure = listOf(PlacedLabel("curb", 0.9f, 0.7f, 2f))
+
+        assertEquals(SidewalkPosition.Absent, SidewalkKeep.positionOf(marches))
+        assertEquals(SidewalkPosition.Absent, SidewalkKeep.positionOf(bordure))
     }
 
     @Test
