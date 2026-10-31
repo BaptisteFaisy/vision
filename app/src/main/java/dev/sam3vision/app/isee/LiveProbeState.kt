@@ -92,10 +92,6 @@ data class LiveProbeState(
      * « peut traverser », toute autre phase vaut « ne peut pas traverser ».
      */
     val traversePhase: dev.sam3vision.core.traverse.TraversePhase? = null,
-    /** Un passage piéton est dans le champ : le mode Traversée s'arme seul (retombe quand le passage disparaît). */
-    val crossingOffer: Boolean = false,
-    /** Passage ou feu vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
-    val crossingVisible: Boolean = false,
     /**
      * Lignes du scan traversée (`null` = inactif : rien à l'écran) : consigne
      * ou constat en cours + constats latéraux déjà rendus, lus sur la vidéo

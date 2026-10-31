@@ -229,8 +229,7 @@ internal fun BoxScope.CrossingChip(
     onBounds: (RectF?) -> Unit,
 ) {
     // Mêmes teintes que le cadre posé sur la vidéo : une seule source (CrossingOverlayLayout).
-    val offering = probe.crossingOffer && !probe.crossingActive
-    val dot = if (offering) Color(CROSSING_ACCENT_OFFER) else Color(crossingAccent(probe.crossingActive, probe.crossing))
+    val dot = Color(crossingAccent(probe.crossingActive, probe.crossing))
     // La racine intercepte tous les taps : le chip publie sa zone fenêtre pour
     // en être exempté, et la retire en partant (sinon taps fantômes).
     DisposableEffect(Unit) { onDispose { onBounds(null) } }
@@ -250,7 +249,7 @@ internal fun BoxScope.CrossingChip(
         Box(Modifier.size(7.dp).background(dot, CircleShape))
         Spacer(Modifier.size(5.dp))
         Text(
-            crossingButtonLabel(probe.crossingActive, probe.crossing, offering),
+            crossingButtonLabel(probe.crossingActive, probe.crossing),
             color = Color.White,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,

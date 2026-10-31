@@ -9,7 +9,6 @@ import dev.sam3vision.core.crossing.CrossingDistance
 import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.crossing.CrossingOffer
-import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
@@ -65,15 +64,13 @@ class CrossingChipZone {
  * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
  * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
  * est coupé tant que le mode est actif : ses mots et « Vert, traversez »
- * ne doivent jamais se mélanger. La coupe fait taire la proposition un
- * moment : toute bascule est manuelle (puce, ordre vocal).
+ * ne doivent jamais se mélanger. Toute bascule est manuelle (puce, ordre vocal).
  */
 internal fun LiveProbe.setCrossingActive(
     settings: Settings,
     active: Boolean,
     sensorLens: LensSpec? = null,
 ) {
-    if (!active) CrossingOfferWatch.declined(System.currentTimeMillis())
     configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens)
 }
 
@@ -165,49 +162,11 @@ internal fun LiveProbe.observeCrossing(scope: CoroutineScope, haptics: IseeHapti
  * Libellé du bouton Traversée : l'état du mode et, quand il est actif, le
  * dernier état connu du feu. Pur, testé en JVM.
  */
-internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: Boolean = false): String {
-    if (!active && offer) return "Crosswalk — cross?"
+internal fun crossingButtonLabel(active: Boolean, state: CrossingState?): String {
     if (!active) return "Crossing: OFF"
     return when (state) {
         CrossingState.Green -> "Crossing: GREEN"
         CrossingState.Red, null -> "Crossing: RED"
-    }
-}
-
-/**
- * Mémoire de la proposition « passage piéton » (pastille de la carte), une
- * par processus : la sonde la consulte à chaque frame publiée (1 ligne, la
- * garde des 500 lignes ne laisse pas de place à un champ de plus dans
- * `LiveProbe`). La proposition n'arme plus le mode : elle s'affiche, l'user
- * bascule (puce, ordre vocal).
- */
-internal object CrossingOfferWatch {
-
-    private val gate = CrossingOfferGate()
-
-    /** Passage vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
-    var lastVisible: Boolean = false
-        private set
-
-    /** Vrai si le mode Traversée doit s'armer seul : passage proche sur cette frame. */
-    fun update(
-        objects: List<SegObject>,
-        nowMs: Long,
-        traversing: Boolean,
-        metersOf: (SegObject) -> Float?,
-        frameH: Int,
-    ): Boolean {
-        lastVisible = CrossingOffer.seesCrosswalk(objects)
-        return gate.onFrame(objects, nowMs, traversing, metersOf, frameH)
-    }
-
-    /** L'utilisateur a coupé le mode : silence d'une minute. */
-    fun declined(nowMs: Long) = gate.declined(nowMs)
-
-    /** Nouvelle séance. */
-    fun reset() {
-        gate.reset()
-        lastVisible = false
     }
 }
 
@@ -262,9 +221,9 @@ internal fun crossingMetersOf(
 }
 
 /**
- * Distances des passages d'une frame pour l'armement auto : une mesure par
- * objet ([crossingMetersOf], profondeur puis sol), `null` sans mesure. Le
- * tri proche/loin part dans [CrossingOffer.seesNearCrosswalk].
+ * Distances des passages d'une frame pour le guidage latéral : une mesure
+ * par objet ([crossingMetersOf], profondeur puis sol), `null` sans mesure.
+ * Le tri proche/loin part dans [CrossingOffer.seesNearCrosswalk].
  */
 internal fun crossingOfferMeters(
     readings: List<DistanceReading>,
@@ -312,8 +271,9 @@ internal fun crossingLateralPatchOf(
 }
 
 /**
- * Mémoire latérale, une par processus (même garde des 500 lignes que
- * [CrossingOfferWatch]) : la sonde l'alimente à chaque frame publiée, l'écran
+ * Mémoire latérale, une par processus (la garde des 500 lignes ne laisse
+ * pas de place à un champ de plus dans `LiveProbe`) : la sonde l'alimente
+ * à chaque frame publiée, l'écran
  * observe [flow] (mot doux + arrivée douce, jamais de « Stop » ici).
  */
 internal object CrossingLateralWatch {
