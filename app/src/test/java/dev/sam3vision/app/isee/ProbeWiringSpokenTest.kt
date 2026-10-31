@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -114,6 +115,15 @@ class ProbeWiringSpokenTest {
             attempts,
         )
         assertEquals(listOf("right."), completions)
+    }
+
+    @Test
+    fun `rappel de suivi part en clip`() {
+        assertEquals("guide_continue_straight", spokenClipId("Continue straight."))
+        assertEquals("guide_continue_left", spokenClipId("Continue à gauche."))
+        assertEquals("guide_right", spokenClipId("Droite."))
+        assertEquals("tl_left", spokenClipId("left."))
+        assertNull(spokenClipId("Personne à 1 mètre."))
     }
 
     @Test

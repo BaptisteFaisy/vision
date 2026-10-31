@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
@@ -7,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Déclencheur du guidage : un mot par changement, dit aussitôt, jamais répété. */
+/** Déclencheur du guidage : un mot par changement, dit aussitôt, rappel de suivi après 8 s de voie libre stable. */
 class GuidanceAnnouncerTest {
 
     private val libre = emptyList<PlacedLabel>()
@@ -238,6 +239,74 @@ class GuidanceAnnouncerTest {
             "left.",
             announcer.onFrame(0L, listOf(personne(0.4f)), samPassage = sam),
         )
+    }
+
+    @Test
+    fun `rappel de suivi apres huit secondes de voie libre stable`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertNull(announcer.onFrame(7_999L, libre))
+        assertEquals("Continue straight.", announcer.onFrame(8_000L, libre))
+    }
+
+    @Test
+    fun `rappel alterne avec le mot a chaque echeance`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertEquals("Continue straight.", announcer.onFrame(8_000L, libre))
+        assertEquals("Straight.", announcer.onFrame(16_000L, libre))
+        assertEquals("Continue straight.", announcer.onFrame(24_000L, libre))
+        assertNull(announcer.onFrame(24_500L, libre))
+    }
+
+    @Test
+    fun `couloir bouche stable ne rappelle jamais`() {
+        val announcer = GuidanceAnnouncer()
+        val bloque = listOf(personne(2f))
+
+        assertEquals("left.", announcer.onFrame(0L, bloque))
+        assertNull(announcer.onFrame(8_000L, bloque))
+        assertNull(announcer.onFrame(16_000L, bloque))
+    }
+
+    @Test
+    fun `mot nouveau relance le compteur de rappel`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertEquals("Left.", announcer.onFrame(4_000L, libre, cap = SteeringCap.Left))
+        assertNull(announcer.onFrame(11_999L, libre, cap = SteeringCap.Left))
+        assertEquals("Continue left.", announcer.onFrame(12_000L, libre, cap = SteeringCap.Left))
+    }
+
+    @Test
+    fun `retour trottoir stable rappelle continue a gauche`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Gauche.", announcer.onFrame(0L, libre, SpeechLanguage.Fr, sidewalk = SidewalkPosition.Left))
+        assertEquals("Continue à gauche.", announcer.onFrame(8_000L, libre, SpeechLanguage.Fr, sidewalk = SidewalkPosition.Left))
+    }
+
+    @Test
+    fun `bouche puis libre reparle et relance le rappel`() {
+        val announcer = GuidanceAnnouncer()
+        val bloque = listOf(personne(2f))
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertEquals("left.", announcer.onFrame(1_000L, bloque))
+        assertEquals("Straight.", announcer.onFrame(2_000L, libre))
+        assertNull(announcer.onFrame(9_999L, libre))
+        assertEquals("Continue straight.", announcer.onFrame(10_000L, libre))
+    }
+
+    @Test
+    fun `rappel suit la langue courante`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertEquals("Continue tout droit.", announcer.onFrame(8_000L, libre, SpeechLanguage.Fr))
     }
 
     @Test

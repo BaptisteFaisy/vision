@@ -12,8 +12,12 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * La machine anti-répétition est [AnnouncementGate], partagée avec les
  * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
  * une consigne nouvelle parle dès la première frame (seul « Stop. » coupe
- * la lecture en cours, les mots doux attendent le silence), et le même mot
- * ne se répète jamais (scène stable = silence, pas de bégaiement).
+ * la lecture en cours, les mots doux attendent le silence). Sur voie libre
+ * stable, le rappel de suivi ([ContinueWord], en alternance avec le mot)
+ * reparle toutes les [DEFAULT_IDLE_REPEAT_MS] millisecondes : quand iSee n'a
+ * rien de neuf à dire, il redit comment suivre le chemin au lieu de se
+ * taire. Le bouché, lui, ne se répète jamais (scène bouchée stable =
+ * silence, pas de bégaiement) : un ordre d'évitement ne se rabâche pas.
  *
  * Arbitrage voix (ordre user du 29/10) : couloir bouché → voix TwinLite
  * ([TwinLiteWord] : arrêt au contact, côté de sortie sinon), voie libre →
@@ -27,6 +31,7 @@ class GuidanceAnnouncer(
     minFrames: Int = AnnouncementGate.DEFAULT_MIN_FRAMES,
     cooldownMs: Long = AnnouncementGate.DEFAULT_COOLDOWN_MS,
     private val rangeMeters: Float = Guidance.RANGE_METERS,
+    private val idleRepeatMs: Long = DEFAULT_IDLE_REPEAT_MS,
 ) {
 
     private val gate = AnnouncementGate(minFrames, cooldownMs)
@@ -57,6 +62,15 @@ class GuidanceAnnouncer(
 
     private val nudge = LateralNudgeTracker()
 
+    /** Clé du dernier mot de voie libre parlé (`null` tant qu'aucun). */
+    private var lastFreeKey: String? = null
+
+    /** Instant de la dernière émission de voie libre ([NO_FREE] si aucune). */
+    private var lastFreeAtMs: Long = NO_FREE
+
+    /** Vrai si le prochain rappel est le « Continue… » (faux : le mot). */
+    private var continueDue: Boolean = true
+
     /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
@@ -70,7 +84,8 @@ class GuidanceAnnouncer(
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
-     * décision locale.
+     * décision locale. Sur voie libre stable, le rappel de suivi
+     * ([ContinueWord]) reparle toutes les [idleRepeatMs] millisecondes.
      */
     fun onFrame(
         atMs: Long,
@@ -94,7 +109,14 @@ class GuidanceAnnouncer(
         }
         val word = nudgeOf(atMs, labels, hfovDeg)?.let { GuidanceWord.fromCap(it.side) }
             ?: sidewalkWord(sidewalk, decision.cap)
-        return speak(atMs, word.key, word.text(language))
+        val phrase = speak(atMs, word.key, word.text(language))
+        if (phrase != null) {
+            lastFreeKey = word.key
+            lastFreeAtMs = atMs
+            continueDue = true
+            return phrase
+        }
+        return idleFollow(atMs, word, language)
     }
 
     /**
@@ -147,6 +169,27 @@ class GuidanceAnnouncer(
         else -> GuidanceWord.fromCap(cap)
     }
 
+    /**
+     * Rappel de suivi sur voie libre stable : [word] est la consigne déjà
+     * dite (le `speak` vient d'échouer dessus) — après [idleRepeatMs] de
+     * silence, le rappel ([ContinueWord]) puis le mot, en alternance : chaque
+     * émission reste distincte de la précédente, là où les déduplications
+     * aval (`LiveProbeState.spoken`, `ProximityVoice.lastPhrase`) avaleraient
+     * une répétition à l'identique. La clé marquée reste celle du mot : un
+     * vrai changement reparle aussitôt, comme avant. `null` hors délai,
+     * consigne changée entre-temps, ou mot sans rappel (stop).
+     */
+    private fun idleFollow(atMs: Long, word: GuidanceWord, language: SpeechLanguage): String? {
+        if (word.key != lastFreeKey || lastFreeAtMs == NO_FREE) return null
+        if (atMs < lastFreeAtMs || atMs - lastFreeAtMs < idleRepeatMs) return null
+        val follow = ContinueWord.fromGuidance(word) ?: return null
+        val phrase = if (continueDue) follow.text(language) else word.text(language)
+        continueDue = !continueDue
+        lastFreeAtMs = atMs
+        gate.markSpoken(word.key, atMs, phrase)
+        return phrase
+    }
+
     /** Mot nouveau, SAM ou TwinLite : dit aussitôt, sans délai ni stabilité (clips < 100 ms). */
     private fun speak(atMs: Long, key: String, phrase: String): String? {
         if (!gate.admit(atMs, key, urgent = true, firstSight = true)) return null
@@ -161,5 +204,20 @@ class GuidanceAnnouncer(
         lastSidewalk = null
         lastNudge = null
         nudge.reset()
+        lastFreeKey = null
+        lastFreeAtMs = NO_FREE
+        continueDue = true
+    }
+
+    companion object {
+        /**
+         * Silence de voie libre stable avant le rappel de suivi (8 s, soit
+         * ~10 m à 1,2 m/s) : le double du délai d'annonce, pour rappeler sans
+         * bégayer. Injecté en test via [GuidanceAnnouncer.idleRepeatMs].
+         */
+        const val DEFAULT_IDLE_REPEAT_MS = 8_000L
+
+        /** Aucune émission de voie libre encore. */
+        private const val NO_FREE = Long.MIN_VALUE
     }
 }
