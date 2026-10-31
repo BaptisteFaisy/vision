@@ -78,10 +78,9 @@ class LiveProbe(
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
         LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
-    /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
+    /** Profondeur embarquée de la sonde : mêmes frames capturées, resets communs. */
     internal val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
-        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } },
-        onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
+        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } })
     internal val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
     internal val _state = MutableStateFlow(LiveProbeState())
@@ -322,7 +321,7 @@ _state.update { it.cleared() }
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
-        meters.offer(jpegB64) // profondeur + danger, même sans session SAM.
+        meters.offer(jpegB64) // profondeur embarquée, même sans session SAM.
         val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
         ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
         val encodedAtNs = clock()

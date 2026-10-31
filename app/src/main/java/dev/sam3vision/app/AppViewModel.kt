@@ -16,7 +16,6 @@ import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
 import dev.sam3vision.core.depth.syntheticGradientArgb
 import dev.sam3vision.core.live.PositionText
-import dev.sam3vision.app.danger.DangerBench
 import dev.sam3vision.app.depth.DepthBench
 import dev.sam3vision.app.depth.DepthEstimators
 import dev.sam3vision.app.depth.ModelDownloader
@@ -346,21 +345,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(statusLine = "Depth: ${DepthBench.summary(verdict)}") }
     }
 
-    /**
-     * Banc danger embarqué : 5 inférences YOLO11n sur une image synthétique
-     * 1024 (proche d'une frame caméra : le modèle redimensionne en descente,
-     * comme en production), verdict dans la ligne de statut et logcat
-     * `DangerBench`. Le modèle est embarqué en asset, rien à télécharger.
-     */
-    fun testDanger() = viewModelScope.launch {
-        _state.update { it.copy(statusLine = "Testing danger… (YOLO11n)") }
-        val verdict = withContext(Dispatchers.Default) {
-            val image = syntheticGradientArgb(DANGER_BENCH_SIZE, DANGER_BENCH_SIZE)
-            DangerBench.run(getApplication(), image, DANGER_BENCH_SIZE, DANGER_BENCH_SIZE)
-        }
-        _state.update { it.copy(statusLine = "Danger: ${DangerBench.summary(verdict)}") }
-    }
-
     // ————— Dictée (appui long partout, bouton « Dictate » dans le chat) —————
 
     /** Bouton « Dictate » du chat : ouvre le micro jusqu'au prochain Stop. */
@@ -404,9 +388,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** Côté de l'image synthétique du banc profondeur (carré, px). */
         const val BENCH_SIZE = 256
-
-        /** Côté de l'image synthétique du banc danger (1024 : comme une frame caméra). */
-        const val DANGER_BENCH_SIZE = 1024
 
         /** Fenêtre anti-rallumage : deux réveils rapprochés ne servent à rien. */
         const val PREWARM_WINDOW_MS = 120_000L

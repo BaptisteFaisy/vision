@@ -27,7 +27,6 @@ class ProbeMetersPredictionsTest {
             depthMeter = null,
             depthEngine = { DepthBackend.DA2 },
             onPredictions = { calls++ },
-            onDangerAlert = {},
         )
         probe.noteFrame(512, 384)
         probe.startPredictions(DistanceMeter())
