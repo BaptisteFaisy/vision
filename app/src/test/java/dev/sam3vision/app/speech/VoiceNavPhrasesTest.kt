@@ -2,6 +2,7 @@ package dev.sam3vision.app.speech
 
 import dev.sam3vision.core.nav.ManeuverAction
 import dev.sam3vision.core.nav.NavEvent
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -155,6 +156,14 @@ class VoiceNavPhrasesTest {
                 NavEvent.ManeuverAhead(ManeuverAction.SlightLeft, null, 10.0, near = true),
                 null,
             ),
+        )
+    }
+
+    @Test
+    fun `traversee passee en francais de compatibilite`() {
+        assertEquals(
+            "Traversée terminée.",
+            VoiceNavPhrases.event(NavEvent.CrossingPassed, null, SpeechLanguage.Fr),
         )
     }
 }
