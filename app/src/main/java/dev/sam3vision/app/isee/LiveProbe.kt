@@ -424,7 +424,7 @@ _state.update { it.cleared() }
         active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
     ) {
         val overlays = overlaysFor(frame, shown, background, painter, chronology)
-        val pinhole = readingsOf(distances, frame)
+        val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame)
         val readings = meters.readingsFor(frame, pinhole)
         val placed = placedLabels(frame, readings) +
             dangerPlaced(distances, meters.dangerSnapshot())
@@ -433,10 +433,9 @@ _state.update { it.cleared() }
             onCrop = cropLogger?.tap(),
         )
         val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec)
-        val phrase = phraseOf(cross, placed, readings, frame, at, speechLanguage,
+        val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
             distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger)
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
-        val steering = steeringCueOf()
         pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
         // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
         StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
@@ -454,10 +453,11 @@ _state.update { it.cleared() }
                 frames = current.frames + 1,
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
+                samDetections = rawDetections,
                 spoken = phrase ?: current.spoken,
                 spokenSeq = if (phrase != null) current.spokenSeq + 1 else current.spokenSeq,
                 spokenUrgent = if (phrase != null) spokenUrgentOf(phrase) else current.spokenUrgent,
-                steering = steering,
+                steering = steeringCueOf(),
                 samPassage = frame.passage,
                 detour = if (_state.value.crossingActive) false else voice.detour,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,

@@ -13,6 +13,7 @@ import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.mask.toDetectionsWithExtents
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 
 /**
@@ -31,12 +32,20 @@ internal fun labelsOf(labels: FrameLabels, frame: LiveFrame): List<String> = lab
 internal fun transportLabel(active: LiveSession): String =
     if (active.socketOpen) TRANSPORT_WS else TRANSPORT_WS_KO
 
-/** Distances de la frame (sténopé) ; aucun journal de suivi ici : mesure brute. */
-internal fun readingsOf(distances: DistanceMeter, frame: LiveFrame): List<DistanceReading> {
-    if (frame.width <= 0 || frame.height <= 0) return emptyList()
+/**
+ * Détections SAM confirmées de la frame et leurs distances (sténopé) : une
+ * seule conversion (les étendues masques coûtent un décodage par objet).
+ * Score 1 : l'écran montre chaque masque, la voix dit chacun — mesuré ou non.
+ */
+internal fun detectionsAndReadingsOf(
+    distances: DistanceMeter,
+    frame: LiveFrame,
+): Pair<List<Detection>, List<DistanceReading>> {
+    if (frame.width <= 0 || frame.height <= 0) return emptyList<Detection>() to emptyList()
     val detections = frame.objects.toDetectionsWithExtents(frame.width, frame.height)
-    if (detections.isEmpty()) return emptyList()
-    return distances.measure(frame.width, frame.height, detections)
+        .map { it.copy(score = 1f) }
+    if (detections.isEmpty()) return detections to emptyList()
+    return detections to distances.measure(frame.width, frame.height, detections)
 }
 
 /**

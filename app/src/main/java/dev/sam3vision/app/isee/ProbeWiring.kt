@@ -295,6 +295,8 @@ internal fun LiveProbe.observeFenceOpening(
  * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
  * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
  * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ * Frames SAM seules (`frames`) et détections brutes : le ticker 120 ms rejoue
+ * des lectures figées qui remettraient la confirmation du mouvement à zéro.
  */
 internal fun LiveProbe.observeVehicleState(
     scope: CoroutineScope,
@@ -303,13 +305,17 @@ internal fun LiveProbe.observeVehicleState(
     language: () -> SpeechLanguage,
     watcher: VehicleStateWatcher = VehicleStateWatcher(),
 ): VehicleStateWatcher {
+    var lastFrames = -1
     scope.launch {
         state.collect { st ->
+            if (st.frames == lastFrames) return@collect
+            lastFrames = st.frames
             if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings ?: return@collect
+            val readings = st.distanceLayer?.readings.orEmpty()
+            if (st.samDetections.isEmpty() && readings.isEmpty()) return@collect
             val motion = ProbeBackgroundMotion.lastMotion
             val cue = watcher.update(
-                detectionsOf(readings, st.width, st.height),
+                st.samDetections,
                 readings,
                 System.currentTimeMillis(),
                 language(),
@@ -390,6 +396,7 @@ internal fun LiveProbe.phraseOf(
     cross: CrossingPatch?,
     placed: List<PlacedLabel>,
     readings: List<DistanceReading>,
+    detections: List<Detection>,
     frame: LiveFrame,
     at: Long,
     language: SpeechLanguage,
@@ -397,7 +404,7 @@ internal fun LiveProbe.phraseOf(
     scanTrigger: Boolean = false,
 ): String? {
     if (state.value.crossingActive) {
-        return crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height),
+        return crossingPhraseOf(cross?.cue, placed, detections,
             readings, at, language, frame.objects, frame.width, frame.height, scanTrigger)
     }
     resetCrossingWatches()
