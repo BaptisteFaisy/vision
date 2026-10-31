@@ -103,6 +103,12 @@ data class LiveProbeState(
      * dans ~3 s »), `null` quand personne ne vient. La voix la lira plus tard.
      */
     val dangerAlert: String? = null,
+    /**
+     * Chiffres mouvement V1 (fond contre boîte) de la dernière frame (`null` = pas
+     * d'estimation publiée) : verdict, score de changement du fond et écart
+     * global-boîte, lus par le panneau debug ([liveProbeMotionLine]).
+     */
+    val motion: MotionDebug? = null,
 ) {
     /** Rien à afficher : ni frame analysée, ni erreur. */
     val idle: Boolean get() = frames == 0 && error == null
@@ -122,3 +128,15 @@ data class LiveProbeState(
     /** L'objet le plus proche mesuré sur la dernière frame, `null` si rien n'est calibré. */
     val nearest: DistanceReading? get() = distanceLayer?.readings?.minByOrNull { it.meters }
 }
+
+/**
+ * Chiffres mouvement V1 exposés au panneau debug : [verdict] (« voiture bouge » ou
+ * « caméra bouge », étiquette posée par le producteur), [bgChange] (score de changement
+ * du fond) et écart global-boîte ([gapMeanPx]/[gapP95Px], en px).
+ */
+data class MotionDebug(
+    val verdict: String = "",
+    val bgChange: Float = 0f,
+    val gapMeanPx: Float = 0f,
+    val gapP95Px: Float = 0f,
+)
