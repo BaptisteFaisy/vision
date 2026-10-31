@@ -118,6 +118,13 @@
 #       lot coûtait ~4,5 min au lieu de ~90 s, et le débit plafonnait à
 #       11-19 merges/h. Un run annulé n'apprend rien : un check annulé ne se
 #       relance pas (v16 s'en occupe depuis la PR), donc le balayage est sauté.
+#   v21 (31/10) agent de conflit : il pousse avec le **PAT** (`GH_TOKEN` du
+#       job), plus avec le jeton de l'installation. Un push de
+#       `@github-actions[bot]` ne déclenche pas les workflows : ils naissent en
+#       `action_required`, aucun check requis n'existe, la PR reste `BLOCKED`
+#       (vécu sur #634 à 16:46 — approuvé à la main). Filet indépendant :
+#       `.github/workflows/auto-approve.yml` approuve tout run `action_required`
+#       du dépôt toutes les 5 min (jamais un run de fork).
 
 name: pr-auto-merge
 
@@ -623,9 +630,14 @@ jobs:
                 # compte rendu, 2 = rien à faire : on saute sans bruit.
                 rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
                 # un exit != 0 de l'agent tuerait tout le sweep.
+                # Le PAT dans `GH_TOKEN` : le push de l'agent doit porter
+                # l'identité du propriétaire, sinon le commit arrive par
+                # `@github-actions[bot]` et les workflows partent en
+                # `action_required` (aucun check requis, PR `BLOCKED` — vu sur
+                # #634 le 31/10). `auto-approve.yml` reste le filet.
                 git show origin/master:.github/fireworks/conflict_agent.py \
                   > /tmp/fw-agent.py 2>/dev/null \
-                  && python3 /tmp/fw-agent.py resolve --repo "$REPO" \
+                  && GH_TOKEN="$GH_ECRITURE" python3 /tmp/fw-agent.py resolve --repo "$REPO" \
                     --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc=$?
                 git rebase --abort >/dev/null 2>&1 || true
                 git checkout -q master 2>/dev/null || true
