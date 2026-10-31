@@ -3,6 +3,13 @@ package dev.sam3vision.core.model
 /**
  * Une détection vue par la caméra, avant normalisation : boîte en pixels de
  * l'image source ([width] × [height]).
+ *
+ * [maskBox] est la bbox **exclusive** du masque (`[x1, y1, x2, y2]`, pixels
+ * frame, même convention que [box]), posée par `toDetectionsWithExtents` quand
+ * le masque est fiable (compact : poly/bits/rle décodé, non fragmenté) —
+ * `null` sinon (PNG non décodé sur ce chemin, `none`, masque troué). Le sténopé
+ * et le plan de sol la préfèrent à [box] : hauteur vraie de l'objet, ligne des
+ * pieds exacte. L'overlay et l'appariement gardent [box], la boîte détecteur.
  */
 data class Detection(
     val label: String,
@@ -10,6 +17,7 @@ data class Detection(
     val box: List<Float>,
     val width: Int,
     val height: Int,
+    val maskBox: List<Float>? = null,
 ) {
     /** Boîte normalisée 0..1 (`x1,y1,x2,y2`) ; `null` si la taille est inconnue. */
     fun normalizedBox(): List<Float>? {

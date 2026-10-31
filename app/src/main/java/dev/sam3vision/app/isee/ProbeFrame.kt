@@ -12,8 +12,8 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.toDetections
 
 /**
  * Mise en forme d'une frame SAM : étiquettes, transport, distances, pastilles,
@@ -34,7 +34,7 @@ internal fun transportLabel(active: LiveSession): String =
 /** Distances de la frame (sténopé) ; aucun journal de suivi ici : mesure brute. */
 internal fun readingsOf(distances: DistanceMeter, frame: LiveFrame): List<DistanceReading> {
     if (frame.width <= 0 || frame.height <= 0) return emptyList()
-    val detections = frame.objects.toDetections(frame.width, frame.height)
+    val detections = frame.objects.toDetectionsWithExtents(frame.width, frame.height)
     if (detections.isEmpty()) return emptyList()
     return distances.measure(frame.width, frame.height, detections)
 }

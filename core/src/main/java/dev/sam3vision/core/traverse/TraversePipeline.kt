@@ -3,9 +3,9 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -64,7 +64,9 @@ class TraversePipeline(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): TraverseOutput {
         val filtered = state.update(objects)
-        val detections = filtered.toDetections(width, height)
+        // Extrêmes masque inclus : le veto lit `.box` (inchangé), le direct mesure
+        // au plus juste (voir `Detection.maskBox`).
+        val detections = filtered.toDetectionsWithExtents(width, height)
         val decision = veto.update(lightGreen, detections, focalPx, atMs)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)

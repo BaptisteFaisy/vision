@@ -48,6 +48,27 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   rouge (même action sûre) — seul un corpus téléphone remontera le rappel.
 - Preuves : tests JVM `:core`/`:app` à 0 échec (r630), UBS 0 critique,
   gardes `ci-core` locales OK ; checks PR (`ci`, `ci-budget`, `couche0`).
+## 2026-10-31 — Distances : pose IMU, affine, Kalman, masque, recette, câblage + fraîcheur 150 ms (phases 2-3)
+
+- **Demande** : ultra-précis + info distance au maximum toutes les 150 ms (essentiel).
+- Fait (5 branches parallèles + câblage) :
+  pose IMU temps réel (`PitchMeter` + hauteur en Réglages, direct et sonde) ;
+  profondeur affine robuste (`AffineScale`, échelle + décalage, aberrantes rejetées) ;
+  Kalman position+vitesse par piste (défaut, EMA en repli) ; géométrie de masque
+  (`MaskExtent`, poly sans décodage) ; protocole et script de recette terrain ;
+  câblage : bbox masque mesurée (`Detection.maskBox`, direct + sonde), pose volatile,
+  ticker 120 ms (`DistanceTicker`, `LiveSensors`, `ProbeMeters`) republiant
+  `DistanceMeter.predictions` (pistes extrapolées + non-suivis maintenus, confiance
+  dégradée, oubli 2 s) — pastilles, plus proche et ligne d'état à ≤ 150 ms.
+- Preuves : `:core` + `:app` verts — `DistanceMeterTest` 22, `DistanceKalmanTest` 10,
+  `MaskDetectionsTest` 9 (nouveau), `DistanceTickerTest` 6 (nouveau),
+  `ProbeMetersPredictionsTest` 1 (nouveau), `DepthAffineTest`, `MaskGeometryTest`,
+  `PitchMathTest`, `test_scripts.sh` ; garde Kotlin verte.
+- Limites honnêtes : étendues de masque dormantes sur PNG (serveur envoie PNG —
+  piste `bits`/`poly` ou cache partagé) ; sonde sans suivi (maintien statique) ;
+  ±15-20 % toujours non confronté au mètre ruban (protocole prêt).
+- Reste (pistes `docs/DISTANCES.md`) : étalonnage guidé (plus gros biais restant),
+  masques compacts en production, précision chiffrée, profondeur sur masque, sol non plan.
 
 
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)

@@ -179,4 +179,76 @@ class DistanceMeterTest {
         assertTrue("une grande boîte vaut mieux qu'une petite", tall.confidence > small.confidence)
         assertEquals(1f - 1f / 200f, tall.confidence, 0.001f)
     }
+
+    @Test
+    fun `bbox du masque mesure a la place de la boite detecteur`() {
+        val meter = DistanceMeter()
+        val masked = detection("personne", box(200f)).copy(maskBox = listOf(110f, 120f, 190f, 290f))
+        val reading = meter.measure(512, 384, listOf(masked)).first()
+        val focal = LensSpec.Default.focalPx(512, 384)
+        assertEquals(1.70f * focal / 170f, reading.rawMeters, 0.001f)
+        assertEquals(box(200f), reading.box)
+    }
+
+    @Test
+    fun `bbox du masque coupee ecarte la mesure`() {
+        val meter = DistanceMeter()
+        val cut = detection("personne", box(200f)).copy(maskBox = listOf(110f, 0f, 190f, 290f))
+        assertTrue(meter.measure(512, 384, listOf(cut)).isEmpty())
+    }
+
+    @Test
+    fun `repli EMA quand le Kalman est coupe`() {
+        val meter = DistanceMeter().apply { kalmanEnabled = false }
+        val reference = DistanceSmoother()
+        val first = meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3)).first()
+        val second = meter.measure(512, 384, listOf(detection("personne", box(180f))), listOf(3)).first()
+        reference.smooth(3, first.rawMeters)
+        assertEquals(reference.smooth(3, second.rawMeters), second.meters, 0f)
+        assertTrue(meter.predictions().isEmpty())
+    }
+
+    @Test
+    fun `reset oublie aussi la piste Kalman`() {
+        val meter = DistanceMeter()
+        meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3))
+        meter.reset()
+        val fresh = meter.measure(512, 384, listOf(detection("personne", box(100f))), listOf(3)).first()
+        assertEquals(fresh.rawMeters, fresh.meters, 0f)
+        assertTrue(meter.predictions().isNotEmpty())
+    }
+
+    @Test
+    fun `predictions suit la piste puis oublie`() {
+        val meter = DistanceMeter()
+        val t0 = System.currentTimeMillis()
+        val measured = meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(7)).first()
+        val predicted = meter.predictions(t0 + 500L)
+        assertEquals(1, predicted.size)
+        assertEquals(7, predicted.first().trackId)
+        assertEquals("personne", predicted.first().label)
+        assertEquals(measured.rawMeters, predicted.first().meters, 0.001f)
+        assertTrue(predicted.first().confidence < measured.confidence)
+        assertTrue(meter.predictions(t0 + 5_000L).isEmpty())
+    }
+
+    @Test
+    fun `predictions maintient le non-suivi puis oublie`() {
+        val meter = DistanceMeter()
+        val t0 = System.currentTimeMillis()
+        val measured = meter.measure(512, 384, listOf(detection("personne", box(200f)))).first()
+        val held = meter.predictions(t0 + 500L)
+        assertEquals(1, held.size)
+        assertEquals(DistanceMeter.UNTRACKED_ID, held.first().trackId)
+        assertEquals(measured.meters, held.first().meters, 0f)
+        assertTrue(meter.predictions(t0 + 5_000L).isEmpty())
+    }
+
+    @Test
+    fun `predictions vides sans mesure ou mesures coupees`() {
+        assertTrue(DistanceMeter().predictions(1_000L).isEmpty())
+        val meter = DistanceMeter().apply { enabled = false }
+        meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(7))
+        assertTrue(meter.predictions(2_000L).isEmpty())
+    }
 }
