@@ -7,9 +7,6 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 
-/** Bouton « Arrêter le guidage » du bloc guidage sur l'accueil. */
-internal const val NAV_STOP_ID = "guidance-stop"
-
 /** Bouton « Démarrer » du bloc confirmation sur l'accueil. */
 internal const val CONFIRM_START_ID = "confirm-start"
 
