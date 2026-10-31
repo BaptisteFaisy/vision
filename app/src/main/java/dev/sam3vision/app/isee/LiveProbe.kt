@@ -156,7 +156,7 @@ class LiveProbe(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         crossingActive: Boolean = false,
         modelsLine: String = "",
-        depth: DepthBackend = DepthBackend.OFF,
+        depth: DepthBackend = DepthBackend.DA2,
         collectCrops: Boolean = false,
     ) {
         val clean = baseUrl.trim()
@@ -175,7 +175,7 @@ class LiveProbe(
         distances.setLens(lens)
         // Un fichier par configuration : recouper l'interrupteur change de fichier.
         cropLogger = if (collectCrops) appContext?.let { LightCropLogger(java.io.File(it.filesDir, "lightcrops"), dev.sam3vision.app.BuildConfig.VERSION_NAME) } else null
-resetPipeline()
+        resetPipeline()
         _state.update {
             LiveProbeState(
                 endpoint = clean,
