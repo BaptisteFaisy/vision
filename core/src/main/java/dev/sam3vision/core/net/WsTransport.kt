@@ -16,12 +16,14 @@ interface WsTransport {
      * Ouvre la connexion ; `false` = socket impossible à ouvrir (l'appelant bascule en HTTP).
      * [onOpen] est appelé quand le handshake aboutit (en-têtes du `101` reçus) : c'est le
      * seul jalon « réseau prêt » observable côté WebSocket, une fois par session.
+     * [headers] part dans le handshake (ex. `xi-api-key` de Scribe realtime).
      */
     fun open(
         url: String,
         onText: (String) -> Unit,
         onClosed: (Throwable?) -> Unit,
         onOpen: () -> Unit = {},
+        headers: Map<String, String> = emptyMap(),
     ): Boolean
 
     /** Envoie un message texte ; `false` = socket fermé ou envoi refusé. */
@@ -67,11 +69,15 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
         onText: (String) -> Unit,
         onClosed: (Throwable?) -> Unit,
         onOpen: () -> Unit,
+        headers: Map<String, String>,
     ): Boolean {
         // Poignée construite DANS le `try` : une URL malformée refuse l'ouverture
         // (`false`, bascule HTTP par l'appelant) au lieu de planter.
         socket = try {
-            client.newWebSocket(request(url, userAgent = LIVE_USER_AGENT), Listener(onText, onClosed, onOpen))
+            client.newWebSocket(
+                request(url, userAgent = LIVE_USER_AGENT, headers = headers),
+                Listener(onText, onClosed, onOpen),
+            )
         } catch (e: IllegalArgumentException) {
             return false
         }
