@@ -63,8 +63,8 @@ assets (mêmes noms) — le fichier téléchargé gagne, l'asset suit en repli.
 Les mètres profondeur alimentent le direct existant (pastilles, voix,
 consignes « va à gauche, 2 mètres », flèches) :
 - `:core` `depth/DepthReadings.kt` (pur, testé) : médiane de proximité par
-  boîte, échelle calibrée par les ancres sténopé (médiane des
-  mètres × proximité), remplace le sténopé quand elle mesure (même sans
+  boîte, échelle calibrée par les ancres (sténopé + plan de sol, médiane
+  des mètres × proximité), remplace le sténopé quand elle mesure (même sans
   hauteur connue : trottoirs, murs), l'ajoute quand il est muet, le garde
   sinon. Mètres bornés [0,3 m, 60 m].
 - `:app` `depth/LiveDepthMeter.kt` : infère la dernière frame JPEG en fond
