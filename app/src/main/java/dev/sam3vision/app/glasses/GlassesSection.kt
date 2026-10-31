@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -141,7 +142,7 @@ internal fun GlassesBlock(glasses: GlassesController) {
         onRegister = glasses::register,
         onRequestCamera = { glasses.requestPermission(Permission.CAMERA) },
         onRequestMic = { glasses.requestPermission(Permission.MICROPHONE) },
-        onConnect = glasses::connect,
+        onConnect = { Log.i("GlassesChain", "tap session"); glasses.connect() },
         onCapture = { glasses.capture() },
         onDisconnect = glasses::disconnect,
         onStartMock = glasses::startMockDevice,
