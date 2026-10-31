@@ -22,13 +22,15 @@ import dev.sam3vision.core.settings.Settings
  * (flush toujours) au lieu d'attendre sa fin — un par un, la plus fraîche gagne.
  * Hors-ligne, parle quand même (voix système embarquée, aucune clé).
  *
- * L'état de parole (`speakingEntryId`) n'est pas touché : le TTS système ne
- * rend pas de fin de lecture, et un fanion posé sans fin bloquerait la
- * dictée — l'alerte est orale seule.
+ * L'alerte est orale seule : aucun fanion parlant n'est posé (le TTS système
+ * ne rend pas de fin de lecture, un fanion sans fin bloquerait la dictée).
+ * Mais [stopCurrent] rend le fanion de la lecture coupée : `player.stop()`
+ * ne termine jamais (`onComplete` ne part pas), le garder muterait toute la
+ * voix douce (lecteur cru occupé pour toujours).
  *
  * Pur Android (aucune coroutine, moteur injecté) : testé en JVM derrière un
- * pilote faux. [stopCurrent] coupe la lecture ElevenLabs (`player::stop` en
- * prod, faux en test).
+ * pilote faux. [stopCurrent] coupe la lecture ElevenLabs et rend son fanion
+ * (`player.stop()` + `cutSpeaking()` en prod, faux en test).
  */
 class SafetyVoice(
     player: SpeechPlayer,

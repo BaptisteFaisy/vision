@@ -125,3 +125,11 @@ private val AUDIO_MARKER = Regex("\\[[^\\]]*]").toPattern()
  */
 fun speakableText(text: String): Boolean =
     AUDIO_MARKER.matcher(text).replaceAll(" ").any { it.isLetterOrDigit() }
+
+/**
+ * Lecture coupée net (alerte de sécurité, voix du user) : le drapeau parlant
+ * est rendu — `SpeechPlayer.stop()` ne termine jamais (`onComplete` ne part
+ * pas), le garder muterait toute la voix douce (lecteur cru occupé pour
+ * toujours). Les sous-titres restent : le texte coupé demeure lisible.
+ */
+fun IseeUiState.cutSpeaking(): IseeUiState = copy(speakingEntryId = null)
