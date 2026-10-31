@@ -3,6 +3,7 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.depth.DepthReadings
 import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
@@ -96,7 +97,9 @@ class TraversePipeline(
         // au plus juste (voir `Detection.maskBox`).
         val detections = filtered.toDetectionsWithExtents(width, height)
         noteBackground(background, atMs)
-        val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion)
+        // PISTE2 : proximités serveur (SegObject.depth) vers le veto suivi — repli quand l'embarqué est muet.
+        val depthByBox = DepthReadings.serverCloseness(filtered).takeIf { it.isNotEmpty() }
+        val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion, depthByBox)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)
         return TraverseOutput(filtered, detections, decision, cue, outcome)
