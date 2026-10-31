@@ -77,7 +77,7 @@ class TraversePipelineTest {
     }
 
     @Test
-    fun `vert maintenu sans veto - traversez parle une fois`() = runBlocking {
+    fun `vert maintenu sans veto - traversez redit toutes les 2 s`() = runBlocking {
         val player = FakePlayer()
         val pipe = pipeline(player = player)
         var cues = 0
@@ -90,8 +90,8 @@ class TraversePipelineTest {
                 assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
             }
         }
-        assertEquals(1, cues)
-        assertEquals(listOf("play"), player.events)
+        assertEquals("annonce à 4 s, répétition à 6 s", 2, cues)
+        assertEquals(listOf("play", "play"), player.events)
     }
 
     @Test
@@ -99,7 +99,12 @@ class TraversePipelineTest {
         val player = FakePlayer()
         val pipe = pipeline(player = player)
         repeat(5) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        pipe.frame(listOf(seg()), green = true, index = 6)
+        val repeat = pipe.frame(listOf(seg()), green = true, index = 6)
+        assertEquals(
+            "piste non confirmée : le vert se répète à 6 s",
+            CrossingText.phrase(CrossingState.Green), repeat.cue?.phrase,
+        )
+        assertFalse(repeat.cue?.urgent ?: true)
         val alert = pipe.frame(listOf(seg()), green = true, index = 7)
         assertNull(alert.cue)
         val out = pipe.frame(listOf(seg()), green = true, index = 8)
@@ -110,7 +115,7 @@ class TraversePipelineTest {
         assertTrue(out.cue!!.urgent)
         assertEquals(CrossingText.phrase(CrossingState.Red), out.cue.phrase)
         assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
-        assertEquals(listOf("play", "stop", "play"), player.events)
+        assertEquals(listOf("play", "play", "stop", "play"), player.events)
     }
 
     @Test

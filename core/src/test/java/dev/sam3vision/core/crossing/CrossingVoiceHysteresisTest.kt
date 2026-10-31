@@ -16,7 +16,7 @@ import org.junit.Test
  * verrouillées. Binaire (ordre user du 31/10) : tout non-vert est rouge.
  *
  * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
- * rouge répété 1 s) : ce fichier les vérifie, il ne les change pas.
+ * rouge et vert répétés 2 s) : ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
 

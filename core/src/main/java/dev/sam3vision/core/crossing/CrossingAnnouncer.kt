@@ -14,9 +14,10 @@ data class CrossingCue(val phrase: String, val urgent: Boolean, val state: Cross
  * jamais sur un scintillement. Pendant de
  * [dev.sam3vision.core.live.GuidanceAnnouncer], avec l'asymétrie inversée :
  *
- * 1. **le vert se confirme** — [GREEN_MIN_FRAMES] frames vertes de suite avant
- *    « traversez » (un faux vert engage sur la chaussée, un vert raté fait
- *    juste attendre), puis silence tant qu'il dure ;
+ * 1. **le vert se confirme puis répète** — [GREEN_MIN_FRAMES] frames vertes
+ *    de suite avant « traversez » (un faux vert engage sur la chaussée, un
+ *    vert raté fait juste attendre), puis « Vert, traversez. » redit toutes
+ *    les [GREEN_REPEAT_MS] ms tant que le vert dure ;
  * 2. **le rouge parle vite et répète** — [RED_MIN_FRAMES] frames suffisent,
  *    puis « Rouge, attendez. » redit toutes les [RED_REPEAT_MS] ms tant que
  *    le rouge dure : manquer un rouge coûte plus qu'une fausse alerte, et
@@ -33,6 +34,7 @@ class CrossingAnnouncer(
     private val redMinFrames: Int = RED_MIN_FRAMES,
     private val cooldownMs: Long = DEFAULT_COOLDOWN_MS,
     private val redRepeatMs: Long = RED_REPEAT_MS,
+    private val greenRepeatMs: Long = GREEN_REPEAT_MS,
 ) {
 
     private var pendingState: CrossingState? = null
@@ -46,9 +48,9 @@ class CrossingAnnouncer(
 
     /**
      * État observé à [atMs] : le signal à prononcer, ou `null` pour garder le
-     * silence. [language] est la langue de la voix (Réglages). Un rouge déjà
-     * annoncé se répète toutes les [redRepeatMs] ms (jamais urgent) ; le
-     * vert annoncé reste muet jusqu'au changement d'état.
+     * silence. [language] est la langue de la voix (Réglages). Un état déjà
+     * annoncé se répète ([redRepeatMs] / [greenRepeatMs], jamais urgent) :
+     * en traversée, le feu dit rouge ou vert en continu, jamais muet.
      */
     fun onFrame(
         atMs: Long,
@@ -69,14 +71,15 @@ class CrossingAnnouncer(
     }
 
     /**
-     * Répétition d'un état déjà annoncé : le rouge seul, toutes les
-     * [redRepeatMs] ms, jamais urgent (l'urgence est réservée au retour au
-     * rouge après un vert). La répétition parle : elle recule le délai.
+     * Répétition d'un état déjà annoncé : rouge ou vert, toutes les
+     * [redRepeatMs] / [greenRepeatMs] ms, jamais urgent (l'urgence est
+     * réservée au retour au rouge après un vert). La répétition parle :
+     * elle recule le délai.
      */
     private fun repeat(atMs: Long, state: CrossingState, language: SpeechLanguage): CrossingCue? {
-        if (state != CrossingState.Red) return null
+        val interval = if (state == CrossingState.Green) greenRepeatMs else redRepeatMs
         val last = lastSpokenAtMs ?: return null
-        if (atMs - last < redRepeatMs) return null
+        if (atMs - last < interval) return null
         lastSpokenAtMs = atMs
         val cue = CrossingCue(CrossingText.phrase(state, language), false, state)
         lastCue = cue
@@ -117,11 +120,16 @@ class CrossingAnnouncer(
         const val DEFAULT_COOLDOWN_MS = 2_500L
 
         /**
-         * Répétition du rouge déjà annoncé (30/10/2026, ordre user : « quand
-         * le feu est rouge, répéter chaque seconde que la traversée est
-         * impossible », resserré de 2 s à 1 s). Le vert ne répète pas ;
-         * la répétition recule le délai comme une annonce normale.
+         * Répétition du rouge déjà annoncé (31/10/2026, ordre user : le feu
+         * dit rouge ou vert toutes les 2 s — le rouge repasse de 1 s à 2 s).
+         * La répétition recule le délai comme une annonce normale.
          */
-        const val RED_REPEAT_MS = 1_000L
+        const val RED_REPEAT_MS = 2_000L
+
+        /**
+         * Répétition du vert déjà annoncé (31/10/2026, même ordre : le vert
+         * ne reste plus muet, il se redit comme le rouge). Jamais urgente.
+         */
+        const val GREEN_REPEAT_MS = 2_000L
     }
 }
