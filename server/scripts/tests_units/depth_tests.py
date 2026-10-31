@@ -150,3 +150,34 @@ def test_run_frame_depth(fast_core) -> None:
           len(calls) == 1 and "depth" not in quiet["objects"][0], str(len(calls)))
     check("run_frame: modèle absent ⇒ repli gracieux",
           "depth" not in bare["objects"][0], str(bare["objects"][0])[:120])
+
+
+def test_depth_local_weights(_) -> None:
+    """Poids DA2 : répertoire local (build) honoré, repli Hub sinon.
+
+    Non-régression du depth=null servi : le boot est hermétique offline
+    (HF_HUB_OFFLINE=1), `from_pretrained` doit lire le répertoire local.
+    """
+    import importlib
+    import os
+
+    from test_units import check
+
+    import depth
+
+    key, var = "FAST_DEPTH_MODEL_DIR", os.environ.get("FAST_DEPTH_MODEL_DIR")
+    try:
+        os.environ[key] = "/opt/models/da2-small"
+        local = importlib.reload(depth)
+        check("depth: FAST_DEPTH_MODEL_DIR honoré",
+              local.MODEL_SOURCE == "/opt/models/da2-small", str(local.MODEL_SOURCE))
+        del os.environ[key]
+        hub = importlib.reload(depth)
+        check("depth: sans env, repli Hub", hub.MODEL_SOURCE == hub.MODEL_ID,
+              str(hub.MODEL_SOURCE))
+    finally:
+        if var is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = var
+        importlib.reload(depth)

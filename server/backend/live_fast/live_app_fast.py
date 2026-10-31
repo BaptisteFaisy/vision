@@ -65,14 +65,19 @@ SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 60)
 MIN_CONTAINERS = clamp_int(os.environ.get("FAST_MIN_CONTAINERS"), 0, 0, 1)
 SNAPSHOT = os.environ.get("FAST_SNAPSHOT", "1").strip().lower() in ("1", "true", "yes", "on")
 MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "/opt/models/sam3.1")
+DEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
+DEPTH_MODEL_DIR = os.environ.get("FAST_DEPTH_MODEL_DIR", "/opt/models/da2-small")
 BACKEND_DIR = Path(__file__).resolve().parent
 
 # Les poids sont téléchargés **au build de l'image**, plus au démarrage du conteneur :
 # ~20 s gagnées sur les 32 s de chargement à froid mesurées fin octobre (le Hub HF renvoyait
 # même un avertissement de débit non authentifié). Étape cachée par le build Modal.
+# DA2-Small (~100 Mo) est requis au même titre : le boot est hermétique offline
+# (HF_HUB_OFFLINE=1) et sans lui with_depth reste sans effet (depth=null).
 WEIGHTS_BUILD = (
     'python -c "from huggingface_hub import snapshot_download; '
-    + f"snapshot_download('unsloth/sam3.1', local_dir='{MODEL_DIR}')"
+    + f"snapshot_download('unsloth/sam3.1', local_dir='{MODEL_DIR}'); "
+    + f"snapshot_download('{DEPTH_MODEL_ID}', local_dir='{DEPTH_MODEL_DIR}')"
     + '"'
 )
 
@@ -97,6 +102,7 @@ def lever_env() -> dict:
     values["PYTHONPATH"] = "/root:/root/backend_src"
     values["BACKEND_PLATFORM"] = "modal"
     values["FAST_MODEL_DIR"] = MODEL_DIR
+    values["FAST_DEPTH_MODEL_DIR"] = DEPTH_MODEL_DIR
     # Boot offline : zéro appel réseau pendant les imports (poids déjà locaux).
     values["HF_HUB_OFFLINE"] = "1"
     values["TRANSFORMERS_OFFLINE"] = "1"
