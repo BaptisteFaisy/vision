@@ -10,9 +10,15 @@ name: auto-approve
 # trois checks requis n'existaient pas, la PR est restée `BLOCKED` et la file
 # Mergify sans verdict. Rien dans le dépôt ne doit dépendre d'un clic.
 #
-# Ici, on approuve sans intervention. Portée volontairement étroite : **dépôt
-# d'origine seulement** — un run de fork n'est jamais approuvé, son code
-# s'exécuterait sur nos runners self-hosted sans revue.
+# Ici, on approuve sans intervention. Deux garde-fous, appris le 31/10 au
+# premier passage réel (30 runs en attente, dont 14 vieux de plusieurs jours :
+# les approuver a lancé un rattrapage de CI inutile sur des branches
+# abandonnées) :
+#   - **dépôt d'origine seulement** — un run de fork n'est jamais approuvé, son
+#     code s'exécuterait sur nos runners self-hosted sans revue ;
+#   - **moins de 60 minutes** — un run en attente est approuvé dans les 5 min
+#     qui suivent ; au-delà, plus personne ne l'attend et un push a de toute
+#     façon rendu sa tête obsolète.
 #
 # Deux jetons essayés dans l'ordre : le PAT du balayeur (identité du
 # propriétaire, `actions: write`), puis le jeton de l'installation en repli
@@ -42,6 +48,7 @@ jobs:
           DEPOT: ${{ github.repository }}
           PAT: ${{ secrets.AUTOMERGE_PAT }}
           JETON_INSTALLATION: ${{ github.token }}
+          AGE_MAX_MIN: '60'
         run: |
           set -euo pipefail
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH"
@@ -50,7 +57,7 @@ jobs:
           lister() {
             GH_TOKEN="${1:-$JETON_INSTALLATION}" gh api \
               "repos/$DEPOT/actions/runs?status=action_required&per_page=100" \
-              --jq '.workflow_runs[] | [.id, .name, .head_branch, .head_repository.full_name] | @tsv' \
+              --jq '.workflow_runs[] | [.id, .name, .head_branch, .head_repository.full_name, .created_at] | @tsv' \
               2>/dev/null || true
           }
           approuver() { # $1 = jeton, $2 = id ; 0 = approuvé
@@ -62,13 +69,19 @@ jobs:
           # jeton de l'installation : `head_repository` est public sur le run.
           runs="$(lister "$PAT")"
           if [ -z "$runs" ]; then runs="$(lister "$JETON_INSTALLATION")"; fi
+          maintenant=$(date -u +%s)
           total=0
           faits=0
-          while IFS=$'\t' read -r id nom branche origine; do
+          while IFS=$'\t' read -r id nom branche origine cree; do
             [ -n "${id:-}" ] || continue
             total=$((total+1))
             if [ "${origine:-}" != "$DEPOT" ]; then
               echo "run $id ($nom, $branche) : fork (${origine:-inconnu}) — jamais approuvé"
+              continue
+            fi
+            age=$(( maintenant - $(date -u -d "${cree:-@0}" +%s) ))
+            if [ "$age" -gt $(( AGE_MAX_MIN * 60 )) ]; then
+              echo "run $id ($nom, $branche) : $((age/60)) min d'attente — périmé, pas approuvé"
               continue
             fi
             if approuver "$PAT" "$id" || approuver "$JETON_INSTALLATION" "$id"; then
