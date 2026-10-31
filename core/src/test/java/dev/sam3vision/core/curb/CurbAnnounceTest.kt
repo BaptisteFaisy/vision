@@ -68,8 +68,8 @@ class CurbAnnounceTest {
         val watcher = CurbWatcher()
         val positive = CurbSignal(detected = true, meters = 0.8f)
 
-        assertNull(watcher.onSignal(positive, 1000L))
-        val cue = watcher.onSignal(positive, 2000L)
+        assertNull(watcher.onSignal(positive, 1000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(positive, 2000L, SpeechLanguage.Fr)
 
         assertNotNull(cue)
         assertEquals("Marche dans 1 mètre.", cue!!.phrase)
@@ -129,8 +129,8 @@ class CurbAnnounceTest {
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Up)
 
-        assertNull(watcher.onSignal(near, 1000L))
-        val cue = watcher.onSignal(near, 2000L)
+        assertNull(watcher.onSignal(near, 1000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
 
         assertNotNull(cue)
         assertEquals("Marche, maintenant.", cue!!.phrase)
@@ -143,8 +143,8 @@ class CurbAnnounceTest {
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Down)
 
-        watcher.onSignal(near, 1000L)
-        val cue = watcher.onSignal(near, 2000L)
+        watcher.onSignal(near, 1000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
 
         assertEquals("Descente, maintenant.", cue!!.phrase)
         assertTrue(cue.urgent)
@@ -155,8 +155,8 @@ class CurbAnnounceTest {
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.3f)
 
-        watcher.onSignal(near, 1000L)
-        val cue = watcher.onSignal(near, 2000L)
+        watcher.onSignal(near, 1000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
 
         assertEquals("Marche, maintenant.", cue!!.phrase)
     }
@@ -304,8 +304,8 @@ class CurbAnnounceTest {
         val watcher = CurbWatcher()
         val pass = CurbSignal.of(listOf(flat()), 512, 1138)
 
-        assertNull(watcher.onSignal(pass, 1000L))
-        val cue = watcher.onSignal(pass, 2000L)
+        assertNull(watcher.onSignal(pass, 1000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(pass, 2000L, SpeechLanguage.Fr)
 
         assertNotNull(cue)
         assertEquals("Bateau, pas de marche.", cue!!.phrase)
