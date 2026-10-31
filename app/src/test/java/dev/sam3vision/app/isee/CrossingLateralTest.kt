@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.crossing.CrossingApproachWatcher
 import dev.sam3vision.core.crossing.CrossingArrivalWatcher
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.distance.CameraPose
@@ -194,5 +195,39 @@ class CrossingLateralTest {
             LensSpec.Default, 0L, SpeechLanguage.Fr,
         )
         assertEquals("Tout droit.", CrossingLateralWatch.flow.value?.lateral)
+    }
+
+    @Test
+    fun `patch annonce le passage localise apres deux frames`() {
+        val lateral = CrossingLateralAnnouncer()
+        val arrival = CrossingArrivalWatcher()
+        val approach = CrossingApproachWatcher()
+        val box = listOf(10f, 100f, 100f, 500f)
+        val objects = listOf(obj("crosswalk", box))
+        val readings = listOf(reading("crosswalk", 2.0f, box))
+        val first = crossingLateralPatchOf(
+            lateral, arrival, objects, 512, 1138, readings, null,
+            LensSpec.Default, 0L, SpeechLanguage.Fr, approach,
+        )
+        assertNull(first?.approach)
+        val second = crossingLateralPatchOf(
+            lateral, arrival, objects, 512, 1138, readings, null,
+            LensSpec.Default, 200L, SpeechLanguage.Fr, approach,
+        )
+        assertEquals("Passage piéton à gauche, à 2 mètres.", second?.approach)
+    }
+
+    @Test
+    fun `observe dit l annonce via say, avant l arrivee`() = runTest {
+        val patches = MutableStateFlow<CrossingLateralPatch?>(null)
+        val words = mutableListOf<Pair<String, String>>()
+        val said = mutableListOf<String>()
+        observeCrossingLateral(patches, backgroundScope, { clip, text -> words.add(clip to text) }, { said.add(it) })
+
+        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Passage piéton devant.")
+        runCurrent()
+
+        assertTrue(words.isEmpty())
+        assertEquals(listOf("Passage piéton devant.", "Sur le passage."), said)
     }
 }
