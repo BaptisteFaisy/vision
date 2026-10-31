@@ -47,6 +47,13 @@ MAX_FICHIERS = 20
 MAX_LIGNES = 1_500
 MAX_JOURNAL_LIGNES = 120
 REFUSES = (".github/", ".mergify.yml")
+# Sorties d'outils (Gradle notamment) : elles apparaissent dans le clone quand
+# l'agent a lancé une compilation, et n'ont rien à faire dans le correctif
+# (vécu : `.kotlin/` commité sur la PR de test #652).
+JAMAIS_COMMITES = (".kotlin/", "build/", ".gradle/", ".idea/", ".git/")
+# Mêmes exclusions côté git (pathspec) : le commit ne prend que du code.
+EXCLUSIONS_GIT = ("--", ":(exclude).kotlin/**", ":(exclude)**/build/**",
+                  ":(exclude).gradle/**", ":(exclude).idea/**")
 MARK = "<!-- test-agent sha=%s -->"
 # Préfixe des sorties d'infrastructure : un runner non provisionné n'est pas un
 # échec de l'agent, donc on ne pose **aucune marque** et l'essai de la tête
@@ -272,6 +279,11 @@ def lancer_agent(prompt, dossier, budget=BUDGET_S):
     return proc.returncode == 0, sortie[-2_000:]
 
 
+def sortie_outil(chemin):
+    """Vrai pour un répertoire de sortie d'outil (Gradle, IDE)."""
+    return chemin.startswith(JAMAIS_COMMITES) or "/build/" in chemin
+
+
 def changements():
     """Fichiers modifiés ou ajoutés dans le clone (hors suivis ignorés)."""
     proc = subprocess.run(["git", "status", "--porcelain"], capture_output=True,
@@ -283,8 +295,9 @@ def changements():
         chemin = ligne[3:].strip()
         if " -> " in chemin:
             chemin = chemin.split(" -> ", 1)[1]
-        if chemin:
-            fichiers.append(chemin.strip('"'))
+        chemin = chemin.strip('"')
+        if chemin and not sortie_outil(chemin):
+            fichiers.append(chemin)
     return fichiers
 
 
@@ -324,9 +337,9 @@ def verifier_diff(fichiers):
 
 
 def commiter(pr):
-    """Commit d'identité propriétaire (règle du dépôt)."""
-    subprocess.run(["git", "add", "-A"], capture_output=True, text=True,
-                   timeout=120)
+    """Commit d'identité propriétaire (règle du dépôt), sorties d'outils exclues."""
+    subprocess.run(["git", "add", "-A"] + list(EXCLUSIONS_GIT),
+                   capture_output=True, text=True, timeout=120)
     proc = subprocess.run(
         ["git", "-c", "user.name=BaptisteFaisy",
          "-c", "user.email=119856854+BaptisteFaisy@users.noreply.github.com",
