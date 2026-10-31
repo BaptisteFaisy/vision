@@ -187,6 +187,53 @@ class StairDetectorTest {
     }
 
     @Test
+    fun `masque sam = marches dedans comptees, dehors ignorees`() {
+        // Masque = moitié basse (lignes 30..59) : 24,25 ignorées, 36,44,52,58 comptées.
+        val plane = ByteArray(64 * 60) { i -> if (i / 64 >= 30) 1 else 0 }
+        val signal = StairDetector.detect(stairsLike(24, 25, 36, 44, 52, 58), maskPlane = plane)
+
+        assertEquals(4, signal.lineCount)
+        assertTrue(signal.detected)
+        assertEquals(30, signal.roiTop)
+        assertEquals(60, signal.roiBottom)
+    }
+
+    @Test
+    fun `masque haut = escalier cadre en haut compte`() {
+        // Le cas que le bas fixe rate : 3 marches sur 4 au-dessus de la ligne 24.
+        val plane = ByteArray(64 * 60) { i -> if (i / 64 < 30) 1 else 0 }
+        val mask = stairsLike(4, 12, 20, 28)
+        val full = StairDetector.detect(mask)
+        val bounded = StairDetector.detect(mask, maskPlane = plane)
+
+        assertEquals(1, full.lineCount)
+        assertEquals(4, bounded.lineCount)
+        assertTrue(bounded.detected)
+        assertEquals(0, bounded.roiTop)
+        assertEquals(30, bounded.roiBottom)
+    }
+
+    @Test
+    fun `masque prime sur roi`() {
+        // ROI = moitié haute (0 marche dedans), masque = image entière (4 dedans).
+        val plane = ByteArray(64 * 60) { 1 }
+        val mask = stairsLike(36, 44, 52, 58)
+        val roiOnly = StairDetector.detect(mask, roi = StairRoi(0f, 0f, 1f, 0.5f))
+        val masked = StairDetector.detect(mask, roi = StairRoi(0f, 0f, 1f, 0.5f), maskPlane = plane)
+
+        assertEquals(0, roiOnly.lineCount)
+        assertEquals(4, masked.lineCount)
+    }
+
+    @Test
+    fun `plan vide ou incoherent = repli sur`() {
+        val mask = stairsLike(36, 44, 52, 58)
+
+        assertEquals(StairSignal.none(), StairDetector.detect(mask, maskPlane = ByteArray(64 * 60)))
+        assertEquals(4, StairDetector.detect(mask, maskPlane = ByteArray(10)).lineCount)
+    }
+
+    @Test
     fun `confiance en rampe 0 puis tiers`() {
         assertEquals(0f, StairDetector.confidenceFor(0, 4), 0f)
         assertEquals(0f, StairDetector.confidenceFor(3, 4), 0f)
