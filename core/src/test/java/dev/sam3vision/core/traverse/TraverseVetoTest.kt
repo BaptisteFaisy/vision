@@ -168,7 +168,7 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `prompts de traversee bornes a seize vehicules en tete`() {
+    fun `prompts de traversee bornes a dix sept vehicules en tete`() {
         val prompts = VehicleConcepts.promptsFor(listOf("traffic light", "person", "door", "zebra"))
         assertEquals(
             listOf(
