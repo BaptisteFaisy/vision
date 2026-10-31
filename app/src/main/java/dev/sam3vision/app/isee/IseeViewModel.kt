@@ -23,6 +23,7 @@ import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeGlassesOrder
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
+import dev.sam3vision.app.isee.vm.IseeStreamDictation
 import dev.sam3vision.app.isee.vm.IseeNavClarify
 import dev.sam3vision.app.isee.vm.IseeSpeedOrder
 import dev.sam3vision.app.isee.vm.IseePhotoShot
@@ -137,7 +138,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Micro de l'appui long, transcription incluse. */
     private val mic = IseeHoldMic()
-    private val dictation = IseeDictation(mic, ::speechClient, ::update)
+    private val streamDictation = IseeStreamDictation(viewModelScope, mic::setChunkListener, ::update)
+    private val dictation = IseeDictation(mic, { s -> streamDictation.finalClient(speechClient(s)) }, ::update, onSettled = streamDictation::stop)
     private val liveDictation = IseeLiveDictation(viewModelScope, mic::preview, ::speechClient, ::update)
 
     /** Vidéo d'environnement du tap, et lien aux actions de la caméra. */
@@ -209,7 +211,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
     private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
-    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap)
+    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap)
     private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
@@ -275,6 +277,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         liveDictation.stop()
+        streamDictation.stop()
         dictation.discard()
         player.release()
         safety.shutdown()

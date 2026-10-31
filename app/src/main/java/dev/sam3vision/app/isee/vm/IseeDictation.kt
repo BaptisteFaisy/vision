@@ -23,6 +23,8 @@ class IseeHoldMic(
 
     fun preview() = transcript.preview()
 
+    fun setChunkListener(listener: ((ByteArray, Int) -> Unit)?) = transcript.setChunkListener(listener)
+
     override suspend fun stop(client: SpeechClient): Result<Pair<String, ByteArray>> =
         transcript.stop(client)
 
@@ -42,6 +44,12 @@ class IseeDictation(
     private val engine: (Settings) -> SpeechClient?,
     private val update: StateUpdate,
     private val transcribeTimeoutMs: Long = TRANSCRIBE_TIMEOUT_MS,
+    /**
+     * Rappel micro rendu (succès, échec, annulation) : le stream temps réel
+     * y ferme sa session quand le batch a repris la main — notamment la
+     * tenue trop courte, refusée avant tout appel réseau.
+     */
+    private val onSettled: () -> Unit = {},
 ) {
 
     /** Vrai entre le début d'une tenue et son relâchement (ou son rejet). */
@@ -85,6 +93,7 @@ class IseeDictation(
         } finally {
             // Garanti aussi sur annulation : le « … » ne reste jamais affiché.
             update { it.copy(transcribing = false) }
+            onSettled()
         }
     }
 
