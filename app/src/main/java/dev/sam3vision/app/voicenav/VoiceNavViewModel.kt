@@ -39,25 +39,12 @@ class VoiceNavViewModel(private val session: VoiceNavSession) : ViewModel() {
     /** La session sous-jacente : entrée vocale `suspend` depuis la dictée. */
     fun session(): VoiceNavSession = session
 
-    /** Bouton « Démarrer » de l'écran de confirmation. */
-    fun confirmDestination() {
-        viewModelScope.launch { session.confirmDestination() }
-    }
 
     /** Bouton « Annuler » de l'écran de confirmation. */
     fun cancelConfirmation() {
         session.cancelConfirmation()
     }
 
-    /**
-     * Champ texte de secours : la saisie devient une dictée équivalente
-     * (« aller à … ») consommée par la session existante — la confirmation
-     * se rouvre sur la destination tapée. Saisie vide : sans effet.
-     */
-    fun submitTypedDestination(text: String) {
-        val query = typedDestinationQuery(text) ?: return
-        viewModelScope.launch { session.onVoiceTranscript(query) }
-    }
 
     /** Bouton « Arrêter » de l'écran de guidage. */
     fun stopGuidance() {
