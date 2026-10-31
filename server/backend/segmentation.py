@@ -146,6 +146,11 @@ def detection_entries(detection, label: str, work_size, image_size,
     ]
 
 
+def _depth_key(item: dict) -> dict:
+    """Clé ``depth`` d'un objet du contrat : présente seulement si mesurée."""
+    return {"depth": item["depth"]} if "depth" in item else {}
+
+
 def _finalize_rle(entries: list[dict], image_size, max_objects: int, mask_edge: int) -> dict:
     """Variante RLE : runs LEB128 sur grille réduite + ``mask_scale`` par objet."""
     from imaging import encode_mask_rle_b64, rle_grid
@@ -163,6 +168,7 @@ def _finalize_rle(entries: list[dict], image_size, max_objects: int, mask_edge: 
                 "box": item["box"],
                 "mask_b64": encode_mask_rle_b64(item["mask"], grid),
                 "mask_scale": scale,
+                **_depth_key(item),
             }
             for item in ordered[:max_objects]
         ],
@@ -197,6 +203,7 @@ def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
                 "score": item["score"],
                 "box": item["box"],
                 "mask_b64": encode_mask_b64(item["mask"], image_size, encoding),
+                **_depth_key(item),
             }
             for item in ordered[:max_objects]
         ],

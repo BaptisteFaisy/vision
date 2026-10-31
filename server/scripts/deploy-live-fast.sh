@@ -90,6 +90,7 @@ lev, app = h.get("levers") or {}, h.get("applied") or {}
 restored = h.get("restored")
 print("gpu    :", h.get("gpu"))
 print("model  :", h.get("model"))
+print("depth  :", h.get("depth") or "INDISPONIBLE (repli gracieux)")
 print("levers :", json.dumps(lev, ensure_ascii=False, sort_keys=True))
 print("applied:", json.dumps(app, ensure_ascii=False, sort_keys=True))
 print("boot   :", "restore" if restored is True else
@@ -101,6 +102,8 @@ missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
     sys.exit("model pas \"fast\"")
+if "depth" not in h:
+    sys.exit("champ depth absent (ancienne version ?)")
 if not isinstance(restored, bool):
     sys.exit("champ restored absent (backend trop vieux ?)")
 lb = h.get("load_breakdown")
