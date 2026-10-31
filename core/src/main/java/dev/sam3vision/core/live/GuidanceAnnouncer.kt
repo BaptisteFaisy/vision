@@ -18,11 +18,12 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * attendre l'échéance). Seul le stop ne se répète jamais : parlé une fois,
  * il ne se rabâche pas.
  *
- * Arbitrage voix (ordre user du 29/10) : couloir bouché → voix TwinLite
- * ([TwinLiteWord] : arrêt au contact, côté de sortie sinon), voie libre →
- * mots SAM ([GuidanceWord] : décalage, retour trottoir, cap marché). Une
- * seule porte pour les deux voix : un seul parle à la fois, jamais de
- * doublon, et le bouché prime toujours — la sécurité ne négocie jamais.
+ * Arbitrage voix (ordre user du 29/10, stop du guidage retiré le 31/10) :
+ * couloir bouché → voix TwinLite ([TwinLiteWord], côté de sortie même au
+ * contact), voie libre → mots SAM ([GuidanceWord] : décalage, retour
+ * trottoir, cap marché). Une seule porte pour les deux voix : un seul
+ * parle à la fois, jamais de doublon, et le bouché prime toujours — la
+ * sécurité ne négocie jamais.
  *
  * Pur et testé en JVM (aucun Android, aucune horloge implicite : [atMs] est fourni).
  */
@@ -106,8 +107,8 @@ class GuidanceAnnouncer(
     /**
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur
      * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
-     * mesures du téléphone (le mot stop a besoin d'une distance). Sans côté
-     * (contrat rompu), la gauche — comme l'égalité côté serveur.
+     * mesures du téléphone. Sans côté (contrat rompu), la gauche — comme
+     * l'égalité côté serveur.
      */
     private fun samDecision(
         passage: Passage,

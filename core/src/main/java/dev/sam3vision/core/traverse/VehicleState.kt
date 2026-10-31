@@ -42,6 +42,9 @@ object VehicleStateText {
     /** Nom parlé du véhicule : [fr] et [en] capitalisés (« Voiture », « Car »). */
     data class VehicleName(val fr: String, val en: String)
 
+    /** Alerte pluriel : « Stop, N vehicles moving. » / « Stop, N véhicules en mouvement. ». */
+    private val PLURAL_ALERT = Regex("^Stop, \\d+ (vehicles moving|véhicules en mouvement)\\.$")
+
     private val NAMES: Map<String, VehicleName> = mapOf(
         "car" to VehicleName("Voiture", "Car"),
         "voiture" to VehicleName("Voiture", "Car"),
@@ -124,6 +127,21 @@ object VehicleStateText {
     fun safetyPluralPhrase(count: Int, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> "Stop, $count véhicules en mouvement."
         SpeechLanguage.En -> "Stop, $count vehicles moving."
+    }
+
+    /**
+     * Vrai si [phrase] est une alerte mouvement (« Stop, car moving. »,
+     * « Stop, 2 vehicles moving. », …) : le [safetyPhrase] de chaque nom
+     * (FR/EN) ou le [safetyPluralPhrase] quel que soit le compte. La sonde
+     * y lit l'urgence parlée en Traversée — le seul mode où le stop se dit
+     * (ordre user du 31/10). Pure, testée en JVM.
+     */
+    fun isSafetyPhrase(phrase: String): Boolean {
+        if (PLURAL_ALERT.matches(phrase)) return true
+        return NAMES.values.any { name ->
+            phrase == safetyPhrase(name, SpeechLanguage.Fr) ||
+                phrase == safetyPhrase(name, SpeechLanguage.En)
+        }
     }
 
     /** « Voiture à l'arrêt… », à la distance mesurée ou à l'heure. */

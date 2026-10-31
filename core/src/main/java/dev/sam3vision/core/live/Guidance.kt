@@ -31,12 +31,6 @@ data class GuidanceDecision(
      * sur voie libre ou distance inconnue (la consigne reste alors non chiffrée).
      */
     val shiftMeters: Float? = null,
-    /**
-     * Contact mesuré : un bloquant à [STOP_METERS] ou moins. Le mot n'est
-     * « stop » que sur les caps latéraux (le cap droit contourne toujours) ;
-     * l'inconnu élu ne masque plus un contact mesuré.
-     */
-    val stop: Boolean = false,
 )
 
 /**
@@ -59,13 +53,6 @@ object Guidance {
 
     /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
     const val RANGE_METERS = 4f
-
-    /**
-     * En deçà (mesuré), contourner n'est plus un pas : le mot est « stop ».
-     * À 1,2 m/s, 0,6 m c'est un pas avant le contact — et la frame parlée a
-     * déjà ~1 s de retard. Sans mesure, le mot reste le côté de sortie.
-     */
-    const val STOP_METERS = 0.6f
 
     /**
      * Demi-largeur du marcheur (m) : le trait droit a l'épaisseur du corps —
@@ -119,16 +106,15 @@ object Guidance {
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
-        val stop = blocking.any { contactOf(it) }
         if (cap == SteeringCap.Straight) {
             val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
             val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, stop)
+            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
         }
         val passage = bestPassage(cleaned, cap, rangeMeters)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift, stop)
+        return GuidanceDecision(true, obstacle, null, cap, passage, shift)
     }
 
     /**
@@ -157,13 +143,10 @@ object Guidance {
     }
 
     /**
-     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie.
-     * Cap droit : toujours le côté de contournement, jamais « stop » — dans
-     * une foule on se faufile, on ne s'arrête pas (ordre user ; le danger
-     * imminent reste couvert par la voix de sécurité, hors d'ici). Caps
-     * latéraux : contact mesuré ([STOP_METERS] ou moins, sur un bloquant
-     * quelconque) ⇒ stop. Sans mesure, le mot reste le côté de sortie (on
-     * ne juge pas le contact sans distance).
+     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie —
+     * même au contact mesuré (ordres user : dans une foule on se faufile,
+     * et jamais de stop pour un obstacle — la voix dit directement
+     * comment l'éviter, cap droit comme caps latéraux).
      */
     fun word(decision: GuidanceDecision): GuidanceWord {
         val obstacle = decision.obstacle
@@ -171,22 +154,14 @@ object Guidance {
         if (decision.cap == SteeringCap.Straight) {
             return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left)
         }
-        if (decision.stop) return GuidanceWord.Stop
-        val meters = obstacle.meters?.takeIf { it.isFinite() }
-        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
         return GuidanceWord.fromCap(decision.passage ?: SteeringCap.Straight)
     }
 
-    /** Contact du label : mesuré fini à [STOP_METERS] ou moins. */
-    private fun contactOf(label: PlacedLabel): Boolean {
-        val meters = label.meters
-        return meters != null && meters.isFinite() && meters <= STOP_METERS
-    }
-
     /**
-     * Consigne prononcée, jamais `null` : un des quatre mots ([GuidanceWord]),
-     * langue de la voix. Ni nom d'obstacle, ni cadran, ni distance, ni
-     * décalage : le mot seul, dit en moins de 100 ms (clips pré-synthétisés).
+     * Consigne prononcée, jamais `null` : l'un des mots ([GuidanceWord],
+     * jamais stop — ordre user du 31/10), langue de la voix. Ni nom
+     * d'obstacle, ni cadran, ni distance, ni décalage : le mot seul, dit
+     * en moins de 100 ms (clips pré-synthétisés).
      */
     fun phrase(
         decision: GuidanceDecision,
