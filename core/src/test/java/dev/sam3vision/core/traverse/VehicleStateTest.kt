@@ -200,10 +200,9 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `voiture qui traverse - mouvement lateral prouve annonce`() {
-        // Fond fixe (caméra immobile) + boîte qui glisse : deux verdicts
-        // VEHICLE_MOVED de suite prouvent le mouvement (la preuve unique jeune
-        // peut être un artefact de montée en vitesse — voir VBG).
+    fun `voiture qui traverse - mouvement lateral annonce`() {
+        // Fond fixe (caméra immobile) + boîte qui glisse à taille stable :
+        // la traversée latérale (verdict approche) annonce dès confirmation.
         val motion = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 100L)
         val watcher = VehicleStateWatcher()
         val frames = listOf(200f, 240f, 280f, 320f, 360f).map { box(100f, cx = it) }
@@ -212,8 +211,9 @@ class VehicleStateTest {
                 listOf(det("car", frame)), listOf(reading("car", 12f, frame)),
                 atMs = index * 100L, language = SpeechLanguage.Fr, motion = motion,
             )
-            if (index < 4) assertNull(cue)
-            else assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
+            if (index < 3) assertNull(cue)
+            else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
+            else assertNull("cooldown mouvement", cue)
         }
     }
 
