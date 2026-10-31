@@ -93,7 +93,11 @@ fun traverseAccent(active: Boolean, phase: TraversePhase?): Int {
  * La transformation est celle de l'aperçu ([cropTransform], `ContentScale.Crop`) —
  * la même que celle des pastilles de distance : sans elle, le cadre dérive dès que
  * le rapport de l'image diffère de celui de la carte. `null` = rien de dessinable
- * (pas de feu, boîte invalide, image dégénérée).
+ * (pas de feu, boîte invalide, vide ou hors champ, image dégénérée).
+ *
+ * Un feu détecté plus petit que [MIN_MARKER_PX] n'est plus effacé : il est
+ * élargi à ce minimum, centré sur sa position ([expandToMinimum]). La position
+ * reste celle de la détection — jamais de marqueur sans détection.
  */
 fun lightMarker(
     box: List<Float>?,
@@ -103,14 +107,49 @@ fun lightMarker(
     boxHeight: Float,
 ): LightMarker? {
     if (box == null || box.size != 4) return null
+    if (box.any { !it.isFinite() }) return null
+    if (box[2] <= box[0] || box[3] <= box[1]) return null
     if (frameWidth <= 0 || frameHeight <= 0 || boxWidth <= 0f || boxHeight <= 0f) return null
     val t = cropTransform(frameWidth, frameHeight, boxWidth, boxHeight)
-    val left = t.screenX(box[0] * frameWidth).coerceIn(0f, boxWidth)
-    val top = t.screenY(box[1] * frameHeight).coerceIn(0f, boxHeight)
-    val right = t.screenX(box[2] * frameWidth).coerceIn(0f, boxWidth)
-    val bottom = t.screenY(box[3] * frameHeight).coerceIn(0f, boxHeight)
-    if (right - left < MIN_MARKER_PX || bottom - top < MIN_MARKER_PX) return null
-    return LightMarker(left, top, right, bottom)
+    val rawLeft = t.screenX(box[0] * frameWidth)
+    val rawTop = t.screenY(box[1] * frameHeight)
+    val rawRight = t.screenX(box[2] * frameWidth)
+    val rawBottom = t.screenY(box[3] * frameHeight)
+    if (rawRight <= 0f || rawLeft >= boxWidth || rawBottom <= 0f || rawTop >= boxHeight) return null
+    val left = rawLeft.coerceIn(0f, boxWidth)
+    val top = rawTop.coerceIn(0f, boxHeight)
+    val right = rawRight.coerceIn(0f, boxWidth)
+    val bottom = rawBottom.coerceIn(0f, boxHeight)
+    return expandToMinimum(left, top, right, bottom, boxWidth, boxHeight)
+}
+
+/**
+ * Marqueur minimal visible : un cadre réel plus petit que [MIN_MARKER_PX] est
+ * élargi à ce minimum, centré sur sa position détectée puis ramené dans
+ * l'écran. Un cadre déjà assez grand est rendu tel quel.
+ */
+private fun expandToMinimum(
+    left: Float,
+    top: Float,
+    right: Float,
+    bottom: Float,
+    boxWidth: Float,
+    boxHeight: Float,
+): LightMarker {
+    if (right - left >= MIN_MARKER_PX && bottom - top >= MIN_MARKER_PX) {
+        return LightMarker(left, top, right, bottom)
+    }
+    val half = MIN_MARKER_PX / 2f
+    val cx = (left + right) / 2f
+    val cy = (top + bottom) / 2f
+    val newLeft = (cx - half).coerceIn(0f, (boxWidth - MIN_MARKER_PX).coerceAtLeast(0f))
+    val newTop = (cy - half).coerceIn(0f, (boxHeight - MIN_MARKER_PX).coerceAtLeast(0f))
+    return LightMarker(
+        newLeft,
+        newTop,
+        (newLeft + MIN_MARKER_PX).coerceAtMost(boxWidth),
+        (newTop + MIN_MARKER_PX).coerceAtMost(boxHeight),
+    )
 }
 
 /**
@@ -152,8 +191,13 @@ fun verdictRect(
     return LightMarker(left, top, left + tagWidth, top + tagHeight)
 }
 
-/** Sous cette taille (px), un cadre ne désigne plus rien : on n'affiche rien. */
-private const val MIN_MARKER_PX = 6f
+/**
+ * Plus petit marqueur dessiné (px) : une détection réelle sous cette taille
+ * est élargie à ce minimum au lieu d'être effacée. 12 px : le trait du cadre
+ * (2,5 dp) noierait un marqueur de 6 px ; au-delà, on mentirait sur la taille
+ * du feu. La position reste celle de la détection.
+ */
+const val MIN_MARKER_PX = 12f
 
 /** Écart (px) entre le haut de la boîte et le bas de l'étiquette. */
 private const val TAG_GAP_PX = 4f
