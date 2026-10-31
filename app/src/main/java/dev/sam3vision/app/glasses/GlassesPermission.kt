@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses
 
 import android.app.Activity
+import android.util.Log
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.DatResult
 import com.meta.wearable.dat.core.types.DeviceSessionError
@@ -38,15 +39,26 @@ fun permissionOutcome(permission: Permission, result: PermissionResult): Permiss
         onFailure = { error, _ -> PermissionOutcome(message = permissionFailed(permission, error)) },
     )
 
+/** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
+private const val TAG = "GlassesChain"
+
 /**
  * Dit une erreur de session dans la langue de l'écran, et ouvre sa page de réparation quand
  * elle s'y répare (app DAT des lunettes à mettre à jour).
+ *
+ * Le journal reçoit TOUJOURS l'erreur brute (enum + description SDK) : seul l'affichage est
+ * filtré ([sessionErrorWorthTelling]), jamais le diagnostic. Un vrai `STOP_ERROR_GENERIC`
+ * devenu `UNEXPECTED` reste donc visible au `logcat` même quand l'écran garde le causal.
  */
 internal fun reportSessionError(
     error: DeviceSessionError,
     activity: Activity?,
     note: (GlassesMessage) -> Unit,
+    phase: SessionPhase = SessionPhase.IDLE,
+    current: GlassesMessage? = null,
 ) {
+    Log.w(TAG, "erreur session : $error — ${error.description}")
+    if (!sessionErrorWorthTelling(error, phase, current)) return
     note(sessionErrorMessage(error))
     if (!sessionErrorNeedsGlassesAppUpdate(error)) return
     activity?.let { host -> runCatching { Wearables.openDATGlassesAppUpdate(host) } }
