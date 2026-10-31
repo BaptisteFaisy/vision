@@ -28,7 +28,8 @@ actif), mathématiquement identiques, pinnés à `transformers==5.20.2` :
   mémoïsé par formes ;
 - `Sam3DetrDecoder._get_coords` alloue `torch.arange` à chaque forward (son
   `lru_cache` keye des tenseurs 0-d par identité, donc miss systématique) →
-  grilles mémoïsées par stockage parent (`data_ptr`, sans sync).
+  grilles mémoïsées par stockage parent **et** dimensions lues (`_coords_key` :
+  le `data_ptr` seul resservait une grille périmée — mort prod du 29/10).
 """
 
 from types import SimpleNamespace
@@ -211,7 +212,13 @@ class DetrGraphs:
 
     @staticmethod
     def _shape(embeds, inputs):
-        """Signature de forme : tout ce qui doit être stable pour un graphe donné."""
+        """Signature de forme : tout ce qui doit être stable pour un graphe donné.
+
+        Les scalaires (flag, `None`) font partie de la clé : un contrôle Python
+        qui en dépend rejouerait sinon un graphe capturé sur un autre chemin.
+        Au pire (scalaire qui varie à chaque frame), la forme ne se capture
+        jamais et le DETR reste en eager — lent, jamais faux.
+        """
         torch = _torch()
 
         def part(value):
@@ -223,7 +230,9 @@ class DetrGraphs:
                 return tuple((k, part(v)) for k, v in sorted(value.items()))
             if isinstance(value, SimpleNamespace):
                 return tuple((k, part(v)) for k, v in sorted(vars(value).items()))
-            return None
+            if value is None or isinstance(value, (bool, int, float, str)):
+                return value
+            return type(value).__name__
 
         return (str(part(embeds)), str(part(inputs)))
 
@@ -235,6 +244,15 @@ class DetrGraphs:
 def graph_holder(ctx):
     """Le cache de la session, ou `None` si le levier est éteint (alors eager pur)."""
     return ctx.get("detr_graphs")
+
+
+def _coords_key(storage_ptr: int, height: int, width: int, dtype, device) -> tuple:
+    """Clé des grilles RPB : stockage parent **et** dimensions lues.
+
+    Le `data_ptr` seul ne suffit pas — l'allocateur réutilise les stockages
+    (voir `_cached_coords`). Testée sans torch (`test_detr_coords_key`).
+    """
+    return (storage_ptr, height, width, str(dtype), str(device))
 
 
 def patch_detr_capture() -> str:
@@ -262,16 +280,18 @@ def patch_detr_capture() -> str:
         return feats, pos, entry
 
     def _cached_coords(self, height, width, dtype, device):
-        # `height`/`width` : vues 0-d d'un tenseur parent — `data_ptr()` du stockage
-        # (métadonnée, sans sync) identifie le parent ; les valeurs ne sont lues
-        # (`int`, sync) qu'au premier passage par stockage, toujours en eager
-        # (le warmup précède la capture, sur les mêmes clones).
-        key = (height.untyped_storage().data_ptr(), str(dtype), str(device))
+        # Valeurs lues à chaque appel (sync ~µs, négligeable devant 52 ms de
+        # DETR) : la clé `data_ptr` seul resservait une grille périmée quand
+        # l'allocateur réutilisait le stockage pour d'autres H/W — corruption
+        # à effet différé, sans traceback (mort prod du 29/10). Les valeurs
+        # sont stables par graphe capturé, donc la lecture reste rejouable.
+        hlo, wlo = int(height), int(width)
+        key = _coords_key(height.untyped_storage().data_ptr(), hlo, wlo, dtype, device)
         hit = _coords_cache.get(key)
         if hit is not None:
             return hit
-        coords_h = torch.arange(0, int(height), device=device, dtype=dtype) / int(height)
-        coords_w = torch.arange(0, int(width), device=device, dtype=dtype) / int(width)
+        coords_h = torch.arange(0, hlo, device=device, dtype=dtype) / hlo
+        coords_w = torch.arange(0, wlo, device=device, dtype=dtype) / wlo
         if len(_coords_cache) >= _COORDS_MAX:
             _coords_cache.pop(next(iter(_coords_cache)))
         _coords_cache[key] = (coords_h, coords_w)

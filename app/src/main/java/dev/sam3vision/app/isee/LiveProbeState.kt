@@ -46,6 +46,13 @@ data class LiveProbeState(
     /** Les deux modèles LLM effectifs (`debugModelsLine`) : vide = non renseigné. */
     val modelsLine: String = "",
     val frames: Int = 0,
+    /**
+     * Compteur de publications pixels : incrémenté à chaque écriture #1 (masques),
+     * une écriture avant [frames] (chiffres + voix). L'écran y accroche
+     * `FirstPixelWatcher` : le poste PIXEL est posé dès la composition des
+     * masques, sans attendre les distances ni la phrase.
+     */
+    val pixelSeq: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     /** Détections SAM confirmées de la dernière frame, mesurées ou non : la voix y voit ce que l'écran montre. */
     val samDetections: List<Detection> = emptyList(),
