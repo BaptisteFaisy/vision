@@ -2,7 +2,8 @@
 """Reentraine l'arbre couleur feu sur crops telephone labellises.
 
 Entree : labels.csv (name,label R/G/BAD) + dossier de PNG (voir
-`tools/review_light_crops.py`), ancres `feuxfr/` + `feuxfr2/` (garde-fou).
+`tools/review_light_crops.py`), ancres `feuxfr/` + `feuxfr2/` (+ `feuxfr3/`
+quand il sera peuple, voir son README) (garde-fou).
 L'arbre candidat (sklearn, max_depth=5) remplace les tableaux de
 `TrainedLightColor` ; la porte et les planchers sont FIXES (non reentraînes).
 
@@ -46,7 +47,7 @@ def load_png(path):
 
 
 def find_anchor(res, stem):
-    for d in ("feuxfr", "feuxfr2"):
+    for d in ("feuxfr", "feuxfr2", "feuxfr3"):
         p = res / d / f"{stem}.ppm"
         if p.exists():
             return p

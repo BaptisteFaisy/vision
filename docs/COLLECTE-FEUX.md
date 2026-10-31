@@ -19,8 +19,9 @@ complète : collecte → étiquetage → réentraînement → barrière GO → P
    `phone-adb -s <tel> pull /data/data/<pkg>/files/lightcrops <OUT>/brut/`
    (chemin exact dans le logcat `LightCrop`).
 
-Cible : **200 crops étiquetables** (le harnais accepte dès 50, 10/classe ;
-en viser 200+ pour un hold-out qui veut dire quelque chose).
+Cible : **200–400 crops étiquetables** (le harnais accepte dès 50,
+10/classe ; viser 200+ pour un hold-out qui veut dire quelque chose,
+400 si le terrain s'y prête — au-delà, le gain est marginal).
 
 ## 2. Étiquetage (PC, ~20 min)
 
@@ -59,6 +60,14 @@ GO (exit 0) ssi les trois tiennent, sinon NO-GO motivé (exit 1) :
 
 Un candidat GO se relit (`candidate.kt` + `report.json`) puis s'embarque par
 PR normale (tests JVM + CI) : le trainer n'écrit jamais dans `core/`.
+
+## 4b. Ancres `feuxfr3/` (embarquement optionnel)
+
+Pour verrouiller le rappel sur données téléphone, promouvoir ~10 crops
+du lot en ancres versionnées : `core/src/test/resources/feuxfr3/README.md`
+décrit la conversion PPM, la traçabilité (`ATTRIBUTION.md`) et le
+branchement (`test_train_light.py`, `train_light.py`, `PedLightGateTest`).
+Les 20 ancres Panoramax restent le socle et ne bougent jamais.
 
 ## 5. Vie privée
 
