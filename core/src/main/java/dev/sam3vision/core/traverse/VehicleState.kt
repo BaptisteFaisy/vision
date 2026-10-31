@@ -7,6 +7,7 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
+import dev.sam3vision.core.predict.EgoCompensator // PISTE1
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.hypot
 
@@ -350,8 +351,8 @@ class VehicleStateWatcher(
         hushed: Set<String>,
     ): Pick? {
         if (current.isEmpty()) return null
-        movingPick(current, meters, tau, hushed)?.let { return it }
-        return stoppedPick(current, meters, atMs)
+        movingPick(current, meters, tau, hushed, atMs)?.let { return it }
+        return stoppedPick(current, meters, atMs, hushed) // PISTE1 : hushed coupe aussi l'arrêt
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -360,6 +361,7 @@ class VehicleStateWatcher(
         meters: Map<String, Float>,
         tau: ApproachVerdict,
         hushed: Set<String>,
+        atMs: Long, // PISTE1 : date la croissance pour la décote zoom
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
@@ -368,7 +370,9 @@ class VehicleStateWatcher(
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
-                val growth = prev != null && current.getValue(candidate).area > prev.area
+                // PISTE1 : croissance décotée du zoom du fond (repli brut sans fond prouvé).
+                val growth = prev != null && EgoCompensator.areaGrowing(
+                    prev.area, current.getValue(candidate).area, atMs - prev.atMs, approach.lastGlobal)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -386,9 +390,11 @@ class VehicleStateWatcher(
         current: Map<String, Current>,
         meters: Map<String, Float>,
         atMs: Long,
+        hushed: Set<String>, // PISTE1 : suivi-caméra — pas de faux « à l'arrêt » quand le fond défile
     ): Pick? {
         val key = current.keys
             .filter { candidate ->
+                if (candidate in hushed) return@filter false // PISTE1
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
                 val measured = meters[candidate] ?: return@filter false

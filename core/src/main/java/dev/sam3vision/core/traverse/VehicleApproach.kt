@@ -1,8 +1,10 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
+import dev.sam3vision.core.predict.EgoCompensator // PISTE1
 import dev.sam3vision.core.predict.MotionModel
 import kotlin.math.abs
 
@@ -68,6 +70,14 @@ class VehicleApproach {
     var cameraMovedKeys: Set<String> = emptySet()
         private set
 
+    /** Dernier mouvement fond reçu (`null` = pas de signal) : la décote zoom. */ // PISTE1
+    var lastGlobal: MotionSample? = null // PISTE1
+        private set
+
+    /** Délai inter-frames du dernier signal fond (ms, 0 sans signal). */ // PISTE1
+    var lastGlobalDtMs: Long = 0L // PISTE1
+        private set
+
     /** Oublie toutes les pistes (nouvelle traversée). */
     fun reset() {
         tracks.clear()
@@ -75,6 +85,8 @@ class VehicleApproach {
         lastVerdicts = emptyMap()
         cameraMoved = false
         cameraMovedKeys = emptySet()
+        lastGlobal = null // PISTE1
+        lastGlobalDtMs = 0L // PISTE1
     }
 
     /**
@@ -107,8 +119,12 @@ class VehicleApproach {
             lastVerdicts = emptyMap()
             cameraMoved = false
             cameraMovedKeys = emptySet()
+            lastGlobal = null // PISTE1
+            lastGlobalDtMs = 0L // PISTE1
             return
         }
+        lastGlobal = motion.global // PISTE1
+        lastGlobalDtMs = motion.dtMs // PISTE1
         val dtSeconds = motion.dtMs / 1000f
         lastVerdicts = tracks.mapNotNull { (id, track) ->
             if (!track.motion.velocityReliable) return@mapNotNull null
@@ -191,6 +207,8 @@ class VehicleApproach {
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
             if (track.motion.velocity.width <= frameWidth * MIN_GROWTH_RATIO) continue
+            // PISTE1 : croissance expliquée par le zoom du fond — pas une approche.
+            if (EgoCompensator.discountGrowth(track.motion.velocity.width / width, lastGlobal, lastGlobalDtMs).discounted) continue
             val tau = width / track.motion.velocity.width
             if (tau < bestTtc) {
                 bestTtc = tau
