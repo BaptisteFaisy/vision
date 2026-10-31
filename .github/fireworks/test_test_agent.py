@@ -107,6 +107,15 @@ class ChangementsTest(unittest.TestCase):
         self.assertEqual(fichiers, ["core/a.kt", "app/b.kt",
                                     "core/nouveau.kt", "docs/note.md"])
 
+    def test_sorties_doutils_ignorees(self):
+        sortie = (" M core/a.kt\n"
+                  "?? .kotlin/sessions/s1.bin\n"
+                  "?? build/tmp/x\n"
+                  "?? app/build/y\n")
+        faux = mock.Mock(returncode=0, stdout=sortie, stderr="")
+        with mock.patch.object(test_agent.subprocess, "run", return_value=faux):
+            self.assertEqual(test_agent.changements(), ["core/a.kt"])
+
     def test_git_muet_rend_vide(self):
         faux = mock.Mock(returncode=1, stdout="", stderr="boom")
         with mock.patch.object(test_agent.subprocess, "run", return_value=faux):
