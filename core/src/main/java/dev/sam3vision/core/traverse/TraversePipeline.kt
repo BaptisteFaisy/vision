@@ -71,6 +71,13 @@ class TraversePipeline(
         return TraverseOutput(filtered, detections, decision, cue, outcome)
     }
 
+    /**
+     * Dernier état annoncé (`null` tant que rien n'est annoncé) : l'affichage
+     * direct suit la voix, jamais la lecture brute — un glitch d'une frame ne
+     * se voit pas (ordre user du 31/10, certitude rouge/vert).
+     */
+    val lastAnnounced: CrossingState? get() = announcer.lastCue?.state
+
     /** Oublie pistes, veto et annonces (nouvelle traversée, nouvelle séance). */
     fun reset() {
         state.reset()

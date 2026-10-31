@@ -25,8 +25,6 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesLive: Boolean) {
             if (!probe.wantsFrame()) continue
             val jpeg = snapshotJpeg() ?: continue
             probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
-            // Même seau que le téléphone : la couleur du feu se relit ici aussi (≤ 150 ms).
-            if (probe.state.value.crossingActive) CrossingLightPump.offerFrame(jpeg)
         }
     }
 }

@@ -73,4 +73,33 @@ class CrossingWiringTest {
         )
         assertNull(patch)
     }
+
+    @Test
+    fun `patch actif - etat confirme rouge des la premiere frame`() {
+        // Pas de boîte en vue : lecture rouge, rien d'annoncé → affiché rouge.
+        val announcer = CrossingAnnouncer()
+        val veto = TraverseVeto()
+        val frame = LiveFrame(100, 100, 0L, emptyList())
+        val patch = crossingPatchOf(
+            announcer, veto, true, frame, LensSpec.Default, "", 0L, SpeechLanguage.Fr,
+        )
+
+        assertNull(patch?.cue)
+        assertEquals(CrossingState.Red, patch?.state)
+        assertNull(patch?.box)
+    }
+
+    @Test
+    fun `patch actif - le rouge annonce parle a la deuxieme frame`() {
+        val announcer = CrossingAnnouncer()
+        val veto = TraverseVeto()
+        val frame = LiveFrame(100, 100, 0L, emptyList())
+        crossingPatchOf(announcer, veto, true, frame, LensSpec.Default, "", 0L, SpeechLanguage.Fr)
+        val patch = crossingPatchOf(
+            announcer, veto, true, frame, LensSpec.Default, "", 200L, SpeechLanguage.Fr,
+        )
+
+        assertEquals("Rouge, attendez.", patch?.cue?.phrase)
+        assertEquals(CrossingState.Red, patch?.state)
+    }
 }

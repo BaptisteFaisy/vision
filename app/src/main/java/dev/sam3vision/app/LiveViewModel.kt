@@ -305,7 +305,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             keepFrame(jpegB64)
             return
         }
-        if (traverse.active) { traverse.offerLightFrame(jpegB64); _state.update { it.withCrossing(true, traverse.local ?: traverse.light) } }
+        if (traverse.active) { _state.update { it.withCrossing(true, traverse.display) } }
         if (!adaptive.admit()) { keepFrame(jpegB64); return }
         if (!dispatcher.onFrame(active, jpegB64, captureAtNs, System.currentTimeMillis())) adaptive.onDropped()
     }
@@ -410,7 +410,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 distanceLayer = if (readings.isEmpty()) null else DistanceLayer(width, height, readings, distances.lensSpec.widthFovDeg(width, height)),
                 prediction = predicted,
                 trails = centerTrails.observeFrame(now, width, height, shown.detections, seen).takeUnless { it.empty },
-            ).withCrossing(traverse.active, traverse.local ?: traverse.light)
+            ).withCrossing(traverse.active, traverse.display)
         }
     }
 
