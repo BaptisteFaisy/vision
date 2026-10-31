@@ -104,8 +104,9 @@ internal fun stairsRoiOf(found: StairLabelSignal, width: Int, height: Int): Stai
 /**
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
- * (« 5 marches. ») — changements seuls ([StairCountVoice]), doux, coupé en
- * Traversée. La voix part en coroutine fille : le battement ne s'arrête
+ * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
+ * 4 s ([StairCountVoice]), doux, coupé en Traversée. La voix part en
+ * coroutine fille : le battement ne s'arrête
  * jamais pour une synthèse lente (le lecteur coupe le précédent, dernier
  * gagnant). Sans escalier nommé ou sans compte frais : silence (auto-muet
  * caméra coupée, séance finie). Rend le compteur pour le `reset()` de séance.

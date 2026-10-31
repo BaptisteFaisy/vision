@@ -29,8 +29,8 @@ import org.junit.Test
 /**
  * Voix du compteur de marches : quand SAM nomme l'escalier et que la caméra
  * voit des marches fraîches, le battement 300 ms dit le compte (« N
- * marches. »), une fois par compte ; sans escalier nommé, sans compte frais
- * ou en Traversée : silence.
+ * marches. »), une fois par compte puis répété toutes les 4 s ; sans
+ * escalier nommé, sans compte frais ou en Traversée : silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
  * `advanceTimeBy` avance sans boucler (miroir `ProbePulse`).
