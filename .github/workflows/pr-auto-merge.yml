@@ -96,6 +96,9 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v26 (31/10) couverture des états actionnables : le balayage ciblé joint
+#       toujours les PR `DIRTY`/`BLOCKED`/`DRAFT` — un run ciblé annulé par une
+#       rafale de concurrency laissait sinon sa tête sans réveil (#652).
 #   v25 (31/10) outillage : `test_agent.py` rend **3** quand le runner n'a ni
 #       `zeroclaw` ni sa config — sans poser sa marque, donc l'unique tentative
 #       de la tête n'est pas brûlée (#652 : binaire posé 2 min trop tard).
@@ -328,8 +331,18 @@ jobs:
           # `MATRIX` illisible ou sans tête connue → matrice entière (jamais
           # moins de travail que nécessaire, jamais de silence).
           if [ "${EVENT:-}" = "workflow_run" ] && [ -n "${HEAD_SHA:-}" ] && [ "$MATRIX" != "[]" ]; then
+            # v26 (31/10) — le ciblage ne peut pas être la seule couverture :
+            # GitHub ne garde qu'UN run en attente par groupe de concurrency, donc
+            # un balayage ciblé peut être annulé par une rafale voisine, et la
+            # tête visée n'a plus aucun événement pour le réveiller (vécu sur
+            # #652 : CI finie, run ciblé annulé, plus personne). On joint donc
+            # toujours les PR dans un état **actionnable** (DIRTY, BLOCKED,
+            # DRAFT) : peu nombreuses, sans travail inutile (fenêtre de 10 min),
+            # et aucune ne peut plus rester orpheline.
             CIBLE=$(printf '%s' "$MATRIX" | jq -c --arg s "$HEAD_SHA" '
               [ .[] | select(.sha == $s) ]
+              + [ .[] | select(.state == "DIRTY" or .state == "BLOCKED"
+                               or .state == "DRAFT") ]
               + ([ .[] | select(.state == "BEHIND") ] | sort_by(.maj) | .[0:1])
               | unique_by(.pr)' 2>/dev/null || echo "")
             if [ -n "${CIBLE:-}" ]; then
