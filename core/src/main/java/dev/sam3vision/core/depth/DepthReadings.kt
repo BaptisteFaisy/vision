@@ -26,15 +26,22 @@ object DepthReadings {
     /** Érosion par côté avant la médiane : les bords portent le fond, le cœur porte l'objet. */
     const val EROSION_FRACTION = 0.25f
 
-    fun boxCloseness(depth: DepthMap, box: List<Float>, frameW: Int, frameH: Int): Float? {
+    fun boxCloseness(
+        depth: DepthMap,
+        box: List<Float>,
+        frameW: Int,
+        frameH: Int,
+        maskBox: List<Float>? = null,
+    ): Float? {
         if (box.size < 4 || frameW <= 0 || frameH <= 0) return null
         if (depth.width <= 0 || depth.height <= 0) return null
         if (box[2] <= 0f || box[0] >= frameW || box[3] <= 0f || box[1] >= frameH) return null
         val inner = erodedBox(box) ?: box
-        val x1 = ((inner[0] / frameW) * depth.width).toInt().coerceIn(0, depth.width - 1)
-        val x2 = ((inner[2] / frameW) * depth.width).toInt().coerceIn(x1, depth.width - 1)
-        val y1 = ((inner[1] / frameH) * depth.height).toInt().coerceIn(0, depth.height - 1)
-        val y2 = ((inner[3] / frameH) * depth.height).toInt().coerceIn(y1, depth.height - 1)
+        val window = maskedWindow(inner, maskBox)
+        val x1 = ((window[0] / frameW) * depth.width).toInt().coerceIn(0, depth.width - 1)
+        val x2 = ((window[2] / frameW) * depth.width).toInt().coerceIn(x1, depth.width - 1)
+        val y1 = ((window[1] / frameH) * depth.height).toInt().coerceIn(0, depth.height - 1)
+        val y2 = ((window[3] / frameH) * depth.height).toInt().coerceIn(y1, depth.height - 1)
         val kept = FloatArray((x2 - x1 + 1) * (y2 - y1 + 1))
         var count = 0
         for (y in y1..y2) {
@@ -61,6 +68,22 @@ object DepthReadings {
         if (dx <= 0f || dy <= 0f) return null
         val inner = listOf(box[0] + dx, box[1] + dy, box[2] - dx, box[3] - dy)
         return inner.takeIf { it[2] > it[0] && it[3] > it[1] }
+    }
+
+    /**
+     * Fenêtre de médiane restreinte au masque : l'intersection (fenêtre érodée
+     * ∩ étendues masque) quand le masque est présent et valide, la fenêtre
+     * érodée sinon (masque absent, invalide, ou intersection vide/dégénérée).
+     */
+    fun maskedWindow(inner: List<Float>, maskBox: List<Float>?): List<Float> {
+        if (inner.size < 4 || maskBox == null || maskBox.size < 4) return inner
+        if (maskBox.take(4).any { !it.isFinite() }) return inner
+        val x1 = maxOf(inner[0], maskBox[0])
+        val y1 = maxOf(inner[1], maskBox[1])
+        val x2 = minOf(inner[2], maskBox[2])
+        val y2 = minOf(inner[3], maskBox[3])
+        if (x2 <= x1 || y2 <= y1) return inner
+        return listOf(x1, y1, x2, y2)
     }
 
     /**
@@ -94,7 +117,7 @@ object DepthReadings {
     ): List<DistanceReading> {
         val closeByBox = HashMap<List<Float>, Float>()
         for (detection in detections) {
-            val closeness = boxCloseness(depth, detection.box, frameW, frameH)
+            val closeness = boxCloseness(depth, detection.box, frameW, frameH, detection.maskBox)
             if (closeness != null) {
                 closeByBox[detection.box] = closeness
             }
