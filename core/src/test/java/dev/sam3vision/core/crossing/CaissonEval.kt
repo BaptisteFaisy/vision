@@ -173,8 +173,11 @@ internal fun loadGolden(loader: ClassLoader?): EvalGolden {
         verdicts[c.getString("id")] = c.getString("verdict")
     }
     val recall = mutableMapOf<String, String>()
-    val node = json.getJSONObject("recall")
-    for ((key, value) in node.toMap()) recall[key] = value as String
+    val aggregates = json.getJSONArray("recall")
+    for (i in 0 until aggregates.length()) {
+        val a = aggregates.getJSONObject(i)
+        recall[a.getString("id")] = a.getString("value")
+    }
     return EvalGolden(json.getInt("version"), verdicts, recall)
 }
 
