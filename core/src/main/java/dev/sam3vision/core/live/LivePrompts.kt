@@ -18,7 +18,7 @@ object LivePrompts {
      * « bicycle », « electric scooter ») puis feu et cheminement
      * (« traffic light », « curb », « sidewalk », « crosswalk ») puis
      * statiques (« pole », « stairs », « barrier », « fence », « gate »),
-     * modifiables à chaud dans le direct (champ « Suivre »).
+     * modifiables à chaud dans le direct (champ « Follow »).
      *
      * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
      * dans les deux modes) : tout ce que la Traversée doit voir (véhicules,
@@ -52,7 +52,7 @@ object LivePrompts {
      * (30/10 : « sidewalk » remplace « dumpster », benne la moins utile),
      * détecté en permanence hors mode traversée pour anticiper les passages
      * protégés. Bascule depuis la pastille « Extérieur » du direct, sans passer
-     * par le champ « Suivre ». Tient sous [MAX] comme [default], qui reste les
+     * par le champ « Follow ». Tient sous [MAX] comme [default], qui reste les
      * 16 concepts (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
@@ -84,7 +84,7 @@ object LivePrompts {
 
     /**
      * Nombre maximal de concepts : **16**, décision user du 28/10 (dangers
-     * extérieurs + marge pour le champ « Suivre »). Le backend tronque à
+     * extérieurs + marge pour le champ « Follow »). Le backend tronque à
      * `PROMPT_LIMIT = 16` côté tracker ; le client ne doit pas en envoyer
      * davantage — sinon l'app affiche des concepts jamais détectés.
      */
@@ -109,7 +109,7 @@ object LivePrompts {
     }
 
     /**
-     * Champ « Suivre » saisi par l'utilisateur : découpé sur les virgules,
+     * Champ « Follow » saisi par l'utilisateur : découpé sur les virgules,
      * points-virgules et retours ligne, nettoyé des vides — vide = [default].
      * La session borne et normalise ensuite (voir [normalize]).
      */

@@ -38,7 +38,7 @@ private suspend fun photoFallback(
     frames: (File) -> String?,
 ): Result<String> {
     val jpeg = runCatching { frames(file) }.getOrNull()
-        ?: return Result.failure(ApiError.BadResponse("repli photo impossible : première frame illisible"))
+        ?: return Result.failure(ApiError.BadResponse("photo fallback impossible: first frame unreadable"))
     return segment.segment(jpeg, null).map(::segmentSummary)
 }
 
@@ -72,16 +72,16 @@ private fun scaleUnder(bitmap: Bitmap, maxEdge: Int): Bitmap {
 }
 
 /**
- * Résumé affiché après un repli : « objets : personne (92 %), chaise (78 %) »,
- * ou « aucun objet détecté » quand `/segment` revient vide.
+ * Résumé affiché après un repli : « objects: person (92%), chair (78%) »,
+ * ou « no object detected » quand `/segment` revient vide.
  */
 fun segmentSummary(result: SegmentResult): String {
-    if (result.objects.isEmpty()) return "aucun objet détecté"
+    if (result.objects.isEmpty()) return "no object detected"
     val names = result.objects.take(MAX_FALLBACK_OBJECTS).joinToString(", ") {
         "${it.label} (${(it.score * 100).toInt()} %)"
     }
     val suffix = if (result.objects.size > MAX_FALLBACK_OBJECTS) ", …" else ""
-    return "objets : $names$suffix"
+    return "objects: $names$suffix"
 }
 
 /** Le résumé du repli ne cite jamais plus d'objets que l'écran n'en montre. */

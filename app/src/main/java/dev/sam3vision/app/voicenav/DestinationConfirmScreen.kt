@@ -23,7 +23,7 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Confirmation de destination : adresse entendue + résumé d'itinéraire
- * (distance · durée), boutons « Démarrer » / « Annuler » / micro sur place.
+ * (distance · durée), boutons « Start » / « Cancel » / micro sur place.
  *
  * Gros texte malvoyant (thème sombre [AppColors]) : la question parlée est
  * posée à l'ouverture (« Do you really want to go to X? … »), et tout l'écran
@@ -66,10 +66,10 @@ fun DestinationConfirmScreen(
             modifier = Modifier.fillMaxWidth().height(64.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.success),
         ) {
-            Text("Démarrer", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Start", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
         OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("Annuler", fontSize = 20.sp)
+            Text("Cancel", fontSize = 20.sp)
         }
         VoiceNavHoldButton(
             hold = hold,
@@ -92,7 +92,7 @@ private fun SummaryBlock(summary: RouteSummary?, loading: Boolean, error: String
     }
 }
 
-/** Adresse (si connue) + « 2,4 km · 15 min ». */
+/** Adresse (si connue) + « 2.4 km · 15 min ». */
 @Composable
 private fun SummaryText(summary: RouteSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -100,7 +100,7 @@ private fun SummaryText(summary: RouteSummary) {
             Text(address, color = AppColors.text, fontSize = 20.sp)
         }
         Text(
-            "${summary.distanceFr()} · ${summary.durationFr()}",
+            "${summary.distance()} · ${summary.duration()}",
             color = AppColors.primary,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold,
@@ -108,7 +108,7 @@ private fun SummaryText(summary: RouteSummary) {
     }
 }
 
-/** Indicateur + « Chargement de l'itinéraire… » pendant l'appel moteur. */
+/** Indicateur + « Loading the route… » pendant l'appel moteur. */
 @Composable
 private fun LoadingRow() {
     Column(
@@ -117,7 +117,7 @@ private fun LoadingRow() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CircularProgressIndicator(color = AppColors.primary)
-        Text("Chargement de l'itinéraire…", color = AppColors.textMuted, fontSize = 18.sp)
+        Text("Loading the route…", color = AppColors.textMuted, fontSize = 18.sp)
     }
 }
 

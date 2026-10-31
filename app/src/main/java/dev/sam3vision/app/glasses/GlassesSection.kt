@@ -49,7 +49,7 @@ fun GlassesSection(
         Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Lunettes Ray-Ban Meta", color = SettingsLight.text, fontSize = 15.sp)
+        Text("Ray-Ban Meta glasses", color = SettingsLight.text, fontSize = 15.sp)
         GlassesStatusLines(state)
         state.message?.let { StatusBanner(it.text, bannerColor(it.kind)) }
         PermissionActions(onRequestCamera, onRequestMic)
@@ -74,8 +74,8 @@ fun GlassesSection(
  */
 @Composable
 private fun PermissionActions(onCamera: () -> Unit, onMic: () -> Unit) {
-    GlassButton("Autoriser la caméra (Meta AI)", true, primary = false, onClick = onCamera)
-    GlassButton("Autoriser le micro (Meta AI)", true, primary = false, onClick = onMic)
+    GlassButton("Allow the camera (Meta AI)", true, primary = false, onClick = onCamera)
+    GlassButton("Allow the microphone (Meta AI)", true, primary = false, onClick = onMic)
 }
 
 /** Les trois gestes de production : enregistrement Meta AI, session, photo. */
@@ -88,7 +88,7 @@ private fun ProductionActions(
     onDisconnect: () -> Unit,
 ) {
     GlassButton(
-        label = if (state.registered) "Ré-enregistrer auprès de Meta AI" else "Enregistrer auprès de Meta AI",
+        label = if (state.registered) "Re-register with Meta AI" else "Register with Meta AI",
         enabled = state.sdkReady,
         primary = false,
         onClick = onRegister,
@@ -100,7 +100,7 @@ private fun ProductionActions(
         onClick = { if (state.connected) onDisconnect() else onConnect() },
     )
     GlassButton(
-        label = "Prendre une photo",
+        label = "Take a photo",
         enabled = state.connected,
         primary = false,
         onClick = onCapture,
@@ -111,7 +111,7 @@ private fun ProductionActions(
 @Composable
 private fun BenchEntry() {
     val openBench = LocalBenchOpener.current ?: return
-    GlassButton("Banc d'essai lunettes", true, false, openBench)
+    GlassButton("Glasses test bench", true, false, openBench)
 }
 
 /** La gravité colore le bandeau : un échec ne se lit pas comme un simple conseil. */
@@ -121,7 +121,7 @@ private fun bannerColor(kind: MessageKind): Color = when (kind) {
     MessageKind.INFO -> AppColors.surfaceHigh
 }
 
-/** État technique en quatre lignes, en français lisible. */
+/** État technique en quatre lignes, en anglais lisible. */
 @Composable
 private fun GlassesStatusLines(state: GlassesUiState) {
     statusLines(state).forEach { Text(it, color = SettingsLight.muted, fontSize = 12.sp) }
@@ -137,13 +137,13 @@ private fun MockControls(
     onMockVoiceLaunch: () -> Unit,
     onStopMock: () -> Unit,
 ) {
-    Text("Démo sans matériel", color = SettingsLight.text, fontSize = 13.sp)
+    Text("Demo without hardware", color = SettingsLight.text, fontSize = 13.sp)
     if (!state.mockActive) {
-        GlassButton("Simuler des lunettes", true, false, onStartMock)
+        GlassButton("Simulate glasses", true, false, onStartMock)
     } else {
-        GlassButton("Simuler un appui sur le bouton capture", state.connected, false, onMockPress)
-        GlassButton("Simuler un appui long (parler)", state.connected, false, onMockHold)
-        GlassButton("Simuler ouvre iSee (voix)", state.mockActive, false, onMockVoiceLaunch)
-        GlassButton("Retirer les lunettes simulées", true, false, onStopMock)
+        GlassButton("Simulate a capture button press", state.connected, false, onMockPress)
+        GlassButton("Simulate a long press (speak)", state.connected, false, onMockHold)
+        GlassButton("Simulate open iSee (voice)", state.mockActive, false, onMockVoiceLaunch)
+        GlassButton("Remove the simulated glasses", true, false, onStopMock)
     }
 }

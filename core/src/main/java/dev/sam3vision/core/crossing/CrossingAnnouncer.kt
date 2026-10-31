@@ -54,7 +54,7 @@ class CrossingAnnouncer(
     fun onFrame(
         atMs: Long,
         state: CrossingState,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): CrossingCue? {
         advance(state)
         if (pendingCount < required(state)) return null

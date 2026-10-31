@@ -369,7 +369,7 @@ class WsLiveClientTest {
         val failure = countedClient(reader, transport).live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
 
         assertTrue("attendu BadResponse, obtenu $failure", failure is ApiError.BadResponse)
-        assertTrue(failure?.message.orEmpty().contains("illisible"))
+        assertTrue(failure?.message.orEmpty().contains("unreadable"))
         assertEquals(1, reader.jsonReads)
     }
 

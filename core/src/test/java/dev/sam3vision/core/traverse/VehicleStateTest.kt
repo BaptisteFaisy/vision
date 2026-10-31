@@ -121,7 +121,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(110f))), emptyList(), atMs = 100L)
         val third = moving.update(listOf(det("car", box(120f))), emptyList(), atMs = 200L)
 
-        assertEquals("Voiture en mouvement, à midi.", third!!.phrase)
+        assertEquals("Car moving, at 12 o'clock.", third!!.phrase)
         assertNull(third.meters)
         assertFalse(third.urgent)
 
@@ -206,7 +206,7 @@ class VehicleStateTest {
             atMs = 200L,
         )
 
-        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertEquals("Car moving, 5 meters away.", third!!.phrase)
         assertFalse("approche à 9 h : doux", third.urgent)
     }
 
@@ -219,7 +219,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 1_000L)
         assertNull("mouvement : 900 ms < 4 s", moving.update(listOf(det("car", box(140f))), listOf(reading("car", 5f, box(140f))), atMs = 1_100L))
         val replay = moving.update(listOf(det("car", box(150f))), listOf(reading("car", 5f, box(150f))), atMs = 4_300L)
-        assertEquals("Voiture en mouvement, à 5 mètres.", replay!!.phrase)
+        assertEquals("Car moving, 5 meters away.", replay!!.phrase)
 
         val stopped = VehicleStateWatcher()
         repeat(3) { index ->
@@ -228,7 +228,7 @@ class VehicleStateTest {
         stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 1_000L)
         assertNull("arrêt : 900 ms < 10 s", stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 1_100L))
         val replayStopped = stopped.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 10_400L)
-        assertEquals("Voiture à l'arrêt, à 2 mètres.", replayStopped!!.phrase)
+        assertEquals("Car stopped, 2 meters away.", replayStopped!!.phrase)
     }
 
     @Test

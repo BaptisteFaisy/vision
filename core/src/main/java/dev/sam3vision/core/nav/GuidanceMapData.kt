@@ -171,21 +171,21 @@ private fun zoomFor(points: List<RoutePoint>): Double {
 private fun NavManeuver.finitePoint(): RoutePoint? =
     if (lat.isFinite() && lon.isFinite()) RoutePoint(lat, lon) else null
 
-/** Verbe français d'une action (pastille carte, sans la rue). */
+/** Verbe anglais d'une action (pastille carte, sans la rue). */
 private fun maneuverVerb(action: ManeuverAction): String = when (action) {
-    ManeuverAction.Start -> "Départ"
-    ManeuverAction.Continue -> "Continuez tout droit"
-    ManeuverAction.SlightLeft -> "Légèrement à gauche"
-    ManeuverAction.TurnLeft -> "Tournez à gauche"
-    ManeuverAction.SlightRight -> "Légèrement à droite"
-    ManeuverAction.TurnRight -> "Tournez à droite"
-    ManeuverAction.UTurn -> "Faites demi-tour"
-    ManeuverAction.Roundabout -> "Prenez le rond-point"
-    ManeuverAction.Arrive -> "Arrivée"
+    ManeuverAction.Start -> "Start"
+    ManeuverAction.Continue -> "Straight ahead"
+    ManeuverAction.SlightLeft -> "Slight left"
+    ManeuverAction.TurnLeft -> "Turn left"
+    ManeuverAction.SlightRight -> "Slight right"
+    ManeuverAction.TurnRight -> "Turn right"
+    ManeuverAction.UTurn -> "U-turn"
+    ManeuverAction.Roundabout -> "Roundabout"
+    ManeuverAction.Arrive -> "Arrived"
 }
 
 /**
- * Libellé complet : verbe [maneuverVerb] + rue (`sur …`), départ et arrivée
+ * Libellé complet : verbe [maneuverVerb] + rue (`on …`), départ et arrivée
  * avec `—` ; l'arrivée préfère [destinationName] à la rue. Rue blanche ou
  * absente : verbe seul (jamais inventé).
  */
@@ -200,7 +200,7 @@ private fun maneuverLabel(maneuver: NavManeuver, destinationName: String?): Stri
     if (place.isEmpty()) return verb
     val joint = when (maneuver.action) {
         ManeuverAction.Start, ManeuverAction.Arrive -> " — "
-        else -> " sur "
+        else -> " on "
     }
     return verb + joint + place
 }

@@ -40,7 +40,7 @@ class YoloDecodeTest {
         assertEquals(1, persons.size)
         val box = persons[0].box
         assertEquals(listOf(128f, 72f, 192f, 168f), box)
-        assertEquals("personne", persons[0].label)
+        assertEquals("person", persons[0].label)
         assertTrue(persons[0].score > 0.99f)
     }
 

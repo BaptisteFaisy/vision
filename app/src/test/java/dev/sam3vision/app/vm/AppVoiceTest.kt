@@ -118,7 +118,7 @@ class AppVoiceTest {
         voice.speak("salut")
         testScheduler.advanceUntilIdle()
 
-        assertEquals(SpeakState.Error("salut", "lecture impossible : mp"), screen.value.speak)
+        assertEquals(SpeakState.Error("salut", "cannot play: mp"), screen.value.speak)
         assertTrue(played.isEmpty())
     }
 }

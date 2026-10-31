@@ -32,7 +32,7 @@ import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.TimingsText
 
 /* * Bandeau du haut : retour, réglages, mode de vision, ligne d'état du direct, erreurs.
- * Le bouton « Partager le suivi » vit dans les Réglages, pas ici (suivi permanent). */
+ * Le bouton « Share tracking » vit dans les Réglages, pas ici (suivi permanent). */
 @Composable
 fun LiveTopBar(
     state: LiveUiState,
@@ -52,8 +52,8 @@ fun LiveTopBar(
 ) {
     Column(modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), Arrangement.spacedBy(8.dp)) {
-            Chip("Arrêter", AppColors.danger, onBack)
-            Chip("Réglages", AppColors.surfaceHigh, onOpenSettings)
+            Chip("Stop", AppColors.danger, onBack)
+            Chip("Settings", AppColors.surfaceHigh, onOpenSettings)
             SamModeChip(state.samEnabled, onToggleSam)
             TrackerChip(state.trackerEnabled, onToggleTracker)
             TraverseModeChip(state.traverseActive, onToggleTraverse)
@@ -102,7 +102,7 @@ private fun LiveStatusLines(state: LiveUiState, pixel: FrameTimings) {
 
 /**
  * Pastille du transport du direct : « Tracker » = sessions à ids stables (`/session` +
- * `/frame`), « WebSocket » = `/live`, « WebSocket KO » = socket tombé (aucun repli POST,
+ * `/frame`), « WebSocket » = `/live`, « WebSocket down » = socket tombé (aucun repli POST,
  * donc une chute se voit tout de suite).
  */
 @Composable
@@ -127,12 +127,12 @@ fun TrackerChip(trackerEnabled: Boolean, onToggle: () -> Unit) {
 }
 
 /**
- * Pastille du mode traversée : « Traversée ON » quand veto et voix guident,
- * « Traversée » sinon. Même structure que [TrackerChip].
+ * Pastille du mode traversée : « Crossing ON » quand veto et voix guident,
+ * « Crossing » sinon. Même structure que [TrackerChip].
  */
 @Composable
 fun TraverseModeChip(traverseActive: Boolean, onToggle: () -> Unit) {
-    val label = if (traverseActive) "Traversée ON" else "Traversée"
+    val label = if (traverseActive) "Crossing ON" else "Crossing"
     Chip(label, if (traverseActive) AppColors.success else AppColors.surfaceHigh, onToggle)
 }
 
@@ -187,13 +187,13 @@ fun LiveBottomBar(
             }
         }
         BigButton(
-            if (memoryOpen) "Fermer les questions" else "Poser une question",
+            if (memoryOpen) "Close questions" else "Ask a question",
             true,
             AppColors.primary,
             onToggleMemory,
         )
         if (state.hasFrame) {
-            Chip("Analyser la frame", AppColors.surfaceHigh, onOpenChat)
+            Chip("Analyze the frame", AppColors.surfaceHigh, onOpenChat)
         }
     }
 }
@@ -222,7 +222,7 @@ fun NarrationCard(state: LiveUiState, modifier: Modifier = Modifier) {
         )
 
         state.narrationBusy -> Text(
-            "Analyse LLM de la scène…",
+            "LLM scene analysis…",
             color = AppColors.textMuted,
             fontSize = 12.sp,
             modifier = modifier
@@ -233,22 +233,22 @@ fun NarrationCard(state: LiveUiState, modifier: Modifier = Modifier) {
     }
 }
 
-/** Pastille objet : label brut SAM (pour l'icône) + texte affiché (français + distance). */
+/** Pastille objet : label brut SAM (pour l'icône) + texte affiché (anglais + distance). */
 data class DetectedChip(val label: String, val text: String)
 
 /**
  * Pastilles du bas : une par concept suivi, avec sa distance la plus courte
- * (« personne 2,1 m ») quand elle est mesurée, sinon le concept seul. Les objets
- * maison s'affichent en français (« clés »), les autres gardent leur label brut.
+ * (« person 2.1 m ») quand elle est mesurée, sinon le concept seul. Les objets
+ * maison s'affichent en anglais (« keys »), les autres gardent leur label brut.
  */
 fun objectChipItems(state: LiveUiState, max: Int = 5): List<DetectedChip> {
     val readings = state.distanceLayer?.readings.orEmpty()
     val measured = DistanceText.perLabel(readings)
     if (measured.isNotEmpty()) {
-        return measured.take(max).map { (label, meters) -> DetectedChip(label, "${HomeModes.french(label)} ${DistanceText.format(meters)}") }
+        return measured.take(max).map { (label, meters) -> DetectedChip(label, "${HomeModes.display(label)} ${DistanceText.format(meters)}") }
     }
     return state.frame?.objects?.map { it.label }?.distinct()?.take(max).orEmpty()
-        .map { DetectedChip(it, HomeModes.french(it)) }
+        .map { DetectedChip(it, HomeModes.display(it)) }
 }
 
 /** Textes des pastilles : [objectChipItems] sans les labels (contrat historique). */
@@ -287,9 +287,9 @@ fun PromptRow(draft: String, onChange: (String) -> Unit, onApply: () -> Unit) {
             value = draft,
             onValueChange = onChange,
             singleLine = true,
-            placeholder = { Text("personne, table, sac…", color = AppColors.textMuted, fontSize = 13.sp) },
+            placeholder = { Text("person, table, bag…", color = AppColors.textMuted, fontSize = 13.sp) },
             modifier = Modifier.weight(1f),
         )
-        Chip("Suivre", AppColors.primary, onApply)
+        Chip("Follow", AppColors.primary, onApply)
     }
 }

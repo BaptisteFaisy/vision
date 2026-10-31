@@ -87,7 +87,7 @@ internal fun parseSessionStart(raw: String): TrackSessionStart {
         height = json.intOr("height"),
         objects = parseTrackedObjects(json),
     )
-    if (start.sessionId.isBlank()) throw ApiError.BadResponse("/session : session_id manquant")
+    if (start.sessionId.isBlank()) throw ApiError.BadResponse("/session: missing session_id")
     return start
 }
 

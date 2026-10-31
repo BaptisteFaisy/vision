@@ -134,7 +134,7 @@ class ModelDownloaderTest {
             val spec = DepthModelSpec("model.bin", "http://127.0.0.1:1/injoignable", shaOf(ByteArray(0)), 0)
             val result = ModelDownloader.ensureSpec(dir, spec)
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()!!.message!!.contains("réseau indisponible"))
+            assertTrue(result.exceptionOrNull()!!.message!!.contains("network unavailable"))
         } finally {
             dir.deleteRecursively()
         }

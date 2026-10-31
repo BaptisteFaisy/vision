@@ -2,52 +2,52 @@
 <resources>
     <string name="app_name">iSee</string>
 
-    <!-- Navigation : clés stables, textes FR du contrat. -->
-    <!-- Confirmation : « Navigation vers X » (cf. NavigationPhrases.started). -->
-    <string name="nav_confirm_destination">Navigation vers %1$s</string>
-    <!-- Erreur : guidage impossible à ouvrir (cf. GUIDANCE_UNAVAILABLE). -->
-    <string name="nav_guidance_unavailable">Je ne peux pas ouvrir le guidage</string>
-    <!-- Réglages : interrupteur « Guidage GPS » (cf. NavigationToggle). -->
-    <string name="nav_guidance_toggle_label">Guider vers la destination confirmée</string>
-    <!-- Guidage vocal : arrivée nommée (cf. VoiceNavPhrases.arrived). -->
-    <string name="nav_voice_arrived">Vous êtes arrivé à %1$s</string>
-    <!-- Guidage vocal : arrivée sans nom (cf. VoiceNavPhrases.ARRIVED_PLAIN). -->
-    <string name="nav_voice_arrived_plain">Vous êtes arrivé à destination</string>
-    <!-- Guidage vocal : écart moteur, recalcul demandé (cf. VoiceNavPhrases.OFF_ROUTE). -->
-    <string name="nav_voice_left_route">Vous avez quitté l\'itinéraire. Recalcul en cours.</string>
-    <!-- Guidage vocal : retour sur le tracé (cf. VoiceNavPhrases.BACK_ON_ROUTE). -->
-    <string name="nav_voice_back_on_route">De retour sur l\'itinéraire.</string>
-    <!-- Guidage vocal : manœuvre à venir, verbe + distance (cf. VoiceNavPhrases.ahead). -->
-    <string name="nav_voice_maneuver">%1$s dans %2$s</string>
-    <!-- Guidage vocal : traversée à venir (cf. VoiceNavPhrases.crossingAhead). -->
-    <string name="nav_voice_crossing">Passage protégé dans %1$s</string>
-    <!-- Guidage vocal : traversée passée, reprise (cf. VoiceNavPhrases.CROSSING_DONE). -->
-    <string name="nav_voice_crossing_done">Traversée terminée.</string>
+    <!-- Navigation: stable keys, EN contract texts. -->
+    <!-- Confirmation: “Navigating to X” (cf. NavigationPhrases.started). -->
+    <string name="nav_confirm_destination">Navigating to %1$s</string>
+    <!-- Error: guidance cannot be opened (cf. GUIDANCE_UNAVAILABLE). -->
+    <string name="nav_guidance_unavailable">I can\'t open the guidance</string>
+    <!-- Settings: “GPS guidance” switch (cf. NavigationToggle). -->
+    <string name="nav_guidance_toggle_label">Guide to the confirmed destination</string>
+    <!-- Voice guidance: named arrival (cf. VoiceNavPhrases.arrived). -->
+    <string name="nav_voice_arrived">You have arrived at %1$s</string>
+    <!-- Voice guidance: unnamed arrival (cf. VoiceNavPhrases.ARRIVED_PLAIN). -->
+    <string name="nav_voice_arrived_plain">You have arrived at your destination</string>
+    <!-- Voice guidance: engine off-route, reroute requested (cf. VoiceNavPhrases.OFF_ROUTE). -->
+    <string name="nav_voice_left_route">You have left the route. Recalculating.</string>
+    <!-- Voice guidance: back on track (cf. VoiceNavPhrases.BACK_ON_ROUTE). -->
+    <string name="nav_voice_back_on_route">Back on route.</string>
+    <!-- Voice guidance: upcoming maneuver, verb + distance (cf. VoiceNavPhrases.ahead). -->
+    <string name="nav_voice_maneuver">%1$s in %2$s</string>
+    <!-- Voice guidance: upcoming crossing (cf. VoiceNavPhrases.crossingAhead). -->
+    <string name="nav_voice_crossing">Crosswalk in %1$s</string>
+    <!-- Voice guidance: crossing passed, resume (cf. VoiceNavPhrases.CROSSING_DONE). -->
+    <string name="nav_voice_crossing_done">Crossing finished.</string>
 
-    <!-- Guidage vocal embarqué : voix système française (cf. VoiceNavPhrases). -->
-    <!-- Arrivée : « Vous êtes arrivé à X » (destination vide = sans nom). -->
-    <string name="nav_voice_arrival">Vous êtes arrivé à %1$s.</string>
-    <!-- Hors-trace : phrase urgente, coupe la phrase en cours. -->
-    <string name="nav_voice_offroute">Vous vous êtes écarté de l\'itinéraire. Recalcul en cours.</string>
-    <!-- Nouvel itinéraire après recalcul. -->
-    <string name="nav_voice_rerouted">Nouvel itinéraire calculé.</string>
-    <!-- Fin de guidage sur ordre de l'utilisateur. -->
-    <string name="nav_voice_stopped">Guidage arrêté.</string>
-    <!-- Ligne droite, sans distance. -->
-    <string name="nav_voice_continue">Continuez tout droit.</string>
+    <!-- On-board voice guidance: English system voice (cf. VoiceNavPhrases). -->
+    <!-- Arrival: “You have arrived at X” (empty destination = unnamed). -->
+    <string name="nav_voice_arrival">You have arrived at %1$s.</string>
+    <!-- Off-track: urgent phrase, cuts the current phrase. -->
+    <string name="nav_voice_offroute">You are off route. Recalculating.</string>
+    <!-- New route after reroute. -->
+    <string name="nav_voice_rerouted">New route calculated.</string>
+    <!-- Guidance ended on user order. -->
+    <string name="nav_voice_stopped">Guidance stopped.</string>
+    <!-- Straight line, no distance. -->
+    <string name="nav_voice_continue">Continue straight ahead.</string>
 
-    <!-- Confirmation : question vocale (cf. VoiceNavPhrases.confirmQuestion). -->
+    <!-- Confirmation: voice question (cf. VoiceNavPhrases.confirmQuestion). -->
     <string name="nav_confirm_question">Do you really want to go to %1$s? Travel time: %2$s. Answer yes or no.</string>
-    <!-- Confirmation sans résumé : question sans le temps. -->
+    <!-- Confirmation without summary: question without the time. -->
     <string name="nav_confirm_question_no_time">Do you really want to go to %1$s? Answer yes or no.</string>
-    <!-- Confirmation refusée (cf. VoiceNavPhrases.CONFIRM_CANCELLED). -->
+    <!-- Confirmation refused (cf. VoiceNavPhrases.CONFIRM_CANCELLED). -->
     <string name="nav_confirm_cancelled">Cancelled.</string>
-    <!-- « yes » pendant le chargement (cf. VoiceNavPhrases.CONFIRM_LOADING). -->
+    <!-- “yes” while loading (cf. VoiceNavPhrases.CONFIRM_LOADING). -->
     <string name="nav_confirm_loading">Your route is still loading, one moment.</string>
-    <!-- Guidage éteint : fiche lieu ouverte (cf. VoiceNavPhrases.placeOpened). -->
-    <string name="nav_place_opened">Voici la fiche de %1$s</string>
-    <!-- Ordre stop consommé (cf. VoiceNavPhrases.STOP_DONE). -->
-    <string name="nav_stop_done">Guidage arrêté</string>
-    <!-- Arrivée signalée par le moteur (cf. VoiceNavPhrases.ARRIVED). -->
-    <string name="nav_arrived">Arrivée à destination</string>
+    <!-- Guidance off: place page opened (cf. VoiceNavPhrases.placeOpened). -->
+    <string name="nav_place_opened">Here is the page for %1$s</string>
+    <!-- Stop order consumed (cf. VoiceNavPhrases.STOP_DONE). -->
+    <string name="nav_stop_done">Guidance stopped</string>
+    <!-- Arrival reported by the engine (cf. VoiceNavPhrases.ARRIVED). -->
+    <string name="nav_arrived">Arrived at destination</string>
 </resources>

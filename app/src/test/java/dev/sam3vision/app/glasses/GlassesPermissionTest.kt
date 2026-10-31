@@ -39,7 +39,7 @@ class GlassesPermissionTest {
 
         assertEquals(false, outcome.cameraAllowed)
         assertEquals(MessageKind.ERROR, outcome.message.kind)
-        assertTrue(outcome.message.text.contains("Autoriser"))
+        assertTrue(outcome.message.text.contains("Allow"))
     }
 
     @Test

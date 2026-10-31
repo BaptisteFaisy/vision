@@ -33,10 +33,10 @@ class CrossingOverlayLayoutTest {
 
     @Test
     fun `chaque etat a sa couleur et son etiquette`() {
-        assertEquals("VERT", crossingTag(true, CrossingState.Green))
-        assertEquals("ROUGE", crossingTag(true, CrossingState.Red))
-        assertEquals("DOUTE", crossingTag(true, null))
-        assertEquals("DOUTE", crossingTag(true, CrossingState.Unknown))
+        assertEquals("GREEN", crossingTag(true, CrossingState.Green))
+        assertEquals("RED", crossingTag(true, CrossingState.Red))
+        assertEquals("UNSURE", crossingTag(true, null))
+        assertEquals("UNSURE", crossingTag(true, CrossingState.Unknown))
         assertEquals(CROSSING_ACCENT_GREEN, crossingAccent(true, CrossingState.Green))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, CrossingState.Red))
         assertEquals(CROSSING_ACCENT_DOUBT, crossingAccent(true, CrossingState.Unknown))
@@ -47,14 +47,14 @@ class CrossingOverlayLayoutTest {
         // Deux surfaces, un seul vocabulaire pour les états tranchés : si l'une
         // dérive, l'utilisateur lit deux mots différents pour le même feu.
         // Le doute est le seul écart assumé : la pastille écrit « … » (rien
-        // d'annoncé), le cadre écrit « DOUTE » (un feu est là, on ne sait pas).
+        // d'annoncé), le cadre écrit « UNSURE » (un feu est là, on ne sait pas).
         for (state in listOf(CrossingState.Green, CrossingState.Red)) {
             val chip = crossingButtonLabel(true, state)
             assertTrue("pastille « $chip » vs étiquette « ${crossingTag(true, state)} »",
                 chip.endsWith(crossingTag(true, state)))
         }
-        assertEquals("Traversée : …", crossingButtonLabel(true, CrossingState.Unknown))
-        assertEquals("DOUTE", crossingTag(true, CrossingState.Unknown))
+        assertEquals("Crossing: …", crossingButtonLabel(true, CrossingState.Unknown))
+        assertEquals("UNSURE", crossingTag(true, CrossingState.Unknown))
     }
 
     @Test
@@ -117,9 +117,9 @@ class CrossingOverlayLayoutTest {
 
     @Test
     fun `seul TRAVERSER autorise - le reste attend`() {
-        assertEquals("peut traverser", traverseTag(true, TraversePhase.TRAVERSER))
+        assertEquals("may cross", traverseTag(true, TraversePhase.TRAVERSER))
         for (phase in listOf(TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null)) {
-            assertEquals("ne peut pas traverser", traverseTag(true, phase))
+            assertEquals("may not cross", traverseTag(true, phase))
         }
         assertEquals("", traverseTag(false, TraversePhase.TRAVERSER))
     }

@@ -40,7 +40,7 @@ internal class ProbeVoice(
     var announce: Boolean = false
 
     /** Langue de la voix (Réglages). */
-    var language: SpeechLanguage = SpeechLanguage.Fr
+    var language: SpeechLanguage = SpeechLanguage.DEFAULT
 
     /** Cap de l'itinéraire (`null` = guidage route inactif, cap manuel). */
     var routeCap: SteeringCap? = null

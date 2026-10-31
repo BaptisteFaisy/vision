@@ -35,7 +35,7 @@ interface TtsDriver {
 
 /**
  * Voix système Android (`android.speech.tts.TextToSpeech`) pour le guidage :
- * gratuite, hors-ligne, en français — là où [dev.sam3vision.app.VoiceAnnouncer]
+ * gratuite, hors-ligne, en anglais — là où [dev.sam3vision.app.VoiceAnnouncer]
  * parle ElevenLabs (clé, réseau, latence), un virage ne peut pas attendre.
  *
  * File sans chevauchement : un seul moteur, les phrases normales s'enchaînent
@@ -94,7 +94,7 @@ class SystemTtsEngine(private val driver: TtsDriver) {
         fun create(context: Context): SystemTtsEngine =
             SystemTtsEngine(AndroidTtsDriver(context.applicationContext))
 
-        /** Langue de la voix → locale du moteur (français par défaut). */
+        /** Langue de la voix → locale du moteur (anglais par défaut). */
         fun localeOf(language: SpeechLanguage): Locale = when (language) {
             SpeechLanguage.Fr -> Locale.FRENCH
             SpeechLanguage.En -> Locale.ENGLISH

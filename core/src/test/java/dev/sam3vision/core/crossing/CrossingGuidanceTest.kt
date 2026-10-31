@@ -105,26 +105,26 @@ class CrossingGuidanceTest {
     @Test
     fun `lateral parle des la premiere frame, mot nouveau seul`() {
         val announcer = CrossingLateralAnnouncer()
-        assertEquals("Tout droit.", announcer.onFrame(0L, 0.50f))
+        assertEquals("Straight.", announcer.onFrame(0L, 0.50f))
         assertNull(announcer.onFrame(200L, 0.52f))
-        assertEquals("Gauche.", announcer.onFrame(400L, 0.10f))
+        assertEquals("Left.", announcer.onFrame(400L, 0.10f))
         assertNull(announcer.onFrame(600L, 0.12f))
-        assertEquals("Droite.", announcer.onFrame(800L, 0.90f))
+        assertEquals("Right.", announcer.onFrame(800L, 0.90f))
     }
 
     @Test
     fun `lateral sans delai ni stabilite, comme le guidage`() {
         val announcer = CrossingLateralAnnouncer(cooldownMs = 60_000L)
-        assertEquals("Tout droit.", announcer.onFrame(0L, 0.50f))
-        assertEquals("Gauche.", announcer.onFrame(100L, 0.10f))
+        assertEquals("Straight.", announcer.onFrame(0L, 0.50f))
+        assertEquals("Left.", announcer.onFrame(100L, 0.10f))
     }
 
     @Test
     fun `lateral absence fait retomber, retour reparle`() {
         val announcer = CrossingLateralAnnouncer()
-        assertEquals("Tout droit.", announcer.onFrame(0L, 0.50f))
+        assertEquals("Straight.", announcer.onFrame(0L, 0.50f))
         assertNull(announcer.onFrame(200L, null))
-        assertEquals("Tout droit.", announcer.onFrame(400L, 0.50f))
+        assertEquals("Straight.", announcer.onFrame(400L, 0.50f))
     }
 
     @Test
@@ -133,10 +133,10 @@ class CrossingGuidanceTest {
         assertNull(announcer.lastWord)
         announcer.onFrame(0L, 0.10f)
         assertEquals(GuidanceWord.Left, announcer.lastWord)
-        assertEquals("Gauche.", announcer.lastPhrase)
+        assertEquals("Left.", announcer.lastPhrase)
         announcer.reset()
         assertNull(announcer.lastWord)
-        assertEquals("Gauche.", announcer.onFrame(200L, 0.10f))
+        assertEquals("Left.", announcer.onFrame(200L, 0.10f))
     }
 
     @Test
@@ -204,9 +204,9 @@ class CrossingGuidanceTest {
     }
 
     @Test
-    fun `francais defaut de l approche`() {
+    fun `anglais defaut de l approche`() {
         assertEquals(
-            "Passage piéton devant, à 2 mètres.",
+            "Crosswalk ahead, 2 meters away.",
             CrossingText.approach(SteeringCap.Straight, 2.0f),
         )
     }

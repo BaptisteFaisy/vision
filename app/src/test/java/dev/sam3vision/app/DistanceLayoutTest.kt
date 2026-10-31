@@ -39,7 +39,7 @@ class DistanceLayoutTest {
         val layer = DistanceLayer(384, 512, listOf(reading("personne", 3.288f, listOf(100f, 100f, 160f, 300f))))
         val labels = screenLabels(layer, cropTransform(384, 512, 1080f, 2400f))
         assertEquals(1, labels.size)
-        assertEquals("≈ 3,3 m", labels.first().text)
+        assertEquals("≈ 3.3 m", labels.first().text)
         // bord gauche de la boîte (100 px) → 100 × 4,6875 − 360 ; bord haut (100 px) → 468,75
         assertEquals(108.75f, labels.first().x, 0.5f)
         assertEquals(468.75f, labels.first().y, 0.5f)
@@ -63,7 +63,7 @@ class DistanceLayoutTest {
     @Test
     fun `pastille posee au-dessus du coin de sa boite`() {
         // ancre (200, 500) ; pastille 100 × 30, fil de 22 px sous elle
-        val pill = placed(listOf(ScreenLabel("≈ 3,2 m", x = 200f, y = 500f, colorIndex = 0))).single()
+        val pill = placed(listOf(ScreenLabel("≈ 3.2 m", x = 200f, y = 500f, colorIndex = 0))).single()
         assertEquals(200f, pill.left, 0.01f)
         assertEquals(448f, pill.top, 0.01f)
         assertEquals(200f, pill.anchorX, 0.01f)
@@ -123,14 +123,14 @@ class DistanceLayoutTest {
 
     @Test
     fun `champ de vision saisi est tolere et borne`() {
-        assertEquals(72.5f, parseFov("72,5"), 0.01f)
+        assertEquals(72.5f, parseFov("72.5"), 0.01f)
         assertEquals(0f, parseFov(""), 0f)
         assertEquals(0f, parseFov("0"), 0f)
         assertEquals(0f, parseFov("n'importe quoi"), 0f)
         assertEquals(15f, parseFov("2"), 0.01f)
         assertEquals(130f, parseFov("500"), 0.01f)
         assertEquals("67", fovText(67f))
-        assertEquals("72,5", fovText(72.5f))
+        assertEquals("72.5", fovText(72.5f))
         assertEquals("", fovText(0f))
     }
 
@@ -147,7 +147,7 @@ class DistanceLayoutTest {
                 ),
             ),
         )
-        assertEquals(listOf("personne 2,1 m", "chaise 1,4 m"), objectChips(measured))
+        assertEquals(listOf("personne 2.1 m", "chaise 1.4 m"), objectChips(measured))
     }
 
     @Test
@@ -165,16 +165,16 @@ class DistanceLayoutTest {
     @Test
     fun `ligne d'etat annonce l'objet le plus proche`() {
         val line = formatLiveStatus(true, 1.5f, 620, "A100", 3, nearestMeters = 1.44f)
-        assertTrue(line.contains("1,4 m"))
+        assertTrue(line.contains("1.4 m"))
         val without = formatLiveStatus(true, 1.5f, 620, "A100", 3)
-        assertTrue(!without.contains("proche"))
+        assertTrue(!without.contains("closest"))
     }
 
     @Test
     fun `pastille prefixee du concept pour les hotes sans masque`() {
         val lecture = reading("personne", 3.2f, listOf(100f, 100f, 160f, 300f))
-        assertEquals("≈ 3,2 m", labelText(lecture, withLabel = false))
-        assertEquals("personne ≈ 3,2 m", labelText(lecture, withLabel = true))
-        assertEquals("objet ≈ 3,2 m", labelText(lecture.copy(label = "   "), withLabel = true))
+        assertEquals("≈ 3.2 m", labelText(lecture, withLabel = false))
+        assertEquals("personne ≈ 3.2 m", labelText(lecture, withLabel = true))
+        assertEquals("objet ≈ 3.2 m", labelText(lecture.copy(label = "   "), withLabel = true))
     }
 }

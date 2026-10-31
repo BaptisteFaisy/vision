@@ -64,6 +64,6 @@ class GroundPipelineTest {
         assertFalse(got.planeOk)
         assertTrue(got.summary.pathClear)
         assertTrue(got.regions.isEmpty())
-        assertEquals("Chemin dégagé. Vous pouvez avancer.", got.report.message)
+        assertEquals("Path clear. You can move forward.", got.report.message)
     }
 }

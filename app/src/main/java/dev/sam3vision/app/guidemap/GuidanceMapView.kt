@@ -291,9 +291,9 @@ private fun frameUpdate(overlays: MapOverlays, view: MapView): CameraUpdate? {
 @Suppress("DEPRECATION")
 private fun drawGuideStatic(map: MapLibreMap, overlays: MapOverlays, pins: GuidePinIcons) {
     drawRoute(map, overlays.route)
-    overlays.destination?.let { drawPin(map, it, "Arrivée", pins.icon(AppColors.success)) }
+    overlays.destination?.let { drawPin(map, it, "Arrival", pins.icon(AppColors.success)) }
     val neutral = pins.icon(AppColors.textMuted)
-    overlays.crossings.forEach { drawPin(map, it, "Passage piéton", neutral) }
+    overlays.crossings.forEach { drawPin(map, it, "Crosswalk", neutral) }
     overlays.maneuvers.forEach { drawPin(map, it.point, it.label, neutral) }
 }
 

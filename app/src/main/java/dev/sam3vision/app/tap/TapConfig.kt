@@ -91,8 +91,8 @@ object TapConfig {
         endpoint: String = sam31Endpoint,
         onDevice: Boolean = ON_DEVICE_INFERENCE,
     ): String? = when {
-        onDevice -> "SAM 3.1 configuré pour l'inférence locale : envoi cloud désactivé"
-        endpoint.isBlank() -> "endpoint SAM 3.1 vide : renseigne sam31.endpoint dans local.properties"
+        onDevice -> "SAM 3.1 set for on-device inference: cloud send disabled"
+        endpoint.isBlank() -> "empty SAM 3.1 endpoint: set sam31.endpoint in local.properties"
         else -> null
     }
 

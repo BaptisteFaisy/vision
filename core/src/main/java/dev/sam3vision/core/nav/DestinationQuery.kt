@@ -39,5 +39,5 @@ sealed class DestinationError(message: String) : Exception(message) {
 
     /** Rien à géocoder : vide, blanc, ou ponctuation seule. */
     class BlankQuery :
-        DestinationError("destination vide : dicte ou saisis une adresse")
+        DestinationError("empty destination: dictate or type an address")
 }

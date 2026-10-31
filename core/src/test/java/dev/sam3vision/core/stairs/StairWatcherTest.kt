@@ -22,7 +22,7 @@ class StairWatcherTest {
         val cue = watcher.onSignal(positive(), 3000L)
 
         assertNotNull(cue)
-        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals("Stairs ahead.", cue!!.phrase)
         assertEquals(5, cue.lineCount)
     }
 

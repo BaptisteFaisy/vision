@@ -60,11 +60,11 @@ class LlmRequestLanguageTest {
     }
 
     @Test
-    fun `le français reste la langue demandée en mode français`() {
-        val server = serverReplying("Une chaise à gauche.")
+    fun `l'anglais reste la langue demandee meme en mode francais`() {
+        val server = serverReplying("A chair on the left.")
         try {
-            runBlocking { client(server, SpeechLanguage.Fr).ask("QUJD", "quoi ?", emptyList()) }
-            assertTrue(firstSystem(server.requests.single().body).contains("français"))
+            runBlocking { client(server, SpeechLanguage.Fr).ask("QUJD", "what?", emptyList()) }
+            assertTrue(firstSystem(server.requests.single().body).contains("English"))
         } finally {
             server.close()
         }

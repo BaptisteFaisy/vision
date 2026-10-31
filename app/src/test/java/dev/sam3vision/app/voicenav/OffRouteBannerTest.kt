@@ -8,7 +8,7 @@ class OffRouteBannerTest {
 
     @Test
     fun `ecart affiche le bandeau recalcul`() {
-        assertEquals("Écart — recalcul…", offRouteBannerText(true))
+        assertEquals("Off route — recalculating…", offRouteBannerText(true))
     }
 
     @Test

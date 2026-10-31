@@ -17,8 +17,8 @@ internal const val ROUTE_USER_AGENT = "$USER_AGENT route"
 /** Coût Valhalla de la marche : le seul mode du guidage vocal. */
 const val ROUTE_COSTING_PEDESTRIAN = "pedestrian"
 
-/** Langue des consignes demandée au serveur : le téléphone parle français. */
-internal const val ROUTE_LANGUAGE = "fr-FR"
+/** Langue des consignes demandée au serveur : le téléphone parle anglais. */
+internal const val ROUTE_LANGUAGE = "en-US"
 
 /** Valhalla répond en kilomètres (`units: kilometers`) : passage en mètres. */
 private const val KM_TO_METERS = 1000.0
@@ -52,7 +52,7 @@ class HttpRouteClient(
 ) : RouteClient {
 
     override suspend fun route(from: RoutePoint, to: RoutePoint, costing: String): Result<RouteTrip> {
-        endpointRefusal("endpoint itinéraire", baseUrl, "/route")?.let { return Result.failure(it) }
+        endpointRefusal("route endpoint", baseUrl, "/route")?.let { return Result.failure(it) }
         return client.executeBuilt {
             requestTo(baseUrl, "/route", "POST", OneShotJsonBody(routeRequestJson(from, to, costing)), ROUTE_USER_AGENT)
         }
@@ -61,7 +61,7 @@ class HttpRouteClient(
     }
 
     override suspend fun health(): Result<Boolean> {
-        endpointRefusal("endpoint itinéraire", baseUrl, "/status")?.let { return Result.failure(it) }
+        endpointRefusal("route endpoint", baseUrl, "/status")?.let { return Result.failure(it) }
         return client.execute(requestTo(baseUrl, "/status"))
             .then { Result.success(it.code in 200..299) }
     }
@@ -76,10 +76,10 @@ internal fun routeRequestJson(from: RoutePoint, to: RoutePoint, costing: String)
 
 /** Réponse `/route` → itinéraire : tronçons décodés, totaux du `summary`. */
 internal fun parseRouteTrip(raw: String): RouteTrip {
-    val json = parse(raw) ?: throw ApiError.BadResponse("/route : JSON illisible")
-    val trip = json.optJSONObject("trip") ?: throw ApiError.BadResponse("/route : trip manquant")
+    val json = parse(raw) ?: throw ApiError.BadResponse("/route: unreadable JSON")
+    val trip = json.optJSONObject("trip") ?: throw ApiError.BadResponse("/route: missing trip")
     val legs = trip.objects("legs").map { leg -> parseRouteLeg(leg) }
-    if (legs.isEmpty()) throw ApiError.BadResponse("/route : aucun tronçon")
+    if (legs.isEmpty()) throw ApiError.BadResponse("/route: no legs")
     val summary = trip.optJSONObject("summary")
     return RouteTrip(
         legs = legs,
@@ -102,7 +102,7 @@ private fun parseRouteLeg(json: JSONObject): RouteLeg {
 /**
  * Une manœuvre : la consigne parlée **avant** la transition prime (c'est elle
  * qui prévient), la consigne d'après ne sert qu'en repli ; sans les deux, le
- * guidage retombe sur `maneuverShortFr(type)`.
+ * guidage retombe sur `maneuverShort(type)`.
  */
 private fun parseRouteManeuver(json: JSONObject): RouteManeuver = RouteManeuver(
     type = json.intOr("type"),

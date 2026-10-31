@@ -34,7 +34,7 @@ fun TtsSettings(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        VoiceLanguageSettings(draft, onChange)
+        Text("Voice language: English", color = SettingsLight.muted, fontSize = 13.sp)
         LabeledField("ElevenLabs API key", draft.ttsApiKey, true) { onChange(draft.copy(ttsApiKey = it)) }
         LabeledField("ElevenLabs voice ID", draft.ttsVoiceId, false) { onChange(draft.copy(ttsVoiceId = it)) }
         SpeedSetting(draft, onChange)

@@ -15,7 +15,7 @@ internal const val SPIKE_LOG_LINES = 60
 internal const val SHORT_ERROR_CHARS = 120
 
 /** Repli quand une erreur ne porte aucun message exploitable. */
-internal const val FALLBACK_ERROR_MESSAGE = "synthèse impossible"
+internal const val FALLBACK_ERROR_MESSAGE = "synthesis impossible"
 
 /**
  * Ajoute [line] à la fin de [lines] et ne garde que les [maxLines] dernières :

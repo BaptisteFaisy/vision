@@ -8,13 +8,13 @@ import java.util.Locale
 /**
  * Mise en forme du journal caméra pour le LLM et pour l'UI.
  *
- * Les temps sont **relatifs** (« il y a 3 s ») : le modèle n'a pas l'horloge,
+ * Les temps sont **relatifs** (« 3 s ago ») : le modèle n'a pas l'horloge,
  * et l'utilisateur non plus. Les positions suivent le cadran horaire
- * (« à 9 heures », « à midi », « à 3 heures »), exactement comme la voix.
+ * (« at 9 o'clock », « at 12 o'clock », « at 3 o'clock »), exactement comme la voix.
  *
  * Le contexte envoyé au LLM suit la **langue de la voix** ([SpeechLanguage]) : un
  * journal français dans une consigne anglaise fait dériver la réponse. Les étiquettes
- * de l'interface ([chipLabel]) restent en français.
+ * de l'interface ([chipLabel]) sont en anglais (langue par défaut).
  */
 object TimelineText {
 
@@ -23,7 +23,7 @@ object TimelineText {
         global: TimelineSummary,
         focus: TimelineSummary? = null,
         focusLabel: String? = null,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String {
         val parts = mutableListOf<String>()
         parts += describe(global, titles(language).first, language)
@@ -43,7 +43,7 @@ object TimelineText {
     fun describe(
         summary: TimelineSummary,
         title: String = "Journal caméra",
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String {
         val header = when (language) {
             SpeechLanguage.Fr -> "$title (de ${ago(summary.toMs, summary.fromMs)} à maintenant, " +
@@ -62,7 +62,7 @@ object TimelineText {
     }
 
     /** Une ligne par objet : position, dernière vue, apparition, occurrences. */
-    fun trackLine(nowMs: Long, track: SeenTrack, language: SpeechLanguage = SpeechLanguage.Fr): String =
+    fun trackLine(nowMs: Long, track: SeenTrack, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.Fr -> buildString {
                 append("- « ").append(track.label).append(" » (suivi n°").append(track.id).append(") : ")
@@ -80,16 +80,16 @@ object TimelineText {
             }
         }
 
-    /** Étiquette compacte pour l'UI : « personne · vu il y a 3 s ». */
+    /** Étiquette compacte pour l'UI : « personne · 3 s ago ». */
     fun chipLabel(nowMs: Long, track: SeenTrack): String =
         "${track.label} · ${ago(nowMs, track.lastAtMs)}"
 
-    /** Repère de position au cadran, comme la voix : « à 9 heures », « à midi ». */
-    fun position(track: SeenTrack, language: SpeechLanguage = SpeechLanguage.Fr): String =
+    /** Repère de position au cadran, comme la voix : « at 9 o'clock », « at 12 o'clock ». */
+    fun position(track: SeenTrack, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         PositionText.clockLabel(track.centerX, language)
 
-    /** Durée relative : « il y a 3 s », « il y a 1 min 05 s », « à l'instant ». */
-    fun ago(nowMs: Long, atMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): String {
+    /** Durée relative : « 3 s ago », « 1 min 05 s ago », « just now ». */
+    fun ago(nowMs: Long, atMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
         val delta = (nowMs - atMs).coerceAtLeast(0L)
         val seconds = delta / 1_000L
         val minutes = seconds / 60L

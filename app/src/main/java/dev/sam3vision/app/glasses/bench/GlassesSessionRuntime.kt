@@ -65,7 +65,7 @@ internal class GlassesRuntime(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                onLog("incident interne : ${error.message}")
+                onLog("internal incident: ${error.message}")
             }
         }
     }
@@ -100,7 +100,7 @@ internal class GlassesRuntime(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                onLog("erreur pendant l'arrêt : ${error.message}")
+                onLog("error while stopping: ${error.message}")
             } finally {
                 cleanup.cancel()
             }

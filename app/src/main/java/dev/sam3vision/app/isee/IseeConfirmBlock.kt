@@ -33,7 +33,7 @@ import dev.sam3vision.core.nav.initialGuidance
 /**
  * La confirmation de destination sur l'accueil iSee, sous la caméra :
  * destination entendue, résumé d'itinéraire (ou chargement, ou motif),
- * carte d'aperçu du tracé, boutons Démarrer / Annuler, rappel vocal et
+ * carte d'aperçu du tracé, boutons Start / Cancel, rappel vocal et
  * saisie clavier de secours. La boule et la phrase en cours s'effacent
  * pendant la confirmation (comme en guidage), la caméra et la sonde
  * continuent, l'appui long reste une question libre et le tap la vidéo.
@@ -69,7 +69,7 @@ internal fun IseeConfirmBlock(
         }
         ConfirmButtons(state, viewModel, Modifier.fillMaxWidth())
         Text(
-            "Dites « oui » ou « non »",
+            "Say “yes” or “no”",
             color = Color(IseePortrait.SUB),
             fontSize = 14.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -78,7 +78,7 @@ internal fun IseeConfirmBlock(
     }
 }
 
-/** Boutons Démarrer / Annuler, côte à côte, zones publiées (exemption racine). */
+/** Boutons Start / Cancel, côte à côte, zones publiées (exemption racine). */
 @Composable
 private fun ConfirmButtons(
     state: VoiceNavUiState.Confirming,
@@ -93,14 +93,14 @@ private fun ConfirmButtons(
                 .navZone(CONFIRM_START_ID, viewModel.navButtons),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.success),
         ) {
-            Text("Démarrer", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Start", fontSize = 19.sp, fontWeight = FontWeight.Bold)
         }
         OutlinedButton(
             onClick = viewModel::cancelVoiceNavConfirmation,
             modifier = Modifier.weight(1f).height(52.dp)
                 .navZone(CONFIRM_CANCEL_ID, viewModel.navButtons),
         ) {
-            Text("Annuler", fontSize = 19.sp)
+            Text("Cancel", fontSize = 19.sp)
         }
     }
 }
@@ -122,12 +122,12 @@ private fun ConfirmTextCard(viewModel: IseeViewModel, modifier: Modifier = Modif
 private fun ConfirmSummary(state: VoiceNavUiState.Confirming) {
     when {
         state.loading -> LoadingRow()
-        state.summary != null -> SummaryText(state.summary.address, state.summary.distanceFr(), state.summary.durationFr())
+        state.summary != null -> SummaryText(state.summary.address, state.summary.distance(), state.summary.duration())
         state.error != null -> Text(state.error, color = AppColors.danger, fontSize = 16.sp)
     }
 }
 
-/** Adresse (si connue) + « 2,4 km · 15 min », encre Portrait. */
+/** Adresse (si connue) + « 2.4 km · 15 min », encre Portrait. */
 @Composable
 private fun SummaryText(address: String?, distance: String, duration: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -143,7 +143,7 @@ private fun SummaryText(address: String?, distance: String, duration: String) {
     }
 }
 
-/** Indicateur + « Chargement de l'itinéraire… » pendant l'appel moteur. */
+/** Indicateur + « Loading the route… » pendant l'appel moteur. */
 @Composable
 private fun LoadingRow() {
     Row(
@@ -152,6 +152,6 @@ private fun LoadingRow() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CircularProgressIndicator(color = AppColors.primary, strokeWidth = 3.dp, modifier = Modifier.size(20.dp))
-        Text("Chargement de l'itinéraire…", color = Color(IseePortrait.SUB), fontSize = 16.sp)
+        Text("Loading the route…", color = Color(IseePortrait.SUB), fontSize = 16.sp)
     }
 }

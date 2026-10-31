@@ -204,7 +204,7 @@ fun isUsableHttpUrl(url: String): Boolean = url.trim().toHttpUrlOrNull() != null
  * remonte plus à l'écran, l'utilisateur est guidé vers Réglages.
  */
 fun invalidEndpointMessage(label: String): String =
-    "$label invalide (https://…) — corrige-le dans Réglages"
+    "$label invalid (https://…) — fix it in Settings"
 
 /**
  * Refus local partagé d'un endpoint inutilisable : `null` quand l'URL exacte de
@@ -212,7 +212,7 @@ fun invalidEndpointMessage(label: String): String =
  * Réglages) devient une erreur actionnable, sans aucun appel réseau.
  */
 fun endpointRefusal(label: String, baseUrl: String, path: String): ApiError.Network? {
-    if (baseUrl.isBlank()) return ApiError.Network("$label absent — renseigne-le dans Réglages")
+    if (baseUrl.isBlank()) return ApiError.Network("$label missing — enter it in Settings")
     if (!isUsableHttpUrl(joinUrl(baseUrl, path))) return ApiError.Network(invalidEndpointMessage(label))
     return null
 }
@@ -290,16 +290,16 @@ internal fun Throwable.toApiError(): ApiError = when (this) {
     is SocketTimeoutException -> ApiError.Timeout()
     is InterruptedIOException -> ApiError.Timeout()
     is IOException -> ApiError.Network(cause = this)
-    else -> ApiError.Network(message = message ?: "backend injoignable", cause = this)
+    else -> ApiError.Network(message = message ?: "backend unreachable", cause = this)
 }
 
 /** 401/402/409/429 ont des messages dédiés, le reste tombe dans [ApiError.Http]. */
 internal fun httpError(code: Int, body: String): ApiError = when (code) {
-    401, 403 -> ApiError.InvalidKey(if (code == 403) "accès refusé (403)" else "clé invalide (401)")
+    401, 403 -> ApiError.InvalidKey(if (code == 403) "access refused (403)" else "invalid key (401)")
     402 -> ApiError.PaymentRequired()
     // 409 du proxy LLM : la requête a été refusée pour une limite côté service (quota ou
     // requête concurrente) — le corps brut ne dit pas laquelle, le message reste actionnable.
-    409 -> ApiError.RateLimited("limite atteinte côté IA (409) : réessaie dans un instant")
+    409 -> ApiError.RateLimited("AI-side limit reached (409): try again in a moment")
     429 -> ApiError.RateLimited()
     // Modal répond 404 « modal-http: invalid function call » quand l'app n'est pas déployée
     // (arrêtée) : message actionnable, et surtout pas de nouvelle tentative.
@@ -354,7 +354,7 @@ internal inline fun <R> catchingResult(block: () -> R): Result<R> =
     } catch (e: ApiError) {
         Result.failure(e)
     } catch (e: Exception) {
-        Result.failure(ApiError.BadResponse(e.message ?: "réponse illisible"))
+        Result.failure(ApiError.BadResponse(e.message ?: "unreadable response"))
     }
 
 

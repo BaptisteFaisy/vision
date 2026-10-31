@@ -52,13 +52,13 @@ internal fun GlassesPhotoStreet(photo: IseeGlassesPhoto, modifier: Modifier = Mo
             val picture = remember(image) { image.asImageBitmap() }
             Image(
                 bitmap = picture,
-                contentDescription = "Photo prise avec les lunettes",
+                contentDescription = "Photo taken with the glasses",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
             )
         } else if (failed) {
             Text(
-                "Photo des lunettes illisible (fichier effacé ?)",
+                "Glasses photo unreadable (file deleted?)",
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier

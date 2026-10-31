@@ -47,7 +47,7 @@ private fun pointJson(point: LatLon): JSONObject =
  */
 internal fun parseRouteDigest(raw: String): Result<RouteDigest> = catchingResult {
     val trip = JSONObject(raw).optJSONObject("trip")
-        ?: throw ApiError.BadResponse("/route : itinéraire absent")
+        ?: throw ApiError.BadResponse("/route: route missing")
     val summary = trip.optJSONObject("summary")
     RouteDigest(
         distanceMeters = summary.kmToMeters("length"),

@@ -59,10 +59,10 @@ class ValhallaRouteLoaderTest {
     @Test
     fun `sans position ni url le motif est explicite, jamais des zeros`() = runBlocking {
         val noOrigin = loader(originNow = { null })("la gare").exceptionOrNull()
-        assertEquals("position de départ indisponible (activez la localisation)", noOrigin?.message)
+        assertEquals("starting position unavailable (enable location)", noOrigin?.message)
 
         val noUrl = loader(baseUrl = { "  " })("la gare").exceptionOrNull()
-        assertEquals("service d'itinéraire non configuré", noUrl?.message)
+        assertEquals("route service not configured", noUrl?.message)
     }
 
     @Test
@@ -111,7 +111,7 @@ class ValhallaRouteLoaderTest {
     }
 
     @Test
-    fun `double echec route donne un motif francais`() = runBlocking {
+    fun `double echec route donne un motif anglais`() = runBlocking {
         var attempts = 0
         val down = loader(
             route = { _, _ ->
@@ -123,7 +123,7 @@ class ValhallaRouteLoaderTest {
         val failure = down("la gare").exceptionOrNull()
 
         assertEquals(2, attempts)
-        assertEquals("itinéraire indisponible (serveur injoignable)", failure?.message)
+        assertEquals("route unavailable (serveur injoignable)", failure?.message)
     }
 
     @Test
@@ -143,7 +143,7 @@ class ValhallaRouteLoaderTest {
 
         val failure = down("loin").exceptionOrNull()
 
-        assertEquals("itinéraire indisponible (destination trop éloignée à pied)", failure?.message)
+        assertEquals("route unavailable (destination too far on foot)", failure?.message)
     }
 
     @Test
@@ -161,7 +161,7 @@ class ValhallaRouteLoaderTest {
         val failure = slow("la gare").exceptionOrNull()
 
         assertEquals(2, attempts)
-        assertEquals("itinéraire indisponible (délai dépassé)", failure?.message)
+        assertEquals("route unavailable (timeout)", failure?.message)
     }
 
     @Test

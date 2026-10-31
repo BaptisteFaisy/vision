@@ -30,7 +30,7 @@ object ShareHealth {
 
     /** Aucune position : permission refusée, GPS coupé ou fix pas encore obtenu. */
     fun noFix() {
-        _message.value = "Position inconnue : autorise la localisation du téléphone pour être suivi."
+        _message.value = "Unknown position: allow the phone location to be tracked."
     }
 
     fun clear() {

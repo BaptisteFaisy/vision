@@ -21,7 +21,7 @@ import java.net.URLEncoder
  */
 fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
     val link = shareLink(siteUrl, shareId)
-    val text = "Suivi en direct : $link"
+    val text = "Live tracking: $link"
     val whatsapp = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
         .setPackage("com.whatsapp")
@@ -36,7 +36,7 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
     if (startShare(context, sms)) return
     val chooser = Intent.createChooser(
         Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
-        "Partager le suivi",
+        "Share tracking",
     )
     startShare(context, chooser)
 }

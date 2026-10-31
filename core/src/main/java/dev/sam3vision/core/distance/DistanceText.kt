@@ -8,23 +8,23 @@ import kotlin.math.roundToInt
  * Mise en forme des distances pour l'écran et pour le LLM.
  *
  * Précision volontairement dégressive : le centimètre en deçà d'un mètre, le
- * décimètre jusqu'à dix mètres, le mètre au-delà — afficher « 23,4 m » laisserait
+ * décimètre jusqu'à dix mètres, le mètre au-delà — afficher « 23.4 m » laisserait
  * croire à une précision que la mesure monocular n'a pas.
  *
- * L'**écran** reste en français ([format], [approximate]) ; seule la **voix** suit la
- * langue choisie ([spoken]).
+ * L'**écran** est en anglais ([format], [approximate]), comme la **voix**
+ * ([spoken], langue unique).
  */
 object DistanceText {
 
-    /** Étiquette française : « 85 cm », « 3,2 m », « 12 m ». */
+    /** Étiquette anglaise : « 85 cm », « 3.2 m », « 12 m ». */
     fun format(meters: Float): String {
         if (!meters.isFinite() || meters <= 0f) return "?"
         if (meters < 1f) return "${(meters * 100f).roundToInt()} cm"
-        if (meters < 10f) return "${decimal(meters, 1, Locale.FRANCE)} m"
-        return "${decimal(meters, 0, Locale.FRANCE)} m"
+        if (meters < 10f) return "${decimal(meters, 1, Locale.US)} m"
+        return "${decimal(meters, 0, Locale.US)} m"
     }
 
-    /** Étiquette avec l'approximation assumée : « ≈ 3,2 m ». */
+    /** Étiquette avec l'approximation assumée : « ≈ 3.2 m ». */
     fun approximate(meters: Float): String = "≈ ${format(meters)}"
 
     /**
@@ -33,7 +33,7 @@ object DistanceText {
      * En français, le singulier va jusqu'à 2 (« 1,5 mètre ») ; en anglais il s'arrête à 1
      * (« 1.4 meters », « 1 meter ») et la décimale est un point, comme le lit la voix.
      */
-    fun spoken(meters: Float, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun spoken(meters: Float, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> spokenFrench(meters)
         SpeechLanguage.En -> spokenEnglish(meters)
     }
@@ -43,7 +43,7 @@ object DistanceText {
      * « 1 mètre »), le centimètre sous un mètre (« 50 centimètres »). Une consigne
      * qui coupe la précédente n'a pas le temps des décimales.
      */
-    fun spokenShort(meters: Float, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun spokenShort(meters: Float, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> spokenShortFrench(meters)
         SpeechLanguage.En -> spokenShortEnglish(meters)
     }
@@ -102,7 +102,7 @@ object DistanceText {
 
     /**
      * Distance la plus courte par étiquette, dans l'ordre d'apparition des objets :
-     * c'est la pastille du bas d'écran (« personne 2,1 m »).
+     * c'est la pastille du bas d'écran (« person 2.1 m »).
      */
     fun perLabel(readings: List<DistanceReading>): List<Pair<String, Float>> {
         val best = LinkedHashMap<String, Float>()
@@ -113,9 +113,9 @@ object DistanceText {
         return best.map { (label, meters) -> label to meters }
     }
 
-    /** Ligne courte pour la barre d'état : « plus proche 1,8 m », vide si rien. */
+    /** Ligne courte pour la barre d'état : « closest 1.8 m », vide si rien. */
     fun nearestLabel(readings: List<DistanceReading>): String =
-        nearest(readings)?.let { "plus proche ${format(it.meters)}" }.orEmpty()
+        nearest(readings)?.let { "closest ${format(it.meters)}" }.orEmpty()
 
     /**
      * Nombre décimal brut, locale explicite : l'unique formatage `String.format` des

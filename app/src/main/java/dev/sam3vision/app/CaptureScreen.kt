@@ -231,7 +231,7 @@ private suspend fun pickFromGallery(context: Context, uri: android.net.Uri, onPh
         onPhoto(target)
         return null
     }
-    return "Impossible de copier l'image choisie."
+    return "Cannot copy the chosen image."
 }
 
 private suspend fun bindCamera(
@@ -240,13 +240,13 @@ private suspend fun bindCamera(
     previewView: PreviewView,
     imageCapture: ImageCapture,
 ): Result<Unit> {
-    if (owner == null) return Result.failure(IllegalStateException("Cycle de vie indisponible pour lier la caméra"))
+    if (owner == null) return Result.failure(IllegalStateException("Lifecycle unavailable to bind the camera"))
     val provider = try {
         withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
     } catch (cancel: CancellationException) {
         throw cancel // effet annulé par recomposition : pas une panne de caméra
     } catch (e: Exception) {
-        return Result.failure(IllegalStateException("Aucune caméra accessible : ${e.message}"))
+        return Result.failure(IllegalStateException("No camera accessible: ${e.message}"))
     }
     return runCatching {
         val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
@@ -271,7 +271,7 @@ private fun captureToFile(
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) = mainPost { onPhoto(target) }
 
-            override fun onError(exception: ImageCaptureException) = mainPost { onError("Capture impossible : ${exception.message}") }
+            override fun onError(exception: ImageCaptureException) = mainPost { onError("Capture failed: ${exception.message}") }
         },
     )
 }
@@ -293,15 +293,15 @@ private fun CaptureControls(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BigButton("Photographier", ready, AppColors.primary, onCapture)
-        BigButton("Direct (vidéo)", ready, AppColors.success, onLive)
+        BigButton("Take a photo", ready, AppColors.primary, onCapture)
+        BigButton("Live (video)", ready, AppColors.success, onLive)
         HalfRow(
-            left = { BigButton("Vidéo (tap)", true, AppColors.success, onOpenTap, 0.5f) },
-            right = { BigButton("Galerie", true, AppColors.surfaceHigh, onGallery, 0.5f) },
+            left = { BigButton("Video (tap)", true, AppColors.success, onOpenTap, 0.5f) },
+            right = { BigButton("Gallery", true, AppColors.surfaceHigh, onGallery, 0.5f) },
         )
         HalfRow(
-            left = { BigButton("Maison", true, AppColors.success, onHome, 0.5f) },
-            right = { BigButton("Réglages", true, AppColors.surfaceHigh, onSettings, 0.5f) },
+            left = { BigButton("Home", true, AppColors.success, onHome, 0.5f) },
+            right = { BigButton("Settings", true, AppColors.surfaceHigh, onSettings, 0.5f) },
         )
     }
 }
@@ -323,7 +323,7 @@ private fun HalfRow(left: @Composable () -> Unit, right: @Composable () -> Unit)
 @Composable
 private fun GestureHint(modifier: Modifier = Modifier) {
     Text(
-        text = "Tap : vidéo · Appui long : parler",
+        text = "Tap: video · Long press: speak",
         color = Color.White,
         fontSize = 13.sp,
         modifier = modifier

@@ -24,7 +24,7 @@ class StairClimbTest {
         assertNull(watcher.onSignal(positive(6), 0L))
         assertNull(watcher.onSignal(positive(6), 100L))
         val cue = watcher.onSignal(positive(6), 200L)
-        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals("Stairs ahead.", cue!!.phrase)
         assertEquals(StairDirection.Unknown, cue.direction)
     }
 
@@ -41,7 +41,7 @@ class StairClimbTest {
         // +2,6 s : la tendance à 4 parle, avec le compte lissé (pas le brut).
         val cue = watcher.onSignal(positive(4), 2800L)
         assertNotNull(cue)
-        assertEquals("Plus que 4 marches.", cue!!.phrase)
+        assertEquals("4 steps left.", cue!!.phrase)
         assertEquals(4, cue.lineCount)
     }
 
@@ -81,11 +81,11 @@ class StairClimbTest {
 
         assertNull(watcher.onSignal(positive(2), 3000L))
         val countdown = watcher.onSignal(positive(1), 3100L)
-        assertEquals("Plus que 2 marches.", countdown!!.phrase)
+        assertEquals("2 steps left.", countdown!!.phrase)
 
         val last = watcher.onSignal(positive(1), 5700L)
         assertNotNull(last)
-        assertEquals("Dernière marche.", last!!.phrase)
+        assertEquals("Last step.", last!!.phrase)
         assertEquals(1, last.lineCount)
     }
 
@@ -129,7 +129,7 @@ class StairClimbTest {
         watcher.onSignal(labels, 0L)
         watcher.onSignal(labels, 100L)
         val cue = watcher.onSignal(labels, 200L)
-        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals("Stairs ahead.", cue!!.phrase)
         assertNull(watcher.smoothedLineCount)
 
         // Pas de compte à rebours sans compteur : le cooldown standard tait.
@@ -146,11 +146,11 @@ class StairClimbTest {
         // Sous minLines (4) : négatifs, mais comptés — la tendance continue.
         assertNull(watcher.onSignal(negative(3), 3000L))
         val countdown = watcher.onSignal(negative(2), 3100L)
-        assertEquals("Plus que 3 marches.", countdown!!.phrase)
+        assertEquals("3 steps left.", countdown!!.phrase)
         assertNull(watcher.onSignal(negative(1), 3200L))
 
         val last = watcher.onSignal(negative(1), 5800L)
-        assertEquals("Dernière marche.", last!!.phrase)
+        assertEquals("Last step.", last!!.phrase)
     }
 
     @Test
@@ -166,7 +166,7 @@ class StairClimbTest {
         watcher.onSignal(positive(6), 3000L)
         watcher.onSignal(positive(6), 3100L)
         val cue = watcher.onSignal(positive(6), 3200L)
-        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals("Stairs ahead.", cue!!.phrase)
     }
 
     @Test
@@ -178,7 +178,7 @@ class StairClimbTest {
         assertNull(watcher.onSignal(positive(6), 10_300L))
         assertNull(watcher.onSignal(positive(6), 10_400L))
         val cue = watcher.onSignal(positive(6), 10_500L)
-        assertEquals("Escalier devant.", cue!!.phrase)
+        assertEquals("Stairs ahead.", cue!!.phrase)
     }
 
     @Test

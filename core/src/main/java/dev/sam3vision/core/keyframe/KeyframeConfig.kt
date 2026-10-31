@@ -34,18 +34,18 @@ data class KeyframeConfig(
 ) {
 
     init {
-        require(minIntervalMs > 0L) { "minIntervalMs doit être > 0" }
-        require(maxAgeMs >= minIntervalMs) { "maxAgeMs doit être >= minIntervalMs" }
-        require(staticSlackMaxAgeMs >= maxAgeMs) { "staticSlackMaxAgeMs doit être >= maxAgeMs" }
-        require(errorThreshold in 0f..1f) { "errorThreshold doit être dans [0, 1]" }
-        require(errorFrames >= 1) { "errorFrames doit être >= 1" }
-        require(emaAlpha > 0f && emaAlpha <= 1f) { "emaAlpha doit être dans ]0, 1]" }
-        require(sceneThreshold > 0f && sceneThreshold <= 1f) { "sceneThreshold doit être dans ]0, 1]" }
-        require(budgetRatePerSec > 0f) { "budgetRatePerSec doit être > 0" }
-        require(budgetBurst >= 1) { "budgetBurst doit être >= 1" }
-        require(inFlightTimeoutMs > minIntervalMs) { "inFlightTimeoutMs doit être > minIntervalMs" }
+        require(minIntervalMs > 0L) { "minIntervalMs must be > 0" }
+        require(maxAgeMs >= minIntervalMs) { "maxAgeMs must be >= minIntervalMs" }
+        require(staticSlackMaxAgeMs >= maxAgeMs) { "staticSlackMaxAgeMs must be >= maxAgeMs" }
+        require(errorThreshold in 0f..1f) { "errorThreshold must be within [0, 1]" }
+        require(errorFrames >= 1) { "errorFrames must be >= 1" }
+        require(emaAlpha > 0f && emaAlpha <= 1f) { "emaAlpha must be within ]0, 1]" }
+        require(sceneThreshold > 0f && sceneThreshold <= 1f) { "sceneThreshold must be within ]0, 1]" }
+        require(budgetRatePerSec > 0f) { "budgetRatePerSec must be > 0" }
+        require(budgetBurst >= 1) { "budgetBurst must be >= 1" }
+        require(inFlightTimeoutMs > minIntervalMs) { "inFlightTimeoutMs must be > minIntervalMs" }
         require(backoffMs.isNotEmpty() && backoffMs.all { it > 0L }) {
-            "le repli doit être une liste non vide de durées > 0"
+            "the fallback must be a non-empty list of durations > 0"
         }
     }
 

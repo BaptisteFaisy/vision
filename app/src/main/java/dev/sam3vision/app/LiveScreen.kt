@@ -172,7 +172,7 @@ private fun LiveCameraHost(
                 pushFrame(proxy, viewModel, encoder)
             }
         }.onSuccess { bound = true }
-            .onFailure { onFailure("Caméra indisponible : ${it.message}") }
+            .onFailure { onFailure("Camera unavailable: ${it.message}") }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -325,7 +325,7 @@ private fun RecoveryTap(onRestart: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            "Touche l'écran pour relancer le direct",
+            "Tap the screen to restart the live",
             color = AppColors.text,
             fontSize = 13.sp,
             modifier = Modifier

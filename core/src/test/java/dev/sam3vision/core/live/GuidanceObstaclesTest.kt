@@ -99,7 +99,7 @@ class GuidanceObstaclesTest {
         assertEquals("mur", decision.obstacle!!.label)
         assertEquals(GuidanceSide.Left, decision.side)
         assertEquals(GuidanceWord.Left, Guidance.word(decision))
-        assertEquals("Gauche.", Guidance.phrase(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
         assertEquals("Left.", Guidance.phrase(decision, SpeechLanguage.En))
         assertEquals("w|left", Guidance.key(decision))
         assertNull(decision.shiftMeters)
@@ -112,7 +112,7 @@ class GuidanceObstaclesTest {
         assertEquals(3f, out.readings.single().meters, 0.02f)
         assertTrue(out.decision.blocked)
         assertEquals(1f, out.decision.shiftMeters!!, 0.001f)
-        assertEquals("Gauche.", Guidance.phrase(out.decision))
+        assertEquals("Left.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -183,7 +183,7 @@ class GuidanceObstaclesTest {
 
         assertTrue(out.readings.isEmpty())
         assertTrue(out.decision.blocked)
-        assertEquals("Gauche.", Guidance.phrase(out.decision))
+        assertEquals("Left.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -192,9 +192,9 @@ class GuidanceObstaclesTest {
         val wallBox = listOf(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
         val cut = pinholeChain(frameOf(seg("mur", wallBox))).placed
 
-        assertEquals("gauche.", announcer.onFrame(0L, cut))
+        assertEquals("left.", announcer.onFrame(0L, cut))
         assertNull(announcer.onFrame(100L, cut))
-        assertEquals("obstacle, arrêtez-vous.", announcer.onFrame(200L, depthWallStop().placed))
+        assertEquals("obstacle, stop.", announcer.onFrame(200L, depthWallStop().placed))
     }
 
     companion object {

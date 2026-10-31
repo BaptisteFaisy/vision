@@ -36,12 +36,12 @@ internal fun PictoDialog(state: PictoUiState, viewModel: IseeViewModel) {
     when (state.phase) {
         PictoPhase.Generating -> AlertDialog(
             onDismissRequest = {},
-            title = { Text("Pictogramme") },
+            title = { Text("Pictogram") },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Génération en cours… (~10 s)")
+                    Text("Generating… (~10 s)")
                 }
             },
             confirmButton = {},
@@ -53,27 +53,27 @@ internal fun PictoDialog(state: PictoUiState, viewModel: IseeViewModel) {
             }
             AlertDialog(
                 onDismissRequest = { viewModel.picto.dismissDraft() },
-                title = { Text("Pictogramme") },
+                title = { Text("Pictogram") },
                 text = {
                     Column {
                         image?.let {
-                            Image(it, contentDescription = "Pictogramme proposé", Modifier.size(128.dp))
+                            Image(it, contentDescription = "Suggested pictogram", Modifier.size(128.dp))
                         }
                         Text(
-                            "Ce dessin représentera l'objet sur la vidéo. Reconnaissable ?",
+                            "This drawing will mark the object on the video. Recognizable?",
                             Modifier.padding(vertical = 8.dp),
                         )
-                        TextField(value = name, onValueChange = { name = it }, label = { Text("Nom de l'objet") })
+                        TextField(value = name, onValueChange = { name = it }, label = { Text("Object name") })
                     }
                 },
                 confirmButton = {
                     Row {
-                        TextButton(onClick = { viewModel.picto.regenerateDraft(name) }) { Text("Régénérer") }
-                        TextButton(onClick = { viewModel.picto.confirmDraft(name) }) { Text("Valider") }
+                        TextButton(onClick = { viewModel.picto.regenerateDraft(name) }) { Text("Regenerate") }
+                        TextButton(onClick = { viewModel.picto.confirmDraft(name) }) { Text("Confirm") }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.picto.dismissDraft() }) { Text("Annuler") }
+                    TextButton(onClick = { viewModel.picto.dismissDraft() }) { Text("Cancel") }
                 },
             )
         }

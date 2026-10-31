@@ -53,7 +53,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Écran « Banc d'essai lunettes » d'iSee : les lunettes (ou l'appareil simulé)
+ * Écran « Glasses test bench » d'iSee : les lunettes (ou l'appareil simulé)
  * filment, SAM segmente, le LLM décrit, la voix annonce. Un journal, cinq gestes.
  *
  * Ce n'est plus une `Activity` : l'écran vit dans la pile de navigation d'iSee
@@ -108,8 +108,8 @@ private fun BenchContent(bench: BenchController, onBack: () -> Unit) {
             .verticalScroll(rememberScrollState()),
     ) {
         ScreenHeader(
-            title = "Banc d'essai lunettes",
-            subtitle = "SAM Vision — lunettes, voix seule",
+            title = "Glasses test bench",
+            subtitle = "SAM Vision — glasses, voice only",
             onBack = onBack,
             onSettings = null,
         )
@@ -133,10 +133,10 @@ private fun BenchActions(bench: BenchController) {
     if (MockControl.available && !bench.running) {
         BigButton("Mock", true, AppColors.surfaceHigh, bench::startMock)
     }
-    BigButton("Lunettes", !bench.running, AppColors.surfaceHigh, bench::startReal)
+    BigButton("Glasses", !bench.running, AppColors.surfaceHigh, bench::startReal)
     BigButton("Stop", bench.running, AppColors.surfaceHigh, bench::stop)
     BigButton(
-        label = if (bench.analyzing) "Couper l'analyse" else "Analyser",
+        label = if (bench.analyzing) "Stop analysis" else "Analyze",
         enabled = true,
         color = AppColors.primary,
         onClick = bench::toggleAnalyze,
@@ -214,7 +214,7 @@ internal class BenchController(
      * vraies lunettes.
      */
     fun startReal() {
-        log("mode réel : recherche de vraies lunettes appairées")
+        log("real mode: looking for truly paired glasses")
         MockControl.dropSimulatedPairs(appContext, ::log)
         scope.launch {
             logRealStart(::log)
@@ -224,21 +224,21 @@ internal class BenchController(
 
     /** Diagnostic à la demande : même lecture que le démarrage réel, sans session. */
     fun reportDiagnosis() {
-        log("diagnostic : état des lunettes vu par le SDK")
+        log("diagnosis: glasses state as seen by the SDK")
         scope.launch { logRealStart(::log) }
     }
 
     /** Bascule l'envoi réseau : par défaut le banc ne fait que prouver la réception. */
     fun toggleAnalyze() {
         analyzing = !analyzing
-        log(if (analyzing) ANALYZE_ARMED_MESSAGE else "analyse réseau coupée")
+        log(if (analyzing) ANALYZE_ARMED_MESSAGE else "network analysis off")
         if (!analyzing) return
         val frame = lastFrame
-        if (frame != null) scope.launch { onFrame(frame) } else log("aucune frame reçue pour l'instant")
+        if (frame != null) scope.launch { onFrame(frame) } else log("no frame received yet")
     }
 
     fun stop() {
-        log("arrêt demandé")
+        log("stop requested")
         session.stop()
         voice.stop()
         MockControl.dropSimulatedPairs(appContext, ::log)
@@ -278,14 +278,14 @@ internal class BenchController(
 
     /** Active le mock (apparié un appareil simulé), sans ouvrir de session. */
     private fun enableMock() {
-        log("mode mock : caméra du téléphone en guise de lunettes")
+        log("mock mode: phone camera standing in for glasses")
         MockControl.start(appContext, ::log)
     }
 
     private fun launchSession() {
         val host = activity
         if (host == null) {
-            log("session impossible : aucune Activity hôte")
+            log("session impossible: no host Activity")
             return
         }
         if (running) return

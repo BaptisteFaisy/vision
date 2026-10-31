@@ -22,7 +22,7 @@ class RouteClientTest {
           {"type":1,"instruction":"Marchez vers le nord.","verbal_pre_transition_instruction":"Marchez vers le nord sur la rue de Rivoli.","street_names":["Rue de Rivoli"],"length":0.12,"time":86.0,"begin_shape_index":0,"end_shape_index":1},
           {"type":4,"instruction":"Vous êtes arrivé.","street_names":[],"length":0.0,"time":0.0,"begin_shape_index":1,"end_shape_index":1}
         ],"shape":"o`~d|AocqnC_yFno[","summary":{"length":0.12,"time":86.0}}],
-        "summary":{"length":0.12,"time":86.0},"status_message":"Found route between points","status":0,"units":"kilometers","language":"fr-FR"}}
+        "summary":{"length":0.12,"time":86.0},"status_message":"Found route between points","status":0,"units":"kilometers","language":"en-US"}}
     """.trimIndent()
 
     private var tripBody = validTrip
@@ -40,7 +40,7 @@ class RouteClientTest {
     fun tearDown() = server.close()
 
     @Test
-    fun `route envoie les deux points en pieton francais avec un User-Agent propre`() = runBlocking {
+    fun `route envoie les deux points en pieton anglais avec un User-Agent propre`() = runBlocking {
         HttpRouteClient(server.baseUrl).route(depart, arrivee).getOrThrow()
 
         val request = server.requests.single()
@@ -50,7 +50,7 @@ class RouteClientTest {
         assertTrue(!request.headers.containsKey("authorization"))
         val sent = JSONObject(request.body)
         assertEquals(ROUTE_COSTING_PEDESTRIAN, sent.getString("costing"))
-        assertEquals("fr-FR", sent.getJSONObject("directions_options").getString("language"))
+        assertEquals("en-US", sent.getJSONObject("directions_options").getString("language"))
         val locations = sent.getJSONArray("locations")
         assertEquals(2, locations.length())
         assertEquals(48.8566, locations.getJSONObject(0).getDouble("lat"), 1e-9)

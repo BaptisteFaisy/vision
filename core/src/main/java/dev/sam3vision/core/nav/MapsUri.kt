@@ -88,10 +88,10 @@ object MapsUri {
 
     private fun coordsOr(latitude: Double, longitude: Double): Result<Pair<Double, Double>> {
         if (!latitude.isFinite() || !longitude.isFinite()) {
-            return Result.failure(IllegalArgumentException("coordonnées non finies"))
+            return Result.failure(IllegalArgumentException("non-finite coordinates"))
         }
         if (latitude !in -90.0..90.0 || longitude !in -180.0..180.0) {
-            return Result.failure(IllegalArgumentException("coordonnées hors plages"))
+            return Result.failure(IllegalArgumentException("coordinates out of range"))
         }
         return Result.success(latitude to longitude)
     }

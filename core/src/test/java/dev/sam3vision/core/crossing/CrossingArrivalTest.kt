@@ -13,7 +13,7 @@ class CrossingArrivalTest {
     @Test
     fun `phrase arrivee douce FR EN`() {
         assertEquals("Sur le passage.", CrossingText.arrived(SpeechLanguage.Fr))
-        assertEquals("Sur le passage.", CrossingText.arrived())
+        assertEquals("On the crosswalk.", CrossingText.arrived())
         assertEquals("On the crosswalk.", CrossingText.arrived(SpeechLanguage.En))
     }
 
@@ -74,7 +74,7 @@ class CrossingArrivalTest {
         val watcher = CrossingArrivalWatcher()
         assertNull(watcher.onFrame(true))
         val cue = watcher.onFrame(true)
-        assertEquals("Sur le passage.", cue?.phrase)
+        assertEquals("On the crosswalk.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
     }
 
@@ -94,7 +94,7 @@ class CrossingArrivalTest {
         watcher.onFrame(true)
         watcher.onFrame(false)
         assertNull(watcher.onFrame(true))
-        assertEquals("Sur le passage.", watcher.onFrame(true)?.phrase)
+        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
     }
 
     @Test
@@ -103,7 +103,7 @@ class CrossingArrivalTest {
         watcher.onFrame(true)
         watcher.onFrame(false)
         assertNull(watcher.onFrame(true))
-        assertEquals("Sur le passage.", watcher.onFrame(true)?.phrase)
+        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
     }
 
     @Test
@@ -114,7 +114,7 @@ class CrossingArrivalTest {
         watcher.reset()
         assertNull(watcher.lastCue)
         assertNull(watcher.onFrame(true))
-        assertEquals("Sur le passage.", watcher.onFrame(true)?.phrase)
+        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
     }
 
     @Test

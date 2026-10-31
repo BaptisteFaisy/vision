@@ -69,7 +69,7 @@ class PictoStore(private val root: File) {
         File(dir, LABEL_FILE).writeText(label.trim().ifEmpty { DEFAULT_LABEL }, Charsets.UTF_8)
         File(dir, PNG_FILE).writeBytes(png)
         File(dir, TEMPLATE_FILE).writeBytes(encodeTemplate(template))
-        return readDir(dir) ?: throw IllegalStateException("repère illisible après écriture")
+        return readDir(dir) ?: throw IllegalStateException("landmark unreadable after write")
     }
 
     /**
@@ -120,6 +120,6 @@ class PictoStore(private val root: File) {
         private const val PICTO_PREFIX = "picto-"
 
         /** Nom quand l'aidant valide sans rien saisir. */
-        const val DEFAULT_LABEL = "Objet"
+        const val DEFAULT_LABEL = "Object"
     }
 }

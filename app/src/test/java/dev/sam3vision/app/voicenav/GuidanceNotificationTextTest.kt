@@ -11,21 +11,21 @@ class GuidanceNotificationTextTest {
 
     @Test
     fun `titre et bouton nomment le guidage vocal`() {
-        assertEquals("Guidage vocal actif", GuidanceNotification.title())
-        assertEquals("Arrêter le guidage", GuidanceNotification.stopLabel())
-        assertEquals("Guidage vocal", GuidanceNotification.channelName())
+        assertEquals("Voice guidance active", GuidanceNotification.title())
+        assertEquals("Stop guidance", GuidanceNotification.stopLabel())
+        assertEquals("Voice guidance", GuidanceNotification.channelName())
     }
 
     @Test
     fun `texte sans destination reste générique mais actionnable`() {
-        assertEquals("Suivez les annonces vocales.", GuidanceNotification.contentText(null))
-        assertEquals("Suivez les annonces vocales.", GuidanceNotification.contentText("  "))
+        assertEquals("Follow the voice announcements.", GuidanceNotification.contentText(null))
+        assertEquals("Follow the voice announcements.", GuidanceNotification.contentText("  "))
     }
 
     @Test
     fun `texte avec destination la nomme`() {
         assertEquals(
-            "Guidage vers la gare — suivez les annonces vocales.",
+            "Guiding to la gare — follow the voice announcements.",
             GuidanceNotification.contentText("  la gare  "),
         )
     }

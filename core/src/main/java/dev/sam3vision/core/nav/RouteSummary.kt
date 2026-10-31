@@ -9,7 +9,7 @@ package dev.sam3vision.core.nav
  * connaît (`null` = inconnue, l'écran montre la destination seule).
  * Distances en mètres, durée en secondes, toujours >= 0.
  *
- * Pur JVM : aucune dépendance Android, formatage français testé sans
+ * Pur JVM : aucune dépendance Android, formatage anglais testé sans
  * Robolectric.
  */
 data class RouteSummary(
@@ -19,41 +19,41 @@ data class RouteSummary(
     val durationSeconds: Long,
 ) {
     init {
-        require(destination.isNotBlank()) { "destination vide" }
-        require(distanceMeters >= 0) { "distance négative" }
-        require(durationSeconds >= 0) { "durée négative" }
+        require(destination.isNotBlank()) { "empty destination" }
+        require(distanceMeters >= 0) { "negative distance" }
+        require(durationSeconds >= 0) { "negative duration" }
     }
 
-    /** « 350 m », « 2,4 km » (virgule française, une décimale au-delà du km). */
-    fun distanceFr(): String = formatDistanceFr(distanceMeters)
+    /** « 350 m », « 2.4 km » (point anglais, une décimale au-delà du km). */
+    fun distance(): String = formatDistance(distanceMeters)
 
-    /** « moins d'une minute », « 12 min », « 1 h 05 ». */
-    fun durationFr(): String = formatDurationFr(durationSeconds)
+    /** « less than a minute », « 12 min », « 1 h 05 ». */
+    fun duration(): String = formatDuration(durationSeconds)
 
     /** « less than a minute », « 12 minutes », « 1 hour, 5 minutes » (question vocale). */
     fun durationEn(): String = formatDurationEn(durationSeconds)
 }
 
 /**
- * Distance en français : mètres ronds sous 1 km, kilomètres à une décimale
- * au-delà (virgule, pas de point). Les négatifs sont ramenés à zéro.
+ * Distance en anglais : mètres ronds sous 1 km, kilomètres à une décimale
+ * au-delà (point, pas de virgule). Les négatifs sont ramenés à zéro.
  */
-fun formatDistanceFr(meters: Long): String {
+fun formatDistance(meters: Long): String {
     val safe = meters.coerceAtLeast(0)
     if (safe < 1000) return "$safe m"
     val whole = safe / 1000
     val tenth = (safe % 1000) / 100
-    return "$whole,$tenth km"
+    return "$whole.$tenth km"
 }
 
 /**
- * Durée en français : secondes arrondies à la minute, heures au-delà de
- * 59 min (« 1 h 05 », minutes sur deux chiffres). Zéro = « moins d'une
+ * Durée en anglais : secondes arrondies à la minute, heures au-delà de
+ * 59 min (« 1 h 05 », minutes sur deux chiffres). Zéro = « less than a
  * minute », jamais « 0 min ».
  */
-fun formatDurationFr(seconds: Long): String {
+fun formatDuration(seconds: Long): String {
     val safe = seconds.coerceAtLeast(0)
-    if (safe < 60) return "moins d'une minute"
+    if (safe < 60) return "less than a minute"
     val minutes = (safe + 30) / 60
     if (minutes < 60) return "$minutes min"
     val hours = minutes / 60
@@ -63,7 +63,7 @@ fun formatDurationFr(seconds: Long): String {
 
 /**
  * Durée parlée en anglais (question de confirmation) : mêmes arrondis que
- * [formatDurationFr] (minute la plus proche, heures au-delà de 59 min),
+ * [formatDuration] (minute la plus proche, heures au-delà de 59 min),
  * minutes nulles omises (« 2 hours », pas « 2 hours, 0 minutes »).
  */
 fun formatDurationEn(seconds: Long): String {

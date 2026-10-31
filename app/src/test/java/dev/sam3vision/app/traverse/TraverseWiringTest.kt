@@ -203,14 +203,14 @@ class TraverseWiringTest {
 
     @Test
     fun `ligne simple - phase et veto seuls`() {
-        val decision = TraverseDecision(TraversePhase.PRET, "prêt", false, null, null, null, false)
+        val decision = TraverseDecision(TraversePhase.PRET, "ready", false, null, null, null, false)
 
         assertEquals("traversee phase=PRET veto=false", traverseLogLine(decision))
     }
 
     @Test
     fun `ligne veto - label et mesures`() {
-        val decision = TraverseDecision(TraversePhase.ALERTE, "attendez", true, "car", 8.2f, 2.1f, true)
+        val decision = TraverseDecision(TraversePhase.ALERTE, "wait", true, "car", 8.2f, 2.1f, true)
 
         assertEquals("traversee phase=ALERTE veto=true blocking=car meters=8.2 ttc=2.1", traverseLogLine(decision))
     }

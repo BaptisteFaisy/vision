@@ -37,7 +37,7 @@ internal class GlassesMockControls(
         }
         Log.i(TAG, "recette : mock actif")
         state.update {
-            it.copy(mockActive = true, deviceName = it.deviceName ?: "Ray-Ban Meta (simulées)", registered = true)
+            it.copy(mockActive = true, deviceName = it.deviceName ?: "Ray-Ban Meta (simulated)", registered = true)
         }
         note(GlassesMessages.mockReady())
     }

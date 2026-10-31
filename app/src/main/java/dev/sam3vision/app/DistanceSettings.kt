@@ -38,7 +38,7 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
 
 /** Displayed field-of-view value: empty when the sensor decides. */
 internal fun fovText(deg: Float): String =
-    if (deg > 0f) String.format(Locale.FRANCE, "%.1f", deg).removeSuffix(",0") else ""
+    if (deg > 0f) String.format(Locale.US, "%.1f", deg).removeSuffix(".0") else ""
 
 /** Tolerant field-of-view input: comma accepted, [LensSpec] bounds, 0 = auto. */
 internal fun parseFov(text: String): Float {

@@ -8,11 +8,11 @@ import org.junit.Test
 class GuidanceUpdateTest {
 
     @Test
-    fun `formats francais de la manoeuvre et du reste`() {
-        val update = GuidanceUpdate("Tournez à droite", 150, 2450, 900)
+    fun `formats anglais de la manoeuvre et du reste`() {
+        val update = GuidanceUpdate("Turn right", 150, 2450, 900)
 
-        assertEquals("Dans 150 m", update.maneuverFr())
-        assertEquals("Encore 2,4 km · 15 min", update.remainingFr())
+        assertEquals("In 150 m", update.maneuver())
+        assertEquals("2.4 km left · 15 min", update.remaining())
     }
 
     @Test
@@ -21,7 +21,7 @@ class GuidanceUpdateTest {
 
         val first = initialGuidance(summary)
 
-        assertEquals("Direction Gare de Lyon", first.instruction)
+        assertEquals("Heading to Gare de Lyon", first.instruction)
         assertEquals(2450, first.remainingDistanceMeters)
         assertEquals(900, first.remainingDurationSeconds)
     }
@@ -48,12 +48,12 @@ class GuidanceUpdateTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun `distance restante negative refusee`() {
-        GuidanceUpdate("Tout droit", 10, -1, 60)
+        GuidanceUpdate("Straight ahead", 10, -1, 60)
     }
 
     @Test
     fun `ecart faux par defaut y compris a l etat initial`() {
-        val update = GuidanceUpdate("Tout droit", 10, 100, 60)
+        val update = GuidanceUpdate("Straight ahead", 10, 100, 60)
         val first = initialGuidance(RouteSummary("Gare de Lyon", null, 2450, 900))
 
         assertFalse(update.offRoute)
@@ -62,7 +62,7 @@ class GuidanceUpdateTest {
 
     @Test
     fun `ecart explicite leve et rabaisse par copy`() {
-        val update = GuidanceUpdate("Tout droit", 10, 100, 60)
+        val update = GuidanceUpdate("Straight ahead", 10, 100, 60)
 
         assertTrue(update.copy(offRoute = true).offRoute)
         assertFalse(update.copy(offRoute = true).copy(offRoute = false).offRoute)

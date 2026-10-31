@@ -26,8 +26,8 @@ class TraverseVoiceTest {
         assertEquals(CrossingText.phrase(CrossingState.Red), TraversePhrases.RED)
         assertEquals(CrossingText.phrase(CrossingState.Green), TraversePhrases.GREEN)
         assertEquals(CrossingText.phrase(CrossingState.Unknown), TraversePhrases.UNKNOWN)
-        assertEquals("Trottoir en face.", TraversePhrases.SIDEWALK_ACROSS)
-        assertEquals("Sur le passage.", TraversePhrases.ON_CROSSWALK)
+        assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
                 TraversePhrases.RED, TraversePhrases.GREEN, TraversePhrases.UNKNOWN,
@@ -147,8 +147,8 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `premier lancement - les cinq phrases fr pre-generees par le systeme`() = runBlocking {
-        val systemTts = FakeSystemTts(language = "fr-FR", store = clips)
+    fun `premier lancement - les cinq phrases en pre-generees par le systeme`() = runBlocking {
+        val systemTts = FakeSystemTts(language = "en-US", store = clips)
         val report = voice(systemTts = systemTts).prewarm()
 
         assertEquals(0, report.ready)
@@ -175,8 +175,8 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `moteur systeme non francais - langue signalee`() = runBlocking {
-        val report = voice(systemTts = FakeSystemTts(language = "en-US", store = clips)).prewarm()
+    fun `moteur systeme non anglais - langue signalee`() = runBlocking {
+        val report = voice(systemTts = FakeSystemTts(language = "fr-FR", store = clips)).prewarm()
 
         assertTrue(!report.languageOk)
         assertEquals(5, report.generated)
@@ -203,11 +203,11 @@ class TraverseVoiceTest {
     @Test
     fun `langue systeme - espaces et casse toleres`() = runBlocking {
         val spaced = mutableMapOf<String, String>()
-        val okSpaced = voice(systemTts = FakeSystemTts(language = " fra ", store = spaced)).prewarm()
+        val okSpaced = voice(systemTts = FakeSystemTts(language = " en ", store = spaced)).prewarm()
 
         assertTrue(okSpaced.languageOk)
         val upper = mutableMapOf<String, String>()
-        val okUpper = voice(systemTts = FakeSystemTts(language = "FRA", store = upper)).prewarm()
+        val okUpper = voice(systemTts = FakeSystemTts(language = "ENG", store = upper)).prewarm()
 
         assertTrue(okUpper.languageOk)
     }

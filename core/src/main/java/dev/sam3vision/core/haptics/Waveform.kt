@@ -19,16 +19,16 @@ class Waveform(
     val repeatIndex: Int = NO_REPEAT,
 ) {
     init {
-        require(timings.isNotEmpty()) { "au moins un timing est requis" }
+        require(timings.isNotEmpty()) { "at least one timing is required" }
         require(timings.size == amplitudes.size) {
-            "timings et amplitudes doivent avoir la même taille (${timings.size} vs ${amplitudes.size})"
+            "timings and amplitudes must have the same size (${timings.size} vs ${amplitudes.size})"
         }
-        require(timings.all { it >= 0 }) { "les timings sont en millisecondes positives" }
+        require(timings.all { it >= 0 }) { "timings are in positive milliseconds" }
         require(amplitudes.all { it == DEFAULT_AMPLITUDE || it in MIN_AMPLITUDE..MAX_AMPLITUDE }) {
-            "amplitude hors bornes : $amplitudes"
+            "amplitude out of bounds: $amplitudes"
         }
         require(repeatIndex == NO_REPEAT || repeatIndex in timings.indices) {
-            "repeatIndex invalide : $repeatIndex"
+            "invalid repeatIndex: $repeatIndex"
         }
     }
 

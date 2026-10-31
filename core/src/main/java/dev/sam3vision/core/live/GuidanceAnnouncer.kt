@@ -75,7 +75,7 @@ class GuidanceAnnouncer(
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         cap: SteeringCap = SteeringCap.Straight,
         routeCap: SteeringCap? = null,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,

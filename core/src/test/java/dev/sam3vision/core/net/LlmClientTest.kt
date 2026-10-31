@@ -99,7 +99,7 @@ class LlmClientTest {
         try {
             val failure = runBlocking { client(server).describe("QUJD", emptyList()) }.exceptionOrNull()
             assertTrue("attendu InvalidKey, obtenu $failure", failure is ApiError.InvalidKey)
-            assertTrue(failure?.message?.contains("clé invalide") == true)
+            assertTrue(failure?.message?.contains("invalid key") == true)
         } finally {
             server.close()
         }
@@ -111,7 +111,7 @@ class LlmClientTest {
         try {
             val failure = runBlocking { client(server).describe("QUJD", emptyList()) }.exceptionOrNull()
             assertTrue(failure is ApiError.RateLimited)
-            assertTrue(failure?.message?.contains("limite atteinte") == true)
+            assertTrue(failure?.message?.contains("limit reached") == true)
             assertEquals("un nouvel essai, pas plus", 2, server.requests.size)
         } finally {
             server.close()
@@ -164,7 +164,7 @@ class LlmClientTest {
         try {
             val failure = runBlocking { client(server).ask("QUJD", "où ?", emptyList()) }.exceptionOrNull()
             assertTrue("attendu BadResponse, obtenu $failure", failure is ApiError.BadResponse)
-            assertTrue(failure?.message?.contains("pas de message") == true)
+            assertTrue(failure?.message?.contains("no message") == true)
         } finally {
             server.close()
         }
@@ -191,7 +191,7 @@ class LlmClientTest {
             val noScheme = HttpLlmClient("inference.baseten.co/v1", TEST_KEY, "modele", retryDelayMs = 5)
             val failure = runBlocking { noScheme.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
             assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
-            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Réglages") == true)
+            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Settings") == true)
             assertTrue(server.requests.isEmpty())
         } finally {
             server.close()
@@ -205,7 +205,7 @@ class LlmClientTest {
             val noBase = HttpLlmClient("  ", TEST_KEY, "modele", retryDelayMs = 5)
             val failure = runBlocking { noBase.ask("QUJD", "que vois-tu ?", emptyList()) }.exceptionOrNull()
             assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
-            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Réglages") == true)
+            assertTrue("message actionnable attendu, obtenu ${failure?.message}", failure?.message?.contains("Settings") == true)
             assertTrue(server.requests.isEmpty())
         } finally {
             server.close()

@@ -25,13 +25,13 @@ sealed interface ShareSend {
     data object Unreachable : ShareSend
 }
 
-/** Message montré dans les Réglages ; `null` = rien à signaler. */
+/** Message montré dans les Settings ; `null` = rien à signaler. */
 fun shareSendMessage(result: ShareSend): String? = when (result) {
     ShareSend.Sent, ShareSend.Skipped -> null
     is ShareSend.Refused ->
-        if (result.code == 403) "Le relais a refusé l'envoi : la clé de ce téléphone n'est pas celle du flux."
-        else "Le relais a refusé l'envoi (code ${result.code})."
-    ShareSend.Unreachable -> "Relais de suivi injoignable : vérifie la connexion du téléphone."
+        if (result.code == 403) "The relay refused the send: this phone's key is not the stream's key."
+        else "The relay refused the send (code ${result.code})."
+    ShareSend.Unreachable -> "Tracking relay unreachable: check the phone's connection."
 }
 
 /**

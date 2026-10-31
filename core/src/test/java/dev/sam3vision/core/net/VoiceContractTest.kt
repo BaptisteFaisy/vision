@@ -11,7 +11,7 @@ import org.junit.Test
  * Contrat de transport des deux clients vocaux ElevenLabs, hors ligne.
  *
  * TTS (`/text-to-speech/{voice}`) : l'audio est le corps, la clé passe par `xi-api-key`.
- * STT (`/speech-to-text`) : multipart `file` + `model_id`, même clé.
+ * STT (`/speech-to-text`) : multipart `file` + `model_id` + `language_code`, même clé.
  * Les cas déjà verrouillés par [ElevenLabsTtsClientTest] et [ElevenLabsSttClientTest]
  * (402, 401/429 du TTS, refus locaux) ne sont pas rejoués ; cette batterie ajoute la
  * matrice 400/500, le corps vide, le corps balisé, le timeout et les en-têtes réels.
@@ -62,7 +62,7 @@ class VoiceContractTest {
         NetContract.server(body = "  \n{\"detail\":\"quota\"}").use { server ->
             val result = tts(server.baseUrl).synthesize("Bonjour.")
             NetContract.assertError(result, ApiError.BadResponse::class.java, "tts balisé")
-            assertTrue(NetContract.errorOf(result).message!!.contains("audio vide"))
+            assertTrue(NetContract.errorOf(result).message!!.contains("empty audio"))
         }
     }
 

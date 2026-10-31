@@ -31,7 +31,7 @@ class AndroidGeocoderSource(
     override suspend fun geocode(query: String, limit: Int): Result<List<GeocodedPlace>> {
         if (query.isBlank()) return Result.failure(GeocodeError.BlankQuery())
         if (!Geocoder.isPresent()) return Result.failure(GeocodeError.ServiceUnavailable(
-            "géocodeur indisponible sur cet appareil",
+            "geocoder unavailable on this device",
         ))
         return try {
             val addresses = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -43,9 +43,9 @@ class AndroidGeocoderSource(
         } catch (c: CancellationException) {
             throw c
         } catch (e: IOException) {
-            Result.failure(GeocodeError.Network("géocodage impossible : réseau injoignable", e))
+            Result.failure(GeocodeError.Network("geocoding impossible: network unreachable", e))
         } catch (e: Exception) {
-            Result.failure(GeocodeError.ServiceUnavailable(e.message ?: "géocodeur indisponible", e))
+            Result.failure(GeocodeError.ServiceUnavailable(e.message ?: "geocoder unavailable", e))
         }
     }
 
@@ -60,7 +60,7 @@ class AndroidGeocoderSource(
 
                 override fun onError(errorMessage: String?) {
                     if (!cont.isCompleted) {
-                        cont.resumeWithException(IOException(errorMessage ?: "géocodeur en erreur"))
+                        cont.resumeWithException(IOException(errorMessage ?: "geocoder error"))
                     }
                 }
             })

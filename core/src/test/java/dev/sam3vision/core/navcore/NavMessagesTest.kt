@@ -11,49 +11,49 @@ import org.junit.Test
 class NavMessagesTest {
 
     @Test
-    fun `started dit Navigation vers X`() {
-        assertEquals("Navigation vers la gare de Lyon", NavMessages.started("la gare de Lyon"))
+    fun `started dit Navigating to X`() {
+        assertEquals("Navigating to la gare de Lyon", NavMessages.started("la gare de Lyon"))
     }
 
     @Test
     fun `started rogne les espaces`() {
-        assertEquals("Navigation vers Paris", NavMessages.started("  Paris  "))
+        assertEquals("Navigating to Paris", NavMessages.started("  Paris  "))
     }
 
     @Test
     fun `guidage impossible verrouille a l identique`() {
-        assertEquals("Je ne peux pas ouvrir le guidage", NavMessages.GUIDANCE_UNAVAILABLE)
+        assertEquals("I can't open the guidance", NavMessages.GUIDANCE_UNAVAILABLE)
     }
 
     @Test
-    fun `placeOpened dit Voici la fiche de X`() {
-        assertEquals("Voici la fiche de la tour Eiffel", NavMessages.placeOpened("la tour Eiffel"))
+    fun `placeOpened dit Here is the page for X`() {
+        assertEquals("Here is the page for la tour Eiffel", NavMessages.placeOpened("la tour Eiffel"))
     }
 
     @Test
     fun `placeOpened rogne les espaces`() {
-        assertEquals("Voici la fiche de Nice", NavMessages.placeOpened(" Nice "))
+        assertEquals("Here is the page for Nice", NavMessages.placeOpened(" Nice "))
     }
 
     @Test
     fun `repli navigateur verrouille a l identique`() {
-        assertEquals("Itinéraire ouvert dans le navigateur", NavMessages.BROWSER_FALLBACK)
+        assertEquals("Route opened in the browser", NavMessages.BROWSER_FALLBACK)
     }
 
     @Test
     fun `stop verrouille a l identique`() {
-        assertEquals("Guidage arrêté", NavMessages.STOP_DONE)
+        assertEquals("Guidance stopped", NavMessages.STOP_DONE)
     }
 
     @Test
     fun `micro occupe reprend le libelle DictationFeature a l identique`() {
-        assertEquals("micro déjà occupé par la vidéo", NavMessages.MIC_BUSY_VIDEO)
+        assertEquals("microphone already busy with video", NavMessages.MIC_BUSY_VIDEO)
     }
 
     @Test
     fun `aide interrupteur eteint verrouillee a l identique`() {
         assertEquals(
-            "Éteint : iSee montre la fiche du lieu au lieu de lancer le guidage.",
+            "Off: iSee shows the place page instead of starting guidance.",
             NavMessages.SETTING_OFF_HELP,
         )
     }
@@ -61,7 +61,7 @@ class NavMessagesTest {
     @Test
     fun `double echec ASR combine les deux messages`() {
         assertEquals(
-            "Erreur. timeout Meta. 401 Scribe.",
+            "Error. timeout Meta. 401 Scribe.",
             NavMessages.asrBothFailed("timeout Meta", "401 Scribe"),
         )
     }
@@ -69,7 +69,7 @@ class NavMessagesTest {
     @Test
     fun `double echec ASR ne double pas les points`() {
         assertEquals(
-            "Erreur. timeout Meta. 401 Scribe.",
+            "Error. timeout Meta. 401 Scribe.",
             NavMessages.asrBothFailed("timeout Meta.", "  401 Scribe. "),
         )
     }
@@ -77,7 +77,7 @@ class NavMessagesTest {
     @Test
     fun `double echec ASR replie un blanc sur echec inconnu`() {
         assertEquals(
-            "Erreur. échec inconnu. 401 Scribe.",
+            "Error. unknown failure. 401 Scribe.",
             NavMessages.asrBothFailed("   ", "401 Scribe"),
         )
     }

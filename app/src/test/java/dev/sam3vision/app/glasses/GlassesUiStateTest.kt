@@ -39,7 +39,7 @@ class GlassesUiStateTest {
     fun `la gravite du message suit le message jusqu a l ecran`() {
         val state = GlassesUiState(message = GlassesMessages.photoRefused("occupée"))
         assertEquals(MessageKind.ERROR, state.message?.kind)
-        assertTrue(state.message?.text.orEmpty().startsWith("Photo refusée"))
+        assertTrue(state.message?.text.orEmpty().startsWith("Photo refused"))
     }
 
     @Test
@@ -53,25 +53,25 @@ class GlassesUiStateTest {
 
     @Test
     fun `la ligne video dit le fichier en cours, sinon rien`() {
-        assertEquals("Vidéo : rien en cours", statusLines(GlassesUiState())[5])
-        val recording = GlassesUiState(recordingName = "isee-lunettes-20261029-101500.mp4")
-        assertTrue(statusLines(recording)[5].contains("Movies/iSee/isee-lunettes-"))
+        assertEquals("Video: nothing running", statusLines(GlassesUiState())[5])
+        val recording = GlassesUiState(recordingName = "isee-glasses-20261029-101500.mp4")
+        assertTrue(statusLines(recording)[5].contains("Movies/iSee/isee-glasses-"))
     }
 
     @Test
-    fun `les lignes disent l etat reel en francais`() {
+    fun `les lignes disent l etat reel en anglais`() {
         val idle = statusLines(GlassesUiState())
-        assertEquals("SDK : inactif", idle[0])
-        assertEquals("Enregistrement : non enregistrée", idle[1])
-        assertEquals("Appareil : aucune paire détectée · batterie inconnue · non portées", idle[2])
-        assertEquals("Session : arrêtée · caméra non autorisée · flux arrêté", idle[3])
-        assertEquals("Micro lunettes : non autorisé", idle[4])
+        assertEquals("SDK: inactive", idle[0])
+        assertEquals("Registration: not registered", idle[1])
+        assertEquals("Device: no pair detected · battery unknown · not worn", idle[2])
+        assertEquals("Session: stopped · camera not allowed · stream stopped", idle[3])
+        assertEquals("Glasses mic: not allowed", idle[4])
 
         val live = statusLines(ready())
-        assertEquals("SDK : prêt (dev mode)", live[0])
-        assertEquals("Appareil : Ray-Ban Meta · 62 % · portées", live[2])
-        assertEquals("Session : en cours · caméra autorisée · flux actif", live[3])
-        assertEquals("Micro lunettes : prêt", live[4])
+        assertEquals("SDK: ready (dev mode)", live[0])
+        assertEquals("Device: Ray-Ban Meta · 62 % · worn", live[2])
+        assertEquals("Session: running · camera allowed · stream active", live[3])
+        assertEquals("Glasses mic: ready", live[4])
         // Aucun nom d'énumération du SDK ne fuit à l'écran.
         live.forEach { line -> assertFalse(line, line.contains("STARTED")) }
     }
@@ -97,10 +97,10 @@ class GlassesUiStateTest {
 
     @Test
     fun `la ligne du micro dit qui ecoute`() {
-        assertEquals("Micro lunettes : non autorisé", statusLines(GlassesUiState())[4])
-        assertEquals("Micro lunettes : en veille", statusLines(idleStream())[4])
-        assertEquals("Micro lunettes : prêt", statusLines(ready())[4])
+        assertEquals("Glasses mic: not allowed", statusLines(GlassesUiState())[4])
+        assertEquals("Glasses mic: standby", statusLines(idleStream())[4])
+        assertEquals("Glasses mic: ready", statusLines(ready())[4])
         val active = ready().copy(micActive = true)
-        assertEquals("Micro lunettes : actif", statusLines(active)[4])
+        assertEquals("Glasses mic: active", statusLines(active)[4])
     }
 }

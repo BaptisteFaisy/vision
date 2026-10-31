@@ -46,7 +46,7 @@ class HandrailWatcherTest {
         val cue = watcher.onSignal(positive, 2000L)
 
         assertNotNull(cue)
-        assertEquals("Rampe, à midi.", cue!!.phrase)
+        assertEquals("Handrail, at 12 o'clock.", cue!!.phrase)
         assertEquals(1.5f, cue.meters!!, 0f)
     }
 
@@ -55,8 +55,8 @@ class HandrailWatcherTest {
         val watcher = HandrailWatcher()
         val right = HandrailSignal(detected = true, meters = 2f, centerX = 0.8f)
 
-        watcher.onSignal(right, 1000L)
-        val cue = watcher.onSignal(right, 2000L)
+        watcher.onSignal(right, 1000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(right, 2000L, SpeechLanguage.Fr)
         assertEquals("Rampe, à 2 heures.", cue!!.phrase)
 
         val english = HandrailWatcher()

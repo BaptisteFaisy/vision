@@ -188,7 +188,7 @@ internal object SettingsCodec {
             llmModel = values[K_LLM_MODEL].orEmpty().ifBlank { default.llmModel },
             samBaseUrl = values[K_SAM_BASE_URL].orEmpty(),
             samRegion = SamRegion.fromName(values[K_SAM_REGION]),
-            speechLanguage = SpeechLanguage.fromName(values[K_SPEECH_LANGUAGE]),
+            speechLanguage = SpeechLanguage.fromStored(values[K_SPEECH_LANGUAGE]),
             ttsApiKey = values[K_TTS_API_KEY].orEmpty(),
             ttsVoiceId = values[K_TTS_VOICE_ID].orEmpty().ifBlank { default.ttsVoiceId },
             ttsSpeed = values[K_TTS_SPEED]?.toFloatOrNull()?.let(Settings::clampTtsSpeed)

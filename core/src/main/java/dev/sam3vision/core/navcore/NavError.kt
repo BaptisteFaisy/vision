@@ -30,16 +30,16 @@ sealed class NavError(message: String, val retryable: Boolean) : Exception(messa
 
     /** Adresse introuvable ou service de géocodage en panne. Réessayable. */
     class GeocodeFailed(val query: String, detail: String) :
-        NavError("géocodage impossible pour « ${query.trim()} » : $detail", true)
+        NavError("geocoding impossible for « ${query.trim()} »: $detail", true)
 
     /** Calcul d'itinéraire impossible (backend injoignable, pas de trajet…). Réessayable. */
-    class RouteFailed(detail: String) : NavError("itinéraire impossible : $detail", true)
+    class RouteFailed(detail: String) : NavError("route impossible: $detail", true)
 
     /** Panne réseau générique (connexion refusée, DNS…). Réessayable. */
-    class Network(detail: String) : NavError("réseau injoignable : $detail", true)
+    class Network(detail: String) : NavError("network unreachable: $detail", true)
 
     /** Délai dépassé ([what] = étape, ex. « réseau »). Réessayable. */
-    class Timeout(what: String) : NavError("délai dépassé : $what", true)
+    class Timeout(what: String) : NavError("timed out: $what", true)
 
     /**
      * Lancement du guidage impossible. Le message affiché est le contrat
@@ -59,7 +59,7 @@ sealed class NavError(message: String, val retryable: Boolean) : Exception(messa
         fun of(error: Throwable): NavError = when (error) {
             is NavError -> error
             is DestinationError -> EmptyDestination(error)
-            is SocketTimeoutException -> Timeout("réseau")
+            is SocketTimeoutException -> Timeout("network")
             is IOException -> Network(navLabelOf(error))
             else -> Unknown(navLabelOf(error))
         }

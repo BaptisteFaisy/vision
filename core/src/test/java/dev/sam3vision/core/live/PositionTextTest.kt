@@ -30,11 +30,11 @@ class PositionTextTest {
 
     @Test
     fun `libelle de position au cadran`() {
-        assertEquals("à 9 heures", PositionText.clockLabel(0.1f))
-        assertEquals("à midi", PositionText.clockLabel(0.5f))
-        assertEquals("à 3 heures", PositionText.clockLabel(0.9f))
-        assertEquals("à 1 heure", PositionText.clockLabel(0.65f))
-        assertEquals("à 11 heures", PositionText.clockLabel(0.35f))
+        assertEquals("at 9 o'clock", PositionText.clockLabel(0.1f))
+        assertEquals("at 12 o'clock", PositionText.clockLabel(0.5f))
+        assertEquals("at 3 o'clock", PositionText.clockLabel(0.9f))
+        assertEquals("at 1 o'clock", PositionText.clockLabel(0.65f))
+        assertEquals("at 11 o'clock", PositionText.clockLabel(0.35f))
     }
 
     @Test
@@ -43,7 +43,7 @@ class PositionTextTest {
 
         assertEquals(0.1f, obj!!.centerX, 0.001f)
         assertEquals(0.1f, obj.centerY, 0.001f)
-        assertEquals("à 9 heures", obj.position)
+        assertEquals("at 9 o'clock", obj.position)
     }
 
     @Test
@@ -60,7 +60,7 @@ class PositionTextTest {
             listOf(placed("chien", 0.9f), placed("personne", 0.1f), placed("livre", 0.5f)),
         )
 
-        assertEquals("Livre à midi, chien à 3 heures, personne à 9 heures.", phrase)
+        assertEquals("Livre at 12 o'clock, chien at 3 o'clock, personne at 9 o'clock.", phrase)
     }
 
     @Test
@@ -71,7 +71,7 @@ class PositionTextTest {
 
         val phrase = PositionText.phrase(listOf(loin, milieu, proche), maxObjects = 2)
 
-        assertEquals("Personne à 1 mètre, chien à 2 mètres, et 1 autre objet.", phrase)
+        assertEquals("Personne 1 meter away, chien 2 meters away, and 1 other object.", phrase)
     }
 
     @Test
@@ -81,14 +81,14 @@ class PositionTextTest {
 
         val phrase = PositionText.phrase(listOf(gauche, centre))
 
-        assertEquals("Personne à 2 mètres, table à 2 mètres.", phrase)
+        assertEquals("Personne 2 meters away, table 2 meters away.", phrase)
     }
 
     @Test
     fun `meme label meme heure cite une seule fois`() {
         val phrase = PositionText.phrase(listOf(placed("personne", 0.1f), placed("personne", 0.05f)))
 
-        assertEquals("Personne à 9 heures.", phrase)
+        assertEquals("Personne at 9 o'clock.", phrase)
     }
 
     @Test
@@ -103,8 +103,8 @@ class PositionTextTest {
 
         val phrase = PositionText.phrase(labels, maxObjects = 3)
 
-        assertTrue(phrase!!.startsWith("Livre à midi, chien à 10 heures, table à 2 heures"))
-        assertTrue(phrase.endsWith(", et 2 autres objets."))
+        assertTrue(phrase!!.startsWith("Livre at 12 o'clock, chien at 10 o'clock, table at 2 o'clock"))
+        assertTrue(phrase.endsWith(", and 2 other objects."))
     }
 
     @Test
@@ -122,13 +122,13 @@ class PositionTextTest {
         val loin = PlacedLabel("chien", 0.9f, 0.5f, meters = 3.0f)
 
         assertEquals(
-            "Personne à 1 mètre, chien à 3 mètres.",
+            "Personne 1 meter away, chien 3 meters away.",
             PositionText.phrase(listOf(proche, loin)),
         )
         // un seul objet avec distance : même règle, la phrase reste courte
-        assertEquals("Personne à 1 mètre.", PositionText.phrase(listOf(proche)))
+        assertEquals("Personne 1 meter away.", PositionText.phrase(listOf(proche)))
         // sans distance connue : le cadran reste, l'ordre dit qui est en face
-        assertEquals("Chien à 3 heures, personne à 9 heures.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
+        assertEquals("Chien at 3 o'clock, personne at 9 o'clock.", PositionText.phrase(listOf(placed("personne", 0.1f), placed("chien", 0.9f))))
     }
 
     @Test
@@ -140,8 +140,8 @@ class PositionTextTest {
         assertTrue(PositionText.key(listOf(trois)) != PositionText.key(listOf(deux)))
         // même mètre près : pas de nouvelle annonce (le lissage suffit)
         assertEquals(PositionText.key(listOf(trois)), PositionText.key(listOf(troisBis)))
-        assertEquals("personne|à midi|2", PositionText.key(listOf(deux)))
-        assertEquals("personne|à midi|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
+        assertEquals("personne|at 12 o'clock|2", PositionText.key(listOf(deux)))
+        assertEquals("personne|at 12 o'clock|?", PositionText.key(listOf(PlacedLabel("personne", 0.5f))))
     }
 
     @Test

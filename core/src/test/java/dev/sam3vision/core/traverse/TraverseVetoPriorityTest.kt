@@ -15,7 +15,7 @@ import org.junit.Test
  *
  * Verrouille le mot d'ordre exact (« attendez », jamais « prêt » ni
  * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
- * la chaîne veto→phrase « Rouge, attendez. », les littéraux FR préchauffés
+ * la chaîne veto→phrase « Red, wait. », les littéraux FR préchauffés
  * et le doute non urgent tué sur lecteur occupé.
  *
  * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN strict, 15 m,
@@ -36,7 +36,7 @@ class TraverseVetoPriorityTest {
         val decision = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
-        assertEquals("attendez", decision.cue)
+        assertEquals("wait", decision.cue)
         assertEquals("car", decision.blockingLabel)
         assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
     }
@@ -47,7 +47,7 @@ class TraverseVetoPriorityTest {
         assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
         val alert = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
-        assertEquals("attendez", alert.cue)
+        assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
     }
 
@@ -59,7 +59,7 @@ class TraverseVetoPriorityTest {
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
         val alert = veto.update(true, listOf(detection("car", 0.8f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
-        assertEquals("attendez", alert.cue)
+        assertEquals("wait", alert.cue)
         assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
         assertEquals(TraversePhase.TRAVERSER, veto.update(true, emptyList(), focalPx).state)
     }
@@ -69,11 +69,11 @@ class TraverseVetoPriorityTest {
         val veto = TraverseVeto()
         val first = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
         assertEquals(TraversePhase.PRET, first.state)
-        assertEquals("prêt", first.cue)
+        assertEquals("ready", first.cue)
         assertFalse(first.veto)
         val second = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
         assertEquals(TraversePhase.TRAVERSER, second.state)
-        assertEquals("traversez", second.cue)
+        assertEquals("cross", second.cue)
     }
 
     @Test
@@ -82,7 +82,7 @@ class TraverseVetoPriorityTest {
         val decision = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
-        assertEquals("attendez", decision.cue)
+        assertEquals("wait", decision.cue)
     }
 
     @Test
@@ -93,7 +93,7 @@ class TraverseVetoPriorityTest {
         val blocked = TraverseVeto().update(true, listOf(detection("car", 0.51f, nearBox)), focalPx)
         assertTrue(blocked.veto)
         assertEquals(TraversePhase.ATTENDRE, blocked.state)
-        assertEquals("attendez", blocked.cue)
+        assertEquals("wait", blocked.cue)
     }
 
     @Test
@@ -121,22 +121,22 @@ class TraverseVetoPriorityTest {
         assertNull(announcer.onFrame(0L, first.crossingState()))
         val second = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         val cue = announcer.onFrame(200L, second.crossingState())
-        assertEquals("Rouge, attendez.", cue?.phrase)
+        assertEquals("Red, wait.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
         assertEquals(CrossingState.Red, cue?.state)
     }
 
     @Test
-    fun `phrases prechauffees - litteraux francais exacts`() {
-        assertEquals("Rouge, attendez.", TraversePhrases.RED)
-        assertEquals("Vert, traversez.", TraversePhrases.GREEN)
-        assertEquals("Doute, attendez.", TraversePhrases.UNKNOWN)
-        assertEquals("Trottoir en face.", TraversePhrases.SIDEWALK_ACROSS)
-        assertEquals("Sur le passage.", TraversePhrases.ON_CROSSWALK)
+    fun `phrases prechauffees - litteraux anglais exacts`() {
+        assertEquals("Red, wait.", TraversePhrases.RED)
+        assertEquals("Green, cross now.", TraversePhrases.GREEN)
+        assertEquals("Unsure, wait.", TraversePhrases.UNKNOWN)
+        assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
-                "Rouge, attendez.", "Vert, traversez.", "Doute, attendez.",
-                "Trottoir en face.", "Sur le passage.",
+                "Red, wait.", "Green, cross now.", "Unsure, wait.",
+                "Sidewalk across the street.", "On the crosswalk.",
             ),
             TraversePhrases.ALL,
         )

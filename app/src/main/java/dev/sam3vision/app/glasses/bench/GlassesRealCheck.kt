@@ -62,9 +62,9 @@ internal fun knownDeviceName(): String? = runCatching {
 private fun describeDevice(id: DeviceIdentifier): String? {
     val device = Wearables.devicesMetadata[id]?.value ?: return null
     return buildString {
-        append("paire ${device.deviceType.name.lowercase()} : ${device.name}")
-        append(" · lien ${linkLabel(device.linkState)}")
-        append(" · batterie ${device.batteryLevel} %${chargeLabel(device.chargingState)}")
+        append("pair ${device.deviceType.name.lowercase()}: ${device.name}")
+        append(" · link ${linkLabel(device.linkState)}")
+        append(" · battery ${device.batteryLevel}%${chargeLabel(device.chargingState)}")
         append(" · ${donLabel(device.donState)} · ${hingeLabel(device.hingeState)}")
         compatibilityHelp(device.compatibility)?.let { append(" · $it") }
     }
@@ -73,31 +73,31 @@ private fun describeDevice(id: DeviceIdentifier): String? {
 /** Seule une compatibilité autre que `COMPATIBLE` mérite une phrase. */
 private fun compatibilityHelp(compatibility: DeviceCompatibility): String? = when (compatibility) {
     DeviceCompatibility.COMPATIBLE, DeviceCompatibility.UNDEFINED -> null
-    DeviceCompatibility.DEVICE_UPDATE_REQUIRED -> "firmware des lunettes à mettre à jour (app Meta AI)"
-    DeviceCompatibility.SDK_UPDATE_REQUIRED -> "SDK DAT trop ancien pour ces lunettes"
+    DeviceCompatibility.DEVICE_UPDATE_REQUIRED -> "glasses firmware needs updating (Meta AI app)"
+    DeviceCompatibility.SDK_UPDATE_REQUIRED -> "DAT SDK too old for these glasses"
 }
 
 private fun linkLabel(state: LinkState): String = when (state) {
-    LinkState.CONNECTED -> "connectée"
-    LinkState.CONNECTING -> "connexion en cours"
-    LinkState.DISCONNECTED -> "déconnectée"
+    LinkState.CONNECTED -> "connected"
+    LinkState.CONNECTING -> "connecting"
+    LinkState.DISCONNECTED -> "disconnected"
 }
 
 private fun donLabel(state: DonState): String = when (state) {
-    DonState.DONNED -> "portées"
-    DonState.DOFFED -> "non portées"
-    DonState.UNKNOWN -> "portée inconnue"
+    DonState.DONNED -> "worn"
+    DonState.DOFFED -> "not worn"
+    DonState.UNKNOWN -> "wear unknown"
 }
 
 private fun hingeLabel(state: HingeState): String = when (state) {
-    HingeState.OPEN -> "dépliées"
-    HingeState.CLOSED -> "repliées"
-    HingeState.UNKNOWN -> "charnière inconnue"
+    HingeState.OPEN -> "unfolded"
+    HingeState.CLOSED -> "folded"
+    HingeState.UNKNOWN -> "hinge unknown"
 }
 
 /** La charge n'est dite que quand elle est en cours : ailleurs, le niveau suffit. */
 private fun chargeLabel(state: ChargingState): String = when (state) {
-    ChargingState.CHARGING -> " (en charge)"
+    ChargingState.CHARGING -> " (charging)"
     ChargingState.NOT_CHARGING, ChargingState.UNKNOWN -> ""
 }
 

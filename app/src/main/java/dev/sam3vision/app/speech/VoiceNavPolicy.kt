@@ -86,7 +86,7 @@ sealed interface VoiceNavEvent {
 object VoiceNavPhrases {
 
     /** Phrase prononcée pour [event], jamais blanche. */
-    fun phrase(event: VoiceNavEvent, language: SpeechLanguage = SpeechLanguage.Fr): String =
+    fun phrase(event: VoiceNavEvent, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (event) {
             is VoiceNavEvent.Started -> started(event.destination, language)
             is VoiceNavEvent.Turn -> turn(event, language)
@@ -99,10 +99,10 @@ object VoiceNavPhrases {
             is VoiceNavEvent.Literal -> event.phrase.ifBlank { stopped(language) }
         }
 
-    /** Départ : le contrat FR est [NavigationPhrases.started], réutilisé tel quel. */
+    /** Départ : la branche FR garde le texte historique, l'anglais suit le contrat. */
     private fun started(destination: String, language: SpeechLanguage): String =
         when (language) {
-            SpeechLanguage.Fr -> NavigationPhrases.started(destination)
+            SpeechLanguage.Fr -> "Navigation vers ${destination.trim()}"
             SpeechLanguage.En -> "Navigating to ${destination.trim()}"
         }
 
@@ -198,21 +198,21 @@ object VoiceNavPhrases {
     private enum class Side { Left, Right }
 
     // ── Événements moteur (NavEvent) : textes du contrat moteur ──
-    // « Vous avez quitté l'itinéraire. Recalcul en cours. »,
-    // « De retour sur l'itinéraire. », « Vous êtes arrivé à X »,
-    // « Continuez dans cette direction, rue de la Paix » (loin) puis
-    // « Tournez à droite, rue de la Paix » (près, sans distance).
+    // « You have left the route. Recalculating. »,
+    // « Back on route. », « You have arrived at X »,
+    // « Continue in this direction, rue de la Paix » (far) then
+    // « Turn right, rue de la Paix » (near, no distance).
     // Miroirs `nav_voice_left_route`, `nav_voice_back_on_route`,
     // `nav_voice_arrived[_plain]`, `nav_voice_maneuver` dans `strings.xml`.
 
     /** Écart : l'appelant recalcule pendant que la voix prévient. */
-    const val OFF_ROUTE = "Vous avez quitté l'itinéraire. Recalcul en cours."
+    const val OFF_ROUTE = "You have left the route. Recalculating."
 
     /** Retour sur le tracé sans recalcul. */
-    const val BACK_ON_ROUTE = "De retour sur l'itinéraire."
+    const val BACK_ON_ROUTE = "Back on route."
 
     /** Arrivé, sans destination nommée. */
-    const val ARRIVED_PLAIN = "Vous êtes arrivé à destination"
+    const val ARRIVED_PLAIN = "You have arrived at your destination"
 
     /**
      * Phrase d'un événement moteur [event] : annonce de manœuvre, traversée,
@@ -233,20 +233,20 @@ object VoiceNavPhrases {
      * que [toSteeringCap][dev.sam3vision.app.voicenav.toSteeringCap]) se
      * disent en deux temps — préavis directionnel de loin, ordre sec sans
      * distance de près ([VoiceNavPolicy.TURN_NOW_M]) ; le reste
-     * (« [verbe] dans [distance] ») et l'arrivée à venir
-     * (« Destination dans X ») sont inchangés. Rue inconnue : la phrase
+     * (« [verb] in [distance] ») et l'arrivée à venir
+     * (« Destination in X ») sont inchangés. Rue inconnue : la phrase
      * omet la rue au lieu d'inventer.
      */
     fun ahead(action: ManeuverAction, street: String?, distM: Double): String {
         val where = street?.trim()?.takeIf { it.isNotEmpty() }?.let { ", $it" } ?: ""
         if (isFrankTurn(action) && !VoiceNavPolicy.isTurnNow(distM)) {
-            return "Continuez dans cette direction$where"
+            return "Continue in this direction$where"
         }
         val verb = verb(action)
         if (isFrankTurn(action)) return "$verb$where"
-        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.Fr)
-        if (action == ManeuverAction.Arrive) return "Destination dans $distance"
-        return "$verb dans $distance$where"
+        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.En)
+        if (action == ManeuverAction.Arrive) return "Destination in $distance"
+        return "$verb in $distance$where"
     }
 
     /** Virages francs : les actions routées au cap parlé (tourner, serrer). */
@@ -258,28 +258,28 @@ object VoiceNavPhrases {
         ManeuverAction.Arrive -> false
     }
 
-    /** « Vous êtes arrivé à X » (ou [ARRIVED_PLAIN] sans nom). */
+    /** « You have arrived at X » (ou [ARRIVED_PLAIN] sans nom). */
     fun arrived(destinationName: String?): String {
         val name = destinationName?.trim()?.takeIf { it.isNotEmpty() } ?: return ARRIVED_PLAIN
-        return "Vous êtes arrivé à $name"
+        return "You have arrived at $name"
     }
 
     /**
-     * « Passage protégé dans X » : préavis de traversée (miroir
+     * « Crosswalk in X » : préavis de traversée (miroir
      * `nav_voice_crossing` dans `strings.xml`). Sans rue : Valhalla ne
      * donne pas de nom aux traversées.
      */
     fun crossingAhead(distM: Double): String {
-        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.Fr)
-        return "Passage protégé dans $distance"
+        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.En)
+        return "Crosswalk in $distance"
     }
 
     /** Traversée passée : le guidage reprend (miroir `nav_voice_crossing_done`). */
-    const val CROSSING_DONE = "Traversée terminée."
+    const val CROSSING_DONE = "Crossing finished."
 
     // ── Confirmation (session) : complètent NavigationPhrases ──
-    // Question vocale (toujours en anglais, exigence produit), « Voici la
-    // fiche de X », « Guidage arrêté », « Arrivée à destination ». Miroirs
+    // Question vocale (toujours en anglais, exigence produit), « Here is the
+    // page for X », « Guidance stopped », « Arrived at destination ». Miroirs
     // `nav_confirm_question[_no_time]`, `nav_confirm_cancelled`,
     // `nav_confirm_loading`, `nav_place_opened`, `nav_stop_done`,
     // `nav_arrived` dans `strings.xml`.
@@ -302,32 +302,32 @@ object VoiceNavPhrases {
     /** « yes » pendant le chargement du résumé : patienter, en anglais. */
     const val CONFIRM_LOADING = "Your route is still loading, one moment."
 
-    /** « Voici la fiche de X » — guidage éteint, fiche lieu ouverte. */
-    fun placeOpened(destination: String): String = "Voici la fiche de ${destination.trim()}"
+    /** « Here is the page for X » — guidage éteint, fiche lieu ouverte. */
+    fun placeOpened(destination: String): String = "Here is the page for ${destination.trim()}"
 
     /** Ordre stop consommé, session fermée. */
-    const val STOP_DONE = "Guidage arrêté"
+    const val STOP_DONE = "Guidance stopped"
 
-    /** GPS désactivé sur ordre de l'utilisateur (« désactive le GPS »). */
-    const val GPS_DISABLED = "GPS désactivé"
+    /** GPS désactivé sur ordre de l'utilisateur (« turn off the GPS »). */
+    const val GPS_DISABLED = "GPS disabled"
 
-    /** GPS réactivé sur ordre de l'utilisateur (« active le GPS »). */
-    const val GPS_ENABLED = "GPS activé"
+    /** GPS réactivé sur ordre de l'utilisateur (« turn on the GPS »). */
+    const val GPS_ENABLED = "GPS enabled"
 
     /** Arrivée signalée par le moteur d'itinéraire (jamais devinée). */
-    const val ARRIVED = "Arrivée à destination"
+    const val ARRIVED = "Arrived at destination"
 
     /** Verbe d'annonce d'une action (le départ ne s'annonce jamais). */
     private fun verb(action: ManeuverAction): String = when (action) {
-        ManeuverAction.Start -> "Partez"
-        ManeuverAction.Continue -> "Continuez tout droit"
-        ManeuverAction.SlightLeft -> "Serrez à gauche"
-        ManeuverAction.TurnLeft -> "Tournez à gauche"
-        ManeuverAction.SlightRight -> "Serrez à droite"
-        ManeuverAction.TurnRight -> "Tournez à droite"
-        ManeuverAction.UTurn -> "Faites demi-tour"
-        ManeuverAction.Roundabout -> "Au rond-point, suivez la route"
-        ManeuverAction.Arrive -> "Vous arrivez"
+        ManeuverAction.Start -> "Go"
+        ManeuverAction.Continue -> "Continue straight ahead"
+        ManeuverAction.SlightLeft -> "Bear left"
+        ManeuverAction.TurnLeft -> "Turn left"
+        ManeuverAction.SlightRight -> "Bear right"
+        ManeuverAction.TurnRight -> "Turn right"
+        ManeuverAction.UTurn -> "Make a U-turn"
+        ManeuverAction.Roundabout -> "At the roundabout, follow the road"
+        ManeuverAction.Arrive -> "You are arriving"
     }
 }
 

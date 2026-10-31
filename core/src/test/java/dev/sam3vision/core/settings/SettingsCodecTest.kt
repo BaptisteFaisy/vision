@@ -42,9 +42,9 @@ class SettingsCodecTest {
     }
 
     @Test
-    fun `la langue de la voix survit a un aller-retour`() {
+    fun `la langue francaise stockee migre vers l'anglais a la lecture`() {
         val french = Settings.Default.copy(speechLanguage = SpeechLanguage.Fr)
-        assertEquals(SpeechLanguage.Fr, SettingsCodec.decode(SettingsCodec.encode(french)).speechLanguage)
+        assertEquals(SpeechLanguage.DEFAULT, SettingsCodec.decode(SettingsCodec.encode(french)).speechLanguage)
         // Un fichier écrit avant la bascule garde la langue par défaut (anglais).
         val legacy = SettingsCodec.encode(Settings.Default).lines().filterNot { it.startsWith("speechLanguage=") }
         assertEquals(

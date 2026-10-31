@@ -1,5 +1,6 @@
 package dev.sam3vision.core.distance
 
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,9 +13,9 @@ class DistanceTextTest {
 
     @Test
     fun `metres avec une decimale jusqu'a dix metres`() {
-        assertEquals("3,3 m", DistanceText.format(3.288f))
-        assertEquals("≈ 3,3 m", DistanceText.approximate(3.288f))
-        assertEquals("1,0 m", DistanceText.format(1f))
+        assertEquals("3.3 m", DistanceText.format(3.288f))
+        assertEquals("≈ 3.3 m", DistanceText.approximate(3.288f))
+        assertEquals("1.0 m", DistanceText.format(1f))
     }
 
     @Test
@@ -38,32 +39,32 @@ class DistanceTextTest {
 
     @Test
     fun `distance prononcee en francais`() {
-        assertEquals("85 centimètres", DistanceText.spoken(0.85f))
-        assertEquals("1 centimètre", DistanceText.spoken(0.01f))
-        assertEquals("1,4 mètre", DistanceText.spoken(1.44f))
-        assertEquals("2 mètres", DistanceText.spoken(1.96f))
-        assertEquals("3,3 mètres", DistanceText.spoken(3.288f))
-        assertEquals("12 mètres", DistanceText.spoken(12.4f))
-        assertEquals("distance inconnue", DistanceText.spoken(0f))
+        assertEquals("85 centimètres", DistanceText.spoken(0.85f, SpeechLanguage.Fr))
+        assertEquals("1 centimètre", DistanceText.spoken(0.01f, SpeechLanguage.Fr))
+        assertEquals("1,4 mètre", DistanceText.spoken(1.44f, SpeechLanguage.Fr))
+        assertEquals("2 mètres", DistanceText.spoken(1.96f, SpeechLanguage.Fr))
+        assertEquals("3,3 mètres", DistanceText.spoken(3.288f, SpeechLanguage.Fr))
+        assertEquals("12 mètres", DistanceText.spoken(12.4f, SpeechLanguage.Fr))
+        assertEquals("distance inconnue", DistanceText.spoken(0f, SpeechLanguage.Fr))
     }
 
     @Test
     fun `distance courte pour la voix de marche`() {
-        assertEquals("50 centimètres", DistanceText.spokenShort(0.5f))
-        assertEquals("1 centimètre", DistanceText.spokenShort(0.01f))
-        assertEquals("1 mètre", DistanceText.spokenShort(1.44f))
-        assertEquals("2 mètres", DistanceText.spokenShort(1.96f))
-        assertEquals("3 mètres", DistanceText.spokenShort(3.288f))
-        assertEquals("12 mètres", DistanceText.spokenShort(12.4f))
-        assertEquals("distance inconnue", DistanceText.spokenShort(0f))
-        assertEquals("distance inconnue", DistanceText.spokenShort(Float.NaN))
+        assertEquals("50 centimètres", DistanceText.spokenShort(0.5f, SpeechLanguage.Fr))
+        assertEquals("1 centimètre", DistanceText.spokenShort(0.01f, SpeechLanguage.Fr))
+        assertEquals("1 mètre", DistanceText.spokenShort(1.44f, SpeechLanguage.Fr))
+        assertEquals("2 mètres", DistanceText.spokenShort(1.96f, SpeechLanguage.Fr))
+        assertEquals("3 mètres", DistanceText.spokenShort(3.288f, SpeechLanguage.Fr))
+        assertEquals("12 mètres", DistanceText.spokenShort(12.4f, SpeechLanguage.Fr))
+        assertEquals("distance inconnue", DistanceText.spokenShort(0f, SpeechLanguage.Fr))
+        assertEquals("distance inconnue", DistanceText.spokenShort(Float.NaN, SpeechLanguage.Fr))
     }
 
     @Test
     fun `objet le plus proche et ligne de barre d'etat`() {
         val readings = listOf(reading("personne", 3.2f), reading("chaise", 1.4f), reading("table", 2.0f))
         assertEquals("chaise", DistanceText.nearest(readings)!!.label)
-        assertEquals("plus proche 1,4 m", DistanceText.nearestLabel(readings))
+        assertEquals("closest 1.4 m", DistanceText.nearestLabel(readings))
         assertNull(DistanceText.nearest(emptyList()))
         assertEquals("", DistanceText.nearestLabel(emptyList()))
     }

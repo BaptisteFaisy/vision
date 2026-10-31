@@ -42,10 +42,10 @@ class TapVideoSession(private val context: Context) : TapVideoRecorder {
 
     /** Lie `VideoCapture` au cycle de vie de l'écran. Sans aperçu : la capture seule suffit. */
     override suspend fun bind(owner: LifecycleOwner?): Result<Unit> {
-        if (owner == null) return Result.failure(IllegalStateException("cycle de vie indisponible"))
+        if (owner == null) return Result.failure(IllegalStateException("lifecycle unavailable"))
         val provider = runCatching {
             withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
-        }.getOrElse { return Result.failure(IllegalStateException("caméra inaccessible : ${it.message}")) }
+        }.getOrElse { return Result.failure(IllegalStateException("camera unreachable: ${it.message}")) }
         val capture = VideoCapture.withOutput(
             Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD)).build(),
         )
@@ -53,7 +53,7 @@ class TapVideoSession(private val context: Context) : TapVideoRecorder {
             provider.unbindAll()
             provider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, capture)
             videoCapture = capture
-        }.recoverCatching { IllegalStateException("liaison vidéo impossible : ${it.message}") }
+        }.recoverCatching { IllegalStateException("video bind impossible: ${it.message}") }
     }
 
     /**
@@ -61,8 +61,8 @@ class TapVideoSession(private val context: Context) : TapVideoRecorder {
      * l'autorisation `RECORD_AUDIO` est accordée** (sinon la capture est muette, jamais perdue).
      */
     override fun start(file: File, withAudio: Boolean): Result<Unit> {
-        val capture = videoCapture ?: return Result.failure(IllegalStateException("caméra non liée"))
-        if (recording != null) return Result.failure(IllegalStateException("enregistrement déjà en cours"))
+        val capture = videoCapture ?: return Result.failure(IllegalStateException("camera not bound"))
+        if (recording != null) return Result.failure(IllegalStateException("recording already in progress"))
         return runCatching {
             val done = CompletableDeferred<File>()
             finalizing = done
@@ -74,7 +74,7 @@ class TapVideoSession(private val context: Context) : TapVideoRecorder {
             recording = pending.start(executor) { event ->
                 if (event is VideoRecordEvent.Finalize) finalize(event, file, done)
             }
-        }.recoverCatching { IllegalStateException("démarrage vidéo refusé : ${it.message}") }
+        }.recoverCatching { IllegalStateException("video start refused: ${it.message}") }
     }
 
     /**
@@ -123,7 +123,7 @@ class TapVideoSession(private val context: Context) : TapVideoRecorder {
 
     /** Le deferred de CETTE prise est complété : pas la field mutable, qui a déjà changé. */
     private fun finalize(event: VideoRecordEvent.Finalize, file: File, done: CompletableDeferred<File>) {
-        if (event.hasError()) onVideoError?.invoke("vidéo interrompue : ${event.error}") else done.complete(file)
+        if (event.hasError()) onVideoError?.invoke("video interrupted: ${event.error}") else done.complete(file)
     }
 
     /** Branché par l'écran : erreur de finalisation détectée hors du fil UI. */

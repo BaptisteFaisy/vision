@@ -59,12 +59,12 @@ object PictoVoiceOrder {
     }
 
     /**
-     * Faux repères de la démo : un « mur » plein cadre et une « fenêtre »,
-     * positions fixes — le guidage y est déterministe (« Mur à 12 heures »).
+     * Faux repères de la démo : un « wall » plein cadre et une « window »,
+     * positions fixes — le guidage y est déterministe (« wall at 12 o'clock »).
      */
     fun demoHits(): List<PictoHit> = listOf(
-        PictoHit(pictoId = "demo", label = "mur", x = 0.05f, y = 0.05f, w = 0.9f, h = 0.9f, score = 1f),
-        PictoHit(pictoId = "demo", label = "fenêtre", x = 0.55f, y = 0.2f, w = 0.3f, h = 0.4f, score = 1f),
+        PictoHit(pictoId = "demo", label = "wall", x = 0.05f, y = 0.05f, w = 0.9f, h = 0.9f, score = 1f),
+        PictoHit(pictoId = "demo", label = "window", x = 0.55f, y = 0.2f, w = 0.3f, h = 0.4f, score = 1f),
     )
 
     /**
@@ -141,37 +141,37 @@ object PictoVoiceOrder {
 object PictoVoiceText {
 
     /** La génération part (~10 s) : le dire, puis se taire jusqu'au résultat. */
-    fun started(language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun started(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Je crée le pictogramme."
         SpeechLanguage.En -> "Creating the pictogram."
     }
 
     /** Le repère est armé : le nommer et dire comment être guidé. */
-    fun created(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun created(label: String, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Pictogramme $label prêt. Dis son nom pour être guidé."
         SpeechLanguage.En -> "Pictogram $label ready. Say its name for guidance."
     }
 
     /** Le repère sans nom (« de ça ») est armé : overlay seul, jamais guidé. */
-    fun createdUnnamed(language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun createdUnnamed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Pictogramme prêt."
         SpeechLanguage.En -> "Pictogram ready."
     }
 
     /** Échec (photo, clé, réseau : le détail reste à l'écran, jamais dit). */
-    fun failed(language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun failed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Création du pictogramme impossible."
         SpeechLanguage.En -> "Pictogram creation failed."
     }
 
     /** Une génération est déjà en vol : la seconde est jetée, et dite. */
-    fun busy(language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun busy(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Création déjà en cours."
         SpeechLanguage.En -> "Creation already running."
     }
 
     /** La démo change d'état : le dire, c'est le seul témoin du basculement. */
-    fun demo(active: Boolean, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
+    fun demo(active: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> if (active) "Démo picto activée." else "Démo picto coupée."
         SpeechLanguage.En -> if (active) "Picto demo on." else "Picto demo off."
     }

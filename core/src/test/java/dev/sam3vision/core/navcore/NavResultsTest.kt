@@ -27,7 +27,7 @@ class NavResultsTest {
         assertTrue(mapped.isFailure)
         val error = mapped.exceptionOrNull()
         assertTrue(error is NavError.Network)
-        assertEquals("réseau injoignable : coupé", error?.message)
+        assertEquals("network unreachable: coupé", error?.message)
     }
 
     @Test
@@ -54,12 +54,12 @@ class NavResultsTest {
     fun `navError rend l echec type`() {
         val error = Result.failure<String>(IOException("coupé")).navError()
         assertTrue(error is NavError.Network)
-        assertEquals("réseau injoignable : coupé", error?.message)
+        assertEquals("network unreachable: coupé", error?.message)
     }
 
     @Test
     fun `asrFailure fusionne Meta et Scribe`() {
         val error = NavResults.asrFailure(IOException("timeout Meta"), IOException("401 Scribe"))
-        assertEquals("Erreur. timeout Meta. 401 Scribe.", error.message)
+        assertEquals("Error. timeout Meta. 401 Scribe.", error.message)
     }
 }

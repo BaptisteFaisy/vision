@@ -191,4 +191,30 @@ class NavigationIntentTest {
         assertNull(destinationOf("va en avant"))
         assertNull(destinationOf("va en haut"))
     }
+
+    @Test
+    fun `english orders render X`() {
+        assertEquals("the station", destinationOf("I want to go to the station"))
+        assertEquals("Lyon station", destinationOf("I wanna go to Lyon station"))
+        assertEquals("Paris", destinationOf("I would like to go to Paris"))
+        assertEquals("Nice", destinationOf("I'd like to go to Nice"))
+        assertEquals("the Eiffel Tower", destinationOf("take me to the Eiffel Tower"))
+        assertEquals("the airport", destinationOf("bring me to the airport"))
+        assertEquals("Eiffel Tower", destinationOf("take me Eiffel Tower"))
+        assertEquals("Orly airport", destinationOf("navigate to Orly airport"))
+        assertEquals("the exit", destinationOf("guide me to the exit"))
+        assertEquals("the Louvre", destinationOf("I'm going to the Louvre"))
+        assertEquals("the station", destinationOf("let's go to the station"))
+        assertEquals("the pharmacy", destinationOf("go to the pharmacy"))
+        assertEquals("Eiffel Tower", destinationOf("go Eiffel Tower"))
+        assertEquals("the station", destinationOf("directions to the station"))
+    }
+
+    @Test
+    fun `english non places are refused`() {
+        assertNull(destinationOf("go fast"))
+        assertNull(destinationOf("take me back"))
+        assertNull(destinationOf("go"))
+        assertNull(destinationOf("I want to go"))
+    }
 }

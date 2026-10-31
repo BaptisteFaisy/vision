@@ -116,7 +116,7 @@ class VoiceNavSessionTest {
 
         val state = session.state.value as VoiceNavUiState.Guiding
         assertEquals("la gare", state.destination)
-        assertEquals("Direction la gare", state.update.instruction)
+        assertEquals("Heading to la gare", state.update.instruction)
         assertTrue(launcher.launched.isEmpty())
         assertEquals(listOf(questionGare), spoken)
     }
@@ -132,7 +132,7 @@ class VoiceNavSessionTest {
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
         assertEquals(listOf(TravelMode.WALK), launcher.modes)
-        assertEquals(listOf(questionGare, "Navigation vers la gare"), spoken)
+        assertEquals(listOf(questionGare, "Navigating to la gare"), spoken)
     }
 
     @Test
@@ -159,7 +159,7 @@ class VoiceNavSessionTest {
         assertTrue(launcher.launched.isEmpty())
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(
-            listOf(questionTour, "Voici la fiche de la tour Eiffel"),
+            listOf(questionTour, "Here is the page for la tour Eiffel"),
             spoken,
         )
     }
@@ -262,7 +262,7 @@ class VoiceNavSessionTest {
 
         val arrived = session.state.value as VoiceNavUiState.Arrived
         assertEquals("la gare", arrived.destination)
-        assertEquals(listOf("Arrivée à destination"), spoken)
+        assertEquals(listOf("Arrived at destination"), spoken)
 
         session.dismissArrived()
 
@@ -289,7 +289,7 @@ class VoiceNavSessionTest {
         session.stopGuidance()
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf("Guidage arrêté"), spoken)
+        assertEquals(listOf("Guidance stopped"), spoken)
     }
 
     @Test
@@ -304,7 +304,7 @@ class VoiceNavSessionTest {
         assertTrue(session.onVoiceTranscript("arrête le guidage"))
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertTrue("Guidage arrêté" in spoken)
+        assertTrue("Guidance stopped" in spoken)
     }
 
     @Test
@@ -330,7 +330,7 @@ class VoiceNavSessionTest {
         val state = session.state.value as VoiceNavUiState.Guiding
         assertEquals("la gare", state.destination)
         assertTrue(launcher.launched.isEmpty())
-        // Une seule voix : le moteur dit « Navigation vers X », pas la session.
+        // Une seule voix : le moteur dit « Navigating to X », pas la session.
         assertTrue(spoken.isEmpty())
     }
 
@@ -367,7 +367,7 @@ class VoiceNavSessionTest {
 
         val state = session.state.value as VoiceNavUiState.Guiding
         assertEquals(null, state.summary)
-        assertEquals("Calcul de l'itinéraire vers la gare…", state.update.instruction)
+        assertEquals("Calculating the route to la gare…", state.update.instruction)
         assertTrue(launcher.launched.isEmpty())
     }
 
@@ -381,7 +381,7 @@ class VoiceNavSessionTest {
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
         assertEquals(listOf(TravelMode.WALK), launcher.modes)
-        assertEquals(listOf("Navigation vers la gare"), spoken)
+        assertEquals(listOf("Navigating to la gare"), spoken)
     }
 
     @Test
@@ -409,7 +409,7 @@ class VoiceNavSessionTest {
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf("la tour Eiffel"), launcher.opened)
         assertTrue(launcher.launched.isEmpty())
-        assertEquals(listOf("Voici la fiche de la tour Eiffel"), spoken)
+        assertEquals(listOf("Here is the page for la tour Eiffel"), spoken)
     }
 
     @Test
@@ -433,7 +433,7 @@ class VoiceNavSessionTest {
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(false), gpsFlags)
-        assertEquals(listOf("GPS désactivé"), spoken)
+        assertEquals(listOf("GPS disabled"), spoken)
 
         // Même sans session ouverte : l'ordre demeure celui de la fonction.
         assertTrue(session.onVoiceTranscript("coupe le gps"))
@@ -448,7 +448,7 @@ class VoiceNavSessionTest {
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(listOf(true), gpsFlags)
-        assertEquals(listOf("GPS activé"), spoken)
+        assertEquals(listOf("GPS enabled"), spoken)
     }
 
     @Test

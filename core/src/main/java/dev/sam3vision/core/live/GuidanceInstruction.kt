@@ -11,7 +11,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
  */
 object GuidanceInstruction {
     /** Ligne affichée : mot seul sans mesure, « … » si périmé. */
-    fun text(pulse: GuidancePulse, language: SpeechLanguage = SpeechLanguage.Fr): String {
+    fun text(pulse: GuidancePulse, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
         val word = pulse.word.text(language).removeSuffix(".")
         val dist = pulse.nearestMeters?.takeIf { it.isFinite() }
             ?.let { " · ${DistanceText.approximate(it)}" }.orEmpty()

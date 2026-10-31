@@ -105,7 +105,7 @@ class LivePositionVoiceTest {
     }
 
     @Test
-    fun `un label maison est dit en francais`() = runTest {
+    fun `un label maison est dit en anglais`() = runTest {
         val voice = voice(this)
         val hunt = LiveFrame(
             width = 200,
@@ -115,7 +115,7 @@ class LivePositionVoiceTest {
         )
         voice.announce(hunt, 200, 200, 1_000L, emptyList())
         val phrase = state.value.spoken.orEmpty()
-        assertTrue("maison dite en français : $phrase", phrase.startsWith("Clés "))
+        assertTrue("maison dite en anglais : $phrase", phrase.startsWith("Keys "))
         advanceUntilIdle()
         assertEquals(listOf(phrase), spoken)
     }

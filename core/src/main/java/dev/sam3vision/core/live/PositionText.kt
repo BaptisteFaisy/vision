@@ -81,7 +81,7 @@ object PositionText {
      * (ou « at 11 o'clock », « at 12 o'clock ») — la convention des déplacements
      * sans voir, plus précise que « à gauche / au centre / à droite ».
      */
-    fun clockLabel(centerX: Float, language: SpeechLanguage = SpeechLanguage.Fr): String {
+    fun clockLabel(centerX: Float, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
         val hour = clockHour(centerX)
         return when (language) {
             SpeechLanguage.Fr ->
@@ -120,7 +120,7 @@ object PositionText {
     fun phrase(
         labels: List<PlacedLabel>,
         maxObjects: Int = MAX_OBJECTS,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
         val cleaned = labels
             .filter { it.label.isNotBlank() }
@@ -140,7 +140,7 @@ object PositionText {
      * Un objet en mots : « personne à 2 mètres » / « person 2 meters away » quand la
      * distance est connue, sinon « personne à 9 heures » / « person at 9 o'clock ».
      */
-    fun item(label: PlacedLabel, language: SpeechLanguage = SpeechLanguage.Fr): String {
+    fun item(label: PlacedLabel, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
         val meters = label.meters
         if (meters == null || !meters.isFinite()) {
             return "${label.label} ${clockLabel(label.centerX, language)}"

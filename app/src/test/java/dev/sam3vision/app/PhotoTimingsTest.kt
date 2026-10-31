@@ -13,28 +13,28 @@ class PhotoTimingsTest {
         val timings = PhotoTimings(clock = { now }, log = lines::add)
         timings.begin()
         now = 1_040L
-        timings.mark("charge")
+        timings.mark("load")
         now = 1_100L
         timings.mark("sam")
         now = 1_900L
-        timings.mark("analyse")
+        timings.mark("analysis")
         now = 2_000L
         val line = timings.emit()
 
-        assertEquals("photo charge=40 sam=60 analyse=800 total=1000", line)
+        assertEquals("photo load=40 sam=60 analysis=800 total=1000", line)
         assertEquals(listOf(line), lines)
         assertEquals(100L, timings.sinceStart("sam"))
-        assertEquals(900L, timings.sinceStart("analyse"))
+        assertEquals(900L, timings.sinceStart("analysis"))
     }
 
     @Test
     fun `sans begin tout est inerte`() {
         val lines = mutableListOf<String>()
         val timings = PhotoTimings(clock = { 0L }, log = lines::add)
-        timings.mark("charge")
+        timings.mark("load")
 
         assertEquals("", timings.emit())
         assertEquals(emptyList<String>(), lines)
-        assertEquals(-1L, timings.sinceStart("charge"))
+        assertEquals(-1L, timings.sinceStart("load"))
     }
 }

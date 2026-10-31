@@ -30,25 +30,25 @@ import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Textes français du micro des écrans navigation, en un seul endroit : une
+ * Textes anglais du micro des écrans navigation, en un seul endroit : une
  * phrase n'est écrite qu'une fois, et les tests la comparent à l'identique.
  */
 object VoiceNavHoldText {
-    const val HOLD_IDLE = "Maintenir pour parler"
-    const val HOLD_LISTENING = "J'écoute… relâche pour envoyer"
-    const val HOLD_TRANSCRIBING = "Transcription…"
-    const val MIC_UNAVAILABLE = "Micro indisponible"
-    const val NO_ENGINE = "Pas de moteur de dictée (Réglages)"
-    const val NOTHING_HEARD = "Rien entendu — maintiens et parle"
-    const val TIMED_OUT = "Transcription trop longue — réessaie"
+    const val HOLD_IDLE = "Hold to speak"
+    const val HOLD_LISTENING = "Listening… release to send"
+    const val HOLD_TRANSCRIBING = "Transcribing…"
+    const val MIC_UNAVAILABLE = "Microphone unavailable"
+    const val NO_ENGINE = "No dictation engine (Settings)"
+    const val NOTHING_HEARD = "Nothing heard — hold and speak"
+    const val TIMED_OUT = "Transcription too slow — retry"
     const val CONFIRM_NOT_UNDERSTOOD =
-        "Je n'ai pas compris — dicte une destination, « oui » ou « non »."
+        "I didn't understand — dictate a destination, “yes” or “no”."
     const val GUIDING_NOT_UNDERSTOOD =
-        "Je n'ai pas compris — dicte une destination ou « arrête le guidage »."
+        "I didn't understand — dictate a destination or “stop guidance”."
 
     /** Échec de transcription, tel qu'affiché sous le bouton. */
     fun dictationFailed(error: Throwable): String =
-        "Dictée : ${error.message ?: "échec"}"
+        "Dictation: ${error.message ?: "failed"}"
 }
 
 /**
@@ -85,7 +85,7 @@ class VoiceNavHold(
     /**
      * Relâchement : coupe le micro et transcrit, borné
      * ([transcribeTimeoutMs]). Rend le texte retenu, ou l'échec avec son
-     * motif français ([VoiceNavHoldText]) — le micro est rendu dans tous
+     * motif anglais ([VoiceNavHoldText]) — le micro est rendu dans tous
      * les cas. Idempotent : sans tenue en cours, rend `null`.
      */
     suspend fun finish(settings: Settings): Result<String>? {
@@ -110,7 +110,7 @@ class VoiceNavHold(
         mic.abort()
     }
 
-    /** Échec : micro rendu, motif français en [Result]. */
+    /** Échec : micro rendu, motif anglais en [Result]. */
     private fun failed(message: String): Result<String> {
         mic.abort()
         return Result.failure(IllegalStateException(message))
@@ -120,7 +120,7 @@ class VoiceNavHold(
 /**
  * État affiché d'une tenue micro, partagé entre le bouton et l'appui long
  * écran : quand le micro s'ouvre depuis n'importe où, le bouton affiche
- * « J'écoute… » et les nouveaux appuis sont ignorés ([busy]).
+ * « Listening… » et les nouveaux appuis sont ignorés ([busy]).
  */
 @Stable
 class HoldMicUiState {

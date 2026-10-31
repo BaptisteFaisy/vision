@@ -23,8 +23,8 @@ class RequestBudget(ratePerSec: Float, burst: Int) {
     private var debt = 0
 
     init {
-        require(rate > 0f) { "ratePerSec doit être > 0" }
-        require(burst >= 1) { "burst doit être >= 1" }
+        require(rate > 0f) { "ratePerSec must be > 0" }
+        require(burst >= 1) { "burst must be >= 1" }
     }
 
     /** Un jeton est-il disponible pour une demande ordinaire ? (jamais à découvert) */

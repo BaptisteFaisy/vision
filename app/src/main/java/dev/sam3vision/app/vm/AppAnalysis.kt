@@ -52,7 +52,7 @@ class AppAnalysis(
                 }
             },
         ).invoke(encoded)
-        mark("analyse")
+        mark("analysis")
         result.fold(onSuccess = { ready(settings, it, samFailure) }, onFailure = { failed(it) })
     }
 

@@ -53,7 +53,7 @@ class LivePositionVoice(
         if (!settings().announcePositions || asking()) return
         val metersByBox = readings.associate { it.box to it.meters }
         val placed = frame.objects.mapNotNull { obj ->
-            val label = HomeModes.french(obj.label)
+            val label = HomeModes.display(obj.label)
             PositionText.fromDetection(Detection(label, obj.score, obj.box, width, height))
                 ?.copy(meters = metersByBox[obj.box])
         }

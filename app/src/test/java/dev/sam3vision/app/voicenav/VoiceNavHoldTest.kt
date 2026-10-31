@@ -77,7 +77,7 @@ class VoiceNavHoldTest {
 
         val heard = hold.finish(Settings.Default)
 
-        assertEquals("Dictée : réseau coupé", heard?.exceptionOrNull()?.message)
+        assertEquals("Dictation: réseau coupé", heard?.exceptionOrNull()?.message)
         assertEquals("le micro est rendu", 1, mic.abortCount)
     }
 
@@ -88,7 +88,7 @@ class VoiceNavHoldTest {
 
         val heard = hold.finish(Settings.Default)
 
-        assertEquals("Dictée : échec", heard?.exceptionOrNull()?.message)
+        assertEquals("Dictation: failed", heard?.exceptionOrNull()?.message)
     }
 
     @Test

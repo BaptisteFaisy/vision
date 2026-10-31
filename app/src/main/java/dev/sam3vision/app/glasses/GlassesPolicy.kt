@@ -46,9 +46,9 @@ data class GlassesMessage(val kind: MessageKind, val text: String)
  * « Déconnecter » (mesuré le 27/10/2026).
  */
 internal fun permissionPath(refusal: String): String =
-    "$refusal : touche « Autoriser … (Meta AI) », Meta AI pose la question. " +
-        "Sinon Meta AI → ☰ → Lunettes → la paire → Paramètres → Applications → " +
-        "applications du mode développeur → cette app."
+    "$refusal: tap “Allow … (Meta AI)”, Meta AI asks the question. " +
+        "Otherwise Meta AI → ☰ → Glasses → the pair → Settings → Apps → " +
+        "developer mode apps → this app."
 
 /** Nom lisible d'une capacité, pour composer les messages sans jargon du SDK. */
 /**
@@ -57,32 +57,32 @@ internal fun permissionPath(refusal: String): String =
  */
 fun streamErrorMessage(error: StreamError): GlassesMessage = when (error) {
     StreamError.STREAM_ERROR ->
-        GlassesMessage(MessageKind.ERROR, "Flux lunettes : erreur du flux, redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Glasses stream: stream error, restart the session.")
     StreamError.CRITICAL_STREAM_ERROR ->
-        GlassesMessage(MessageKind.ERROR, "Flux lunettes interrompu : redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Glasses stream interrupted: restart the session.")
     StreamError.HINGE_CLOSED ->
-        GlassesMessage(MessageKind.WARNING, "Branches des lunettes refermées : ouvre-les pour filmer.")
-    StreamError.PERMISSIONS_DENIED -> GlassesMessage(MessageKind.ERROR, permissionPath("Caméra refusée"))
+        GlassesMessage(MessageKind.WARNING, "Glasses arms folded: unfold them to film.")
+    StreamError.PERMISSIONS_DENIED -> GlassesMessage(MessageKind.ERROR, permissionPath("Camera refused"))
     StreamError.THERMAL_HOT ->
-        GlassesMessage(MessageKind.WARNING, "Lunettes chaudes : le flux reprendra une fois refroidies.")
+        GlassesMessage(MessageKind.WARNING, "Glasses hot: the stream will resume once cooled.")
     StreamError.BATTERY_LOW ->
-        GlassesMessage(MessageKind.ERROR, "Batterie des lunettes trop basse pour filmer : recharge-les.")
+        GlassesMessage(MessageKind.ERROR, "Glasses battery too low to film: recharge them.")
     StreamError.PEAK_POWER_LIMIT ->
-        GlassesMessage(MessageKind.ERROR, "Les lunettes ont coupé le flux pour économiser la batterie.")
+        GlassesMessage(MessageKind.ERROR, "The glasses cut the stream to save battery.")
     StreamError.TIMEOUT ->
-        GlassesMessage(MessageKind.WARNING, "Flux lunettes : pas de réponse à temps, redémarre la session.")
+        GlassesMessage(MessageKind.WARNING, "Glasses stream: no timely answer, restart the session.")
 }
 
 /** Les quatre refus de photo du SDK (`CaptureError`). */
 fun captureErrorMessage(error: CaptureError): GlassesMessage = when (error) {
     CaptureError.CaptureFailed ->
-        GlassesMessage(MessageKind.ERROR, "Photo des lunettes : prise de vue échouée, réessaie.")
+        GlassesMessage(MessageKind.ERROR, "Glasses photo: shot failed, try again.")
     CaptureError.CaptureInProgress ->
-        GlassesMessage(MessageKind.WARNING, "Photo déjà en cours : attends la fin avant de rappuyer.")
+        GlassesMessage(MessageKind.WARNING, "Photo already running: wait for it to finish before pressing again.")
     CaptureError.DeviceDisconnected ->
-        GlassesMessage(MessageKind.ERROR, "Lunettes déconnectées pendant la photo : redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Glasses disconnected during the photo: restart the session.")
     CaptureError.NotStreaming ->
-        GlassesMessage(MessageKind.ERROR, "Flux arrêté : la photo en a besoin, redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Stream stopped: the photo needs it, restart the session.")
 }
 
 /**
@@ -92,41 +92,41 @@ fun captureErrorMessage(error: CaptureError): GlassesMessage = when (error) {
 fun registrationRequestErrorMessage(error: RegistrationRequestError): GlassesMessage = when (error) {
     RegistrationRequestError.INVALID_REQUEST -> GlassesMessage(
         MessageKind.ERROR,
-        "Enregistrement : demande invalide, relance-le depuis Réglages → Lunettes.",
+        "Registration: invalid request, restart it from Settings → Glasses.",
     )
     RegistrationRequestError.ALREADY_HANDLED ->
-        GlassesMessage(MessageKind.INFO, "Enregistrement déjà traité par Meta AI.")
+        GlassesMessage(MessageKind.INFO, "Registration already handled by Meta AI.")
     RegistrationRequestError.CONFIGURATION_INVALID -> GlassesMessage(
         MessageKind.ERROR,
-        "Enregistrement : identifiants de l'app refusés par Meta AI (APPLICATION_ID / CLIENT_TOKEN).",
+        "Registration: app credentials refused by Meta AI (APPLICATION_ID / CLIENT_TOKEN).",
     )
     RegistrationRequestError.REGISTRATION_FAILED -> GlassesMessage(
         MessageKind.ERROR,
-        "Meta AI a refusé l'enregistrement : réessaie depuis Réglages → Lunettes.",
+        "Meta AI refused the registration: try again from Settings → Glasses.",
     )
     RegistrationRequestError.CANCELLATION_FAILED -> GlassesMessage(
         MessageKind.ERROR,
-        "Annulation de l'enregistrement impossible : termine-la dans Meta AI.",
+        "Cannot cancel the registration: finish it in Meta AI.",
     )
 }
 
 fun permissionLabel(permission: Permission): String = when (permission) {
-    Permission.CAMERA -> "caméra des lunettes"
-    Permission.MICROPHONE -> "micro des lunettes"
+    Permission.CAMERA -> "glasses camera"
+    Permission.MICROPHONE -> "glasses microphone"
 }
 
 fun permissionRequested(permission: Permission) = GlassesMessage(
     MessageKind.INFO,
-    "Meta AI demande l'autorisation : ${permissionLabel(permission)}. Accepte, puis reviens ici.",
+    "Meta AI asks for permission: ${permissionLabel(permission)}. Accept, then come back here.",
 )
 
 fun permissionGranted(permission: Permission) = GlassesMessage(
     MessageKind.INFO,
-    "Autorisation accordée : ${permissionLabel(permission)}.",
+    "Permission granted: ${permissionLabel(permission)}.",
 )
 
 fun permissionRefused(permission: Permission) =
-    GlassesMessage(MessageKind.ERROR, permissionPath("Autorisation refusée : ${permissionLabel(permission)}"))
+    GlassesMessage(MessageKind.ERROR, permissionPath("Permission refused: ${permissionLabel(permission)}"))
 
 /**
  * La page de Meta AI ne s'est pas ouverte, ou la demande a échoué : chaque cause du SDK a sa
@@ -139,58 +139,58 @@ fun permissionFailed(permission: Permission, error: PermissionError) = GlassesMe
 
 private fun permissionErrorReason(error: PermissionError): String = when (error) {
     PermissionError.META_AI_NOT_INSTALLED ->
-        "l'app Meta AI est absente du téléphone, et c'est elle qui porte l'autorisation."
+        "the Meta AI app is missing from the phone, and it owns the permission."
     PermissionError.NO_DEVICE ->
-        "aucune paire connue : appaire les lunettes dans Meta AI et enregistre l'app d'abord."
+        "no known pair: pair the glasses in Meta AI and register the app first."
     PermissionError.NO_DEVICE_WITH_CONNECTION ->
-        "aucune paire connectée : allume les lunettes, Bluetooth actif, puis réessaie."
-    PermissionError.CONNECTION_ERROR -> "la connexion à l'app Meta AI a été interrompue, réessaie."
-    PermissionError.REQUEST_IN_PROGRESS -> "une demande est déjà ouverte dans Meta AI, réponds-y."
-    PermissionError.REQUEST_TIMEOUT -> "Meta AI n'a pas répondu à temps, réessaie."
-    PermissionError.INTERNAL_ERROR -> "erreur interne du SDK, réessaie puis redémarre Meta AI."
+        "no connected pair: turn the glasses on, Bluetooth active, then try again."
+    PermissionError.CONNECTION_ERROR -> "the connection to the Meta AI app was interrupted, try again."
+    PermissionError.REQUEST_IN_PROGRESS -> "a request is already open in Meta AI, answer it."
+    PermissionError.REQUEST_TIMEOUT -> "Meta AI did not answer in time, try again."
+    PermissionError.INTERNAL_ERROR -> "internal SDK error, try again then restart Meta AI."
 }
 
 /**
  * Traduction **erreur par erreur** des refus et fins de session du SDK (les 18 valeurs de
- * `DeviceSessionError`) : chacune dit quoi faire, aucune ne laisse la description anglaise nue.
+ * `DeviceSessionError`) : chacune dit quoi faire, avec nos mots plutôt que la description brute.
  */
 fun sessionErrorMessage(error: DeviceSessionError): GlassesMessage = when (error) {
     DeviceSessionError.CAPABILITY_DENIED ->
-        GlassesMessage(MessageKind.ERROR, "Caméra refusée par le SDK : autorise-la, puis redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Camera refused by the SDK: allow it, then restart the session.")
     DeviceSessionError.NO_ELIGIBLE_DEVICE ->
-        GlassesMessage(MessageKind.ERROR, "Aucune paire disponible : déplie les lunettes, mets-les pour réveiller le lien, puis redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "No pair available: unfold the glasses, wear them to wake the link, then restart the session.")
     DeviceSessionError.SESSION_ALREADY_STOPPED ->
-        GlassesMessage(MessageKind.INFO, "Session déjà arrêtée côté SDK : redémarre-la.")
+        GlassesMessage(MessageKind.INFO, "Session already stopped on the SDK side: restart it.")
     DeviceSessionError.SESSION_IDLE ->
-        GlassesMessage(MessageKind.WARNING, "Session au repos : démarre-la pour filmer.")
+        GlassesMessage(MessageKind.WARNING, "Session idle: start it to film.")
     DeviceSessionError.CAPABILITY_ALREADY_ADDED ->
-        GlassesMessage(MessageKind.INFO, "Caméra déjà attachée à la session.")
+        GlassesMessage(MessageKind.INFO, "Camera already attached to the session.")
     DeviceSessionError.CAPABILITY_NOT_FOUND ->
-        GlassesMessage(MessageKind.WARNING, "Caméra déjà détachée de la session.")
+        GlassesMessage(MessageKind.WARNING, "Camera already detached from the session.")
     DeviceSessionError.DEVICE_DISCONNECTED ->
-        GlassesMessage(MessageKind.ERROR, "Lunettes déconnectées : vérifie le Bluetooth, puis redémarre la session.")
+        GlassesMessage(MessageKind.ERROR, "Glasses disconnected: check Bluetooth, then restart the session.")
     DeviceSessionError.SESSION_ENDED_BY_DEVICE ->
-        GlassesMessage(MessageKind.ERROR, "Les lunettes ont fermé la session : redémarre-la.")
+        GlassesMessage(MessageKind.ERROR, "The glasses closed the session: restart it.")
     DeviceSessionError.SESSION_ALREADY_EXISTS ->
-        GlassesMessage(MessageKind.ERROR, "Une session SDK existe déjà : arrête-la, puis redémarre.")
+        GlassesMessage(MessageKind.ERROR, "An SDK session already exists: stop it, then restart.")
     DeviceSessionError.THERMAL_CRITICAL ->
-        GlassesMessage(MessageKind.WARNING, "Lunettes trop chaudes : laisse-les refroidir avant de reprendre.")
+        GlassesMessage(MessageKind.WARNING, "Glasses too hot: let them cool down before resuming.")
     DeviceSessionError.THERMAL_EMERGENCY ->
-        GlassesMessage(MessageKind.ERROR, "Surchauffe des lunettes : session coupée, laisse-les refroidir.")
+        GlassesMessage(MessageKind.ERROR, "Glasses overheating: session cut, let them cool down.")
     DeviceSessionError.PEAK_POWER_SHUTDOWN ->
-        GlassesMessage(MessageKind.ERROR, "Pic de consommation : les lunettes ont coupé la session.")
+        GlassesMessage(MessageKind.ERROR, "Power spike: the glasses cut the session.")
     DeviceSessionError.BATTERY_CRITICAL ->
-        GlassesMessage(MessageKind.ERROR, "Batterie des lunettes critique : recharge-les.")
+        GlassesMessage(MessageKind.ERROR, "Glasses battery critical: recharge them.")
     DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED ->
-        GlassesMessage(MessageKind.ERROR, "L'app DAT des lunettes doit être mise à jour : la page Meta AI s'ouvre.")
+        GlassesMessage(MessageKind.ERROR, "The glasses DAT app must be updated: the Meta AI page opens.")
     DeviceSessionError.DWA_UNAVAILABLE ->
-        GlassesMessage(MessageKind.ERROR, "Service lunettes indisponible : mets à jour l'app Meta AI, puis réessaie.")
+        GlassesMessage(MessageKind.ERROR, "Glasses service unavailable: update the Meta AI app, then try again.")
     DeviceSessionError.INSUFFICIENT_SDK_VERSION ->
-        GlassesMessage(MessageKind.ERROR, "SDK trop ancien pour ces lunettes : mets à jour l'app Meta AI et l'app DAT.")
+        GlassesMessage(MessageKind.ERROR, "SDK too old for these glasses: update the Meta AI app and the DAT app.")
     DeviceSessionError.DWA_OUT_OF_STU_RANGE ->
-        GlassesMessage(MessageKind.ERROR, "Lunettes hors de portée de mise à jour : rapproche-les du téléphone.")
+        GlassesMessage(MessageKind.ERROR, "Glasses out of update range: bring them closer to the phone.")
     DeviceSessionError.UNEXPECTED_ERROR ->
-        GlassesMessage(MessageKind.ERROR, "Erreur inattendue du SDK : redémarre la session, puis l'app.")
+        GlassesMessage(MessageKind.ERROR, "Unexpected SDK error: restart the session, then the app.")
 }
 
 /** Deux erreurs se réparent sur la page de mise à jour de l'app DAT des lunettes, dans Meta AI. */
@@ -200,22 +200,22 @@ fun sessionErrorNeedsGlassesAppUpdate(error: DeviceSessionError): Boolean =
 
 object GlassesMessages {
 
-    fun sdkUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "SDK lunettes indisponible : $reason")
+    fun sdkUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Glasses SDK unavailable: $reason")
 
     fun registrationFailed(reason: String) =
-        GlassesMessage(MessageKind.ERROR, "Enregistrement refusé : $reason")
+        GlassesMessage(MessageKind.ERROR, "Registration refused: $reason")
 
-    fun sessionRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Session refusée : $reason")
+    fun sessionRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Session refused: $reason")
 
-    fun sessionInterrupted(reason: String) = GlassesMessage(MessageKind.ERROR, "Session interrompue : $reason")
+    fun sessionInterrupted(reason: String) = GlassesMessage(MessageKind.ERROR, "Session interrupted: $reason")
 
     fun sessionAlreadyRunning() =
-        GlassesMessage(MessageKind.WARNING, "Une session lunettes tourne déjà : arrête-la d'abord.")
+        GlassesMessage(MessageKind.WARNING, "A glasses session is already running: stop it first.")
 
     /** L'attente du lien : c'est l'app qui patiente, l'utilisateur n'a rien à corriger. */
     fun waitingForLink() = GlassesMessage(
         MessageKind.INFO,
-        "Lunettes pas encore liées : j'attends le Bluetooth (jusqu'à 30 s), garde-les dépliées et portées.",
+        "Glasses not linked yet: waiting for Bluetooth (up to 30 s), keep them unfolded and worn.",
     )
 
     /**
@@ -224,59 +224,59 @@ object GlassesMessages {
      */
     fun noLinkedDevice() = GlassesMessage(
         MessageKind.ERROR,
-        "Lunettes pas encore connectées : déplie-les, mets-les sur le nez, vérifie le Bluetooth, puis redémarre la session.",
+        "Glasses not connected yet: unfold them, put them on your nose, check Bluetooth, then restart the session.",
     )
 
     fun noCamera() = GlassesMessage(
         MessageKind.WARNING,
-        "Caméra lunettes inactive : démarre la session, ou autorise la caméra dans l'app Meta AI.",
+        "Glasses camera inactive: start the session, or allow the camera in the Meta AI app.",
     )
 
-    fun cameraPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Caméra non autorisée"))
+    fun cameraPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Camera not allowed"))
 
-    fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Caméra indisponible : $reason")
+    fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Camera unavailable: $reason")
 
-    fun micPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Micro non autorisé"))
+    fun micPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Microphone not allowed"))
 
     fun audioRefused(hertz: Int, reason: String) = GlassesMessage(
         MessageKind.WARNING,
-        "Micro lunettes refusé en ${hertz / 1000} kHz ($reason) : repli sur le format suivant.",
+        "Glasses mic refused at ${hertz / 1000} kHz ($reason): falling back to the next format.",
     )
 
     fun audioUnavailable() = GlassesMessage(
         MessageKind.WARNING,
-        "Micro lunettes indisponible : la session continue en caméra seule, " +
-            "la dictée garde le micro du téléphone.",
+        "Glasses mic unavailable: the session continues camera-only, " +
+            "dictation keeps the phone mic.",
     )
 
-    fun streamRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Flux refusé : $reason")
+    fun streamRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Stream refused: $reason")
 
-    fun streamError(reason: String) = GlassesMessage(MessageKind.WARNING, "Flux lunettes : $reason")
+    fun streamError(reason: String) = GlassesMessage(MessageKind.WARNING, "Glasses stream: $reason")
 
     fun streamStopped() =
-        GlassesMessage(MessageKind.WARNING, "Flux caméra arrêté : redémarre la session pour reprendre une photo.")
+        GlassesMessage(MessageKind.WARNING, "Camera stream stopped: restart the session to take a photo again.")
 
-    fun photoRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Photo refusée : $reason")
+    fun photoRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Photo refused: $reason")
 
     fun photoUndecodable() = GlassesMessage(
         MessageKind.ERROR,
-        "Photo des lunettes illisible : format non décodé par l'app.",
+        "Glasses photo unreadable: format not decoded by the app.",
     )
 
     fun inputsUnavailable(reason: String) =
-        GlassesMessage(MessageKind.ERROR, "Bouton capture indisponible : $reason")
+        GlassesMessage(MessageKind.ERROR, "Capture button unavailable: $reason")
 
     fun liveNotOnGlasses() = GlassesMessage(
         MessageKind.INFO,
-        "Mode Direct : pas encore porté sur lunettes, il reste sur le téléphone.",
+        "Live mode: not on glasses yet, it stays on the phone.",
     )
 
     fun registrationStarted() = GlassesMessage(
         MessageKind.INFO,
-        "L'app Meta AI demande confirmation : accepte, puis reviens ici.",
+        "The Meta AI app asks for confirmation: accept, then come back here.",
     )
 
-    fun noActivity() = GlassesMessage(MessageKind.ERROR, "Reviens dans l'app, puis relance l'enregistrement.")
+    fun noActivity() = GlassesMessage(MessageKind.ERROR, "Come back to the app, then restart the registration.")
 
     /**
      * L'enregistrement a existé puis a disparu : le SDK ne le dit pas, et l'écran se
@@ -285,17 +285,17 @@ object GlassesMessages {
      */
     fun registrationLost() = GlassesMessage(
         MessageKind.WARNING,
-        "Enregistrement Meta AI perdu (mise à jour ou réinstallation) : " +
-            "touche « Enregistrer auprès de Meta AI ».",
+        "Meta AI registration lost (update or reinstall): " +
+            "tap “Register with Meta AI”.",
     )
 
     fun mockUnavailable() =
-        GlassesMessage(MessageKind.ERROR, "Appareil simulé indisponible sur ce téléphone.")
+        GlassesMessage(MessageKind.ERROR, "Mock device unavailable on this phone.")
 
     fun mockReady() =
-        GlassesMessage(MessageKind.INFO, "Lunettes simulées prêtes : démarre la session, puis simule un appui.")
+        GlassesMessage(MessageKind.INFO, "Mock glasses ready: start the session, then simulate a press.")
 
-    fun noMockPress() = GlassesMessage(MessageKind.WARNING, "Aucun appareil simulé actif.")
+    fun noMockPress() = GlassesMessage(MessageKind.WARNING, "No active mock device.")
 
     /**
      * L'écoute mains-libres est ouverte : ce qui se dit part en question, sans
@@ -303,7 +303,7 @@ object GlassesMessages {
      */
     fun talkListening() = GlassesMessage(
         MessageKind.INFO,
-        "J'écoute (lunettes) : parle, puis rappuie longuement pour envoyer (envoi auto à 20 s).",
+        "Listening (glasses): speak, then long-press again to send (auto-send at 20 s).",
     )
 
     /**
@@ -312,38 +312,38 @@ object GlassesMessages {
      */
     fun talkMicUnavailable() = GlassesMessage(
         MessageKind.WARNING,
-        "Micro lunettes indisponible : fais un appui long sur le téléphone pour dicter.",
+        "Glasses mic unavailable: long-press on the phone to dictate.",
     )
 
     fun talkFailed(reason: String) =
-        GlassesMessage(MessageKind.ERROR, "Question lunettes : $reason")
+        GlassesMessage(MessageKind.ERROR, "Glasses question: $reason")
 
     fun voiceLaunchStarted() = GlassesMessage(
         MessageKind.INFO,
-        "« Hey Meta, ouvre iSee » : connexion, puis j'écoute.",
+        "“Hey Meta, open iSee”: connecting, then listening.",
     )
 
     fun voiceLaunchListening() = GlassesMessage(
         MessageKind.INFO,
-        "« Hey Meta, ouvre iSee » : j'écoute, parle.",
+        "“Hey Meta, open iSee”: listening, speak.",
     )
 
     fun voiceLaunchNeedsRegistration() = GlassesMessage(
         MessageKind.ERROR,
-        "Commande vocale reçue mais app non enregistrée : touche « Enregistrer auprès de Meta AI ».",
+        "Voice command received but app not registered: tap “Register with Meta AI”.",
     )
 
     fun voiceInvocationsUnavailable() = GlassesMessage(
         MessageKind.WARNING,
-        "Invocations vocales indisponibles : l'appui long reste le seul déclencheur.",
+        "Voice invocations unavailable: long press remains the only trigger.",
     )
 
     fun voiceInvocationError(reason: String) =
-        GlassesMessage(MessageKind.WARNING, "Invocation vocale : $reason")
+        GlassesMessage(MessageKind.WARNING, "Voice invocation: $reason")
 
     fun voiceInvocationUnknown() = GlassesMessage(
         MessageKind.WARNING,
-        "Invocation vocale inconnue : ignorée (seul le lancement est géré).",
+        "Unknown voice invocation: ignored (only launch is handled).",
     )
 
     /**
@@ -353,32 +353,32 @@ object GlassesMessages {
      */
     fun framesVoiceRoute() = GlassesMessage(
         MessageKind.INFO,
-        "Direct lunettes : la voix des descriptions suit les lunettes, haut-parleur en repli.",
+        "Glasses live: description voice follows the glasses, speaker as fallback.",
     )
 
     fun videoUndecodable() = GlassesMessage(
         MessageKind.WARNING,
-        "Vidéo des lunettes illisible : ce format n'est pas décodé, photo seule.",
+        "Glasses video unreadable: this format is not decoded, photo only.",
     )
 
     /** Vidéo des lunettes publiée dans la galerie : le chemin dit où la retrouver. */
     fun recordingSaved(name: String, seconds: Long, withSound: Boolean) = GlassesMessage(
         MessageKind.INFO,
-        "Vidéo des lunettes enregistrée" + (if (withSound) " avec le son" else " (sans son)") +
-            " : galerie → Movies/iSee/$name ($seconds s).",
+        "Glasses video saved" + (if (withSound) " with sound" else " (silent)") +
+            ": gallery → Movies/iSee/$name ($seconds s).",
     )
 
     fun recordingEmpty() = GlassesMessage(
         MessageKind.WARNING,
-        "Aucune vidéo enregistrée : le flux lunettes n'a livré aucune image compressée.",
+        "No video recorded: the glasses stream delivered no compressed image.",
     )
 
     fun recordingFailed(reason: String) =
-        GlassesMessage(MessageKind.ERROR, "Vidéo des lunettes non enregistrée : $reason")
+        GlassesMessage(MessageKind.ERROR, "Glasses video not recorded: $reason")
 
     fun mockConnectTimeout() = GlassesMessage(
         MessageKind.ERROR,
-        "Lunettes simulées : enregistrement trop lent, relance la connexion.",
+        "Mock glasses: registration too slow, restart the connection.",
     )
 
     /** Ordre vocal « iSee » : la session demandée s'ouvre, le lien est là. */
@@ -409,8 +409,8 @@ object GlassesMessages {
  * consomme les frames (sans consommateur, collecter paierait le décodage pour rien).
  */
 fun frameCollectionIdleReason(enabled: Boolean, hasConsumer: Boolean): String? = when {
-    !enabled -> "Collecte des frames lunettes désactivée : le flux n'est pas lu."
-    !hasConsumer -> "Collecte des frames lunettes sans consommateur : le flux n'est pas lu."
+    !enabled -> "Glasses frame collection disabled: the stream is not read."
+    !hasConsumer -> "Glasses frame collection without consumer: the stream is not read."
     else -> null
 }
 
@@ -439,12 +439,12 @@ fun registrationLostMessage(
 /** Une session terminée n'est pas une session : il faut pouvoir en rouvrir une. */
 fun SessionPhase.isFinished(): Boolean = this == SessionPhase.STOPPED
 
-/** Phase de session en français, pour la ligne d'état (pas de nom d'enum à l'écran). */
-fun SessionPhase.labelFr(): String = when (this) {
-    SessionPhase.IDLE -> "arrêtée"
-    SessionPhase.STARTING -> "démarrage"
-    SessionPhase.STARTED -> "en cours"
-    SessionPhase.STOPPED -> "terminée"
+/** Phase de session en anglais, pour la ligne d'état (pas de nom d'enum à l'écran). */
+fun SessionPhase.label(): String = when (this) {
+    SessionPhase.IDLE -> "stopped"
+    SessionPhase.STARTING -> "connecting"
+    SessionPhase.STARTED -> "running"
+    SessionPhase.STOPPED -> "ended"
 }
 
 /**
@@ -461,9 +461,9 @@ fun SessionPhase.allowsConnect(): Boolean = this == SessionPhase.IDLE || isFinis
  * aucune règle qui pourrait griser un chemin qui marche sur du vrai matériel.
  */
 fun photoHint(state: GlassesUiState): String? = when {
-    !state.connected -> "Photo : démarre la session d'abord."
-    !state.cameraAllowed -> "Photo : caméra non autorisée côté app Meta AI."
-    !state.streaming -> "Photo : flux caméra inactif."
+    !state.connected -> "Photo: start the session first."
+    !state.cameraAllowed -> "Photo: camera not allowed in the Meta AI app."
+    !state.streaming -> "Photo: camera stream inactive."
     else -> null
 }
 
@@ -473,15 +473,15 @@ fun photoHint(state: GlassesUiState): String? = when {
  * capte, et comment envoyer.
  */
 fun talkHint(state: GlassesUiState): String? =
-    if (state.talkListening) "Parle, puis rappuie longuement (ou attends 20 s)." else null
+    if (state.talkListening) "Speak, then long-press again (or wait 20 s)." else null
 
 /**
  * Libellé du bouton de session : dit l'étape manquante plutôt que de rester grisé sans
  * raison visible. Quand tout est prêt, c'est le libellé d'action habituel.
  */
 fun connectLabel(state: GlassesUiState): String = when {
-    state.connected -> "Arrêter la session"
-    state.phase == SessionPhase.STARTING -> "Session en cours de démarrage…"
-    !state.registered -> "Enregistre l'app d'abord"
-    else -> "Démarrer la session"
+    state.connected -> "Stop the session"
+    state.phase == SessionPhase.STARTING -> "Session starting…"
+    !state.registered -> "Register the app first"
+    else -> "Start the session"
 }

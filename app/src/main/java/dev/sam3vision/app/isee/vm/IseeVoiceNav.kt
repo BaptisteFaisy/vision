@@ -257,7 +257,7 @@ class IseeVoiceNav(
 
     /** Dictée injectée puis confirmation dès le résumé (30 s max). */
     private suspend fun startDebugGuidance(destination: String) {
-        if (!session.onVoiceTranscript("aller à $destination")) return
+        if (!session.onVoiceTranscript("go to $destination")) return
         repeat(DEBUG_NAV_POLLS) {
             when (val current = state.value) {
                 is VoiceNavUiState.Guiding -> return

@@ -9,11 +9,11 @@ class RouteStatusTextTest {
     @Test
     fun `guidage coupé — fiche lieu, avec ou sans URL`() {
         assertEquals(
-            "Guidage coupé : seule la fiche du lieu s'affichera.",
+            "Guidance off: only the place page will show.",
             routeStatusText("https://valhalla.test", false),
         )
         assertEquals(
-            "Guidage coupé : seule la fiche du lieu s'affichera.",
+            "Guidance off: only the place page will show.",
             routeStatusText("", false),
         )
     }
@@ -21,11 +21,11 @@ class RouteStatusTextTest {
     @Test
     fun `URL vide ou blanche — Maps uniquement`() {
         assertEquals(
-            "URL Valhalla manquante : guidage Google Maps uniquement.",
+            "Valhalla URL missing: Google Maps guidance only.",
             routeStatusText("", true),
         )
         assertEquals(
-            "URL Valhalla manquante : guidage Google Maps uniquement.",
+            "Valhalla URL missing: Google Maps guidance only.",
             routeStatusText("   ", true),
         )
     }
@@ -33,7 +33,7 @@ class RouteStatusTextTest {
     @Test
     fun `URL renseignée — guidage in-app avec repli Maps`() {
         assertEquals(
-            "Guidage in-app : écrans + voix iSee, avec repli Google Maps.",
+            "In-app guidance: iSee screens + voice, with Google Maps fallback.",
             routeStatusText("https://valhalla.test", true),
         )
     }

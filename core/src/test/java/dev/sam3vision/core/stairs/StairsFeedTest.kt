@@ -23,8 +23,8 @@ class StairsFeedTest {
 
         assertEquals("", feed.tick(luma, 0L))
         assertEquals("", feed.tick(luma, 33L))
-        assertEquals("Escalier devant.", feed.tick(luma, 66L))
-        assertEquals("Escalier devant.", feed.tick(blankLuma(), 1000L))
+        assertEquals("Stairs ahead.", feed.tick(luma, 66L))
+        assertEquals("Stairs ahead.", feed.tick(blankLuma(), 1000L))
         assertEquals("", feed.tick(blankLuma(), 4000L))
     }
 

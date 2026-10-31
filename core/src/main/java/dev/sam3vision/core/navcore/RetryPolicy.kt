@@ -20,10 +20,10 @@ data class RetryPolicy(
     val factor: Double = 2.0,
 ) {
     init {
-        require(maxAttempts >= 1) { "maxAttempts doit valoir au moins 1" }
-        require(baseDelayMs >= 0) { "baseDelayMs doit être positif" }
-        require(maxDelayMs >= baseDelayMs) { "maxDelayMs doit couvrir baseDelayMs" }
-        require(factor >= 1.0) { "factor doit valoir au moins 1" }
+        require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
+        require(baseDelayMs >= 0) { "baseDelayMs must be positive" }
+        require(maxDelayMs >= baseDelayMs) { "maxDelayMs must cover baseDelayMs" }
+        require(factor >= 1.0) { "factor must be at least 1" }
     }
 
     /**

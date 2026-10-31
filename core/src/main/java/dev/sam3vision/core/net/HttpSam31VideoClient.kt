@@ -34,8 +34,8 @@ class HttpSam31VideoClient(
 
     override suspend fun sendVideo(video: File, prompt: String?): Result<String> {
         if (onDeviceMode) return Result.failure(ApiError.BadResponse(INFERRED_ON_DEVICE))
-        if (baseUrl.isBlank()) return Result.failure(ApiError.InvalidKey("endpoint SAM 3.1 vide"))
-        if (!video.isFile || video.length() == 0L) return Result.failure(ApiError.BadResponse("vidéo absente ou vide"))
+        if (baseUrl.isBlank()) return Result.failure(ApiError.InvalidKey("SAM 3.1 endpoint empty"))
+        if (!video.isFile || video.length() == 0L) return Result.failure(ApiError.BadResponse("video missing or empty"))
         if (!isUsableHttpUrl(joinUrl(baseUrl, path))) {
             return Result.failure(ApiError.BadResponse(invalidEndpointMessage("endpoint SAM 3.1")))
         }
@@ -43,7 +43,7 @@ class HttpSam31VideoClient(
         // L'échec de construction reste un BadResponse (contrat historique), pas un Network.
         return client.executeBuilt {
             runCatching { buildRequest(video, prompt) }.getOrElse {
-                throw ApiError.BadResponse("vidéo illisible : ${it.message}")
+                throw ApiError.BadResponse("unreadable video: ${it.message}")
             }
         }
             .then { outcome -> outcome.requireSuccess() }
@@ -73,7 +73,7 @@ class HttpSam31VideoClient(
         const val DEFAULT_PATH = "/video"
         const val DEFAULT_MODEL = "sam3.1-video"
         const val UPLOAD_TIMEOUT_SECONDS: Long = 120L
-        const val INFERRED_ON_DEVICE = "SAM 3.1 configuré pour l'inférence locale : envoi cloud désactivé"
+        const val INFERRED_ON_DEVICE = "SAM 3.1 set for on-device inference: cloud upload disabled"
     }
 }
 
@@ -81,7 +81,7 @@ class HttpSam31VideoClient(
 private val SUMMARY_KEYS = listOf("text", "description", "answer", "caption")
 
 /** Message de remplacement quand le serveur répond 200 avec un corps vide. */
-private const val EMPTY_SUMMARY = "réponse vide de SAM 3.1"
+private const val EMPTY_SUMMARY = "empty SAM 3.1 response"
 
 /**
  * Résumé d'une réponse vidéo : le premier champ texte connu du JSON, ou le corps brut quand

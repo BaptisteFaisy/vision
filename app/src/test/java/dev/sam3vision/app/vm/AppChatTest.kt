@@ -104,7 +104,7 @@ class AppChatTest {
         chat(screen, llm).ask("et là ?")
 
         assertFalse("plus de « … »", screen.value.asking)
-        assertEquals("Question sans réponse : délai dépassé", screen.value.statusLine)
+        assertEquals("Question unanswered: délai dépassé", screen.value.statusLine)
         assertTrue("historique intact", screen.value.chat.isEmpty())
     }
 }

@@ -17,18 +17,18 @@ class ShareSendMessageTest {
     @Test
     fun `un refus 403 nomme la cle du flux`() {
         val message = shareSendMessage(ShareSend.Refused(403)).orEmpty()
-        assertTrue(message, message.contains("clé"))
-        assertTrue(message, message.contains("flux"))
+        assertTrue(message, message.contains("key"))
+        assertTrue(message, message.contains("stream"))
     }
 
     @Test
     fun `les autres refus portent leur code`() {
-        assertEquals("Le relais a refusé l'envoi (code 503).", shareSendMessage(ShareSend.Refused(503)))
+        assertEquals("The relay refused the send (code 503).", shareSendMessage(ShareSend.Refused(503)))
     }
 
     @Test
     fun `un relais injoignable parle de la connexion`() {
         val message = shareSendMessage(ShareSend.Unreachable).orEmpty()
-        assertTrue(message, message.contains("injoignable"))
+        assertTrue(message, message.contains("unreachable"))
     }
 }

@@ -67,7 +67,7 @@ class LiveTimingsTest {
         assertEquals(-1L, stages.headersToBodyMs)
         assertEquals(-1L, stages.bodyToReceivedMs)
         assertEquals(1L, stages.sentToReceivedMs)
-        assertTrue(TimingsText.detail(stages).none { it.startsWith("envoi → en-têtes") })
+        assertTrue(TimingsText.detail(stages).none { it.startsWith("send → headers") })
     }
 
     @Test
@@ -76,9 +76,9 @@ class LiveTimingsTest {
             sentToHeadersMs = 90, headersToBodyMs = 40, bodyToReceivedMs = 23,
         )
         val details = TimingsText.detail(stages)
-        assertTrue(details.contains("envoi → en-têtes : 90 ms"))
-        assertTrue(details.contains("en-têtes → corps : 40 ms"))
-        assertTrue(details.contains("corps → réponse : 23 ms"))
+        assertTrue(details.contains("send → headers: 90 ms"))
+        assertTrue(details.contains("headers → body: 40 ms"))
+        assertTrue(details.contains("body → response: 23 ms"))
         // La ligne compacte garde son format : la décomposition n'est que dans le détail.
         assertFalse(TimingsText.compact(stages).contains("down"))
     }
@@ -118,7 +118,7 @@ class LiveTimingsTest {
     fun `la ligne compacte tient sur une seule ligne`() {
         val line = TimingsText.compact(fullStages())
         assertEquals(
-            "latence 348 · capt 22 · up 61 · srv 92 · rtt 153 · masque 37 · pixel 8",
+            "latency 348 · capt 22 · up 61 · srv 92 · rtt 153 · mask 37 · pixel 8",
             line,
         )
         assertFalse(line.contains("\n"))
@@ -128,7 +128,7 @@ class LiveTimingsTest {
     fun `la ligne compacte affiche un tire quand un poste manque`() {
         val stages = FrameTimings(captureToJpegMs = 22, sentToReceivedMs = 153)
         val line = TimingsText.compact(stages)
-        assertTrue(line.startsWith("latence 175"))
+        assertTrue(line.startsWith("latency 175"))
         assertTrue(line.contains("up ${TimingsText.MISSING}"))
         assertTrue(line.contains("srv ${TimingsText.MISSING}"))
         assertTrue(line.contains("pixel ${TimingsText.MISSING}"))
@@ -145,18 +145,18 @@ class LiveTimingsTest {
     @Test
     fun `le detail decompose l'aller-retour quand le serveur parle`() {
         val details = TimingsText.detail(fullStages())
-        assertTrue(details.contains("capture → jpeg : 22 ms"))
+        assertTrue(details.contains("capture → jpeg: 22 ms"))
         assertTrue(
-            details.contains("envoi → réponse : 153 ms (dont serveur 92 ms, réseau + file 61 ms)"),
+            details.contains("send → response: 153 ms (incl. server 92 ms, network + queue 61 ms)"),
         )
-        assertTrue(details.contains("latence perçue : 348 ms"))
+        assertTrue(details.contains("perceived latency: 348 ms"))
     }
 
     @Test
     fun `sans chiffre serveur l'aller-retour n'est pas decoupe`() {
         val stages = fullStages().copy(server = emptyMap(), serverTotalMs = -1)
-        val line = TimingsText.detail(stages).first { it.startsWith("envoi → réponse") }
-        assertEquals("envoi → réponse : 153 ms", line)
+        val line = TimingsText.detail(stages).first { it.startsWith("send → response") }
+        assertEquals("send → response: 153 ms", line)
         assertEquals(-1L, stages.networkMs)
     }
 
@@ -164,7 +164,7 @@ class LiveTimingsTest {
     fun `le serveur fournit son total par elapsed_ms a defaut de timings`() {
         val stages = fullStages().copy(server = emptyMap(), serverTotalMs = 118)
         assertEquals(118L, stages.serverMs)
-        assertEquals("serveur : ${TimingsText.MISSING}", TimingsText.servers(stages.server))
+        assertEquals("server: ${TimingsText.MISSING}", TimingsText.servers(stages.server))
     }
 
     @Test
@@ -172,7 +172,7 @@ class LiveTimingsTest {
         val servers = TimingsText.servers(
             mapOf("masks_ms" to 4.4, "vision_ms" to 47.0, "detr_ms" to 38.6, "total" to 92.0),
         )
-        assertEquals("serveur : vision 47 ms · detr 39 ms · masks 4 ms", servers)
+        assertEquals("server: vision 47 ms · detr 39 ms · masks 4 ms", servers)
     }
 
     @Test

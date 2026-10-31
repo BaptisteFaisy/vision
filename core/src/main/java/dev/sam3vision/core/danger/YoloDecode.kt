@@ -21,8 +21,8 @@ object YoloDecode {
     /** Côté d'entrée du modèle (carré 640). */
     const val INPUT_SIZE = 640
 
-    /** Étiquette des détections rendues (le français de l'app). */
-    const val PERSON_LABEL = "personne"
+    /** Étiquette des détections rendues (l'anglais de l'app). */
+    const val PERSON_LABEL = "person"
 
     /**
      * Tenseur → personnes en pixels source. [rows] = les 84 lignes de 8400
@@ -37,7 +37,7 @@ object YoloDecode {
         confThreshold: Float = 0.1f,
         nmsIou: Float = 0.5f,
     ): List<Detection> {
-        require(rows.size > PERSON_CLASS + 4) { "tenseur YOLO inattendu : ${rows.size} lignes" }
+        require(rows.size > PERSON_CLASS + 4) { "unexpected YOLO tensor: ${rows.size} rows" }
         val cols = rows[0].size
         val scaleX = srcWidth / INPUT_SIZE.toFloat()
         val scaleY = srcHeight / INPUT_SIZE.toFloat()

@@ -46,8 +46,8 @@ class BlockMotionSource(
     private val fine = Fit()
 
     init {
-        require(coarseStride > 0 && fineStride > 0) { "pas de grille invalide" }
-        require(coarseStride % fineStride == 0) { "la grille grossière doit être un multiple de la fine" }
+        require(coarseStride > 0 && fineStride > 0) { "invalid grid stride" }
+        require(coarseStride % fineStride == 0) { "the coarse grid must be a multiple of the fine one" }
     }
 
     override fun estimateSince(prevLuma: GrayMask, curLuma: GrayMask): MotionSample? {
