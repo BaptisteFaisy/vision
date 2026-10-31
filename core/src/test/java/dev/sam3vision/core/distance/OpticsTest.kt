@@ -198,4 +198,34 @@ class OpticsTest {
     fun `calibrage sans zone active est nul`() {
         assertNull(Optics.lensSpec(FOCAL, null))
     }
+
+    @Test
+    fun `calibration intrinseque donne focale et centre exacts`() {
+        // mêmes angles que la voie mm (67,63° / 53,34°), centre au milieu
+        val spec = Optics.lensSpecFromIntrinsics(2986.1f, 2986.1f, 1999.5f, 1499.5f, ARRAY_W, ARRAY_H)!!
+        assertEquals(67.63f, spec.horizontalFovDeg, 0.1f)
+        assertEquals(53.34f, spec.verticalFovDeg, 0.1f)
+        assertEquals(0.5f, spec.principalXFrac, 0.001f)
+        assertEquals(0.5f, spec.principalYFrac, 0.001f)
+        assertEquals(382.2f, spec.focalPx(512, 384), 0.5f)
+    }
+
+    @Test
+    fun `calibration intrinseque decentree garde son centre`() {
+        val spec = Optics.lensSpecFromIntrinsics(2986.1f, 2986.1f, 2050f, 1450f, ARRAY_W, ARRAY_H)!!
+        assertEquals(2050f / 3999f, spec.principalXFrac, 0.0001f)
+        assertEquals(1450f / 2999f, spec.principalYFrac, 0.0001f)
+        val (cx, cy) = spec.principalPx(512, 384)
+        assertEquals(2050f / 3999f * 511f, cx, 0.01f)
+        assertEquals(1450f / 2999f * 383f, cy, 0.01f)
+    }
+
+    @Test
+    fun `calibration intrinseque incoherente retombe sur la voie millimetres`() {
+        assertNull(Optics.lensSpecFromIntrinsics(0f, 2986f, 1999f, 1499f, ARRAY_W, ARRAY_H))
+        assertNull(Optics.lensSpecFromIntrinsics(2986f, 2986f, -5f, 1499f, ARRAY_W, ARRAY_H))
+        assertNull(Optics.lensSpecFromIntrinsics(2986f, 2986f, 1999f, 1499f, 0, ARRAY_H))
+        // téléobjectif : 3,8° horizontaux, hors bornes comme par la voie mm
+        assertNull(Optics.lensSpecFromIntrinsics(60000f, 60000f, 1999f, 1499f, ARRAY_W, ARRAY_H))
+    }
 }

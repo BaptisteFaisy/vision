@@ -1,4 +1,4 @@
-# Distances en temps réel sur le Direct — fiche revérifiée dans le code de cet arbre le 2026-10-26
+# Distances en temps réel sur le Direct — fiche revérifiée dans le code de cet arbre le 2026-10-31
 
 Chaque objet suivi du Direct porte sa distance à la caméra : une pastille « ≈ 3,2 m » de verre sombre, posée
 au-dessus du coin haut-gauche de sa boîte, avec une puce et un liseré de la couleur de son masque ; plus la
@@ -22,22 +22,30 @@ Deux entrées, deux sources :
 
 | Entrée | D'où elle vient |
 |---|---|
-| **Hauteur réelle** | `KnownSizes.TABLE` (`KnownSizes.kt:40+`) : table label → mètres (personne 1,70 · voiture 1,45 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · borne 0,80 · clôture 1,50 · portail 1,75…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Quatre défauts n'ont volontairement pas de hauteur sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau) : leur distance vient de la profondeur ou du plan de sol. |
-| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **focale mm + taille physique lues par l'interop Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt:22-27`), sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Ordre vérifié : direct `LiveViewModel.chosenLens` (`:338-341`), photo iSee `IseePhotoDistances.chosenLens` (`:53-56`). **Attention : la voie REC d'iSee ne passe pas par le capteur** — `LiveProbe.configureFrom` applique `LensSpec.fromSettings` (`ProbeWiring.kt:22-31`), qui borne en plus la valeur saisie à 15–130° (`LensSpec.kt:43-46,71-72`) alors que le direct accepte tout champ positif. Écart connu, non corrigé. |
+| **Hauteur réelle** | `KnownSizes.TABLE` : table label → mètres (personne 1,70 · personne assise 1,25 · cycliste 1,75 · voiture 1,45 · SUV 1,65 · camionnette 1,95 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · borne 0,80 · clôture 1,50 · portail 1,75…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Les défauts sans hauteur défendable n'ont volontairement pas d'entrée sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau, feu, bordures…) : leur distance vient de la profondeur ou du plan de sol. Chaque entrée porte en plus son incertitude (`KnownSizes.TOLERANCE` : porte ±3 % · adulte ±6 % · enfant/arbre ±15-30 %) qui pondère la fusion. |
+| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **lecture Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt`) — d'abord la **calibration intrinsèque** (`LENS_INTRINSIC_CALIBRATION`, focale + centre optique en pixels, `Optics.lensSpecFromIntrinsics`) quand le driver l'expose, sinon **focale mm + taille physique** (`Optics.lensSpec`) — sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Ordre vérifié : direct `LiveViewModel.chosenLens`, photo iSee `IseePhotoDistances.chosenLens`. **Attention : la voie REC d'iSee ne passe pas par le capteur** — `LiveProbe.configureFrom` applique `LensSpec.fromSettings` (`ProbeWiring.kt`), qui borne en plus la valeur saisie à 15–130° alors que le direct accepte tout champ positif. Écart connu, non corrigé. |
 
-L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`, `LensSpec.kt:23-29`)
-— le direct redresse chaque frame avant envoi (`uprightScaled`, `LiveScreen.kt:291`). La mesure est indépendante de la
+L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`)
+— le direct redresse chaque frame avant envoi (`uprightScaled`, `LiveScreen.kt`). La mesure est indépendante de la
 résolution envoyée : `focalPx` se recalcule pour chaque frame depuis les dimensions **revenant du serveur**
-(512 px côté direct `LIVE_EDGE`, `LiveScreen.kt:45` ; **320 px** côté iSee `ISEE_FRAME_EDGE`, `IseeCameraPane.kt:40` ;
-`work_edge` demandé au serveur : 640, `LiveSession.kt:66,173`).
+(512 px côté direct `LIVE_EDGE` ; **320 px** côté iSee `ISEE_FRAME_EDGE`).
 
-**Bornes de plausibilité** (`Pinhole`, `DistanceEstimator.kt:30,33,36`) : rien sous **0,3 m** (`MIN_METERS`),
+Le **centre optique** n'est plus supposé au milieu de l'image : `LensSpec` le porte en fractions
+(`principalXFrac`/`principalYFrac`, 0,5 = centré), lus de `LENS_INTRINSIC_CALIBRATION` quand le driver
+les donne, et le plan de sol (`DistanceMeter.groundMeters`) comme le nuage de points
+(`CameraIntrinsics.fromLens`) s'en servent. Le sténopé n'en a pas besoin (hauteurs seules).
+
+**Bornes de plausibilité** (`Pinhole`) : rien sous **0,3 m** (`MIN_METERS`),
 rien au-delà de **60 m** (`MAX_METERS`), rien pour une boîte de moins de **4 px** de haut (`MIN_BOX_PX`). Hors bornes ⇒ pas d'affichage.
 
-**Objet coupé par le bord haut ou bas ⇒ pas de distance** (`Pinhole.isVerticallyCut`, marge de **2 px**,
-`DistanceEstimator.kt`). Constat de recette sur téléphone (non rejoué ici) : une couette segmentée à tort en « personne », collée
+**Objet coupé par le bord haut ou bas ⇒ pas de distance** (`Pinhole.isVerticallyCut`, marge de **2 px**).
+Constat de recette sur téléphone (non rejoué ici) : une couette segmentée à tort en « personne », collée
 aux deux bords, sortait à **31 m** — la boîte ne mesurait plus la hauteur réelle. Les bords gauche/droite
 restent acceptés : seule la hauteur porte la mesure.
+
+**Objet masqué par une meilleure détection ⇒ pas de distance** (`Occlusion.isOccluded`) : une boîte
+contenue à **60 %** dans celle d'une détection mieux scorée ne mesure plus son objet (la personne
+derrière la voiture sortirait trop loin). Recouvrement partiel ou scores égaux : les deux sont mesurés.
 
 ## Lissage : lisible à 1-2 images par seconde
 
@@ -52,14 +60,33 @@ Sur la page caméra iSee (REC) : **pas de journal de pistes, mesure brute**
 (`LiveProbe.readingsOf` n'appelle jamais `record`) — la pastille y bouge donc
 un peu plus qu'en Direct.
 
+## Fusion et confiance
+
+Quand le sténopé et le plan de sol parlent tous deux et concordent (rapport ≤ 1,5), la lecture est leur
+**moyenne pondérée** (`DistanceFusion.combine`) : le sténopé pèse `1 / (1 + tolérance de sa classe)`
+(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse 1. En cas de divergence, le sténopé garde
+la main quels que soient les poids — la pose du sol peut être fausse, le sténopé est la branche validée.
+
+Chaque lecture porte sa **confiance** (`ReadingConfidence`, 0..1) : `1 − 1 px / hauteur de boîte`
+(quantification : 0,995 à 200 px, 0,90 à 10 px), multipliée par l'accord des branches quand les deux
+parlent (1 si elles coïncident, 0 si leur rapport atteint 2).
+
 ## Précision — ce que le chiffre vaut
 
-Le doc annonçait « ±15-20 % sur un objet **debout et entier** » : **jamais confronté à un mètre ruban,
-précision non mesurée** — à tenir pour une estimation d'ingénierie, pas une mesure. Trois causes d'erreur connues :
+Le « ±15-20 % sur un objet **debout et entier** » reste **non confronté à un mètre ruban** — estimation
+d'ingénierie, pas mesure. Causes d'erreur et leur sort :
 
 - **hauteur réelle supposée** : un enfant mesuré comme « personne » (1,70 m) sort deux fois trop loin ;
-- **objet coupé** par un bord haut/bas : écarté depuis (il n'affiche rien) ;
+  atténué par les entrées de posture (« personne assise » 1,25 m, « cycliste » 1,75 m) quand le concept
+  suivi porte la posture, et par la tolérance par classe qui dé-pèse les classes floues dans la fusion ;
+- **objet coupé** par un bord haut/bas : écarté (il n'affiche rien) ;
+- **objet masqué** par un autre : écarté (`Occlusion`) ;
 - **objet penché ou allongé** (chaise vue de dessus, table basse) : la boîte ne mesure plus la hauteur réelle.
+
+Le **banc de précision** (`DistanceBenchmarkTest`, caméra virtuelle exacte) borne l'erreur de formule :
+aller-retour sténopé/sol au centimètre de 0,5 à 50 m, et enveloppe de quantification à ±1 px sur la
+boîte — **±0,5 % à 2 m, ±1 % à 5 m, ±2 % à 10 m, ±4 % à 20 m** (focale du direct 67°/512 px).
+Au-delà, l'erreur est dominée par la hauteur supposée, pas par le calcul.
 
 L'étiquette porte le « ≈ » pour cette raison (`DistanceText.approximate`), et le format dégressif — cm sous
 1 m, décimètre jusqu'à 10 m, mètre au-delà (`DistanceText.format`) — ne promet pas plus de précision que ça.
@@ -121,17 +148,24 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   si l'étalonnage dérive — la valeur se vérifie facilement : à 2 m, une personne de 1,70 m doit afficher
   « ≈ 2,0 m » (recette de contrôle ; tolérance chiffrée non mesurée).
 
-## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-26, par `grep -c '@Test'`)
+## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-31, par `grep -c '@Test'`)
 
-- `core.distance.LensSpecTest` (**7**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical.
-- `core.distance.KnownSizesTest` (**11**) : chaque défaut du direct est calibré au sténopé **ou**
-  explicitement profondeur (`DEPTH_ONLY` : `stairs`, `sidewalk`, `crosswalk`, `pole` — voir le KDoc de
-  `KnownSizes`) ; extérieur couvert (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage`
-  1,50 · `gate`/`portail` 1,75, `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions
-  (« clôture grillagée »), concept inconnu.
-- `core.distance.DistanceMeterTest` (**12**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
+- `core.distance.LensSpecTest` (**12**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical, centre optique (défaut, échelle, bornes), focale en pixels (`fromFocalPx`, aller-retour, refus).
+- `core.distance.OpticsTest` (**27**) : zone active, recadrages, bornes mm/px, calibration intrinsèque (exacte, décentrée, incohérente).
+- `core.distance.KnownSizesTest` (**16**) : chaque défaut du direct est calibré au sténopé **ou**
+  explicitement profondeur (`DEPTH_ONLY` — voir le KDoc de `KnownSizes`) ; extérieur couvert
+  (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage` 1,50 · `gate`/`portail` 1,75,
+  `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions (« clôture grillagée »),
+  concept inconnu ; postures assises et sous-types de véhicules ; tolérances par classe et poids de fusion.
+- `core.distance.DistanceMeterTest` (**15**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
-  deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes.
+  deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes, occlusion (masquée
+  écartée, partielle/égaux gardés), confiance croissante avec la boîte.
+- `core.distance.DistanceFusionTest` (**13**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
+  sténopé gardé en divergence, poids par tolérance, centre optique décentré.
+- `core.distance.ReadingQualityTest` (**6**) : occlusion (contenue, scores égaux, seuil, malformée), confiance (quantification, accord des branches).
+- `core.distance.DistanceBenchmarkTest` (**5**) : banc de précision — aller-retour sténopé 0,5-50 m, aller-retour sol (3 pitchs, centre décentré), enveloppe ±1 px, fusion à branches d'accord.
+- `core.distance.GroundPlaneTest` (**17**) : horizon, dépression, ligne à distance, pieds→mètres, latéral, point complet.
 - `core.distance.DistanceTextTest` (**7**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
 - `core.live.LiveTimelineTest` (**10**, dont le test « record rend l'identité **dans l'ordre des détections** »,
   `null` pour une détection inexploitable).
@@ -153,10 +187,14 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 
 ## Pistes (non faites)
 
-- **Plan de sol** : distance pour n'importe quel objet qui touche le sol, à partir de la hauteur et de
-  l'inclinaison de la caméra — plus juste pour « l'obstacle devant moi », mais il faut lire le pitch du capteur.
-- **Profondeur métrique réelle** (Depth Anything sur la GPU Modal) : plus juste, mais réveil du GPU payant et
-  latence par frame — décision explicite du user.
+- **Pose IMU temps réel** : le plan de sol (`GroundPlane`, fait) attend toujours sa pose — `DistanceMeter.pose`
+  n'est alimenté nulle part ; lire le pitch du vecteur de rotation + hauteur en Réglages l'activerait pour
+  de bon, avec arbitrage des postures (assis/debout) par la fusion pondérée.
+- **Hauteur et pieds du masque** : le masque SAM (déjà reçu) donne la hauteur vraie de l'objet et la ligne
+  des pieds exacte, au lieu de la boîte — remplace `box[3] - box[1]` et `box[3]` quand le masque est là.
+- **Profondeur affine** : calibrer `mètres = échelle / proximité + décalage` (DA2 est relatif) sur plusieurs
+  ancres robustes au lieu d'une échelle seule, et médiane sur le masque au lieu de la boîte.
+- **Kalman par piste** : remplacer l'EMA par position + vitesse radiale (prédiction inter-frame, temps avant contact).
 - **Étalonnage guidé** : « tiens-toi à 2 m » → ajustement du champ de vision.
 - **Précision chiffrée** : une fois pour toutes, comparer 10 objets à un mètre ruban et remplacer « ±15-20 %
   non mesuré » par un chiffre daté.

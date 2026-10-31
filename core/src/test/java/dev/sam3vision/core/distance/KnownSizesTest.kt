@@ -120,4 +120,53 @@ class KnownSizesTest {
         assertNull(KnownSizes.heightMeters(""))
         assertNull(KnownSizes.heightMeters("   "))
     }
+
+    @Test
+    fun `postures assises et roulees ont leur hauteur`() {
+        assertEquals(1.25f, KnownSizes.heightMeters("personne assise")!!, 0.001f)
+        assertEquals(1.25f, KnownSizes.heightMeters("seated person")!!, 0.001f)
+        assertEquals(1.25f, KnownSizes.heightMeters("sitting person")!!, 0.001f)
+        assertEquals(1.28f, KnownSizes.heightMeters("homme assis")!!, 0.001f)
+        assertEquals(1.23f, KnownSizes.heightMeters("femme assise")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("cycliste")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("cyclist")!!, 0.001f)
+        assertEquals(1.25f, KnownSizes.heightMeters("fauteuil roulant")!!, 0.001f)
+        assertEquals(1.25f, KnownSizes.heightMeters("wheelchair")!!, 0.001f)
+        // « personne » seule reste debout : l'entrée exacte prime sur le premier mot
+        assertEquals(1.70f, KnownSizes.heightMeters("personne")!!, 0.001f)
+    }
+
+    @Test
+    fun `sous types de vehicules calibres`() {
+        assertEquals(1.65f, KnownSizes.heightMeters("suv")!!, 0.001f)
+        assertEquals(1.95f, KnownSizes.heightMeters("van")!!, 0.001f)
+        assertEquals(1.95f, KnownSizes.heightMeters("camionnette")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("pickup")!!, 0.001f)
+        assertEquals(1.75f, KnownSizes.heightMeters("pick up")!!, 0.001f)
+    }
+
+    @Test
+    fun `tolerances par classe, porte sure et arbre flou`() {
+        assertEquals(0.06f, KnownSizes.toleranceFraction("personne"), 0.001f)
+        assertEquals(0.05f, KnownSizes.toleranceFraction("homme"), 0.001f)
+        assertEquals(0.03f, KnownSizes.toleranceFraction("porte"), 0.001f)
+        assertEquals(0.30f, KnownSizes.toleranceFraction("arbre"), 0.001f)
+        assertEquals(0.08f, KnownSizes.toleranceFraction("personne assise"), 0.001f)
+        assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction("licorne"), 0.001f)
+        assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction(""), 0.001f)
+        // pluriel et premier mot suivent la hauteur
+        assertEquals(0.06f, KnownSizes.toleranceFraction("personnes"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("clôture grillagée"), 0.001f)
+    }
+
+    @Test
+    fun `poids de fusion decroit avec la tolerance`() {
+        val door = KnownSizes.fusionWeight("porte")
+        val person = KnownSizes.fusionWeight("personne")
+        val tree = KnownSizes.fusionWeight("arbre")
+        assertTrue(door > person)
+        assertTrue(person > tree)
+        assertEquals(1f / 1.03f, door, 0.001f)
+        assertTrue(tree > 0f)
+    }
 }
