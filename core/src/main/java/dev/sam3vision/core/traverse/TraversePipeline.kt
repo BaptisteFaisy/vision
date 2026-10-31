@@ -90,7 +90,7 @@ class TraversePipeline(
          * Prompts du mode traversée : véhicules d'abord (voir
          * [VehicleConcepts]), puis bordure et trottoir (le bord et le but se
          * suivent en traversée), [base] ensuite, bornés au plafond du direct
-         * ([LivePrompts.MAX] : 7 véhicules + 2 + base tronquée à 16).
+         * ([LivePrompts.MAX] : 3 véhicules + 2 + base, le tout borné à 16).
          */
         fun promptsFor(base: List<String> = emptyList()): List<String> =
             VehicleConcepts.promptsFor(listOf("curb", "sidewalk") + base)

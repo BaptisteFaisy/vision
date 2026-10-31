@@ -60,6 +60,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `test_units.py` 400/400 (nouveau groupe `concepts : feux piétons
   (traversée)`), UBS 0 critique, gardes `ci-core` locales OK ; checks PR
   (`ci`, `ci-budget`, `couche0`) sur la PR.
+## 2026-10-31 — iSee : souvenirs suivis par défaut, camion/moto/trottinette sortis
+
+- **Demande** : filmer le square Louise-Michel (boutique de souvenirs au pied du
+  Sacré-Cœur) et qu'iSee annonce la boutique et ses articles.
+- `LivePrompts.default` : `truck`, `motorcycle`, `electric scooter` cèdent leurs
+  slots à `souvenir shop`, `beanie`, `socks` (16 concepts, plafond inchangé) ;
+  `VehicleConcepts.PROMPTS` passe de 7 à 3 (`car`, `bus`, `bicycle`).
+- Traversée : le veto ne suit plus camion/moto/trottinette (choix user assumé) ;
+  `isVehicle`, `KnownSizes`, `CycleConcepts` et les alias serveur FR→EN inchangés
+  (reconnaissance intacte via le champ « Follow »).
+- Distances : les 3 souvenirs en `DEPTH_ONLY` (pas de hauteur sténopé défendable).
+- Tests : `:core` 2270/2275 verts ; 5 échecs `PrivateFileSettingsStoreTest`
+  pré-existants sur l'arbre vierge (permissions fichiers Windows, hors scope).
 
 
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct

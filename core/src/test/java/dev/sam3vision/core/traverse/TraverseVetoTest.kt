@@ -171,14 +171,14 @@ class TraverseVetoTest {
         val prompts = VehicleConcepts.promptsFor(listOf("traffic light", "person", "door", "zebra"))
         assertEquals(
             listOf(
-                "car", "bus", "truck", "motorcycle", "bicycle", "scooter", "electric scooter",
+                "car", "bus", "bicycle",
                 "traffic light", "person", "door", "zebra",
             ),
             prompts,
         )
         val full = VehicleConcepts.promptsFor((1..20).map { "objet$it" })
         assertEquals(LivePrompts.MAX, full.size)
-        assertEquals(VehicleConcepts.PROMPTS, full.take(7))
+        assertEquals(VehicleConcepts.PROMPTS, full.take(3))
         assertEquals(VehicleConcepts.PROMPTS, VehicleConcepts.promptsFor())
     }
 

@@ -13,35 +13,38 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **16** dangers extérieurs pour un piéton aveugle —
-     * mobiles (« person », « car », « bus », « truck », « motorcycle »,
-     * « bicycle », « electric scooter ») puis feu piéton et cheminement
-     * (« pedestrian traffic light », « curb », « sidewalk », « crosswalk ») puis
-     * statiques (« pole », « stairs », « barrier », « fence », « gate »),
+     * Concepts par défaut : **16** concepts extérieurs — mobiles (« person »,
+     * « car », « bus », « bicycle ») puis feu piéton et cheminement
+     * (« pedestrian traffic light », « curb », « sidewalk », « crosswalk »)
+     * puis statiques (« pole », « stairs », « barrier », « fence », « gate »)
+     * puis souvenirs (« souvenir shop », « beanie », « socks », boutique du
+     * square, ordre user du 31/10),
      * modifiables à chaud dans le direct (champ « Follow »).
      *
      * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
-     * dans les deux modes) : tout ce que la Traversée doit voir (véhicules,
-     * feu, bordure, trottoir, passage, personnes) est déjà suivi ici, la
-     * bascule ne change plus les prompts. « scooter » simple n'y est pas
-     * (« electric scooter » couvre les trottinettes, le veto reconnaît les
-     * deux libellés) ; « door », « wall » et « window » ont cédé leurs slots
-     * aux véhicules, au feu et à la bordure.
+     * dans les deux modes) : tout ce que la Traversée doit voir (voiture,
+     * bus, vélo, feu, bordure, trottoir, passage, personnes) est déjà suivi
+     * ici, la bascule ne change plus les prompts. « truck », « motorcycle »,
+     * « scooter » et « electric scooter » n'y sont plus (ordre user du 31/10,
+     * boutique du square) : le veto les reconnaît encore par le champ
+     * « Follow », mais la traversée ne les suit plus. « door », « wall » et
+     * « window » ont cédé leurs slots aux véhicules, au feu et à la bordure.
      *
      * Historique des plafonds : 2 (26/10, le tracker tronquait à
      * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
      * tous les dangers extérieurs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
      * Historique des défauts : 10 (28/10), 12 (29/10, ordre user : portes et
      * barrières reconnues en plus), 14 (30/10 : clôtures et portails reconnus
-     * en plus), 16 (30/10 : unification traversée/normal). Sur `/live` les
+     * en plus), 16 (30/10 : unification traversée/normal ; 31/10 : camion,
+     * moto et trottinette cèdent leurs slots aux souvenirs). Sur `/live` les
      * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts
      * = 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
      * `/frame`, d'où un coût ×8 assumé sur ce chemin.
      */
     val default: List<String> = listOf(
-        "person", "car", "bus", "truck", "motorcycle", "bicycle",
-        "electric scooter", "pedestrian traffic light", "curb", "sidewalk",
-        "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
+        "person", "car", "bus", "bicycle", "pedestrian traffic light", "curb",
+        "sidewalk", "crosswalk", "pole", "stairs", "barrier", "fence",
+        "gate", "souvenir shop", "beanie", "socks",
     )
 
     /**
