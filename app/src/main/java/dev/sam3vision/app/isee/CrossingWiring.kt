@@ -20,7 +20,6 @@ import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.toDetections
-import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
@@ -329,30 +328,11 @@ internal fun crossingMetersOf(
     principalY: Float,
     imageH: Int,
 ): Float? {
-    val exact = readings.firstOrNull { it.box == box }
-        ?.meters?.takeIf { it.isFinite() && it > 0f }
-    val depth = exact ?: readings
-        .filter { CrossingOffer.isCrosswalkLabel(it.label) }
-        .mapNotNull { reading ->
-            val meters = reading.meters.takeIf { it.isFinite() && it > 0f } ?: return@mapNotNull null
-            iouOf(reading.box, box) to meters
-        }
-        .filter { it.first >= CROSSING_BOX_MATCH_IOU }
-        .maxByOrNull { it.first }
-        ?.second
+    val depth = crosswalkDepthMeters(readings, box)
     val ground = if (box.size >= 4 && pose != null) {
         CrossingDistance.groundMeters(box[3], pose, focalPx, principalY, imageH)
     } else null
     return CrossingDistance.bestMeters(depth, ground)
-}
-
-/** Recouvrement min pour rattacher une lecture au passage (repli IoU). */
-internal const val CROSSING_BOX_MATCH_IOU = 0.3f
-
-private fun iouOf(a: List<Float>, b: List<Float>): Float {
-    val first = Box.fromProto(a) ?: return 0f
-    val second = Box.fromProto(b) ?: return 0f
-    return first.iou(second)
 }
 
 /**
