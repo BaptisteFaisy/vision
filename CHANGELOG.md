@@ -23,6 +23,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (le cœur porte l'objet) ; repli boîte entière si la fenêtre dégénère.
 - Preuves : `DepthReadingsTest` +2 (contraste centre/fond, dégénérescence) ;
   garde Kotlin verte.
+## 2026-10-31 — iSee : profondeur toujours active, Coupée supprimée (branche `isee-depth-always`)
+
+- **Demande** : contournement toujours optimal + profondeur toujours activée
+  (les poteaux depth-only doivent être mesurés, donc participer au chemin).
+- Fait : option Coupée supprimée (`DepthBackend.OFF` et `NoOp` effacés, bouton
+  Réglages retiré, `with_depth` toujours demandé) ; réglages anciens
+  (`OFF`, inconnu) migrés vers DA2 ; repli sténopé gardé si modèle absent.
+  Le compilateur prouve l'absence d'OFF (plus aucune référence). Doc
+  `DEPTH.md` alignée.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 744 tests, 0 échec — dont poteau depth-only mesuré à 4 m via ancre,
+  chemin optimal à gauche contre comptage à droite) ;
+  `check-kotlin-limits.py` vert.
 
 
 ## 2026-10-31 — iSee : cap droit contourne toujours, jamais stop (branche `isee-droit-sans-stop`)
