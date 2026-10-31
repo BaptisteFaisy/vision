@@ -118,4 +118,35 @@ class IseePictoVoiceTest {
         assertTrue(opened.isEmpty())
         assertTrue(spoken.isEmpty())
     }
+
+    @Test
+    fun `where are my keys cherche sur place sans ouvrir le direct`() = runBlocking {
+        val found = mutableListOf<String>()
+        assertTrue(voice(emptyList(), SpeechLanguage.En, found).run("Where are my keys"))
+        assertEquals(listOf("keys"), found)
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Looking for keys."), spoken)
+        assertEquals("Looking for keys.", state.status)
+    }
+
+    @Test
+    fun `where avec repere arme chasse au lieu de regenerer`() = runBlocking {
+        val found = mutableListOf<String>()
+        assertTrue(voice(listOf("keys"), SpeechLanguage.En, found).run("Where are my keys"))
+        assertTrue(found.isEmpty())
+        assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoHunt = "keys"), null)), opened)
+        assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `where hors maison ne declenche rien`() = runBlocking {
+        val found = mutableListOf<String>()
+        val orders = voice(emptyList(), SpeechLanguage.En, found)
+        assertFalse(orders.run("Where is the exit?"))
+        assertFalse(orders.run("Where am I?"))
+        assertFalse(orders.run("Where is it?"))
+        assertTrue(found.isEmpty())
+        assertTrue(opened.isEmpty())
+        assertTrue(spoken.isEmpty())
+    }
 }

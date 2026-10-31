@@ -385,7 +385,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
     fun settingsOpened() = update { it.copy(openSettings = false) }
 
-    /** Ordre « Find the X » : X rejoint les masques SAM, son picto se crée et s'arme. */
+    /** Ordres « Find the X » / « Where are my keys » : X rejoint les masques SAM, son picto se crée et s'arme. */
     private fun runFindOrder(label: String) {
         probe.ensureConcept(settings, label)
         picto.findObject(label)

@@ -5,7 +5,8 @@ import dev.sam3vision.core.settings.Settings
 /**
  * Les ordres de **mode** de l'accueil iSee, dans l'ordre où la dictée les
  * essaie : maison (« maison »), puis pictos (« décris les portes », « Find
- * the X »). Un ordre de mode ne fait aucun appel réseau lui-même (la
+ * the X », « Where are my keys »). Un ordre de mode ne fait aucun appel
+ * réseau lui-même (la
  * génération du picto, elle, en fait un) et ne part jamais au LLM.
  *
  * Construits ensemble parce qu'ils partagent tout (settings, voix, état) et

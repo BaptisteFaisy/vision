@@ -1,6 +1,7 @@
 package dev.sam3vision.core.picto
 
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -35,6 +36,9 @@ object PictoVoiceOrder {
 
     /** Verbes de l'ordre « Find the X » : anglais seul, en premier mot. */
     private val FIND_VERBS = setOf("find", "locate")
+
+    /** Auxiliaire « be » de l'ordre « Where is/are X » (« where's » → « where s »). */
+    private val WHERE_BE = setOf("is", "are", "s")
 
     /** Articles et possessifs retirés devant le label (« de ces médics »). */
     private val LEADERS = setOf(
@@ -80,6 +84,33 @@ object PictoVoiceOrder {
         val rest = words.drop(1).dropWhile { FIND_LEADERS.contains(it) }.dropLastWhile { it == "please" }
         if (rest.isEmpty()) return null
         return rest.joinToString(" ")
+    }
+
+    /**
+     * Label brut de l'ordre « Where is/are X » porté par [text], `null` si ce
+     * n'en est pas un (« Where are my keys » → « keys », « Where's my phone »
+     * → « phone ») ; un « please » final est ignoré. Seuls les objets maison
+     * ([HomeModes.CONCEPTS], singulier ou pluriel) ou possédés (« my »)
+     * déclenchent : « Where is the exit? » reste une question pour le LLM.
+     * Le label sert tel quel de concept SAM et de nom de repère — jamais
+     * vide (« Where is it? » ⇒ `null`), jamais traduit.
+     */
+    fun parseWhere(text: String): String? {
+        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        if (words.size < 2 || words[0] != "where" || !WHERE_BE.contains(words[1])) return null
+        val rest = words.drop(2).dropWhile { FIND_LEADERS.contains(it) }.dropLastWhile { it == "please" }
+        if (rest.isEmpty()) return null
+        val label = rest.joinToString(" ")
+        if (words.contains("my")) return label
+        if (isHousehold(label)) return label
+        return null
+    }
+
+    /** Vrai si [label] est un concept maison, au singulier ou au pluriel. */
+    private fun isHousehold(label: String): Boolean {
+        if (HomeModes.CONCEPTS.contains(label)) return true
+        val flip = if (label.endsWith("s")) label.dropLast(1) else label + "s"
+        return HomeModes.CONCEPTS.contains(flip)
     }
 
     /**
