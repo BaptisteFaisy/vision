@@ -4,6 +4,30 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — CI : un lot de la file ne peut plus être éjecté par un `ci` en échec fantôme (branche `ci/fix-doublon-check-file`)
+
+- **Symptôme** : #634 (16:30) et #637 (16:36) sortaient de la file Mergify avec
+  `CHECKS_FAILED` / « `ci` fails with this pull request », alors que les trois
+  checks requis étaient verts sur la tête de chaque PR — et le balayeur les y
+  remettait, en boucle.
+- **Cause** : sur une branche de lot, deux suites publiaient les mêmes checks
+  pour la même tête (le `push` de Mergify et la PR que Mergify ouvre dessus).
+  La `concurrency` annulait celle du `push` ; l'agrégateur `ci` (`if: always()`)
+  voyait `ci-core` et `ci-app` = `cancelled` et publiait `ci = FAILURE` sur le
+  SHA du lot. Mergify lit ce FAILURE même après le `ci = SUCCESS` publié par la
+  suite `pull_request` sur le même SHA.
+- **Correctif** : `push` sur `mergify/merge-queue/**` retiré de `ci.yml` et de
+  `couche0.yml` — le verdict du lot vient de l'événement `pull_request` de la
+  PR de lot. Commentaires de `concurrency`, `.mergify.yml` et
+  `docs/CI-QUEUE.md` alignés sur le nouveau contrat.
+- **Preuves** : lot `ea1b4fd9`, suite `push` `111732719091` → `ci-core`,
+  `ci-app`, `ci-budget` `cancelled` + `ci failure` à 16:34:56 ; suite
+  `pull_request` `111732730738` → tout `success` à 16:35:42 ; #637 éjectée à
+  16:36:06. Après correctif, en A/B sur deux branches `mergify/merge-queue/`
+  jetables (supprimées aussitôt) : commit d'avant patch (f82e2a27) → runs
+  `CI push` + `couche0 push` déclenchés ; commit patché (14cd7aa8) → **0 run**
+  (`actions/runs?head_sha=`, total_count = 0).
+
 ## 2026-10-31 — iSee : écoute auto à l'ouverture de la session lunettes (branche `feat/isee-ecoute-auto-session`)
 
 - **Demande** : au démarrage d'une session lunettes, le mode speech (écoute
