@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.guidemap.GuidanceMapCard
 import dev.sam3vision.app.voicenav.OffRouteBanner
 import dev.sam3vision.app.voicenav.VoiceNavUiState
@@ -30,22 +27,20 @@ import dev.sam3vision.core.nav.NavRoute
 
 /**
  * Le guidage GPS sur l'accueil iSee, sous la caméra : carte (tracé +
- * position, repli schéma si les tuiles échouent), instruction en cours,
- * reste du trajet et bouton d'arrêt. La boule et la phrase en cours
- * s'effacent pendant le guidage (la carte prend leur place), la caméra
- * et la sonde continuent (évitement d'obstacles préservé).
+ * position, repli schéma si les tuiles échouent), instruction en cours
+ * et reste du trajet. La boule et la phrase en cours s'effacent pendant
+ * le guidage (la carte prend leur place), la caméra et la sonde
+ * continuent (évitement d'obstacles préservé). L'arrêt se fait à la
+ * voix (« arrête le guidage »).
  *
  * Affichée par `IseeScenePane` quand la session est en
  * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
- * l'instruction reste). Le bouton d'arrêt publie sa zone ([navZone],
- * exemption racine), sinon intouchable.
+ * l'instruction reste).
  */
 @Composable
 internal fun IseeGuidanceBlock(
     state: VoiceNavUiState.Guiding,
     snapshot: () -> Pair<NavRoute?, NavFix?>,
-    onStop: () -> Unit,
-    zones: NavButtonZones,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -57,7 +52,6 @@ internal fun IseeGuidanceBlock(
             showAttribution = false,
         )
         GuidanceInstruction(state)
-        StopGuidanceButton(onStop, zones, Modifier.fillMaxWidth())
     }
 }
 
@@ -90,18 +84,6 @@ private fun remainingLine(state: VoiceNavUiState.Guiding): String =
         "${state.update.maneuver()} · ${state.update.remaining()}"
     }
 
-/** Bouton d'arrêt : même rouge danger que l'écran de guidage historique. */
-@Composable
-private fun StopGuidanceButton(onStop: () -> Unit, zones: NavButtonZones, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onStop,
-        modifier = modifier.navZone(NAV_STOP_ID, zones).height(48.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
-    ) {
-        Text("Stop guidance", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
 /**
  * Sous la caméra : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
@@ -123,8 +105,6 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
         is VoiceNavUiState.Guiding -> IseeGuidanceBlock(
             nav,
             viewModel::debugNavSnapshot,
-            viewModel::dismissVoiceNav,
-            viewModel.navButtons,
             placed,
         )
         is VoiceNavUiState.Confirming -> IseeRouteLoading(nav, placed)

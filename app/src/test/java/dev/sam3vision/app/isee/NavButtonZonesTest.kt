@@ -36,9 +36,9 @@ class NavButtonZonesTest {
     @Test
     fun `reposer une zone remplace l'ancienne position`() {
         val holder = NavButtonZones()
-        holder.setBounds(NAV_STOP_ID, RectF(1f, 2f, 3f, 4f))
+        holder.setBounds(CONFIRM_START_ID, RectF(1f, 2f, 3f, 4f))
         val moved = RectF(9f, 9f, 9f, 9f)
-        holder.setBounds(NAV_STOP_ID, moved)
+        holder.setBounds(CONFIRM_START_ID, moved)
 
         assertEquals(1, holder.zones().size)
         assertSame(moved, holder.zones().single())
