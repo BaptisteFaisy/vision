@@ -76,6 +76,14 @@ class VehicleApproach {
     var cameraMovedKeys: Set<String> = emptySet()
         private set
 
+    /**
+     * Fond prouvé franc à la dernière frame ([VehicleBackground.groundOf] au-delà
+     * de [VehicleBackground.LATERAL_RATIO]) : la caméra bouge, même si aucune piste
+     * ne la suit (boîte fixe sous pan — FUSION : coupe l'arrêt, jamais le mouvement).
+     */
+    var fondFranc: Boolean = false
+        private set
+
     /** Dernier mouvement fond reçu (`null` = pas de signal) : la décote zoom. */ // PISTE1
     var lastGlobal: MotionSample? = null // PISTE1
         private set
@@ -91,6 +99,7 @@ class VehicleApproach {
         lastVerdicts = emptyMap()
         cameraMoved = false
         cameraMovedKeys = emptySet()
+        fondFranc = false // FUSION
         lastGlobal = null // PISTE1
         lastGlobalDtMs = 0L // PISTE1
     }
@@ -128,10 +137,14 @@ class VehicleApproach {
             lastVerdicts = emptyMap()
             cameraMoved = false
             cameraMovedKeys = emptySet()
+            fondFranc = false // FUSION
             lastGlobal = null // PISTE1
             lastGlobalDtMs = 0L // PISTE1
             return
         }
+        fondFranc = VehicleBackground.groundOf( // FUSION : arrêt coupé sous fond franc, sans piste suiveuse.
+            motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs,
+        )?.let { it > VehicleBackground.LATERAL_RATIO } == true
         lastGlobal = motion.global // PISTE1
         lastGlobalDtMs = motion.dtMs // PISTE1
         val dtSeconds = motion.dtMs / 1000f
