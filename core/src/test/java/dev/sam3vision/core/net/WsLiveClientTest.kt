@@ -283,6 +283,7 @@ class WsLiveClientTest {
             }
 
             override fun send(text: String): Boolean = true
+            override fun sendBytes(bytes: ByteArray): Boolean = true
 
             override fun close() {}
         }
@@ -408,6 +409,8 @@ class WsLiveClientTest {
             onOpen()
             return true
         }
+
+        override fun sendBytes(bytes: ByteArray): Boolean = true
 
         override fun send(text: String): Boolean {
             if (sends.incrementAndGet() == 1) released.await(10, TimeUnit.SECONDS)

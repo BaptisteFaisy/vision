@@ -106,6 +106,7 @@ private class FailingWsTransport : WsTransport {
     ): Boolean = false
 
     override fun send(text: String): Boolean = false
+    override fun sendBytes(bytes: ByteArray): Boolean = false
 
     override fun close() {}
 }

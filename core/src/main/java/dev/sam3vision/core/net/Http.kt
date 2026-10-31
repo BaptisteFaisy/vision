@@ -112,12 +112,12 @@ fun liveWsClient(timeoutSeconds: Long = LIVE_TIMEOUT_SECONDS): OkHttpClient =
         .build()
 
 /**
- * Client du WebSocket Scribe realtime : même pool que le direct (`newBuilder`
+ * Client du WebSocket Muse realtime : même pool que le direct (`newBuilder`
  * garde connexions et dispatcher), mais **sans délai de lecture** — une tenue
  * silencieuse ne doit pas tuer le socket à 60 s. La session est bornée par
- * l'app (commit au relâchement, abort à l'annulation).
+ * l'app (`endStream` au relâchement, abort à l'annulation).
  */
-fun scribeWsClient(): OkHttpClient =
+fun museWsClient(): OkHttpClient =
     liveWsClient().newBuilder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
