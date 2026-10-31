@@ -11,16 +11,28 @@ import kotlin.math.tan
  * cette image — le direct redresse chaque frame, une image portrait livre donc
  * en largeur l'axe *vertical* du capteur ([sensorLandscape] dit dans quel sens
  * le capteur est natif).
+ *
+ * Le **centre optique** ([principalXFrac], [principalYFrac], en fractions
+ * d'image) n'est pas toujours le centre géométrique : le driver le donne via
+ * `LENS_INTRINSIC_CALIBRATION` quand il le connaît. Le plan de sol et le nuage
+ * de points le lisent ([principalPx]) ; le sténopé, qui ne voit que des
+ * hauteurs, n'en a pas besoin.
  */
 data class LensSpec(
     val horizontalFovDeg: Float,
     val verticalFovDeg: Float,
     val sensorLandscape: Boolean = true,
+    /** Centre optique horizontal, en fraction de largeur (0,5 = centré). */
+    val principalXFrac: Float = 0.5f,
+    /** Centre optique vertical, en fraction de hauteur (0,5 = centré). */
+    val principalYFrac: Float = 0.5f,
 ) {
 
-    /** Vrai si les deux angles sont plausibles pour une caméra de téléphone. */
+    /** Vrai si les deux angles et le centre optique sont plausibles. */
     val usable: Boolean
-        get() = horizontalFovDeg in FOV_MIN..FOV_MAX && verticalFovDeg in FOV_MIN..FOV_MAX
+        get() = horizontalFovDeg in FOV_MIN..FOV_MAX && verticalFovDeg in FOV_MIN..FOV_MAX &&
+            principalXFrac.isFinite() && principalYFrac.isFinite() &&
+            principalXFrac in 0f..1f && principalYFrac in 0f..1f
 
     /** Champ de vision porté par la largeur d'une image `[width]`×`[height]`. */
     fun widthFovDeg(width: Int, height: Int): Float {
@@ -37,6 +49,15 @@ data class LensSpec(
         val halfTangent = tan(Math.toRadians(widthFovDeg(width, height) / 2.0))
         return if (halfTangent <= 1e-6) 0f else (width / 2.0 / halfTangent).toFloat()
     }
+
+    /**
+     * Centre optique en pixels d'une image `[width]`×`[height]`, au sens des
+     * centres de pixels (`0,5` → `(size − 1) / 2`, comme `CameraIntrinsics`).
+     * Les fractions se conservent par mise à l'échelle : une frame réduite
+     * garde le même centre relatif que le capteur.
+     */
+    fun principalPx(width: Int, height: Int): Pair<Float, Float> =
+        Pair(principalXFrac * (width - 1), principalYFrac * (height - 1))
 
     companion object {
         /** En deçà, ce n'est plus une caméra (téléobjectif extrême). */
@@ -77,6 +98,36 @@ data class LensSpec(
             val horizontal = Math.toDegrees(2.0 * atan(sensorWidthMm / 2.0 / focalMm)).toFloat()
             val vertical = Math.toDegrees(2.0 * atan(sensorHeightMm / 2.0 / focalMm)).toFloat()
             return LensSpec(horizontal, vertical, sensorLandscape = sensorWidthMm >= sensorHeightMm)
+        }
+
+        /**
+         * Calibrage depuis une focale **en pixels** (`fx`, `fy`) et un centre optique
+         * (`cx`, `cy`), dans les coordonnées de la zone active
+         * `[refWidthPx]`×`[refHeightPx]` — le contenu de `LENS_INTRINSIC_CALIBRATION`.
+         * `null` si une entrée est incohérente ou si le centre sort du capteur.
+         * Le tour est exact : [focalPx] et [principalPx] retrouvent les entrées.
+         */
+        fun fromFocalPx(
+            fxPx: Float,
+            fyPx: Float,
+            cxPx: Float,
+            cyPx: Float,
+            refWidthPx: Int,
+            refHeightPx: Int,
+        ): LensSpec? {
+            if (!fxPx.isFinite() || !fyPx.isFinite() || fxPx <= 0f || fyPx <= 0f) return null
+            if (!cxPx.isFinite() || !cyPx.isFinite()) return null
+            if (refWidthPx <= 1 || refHeightPx <= 1) return null
+            if (cxPx < 0f || cxPx > refWidthPx - 1 || cyPx < 0f || cyPx > refHeightPx - 1) return null
+            val horizontal = Math.toDegrees(2.0 * atan(refWidthPx / 2.0 / fxPx)).toFloat()
+            val vertical = Math.toDegrees(2.0 * atan(refHeightPx / 2.0 / fyPx)).toFloat()
+            return LensSpec(
+                horizontal,
+                vertical,
+                sensorLandscape = refWidthPx >= refHeightPx,
+                principalXFrac = cxPx / (refWidthPx - 1),
+                principalYFrac = cyPx / (refHeightPx - 1),
+            )
         }
 
         /**

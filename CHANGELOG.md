@@ -4,6 +4,25 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)
+
+- **Demande** : calcul des distances beaucoup plus précis, le plus précis possible.
+- Fait (`core.distance`, `core.ground`, `app/CameraLens.kt`, `docs/DISTANCES.md`) :
+  centre optique porté par `LensSpec` (fini le milieu supposé) + voie
+  `LENS_INTRINSIC_CALIBRATION` avec repli mm ; postures et sous-types
+  (`personne assise` 1,25 m, `cycliste` 1,75 m, `suv`/`van`/`pickup`) ;
+  tolérance par classe pondérant la fusion ; rejet des boîtes masquées
+  (contenance 60 % + score) ; confiance par lecture (quantification × accord) ;
+  banc `DistanceBenchmarkTest` (aller-retour au cm, enveloppe ±1 px :
+  ±0,5 % à 2 m, ±1 % à 5 m, ±2 % à 10 m, ±4 % à 20 m).
+- Preuves : `:core` tests distance — `LensSpecTest` 12, `OpticsTest` 27,
+  `KnownSizesTest` 16, `DistanceMeterTest` 15, `DistanceFusionTest` 13,
+  `ReadingQualityTest` 6 (nouveau), `DistanceBenchmarkTest` 5 (nouveau),
+  `GroundPlaneTest` 17 ; garde `check-kotlin-limits.py` verte.
+- Reste (pistes `docs/DISTANCES.md`) : pose IMU temps réel, hauteur/pieds du
+  masque, profondeur affine, Kalman par piste.
+
+
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct
 
 - **Demande** : la facturation Meta est régularisée — retester.

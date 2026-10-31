@@ -65,4 +65,45 @@ class LensSpecTest {
         assertEquals(LensSpec.Default, LensSpec.fromSettings(0f))
         assertEquals(LensSpec.Default, LensSpec.fromSettings(150f))
     }
+
+    @Test
+    fun `centre optique par defaut au milieu des pixels`() {
+        val (cx, cy) = LensSpec.Default.principalPx(512, 384)
+        assertEquals(255.5f, cx, 0.001f)
+        assertEquals(191.5f, cy, 0.001f)
+    }
+
+    @Test
+    fun `centre optique suit les fractions et l'echelle`() {
+        val lens = LensSpec(67f, 52.85f, principalXFrac = 0.6f, principalYFrac = 0.4f)
+        val (cx, cy) = lens.principalPx(512, 384)
+        assertEquals(0.6f * 511f, cx, 0.001f)
+        assertEquals(0.4f * 383f, cy, 0.001f)
+    }
+
+    @Test
+    fun `centre optique hors capteur rend le calibrage inutilisable`() {
+        assertFalse(LensSpec(67f, 53f, principalXFrac = 1.5f).usable)
+        assertFalse(LensSpec(67f, 53f, principalYFrac = Float.NaN).usable)
+        assertTrue(LensSpec(67f, 53f, principalXFrac = 0f, principalYFrac = 1f).usable)
+    }
+
+    @Test
+    fun `focale en pixels et centre optique retrouvent leurs entrees`() {
+        val lens = LensSpec.fromFocalPx(2986.1f, 2986.1f, 1999.5f, 1499.5f, 4000, 3000)!!
+        assertEquals(67.63f, lens.horizontalFovDeg, 0.1f)
+        assertEquals(53.34f, lens.verticalFovDeg, 0.1f)
+        assertEquals(2986.1f, lens.focalPx(4000, 3000), 1f)
+        val (cx, cy) = lens.principalPx(4000, 3000)
+        assertEquals(1999.5f, cx, 0.01f)
+        assertEquals(1499.5f, cy, 0.01f)
+    }
+
+    @Test
+    fun `focale en pixels incoherente est refusee`() {
+        assertEquals(null, LensSpec.fromFocalPx(0f, 2986f, 1999f, 1499f, 4000, 3000))
+        assertEquals(null, LensSpec.fromFocalPx(2986f, -1f, 1999f, 1499f, 4000, 3000))
+        assertEquals(null, LensSpec.fromFocalPx(2986f, 2986f, 5000f, 1499f, 4000, 3000))
+        assertEquals(null, LensSpec.fromFocalPx(2986f, 2986f, 1999f, 1499f, 0, 3000))
+    }
 }
