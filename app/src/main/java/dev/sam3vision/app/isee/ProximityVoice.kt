@@ -29,7 +29,8 @@ import kotlin.coroutines.coroutineContext
  * guidage) : clip local quand il existe (< 100 ms, zéro réseau), synthèse
  * + mise en cache sinon (`null` = synthèse seule, comme avant).
  * [routeSpeaking] dit si la voix route parle : l'obstacle non urgent se tait tant
- * qu'elle parle, le danger urgent coupe toujours.
+ * qu'elle parle, le danger urgent coupe toujours. [flushPending] redit la phrase
+ * douce gardée ([onPhrase] avec file) dès le silence, dans [PENDING_TTL_MS].
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -40,13 +41,18 @@ class ProximityVoice(
         { apiKey, voiceId, text -> ElevenLabsTtsClient(apiKey, voiceId).synthesize(text) },
     private val clips: VoicePack? = null,
     private val routeSpeaking: () -> Boolean = { false },
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) {
 
     private var lastPhrase: String? = null
 
+    /** Phrase douce gardée ([onPhrase] avec file), `null` si aucune. */
+    private var pending: Pending? = null
+
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
+        pending = null
     }
 
     /**
@@ -57,14 +63,44 @@ class ProximityVoice(
      * Tant que la voix route parle ([routeSpeaking]),
      * l'obstacle non urgent se tait aussi (mémorisé, pas de rattrapage tardif : une
      * nouvelle signature réémettra si l'obstacle évolue).
+     * [queue] : la phrase douce tue par le chat ou la route est gardée (une seule,
+     * la plus fraîche) et redite par [flushPending] dès le silence, dans
+     * [PENDING_TTL_MS] — sans file, elle est perdue comme avant.
      */
-    suspend fun onPhrase(phrase: String, playerIdle: Boolean, urgent: Boolean = false) {
+    suspend fun onPhrase(phrase: String, playerIdle: Boolean, urgent: Boolean = false, queue: Boolean = false) {
         if (phrase == lastPhrase) return
-        lastPhrase = phrase
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && !playerIdle) return
-        if (!urgent && routeSpeaking()) return
+        if (!urgent && (!playerIdle || routeSpeaking())) {
+            if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            else lastPhrase = phrase
+            return
+        }
+        speak(phrase, current, urgent)
+    }
+
+    /**
+     * Redit la phrase douce gardée par [onPhrase] (`queue = true`) dès que plus
+     * rien ne parle : chat silencieux ([playerIdle]), route tue et [busy] faux
+     * (P1/P2 en cours, vu par l'appelant). Périmée ([PENDING_TTL_MS]) ou déjà
+     * dite : jetée. À appeler à chaque frame par le guetteur en file.
+     */
+    suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
+        val due = pending ?: return
+        if (due.phrase == lastPhrase || nowMs() >= due.expiresAtMs) {
+            pending = null
+            return
+        }
+        if (!playerIdle || routeSpeaking() || busy()) return
+        val current = settings()
+        if (!current.ttsConfigured) return
+        pending = null
+        speak(due.phrase, current, urgent = false)
+    }
+
+    /** Synthèse + lecture d'une phrase admise (mémorisée : dite une fois). */
+    private suspend fun speak(phrase: String, current: Settings, urgent: Boolean) {
+        lastPhrase = phrase
         if (urgent) player.stop()
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
@@ -124,5 +160,13 @@ class ProximityVoice(
     suspend fun reportEmergency(language: SpeechLanguage, playerIdle: Boolean) {
         val stop = GuidanceWord.Stop
         speakWord(stop.clipId, stop.text(language), language, playerIdle, urgent = true)
+    }
+
+    /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs]. */
+    private data class Pending(val phrase: String, val expiresAtMs: Long)
+
+    companion object {
+        /** Rattrapage borné : au-delà, la scène a changé, la phrase est périmée. */
+        const val PENDING_TTL_MS = 3_000L
     }
 }

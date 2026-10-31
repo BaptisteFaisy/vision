@@ -48,4 +48,7 @@ object HazardConcepts {
 
     /** Vrai si [label] désigne du mobilier suivi (casse, accents, pluriel neutralisés). */
     fun isHazard(label: String): Boolean = nameOf(label) != null
+
+    /** Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais une table à part). */
+    fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
 }

@@ -42,6 +42,17 @@ class HazardConceptsTest {
     }
 
     @Test
+    fun `poteaux reconnus FR EN pluriel`() {
+        assertTrue(HazardConcepts.isPole("pole"))
+        assertTrue(HazardConcepts.isPole("poteau"))
+        assertTrue(HazardConcepts.isPole("POTEAUX"))
+        assertTrue(HazardConcepts.isPole("poles"))
+        assertFalse(HazardConcepts.isPole("barrier"))
+        assertFalse(HazardConcepts.isPole("person"))
+        assertFalse(HazardConcepts.isPole("  "))
+    }
+
+    @Test
     fun `autres labels ignores`() {
         assertFalse(HazardConcepts.isHazard("person"))
         assertFalse(HazardConcepts.isHazard("car"))

@@ -236,9 +236,16 @@ class CurbWatcher(
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
 
+    /** Instant de la dernière marche imminente, [NO_INSTANT] si aucune. */
+    private var lastNearAtMs: Long = NO_INSTANT
+
     /** Dernière annonce, `null` si aucune. */
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
+
+    /** Dernière marche imminente, `null` si aucune (P2 : le poteau attend quand elle est fraîche). */
+    val lastNearMs: Long?
+        get() = lastNearAtMs.takeIf { it != NO_INSTANT }
 
     /**
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
@@ -278,6 +285,7 @@ class CurbWatcher(
         if (nearSpoken) return null
         nearSpoken = true
         lastCueAtMs = nowMs
+        lastNearAtMs = nowMs
         nearHits = 0
         val edge = signal.edge ?: CurbEdge.Up
         return CurbCue(
@@ -317,6 +325,7 @@ class CurbWatcher(
         nearSpoken = false
         flatSpoken = false
         lastCueAtMs = NO_INSTANT
+        lastNearAtMs = NO_INSTANT
     }
 
     companion object {

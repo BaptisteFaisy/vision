@@ -6,10 +6,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Signal mobilier d'une frame : [detected] quand du mobilier suivi est dans
- * le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins, [meters] sa
- * distance (la plus proche en cas de doublons), [label] son libellé SAM brut
- * (la phrase y lit le nom parlé), [centerX] son centre normalisé (l'heure du
- * cadran, `null` = inconnue).
+ * le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins
+ * ([HazardWatcher.POLE_METERS] pour un poteau), [meters] sa distance (la plus
+ * proche en cas de doublons), [label] son libellé SAM brut (la phrase y lit le
+ * nom parlé), [centerX] son centre normalisé (l'heure du cadran,
+ * `null` = inconnue).
  */
 data class HazardSignal(
     val detected: Boolean,
@@ -44,7 +45,9 @@ data class HazardSignal(
         private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
             if (!HazardConcepts.isHazard(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
-            if (meters > HazardWatcher.HAZARD_METERS) return null
+            val limit = if (HazardConcepts.isPole(reading.label)) HazardWatcher.POLE_METERS
+            else HazardWatcher.HAZARD_METERS
+            if (meters > limit) return null
             val box = reading.box
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
@@ -56,11 +59,14 @@ data class HazardSignal(
 
 /**
  * Ordre d'annonce « attention … » : [phrase] dans la langue de la voix,
- * [meters] la distance du signal qui l'a déclenché (journal, réglages).
+ * [meters] la distance du signal qui l'a déclenché (journal, réglages),
+ * [urgent] pour le seul poteau imminent (coupe la voix, sauf P1/P2 en cours —
+ * voir `ProbeWiring.shouldCutForHazard`).
  */
 data class HazardCue(
     val phrase: String,
     val meters: Float?,
+    val urgent: Boolean = false,
 )
 
 /**
@@ -86,8 +92,9 @@ object HazardText {
  * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs, puis
  * silence pendant [cooldownMs] (le mobilier ne bouge pas).
  *
- * Pur JVM et testé. Douceur : l'appelant parle avec `urgent = false` (ne
- * coupe rien, attend le silence) — seule l'urgence (stop) coupe.
+ * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence) ;
+ * le poteau imminent (à [POLE_FAST_METERS] ou moins) sort urgent : il coupe,
+ * sauf P1/P2 en cours (voir `ProbeWiring`).
  */
 class HazardWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -99,6 +106,12 @@ class HazardWatcher(
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
 
+    /** Poteau déjà dit, en attente de ré-armement ([POLE_REARM_FRAMES] sans poteau). */
+    private var poleSpoken: Boolean = false
+
+    /** Frames consécutives sans poteau détecté (un clignotement ne ré-arme pas). */
+    private var poleQuiet: Int = 0
+
     /** Dernière annonce, `null` si aucune. */
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
@@ -109,15 +122,38 @@ class HazardWatcher(
      */
     fun onSignal(signal: HazardSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): HazardCue? {
         val name = signal.label?.let(HazardConcepts::nameOf)
+        val pole = signal.detected && signal.label?.let(HazardConcepts::isPole) == true
+        if (pole) {
+            poleQuiet = 0
+        } else {
+            poleQuiet = (poleQuiet + 1).coerceAtMost(POLE_REARM_FRAMES)
+            if (poleQuiet >= POLE_REARM_FRAMES) poleSpoken = false
+        }
         if (!signal.detected || name == null) {
             hits = 0
             return null
+        }
+        if (pole && poleSpoken) {
+            hits = 0
+            return null
+        }
+        val meters = signal.meters
+        if (pole && meters != null && meters <= POLE_FAST_METERS) {
+            poleSpoken = true
+            poleQuiet = 0
+            lastCueAtMs = nowMs
+            hits = 0
+            return HazardCue(HazardText.phrase(name, language, signal.centerX), meters, urgent = true)
         }
         hits++
         if (hits < confirmFrames) return null
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
         lastCueAtMs = nowMs
         hits = 0
+        if (pole) {
+            poleSpoken = true
+            poleQuiet = 0
+        }
         return HazardCue(HazardText.phrase(name, language, signal.centerX), signal.meters)
     }
 
@@ -125,6 +161,8 @@ class HazardWatcher(
     fun reset() {
         hits = 0
         lastCueAtMs = NO_INSTANT
+        poleSpoken = false
+        poleQuiet = 0
     }
 
     companion object {
@@ -136,6 +174,15 @@ class HazardWatcher(
 
         /** Au-delà de cette distance (m), le mobilier ne fait pas parler. */
         const val HAZARD_METERS = 3f
+
+        /** Au-delà de cette distance (m), un poteau ne fait pas parler (ordre user : 4 m). */
+        const val POLE_METERS = 4f
+
+        /** Poteau à cette distance (m) ou moins : annonce dès la 1re frame, urgente. */
+        const val POLE_FAST_METERS = 2f
+
+        /** Frames sans poteau avant de ré-armer l'annonce (un clignotement ne ré-arme pas). */
+        const val POLE_REARM_FRAMES = 3
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE
