@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.stairs.StairDetector
+import dev.sam3vision.core.stairs.StairRoi
 import dev.sam3vision.core.stairs.StairWatcher
 
 /**
@@ -16,6 +17,12 @@ import dev.sam3vision.core.stairs.StairWatcher
  * fils, jamais une image. Frais, le compte nourrit le compte à rebours de la
  * montée (« Plus que N marches. ») ; périmé (caméra coupée, repli bitmap sans
  * luminance), il vaut 0 et l'annonce reste standard.
+ *
+ * Le comptage est calibré sur la reconnaissance SAM : le guetteur pose la
+ * ROI ([setRoi], boîte normalisée de l'escalier retenu) à chaque réponse, et
+ * les frames suivantes ne comptent que dedans — plus de bas fixe ni de
+ * stores vénitiens hors escalier. Sans ROI (pas d'escalier localisé), le
+ * balayage couvre l'image entière, comme avant.
  */
 internal object StairCannyCount {
 
@@ -28,6 +35,19 @@ internal object StairCannyCount {
     @Volatile
     private var countedAtMs: Long = 0L
 
+    /** ROI SAM en cours (`null` = image entière) : posée par le guetteur, lue par l'analyse. */
+    @Volatile
+    private var roi: StairRoi? = null
+
+    /**
+     * ROI du comptage (boîte SAM normalisée de l'escalier) ; `null` l'efface
+     * (plus d'escalier localisé : le balayage couvre l'image entière).
+     * S'applique aux frames suivantes, pas au compte déjà lu.
+     */
+    fun setRoi(roi: StairRoi?) {
+        this.roi = roi
+    }
+
     /**
      * Compte les marches vues par les lunettes : [pixels] est la photo du pont
      * (ARGB_8888, déjà redressée), rééchantillonnée au plan [LumaPlane] au plus
@@ -35,7 +55,7 @@ internal object StairCannyCount {
      */
     fun offerPixels(pixels: IntArray, width: Int, height: Int) {
         val luma = lumaPlaneFromPixels(pixels, width, height) ?: return
-        count = cannyLineCount(luma)
+        count = cannyLineCount(luma, roi)
         countedAtMs = System.currentTimeMillis()
     }
 
@@ -46,7 +66,7 @@ internal object StairCannyCount {
      */
     fun offerLuma(luma: ByteArray) {
         if (luma.size != LumaPlane.SIZE) return
-        count = cannyLineCount(luma)
+        count = cannyLineCount(luma, roi)
         countedAtMs = System.currentTimeMillis()
     }
 
@@ -61,10 +81,11 @@ internal object StairCannyCount {
     fun countAgeMs(nowMs: Long = System.currentTimeMillis()): Long? =
         (nowMs - countedAtMs).takeIf { countedAtMs > 0L }
 
-    /** Nouvelle séance : le compte d'avant ne nourrit pas la montée d'après. */
+    /** Nouvelle séance : ni compte ni ROI d'avant (la montée d'après repart de zéro). */
     fun clear() {
         count = 0
         countedAtMs = 0L
+        roi = null
     }
 }
 
@@ -91,12 +112,13 @@ internal fun lumaPlaneFromPixels(pixels: IntArray, width: Int, height: Int): Byt
 }
 
 /**
- * Marches comptées dans [luma] (plan [LumaPlane] complet), 0 sinon : le
- * détecteur Canny pur ([StairDetector]), sans exception sur le chemin du direct.
+ * Marches comptées dans [luma] (plan [LumaPlane] complet), dans [roi] quand
+ * elle est posée (calibrage SAM), 0 sinon : le détecteur Canny pur
+ * ([StairDetector]), sans exception sur le chemin du direct.
  */
-internal fun cannyLineCount(luma: ByteArray): Int {
+internal fun cannyLineCount(luma: ByteArray, roi: StairRoi? = null): Int {
     if (luma.size != LumaPlane.SIZE) return 0
     return runCatching {
-        StairDetector.detect(GrayMask(LumaPlane.WIDTH, LumaPlane.HEIGHT, luma)).lineCount
+        StairDetector.detect(GrayMask(LumaPlane.WIDTH, LumaPlane.HEIGHT, luma), roi = roi).lineCount
     }.getOrDefault(0)
 }

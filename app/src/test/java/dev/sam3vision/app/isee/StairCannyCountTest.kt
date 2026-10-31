@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.local.LumaPlane
+import dev.sam3vision.core.stairs.StairRoi
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -121,5 +122,36 @@ class StairCannyCountTest {
         StairCannyCount.offerLuma(ByteArray(10) { 20 })
 
         assertEquals(0, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `roi sam : marches hors boite ignorees`() {
+        // ROI = moitié basse : les 2 marches du haut (44,45) ne comptent plus.
+        StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+
+        assertEquals(4, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `roi effacee : balayage entier`() {
+        StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+        assertEquals(4, StairCannyCount.lineCount())
+
+        StairCannyCount.setRoi(null)
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+
+        assertEquals(5, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `clear oublie la roi`() {
+        StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
+
+        StairCannyCount.clear()
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+
+        assertEquals(5, StairCannyCount.lineCount())
     }
 }

@@ -5,6 +5,7 @@ import dev.sam3vision.core.stairs.StairConcepts
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairLabelSignal
 import dev.sam3vision.core.stairs.StairLabelSignals
+import dev.sam3vision.core.stairs.StairRoi
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +42,9 @@ internal fun LiveProbe.observeStairs(
             // repli : un escalier nommé sans mesure reste un escalier.
             val readings = st.distanceLayer?.readings.orEmpty()
             val found = stairsFoundOf(st)
+            // Calibrage SAM : les frames suivantes ne comptent que dans la
+            // boîte de l'escalier retenu (effacée sinon : balayage entier).
+            StairCannyCount.setRoi(stairsRoiOf(found, st.width, st.height))
             // Profondeur du marchement le plus proche : la dernière marche par
             // profondeur (< 1 m) parle même quand le compteur est indisponible
             // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
@@ -81,6 +85,18 @@ internal fun stairsFoundOf(st: LiveProbeState): StairLabelSignal {
     val readings = st.distanceLayer?.readings.orEmpty()
     return StairLabelSignals.of(readings, st.width, st.height)
         .takeIf { it.detected } ?: StairLabelSignals.ofLabels(st.labels)
+}
+
+/**
+ * ROI du compteur dans la boîte SAM de l'escalier (`null` = pas d'escalier
+ * localisé : le compteur balaie l'image entière). Boîte pixels → normalisée
+ * (miroir de `Detection.normalizedBox`) ; dégénérée = `null`. Pur, testé.
+ */
+internal fun stairsRoiOf(found: StairLabelSignal, width: Int, height: Int): StairRoi? {
+    if (!found.detected || width <= 0 || height <= 0 || found.box.size < 4) return null
+    return StairRoi(
+        found.box[0] / width, found.box[1] / height, found.box[2] / width, found.box[3] / height,
+    ).normalized()
 }
 
 /**
