@@ -407,12 +407,17 @@ def _locked(gpu_lock, timers: dict):
 
 def _payload(entries, image_size, max_objects, mask_encoding, timers: dict,
              mask_format=None, mask_edge: int = 0) -> dict:
-    """Tri global, troncature à ``max_objects``, puis encodage des seuls objets gardés."""
+    """Tri global, troncature à ``max_objects``, puis encodage des seuls objets gardés.
+
+    La troncature passe par ``feux_guard`` : un petit feu (score faible) garde une
+    place au lieu d'être évincé — seuils globaux inchangés, tri pur sinon.
+    """
+    from feux_guard import finalize_guarded
     from segmentation import finalize
 
     started = now()
-    result = finalize(entries, image_size, max_objects, mask_encoding,
-                      mask_format=mask_format, mask_edge=mask_edge)
+    result = finalize_guarded(finalize, entries, image_size, max_objects, mask_encoding,
+                              mask_format=mask_format, mask_edge=mask_edge)
     add_ms(timers, "masks_ms", elapsed_ms(started))
     return result
 
@@ -442,7 +447,7 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
     permet à l'appelant d'ajouter ses propres postes (``decode_ms``) à la même carte.
     """
     from depth import attach_frame_depth
-    from segmentation import model_concept
+    from feux_guard import routed_concept
 
     timers = {} if timers is None else timers
     # `use_edge` peut réécrire la grille RoPE du ViT (FAST_EDGE_RUNTIME=1) : hors verrou, ce
@@ -452,7 +457,7 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
     image_size = image.size
     with Stage(timers, "preprocess_ms"):
         work, pixels = _preprocess(ctx, image, work_edge)
-    concepts = [model_concept(prompt) for prompt in prompts]
+    concepts = [routed_concept(prompt) for prompt in prompts]
     with _locked(gpu_lock, timers):
         vision = _vision(ctx, pixels, timers)
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,

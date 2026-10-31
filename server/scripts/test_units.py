@@ -27,7 +27,7 @@ from pathlib import Path
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
-                         depth_tests, latency_tests,
+                         depth_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
                          native_tests, tracking_tests, weights_tests)
 
@@ -475,6 +475,7 @@ RUNNERS = (
     ("live_fast : parité des vendored", "timing", test_live_fast_parity),
     ("live_fast : cache tokenize", "timing", live_fast_perf_tests.test_tokenize_cache),
     ("live_fast : clone detr_graph", "timing", live_fast_perf_tests.test_detr_clone),
+    ("feux : garde serveur (labels/slot/work_edge)", "timing", feux_guard_tests.test_feux_guard),
 )
 
 
