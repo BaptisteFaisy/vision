@@ -22,7 +22,7 @@ import dev.sam3vision.core.traverse.TraversePhase
 
 /**
  * Le feu piéton **sur la vidéo**, au même endroit que les masques SAM : un cadre
- * de la couleur de l'état et une étiquette courte (`VERT`, `ROUGE`, `DOUTE`)
+ * de la couleur de l'état et une étiquette courte (`VERT`, `ROUGE`)
  * posée au-dessus.
  *
  * Pourquoi un cadre et pas un rectangle plein : la règle des distances vaut ici

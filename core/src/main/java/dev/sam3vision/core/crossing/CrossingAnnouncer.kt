@@ -20,10 +20,9 @@ data class CrossingCue(val phrase: String, val urgent: Boolean, val state: Cross
  * 2. **le rouge parle vite et répète** — [RED_MIN_FRAMES] frames suffisent,
  *    puis « Rouge, attendez. » redit toutes les [RED_REPEAT_MS] ms tant que
  *    le rouge dure : manquer un rouge coûte plus qu'une fausse alerte, et
- *    le silence seul ne retient personne au bord du trottoir ;
- * 3. **le doute parle une fois** — pour dire pourquoi on ne traverse pas,
- *    puis se tait jusqu'au prochain changement d'état ;
- * 4. **le retour au rouge coupe tout** — [CrossingCue.urgent] vrai quand le feu
+ *    le silence seul ne retient personne au bord du trottoir (binaire, ordre
+ *    user du 31/10 : tout non-vert est rouge, fini le doute) ;
+ * 3. **le retour au rouge coupe tout** — [CrossingCue.urgent] vrai quand le feu
  *    repasse au rouge après un vert annoncé (appelant : couper la lecture du
  *    chat, comme un danger du guidage). Une répétition n'est jamais urgente.
  *
@@ -49,7 +48,7 @@ class CrossingAnnouncer(
      * État observé à [atMs] : le signal à prononcer, ou `null` pour garder le
      * silence. [language] est la langue de la voix (Réglages). Un rouge déjà
      * annoncé se répète toutes les [redRepeatMs] ms (jamais urgent) ; le
-     * vert et le doute annoncés restent muets jusqu'au changement d'état.
+     * vert annoncé reste muet jusqu'au changement d'état.
      */
     fun onFrame(
         atMs: Long,
@@ -93,7 +92,7 @@ class CrossingAnnouncer(
         lastCue = null
     }
 
-    /** Frames stables exigées : le vert se prouve, le rouge et le doute moins. */
+    /** Frames stables exigées : le vert se prouve (4), le rouge moins (2). */
     private fun required(state: CrossingState): Int =
         if (state == CrossingState.Green) greenMinFrames else redMinFrames
 
@@ -111,7 +110,7 @@ class CrossingAnnouncer(
         /** Frames vertes de suite avant « traversez » (≈ 0,8 s à 5 ips). */
         const val GREEN_MIN_FRAMES = 4
 
-        /** Frames rouges (ou douteuses) de suite avant « attendez ». */
+        /** Frames rouges de suite avant « attendez ». */
         const val RED_MIN_FRAMES = 2
 
         /** Délai minimal entre deux annonces (le retour au rouge l'ignore). */
@@ -120,9 +119,8 @@ class CrossingAnnouncer(
         /**
          * Répétition du rouge déjà annoncé (30/10/2026, ordre user : « quand
          * le feu est rouge, répéter chaque seconde que la traversée est
-         * impossible », resserré de 2 s à 1 s). Le vert et le doute ne
-         * répètent pas ; la répétition recule le délai comme une annonce
-         * normale.
+         * impossible », resserré de 2 s à 1 s). Le vert ne répète pas ;
+         * la répétition recule le délai comme une annonce normale.
          */
         const val RED_REPEAT_MS = 1_000L
     }

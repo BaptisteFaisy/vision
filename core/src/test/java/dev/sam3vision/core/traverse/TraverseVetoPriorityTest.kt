@@ -15,8 +15,7 @@ import org.junit.Test
  *
  * Verrouille le mot d'ordre exact (« attendez », jamais « prêt » ni
  * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
- * la chaîne veto→phrase « Red, wait. », les littéraux FR préchauffés
- * et le doute non urgent tué sur lecteur occupé.
+ * la chaîne veto→phrase « Red, wait. » et les littéraux FR préchauffés.
  *
  * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN strict, 15 m,
  * ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
@@ -130,27 +129,14 @@ class TraverseVetoPriorityTest {
     fun `phrases prechauffees - litteraux anglais exacts`() {
         assertEquals("Red, wait.", TraversePhrases.RED)
         assertEquals("Green, cross now.", TraversePhrases.GREEN)
-        assertEquals("Unsure, wait.", TraversePhrases.UNKNOWN)
         assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
         assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
-                "Red, wait.", "Green, cross now.", "Unsure, wait.",
+                "Red, wait.", "Green, cross now.",
                 "Sidewalk across the street.", "On the crosswalk.",
             ),
             TraversePhrases.ALL,
         )
-    }
-
-    @Test
-    fun `doute non urgent sur lecteur occupe - tu sans reseau`() = runBlocking {
-        val clips = mutableMapOf<String, String>()
-        val player = FakePlayer(isBusy = true)
-        val tts = FakeTts(Result.success(mp3))
-        val voice = TraverseVoice(tts, player, FakeSystemTts(store = clips), FakeStore(clips))
-        val outcome = voice.speak(TraversePhrases.UNKNOWN, urgent = false)
-        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, outcome)
-        assertTrue(player.events.isEmpty())
-        assertEquals(0, tts.calls)
     }
 }

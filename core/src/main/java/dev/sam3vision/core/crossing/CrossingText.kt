@@ -7,7 +7,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Phrases du **mode Traversée** : ce que dit iSee à une personne aveugle au
- * bord du trottoir. Trois phrases seulement, une par [CrossingState], courtes
+ * bord du trottoir. Deux phrases seulement, une par [CrossingState], courtes
  * (le vert piéton ne dure pas) et sans distance (la couleur suffit).
  *
  * Comme [dev.sam3vision.core.live.GuidanceText], tout est pur et testé en JVM.
@@ -15,20 +15,18 @@ import dev.sam3vision.core.speech.SpeechLanguage
 object CrossingText {
 
     /**
-     * Phrase pour [state] dans [language]. Le doute parle comme le rouge
-     * (« attendez ») : le silence seul ne dit pas pourquoi on ne traverse pas.
+     * Phrase pour [state] dans [language]. Binaire : rouge ou vert, pas de
+     * doute (ordre user du 31/10) — tout non-vert dit « attendez ».
      */
     fun phrase(state: CrossingState, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.En -> when (state) {
                 CrossingState.Red -> "Red, wait."
                 CrossingState.Green -> "Green, cross now."
-                CrossingState.Unknown -> "Unsure, wait."
             }
             SpeechLanguage.Fr -> when (state) {
                 CrossingState.Red -> "Rouge, attendez."
                 CrossingState.Green -> "Vert, traversez."
-                CrossingState.Unknown -> "Doute, attendez."
             }
         }
 

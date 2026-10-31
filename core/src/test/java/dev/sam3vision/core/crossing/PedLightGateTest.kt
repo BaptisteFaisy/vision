@@ -64,15 +64,15 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `barre sous-exposee - acceptee puis doute, jamais d invention`() {
+    fun `barre sous-exposee - acceptee puis refusee, jamais d invention`() {
         assertTrue(PedLightGate.acceptGreen(dim(barBottom(), 0.5f), 20, 20))
         assertFalse(PedLightGate.acceptGreen(dim(barBottom(), 0.25f), 20, 20))
     }
 
     @Test
-    fun `verdict - cadre tout vert doute (pas elance, pas bonhomme)`() {
+    fun `verdict - cadre tout vert attend rouge (pas elance, pas bonhomme)`() {
         assertEquals(
-            CrossingState.Unknown,
+            CrossingState.Red,
             PedLightGate.verdict(IntArray(100) { CYAN_GREEN }, 10, 10),
         )
     }
@@ -86,9 +86,9 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - noir et gris restent un doute`() {
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
+    fun `verdict - noir et gris attendent rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
     }
 
     @Test
@@ -140,7 +140,7 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `feux fr - pose large doute documente`() {
+    fun `feux fr - pose large rouge documente, jamais vert`() {
         assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.ppm"))
     }
 

@@ -23,7 +23,7 @@ object CrossingFeatures {
 
     /**
      * Traits du crop [argb] ([width] x [height], ARGB 32 bits, ligne majeure).
-     * Tableau vide ou incohérent ⇒ traits nuls (l'appelant répond doute avant).
+     * Tableau vide ou incohérent ⇒ traits nuls (l'appelant répond rouge avant).
      */
     fun extract(argb: IntArray, width: Int, height: Int): FloatArray {
         if (width <= 0 || height <= 0 || argb.size != width * height) return FloatArray(COUNT)

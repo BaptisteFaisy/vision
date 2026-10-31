@@ -95,16 +95,16 @@ data class CrossingLight(
  * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
  * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
  * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
- * [CrossingState.Unknown] (le doute vaut « attendez »).
+ * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10).
  *
  * Appelée **une fois par frame** par la sonde : le décodage du crop est le poste
  * coûteux, le refaire pour l'affichage doublerait le travail.
  */
 internal fun crossingLightOf(frame: LiveFrame, jpegB64: String): CrossingLight {
     val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-        ?: return CrossingLight(null, CrossingState.Unknown)
+        ?: return CrossingLight(null, CrossingState.Red)
     val crop = CrossingPixels.frame(jpegB64, box)
-        ?: return CrossingLight(box, CrossingState.Unknown)
+        ?: return CrossingLight(box, CrossingState.Red)
     return CrossingLight(box, PedLightGate.verdict(crop.argb, crop.width, crop.height))
 }
 
@@ -186,8 +186,7 @@ internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: 
     if (!active) return "Crossing: OFF"
     return when (state) {
         CrossingState.Green -> "Crossing: GREEN"
-        CrossingState.Red -> "Crossing: RED"
-        CrossingState.Unknown, null -> "Crossing: …"
+        CrossingState.Red, null -> "Crossing: RED"
     }
 }
 
