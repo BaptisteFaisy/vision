@@ -15,7 +15,7 @@ class LivePromptsTest {
         assertEquals(
             listOf(
                 "person", "car", "bus", "truck", "motorcycle", "bicycle",
-                "electric scooter", "traffic light", "curb", "sidewalk",
+                "electric scooter", "pedestrian traffic light", "curb", "sidewalk",
                 "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
             ),
             LivePrompts.default,
@@ -54,7 +54,7 @@ class LivePromptsTest {
         assertEquals(
             listOf(
                 "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-                "trash can", "sidewalk", "animal", "traffic light",
+                "trash can", "sidewalk", "animal", "pedestrian traffic light",
             ),
             LivePrompts.outdoor,
         )

@@ -30,6 +30,8 @@ class PersonLabelsTest {
         assertFalse(PersonLabels.isPerson("car"))
         assertFalse(PersonLabels.isPerson("crosswalk"))
         assertFalse(PersonLabels.isPerson("traffic light"))
+        assertFalse(PersonLabels.isPerson("pedestrian traffic light"))
+        assertFalse(PersonLabels.isPerson("feu piéton"))
         assertFalse(PersonLabels.isPerson("personnel"))
         assertFalse(PersonLabels.isPerson(""))
     }

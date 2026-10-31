@@ -56,7 +56,7 @@ class StairConceptsTest {
         assertEquals(
             listOf(
                 "person", "car", "bus", "truck", "motorcycle", "bicycle",
-                "electric scooter", "traffic light", "curb", "sidewalk",
+                "electric scooter", "pedestrian traffic light", "curb", "sidewalk",
                 "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
             ),
             LivePrompts.default,

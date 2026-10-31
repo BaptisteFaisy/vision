@@ -164,6 +164,11 @@ object KnownSizes {
         "stairs", "sidewalk", "crosswalk", "pole", "traffic light", "curb",
         "kerb", "step", "steps", "bordure", "rebord", "curb ramp", "bateau",
         "ramp", "rampe", "gutter", "caniveau",
+        // Feu piéton (31/10, ordre user : piétons seuls) : le caisson n'a pas
+        // de hauteur typique projetable — profondeur ou plan de sol.
+        // `traffic light` reste (saisie manuelle d'un feu voiture : jamais
+        // de sténopé dessus non plus).
+        "pedestrian traffic light",
     )
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */

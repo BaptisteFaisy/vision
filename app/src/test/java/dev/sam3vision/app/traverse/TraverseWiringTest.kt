@@ -1,6 +1,7 @@
 package dev.sam3vision.app.traverse
 
 import dev.sam3vision.app.isee.CrossingLight
+import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -258,4 +259,13 @@ class TraverseWiringTest {
     }
 
     private fun scope(): CoroutineScope = CoroutineScope(EmptyCoroutineContext)
+
+    @Test
+    fun `prompts - le feu pieton est toujours demande`() {
+        val prompts = traversePrompts(listOf("person"))
+
+        assertTrue(CrossingPrompts.LIGHT in prompts)
+        assertTrue("car" in prompts)
+        assertTrue("person" in prompts)
+    }
 }

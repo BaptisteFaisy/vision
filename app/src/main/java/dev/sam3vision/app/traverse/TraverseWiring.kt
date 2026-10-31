@@ -219,10 +219,17 @@ class TraverseWiring(
         tts = engine
         pipeline.voice = voice
         scope.launch { voice.prewarm() }
-        // Véhicules + feu : sans le concept feu, aucun vert ne serait jamais lu.
-        return TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT) + prompts)
+        return traversePrompts(prompts)
     }
 }
+
+/**
+ * Prompts du mode : le feu piéton devant, véhicules + base ensuite.
+ * Sans le concept feu, aucun vert ne serait jamais lu. Pur, testé en JVM
+ * (l'activation autour touche Android : TTS, cache, appareil seul).
+ */
+internal fun traversePrompts(prompts: List<String>): List<String> =
+    TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT) + prompts)
 
 /**
  * Ligne de décision traversée, stable pour `adb logcat` et les recettes :

@@ -15,8 +15,8 @@ object LivePrompts {
     /**
      * Concepts par défaut : **16** dangers extérieurs pour un piéton aveugle —
      * mobiles (« person », « car », « bus », « truck », « motorcycle »,
-     * « bicycle », « electric scooter ») puis feu et cheminement
-     * (« traffic light », « curb », « sidewalk », « crosswalk ») puis
+     * « bicycle », « electric scooter ») puis feu piéton et cheminement
+     * (« pedestrian traffic light », « curb », « sidewalk », « crosswalk ») puis
      * statiques (« pole », « stairs », « barrier », « fence », « gate »),
      * modifiables à chaud dans le direct (champ « Follow »).
      *
@@ -40,7 +40,7 @@ object LivePrompts {
      */
     val default: List<String> = listOf(
         "person", "car", "bus", "truck", "motorcycle", "bicycle",
-        "electric scooter", "traffic light", "curb", "sidewalk",
+        "electric scooter", "pedestrian traffic light", "curb", "sidewalk",
         "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
     )
 
@@ -48,7 +48,8 @@ object LivePrompts {
      * Preset extérieur : **12** concepts de cheminement urbain — la personne et
      * le mobilier qui borde le trottoir (poteaux, bornes, clôtures, barrières,
      * portails, panneaux, arbres), plus le trottoir lui-même, les encombrants
-     * (poubelles), les animaux et le feu tricolore — ordre user du 29/10
+     * (poubelles), les animaux et le feu piéton — ordre user du 29/10
+     * (31/10 : piétons seuls, plus de feux voiture)
      * (30/10 : « sidewalk » remplace « dumpster », benne la moins utile),
      * détecté en permanence hors mode traversée pour anticiper les passages
      * protégés. Bascule depuis la pastille « Extérieur » du direct, sans passer
@@ -57,7 +58,7 @@ object LivePrompts {
      */
     val outdoor: List<String> = listOf(
         "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-        "trash can", "sidewalk", "animal", "traffic light",
+        "trash can", "sidewalk", "animal", "pedestrian traffic light",
     )
 
     /**
