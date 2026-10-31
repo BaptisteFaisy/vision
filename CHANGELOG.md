@@ -52,7 +52,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Fait : `CrosswalkScan` (machine core pure : « Stop. » → consigne gauche → virage à gauche
   prouvé, 60° signés depuis le cap du scan, ou timeout 6 s → observation 2,5 s → constat parlé
   (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à droite → silence si
-  libre, sinon re-vérification obligatoire (attente 10 s + nouveau cycle, max 3 cycles, puis
+  libre, sinon re-vérification obligatoire (attente 3 s + nouveau cycle, max 3 cycles, puis
   release au veto), horloges gelées pendant le feu) ; mouvement latéral véhicules
   (`VehicleApproach` : vitesse x lissée > 8 %/s — le tau ne voyait pas la traversée du champ
   à taille stable, suivi par les annonces d'état, pas par le veto, tué par le véto fond
