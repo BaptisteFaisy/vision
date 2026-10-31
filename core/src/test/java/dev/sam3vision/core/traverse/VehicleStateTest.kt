@@ -430,4 +430,47 @@ class VehicleStateTest {
             VehicleStateText.safetyPluralPhrase(3, SpeechLanguage.Fr),
         )
     }
+
+    @Test
+    fun `glissade laterale sans croissance - silence`() {
+        // V1 (signal fond absent) : sans fond, une boîte qui glisse à largeur
+        // constante n'est ni mouvement (ni tau ni croissance) ni arrêt.
+        val bare = VehicleStateWatcher()
+        listOf(300f, 320f, 340f).forEachIndexed { index, cx ->
+            assertNull(
+                "ni tau ni croissance : silence",
+                bare.update(listOf(det("car", box(100f, cx = cx))), emptyList(), atMs = index * 100L),
+            )
+        }
+
+        val near = VehicleStateWatcher()
+        listOf(300f, 320f, 340f).forEachIndexed { index, cx ->
+            assertNull(
+                "dérive trop vive pour un arrêt : silence",
+                near.update(
+                    listOf(det("car", box(100f, cx = cx))),
+                    listOf(reading("car", 2f, box(100f, cx = cx))),
+                    atMs = index * 100L,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `mouvement à 8 m pile - stop, frontiere proche`() {
+        // V1 (signal fond absent) : la frontière proche (≤ 8 m) parle en stop.
+        val watcher = VehicleStateWatcher()
+        watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 0L)
+        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 8f, box(110f))), atMs = 100L)
+        val third = watcher.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 8f, box(120f))),
+            atMs = 200L,
+            language = SpeechLanguage.En,
+        )
+
+        assertEquals("Car moving, 8 meters away.", third!!.phrase)
+        assertEquals("Stop, car moving.", third.safetyPhrase)
+        assertTrue("tau + 8 m + centre : urgent", third.urgent)
+    }
 }
