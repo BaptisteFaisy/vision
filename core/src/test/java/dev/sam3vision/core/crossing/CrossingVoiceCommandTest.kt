@@ -97,4 +97,12 @@ class CrossingVoiceCommandTest {
     fun `traverser le crosswalk active par traverser`() {
         assertEquals(CrossingVoiceAction.Activate, CrossingVoiceCommand.parse("traverser le crosswalk"))
     }
+
+    @Test
+    fun `cross walk coupe par l ASR suit la meme regle`() {
+        assertEquals(CrossingVoiceAction.Activate, CrossingVoiceCommand.parse("cross walk on"))
+        assertEquals(CrossingVoiceAction.Deactivate, CrossingVoiceCommand.parse("cross walk off"))
+        assertNull(CrossingVoiceCommand.parse("cross walk in 50 meters"))
+        assertNull(CrossingVoiceCommand.parse("Find the cross walk"))
+    }
 }
