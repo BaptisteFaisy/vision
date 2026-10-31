@@ -14,9 +14,9 @@ class LivePromptsTest {
         assertEquals(16, LivePrompts.default.size)
         assertEquals(
             listOf(
-                "person", "car", "bus", "truck", "motorcycle", "bicycle",
-                "electric scooter", "pedestrian traffic light", "curb", "sidewalk",
-                "crosswalk", "pole", "stairs", "barrier", "fence", "gate",
+                "person", "car", "bus", "bicycle", "pedestrian traffic light", "curb",
+                "sidewalk", "crosswalk", "pole", "stairs", "barrier", "fence",
+                "gate", "souvenir shop", "beanie", "socks",
             ),
             LivePrompts.default,
         )
@@ -34,6 +34,20 @@ class LivePromptsTest {
         assertFalse("door" in LivePrompts.default)
         assertFalse("wall" in LivePrompts.default)
         assertFalse("window" in LivePrompts.default)
+    }
+
+    @Test
+    fun `souvenirs suivis par defaut, camion moto et trottinette sortis`() {
+        // Ordre user du 31/10 (boutique du square) : les trois slots
+        // camion/moto/trottinette passent aux souvenirs, des deux côtés
+        // (direct et véhicules traversée).
+        assertTrue("souvenir shop" in LivePrompts.default)
+        assertTrue("beanie" in LivePrompts.default)
+        assertTrue("socks" in LivePrompts.default)
+        assertFalse("truck" in LivePrompts.default)
+        assertFalse("motorcycle" in LivePrompts.default)
+        assertFalse("electric scooter" in LivePrompts.default)
+        assertFalse("scooter" in LivePrompts.default)
     }
 
     @Test
