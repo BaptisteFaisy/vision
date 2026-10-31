@@ -53,6 +53,28 @@ class HazardConceptsTest {
     }
 
     @Test
+    fun `barrieres reconnues FR EN pluriel`() {
+        assertTrue(HazardConcepts.isBarrier("barrier"))
+        assertTrue(HazardConcepts.isBarrier("barrière"))
+        assertTrue(HazardConcepts.isBarrier("BARRIERS"))
+        assertFalse(HazardConcepts.isBarrier("pole"))
+        assertFalse(HazardConcepts.isBarrier("borne"))
+        assertFalse(HazardConcepts.isBarrier("person"))
+        assertFalse(HazardConcepts.isBarrier("  "))
+    }
+
+    @Test
+    fun `sorte par label - poteau, barriere, divers`() {
+        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poteau"))
+        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poles"))
+        assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("barrier"))
+        assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("Barrières"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("borne"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("clôture"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("person"))
+    }
+
+    @Test
     fun `autres labels ignores`() {
         assertFalse(HazardConcepts.isHazard("person"))
         assertFalse(HazardConcepts.isHazard("car"))

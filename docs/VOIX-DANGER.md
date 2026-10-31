@@ -667,7 +667,6 @@ Recette téléphone : deux voitures qui roulent → « 2 vehicles moving… » ;
 poteau à 3 m à 11 h → « …, passez à droite. » ; marques craie à 1,0 m et
 0,7 m, montée puis descente — sens juste 4/4 jour — **non mesuré**, exige
 un APK de cette branche sur appareil réel.
-
 ## 22. Stop seulement en Traversée, voitures en mouvement (ordre user du 31/10)
 
 Le user marche avec l'app : iSee dit trop souvent « stop » — elle doit
@@ -844,8 +843,60 @@ question posée en marchant → le guidage continue pendant la réflexion
 et entre les tranches lues ; voix non-Laure → les mots finissent par
 se dire puis partent en clips — **non mesuré**, exige un APK de cette
 branche sur appareil réel.
-
 *Note de fusion : les deux sections « 24 » concurrentes sont conservées
 en entier — celle de la branche reste le §24 (priorité en cas de
-doute), celle de master est renumérotée §25 (ex-§24) ; aucun des deux
-contrats n'est fusionné ni abandonné.*
+doute), celle de master est renumérotée §26 (ex-§24, le §25 restant
+occupé par la section « Voix obstacles » de la branche, conservée
+ci-dessous telle quelle) ; aucun des deux contrats n'est fusionné ni
+abandonné.*
+
+## 25. Voix obstacles : hiérarchie P1-P5, poteau imminent en sécurité (ordre user du 31/10)
+
+Le user marche avec l'app : quand SAM confirme plusieurs obstacles en même
+temps, l'ordre de parole n'était pas défini (trois guetteurs indépendants,
+chacun sa voix) et le poteau imminent partait en synthèse réseau (lente).
+Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
+(jamais de « Stop » hors Traversée) :
+
+- **hiérarchie** : P1 voiture en mouvement > P2 bordure > P3 poteau > P4
+  barrière > reste (arrêt, bateau, bornes…, dans l'ordre de détection) ;
+- **un seul guetteur** (`LiveProbe.observeObstacles`) calcule les trois
+  signaux (véhicules, bordure, mobilier) sur la même frame et parle une
+  fois : les alertes de sécurité fusionnent dans l'ordre des rangs
+  (« Montez le rebord. Poteau, passez à droite. », voix de sécurité,
+  immédiat, sans « Stop »), les phrases douces aussi (voix ElevenLabs,
+  file d'attente au silence) — une alerte confirmée ne se perd plus,
+  elle attend son rang ; le véhicule ne fournit que du doux ici (son
+  stop roulant ne se dit qu'en Traversée, § 22), P1 en tête ;
+- **poteau imminent en sécurité** : à 2 m ou moins, « Poteau, passez à
+  droite. » / « Pole, pass on the right. » (côté d'évitement gardé,
+  heure abandonnée : à un pas, le côté prime) — deuxième consigne de
+  sécurité après le rebord (§ 22), qui coupe tout ; l'imminent ne
+  consomme pas le cooldown doux (la barrière suit sans attendre 10 s) ;
+- **poteau avant barrière** : même frame, le poteau parle d'abord (signal
+  préféré), la barrière suit en repli dès le poteau dit (compteurs de
+  confirmation séparés par sorte, cooldown doux partagé) ;
+- **doux sérialisé** : la voix douce ne bloque plus la frame (coroutine
+  fille + mutex — la sécurité reste instantanée même pendant une
+  synthèse) et ne chevauche plus la sécurité (fenêtre
+  `SAFETY_SPEECH_MS = 2,5 s`, provisoire : sous les 3 s de la file, pour
+  que le rattrapage parle encore frais — à valider rue) ; seul le
+  danger qui s'approche (`urgent` véhicule) coupe, comme avant ;
+- **inchangé** : confirmation 2 frames partout, cooldowns, Traversée
+  (seul l'imminent bordure y passe, stop roulant à part), flush (§ 20 :
+  la frame suivante coupe la précédente), le reste parle doux comme
+  avant.
+
+Verrouillé par `ObstacleArbiterTest` (10 : ordre des rangs, fusion
+sécurité P2-P3, stop roulant ignoré en normal, doux ordonnés, urgent
+véhicule, barrière après poteau, reste en ordre de détection, poteau
+imminent, silence, fenêtre), `HazardWatchTest` (+6 : préférence poteau,
+repli barrière, compteurs par sorte, consigne poteau FR/EN, cooldown
+gardé, sorte divers), `HazardConceptsTest` (+2 : `isBarrier`, `kindOf`),
+`VehicleStateTest` (+1 : flag `moving`) et `ProbeWiringWatchersTest`
+(`p1p2Busy`/`shouldCutForHazard` supprimés, remplacés par l'arbitre).
+
+Recette téléphone : voiture qui roule + marche + poteau cadrés ensemble
+→ « Montez le rebord. Poteau, passez à droite. » puis « Car moving,
+12 meters away. … » en doux, premier son immédiat, aucun « Stop » —
+**non mesuré**, exige un APK de cette branche sur appareil réel.
