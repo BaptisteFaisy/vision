@@ -1,5 +1,7 @@
 package dev.sam3vision.core.traverse
 
+import dev.sam3vision.core.danger.ApproachThresholds
+import dev.sam3vision.core.depth.DepthConfirm
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.Box
@@ -40,9 +42,13 @@ class VehicleApproach {
         var label: String,
         val motion: MotionModel,
         var lastSeenMs: Long,
+        // PISTE2 : proximités première/dernière vues — la profondeur confirme l'expansion.
+        var firstCloseness: Float? = null,
+        var lastCloseness: Float? = null,
     )
 
-    private data class VehicleBox(val label: String, val box: Box)
+    // PISTE2 : [key] = boîte proto, clé des proximités ([DepthConfirm]).
+    private data class VehicleBox(val label: String, val box: Box, val key: List<Float>)
 
     private val tracks = LinkedHashMap<Int, Track>()
     private var nextId = 0
@@ -94,16 +100,19 @@ class VehicleApproach {
      * (`null` = pas de signal fond) fait juger chaque piste par
      * [VehicleBackground] : une piste qui suit le défilement du fond
      * ([Verdict.CAMERA_MOVED]) ne conclut plus l'approche — les pistes
-     * restent suivies, seul le verdict se tait.
+     * restent suivies, seul le verdict se tait. [depthByBox] (PISTE2,
+     * `null` = pas de profondeur : repli géométrie) invalide les pistes
+     * dont la proximité ne suit pas l'expansion (pan/zoom caméra).
      */
     fun update(
         detections: List<Detection>,
         atMs: Long,
         motion: FrameMotion? = null,
+        depthByBox: Map<List<Float>, Float>? = null, // PISTE2
     ): ApproachVerdict {
         val frameWidth = detections.maxOfOrNull { it.width }?.takeIf { it > 0 } ?: FALLBACK_WIDTH
         val frameHeight = detections.maxOfOrNull { it.height }?.takeIf { it > 0 } ?: FALLBACK_HEIGHT
-        associate(vehiclesOf(detections), atMs, frameWidth)
+        associate(vehiclesOf(detections), atMs, frameWidth, depthByBox)
         dropStale(atMs)
         evaluateMotion(motion, frameWidth, frameHeight)
         return verdict(frameWidth)
@@ -146,17 +155,18 @@ class VehicleApproach {
             if (detection.score <= TraverseVeto.SCORE_MIN) return@mapNotNull null
             val box = Box.fromProto(detection.box) ?: return@mapNotNull null
             if (!box.isSane) return@mapNotNull null
-            VehicleBox(detection.label, box)
+            VehicleBox(detection.label, box, detection.box)
         }
 
     /** Associe chaque véhicule à sa piste (meilleur IoU) ou en crée une. */
-    private fun associate(vehicles: List<VehicleBox>, atMs: Long, frameWidth: Int) {
+    private fun associate(vehicles: List<VehicleBox>, atMs: Long, frameWidth: Int, depthByBox: Map<List<Float>, Float>?) {
         val maxSpeed = frameWidth * BoxPredictor.DEFAULT_MAX_SPEED_RATIO
         val claimed = HashSet<Int>()
         for (vehicle in vehicles) {
             val id = bestTrack(vehicle.box, atMs, claimed)
             if (id == null) {
-                tracks[nextId] = Track(vehicle.label, MotionModel(vehicle.box, atMs), atMs)
+                val closeness = closenessOf(depthByBox, vehicle.key) // PISTE2
+                tracks[nextId] = Track(vehicle.label, MotionModel(vehicle.box, atMs), atMs, closeness, closeness)
                 nextId += 1
             } else {
                 claimed += id
@@ -164,9 +174,15 @@ class VehicleApproach {
                 track.label = vehicle.label
                 track.motion.observe(vehicle.box, atMs, maxSpeed)
                 track.lastSeenMs = atMs
+                // PISTE2 : la dernière proximité suit la boîte (sans mesure, on garde l'ancienne).
+                closenessOf(depthByBox, vehicle.key)?.let { track.lastCloseness = it }
             }
         }
     }
+
+    /** Proximité finie de la boîte [key], `null` sans mesure (PISTE2). */
+    private fun closenessOf(depthByBox: Map<List<Float>, Float>?, key: List<Float>): Float? =
+        depthByBox?.get(key)?.takeIf { it.isFinite() }
 
     /** Piste prédite la plus proche, `null` sous le seuil IoU ou déjà prise. */
     private fun bestTrack(box: Box, atMs: Long, claimed: Set<Int>): Int? {
@@ -204,6 +220,8 @@ class VehicleApproach {
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            // PISTE2 : expansion à profondeur constante = pan/zoom caméra, pas une approche.
+            if (DepthConfirm.contradicts(track.firstCloseness, track.lastCloseness)) continue
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
             if (track.motion.velocity.width <= frameWidth * MIN_GROWTH_RATIO) continue
@@ -273,3 +291,29 @@ class VehicleApproach {
         const val FALLBACK_HEIGHT = 1000
     }
 }
+
+/**
+ * Seuils d'expansion des véhicules pour
+ * [dev.sam3vision.core.danger.ApproachEstimator] (PISTE2) : un véhicule est
+ * un danger grave — seuil de grossissement abaissé (0,02), couloir élargi
+ * (0,30, un véhicule large menace même excentré), TTC plafonné à 4 s.
+ * Priors à recaler sur téléphone, comme [VehicleApproach.TTC_SECONDS].
+ */
+val VEHICLE_APPROACH_THRESHOLDS = ApproachThresholds(
+    minGrowthPerSec = 0.02f,
+    centerMargin = 0.30f,
+    maxTtcSec = 4f,
+)
+
+/**
+ * Seuils d'expansion par label pour
+ * [dev.sam3vision.core.danger.ApproachEstimator] (PISTE2) : [vehicle] pour
+ * les labels de [VehicleConcepts], [person] pour tout le reste — à passer
+ * en `thresholdsForLabel` (`ApproachEstimator(thresholdsForLabel =
+ * ::approachThresholdsFor)`).
+ */
+fun approachThresholdsFor(
+    label: String,
+    vehicle: ApproachThresholds = VEHICLE_APPROACH_THRESHOLDS,
+    person: ApproachThresholds = ApproachThresholds(),
+): ApproachThresholds = if (VehicleConcepts.isVehicle(label)) vehicle else person
