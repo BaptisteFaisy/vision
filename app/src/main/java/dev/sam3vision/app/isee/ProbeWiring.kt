@@ -30,7 +30,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
+import dev.sam3vision.core.traverse.BackgroundFrame
 import dev.sam3vision.core.traverse.VehicleStateWatcher
+import dev.sam3vision.app.traverse.backgroundOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -483,4 +485,14 @@ internal fun LiveProbe.observeHazards(
         observeCycles(scope, voice, playerIdle, language),
         observeSidewalk(scope, voice, playerIdle, language),
     )
+}
+
+/** Paire fond V1 côté sonde : `LiveProbe.publish` offre son JPEG ici, l'intégrateur y lit prev/cur pour `decide()`. */
+internal object ProbeBackground {
+    var prev: BackgroundFrame? = null
+    /** Offre une frame : rend (prev, cur), retient cur comme prochain prev. */
+    fun offer(jpegB64: String): Pair<BackgroundFrame?, BackgroundFrame?> =
+        (prev to backgroundOf(jpegB64)).also { prev = it.second }
+    /** Nouvelle séance. */
+    fun reset() { prev = null }
 }

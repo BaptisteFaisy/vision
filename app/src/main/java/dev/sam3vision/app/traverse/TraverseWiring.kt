@@ -1,6 +1,9 @@
 package dev.sam3vision.app.traverse
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.glasses.GlassesVoiceRoute
@@ -18,11 +21,13 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.BackgroundFrame
 import dev.sam3vision.core.traverse.TraverseDecision
 import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraverseVoice
 import java.io.File
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -93,6 +98,9 @@ class TraverseWiring(
     /** Clé de la dernière transition journalisée : les répétitions se taisent. */
     private var lastKey: String = ""
 
+    /** Dernier verdict fond V1 journalisé (`null` = aucun) : les répétitions se taisent. */
+    private var lastBackgroundMoving: Boolean? = null
+
     /**
      * Filtre une frame publiée : hystérésis, conversion, veto, annonce et
      * voix éventuelle — voir [TraversePipeline.onFrame]. En mode actif, le
@@ -108,9 +116,13 @@ class TraverseWiring(
         jpegB64: String = "",
     ): ShownFrame {
         if (active) updateLight(crossingLightOf(frame, jpegB64, onCrop = cropLogger?.tap()))
-        val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
+        // Fond V1 : la luminance courante part au pipeline, qui la paire au prev et
+        // appelle decide() — verdict log-only (voir logBackground).
+        val background = if (active) backgroundOf(jpegB64) else null
+        val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language, background)
         CalibrationSnapshots.note(out.detections, width, height, atMs)
         logTransition(out.decision)
+        logBackground(pipeline.lastBackgroundMoving)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }
 
@@ -134,6 +146,13 @@ class TraverseWiring(
         if (key == lastKey) return
         lastKey = key
         log(traverseLogLine(decision))
+    }
+
+    /** Journalise le verdict fond V1 à ses fronts seuls (`null` = pas de paire prev/cur). */
+    private fun logBackground(moving: Boolean?) {
+        if (moving == lastBackgroundMoving) return
+        lastBackgroundMoving = moving
+        if (moving != null) log("traversee fond moving=$moving")
     }
 
     /**
@@ -181,14 +200,16 @@ class TraverseWiring(
         lightGreen = false
         light = null
         cropLogger = null
+        lastBackgroundMoving = null
         quiet()
     }
 
-    /** Oublie pistes, veto, vert et annonces (nouvelle séance). */
+    /** Oublie pistes, veto, vert, annonces et verdict fond (nouvelle séance). */
     fun reset() {
         pipeline.reset()
         lightGreen = false
         light = null
+        lastBackgroundMoving = null
     }
 
     /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */
@@ -237,4 +258,34 @@ internal fun traverseLogLine(decision: TraverseDecision): String {
     val meters = decision.blockingMeters?.let { " meters=${"%.1f".format(Locale.US, it)}" }.orEmpty()
     val ttc = decision.approachTtcSeconds?.let { " ttc=${"%.1f".format(Locale.US, it)}" }.orEmpty()
     return "traversee phase=${decision.state} veto=${decision.veto}$blocking$meters$ttc"
+}
+
+/** Plus grand côté de la luminance fond V1 : le fond n'a pas besoin de mégapixels. */
+internal const val BACKGROUND_EDGE = 96
+
+/**
+ * Luminance d'une frame JPEG (base64) réduite à [BACKGROUND_EDGE] px, pour la
+ * sonde fond V1 (prev/cur comparés par `decide()`). `null` = image illisible.
+ * Wrapper plateforme (Bitmap), non testé en JVM comme `CrossingPixels.frame`.
+ */
+internal fun backgroundOf(jpegB64: String): BackgroundFrame? {
+    if (jpegB64.isBlank()) return null
+    val bytes = runCatching { Base64.decode(jpegB64, Base64.DEFAULT) }.getOrNull() ?: return null
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+    if (bitmap.width <= 0 || bitmap.height <= 0) return null
+    val scale = BACKGROUND_EDGE.toFloat() / maxOf(bitmap.width, bitmap.height)
+    val w = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
+    val h = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
+    val small = Bitmap.createScaledBitmap(bitmap, w, h, false)
+    val argb = IntArray(w * h)
+    small.getPixels(argb, 0, w, 0, 0, w, h)
+    return BackgroundFrame(w, h, ByteArray(w * h) { i -> lumaOf(argb[i]) })
+}
+
+/** Luminance Rec.601 d'un pixel ARGB, 0..255. */
+private fun lumaOf(argb: Int): Byte {
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
+    return (0.299f * r + 0.587f * g + 0.114f * b).roundToInt().coerceIn(0, 255).toByte()
 }
