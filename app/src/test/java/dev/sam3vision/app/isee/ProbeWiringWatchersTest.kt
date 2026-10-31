@@ -64,4 +64,13 @@ class ProbeWiringWatchersTest {
         assertEquals(640, detections.single().width)
         assertEquals(480, detections.single().height)
     }
+
+    @Test
+    fun `urgence parlee = stop ou alerte mouvement traversee`() {
+        assertTrue(spokenUrgentOf("Stop."))
+        assertTrue(spokenUrgentOf("obstacle, stop."))
+        assertTrue(spokenUrgentOf("Stop, car moving."))
+        assertFalse(spokenUrgentOf("Car moving, 5 meters away."))
+        assertFalse(spokenUrgentOf("left."))
+    }
 }

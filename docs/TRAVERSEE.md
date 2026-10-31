@@ -270,14 +270,16 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   jetterait l'ordre pas encore joué (`CrossingPeopleVoice.kt`, la sonde ne
   change que d'une ligne) ; depuis le 31/10 le vert se répète toutes les
   2 s comme le rouge, un ordre jeté se rattrape à la répétition suivante ;
-- **états moteurs** (30/10, soir) : en traversée, les voitures disent si
-  elles roulent ou sont arrêtées (« Car moving, 5 meters away. » /
-  « Car stopped, 2 meters away. », langue de la voix, anglais par défaut) —
-  le même `VehicleStateWatcher` que le mode normal (mouvement confirmé ou
-  croissance jusqu'à 15 m — `MOVING_METERS`, info douce au-delà de 8 m,
-  arrêt mesuré jusqu'à 3 m, 2 frames, silences 4 s / 10 s), parlé après le
-  feu et avant les personnes (`CrossingVehicleWatch`, chaîne
-  `crossingPhraseOf`) ; le silence post-ordre est partagé
+- **états moteurs** (30/10, soir ; stop déplacé le 31/10) : en traversée,
+  les voitures disent si elles roulent ou sont arrêtées (« Stop, car
+  moving. » — « Stop, 2 vehicles moving. » au pluriel — si le mouvement
+  est proche (sous 8 m), « Car moving, 12 meters away. » / « Car stopped,
+  2 meters away. » sinon, langue de la voix, anglais par défaut) — le
+  même `VehicleStateWatcher` que le mode normal (mouvement confirmé ou
+  croissance jusqu'à 15 m — `MOVING_METERS`, arrêt mesuré jusqu'à 3 m,
+  2 frames, silences 4 s / 10 s), parlé après le feu et avant les
+  personnes (`CrossingVehicleWatch`, chaîne `crossingPhraseOf`) ; le
+  silence post-ordre est partagé
   (`CrossingCueQuiet`, `:core` pur, les deux voix douces nourries du même
   ordre) et les personnes ne sont consultées que sur le silence des
   véhicules — un mot de décalage ne se perd pas au profit d'une phrase

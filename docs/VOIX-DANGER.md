@@ -451,9 +451,11 @@ escaliers, cycles) parle toujours en douceur.
 
 - **phrases** (langue de la voix, anglais par défaut) :
   - mouvement : `Stop, car moving.` / `Stop, voiture en mouvement.` (nom du
-    véhicule : bus, camion, moto — `VehicleStateText.safetyPhrase`) ;
-  - rebord imminent : `Stop, step up.` / `Stop, step down.` (`Stop, rebord
-    montant.` / `Stop, rebord descendant.` — `CurbText.safetyStepPhrase`) ;
+    véhicule : bus, camion, moto — `VehicleStateText.safetyPhrase`),
+    Traversée seule depuis le § 22 (plus d'alerte en mode normal) ;
+  - rebord imminent : `Montez le rebord.` / `Descendez le rebord.`
+    (`Step up.` / `Step down.` — `CurbText.safetyStepPhrase`, plus de
+    « Stop » depuis le § 22) ;
     la pré-alerte à 1 m est douce depuis le § 19 (plus d'alerte immédiate) ;
 - **canal** : voix de sécurité dédiée (`SafetyVoice`, TTS système
   hors-ligne) — pas de synthèse réseau, pas de clé exigée, parle sans
@@ -465,9 +467,11 @@ escaliers, cycles) parle toujours en douceur.
   système ne rend pas de fin, un fanion sans fin bloquerait la dictée) ;
 - **gardes gardées** : confirmation 2 frames (un positif isolé ne crie
   jamais « Stop »), cooldowns des guetteurs (4 s mouvement, 10 s trottoir,
-  ré-armements § 19) ; coupé en mode Traversée sauf l'imminent sous le
-  pied (sa voix rouge/vert est propriétaire du son) ; le bateau
+  ré-armements § 19) ; le rebord imminent passe en Traversée, le reste
+  y est coupé (sa voix rouge/vert est propriétaire du son) ; le bateau
   (« Bateau, pas de marche. ») et la voiture à l'arrêt restent doux ;
+  depuis le § 22, le stop mouvement ne se dit qu'en Traversée
+  (inversion : plus d'alerte `SafetyVoice` en normal) ;
 - **supprimé** : la priorité stop > marche imminente (`ProbeVoice.stopRecent`,
   fenêtre 2 s) — une alerte de sécurité ne se tait pour rien.
 
@@ -478,9 +482,9 @@ blanc ignoré, locale), `ProbeWiringWatchersTest` (imminent passe toujours)
 et `ProbeVoiceTest` (stopRecent supprimé, phrases gardées).
 
 Recette téléphone : voiture qui roule cadrée → « Stop, car moving. »
-coupe le chat en lecture ; rebord sous le pied en dictée → « Stop, step
-up. » parlé quand même — **non mesuré**, exige un APK de cet arbre sur
-appareil réel.
+coupe le chat en lecture (Traversée seule depuis le § 22) ; rebord sous
+le pied en dictée → « Montez le rebord. » parlé quand même —
+**non mesuré**, exige un APK de cet arbre sur appareil réel.
 ## 17. Véhicules : mouvement annoncé à 15 m, stop sous 8 m (ordre user du 30/10)
 
 Le user veut entendre les voitures en mouvement jusqu'à 15 m, et en
@@ -491,16 +495,19 @@ Traversée savoir si elles roulent ou sont arrêtées — tout en anglais
   `VehicleStateWatcher`, mêmes 2 frames, mêmes cooldowns) — en normal
   comme en Traversée (même watcher, mêmes phrases) ;
 - **deux bandes** : proche (sous 8 m, `NEAR_MOVING_METERS`, ou non mesuré
-  — jamais prouvé loin) = alerte immédiate « Stop, car moving. »
-  (voix de sécurité, §16) ; loin (8-15 m) = info douce « Car moving,
-  12 meters away. » (voix ElevenLabs, attend le silence) ;
+  — jamais prouvé loin) = « Stop, car moving. » (Traversée seule depuis
+  le § 22, urgent côté sonde) ; loin (8-15 m) = info douce « Car moving,
+  12 meters away. » (voix ElevenLabs, attend le silence), en normal
+  comme en Traversée ;
 - **cooldowns** : le stop a son propre cooldown 4 s — une info lointaine
   ne fait jamais taire un stop qui suit ; à l'inverse une info ne reparle
   pas dans les 4 s d'un stop (le danger vient d'être dit) ;
-- **Traversée** : câblage inchangé — `CrossingVehicleWatch` parle
-  `.phrase` (info douce après le feu) : le mouvement ≤ 15 m et l'arrêt
-  ≤ 3 m s'y disent (« Car moving/stopped, X meters away. »), le veto
-  rouge restant l'autorité sécurité (pas de « Stop » en Traversée) ;
+- **Traversée** : `CrossingVehicleWatch` parle l'alerte « Stop, … » si
+  le mouvement est proche, la phrase douce sinon (après le feu, avant
+  les personnes) : le mouvement ≤ 15 m et l'arrêt ≤ 3 m s'y disent
+  (« Stop, car moving. » / « Car moving/stopped, X meters away. »),
+  le veto rouge restant l'autorité passage (amendé § 22 : le stop
+  mouvement se dit en Traversée, plus en normal) ;
 - **inchangé** : arrêt ≤ 3 m, cycles (`CycleWatcher`), urgent (tau + ≤ 8 m
   + centre), anglais par défaut.
 
@@ -509,9 +516,9 @@ sans attendre le cooldown, cooldown 4 s entre stops ; portée 9 m → 16 m)
 et `CrossingVehicleTest` (+1 : mouvement 12 m annoncé en Traversée).
 
 Recette téléphone : voiture qui roule à ~12 m → « Car moving, 12 meters
-away. » doux ; qui s'approche sous 8 m → « Stop, car moving. » coupe tout ;
-en Traversée idem en doux + « Car stopped… » — **non mesuré**, exige un
-APK de cet arbre sur appareil réel.
+away. » doux ; qui s'approche sous 8 m → pareil en doux en normal,
+« Stop, car moving. » urgent en Traversée ; arrêt « Car stopped… » doux
+— **non mesuré**, exige un APK de cet arbre sur appareil réel.
 ## 18. Poteau à 4 m, 3e priorité, rattrapage (ordre user du 30/10)
 
 Le user marche avec l'app : les poteaux ne sont pas dits, ou trop tard —
@@ -559,7 +566,8 @@ anglais par défaut :
   heure du cadran quand le centre est connu) ; 0,4 m `Step up now.` /
   `Step down now.` (`Marche, maintenant.` / `Descente, maintenant.`,
   `CurbText.stepPhrase`, sans heure : à un pas, l'heure retarde la
-  consigne) + `Stop, step up.` / `Stop, step down.` en alerte immédiate ;
+  consigne) + `Montez le rebord.` / `Descendez le rebord.` (`Step up.` /
+  `Step down.`, consigne immédiate sans « Stop » depuis le § 22) ;
 - **paliers** (`CurbWatcher`) : suivi jusqu'à 3 m mais annonce dès 1 m
   (`FAR_ANNOUNCE_METERS`), imminent à 0,4 m (`STEP_NEAR_METERS`) ;
   hystérésis 1,0 / 1,4 m (pré-alerte, une fois par approche) et
@@ -660,3 +668,43 @@ poteau à 3 m à 11 h → « …, passez à droite. » ; marques craie à 1,0 m 
 0,7 m, montée puis descente — sens juste 4/4 jour — **non mesuré**, exige
 un APK de cette branche sur appareil réel.
 
+## 22. Stop seulement en Traversée, voitures en mouvement (ordre user du 31/10)
+
+Le user marche avec l'app : iSee dit trop souvent « stop » — elle doit
+dire directement ce qu'il faut faire. Nouveau contrat, qui achève le
+retrait du stop des §§ 10/11/13 (le cap droit ne dit déjà plus stop)
+et amende les §§ 16/17/19 et le § 21 pluriel :
+
+- **guidage** : un obstacle dit son côté de sortie, même au contact
+  mesuré (`Guidance.word`, `STOP_METERS` et `GuidanceDecision.stop`
+  supprimés) — « gauche. » / « left. » TwinLite, jamais
+  « obstacle, stop. » ; la voix dit directement comment éviter ;
+- **voitures** : « Stop, car moving. » / « Stop, voiture en mouvement. »
+  (et « Stop, 2 vehicles moving. » au pluriel) ne se dit qu'en Traversée,
+  mouvement proche (≤ 8 m ou non mesuré,
+  `CrossingVehicleWatch`, urgent côté sonde via
+  `VehicleStateText.isSafetyPhrase`) ; en normal, mouvement comme arrêt
+  parlent doux (`observeVehicleState`, plus d'alerte `SafetyVoice`) ;
+- **rebord** : jamais de « Stop » — l'imminent dit la consigne
+  (« Montez le rebord. » / « Descendez le rebord. », `Step up.` /
+  `Step down.`, `CurbText.safetyStepPhrase`), toujours par la voix de
+  sécurité (coupe tout, survit à la dictée) ;
+- **P1/P2** : `SafetyVoice` ne porte plus que le rebord (flush § 21
+  inchangé) — le stop mouvement est parlé urgent (voix ElevenLabs),
+  pas en alerte système ;
+- **inchangé** : « Stop. » de l'urgence externe (`reportEmergency`,
+  contrat `docs/URGENCE-EXTERNE.md`), veto rouge, cooldowns (4 s
+  mouvement, 10 s arrêt/trottoir), mots et clips `guide_stop`/`tl_stop`
+  au catalogue (miroir `tools/voicepack-catalog.json`, inutilisés).
+
+Verrouillé par `GuidanceTest` + `GuidanceAnnouncerTest` +
+`GuidanceObstaclesTest` + `DangerVoiceTest` (contact ⇒ côté),
+`VehicleStateTextTest` (+2 : `isSafetyPhrase`, singulier + pluriel),
+`CurbAnnounceTest` (consigne sans stop), `CrossingVehicleTest` (stop
+EN/FR en Traversée), `LiveProbeGuidanceTest` (contact ⇒ côté non
+urgent) et `ProbeWiringWatchersTest` (+1 : `spokenUrgentOf`).
+
+Recette téléphone : obstacle au contact → côté de sortie, pas de stop ;
+voiture qui roule sous 8 m → doux en normal, « Stop, car moving. » en
+Traversée ; rebord imminent → « Montez le rebord. » — **non mesuré**,
+exige un APK de cette branche sur appareil réel.

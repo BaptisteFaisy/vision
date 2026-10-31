@@ -154,10 +154,12 @@ internal fun spokenClipId(text: String): String? =
  * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
  * mot stop) : seul le stop coupe la lecture en cours, chat compris
- * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » SAM urgence externe) —
+ * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » urgence externe,
+ * « Stop, car moving. » en Traversée) —
  * les mots doux attendent le silence, en file (`queue`, redits au silence
  * par le guetteur mobilier : sans file, ils se perdaient dès que la route
- * ou le chat parlait).
+ * ou le chat parlait). Le flag ne change qu'avec la phrase,
+ * donc la paire reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -181,9 +183,10 @@ internal fun LiveProbe.observeSpoken(
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
  * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
  * guetteur pour le `reset()` de début de séance. L'imminent ([CurbTier.NEAR],
- * 0,4 m) parle en alerte de sécurité (« Stop, … », [SafetyVoice]) ; la
- * pré-alerte à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent
- * doux. L'imminent passe en Traversée, la pré-alerte y est coupée — et la
+ * 0,4 m) parle en alerte de sécurité (consigne « Montez le rebord. »,
+ * [SafetyVoice], jamais de « Stop » — ordre user du 31/10) ; la pré-alerte
+ * à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent doux.
+ * L'imminent passe en Traversée, la pré-alerte y est coupée — et la
  * porte précède le watcher (un FAR coupé ne consomme ni confirmation ni
  * cooldown). `collect` séquentiel, voix douce en coroutine fille.
  */
@@ -290,9 +293,10 @@ internal fun LiveProbe.observeFenceOpening(
 /**
  * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
  * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
- * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Le mouvement
- * parle en alerte de sécurité (« Stop, … », [SafetyVoice] : immédiat, coupe
- * tout, dictée du user comprise) ; l'annonce reste douce (attend le silence).
+ * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
+ * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
+ * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
+ * parlent doux (seul l'`urgent` du danger qui s'approche coupe).
  * En Traversée, le veto seul parle (coupé ici) — les états moteurs se disent
  * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
  * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
@@ -303,7 +307,6 @@ internal fun LiveProbe.observeVehicleState(
     voice: ProximityVoice,
     playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
-    safety: SafetyVoice,
     watcher: VehicleStateWatcher = VehicleStateWatcher(),
 ): VehicleStateWatcher {
     scope.launch {
@@ -319,11 +322,6 @@ internal fun LiveProbe.observeVehicleState(
                 motion,
             ) ?: return@collect
             logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
-            val alert = cue.safetyPhrase
-            if (alert != null) {
-                safety.speak(alert)
-                return@collect
-            }
             voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
         }
     }
@@ -485,7 +483,7 @@ internal fun LiveProbe.observeHazards(
         observeStairsCount(scope, voice, playerIdle, language),
         observeHazard(scope, voice, playerIdle, language, busy),
         observeFenceOpening(scope, voice, playerIdle, language),
-        observeVehicleState(scope, voice, playerIdle, language, safety, vehicle),
+        observeVehicleState(scope, voice, playerIdle, language, vehicle),
         observeCycles(scope, voice, playerIdle, language),
         observeSidewalk(scope, voice, playerIdle, language),
     )

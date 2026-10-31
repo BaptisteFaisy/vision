@@ -12,25 +12,24 @@ proximity.reportEmergency(settings.speechLanguage, playerIdle = canAnnounce())
 
 - Dit « Stop. » (FR/EN, langue de la voix) **aussitôt**, en clip local
   (< 100 ms, zéro réseau) quand le pack voix l'a, sinon synthèse + cache ;
-- **coupe tout** (chat compris, `urgent = true`), comme le stop interne ;
-- **dédupliqué** : un « Stop. » déjà dit ne se répète pas — le stop interne
-  dit « obstacle, arrêtez-vous. » (voix TwinLite, § 12 de
-  `docs/VOIX-DANGER.md`), pas de conflit ;
+- **coupe tout** (chat compris, `urgent = true`), comme le stop Traversée ;
+- **dédupliqué** : un « Stop. » déjà dit ne se répète pas (le stop
+  interne du guidage est supprimé depuis l'ordre user du 31/10 —
+  jamais de stop pour un obstacle) ;
 - rien sans clé ElevenLabs (`ttsConfigured`), comme le reste de la voix.
 
 Le modèle externe est câblé au niveau du ViewModel (c'est lui qui possède
 `proximity`) ou d'un guetteur façon `ProbeWiring.observeCurb` — jamais dans
 `LiveProbe` (499/500 lignes, tout câblage vit à côté).
 
-## 2. En attendant : le stop interne reste
+## 2. Le stop interne est supprimé (ordre user du 31/10)
 
-`TwinLiteWord.Stop` (« obstacle, arrêtez-vous. », contact mesuré ≤ 0,6 m
-sur caps latéraux — le cap droit contourne toujours —, `Guidance.STOP_METERS`)
-est le seul urgent de la sonde
-(`LiveProbeState.spokenUrgent`, via `isStopPhrase`). Quand le modèle
-externe est branché et validé, le stop interne est **supprimé** (mot, seuil,
-clip `tl_stop`, tests) — la suppression est un commit à part, pas un
-mélange avec le branchement.
+`TwinLiteWord.Stop` (« obstacle, arrêtez-vous. », ex-contact mesuré
+≤ 0,6 m, `Guidance.STOP_METERS` supprimé) ne se dit plus : un obstacle
+dit son côté de sortie, jamais stop. Le mot et le clip `tl_stop` restent
+au catalogue (miroir `tools/voicepack-catalog.json`, inutilisés). Seul
+urgent restant de la sonde : « Stop, car moving. » en Traversée et
+« Stop. » du modèle externe, via `spokenUrgentOf`.
 
 ## 3. Ce que l'urgence ne fait jamais
 

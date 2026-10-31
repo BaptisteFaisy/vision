@@ -22,8 +22,9 @@ import kotlin.coroutines.coroutineContext
  * jouée. Le stop seul ne se répète jamais ; les directions douces reparlent
  * à chaque émission (ordre user du 31/10).
  *
- * [urgent] = stop (mot du guidage ou modèle d'urgence externe) : coupe la
- * lecture en cours et parle quand même, y compris pendant une dictée — la
+ * [urgent] = stop (mot du guidage, alerte mouvement en Traversée ou modèle
+ * d'urgence externe) : coupe la lecture en cours et parle quand même,
+ * y compris pendant une dictée — la
  * sécurité passe avant le sous-titre (miroir de `TraverseVoice`, qui
  * préempte la verte par la rouge). Les mots doux et les « Attention … »
  * attendent le silence. [synthesize] injecte le moteur (ElevenLabs en prod,
@@ -147,8 +148,8 @@ class ProximityVoice(
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { return }
         // L'urgence (stop) parle toujours : la sécurité passe avant la
-        // priorité du user et avant la porte « GPS désactivé ». (Trottoir et
-        // voiture en mouvement parlent par la voix de sécurité, hors d'ici.)
+        // priorité du user et avant la porte « GPS désactivé ». (Le rebord
+        // imminent parle par la voix de sécurité, hors d'ici.)
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
             // Mémorisée au moment de parler seulement : un avalement transitoire
@@ -209,9 +210,9 @@ class ProximityVoice(
      * Stop d'urgence injecté par le modèle d'urgence externe (ordre user du
      * 29/10, contrat `docs/URGENCE-EXTERNE.md`) : « Stop. » dit aussitôt, en
      * clip local (< 100 ms) quand le pack l'a, coupe tout (chat compris).
-     * Dédupliqué comme le reste : un « Stop. » déjà dit ne se répète pas (le
-     * stop interne, contact ≤ 0,6 m, est gardé en attendant — même mot, pas
-     * de conflit).
+     * Dédupliqué comme le reste : un « Stop. » déjà dit ne se répète pas
+     * (le stop interne du guidage est supprimé depuis l'ordre user du
+     * 31/10 : jamais de stop pour un obstacle).
      */
     suspend fun reportEmergency(language: SpeechLanguage, playerIdle: Boolean) {
         val stop = GuidanceWord.Stop

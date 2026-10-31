@@ -455,7 +455,7 @@ _state.update { it.cleared() }
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
                 spokenSeq = if (phrase != null) current.spokenSeq + 1 else current.spokenSeq,
-                spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
+                spokenUrgent = if (phrase != null) spokenUrgentOf(phrase) else current.spokenUrgent,
                 steering = steering,
                 samPassage = frame.passage,
                 detour = if (_state.value.crossingActive) false else voice.detour,
