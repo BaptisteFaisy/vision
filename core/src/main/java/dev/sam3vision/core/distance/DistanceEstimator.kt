@@ -256,16 +256,16 @@ class DistanceMeter(
         principalY: Float,
         height: Int,
     ): RawReading? {
-        val standing = KnownSizes.heightMeters(label)
-            ?.let { Pinhole.distanceMeters(box, it, focalPx) }
-        val ground = groundMeters(box, focalPx, principalY, height)
+        val standing = KnownSizes.heightMeters(detection.label)
+            ?.let { Pinhole.distanceMeters(detection.box, it, focalPx) }
+        val ground = groundMeters(detection.box, focalPx, principalY, height)
         val meters = DistanceFusion.combine(
             standing,
             ground,
-            KnownSizes.fusionWeight(label),
-            groundWeight(box, focalPx, principalY),
+            KnownSizes.fusionWeight(detection.label),
+            groundWeight(detection.box, focalPx, principalY),
         ) ?: return null
-        val confidence = ReadingConfidence.of(box, standing, ground)
+        val confidence = ReadingConfidence.of(detection.box, standing, ground)
         return RawReading(meters, confidence)
     }
 
