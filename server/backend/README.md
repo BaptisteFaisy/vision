@@ -66,7 +66,7 @@ curl -s -X POST $URL/segment -H 'Content-Type: application/json' \
 
 `prompts: null` ⇒ concepts génériques du serveur (`person`, `car`, `animal`, `plant`,
 `furniture`, `building`, `food`, `clothing`) puis repli `object`/`thing` si rien n'est trouvé.
-`prompts` fourni : 1 à 16 concepts, 64 caractères max chacun (sinon 400).
+`prompts` fourni : 1 à 18 concepts, 64 caractères max chacun (sinon 400).
 L'encodeur de texte de SAM 3.1 étant un CLIP anglais, les concepts français courants
 (`personne`, `voiture`, `objet`…) sont traduits pour le modèle — **le label renvoyé reste
 celui tapé par l'utilisateur**.

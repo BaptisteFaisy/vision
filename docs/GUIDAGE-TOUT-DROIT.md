@@ -170,8 +170,8 @@ Chaîne `LiveProbe.publish` rejouée en JVM (`core/.../live/GuidanceObstaclesTes
 sténopé, profondeur serveur, `placedLabels`, `decide`, mot, phrase — 8/8 sur r630.
 Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
 
-- **Mur** : `wall` dans les défauts (`LivePrompts.kt:31-35`), `mur`/`wall` 2,50 m
-  (`KnownSizes.kt:68`). À ~2 m le mur remplit l'image (boîte coupée haut/bas) :
+- **Mur** : `wall` dans les défauts (`LivePrompts.kt:52-57`), `mur`/`wall` 2,50 m
+  (`KnownSizes.kt:104`). À ~2 m le mur remplit l'image (boîte coupée haut/bas) :
   pas de lecture sténopé, le couloir bloque par prudence avec le côté de sortie
   (`GuidanceObstaclesTest.kt:90`). Mesuré (~3 m) : blocage + décalage chiffré
   (`:109`). À 0,5 m le mot reste le côté de sortie (« right. », voix
