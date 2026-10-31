@@ -1,19 +1,24 @@
 package dev.sam3vision.core.crossing
 
 /**
- * Classifieur d'état entraîné hors dépôt sur les crops du jeu Ampel
- * (dépôt patVlnta/Ampel-Pilot-Dataset : boîtes SQL, feux allemands), puis
- * porté ici sous forme de tableaux. Ne pas éditer à la main : régénérer
- * depuis les crops (harnais d'évaluation), mêmes hyperparamètres
- * (profondeur 6, feuille min 20). Traits : [FEATURE_NAMES] dans l'ordre.
+ * Classifieur d'état entraîné sur crops téléphone (`tools/train_light.py`,
+ * lot lotfinal 52 crops + `fr_green_fig_243` miné en dur positif petit-vert,
+ * gini, profondeur 5, feuille min 5, seed 42), porté ici sous forme de
+ * tableaux. Ne pas éditer à la main : régénérer depuis les crops, mêmes
+ * hyperparamètres. Traits : [FEATURE_NAMES] dans l'ordre.
+ *
+ * L'arbre appris est une souche (`green_frac` > 0,0048) : sur les crops
+ * téléphone, la fraction verte sépare à elle seule (verts ≥ 0,017, rouges
+ * ≤ 0,0018) et la forme reste du ressort de la porte. Mesuré 01/11 :
+ * verdicts 18/20 verts lotfinal (0009 et 0015 : tache trop large, élancement
+ * < 1,0 — seuils de porte intacts, non réglés), 32/32 rouges, 0 faux vert ;
+ * 18/20 ancres stables (2 disques voiture repassent rouges, sens sûr).
  *
  * Sous le plancher de pureté de la feuille atteinte, la réponse est
  * [CrossingState.Red] : binaire, une couleur fragile attend (ordre user du
  * 31/10, fini le doute). Le vert se tranche plus large ([GREEN_MIN_PURITY])
- * que le rouge ([MIN_PURITY]) — un vert raté fait attendre, mais un vert
- * jamais détecté ne sert à rien — avec un garde-fou : sans pixels verts
+ * que le rouge ([MIN_PURITY]) — avec un garde-fou : sans pixels verts
  * ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert (le noir attend).
- * Reste à valider sur feux français et boîtes SAM réelles (non mesuré).
  */
 object TrainedLightColor {
 
@@ -32,12 +37,12 @@ object TrainedLightColor {
     /** Indice du trait `green_frac` dans [FEATURE_NAMES] (plancher vert). */
     private const val GREEN_FRAC_INDEX = 13
 
-    private val FEATURE = intArrayOf(3, 8, 15, 15, 15, 16, -2, -2, -2, -2, 10, 15, -2, 15, -2, -2, -2, 15, 0, -2, -2, -2, 10, -2, -2)
-    private val THRESHOLD = floatArrayOf(0.020556f, 0.000737f, 0.251779f, 0.235394f, 0.179629f, 0.285050f, -2.000000f, -2.000000f, -2.000000f, -2.000000f, 0.000336f, 0.302868f, -2.000000f, 0.557728f, -2.000000f, -2.000000f, -2.000000f, 0.483485f, 0.966917f, -2.000000f, -2.000000f, -2.000000f, 0.001128f, -2.000000f, -2.000000f)
-    private val LEFT = intArrayOf(1, 2, 3, 4, 5, 6, -1, -1, -1, -1, 11, 12, -1, 14, -1, -1, -1, 18, 19, -1, -1, -1, 23, -1, -1)
-    private val RIGHT = intArrayOf(22, 17, 10, 9, 8, 7, -1, -1, -1, -1, 16, 13, -1, 15, -1, -1, -1, 21, 20, -1, -1, -1, 24, -1, -1)
-    private val LEAF_CLASS = intArrayOf(0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1)
-    private val LEAF_PURITY = floatArrayOf(0.6256f, 0.9034f, 0.5590f, 0.5970f, 0.5614f, 0.6250f, 0.7179f, 0.5366f, 0.5882f, 0.8000f, 0.6136f, 0.5994f, 0.7895f, 0.5772f, 0.5030f, 0.6624f, 0.8571f, 0.9974f, 0.9995f, 1.0000f, 0.9500f, 0.8000f, 0.9963f, 1.0000f, 0.8519f)
+    private val FEATURE = intArrayOf(13, -2, -2)
+    private val THRESHOLD = floatArrayOf(0.004812047118321061f, -2.0f, -2.0f)
+    private val LEFT = intArrayOf(1, -1, -1)
+    private val RIGHT = intArrayOf(2, -1, -1)
+    private val LEAF_CLASS = intArrayOf(0, 0, 1)
+    private val LEAF_PURITY = floatArrayOf(0.0f, 1.0f, 1.0f)
 
     /** Noms des traits, dans l'ordre d'extraction (documentation et tests). */
     val FEATURE_NAMES: List<String> = listOf("hue_bin_0", "hue_bin_1", "hue_bin_2", "hue_bin_3", "hue_bin_4", "hue_bin_5", "hue_bin_6", "hue_bin_7", "red_top", "red_bottom", "green_top", "green_bottom", "red_frac", "green_frac", "sat_frac", "mean_value", "mean_sat")
