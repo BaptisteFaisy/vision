@@ -348,7 +348,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - Causes : seuil dur 3 m (poteau 3-4 m ignoré) ; phrase douce tuée par le chat ou la route mémorisée puis perdue ; `VehicleStateCue.urgent` ignoré par le câblage.
 - Portée poteau 4 m (`POLE_METERS`, autres mobiliers à 3 m), imminent ≤ 2 m dès la 1re frame urgent, dit une fois puis ré-armé (3 frames sans poteau), cooldown 10 s inchangé ; `p1p2Busy` + `shouldCutForHazard` (P3 ne coupe jamais P1/P2) ; file voix 1 phrase TTL 3 s redite au silence (`flushPending`) ; P1 coupe.
 - Docs : `VOIX-DANGER.md` § 16, recette rue ≤ 4 m (`RECETTE-RUE.md`, `verify-street.sh`), verrou `≤ 4 m` dans `test_scripts.sh`.
-- Preuves : `:app` 1298/1298, `:core` 2203/2208 (5 `PrivateFileSettingsStoreTest` préexistants, POSIX sous Windows, hors zone), `assembleDebug` OK, `check-kotlin-limits` OK (1163 fichiers), `test_scripts.sh` 130/130.
+- Preuves : `:app` 1300/1300, `:core` 2214/2219 (5 `PrivateFileSettingsStoreTest` préexistants, POSIX sous Windows, hors zone), `assembleDebug` OK, `check-kotlin-limits` OK (1163 fichiers), `test_scripts.sh` 130/130.
 
 ## 2026-10-30 — suivi caregiver : la caméra disparaît dès qu'elle s'éteint (branche `fix/caregiver-camera-cutoff`)
 
