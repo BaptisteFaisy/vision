@@ -200,6 +200,8 @@ fun AppNav(
     NavOrderEffect(isee)
     VoiceNavStateEffect(isee, route, push, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
+    // Accueil iSee plein écran : le téléphone ne doit pas se mettre en veille.
+    KeepScreenOnEffect(keepsScreenOn(route))
 
     Box(Modifier.fillMaxSize()) {
         // Les lunettes nourrissent iSee : photos posées sans changer de page, questions parlées comme des dictées.
