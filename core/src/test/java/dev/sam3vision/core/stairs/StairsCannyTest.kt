@@ -31,6 +31,26 @@ class StairsCannyTest {
     }
 
     @Test
+    fun `bande epaisse = rangs actifs d un seul tenant, pas dedoubles`() {
+        // Contrat du compteur : un nez n'a qu'un côté montant — les deux
+        // côtés d'une bande de 6 px ne doivent plus activer deux rangs
+        // séparés (un plateau NMS peut garder 2 rangs adjacents : le
+        // groupement les fusionne, le compte reste un).
+        val width = 64
+        val mask = grayOf(width, 60, fill = 20) { pixels, w, _ ->
+            for (y in 38 until 44) hline(pixels, w, y)
+        }
+        val edges = StairsCanny.horizontalEdges(mask, 24, 60, config)
+        val needed = (width * config.minRowCoverage).toInt()
+        val active = (24 until 60).filter { y ->
+            (0 until width).count { x -> edges[y * width + x] != 0.toByte() } >= needed
+        }
+
+        assertTrue(active.isNotEmpty())
+        assertEquals(active.size, active.last() - active.first() + 1)
+    }
+
+    @Test
     fun `marche verticale = aucun contour retenu`() {
         val mask = grayOf(64, 60, fill = 20) { pixels, width, height ->
             for (y in 0 until height) pixels[y * width + 32] = 255.toByte()
