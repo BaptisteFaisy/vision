@@ -219,10 +219,14 @@ object VoiceNavPhrases {
      * arrivée (habillée de [destinationName] quand il est connu), écart ou
      * retour.
      */
-    fun event(event: NavEvent, destinationName: String?): String = when (event) {
+    fun event(
+        event: NavEvent,
+        destinationName: String?,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
+    ): String = when (event) {
         is NavEvent.ManeuverAhead -> ahead(event.action, event.street, event.distM)
         is NavEvent.CrossingAhead -> crossingAhead(event.distM)
-        NavEvent.CrossingPassed -> CROSSING_DONE
+        NavEvent.CrossingPassed -> crossingDone(language)
         is NavEvent.Arrived -> arrived(destinationName)
         is NavEvent.OffRoute -> OFF_ROUTE
         is NavEvent.BackOnRoute -> BACK_ON_ROUTE
@@ -274,8 +278,17 @@ object VoiceNavPhrases {
         return "Crosswalk in $distance"
     }
 
+    /** Traversée passée, dans la langue de la voix. */
+    private fun crossingDone(language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> CROSSING_DONE_FR
+        SpeechLanguage.En -> CROSSING_DONE
+    }
+
     /** Traversée passée : le guidage reprend (miroir `nav_voice_crossing_done`). */
     const val CROSSING_DONE = "Crossing finished."
+
+    /** Traversée passée, voix française de compatibilité (clip pack `nav_crossing_done`). */
+    const val CROSSING_DONE_FR = "Traversée terminée."
 
     // ── Confirmation (session) : complètent NavigationPhrases ──
     // Question vocale (toujours en anglais, exigence produit), « Here is the

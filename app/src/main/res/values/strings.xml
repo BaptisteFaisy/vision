@@ -6,7 +6,7 @@
     <!-- Confirmation: “Navigating to X” (cf. NavigationPhrases.started). -->
     <string name="nav_confirm_destination">Navigating to %1$s</string>
     <!-- Error: guidance cannot be opened (cf. GUIDANCE_UNAVAILABLE). -->
-    <string name="nav_guidance_unavailable">I can\'t open the guidance</string>
+    <string name="nav_guidance_unavailable">I can’t open the guidance</string>
     <!-- Settings: “GPS guidance” switch (cf. NavigationToggle). -->
     <string name="nav_guidance_toggle_label">Guide to the confirmed destination</string>
     <!-- Voice guidance: named arrival (cf. VoiceNavPhrases.arrived). -->
