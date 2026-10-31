@@ -25,7 +25,7 @@ from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, cl
                        segment_frame, vision_grid)
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
 from passage import suggest_passage
-from timing import Stage, elapsed_ms, format_server_timing, now
+from timing import Stage, container_age_seconds, elapsed_ms, format_server_timing, now
 
 MODEL_LABEL = "sam3.1-fast"
 # Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
@@ -82,26 +82,6 @@ def accepts_mask_encoding(pipeline) -> bool:
     return accepts_param(pipeline, "mask_encoding")
 
 
-def container_age_seconds():
-    """Âge du conteneur en secondes (uptime machine - début du processus).
-
-    Copie volontaire de ``live_app_utils.container_age_seconds`` : ce module vit hors
-    de ``live_fast/`` donc hors de l'image déployée (non importable ici). Après une
-    restauration de snapshot, le processus est neuf mais ``/proc`` voit son vrai âge —
-    là où le chrono du code ne verrait que la phase GPU rejouée.
-    """
-    try:
-        with open("/proc/uptime", "r", encoding="utf-8") as handle:
-            uptime = float(handle.read().split()[0])
-        with open("/proc/self/stat", "r", encoding="utf-8") as handle:
-            fields = handle.read().rsplit(") ", 1)[1].split()
-        start_ticks = int(fields[19])
-        hertz = os.sysconf("SC_CLK_TCK")
-        return round(uptime - start_ticks / hertz, 1)
-    except Exception:  # noqa: BLE001 — mesure best-effort, jamais bloquante
-        return None
-
-
 class Sam3LiveService:
     """Modèle chargé une fois, leviers activables, verrou GPU unique.
 
@@ -155,6 +135,8 @@ class Sam3LiveService:
             self.ctx["detr_graphs"] = detr_graph.DetrGraphs()
         else:
             self.ctx["detr_graphs"] = None
+        from depth import ensure_depth
+        ensure_depth(self.ctx, device, dtype)
         self.gpu_name = gpu_name()
         self.load_seconds = round(time.monotonic() - started, 1)
         snap = getattr(self, "snap_seconds", None)
@@ -168,7 +150,8 @@ class Sam3LiveService:
         self._gpu_lock = threading.Lock()
 
     def _live_sync(self, image_b64, prompts, max_objects, work_edge, batch_prompts, edge,
-                   mask_encoding=None, mask_format=None, mask_edge=0) -> dict:
+                   mask_encoding=None, mask_format=None, mask_edge=0,
+                   with_depth=False) -> dict:
         """Une frame de direct : décodage, segmentation avec les leviers effectifs, chrono.
 
         Le décodage et le pré-traitement CPU sont **hors** du verrou GPU (``run_frame`` ne
@@ -184,10 +167,12 @@ class Sam3LiveService:
         with Stage(timers, "decode_ms"):
             image = decode_image(image_b64)
         return self._live_from_image(image, prompts, max_objects, work_edge, batch_prompts,
-                                     edge, mask_encoding, mask_format, mask_edge, timers, started)
+                                     edge, mask_encoding, mask_format, mask_edge, timers, started,
+                                     with_depth)
 
     def _live_from_image(self, image, prompts, max_objects, work_edge, batch_prompts, edge,
-                         mask_encoding, mask_format, mask_edge, timers, started) -> dict:
+                         mask_encoding, mask_format, mask_edge, timers, started,
+                         with_depth=False) -> dict:
         """Suite de :meth:`_live_sync` sur une image déjà décodée (entrée JSON ou binaire)."""
         from segmentation import MAX_OBJECTS, normalize_prompts
 
@@ -197,7 +182,8 @@ class Sam3LiveService:
         batch = BATCH_PROMPTS if batch_prompts is None else bool(int(batch_prompts))
         result = run_frame(self.ctx, image, concepts, work, cap, batch, edge=edge,
                            mask_encoding=mask_encoding, gpu_lock=self._gpu_lock, timers=timers,
-                           mask_format=mask_format, mask_edge=mask_edge or 0)
+                           mask_format=mask_format, mask_edge=mask_edge or 0,
+                           with_depth=with_depth)
         timers["total_ms"] = elapsed_ms(started)
         result["elapsed_ms"] = int(round(timers["total_ms"]))
         result["fast"] = {"batch_prompts": batch, "edge": result.pop("_edge_applied"),
@@ -219,6 +205,8 @@ class Sam3LiveService:
         if accepts_param(self._live_sync, "mask_format"):
             extra["mask_format"] = getattr(request, "mask_format", None)
             extra["mask_edge"] = getattr(request, "mask_edge", None) or 0
+        if accepts_param(self._live_sync, "with_depth"):
+            extra["with_depth"] = bool(getattr(request, "with_depth", False))
         return await call(self._live_sync, *args, **extra)
 
     async def _run_live_binary(self, request) -> dict:
@@ -244,7 +232,8 @@ class Sam3LiveService:
             return self._live_from_image(
                 image, prompts, _int("max_objects"), _int("work_edge"),
                 _int("batch_prompts"), _int("edge"), params.get("mask_encoding"),
-                params.get("mask_format"), _int("mask_edge") or 0, timers, started)
+                params.get("mask_format"), _int("mask_edge") or 0, timers, started,
+                _int("with_depth") == 1)
 
         return await call(run)
 
@@ -374,6 +363,7 @@ class Sam3LiveService:
         ce conteneur a booté (restore vs complet), ``memory_snapshot`` si le levier est armé.
         """
         return {"ok": True, "model": MODEL_LABEL, "device": self.ctx.get("device_label", "cpu"),
+                "depth": self.ctx.get("depth_model_id"),
                 "gpu": getattr(self, "gpu_name", "unknown"),
                 "region": (os.environ.get("MODAL_REGION") or os.environ.get("BASETEN_REGION")
                            or "unknown"),
