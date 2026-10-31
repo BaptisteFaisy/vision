@@ -130,16 +130,17 @@ private fun decodeGrayMaskArgb(bytes: ByteArray): GrayMask? {
 /**
  * Colore [mask] dans [scratch] (table [lut]) puis l'écrit dans [target], réutilisé s'il a
  * déjà la bonne taille : une frame ne coûte plus qu'une écriture de pixels, sans tableau
- * intermédiaire ni bitmap neuf. Renvoie le bitmap à afficher (jamais recyclé par l'appelant).
+ * intermédiaire ni bitmap neuf. Renvoie le bitmap à afficher (jamais recyclé par l'appelant),
+ * `null` si le bitmap ne se crée pas (mémoire : l'appelant saute le masque, pas de crash).
  */
-fun colorizeGrayToBitmap(mask: GrayMask, lut: IntArray, scratch: IntArray, target: Bitmap?): Bitmap {
+fun colorizeGrayToBitmap(mask: GrayMask, lut: IntArray, scratch: IntArray, target: Bitmap?): Bitmap? {
     colorizeGrayInto(mask, lut, scratch)
     val bitmap = if (target != null && !target.isRecycled &&
         target.width == mask.width && target.height == mask.height
     ) {
         target
     } else {
-        Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ARGB_8888)
+        Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ARGB_8888) ?: return null
     }
     bitmap.setPixels(scratch, 0, mask.width, 0, 0, mask.width, mask.height)
     return bitmap
