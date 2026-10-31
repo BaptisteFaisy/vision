@@ -95,7 +95,7 @@ class CrossingAnnouncer(
         lastCue = null
     }
 
-    /** Frames stables exigées : le vert se prouve (4), le rouge moins (2). */
+    /** Frames stables exigées : le vert comme le rouge se prouvent en 2 frames. */
     private fun required(state: CrossingState): Int =
         if (state == CrossingState.Green) greenMinFrames else redMinFrames
 
@@ -110,8 +110,13 @@ class CrossingAnnouncer(
     }
 
     companion object {
-        /** Frames vertes de suite avant « traversez » (≈ 0,8 s à 5 ips). */
-        const val GREEN_MIN_FRAMES = 4
+        /**
+         * Frames vertes de suite avant « traversez » (≈ 0,4 s à 5 ips).
+         * 2 depuis le 31/10 (ordre user : à 4, P(annonce) = p⁴ et le vert
+         * n'était jamais annoncé) ; la porte par frame garde la sûreté, un
+         * vert isolé reste muet.
+         */
+        const val GREEN_MIN_FRAMES = 2
 
         /** Frames rouges de suite avant « attendez ». */
         const val RED_MIN_FRAMES = 2

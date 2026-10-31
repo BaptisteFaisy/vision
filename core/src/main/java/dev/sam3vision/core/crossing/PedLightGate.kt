@@ -35,9 +35,11 @@ object PedLightGate {
     /**
      * Vert minimal dans le cadre (en dessous : reflet ou bruit). Partagé
      * avec [TrainedLightColor] : mêmes pixels, même plancher, pas de vert
-     * sans vert.
+     * sans vert. 0,002 depuis le 31/10 (ordre user : feux petits et
+     * lointains) ; les disques voiture (≥ 0,046) restent hors d'atteinte
+     * de ce plancher et la porte forme tranche ensuite.
      */
-    internal const val GREEN_MIN_FRACTION = 0.004f
+    internal const val GREEN_MIN_FRACTION = 0.002f
 
     /** Élancement minimal de la tache verte (un disque est aussi large que haut). */
     private const val ELONGATION_MIN = 1.5f

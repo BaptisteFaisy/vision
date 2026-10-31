@@ -9,12 +9,10 @@ import org.junit.Test
 class CrossingAnnouncerTest {
 
     @Test
-    fun `le vert exige quatre frames de suite`() {
+    fun `le vert exige deux frames de suite`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Green))
-        assertNull(announcer.onFrame(200L, CrossingState.Green))
-        assertNull(announcer.onFrame(400L, CrossingState.Green))
-        val cue = announcer.onFrame(600L, CrossingState.Green)
+        val cue = announcer.onFrame(200L, CrossingState.Green)
         assertEquals("You can cross", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
         assertEquals(CrossingState.Green, cue?.state)
