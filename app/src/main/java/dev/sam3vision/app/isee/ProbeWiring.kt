@@ -30,7 +30,6 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
-import dev.sam3vision.core.traverse.VehicleStateText
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
@@ -178,15 +177,6 @@ internal fun LiveProbe.observeSpoken(
             }
     }
 }
-
-/**
- * Urgence d'une phrase parlée : le mot stop (guidage, ou « Stop. » de
- * l'urgence externe — [GuidanceWord.isStopPhrase]) ou une alerte
- * mouvement (« Stop, car moving. » — [VehicleStateText.isSafetyPhrase],
- * Traversée seule depuis l'ordre user du 31/10). Pure, testée en JVM.
- */
-internal fun spokenUrgentOf(phrase: String): Boolean =
-    GuidanceWord.isStopPhrase(phrase) || VehicleStateText.isSafetyPhrase(phrase)
 
 /**
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de

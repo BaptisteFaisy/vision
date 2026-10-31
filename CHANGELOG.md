@@ -454,8 +454,9 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   caps latéraux ; `CrossingVehicleWatch` parle l'alerte « Stop, car
   moving. » / « Stop, voiture en mouvement. » (et « Stop, 2 vehicles
   moving. » au pluriel) quand le mouvement est proche (≤ 8 m ou non
-  mesuré), la phrase douce sinon ; `spokenUrgentOf` (`ProbeWiring`,
-  `VehicleStateText.isSafetyPhrase` nouveau, singulier + pluriel) rend
+  mesuré), la phrase douce sinon ; `spokenUrgentOf` (nouveau
+  `SpokenUrgent.kt`, `VehicleStateText.isSafetyPhrase` nouveau,
+  singulier + pluriel) rend
   l'alerte urgente côté sonde (`LiveProbe.kt`, 1 ligne) ;
   `observeVehicleState` ne parle plus qu'en doux en normal (paramètre
   `safety` retiré) ; `CurbText.safetyStepPhrase` devient la consigne
