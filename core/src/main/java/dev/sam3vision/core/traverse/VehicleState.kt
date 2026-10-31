@@ -8,7 +8,6 @@ import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.speech.SpeechLanguage
-import kotlin.math.hypot
 
 /**
  * Ordre d'annonce d'état véhicule : [phrase] dans la langue de la voix,
@@ -403,7 +402,7 @@ class VehicleStateWatcher(
                 if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) {
                     return@filter false
                 }
-                if (!still(prev, seen, atMs)) return@filter false
+                if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { meters.getValue(it) }
@@ -411,18 +410,6 @@ class VehicleStateWatcher(
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
         return Pick(State.STOPPED, name, meters.getValue(key), seen.cx, false)
-    }
-
-    /** Dérive du centre sous le seuil : l'image ne bouge (presque) plus. */
-    private fun still(prev: Prev, seen: Current, atMs: Long): Boolean {
-        if (atMs < 0L || prev.atMs < 0L) return false
-        val dtSeconds = (atMs - prev.atMs) / 1000f
-        if (dtSeconds <= 0f) return false
-        val cx = seen.cx ?: return false
-        val cy = seen.cy ?: return false
-        val px = prev.cx ?: return false
-        val py = prev.cy ?: return false
-        return hypot(cx - px, cy - py) / dtSeconds <= STILL_SPEED
     }
 
     /** Véhicules moteurs vus par clé (surface max, miroir du veto). */
