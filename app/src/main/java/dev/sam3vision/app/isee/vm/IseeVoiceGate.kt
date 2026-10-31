@@ -16,7 +16,8 @@ import android.os.SystemClock
  *   photo prise) rouvre la parole pendant [AMBIENT_WINDOW_MS] : la fenêtre
  *   laisse la voix décrire ce qui vient d'être pris ;
  * - les urgences (trottoir, escaliers, hors-trace) ne passent pas par ici :
- *   la sécurité passe avant le silence ([maySpeak]).
+ *   la sécurité passe avant le silence — trottoir imminent par `SafetyVoice`,
+ *   escaliers en doux dès que le chat est libre (`stairsAudible`, GPS ou pas).
  *
  * Pur (l'horloge est injectée, testé en JVM sans Android).
  */
