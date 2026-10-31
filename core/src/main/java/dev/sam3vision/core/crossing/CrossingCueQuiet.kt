@@ -7,9 +7,8 @@ package dev.sam3vision.core.crossing
  * Un ordre du feu **nouveau** (phrase jamais vue) fait taire la voix douce
  * pendant [quietMs] — le temps de le synthétiser et de le dire : sans ce
  * silence, le `collectLatest` côté sonde jetterait l'ordre pas encore joué
- * dès qu'une voix douce parlerait, et un « Vert, traversez. » dit une seule
- * fois ne se rattrape pas. Les répétitions (même phrase, comme le rouge
- * redit toutes les 2 s) ne réarment pas le silence.
+ * dès qu'une voix douce parlerait. Les répétitions (même phrase, rouge ou
+ * vert redits toutes les 2 s) ne réarment pas le silence.
  *
  * Pur et testé en JVM : [atMs] est fourni, aucune horloge implicite.
  */

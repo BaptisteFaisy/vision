@@ -258,10 +258,11 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
   (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; un ordre du feu nouveau
   fait taire la voix
-  douce 2,5 s (`CUE_QUIET_MS`, les répétitions du rouge ne réarment pas) —
-  sans ce silence, le `collectLatest` côté sonde jetterait l'ordre pas
-  encore joué, et un « Vert, traversez. » dit une seule fois ne se rattrape
-  pas (`CrossingPeopleVoice.kt`, la sonde ne change que d'une ligne) ;
+  douce 2,5 s (`CUE_QUIET_MS`, les répétitions — même phrase, rouge ou
+  vert — ne réarment pas) — sans ce silence, le `collectLatest` côté sonde
+  jetterait l'ordre pas encore joué (`CrossingPeopleVoice.kt`, la sonde ne
+  change que d'une ligne) ; depuis le 31/10 le vert se répète toutes les
+  2 s comme le rouge, un ordre jeté se rattrape à la répétition suivante ;
 - **états moteurs** (30/10, soir) : en traversée, les voitures disent si
   elles roulent ou sont arrêtées (« Car moving, 5 meters away. » /
   « Car stopped, 2 meters away. », langue de la voix, anglais par défaut) —

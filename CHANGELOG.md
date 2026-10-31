@@ -4,6 +4,23 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — traversée : le feu dit rouge ou vert toutes les 2 s (branche `vert-repete-2s`)
+
+- **Demande** : en mode Traversée, dire obligatoirement si le feu est rouge
+  ou vert — donc toutes les 2 s. Avant : le vert ne parlait qu'une fois puis
+  restait muet, et le rouge se répétait chaque seconde (ordre du 30/10).
+- Fait : `CrossingAnnouncer` répète le vert comme le rouge (`GREEN_REPEAT_MS`
+  = 2 s, paramètre `greenRepeatMs`, répétition jamais urgente, recule le
+  délai comme une annonce) et le rouge repasse de 1 s à 2 s
+  (`RED_REPEAT_MS`) — une seule cadence pour les deux états. Les voix douces
+  (personnes, véhicules) sont inchangées : les répétitions (même phrase) ne
+  réarment pas leur silence (`CrossingCueQuiet`).
+- Preuves : échec constaté avant sur les 4 tests visés
+  (`CrossingAnnouncerTest` vert-2s + rouge-2s, `TraversePipelineTest` vert
+  redit + veto — 19 tests, 4 échecs), vert après (`:core` 2 462/2 462 et
+  `:app` 1 378/1 378 sur r630 après rebase, 0 échec) ;
+  `check-kotlin-limits.py` vert.
+
 ## 2026-10-31 — iSee : pictos Find/Where affichés sur la page blanche, chasse sans Direct (branche `feat/isee-picto-page-blanche`)
 
 - **Demande** : « Find my keys » doit trouver sur l'image, créer le gros

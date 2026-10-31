@@ -39,26 +39,32 @@ class CrossingAnnouncerTest {
     }
 
     @Test
-    fun `un vert stable annonce ne se repete pas`() {
+    fun `le vert se repete toutes les deux secondes`() {
         val announcer = CrossingAnnouncer()
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
-        assertNull(announcer.onFrame(3_000L, CrossingState.Green))
-        assertNull(announcer.onFrame(6_000L, CrossingState.Green))
+        assertEquals("Green, cross now.", announcer.lastCue?.phrase)
+        assertNull(announcer.onFrame(1_500L, CrossingState.Green))
+        val repeat = announcer.onFrame(2_600L, CrossingState.Green)
+        assertEquals("Green, cross now.", repeat?.phrase)
+        assertFalse(repeat?.urgent ?: true)
+        assertEquals(CrossingState.Green, announcer.lastCue?.state)
+        assertNull(announcer.onFrame(3_500L, CrossingState.Green))
+        assertEquals("Green, cross now.", announcer.onFrame(4_600L, CrossingState.Green)?.phrase)
     }
 
     @Test
-    fun `le rouge se repete toutes les secondes`() {
+    fun `le rouge se repete toutes les deux secondes`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Red))
         assertEquals("Red, wait.", announcer.onFrame(200L, CrossingState.Red)?.phrase)
-        assertNull(announcer.onFrame(700L, CrossingState.Red))
-        val repeat = announcer.onFrame(1_200L, CrossingState.Red)
+        assertNull(announcer.onFrame(1_000L, CrossingState.Red))
+        assertNull("pas de répétition à 1 s", announcer.onFrame(1_300L, CrossingState.Red))
+        val repeat = announcer.onFrame(2_200L, CrossingState.Red)
         assertEquals("Red, wait.", repeat?.phrase)
         assertFalse(repeat?.urgent ?: true)
         assertEquals(CrossingState.Red, announcer.lastCue?.state)
-        assertNull(announcer.onFrame(1_700L, CrossingState.Red))
-        assertEquals("Red, wait.", announcer.onFrame(2_200L, CrossingState.Red)?.phrase)
-
+        assertNull(announcer.onFrame(3_000L, CrossingState.Red))
+        assertEquals("Red, wait.", announcer.onFrame(4_200L, CrossingState.Red)?.phrase)
     }
 
     @Test
@@ -69,6 +75,15 @@ class CrossingAnnouncerTest {
         assertNull(announcer.onFrame(30_000L, CrossingState.Red))
         assertEquals("Red, wait.", announcer.onFrame(60_200L, CrossingState.Red)?.phrase)
     }
+
+    @Test
+    fun `la repetition verte suit le parametre`() {
+        val announcer = CrossingAnnouncer(greenRepeatMs = 60_000L)
+        repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
+        assertNull(announcer.onFrame(30_000L, CrossingState.Green))
+        assertEquals("Green, cross now.", announcer.onFrame(60_600L, CrossingState.Green)?.phrase)
+    }
+
 
     @Test
     fun `le retour au rouge apres un vert coupe tout`() {
