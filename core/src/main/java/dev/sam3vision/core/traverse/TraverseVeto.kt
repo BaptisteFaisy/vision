@@ -159,7 +159,7 @@ class TraverseVeto {
         val blocking = findBlocking(detections, focalPx, stopped + hushed)
         previousAreas = vehicleAreas(detections)
         previousStill = stillMemoryOf(detections, focalPx, atMs)
-        val tracked = approachVerdict(detections, atMs)
+        val tracked = approachVerdict(detections, atMs, motion)
         val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
@@ -196,7 +196,7 @@ class TraverseVeto {
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
         val growing = area != null && previous != null && area > previous
-        val approaching = growing && vehicleKey(detection.label) !in hushed
+        val approaching = growing && vehicleKey(detection.label) !in stopped
         if (!approaching && vehicleKey(detection.label) in stopped) return null
         val meters = distanceOf(detection, focalPx)
         val near = meters != null && meters < VETO_METERS
