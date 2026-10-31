@@ -32,7 +32,7 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. This page describes
 > what the tree **actually ships**, re-checked on **31/10/2026** against
-> `origin/master` (`39a23935`). The tree counts in [Figures](#figures) are the
+> `origin/master` (`ec90a63b`). The tree counts in [Figures](#figures) are the
 > output of `python3 tools/count-tree.py`; measured figures elsewhere are dated
 > and marked as measurements, not as code guarantees.
 
@@ -258,20 +258,20 @@ python3 tools/count-tree.py                                # the Figure table be
 
 ## Figures
 
-Measured on `origin/master` (`39a23935`), 31/10/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`ec90a63b`), 31/10/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1112** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **127,859** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **69,309** — `:core` 253 f. / 29,964 l. · `:app` 340 f. / 39,345 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **3,860** — `:core` 2,473 · `:app` 1,387 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **1116** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **128,907** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **69,910** — `:core` 254 f. / 30,308 l. · `:app` 342 f. / 39,602 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **3,880** — `:core` 2,493 · `:app` 1,387 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
 | Backend Python (`server/backend`) | **40** fichiers, **7,912** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **58** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Docs | **59** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
 | Workflows CI | **6** | `ls .github/workflows/*.yml \| wc -l` |
 | Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
@@ -378,7 +378,7 @@ Detail: `docs/CI-QUEUE.md`.
   `CHANGELOG.md` (journal since 26/10/2026).
 - **Vision, distances, crossing**: `docs/LIVE-SPEC.md`, `docs/LATENCE-BUDGET.md`,
   `docs/MASK-DECODE.md`, `docs/DISTANCES.md`, `docs/DEPTH.md`, `docs/POSE-IMU.md`,
-  `docs/TRAVERSEE.md`, `docs/MESURES-SAM3-FEUX.md`, `docs/CALIBRAGE-FEU.md`,
+  `docs/TRAVERSEE.md`, `docs/VEHICLE-BACKGROUND.md`, `docs/MESURES-SAM3-FEUX.md`, `docs/CALIBRAGE-FEU.md`,
   `docs/COLLECTE-FEUX.md`, `docs/DATASETS-FEUX.md`, `docs/RECETTE-FEUX-FR.md`,
   `docs/RECETTE-DISTANCES.md`, `docs/RECETTE-RUE.md`.
 - **Voice, narration, navigation**: `docs/ELEVENLABS-TTS.md`, `docs/META-ASR.md`,
