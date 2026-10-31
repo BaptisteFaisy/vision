@@ -211,7 +211,7 @@ class VoiceNavSession(
      * jamais d'app externe. **Aucune annonce ici** en cas de succès : le
      * moteur dit « Navigation vers X » — une seule voix, jamais deux
      * annonces qui se chevauchent. Un ordre stop (ou une autre
-     * destination) pendant le chargement annule ce démarrage : l'état
+     * destination) pendant le chargement ou le moteur annule ce démarrage : l'état
      * courant n'est plus le nôtre, on s'arrête là.
      */
     private suspend fun startFromVoice(destination: String) {
@@ -227,8 +227,12 @@ class VoiceNavSession(
             if (_state.value === loading) setState(guiding(destination, summary))
             return
         }
-        goIdle()
-        announcer.announceGuidanceUnavailable()
+        // Échec périmé (stop ou autre destination pendant le moteur) : l'état
+        // courant n'est plus le nôtre, on le laisse intact, sans annonce.
+        if (_state.value === loading) {
+            goIdle()
+            announcer.announceGuidanceUnavailable()
+        }
     }
 
     /**
