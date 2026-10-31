@@ -161,6 +161,7 @@ class LiveProbe(
         modelsLine: String = "",
         depth: DepthBackend = DepthBackend.DA2,
         collectCrops: Boolean = false,
+        followed: List<String> = emptyList(),
     ) {
         val clean = baseUrl.trim()
         closeSessions()
@@ -185,6 +186,7 @@ class LiveProbe(
                 gpu = it.gpu,
                 modelsLine = modelsLine,
                 conceptsSent = LivePrompts.normalize(prompts),
+                followed = followed,
                 transport = TRANSPORT_WS,
                 error = if (clean.isBlank()) "no endpoint (Settings)" else null,
                 crossingActive = crossingActive,

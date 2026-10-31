@@ -263,7 +263,7 @@ private fun LiveCameraStage(
         update = { surface -> surface.setMasks(overlayLayers(state.overlays, if (state.running) local else null)) },
         modifier = Modifier.fillMaxSize(),
     )
-    LiveDistanceLayer(state.distanceLayer)
+    LiveDistanceLayer(state.distanceLayer, followed = state.prompts.toSet())
     // Feu piéton du mode Traversée : cadre + étiquette, posés comme les masques.
     CrossingOverlayLayer(
         active = state.traverseActive,

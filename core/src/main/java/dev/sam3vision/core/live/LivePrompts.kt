@@ -92,6 +92,16 @@ object LivePrompts {
     fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
 
     /**
+     * Concepts suivis explicitement : [effective] moins la liste du monde
+     * (comparaison insensible à la casse) — les pastilles des suivis seules
+     * s'affichent, vide = tout s'affiche. Pur, testé en JVM.
+     */
+    fun followedOf(effective: List<String>, outdoorMode: Boolean): List<String> {
+        val base = forMode(outdoorMode).map { it.trim().lowercase() }.toSet()
+        return normalize(effective).filter { it.trim().lowercase() !in base }
+    }
+
+    /**
      * Nombre maximal de concepts : **17** (16 dangers extérieurs du 28/10
      * plus la tête du feu piéton, ordre user du 31/10). Le backend suit :
      * `MAX_PROMPTS = 17` sur `/live`, `PROMPT_LIMIT = 17` côté tracker ;

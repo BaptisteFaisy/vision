@@ -23,6 +23,25 @@ class ProbeEnsureConceptTest {
     }
 
     @Test
+    fun `suivis explicites portes dans l etat pour les pastilles`() = runTest {
+        val (probe, _) = probeHarness(this)
+        assertEquals(emptyList<String>(), probe.state.value.followed)
+        probe.ensureConcept(Settings.Default, "wallet")
+        advanceUntilIdle()
+        assertEquals(listOf("wallet"), probe.state.value.followed)
+    }
+
+    @Test
+    fun `suivis explicites dedans hors liste du monde`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val indoor = Settings.Default.copy(outdoorMode = false)
+        probe.configure(PROBE_TEST_ENDPOINT, prompts = LivePrompts.indoor)
+        probe.ensureConcept(indoor, "keys")
+        advanceUntilIdle()
+        assertEquals(listOf("keys"), probe.state.value.followed)
+    }
+
+    @Test
     fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
         // Liste unique normal/Traversée (30/10) : 17 concepts, au plafond —
         // « Find the X » dehors fait sortir le 17e (« socks ») puis reconfigure

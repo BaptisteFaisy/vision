@@ -55,6 +55,36 @@ class DistanceLayoutTest {
     }
 
     @Test
+    fun `suivis vides tout s affiche`() {
+        val layer = DistanceLayer(384, 512, listOf(
+            reading("personne", 3f, listOf(10f, 10f, 60f, 100f)),
+            reading("poteau", 5f, listOf(200f, 10f, 250f, 100f)),
+        ))
+
+        assertEquals(2, screenLabels(layer, cropTransform(384, 512, 1080f, 2400f), followed = emptySet()).size)
+    }
+
+    @Test
+    fun `suivis explicites seules pastilles affichees`() {
+        val layer = DistanceLayer(384, 512, listOf(
+            reading("personne", 3f, listOf(10f, 10f, 60f, 100f)),
+            reading("poteau", 5f, listOf(200f, 10f, 250f, 100f)),
+        ))
+        val labels = screenLabels(layer, cropTransform(384, 512, 1080f, 2400f), withLabel = true, followed = setOf("poteau"))
+
+        assertEquals(1, labels.size)
+        assertTrue(labels.first().text.startsWith("poteau"))
+    }
+
+    @Test
+    fun `suivis insensibles a la casse`() {
+        val layer = DistanceLayer(384, 512, listOf(reading("Personne", 3f, listOf(10f, 10f, 60f, 100f))))
+
+        assertEquals(1, screenLabels(layer, cropTransform(384, 512, 1080f, 2400f), followed = setOf("personne")).size)
+        assertEquals(1, screenLabels(layer, cropTransform(384, 512, 1080f, 2400f), followed = setOf("PERSONNE")).size)
+    }
+
+    @Test
     fun `boite illisible ignoree et couche vide sans mesure`() {
         val broken = DistanceLayer(384, 512, listOf(reading("personne", 3f, listOf(1f, 2f))))
         assertTrue(screenLabels(broken, cropTransform(384, 512, 1080f, 2400f)).isEmpty())
