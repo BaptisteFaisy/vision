@@ -26,7 +26,7 @@ private val PanelTimings = Color(0xFF7FD8A8)
  * 640 ms · 8 objets · A100 »), la **chronologie sur une ligne** (« latence 348 · capt 22 ·
  * up 61 · srv 92 · rtt 153 · masque 37 · pixel 8 ») puis le détail utile quand quelque
  * chose cloche — endpoint, taille de frame, p95, poste par poste, étages serveur, nombre
- * de frames et de masques, dernière erreur.
+ * de frames et de masques, mouvement V1 (verdict, fond, écart), dernière erreur.
  *
  * Purement informatif : aucun clic (les gestes de la page sont captés à la racine).
  */
@@ -40,11 +40,8 @@ fun LiveDebugPanel(
     // En mode dense (fenêtre caméra, un peu moins d'un demi-écran), le panneau ne garde
     // que la ligne d'état et une éventuelle erreur : le détail complet masquait l'aperçu
     // et les masques, c'est-à-dire exactement ce qu'on vient regarder.
-    val details = if (dense) {
-        panelDetails(state, dense).filter { it.startsWith(ERROR_PREFIX) }
-    } else {
-        panelDetails(state, dense)
-    }
+    val all = panelDetails(state, dense)
+    val details = if (dense) all.filter { it.startsWith(ERROR_PREFIX) } else all
     Column(
         modifier
             .then(if (dense) Modifier else Modifier.statusBarsPadding())
@@ -75,10 +72,28 @@ fun LiveDebugPanel(
                 maxLines = 1,
             )
         }
+        MotionLine(state, dense)
         details.forEach { line ->
             Text(line, color = PanelDetail, fontSize = if (dense) 8.sp else 11.sp, maxLines = 1)
         }
     }
+}
+
+/**
+ * Ligne mouvement V1 sous la chronologie : verdict + fond + écart, une seule ligne
+ * comme elle — visible en mode dense aussi, où le détail est réduit aux erreurs.
+ * Rien si aucune estimation n'est publiée.
+ */
+@Composable
+private fun MotionLine(state: LiveProbeState, dense: Boolean) {
+    val motion = liveProbeMotionLine(state)
+    if (motion.isBlank()) return
+    Text(
+        motion,
+        color = PanelDetail,
+        fontSize = if (dense) 8.sp else 11.sp,
+        maxLines = 1,
+    )
 }
 
 /** Préfixe des lignes d'erreur de [liveProbeDetails] : les seules gardées en mode dense. */

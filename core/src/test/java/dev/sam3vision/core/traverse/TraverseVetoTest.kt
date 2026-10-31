@@ -2,6 +2,7 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -217,5 +218,28 @@ class TraverseVetoTest {
         assertNull(first.approachTtcSeconds)
         assertTrue(third.veto)
         assertNotNull("rapprochement confirmé suivi", third.approachTtcSeconds)
+    }
+
+    @Test
+    fun `fond qui defile - le suivi se tait, l instantane reste conservateur`() {
+        // Croissance + dérive suivies de la caméra : l'approche suivie se
+        // tait (TTC nul), mais le veto instantané de surface tient toujours.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val bare = TraverseVeto()
+        val aided = TraverseVeto()
+        var bareLast: TraverseDecision? = null
+        var aidedLast: TraverseDecision? = null
+        repeat(13) { index ->
+            val width = 100f + index * 10f
+            val cx = 320f + index * 5f
+            val box = listOf(cx - width / 2f, 240f - width * 0.3f, cx + width / 2f, 240f + width * 0.3f)
+            val atMs = index * 100L
+            bareLast = bare.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs)
+            aidedLast = aided.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs, motion = motion)
+        }
+
+        assertNotNull("sans fond, le suivi voit l'approche", bareLast!!.approachTtcSeconds)
+        assertNull("avec fond, la piste suit la caméra", aidedLast!!.approachTtcSeconds)
+        assertTrue("l'instantané (surface) reste conservateur", aidedLast.veto)
     }
 }

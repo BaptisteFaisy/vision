@@ -124,16 +124,20 @@ class TraverseVeto {
      * [detections] porte les boîtes SAM, [focalPx] la focale en pixels de l'image
      * analysée (≤ 0 : distance indisponible, seule l'approche compte), [atMs]
      * la date de la frame (< 0 : suivi temporel désactivé, veto instantané seul).
+     * [motion] (`null` = pas de signal fond) fait taire l'approche suivie des
+     * pistes qui suivent la caméra — le veto instantané (surface, proximité)
+     * reste conservateur et n'en dépend pas.
      */
     fun update(
         lightGreen: Boolean,
         detections: List<Detection>,
         focalPx: Float,
         atMs: Long = -1L,
+        motion: FrameMotion? = null,
     ): TraverseDecision {
         val blocking = findBlocking(detections, focalPx)
         previousAreas = vehicleAreas(detections)
-        val tracked = approachVerdict(detections, atMs)
+        val tracked = approachVerdict(detections, atMs, motion)
         val veto = blocking != null || tracked.approaching
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
@@ -148,9 +152,9 @@ class TraverseVeto {
     }
 
     /** Approche suivie, ou silence si la frame n'est pas datée. */
-    private fun approachVerdict(detections: List<Detection>, atMs: Long): ApproachVerdict {
+    private fun approachVerdict(detections: List<Detection>, atMs: Long, motion: FrameMotion?): ApproachVerdict {
         if (atMs < 0L) return ApproachVerdict(false, null, null)
-        return approach.update(detections, atMs)
+        return approach.update(detections, atMs, motion)
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */

@@ -41,18 +41,65 @@ class VehicleApproach {
     /** Pistes en cours (après purge) — exposé pour les tests. */
     val trackCount: Int get() = tracks.size
 
+    /** Verdicts fond de la dernière frame par piste (vide sans signal fond). */
+    var lastVerdicts: Map<Int, MovingVerdict> = emptyMap()
+        private set
+
+    /**
+     * Vrai quand chaque piste évaluée accuse la caméra ([Verdict.CAMERA_MOVED])
+     * : le porteur bouge, aucun véhicule ne roule — le veto mouvement se tait.
+     * Faux sans piste évaluée : on ne met jamais le veto à l'aveugle.
+     */
+    var cameraMoved: Boolean = false
+        private set
+
     /** Oublie toutes les pistes (nouvelle traversée). */
     fun reset() {
         tracks.clear()
         nextId = 0
+        lastVerdicts = emptyMap()
+        cameraMoved = false
     }
 
-    /** Verdict pour une frame datée de [atMs] (ms, monotone). */
-    fun update(detections: List<Detection>, atMs: Long): ApproachVerdict {
+    /**
+     * Verdict pour une frame datée de [atMs] (ms, monotone). [motion]
+     * (`null` = pas de signal fond) fait juger chaque piste par
+     * [VehicleBackground] : une piste qui suit le défilement du fond
+     * ([Verdict.CAMERA_MOVED]) ne conclut plus l'approche — les pistes
+     * restent suivies, seul le verdict se tait.
+     */
+    fun update(
+        detections: List<Detection>,
+        atMs: Long,
+        motion: FrameMotion? = null,
+    ): ApproachVerdict {
         val frameWidth = detections.maxOfOrNull { it.width }?.takeIf { it > 0 } ?: FALLBACK_WIDTH
+        val frameHeight = detections.maxOfOrNull { it.height }?.takeIf { it > 0 } ?: FALLBACK_HEIGHT
         associate(vehiclesOf(detections), atMs, frameWidth)
         dropStale(atMs)
+        evaluateMotion(motion, frameWidth, frameHeight)
         return verdict(frameWidth)
+    }
+
+    /**
+     * Verdicts fond des pistes à vitesse établie : la vitesse lissée de la
+     * piste (px/s) passe en fractions d'image par frame pour [VehicleBackground].
+     * Sans [motion], verdicts vides et [cameraMoved] faux (comportement inchangé).
+     */
+    private fun evaluateMotion(motion: FrameMotion?, frameWidth: Int, frameHeight: Int) {
+        if (motion == null) {
+            lastVerdicts = emptyMap()
+            cameraMoved = false
+            return
+        }
+        val dtSeconds = motion.dtMs / 1000f
+        lastVerdicts = tracks.mapNotNull { (id, track) ->
+            if (!track.motion.velocityReliable) return@mapNotNull null
+            val boxDx = track.motion.velocity.x / frameWidth * dtSeconds
+            val boxDy = track.motion.velocity.y / frameHeight * dtSeconds
+            id to VehicleBackground.decide(id, boxDx, boxDy, motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs, 0f)
+        }.toMap()
+        cameraMoved = lastVerdicts.isNotEmpty() && lastVerdicts.all { it.value.verdict == Verdict.CAMERA_MOVED }
     }
 
     /** Véhicules confiants à boîte saine, seuls suivis. */
@@ -110,8 +157,9 @@ class VehicleApproach {
     private fun verdict(frameWidth: Int): ApproachVerdict {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
-        for ((_, track) in tracks) {
+        for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
+            if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
             if (track.motion.velocity.width <= frameWidth * MIN_GROWTH_RATIO) continue
@@ -143,5 +191,8 @@ class VehicleApproach {
 
         /** Largeur d'image de repli quand les détections ne la donnent pas. */
         const val FALLBACK_WIDTH = 1000
+
+        /** Hauteur d'image de repli (même rôle pour la dérive verticale). */
+        const val FALLBACK_HEIGHT = 1000
     }
 }

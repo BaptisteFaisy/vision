@@ -310,9 +310,15 @@ internal fun LiveProbe.observeVehicleState(
         state.collect { st ->
             if (st.crossingActive) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
+            val motion = ProbeBackgroundMotion.lastMotion
             val cue = watcher.update(
-                detectionsOf(readings, st.width, st.height), readings, System.currentTimeMillis(), language())
-                ?: return@collect
+                detectionsOf(readings, st.width, st.height),
+                readings,
+                System.currentTimeMillis(),
+                language(),
+                motion,
+            ) ?: return@collect
+            logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
             val alert = cue.safetyPhrase
             if (alert != null) {
                 safety.speak(alert)
@@ -484,3 +490,5 @@ internal fun LiveProbe.observeHazards(
         observeSidewalk(scope, voice, playerIdle, language),
     )
 }
+
+

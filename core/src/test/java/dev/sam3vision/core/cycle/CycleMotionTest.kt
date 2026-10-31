@@ -107,6 +107,20 @@ class CycleMotionTest {
     }
 
     @Test
+    fun `derive lente sous le seuil lateral - a l'arret`() {
+        // V1 : un résidu sous 3 % de l'image/s, c'est un arrêt — pas un mouvement.
+        val motion = CycleMotion()
+        motion.update(listOf(bikeAt(270f)), atMs = 0L)
+        motion.update(listOf(bikeAt(271f)), atMs = 100L)
+        val third = motion.update(listOf(bikeAt(272f)), atMs = 200L)
+
+        assertTrue(third.movingKeys.isEmpty())
+        assertEquals(setOf("bicycle"), third.stillKeys)
+        assertTrue(third.approachKeys.isEmpty())
+        assertEquals(1, motion.trackCount)
+    }
+
+    @Test
     fun `reset - oublie tout`() {
         val motion = CycleMotion()
         motion.update(listOf(bikeAt(270f)), atMs = 0L)
