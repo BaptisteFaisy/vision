@@ -16,7 +16,7 @@ class LivePromptsTest {
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "barrier", "fence", "gate", "souvenir shop", "beanie",
+                "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
                 "socks",
             ),
             LivePrompts.default,
@@ -26,8 +26,11 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `barrieres clotures et portails suivis en exterieur, porte mur et fenetre sortis`() {
-        assertTrue("barrier" in LivePrompts.default)
+    fun `clotures et portails suivis en exterieur, barrier cede son slot a keys`() {
+        // Ordre user du 31/10 : les clés entrent dans les 17, « fence » garde
+        // son slot, « barrier » sort (reconnu encore par le preset extérieur).
+        assertTrue("keys" in LivePrompts.default)
+        assertFalse("barrier" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.default)
         assertTrue("gate" in LivePrompts.default)
         // Unification traversée/normal (30/10) : porte, mur et fenêtre cèdent
@@ -182,5 +185,31 @@ class LivePromptsTest {
         assertEquals(listOf("a", "b", "c"), LivePrompts.field(" a , b;c "))
         assertEquals(listOf("x", "y"), LivePrompts.field("x\ny"))
         assertEquals(LivePrompts.default, LivePrompts.field(" , ;\n"))
+    }
+
+    @Test
+    fun `find the x rejoint la liste sous le plafond`() {
+        assertEquals(
+            LivePrompts.indoor + "keys",
+            LivePrompts.withConcept(LivePrompts.indoor, "keys"),
+        )
+    }
+
+    @Test
+    fun `find the x au plafond, le dernier concept cede son slot`() {
+        // « Find the X » au plafond ne reste plus muet — démontré avec « wallet »
+        // (« keys » est déjà dans les défauts) : « socks », 17e, sort, 17 suivis.
+        val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
+        assertEquals(LivePrompts.MAX, next.size)
+        assertTrue("wallet" in next)
+        assertFalse("socks" in next)
+        assertEquals(LivePrompts.default.dropLast(1) + "wallet", next)
+    }
+
+    @Test
+    fun `find the x deja suivi present ou invalide, liste inchangee`() {
+        assertEquals(LivePrompts.default, LivePrompts.withConcept(LivePrompts.default, "Person"))
+        assertEquals(LivePrompts.indoor, LivePrompts.withConcept(LivePrompts.indoor, "  "))
+        assertEquals(LivePrompts.indoor, LivePrompts.withConcept(LivePrompts.indoor, "x".repeat(33)))
     }
 }

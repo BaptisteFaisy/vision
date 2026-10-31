@@ -17,7 +17,8 @@ object LivePrompts {
      * « car », « bus », « bicycle ») puis feux piétons et cheminement
      * (« pedestrian traffic light », « pedestrian signal head », « curb »,
      * « sidewalk », « crosswalk ») puis statiques (« pole », « stairs »,
-     * « barrier », « fence », « gate ») puis souvenirs (« souvenir shop »,
+     * « fence », « gate ») et les clés (« keys », ordre user du 31/10 :
+     * « barrier » cède son slot, « fence » garde le sien) puis souvenirs (« souvenir shop »,
      * « beanie », « socks », boutique du square, ordre user du 31/10),
      * modifiables à chaud dans le direct (champ « Follow »).
      *
@@ -38,7 +39,8 @@ object LivePrompts {
      * barrières reconnues en plus), 14 (30/10 : clôtures et portails reconnus
      * en plus), 16 (30/10 : unification traversée/normal ; 31/10 : camion,
      * moto et trottinette cèdent leurs slots aux souvenirs), 17 (31/10 :
-     * tête du feu piéton en plus du caisson). Sur `/live` les
+     * tête du feu piéton en plus du caisson, « barrier » à « keys »).
+     * Sur `/live` les
      * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts
      * = 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
      * `/frame`, d'où un coût ×8 assumé sur ce chemin.
@@ -46,7 +48,7 @@ object LivePrompts {
     val default: List<String> = listOf(
         "person", "car", "bus", "bicycle", "pedestrian traffic light",
         "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-        "stairs", "barrier", "fence", "gate", "souvenir shop", "beanie", "socks",
+        "stairs", "keys", "fence", "gate", "souvenir shop", "beanie", "socks",
     )
 
     /**
@@ -114,6 +116,21 @@ object LivePrompts {
             .take(MAX)
             .toList()
         return cleaned.ifEmpty { default }
+    }
+
+    /**
+     * Ordre « Find the X » : [label] rejoint [prompts], même au plafond —
+     * le dernier concept cède alors son slot à l'ordre explicite (les
+     * concepts de tête, piétons et traversée, ne bougent jamais). Déjà
+     * présent (comparaison insensible à la casse), vide ou trop long :
+     * liste inchangée. Pur, testé en JVM.
+     */
+    fun withConcept(prompts: List<String>, label: String): List<String> {
+        val clean = label.trim()
+        if (clean.isEmpty() || clean.length > MAX_LENGTH) return prompts
+        if (prompts.any { it.trim().equals(clean, ignoreCase = true) }) return prompts
+        val base = if (prompts.size >= MAX) prompts.dropLast(1) else prompts
+        return normalize(base + clean)
     }
 
     /**
