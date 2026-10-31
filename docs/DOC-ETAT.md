@@ -11,7 +11,7 @@ plus l'arbre — bandeau ajouté).
 |---|---|---|
 | `docs/MESURES-SAM3-FEUX.md` | **nouveau** (29/10), **relevé hors arbre** | Deux mesures : rappel SAM 3.1 (87,5 % avec `pedestrian traffic light`, 12,5 % avec un prompt d'état) et **`PedLightGate` exécutée sur de vrais crops SAM** — 1 vert sur 6 signaux verts, rejet par `ELONGATION_MIN`, et l'ordre des élongations est inversé entre vert réel (≤ 1,11) et disque voiture (≥ 1,30) : le seuil ne peut pas être réglé, l'hypothèse « la boîte SAM serre la lampe » tombe. Harnais contrôlé 9/9 sur `feuxfr/`. Images non versionnées, attribution au §8 |
 | `docs/TRAVERSEE.md` | **à jour** (28/10, §7 ajouté le 29/10) | Bilan traversée : recherche 10 angles, PR #163-167 + #174, dépendances in-app vs `/live`, preuves JVM, 4 restes bloquants listés ; §7 = ce que la vidéo montre (cadre du feu + étiquette, `CrossingOverlayLayout` / `CrossingOverlayLayer`) |
-| `README.md` | **réécrit** (29/10 au soir) | Problème, solution, 8 blocs (`server/`, `suivi-parent/`, `suivi-relais/`, `tools/`, `scripts/`, `docs/`) ; chiffres du jour (913 `.kt`, 54 684 lignes de prod, 2 884 `@Test` JVM + 9 instrumentés, 35 fichiers Python) produits par `tools/count-tree.py` ; 12 concepts du direct (max 16), écrans legacy par « Other screens », traversée *proposée* et non activée, file de merge **Mergify**, relais Worker + D1, `NOTICE` cité, les 46 docs cités |
+| `README.md` | **réécrit** (31/10/2026, commit `ec90a63b`) | Décrit ce que l'arbre livre vraiment : pile Meta AI (SAM 3.1, Muse Spark/Baseten, ASR batch + realtime, Muse Image, lunettes), 16 concepts par défaut (max 16), traversée **armée à la main**, pictogrammes, suivi caregiver en WebSocket ; chiffres du jour produits par `tools/count-tree.py` (1116 `.kt`, 69 910 lignes de prod, 3 880 `@Test` JVM + 10 instrumentés, 40 fichiers Python) ; retirés : `InferHubLlmClient` (renommé `HttpLlmClient`), traversée auto-proposée, clé Google Maps « requise », colonne YOLO fine-tunée `pending`, `/signals` côté app |
 | `docs/ARCHITECTURE.md` | **recompté** (29/10, §1) | Tableau §1 et bloc de commandes alignés sur `tools/count-tree.py` (216/249/283/159 fichiers, 913 `.kt`, 98 370 lignes) ; les deux valeurs contradictoires du même §1 (204 vs 211, 268 vs 277) sont parties ; §2-7 : valeurs vraies, lignes non recalées |
 | `docs/PERF.md` | **recompté** (29/10, §1.1-1.2) | §1.1 refait (913 / 98 370 / 2 884 / 9, garde 1 008 fichiers, **6** workflows et non 8), §1.2 : `:core` 1 835 + `:app` 1 049 exécutés, 0 échec ; §2 et §4 inchangés |
 | `docs/DOC-ETAT.md` | **nouveau** (26/10) | Ce tableau |
@@ -86,8 +86,8 @@ plus l'arbre — bandeau ajouté).
   désormais `IseeHome` → `IseeScenePane` : `IseeChatPane` et `IseeCameraWindow` sont
   supprimés. Reste à confirmer visuellement sur appareil (jamais regardé sur écran).
 - **« 8 objets par défaut »** — **vrai pour les objets affichés** (`ObjectLimits.DEFAULT_ON_SCREEN = 8`,
-  borné 1–12), **faux pour les concepts suivis** : `LivePrompts.Default` en contient **6**
-  (`person`, `door`, `bicycle`, `car`, `truck`, `electric scooter`) et `LivePrompts.MAX = 6`.
+  borné 1–32), **faux pour les concepts suivis** : `LivePrompts.default` en contient **16**
+  (max 16, `LivePrompts.MAX`), et c'est aussi le plafond du champ « Follow ».
 
 ## Hors périmètre de cette passe (à reprendre)
 
