@@ -1,5 +1,6 @@
 package dev.sam3vision.core.motion
 
+import dev.sam3vision.core.predict.Shift
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -89,7 +90,7 @@ object GyroCompensation {
     const val MAX_AGE_MS = 250L
 
     /** Confiance minimale du hint gyro, reprise de `Shift.TRUST_MIN`. */
-    const val TRUST_MIN = 0.12f
+    const val TRUST_MIN = Shift.TRUST_MIN
 
     /**
      * Déplacement image attendu (px) pour [delta] et une focale [focalPx] (px du plan
