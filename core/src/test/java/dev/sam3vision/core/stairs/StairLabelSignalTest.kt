@@ -49,6 +49,24 @@ class StairLabelSignalTest {
     }
 
     @Test
+    fun `signal porte la boite de l'escalier retenu`() {
+        val box = listOf(10f, 10f, 90f, 95f)
+        val signal = StairLabelSignals.of(
+            listOf(DistanceReading(1, "stairs going up", 2f, 2f, box)), 100, 100)
+
+        assertTrue(signal.detected)
+        assertEquals(box, signal.box)
+    }
+
+    @Test
+    fun `repli libelles sans boite`() {
+        val signal = StairLabelSignals.ofLabels(listOf("escalier"))
+
+        assertTrue(signal.detected)
+        assertTrue(signal.box.isEmpty())
+    }
+
+    @Test
     fun `image inconnue ou boite illisible = silence sur`() {
         assertFalse(StairLabelSignals.of(listOf(reading("stairs", 50f)), 0, 100).detected)
         val short = DistanceReading(1, "stairs", 2f, 2f, listOf(1f))

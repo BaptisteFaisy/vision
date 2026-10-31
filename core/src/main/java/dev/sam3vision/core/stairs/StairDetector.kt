@@ -21,6 +21,26 @@ data class StairSignal(
 }
 
 /**
+ * Région d'intérêt normalisée 0..1 (`left, top, right, bottom`) : la zone où
+ * SAM reconnaît l'escalier (sa boîte normalisée), où le Canny compte les
+ * marches — sans elle, le bas fixe de l'image ([StairsConfig.roiTopFraction]).
+ */
+data class StairRoi(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    /**
+     * ROI triée et bornée à 0..1 ; `null` si dégénérée (largeur ou hauteur
+     * nulle : rien à compter, jamais d'exception).
+     */
+    fun normalized(): StairRoi? {
+        val l = minOf(left, right).coerceIn(0f, 1f)
+        val r = maxOf(left, right).coerceIn(0f, 1f)
+        val t = minOf(top, bottom).coerceIn(0f, 1f)
+        val b = maxOf(top, bottom).coerceIn(0f, 1f)
+        if (r <= l || b <= t) return null
+        return StairRoi(l, t, r, b)
+    }
+}
+
+/**
  * Détecteur d'escaliers classique, secours quand SAM ne segmente pas les
  * marches (constaté au téléphone le 28/10 : aucun concept escalier ne répond).
  * Adapté de `stair_detector.py` de `github.com/agrimbillowria/blind-project`
@@ -36,7 +56,8 @@ data class StairSignal(
  * vraie ligne de contour), suffisant pour un signal binaire « escalier devant ».
  *
  * Limites héritées du MIT (à documenter, pas à corriger ici) :
- * - ROI fixe (bas 60 %) : un escalier cadré en haut est invisible ;
+ * - sans [StairRoi] (boîte SAM), ROI fixe (bas 60 %) : un escalier cadré en
+ *   haut est invisible ; avec ROI, c'est la reconnaissance SAM qui cadre ;
  * - aucune distinction montée/descente ;
  * - faux positifs sur stores vénitiens, rayures et zébrures horizontales.
  * Seuils et flou recalibrés pour la luminance téléphone 256×103 (voir
@@ -60,20 +81,33 @@ object StairDetector {
     private const val CONFIDENCE_RAMP = 3
 
     /**
-     * Détecte un escalier dans [mask] (luminance 8 bits). Fonction totale :
+     * Détecte un escalier dans [mask] (luminance 8 bits), dans [roi] quand elle
+     * est posée (la boîte SAM de l'escalier : le comptage est calibré sur sa
+     * reconnaissance), sinon dans le bas fixe de l'image. Fonction totale :
      * image vide, incohérente ou ROI dégénérée = [StairSignal.none].
      */
-    fun detect(mask: GrayMask, config: StairsConfig = StairsConfig()): StairSignal {
+    fun detect(
+        mask: GrayMask,
+        config: StairsConfig = StairsConfig(),
+        roi: StairRoi? = null,
+    ): StairSignal {
         val width = mask.width
         val height = mask.height
         if (width < 2 || height < 2 || mask.pixels.size < width * height) return StairSignal.none()
         val effective = config.normalized()
-        val roiTop = (height * effective.roiTopFraction).toInt().coerceIn(0, height)
-        if (height - roiTop < effective.minLines) return StairSignal.none()
-        val edges = StairsCanny.horizontalEdges(mask, roiTop, height, effective)
-        val lineCount = countLines(edges, width, roiTop, height, effective)
+        val bounds = roi?.normalized()?.toPixels(width, height)
+        if (roi != null && bounds == null) return StairSignal.none()
+        val roiTop = bounds?.top ?: (height * effective.roiTopFraction).toInt().coerceIn(0, height)
+        val roiBottom = bounds?.bottom ?: height
+        if (roiBottom - roiTop < effective.minLines) return StairSignal.none()
+        val edges = StairsCanny.horizontalEdges(mask, roiTop, roiBottom, effective)
+        val lineCount = if (bounds == null) {
+            countLines(edges, width, roiTop, roiBottom, effective)
+        } else {
+            countLinesIn(edges, width, roiTop, roiBottom, bounds.left, bounds.right, effective)
+        }
         val detected = lineCount >= effective.minLines
-        return StairSignal(detected, confidenceFor(lineCount, effective.minLines), lineCount, roiTop, height)
+        return StairSignal(detected, confidenceFor(lineCount, effective.minLines), lineCount, roiTop, roiBottom)
     }
 
     /**
@@ -119,5 +153,62 @@ object StairDetector {
             if (edges[offset + x] != 0.toByte()) count++
         }
         return count
+    }
+
+    /**
+     * Marches dans le rectangle `[left, right) × [top, bottom)` : comme
+     * [countLines], mais la couverture minimale est proportionnée à la largeur
+     * observée (miroir de `minLineLength` : un escalier cadré par SAM n'a pas
+     * la largeur de l'image).
+     */
+    internal fun countLinesIn(
+        edges: ByteArray,
+        width: Int,
+        top: Int,
+        bottom: Int,
+        left: Int,
+        right: Int,
+        config: StairsConfig,
+    ): Int {
+        val needed = ((right - left) * config.minRowCoverage).toInt().coerceAtLeast(1)
+        var lines = 0
+        var gap = config.maxRowGap + 1
+        var open = false
+        for (y in top until bottom) {
+            val active = rowCoverageIn(edges, y * width + left, right - left) >= needed
+            if (active) {
+                if (!open) {
+                    lines++
+                    open = true
+                }
+                gap = 0
+            } else if (open) {
+                gap++
+                if (gap > config.maxRowGap) open = false
+            }
+        }
+        return lines
+    }
+
+    /** Pixels de contour quasi-horizontaux sur [span] colonnes depuis [offset]. */
+    private fun rowCoverageIn(edges: ByteArray, offset: Int, span: Int): Int {
+        var count = 0
+        for (x in 0 until span) {
+            if (edges[offset + x] != 0.toByte()) count++
+        }
+        return count
+    }
+
+    /** Bornes pixels d'une ROI normalisée (`left`/`top` inclus, `right`/`bottom` exclus). */
+    private data class RoiPixels(val left: Int, val top: Int, val right: Int, val bottom: Int)
+
+    /** ROI normalisée → bornes pixels, `null` si rien ne reste à l'échelle. */
+    private fun StairRoi.toPixels(width: Int, height: Int): RoiPixels? {
+        val left = (left * width).toInt().coerceIn(0, width)
+        val right = (right * width).toInt().coerceIn(0, width)
+        val top = (top * height).toInt().coerceIn(0, height)
+        val bottom = (bottom * height).toInt().coerceIn(0, height)
+        if (right <= left || bottom <= top) return null
+        return RoiPixels(left, top, right, bottom)
     }
 }
