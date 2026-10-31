@@ -95,6 +95,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (`CrossingOfferTest` 19/19, dont 8 nouveaux) ; `assembleDebug` vert ;
   `check-kotlin-limits.py` vert. 5 échecs `:core` pré-existants hors
   périmètre (`PrivateFileSettingsStoreTest`, POSIX sous Windows).
+## 2026-10-30 — iSee : mouvement annoncé à 15 m, stop sous 8 m, traversée roulant+arrêté (branche `fix/isee-voitures-15m-traversee`)
+
+- **Demande** : dire les voitures en mouvement à moins de 15 m, et en
+  Traversée dire si elles roulent ou sont arrêtées, tout en anglais.
+- Fait : portée mouvement 8 → 15 m (`MOVING_METERS`) avec deux bandes —
+  proche ≤ 8 m (`NEAR_MOVING_METERS`, ou non mesuré) = « Stop, car moving. »
+  (voix sécurité, cooldown 4 s propre, jamais couvert par une info), loin 8-15 m
+  = « Car moving, 12 meters away. » doux ; Traversée câblage inchangé
+  (parle `.phrase` : mouvement ≤ 15 m + arrêt ≤ 3 m après le feu) ; arrêt,
+  cycles, urgent, anglais par défaut inchangés. Contrat `docs/VOIX-DANGER.md`
+  §17 + seuils `docs/TRAVERSEE.md`.
+- Preuves : `:app:testDebugUnitTest` vert (1 272 tests, 0 échec, dont
+  `CrossingVehicleTest` +1) ; `:core:testDebugUnitTest` 2 193 tests
+  (dont `VehicleStateTest` +3), 5 échecs préexistants
+  `PrivateFileSettingsStoreTest` (POSIX/Windows) + 1 flaky
+  `MaskRobustnessTest` (vert isolément, sans lien de code) ;
+  `check-kotlin-limits.py` vert.
 
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)

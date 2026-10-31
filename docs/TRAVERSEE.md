@@ -263,9 +263,10 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   elles roulent ou sont arrêtées (« Car moving, 5 meters away. » /
   « Car stopped, 2 meters away. », langue de la voix, anglais par défaut) —
   le même `VehicleStateWatcher` que le mode normal (mouvement confirmé ou
-  croissance jusqu'à 8 m, arrêt mesuré jusqu'à 3 m, 2 frames, silences 4 s /
-  10 s), parlé après le feu et avant les personnes (`CrossingVehicleWatch`,
-  chaîne `crossingPhraseOf`) ; le silence post-ordre est partagé
+  croissance jusqu'à 15 m — `MOVING_METERS`, info douce au-delà de 8 m,
+  arrêt mesuré jusqu'à 3 m, 2 frames, silences 4 s / 10 s), parlé après le
+  feu et avant les personnes (`CrossingVehicleWatch`, chaîne
+  `crossingPhraseOf`) ; le silence post-ordre est partagé
   (`CrossingCueQuiet`, `:core` pur, les deux voix douces nourries du même
   ordre) et les personnes ne sont consultées que sur le silence des
   véhicules — un mot de décalage ne se perd pas au profit d'une phrase
