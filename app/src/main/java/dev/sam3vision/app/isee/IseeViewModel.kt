@@ -313,11 +313,16 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** iSee se tait (réponse en vol + lecture + guidage) : la voix du user a priorité. */
     private fun silenceForGlasses() {
         answers.cancelInFlight()
+        cutSpeech()
+        voiceNav.stopVoice()
+    }
+
+    /** Coupe la lecture en cours et rend l'état parlant : la parole du user passe devant. */
+    private fun cutSpeech() {
         if (!playerIdle()) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
         }
-        voiceNav.stopVoice()
     }
 
     /** Texte entendu (lunettes ou dictée) : ordres locaux d'abord, sinon question au LLM. */
@@ -359,11 +364,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Fin de la tenue : transcription, coupe d'intro éventuelle, puis réponse IA. */
     private suspend fun transcribeAndAnswer() {
-        if (!playerIdle()) {
-            // Tenue pendant une lecture : capture jetée, micro jamais bloqué, et dit.
-            dropHeard(IseeStatusText.BUSY_SPEAKING)
-            return
-        }
+        // Voix partie pendant la tenue (annonce, réponse tardive) : coupée, et la
+        // nouvelle question prend sa place (overwrite) — jamais d'erreur « busy ».
+        cutSpeech()
         // Échec de dictée : le motif est déjà affiché, la conversation reste à l'écran.
         // Le contexte photo de cette tenue est relâché : il ne gèle pas à vie.
         val heard = dictation.finish(settings) ?: run {
@@ -400,10 +403,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             dropHeard(IseeStatusText.NOTHING_HEARD)
             return
         }
-        if (_state.value.thinking) {
-            dropHeard(IseeStatusText.ANSWER_PENDING)
-            return
-        }
+        // Pas de garde « thinking » : une nouvelle parole écrase la réponse en vol
+        // (ordres locaux directs, question préemptée dans `IseeAnswers.answer`).
         if (modes.run(text)) return
         if (steering.runSteering(text)) return
         // Ordre GPS (« arrête / désactive / active le GPS ») : consommé même

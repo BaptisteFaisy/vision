@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -45,20 +46,21 @@ class IseeAnswers(
     /** Destination GPS en cours (`null` hors guidage) : rejoint la question en contexte. */
     private val destination: () -> String? = { GpsDestinationMemory.destination.value },
     private val askTimeoutMs: Long = ASK_TIMEOUT_MS,
+    /** Attente maximale de la réponse préemptée avant de renoncer (repli, voir [acquireAsking]). */
+    private val preemptTimeoutMs: Long = PREEMPT_TIMEOUT_MS,
 ) {
 
     /**
      * Une seule question à la fois : le backend refuse deux appels LLM simultanés
-     * (409 « limite atteinte ») et la seconde tenue restait sans réponse. Le drapeau
-     * est posé avant toute suspension, donc deux tenues rapprochées ne peuvent pas
-     * lancer deux appels.
+     * (409 « limite atteinte »). Une nouvelle parole ne part donc qu'une fois la
+     * précédente annulée et rendue ([acquireAsking]) — écrasée, jamais en parallèle.
      */
     private val asking = AtomicBoolean(false)
 
     /**
      * Job de la réponse en vol, posé après le drapeau et rendu dans le `finally` :
-     * un nouvel appui l'annule pour couper la question précédente au lieu de
-     * jeter la nouvelle avec [IseeStatusText.ANSWER_PENDING].
+     * une nouvelle parole l'annule pour couper la question précédente au lieu de
+     * jeter la nouvelle (overwrite).
      */
     @Volatile
     private var inFlight: Job? = null
@@ -78,9 +80,9 @@ class IseeAnswers(
 
     /** Question → réponse LLM (image = photo-contexte) → texte Room → voix. */
     suspend fun answer(row: MessageMultimedia, question: String) {
-        if (!asking.compareAndSet(false, true)) {
-            // Tenue déjà en vol : sa photo-contexte ne servira plus, on la relâche et
-            // on dit pourquoi cette question-ci reste sans réponse.
+        if (!acquireAsking()) {
+            // La réponse précédente refuse de mourir (repli pathologique) : cette
+            // question-ci reste sans réponse, photo relâchée, et dit pourquoi.
             photo.releaseContext()
             update { it.copy(status = IseeStatusText.ANSWER_PENDING) }
             return
@@ -112,6 +114,25 @@ class IseeAnswers(
             asking.set(false)
             if (inFlight === self) inFlight = null
         }
+    }
+
+    /**
+     * Prend le drapeau d'appel LLM, en écrasant la réponse en vol si besoin :
+     * une nouvelle parole coupe la précédente (ordre user) au lieu d'être jetée
+     * avec une erreur « busy » ou « en train de réfléchir ». La précédente est
+     * annulée puis attendue — son `finally` rend le drapeau (et le « … ») avant
+     * que la nouvelle ne parte, donc deux appels LLM ne se chevauchent jamais
+     * (409 « limite atteinte »). `false` passé [preemptTimeoutMs] (la précédente
+     * ignore l'annulation) : l'appelant dit pourquoi, sans lancer un second appel.
+     */
+    private suspend fun acquireAsking(): Boolean {
+        if (asking.compareAndSet(false, true)) return true
+        val self = currentCoroutineContext()[Job]
+        inFlight?.takeIf { it !== self }?.cancel()
+        withTimeoutOrNull(preemptTimeoutMs) {
+            while (asking.get()) delay(PREEMPT_POLL_MS)
+        }
+        return asking.compareAndSet(false, true)
     }
 
     /**
@@ -156,6 +177,16 @@ class IseeAnswers(
          * telle quelle, jamais convertie en timeout.
          */
         const val ASK_TIMEOUT_MS = 65_000L
+
+        /**
+         * Attente maximale de la réponse préemptée : une annulation se rend en
+         * millisecondes (appel HTTP, lecture) ; au-delà, la précédente est coincée
+         * et la nouvelle renonce plutôt que de lancer un second appel (409).
+         */
+        const val PREEMPT_TIMEOUT_MS = 10_000L
+
+        /** Scrutation du drapeau rendu par la réponse préemptée. */
+        const val PREEMPT_POLL_MS = 20L
     }
 }
 

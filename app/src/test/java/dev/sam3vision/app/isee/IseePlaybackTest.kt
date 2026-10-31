@@ -25,8 +25,7 @@ import org.junit.Test
 /**
  * La lecture iSee : l'état parlant est posé avant la lecture et rendu sur
  * échec. Un `Result` de lecture ignoré laisserait `speakingEntryId` à vie —
- * les tenues suivantes seraient jetées (« Busy speaking ») et les annonces
- * bloquées, sans que l'écran ne dise jamais pourquoi.
+ * les annonces se croiraient bloquées, sans que l'écran ne dise jamais pourquoi.
  */
 class IseePlaybackTest {
 
