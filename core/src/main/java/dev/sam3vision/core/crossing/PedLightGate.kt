@@ -4,11 +4,10 @@ package dev.sam3vision.core.crossing
  * Porte du vert piéton : un vert classifié ne devient un ordre de traverser
  * que s'il n'est pas confiné en haut et sans rouge franc mélangé. Détection
  * au plus large (31/10, ordre user) : la forme n'exige qu'une tache au moins
- * aussi haute que large — bonhommes comme disques ronds passent, seuls les
- * feux rouges, les feux éteints et le bruit restent refusés. Contrepartie
- * assumée : un disque voiture vert mal étiqueté par SAM annonce
- * « traversez » (les prompts piétons restent la seule garde, A2 levé —
- * voir `docs/RECETTE-FEUX-FR.md`).
+ * aussi haute que large — élancés comme ronds passent à 1,0 ; les disques
+ * au contour cyan complet (tache plus large que haute) restent refusés,
+ * réalité par ancre (voir `PedLightGateTest` et `docs/RECETTE-FEUX-FR.md`).
+ * Les prompts piétons restent la garde contre les disques admis.
  *
  * Historique (10/2026, corpus Panoramax 235 lampes, crops ≤ 48 px) : à
  * élancement 1,5, 0 vert sur 90 rouges, 28/42 bonhommes, 0/47 disques de
@@ -197,12 +196,8 @@ object PedLightGate {
         return scan
     }
 
-    /** Pixel allumé franc (mêmes planchers que [PedLightColor]). */
-    private fun isLit(pixel: Int): Boolean {
-        if (PedLightColor.saturation(pixel) < PedLightColor.MIN_SATURATION) return false
-        if (PedLightColor.value(pixel) < PedLightColor.MIN_VALUE) return false
-        return true
-    }
+    /** Pixel retenu : la seule définition ([PedLightColor.isLit], francs + délavés). */
+    private fun isLit(pixel: Int): Boolean = PedLightColor.isLit(pixel)
 
     private fun isRedHue(hue: Float): Boolean {
         if (hue <= PedLightColor.RED_HUE_DEG) return true

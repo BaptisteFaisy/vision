@@ -46,6 +46,21 @@ class PedLightColorTest {
     }
 
     @Test
+    fun `un cadre cyan 180 est vert (LED francaise)`() {
+        assertEquals(CrossingState.Green, PedLightColor.classify(IntArray(100) { CYAN_180 }, 10, 10))
+    }
+
+    @Test
+    fun `un cadre vert delave brillant est vert (soleil)`() {
+        assertEquals(CrossingState.Green, PedLightColor.classify(IntArray(100) { WASHED_GREEN }, 10, 10))
+    }
+
+    @Test
+    fun `un cadre gris delave attend rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100) { WASHED_GRAY }, 10, 10))
+    }
+
+    @Test
     fun `quelques pixels rouges perdus attendent rouge, binaire`() {
         val pixels = IntArray(100) { BLACK }
         pixels[0] = RED
@@ -83,5 +98,8 @@ class PedLightColorTest {
         private const val GREEN = 0xFF00FF00.toInt()
         private const val BLACK = 0xFF000000.toInt()
         private const val GRAY = 0xFF808080.toInt()
+        private const val CYAN_180 = 0xFF00FFFF.toInt()
+        private const val WASHED_GREEN = 0xFF99FFFF.toInt()
+        private const val WASHED_GRAY = 0xFFF0F0F0.toInt()
     }
 }

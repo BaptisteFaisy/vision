@@ -18,13 +18,17 @@ object PedLightColor {
     /** Teinte rouge : en dessous (côté 0°) ou au dessus (côté 360°). */
     internal const val RED_HUE_DEG = 15f
 
-    /** Plage de teinte du vert piéton (le vert français tire vers le bleu). */
+    /** Plage de teinte du vert piéton : les LED françaises montent au cyan (~180°, lot téléphone 31/10), le bleu (240°) restant exclu. */
     internal const val GREEN_HUE_MIN_DEG = 80f
-    internal const val GREEN_HUE_MAX_DEG = 175f
+    internal const val GREEN_HUE_MAX_DEG = 195f
 
     /** Saturation et valeur minimales : un feu allumé est franc, pas pastel. */
     internal const val MIN_SATURATION = 0.45f
     internal const val MIN_VALUE = 0.35f
+
+    /** Délavage du jour : une lampe surexposée (valeur ≥ 0,90) compte dès 0,15 de saturation — les gris (sat 0) restant exclus. */
+    internal const val WASHOUT_MIN_SATURATION = 0.15f
+    internal const val WASHOUT_MIN_VALUE = 0.90f
 
     /** Fraction de pixels colorés exigée pour trancher (un bonhomme dans sa boîte). */
     private const val MIN_FRACTION = 0.06f
@@ -42,10 +46,8 @@ object PedLightColor {
         var red = 0
         var green = 0
         for (pixel in argb) {
+            if (!isLit(pixel)) continue
             val hue = hueDeg(pixel)
-            val sat = saturation(pixel)
-            val value = value(pixel)
-            if (sat < MIN_SATURATION || value < MIN_VALUE) continue
             if (hue <= RED_HUE_DEG || hue >= 360f - RED_HUE_DEG) red += 1
             else if (hue in GREEN_HUE_MIN_DEG..GREEN_HUE_MAX_DEG) green += 1
         }
@@ -59,6 +61,21 @@ object PedLightColor {
             return CrossingState.Green
         }
         return CrossingState.Red
+    }
+
+    /**
+     * Pixel retenu par le pipeline (traits, porte, classifieur HSV) : franc
+     * (saturation ≥ [MIN_SATURATION]) ou délavé par le soleil (très brillant,
+     * saturation ≥ [WASHOUT_MIN_SATURATION]) — une lampe blanche de jour reste
+     * une lampe. Toujours éteint sous [MIN_VALUE]. Seule définition du lot
+     * (porte et traits l'appellent, pas de copie).
+     */
+    internal fun isLit(pixel: Int): Boolean {
+        val value = value(pixel)
+        if (value < MIN_VALUE) return false
+        val sat = saturation(pixel)
+        if (sat >= MIN_SATURATION) return true
+        return sat >= WASHOUT_MIN_SATURATION && value >= WASHOUT_MIN_VALUE
     }
 
     /** Teinte 0..360° (conversion maison : pas d'Android en `:core`). */
