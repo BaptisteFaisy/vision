@@ -103,4 +103,19 @@ class LatestFrameSlotTest {
         assertFalse("la réserve est vide après un take", slot.pending)
         assertTrue("des frames ont bien été remplacées", slot.droppedFrames > 0L)
     }
+
+    @Test
+    fun `reserve perimee apres le seuil, jamais a vide`() {
+        val slot = LatestFrameSlot()
+        assertFalse("vide = jamais périmée", slot.stale(nowNs = 1_000_000_000L, thresholdMs = 50L))
+        slot.offer("A", captureAtNs = 0L, encodedAtNs = 1_000_000_000L)
+        assertFalse(
+            "fraîche sous le seuil",
+            slot.stale(nowNs = 1_000_000_000L + 49_000_000L, thresholdMs = 50L),
+        )
+        assertTrue(
+            "périmée au-delà",
+            slot.stale(nowNs = 1_000_000_000L + 51_000_000L, thresholdMs = 50L),
+        )
+    }
 }

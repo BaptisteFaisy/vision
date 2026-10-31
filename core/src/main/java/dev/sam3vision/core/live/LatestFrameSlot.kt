@@ -55,6 +55,16 @@ class LatestFrameSlot {
     /** Une frame attend-elle ? (la caméra peut éviter de convertir une image inutile). */
     val pending: Boolean get() = synchronized(lock) { jpegB64 != null }
 
+    /**
+     * La frame en réserve a-t-elle plus de [thresholdMs] (encodée avant
+     * `nowNs - seuil`) ? Vide = jamais périmée. Sert à réalimenter la réserve
+     * pendant le vol : drainer une frame fraîche (≤ 1 période caméra) au lieu
+     * d'une frame âgée d'un RTT (poste `up`).
+     */
+    fun stale(nowNs: Long, thresholdMs: Long): Boolean = synchronized(lock) {
+        jpegB64 != null && nowNs - encodedAtNs > thresholdMs * 1_000_000L
+    }
+
     /** Frames **jetées** parce que la réserve était déjà pleine (jamais mises en file). */
     val droppedFrames: Long get() = synchronized(lock) { dropped }
 

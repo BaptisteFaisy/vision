@@ -100,6 +100,31 @@ class LiveProbeCadenceTest {
     }
 
     /**
+     * Réserve pleine mais périmée (> 50 ms) pendant le vol : la caméra est invitée
+     * à ré-encoder (remplacement, jamais de file) pour drainer une frame fraîche —
+     * une frame âgée d'un RTT gonflerait le poste `up` pour rien.
+     */
+    @Test
+    fun `reserve perimee pendant le vol, la camera re-encode`() = runTest {
+        val fake = BlockingClient(mutableListOf())
+        val probe = probe(this, fake)
+
+        at(0)
+        probe.onFrame("A", captureAtNs = 1_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 2_000_000L)
+        assertFalse("réserve fraîche : pas de conversion", probe.wantsFrame())
+
+        at(10)
+        assertFalse("10 ms : encore fraîche", probe.wantsFrame())
+        at(60)
+        assertTrue("60 ms : périmée, on réalimente", probe.wantsFrame())
+        assertEquals("aucun envoi pendant le vol de A", 1, fake.sent)
+        fake.release(frame())
+        advanceUntilIdle()
+    }
+
+    /**
      * Un seul créneau, décidé par `Cadence.Fast` : la sonde ne peut pas ouvrir deux vols
      * à la fois, même si la caméra presse. Vérifié sur le régulateur lui-même.
      */
