@@ -124,7 +124,7 @@ class GlassesController(
             voiceInvocations.disarm()
         },
         note = ::note,
-        report = { error -> reportSessionError(error, activity, ::note) },
+        report = { error, phase, current -> reportSessionError(error, activity, ::note, phase, current) },
         onCreated = { created -> startSession(created) },
     )
 
@@ -282,7 +282,8 @@ class GlassesController(
         sessionWatch = scope.launch {
             launch { created.state.collect { state -> onSessionState(created, state) } }
             launch {
-                created.errors.collect { error -> reportSessionError(error, activity, ::note) }
+                // Session oubliée : ses erreurs tardives n'écrasent pas la nouvelle.
+                created.errors.collect { error -> if (created === session) reportSessionError(error, activity, ::note, _state.value.phase, _state.value.message) }
             }
         }
         created.start()

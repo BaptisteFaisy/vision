@@ -30,7 +30,7 @@ internal class GlassesSessionOpener(
     /** Session retombée au repos (+ invocation vocale désarmée), côté contrôleur. */
     private val idle: () -> Unit,
     private val note: (GlassesMessage) -> Unit,
-    private val report: (DeviceSessionError) -> Unit,
+    private val report: (DeviceSessionError, SessionPhase, GlassesMessage?) -> Unit,
     private val onCreated: (DeviceSession) -> Unit,
 ) {
     private var openJob: Job? = null
@@ -82,7 +82,7 @@ internal class GlassesSessionOpener(
                 } else {
                     Log.w(TAG, "session refusée : ${error.description}")
                     idle()
-                    report(error)
+                    report(error, snapshot().phase, snapshot().message)
                     null
                 }
             },
