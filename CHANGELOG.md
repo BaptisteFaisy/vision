@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : destination GPS en mémoire pour les questions LLM (branche `feat/isee-gps-destination-memoire-llm`)
+
+- **Constat** : pendant un guidage GPS, les questions sur la destination
+  partaient au LLM sans elle (iSee : historique vide ; direct : journal
+  caméra seul) — le modèle décrivait la photo au lieu de répondre sur la
+  destination.
+- **Fait** : `VoiceNavSession` republie la destination guidée à chaque
+  transition (`setState`, `null` hors guidage), `IseeVoiceNav` la verse dans
+  `GpsDestinationMemory`, `IseeAnswers` et `LiveAskSession` la joignent au
+  contexte (`GpsDestinationText`, FR/EN selon la langue de la voix). Un
+  fournisseur qui jette = pas de contexte, jamais d'échec.
+- **Preuve** : 24 tests nouveaux (texte 6, mémoire 5, direct 5, réponses 4,
+  session 4) ; suites `:app` 1423/1423 et `:core` 2506/2511 (5
+  `PrivateFileSettingsStoreTest` pré-existants, prouvés sur base intacte),
+  `assembleDebug` OK, garde tailles OK.
+
 ## 2026-10-31 — CI : un runner non provisionné ne brûle plus l'unique tentative de l'agent `fw` (branche `ci/agent-code3`)
 
 - **Constat sur #652** (brouillon jetable aux tests rouges) : la v23 a bien

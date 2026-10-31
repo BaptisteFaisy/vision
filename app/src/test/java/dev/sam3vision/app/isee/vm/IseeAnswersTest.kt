@@ -417,7 +417,7 @@ class IseeAnswersTest {
             playback = streaming,
             photo = shots,
             prune = {},
-            ask = { _, _, _ -> Result.success("Devant toi") },
+            ask = { _, _, _, _ -> Result.success("Devant toi") },
         )
         val job = launch { answers.answer(seedRow(), "question") }
         withTimeout(2_000) { entered.await() }
