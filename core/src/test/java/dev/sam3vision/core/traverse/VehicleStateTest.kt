@@ -400,4 +400,34 @@ class VehicleStateTest {
         )
         assertEquals("Stop, car moving.", second!!.safetyPhrase)
     }
+
+    @Test
+    fun `deux types en mouvement - pluriel generique et stop pluriel`() {
+        val watcher = VehicleStateWatcher()
+        var cue: VehicleStateCue? = null
+        listOf(100f, 110f, 120f).forEachIndexed { index, width ->
+            cue = watcher.update(
+                listOf(det("car", box(width)), det("bus", box(width, cx = 420f))),
+                listOf(reading("car", 5f, box(width)), reading("bus", 6f, box(width, cx = 420f))),
+                atMs = index * 100L,
+                language = SpeechLanguage.En,
+            )
+        }
+
+        assertEquals("2 vehicles moving, 5 meters away.", cue!!.phrase)
+        assertEquals("Stop, 2 vehicles moving.", cue.safetyPhrase)
+        assertEquals(2, cue.movingCount)
+        assertEquals(
+            "2 véhicules en mouvement, à 5 mètres.",
+            VehicleStateText.movingPluralPhrase(2, 5f, null, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "2 vehicles moving, at 12 o'clock.",
+            VehicleStateText.movingPluralPhrase(2, null, 0.5f, SpeechLanguage.En),
+        )
+        assertEquals(
+            "Stop, 3 véhicules en mouvement.",
+            VehicleStateText.safetyPluralPhrase(3, SpeechLanguage.Fr),
+        )
+    }
 }

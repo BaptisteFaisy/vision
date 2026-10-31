@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Annonces trottoir : double palier 1 m / 0,4 m, verrous, cooldown, bateau. */
+/** Annonces trottoir : double palier 1 m / 0,7 m, verrous, cooldown, bateau. */
 class CurbAnnounceTest {
 
     private fun reading(label: String, meters: Float, box: List<Float>) =
@@ -80,7 +80,7 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `double annonce approche normale un metre puis 40 cm EN`() {
+    fun `double annonce approche normale un metre puis 70 cm EN`() {
         val watcher = CurbWatcher()
         val far = CurbSignal(detected = true, meters = 0.8f, centerX = 0.5f, edge = CurbEdge.Up)
         val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Up)
@@ -177,22 +177,22 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `apres imminent silence jusqu'au rearmement a 06`() {
+    fun `apres imminent silence jusqu'au rearmement a 09`() {
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.3f, edge = CurbEdge.Up)
-        val mid = CurbSignal(detected = true, meters = 0.5f)
-        val back = CurbSignal(detected = true, meters = 0.8f)
+        val mid = CurbSignal(detected = true, meters = 0.8f)
+        val back = CurbSignal(detected = true, meters = 1.0f)
 
         watcher.onSignal(near, 1000L)
         assertNotNull(watcher.onSignal(near, 2000L))
-        // Entre 0,4 et 0,6 m : pas de ré-armement, l'imminent reste muet.
+        // Entre 0,7 et 0,9 m : pas de ré-armement, l'imminent reste muet.
         assertNull(watcher.onSignal(mid, 3000L))
         assertNull(watcher.onSignal(mid, 4000L))
         assertNull(watcher.onSignal(mid, 5000L))
         assertNull(watcher.onSignal(near, 6000L))
         assertNull(watcher.onSignal(near, 7000L))
         assertEquals(2_000L, watcher.lastAlertMs)
-        // Au-delà de 0,6 m : ré-armé, l'imminent reparle.
+        // Au-delà de 0,9 m : ré-armé, l'imminent reparle.
         assertNull(watcher.onSignal(back, 8000L))
         assertNull(watcher.onSignal(near, 9000L))
         val cue = watcher.onSignal(near, 10_000L)
@@ -383,5 +383,24 @@ class CurbAnnounceTest {
         val flatCue = flatWatcher.onSignal(pass, 2000L, SpeechLanguage.Fr)
 
         assertNull(flatCue!!.safetyPhrase)
+    }
+
+    @Test
+    fun `imminent a 65 cm parle urgent, pre-alerte a 75 cm`() {
+        val watcher = CurbWatcher()
+        val near = CurbSignal(detected = true, meters = 0.65f, centerX = 0.5f, edge = CurbEdge.Up)
+        watcher.onSignal(near, 1000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
+
+        assertEquals("Marche, maintenant.", cue!!.phrase)
+        assertTrue(cue.urgent)
+
+        val soft = CurbWatcher()
+        val far = CurbSignal(detected = true, meters = 0.75f, centerX = 0.5f, edge = CurbEdge.Up)
+        soft.onSignal(far, 1000L, SpeechLanguage.Fr)
+        val cueFar = soft.onSignal(far, 2000L, SpeechLanguage.Fr)
+
+        assertEquals("Marche dans 1 mètre, à midi.", cueFar!!.phrase)
+        assertFalse(cueFar.urgent)
     }
 }
