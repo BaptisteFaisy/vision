@@ -469,6 +469,8 @@ internal class ProbeHazards(
  * Les huit guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeCurb`, même contrat). Bordure et véhicules sont
  * construits ici pour que le mobilier lise P1/P2 ([p1p2Busy] : le poteau est P3).
+ * [stairsAudible] est la porte des deux voix escaliers (GPS coupé : parlent
+ * quand même, sécurité — contrat `IseeVoiceGate`).
  */
 internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,
@@ -476,14 +478,15 @@ internal fun LiveProbe.observeHazards(
     playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
     safety: SafetyVoice,
+    stairsAudible: () -> Boolean = playerIdle,
 ): ProbeHazards {
     val curb = CurbWatcher()
     val vehicle = VehicleStateWatcher()
     val busy: (Long) -> Boolean = { nowMs -> p1p2Busy(nowMs, vehicle.lastMovingAlertMs, curb.lastNearMs) }
     return ProbeHazards(
         observeCurb(scope, voice, playerIdle, language, safety, curb),
-        observeStairs(scope, voice, playerIdle, language),
-        observeStairsCount(scope, voice, playerIdle, language),
+        observeStairs(scope, voice, stairsAudible, language),
+        observeStairsCount(scope, voice, stairsAudible, language),
         observeHazard(scope, voice, playerIdle, language, busy),
         observeFenceOpening(scope, voice, playerIdle, language),
         observeVehicleState(scope, voice, playerIdle, language, vehicle),

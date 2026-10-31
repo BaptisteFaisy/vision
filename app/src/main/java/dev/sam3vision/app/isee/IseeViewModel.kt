@@ -258,7 +258,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false, queue = true) }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
-        hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety)
+        hazards = probe.observeHazards(
+            viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety,
+            stairsAudible = { !speechBusy() },
+        )
     }
 
     /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
