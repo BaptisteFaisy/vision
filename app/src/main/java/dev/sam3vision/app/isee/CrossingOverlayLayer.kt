@@ -127,10 +127,10 @@ internal fun TraverseVerdictBanner(
 private const val STROKE_DP = 2.5f
 
 /** Verdict plus grand que l'étiquette du feu : c'est lui qu'on lit en marchant. */
-private const val VERDICT_FONT_SP = 14f
+internal const val VERDICT_FONT_SP = 14f
 
-private const val VERDICT_PAD_H_PX = 10f
-private const val VERDICT_PAD_V_PX = 4f
+internal const val VERDICT_PAD_H_PX = 10f
+internal const val VERDICT_PAD_V_PX = 4f
 
 /** Décalage du bandeau sous la puce (~46 dp de puce + respiration). */
 private const val VERDICT_TOP_MARGIN_DP = 64f
@@ -140,4 +140,4 @@ private const val TAG_FONT_SP = 11f
 
 private const val TAG_PAD_H_DP = 6f
 private const val TAG_PAD_V_DP = 2f
-private const val TAG_CORNER_DP = 6f
+internal const val TAG_CORNER_DP = 6f

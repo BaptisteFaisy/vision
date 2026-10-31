@@ -735,6 +735,13 @@ Nouveau contrat, en mode Traversée seul :
   passe — consignes seules, sans « Stop. »), jusqu'à 3 cycles par
   traversée ; au-delà, le scan rend la voix (le veto garde la traversée,
   les voix douces reprennent) ;
+- **mauvais sens corrigé** : tourner à droite quand on a demandé la
+  gauche (30° depuis l'entrée du côté, prior) redit aussitôt « Non,
+  regardez à gauche. » (miroir à droite) au lieu d'attendre le timeout ;
+- **écran miroir** : le bandeau Traversée montre la consigne en cours
+  et les constats latéraux déjà rendus (« Pas de voiture à gauche en
+  mouvement. » / « Voiture à gauche ! », FR/EN), rouge/vert/ambre —
+  rien hors scan ;
 - **mouvement latéral** : une voiture qui traverse le champ à taille
   stable est désormais « en mouvement » (vitesse x lissée > 8 %/s,
   `VehicleApproach`, prior à valider rue) — le tau ne la voyait pas, et
@@ -745,13 +752,14 @@ Nouveau contrat, en mode Traversée seul :
   qui ressembleraient à du mouvement) ; sans capteur, repli temporisé
   (le verdict vaut pour les deux fenêtres d'observation, limite connue).
 
-Verrouillé par `CrosswalkScanTest` (17 : séquence, virages signés,
+Verrouillé par `CrosswalkScanTest` (21 : séquence, virages signés,
 bouclage ±180°, repli temporisé, constats par côté, gel feu, regard
-tournant ignoré, re-vérification, plafond 3 cycles),
+tournant ignoré, re-vérification, plafond 3 cycles, mauvais sens),
 `VehicleApproachTest` (+4 : latéral franc, dérive lente,
 approche muette, panoramique tuée par le fond), `VehicleStateLateralTest`
-(2 : latéral annoncé, brut par frame) et `CrosswalkScanWiringTest`
-(10 : déclencheur 2 m, priorités).
+(2 : latéral annoncé, brut par frame), `CrosswalkScanWiringTest`
+(10 : déclencheur 2 m, priorités) et `CrosswalkScanDisplayTest`
+(10 : textes FR/EN, cycles, couleurs).
 
 Recette téléphone : fumée Redmi OK (install + lancement + pid vivant,
 capteur rotation présent sur les deux téléphones) ; sur un passage,
