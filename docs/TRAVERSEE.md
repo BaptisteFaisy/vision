@@ -338,6 +338,10 @@ s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
   « Tout droit. » en clips < 100 ms, « Sur le passage. » après 2 frames),
   doux (`urgent = false`) — le feu, le veto et les véhicules gardent la
   priorité du son, le latéral attend le silence ;
+- **arrivée dernière** (ordre user du 31/10) : « Sur le passage. » passe
+  derrière toutes les autres annonces (danger > route > doux > arrivée) —
+  parlée au silence seul, sinon gardée et redite en dernier, y compris en
+  Traversée (rattrapage latéral, file obstacles coupée) ;
 - **câblage** : `feedCrossingLateral` (`isee/CrossingWiring.kt`) — hors
   traversée inchangé, en traversée guidage si proche sinon retombée ;
   `LiveProbe` inchangée (499 lignes, au plafond) ;

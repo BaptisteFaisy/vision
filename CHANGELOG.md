@@ -14,6 +14,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   contexte, jamais d'échec.
 - **Preuve** : 4 tests nouveaux (`LockedMicAnswerTest`, 10/10 avec les 6
   existants) ; `check-kotlin-limits.py` vert (1284 fichiers, aucun dépassement).
+## 2026-10-31 — iSee : « Sur le passage. » en dernière priorité voix (branche `feat-arrivee-passage-derniere`)
+
+- **Demande** : l'annonce d'arrivée sur le passage piéton (« Sur le passage. »)
+  passe derrière tous les autres types d'annonce.
+- **Constat** : elle partait par `speakNavigation`, sans garde — et
+  `SpeechPlayer.play` coupe la lecture en cours : l'arrivée couvrait le feu,
+  la route, les obstacles et le chat. Les docs la disaient douce (`urgent =
+  false`), le câblage coupait.
+- **Fait** : voie arrivée dédiée dans `ProximityVoice` (`onArrivalPhrase` :
+  parlée au silence seul, sinon gardée et redite en dernier — danger > route
+  > doux > arrivée) ; l'annonce localisée (« Passage piéton à gauche… »)
+  passe en doux obstacle ; rattrapage arrivée à chaque frame y compris en
+  Traversée (`flushArrival`, sans toucher à la file obstacles, coupée en
+  Traversée). `IseeViewModel` tient ses 498 lignes (câblage extrait).
+- **Preuve** : 8 tests nouveaux (`ProximityVoiceArrivalTest` 6,
+  `CrossingLateralTest` 2) ; suite `:app` 1492/1492 sur r630 ; garde tailles OK.
 
 ## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
 
