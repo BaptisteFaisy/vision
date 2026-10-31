@@ -35,6 +35,7 @@ import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.stairsMaskPlaneOf
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -429,6 +430,8 @@ _state.update { it.cleared() }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
         pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
+        // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
+        StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
         _state.update { current ->
             current.copy(
                 masks = overlays,

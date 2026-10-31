@@ -39,6 +39,10 @@ class StairCannyCountTest {
         return pixels
     }
 
+    /** Plan LumaPlane : 1 sur [rows], 0 ailleurs. */
+    private fun maskPlane(rows: IntRange): ByteArray =
+        ByteArray(LumaPlane.SIZE) { i -> if (i / LumaPlane.WIDTH in rows) 1 else 0 }
+
     @Test
     fun `marches vues = compte positif`() {
         StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
@@ -148,6 +152,40 @@ class StairCannyCountTest {
     @Test
     fun `clear oublie la roi`() {
         StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
+
+        StairCannyCount.clear()
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+
+        assertEquals(5, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `masque prime sur roi`() {
+        // ROI = moitié haute (2 marches), masque = moitié basse (4 marches) : 4 gagne.
+        StairCannyCount.setRoi(StairRoi(0f, 0f, 1f, 0.5f))
+        StairCannyCount.setMaskPlane(maskPlane(52..102))
+        StairCannyCount.offerLuma(stairsLuma(10, 18, 60, 68, 76, 84))
+
+        assertEquals(4, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `masque efface = repli boite`() {
+        // Masque = moitié haute (1 marche fusionnée), ROI = moitié basse (4 marches).
+        StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
+        StairCannyCount.setMaskPlane(maskPlane(0..51))
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+        assertEquals(1, StairCannyCount.lineCount())
+
+        StairCannyCount.setMaskPlane(null)
+        StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
+
+        assertEquals(4, StairCannyCount.lineCount())
+    }
+
+    @Test
+    fun `clear oublie le masque`() {
+        StairCannyCount.setMaskPlane(maskPlane(52..102))
 
         StairCannyCount.clear()
         StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
