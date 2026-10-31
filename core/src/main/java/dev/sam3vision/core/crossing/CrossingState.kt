@@ -34,7 +34,9 @@ object CrossingPrompts {
      * contre 43,8 % pour `pedestrian signal` et 12,5 % pour un prompt
      * d'état). Les feux voiture ne sont jamais suivis (ordre user du
      * 31/10) : un vert voiture ne doit jamais devenir un ordre de
-     * traverser. Variantes d'union : [LIGHT_SHORT], [LIGHT_SIGNAL].
+     * traverser — 31/10, cette exclusion est la seule garde (la porte
+     * forme admet les disques, détection au plus large).
+     * Variantes d'union : [LIGHT_SHORT], [LIGHT_SIGNAL].
      */
     const val LIGHT = "pedestrian traffic light"
 

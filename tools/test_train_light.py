@@ -19,7 +19,8 @@ RES = TOOLS.parent / "core/src/test/resources"
 
 RED, GREEN, BLACK = 0xFFFF0000, 0xFF00FF00, 0xFF000000
 
-# Verdicts binaires attendus (cf. tests JVM) : verts confirmes, tout le reste rouge.
+# Verdicts binaires attendus (cf. tests JVM). 31/10, ordre user : detection
+# au plus large — disques verts et pose large admis, seuls les rouges refusent.
 ANCHORS = {
     "feuxfr/fr_red_fig_548.ppm": "Red",
     "feuxfr/fr_red_dim_138.ppm": "Red",
@@ -27,9 +28,9 @@ ANCHORS = {
     "feuxfr/fr_green_fig_21.ppm": "Green",
     "feuxfr/fr_green_fig_302.ppm": "Green",
     "feuxfr/fr_green_fig_243.ppm": "Green",
-    "feuxfr/fr_cardisc_close_183.ppm": "Red",
-    "feuxfr/fr_cardisc_367.ppm": "Red",
-    "feuxfr/fr_green_widepose_355.ppm": "Red",
+    "feuxfr/fr_cardisc_close_183.ppm": "Green",
+    "feuxfr/fr_cardisc_367.ppm": "Green",
+    "feuxfr/fr_green_widepose_355.ppm": "Green",
     "feuxfr2/r1b_g01.ppm": "Green",
     "feuxfr2/r1b_g02.ppm": "Green",
     "feuxfr2/r1b_g03.ppm": "Green",
@@ -39,8 +40,8 @@ ANCHORS = {
     "feuxfr2/st_g02.ppm": "Green",
     "feuxfr2/st_r01.ppm": "Red",
     "feuxfr2/st_r02.ppm": "Red",
-    "feuxfr2/st_c01.ppm": "Red",
-    "feuxfr2/st_c02.ppm": "Red",
+    "feuxfr2/st_c01.ppm": "Green",
+    "feuxfr2/st_c02.ppm": "Green",
 }
 
 
