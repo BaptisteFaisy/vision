@@ -4,7 +4,9 @@ import dev.sam3vision.app.isee.IseePlayback
 import dev.sam3vision.app.llmClient
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MessageMultimedia
+import dev.sam3vision.app.voicenav.GpsDestinationMemory
 import dev.sam3vision.core.model.ChatTurn
+import dev.sam3vision.core.nav.GpsDestinationText
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
 import java.util.concurrent.atomic.AtomicBoolean
@@ -17,9 +19,11 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Le chemin de la réponse : question écrite en base, image = photo-contexte, texte
  * rendu par le LLM, puis voix lue en continu, tranche par tranche.
  *
- * **Aucune mémoire** : la question part avec une liste d'historique **toujours vide**
- * (`emptyList()`) — le LLM ne reçoit jamais les messages précédents, même dans la
- * même session. Les tours ne sont plus jamais lus de la base.
+ * **Zéro historique** : la question part avec une liste **toujours vide**
+ * (`emptyList()`) — le LLM ne reçoit jamais les messages précédents, même
+ * dans la même session. Les tours ne sont plus jamais lus de la base.
+ * Seule la destination GPS en cours rejoint la question, en contexte
+ * ([GpsDestinationMemory]) — le modèle répond sur la bonne destination.
  *
  * L'écran dit l'étape en cours ([IseeStatusText.STEP_ASKING], puis
  * [IseeStatusText.STEP_SPEAKING]) et la question au LLM est plafonnée : au-delà,
@@ -36,8 +40,10 @@ class IseeAnswers(
     private val playback: IseePlayback,
     private val photo: IseePhotoShot,
     private val prune: suspend () -> Unit,
-    private val ask: suspend (image: String, question: String, history: List<ChatTurn>) -> Result<String> =
-        { image, question, history -> AskUseCase(llmClient(settings())).invoke(image, question, history) },
+    private val ask: suspend (image: String, question: String, history: List<ChatTurn>, context: String?) -> Result<String> =
+        { image, question, history, context -> AskUseCase(llmClient(settings())).invoke(image, question, history, context) },
+    /** Destination GPS en cours (`null` hors guidage) : rejoint la question en contexte. */
+    private val destination: () -> String? = { GpsDestinationMemory.destination.value },
     private val askTimeoutMs: Long = ASK_TIMEOUT_MS,
 ) {
 
@@ -113,14 +119,19 @@ class IseeAnswers(
      * du LLM comme une exception d'écriture ou de synthèse revient en [Result] avec son motif.
      * La question au LLM est plafonnée ([askTimeoutMs]) : l'échéance nomme l'étape.
      */
+    /** Contexte de la question : la destination GPS guidée, `null` hors guidage (sans lever). */
+    private fun destinationContext(): String? =
+        GpsDestinationText.line(runCatching { destination() }.getOrNull(), settings().speechLanguage)
+
     private suspend fun outcome(
         row: MessageMultimedia,
         image: String,
         question: String,
     ): Result<Unit> =
-        // Zéro mémoire : la liste est vide, quoi que la base garde encore.
+        // Zéro historique : la liste est vide, quoi que la base garde encore ;
+        // seule la destination GPS en cours rejoint la question, en contexte.
         runCatching {
-            withTimeoutOrNull(askTimeoutMs) { ask(image, question, emptyList()) }
+            withTimeoutOrNull(askTimeoutMs) { ask(image, question, emptyList(), destinationContext()) }
                 ?: throw StepTimeout(IseeStatusText.STEP_ASKING)
         }
             .getOrElse { Result.failure(it) }

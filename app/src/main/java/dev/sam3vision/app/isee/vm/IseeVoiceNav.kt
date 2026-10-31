@@ -9,6 +9,7 @@ import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.perms.hasPerm
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
+import dev.sam3vision.app.voicenav.GpsDestinationMemory
 import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.ValhallaRouteLoader
 import dev.sam3vision.app.voicenav.VoiceNavEngineDriver
@@ -116,6 +117,8 @@ class IseeVoiceNav(
             // question ni bouton (autoStartOnVoice=true) — la boule tourne
             // pendant le calcul, puis le guidage parle.
             autoStartOnVoice = true,
+            // Guidage actif : la destination reste en mémoire pour le LLM.
+            onActiveDestination = GpsDestinationMemory::remember,
         )
     }
 
