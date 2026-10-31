@@ -11,13 +11,12 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 
 ## 1. Le contrat, en une phrase
 
-Dire à voix haute **où mettre le prochain pas** — un mot dit **en moins de
-100 ms** : voix TwinLite quand le couloir est bouché (toujours le côté de
-sortie, même au contact), mots SAM sur voie libre
-(cap, décalage, retour trottoir) — calculé **sur le téléphone depuis les
-seuls objets SAM** — **aucun appel LLM**, le mot part en clip
-pré-synthétisé, jamais de synthèse réseau au moment de parler — sauf le rappel
-de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
+Dire à voix haute **où mettre le prochain pas** — la direction dite **en
+continu toutes les 2 s, en moins de 100 ms** (ordre user du 31/10) : voix
+TwinLite quand le couloir est bouché (toujours le côté de sortie, même au
+contact), mots SAM sur voie libre (cap, décalage, retour trottoir) — calculé
+**sur le téléphone depuis les seuls objets SAM** — **aucun appel LLM**, le mot
+part en clip pré-synthétisé, jamais de synthèse réseau au moment de parler.
 
 ## 2. Le trait et la portée
 
@@ -55,8 +54,7 @@ de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
 | Obstacle, sortie à droite | droite. (TwinLite) | right. (TwinLite) |
 | Décalage latéral | Gauche. / Droite. | Left. / Right. |
 | Retour trottoir | Gauche. / Droite. | Left. / Right. |
-| Voie libre stable (rappel, toutes les 8 s) | Continue tout droit. (en alternance avec Tout droit.) | Continue straight. (alternating with Straight.) |
-| Retour/décalage stable (rappel) | Continue à gauche/à droite. | Continue left/right. |
+| Direction stable (répétée toutes les 2 s) | Tout droit. / Gauche. / Droite. | Straight. / Left. / Right. |
 
 - Deux voix, un seul parle à la fois (ordre user du 29/10, `TwinLiteWord` +
   `GuidanceWord`, arbitrés par `GuidanceAnnouncer`) : ni nom d'obstacle, ni
@@ -66,42 +64,33 @@ de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
 - Les labels SAM n'étant plus dits, leur non-traduction ne touche plus le guidage
   (elle reste vraie des positions, `docs/VOIX-ANGLAIS.md`).
 
-## 4. Quand elle parle : le mot nouveau, aussitôt
+## 4. Quand elle parle : en continu, sauf overwrite
 
 `core/.../live/GuidanceAnnouncer.kt` — machine à états **pure** (l'horodatage est fourni) :
 
-1. **mot nouveau** — un mot différent du précédent parle **dès la 1re frame**
-   (`firstSight`), **sans délai ni stabilité** : à 5 ips, attendre, c'est rater
-   le pas. Le même mot bouché ne se répète jamais (scène bouchée stable =
-   silence, pas de bégaiement) ; la voie libre stable rappelle (voir 5).
-2. **signature** — le mot (`w|left` SAM, `tl|left` TwinLite,
-   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil, seule
-   une consigne différente fait reparler ;
-3. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact),
+1. **mot nouveau (overwrite)** — un mot différent du précédent parle **dès la
+   1re frame** (`firstSight`), **sans délai ni stabilité** : à 5 ips, attendre,
+   c'est rater le pas. Il parle aussitôt, sans attendre l'échéance de
+   répétition.
+2. **répétition** — la même direction se redit toutes les 2 s
+   (`GuidanceAnnouncer.DEFAULT_REPEAT_MS`, comme le rouge répété) tant qu'elle
+   dure, libre comme bouchée (côtés TwinLite inclus). Seul le stop ne se répète
+   jamais : parlé une fois, il ne se rabâche pas.
+3. **signature** — le mot (`w|left` SAM, `tl|left` TwinLite,
+   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil ;
+4. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact),
    libre ⇒ mots SAM (décalage, retour trottoir, cap marché). Une
    seule porte : un seul parle à la fois, jamais de doublon. Le bouché prime
    toujours : la sécurité ne négocie jamais.
-4. **urgence** — seul le stop coupe la lecture en cours, chat compris
+5. **urgence** — seul le stop coupe la lecture en cours, chat compris
    (`LiveProbeState.spokenUrgent`, vrai pour le seul mot stop : « obstacle,
    arrêtez-vous. » TwinLite sur caps latéraux au contact, « Stop. » SAM
    pour l'urgence externe) : les mots doux (gauche/tout droit/droite)
    attendent le silence (`ProbeWiring.observeSpoken`). Le cap droit ne dit
    jamais stop (`docs/URGENCE-EXTERNE.md` pour l'urgence externe).
 
-5. **rappel de suivi** — sur voie libre stable (même consigne : cap, décalage
-   ou retour trottoir), le rappel ([ContinueWord] : « Continue straight. »,
-   « Continue left/right. ») reparle toutes les 8 s
-   (`GuidanceAnnouncer.DEFAULT_IDLE_REPEAT_MS`), en alternance avec le mot
-   (« Straight. », « Continue straight. », « Straight. », …) : chaque émission
-   reste distincte de la précédente, là où les déduplications aval
-   (`LiveProbeState.spoken`, `ProximityVoice.lastPhrase`) avaleraient une
-   répétition à l'identique. Le rappel ne contredit jamais la consigne stable
-   (même direction) ; le bouché ne se rappelle jamais. Première occurrence
-   synthétisée réseau puis mise en cache 30 j (`speakWord`, `VoicePack.put`) —
-   hors catalogue embarqué (`check-voicepack.py` inchangé).
-
 Différence assumée avec les positions : **la voie libre se dit** (« Tout droit. »,
-une fois par période libre, puis en rappel toutes les 8 s) là où une scène vide reste muette
+puis redit toutes les 2 s) là où une scène vide reste muette
 (`AnnouncementGate.clearScene`, via `PositionAnnouncer`). Le guidage confirme qu'il
 veille ; les positions décrivent ce qu'il y a.
 
@@ -109,9 +98,9 @@ veille ; les positions décrivent ce qu'il y a.
 
 | Élément | Fichier |
 |---|---|
-| Décision, mot, signature | `core/.../live/Guidance.kt`, `core/.../live/GuidanceWord.kt`, `core/.../live/TwinLiteWord.kt`, `core/.../live/ContinueWord.kt` |
-| Machine mot nouveau immédiat + arbitrage | `core/.../live/GuidanceAnnouncer.kt` |
-| Clips `guide_*` + `tl_*` (16 MP3, voix Laure) | `tools/voicepack-catalog.json`, `app/src/main/res/raw/vp_guide_*` + `vp_tl_*`, gardés par `tools/check-voicepack.py` (rappels `guide_continue_*` : cache runtime, hors catalogue) |
+| Décision, mot, signature | `core/.../live/Guidance.kt`, `core/.../live/GuidanceWord.kt`, `core/.../live/TwinLiteWord.kt` |
+| Machine direction en continu + arbitrage | `core/.../live/GuidanceAnnouncer.kt` (`AnnouncementGate` avec `repeatMs`) |
+| Clips `guide_*` + `tl_*` (16 MP3, voix Laure) | `tools/voicepack-catalog.json`, `app/src/main/res/raw/vp_guide_*` + `vp_tl_*`, gardés par `tools/check-voicepack.py` |
 | Sonde iSee : `guide` prime sur `announce` | `app/.../isee/LiveProbe.kt` (`phraseOf`), `ProbeWiring.kt` (`configureFrom`) |
 | Voix : mot ⇒ clip (< 100 ms), sinon synthèse + cache | `app/.../isee/ProximityVoice.kt` (`speakWord`), routage `ProbeWiring.kt` (`spokenClipId`), pack `ProbeWiring.kt` (`guideVoicePack`) |
 | Réglage | `Settings.ttsGuidanceStraight` (défaut `true`), effectif `guideStraight = bascule && ttsConfigured` (`Settings.kt`), bascule « Guider tout droit (caméra iSee) » (`app/TtsSettings.kt`) |
@@ -129,29 +118,29 @@ trait : précision, rappel, affinage au loin, replis, producteurs, voix),
 `GuidanceWordTest` (6, dont seul-stop-coupe), `TwinLiteWordTest` (9, dont
 stop-coupe FR/EN), `GuidanceObstaclesTest` (8, mur + liste bloquants de bout en
 bout, § 8),
-`GuidanceAnnouncerTest` (30, dont l'arbitrage des deux voix et 7 rappel de suivi), `ContinueWordTest` (7, nouveau),
+`GuidanceAnnouncerTest` (dont l'arbitrage des deux voix, la répétition 2 s sauf
+overwrite et le stop unique), `GuidanceAnnouncerSteeringTest` (cap suivi + répétition),
 `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (5, sonde branchée sur un faux
 client SAM : voie libre → mot, obstacle → voix TwinLite, mots doux + positions
 non urgents, contact mesuré = contournement non urgent, positions seules
 → silence sur voie libre),
-`ProbeWiringSpokenTest` (4 : même mot ré-émis → une synthèse qui aboutit, mot frais →
-dernier gagnant, mot doux → muet chat en lecture, rappel → clip), `ProximityVoiceWordTest` (4 :
-clip sans synthèse, synthèse mise en cache, mot unique, urgence externe coupe le
-chat en clip).
+`ProbeWiringSpokenTest` (même mot ré-émis → une synthèse qui aboutit, mot frais →
+dernier gagnant, mot doux → muet chat en lecture, mots → clips),
+`ProximityVoiceWordTest` (clip sans synthèse, synthèse mise en cache, doux répété,
+stop unique, urgence externe coupe le chat en clip).
 
 ## 6. Recette
 
 1. Réglages → **clé ElevenLabs** + **ID de voix** renseignés (sinon muet) et bascule
    « Guider tout droit (caméra iSee) » **activée** ;
-2. page caméra, champ vide → « Straight. » (ou « Tout droit. »), puis toutes les 8 s
-   « Continue straight. » / « Straight. » en alternance ;
+2. page caméra, champ vide → « Straight. » (ou « Tout droit. »), redit toutes
+   les 2 s tant que le champ reste vide ;
 3. une personne entre au centre à ~2 m → « gauche. » (TwinLite — ou à droite
-   si la gauche est encombrée), **aussitôt** ;
-4. la personne s'approche → silence (même mot) ;
-5. la personne est à ~0,5 m → « gauche. » (même mot, silence si déjà dit —
-   le cap droit ne dit jamais stop) ; main devant l'objectif (boîte coupée,
-   non mesurée) → « gauche. » ;
-6. le couloir se dégage → « Tout droit. » aussitôt ;
+   si la gauche est encombrée), **aussitôt** (overwrite), puis redit toutes les 2 s ;
+4. la personne s'approche → même mot redit toutes les 2 s (continu) ;
+5. la personne est à ~0,5 m → « gauche. » redit (le cap droit ne dit jamais
+   stop) ; main devant l'objectif (boîte coupée, non mesurée) → « gauche. » ;
+6. le couloir se dégage → « Tout droit. » aussitôt, puis redit toutes les 2 s ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
 ## 7. État des mesures (28/10/2026, appareil Redmi 2312DRA50G)

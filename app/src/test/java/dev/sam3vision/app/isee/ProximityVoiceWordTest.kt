@@ -13,7 +13,8 @@ import org.junit.Test
 
 /**
  * Mot du guidage : clip local sans synthèse quand le pack l'a, sinon synthèse
- * réseau mise en cache pour la suite. Le même mot ne se rejoue pas.
+ * réseau mise en cache pour la suite. Directions douces redites en continu,
+ * stop unique.
  */
 class ProximityVoiceWordTest {
 
@@ -70,7 +71,7 @@ class ProximityVoiceWordTest {
     }
 
     @Test
-    fun `meme mot deux fois, parle une fois`() = runTest {
+    fun `meme mot doux deux fois, parle deux fois`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
         val pack = VoicePack(
@@ -83,7 +84,24 @@ class ProximityVoiceWordTest {
         voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
         voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
 
-        assertEquals(1, spoken.count { it == "Gauche." })
+        assertEquals(2, spoken.count { it == "Gauche." })
+    }
+
+    @Test
+    fun `meme stop deux fois, parle une fois`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val pack = VoicePack(
+            filesDir = tempDir(),
+            packVoiceId = { "voix-test" },
+            bundledClip = { "faux-mp3".toByteArray() },
+        )
+        val voice = voice(pack, attempts, spoken)
+
+        voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
+        voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
+
+        assertEquals(1, spoken.count { it == "Stop." })
     }
 
     @Test

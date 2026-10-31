@@ -17,13 +17,14 @@ import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.hazard.FenceOpeningWatcher
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
-import dev.sam3vision.core.live.ContinueWord
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairCountVoice
@@ -138,27 +139,25 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
 
 /**
  * Entrée clip d'une phrase de la sonde (`null` = synthèse réseau) : mots SAM,
- * rappels de suivi ([ContinueWord], cache runtime — synthèse à la 1re
- * occurrence, clip ensuite), mots TwinLite. Pur, testé en JVM.
+ * mots TwinLite. Pur, testé en JVM.
  */
 internal fun spokenClipId(text: String): String? =
-    GuidanceWord.clipIdFor(text) ?: ContinueWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
+    GuidanceWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
 
 /**
- * Chaque nouvelle phrase de la sonde est confiée à la voix (une seule fois par
- * phrase). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
- * Dernier-gagnant : une phrase plus fraîche annule la synthèse en cours au lieu
- * de faire la queue derrière — une consigne datée ne sert à rien. La même phrase
- * ré-émise par les frames suivantes n'annule rien (`distinctUntilChanged`) :
- * annuler à chaque frame, c'était ne jamais finir une synthèse lente.
- * Les mots du guidage (rappels de suivi inclus) partent en clips (< 100 ms), le reste (positions) en
+ * Chaque phrase de la sonde est confiée à la voix, y compris redite à
+ * l'identique (direction stable : [LiveProbeState.spokenSeq] distingue les
+ * émissions, `distinctUntilChanged` ne les avale plus). [playerIdle] vrai =
+ * aucune bulle du chat en cours de lecture. Dernier-gagnant : une phrase
+ * plus fraîche annule la synthèse en cours au lieu de faire la queue
+ * derrière — une consigne datée ne sert à rien (overwrite).
+ * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
  * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
  * mot stop) : seul le stop coupe la lecture en cours, chat compris
  * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » SAM urgence externe) —
  * les mots doux attendent le silence, en file (`queue`, redits au silence
- * par le guetteur mobilier : sans file, `distinctUntilChanged` les perdait
- * dès que la route ou le chat parlait). Le flag ne change qu'avec la phrase,
- * donc la paire reste aussi stable que la phrase seule.
+ * par le guetteur mobilier : sans file, ils se perdaient dès que la route
+ * ou le chat parlait).
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -167,12 +166,13 @@ internal fun LiveProbe.observeSpoken(
     language: () -> SpeechLanguage,
 ) {
     scope.launch {
-        state.map { it.spoken to it.spokenUrgent }.distinctUntilChanged().collectLatest { (phrase, urgent) ->
-            val text = phrase ?: return@collectLatest
-            val clipId = spokenClipId(text)
-            if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
-            else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
-        }
+        state.map { Triple(it.spoken, it.spokenUrgent, it.spokenSeq) }.distinctUntilChanged()
+            .collectLatest { (phrase, urgent, _) ->
+                val text = phrase ?: return@collectLatest
+                val clipId = spokenClipId(text)
+                if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
+                else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
+            }
     }
 }
 
@@ -382,6 +382,29 @@ internal fun LiveProbe.observeDetour(scope: CoroutineScope, onDetour: (Boolean, 
  */
 internal fun LiveProbe.steeringCueOf(): SteeringCue? =
     if (state.value.crossingActive) null else voice.cue()
+
+/**
+ * Phrase à dire pour la frame (`null` = silence) : voix rouge/vert en
+ * Traversée, sinon guidage (cap route, sinon cap manuel) puis positions.
+ * Extraite de `LiveProbe.publish` (plafond 50 lignes/fonction).
+ */
+internal fun LiveProbe.phraseOf(
+    cross: CrossingPatch?,
+    placed: List<PlacedLabel>,
+    readings: List<DistanceReading>,
+    frame: LiveFrame,
+    at: Long,
+    language: SpeechLanguage,
+    hfovDeg: Float,
+): String? {
+    if (state.value.crossingActive) {
+        return crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height),
+            readings, at, language, frame.objects, frame.width, frame.height)
+    }
+    CrossingPeopleWatch.reset()
+    CrossingVehicleWatch.reset()
+    return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
+}
 
 /**
  * Guetteur trottoir-nommé de la sonde, miroir des dangers : la position lue

@@ -17,8 +17,10 @@ import dev.sam3vision.core.model.Passage
  *
  * [spoken] est la phrase que la voix doit dire (« Tout droit. » en guidage,
  * « Personne à 9 heures, à 1,4 mètre » en annonce des positions) : elle reste dans
- * l'état (rien ne se perd si l'écran se recompose) et change de valeur une seule
- * fois par nouvelle scène. [steering] est le chemin calculé pour la dernière
+ * l'état (rien ne se perd si l'écran se recompose). [spokenSeq] compte ses
+ * émissions : une direction stable redite à l'identique garde le même [spoken]
+ * mais incrémente [spokenSeq], pour que la voix la redise au lieu de l'avaler
+ * (`distinctUntilChanged`). [steering] est le chemin calculé pour la dernière
  * frame, dessiné sur la vidéo à chaque frame (la vidéo est en direct, la voix
  * seule est débouncée).
  */
@@ -45,6 +47,13 @@ data class LiveProbeState(
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
     val spoken: String? = null,
+    /**
+     * Compteur d'émissions de [spoken] : incrémenté à chaque phrase produite,
+     * même à l'identique (direction stable redite en continu). La voix
+     * observe le triplet ([spoken], [spokenUrgent], [spokenSeq]) : sans lui,
+     * une répétition à l'identique serait avalée par `distinctUntilChanged`.
+     */
+    val spokenSeq: Long = 0,
     /**
      * [spoken] est-elle le mot stop ? Publié avec la phrase, dans la même
      * écriture : la voix coupe la lecture en cours pour le dire (chat

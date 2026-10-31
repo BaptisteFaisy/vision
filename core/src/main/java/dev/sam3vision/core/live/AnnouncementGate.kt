@@ -12,13 +12,14 @@ package dev.sam3vision.core.live
  *    une demi-seconde de marche en plus, et un obstacle qui s'approche change de
  *    clé à chaque frame (seau de distance) donc ne serait jamais stable ;
  * 2. **nouveauté** — une clé déjà annoncée reste muette, même si la scène est
- *    toujours là ;
+ *    toujours là, sauf [repeatMs] (répétition en continu des directions) ;
  * 3. **délai** — jamais deux annonces à moins de [cooldownMs] (le temps de dire la
  *    phrase précédente), sauf appel [urgent].
  *
- * Utilisée par [PositionAnnouncer] (positions) et [GuidanceAnnouncer] (consignes de
- * guidage, dont le danger parle tout de suite). Pure et testée en JVM (aucun
- * Android, aucune horloge implicite : [atMs] est fourni).
+ * Utilisée par [PositionAnnouncer] (positions, sans répétition) et
+ * [GuidanceAnnouncer] (consignes : le danger parle tout de suite, les directions
+ * douces se répètent). Pure et testée en JVM (aucun Android, aucune horloge
+ * implicite : [atMs] est fourni).
  */
 class AnnouncementGate(
     private val minFrames: Int = DEFAULT_MIN_FRAMES,
@@ -38,16 +39,33 @@ class AnnouncementGate(
      * Clé vue à [atMs] : vrai s'il faut parler (stable, nouvelle, délai écoulé).
      * [urgent] saute le délai — le danger n'attend pas la fin de la phrase en cours.
      * [firstSight] saute la stabilité — une clé nouvelle parle dès la première
-     * frame (la nouveauté reste : une clé déjà dite ne reparle pas).
+     * frame (la nouveauté reste : une clé déjà dite ne reparle pas, sauf [repeatMs]).
+     * [repeatMs] redit la même clé après ce silence (`null` = jamais, défaut
+     * historique) : les directions se répètent en continu, le stop ne se répète pas.
      * L'appelant qui obtient vrai doit appeler [markSpoken] une fois la phrase dite ;
      * s'il ne dit rien (phrase vide), il n'appelle rien et la mémoire est inchangée.
      */
-    fun admit(atMs: Long, key: String, urgent: Boolean = false, firstSight: Boolean = false): Boolean {
+    fun admit(
+        atMs: Long,
+        key: String,
+        urgent: Boolean = false,
+        firstSight: Boolean = false,
+        repeatMs: Long? = null,
+    ): Boolean {
         advance(key)
-        if ((!firstSight && pendingCount < minFrames) || key == spokenKey) return false
+        if (key == spokenKey) return admitsRepeat(atMs, repeatMs)
+        if (!firstSight && pendingCount < minFrames) return false
         val last = lastSpokenAtMs
         if (!urgent && last != null && atMs - last < cooldownMs) return false
         return true
+    }
+
+    /** Même clé que la dernière dite : vrai après [repeatMs] de silence, sinon faux. */
+    private fun admitsRepeat(atMs: Long, repeatMs: Long?): Boolean {
+        if (repeatMs == null) return false
+        val last = lastSpokenAtMs ?: return false
+        if (atMs < last) return false
+        return atMs - last >= repeatMs
     }
 
     /** Mémorise l'annonce dite : clé, instant et phrase. */
