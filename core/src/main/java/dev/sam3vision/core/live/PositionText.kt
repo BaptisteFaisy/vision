@@ -152,6 +152,32 @@ object PositionText {
     }
 
     /**
+     * Mise en lumière d'un objet suivi : « Les clés sont devant toi, à 9
+     * heures. » — dite quand l'utilisateur cherche cet objet précis (chasse
+     * picto, « Find the X »), jamais dans l'annonce générale ([phrase]).
+     * Le pluriel se lit à la finale (« clés », « keys » : « Les … sont » /
+     * « The … are ») ; au singulier, pas d'article en français (le genre du
+     * label est inconnu : « Téléphone devant toi, à 9 heures »). La distance
+     * connue remplace le cadran, comme dans [item]. [label] n'est jamais vide
+     * (l'appelant ne retient que des labels visés).
+     */
+    fun spotlight(label: PlacedLabel, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
+        val name = label.label.trim()
+        val plural = name.endsWith('s', ignoreCase = true) && !name.endsWith("ss", ignoreCase = true)
+        val where = if (label.meters == null || !label.meters.isFinite()) {
+            clockLabel(label.centerX, language)
+        } else when (language) {
+            SpeechLanguage.Fr -> "à ${DistanceText.spokenShort(label.meters, language)}"
+            SpeechLanguage.En -> "${DistanceText.spokenShort(label.meters, language)} away"
+        }
+        return when (language) {
+            SpeechLanguage.Fr -> if (plural) "Les ${name.lowercase()} sont devant toi, $where."
+            else "${name.replaceFirstChar { it.uppercaseChar() }} devant toi, $where."
+            SpeechLanguage.En -> "The ${name.lowercase()} ${if (plural) "are" else "is"} in front of you, $where."
+        }
+    }
+
+    /**
      * Signature de scène (labels + heures + distance **arrondie au mètre**),
      * insensible à l'ordre : sert à ne pas répéter la même scène. Arrondir est ce
      * qui fait parler un objet qui s'approche (3 m → 2 m → 1 m) sans le faire

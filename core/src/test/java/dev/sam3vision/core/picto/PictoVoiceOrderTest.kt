@@ -18,6 +18,14 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `create a picto for my keys rend keys`() {
+        assertEquals("keys", PictoVoiceOrder.parse("create a picto for my keys"))
+        assertEquals("keys", PictoVoiceOrder.parse("create a pictogram of my keys"))
+        assertEquals("phone", PictoVoiceOrder.parse("make a picto for my phone"))
+        assertEquals("tv remote", PictoVoiceOrder.parse("create a picto for the tv remote"))
+    }
+
+    @Test
     fun `pictogramme de ca rend vide, objet filme sans nom`() {
         assertEquals("", PictoVoiceOrder.parse("fais un pictogramme de ça"))
         assertEquals("", PictoVoiceOrder.parse("fais-moi un picto de cela"))

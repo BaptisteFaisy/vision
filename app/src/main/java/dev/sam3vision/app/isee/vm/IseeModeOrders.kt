@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee.vm
 
+import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.settings.Settings
 
 /**
@@ -19,10 +20,12 @@ class IseeModeOrders(
     update: StateUpdate,
     pictoLabels: () -> List<String>,
     onFind: (String) -> Unit = {},
+    onCreate: (String) -> Unit = {},
+    pictoHits: () -> List<PictoHit> = { emptyList() },
 ) {
 
     private val maison = MaisonEnterOrder(settings, speak, update)
-    private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind)
+    private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind, onCreate = onCreate, hits = pictoHits)
 
     /** Vrai si [text] portait un ordre de mode (texte consommé, rien d'autre à faire). */
     suspend fun run(text: String): Boolean =
