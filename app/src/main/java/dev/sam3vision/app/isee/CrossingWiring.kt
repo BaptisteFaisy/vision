@@ -312,6 +312,8 @@ internal data class CrossingLateralPatch(
     val arrival: String?,
     val centerX: Float?,
     val meters: Float?,
+    /** Horodatage de la frame (ms) : l'annonce d'activation n'en parle que fraîche. */
+    val atMs: Long = 0L,
 )
 
 /** Centre du meilleur passage (pixels → normalisé), `null` si aucun. */
@@ -387,7 +389,7 @@ internal fun crossingLateralPatchOf(
     val clip = lateralPhrase?.let { GuidanceWord.clipIdFor(it) }
     val arrived = CrossingGuidance.isArrivedPx(best.box, height, meters)
     val arrivalPhrase = arrival.onFrame(arrived, language)?.phrase
-    return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters)
+    return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters, atMs)
 }
 
 /**
