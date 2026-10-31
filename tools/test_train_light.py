@@ -83,5 +83,20 @@ class ParityTest(unittest.TestCase):
                 self.assertEqual(lf.verdict(px, w, h), want)
 
 
+class Feuxfr3PatternTest(unittest.TestCase):
+    """Le patron feuxfr3/ existe et reste documente (0 crop ou N ancres)."""
+
+    def test_patron_documente(self):
+        d = RES / "feuxfr3"
+        self.assertTrue((d / "ATTRIBUTION.md").is_file())
+        self.assertTrue((d / "README.md").is_file())
+        text = (d / "ATTRIBUTION.md").read_text()
+        self.assertIn("tel_g", text)
+        for ppm in sorted(d.glob("*.ppm")):
+            px, w, h = lf.load_ppm(ppm)
+            self.assertLessEqual(max(w, h), 48, ppm.name)
+            self.assertIn(ppm.name, text, ppm.name)
+
+
 if __name__ == "__main__":
     unittest.main()
