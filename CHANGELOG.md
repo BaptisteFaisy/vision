@@ -8,7 +8,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   dire comment éviter un poteau à moins de 4 m, dire le rebord à 1 m puis à
   70 cm, et détecter s'il se monte ou se descend.
 - **Fait** (`core.traverse`, `core.hazard`, `core.curb`, `docs/VOIX-DANGER.md`
-  § 20) : annonce pluriel générique (« 2 vehicles moving… », pistes par
+  § 21) : annonce pluriel générique (« 2 vehicles moving… », pistes par
   type — deux voitures sous le même label comptent pour une, limite connue)
   avec « Stop » pluriel, singulier inchangé ; phrase poteau avec évitement
   côté opposé (« …, passez à gauche. », droite par défaut), doux comme
