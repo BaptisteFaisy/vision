@@ -117,10 +117,10 @@ object DepthReadings {
                 anchors += DepthAnchor(meters, closeness)
             }
         }
-        val scale = scaleFromAnchors(anchors)
+        val cal = AffineScale.calibrate(anchors)
         val refined = ArrayList<DistanceReading>(detections.size)
         for (detection in detections) {
-            refined += refinedOne(detection, byBox[detection.box], closeByBox[detection.box], scale)
+            refined += refinedOne(detection, byBox[detection.box], closeByBox[detection.box], cal)
                 ?: continue
         }
         return refined
@@ -130,22 +130,24 @@ object DepthReadings {
         detection: Detection,
         base: DistanceReading?,
         closeness: Float?,
-        scale: Float?,
+        cal: AffineCalibration?,
     ): DistanceReading? {
         var meters: Float? = null
-        if (closeness != null && scale != null) {
-            meters = toMeters(closeness, scale)
+        if (closeness != null && cal != null) {
+            meters = toMeters(closeness, cal)
         }
         if (meters != null) {
             val id = base?.trackId ?: DistanceMeter.UNTRACKED_ID
-            return DistanceReading(id, detection.label, meters, meters, detection.box)
+            // La confiance du sténopé traverse : les mètres viennent de la profondeur,
+            // calibrée par ces mêmes ancres — pas une certitude neuve.
+            return DistanceReading(id, detection.label, meters, meters, detection.box, base?.confidence ?: 1f)
         }
         return base
     }
 
     /** Proximité → mètres bornés plausibles ; `null` si hors bornes. */
-    private fun toMeters(closeness: Float, scale: Float): Float? {
-        val meters = DepthFusion.closenessToMeters(closeness, scale) ?: return null
+    private fun toMeters(closeness: Float, cal: AffineCalibration): Float? {
+        val meters = AffineScale.apply(closeness, cal) ?: return null
         if (!meters.isFinite()) return null
         return meters.coerceIn(Pinhole.MIN_METERS, Pinhole.MAX_METERS)
     }
