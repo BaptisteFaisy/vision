@@ -95,6 +95,17 @@ data class CrossingLight(
 )
 
 /**
+ * Vert utilisable pour une décision (veto sonde, pipeline direct) : état vert
+ * **et** boîte présente. Une lecture sans boîte (pas de feu en vue —
+ * l'ex-`boxOf()` null de la pompe locale supprimée le 31/10) ne fait jamais
+ * traverser, même si l'état porté est vert : fail-closed, l'équivalent
+ * binaire de l'ancien « Doute ». Seuils inchangés : ceci ne touche ni
+ * l'arbre ni la porte, seulement l'interprétation de la lecture.
+ */
+internal val CrossingLight.greenForDecision: Boolean
+    get() = state == CrossingState.Green && box != null
+
+/**
  * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
  * ([cue], `null` = rester muet), l'état confirmé affiché (dernier annoncé,
  * rouge par défaut) et la boîte lue sur la frame. Un seul aller-retour,
@@ -110,7 +121,8 @@ internal data class CrossingPatch(
 
 /**
  * Signal traversée de la frame, ou `null` quand le mode est coupé : la sonde
- * reste alors muette et ne marque aucun feu.
+ * reste alors muette et ne marque aucun feu. Le veto ne voit un vert que
+ * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente.
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
@@ -127,7 +139,7 @@ internal fun crossingPatchOf(
     val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
-    val decision = veto.update(light.state == CrossingState.Green, detections, focalPx, atMs)
+    val decision = veto.update(light.greenForDecision, detections, focalPx, atMs)
     val vetoed = decision.crossingState()
     val cue = announcer.onFrame(atMs, vetoed, language)
     // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
