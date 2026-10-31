@@ -174,11 +174,13 @@ class Sam3LiveService:
                          mask_encoding, mask_format, mask_edge, timers, started,
                          with_depth=False) -> dict:
         """Suite de :meth:`_live_sync` sur une image déjà décodée (entrée JSON ou binaire)."""
+        from feux_guard import coherent_work_edge
         from segmentation import MAX_OBJECTS, normalize_prompts
 
         concepts = normalize_prompts(prompts if prompts is not None else list(LIVE_DEFAULT_PROMPTS))
         cap = clamp_int(max_objects, MAX_OBJECTS_DEFAULT, MAX_OBJECTS_MIN, MAX_OBJECTS)
         work = clamp_int(work_edge, WORK_EDGE_DEFAULT, WORK_EDGE_MIN, WORK_EDGE_MAX)
+        work = coherent_work_edge(work, image.size)
         batch = BATCH_PROMPTS if batch_prompts is None else bool(int(batch_prompts))
         result = run_frame(self.ctx, image, concepts, work, cap, batch, edge=edge,
                            mask_encoding=mask_encoding, gpu_lock=self._gpu_lock, timers=timers,
