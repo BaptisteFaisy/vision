@@ -10,6 +10,7 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateText
 
 /**
@@ -27,8 +28,10 @@ import dev.sam3vision.core.traverse.VehicleStateText
  * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — le
  * stop urgent parle en premier, puis l'évitement, puis les véhicules
  * doux, sinon le verdict ([NoLightCrossWatch]) : « Traversez. » sans
- * danger, « Attendez. » sur danger ([veto] ou mouvement brut), tous les
- * deux toutes les 2 s.
+ * danger, « Attendez. » sur danger (mouvement brut seul — une voiture
+ * garée ne bloque jamais, même proche ou sous pan caméra, ordre user du
+ * 31/10), tous les deux toutes les 2 s. [motion] (`null` = pas de signal
+ * fond) juge les pistes par le fond, sans feu seul (avec feu : inchangé).
  */
 internal fun crossingPhraseOf(
     cue: CrossingCue?,
@@ -42,8 +45,8 @@ internal fun crossingPhraseOf(
     height: Int = 0,
     scanTrigger: Boolean = false,
     noLight: Boolean = false,
-    veto: Boolean = false,
     steering: String? = null,
+    motion: FrameMotion? = null,
 ): String? {
     if (cue != null) {
         CrossingVehicleWatch.update(detections, readings, atMs, language, cue)
@@ -56,9 +59,9 @@ internal fun crossingPhraseOf(
     }
     if (noLight) {
         CrosswalkScanWatch.update(atMs, false, movingNow = false, feu = false, language)
-        val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null, noLight = true)
+        val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null, noLight = true, motion = motion)
         val verdict = NoLightCrossWatch.update(
-            atMs, veto || CrossingVehicleWatch.movingNow, language, vehiclePhrase != null,
+            atMs, CrossingVehicleWatch.movingNow, language, vehiclePhrase != null,
         )
         if (vehiclePhrase != null && VehicleStateText.isSafetyPhrase(vehiclePhrase)) return vehiclePhrase
         steering?.let { return it }

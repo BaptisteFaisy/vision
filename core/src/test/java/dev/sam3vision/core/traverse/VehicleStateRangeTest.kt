@@ -2,6 +2,7 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -56,6 +57,54 @@ class VehicleStateRangeTest {
 
         assertEquals("Car moving, 30 meters away.", third?.phrase)
         assertTrue(watcher.movingThisFrame)
+    }
+
+    @Test
+    fun `camera qui avance sur voiture garee - silence avec fond, annonce sans fond`() {
+        // Glissade + croissance d'une boîte garée à 30 m : sans fond ça
+        // annonce (croissance), avec fond la caméra unanime fait taire.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val range = Float.POSITIVE_INFINITY
+        val muted = VehicleStateWatcher()
+        val loud = VehicleStateWatcher()
+        repeat(12) { index ->
+            val width = if (index < 8) 100f else 100f + (index - 7) * 10f
+            val frame = box(width, cx = 320f + index * 5f)
+            val atMs = index * 100L
+            val hushed = muted.update(
+                listOf(det("car", frame)), listOf(reading("car", 30f, frame)),
+                atMs = atMs, motion = motion, movingMeters = range,
+            )
+            val spoke = loud.update(
+                listOf(det("car", frame)), listOf(reading("car", 30f, frame)),
+                atMs = atMs, movingMeters = range,
+            )
+            if (index >= 8) assertNull("caméra unanime : le mouvement se tait", hushed)
+            if (index == 9) assertEquals("Car moving, 30 meters away.", spoke?.phrase)
+        }
+
+        assertTrue(muted.cameraMoved)
+        assertFalse(muted.movingThisFrame)
+    }
+
+    @Test
+    fun `pan sur voiture garee lointaine - silence`() {
+        // Pan pur (largeur constante) sur une boîte garée à 30 m : aucun
+        // mouvement conclu, le verdict reste libre de dire « Traversez. ».
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val watcher = VehicleStateWatcher()
+        repeat(12) { index ->
+            val frame = box(100f, cx = 320f + index * 5f)
+            assertNull(
+                watcher.update(
+                    listOf(det("car", frame)), listOf(reading("car", 30f, frame)),
+                    atMs = index * 100L, motion = motion, movingMeters = Float.POSITIVE_INFINITY,
+                ),
+            )
+        }
+
+        assertTrue(watcher.cameraMoved)
+        assertFalse(watcher.movingThisFrame)
     }
 
     @Test

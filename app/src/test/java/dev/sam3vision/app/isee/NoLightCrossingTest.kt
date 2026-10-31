@@ -9,7 +9,9 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.TraverseVeto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -29,10 +31,14 @@ class NoLightCrossingTest {
     private fun carReading(meters: Float, box: List<Float>): DistanceReading =
         DistanceReading(trackId = -1, label = "car", meters = meters, rawMeters = meters, box = box)
 
-    private fun carBox(widthPx: Float): List<Float> {
+    private fun carBox(widthPx: Float, cx: Float = 320f): List<Float> {
         val heightPx = widthPx * 0.6f
-        return listOf(320f - widthPx / 2f, 240f - heightPx / 2f, 320f + widthPx / 2f, 240f + heightPx / 2f)
+        return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
     }
+
+    /** Pan qui suit la glissade des boîtes (+5 px/frame sur 640) : la caméra bouge, pas la voiture. */
+    private fun panMotion(): FrameMotion =
+        FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
 
     private fun resetWatches() {
         CrossingVehicleWatch.reset()
@@ -190,33 +196,55 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `sans feu - veto dit attendez toutes les 2 s`() {
+    fun `sans feu - voiture garee proche ne bloque pas traversez`() {
         resetWatches()
-        fun vetoed(atMs: Long): String? =
-            crossingPhraseOf(
-                null, emptyList(), emptyList(), emptyList(), atMs, SpeechLanguage.Fr,
-                noLight = true, veto = true,
+        fun parked(atMs: Long): String? {
+            val frame = carBox(100f)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(5f, frame)),
+                atMs, SpeechLanguage.Fr, noLight = true,
             )
+        }
 
-        assertNull(vetoed(0L))
-        assertEquals("Attendez.", vetoed(200L))
-        assertNull(vetoed(400L))
-        assertEquals("Attendez.", vetoed(2_300L))
+        assertNull(parked(0L))
+        assertEquals("Traversez.", parked(200L))
+        assertEquals("Voiture à l'arrêt, à 5 mètres.", parked(400L))
+        assertNull(parked(600L))
+        assertEquals("Traversez.", parked(2_500L))
     }
 
     @Test
-    fun `sans feu - attendez contredit vite traversez`() {
+    fun `sans feu - pan sur voiture garee lointaine dit traversez`() {
         resetWatches()
-        fun vetoed(atMs: Long): String? =
-            crossingPhraseOf(
-                null, emptyList(), emptyList(), emptyList(), atMs, SpeechLanguage.Fr,
-                noLight = true, veto = true,
+        fun panning(index: Int, atMs: Long): String? {
+            val frame = carBox(100f, cx = 320f + index * 5f)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(30f, frame)),
+                atMs, SpeechLanguage.Fr, noLight = true, motion = panMotion(),
             )
+        }
 
-        assertNull(calm(SpeechLanguage.Fr, 0L))
-        assertEquals("Traversez.", calm(SpeechLanguage.Fr, 200L))
-        assertNull(vetoed(400L))
-        assertEquals("Attendez.", vetoed(600L))
+        assertNull(panning(0, 0L))
+        assertEquals("Traversez.", panning(1, 100L))
+        assertNull(panning(2, 200L))
+    }
+
+    @Test
+    fun `sans feu - voiture qui demarre contredit vite cross`() {
+        resetWatches()
+        fun moving(widthPx: Float, atMs: Long): String? {
+            val frame = carBox(widthPx)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(5f, frame)),
+                atMs, SpeechLanguage.En, noLight = true,
+            )
+        }
+
+        assertNull(calm(SpeechLanguage.En, 0L))
+        assertEquals("Cross.", calm(SpeechLanguage.En, 200L))
+        assertNull(moving(100f, 400L))
+        assertNull(moving(110f, 500L))
+        assertEquals("Stop, car moving.", moving(120f, 600L))
     }
 
     @Test
