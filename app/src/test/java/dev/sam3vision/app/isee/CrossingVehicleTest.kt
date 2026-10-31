@@ -189,4 +189,28 @@ class CrossingVehicleTest {
         assertNull(at(110f, 100L))
         assertEquals("Car moving, 12 meters away.", at(120f, 200L))
     }
+
+    @Test
+    fun `mouvement a 30 m muet avec feu, parle sans feu`() {
+        CrossingVehicleWatch.reset()
+        val at = { width: Float, ms: Long, noLight: Boolean ->
+            val frame = box(width)
+            CrossingVehicleWatch.update(
+                listOf(det("car", frame)),
+                listOf(reading("car", 30f, frame)),
+                ms,
+                SpeechLanguage.En,
+                noLight = noLight,
+            )
+        }
+
+        assertNull(at(100f, 0L, false))
+        assertNull(at(110f, 100L, false))
+        assertNull(at(120f, 200L, false))
+
+        CrossingVehicleWatch.reset()
+        assertNull(at(100f, 0L, true))
+        assertNull(at(110f, 100L, true))
+        assertEquals("Car moving, 30 meters away.", at(120f, 200L, true))
+    }
 }
