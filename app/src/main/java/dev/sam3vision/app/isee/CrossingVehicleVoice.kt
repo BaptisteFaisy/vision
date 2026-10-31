@@ -47,7 +47,10 @@ internal object CrossingVehicleWatch {
      * Le guetteur n'est nourri que hors silence (miroir de l'annonceur des
      * personnes) : une annonce mûrie pendant le quiet ne part pas en
      * cooldown sourd — elle se reconfirme sur les frames suivantes et parle
-     * dès la parole rendue.
+     * dès la parole rendue. Exception sans feu : le guetteur reste nourri
+     * sous quiet (transition feu→sans-feu) pour que le brut [movingNow]
+     * reste frais — seule la phrase est tue, le verdict « Attendez. » ne
+     * rate aucun danger.
      */
     fun update(
         detections: List<Detection>,
@@ -57,9 +60,11 @@ internal object CrossingVehicleWatch {
         cue: CrossingCue? = null,
         noLight: Boolean = false,
     ): String? {
-        if (quiet.hush(cue, atMs)) return null
+        val hushed = quiet.hush(cue, atMs)
+        if (hushed && !noLight) return null
         val range = if (noLight) Float.POSITIVE_INFINITY else VehicleStateWatcher.MOVING_METERS
         val found = watcher.update(detections, readings, atMs, language, movingMeters = range) ?: return null
+        if (hushed) return null
         return found.safetyPhrase ?: found.phrase
     }
 
