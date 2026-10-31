@@ -35,9 +35,15 @@ WS_FRAME_SECONDS = 180.0  # inférence max par frame : au-delà, erreur 503, con
 WS_MAX_REPLY_BYTES = 4_000_000  # réponse plus grosse : fermeture 1009 avant le proxy
 
 WORK_EDGE_DEFAULT = 768
-WORK_EDGE_MIN = 256
+# Plancher 512 (reel audit 31/10, ex-256) : sous 512 px le petit feu lointain et
+# les zébrures ne sont plus segmentés — un client qui demande moins reçoit 512.
+WORK_EDGE_MIN = 512
 WORK_EDGE_MAX = 1024
-MAX_OBJECTS_DEFAULT = 12
+# Backstop quand le client n'envoie pas `max_objects` (il envoie son plafond,
+# 8 par défaut) : 16 (reel audit 31/10, ex-12) — les 17 prompts par défaut
+# tiennent presque tous (un objet chacun) et les 2 slots gardés (feu, passage)
+# ne chassent plus un concept entier. Plafond absolu : segmentation.MAX_OBJECTS.
+MAX_OBJECTS_DEFAULT = 16
 MAX_OBJECTS_MIN = 1
 LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")
 

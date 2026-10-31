@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.sam3vision.app.isee.CrossingOverlayLayer
+import dev.sam3vision.app.isee.FramePolicy
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import dev.sam3vision.app.live.setFocus
 import dev.sam3vision.app.media.Nv21JpegEncoder
@@ -54,9 +55,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Le téléphone envoie des frames de 512 px maximum, en JPEG léger (lien montant limité). */
-const val LIVE_EDGE = 512
-const val LIVE_JPEG_QUALITY = 65
+/** Le Direct suit [FramePolicy] : 480 px maximum, en JPEG léger (lien montant limité). */
+const val LIVE_EDGE = FramePolicy.EDGE
+const val LIVE_JPEG_QUALITY = FramePolicy.QUALITY
+
+/**
+ * Frames jetées du Direct (porte `wantsFrame` fermée, KEEP_ONLY_LATEST gardé) :
+ * comptées, pas silencieuses — loguées tous les 60, lisibles via [dropped].
+ */
+internal object LiveFrameDrops {
+    @Volatile
+    var dropped: Long = 0L
+        private set
+
+    /** Une frame jetée de plus (porte fermée) ; log tous les 60. */
+    fun noteDropped() {
+        dropped += 1
+        if (dropped % LOG_EVERY_DROPS == 0L) {
+            android.util.Log.i("sam3vision", "direct: $dropped frames jetées (porte wantsFrame fermée)")
+        }
+    }
+
+    private const val LOG_EVERY_DROPS = 60L
+}
 
 /**
  * Mode Direct : aperçu caméra, frames poussées à [LiveViewModel], masques SAM 3.1 superposés,
@@ -358,7 +379,7 @@ private suspend fun bindLiveCamera(
     val analysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setResolutionSelector(
-            // Repli « plus proche en dessous » comme iSee : un capteur qui dépasse 512 px
+            // Repli « plus proche en dessous » comme iSee : un capteur qui dépasse le bord
             // forçait une réduction coûteuse, en dessous l'encodeur rend le buffer tel quel.
             ResolutionSelector.Builder()
                 .setResolutionStrategy(
@@ -384,7 +405,10 @@ private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21
     try {
         // Porte d'encodage (motif `IseeCameraPane`) : aucun consommateur (réseau, calque,
         // traversée, questions) ne veut la frame — on économise le JPEG (le `finally` ferme).
-        if (!viewModel.wantsFrame()) return
+        if (!viewModel.wantsFrame()) {
+            LiveFrameDrops.noteDropped()
+            return
+        }
         // NV21 direct (zéro bitmap par frame) **et** luminance du calque local :
         // le plan Y du NV21 est déjà tourné et réduit, donc c'est la même géométrie que
         // l'ancien bitmap `uprightScaled` — sans le payer.

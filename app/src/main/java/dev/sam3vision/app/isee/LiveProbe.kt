@@ -85,7 +85,7 @@ class LiveProbe(
         onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
     private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
-    private val _state = MutableStateFlow(LiveProbeState())
+    internal val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
 
     internal var session: LiveSession? = null
@@ -140,6 +140,9 @@ class LiveProbe(
     /** Un réveil `/health` est en cours (un seul à la fois). */
     private var warming = false
 
+    /** Refus essuyé : la frame suivante part sans attendre l'échéance (voir [wantsFrame]). */
+    private var priorityArmed = false
+
     /** Premier plan : en arrière-plan les frames sont jetées (la carte reste éteinte). */
     private val foregroundGate = ForegroundTracker()
 
@@ -185,6 +188,7 @@ class LiveProbe(
                 modelsLine = modelsLine,
                 conceptsSent = LivePrompts.normalize(prompts),
                 transport = TRANSPORT_WS,
+                timeoutSec = if (clean.isBlank()) 0L else COLD_TIMEOUT_SECONDS,
                 error = if (clean.isBlank()) "no endpoint (Settings)" else null,
                 crossingActive = crossingActive,
             )
@@ -196,9 +200,9 @@ class LiveProbe(
         }
     }
 
-    /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod). */
+    /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod) ; `/health` OK = carte chaude, on bascule sans attendre la frame (un vol froid peut coexister avec les vols chauds : transitoire, borné). */
     internal fun fireWake(url: String) {
-        scope.launch { GpuWake.wake(url, health = { openClient(it, COLD_TIMEOUT_SECONDS, null).health().map { h -> h.ok } }) }
+        scope.launch { GpuWake.wake(url, health = { openClient(it, COLD_TIMEOUT_SECONDS, null).health().map { h -> h.ok } }, onResult = { if (it.getOrNull() == true && !warmed) goWarm() }) }
     }
 
     /**
@@ -240,11 +244,16 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Remet le pipeline à zéro (cadence, réserve, chronologie, compteurs, voix) :
-     * partagé par [configure] et [begin], qui n'ajoutent que leur propre état.
+     * Remet le pipeline à zéro (cadence, réserve, chronologie, compteurs, voix,
+     * réveil) : partagé par [configure] et [begin], qui n'ajoutent que leur
+     * propre état. `warming` est ré-armé ici pour que le [markWarming] qui suit
+     * ré-émette l'avis d'armement — sans lui, `begin()` après `configure()`
+     * effacerait l'avis sans le redire.
      */
     internal fun resetPipeline() {
         warmed = false
+        warming = false
+        priorityArmed = false
         cadence.reset()
         reserve.clear()
         chronology.reset()
@@ -265,17 +274,8 @@ _state.update { it.cleared() }
     /** Retour au premier plan : la frame suivante repart (l'enregistrement continue). */
     fun onForeground() = foregroundGate.onForeground()
 
-    /**
-     * Cap demandé à la voix (« va à gauche ») : le guidage recalcule le passage
-     * vers ce cap dès la prochaine frame. L'annonceur repart de zéro pour que
-     * la nouvelle consigne se dise sans attendre ; sans effet à cap identique.
-     * Le cap retombe à tout droit à la prochaine session (voir [begin]).
-     */
-    fun setSteering(cap: SteeringCap) {
-        if (_state.value.steeringCap == cap) return
-        voice.reset()
-        _state.update { it.copy(steeringCap = cap) }
-    }
+    /** Cap demandé à la voix (corps déporté, voir [applySteering]). */
+    fun setSteering(cap: SteeringCap) = applySteering(cap)
 
     /**
      * Frame encodée en réserve (**une seule**) : elle est convertie **pendant** que la
@@ -291,20 +291,23 @@ _state.update { it.cleared() }
     /** Contenu de la frame en réserve, réutilisé d'une frame à l'autre : zéro allocation. */
     private val reserved = FramePayload()
 
+    /** Frames remplacées en réserve (la plus récente gagne) : comptées, jamais silencieuses. */
+    val droppedFrames: Long get() = reserve.droppedFrames
+
     /** Étiquettes de la frame, sans doublon : un ensemble réutilisé à chaque publication. */
     private val labels = FrameLabels()
 
     /**
      * Faut-il convertir la frame qui arrive ? Oui si une frame de réserve manque :
-     * soit un créneau est libre et la cadence est écoulée, soit une requête est en vol
-     * et on prépare la suivante. Un seul buffer : au-delà, l'encodage serait du gâchis.
+     * créneau libre et cadence écoulée, requête en vol (on prépare la suivante), ou
+     * priorité armée par un refus précédent — un refus (réserve pleine) est **compté**, jamais silencieux.
      */
     fun wantsFrame(): Boolean {
         if (!foregroundGate.foreground) return false
         val active = (if (warmed) session else coldSession) ?: return false
-        // Réserve pleine : convertir une image de plus serait du CPU jeté.
-        if (reserve.pending) return false
-        if (active.saturated) return true
+        // Réserve pleine : refus compté (jamais silencieux), la suivante est prioritaire.
+        if (reserve.pending) { priorityArmed = true; noteSkipped(); return false }
+        if (active.saturated || priorityArmed) return true
         return cadence.isDue(System.currentTimeMillis())
     }
 
@@ -331,10 +334,12 @@ _state.update { it.cleared() }
             reserve.offer(jpegB64, captureAtNs, encodedAtNs)
             return
         }
-        // Créneau libre : `admits` se réduit au garde temporel (`saturated` ⟺ `inFlight`).
+        // Deux créneaux : plein ⟺ saturé (plus ⟺ en vol) — le garde temporel seul décide.
         val now = System.currentTimeMillis()
-        if (!cadence.admits(active, now)) return
+        if (!probePriority(state.value, priorityArmed) && !cadence.isDue(now)) return
+        cadence.markSent(active, now)
         if (!adaptive.admit()) return // keyframe : propagation locale, rien à envoyer
+        priorityArmed = false
         dispatch(active, jpegB64, captureAtNs, encodedAtNs, now)
     }
 
@@ -372,6 +377,7 @@ _state.update { it.cleared() }
         // La réserve saute le garde (elle a déjà attendu) mais avance l'échéance.
         val now = System.currentTimeMillis()
         cadence.markSent(active, now)
+        priorityArmed = false
         dispatch(active, reserved.jpegB64, reserved.captureAtNs, reserved.encodedAtNs, now)
     }
 
@@ -393,6 +399,7 @@ _state.update { it.cleared() }
             // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
             // restent les derniers connus, seul le message d'erreur change.
             val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
+            if (!warmed && error is ApiError.Timeout) sayColdTimeout()
             android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
             _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
             return
@@ -415,7 +422,7 @@ _state.update { it.cleared() }
         warmed = true
         if (warming) {
             warming = false
-            _state.update { it.copy(warming = false) }
+            _state.update { it.copy(warming = false, timeoutSec = DEFAULT_TIMEOUT_SECONDS) }
         }
     }
 
@@ -486,7 +493,7 @@ _state.update { it.cleared() }
     private fun markWarming() {
         if (_state.value.endpoint.isBlank() || warming) return
         warming = true
-        _state.update { it.copy(warming = true) }
+        _state.update { it.copy(warming = true, timeoutSec = COLD_TIMEOUT_SECONDS, spoken = WARM_SPOKEN, spokenSeq = it.spokenSeq + 1) }
     }
 
 }

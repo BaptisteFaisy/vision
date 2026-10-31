@@ -17,10 +17,22 @@ import org.junit.Test
  */
 class LiveAdaptiveTest {
 
+    @Test
+    fun `allume par defaut les deux interrupteurs`() {
+        val adaptive = LiveAdaptive(baseQuality = base, scheduler = scheduler())
+
+        assertTrue(adaptive.uploadEnabled)
+        assertTrue(adaptive.keyframesEnabled)
+        assertTrue(adaptive.admit()) // STARTUP : première demande.
+        assertFalse(adaptive.admit()) // keyframe en vol : propagation locale.
+    }
+
     private val base = 65
     private var now = 1_000L
     private fun scheduler() = KeyframeScheduler(clock = { now })
+    /** Éteint : ces tests verrouillent chaque bras isolément (allumé par défaut, voir dessous). */
     private fun adaptive() = LiveAdaptive(baseQuality = base, scheduler = scheduler())
+        .also { it.configure(uploadEnabled = false, keyframesEnabled = false) }
 
     /** Une réponse serveur : `elapsedMs` annoncé, un objet par centre, ou aucun. */
     private fun frame(vararg centersX: Float, elapsedMs: Long = 40L): LiveFrame = LiveFrame(

@@ -13,10 +13,11 @@ import org.junit.Test
  * Verrouille ce que les tests existants ne disent pas littéralement :
  * le rouge isolé se tait, le rouge après un vert exige quand même deux
  * frames puis coupe (urgent), et les phrases exactes des deux langues sont
- * verrouillées. Binaire (ordre user du 31/10) : tout non-vert est rouge.
+ * verrouillées. Zone grise (31/10) : le doute suspend les confirmations.
  *
- * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
- * rouge et vert répétés 2 s) : ce fichier les vérifie, il ne les change pas.
+ * Seuils lus dans [CrossingAnnouncer] (3f vert sur 4 avec joker / 2f rouge /
+ * doute 2f + persistance 3 s / répétés 2 s, clignotant 2 extinctions sur 6) :
+ * ce fichier les vérifie, il ne les change pas.
  */
 class CrossingVoiceHysteresisTest {
 
@@ -48,9 +49,10 @@ class CrossingVoiceHysteresisTest {
     }
 
     @Test
-    fun `phrases francaises litterales de la voix, binaire`() {
+    fun `phrases francaises litterales de la voix`() {
         assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
         assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
+        assertEquals("Feu illisible, attendez.", CrossingText.phrase(CrossingState.Unknown, SpeechLanguage.Fr))
     }
 
     @Test

@@ -43,9 +43,14 @@ BACKEND_DIR = Path(__file__).resolve().parent
 # /live : knobs de latence bornés côté serveur — un client hors bornes reçoit quand même
 # une frame, et ne peut pas faire exploser la VRAM en demandant une résolution délirante.
 WORK_EDGE_DEFAULT = 768
-WORK_EDGE_MIN = 256
+# Plancher 512 (reel audit 31/10, ex-256, comme live_fast/service.py) : sous
+# 512 px le petit feu lointain et les zébrures ne sont plus segmentés.
+WORK_EDGE_MIN = 512
 WORK_EDGE_MAX = 1024
-MAX_OBJECTS_DEFAULT = 12
+# Backstop quand le client n'envoie pas `max_objects` : 16 (reel audit 31/10,
+# ex-12, comme live_fast/service.py) — les 17 prompts par défaut tiennent
+# presque tous, et les 2 slots gardés (feu, passage) ne chassent plus un concept.
+MAX_OBJECTS_DEFAULT = 16
 MAX_OBJECTS_MIN = 1
 # Concepts quand le client n'en envoie aucun : liste courte, le direct est cadencé.
 LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")

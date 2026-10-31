@@ -191,4 +191,64 @@ class HazardWatchTest {
 
         assertEquals("Attention à la barrière.", cue!!.phrase)
     }
+
+    @Test
+    fun `poteau intermittent 2 positifs sur 3 frames = annonce`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole")
+
+        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(HazardSignal.none(), 2_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 3_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau, passez à droite.", cue!!.phrase)
+        assertFalse(cue.urgent)
+    }
+
+    @Test
+    fun `poteau isole 1 positif sur 3 frames = silence`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole")
+
+        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(HazardSignal.none(), 2_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(HazardSignal.none(), 3_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(signal, 4_000L, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `poteau imminent au bord du cadre = detecte plein axe`() {
+        val signal = HazardSignal.of(
+            listOf(reading("pole", 1.5f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertTrue(signal.detected)
+        assertEquals("pole", signal.label)
+    }
+
+    @Test
+    fun `poteau lointain au bord du cadre = silence`() {
+        val signal = HazardSignal.of(
+            listOf(reading("pole", 3.5f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `poteau cooldown 4s, pas 10s`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 3.5f, label = "pole")
+        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+        watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        repeat(3) { watcher.onSignal(HazardSignal.none(), 3_000L + it * 1_000L, SpeechLanguage.Fr) }
+
+        assertNull(watcher.onSignal(signal, 5_100L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(signal, 5_200L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 6_500L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau, passez à droite.", cue!!.phrase)
+    }
 }

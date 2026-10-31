@@ -1,6 +1,7 @@
 package dev.sam3vision.core.crossing
 
 import dev.sam3vision.core.model.SegObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +28,13 @@ class CrossingOfferTest {
     private val nan = { _: SegObject -> Float.NaN }
 
     @Test
+    fun `le seuil client aligne le seuil serveur 035`() {
+        assertEquals(0.35f, CrossingOffer.MIN_SCORE, 0f)
+        assertTrue(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.35f))))
+        assertFalse(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.34f))))
+    }
+
+    @Test
     fun `les etiquettes de passage sont reconnues telles que SAM les rend`() {
         assertTrue(CrossingOffer.isCrosswalkLabel("crosswalk"))
         assertTrue(CrossingOffer.isCrosswalkLabel("Crosswalk"))
@@ -36,6 +44,20 @@ class CrossingOfferTest {
         assertFalse(CrossingOffer.isCrosswalkLabel("sidewalk"))
         assertFalse(CrossingOffer.isCrosswalkLabel("crossing"))
         assertFalse(CrossingOffer.isCrosswalkLabel("person"))
+    }
+
+    @Test
+    fun `zebra et bandes elargissent les etiquettes, sans le crossing nu`() {
+        assertTrue(CrossingOffer.isCrosswalkLabel("zebra"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("Zebra"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("zèbre"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("zebra crossing la nuit"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bandes"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bandes blanches"))
+        assertTrue(CrossingOffer.isCrosswalkLabel("bande blanche"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("crossing"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("crossing the street"))
+        assertFalse(CrossingOffer.isCrosswalkLabel("bandes dessinees"))
     }
 
     @Test
@@ -62,21 +84,33 @@ class CrossingOfferTest {
     }
 
     @Test
-    fun `trois frames sur cinq proposent`() {
+    fun `deux frames sur cinq arment`() {
         val gate = CrossingOfferGate()
         assertFalse(gate.onFrame(walk, 0, metersOf = near, frameH = h))
-        assertFalse(gate.onFrame(walk, 100, metersOf = near, frameH = h))
+        assertTrue(gate.onFrame(walk, 100, metersOf = near, frameH = h))
         assertTrue(gate.onFrame(walk, 200, metersOf = near, frameH = h))
     }
 
     @Test
-    fun `le passage qui sort du champ fait retomber la proposition`() {
+    fun `hysteresis - une frame sur cinq garde, zero fait retomber`() {
         val gate = CrossingOfferGate()
-        repeat(3) { gate.onFrame(walk, it * 100L, metersOf = near, frameH = h) }
-        assertTrue(gate.onFrame(walk, 300, metersOf = near, frameH = h))
-        gate.onFrame(empty, 400, metersOf = near, frameH = h)
-        gate.onFrame(empty, 500, metersOf = near, frameH = h)
-        assertFalse("trois frames vides ont vidé la fenêtre", gate.onFrame(empty, 600, metersOf = near, frameH = h))
+        gate.onFrame(walk, 0, metersOf = near, frameH = h)
+        assertTrue(gate.onFrame(walk, 100, metersOf = near, frameH = h))
+        assertTrue("1/5 garde", gate.onFrame(empty, 200, metersOf = near, frameH = h))
+        assertTrue("1/5 garde", gate.onFrame(empty, 300, metersOf = near, frameH = h))
+        assertTrue("1/5 garde", gate.onFrame(empty, 400, metersOf = near, frameH = h))
+        assertTrue("1/5 garde", gate.onFrame(empty, 500, metersOf = near, frameH = h))
+        assertFalse("0/5 retombe", gate.onFrame(empty, 600, metersOf = near, frameH = h))
+    }
+
+    @Test
+    fun `hysteresis - une reapparition dans la fenetre re-arme sans delai`() {
+        val gate = CrossingOfferGate()
+        gate.onFrame(walk, 0, metersOf = near, frameH = h)
+        assertTrue(gate.onFrame(walk, 100, metersOf = near, frameH = h))
+        gate.onFrame(empty, 200, metersOf = near, frameH = h)
+        gate.onFrame(empty, 300, metersOf = near, frameH = h)
+        assertTrue(gate.onFrame(walk, 400, metersOf = near, frameH = h))
     }
 
     @Test
@@ -94,7 +128,7 @@ class CrossingOfferTest {
         assertFalse(gate.onFrame(walk, 1_000, metersOf = near, frameH = h))
         assertFalse(gate.onFrame(walk, 60_000, metersOf = near, frameH = h))
         // La fenêtre a été vidée : il faut la reconstruire, pas juste attendre.
-        repeat(3) { gate.onFrame(walk, 60_100L + it * 100L, metersOf = near, frameH = h) }
+        assertFalse(gate.onFrame(walk, 60_100L, metersOf = near, frameH = h))
         assertTrue("le silence est écoulé", gate.onFrame(walk, 60_400L, metersOf = near, frameH = h))
     }
 
@@ -104,8 +138,8 @@ class CrossingOfferTest {
         repeat(3) { gate.onFrame(walk, it * 100L, metersOf = near, frameH = h) }
         gate.declined(300)
         gate.reset()
-        repeat(3) { gate.onFrame(walk, 400L + it * 100L, metersOf = near, frameH = h) }
-        assertTrue(gate.onFrame(walk, 800, metersOf = near, frameH = h))
+        assertFalse(gate.onFrame(walk, 400L, metersOf = near, frameH = h))
+        assertTrue(gate.onFrame(walk, 500L, metersOf = near, frameH = h))
     }
 
     @Test
@@ -118,7 +152,7 @@ class CrossingOfferTest {
     fun `un passage a 2 m pile arme`() {
         val gate = CrossingOfferGate()
         assertFalse(gate.onFrame(walk, 0, metersOf = edge, frameH = h))
-        assertFalse(gate.onFrame(walk, 100, metersOf = edge, frameH = h))
+        assertTrue(gate.onFrame(walk, 100, metersOf = edge, frameH = h))
         assertTrue(gate.onFrame(walk, 200, metersOf = edge, frameH = h))
     }
 
@@ -127,7 +161,7 @@ class CrossingOfferTest {
         val gate = CrossingOfferGate()
         val under = frame(obj("person"), obj("crosswalk", box = underBox))
         assertFalse(gate.onFrame(under, 0, metersOf = none, frameH = h))
-        assertFalse(gate.onFrame(under, 100, metersOf = none, frameH = h))
+        assertTrue(gate.onFrame(under, 100, metersOf = none, frameH = h))
         assertTrue(gate.onFrame(under, 200, metersOf = none, frameH = h))
     }
 
@@ -144,9 +178,9 @@ class CrossingOfferTest {
     }
 
     @Test
-    fun `deux proches et trois loin ne proposent pas`() {
+    fun `des positifs isoles espaces de la fenetre restent silencieux`() {
         val gate = CrossingOfferGate()
-        val meters = listOf(near, far, near, far, far)
+        val meters = listOf(near, far, far, far, far, far, near, far, far)
         meters.forEachIndexed { i, m -> assertFalse(gate.onFrame(walk, i * 100L, metersOf = m, frameH = h)) }
     }
 

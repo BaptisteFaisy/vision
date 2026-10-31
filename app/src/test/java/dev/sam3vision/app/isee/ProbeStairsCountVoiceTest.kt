@@ -158,6 +158,8 @@ class ProbeStairsCountVoiceTest {
         )
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
+        // Scheduler coupé : ce test verrouille le compteur, pas les keyframes (voir LiveAdaptiveTest).
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         val spoken = mutableListOf<String>()
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),

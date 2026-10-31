@@ -3,7 +3,10 @@ package dev.sam3vision.core.crossing
 /**
  * Couleur d'un feu piéton lue dans ses pixels : compte les pixels rouges et
  * verts (teinte HSV) dans [argb] et tranche [CrossingState.Red] ou
- * [CrossingState.Green] — binaire, tout non-vert attend (ordre user du 31/10).
+ * [CrossingState.Green] — ou [CrossingState.Unknown] dans la zone grise
+ * (match nul, signal faible, entrée illisible : le doute se dit, il ne se
+ * force plus en rouge — l'aval attend sur [CrossingState.Unknown] comme sur
+ * [CrossingState.Red], décision fail-safe).
  *
  * L'appelant a déjà cadré le feu (crop de la boîte SAM, voir `:app`) : ce
  * classifieur ne fait que la couleur, sans Android ni Bitmap — pur Kotlin,
@@ -12,40 +15,40 @@ package dev.sam3vision.core.crossing
  * Les seuils ci-dessous sont des ordres de grandeur **non calibrés sur
  * appareil** (aucune mesure téléphone dans cet arbre) : une passe de calibrage
  * sur feux français (jour, nuit, pluie) reste à faire avant tout usage réel.
+ * Ils sont publics (surface de calibrage, voir aussi [PedLightGate]).
  */
 object PedLightColor {
 
     /** Teinte rouge : en dessous (côté 0°) ou au dessus (côté 360°). */
-    internal const val RED_HUE_DEG = 15f
+    const val RED_HUE_DEG = 15f
 
     /** Plage de teinte du vert piéton (le vert français tire vers le bleu). */
-    internal const val GREEN_HUE_MIN_DEG = 80f
-    internal const val GREEN_HUE_MAX_DEG = 175f
+    const val GREEN_HUE_MIN_DEG = 80f
+    const val GREEN_HUE_MAX_DEG = 175f
 
     /** Saturation et valeur minimales : un feu allumé est franc, pas pastel. */
-    internal const val MIN_SATURATION = 0.45f
-    internal const val MIN_VALUE = 0.35f
+    const val MIN_SATURATION = 0.45f
+    const val MIN_VALUE = 0.35f
 
     /** Fraction de pixels colorés exigée pour trancher (un bonhomme dans sa boîte). */
-    private const val MIN_FRACTION = 0.06f
+    const val MIN_FRACTION = 0.06f
 
     /** Marge exigée entre les deux camps : pas de verdict sur un match nul. */
-    private const val MARGIN_RATIO = 2.0f
+    const val MARGIN_RATIO = 2.0f
 
     /**
      * État du feu cadré par [argb] ([width] × [height], ARGB 32 bits, ligne
-     * majeure). Tableau vide ou dimensions incohérentes ⇒ [CrossingState.Red]
-     * (une entrée illisible attend, comme un doute).
+     * majeure). Tableau vide ou dimensions incohérentes ⇒
+     * [CrossingState.Unknown] (une entrée illisible est un doute : l'aval
+     * attend, comme sur [CrossingState.Red]).
      */
     fun classify(argb: IntArray, width: Int, height: Int): CrossingState {
-        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Red
+        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Unknown
         var red = 0
         var green = 0
         for (pixel in argb) {
+            if (!isLampPixel(pixel)) continue
             val hue = hueDeg(pixel)
-            val sat = saturation(pixel)
-            val value = value(pixel)
-            if (sat < MIN_SATURATION || value < MIN_VALUE) continue
             if (hue <= RED_HUE_DEG || hue >= 360f - RED_HUE_DEG) red += 1
             else if (hue in GREEN_HUE_MIN_DEG..GREEN_HUE_MAX_DEG) green += 1
         }
@@ -58,8 +61,17 @@ object PedLightColor {
         if (greenFraction >= MIN_FRACTION && greenFraction >= redFraction * MARGIN_RATIO) {
             return CrossingState.Green
         }
-        return CrossingState.Red
+        return CrossingState.Unknown
     }
+
+    /**
+     * Pixel de lampe allumée : saturé et franc (planchers [MIN_SATURATION] et
+     * [MIN_VALUE], les mêmes qui filtrent [classify]). C'est le prédicat que
+     * le recentrage `:app` partage avec le classifieur — la conversion HSV
+     * reste interne, seuls les seuils et ce verdict sont publics.
+     */
+    fun isLampPixel(pixel: Int): Boolean =
+        saturation(pixel) >= MIN_SATURATION && value(pixel) >= MIN_VALUE
 
     /** Teinte 0..360° (conversion maison : pas d'Android en `:core`). */
     internal fun hueDeg(pixel: Int): Float {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug UNIQUEMENT (recouvre `main` en build debug) : trafic en clair vers les
+  bacs d'essai locaux — 10.0.2.2 = hôte vu depuis l'émulateur, localhost =
+  port-forward adb. La release garde le HTTPS obligatoire (voir `main`).
+  (C'est cette config qui gouverne le clair : quand une config réseau est
+  posée, le flag `usesCleartextTraffic` du manifeste est ignoré.)
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

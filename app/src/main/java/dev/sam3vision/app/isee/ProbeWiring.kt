@@ -3,9 +3,9 @@ package dev.sam3vision.app.isee
 import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
-import dev.sam3vision.app.live.chosenLens
+import dev.sam3vision.app.live.LensOrigin
+import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.app.speech.VoicePack
-import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
@@ -32,8 +32,9 @@ import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -71,18 +72,20 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
  * EU/US > URL du build), monde sensoriel (dehors/dedans), guidage « tout droit »
  * (il prime sur l'annonce), annonce vocale des objets et de leur distance,
- * focale de la caméra, distances on/off, plafond d'objets.
+ * focale de la caméra, distances on/off, plafond d'objets. L'annonce et le
+ * guidage suivent les bascules brutes (clé non exigée) : sans clé, la voix de
+ * proximité parle au TTS système (repli + alerte unique) au lieu de se taire.
  *
  * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
- * l'appelant a passé les défauts ([LivePrompts.default], [LivePrompts.indoor]
- * ou une liste vide) ; une liste explicite (Traversée feu+voitures, champ
- * « Follow », « Find the X ») traverse inchangée.
+ * l'appelant a passé les défauts (`default`, `indoor`, vide) ; une liste
+ * explicite (Traversée, « Follow », « Find the X ») traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
     prompts: List<String> = LivePrompts.default,
     crossingActive: Boolean = false,
     sensorLens: LensSpec? = null,
+    onLens: ((LensOrigin) -> Unit)? = null,
 ) {
     android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
@@ -90,12 +93,14 @@ internal fun LiveProbe.configureFrom(
     } else {
         prompts
     }
+    val chosen = chooseLens(settings.cameraFovDeg, sensorLens)
+    onLens?.invoke(chosen.origin)
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
         prompts = effective,
-        announce = settings.announcePositions,
-        guide = settings.guideStraight,
-        lens = chosenLens(settings.cameraFovDeg, sensorLens),
+        announce = settings.ttsAnnouncePositions,
+        guide = settings.ttsGuidanceStraight,
+        lens = chosen.spec,
         distancesOn = settings.distanceOverlayEnabled,
         collectCrops = settings.collectLightCrops,
         maxObjects = settings.objectsOnScreen,
@@ -125,7 +130,7 @@ fun LiveProbe.clearRouteCap() {
  * concept ou un label de plus de 32 caractères est refusé par
  * [LivePrompts.normalize], sans reconfiguration. Pur hors sonde, testé en JVM.
  */
-internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
+internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLens: LensSpec? = null, onLens: ((LensOrigin) -> Unit)? = null) {
     if (state.value.crossingActive) return
     val clean = label.trim()
     if (clean.isEmpty()) return
@@ -134,7 +139,7 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String) {
     val next = LivePrompts.normalize(current + clean)
     if (next == current) return
     android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM (${next.size} suivis)")
-    configureFrom(settings, next, false)
+    configureFrom(settings, next, false, sensorLens, onLens)
 }
 
 /**
@@ -146,20 +151,17 @@ internal fun spokenClipId(text: String): String? =
 
 /**
  * Chaque phrase de la sonde est confiée à la voix, y compris redite à
- * l'identique (direction stable : [LiveProbeState.spokenSeq] distingue les
- * émissions, `distinctUntilChanged` ne les avale plus). [playerIdle] vrai =
- * aucune bulle du chat en cours de lecture. Dernier-gagnant : une phrase
- * plus fraîche annule la synthèse en cours au lieu de faire la queue
- * derrière — une consigne datée ne sert à rien (overwrite).
- * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
- * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
- * mot stop) : seul le stop coupe la lecture en cours, chat compris
- * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » urgence externe,
- * « Stop, car moving. » en Traversée) —
- * les mots doux attendent le silence, en file (`queue`, redits au silence
- * par le guetteur mobilier : sans file, ils se perdaient dès que la route
- * ou le chat parlait). Le flag ne change qu'avec la phrase,
- * donc la paire reste aussi stable que la phrase seule.
+ * l'identique ([LiveProbeState.spokenSeq] distingue les émissions).
+ * [playerIdle] vrai = aucune bulle du chat en cours de lecture. L'urgence
+ * parle jusqu'au bout : une phrase plus fraîche n'annule plus sa synthèse
+ * (l'ancienne `collectLatest` taisait un stop pour une direction douce) —
+ * la douce en vol est annulée, les suivantes attendent (conflated). Les
+ * douces restent dernier-gagnant (file fille annulée par émission). Mots du
+ * guidage en clips (< 100 ms), positions en synthèse ; l'urgence vient de
+ * l'état ([LiveProbeState.spokenUrgent]) : seul le stop coupe, chat compris
+ * — les doux attendent le silence, en file (`queue`, redits au silence par
+ * le guetteur mobilier). Le flag ne change qu'avec la phrase, donc la paire
+ * reste aussi stable que la phrase seule.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -168,27 +170,45 @@ internal fun LiveProbe.observeSpoken(
     language: () -> SpeechLanguage,
 ) {
     scope.launch {
+        var soft: Job? = null
         state.map { Triple(it.spoken, it.spokenUrgent, it.spokenSeq) }.distinctUntilChanged()
-            .collectLatest { (phrase, urgent, _) ->
-                val text = phrase ?: return@collectLatest
-                val clipId = spokenClipId(text)
-                if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
-                else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
+            .collect { (phrase, urgent, _) ->
+                val text = phrase ?: return@collect
+                if (urgent) {
+                    soft?.cancelAndJoin()
+                    soft = null
+                    speakProbePhrase(voice, text, playerIdle(), language(), urgent = true)
+                } else {
+                    soft?.cancel()
+                    soft = scope.launch {
+                        speakProbePhrase(voice, text, playerIdle(), language(), urgent = false)
+                    }
+                }
             }
     }
+}
+
+/** Une phrase de la sonde vers la voix (clip ou synthèse) : urgent en ligne, doux en file fille. */
+private suspend fun speakProbePhrase(
+    voice: ProximityVoice,
+    text: String,
+    idle: Boolean,
+    language: SpeechLanguage,
+    urgent: Boolean,
+) {
+    val clipId = spokenClipId(text)
+    if (clipId != null) voice.speakWord(clipId, text, language, idle, urgent = urgent, queue = !urgent)
+    else voice.onPhrase(text, idle, urgent = urgent, queue = !urgent)
 }
 
 /**
  * Guetteur trottoir de la sonde : le signal est relu dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), sans toucher à `LiveProbe`
- * (499/500 lignes — tout câblage vit ici, comme `observeSpoken`). Rend le
- * guetteur pour le `reset()` de début de séance. L'imminent ([CurbTier.NEAR],
- * 0,4 m) parle en alerte de sécurité (consigne « Montez le rebord. »,
+ * (499/500 lignes — câblage ici, comme `observeSpoken`). L'imminent
+ * ([CurbTier.NEAR], 0,4 m) parle en alerte de sécurité (« Montez le rebord. »,
  * [SafetyVoice], jamais de « Stop » — ordre user du 31/10) ; la pré-alerte
- * à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent doux.
- * L'imminent passe en Traversée, la pré-alerte y est coupée — et la
- * porte précède le watcher (un FAR coupé ne consomme ni confirmation ni
- * cooldown). `collect` séquentiel, voix douce en coroutine fille.
+ * à 1 m ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) restent doux. Tous
+ * parlent en Traversée. `collect` séquentiel, voix douce en coroutine fille.
  */
 internal fun LiveProbe.observeCurb(
     scope: CoroutineScope,
@@ -202,9 +222,7 @@ internal fun LiveProbe.observeCurb(
         state.collect { st ->
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = CurbSignal.of(readings, st.width, st.height)
-            if (st.crossingActive && signal.tier != CurbTier.NEAR) return@collect
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            if (!shouldSpeakCurb(cue, st.crossingActive)) return@collect
             val alert = cue.safetyPhrase
             if (alert != null) {
                 safety.speak(alert)
@@ -217,24 +235,15 @@ internal fun LiveProbe.observeCurb(
 }
 
 /**
- * Parole bordure : la marche imminente ([CurbTier.NEAR]) passe toujours,
- * même en Traversée et même après un stop (une alerte de sécurité ne se
- * tait pour rien) ; la pré-alerte ([CurbTier.FAR]) et le bateau
- * ([CurbTier.NONE]) sont coupés en Traversée. Pure, testée en JVM.
- */
-internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
-    cue.tier == CurbTier.NEAR || !crossingActive
-
-/**
  * Guetteur mobilier de la sonde, miroir du trottoir : le mobilier suivi
  * ([dev.sam3vision.core.hazard.HazardConcepts]) lu dans l'état, sans toucher
- * à `LiveProbe` (lectures de distance + dimensions, déjà publiées par
- * frame). L'annonce (« Attention à la barrière. ») est douce (attend le
- * silence) : iSee décrit, en douceur — sauf le poteau imminent, urgent sauf
- * P1/P2 en cours ([p1p2Busy] : le poteau est P3). La phrase douce tue part en
- * file ([ProximityVoice.flushPending], redite au silence) : une alerte
- * confirmée ne se perd plus. Coupé en mode Traversée. Lecture séquentielle,
- * comme le trottoir : une alerte confirmée ne s'annule pas.
+ * à `LiveProbe` (lectures + dimensions, déjà publiées par frame). L'annonce
+ * (« Attention à la barrière. ») est douce (attend le silence) — sauf le
+ * poteau imminent, urgent sauf P1/P2 en cours ([p1p2Busy] : le poteau est
+ * P3). La phrase douce tuée part en file ([ProximityVoice.flushPending],
+ * redite au silence, Traversée comprise) : une alerte confirmée ne se perd
+ * plus. Parle en Traversée. Lecture séquentielle, comme le trottoir : une
+ * alerte confirmée ne s'annule pas.
  */
 internal fun LiveProbe.observeHazard(
     scope: CoroutineScope,
@@ -246,7 +255,6 @@ internal fun LiveProbe.observeHazard(
     val watcher = HazardWatcher()
     scope.launch {
         state.collect { st ->
-            if (st.crossingActive) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val nowMs = System.currentTimeMillis()
             val cue = watcher.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, language())
@@ -296,9 +304,9 @@ internal fun LiveProbe.observeFenceOpening(
  * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
  * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
  * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
- * parlent doux (seul l'`urgent` du danger qui s'approche coupe).
- * En Traversée, le veto seul parle (coupé ici) — les états moteurs se disent
- * dans la phrase traversée (`CrossingVehicleWatch`, après le feu).
+ * parlent doux (seul l'`urgent` du danger qui s'approche coupe). Parle en
+ * Traversée comme ailleurs (audit voix 31/10 : les états moteurs ne sont
+ * plus coupés — le feu garde sa voix, sans couvrir les moteurs).
  * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
  * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
  */
@@ -311,7 +319,6 @@ internal fun LiveProbe.observeVehicleState(
 ): VehicleStateWatcher {
     scope.launch {
         state.collect { st ->
-            if (st.crossingActive) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val motion = ProbeBackgroundMotion.lastMotion
             val cue = watcher.update(
@@ -488,5 +495,3 @@ internal fun LiveProbe.observeHazards(
         observeSidewalk(scope, voice, playerIdle, language),
     )
 }
-
-

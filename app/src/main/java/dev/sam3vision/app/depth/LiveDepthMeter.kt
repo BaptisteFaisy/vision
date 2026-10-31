@@ -9,6 +9,7 @@ import dev.sam3vision.core.depth.DepthReadings
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
+import kotlin.jvm.Volatile
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
  * (~176 ms DA2, ~5 Hz face aux 7 i/s du direct) et affine les lectures
  * sténopé en mètres calibrés. Toujours active ; modèle manquant ou carte
  * périmée : le sténopé passe tel quel — le direct ne s'arrête jamais.
+ * La carte périmée est signalée ([lastFreshness], journal), pas déguisée.
  */
 class LiveDepthMeter(
     private val scope: CoroutineScope,
@@ -26,6 +28,21 @@ class LiveDepthMeter(
     private val background: CoroutineDispatcher = Dispatchers.Default,
     private val backend: () -> DepthBackend = { DepthBackend.DA2 },
 ) : DepthMeter {
+    /**
+     * Fraîcheur de la profondeur au dernier [readingsFor] : la carte périmée
+     * ([STALE_MAP]) est signalée ici et journalisée, pas déguisée en sténopé.
+     */
+    enum class DepthFreshness {
+        /** Médianes serveur de la frame : fraîches par construction. */
+        SERVER,
+        /** Carte embarquée de moins d'une seconde. */
+        EMBEDDED,
+        /** Carte embarquée périmée : sténopé tel quel, signalé. */
+        STALE_MAP,
+        /** Jamais de carte (moteur froid, modèle absent) : sténopé tel quel. */
+        NO_MAP,
+    }
+
     private val lock = Any()
     private var pendingJpeg: String? = null
     private var running = false
@@ -33,6 +50,11 @@ class LiveDepthMeter(
     private var latestAtMs = 0L
     private var estimator: DepthEstimator? = null
     private var engineTriedMs = 0L
+
+    /** Fraîcheur au dernier [readingsFor] (diagnostic, pastille future). */
+    @Volatile
+    var lastFreshness: DepthFreshness = DepthFreshness.NO_MAP
+        private set
 
     override fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
@@ -54,10 +76,20 @@ class LiveDepthMeter(
             val detections = frame.objects.toDetections(frame.width, frame.height)
             val server = DepthReadings.serverCloseness(frame.objects)
             if (server.isNotEmpty()) {
+                lastFreshness = DepthFreshness.SERVER
                 return DepthReadings.refineWithCloseness(detections, pinhole, server)
             }
             val map = freshMap()
-            if (map == null) return pinhole
+            if (map == null) {
+                if (hasMap()) {
+                    lastFreshness = DepthFreshness.STALE_MAP
+                    Log.w(TAG, "carte périmée : sténopé tel quel")
+                } else {
+                    lastFreshness = DepthFreshness.NO_MAP
+                }
+                return pinhole
+            }
+            lastFreshness = DepthFreshness.EMBEDDED
             DepthReadings.refine(frame.width, frame.height, detections, pinhole, map)
         } catch (e: Exception) {
             Log.w(TAG, "affinage: " + e.message)
@@ -80,9 +112,12 @@ class LiveDepthMeter(
         }
     }
 
+    /** Vrai si une carte a déjà été inférée (fraîche ou périmée). */
+    private fun hasMap(): Boolean = synchronized(lock) { latest != null }
+
     private fun freshMap(): DepthMap? {
         synchronized(lock) {
-            if (latestAtMs <= 0L || nowMs() - latestAtMs > FRESH_MS) return null
+            if (freshnessOf(nowMs(), latestAtMs) != DepthFreshness.EMBEDDED) return null
             return latest
         }
     }
@@ -146,6 +181,17 @@ class LiveDepthMeter(
     companion object {
         const val TAG = "DepthLive"
         private const val FRESH_MS = 1000L
+
+        /**
+         * Fraîcheur d'une carte inférée à [atMs], lue à [nowMs] : [DepthFreshness.EMBEDDED]
+         * sous [FRESH_MS], [DepthFreshness.STALE_MAP] au-delà, [DepthFreshness.NO_MAP] sans
+         * carte ([atMs] nul). Pure, testée sur JVM (l'horloge Android reste à [readingsFor]).
+         */
+        fun freshnessOf(nowMs: Long, atMs: Long, freshMs: Long = FRESH_MS): DepthFreshness {
+            if (atMs <= 0L) return DepthFreshness.NO_MAP
+            if (nowMs - atMs > freshMs) return DepthFreshness.STALE_MAP
+            return DepthFreshness.EMBEDDED
+        }
         private const val RETRY_MS = 60_000L
         private const val DRAIN_ROUNDS = 4
     }

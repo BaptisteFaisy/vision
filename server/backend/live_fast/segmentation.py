@@ -32,6 +32,8 @@ MAX_PROMPTS = 17
 MAX_OBJECTS = 32
 MAX_PROMPT_CHARS = 64
 SEG_MAX_EDGE = 1024
+# Seuil partagé client/serveur : CrossingOffer.MIN_SCORE vaut le même 0,35
+# (reel audit 31/10) — le client ne jette plus ce que le modèle a vu.
 SCORE_THRESHOLD = 0.35
 MASK_THRESHOLD = 0.5
 

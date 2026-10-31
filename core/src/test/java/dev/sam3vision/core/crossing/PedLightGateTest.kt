@@ -10,7 +10,9 @@ import org.junit.Test
  * Porte anti-confusion du vert piéton : pixels synthétiques (frontières des
  * seuils) + échantillon réel `feuxfr/` (9 crops Panoramax ≤ 48 px, voir
  * ATTRIBUTION.md). Les seuils sont calibrés sur feux français (10/2026) :
- * ces tests verrouillent 0 vert sur rouge et le rappel bonhomme.
+ * ces tests verrouillent 0 vert sur rouge et le rappel bonhomme. Zone grise
+ * (31/10) : un refus de porte ou une feuille fragile doute (Unknown), sans
+ * se forcer en rouge — l'aval attend dans les deux cas.
  */
 class PedLightGateTest {
 
@@ -70,9 +72,9 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - cadre tout vert attend rouge (pas elance, pas bonhomme)`() {
+    fun `verdict - cadre tout vert doute (pas elance, pas bonhomme)`() {
         assertEquals(
-            CrossingState.Red,
+            CrossingState.Unknown,
             PedLightGate.verdict(IntArray(100) { CYAN_GREEN }, 10, 10),
         )
     }
@@ -86,9 +88,14 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - noir et gris attendent rouge, binaire`() {
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
+    fun `verdict - disque vert refuse doute, pas rouge force`() {
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(disc(10, 10, 5), 20, 20))
+    }
+
+    @Test
+    fun `verdict - noir et gris doutent, zone grise`() {
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { GRAY }, 10, 10))
     }
 
     @Test

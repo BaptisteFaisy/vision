@@ -33,18 +33,18 @@ class DangerPipeline(
     private val tracker = PersonTracker()
     private val approach = ApproachEstimator()
     private val lock = Any()
-    private var pendingJpeg: String? = null
+    private val queue = DangerFrameQueue()
     private var running = false
     private var detector: PersonDetector? = null
     private var engineTriedMs = 0L
     private var lastKey: String? = null
     private var lastSnapshot: DangerSnapshot = DangerSnapshot.Empty
 
-    /** Dernière frame à analyser (les intermédiaires sont jetées, pas empilées). */
+    /** File courte des frames à analyser (3 max : la plus vieille est jetée, pas empilée). */
     fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
         synchronized(lock) {
-            pendingJpeg = jpegB64
+            queue.offer(jpegB64)
             if (running) return
             running = true
         }
@@ -58,7 +58,7 @@ class DangerPipeline(
     fun reset() {
         val stale: PersonDetector?
         synchronized(lock) {
-            pendingJpeg = null
+            queue.clear()
             lastKey = null
             lastSnapshot = DangerSnapshot.Empty
             stale = detector
@@ -71,12 +71,17 @@ class DangerPipeline(
 
     private suspend fun pump() {
         try {
-            // Dernière frame seule : une vieille image n'apprend rien sur le danger.
-            takePending()?.let { infer(it) }
+            // File courte, dans l'ordre : 3 frames max — une image plus
+            // vieille n'apprend rien sur le danger.
+            var jpeg = takePending()
+            while (jpeg != null) {
+                infer(jpeg)
+                jpeg = takePending()
+            }
         } finally {
             synchronized(lock) { running = false }
             synchronized(lock) {
-                if (pendingJpeg != null && !running) {
+                if (queue.hasPending() && !running) {
                     running = true
                     scope.launch(background) { pump() }
                 }
@@ -84,11 +89,7 @@ class DangerPipeline(
         }
     }
 
-    private fun takePending(): String? = synchronized(lock) {
-        val jpeg = pendingJpeg
-        pendingJpeg = null
-        jpeg
-    }
+    private fun takePending(): String? = synchronized(lock) { queue.poll() }
 
     private suspend fun infer(jpegB64: String) {
         try {
@@ -99,28 +100,15 @@ class DangerPipeline(
             val tracks = tracker.update(result.persons, nowMs)
             synchronized(lock) { lastSnapshot = DangerSnapshot(tracks, frame.width, frame.height) }
             approach.retainAlive(tracks.map { it.id }.toSet())
-            publish(pickAlert(tracks.map { approach.update(it, nowMs) }, result.persons.size))
+            publish(pickDangerAlert(tracks.map { approach.update(it, nowMs) }, result.persons.size))
         } catch (e: Exception) {
             Log.w(TAG, "inférence: " + e.message)
         }
     }
 
-    /** La plus urgente des pistes qui s'approchent (ttc minimal sous le seuil). */
-    private fun pickAlert(readings: List<ApproachReading>, persons: Int): DangerAlert? {
-        var best: ApproachReading? = null
-        for (reading in readings) {
-            val ttc = reading.ttcSec ?: continue
-            if (!reading.approaching || ttc > DangerAlert.ALERT_TTC_SEC) continue
-            val current = best?.ttcSec
-            if (current == null || ttc < current) best = reading
-        }
-        val winner = best ?: return null
-        return DangerAlert(winner.trackId, winner.ttcSec ?: return null, persons)
-    }
-
-    /** Publie l'alerte si elle a changé (apparition, piste ou seconde) ; logue. */
+    /** Publie l'alerte si elle a changé (apparition, piste, seconde ou sens) ; logue. */
     private fun publish(alert: DangerAlert?) {
-        val key = alert?.let { "${it.trackId}:${it.ttcSec.toInt()}" }
+        val key = alert?.let { "${it.trackId}:${it.ttcSec.toInt()}:${it.crossing}" }
         synchronized(lock) {
             if (key == lastKey) return
             lastKey = key
@@ -146,6 +134,56 @@ class DangerPipeline(
 
     companion object {
         const val TAG = "DangerAlert"
+        /**
+         * File courte : 3 frames max en attente — quand YOLO rame, le tracker
+         * garde la continuité au lieu de sauter à la dernière seule.
+         */
+        const val MAX_PENDING_FRAMES = 3
         private const val RETRY_MS = 60_000L
     }
+}
+
+/**
+ * File courte des frames danger (FIFO bornée) : [offer] enfile en jetant la
+ * plus vieille au-delà du plafond, [poll] défile dans l'ordre. Pure, testée
+ * en JVM (le pipeline, lui, exige Android).
+ */
+internal class DangerFrameQueue(private val maxFrames: Int = DangerPipeline.MAX_PENDING_FRAMES) {
+    private val frames = ArrayDeque<String>()
+
+    /** Enfile, en jetant les plus vieilles au-delà du plafond. */
+    fun offer(jpegB64: String) {
+        frames.addLast(jpegB64)
+        while (frames.size > maxFrames) frames.removeFirst()
+    }
+
+    /** Défile la plus vieille, `null` si vide. */
+    fun poll(): String? = if (frames.isEmpty()) null else frames.removeFirst()
+
+    /** Reste-t-il une frame à analyser ? */
+    fun hasPending(): Boolean = frames.isNotEmpty()
+
+    /** Vide la file (nouvelle séance). */
+    fun clear() {
+        frames.clear()
+    }
+
+    /** Frames en attente. */
+    val size: Int get() = frames.size
+}
+
+/**
+ * La plus urgente des pistes qui s'approchent (ttc minimal sous le seuil),
+ * de face comme en traversée ([ApproachReading.crossing]). Pure, testée en JVM.
+ */
+internal fun pickDangerAlert(readings: List<ApproachReading>, persons: Int): DangerAlert? {
+    var best: ApproachReading? = null
+    for (reading in readings) {
+        val ttc = reading.ttcSec ?: continue
+        if (!reading.approaching || ttc > DangerAlert.ALERT_TTC_SEC) continue
+        val current = best?.ttcSec
+        if (current == null || ttc < current) best = reading
+    }
+    val winner = best ?: return null
+    return DangerAlert(winner.trackId, winner.ttcSec ?: return null, persons, winner.crossing)
 }

@@ -84,9 +84,9 @@ class VehicleApproachTest {
     }
 
     @Test
-    fun `score faible ou non vehicule - ignores`() {
+    fun `score au seuil ou non vehicule - ignores`() {
         val approach = VehicleApproach()
-        val weak = Detection("car", 0.5f, box(100f), width = 640, height = 480)
+        val weak = Detection("car", 0.35f, box(100f), width = 640, height = 480)
         val person = Detection("person", 0.9f, box(100f), width = 640, height = 480)
         approach.update(listOf(weak, person), atMs = 0L)
         approach.update(listOf(weak, person), atMs = 100L)
@@ -170,9 +170,125 @@ class VehicleApproachTest {
         assertEquals(Verdict.CAMERA_MOVED, approach.lastVerdicts[1]?.verdict)
     }
 
-    /** Mouvement global latéral piloté : [dxPx] px par frame sur plan 96, dt 100 ms. */
-    private fun lateralMotion(dxPx: Float): FrameMotion =
-        FrameMotion(MotionSample(dxPx, 0f, 1f, 0.9f), lumaWidth = 96, lumaHeight = 96, dtMs = 100L)
+    @Test
+    fun `dt 500ms - association IoU 0-2 et veto a la 3e frame`() {
+        val approach = VehicleApproach()
+        assertFalse(approach.update(listOf(car(100f)), atMs = 0L).approaching)
+        assertFalse(approach.update(listOf(car(200f)), atMs = 500L).approaching)
+        val third = approach.update(listOf(car(300f)), atMs = 1000L)
+
+        assertTrue("IoU 0,25 > 0,2 : piste tenue", third.approaching)
+        assertNotNull(third.ttcSeconds)
+        assertTrue("tau ~2,5 s", third.ttcSeconds!! in 1.0f..3.0f)
+        assertEquals("car", third.label)
+        assertEquals(1, approach.trackCount)
+    }
+
+    @Test
+    fun `dt 900ms - association tenue sans veto fantome`() {
+        val approach = VehicleApproach()
+        approach.update(listOf(car(100f)), atMs = 0L)
+        approach.update(listOf(car(150f)), atMs = 900L)
+        val third = approach.update(listOf(car(200f)), atMs = 1800L)
+
+        assertEquals("piste unique tenue à 900 ms", 1, approach.trackCount)
+        assertFalse("croissance lente : pas de veto", third.approaching)
+        assertNull(third.ttcSeconds)
+    }
+
+    @Test
+    fun `purge 1500ms - trou 1200ms tenu, trou 1600ms purge`() {
+        val kept = VehicleApproach()
+        kept.update(listOf(car(100f)), atMs = 0L)
+        kept.update(listOf(car(110f)), atMs = 500L)
+        kept.update(listOf(carFar()), atMs = 1700L)
+        assertEquals("1200 ms < 1500 : ancienne piste tenue", 2, kept.trackCount)
+
+        val purged = VehicleApproach()
+        purged.update(listOf(car(100f)), atMs = 0L)
+        purged.update(listOf(car(110f)), atMs = 500L)
+        purged.update(listOf(carFar()), atMs = 2100L)
+        assertEquals("1600 ms > 1500 : ancienne piste purgée", 1, purged.trackCount)
+    }
+
+    @Test
+    fun `reactivation courte - retour rapide garde la piste, retour tardif non`() {
+        val static = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 500L)
+        val quick = VehicleApproach()
+        quick.update(listOf(car(100f)), atMs = 0L)
+        quick.update(listOf(car(200f)), atMs = 500L)
+        quick.update(listOf(car(300f)), atMs = 1000L)
+        quick.update(listOf(carFar()), atMs = 2600L)
+        quick.update(listOf(car(350f)), atMs = 2800L, motion = static)
+        assertEquals("200 ms < 500 : piste réactivée, verdict fond", 1, quick.lastVerdicts.size)
+
+        val late = VehicleApproach()
+        late.update(listOf(car(100f)), atMs = 0L)
+        late.update(listOf(car(200f)), atMs = 500L)
+        late.update(listOf(car(300f)), atMs = 1000L)
+        late.update(listOf(carFar()), atMs = 2600L)
+        late.update(listOf(car(350f)), atMs = 3300L, motion = static)
+        assertTrue("700 ms > 500 : nouvelle piste sans vitesse", late.lastVerdicts.isEmpty())
+    }
+
+    @Test
+    fun `glissade laterale 500ms - TTC lateral expose sans veto`() {
+        val approach = VehicleApproach()
+        approach.update(listOf(carAt(100f, 320f)), atMs = 0L)
+        approach.update(listOf(carAt(100f, 380f)), atMs = 500L)
+        val third = approach.update(listOf(carAt(100f, 440f)), atMs = 1000L)
+
+        assertFalse("latéral sans croissance : pas d'approche", third.approaching)
+        assertNull(third.ttcSeconds)
+        assertNotNull("TTC latéral exposé au veto", third.lateralTtcSeconds)
+        assertTrue("tau latéral ~1,6 s", third.lateralTtcSeconds!! in 0.5f..3.0f)
+    }
+
+    @Test
+    fun `vitesse radiale - approche confirmee sans croissance, recession n efface pas le tau`() {
+        val key = VehicleApproach.instanceKeyOf("car", 0.5f)
+        val aided = VehicleApproach()
+        aided.update(listOf(car(100f)), atMs = 0L)
+        aided.update(listOf(car(102f)), atMs = 500L)
+        val confirmed = aided.update(listOf(car(104f)), atMs = 1000L, radialMpsByKey = mapOf(key to -2f))
+        assertTrue("radiale -2 m/s : approche", confirmed.approaching)
+        assertEquals("car", confirmed.label)
+
+        val bare = VehicleApproach()
+        bare.update(listOf(car(100f)), atMs = 0L)
+        bare.update(listOf(car(102f)), atMs = 500L)
+        val silent = bare.update(listOf(car(104f)), atMs = 1000L)
+        assertFalse("sans radiale : croissance lente muette", silent.approaching)
+
+        val noisy = VehicleApproach()
+        noisy.update(listOf(car(100f)), atMs = 0L)
+        noisy.update(listOf(car(200f)), atMs = 500L)
+        val held = noisy.update(listOf(car(300f)), atMs = 1000L, radialMpsByKey = mapOf(key to 5f))
+        assertTrue("tau franc : récession n'efface pas", held.approaching)
+        assertNotNull(held.ttcSeconds)
+    }
+
+    @Test
+    fun `cles par instance - hush lateralise a 500ms`() {
+        val motion = lateralMotion(dxPx = 1.5f, dtMs = 500L)
+        val approach = VehicleApproach()
+        var last = ApproachVerdict(false, null, null)
+        repeat(13) { index ->
+            val left = carAt(100f, 60f + index * 10f)
+            val right = carAt(100f + index * 20f, 500f)
+            last = approach.update(listOf(left, right), atMs = index * 500L, motion = motion)
+        }
+
+        assertFalse("croissance lente : pas d'approche", last.approaching)
+        assertFalse("unanimité rompue", approach.cameraMoved)
+        assertEquals(setOf("car@L"), approach.cameraMovedKeys)
+        assertEquals("car@L", VehicleApproach.instanceKeyOf("car", 60f / 640f))
+        assertEquals("car@R", VehicleApproach.instanceKeyOf("Cars", 500f / 640f))
+    }
+
+    /** Mouvement global latéral piloté : [dxPx] px par frame sur plan 96 ([dtMs]). */
+    private fun lateralMotion(dxPx: Float, dtMs: Long = 100L): FrameMotion =
+        FrameMotion(MotionSample(dxPx, 0f, 1f, 0.9f), lumaWidth = 96, lumaHeight = 96, dtMs = dtMs)
 
     /** Voiture qui grandit (+10 px/frame) en dérivant (+5 px/frame). */
     private fun driftingCar(index: Int): Detection = carAt(100f + index * 10f, 320f + index * 5f)

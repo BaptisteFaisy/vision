@@ -1,9 +1,9 @@
 package dev.sam3vision.app.isee
 
 /**
- * Politique de frame SAM de la page caméra : 320 px envoyés, jamais agrandis.
- * Le capteur est demandé en 640×480 (le direct aidant prend 480 px) :
- * la réduction vers [EDGE] se fait alors dans la passe NV21.
+ * Politique de frame SAM de la page caméra : 480 px envoyés, jamais agrandis.
+ * Le capteur est demandé en 640×480 et le direct aidant prend la même géométrie :
+ * un seul pack NV21 sert alors les deux (voir Nv21JpegEncoder).
  *
  * Le 2026-10-26, la conversion d'une frame coûtait 12-42 ms côté téléphone parce que
  * l'on demandait 320 px au capteur qui livrait 640×480, redimensionné ensuite pour rien
@@ -15,10 +15,10 @@ package dev.sam3vision.app.isee
 object FramePolicy {
 
     /** Côté long de l'image envoyée à SAM (px). */
-    const val EDGE = 320
+    const val EDGE = 480
 
-    /** Qualité JPEG de l'image envoyée (55 : invisible à l'œil, ~6 Ko par frame). */
-    const val QUALITY = 55
+    /** Qualité JPEG de l'image envoyée (65 : invisible à l'œil sur du 480 px). */
+    const val QUALITY = 65
 
     /**
      * Règle de choix de la taille quand le capteur ne peut pas livrer exactement
@@ -42,7 +42,7 @@ object FramePolicy {
 
     /**
      * Taille à demander au capteur : celle de l'image envoyée, ratio du capteur conservé.
-     * Exemple : capteur 640×480 → 320×240 ; 1080×1920 → 180×320.
+     * Exemple : capteur 640×480 → 480×360 ; 1080×1920 → 270×480.
      *
      * Troncature volontaire (`toInt`), pas arrondi : ne pas factoriser avec
      * `GlassesFramePolicy.scaledDimensions` (arrondi + `null` si inutile) — les deux

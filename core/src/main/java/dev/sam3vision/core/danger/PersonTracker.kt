@@ -65,7 +65,12 @@ data class ByteTrackParams(
     val highThresh: Float = 0.25f,
     val lowThresh: Float = 0.1f,
     val newThresh: Float = 0.25f,
-    val maxLostFrames: Int = 30,
+    /**
+     * Mémoire des pistes perdues : 10 frames (30 chez ultralytics — à la
+     * cadence danger ~2-5 inf/s sur téléphone, 30 frames = 6-15 s de
+     * fantômes ; 10 ≈ 2-5 s couvre les occlusions brèves sans hanter).
+     */
+    val maxLostFrames: Int = 10,
     val matchThresh: Float = 0.8f,
     val fuseScore: Boolean = true,
 )

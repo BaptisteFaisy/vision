@@ -85,6 +85,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
+    private val lensQuality = dev.sam3vision.app.live.LensQualityStore(getApplication())
     private val pitch = PitchMeter(app, probe.distances) // IMU → pose, null sans capteur
 
     /** Ordres cap/Traversée + guidage auto, extraits du ViewModel (limite 500). */
@@ -105,10 +106,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
-    /** Voix de proximité : dit les objets et leur distance une fois par scène. */
-    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking)
+    /** TTS système partagé : alertes de sécurité + repli hors-ligne de la voix de proximité. */
+    private val systemTts = SystemTtsEngine.create(getApplication())
     /** Voix de sécurité : voiture en mouvement + rebord, dits aussitôt, même en dictée. */
-    private val safety = SafetyVoice(player, SystemTtsEngine.create(getApplication()), { settings })
+    private val safety = SafetyVoice(player, systemTts, { settings })
+    /** Voix de proximité : dit les objets et leur distance une fois par scène. */
+    private val proximity = ProximityVoice(player, { settings }, ::speakAnnouncement, { canAnnounce() },
+        clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking,
+        safety = safety, system = systemTts, systemBusy = { systemTts.speaking })
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null
@@ -177,7 +182,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
-        speakRoute = { text, urgent -> proximity.onRoutePhrase(text, canAnnounce(), urgent) },
+        speakRoute = { text, urgent -> proximity.onRoutePhrase(text, canAnnounce(urgent), urgent) },
         // Fin de guidage : le lecteur coupé ne termine jamais (`onComplete`
         // ne part pas) — le flag est remis à zéro ici, sinon toute la voix
         // douce resterait muette (lecteur cru occupé pour toujours).
@@ -245,9 +250,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             // ne passe pas par onDestroy — le téléphone gardait alors les messages.
             runCatching { cleaner.purgeAll() }
             settings = loadedSettings(prefs)
-            // GPS laissé désactivé (ordre vocal, réglages) : la voix ambiante
-            // reste muette après redémarrage, jusqu'à une action du user.
-            voiceNav.syncGate()
+            // Porte GPS non persistée : elle rouvre à chaque redémarrage — un
+            // ordre « désactive le GPS » d'hier ne tait pas la voix d'aujourd'hui.
             syncProbe()
             transcript.refresh()
             picto.refresh()
@@ -335,7 +339,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Les Réglages pilotent la sonde SAM (mode Traversée préservé) et la vitesse de lecture. */
     private fun syncProbe() {
-        probe.setCrossingActive(settings, probe.state.value.crossingActive, sensorLens = camera?.lensSpec)
+        probe.setCrossingActive(settings, probe.state.value.crossingActive, sensorLens = camera?.lensSpec, onLens = lensQuality::note)
         probe.cadence.continuous = settings.continuousCadenceEnabled
         player.speed = settings.ttsSpeed
     }
@@ -382,7 +386,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordres « Find the X » / « Where are my keys » : X rejoint les masques SAM, son picto se crée et s'arme. */
     private fun runFindOrder(label: String) {
-        probe.ensureConcept(settings, label)
+        probe.ensureConcept(settings, label, camera?.lensSpec, lensQuality::note)
         picto.findObject(label)
     }
 
@@ -433,7 +437,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         return !playerIdle() || state.holding || state.transcribing || state.thinking
     }
 
-    private fun canAnnounce(): Boolean = !speechBusy() && voiceNavVoiceGate.ambientAllowed()
+    /** Voix ambiante : [urgent] passe toujours (micro, LLM, GPS coupé) ; sinon, silence si occupé ou porte fermée. */
+    private fun canAnnounce(urgent: Boolean = false): Boolean =
+        urgent || (!speechBusy() && voiceNavVoiceGate.ambientAllowed())
 
     /** Décision d'une voix ambiante (annonce ou voix du sol), urgence mise à part. */
     private fun maySpeakAmbient(urgent: Boolean): Boolean = voiceNavVoiceGate.maySpeak(urgent, speechBusy())

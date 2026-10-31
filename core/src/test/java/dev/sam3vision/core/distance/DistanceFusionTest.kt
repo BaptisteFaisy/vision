@@ -8,7 +8,8 @@ import org.junit.Test
 
 /**
  * Fusion sténopé/plan de sol dans [DistanceMeter] : cohérence ([DistanceFusion]), sol seul
- * quand la classe est inconnue, refus de l'objet coupé et bornes 0,3-60 m côté sol.
+ * quand la classe est inconnue, repli bas-au-contact signalé (haut coupé refusé),
+ * bornes 0,3-60 m côté sol.
  *
  * Fixture du fichier voisin : image 512×384, calibrage par défaut 67° → f = 386,774 px, centre
  * optique (255,5, 191,5). Les nombres attendus sont calculés à la main avec les deux formules :
@@ -89,10 +90,18 @@ class DistanceFusionTest {
     }
 
     @Test
-    fun `objet coupe refuse meme avec la pose`() {
+    fun `coupe bas avec pose donne un repli signale, coupe haut refuse`() {
         val posed = meter(CameraPose(1.5f, 0.2f))
-        assertTrue(posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(100f, 200f, 200f, 384f)))).isEmpty())
+        val reading = posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(100f, 200f, 200f, 384f)))).single()
+        assertTrue(reading.cutFallback)
+        // sol au bord bas : 1,5 / tan(atan((384 - 191,5)/386,774) + 0,2) = 1,925 m
+        assertEquals(1.925f, reading.meters, 0.02f)
+        assertEquals(reading.meters, reading.rawMeters, 0f)
+        assertTrue(reading.confidence in 0f..DistanceMeter.CUT_FALLBACK_MAX_CONFIDENCE)
+        // tête coupée : toujours refusée, même avec la pose
         assertTrue(posed.measure(WIDTH, HEIGHT, listOf(detection("licorne", listOf(100f, 0f, 200f, 200f)))).isEmpty())
+        // collée aux deux bords : refusée aussi (pas de sténopé à 31 m déguisé)
+        assertTrue(posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(0f, 0f, 512f, 384f)))).isEmpty())
     }
 
     @Test

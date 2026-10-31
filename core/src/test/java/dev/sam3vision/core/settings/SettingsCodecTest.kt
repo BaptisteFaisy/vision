@@ -152,22 +152,22 @@ class SettingsCodecTest {
     }
 
     @Test
-    fun `les flags adaptatifs sont eteints par defaut et survivent a un aller-retour`() {
-        // Off par défaut : le direct est celui d'avant tant que l'A/B ne les allume pas.
-        assertEquals(false, Settings.Default.adaptiveUploadEnabled)
+    fun `le montant adaptatif est allume par defaut, les keyframes eteints, aller-retour preserve`() {
+        // Montant adaptatif allumé par défaut (audit réel 31/10), keyframes éteints.
+        assertEquals(true, Settings.Default.adaptiveUploadEnabled)
         assertEquals(false, Settings.Default.keyframeSchedulerEnabled)
-        assertEquals(false, SettingsCodec.decode("").adaptiveUploadEnabled)
+        assertEquals(true, SettingsCodec.decode("").adaptiveUploadEnabled)
         assertEquals(false, SettingsCodec.decode("").keyframeSchedulerEnabled)
 
-        val on = Settings.Default.copy(adaptiveUploadEnabled = true, keyframeSchedulerEnabled = true)
+        val on = Settings.Default.copy(keyframeSchedulerEnabled = true)
         val round = SettingsCodec.decode(SettingsCodec.encode(on))
         assertEquals(true, round.adaptiveUploadEnabled)
         assertEquals(true, round.keyframeSchedulerEnabled)
 
-        // Un fichier écrit avant les flags : éteints, jamais d'adaptatif hérité.
+        // Un fichier écrit avant les flags : montant allumé (nouveau défaut), keyframes éteints.
         val legacy = SettingsCodec.encode(Settings.Default).lines()
             .filterNot { it.startsWith("adaptiveUploadEnabled=") || it.startsWith("keyframeSchedulerEnabled=") }
-        assertEquals(false, SettingsCodec.decode(legacy.joinToString("\n")).adaptiveUploadEnabled)
+        assertEquals(true, SettingsCodec.decode(legacy.joinToString("\n")).adaptiveUploadEnabled)
         assertEquals(false, SettingsCodec.decode(legacy.joinToString("\n")).keyframeSchedulerEnabled)
     }
 

@@ -68,18 +68,19 @@ data class FrameMotion(
  * (estimateur muet, `null`), temps ou dimensions invalides, bande de doute —
  * dit [Verdict.UNKNOWN] : on ne tranche jamais sans preuve.
  *
- * Seuils = priors à recaler sur téléphone, direction sûre : une piste jeune,
+ * Seuils = priors rue à recaler sur séquences téléphone (rue, parking,
+ * embouteillage), direction sûre : une piste jeune,
  * floue ou perdue ne déclenche jamais. Pur JVM, zéro allocation hors verdict.
  */
 object VehicleBackground {
 
-    /** Dérive maximale d'un arrêt : 2 % de l'image par seconde (miroir de `VehicleStateWatcher`). */
+    /** Dérive maximale d'un arrêt, prior rue : 2 % de l'image par seconde (miroir de `VehicleStateWatcher`). */
     const val STILL_SPEED = 0.02f
 
-    /** Au-delà (fraction d'image/s), le résidu ou le fond est franc (bande morte au-dessus de l'arrêt). */
+    /** Au-delà (fraction d'image/s), prior rue, le résidu ou le fond est franc (bande morte au-dessus de l'arrêt). */
     const val LATERAL_RATIO = 0.03f
 
-    /** Confiance minimale du fond, reprise de `Shift.TRUST_MIN` : en dessous, le fond est plat ou flou. */
+    /** Confiance minimale du fond, prior rue repris de `Shift.TRUST_MIN` : en dessous, le fond est plat ou flou. */
     const val TRUST_MIN = 0.12f
 
     /**
@@ -140,6 +141,20 @@ object VehicleBackground {
         val ground = hypot(global.dx / lumaWidth / dtSeconds, global.dy / lumaHeight / dtSeconds) +
             abs(global.scale - 1f) / dtSeconds
         return ground.takeIf { it.isFinite() }
+    }
+
+    /**
+     * Arrêt prouvé d'une piste : [speed01ps] la dérive du centre (fractions
+     * d'image/s, magnitude positive) sous [STILL_SPEED] et [confidence] la
+     * confiance du fond au-dessus de [TRUST_MIN]. Le doute (valeur non finie
+     * ou négative, fond plat) dit faux : jamais d'arrêt inventé. Prior rue,
+     * consommé par `VehicleStateWatcher` (autre module) pour l'arrêt mesuré.
+     */
+    fun isStatic(speed01ps: Float, confidence: Float): Boolean {
+        if (!speed01ps.isFinite() || !confidence.isFinite()) return false
+        if (speed01ps < 0f) return false
+        if (confidence < TRUST_MIN) return false
+        return speed01ps <= STILL_SPEED
     }
 
     /** Résidu franc = le véhicule roule ; résidu nul + fond franc = la caméra ; sinon doute ou arrêt. */

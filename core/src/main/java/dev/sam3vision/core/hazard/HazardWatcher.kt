@@ -24,8 +24,10 @@ data class HazardSignal(
 
         /**
          * Signal des lectures affinées : un label [HazardConcepts] dans le
-         * couloir ([PositionText.SIDE_EDGE]), mesuré sous le seuil. Le plus
-         * proche gagne ; boîte illisible ou dimensions nulles = ignoré.
+         * couloir ([PositionText.SIDE_EDGE]) — plein axe pour un poteau
+         * imminent ([HazardWatcher.POLE_FAST_METERS], le proche percute
+         * même au bord du cadre) — mesuré sous le seuil. Le plus proche
+         * gagne ; boîte illisible ou dimensions nulles = ignoré.
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): HazardSignal {
             if (frameW <= 0 || frameH <= 0) return none()
@@ -45,13 +47,16 @@ data class HazardSignal(
         private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
             if (!HazardConcepts.isHazard(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
-            val limit = if (HazardConcepts.isPole(reading.label)) HazardWatcher.POLE_METERS
+            val pole = HazardConcepts.isPole(reading.label)
+            val limit = if (pole) HazardWatcher.POLE_METERS
             else HazardWatcher.HAZARD_METERS
             if (meters > limit) return null
             val box = reading.box
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
-            if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
+            // Poteau imminent : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
+            val nearPole = pole && meters <= HazardWatcher.POLE_FAST_METERS
+            if (!nearPole && (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE)) return null
             return Hit(meters, reading.label, centerX)
         }
     }
@@ -61,7 +66,7 @@ data class HazardSignal(
  * Ordre d'annonce « attention … » : [phrase] dans la langue de la voix,
  * [meters] la distance du signal qui l'a déclenché (journal, réglages),
  * [urgent] pour le seul poteau imminent (coupe la voix, sauf P1/P2 en cours —
- * voir `ProbeWiring.shouldCutForHazard`).
+ * voir `ProbeWiring.shouldCutForHazard`) — à honorer même en Traversée (P3 parle quand même).
  */
 data class HazardCue(
     val phrase: String,
@@ -119,20 +124,24 @@ object HazardText {
 
 /**
  * Lissage temporel du [HazardSignal], miroir de `StairWatcher` : un positif
- * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs, puis
- * silence pendant [cooldownMs] (le mobilier ne bouge pas).
+ * isolé ne parle pas, il faut [confirmFrames] positifs sur les
+ * [CONFIRM_WINDOW] dernières frames (2/3 : les poteaux intermittents
+ * parlent), puis silence ([poleCooldownMs] pour un poteau, [cooldownMs]
+ * sinon — le mobilier ne bouge pas).
  *
  * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence) ;
  * le poteau imminent (à [POLE_FAST_METERS] ou moins) sort urgent : il coupe,
- * sauf P1/P2 en cours (voir `ProbeWiring`). Le poteau dit aussi comment
-* l'éviter ([HazardText.polePhrase]), doux comme imminent.
+ * sauf P1/P2 en cours (voir `ProbeWiring`) — et l'urgent reste à honorer
+ * même en Traversée (P3 parle quand même, câblage `observeHazard` à ouvrir).
+ * Le poteau dit aussi comment l'éviter ([HazardText.polePhrase]), doux comme imminent.
  */
 class HazardWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
     private val cooldownMs: Long = DEFAULT_COOLDOWN_MS,
+    private val poleCooldownMs: Long = DEFAULT_POLE_COOLDOWN_MS,
 ) {
-    /** Positifs consécutifs en cours (un négatif remet à zéro). */
-    private var hits: Int = 0
+    /** Positifs des dernières frames ([CONFIRM_WINDOW] au plus : 2/3 confirment). */
+    private val window: ArrayDeque<Boolean> = ArrayDeque()
 
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
@@ -161,11 +170,11 @@ class HazardWatcher(
             if (poleQuiet >= POLE_REARM_FRAMES) poleSpoken = false
         }
         if (!signal.detected || name == null) {
-            hits = 0
+            pushWindow(false)
             return null
         }
         if (pole && poleSpoken) {
-            hits = 0
+            window.clear()
             return null
         }
         val meters = signal.meters
@@ -173,14 +182,15 @@ class HazardWatcher(
             poleSpoken = true
             poleQuiet = 0
             lastCueAtMs = nowMs
-            hits = 0
+            window.clear()
             return HazardCue(HazardText.polePhrase(name, language, signal.centerX), meters, urgent = true)
         }
-        hits++
-        if (hits < confirmFrames) return null
-        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
+        pushWindow(true)
+        if (window.count { it } < confirmFrames.coerceIn(1, CONFIRM_WINDOW)) return null
+        val cool = if (pole) poleCooldownMs else cooldownMs
+        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cool) return null
         lastCueAtMs = nowMs
-        hits = 0
+        window.clear()
         if (pole) {
             poleSpoken = true
             poleQuiet = 0
@@ -190,20 +200,32 @@ class HazardWatcher(
         return HazardCue(text, signal.meters)
     }
 
+    /** Pousse [positive] dans la fenêtre ([CONFIRM_WINDOW] dernières frames au plus). */
+    private fun pushWindow(positive: Boolean) {
+        window.addLast(positive)
+        while (window.size > CONFIRM_WINDOW) window.removeFirst()
+    }
+
     /** Oublie le compte et l'annonce (nouvelle séance de direct). */
     fun reset() {
-        hits = 0
+        window.clear()
         lastCueAtMs = NO_INSTANT
         poleSpoken = false
         poleQuiet = 0
     }
 
     companion object {
-        /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
+        /** Positifs requis sur la fenêtre [CONFIRM_WINDOW] avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
+
+        /** Fenêtre de confirmation : les dernières frames comptées (2/3 confirment). */
+        const val CONFIRM_WINDOW = 3
 
         /** Silence entre deux annonces (le mobilier ne bouge pas). */
         const val DEFAULT_COOLDOWN_MS = 10_000L
+
+        /** Silence entre deux annonces de poteau (4 s : le marcheur avance, un poteau en cache un autre). */
+        const val DEFAULT_POLE_COOLDOWN_MS = 4_000L
 
         /** Au-delà de cette distance (m), le mobilier ne fait pas parler. */
         const val HAZARD_METERS = 3f

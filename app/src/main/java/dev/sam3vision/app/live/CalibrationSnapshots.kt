@@ -2,6 +2,7 @@ package dev.sam3vision.app.live
 
 import android.content.Context
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.model.Detection
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,10 +73,52 @@ object CalibrationSnapshots {
 }
 
 /**
+ * Esquisse d'étalonnage automatique (non câblée) : une visée mûre — fraîche et
+ * assez grande pour une tolérance honnête — est proposée telle quelle, sans
+ * rien résoudre ici. Le solveur réclame une taille et une distance d'aide
+ * dignes de foi (pas d'hypothèse « adulte à 2 m » : un faux 1,75 m biaise
+ * toutes les distances) ; le déclenchement (sonde/direct), la source de
+ * confiance et l'écriture Réglages vivent hors de ce fichier.
+ */
+object AutoCalibration {
+
+    /**
+     * Boîte minimale d'une proposition auto (100 px) : en dessous, ±1 px de
+     * quantification seul vaut déjà ±1° — un auto qui calibre flou vaut moins
+     * qu'un guidé qui fait viser grand.
+     */
+    const val MIN_AUTO_BOX_PX = 100f
+
+    /**
+     * Visée mûre pour un solve auto à [nowMs], `null` sinon (périmée ou trop
+     * petite). La taille et la distance de l'aide restent à fournir par
+     * l'appelant — jamais devinées (voir [CalibrationSolver]).
+     */
+    fun propose(snap: CalibrationSnap?, nowMs: Long): CalibrationSnap? {
+        if (!CalibrationSnapshots.isFresh(snap, nowMs)) return null
+        if (snap == null || !snap.boxHeightPx.isFinite() || snap.boxHeightPx < MIN_AUTO_BOX_PX) return null
+        return snap
+    }
+}
+
+/**
+ * Étalonnage mesuré persisté : le champ résolu, son incertitude et sa date —
+ * l'état que les Réglages affichent (« mesuré 67,2° ±0,5°, il y a 3 j ») au
+ * lieu d'un simple témoin.
+ */
+data class SavedCalibration(
+    val fovDeg: Float,
+    val toleranceDeg: Float,
+    val atMs: Long,
+)
+
+/**
  * Témoin d'étalonnage persisté : vrai quand le champ des Réglages vient d'une
  * mesure (solveur), faux quand il est saisi à la main ou effacé — à côté de la
  * valeur, dans ses propres prefs (comme `CameraHeightStore`, pas dans `Settings`
- * dont le codec chiffré a sa parité à garder).
+ * dont le codec chiffré a sa parité à garder). La mesure elle-même (champ,
+ * tolérance, date) est persistée avec ([saveCalibration]) : « jamais calibré »
+ * se distingue d'« étalonnage effacé », et l'âge s'alerte.
  */
 class CalibrationStore(context: Context) {
 
@@ -84,13 +127,57 @@ class CalibrationStore(context: Context) {
     /** Le champ courant a-t-il été mesuré (plutôt que saisi) ? */
     fun isCalibrated(): Boolean = prefs.getBoolean(KEY, false)
 
-    /** Mémorise la provenance du champ courant. */
+    /**
+     * Mémorise la provenance du champ courant. `false` (saisie manuelle,
+     * effacement) oublie aussi la mesure persistée : un champ tapé à la main
+     * n'est plus « mesuré 67,2° ±0,5° ».
+     */
     fun setCalibrated(done: Boolean) {
-        prefs.edit().putBoolean(KEY, done).apply()
+        if (done) {
+            prefs.edit().putBoolean(KEY, true).apply()
+        } else {
+            prefs.edit().remove(KEY).remove(KEY_FOV).remove(KEY_TOLERANCE).remove(KEY_AT).apply()
+        }
+    }
+
+    /** Persiste la mesure du solveur (champ + tolérance + date) et lève le témoin. */
+    fun saveCalibration(fovDeg: Float, toleranceDeg: Float, atMs: Long = System.currentTimeMillis()) {
+        prefs.edit()
+            .putBoolean(KEY, true)
+            .putFloat(KEY_FOV, fovDeg)
+            .putFloat(KEY_TOLERANCE, toleranceDeg)
+            .putLong(KEY_AT, atMs)
+            .apply()
+    }
+
+    /** Dernière mesure persistée, `null` si jamais calibré, effacé ou illisible. */
+    fun lastCalibration(): SavedCalibration? {
+        if (!prefs.getBoolean(KEY, false)) return null
+        val fov = prefs.getFloat(KEY_FOV, Float.NaN)
+        val tolerance = prefs.getFloat(KEY_TOLERANCE, Float.NaN)
+        val at = prefs.getLong(KEY_AT, 0L)
+        if (!fov.isFinite() || fov !in LensSpec.FOV_MIN..LensSpec.FOV_MAX) return null
+        if (!tolerance.isFinite() || tolerance < 0f) return null
+        if (at <= 0L) return null
+        return SavedCalibration(fov, tolerance, at)
+    }
+
+    /**
+     * Âge de la mesure à [nowMs], `null` si jamais calibré : l'appelant alerte
+     * (« jamais calibré : les distances tournent au capteur/repli ») au lieu
+     * de mesurer en silence sur un champ par défaut.
+     */
+    fun calibrationAgeMs(nowMs: Long): Long? {
+        val at = lastCalibration()?.atMs ?: return null
+        val age = nowMs - at
+        return if (age >= 0L) age else null
     }
 
     private companion object {
         const val PREFS = "calibration"
         const val KEY = "fovCalibrated"
+        const val KEY_FOV = "fovDeg"
+        const val KEY_TOLERANCE = "fovToleranceDeg"
+        const val KEY_AT = "calibratedAtMs"
     }
 }

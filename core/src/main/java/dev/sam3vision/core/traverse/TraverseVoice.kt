@@ -37,6 +37,20 @@ object TraversePhrases {
     const val LANGUAGE_PREFIX = "en"
 }
 
+/**
+ * Phrase « voiture garée » du mode traversée, FR/EN comme les états moteurs
+ * ([VehicleStateText.stoppedPhrase]) : « Voiture garée, à 2 mètres. » /
+ * « Parked car, 2 meters away. » — la distance au mètre entier quand elle est
+ * mesurée, l'heure du cadran sinon (jamais d'heure devinée sans géométrie).
+ * Paramétrée par la distance : elle ne préchauffe pas ([TraversePhrases] reste
+ * la liste fermée des clips hors-ligne) et part en synthèse réseau.
+ */
+object TraverseParkedText {
+    /** « Voiture en stationnement… » : même source que le guetteur, nom voiture seul. */
+    fun parkedPhrase(meters: Float?, centerX: Float?, language: SpeechLanguage): String =
+        VehicleStateText.parkedPhrase(VehicleStateText.VehicleName("Voiture", "Car"), meters, centerX, language)
+}
+
 /** Où la phrase a été jouée — ou pourquoi elle ne l'a pas été. */
 enum class TraverseVoiceOutcome {
     /** Synthèse ElevenLabs jouée (lecteur préempté si la phrase était urgente). */
@@ -45,7 +59,10 @@ enum class TraverseVoiceOutcome {
     /** Clip hors-ligne du cache local joué (ElevenLabs en échec ou absent). */
     OFFLINE,
 
-    /** Phrase non urgente tue : le lecteur parlait déjà (une verte ne couvre jamais une rouge). */
+    /** Phrase non urgente gardée (lecteur occupé) : dite au silence, la plus fraîche seule. */
+    QUEUED,
+
+    /** Doublon : la phrase est déjà en file — on ne la garde pas deux fois. */
     SKIPPED_BUSY,
 
     /** Rien de jouable : ni réseau, ni clip en cache (ou texte vide). */
@@ -120,9 +137,12 @@ interface TraverseClipStore {
  * `urgent = true`) :
  * - **urgente** — [TraversePlayer.stop] (préemption de la verte en cours) puis
  *   lecture immédiate : ElevenLabs d'abord, clip hors-ligne en repli. Jamais tue
- *   pour cause de lecteur occupé : le `stop` l'a libéré avant.
- * - **non urgente** — tue ([TraverseVoiceOutcome.SKIPPED_BUSY]) si le lecteur
- *   parle déjà, sinon même chaîne ElevenLabs puis cache.
+ *   pour cause de lecteur occupé : le `stop` l'a libéré avant. La file est jetée
+ *   (un ordre nouveau périme le précédent — jamais de « traversez » après coup).
+ * - **non urgente** — gardée ([TraverseVoiceOutcome.QUEUED], doublon
+ *   [TraverseVoiceOutcome.SKIPPED_BUSY]) si le lecteur parle déjà (file courte :
+ *   une seule, la plus fraîche — miroir `ProximityVoice`), dite au silence avant
+ *   la phrase courante, sinon même chaîne ElevenLabs puis cache.
  *
  * Hors-ligne ([prewarm], au premier lancement) : chaque phrase EN est rendue une
  * fois par le TTS système dans le cache local, et la langue effective du moteur
@@ -138,10 +158,17 @@ class TraverseVoice(
     private val store: TraverseClipStore,
 ) {
     /**
+     * Phrase douce gardée (file courte : une seule, la plus fraîche), `null` si aucune.
+     */
+    private var pending: String? = null
+
+    /**
      * Pré-génère les phrases EN via le TTS système. À appeler au premier
      * lancement ; les appels suivants ne coûtent qu'une vérification de présence.
+     * Vide aussi la file (nouvelle session : un ordre gardé ne survit pas à l'activation).
      */
     suspend fun prewarm(phrases: List<String> = TraversePhrases.ALL): TraversePrewarm {
+        pending = null
         var ready = 0
         var generated = 0
         val missing = mutableListOf<String>()
@@ -158,20 +185,45 @@ class TraverseVoice(
     }
 
     /**
-     * Prononce [phrase] : [urgent] `= true` préempte et joue toujours (la rouge),
-     * `false` se tait si le lecteur est occupé (la verte). Chaîne audio dans les
-     * deux cas : ElevenLabs, puis clip hors-ligne en repli automatique.
+     * Prononce [phrase] : [urgent] `= true` préempte et joue toujours (la rouge,
+     * la file est jetée — un ordre nouveau périme le précédent),
+     * `false` se garde si le lecteur est occupé ([TraverseVoiceOutcome.QUEUED],
+     * doublon [TraverseVoiceOutcome.SKIPPED_BUSY]) et se dit au silence avant la
+     * phrase courante. Chaîne audio dans tous les cas : ElevenLabs, puis clip
+     * hors-ligne en repli automatique.
      */
     suspend fun speak(phrase: String, urgent: Boolean): TraverseVoiceOutcome {
         if (phrase.isBlank()) return TraverseVoiceOutcome.UNAVAILABLE
         if (urgent) {
+            pending = null
             player.stop()
         } else if (player.isBusy) {
-            return TraverseVoiceOutcome.SKIPPED_BUSY
+            if (phrase == pending) return TraverseVoiceOutcome.SKIPPED_BUSY
+            pending = phrase
+            return TraverseVoiceOutcome.QUEUED
+        } else {
+            drainPending(phrase)
         }
         if (playPrimary(phrase)) return TraverseVoiceOutcome.PRIMARY
         if (playOffline(phrase)) return TraverseVoiceOutcome.OFFLINE
         return TraverseVoiceOutcome.UNAVAILABLE
+    }
+
+    /**
+     * Dit la phrase gardée avant [phrase] (au silence : l'appelant est libre) —
+     * sauf doublon (la lecture courante la dit déjà). Chaîne audio identique,
+     * résultat ignoré : la phrase courante suit dans tous les cas.
+     */
+    private suspend fun drainPending(phrase: String) {
+        val due = pending
+        pending = null
+        if (due != null && due != phrase) playKept(due)
+    }
+
+    /** Dit une phrase gardée (ElevenLabs puis cache, comme la courante). */
+    private suspend fun playKept(due: String) {
+        if (playPrimary(due)) return
+        playOffline(due)
     }
 
     /** Synthèse ElevenLabs puis lecture ; `false` sur erreur réseau, clé absente ou lecture ratée. */

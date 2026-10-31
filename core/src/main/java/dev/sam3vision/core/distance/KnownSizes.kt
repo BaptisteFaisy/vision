@@ -37,7 +37,11 @@ object KnownSizes {
         if (key.isEmpty()) return null
         TABLE[key]?.let { return it }
         if (key.endsWith("s") && key.length > 3) TABLE[key.dropLast(1)]?.let { return it }
-        return FIRST_WORD[key.substringBefore(' ')]?.takeIf { key.contains(' ') }
+        if (!key.contains(' ')) return null
+        // Tête du composé : premier mot en français (« sac à dos » → « sac »),
+        // dernier en anglais (« a traffic sign » → « sign ») — voir FIRST_WORD.
+        FIRST_WORD[key.substringBefore(' ')]?.let { return it }
+        return FIRST_WORD[key.substringAfterLast(' ')]
     }
 
     /**
@@ -52,7 +56,10 @@ object KnownSizes {
         if (key.isEmpty()) return DEFAULT_TOLERANCE
         TOLERANCE[key]?.let { return it }
         if (key.endsWith("s") && key.length > 3) TOLERANCE[key.dropLast(1)]?.let { return it }
-        if (key.contains(' ')) FIRST_WORD_TOLERANCE[key.substringBefore(' ')]?.let { return it }
+        if (key.contains(' ')) {
+            FIRST_WORD_TOLERANCE[key.substringBefore(' ')]?.let { return it }
+            FIRST_WORD_TOLERANCE[key.substringAfterLast(' ')]?.let { return it }
+        }
         return DEFAULT_TOLERANCE
     }
 
@@ -101,8 +108,8 @@ object KnownSizes {
         "bureau" to 0.75f, "desk" to 0.75f, "armoire" to 1.90f, "cupboard" to 1.90f,
         // Architecture et rue
         "porte" to 2.05f, "door" to 2.05f, "fenetre" to 1.30f, "window" to 1.30f,
-        "mur" to 2.50f, "wall" to 2.50f, "panneau" to 2.20f, "sign" to 2.20f,
-        "lampadaire" to 5.00f, "poubelle" to 0.90f, "bin" to 0.90f,
+        "mur" to 2.50f, "wall" to 2.50f, "panneau" to 2.20f, "sign" to 2.20f, "traffic sign" to 2.20f,
+        "lampadaire" to 5.00f, "street lamp" to 5.00f, "poubelle" to 0.90f, "bin" to 0.90f,
         "trash can" to 0.90f, "benne" to 1.50f, "dumpster" to 1.50f,
         // Barrière de chantier type Vauban ≈ 1 m (glissière 0,75 m : ordre de grandeur).
         "barriere" to 1.00f, "barrier" to 1.00f,
@@ -149,7 +156,7 @@ object KnownSizes {
         "velo" to 0.10f, "bicycle" to 0.10f, "bike" to 0.10f,
         "chaise" to 0.10f, "chair" to 0.10f, "table" to 0.10f,
         "porte" to 0.03f, "door" to 0.03f, "mur" to 0.20f, "wall" to 0.20f,
-        "panneau" to 0.25f, "sign" to 0.25f, "arbre" to 0.30f, "tree" to 0.30f,
+        "panneau" to 0.25f, "sign" to 0.25f, "traffic sign" to 0.25f, "arbre" to 0.30f, "tree" to 0.30f,
         "borne" to 0.20f, "bollard" to 0.20f, "plot" to 0.20f, "potelet" to 0.20f,
         "cloture" to 0.25f, "fence" to 0.25f, "grillage" to 0.25f,
         "bouteille" to 0.20f, "bottle" to 0.20f, "verre" to 0.20f, "glass" to 0.20f,
@@ -159,7 +166,9 @@ object KnownSizes {
     /**
      * Défauts du direct volontairement sans hauteur (voir le KDoc de classe) :
      * leur distance vient de la profondeur ou du plan de sol. Clés canoniques
-     * anglaises (voir [canonical]).
+     * anglaises (voir [canonical]). « pole » y reste même depuis que
+     * « street lamp » est calibré (5 m) : un lampadaire a une hauteur
+     * typique, un poteau quelconque non (borne 1 m, pylône 10 m).
      */
     val DEPTH_ONLY: Set<String> = setOf(
         "stairs", "sidewalk", "crosswalk", "pole", "traffic light", "curb",
@@ -173,9 +182,12 @@ object KnownSizes {
         "souvenir shop", "beanie", "socks",
     )
 
-    /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
+    /**
+     * Repli par tête du composé : premier mot (français, « sac à dos » trouve
+     * « sac ») puis dernier (anglais, « a traffic sign » trouve « sign »).
+     */
     private val FIRST_WORD: Map<String, Float> = TABLE
 
-    /** Même repli pour les tolérances : « clôture grillagée » trouve « clôture ». */
+    /** Même repli pour les tolérances, premier mot puis dernier. */
     private val FIRST_WORD_TOLERANCE: Map<String, Float> = TOLERANCE
 }

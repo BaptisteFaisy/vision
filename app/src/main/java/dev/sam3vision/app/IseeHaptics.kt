@@ -22,11 +22,12 @@ class IseeHaptics(context: Context) {
     /** Relâchement : queue de 200 ms. */
     fun holdEnd() = motor.release()
 
-    /** Traversée : le nouvel état confirmé du feu se sent (vert = double salve, rouge = créneau long). */
+    /** Traversée : le nouvel état confirmé du feu se sent (vert = double salve, rouge = créneau long, doute = créneau long : le doute attend comme le rouge). */
     fun crossing(state: dev.sam3vision.core.crossing.CrossingState) {
         val wave = when (state) {
             dev.sam3vision.core.crossing.CrossingState.Green -> HapticPattern.crossingGreen()
-            dev.sam3vision.core.crossing.CrossingState.Red -> HapticPattern.crossingRed()
+            dev.sam3vision.core.crossing.CrossingState.Red,
+            dev.sam3vision.core.crossing.CrossingState.Unknown -> HapticPattern.crossingRed()
         }
         motor.play(wave)
     }

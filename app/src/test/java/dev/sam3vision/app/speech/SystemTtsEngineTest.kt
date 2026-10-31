@@ -126,6 +126,40 @@ class SystemTtsEngineTest {
     }
 
     @Test
+    fun `tampon rejoue a l init dans l ordre puis vide`() {
+        val buffer = TtsInitBuffer()
+        buffer.add("Un.", flush = false, Locale.FRENCH, 1f)
+        buffer.add("Deux.", flush = false, Locale.FRENCH, 1f)
+
+        val replayed = buffer.drain()
+
+        assertEquals(listOf("Un.", "Deux."), replayed.map { it.text })
+        assertEquals(0, buffer.size)
+        assertTrue(buffer.drain().isEmpty())
+
+        buffer.add("Trois.", flush = false, Locale.FRENCH, 1f)
+        buffer.clear()
+        assertEquals(0, buffer.size)
+    }
+
+    @Test
+    fun `urgente vide le tampon, debordement jette les vieilles`() {
+        val buffer = TtsInitBuffer(max = 2)
+        buffer.add("Un.", flush = false, Locale.FRENCH, 1f)
+        buffer.add("Deux.", flush = false, Locale.FRENCH, 1f)
+        buffer.add("Trois.", flush = false, Locale.FRENCH, 1f)
+
+        assertEquals(listOf("Deux.", "Trois."), buffer.drain().map { it.text })
+
+        buffer.add("Quatre.", flush = false, Locale.FRENCH, 1f)
+        buffer.add("Stop.", flush = true, Locale.FRENCH, 1f)
+
+        val replayed = buffer.drain()
+        assertEquals(listOf("Stop."), replayed.map { it.text })
+        assertTrue(replayed.single().flush)
+    }
+
+    @Test
     fun `langue de la voix vers locale du moteur`() {
         assertEquals(Locale.FRENCH, SystemTtsEngine.localeOf(SpeechLanguage.Fr))
         assertEquals(Locale.ENGLISH, SystemTtsEngine.localeOf(SpeechLanguage.En))

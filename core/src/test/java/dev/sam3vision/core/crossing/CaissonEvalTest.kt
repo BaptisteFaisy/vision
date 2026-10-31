@@ -6,20 +6,23 @@ import org.junit.Test
 
 /**
  * Éval JVM détection→verdict sur caissons type SAM + rappel petits objets
- * versionné (`feuxevel/RECALL-v1.json`).
+ * versionné (`feuxevel/RECALL-v2.json`).
  *
  * Les 6 cas `green-h*` balayent la taille du caisson (64 → 8 px de haut) :
  * rappel piné 0/6 — l'écart de domaine connu (boîte SAM = caisson, porte
  * calibrée lampe, `docs/MESURES-SAM3-FEUX.md` §6), pas une régression. Les
  * cas `real-*` prouvent que la chaîne rend du vert sur de vrais crops.
+ * V2 (31/10) : zone grise — les refus de porte et feuilles fragiles doutent
+ * (Unknown) au lieu de forcer rouge, le rouge franc reste rouge ; le rappel
+ * ne compte que les verts.
  * Joue dans `:core:testDebugUnitTest` (CI existante, aucun workflow ajouté).
  */
 class CaissonEvalTest {
 
     @Test
-    fun `la chaine detection-verdict suit le dore v1`() {
+    fun `la chaine detection-verdict suit le dore v2`() {
         val golden = loadGolden(javaClass.classLoader)
-        assertEquals("version du doré", 1, golden.version)
+        assertEquals("version du doré", 2, golden.version)
         val cases = evalCases(javaClass.classLoader)
         assertEquals("cas dorés", golden.verdicts.keys.sorted(), cases.map { it.id }.sorted())
         for (c in cases) {
@@ -28,7 +31,7 @@ class CaissonEvalTest {
     }
 
     @Test
-    fun `le rappel petits objets vaut le dore v1`() {
+    fun `le rappel petits objets vaut le dore v2`() {
         val cases = evalCases(javaClass.classLoader)
         val verdicts = cases.associate { it.id to runChain(it) }
         val golden = loadGolden(javaClass.classLoader)
@@ -46,12 +49,12 @@ class CaissonEvalTest {
     }
 
     @Test
-    fun `aucun vert sur les cas non verts`() {
-        for (c in evalCases(javaClass.classLoader)) {
-            if (c.truth == CrossingState.Red) {
-                assertEquals("${c.id} : jamais vert", CrossingState.Red, runChain(c))
-            }
-        }
+    fun `pas de vert sur les cas non verts, rouge franc ou doute`() {
+        val verdicts = evalCases(javaClass.classLoader).associate { it.id to runChain(it) }
+        assertEquals(CrossingState.Red, verdicts["red-h32"])
+        assertEquals(CrossingState.Red, verdicts["real-red"])
+        assertEquals(CrossingState.Red, verdicts["car-disc"])
+        assertEquals(CrossingState.Unknown, verdicts["off-h32"])
     }
 
     @Test

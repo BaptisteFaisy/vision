@@ -146,6 +146,15 @@ class LiveProbeTextTest {
             liveProbeNotice(LiveProbeState(error = "GPU SAM éteint — demande à b de l'allumer")),
         )
     }
+    @Test
+    fun `reveil affiche le delai de session et refus compteur`() {
+        assertEquals(
+            "waking the SAM GPU… (up to 60 s)",
+            liveProbeNotice(LiveProbeState(warming = true, timeoutSec = 60)),
+        )
+        assertTrue(liveProbeDetails(LiveProbeState(skippedFrames = 3)).contains("skipped: 3 refused"))
+        assertTrue(liveProbeDetails(LiveProbeState()).none { it.startsWith("skipped:") })
+    }
 
     @Test
     fun `des qu_une frame est analysee le message disparait`() {

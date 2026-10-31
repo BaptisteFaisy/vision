@@ -65,6 +65,27 @@ private class FakeTrackClient(
 class TrackRunnerTest {
 
     @Test
+    fun `par defaut la session rouvre au bout d_une seconde`() = runBlocking {
+        val client = FakeTrackClient()
+        var now = 0L
+        val runner = TrackRunner(client, clock = { now })
+        assertEquals(1_000L, TrackRunner.DEFAULT_REKEY_MS)
+        runner.start(listOf("person"), "SUVL").getOrThrow()
+
+        now = 500L
+        runner.frameOf("QUJD")
+        assertEquals(listOf("start:person", "frame:s1"), client.calls)
+
+        now = 1_000L
+        client.startResult = Result.success(TrackSessionStart("s2", 640, 480, listOf(tracked(2))))
+        val frame = runner.frameOf("QUJD")
+
+        assertEquals("s2", runner.sessionId)
+        assertEquals(2, frame.objects.single().id)
+        assertEquals(listOf("start:person", "frame:s1", "start:person", "close:s1"), client.calls)
+    }
+
+    @Test
     fun `start ouvre la session avec des prompts normalises`() = runBlocking {
         val client = FakeTrackClient()
         val runner = TrackRunner(client)

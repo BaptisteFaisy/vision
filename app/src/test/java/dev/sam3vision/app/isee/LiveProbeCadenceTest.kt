@@ -2,6 +2,8 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.live.FrameGate
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.MASK_ENCODING_NONE
+import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.net.LiveClient
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +29,77 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LiveProbeCadenceTest {
 
+    @Test
+    fun `avec detections la frame suivante saute l_echeance`() = runTest {
+        val journal = mutableListOf<String>()
+        val fake = ProbeTestClient(journal)
+        val probe = LiveProbe(
+            scope = this,
+            clock = clock,
+            background = StandardTestDispatcher(testScheduler),
+            clientFor = { _, _, marks -> fake.also { it.marks = marks } },
+        )
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
+        probe.configure(ENDPOINT)
+        probe.begin()
+        // Chauffe : la session chaude est active, puis le backend ralentit (900 ms).
+        probe.onFrame("A0", captureAtNs = 1_000_000L)
+        advanceUntilIdle()
+        fake.respond("A0", frame())
+        advanceUntilIdle()
+        val session = probe.session ?: error("session chaude attendue")
+        repeat(3) { session.stats.record(10_000L) }
+        probe.onFrame("A", captureAtNs = 2_000_000L)
+        advanceUntilIdle()
+        assertEquals(2, fake.sent)
+        fake.respond("A", LiveFrame(width = 512, height = 1138, elapsedMs = 100L, objects = listOf(personne())))
+        advanceUntilIdle()
+        assertEquals(1, probe.state.value.objects)
+        // Échéance fermée (900 ms) mais détections à l'écran : B part quand même.
+        probe.onFrame("B", captureAtNs = 3_000_000L)
+        advanceUntilIdle()
+        assertEquals("priorité aux frames avec détection", 3, fake.sent)
+        fake.respond("B", frame())
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `par defaut le scheduler retient la deuxieme frame rapprochee`() = runTest {
+        val journal = mutableListOf<String>()
+        val fake = BlockingClient(journal)
+        val probe = LiveProbe(
+            scope = this,
+            clock = clock,
+            background = StandardTestDispatcher(testScheduler),
+            clientFor = { _, _, _ -> fake },
+        )
+        probe.configure(ENDPOINT)
+        probe.begin()
+
+        at(0)
+        probe.onFrame("A", captureAtNs = 1_000_000L)
+        advanceUntilIdle()
+        assertEquals(1, fake.sent)
+        probe.onFrame("B", captureAtNs = 2_000_000L)
+        advanceUntilIdle()
+        assertEquals("keyframe en vol : B retenue, pas envoyée", 1, fake.sent)
+
+        at(40)
+        fake.release(frame())
+        advanceUntilIdle()
+        assertEquals("B retenue ne part pas au drain", 1, fake.sent)
+        assertEquals("seule A est publiée", 1, probe.state.value.frames)
+    }
+
+    /** Personne au centre, sans masque (inutile à la priorité, aucun Android à moquer). */
+    private fun personne() = SegObject(
+        label = "person",
+        score = 0.9f,
+        box = listOf(206f, 400f, 306f, 900f),
+        maskPngB64 = "",
+        maskEncoding = MASK_ENCODING_NONE,
+    )
+
     /** Horloge monotone pilotée (ns), comme `imageInfo.timestamp`. */
     private var ns = 0L
     private val clock: () -> Long get() = { ns }
@@ -39,7 +112,7 @@ class LiveProbeCadenceTest {
     private fun frame() = LiveFrame(width = 512, height = 1138, elapsedMs = 100L, objects = emptyList())
 
     @Test
-    fun `quatre frames pendant un aller-retour, une seule part, la plus recente`() = runTest {
+    fun `cinq frames pendant deux vols, les fraiches partent, la plus recente gagne`() = runTest {
         val journal = mutableListOf<String>()
         val fake = BlockingClient(journal)
         val probe = probe(this, fake)
@@ -48,22 +121,27 @@ class LiveProbeCadenceTest {
         probe.onFrame("A", captureAtNs = 1_000_000L)
         advanceUntilIdle()
         assertEquals("A part aussitôt", 1, fake.sent)
-        assertTrue("créneau pris : la caméra peut préparer une réserve", probe.wantsFrame())
+        assertTrue("créneau libre : la caméra peut envoyer", probe.wantsFrame())
 
         probe.onFrame("B", captureAtNs = 2_000_000L)
-        assertFalse("réserve pleine : plus aucune conversion à payer", probe.wantsFrame())
-        probe.onFrame("C", captureAtNs = 3_000_000L)
-        probe.onFrame("D", captureAtNs = 4_000_000L)
         advanceUntilIdle()
-        assertEquals("rien n'est envoyé pendant le vol de A", 1, fake.sent)
+        assertEquals("deuxième créneau : B part aussitôt", 2, fake.sent)
+        assertTrue("saturé, réserve vide : la caméra prépare la suivante", probe.wantsFrame())
+        probe.onFrame("C", captureAtNs = 3_000_000L)
+        assertFalse("réserve pleine : plus aucune conversion à payer", probe.wantsFrame())
+        probe.onFrame("D", captureAtNs = 4_000_000L)
+        probe.onFrame("E", captureAtNs = 5_000_000L)
+        advanceUntilIdle()
+        assertEquals("rien n'est envoyé pendant les vols", 2, fake.sent)
 
         at(40)
         fake.release(frame())
         advanceUntilIdle()
 
-        assertEquals("A puis UNE seule frame : jamais trois ni quatre", 2, fake.sent)
-        assertEquals("la plus récente gagne, les autres sont jetées", listOf("A", "D"), journal)
-        assertEquals("les deux frames sont publiées", 2, probe.state.value.frames)
+        assertEquals("A, B puis UNE seule frame : jamais quatre ni cinq", 3, fake.sent)
+        assertEquals("la plus récente gagne, les autres sont jetées", listOf("A", "B", "E"), journal)
+        assertEquals("les trois frames sont publiées", 3, probe.state.value.frames)
+        assertEquals("le refus est compté, pas silencieux", 1L, probe.state.value.skippedFrames)
     }
 
     @Test
@@ -76,12 +154,15 @@ class LiveProbeCadenceTest {
         probe.onFrame("A", captureAtNs = 1_000_000L)
         advanceUntilIdle()
         probe.onFrame("B", captureAtNs = 2_000_000L)
+        probe.onFrame("C", captureAtNs = 3_000_000L)
+        advanceUntilIdle()
         probe.begin()
 
         at(40)
         fake.release(frame())
         advanceUntilIdle()
-        assertEquals("B datait d'avant : elle est jetée, pas renvoyée", 1, fake.sent)
+        assertEquals("C datait d'avant : elle est jetée, pas renvoyée", 2, fake.sent)
+        assertEquals(listOf("A", "B"), journal)
     }
 
     @Test
@@ -100,8 +181,9 @@ class LiveProbeCadenceTest {
     }
 
     /**
-     * Un seul créneau, décidé par `Cadence.Fast` : la sonde ne peut pas ouvrir deux vols
-     * à la fois, même si la caméra presse. Vérifié sur le régulateur lui-même.
+     * Le régulateur à un créneau refuse le second vol : même si la caméra presse,
+     * la suivante est jetée (l'unité de base — `Cadence.Fast` en ouvre deux,
+     * refermés à un si le backend sérialise). Vérifié sur le régulateur lui-même.
      */
     @Test
     fun `le gate d un creneau refuse la seconde frame en vol`() {
@@ -123,6 +205,8 @@ class LiveProbeCadenceTest {
         )
         built.configure(ENDPOINT)
         built.begin()
+        // Scheduler coupé : ce test verrouille la cadence, pas les keyframes (voir LiveAdaptiveTest).
+        built.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         return built
     }
 
@@ -153,12 +237,13 @@ class LiveProbeCadenceTest {
             return reply.await()
         }
 
-        /** Livre LA réponse : une seule frame doit être partie quand elle arrive. */
+        /** Livre LA réponse, partagée par les vols en cours (même analyse pour tous). */
         fun release(frame: LiveFrame) {
             reply.complete(Result.success(frame))
         }
 
+        /** `/health` négatif aussitôt : pas de réveil précoce (cadence seule, vols sur la froide), et la coroutine de réveil termine — un `/health` suspendu pendrait `runTest`. */
         override suspend fun health(): Result<LiveHealth> =
-            Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+            Result.success(LiveHealth(ok = false, model = "sam3.1", device = "cuda", gpu = "A100"))
     }
 }

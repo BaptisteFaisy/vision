@@ -35,8 +35,8 @@ object RiskZones {
     const val CRITICAL = 3
 
     /**
-     * Carte de risque 0–3 : seuls les obstacles et drop-offs sont des dangers
-     * (le plafond, label 4, n'en est pas un), côtés par leur profondeur.
+     * Carte de risque 0–3 : obstacles, drop-offs et plafonds sont des dangers, côtés par
+     * leur profondeur — les hauts de bus/camion (> 2 m, label 4) resteraient invisibles sinon.
      */
     fun compute(
         depthM: FloatArray,
@@ -48,7 +48,7 @@ object RiskZones {
         val risk = IntArray(width * height)
         if (depthM.size != risk.size || labels.size != risk.size) return risk
         for (i in risk.indices) {
-            if (labels[i] != SceneLabels.OBSTACLE && labels[i] != SceneLabels.DROPOFF) continue
+            if (labels[i] != SceneLabels.OBSTACLE && labels[i] != SceneLabels.DROPOFF && labels[i] != SceneLabels.CEILING) continue
             risk[i] = levelFor(depthM[i], config)
         }
         return risk

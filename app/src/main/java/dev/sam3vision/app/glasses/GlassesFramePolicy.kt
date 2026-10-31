@@ -57,11 +57,14 @@ internal fun scaledDimensions(
 internal data class CropRect(val x: Int, val y: Int, val width: Int, val height: Int)
 
 /**
- * Recadrage centré au format 16:9 paysage.
+ * Recadrage centré au format 16:9 paysage (hérité : voir [cropTo4x3]).
  *
  * Les lunettes livrent du portrait 9:16 (`VideoQuality.HIGH` = 720×1280 en production,
  * imposé par le SDK Meta : `StreamConfiguration` n'expose ni dimensions ni
- * orientation) ; le 16:9 part à l'API en coupant le haut et le bas (720×405 en production).
+ * orientation). En production, le 16:9 ne garde que 720×405 : 68 % de la hauteur
+ * coupée — le sol et l'horizon sont perdus. Ne plus utiliser : [cropTo4x3]
+ * (720×960) garde trois quarts de la hauteur ; bascule à faire dans
+ * `GlassesFrameConvert.cropToLandscape` (hors propriété de ce correctif).
  *
  * @return `null` quand l'image est déjà au 16:9 exact (rien à couper), quand
  *   ses dimensions sont inexploitables, ou quand le côté coupé tomberait à zéro
@@ -79,6 +82,43 @@ internal fun cropTo16x9(width: Int, height: Int): CropRect? {
         return CropRect(0, (height - cropped) / 2, width, cropped)
     }
     val cropped = tall / 9
+    if (cropped < 1) return null
+    return CropRect((width - cropped) / 2, 0, cropped, height)
+}
+
+/**
+ * Recadrage centré au format 4:3, **dans l'orientation de la source** : un portrait
+ * reste portrait (3:4), un paysage reste paysage (4:3) — le 16:9 paysage coupait 68 %
+ * de la hauteur du portrait des lunettes (720×405), le 4:3 n'en coupe que 25 %
+ * (720×960 : le sol et l'horizon survivent). L'API accepte tous les ratios et
+ * [scaledDimensions] borne déjà le grand côté : le recadrage ne sert qu'à alléger.
+ *
+ * @return `null` quand l'image est déjà au 4:3 exact de son orientation (rien à
+ *   couper), quand ses dimensions sont inexploitables, ou quand le côté coupé
+ *   tomberait à zéro (on garde l'image entière plutôt qu'un recadrage vide).
+ */
+internal fun cropTo4x3(width: Int, height: Int): CropRect? {
+    if (width <= 0 || height <= 0) return null
+    if (width >= height) {
+        // Paysage → 4:3 paysage (comparaison sans flottant, comme le 16:9).
+        if (width * 3 == height * 4) return null
+        if (width * 3 > height * 4) {
+            val cropped = height * 4 / 3
+            if (cropped < 1) return null
+            return CropRect((width - cropped) / 2, 0, cropped, height)
+        }
+        val cropped = width * 3 / 4
+        if (cropped < 1) return null
+        return CropRect(0, (height - cropped) / 2, width, cropped)
+    }
+    // Portrait → 3:4 portrait : le cas des lunettes (720×1280 → 720×960).
+    if (width * 4 == height * 3) return null
+    if (width * 4 < height * 3) {
+        val cropped = width * 4 / 3
+        if (cropped < 1) return null
+        return CropRect(0, (height - cropped) / 2, width, cropped)
+    }
+    val cropped = height * 3 / 4
     if (cropped < 1) return null
     return CropRect((width - cropped) / 2, 0, cropped, height)
 }

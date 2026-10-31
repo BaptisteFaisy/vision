@@ -106,6 +106,11 @@ soustraction** (328 − 234 − 7) : un `breakdown_ms` sur un appel réel doit l
   seul étage « physique » que l'utilisateur peut changer sans code.
 - **Le démarrage à froid (25–38 s) n'est pas de la latence** mais une indisponibilité : il sort du
   budget perçu et se traite par l'infrastructure, pas par une optimisation dans la boucle de frame.
+- **Protocole de réveil (31/10)** : `GET /warm` réveille le conteneur sans inférence (boot
+  complet 25–38 s à froid, restauration snapshot 2–7 s ensuite) ; le déploiement CI exige
+  le marqueur `[deploy-gpu]` pour ne pas invalider le snapshot à chaque push. Le snapshot
+  ne change aucun chiffre de ce budget (disponibilité, pas latence), mais une recette
+  qui suit un deploy de peu paie le boot complet — prévoir le réveil hors prise.
 
 ## 4. Budget par architecture (latence perçue, calculée étage par étage)
 

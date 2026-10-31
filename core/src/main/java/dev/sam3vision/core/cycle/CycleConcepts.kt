@@ -6,11 +6,13 @@ import dev.sam3vision.core.distance.KnownSizes
  * Concepts des cycles : ce que le [CycleWatcher] suit pour dire « Attention,
  * vélo en mouvement… » ou « Vélo arrêté… ».
  *
- * Deux engins, FR/EN : le vélo (`bicycle`, `bike`) et la trottinette
- * (`scooter`, `electric scooter` — déjà dans les défauts du direct). Le
- * français reste reconnu : un label « trottinette » compte comme un
- * « scooter ». La moto (`motorcycle`) n'est pas un cycle : elle reste un
- * véhicule moteur annoncé par `VehicleState` (traversée).
+ * Trois engins, FR/EN : le vélo (`bicycle`, `bike`, `electric bike`,
+ * `e-bike`, `bicyclette`), la trottinette (`scooter`, `electric scooter`,
+ * `kick scooter`, `e-scooter`) et le 2-roues générique (`two-wheeler`,
+ * `deux-roues`, `2-roues` — reel audit 31/10). Le français reste reconnu :
+ * un label « trottinette » compte comme un « scooter ». La moto
+ * (`motorcycle`) n'est pas un cycle : elle reste un véhicule moteur
+ * annoncé par `VehicleState` (traversée).
  *
  * Liste fermée, miroir de `HazardConcepts` : un concept = un nom parlé
  * ([CycleName]). Le « etc. » s'ajoute ici (clé canonique → nom), jamais en
@@ -27,15 +29,29 @@ object CycleConcepts {
 
     private val VELO = CycleName("vélo", "bicycle", "arrêté")
     private val TROTTINETTE = CycleName("trottinette", "scooter", "arrêtée")
+    private val DEUX_ROUES = CycleName("deux-roues", "two-wheeler", "arrêté")
 
     private val NAMES: Map<String, CycleName> = mapOf(
         "bicycle" to VELO,
         "bike" to VELO,
         "velo" to VELO,
+        "electric bike" to VELO,
+        "electric bicycle" to VELO,
+        "e bike" to VELO,
+        "ebike" to VELO,
+        "velo electrique" to VELO,
+        "bicyclette" to VELO,
         "scooter" to TROTTINETTE,
         "electric scooter" to TROTTINETTE,
+        "kick scooter" to TROTTINETTE,
+        "electric kick scooter" to TROTTINETTE,
+        "e scooter" to TROTTINETTE,
+        "escooter" to TROTTINETTE,
         "trottinette" to TROTTINETTE,
         "trottinette electrique" to TROTTINETTE,
+        "two wheeler" to DEUX_ROUES,
+        "deux roues" to DEUX_ROUES,
+        "2 roues" to DEUX_ROUES,
     )
 
     /** Nom parlé de [label], `null` si ce n'est pas un cycle suivi. */

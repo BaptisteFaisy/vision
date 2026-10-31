@@ -37,9 +37,29 @@ class VoiceNavAnnouncer(
     /**
      * Événement survenu à [atMs] : la phrase à prononcer, ou `null` s'il faut
      * garder le silence (répétition, délai, départ sans destination).
-     * [language] est la langue de la voix (Réglages).
+     * [language] est la langue de la voix (Réglages). Admise ET marquée :
+     * raccourci [admitEvent] + [markSpoken] (moteur synchrone, refus
+     * impossible) ; le canal qui parle après coup ([VoiceNavSpeaker])
+     * admet, parle, puis marque — un refus moteur ne marque pas.
      */
     fun onEvent(
+        atMs: Long,
+        event: VoiceNavEvent,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
+    ): String? {
+        val phrase = admitEvent(atMs, event, language) ?: return null
+        markSpoken(event, atMs, phrase)
+        return phrase
+    }
+
+    /**
+     * Événement admis à [atMs] ([VoiceNavPolicy]) : la phrase à prononcer,
+     * ou `null` s'il faut garder le silence — SANS marquer. L'appelant
+     * parle, puis confirme par [markSpoken] : une phrase refusée par le
+     * moteur (fermé, en panne) n'est pas marquée dite et se ré-admet à sa
+     * réémission au lieu d'être perdue.
+     */
+    fun admitEvent(
         atMs: Long,
         event: VoiceNavEvent,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
@@ -47,9 +67,15 @@ class VoiceNavAnnouncer(
         if (event is VoiceNavEvent.Started && event.destination.isBlank()) return null
         val key = VoiceNavPolicy.key(event)
         if (!gate.admit(atMs, key, urgent = VoiceNavPolicy.isUrgent(event))) return null
-        val phrase = VoiceNavPhrases.phrase(event, language)
-        gate.markSpoken(key, atMs, phrase)
-        return phrase
+        return VoiceNavPhrases.phrase(event, language)
+    }
+
+    /**
+     * Confirme la parole moteur : [phrase] (admise par [admitEvent]) a été
+     * prononcée à [atMs] — marquée dite (nouveauté, délai, [lastPhrase]).
+     */
+    fun markSpoken(event: VoiceNavEvent, atMs: Long, phrase: String) {
+        gate.markSpoken(VoiceNavPolicy.key(event), atMs, phrase)
     }
 
     /** Nouvelle session : tout est oublié (le prochain départ sera dit). */

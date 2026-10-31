@@ -15,8 +15,13 @@ import android.os.SystemClock
  * - une action de l'utilisateur ([openWindow] : caméra activée, vidéo ou
  *   photo prise) rouvre la parole pendant [AMBIENT_WINDOW_MS] : la fenêtre
  *   laisse la voix décrire ce qui vient d'être pris ;
- * - les urgences (trottoir, escaliers, hors-trace) ne passent pas par ici :
- *   la sécurité passe avant le silence ([maySpeak]).
+ * - les urgences ne passent pas par le silence ([maySpeak]) : GPS coupé ou
+ *   pas, voix occupée ou pas, elles parlent — la sécurité passe avant le
+ *   silence demandé (miroir `SafetyVoice`, qui coupe tout, tout le temps).
+ *
+ * Non persistée : à chaque redémarrage la porte rouvre — un ordre de la
+ * veille ne tait pas la voix du lendemain (l'appelant ne la resynchronise
+ * pas avec le réglage persisté).
  *
  * Pur (l'horloge est injectée, testé en JVM sans Android).
  */
@@ -52,13 +57,14 @@ class IseeVoiceGate(
     fun ambientAllowed(): Boolean = !gpsMuted || clock() < allowedUntil
 
     /**
-     * Décision d'une voix ambiante : GPS actif → l'urgence coupe (la
-     * sécurité passe), sinon parler seulement quand rien n'occupe la voix ;
-     * GPS coupé → fenêtre ouverte seulement, urgences comprises, la
-     * désactivation est une demande de silence.
+     * Décision d'une voix ambiante : l'urgence passe toujours (GPS coupé
+     * comme occupé — la sécurité ne négocie pas) ; sinon, GPS actif → parler
+     * seulement quand rien n'occupe la voix, GPS coupé → fenêtre ouverte
+     * seulement (la désactivation reste une demande de silence pour le doux).
      */
     fun maySpeak(urgent: Boolean, busy: Boolean): Boolean = when {
-        !gpsMuted -> urgent || !busy
+        urgent -> true
+        !gpsMuted -> !busy
         ambientAllowed() -> !busy
         else -> false
     }

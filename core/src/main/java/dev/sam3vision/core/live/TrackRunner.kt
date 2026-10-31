@@ -215,11 +215,15 @@ class TrackRunner(
 
     companion object {
         /**
-         * Âge maximal d'une session : 3 s. À ~1 m/s, un nouvel obstacle est
-         * détecté au pire 3 m plus tard ; en deçà, les re-keyframes (1 analyse
-         * complète chacun) mangeraient le gain du suivi.
+         * Âge maximal d'une session : 1 s. À ~1 m/s, un nouvel obstacle est
+         * détecté au pire 1 m plus tard — rue piétonne, 3 m d'aveugle aux
+         * nouveautés, c'est trop. Chaque re-keyframe coûte une ouverture
+         * `/session` complète (la campagne TRACK-PERF mesurait 3,1 s) pendant
+         * laquelle le créneau est tenu et les frames suivantes tombent : le
+         * prix de la fraîcheur, borné par le créneau (jamais de file), avec
+         * repli sur l'ancienne session si l'ouverture échoue.
          */
-        const val DEFAULT_REKEY_MS = 3_000L
+        const val DEFAULT_REKEY_MS = 1_000L
 
         /**
          * Après un [start] en échec, la même erreur est rejouée sans appel réseau

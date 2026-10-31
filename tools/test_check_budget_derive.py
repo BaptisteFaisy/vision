@@ -54,8 +54,10 @@ CODE = {
         "        )\n"
         "    }\n"
         "}\n",
-    APP + "/isee/IseeCameraPane.kt":
-        "package dev.sam3vision.app.isee\n\nconst val ISEE_FRAME_EDGE = 320\n",
+    APP + "/isee/FramePolicy.kt":
+        "package dev.sam3vision.app.isee\n\nconst val EDGE = 480\n",
+    # Hôte du test d'ambiguité des renvois par nom de fichier (hors
+    # registre depuis que les côtés longs se lisent dans FramePolicy.kt).
     APP + "/LiveScreen.kt":
         "package dev.sam3vision.app\n\nconst val LIVE_EDGE = 512\n",
     "core/src/main/java/dev/sam3vision/core/model/ObjectLimits.kt":
@@ -78,13 +80,13 @@ DOC_CONFORME = """# LATENCE-BUDGET
 | fenêtre de réveil côté app | 60 s | `%s/live/LiveWakeGuard.kt::WAKE_TIMEOUT_MS` |
 | plancher de cadence du Direct | 350 ms | `%s/LiveSession.kt::Cadence.Direct.fastMs` |
 | budget de latence d'iSee | 150 ms | `%s/LiveSession.kt::Cadence.Fast.latencyBudgetMs` |
-| côté long de la frame iSee | 320 px | `%s/IseeCameraPane.kt::ISEE_FRAME_EDGE` |
-| côté long de la frame du Direct | 512 px | `%s/LiveScreen.kt::LIVE_EDGE` |
+| côté long de la frame iSee | 480 px | `%s/FramePolicy.kt::EDGE` |
+| côté long de la frame du Direct | 480 px | `%s/FramePolicy.kt::EDGE` |
 | objets affichés par défaut | 8 | `%s/ObjectLimits.kt::DEFAULT_ON_SCREEN` |
 | délai d'envoi d'une vidéo | 120 s | `%s/HttpSam31VideoClient.kt::UPLOAD_TIMEOUT_SECONDS` |
 | ancien délai du direct | 10 s | `%s/HttpLiveClient.kt::LIVE_TIMEOUT_SECONDS` |
 """ % (CTX, CTX, APP, "core/src/main/java/dev/sam3vision/core/live",
-       "core/src/main/java/dev/sam3vision/core/live", APP + "/isee", APP,
+       "core/src/main/java/dev/sam3vision/core/live", APP + "/isee", APP + "/isee",
        "core/src/main/java/dev/sam3vision/core/model", CTX, CTX)
 
 

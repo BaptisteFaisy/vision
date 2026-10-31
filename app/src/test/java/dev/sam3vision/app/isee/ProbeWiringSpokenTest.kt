@@ -83,7 +83,7 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("left."), attempts)
+        assertEquals(listOf(WARM_SPOKEN, "left."), attempts)
         assertEquals(listOf("left."), completions)
     }
 
@@ -111,7 +111,7 @@ class ProbeWiringSpokenTest {
         }
 
         assertEquals(
-            listOf("left.", "right."),
+            listOf(WARM_SPOKEN, "left.", "right."),
             attempts,
         )
         assertEquals(listOf("right."), completions)
@@ -182,6 +182,8 @@ class ProbeWiringSpokenTest {
         )
         probe.configure(PROBE_TEST_ENDPOINT, guide = true)
         probe.begin()
+        // Scheduler coupé : ce test verrouille la voix, pas les keyframes (voir LiveAdaptiveTest).
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         return probe to fake
     }
 
@@ -216,6 +218,43 @@ class ProbeWiringSpokenTest {
             fake.respond(id, frame(listOf(obj)))
             advanceTimeBy(1_000L)
         }
+    }
+
+    @Test
+    fun `urgence non annulee par une douce plus fraiche`() = runTest {
+        val attempts = mutableListOf<String>()
+        val completions = mutableListOf<String>()
+        val gate = CompletableDeferred<Result<ByteArray>>()
+        val voice = ProximityVoice(
+            player = SpeechPlayer(File(tempDir(), "play")),
+            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
+            synthesize = { _, _, text ->
+                attempts += text
+                gate.await()
+                completions += text
+                Result.success(ByteArray(0))
+            },
+        )
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val probe = LiveProbe(
+                scope = this,
+                clock = { 0L },
+                background = StandardTestDispatcher(testScheduler),
+            )
+            probe.observeSpoken(scope, voice, { true }) { SpeechLanguage.Fr }
+            probe._state.value = LiveProbeState(spoken = "Stop.", spokenUrgent = true, spokenSeq = 1)
+            advanceUntilIdle()
+            probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 2)
+            advanceUntilIdle()
+            gate.complete(Result.success(ByteArray(0)))
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertEquals(listOf("Stop.", "Gauche."), attempts)
+        assertEquals(listOf("Stop.", "Gauche."), completions)
     }
 
     private fun tempDir(): File =

@@ -71,4 +71,11 @@ class SamRegionTest {
         assertFalse(SamRegion.Eu.presetBaseUrl == SamRegion.Us.presetBaseUrl)
         assertTrue(SamRegion.Us.presetBaseUrl.contains("us-east"))
     }
+
+    @Test
+    fun `le bail gpu tient en une ligne chiffree`() {
+        assertTrue(SamRegion.GPU_LEASE_LINE.isNotBlank())
+        assertTrue(SamRegion.GPU_LEASE_LINE.contains("25-38"))
+        assertTrue(SamRegion.GPU_LEASE_LINE.contains("2-7"))
+    }
 }

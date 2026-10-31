@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.live.CalibrationSnap
 import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.live.CalibrationStore
+import dev.sam3vision.app.live.LensOrigin
+import dev.sam3vision.app.live.LensQualityStore
+import dev.sam3vision.app.live.SavedCalibration
 import dev.sam3vision.app.pose.CameraHeightStore
 import dev.sam3vision.core.distance.Calibration
 import dev.sam3vision.core.distance.CalibrationSolver
@@ -33,6 +36,8 @@ import java.util.Locale
 internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
     val context = LocalContext.current
     val heights = remember(context) { CameraHeightStore(context) }
+    val calibrationStore = remember(context) { CalibrationStore(context) }
+    val lensStore = remember(context) { LensQualityStore(context) }
     var heightM by remember { mutableStateOf(heights.get()) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -48,7 +53,12 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             label = "Camera field of view (°, 0 = sensor reading)",
             value = fovText(draft.cameraFovDeg),
             secret = false,
-        ) { text -> onChange(draft.copy(cameraFovDeg = parseFov(text))) }
+        ) { text ->
+            // A hand-typed field is not a measurement: the solved flag falls, so the
+            // status never calls a typed 67° "measured".
+            calibrationStore.setCalibrated(false)
+            onChange(draft.copy(cameraFovDeg = parseFov(text)))
+        }
         LabeledField(
             label = "Camera height in meters (shoulder ~1.5)",
             value = heightText(heightM),
@@ -58,7 +68,25 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             heightM = parsed
             heights.set(parsed)
         }
-        CalibrationBlock(draft, onChange)
+        LensFallbackWarning(lensStore)
+        CalibrationBlock(draft, onChange, calibrationStore)
+    }
+}
+
+/**
+ * Warning when the last camera bind fell back to the 67° default (mute driver,
+ * nothing set): distances then run on a guess, worth one line. Silent when the
+ * sensor answered or no bind was ever noted.
+ */
+@Composable
+private fun LensFallbackWarning(lensStore: LensQualityStore) {
+    val fallback = remember { lensStore.lastOrigin() == LensOrigin.FALLBACK }
+    if (fallback) {
+        Text(
+            "Warning: sensor silent, distances run on the 67° fallback field",
+            color = SettingsLight.text,
+            fontSize = 13.sp,
+        )
     }
 }
 
@@ -70,17 +98,16 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
  * field); [CalibrationStore] remembers it was measured, not typed.
  */
 @Composable
-private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit) {
-    val context = LocalContext.current
-    val store = remember(context) { CalibrationStore(context) }
+private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit, store: CalibrationStore) {
     val snap by CalibrationSnapshots.latest.collectAsState()
     var heightText by remember { mutableStateOf("") }
     var distanceText by remember { mutableStateOf("") }
-    var calibrated by remember { mutableStateOf(store.isCalibrated()) }
+    var calibrated by remember(draft.cameraFovDeg) { mutableStateOf(store.isCalibrated()) }
+    var saved by remember(draft.cameraFovDeg) { mutableStateOf(store.lastCalibration()) }
     var message by remember { mutableStateOf<String?>(null) }
     val fresh = CalibrationSnapshots.isFresh(snap, System.currentTimeMillis())
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        CalibrationStatus(snap, calibrated, draft.cameraFovDeg)
+        CalibrationStatus(snap, calibrated, saved, draft.cameraFovDeg)
         LabeledField(
             label = "Helper height in meters (e.g. 1.78)",
             value = heightText,
@@ -97,8 +124,9 @@ private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit) {
                 message = "Cannot solve: re-aim at the helper and check both numbers"
             } else {
                 onChange(draft.copy(cameraFovDeg = solved.fovDeg))
-                store.setCalibrated(true)
+                store.saveCalibration(solved.fovDeg, solved.toleranceDeg)
                 calibrated = true
+                saved = store.lastCalibration()
                 message = "Calibrated: ${fovText(solved.fovDeg)}° ±${String.format(Locale.US, "%.1f", solved.toleranceDeg)}°"
             }
         })
@@ -107,6 +135,7 @@ private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit) {
                 onChange(draft.copy(cameraFovDeg = 0f))
                 store.setCalibrated(false)
                 calibrated = false
+                saved = null
                 message = null
             })
         }
@@ -114,11 +143,16 @@ private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit) {
     }
 }
 
-/** État d'étalonnage + dernière visée, en deux lignes. */
+/** État d'étalonnage + dernière visée, en deux lignes (+ alerte si jamais calibré). */
 @Composable
-private fun CalibrationStatus(snap: CalibrationSnap?, calibrated: Boolean, fovDeg: Float) {
+private fun CalibrationStatus(
+    snap: CalibrationSnap?,
+    calibrated: Boolean,
+    saved: SavedCalibration?,
+    fovDeg: Float,
+) {
     Text(
-        if (calibrated) "Calibration: measured ${fovText(fovDeg)}°" else "Calibration: not calibrated",
+        calibrationLine(calibrated, saved, fovDeg, System.currentTimeMillis()),
         color = SettingsLight.text,
         fontSize = 13.sp,
     )
@@ -129,6 +163,32 @@ private fun CalibrationStatus(snap: CalibrationSnap?, calibrated: Boolean, fovDe
         color = SettingsLight.text,
         fontSize = 13.sp,
     )
+}
+
+/**
+ * Ligne d'état d'étalonnage : mesure persistée (champ ± tolérance, âge) quand
+ * elle existe, alerte sinon — « jamais calibré » se voit, les distances ne
+ * tournent plus en silence sur un champ par défaut.
+ */
+internal fun calibrationLine(calibrated: Boolean, saved: SavedCalibration?, fovDeg: Float, nowMs: Long): String {
+    if (saved != null) {
+        val age = (nowMs - saved.atMs).takeIf { it >= 0L }?.let { " (${ageText(it)} ago)" } ?: ""
+        val tolerance = String.format(Locale.US, "%.1f", saved.toleranceDeg)
+        return "Calibration: measured ${fovText(saved.fovDeg)}° ±${tolerance}°$age"
+    }
+    if (calibrated) return "Calibration: measured ${fovText(fovDeg)}°"
+    return "Calibration: not calibrated — distances run on the sensor/default field"
+}
+
+/** Âge compact : 40 s, 12 min, 3 h, 5 d. */
+internal fun ageText(ageMs: Long): String {
+    val seconds = ageMs / 1000L
+    if (seconds < 60L) return "$seconds s"
+    val minutes = seconds / 60L
+    if (minutes < 60L) return "$minutes min"
+    val hours = minutes / 60L
+    if (hours < 48L) return "$hours h"
+    return "${hours / 24L} d"
 }
 
 /**

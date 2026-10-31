@@ -222,11 +222,11 @@ def test_max_objects_ceiling(segmentation) -> None:
 
 
 def test_live_clamp_ceiling(live_app) -> None:
-    """Knob ``max_objects`` : 32 passe, au-delà le plafond serveur s'applique, défaut 12."""
+    """Knob ``max_objects`` : 32 passe, au-delà le plafond serveur s'applique, défaut 16."""
     from test_units import check
 
     cap = __import__("segmentation").MAX_OBJECTS
     low, default = live_app.MAX_OBJECTS_MIN, live_app.MAX_OBJECTS_DEFAULT
     check("_clamp: 32 passe (plafond serveur)", live_app._clamp(32, default, low, cap) == 32)
     check("_clamp: au-delà → plafond serveur", live_app._clamp(99, default, low, cap) == cap)
-    check("défaut /live inchangé (12)", default == 12)
+    check("défaut /live (16 : 17 prompts + slots gardés)", default == 16)

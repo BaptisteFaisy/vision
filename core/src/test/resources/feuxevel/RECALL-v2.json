@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "date": "2026-10-31",
+  "sha": "inconnu",
+  "pipeline": "CrossingPrompts.selectLightBox -> crop JVM 96px (miroir CrossingPixels.crop, sans recadrage lampe) -> PedLightGate.verdict",
+  "note": "V2 : zone grise (31/10) - refus de porte et feuilles fragiles doutent (Unknown), le rouge franc reste rouge. Rappel nul sur lentilles rondes synthetiques : ecart de domaine connu (boite SAM = caisson, porte calibree lampe), voir docs/MESURES-SAM3-FEUX.md section 6. Toute evolution de la porte qui change un verdict bump la version.",
+  "cases": [
+    {"id": "green-h64", "truth": "Green", "verdict": "Unknown"},
+    {"id": "green-h32", "truth": "Green", "verdict": "Unknown"},
+    {"id": "green-h24", "truth": "Green", "verdict": "Unknown"},
+    {"id": "green-h16", "truth": "Green", "verdict": "Unknown"},
+    {"id": "green-h12", "truth": "Green", "verdict": "Unknown"},
+    {"id": "green-h08", "truth": "Green", "verdict": "Unknown"},
+    {"id": "red-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "off-h32", "truth": "Red", "verdict": "Unknown"},
+    {"id": "car-disc", "truth": "Red", "verdict": "Red"},
+    {"id": "real-green", "truth": "Green", "verdict": "Green"},
+    {"id": "real-red", "truth": "Red", "verdict": "Red"},
+    {"id": "real-r1b", "truth": "Green", "verdict": "Green"}
+  ],
+  "recall": [
+    {"id": "synthetic_green", "value": "0/6"},
+    {"id": "synthetic_green_grand", "value": "0/2"},
+    {"id": "synthetic_green_petit", "value": "0/4"},
+    {"id": "false_green", "value": "0/4"}
+  ]
+}

@@ -39,14 +39,15 @@ data class LightMarker(val left: Float, val top: Float, val right: Float, val bo
 }
 
 /**
- * Couleur du cadre et de l'étiquette pour [state] : binaire, rouge ou vert —
- * pas encore de lecture (`null`) attend comme un rouge (ordre user du 31/10).
+ * Couleur du cadre et de l'étiquette pour [state] : vert pour traverser,
+ * rouge pour attendre — le doute ([CrossingState.Unknown], pas encore de
+ * lecture (`null`)) attend comme un rouge (fail-safe, reel audit 31/10).
  */
 fun crossingAccent(active: Boolean, state: CrossingState?): Int {
     if (!active) return CROSSING_ACCENT_OFF
     return when (state) {
         CrossingState.Green -> CROSSING_ACCENT_GREEN
-        CrossingState.Red, null -> CROSSING_ACCENT_RED
+        CrossingState.Red, CrossingState.Unknown, null -> CROSSING_ACCENT_RED
     }
 }
 
@@ -55,7 +56,7 @@ fun crossingTag(active: Boolean, state: CrossingState?): String {
     if (!active) return ""
     return when (state) {
         CrossingState.Green -> "GREEN"
-        CrossingState.Red, null -> "RED"
+        CrossingState.Red, CrossingState.Unknown, null -> "RED"
     }
 }
 

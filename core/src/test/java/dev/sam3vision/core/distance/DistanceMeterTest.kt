@@ -274,4 +274,72 @@ class DistanceMeterTest {
         assertTrue("une boîte redressée plus petite éloigne", corrected.rawMeters > plain.rawMeters)
         assertEquals(box(200f), corrected.box)
     }
+
+    @Test
+    fun `coupe bas sans pose rend la derniere piste, signalee`() {
+        val meter = DistanceMeter()
+        val first = meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3)).first()
+        val cut = listOf(100f, 200f, 200f, 384f)
+        val fallback = meter.measure(512, 384, listOf(detection("personne", cut)), listOf(3)).single()
+        assertTrue(fallback.cutFallback)
+        assertEquals(first.meters, fallback.meters, 0.02f)
+        assertEquals(fallback.meters, fallback.rawMeters, 0f)
+        assertTrue(fallback.confidence in 0f..DistanceMeter.CUT_FALLBACK_MAX_CONFIDENCE)
+    }
+
+    @Test
+    fun `coupe haut refuse meme avec piste et pose`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f, 0.2f)
+        meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3))
+        val cut = listOf(100f, 0f, 200f, 200f)
+        assertTrue(meter.measure(512, 384, listOf(detection("personne", cut)), listOf(3)).isEmpty())
+    }
+
+    @Test
+    fun `repli ne nourrit pas la piste Kalman`() {
+        val meter = DistanceMeter()
+        val t0 = System.currentTimeMillis()
+        val cut = listOf(100f, 200f, 200f, 384f)
+        meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3))
+        val fallback = meter.measure(512, 384, listOf(detection("personne", cut)), listOf(3)).single()
+        assertTrue(fallback.cutFallback)
+        val predicted = meter.predictions(t0 + 500L).first { it.trackId == 3 }
+        assertEquals(box(200f), predicted.box)
+    }
+
+    @Test
+    fun `repli non suivi se maintient drapeau conserve`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f, 0.2f)
+        val t0 = System.currentTimeMillis()
+        val cut = listOf(100f, 200f, 200f, 384f)
+        val fallback = meter.measure(512, 384, listOf(detection("personne", cut))).single()
+        assertTrue(fallback.cutFallback)
+        val held = meter.predictions(t0 + 500L).single()
+        assertTrue(held.cutFallback)
+        assertEquals(fallback.meters, held.meters, 0f)
+    }
+
+    @Test
+    fun `coupe bas en EMA rend le dernier lisse`() {
+        val meter = DistanceMeter().apply { kalmanEnabled = false }
+        meter.measure(512, 384, listOf(detection("personne", box(200f))), listOf(3))
+        val cut = listOf(100f, 200f, 200f, 384f)
+        val fallback = meter.measure(512, 384, listOf(detection("personne", cut)), listOf(3)).single()
+        assertTrue(fallback.cutFallback)
+        assertEquals(3.29f, fallback.meters, 0.02f)
+    }
+
+    @Test
+    fun `dernier lisse relu sans modifier, perime oublie`() {
+        val smoother = DistanceSmoother(timeoutMs = 1_000L)
+        assertNull(smoother.last(1, 0L))
+        smoother.smooth(1, 4.0f, 0L)
+        assertEquals(4.0f, smoother.last(1, 500L)!!, 0f)
+        assertNull(smoother.last(1, 5_000L))
+        // relire ne prolonge pas : l'oubli reste à 1 s après la mesure
+        assertNull(smoother.last(1, 1_001L))
+        assertEquals(1, smoother.size())
+    }
 }

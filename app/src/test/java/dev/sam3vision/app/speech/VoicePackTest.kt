@@ -116,6 +116,27 @@ class VoicePackTest {
     }
 
     @Test
+    fun `clip perime servi sans embarque, mieux que rien`() {
+        val voix = pack(embarque = { "VIEUX".toByteArray() })
+        val installe = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
+        installe?.setLastModified(0L)
+        val sansEmbarque = pack(embarque = { null }, horloge = { VoicePack.CLIP_TTL_MS + 1 })
+
+        val clip = sansEmbarque.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
+
+        assertEquals("VIEUX", clip?.readText())
+    }
+
+    @Test
+    fun `voix du pack tolere casse et blancs`() {
+        val voix = pack(voixPack = "  VOIX-LAURE-12345678  ", embarque = { "MP3".toByteArray() })
+
+        val clip = voix.clipFor("cross_green", SpeechLanguage.Fr, "voix-laure-12345678")
+
+        assertEquals("MP3", clip?.readText())
+    }
+
+    @Test
     fun `les langues ne se mélangent pas`() {
         val voix = pack()
         voix.put("cross_green", SpeechLanguage.Fr, "v", "FR".toByteArray())

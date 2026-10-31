@@ -9,15 +9,25 @@ import org.junit.Test
 class CrossingAnnouncerTest {
 
     @Test
-    fun `le vert exige quatre frames de suite`() {
+    fun `le vert exige trois frames sur quatre`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Green))
         assertNull(announcer.onFrame(200L, CrossingState.Green))
-        assertNull(announcer.onFrame(400L, CrossingState.Green))
-        val cue = announcer.onFrame(600L, CrossingState.Green)
+        val cue = announcer.onFrame(400L, CrossingState.Green)
         assertEquals("Green, cross now.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
         assertEquals(CrossingState.Green, cue?.state)
+    }
+
+    @Test
+    fun `le vote tolere une frame rouge intercalee`() {
+        val announcer = CrossingAnnouncer()
+        assertNull(announcer.onFrame(0L, CrossingState.Green))
+        assertNull(announcer.onFrame(200L, CrossingState.Green))
+        assertNull(announcer.onFrame(400L, CrossingState.Red))
+        val cue = announcer.onFrame(600L, CrossingState.Green)
+        assertEquals("Green, cross now.", cue?.phrase)
+        assertFalse(cue?.urgent ?: true)
     }
 
     @Test
@@ -36,6 +46,57 @@ class CrossingAnnouncerTest {
         val cue = announcer.onFrame(200L, CrossingState.Red)
         assertEquals("Red, wait.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
+    }
+
+    @Test
+    fun `le vert clignotant se dit et veto, etat rouge fail-safe`() {
+        val announcer = CrossingAnnouncer()
+        assertNull(announcer.onFrame(0L, CrossingState.Green))
+        assertNull(announcer.onFrame(200L, CrossingState.Red))
+        assertNull(announcer.onFrame(400L, CrossingState.Green))
+        val cue = announcer.onFrame(600L, CrossingState.Red)
+        assertEquals("Flashing green, do not cross.", cue?.phrase)
+        assertFalse(cue?.urgent ?: true)
+        assertEquals(CrossingState.Red, cue?.state)
+        assertNull("veto : pas de traversez tant que ca clignote", announcer.onFrame(800L, CrossingState.Green))
+        assertEquals("Flashing green, do not cross.", announcer.lastCue?.phrase)
+    }
+
+    @Test
+    fun `le clignotant sur vert annonce coupe comme un rouge`() {
+        val announcer = CrossingAnnouncer()
+        repeat(3) { announcer.onFrame(it * 200L, CrossingState.Green) }
+        assertEquals(CrossingState.Green, announcer.lastCue?.state)
+        assertNull(announcer.onFrame(600L, CrossingState.Red))
+        assertNull(announcer.onFrame(800L, CrossingState.Green))
+        val cue = announcer.onFrame(1_000L, CrossingState.Red)
+        assertEquals("Flashing green, do not cross.", cue?.phrase)
+        assertTrue(cue?.urgent ?: false)
+    }
+
+    @Test
+    fun `le doute sans rien d'annonce se dit des la deuxieme frame`() {
+        val announcer = CrossingAnnouncer()
+        assertNull(announcer.onFrame(0L, CrossingState.Unknown))
+        val cue = announcer.onFrame(200L, CrossingState.Unknown)
+        assertEquals("Light unclear, wait.", cue?.phrase)
+        assertFalse(cue?.urgent ?: true)
+        assertEquals(CrossingState.Unknown, cue?.state)
+    }
+
+    @Test
+    fun `le doute garde le dernier connu sous TTL puis se dit et repete`() {
+        val announcer = CrossingAnnouncer()
+        repeat(3) { announcer.onFrame(it * 200L, CrossingState.Green) }
+        assertNull(announcer.onFrame(600L, CrossingState.Unknown))
+        assertNull(announcer.onFrame(800L, CrossingState.Unknown))
+        assertEquals("persistance : le vert est garde", CrossingState.Green, announcer.lastCue?.state)
+        assertNull(announcer.onFrame(1_000L, CrossingState.Unknown))
+        val cue = announcer.onFrame(3_400L, CrossingState.Unknown)
+        assertEquals("Light unclear, wait.", cue?.phrase)
+        assertEquals(CrossingState.Unknown, announcer.lastCue?.state)
+        assertNull(announcer.onFrame(4_000L, CrossingState.Unknown))
+        assertEquals("Light unclear, wait.", announcer.onFrame(5_400L, CrossingState.Unknown)?.phrase)
     }
 
     @Test

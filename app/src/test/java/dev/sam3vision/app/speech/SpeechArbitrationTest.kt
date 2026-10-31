@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Arbitrage de la voix unique : danger > consigne > info, coupe stricte. */
+/** Arbitrage de la voix unique : danger > consigne > info, urgent coupe tout. */
 class SpeechArbitrationTest {
 
     @Test
@@ -49,17 +49,21 @@ class SpeechArbitrationTest {
     }
 
     @Test
+    fun `danger coupe meme un danger en cours, la plus fraiche gagne`() {
+        assertTrue(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Danger))
+    }
+
+    @Test
     fun `consigne coupe info mais pas danger`() {
         assertTrue(SpeechArbitration.interrupts(SpeechPriority.Info, SpeechPriority.Instruction))
         assertFalse(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Instruction))
     }
 
     @Test
-    fun `info ne coupe rien et meme niveau s enchaine`() {
+    fun `info ne coupe rien et doux de meme niveau s enchaine`() {
         assertFalse(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Info))
         assertFalse(SpeechArbitration.interrupts(SpeechPriority.Instruction, SpeechPriority.Info))
         assertFalse(SpeechArbitration.interrupts(SpeechPriority.Info, SpeechPriority.Info))
         assertFalse(SpeechArbitration.interrupts(SpeechPriority.Instruction, SpeechPriority.Instruction))
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Danger))
     }
 }

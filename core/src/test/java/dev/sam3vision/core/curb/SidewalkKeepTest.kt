@@ -2,6 +2,7 @@ package dev.sam3vision.core.curb
 
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -102,6 +103,24 @@ class SidewalkKeepTest {
         assertEquals(SteeringCap.Right, SidewalkKeep.returnCap(SidewalkPosition.Right))
         assertNull(SidewalkKeep.returnCap(SidewalkPosition.Ahead))
         assertNull(SidewalkKeep.returnCap(SidewalkPosition.Absent))
+    }
+
+    @Test
+    fun `deux cotes sans distance = consigne prudente, pas de deviation`() {
+        val labels = listOf(trottoir(0.1f), trottoir(0.9f))
+
+        assertEquals("Attention, trottoir des deux côtés.", SidewalkKeep.cautionPhrase(labels, SpeechLanguage.Fr))
+        assertEquals("Attention, sidewalk on both sides.", SidewalkKeep.cautionPhrase(labels, SpeechLanguage.En))
+        assertNull(SidewalkKeep.returnCap(SidewalkKeep.positionOf(labels)))
+    }
+
+    @Test
+    fun `consigne prudente nulle sinon`() {
+        assertNull(SidewalkKeep.cautionPhrase(listOf(trottoir(0.1f, 2f), trottoir(0.9f, 5f))))
+        assertNull(SidewalkKeep.cautionPhrase(listOf(trottoir(0.1f))))
+        assertNull(SidewalkKeep.cautionPhrase(listOf(trottoir(0.5f))))
+        assertNull(SidewalkKeep.cautionPhrase(listOf(personne())))
+        assertNull(SidewalkKeep.cautionPhrase(emptyList()))
     }
 
     @Test

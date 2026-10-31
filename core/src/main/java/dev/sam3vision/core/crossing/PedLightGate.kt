@@ -4,18 +4,23 @@ package dev.sam3vision.core.crossing
  * Porte anti-confusion du vert piéton : un vert classifié ne devient un ordre
  * de traverser que s'il ressemble à un bonhomme — élancé, pas confiné en
  * haut, sans rouge franc mélangé. Un feu de voiture (disque rond), un reflet
- * ou un bruit retombe en rouge : la porte ne fabrique jamais de vert, elle
- * n'en refuse que (binaire, ordre user du 31/10).
+ * ou un bruit retombe en [CrossingState.Unknown] : la porte ne fabrique
+ * jamais de vert, elle n'en refuse que — et un refus est un doute, pas un
+ * rouge forcé (l'aval attend dans les deux cas).
  *
- * Seuils calibrés sur feux français (10/2026, corpus Panoramax 235 lampes
- * labellisées, crops ≤ 48 px comme en production) : 0 vert sur 90 rouges,
- * 28/42 bonhommes verts acceptés, 0/47 disques voiture de face acceptés
- * (2 disques de profil passent : vue impossible téléphone en main face au
- * passage, et la confirmation temporelle les filtre). Hypothèse cadrage :
- * la boîte SAM serre la lampe (lampe centrée, le « bas du cadre » d'avant
- * ne sépare plus rien) — [GREEN_BOTTOM_MIN] n'est plus un prior de
- * position mais une garde anti-bruit-haut. Poses larges et pictogrammes
- * non standard : rouge documenté (voir test `pose large`).
+ * Porte **calibrée lampe serrée** : seuils mesurés sur feux français
+ * (10/2026, corpus Panoramax 235 lampes labellisées, crops ≤ 48 px comme en
+ * production alors) : 0 vert sur 90 rouges, 28/42 bonhommes verts acceptés,
+ * 0/47 disques voiture de face acceptés (2 disques de profil passent : vue
+ * impossible téléphone en main face au passage, et la confirmation
+ * temporelle les filtre). Hypothèse cadrage : la boîte SAM serre la lampe
+ * (lampe centrée — `CrossingPixels` recentre sur le centroïde saturé quand
+ * elle s'écarte ; le « bas du cadre » d'avant ne sépare plus rien) —
+ * [GREEN_BOTTOM_MIN] n'est plus un prior de position mais une garde
+ * anti-bruit-haut. Les fractions sont invariantes d'échelle (crop 96 px
+ * depuis le 31/10) ; [BBOX_MIN_PX] reste à 3 px (un point ne fait pas un
+ * bonhomme, même en 96 px). Poses larges et pictogrammes non standard :
+ * doute documenté (voir test `pose large`).
  * Pur Kotlin, testé en JVM (synthétique + échantillons `feuxfr/`, `feuxfr2/`).
  *
  * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : dans la
@@ -23,54 +28,58 @@ package dev.sam3vision.core.crossing
  * tranche — allongé, avec de l'intérieur, masse non entassée en haut.
  * Mesuré : rappel vert 81/183 → 90/183, fuites inchangées (0 rouge,
  * 100 voiture, 6 éteints), seuils existants intacts.
+ *
+ * Seuils publics (surface de calibrage, voir aussi [PedLightColor]).
  */
 object PedLightGate {
 
     /** Le vert ne doit pas être confiné en haut (bruit sur un rouge). */
-    private const val GREEN_BOTTOM_MIN = 0.35f
+    const val GREEN_BOTTOM_MIN = 0.35f
 
-    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, rouge). */
-    private const val RED_MAX_FRACTION = 0.02f
+    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
+    const val RED_MAX_FRACTION = 0.02f
 
     /**
      * Vert minimal dans le cadre (en dessous : reflet ou bruit). Partagé
      * avec [TrainedLightColor] : mêmes pixels, même plancher, pas de vert
      * sans vert.
      */
-    internal const val GREEN_MIN_FRACTION = 0.004f
+    const val GREEN_MIN_FRACTION = 0.004f
 
     /** Élancement minimal de la tache verte (un disque est aussi large que haut). */
-    private const val ELONGATION_MIN = 1.5f
+    const val ELONGATION_MIN = 1.5f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
-    private const val BBOX_MIN_PX = 3
+    const val BBOX_MIN_PX = 3
 
     /** R1b : masse verte max du tiers haut de bbox (bonhomme non entassé en haut). */
-    private const val TOP3_MAX = 0.38f
+    const val TOP3_MAX = 0.38f
 
     /** R1b : fraction max de pixels verts en lisière (un disque n'est que contour). */
-    private const val EDGE_MAX = 0.72f
+    const val EDGE_MAX = 0.72f
 
     /** R1b : allongement vertical min du nuage (écart-types, pas bbox). */
-    private const val CLOUD_ELONGATION_MIN = 1.5f
+    const val CLOUD_ELONGATION_MIN = 1.5f
 
     /**
      * R1b : plancher bas — à 20 % ou moins, rejet dur sans appel (contrat
      * historique : la garde bas garde ses dents, la forme ne tranche que
      * dans la bande 20-35 %, les quasi-ratés).
      */
-    private const val R1B_BOTTOM_FLOOR = 0.20f
+    const val R1B_BOTTOM_FLOOR = 0.20f
 
     /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne
-     * passe que la porte, tout le reste vaut [CrossingState.Red] — binaire,
-     * un refus attend (ordre user du 31/10, fini le doute).
+     * passe que la porte, le rouge franc de l'arbre reste rouge, tout le
+     * reste doute ([CrossingState.Unknown]) — un refus de porte ou une
+     * feuille fragile attendent comme un rouge, sans s'y forcer.
      */
     fun verdict(argb: IntArray, width: Int, height: Int): CrossingState {
         val raw = TrainedLightColor.classify(argb, width, height)
+        if (raw == CrossingState.Unknown) return CrossingState.Unknown
         if (raw != CrossingState.Green) return CrossingState.Red
         if (acceptGreen(argb, width, height)) return CrossingState.Green
-        return CrossingState.Red
+        return CrossingState.Unknown
     }
 
     /** Vrai si le vert du crop a la position et la forme d'un bonhomme. */

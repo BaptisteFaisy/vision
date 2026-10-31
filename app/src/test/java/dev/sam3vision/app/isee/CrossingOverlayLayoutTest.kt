@@ -32,12 +32,14 @@ class CrossingOverlayLayoutTest {
     }
 
     @Test
-    fun `chaque etat a sa couleur et son etiquette, binaire`() {
+    fun `chaque etat a sa couleur et son etiquette, doute attend rouge`() {
         assertEquals("GREEN", crossingTag(true, CrossingState.Green))
         assertEquals("RED", crossingTag(true, CrossingState.Red))
+        assertEquals("RED", crossingTag(true, CrossingState.Unknown))
         assertEquals("RED", crossingTag(true, null))
         assertEquals(CROSSING_ACCENT_GREEN, crossingAccent(true, CrossingState.Green))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, CrossingState.Red))
+        assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, CrossingState.Unknown))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, null))
     }
 

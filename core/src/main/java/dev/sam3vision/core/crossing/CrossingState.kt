@@ -6,25 +6,25 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
 
 /**
- * État d'un feu piéton vu par la caméra : [Red] (« attendez ») ou [Green]
+ * État d'un feu piéton vu par la caméra : [Red] (« attendez »), [Green]
  * (« traversez », annoncé seulement après confirmation, voir
- * [CrossingAnnouncer]). Binaire (ordre user du 31/10, fini le doute) : pas
- * de feu détecté, boîte invalide ou couleur indécise valent [Red] — seul
- * un vert confirmé autorise la traversée, tout le reste attend.
+ * [CrossingAnnouncer]) ou [Unknown] (le doute : pas de feu détecté,
+ * boîte invalide ou couleur indécise — reel audit 31/10). La décision
+ * traversée reste fail-safe ([Red] comme [Unknown] attendent).
  */
-enum class CrossingState { Red, Green }
+enum class CrossingState { Red, Green, Unknown }
 
 /**
  * Concepts **minimaux** de la Traversée : le feu (en trois variantes), la
- * tête du feu, les voitures, les personnes et le passage lui-même. Sept
- * concepts : le feu dit quand traverser, les personnes sont annoncées par
- * positions, et le passage vu garde le mode auto actif (perdu plusieurs
- * frames de suite, retour au mode normal).
+ * tête du feu, les véhicules (voiture, camion, moto — reel audit 31/10),
+ * les personnes et le passage lui-même. Neuf concepts : le feu dit quand
+ * traverser, les personnes sont annoncées par positions, et le passage vu
+ * garde le mode auto actif (perdu plusieurs frames, retour au mode normal).
  *
- * Couverture « mêmes masques » : [LIGHT] est dans [LivePrompts.default],
- * les variantes ([LIGHT_SHORT], [LIGHT_SIGNAL]) désignent les mêmes masques
- * — le mode traversée actif les envoie en plus ([LIGHTS], câblage `:app`),
- * sans nouveau concept visuel à couvrir.
+ * Couverture « mêmes masques » : tout est dans [LivePrompts.default] sauf
+ * « truck » et « motorcycle », envoyés en plus en traversée active — le
+ * mode actif envoie aussi [LIGHTS] (câblage `:app`), sans nouveau concept
+ * visuel à couvrir (mêmes masques que [LIGHT]).
  */
 object CrossingPrompts {
 
@@ -67,8 +67,9 @@ object CrossingPrompts {
     /** Concept passage, qui garde le mode auto actif tant qu'il est vu. */
     const val CROSSWALK = "crosswalk"
 
-    /** Concepts envoyés à SAM en mode Traversée (anglais, comme les défauts). */
-    val PROMPTS: List<String> = LIGHTS + listOf(HEAD, "car", PERSON, CROSSWALK)
+    /** Couverture documentaire du mode Traversée (l'envoi réel passe par TraversePipeline.promptsFor). */
+    val PROMPTS: List<String> =
+        LIGHTS + listOf(HEAD, "car", "truck", "motorcycle", PERSON, CROSSWALK)
 
     /**
      * Étiquettes (canoniques, voir [KnownSizes.canonical]) qui désignent un

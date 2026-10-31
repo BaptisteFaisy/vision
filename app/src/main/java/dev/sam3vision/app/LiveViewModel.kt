@@ -17,7 +17,7 @@ import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.live.LiveSensors
-import dev.sam3vision.app.live.LivePositionVoice
+import dev.sam3vision.app.live.LiveDirectAnnouncers
 import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
 import dev.sam3vision.app.live.LiveWakeGuard
@@ -99,6 +99,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, éteints par défaut. */
     internal val adaptive = LiveAdaptive(baseQuality = LIVE_JPEG_QUALITY)
     private var sensorLens: LensSpec? = null
+    private val lensQuality = dev.sam3vision.app.live.LensQualityStore(getApplication())
 
     private var settings: Settings = Settings.Default
 
@@ -126,13 +127,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Annonce vocale des positions : une phrase à la fois, jamais superposée. */
     private val voice = VoiceAnnouncer(app, POSITION_VOICE_DIR)
 
-    private val positions = LivePositionVoice(
-        scope = viewModelScope,
-        state = _state,
-        settings = { settings },
-        asking = { _state.value.memory.asking || asker.pictoActive },
-        speak = { current, phrase -> voice.say(current, phrase) },
-    )
+    /** Voix du direct : positions + états moteurs (un champ, plafond 500 lignes). */
+    private val announcers = LiveDirectAnnouncers(viewModelScope, _state, { settings },
+        { traverse.active }, { _state.value.memory.asking || asker.pictoActive }, { c, p -> voice.say(c, p) })
 
     /** Câblage traversée : pipeline + voix, branché dans [publish]. */
     private val traverse = TraverseWiring(TraversePipeline())
@@ -237,6 +234,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     private fun resetForStart(prompts: List<String>) {
         trackFallback.reset()
         traverse.reset()
+        announcers.reset()
         val chosen = LivePrompts.normalize(prompts)
         // Journal et historique : vidés par `asker.reset()` (implémentation unique, partagée avec `stop()`).
         asker.reset()
@@ -285,7 +283,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Bascule le mode traversée : prompts véhicules + voix, ou retour au défaut. */
     fun setTraverseActive(active: Boolean) {
-        traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) }, positions::reset)
+        traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) }, announcers::resetPositions)
         _state.update { it.copy(traverseActive = traverse.active) }
     }
 
@@ -386,7 +384,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
         prediction.absorb(shown.frame, now, width, height)
         val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
-        if (!traverse.active || shown.keepGuidance) positions.announce(shown.frame, width, height, now, readings)
+        announcers.announce(shown.frame, width, height, now, readings, shown.detections, !traverse.active || shown.keepGuidance)
         if (!traverse.active) asker.onLiveFrame(width, height, now)
         // Calcul hors thread principal ; le poste `overlays` est posé juste après.
         val overlays = decodeOverlays(shown.frame)
@@ -420,7 +418,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun applyLens(spec: LensSpec?) {
         if (spec != null && spec.usable) sensorLens = spec
-        distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
+        val chosen = dev.sam3vision.app.live.chooseLens(settings.cameraFovDeg, sensorLens)
+        distances.setLens(chosen.spec)
+        lensQuality.note(chosen.origin)
     }
 
     /**
@@ -478,7 +478,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         prediction.reset()
         adaptive.reset()
         wake.reset()
-        traverse.deactivate(positions::reset)
+        traverse.deactivate(announcers::resetPositions)
         voice.stop()
         latestFrame.clear()
         chronology.reset()

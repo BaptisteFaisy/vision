@@ -1,6 +1,7 @@
 package dev.sam3vision.core.crossing
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -19,26 +20,26 @@ class TrainedLightColorTest {
     }
 
     @Test
-    fun `le noir attend rouge, binaire`() {
+    fun `le noir doute, garde vert`() {
         assertEquals(
-            CrossingState.Red,
+            CrossingState.Unknown,
             TrainedLightColor.classify(IntArray(100) { BLACK }, 10, 10),
         )
     }
 
     @Test
-    fun `le gris attend rouge, binaire`() {
+    fun `le gris doute, feuille fragile`() {
         assertEquals(
-            CrossingState.Red,
+            CrossingState.Unknown,
             TrainedLightColor.classify(IntArray(100) { GRAY }, 10, 10),
         )
     }
 
     @Test
-    fun `un tableau incoherent attend rouge, binaire`() {
-        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(0), 0, 0))
-        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(10), 10, 10))
-        assertEquals(CrossingState.Red, TrainedLightColor.classify(IntArray(100), -1, 10))
+    fun `un tableau incoherent doute`() {
+        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(0), 0, 0))
+        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(10), 10, 10))
+        assertEquals(CrossingState.Unknown, TrainedLightColor.classify(IntArray(100), -1, 10))
     }
 
     @Test
@@ -49,6 +50,11 @@ class TrainedLightColorTest {
     @Test
     fun `le vert se tranche des 0,50 de purete`() {
         assertEquals(0.50f, TrainedLightColor.GREEN_MIN_PURITY, 0f)
+    }
+
+    @Test
+    fun `l'arbre dit non valide France, corpus allemand`() {
+        assertFalse(TrainedLightColor.VALIDATED_FR)
     }
 
     /** Barre verte 4x10 sur fond noir : petit bonhomme sombre (feuille 6 de l'arbre). */

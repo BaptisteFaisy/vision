@@ -5,9 +5,9 @@ import dev.sam3vision.core.model.SegObject
 
 /**
  * Détection d'un passage piéton proche : le mode Traversée s'arme
- * **automatiquement** à 2 mètres au plus ([CrossingOfferGate], 3 frames sur 5)
- * et retombe seul quand le passage disparaît ([CrossingLossGate], 4 frames
- * vides de suite).
+ * **automatiquement** à 2 mètres au plus ([CrossingOfferGate], 2 frames sur 5,
+ * hystérésis : retombée à 0 sur 5) et retombe seul quand le passage
+ * disparaît ([CrossingLossGate], 4 frames vides de suite).
  *
  * Le concept `crosswalk` est déjà l'un des douze prompts par défaut du direct
  * (`LivePrompts.default`) : SAM le détecte donc déjà, et jusqu'ici l'information
@@ -19,23 +19,31 @@ import dev.sam3vision.core.model.SegObject
  */
 object CrossingOffer {
 
-    /** Score minimal d'un objet pour compter comme passage piéton. */
-    const val MIN_SCORE = 0.40f
+    /**
+     * Score minimal d'un objet pour compter comme passage piéton : 0,35, miroir
+     * du seuil serveur (`SCORE_THRESHOLD`, `segmentation.py`) — le serveur ne
+     * renvoie rien sous 0,35, exiger 0,40 côté client jetait des passages que
+     * le modèle avait vus (reel audit 31/10 : seuils client/serveur alignés).
+     */
+    const val MIN_SCORE = 0.35f
 
     /** Au-delà (m), un passage vu n'arme plus seul le mode (ordre user 30/10). */
     const val OFFER_MAX_METERS = 2.0f
 
     /** Étiquettes acceptées, après canonicalisation (casse, accents, ponctuation). */
     private val LABELS = setOf(
-        "crosswalk", "cross walk", "zebra crossing", "zebra crossing", "pedestrian crossing",
-        "passage pieton", "passage cloute", "cloutage",
+        "crosswalk", "cross walk", "zebra crossing", "pedestrian crossing",
+        "zebra", "zebre", "passage pieton", "passage cloute", "cloutage",
+        "bande", "bandes", "bande blanche", "bandes blanches",
     )
 
     /** Vrai si [label] (brut, tel que renvoyé par SAM) désigne un passage piéton. */
     fun isCrosswalkLabel(label: String): Boolean {
         val key = KnownSizes.canonical(label)
         if (LABELS.contains(key)) return true
-        return key.split(' ').any { it == "crosswalk" || it == "cloutage" }
+        return key.split(' ').any {
+            it == "crosswalk" || it == "cloutage" || it == "zebra" || it == "zebre"
+        }
     }
 
     /** Vrai si la frame contient un passage piéton assez sûr. */
@@ -68,8 +76,12 @@ object CrossingOffer {
 
 /**
  * Mémoire courte de l'armement auto : il faut voir le passage proche sur
- * plusieurs frames (une détection isolée est du bruit), et un refus se tait
- * pendant [quietMs].
+ * [minFrames] frames de la fenêtre ([WINDOW]) pour armer (une détection
+ * isolée reste du bruit), puis une seule frame positive de la fenêtre suffit
+ * à garder la proposition ([keepFrames]) — hystérésis : l'offre ne clignote
+ * pas quand la détection hésite. Un refus se tait pendant [quietMs] ; le repli
+ * reste l'armement manuel (puce Traversée, ordre vocal), qui ne passe pas par
+ * cette porte (couche app).
  *
  * Pur et testé en JVM : l'instant est toujours passé en argument.
  */
@@ -77,10 +89,12 @@ class CrossingOfferGate(
     private val window: Int = WINDOW,
     private val minFrames: Int = MIN_FRAMES,
     private val quietMs: Long = QUIET_MS,
+    private val keepFrames: Int = KEEP_FRAMES,
 ) {
 
     private val recent = ArrayDeque<Boolean>()
     private var quietUntilMs = 0L
+    private var armed = false
 
     /**
      * Frame publiée : vrai si l'app doit armer seul le mode Traversée — passage
@@ -98,27 +112,38 @@ class CrossingOfferGate(
         while (recent.size > window) recent.removeFirst()
         if (traversing) return false
         if (nowMs < quietUntilMs) return false
-        return recent.count { it } >= minFrames
+        val hits = recent.count { it }
+        if (!armed) {
+            armed = hits >= minFrames
+        } else if (hits < keepFrames) {
+            armed = false
+        }
+        return armed
     }
 
     /** L'utilisateur a coupé le mode : on se tait un moment au lieu de relancer. */
     fun declined(nowMs: Long) {
         quietUntilMs = nowMs + quietMs
         recent.clear()
+        armed = false
     }
 
     /** Nouvelle séance : mémoire et silence effacés. */
     fun reset() {
         recent.clear()
         quietUntilMs = 0L
+        armed = false
     }
 
     companion object {
         /** Fenêtre d'observation, en frames publiées. */
         const val WINDOW = 5
 
-        /** Frames de la fenêtre qui doivent voir le passage. */
-        const val MIN_FRAMES = 3
+        /** Frames de la fenêtre qui arment la proposition (assoupli, 3 → 2). */
+        const val MIN_FRAMES = 2
+
+        /** Frames de la fenêtre qui gardent la proposition armée (hystérésis). */
+        const val KEEP_FRAMES = 1
 
         /** Silence après un refus. */
         const val QUIET_MS = 60_000L

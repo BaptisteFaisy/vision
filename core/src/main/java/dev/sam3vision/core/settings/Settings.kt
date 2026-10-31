@@ -94,14 +94,15 @@ data class Settings(
      * Poids montant adaptatif (Q8) : le régulateur marche les paliers qualité seule
      * 0-2 (q65→q55→q45 sur le Direct, q55→q45→q35 sur iSee — jamais le bord, donc
      * sans rebind CameraX) d'après la part réseau mesurée (aller-retour −
-     * `elapsed_ms`). **`false` par défaut** : éteint, l'encodeur garde sa constante.
+     * `elapsed_ms`). **`true` par défaut** (audit réel 31/10) : auto-calibré, constant sans variation réseau.
      */
-    val adaptiveUploadEnabled: Boolean = false,
+    val adaptiveUploadEnabled: Boolean = true,
     /**
      * Keyframes à la demande (Q9) : le scheduler ne fait envoyer qu'une frame clé
      * quand les masques en service sont périmés (~2/s au lieu de ~5/s), la
      * propagation locale ([boxPredictionEnabled]) comblant l'intervalle.
-     * **`false` par défaut** : éteint, chaque frame part comme avant.
+     * **`false` par défaut**, volontaire (audit réel 31/10) : sans propagation locale
+     * ([boxPredictionEnabled] éteint), les keyframes (~2/s) pire que le direct (~5/s).
      */
     val keyframeSchedulerEnabled: Boolean = false,
     /**

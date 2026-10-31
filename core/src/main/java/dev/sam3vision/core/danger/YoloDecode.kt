@@ -29,6 +29,11 @@ object YoloDecode {
      * colonnes ; [confThreshold] après sigmoïde ; [nmsIou] pour la NMS.
      * Seuil bas volontaire (= temps faible ByteTrack) : le tracker partage
      * lui-même fortes et faibles — couper ici affamerait le 2e temps.
+     *
+     * Contrat GARDÉ : [confThreshold] 0,1 et [MAX_CANDIDATES] ne se relèvent
+     * pas (les faibles maintiennent les pistes, le cap protège la NMS en
+     * n²), et la NMS personnes ne se retire pas (les doublons YOLO y sont
+     * fusionnés avant le tracker : une personne = une piste).
      */
     fun persons(
         rows: Array<FloatArray>,

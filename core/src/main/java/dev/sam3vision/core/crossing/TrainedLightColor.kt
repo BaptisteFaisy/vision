@@ -8,16 +8,25 @@ package dev.sam3vision.core.crossing
  * (profondeur 6, feuille min 20). Traits : [FEATURE_NAMES] dans l'ordre.
  *
  * Sous le plancher de pureté de la feuille atteinte, la réponse est
- * [CrossingState.Red] : binaire, une couleur fragile attend (ordre user du
- * 31/10, fini le doute). Le vert se tranche plus large ([GREEN_MIN_PURITY])
- * que le rouge ([MIN_PURITY]) — un vert raté fait attendre, mais un vert
- * jamais détecté ne sert à rien — avec un garde-fou : sans pixels verts
- * ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert (le noir attend).
- * Reste à valider sur feux français et boîtes SAM réelles (non mesuré).
+ * [CrossingState.Unknown] : le doute se dit (zone grise), il ne se force
+ * plus en rouge — l'aval attend dans les deux cas. Le vert se tranche plus
+ * large ([GREEN_MIN_PURITY]) que le rouge ([MIN_PURITY]) — un vert raté fait
+ * attendre, mais un vert jamais détecté ne sert à rien — avec un garde-fou :
+ * sans pixels verts ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert
+ * (le noir doute). **Non validé sur feux français** ([VALIDATED_FR]) : seule
+ * la porte ([PedLightGate]) est calibrée France, l'arbre reste allemand.
  */
 object TrainedLightColor {
 
-    /** Pureté minimale exigée d'une feuille rouge (une feuille fragile attend quand même : binaire). */
+    /**
+     * Faux : l'arbre est entraîné sur feux allemands (Ampel) et n'a jamais
+     * été validé sur feux français ni boîtes SAM réelles — la porte
+     * anti-confusion tranche ensuite, calibrée lampe serrée France. Passer à
+     * vrai exige un corpus FR mesuré (voir `docs/CALIBRAGE-FEU.md`).
+     */
+    const val VALIDATED_FR = false
+
+    /** Pureté minimale exigée d'une feuille rouge (en dessous : doute, [CrossingState.Unknown]). */
     const val MIN_PURITY = 0.80f
 
     /**
@@ -44,10 +53,10 @@ object TrainedLightColor {
 
     /**
      * État du feu cadré par [argb] ([width] x [height], ARGB 32 bits).
-     * Tableau vide ou incohérent ⇒ [CrossingState.Red], comme HSV.
+     * Tableau vide ou incohérent ⇒ [CrossingState.Unknown], comme HSV.
      */
     fun classify(argb: IntArray, width: Int, height: Int): CrossingState {
-        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Red
+        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Unknown
         val features = CrossingFeatures.extract(argb, width, height)
         var node = 0
         while (LEFT[node] >= 0) {
@@ -55,9 +64,9 @@ object TrainedLightColor {
         }
         val leafGreen = LEAF_CLASS[node] == 1
         val floor = if (leafGreen) GREEN_MIN_PURITY else MIN_PURITY
-        if (LEAF_PURITY[node] < floor) return CrossingState.Red
+        if (LEAF_PURITY[node] < floor) return CrossingState.Unknown
         if (leafGreen && features[GREEN_FRAC_INDEX] < PedLightGate.GREEN_MIN_FRACTION) {
-            return CrossingState.Red
+            return CrossingState.Unknown
         }
         return if (leafGreen) CrossingState.Green else CrossingState.Red
     }

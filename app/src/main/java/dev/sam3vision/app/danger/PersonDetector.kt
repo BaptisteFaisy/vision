@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import dev.sam3vision.app.depth.DepthPreprocess
 import dev.sam3vision.core.danger.YoloDecode
 import dev.sam3vision.core.depth.SerialRunGuard
@@ -47,7 +48,8 @@ class PersonDetector private constructor(
                 val resized = DepthPreprocess.resizeArgbBilinear(argb, width, height, YoloDecode.INPUT_SIZE)
                 val input = DepthPreprocess.normalizeCHW(resized, YoloDecode.INPUT_SIZE, ZERO_MEAN, UNIT_STD)
                 val started = SystemClock.elapsedRealtime()
-                val rows = guard.run { runSession(input) }.getOrThrow()
+                val (rows, guardWaitMs) = guard.runMeasured { runSession(input) }.getOrThrow()
+                if (guardWaitMs > 0) Log.d("DangerAlert", "verrou ORT : attente $guardWaitMs ms")
                 val decoded = SystemClock.elapsedRealtime()
                 val persons = YoloDecode.persons(rows, width, height)
                 val done = SystemClock.elapsedRealtime()
@@ -82,7 +84,12 @@ class PersonDetector private constructor(
 
         /**
          * Session CPU sur le store adb (itération sans rebuild) puis l'asset
-         * embarqué, `null` si le modèle est absent des deux.
+         * embarqué, `null` si le modèle est absent des deux. CPU + 4 threads
+         * intra-op, comme [dev.sam3vision.app.depth.OnnxDepthEstimator] : NNAPI
+         * essayé sans gain mesuré (dos-à-dos 2026-10-28, session OK mais jamais
+         * plus rapide) — CPU seul tant qu'un banc ne prouve pas le contraire.
+         * Budget suivi par [DangerBench] (médiane totale/session/décodage) ; une
+         * passe rend ses trois postes ([PersonResult]) pour la recette.
          */
         fun open(context: Context): PersonDetector? {
             val weights = readStoreFile(context) ?: readAsset(context) ?: return null

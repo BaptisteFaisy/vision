@@ -4,9 +4,10 @@
 dans DA2-Small (~25 M params, ~50 Mo VRAM) et chaque objet renvoyé porte sa
 médiane de proximité (``depth``, 0..1, **grand = proche** — même convention que
 la carte on-device, voir ``DepthMap.kt`` : la sortie brute de DA2 est une
-disparité). Médiane sur la **boîte** (pas le masque) : robuste, prévisible, et le
-téléphone garde sa fusion au masque embarquée en complément. Client muet = aucune
-clé, aucun coût ; modèle absent = repli gracieux (pas de clé, jamais d'erreur).
+disparité). Médiane sur le **masque** (pixels objet dans la boîte érodée),
+repli boîte érodée (25 % par côté, comme ``DepthReadings`` embarqué) : la boîte
+entière lirait le fond sur un objet fin (poteau). Client muet = aucune clé,
+aucun coût ; modèle absent = repli gracieux (pas de clé, jamais d'erreur).
 
 Imports lourds (torch/transformers) dans les fonctions : ce module reste
 importable sans GPU, comme ``segmentation``.
@@ -19,6 +20,10 @@ import numpy as np
 MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 # Carte plate (aucune information) : ni proche ni loin.
 NEUTRAL_DEPTH = 0.5
+# Érosion par côté avant la médiane : les bords portent le fond (voir DepthReadings.kt).
+EROSION_FRACTION = 0.25
+# Pixels objet minimaux dans la fenêtre : en deçà, la médiane masque est du bruit.
+MIN_MASK_PIXELS = 4
 
 
 def load_depth(device: str, dtype):
@@ -67,22 +72,84 @@ def normalize_disparity(values) -> np.ndarray:
     return ((array - array.min()) / span).astype(np.float32)
 
 
-def median_in_box(norm, box, image_size):
-    """Médiane de la carte sur la boîte ``box`` (xyxy, pixels image) ; None si vide."""
+def eroded_box(box):
+    """Boîte ``box`` (xyxy) rognée d'``EROSION_FRACTION`` par côté ; None si dégénérée."""
+    x1, y1, x2, y2 = (float(value) for value in box)
+    dx, dy = (x2 - x1) * EROSION_FRACTION, (y2 - y1) * EROSION_FRACTION
+    if dx <= 0 or dy <= 0:
+        return None
+    inner = [x1 + dx, y1 + dy, x2 - dx, y2 - dy]
+    return inner if inner[2] > inner[0] and inner[3] > inner[1] else None
+
+
+def _clip_window(window, image_size):
+    """Fenêtre xyxy flottante -> bornes entières (x1, y1, x2, y2), cadre inclus."""
     width, height = image_size
-    x1, y1, x2, y2 = (int(round(value)) for value in box)
-    x1, y1 = max(x1, 0), max(y1, 0)
-    x2, y2 = min(x2, width), min(y2, height)
+    x1, y1, x2, y2 = (int(round(value)) for value in window)
+    return max(x1, 0), max(y1, 0), min(x2, width), min(y2, height)
+
+
+def median_in_window(norm, window, image_size):
+    """Médiane de la carte sur ``window`` (xyxy flottants, bornés) ; None si vide."""
+    x1, y1, x2, y2 = _clip_window(window, image_size)
     if x2 <= x1 or y2 <= y1:
         return None
     return float(np.median(norm[y1:y2, x1:x2]))
 
 
+def median_in_box(norm, box, image_size):
+    """Médiane de la carte sur la boîte ``box`` (xyxy, pixels image) ; None si vide.
+
+    Chemin historique (boîte entière, tests) — :func:`attach_medians` préfère le
+    masque puis la boîte érodée.
+    """
+    return median_in_window(norm, box, image_size)
+
+
+def median_in_mask(norm, mask, window, image_size):
+    """Médiane sur les pixels objet (``mask > 0``) dans ``window`` ; None si < 4.
+
+    ``mask`` est le masque brut de l'entrée (résolution de travail) : il est ramené
+    à ``image_size`` au plus proche (``imaging.mask_to_uint8``, même seuil que
+    l'encodage), puis croisé avec la fenêtre déjà bornée.
+    """
+    from imaging import mask_to_uint8
+
+    binary = mask_to_uint8(mask, image_size) > 0
+    x1, y1, x2, y2 = _clip_window(window, image_size)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    picked = norm[y1:y2, x1:x2][binary[y1:y2, x1:x2]]
+    if picked.size < MIN_MASK_PIXELS:
+        return None
+    return float(np.median(picked))
+
+
+def median_for_entry(norm, entry, image_size):
+    """Médiane d'une entrée : masque dans la boîte érodée, sinon boîte érodée.
+
+    Ni l'un ni l'autre (boîte dégénérée, masque vide) : None, et la clé ``depth``
+    reste absente — pas de médiane déguisée sur la boîte entière.
+    """
+    window = eroded_box(entry["box"])
+    if window is None:
+        return None
+    mask = entry.get("mask")
+    if mask is not None:
+        try:
+            masked = median_in_mask(norm, mask, window, image_size)
+        except (TypeError, ValueError, AttributeError):
+            masked = None
+        if masked is not None:
+            return masked
+    return median_in_window(norm, window, image_size)
+
+
 def attach_medians(norm, entries, image_size):
-    """Joint ``entry["depth"]`` (médiane de boîte) à chaque entrée mesurable."""
+    """Joint ``entry["depth"]`` (médiane masque/érodée) à chaque entrée mesurable."""
     for entry in entries:
         try:
-            median = median_in_box(norm, entry["box"], image_size)
+            median = median_for_entry(norm, entry, image_size)
         except (KeyError, TypeError, ValueError):
             median = None
         if median is not None:

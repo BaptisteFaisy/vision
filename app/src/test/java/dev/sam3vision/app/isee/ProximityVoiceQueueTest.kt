@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * File de rattrapage des phrases douces : tue par le chat ou la route, la
- * phrase en file est redite au silence, une fois, dans les 3 s — sans file,
+ * phrase en file est redite au silence, une fois, dans les 5 s — sans file,
  * elle est perdue comme avant.
  */
 class ProximityVoiceQueueTest {

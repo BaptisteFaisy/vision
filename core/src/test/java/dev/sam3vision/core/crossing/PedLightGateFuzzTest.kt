@@ -7,13 +7,13 @@ import org.junit.Test
 /**
  * Fuzz anti-inversion de la porte : un rouge ne rend JAMAIS vert —
  * photométrie, géométrie, bruit et balance des blancs, sur crops réels
- * (`feuxfr/`, `feuxfr2/`) et synthétiques. Binaire (ordre user du 31/10) :
- * tout non-vert attend rouge.
+ * (`feuxfr/`, `feuxfr2/`) et synthétiques. Zone grise (31/10) : tout non-vert
+ * attend (rouge franc ou doute), jamais vert.
  *
  * Tous déterministes (graines fixées, pas d'ImageIO) et pré-validés sur un
  * modèle Python fidèle du pipeline (arbre + porte) : 412/413 sans vert, le
- * seul écart expliqué (ligne 1 px : doute tri-state du modèle, rouge binaire
- * en Kotlin — la porte la refuse par sa hauteur minimale).
+ * seul écart expliqué (ligne 1 px : doute tri-state du modèle comme en
+ * Kotlin — la porte la refuse par sa hauteur minimale).
  *
  * Pixels et transforms partagés : voir CrossingTestPixels.kt.
  */
@@ -55,7 +55,7 @@ class PedLightGateFuzzTest {
     @Test
     fun `fuzz - rouges et bruit jamais verts, graines 0 a 19`() {
         // Poivre-et-sel, pixels verts parasites, gigue uniforme : le rouge
-        // bruité reste rouge (binaire), jamais vert.
+        // bruité attend (rouge ou doute), jamais vert.
         val sources = listOf(
             pixelsOf(javaClass.classLoader, "feuxfr", "fr_red_fig_548.ppm"),
             pixelsOf(javaClass.classLoader, "feuxfr2", "st_r01.ppm"),
@@ -83,11 +83,11 @@ class PedLightGateFuzzTest {
     }
 
     @Test
-    fun `fuzz - melange rouge dominant et ligne verte attendent rouge`() {
-        // Mécanisme certain : le rouge franc (75 %) fait refuser la porte, la
-        // ligne d'1 px échoue la hauteur minimale — verdict rouge, pas vert.
+    fun `fuzz - melange rouge dominant attend, ligne verte doute`() {
+        // Mécanisme certain : le rouge franc (75 %) tranche rouge, la ligne
+        // d'1 px échoue la hauteur minimale — doute, jamais vert.
         assertEquals(CrossingState.Red, PedLightGate.verdict(redDominant(20, 20), 20, 20))
-        assertEquals(CrossingState.Red, PedLightGate.verdict(hline(20, 20), 20, 20))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(hline(20, 20), 20, 20))
     }
 
     /** Sources rouges du fuzz : réelles (feuxfr/, feuxfr2/) + synthétiques. */

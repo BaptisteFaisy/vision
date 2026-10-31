@@ -10,7 +10,10 @@ import dev.sam3vision.core.distance.KnownSizes
  * `barrier` est déjà dans les défauts du direct (dangers extérieurs, ordre
  * user du 28/10) ; les autres formes sont reconnues côté client ([isHazard])
  * quand le backend les segmente. Le français reste reconnu : un label
- * « barrière » compte comme un « barrier ».
+ * « barrière » compte comme un « barrier ». Lampadaires (« street lamp »,
+ * « lampadaire », « réverbère »), panneaux (« sign », « panneau »,
+ * « traffic sign ») et potelets (« potelet », « plot » → « bollard »)
+ * s'y ajoutent (reel audit 31/10).
  *
  * Liste fermée : un concept = un nom FR/EN ([HazardName]). Le « etc. » de
  * l'ordre s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
@@ -35,6 +38,15 @@ object HazardConcepts {
         "cloture" to HazardName("à la clôture", "fence"),
         "gate" to HazardName("au portail", "gate"),
         "portail" to HazardName("au portail", "gate"),
+        "street lamp" to HazardName("au lampadaire", "street lamp"),
+        "lampadaire" to HazardName("au lampadaire", "street lamp"),
+        "reverbere" to HazardName("au lampadaire", "street lamp"),
+        "sign" to HazardName("au panneau", "sign"),
+        "panneau" to HazardName("au panneau", "sign"),
+        "panneaux" to HazardName("au panneau", "sign"),
+        "traffic sign" to HazardName("au panneau de signalisation", "traffic sign"),
+        "potelet" to HazardName("au potelet", "bollard"),
+        "plot" to HazardName("au plot", "bollard"),
     )
 
     /** Nom parlé de [label], `null` si ce n'est pas du mobilier suivi. */

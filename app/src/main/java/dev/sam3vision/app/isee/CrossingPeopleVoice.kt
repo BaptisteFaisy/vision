@@ -33,9 +33,9 @@ internal fun crossingPhraseOf(
     height: Int = 0,
 ): String? {
     if (cue != null) {
-        CrossingVehicleWatch.update(detections, readings, atMs, language, cue)
+        val vehicle = CrossingVehicleWatch.updateFull(detections, readings, atMs, language, cue)
         CrossingPeopleWatch.update(placed, atMs, language, cue, objects, width, height, readings)
-        return cue.phrase
+        return vehicle?.safetyPhrase ?: cue.phrase
     }
     CrossingVehicleWatch.update(detections, readings, atMs, language, null)?.let { return it }
     return CrossingPeopleWatch.update(placed, atMs, language, null, objects, width, height, readings)

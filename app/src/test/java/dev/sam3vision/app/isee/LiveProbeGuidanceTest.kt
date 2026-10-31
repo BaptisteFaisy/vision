@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -181,7 +180,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `sans guidage la voie libre reste muette`() = runTest {
+    fun `sans guidage la voie libre ne dit que l_avis d_armement`() = runTest {
         val (probe, fake) = harness(this, guide = false, announce = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -192,7 +191,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertNull(probe.state.value.spoken)
+        assertEquals("pas de phrase de guidage : seul l'avis d'armement", WARM_SPOKEN, probe.state.value.spoken)
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */
@@ -206,6 +205,8 @@ class LiveProbeGuidanceTest {
         )
         probe.configure("https://sam.test", announce = announce, guide = guide)
         probe.begin()
+        // Scheduler coupé : ce test verrouille le guidage, pas les keyframes (voir LiveAdaptiveTest).
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         return probe to fake
     }
 

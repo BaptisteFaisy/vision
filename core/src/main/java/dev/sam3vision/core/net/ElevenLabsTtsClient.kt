@@ -19,21 +19,31 @@ private const val SNIFF_BYTES = 4_096
  * Erreurs typées : 401 → [ApiError.InvalidKey], 402 (compte sans crédits) →
  * [ApiError.PaymentRequired], 429 → [ApiError.RateLimited], le reste → [ApiError.Http].
  * Un texte vide ou une clé absente échoue sans aucun appel réseau.
+ *
+ * Voix redites sans re-facturer : [cache] garde les phrases synthétisées
+ * (clé [phraseKey] : base + voix + modèle + texte — jamais la clé, qui ne
+ * change pas le son) et les rejoue sans réseau ; les échecs ne sont jamais
+ * mis en cache (un 429 ne doit pas taire la phrase suivante). `null` (défaut,
+ * tests) = sans cache ; la prod passe [sharedPhrases].
  */
 class ElevenLabsTtsClient(
     private val apiKey: String,
     private val voiceId: String,
     private val baseUrl: String = DEFAULT_TTS_BASE_URL,
     private val modelId: String = DEFAULT_TTS_MODEL,
-    private val http: OkHttpClient = defaultHttpClient(),
+    private val http: OkHttpClient = defaultHttpClient(TTS_TIMEOUT_SECONDS),
+    private val cache: MutableMap<String, ByteArray>? = null,
 ) : TtsClient {
 
     override suspend fun synthesize(text: String): Result<ByteArray> {
         val refusal = localRefusal(text)?.let { Result.failure<ByteArray>(it) }
         if (refusal != null) return refusal
+        val key = phraseKey(baseUrl, voiceId, modelId, text)
+        cache?.let { synchronized(it) { it[key] } }?.let { return Result.success(it) }
         return catchingResult { buildRequest(text) }
             .then { http.executeBytes(it) }
             .then(::ensureAudio)
+            .onSuccess { bytes -> cache?.let { putPhrase(it, key, bytes) } }
     }
 
     /** Refus locaux, avant tout appel réseau : message déjà affichable dans l'UI. */
@@ -78,6 +88,40 @@ class ElevenLabsTtsClient(
 
         /** Modèle multilingue rapide, accepté en compte free (vérifié le 26/10/2026). */
         const val DEFAULT_TTS_MODEL = "eleven_v4_turbo"
+
+        /**
+         * Budget d'une synthèse (30 s, moitié du défaut HTTP) : une synthèse
+         * normale prend 1 à 5 s ; au-delà du plafond de tranche (25 s),
+         * l'appelant a déjà abandonné — ce délai ne borne que les appels
+         * sans plafond (voix de proximité).
+         */
+        const val TTS_TIMEOUT_SECONDS = 30L
+
+        /** Phrases gardées en cache (LRU) : les positions redites ne coûtent rien. */
+        const val PHRASE_CACHE_MAX = 32
+
+        /** Cache partagé de la prod : la même phrase dite deux fois est gratuite. */
+        val sharedPhrases: LinkedHashMap<String, ByteArray> =
+            object : LinkedHashMap<String, ByteArray>(64, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean =
+                    size > PHRASE_CACHE_MAX
+            }
+
+        /** Clé de cache : base + voix + modèle + texte (jamais la clé d'API). */
+        fun phraseKey(baseUrl: String, voiceId: String, modelId: String, text: String): String =
+            listOf(baseUrl.trim().trimEnd('/'), voiceId.trim(), modelId.trim(), text)
+                .joinToString("\u0000")
+
+        /** Insertion bornée (le LRU d'accès ne suffit pas à borner la taille). */
+        fun putPhrase(cache: MutableMap<String, ByteArray>, key: String, value: ByteArray) {
+            synchronized(cache) {
+                cache[key] = value
+                while (cache.size > PHRASE_CACHE_MAX) {
+                    val oldest = cache.keys.firstOrNull() ?: break
+                    cache.remove(oldest)
+                }
+            }
+        }
     }
 }
 

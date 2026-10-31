@@ -17,7 +17,8 @@ import org.junit.Test
  * Note : [PedLightGate.verdict] passe d'abord par [TrainedLightColor],
  * donc les formes synthétiques sont testées via [PedLightGate.acceptGreen]
  * (géométrie pure) ; [verdict] n'est testé que sur des cas dont la
- * réponse de l'arbre est prévisible (plein rouge, noir, incohérent).
+ * réponse de l'arbre est prévisible (plein rouge, noir, incohérent — le
+ * plein rouge reste rouge, le reste doute).
  */
 class PedLightGateLimitsTest {
 
@@ -31,11 +32,11 @@ class PedLightGateLimitsTest {
     }
 
     @Test
-    fun `verdict incoherent - rouge, binaire`() {
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(0), 0, 0))
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(10), 10, 10))
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100), -1, 10))
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 0, 10))
+    fun `verdict incoherent - doute, zone grise`() {
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(0), 0, 0))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(10), 10, 10))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100), -1, 10))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 0, 10))
     }
 
     @Test
@@ -63,13 +64,13 @@ class PedLightGateLimitsTest {
     }
 
     @Test
-    fun `verdict - plein rouge reste rouge, jamais vert`() {
+    fun `verdict - plein rouge reste rouge, plein noir doute, jamais vert`() {
         assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { RED }, 10, 10))
         assertNotEquals(
             CrossingState.Green,
             PedLightGate.verdict(disc(10, 10, 5, RED), 20, 20),
         )
-        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
+        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
     }
 
     /** Barre verte 4x10 dans la moitié basse, plus [reds] pixels rouges en haut. */

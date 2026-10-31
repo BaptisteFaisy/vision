@@ -12,8 +12,10 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameLabels
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.LiveFrame
+import kotlinx.coroutines.flow.update
 
 /**
  * Mise en forme d'une frame SAM : étiquettes, transport, distances, pastilles,
@@ -22,6 +24,10 @@ import dev.sam3vision.core.model.LiveFrame
  * Extraits de [LiveProbe] pour qu'elle reste sous la limite de 500 lignes
  * (même raison que `ProbeWiring.kt` et `CrossingWiring.kt`) : logique
  * inchangée, dépendances passées en paramètres.
+ *
+ * À deux créneaux, les vols se chevauchent sur la chronologie unique de la sonde : les
+ * marques du premier vol sont approximatives (le `beginFrame` suivant les remplace).
+ * Seul le panneau debug est concerné — masques, distances et voix sont intacts.
  */
 
 /** Étiquettes de la frame, sans doublon (ensemble réutilisé, voir [FrameLabels]). */
@@ -69,3 +75,43 @@ internal const val DEFAULT_TIMEOUT_SECONDS = 10L
 
 /** Délai du premier appel : couvre le démarrage d'un conteneur Modal (30-50 s). */
 internal const val COLD_TIMEOUT_SECONDS = 60L
+
+/** Phrase d'armement : le réveil parle, plus de 30-50 s aveugles. */
+internal const val WARM_SPOKEN = "Waking the server, up to a minute."
+
+/** Phrase du réveil qui dépasse le délai froid (dite une fois par panne). */
+internal const val COLD_TIMEOUT_SPOKEN = "Server still waking. Retrying."
+
+/**
+ * Envoi prioritaire : priorité armée par un refus, alerte danger en cours, ou
+ * détections à l'écran — ces frames sautent le garde temporel (jamais le créneau).
+ */
+internal fun probePriority(state: LiveProbeState, armed: Boolean): Boolean =
+    armed || state.dangerAlert != null || state.objects > 0
+
+/** Un refus de conversion (réserve pleine) : compté dans l'état, jamais silencieux. */
+internal fun LiveProbe.noteSkipped() {
+    _state.update { it.copy(skippedFrames = it.skippedFrames + 1) }
+}
+
+/**
+ * Réveil qui dépasse le délai froid : dit une fois par panne (la phrase présente
+ * prouve qu'on l'a déjà dit — pas de drapeau, pas de spam à chaque frame en échec).
+ */
+internal fun LiveProbe.sayColdTimeout() {
+    val current = _state.value
+    if (current.spoken == COLD_TIMEOUT_SPOKEN) return
+    _state.update { it.copy(spoken = COLD_TIMEOUT_SPOKEN, spokenSeq = it.spokenSeq + 1) }
+}
+
+/**
+ * Cap demandé à la voix (« va à gauche ») : le guidage recalcule le passage
+ * vers ce cap dès la prochaine frame. L'annonceur repart de zéro pour que
+ * la nouvelle consigne se dise sans attendre ; sans effet à cap identique.
+ * Le cap retombe à tout droit à la prochaine session (voir [LiveProbe.begin]).
+ */
+internal fun LiveProbe.applySteering(cap: SteeringCap) {
+    if (_state.value.steeringCap == cap) return
+    voice.reset()
+    _state.update { it.copy(steeringCap = cap) }
+}

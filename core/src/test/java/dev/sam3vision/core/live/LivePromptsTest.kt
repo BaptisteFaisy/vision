@@ -53,29 +53,29 @@ class LivePromptsTest {
 
     @Test
     fun `la traversee est couverte par les defauts, memes masques`() {
-        // Contrat « mêmes masques » : tout ce que la Traversée doit voir est
-        // déjà suivi en mode normal — la bascule ne change plus les prompts.
-        // Les variantes du feu (« pedestrian light », « pedestrian signal »,
-        // voir CrossingPrompts.LIGHTS) désignent les mêmes masques que LIGHT
-        // déjà suivi : couverture visuelle, pas égalité de chaînes.
+        // Mêmes masques (reel audit 31/10) : la Traversée voit les défauts,
+        // plus les extras camion/moto en mode actif (voir PROMPTS) ; les
+        // variantes du feu (LIGHTS) couvrent les mêmes masques que LIGHT.
+        val extras = setOf("truck", "motorcycle")
+        assertTrue(CrossingPrompts.PROMPTS.containsAll(extras))
         CrossingPrompts.PROMPTS.forEach { concept ->
-            val covered = concept in LivePrompts.default ||
+            val covered = concept in extras || concept in LivePrompts.default ||
                 (CrossingPrompts.isLightLabel(concept) && CrossingPrompts.LIGHT in LivePrompts.default)
             assertTrue(concept, covered)
         }
-        (VehicleConcepts.PROMPTS - "scooter").forEach { concept ->
+        (VehicleConcepts.PROMPTS - extras - "scooter").forEach { concept ->
             assertTrue(concept, concept in LivePrompts.default)
         }
         assertTrue("curb" in LivePrompts.default)
     }
 
     @Test
-    fun `preset exterieur douze concepts de cheminement sous le plafond`() {
+    fun `preset exterieur quinze concepts de cheminement sous le plafond`() {
         assertEquals(
             listOf(
-                "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
-                "trash can", "sidewalk", "animal", "pedestrian traffic light",
-                "pedestrian signal head",
+                "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
+                "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
+                "pedestrian traffic light", "pedestrian signal head",
             ),
             LivePrompts.outdoor,
         )
@@ -88,16 +88,16 @@ class LivePromptsTest {
         assertTrue("sidewalk" in LivePrompts.outdoor)
         assertFalse("dumpster" in LivePrompts.outdoor)
         assertTrue("pedestrian signal head" in LivePrompts.outdoor)
-        assertEquals(13, LivePrompts.outdoor.size)
+        assertEquals(15, LivePrompts.outdoor.size)
     }
 
     @Test
-    fun `sept objets d interieur dedans, douze dangers dehors`() {
+    fun `huit objets d interieur dedans, douze dangers dehors`() {
         assertEquals(
-            listOf("person", "door", "chair", "table", "stairs", "wall", "window"),
+            listOf("person", "door", "chair", "table", "stairs", "wall", "window", "crosswalk"),
             LivePrompts.indoor,
         )
-        assertEquals(7, LivePrompts.indoor.size)
+        assertEquals(8, LivePrompts.indoor.size)
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
     }

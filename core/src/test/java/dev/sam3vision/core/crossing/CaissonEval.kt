@@ -12,15 +12,17 @@ import org.json.JSONObject
  *
  * Chaîne : [CrossingPrompts.selectLightBox] (vrai code) → [cropNorm] (miroir
  * JVM de `CrossingPixels.crop`, `:app` non testable en JVM : crop sur boîte
- * normalisée + réduction au bord 48, plus proche voisin) →
+ * normalisée + réduction au bord 96, plus proche voisin — le recadrage lampe
+ * n'est pas rejoué : les caissons contiennent leur lentille, verdicts
+ * inchangés, voir `CrossingRecenterTest` côté `:app`) →
  * [PedLightGate.verdict] (vrai code). Les verdicts attendus sont pinés dans
- * `feuxevel/RECALL-v1.json` (pré-calculés par le miroir Python
+ * `feuxevel/RECALL-v2.json` (pré-calculés par le miroir Python
  * `tools/light_features.py`, parité verrouillée en CI sur 20 ancres).
  */
 internal const val CAISSON_FRAME = 128
 
 /** Bord max du crop, miroir de `CrossingPixels.MAX_EDGE`. */
-internal const val CAISSON_MAX_EDGE = 48
+internal const val CAISSON_MAX_EDGE = 96
 
 /** Caisson éteint : valeur 0,16 < MIN_VALUE — invisible du pipeline. */
 private const val HOUSING = 0xFF2A2A2A.toInt()
@@ -127,7 +129,7 @@ internal fun lightObjects(rect: IntArray): List<SegObject> = listOf(
 internal fun detectBox(rect: IntArray): List<Float>? =
     CrossingPrompts.selectLightBox(lightObjects(rect), CAISSON_FRAME, CAISSON_FRAME)
 
-/** Crop sur boîte normalisée + réduction au bord 48 (miroir `CrossingPixels.crop`). */
+/** Crop sur boîte normalisée + réduction au bord 96 (miroir `CrossingPixels.crop`). */
 internal fun cropNorm(frame: IntArray, norm: List<Float>): Triple<IntArray, Int, Int> {
     val left = (norm[0].coerceIn(0f, 1f) * CAISSON_FRAME).roundToInt().coerceIn(0, CAISSON_FRAME - 1)
     val top = (norm[1].coerceIn(0f, 1f) * CAISSON_FRAME).roundToInt().coerceIn(0, CAISSON_FRAME - 1)
@@ -139,7 +141,7 @@ internal fun cropNorm(frame: IntArray, norm: List<Float>): Triple<IntArray, Int,
     return reduceEdge(crop, w, h)
 }
 
-/** Réduction au bord 48, plus proche voisin (division entière = plancher). */
+/** Réduction au bord 96, plus proche voisin (division entière = plancher). */
 internal fun reduceEdge(crop: IntArray, w: Int, h: Int): Triple<IntArray, Int, Int> {
     val nw = minOf(CAISSON_MAX_EDGE, w)
     val nh = minOf(CAISSON_MAX_EDGE, h)
@@ -161,10 +163,10 @@ internal data class EvalGolden(
     val recall: Map<String, String>,
 )
 
-/** Lecture du doré `feuxevel/RECALL-v1.json` (échoue fort si absent). */
+/** Lecture du doré `feuxevel/RECALL-v2.json` (échoue fort si absent). */
 internal fun loadGolden(loader: ClassLoader?): EvalGolden {
-    val text = loader?.getResourceAsStream("feuxevel/RECALL-v1.json")?.bufferedReader()?.readText()
-        ?: error("ressource manquante : feuxevel/RECALL-v1.json")
+    val text = loader?.getResourceAsStream("feuxevel/RECALL-v2.json")?.bufferedReader()?.readText()
+        ?: error("ressource manquante : feuxevel/RECALL-v2.json")
     val json = JSONObject(text)
     val cases = json.getJSONArray("cases")
     val verdicts = mutableMapOf<String, String>()
