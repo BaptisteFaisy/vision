@@ -103,13 +103,15 @@ private fun copyLuma(
     destHeight: Int,
     out: ByteArray,
 ): Int {
+    // Colonnes sources calculées une fois (`destWidth` divisions), pas une fois par
+    // ligne (`destWidth × destHeight`) : même formule, même échantillonnage.
+    val xs = IntArray(destWidth) { x -> x * turnedWidth / destWidth }
     var offset = 0
     for (y in 0 until destHeight) {
         val ys = y * turnedHeight / destHeight
         for (x in 0 until destWidth) {
-            val xs = x * turnedWidth / destWidth
-            val row = sourceRow(turn, xs, ys, planes.width, planes.height)
-            val col = sourceCol(turn, xs, ys, planes.width, planes.height)
+            val row = sourceRow(turn, xs[x], ys, planes.width, planes.height)
+            val col = sourceCol(turn, xs[x], ys, planes.width, planes.height)
             out[offset++] = planes.y.at(row, col)
         }
     }
@@ -129,13 +131,14 @@ private fun copyChroma(
     destHeight: Int,
     out: ByteArray,
 ): Int {
+    // Idem luma : colonnes chroma calculées une fois par appel.
+    val xs = IntArray(destWidth / 2) { cx -> (cx * 2) * turnedWidth / destWidth }
     var offset = destWidth * destHeight
     for (cy in 0 until destHeight / 2) {
         val ys = (cy * 2) * turnedHeight / destHeight
         for (cx in 0 until destWidth / 2) {
-            val xs = (cx * 2) * turnedWidth / destWidth
-            val row = sourceRow(turn, xs, ys, planes.width, planes.height) / 2
-            val col = sourceCol(turn, xs, ys, planes.width, planes.height) / 2
+            val row = sourceRow(turn, xs[cx], ys, planes.width, planes.height) / 2
+            val col = sourceCol(turn, xs[cx], ys, planes.width, planes.height) / 2
             out[offset++] = planes.v.at(row, col)
             out[offset++] = planes.u.at(row, col)
         }
@@ -242,12 +245,20 @@ class Nv21JpegEncoder {
 
     /** Plan Y du NV21 (déjà tourné) → plan de référence [LumaPlane], au plus proche voisin. */
     private fun lumaPlan(size: Packed): ByteArray {
+        // Tables ligne/colonne (`H + W` divisions `Long`) au lieu d'une paire par
+        // pixel (`H × W`) : même formule, même plan.
+        val rows = IntArray(LumaPlane.HEIGHT) { y ->
+            (y.toLong() * size.height / LumaPlane.HEIGHT).toInt() * size.width
+        }
+        val cols = IntArray(LumaPlane.WIDTH) { x ->
+            (x.toLong() * size.width / LumaPlane.WIDTH).toInt()
+        }
         val out = ByteArray(LumaPlane.SIZE)
         var index = 0
         for (y in 0 until LumaPlane.HEIGHT) {
-            val row = (y.toLong() * size.height / LumaPlane.HEIGHT).toInt() * size.width
+            val row = rows[y]
             for (x in 0 until LumaPlane.WIDTH) {
-                out[index++] = nv21[row + (x.toLong() * size.width / LumaPlane.WIDTH).toInt()]
+                out[index++] = nv21[row + cols[x]]
             }
         }
         return out

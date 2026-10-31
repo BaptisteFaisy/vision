@@ -153,7 +153,7 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
 @Composable
 internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: IseeViewModel, modifier: Modifier) {
     // SAM tourne quand la caméra est active (enregistrement et Traversée aussi) : le câblage vit avec la carte.
-    IseeCameraWiring(glue, viewModel, probe.frames)
+    IseeCameraWiring(glue, viewModel, probe.pixelSeq)
     if (!glue.granted) {
         Text(
             "iSee needs the camera.",
@@ -325,7 +325,7 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
 private fun IseeCameraWiring(
     glue: CameraGlue,
     viewModel: IseeViewModel,
-    frames: Int,
+    pixelSeq: Int,
 ) {
     LaunchedEffect(glue.host, viewModel) {
         // SAM voit la caméra dès qu'elle est active (l'enregistrement et la Traversée
@@ -357,7 +357,7 @@ private fun IseeCameraWiring(
     DisposableEffect(glue.host) {
         onDispose { SharedCameraFrame.clear(); StairCannyCount.clear() }
     }
-    FirstPixelWatcher(frames, frames > 0) { viewModel.probe.noteDrawn() }
+    FirstPixelWatcher(pixelSeq, pixelSeq > 0) { viewModel.probe.noteDrawn() }
 }
 
 /** Vrai quand les frames partent vers SAM : caméra active, enregistrement ou Traversée. */
