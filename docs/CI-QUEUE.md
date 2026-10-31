@@ -123,8 +123,14 @@ dans le commentaire d'état du balayeur (§5).
 
 `master` est protégé (PR obligatoire, historique linéaire, pas de push direct) et les
 PR sont fusionnées par le workflow `pr-auto-merge` (jobs `discover` + `sweep` en
-matrice, un job par PR : à chaque fin de `CI` ou de `couche0`, toutes les 15 min en filet, à
-chaque push sur `master` et au passage brouillon → prête). Depuis la v11 (29/10), un couple
+matrice, un job par PR : à chaque fin de `CI`, toutes les 15 min en filet, à
+chaque push sur `master`, au passage brouillon → prête et sur une **réécriture de corps**
+(`edited`, qui réarme `couche0` seul — bloc `## Scope`)). Depuis la v27 (31/10), la fin de
+`couche0` ne réveille plus le balayage : il finit ~9 s après un push quand `CI` met ~115 s, donc
+ce réveil tombait structurellement avant le verdict (mesuré 20:10→22:10 : 41 fins de `couche0`
+pour 21 runs `CI`, la moitié des balayages de la fenêtre). Un `couche0` rouge arrive par la fin de
+`CI` de la même tête ; un `couche0` réarmé seul arrive par `edited`. Même règle pour
+`auto-approve` (31/10 : 25 balayages échantillonnés, 160 runs vus, 0 approuvé). Depuis la v11 (29/10), un couple
 **(tête de PR, base, état de fusion)** n'est balayé qu'une fois : l'empreinte vit dans un
 commentaire unique édité sur place (`<!-- automerge-etat -->`), et un changement d'état
 (`BLOCKED` → `CLEAN` quand les checks passent) en fait un nouveau couple. Avant, les trois
