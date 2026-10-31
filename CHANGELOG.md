@@ -31,6 +31,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   (3 682 tests, 0 échec — dont fuzz déterministe 2 000 scènes, 12 cas de
   bruit chiffrés avec seuils de falaise, chaque correctif rouge avant / vert
   après) ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à 499 lignes).
+## 2026-10-31 — Traversée binaire rouge/vert, sorties confirmées, fuzz anti-inversion
+
+- **Demande** (ordre user) : fini le doute — rouge ou vert, et une
+  différenciation certaine, absolument.
+- **Fait** : `CrossingState` binaire (tout non-vert attend rouge :
+  classifieurs, porte, voix, vibration, affichage, voicepack — clip
+  `cross_unsure` et MP3 supprimés) ; voix, vibration et affichage suivent
+  le dernier état **annoncé** (trou trouvé par audit : 1 frame verte
+  suffisait à vibrer vert et afficher VERT, même sous veto) ; pompe
+  locale ≤ 150 ms supprimée (contournait la confirmation) ;
+  `PedLightGateFuzzTest` (~230 assertions, graines fixées : rouges ×
+  photométrie/géométrie/bruit/balance — jamais verts).
+- **Non fait, assumé** : porte intouchée (pas de retouche sans données) ;
+  fusion arbre+HSV abandonnée (no-op prouvé) ; verts illisibles disent
+  rouge (même action sûre) — seul un corpus téléphone remontera le rappel.
+- Preuves : tests JVM `:core`/`:app` à 0 échec (r630), UBS 0 critique,
+  gardes `ci-core` locales OK ; checks PR (`ci`, `ci-budget`, `couche0`).
 
 
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)

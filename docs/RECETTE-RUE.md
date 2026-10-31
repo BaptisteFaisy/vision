@@ -37,7 +37,7 @@ temps**) ; sinon repli Google Maps piéton (`TravelMode.WALK`) décrit dans
 | Virage + obstacle | 0 chevauchement : une seule voix, la consigne route se met en file (`Instruction`), le danger coupe (`Danger`), deux phrases de même niveau s'enchaînent ; obstacle non urgent différé tant que la route parle, urgent coupe toujours | `VoiceNavEngineDriver.kt:49-57,200-201`, `SpeechArbitration.kt:18-26,48-49`, `ProximityVoice.kt:42,67`, `IseeVoiceNav.kt:146` |
 | Traversée, préavis | « Passage protégé dans X » (loin), jamais de « tout droit » au bord du trottoir | `VoiceNavPhrases.crossingAhead` (`VoiceNavPolicy.kt:272-275`), `VoiceNavEngine.kt:225-226` |
 | Traversée, rappel proche | le mode s'arme **une seule fois**, sa voix prend le relais (« Mode traversée activé. »), la progression se tait | `VoiceNavEngineDriver.kt:253-263`, `IseeViewModel.kt:231-235` |
-| Traversée, feu | « Vert, traversez. » / « Rouge, attendez. » / « Doute, attendez. » | `CrossingText.kt:26-28` |
+| Traversée, feu | « Vert, traversez. » / « Rouge, attendez. » (binaire depuis le 31/10, fini le doute) | `CrossingText.kt` |
 | Traversée passée | « Traversée terminée. », le mode auto se coupe, le guidage reprend | `VoiceNavPolicy.kt:277-278`, `VoiceNavEngineDriver.kt:266-272` |
 | Arrivée | « Vous êtes arrivé à X » (rayon 20 m), une seule fois, moteur arrêté | `VoiceNavPolicy.kt:261-265`, `VoiceNavEngine.kt:11`, `VoiceNavEngineDriver.kt:223-226` |
 
@@ -99,8 +99,8 @@ c'est la 2ᵉ frame (`HazardWatcher`, 1ʳᵉ si poteau ≤ 2 m), le chronomètre
    obstacle non urgent différé pendant la consigne). Capture écran.
 8. **Traversée.** Attendu : préavis « Passage protégé dans … » ; au
    rappel proche, « Mode traversée activé. » et la progression se tait ;
-   feu (« Vert, traversez. » / « Rouge, attendez. » / « Doute,
-   attendez. ») ; une fois passé, « Traversée terminée. » puis **retour
+   feu (« Vert, traversez. » / « Rouge, attendez. », binaire) ; une fois
+   passé, « Traversée terminée. » puis **retour
    au libre** (consigne route ou « Tout droit. »). Capture écran.
 9. **Arrivée.** Marcher jusqu'à X. Attendu : « Vous êtes arrivé à X »,
    une seule fois ; retour iSee : écran d'accueil, pas de crash.

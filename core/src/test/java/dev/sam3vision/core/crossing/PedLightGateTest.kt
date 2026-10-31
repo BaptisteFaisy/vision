@@ -203,79 +203,13 @@ class PedLightGateTest {
 
     /** Verdict sur un crop réel `feuxfr/` (PPM ≤ 48 px, voir ATTRIBUTION.md). */
     private fun verdictOf(name: String): CrossingState {
-        val bytes = javaClass.classLoader.getResourceAsStream("feuxfr/$name")?.readBytes()
-            ?: error("ressource manquante : feuxfr/$name")
-        val (pixels, width, height) = ppmPixels(bytes)
+        val (pixels, width, height) = pixelsOf(javaClass.classLoader, "feuxfr", name)
         return PedLightGate.verdict(pixels, width, height)
     }
 
     /** Verdict sur un crop réel `feuxfr2/` (lot R1b, voir ATTRIBUTION.md). */
     private fun verdict2Of(name: String): CrossingState {
-        val bytes = javaClass.classLoader.getResourceAsStream("feuxfr2/$name")?.readBytes()
-            ?: error("ressource manquante : feuxfr2/$name")
-        val (pixels, width, height) = ppmPixels(bytes)
+        val (pixels, width, height) = pixelsOf(javaClass.classLoader, "feuxfr2", name)
         return PedLightGate.verdict(pixels, width, height)
-    }
-
-    /** Pixels ARGB d'un PPM P6 brut (pas d'ImageIO sur le classpath des tests). */
-    private fun ppmPixels(bytes: ByteArray): Triple<IntArray, Int, Int> {
-        var pos = 0
-        fun token(): String {
-            while (pos < bytes.size && bytes[pos] in SPACES) pos++
-            val start = pos
-            while (pos < bytes.size && bytes[pos] !in SPACES) pos++
-            return String(bytes, start, pos - start, Charsets.US_ASCII)
-        }
-        require(token() == "P6") { "PPM attendu" }
-        val width = token().toInt()
-        val height = token().toInt()
-        require(token() == "255") { "PPM 255 attendu" }
-        pos++
-        val pixels = IntArray(width * height)
-        for (i in pixels.indices) {
-            val r = bytes[pos++].toInt() and 0xFF
-            val g = bytes[pos++].toInt() and 0xFF
-            val b = bytes[pos++].toInt() and 0xFF
-            pixels[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
-        }
-        return Triple(pixels, width, height)
-    }
-
-    /** Disque de couleur sur fond noir. */
-    private fun disc(cx: Int, cy: Int, radius: Int, color: Int = GREEN): IntArray {
-        val pixels = IntArray(20 * 20) { BLACK }
-        paintDisc(pixels, 20, 20, cx, cy, radius, color)
-        return pixels
-    }
-
-    private fun paintDisc(pixels: IntArray, w: Int, h: Int, cx: Int, cy: Int, radius: Int, color: Int) {
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                val dx = x - cx
-                val dy = y - cy
-                if (dx * dx + dy * dy <= radius * radius) pixels[y * w + x] = color
-            }
-        }
-    }
-
-    /** Sous-exposition : canaux multipliés, teinte et saturation conservées. */
-    private fun dim(pixels: IntArray, factor: Float): IntArray {
-        return IntArray(pixels.size) { index ->
-            val pixel = pixels[index]
-            if (pixel == BLACK) return@IntArray BLACK
-            val r = (((pixel shr 16) and 0xFF) * factor).toInt()
-            val g = (((pixel shr 8) and 0xFF) * factor).toInt()
-            val b = ((pixel and 0xFF) * factor).toInt()
-            (0xFF shl 24) or (r shl 16) or (g shl 8) or b
-        }
-    }
-
-    companion object {
-        private const val RED = 0xFFFF0000.toInt()
-        private const val GREEN = 0xFF00FF00.toInt()
-        private const val CYAN_GREEN = 0xFF00FFAA.toInt()
-        private const val BLACK = 0xFF000000.toInt()
-        private const val GRAY = 0xFF808080.toInt()
-        private val SPACES = byteArrayOf(' '.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte())
     }
 }
