@@ -2,6 +2,7 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -115,7 +116,7 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `sans mesure - mouvement a l'heure, arret muet`() {
+    fun `sans mesure - mouvement et arret a l'heure`() {
         val moving = VehicleStateWatcher()
         moving.update(listOf(det("car", box(100f))), emptyList(), atMs = 0L)
         moving.update(listOf(det("car", box(110f))), emptyList(), atMs = 100L)
@@ -126,12 +127,14 @@ class VehicleStateTest {
         assertFalse(third.urgent)
 
         val stopped = VehicleStateWatcher()
-        repeat(3) { index ->
-            assertNull(
-                "arrêt non mesuré : jamais inventé",
-                stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = index * 100L),
-            )
-        }
+        stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = 0L)
+        stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = 100L)
+        val parked = stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = 200L)
+
+        assertEquals("Car stopped, at 12 o'clock.", parked!!.phrase)
+        assertNull(parked.meters)
+        assertFalse(parked.urgent)
+        assertNull(parked.safetyPhrase)
     }
 
     @Test
@@ -158,7 +161,7 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `hors portee 15m et hors couloir - silence`() {
+    fun `mouvement a 16m - hors portee, silence`() {
         val movingFar = VehicleStateWatcher()
         listOf(100f, 110f, 120f).forEachIndexed { index, width ->
             assertNull(
@@ -170,28 +173,47 @@ class VehicleStateTest {
                 ),
             )
         }
-        val stoppedFar = VehicleStateWatcher()
-        repeat(3) { index ->
-            assertNull(
-                "arrêt à 3,5 m : hors portée",
-                stoppedFar.update(
-                    listOf(det("car", box(100f))),
-                    listOf(reading("car", 3.5f, box(100f))),
-                    atMs = index * 100L,
-                ),
-            )
+    }
+
+    @Test
+    fun `voiture garee a 5m et sur le cote - annonce a l'arret`() {
+        val mid = VehicleStateWatcher()
+        repeat(2) { index ->
+            mid.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = index * 100L)
         }
-        val stoppedSide = VehicleStateWatcher()
+        val far = mid.update(
+            listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))),
+            atMs = 200L, language = SpeechLanguage.Fr,
+        )
+        assertEquals("Voiture à l'arrêt, à 5 mètres.", far!!.phrase)
+
         val sideBox = box(100f, cx = 64f)
-        repeat(3) { index ->
-            assertNull(
-                "arrêt hors couloir : silence",
-                stoppedSide.update(
-                    listOf(det("car", sideBox)),
-                    listOf(reading("car", 2f, sideBox)),
-                    atMs = index * 100L,
-                ),
+        val edge = VehicleStateWatcher()
+        repeat(2) { index ->
+            edge.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = index * 100L)
+        }
+        val parked = edge.update(
+            listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)),
+            atMs = 200L, language = SpeechLanguage.Fr,
+        )
+        assertEquals("Voiture à l'arrêt, à 2 mètres.", parked!!.phrase)
+    }
+
+    @Test
+    fun `voiture qui traverse - mouvement lateral annonce`() {
+        // Fond fixe (caméra immobile) + boîte qui glisse à taille stable :
+        // la traversée latérale (verdict approche) annonce dès confirmation.
+        val motion = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val watcher = VehicleStateWatcher()
+        val frames = listOf(200f, 240f, 280f, 320f, 360f).map { box(100f, cx = it) }
+        frames.forEachIndexed { index, frame ->
+            val cue = watcher.update(
+                listOf(det("car", frame)), listOf(reading("car", 12f, frame)),
+                atMs = index * 100L, language = SpeechLanguage.Fr, motion = motion,
             )
+            if (index < 3) assertNull(cue)
+            else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
+            else assertNull("cooldown mouvement", cue)
         }
     }
 
