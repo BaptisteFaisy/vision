@@ -7,10 +7,10 @@ import dev.sam3vision.core.distance.KnownSizes
  * dire « Attention … » (ordre user du 29/10 : iSee décrit, en douceur — les
  * mots du guidage disent où aller, l'attention dit quoi éviter).
  *
- * `barrier` est déjà dans les défauts du direct (dangers extérieurs, ordre
- * user du 28/10) ; les autres formes sont reconnues côté client ([isHazard])
- * quand le backend les segmente. Le français reste reconnu : un label
- * « barrière » compte comme un « barrier ».
+ * `barrier` n'est plus dans les défauts du direct (31/10 : son slot passe
+ * à « keys », ordre user) ; il reste reconnu côté client ([isHazard])
+ * quand le backend le segmente (preset extérieur, champ « Follow »). Le
+ * français reste reconnu : un label « barrière » compte comme « barrier ».
  *
  * Liste fermée : un concept = un nom FR/EN ([HazardName]). Le « etc. » de
  * l'ordre s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
