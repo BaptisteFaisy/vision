@@ -39,6 +39,11 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   vertes via build serveur. **Non mesuré** : aucun aller-retour realtime
   instrumenté (ni téléphone ni banc), compte bloqué en facturation.
 
+## 2026-10-31 — iSee : le Sacré-Cœur dicté part vers son adresse, 35 Rue du Chevalier de la Barre (branche `fix/isee-sacre-coeur-adresse`)
+
+- **Demande** : dire « I want to go to the Sacré Coeur » doit guider vers le 35 Rue du Chevalier de la Barre (Paris 18e), pas vers un homonyme lointain du géocodeur (le repli BAN rend le Sacré-Cœur du Pas-de-Calais).
+- Fait : `KnownPlaces` nouveau (:core, `core/nav/`) — table nom usuel → adresse, égalité stricte insensible à la casse, aux accents, aux ligatures (« œ » vaut « oe ») et à l'article initial (« the », « le/la/les/l' ») ; `DestinationQuery.normalize` y résout chaque destination, donc voix (routeur + « direction X »), saisie clavier et géocodage moteur partent tous vers l'adresse — confirmation et repli Maps inclus.
+- Preuves : `KnownPlacesTest` (4 tests), `NavigationRouterTest` +1, `VoiceNavSessionTest` +1 ; suites :core (2251 tests, 5 échecs pré-existants `PrivateFileSettingsStoreTest`, permissions POSIX sous Windows, identiques hors changement) et :app (1304, 0 échec) ; `check-kotlin-limits.py` et `check-voice-nav-doc.py` verts.
 
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 

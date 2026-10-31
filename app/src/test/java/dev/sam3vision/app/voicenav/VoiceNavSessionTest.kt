@@ -94,6 +94,15 @@ class VoiceNavSessionTest {
     }
 
     @Test
+    fun `sacre-coeur dicte ouvre la confirmation sur son adresse`() = runBlocking {
+        val session = session()
+        assertTrue(session.onVoiceTranscript("I want to go to the Sacré Coeur"))
+        val state = session.state.value as VoiceNavUiState.Confirming
+        assertEquals("35 Rue du Chevalier de la Barre", state.destination)
+        assertEquals(listOf("Do you really want to go to 35 Rue du Chevalier de la Barre? Travel time: 15 minutes. Answer yes or no."), spoken)
+    }
+
+    @Test
     fun `chargeur en echec montre l'adresse seule`() = runBlocking {
         val session = session(loader = { Result.failure(IllegalStateException("moteur coupé")) })
 

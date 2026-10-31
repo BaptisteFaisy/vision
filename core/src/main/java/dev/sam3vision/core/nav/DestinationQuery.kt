@@ -7,6 +7,10 @@ package dev.sam3vision.core.nav
  *
  * La ponctuation **intérieure** est conservée : elle porte le sens des noms de
  * lieux (« Saint-Germain-en-Laye », « l'Haÿ-les-Roses », « 12, rue de la Paix »).
+ *
+ * Un nom de lieu connu est remplacé par son adresse ([KnownPlaces.resolve]) :
+ * « the Sacré Coeur » part vers « 35 Rue du Chevalier de la Barre », jamais
+ * vers un homonyme lointain du géocodeur.
  */
 object DestinationQuery {
 
@@ -17,15 +21,16 @@ object DestinationQuery {
 
     /**
      * Normalise [raw] : trim, blancs internes réduits à une espace, ponctuation
-     * des bords retirée. Échec [DestinationError.BlankQuery] si rien n'est dit
-     * (vide, blanc, ou que de la ponctuation). Ne lève jamais.
+     * des bords retirée, puis résolution du lieu connu ([KnownPlaces]). Échec
+     * [DestinationError.BlankQuery] si rien n'est dit (vide, blanc, ou que de
+     * la ponctuation). Ne lève jamais.
      */
     fun normalize(raw: String): Result<String> {
         if (raw.isBlank()) return Result.failure(DestinationError.BlankQuery())
         val collapsed = WHITESPACE_RUN.replace(raw.trim(), " ")
         val cleaned = collapsed.trim(::isEdgePunct).trim()
         if (cleaned.isBlank()) return Result.failure(DestinationError.BlankQuery())
-        return Result.success(cleaned)
+        return Result.success(KnownPlaces.resolve(cleaned))
     }
 
     private fun isEdgePunct(c: Char): Boolean = c in EDGE_PUNCT
