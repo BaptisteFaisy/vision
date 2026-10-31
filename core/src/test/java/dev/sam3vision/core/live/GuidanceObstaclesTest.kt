@@ -1,6 +1,7 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.depth.DepthReadings
+import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.KnownSizes
@@ -217,6 +218,29 @@ class GuidanceObstaclesTest {
         // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
         assertEquals(GuidanceSide.Left, out.decision.side)
         assertEquals("Gauche.", Guidance.phrase(out.decision, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `inconnu au sol avec pose mesure puis suit le chemin optimal`() {
+        assertNull(KnownSizes.heightMeters("poteau"))
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f, 0f)
+        val poleBox = listOf(0.30f * WIDTH - 50f, 137f, 0.30f * WIDTH + 50f, 337f)
+        val frame = frameOf(
+            seg("poteau", poleBox),
+            seg("personne", boxFor("personne", 2f, 0.55f)),
+        )
+        val detections = frame.objects.toDetections(frame.width, frame.height)
+        val readings = meter.measure(frame.width, frame.height, detections)
+        val pole = readings.first { it.label == "poteau" }
+
+        assertEquals(4f, pole.meters, 0.1f)
+        val decision = Guidance.decide(placedLabels(frame, readings))
+
+        assertTrue(decision.blocked)
+        // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
+        assertEquals(GuidanceSide.Left, decision.side)
+        assertEquals("Gauche.", Guidance.phrase(decision, SpeechLanguage.Fr))
     }
 
     @Test
