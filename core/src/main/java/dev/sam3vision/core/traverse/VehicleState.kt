@@ -294,8 +294,8 @@ class VehicleStateWatcher(
             return null
         }
         if (armed != pick.state) {
+            hits = if (armed == State.MOVING && pick.state == State.STOPPED) 0 else 1 // bascule M→S : zéro (gigue)
             armed = pick.state
-            hits = 1
         } else {
             hits += 1
         }
