@@ -12,7 +12,9 @@ import dev.sam3vision.core.live.TimingsText
  * (`scripts/parse_isee_lat.py` l'agrège hors ligne en p50/p95/max).
  *
  * La ligne est exactement [TimingsText.compact] (la même chaîne que l'écran) : une
- * seule source de mise en forme, et le parseur ne connaît qu'elle. Les frames
+ * seule source de mise en forme, et le parseur ne connaît qu'elle. Une seconde
+ * ligne ([TimingsText.servers]) détaille les étages serveur (`timings_ms`) pour
+ * le diagnostic — le parseur l'ignore (pas de `latency N`). Les frames
  * incomplètes (pas de poste capteur, écran sorti) ne sont jamais loggées : une
  * latence inventée vaudrait moins que rien.
  */
@@ -26,8 +28,16 @@ object LiveLatencyLog {
      */
     fun line(t: FrameTimings): String? = if (t.complete) TimingsText.compact(t) else null
 
-    /** Écrit la frame complète en logcat ; silencieuse sinon. Ne lève jamais. */
+    /**
+     * Ligne serveur d'une frame dessinée, `null` si incomplète ou sans détail
+     * serveur (`FAST_TIMING=0`). Pure, testée en JVM.
+     */
+    fun serverLine(t: FrameTimings): String? =
+        if (t.complete && t.server.isNotEmpty()) TimingsText.servers(t.server) else null
+
+    /** Écrit la frame complète en logcat (perçu + détail serveur) ; silencieuse sinon. Ne lève jamais. */
     fun frame(t: FrameTimings) {
         line(t)?.let { Log.i(TAG, it) }
+        serverLine(t)?.let { Log.i(TAG, it) }
     }
 }

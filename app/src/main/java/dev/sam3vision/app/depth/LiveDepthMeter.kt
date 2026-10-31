@@ -16,9 +16,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Profondeur du direct : infère la dernière frame JPEG en tâche de fond
- * (~176 ms DA2, ~5 Hz face aux 7 i/s du direct) et affine les lectures
- * sténopé en mètres calibrés. Toujours active ; modèle manquant ou carte
- * périmée : le sténopé passe tel quel — le direct ne s'arrête jamais.
+ * (~176 ms DA2) et affine les lectures sténopé en mètres calibrés. L'inférence
+ * embarquée ne tourne que quand la profondeur serveur manque
+ * ([depthInferenceNeeded]) : iSee reçoit des médianes serveur fraîches à
+ * chaque réponse, inférer en plus saturerait ~1 cœur pour rien. Modèle
+ * manquant ou carte périmée : le sténopé passe tel quel — le direct ne
+ * s'arrête jamais.
  */
 class LiveDepthMeter(
     private val scope: CoroutineScope,
@@ -33,6 +36,7 @@ class LiveDepthMeter(
     private var latestAtMs = 0L
     private var estimator: DepthEstimator? = null
     private var engineTriedMs = 0L
+    private var lastServerDepthMs = 0L
 
     override fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
@@ -54,6 +58,7 @@ class LiveDepthMeter(
             val detections = frame.objects.toDetections(frame.width, frame.height)
             val server = DepthReadings.serverCloseness(frame.objects)
             if (server.isNotEmpty()) {
+                synchronized(lock) { lastServerDepthMs = nowMs() }
                 return DepthReadings.refineWithCloseness(detections, pinhole, server)
             }
             val map = freshMap()
@@ -91,12 +96,17 @@ class LiveDepthMeter(
         try {
             for (i in 0 until DRAIN_ROUNDS) {
                 val jpeg = takePending() ?: break
-                infer(jpeg)
+                // Profondeur serveur fraîche : la carte embarquée ne servirait
+                // pas (`readingsFor` préfère le serveur) — on jette la frame
+                // au lieu d'inférer ~176 ms pour rien.
+                if (depthInferenceNeeded(nowMs(), lastServerDepthMs())) infer(jpeg)
             }
         } finally {
             synchronized(lock) { running = false }
         }
     }
+
+    private fun lastServerDepthMs(): Long = synchronized(lock) { lastServerDepthMs }
 
     private fun takePending(): String? = synchronized(lock) {
         val jpeg = pendingJpeg
@@ -150,3 +160,19 @@ class LiveDepthMeter(
         private const val DRAIN_ROUNDS = 4
     }
 }
+
+/**
+ * Fraîcheur de la profondeur serveur au-delà de laquelle l'inférence embarquée
+ * redevient utile : les réponses arrivent toutes les ~150–250 ms, un silence
+ * de plus de [SERVER_FRESH_MS] signe une profondeur serveur perdue (réseau ou
+ * modèle tombé) et la carte embarquée reprend le repli.
+ */
+internal const val SERVER_FRESH_MS = 1500L
+
+/**
+ * Faut-il inférer la carte embarquée ? Non quand le serveur vient de fournir
+ * des médianes ([readingsFor] les préfère de toute façon) — oui au démarrage
+ * (aucune réponse reçue) et quand le serveur se tait. Pure, testée en JVM.
+ */
+internal fun depthInferenceNeeded(nowMs: Long, lastServerDepthMs: Long): Boolean =
+    lastServerDepthMs <= 0L || nowMs - lastServerDepthMs >= SERVER_FRESH_MS
