@@ -80,6 +80,7 @@ internal class GlassesCamera(
         }
         // Le refus est un `DeviceSessionError` : sa phrase dit quoi faire (autorisation,
         // paire absente, session ailleurs), pas seulement « caméra indisponible ».
+        Log.w(TAG, "attache caméra refusée : ${refusal ?: "inconnu"} — $reason")
         onNote(refusal?.let(::sessionErrorMessage) ?: GlassesMessages.cameraUnavailable(reason))
         return false
     }
