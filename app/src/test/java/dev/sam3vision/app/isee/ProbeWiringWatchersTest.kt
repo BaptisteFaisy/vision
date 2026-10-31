@@ -13,6 +13,7 @@ import org.junit.Test
  * en Traversée pour l'imminente et même après un stop — une alerte de
  * sécurité ne se tait jamais pour une autre phrase ; le bateau reste doux
  * et coupé en Traversée — et les détections sont reconstruites des lectures.
+ * L'ordre P1-P5 vit dans `ObstacleArbiterTest`.
  */
 class ProbeWiringWatchersTest {
 
@@ -30,22 +31,6 @@ class ProbeWiringWatchersTest {
         assertFalse(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = true))
         assertTrue(shouldSpeakCurb(cue(CurbTier.FAR), crossingActive = false))
         assertTrue(shouldSpeakCurb(cue(CurbTier.NONE), crossingActive = false))
-    }
-
-    @Test
-    fun `p1p2 recent = occupe, ancien = libre`() {
-        assertTrue(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = 4_000L, lastNearMs = null))
-        assertTrue(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = null, lastNearMs = 4_500L))
-        assertFalse(p1p2Busy(nowMs = 9_000L, lastMovingAlertMs = 4_000L, lastNearMs = null))
-        assertFalse(p1p2Busy(nowMs = 7_000L, lastMovingAlertMs = null, lastNearMs = 4_500L))
-        assertFalse(p1p2Busy(nowMs = 5_000L, lastMovingAlertMs = null, lastNearMs = null))
-    }
-
-    @Test
-    fun `poteau coupe seulement si imminent et p1p2 silencieux`() {
-        assertTrue(shouldCutForHazard(cueUrgent = true, busy = false))
-        assertFalse(shouldCutForHazard(cueUrgent = true, busy = true))
-        assertFalse(shouldCutForHazard(cueUrgent = false, busy = false))
     }
 
     @Test

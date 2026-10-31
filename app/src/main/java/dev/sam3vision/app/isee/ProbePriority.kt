@@ -1,32 +1,81 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.curb.CurbCue
+import dev.sam3vision.core.curb.CurbTier
+import dev.sam3vision.core.hazard.HazardCue
+import dev.sam3vision.core.hazard.HazardKind
+import dev.sam3vision.core.traverse.VehicleStateCue
+
 /**
- * Priorité voix des guetteurs : P1 (véhicule en mouvement) et P2 (marche
- * imminente — alertes `SafetyVoice`) passent devant le poteau (P3), qui attend
- * en file au lieu de couper ou de chevaucher. Extrait de `ProbeWiring`
+ * Priorité voix des obstacles : P1 (voiture en mouvement) > P2 (bordure) >
+ * P3 (poteau) > P4 (barrière) > reste (arrêt, bateau, divers — dans l'ordre
+ * de détection). Quand SAM confirme plusieurs obstacles sur la même frame,
+ * l'arbitre ([decideObstacles]) les ordonne au lieu de les faire se couper :
+ * tout ce qui est confirmé est dit, dans cet ordre. Extrait de `ProbeWiring`
  * (plafond 500 lignes). Pur, testé en JVM.
  */
+internal enum class ObstacleRank { VEHICLE_MOVING, CURB, POLE, BARRIER, OTHER }
 
-/** P1 en cours : un « véhicule en mouvement » couvre les 4 s qui suivent (son cooldown). */
-internal const val P1_BUSY_MS = 4_000L
-
-/** P2 en cours : une marche imminente couvre les 2 s qui suivent (prior : ≈ 2 s de parole, à valider rue). */
-internal const val P2_BUSY_MS = 2_000L
+/** Voix de sécurité en cours : une alerte couvre les 2,5 s qui suivent (sous les 3 s de la file douce, pour que le rattrapage parle encore frais — prior, à valider rue). */
+internal const val SAFETY_SPEECH_MS = 2_500L
 
 /**
- * P1/P2 en cours à [nowMs] : véhicule en mouvement dit il y a moins de [P1_BUSY_MS],
- * ou marche imminente dite il y a moins de [P2_BUSY_MS] — le poteau (P3) attend alors
- * (doux + file, jamais de coupure). Fenêtres provisoires, non mesurées : à valider rue
- * (si P3 parle sur P1/P2, élargir ; s'il se tait trop, resserrer). Pur, testé en JVM.
+ * Sécurité en cours à [nowMs] : alerte dite il y a moins de [SAFETY_SPEECH_MS] —
+ * le doux attend alors en file au lieu de chevaucher. Pur, testé en JVM.
  */
-internal fun p1p2Busy(nowMs: Long, lastMovingAlertMs: Long?, lastNearMs: Long?): Boolean {
-    if (lastMovingAlertMs != null && nowMs - lastMovingAlertMs < P1_BUSY_MS) return true
-    if (lastNearMs != null && nowMs - lastNearMs < P2_BUSY_MS) return true
-    return false
+internal fun safetyBusy(nowMs: Long, lastSafetyMs: Long?): Boolean =
+    lastSafetyMs != null && nowMs - lastSafetyMs < SAFETY_SPEECH_MS
+
+/**
+ * Parole d'une frame : [safety] les alertes fusionnées P2→P3 (`null` = rien
+ * d'immédiat), [soft] les phrases douces fusionnées par rang (`null` =
+ * silence), [urgent] vrai quand le danger roule sur le user (le doux coupe,
+ * comme avant). Une alerte couverte par la sécurité n'est pas redite en doux.
+ */
+internal data class ObstacleDecision(val safety: String?, val soft: String?, val urgent: Boolean = false)
+
+/**
+ * Arbitre d'une frame en mode normal : les sécurités (bordure, poteau
+ * imminent — jamais de « Stop » hors Traversée, § 22) fusionnent dans
+ * l'ordre des rangs, puis les doux (mouvement P1, bordure à 1 m, poteau,
+ * barrière, reste en ordre de détection). Le véhicule ne fournit que du
+ * doux ici (son stop roulant ne se dit qu'en Traversée, § 22) ; son
+ * `urgent` (danger qui s'approche) fait couper le doux. `null` partout =
+ * silence. Pur, testé en JVM.
+ */
+internal fun decideObstacles(
+    vehicle: VehicleStateCue?,
+    curb: CurbCue?,
+    hazard: HazardCue?,
+): ObstacleDecision {
+    val safety = listOfNotNull(curb?.safetyPhrase, hazard?.safetyPhrase)
+        .joinToString(" ").takeIf { it.isNotEmpty() }
+    val soft = softParts(vehicle, curb, hazard).joinToString(" ").takeIf { it.isNotEmpty() }
+    return ObstacleDecision(safety, soft, urgent = vehicle?.urgent == true)
 }
 
-/**
- * Le poteau coupe : imminent ([cueUrgent]) et P1/P2 silencieux ([busy] faux — le
- * poteau est P3). Pur, testé en JVM.
- */
-internal fun shouldCutForHazard(cueUrgent: Boolean, busy: Boolean): Boolean = cueUrgent && !busy
+/** Phrases douces de la frame, par rang (véhicule, bordure, mobilier à égalité). */
+private fun softParts(
+    vehicle: VehicleStateCue?,
+    curb: CurbCue?,
+    hazard: HazardCue?,
+): List<String> = listOfNotNull(
+    vehicle?.let { softRank(it) to it.phrase },
+    curb?.takeIf { it.safetyPhrase == null }?.let { softRank(it) to it.phrase },
+    hazard?.takeIf { it.safetyPhrase == null }?.let { softRank(it.kind) to it.phrase },
+).sortedBy { it.first }.map { it.second }
+
+/** Rang doux d'un état véhicule : le mouvement loin reste P1, l'arrêt rejoint le reste. */
+private fun softRank(cue: VehicleStateCue): ObstacleRank =
+    if (cue.moving) ObstacleRank.VEHICLE_MOVING else ObstacleRank.OTHER
+
+/** Rang doux d'une bordure : la pré-alerte à 1 m reste P2, le bateau rejoint le reste. */
+private fun softRank(cue: CurbCue): ObstacleRank =
+    if (cue.tier == CurbTier.FAR) ObstacleRank.CURB else ObstacleRank.OTHER
+
+/** Rang doux du mobilier : poteau, barrière, puis divers avec le reste. */
+private fun softRank(kind: HazardKind): ObstacleRank = when (kind) {
+    HazardKind.POLE -> ObstacleRank.POLE
+    HazardKind.BARRIER -> ObstacleRank.BARRIER
+    HazardKind.OTHER -> ObstacleRank.OTHER
+}
