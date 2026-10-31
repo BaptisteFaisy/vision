@@ -668,32 +668,6 @@ poteau à 3 m à 11 h → « …, passez à droite. » ; marques craie à 1,0 m 
 0,7 m, montée puis descente — sens juste 4/4 jour — **non mesuré**, exige
 un APK de cette branche sur appareil réel.
 
-## 21. Alertes P1/P2 : la nouvelle coupe l'ancienne, jamais de file (ordre user du 31/10)
-
-Le user marche avec l'app : entre l'obstacle détecté et la parole, des
-latences de plusieurs secondes — une alerte P1/P2 qui arrivait pendant
-qu'une autre parlait attendait sa fin en file TTS (`QUEUE_ADD`,
-contrat § 16). Nouveau contrat, qui amende le § 16 pour les deux
-alertes de sécurité (voiture en mouvement, rebord) :
-
-- **flush toujours** : `SafetyVoice.speak` parle en `QUEUE_FLUSH` même
-  quand le TTS système parle — la nouvelle alerte coupe l'ancienne, un
-  par un, la plus fraîche gagne (une alerte datée ne sert à rien, le
-  danger a changé) ; ne dépend plus du flag `speaking` ;
-- **inchangé** : coupe la lecture ElevenLabs avant de parler
-  (`stopCurrent`), survit à la dictée, parle hors-ligne sans clé ;
-  P3 (poteau — qui dit désormais aussi par quel côté passer, § 20) attend
-  toujours P1/P2 en file douce (§ 18) ; le reste parle doux et attend
-  le silence (§ 11).
-
-Verrouillé par `SafetyVoiceTest` (4 : coupe + flush, alerte coupe
-l'ancienne, blanc ignoré, locale).
-
-Recette téléphone : deux alertes rapprochées (voiture qui roule puis
-rebord sous le pied) — la seconde coupe la première, pas de
-chevauchement, pas d'attente — **non mesuré**, exige un APK de cette
-branche sur appareil réel.
-
 ## 22. Stop seulement en Traversée, voitures en mouvement (ordre user du 31/10)
 
 Le user marche avec l'app : iSee dit trop souvent « stop » — elle doit
