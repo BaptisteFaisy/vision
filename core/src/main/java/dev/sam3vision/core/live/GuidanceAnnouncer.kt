@@ -15,8 +15,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * la lecture en cours, les mots doux attendent le silence), et la même
  * direction se redit toutes les [DEFAULT_REPEAT_MS] millisecondes tant
  * qu'elle dure — sauf overwrite (un mot nouveau parle aussitôt, sans
- * attendre l'échéance). Seul le stop ne se répète jamais : parlé une fois,
- * il ne se rabâche pas.
+ * attendre l'échéance). Aucun stop n'est produit ici depuis le 31/10 (ordre
+ * user : on se faufile, on ne s'arrête pas devant un obstacle) — le seul stop
+ * qui reste est celui de la voix de sécurité, hors de cette classe.
  *
  * Arbitrage voix (ordre user du 29/10, stop du guidage retiré le 31/10) :
  * couloir bouché → voix TwinLite ([TwinLiteWord], côté de sortie même au
@@ -76,7 +77,7 @@ class GuidanceAnnouncer(
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
      * décision locale. Direction stable : redite toutes les [repeatMs]
-     * millisecondes, sauf overwrite (mot nouveau aussitôt) ; stop unique.
+     * millisecondes, sauf overwrite (mot nouveau aussitôt) ; jamais de stop.
      */
     fun onFrame(
         atMs: Long,
@@ -157,7 +158,7 @@ class GuidanceAnnouncer(
     /**
      * Mot SAM ou TwinLite : nouveau dit aussitôt (overwrite, sans délai ni
      * stabilité, clips < 100 ms), même direction redite après [again]
-     * (`null` = stop unique, jamais répété).
+     * (`null` = jamais répété ; plus aucun stop depuis le 31/10).
      */
     private fun speak(atMs: Long, key: String, phrase: String, again: Long?): String? {
         if (!gate.admit(atMs, key, urgent = true, firstSight = true, repeatMs = again)) return null
