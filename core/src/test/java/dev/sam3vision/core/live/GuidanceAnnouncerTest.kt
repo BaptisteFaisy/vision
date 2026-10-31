@@ -146,9 +146,9 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer()
         fun poteauDroite(meters: Float) = PlacedLabel("poteau", 0.7f, 0.5f, meters)
 
-        assertEquals("Tout droit.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
+        assertEquals("Straight.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
         assertNull(announcer.onFrame(250L, listOf(poteauDroite(2.6f))))
-        assertEquals("Gauche.", announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
+        assertEquals("Left.", announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
     }
 
     @Test
