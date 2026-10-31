@@ -1,6 +1,7 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.cycle.CycleConcepts
+import dev.sam3vision.core.depth.DepthConfirm
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.distance.KnownSizes
@@ -215,16 +216,17 @@ class VehicleStateWatcher(
     /** État annoncé : ce qui roule, ce qui est à l'arrêt. */
     private enum class State { MOVING, STOPPED }
 
-    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé. */
-    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?)
+    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité. */
+    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?)
 
-    /** Mémoire d'une frame : surface, centre, seau-mètre et date. */
+    /** Mémoire d'une frame : surface, centre, seau-mètre, date et proximité. */
     private data class Prev(
         val area: Float,
         val cx: Float?,
         val cy: Float?,
         val bucket: String,
         val atMs: Long,
+        val closeness: Float?, // PISTE2
     )
 
     /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile. */
@@ -276,16 +278,16 @@ class VehicleStateWatcher(
         readings: List<DistanceReading>,
         atMs: Long,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
-        motion: FrameMotion? = null,
+        motion: FrameMotion? = null, depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte — null = repli géométrie.
     ): VehicleStateCue? {
-        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion)
+        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion, depthByBox) // PISTE2
         else ApproachVerdict(false, null, null)
-        val current = currentByKey(detections)
+        val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
         val pick = pick(current, meters, tau, atMs, hushed)
         previous = current.mapValues { (key, seen) ->
-            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs)
+            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness) // PISTE2
         }
         movingThisFrame = pick?.state == State.MOVING
         if (pick == null) {
@@ -370,9 +372,11 @@ class VehicleStateWatcher(
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
-                // PISTE1 : croissance décotée du zoom du fond (repli brut sans fond prouvé).
+                // PISTE1+2 : croissance décotée du zoom du fond ET confirmée en profondeur
+                // (repli brut sans fond prouvé ; pan/zoom à profondeur constante = pas un véhicule qui roule).
                 val growth = prev != null && EgoCompensator.areaGrowing(
-                    prev.area, current.getValue(candidate).area, atMs - prev.atMs, approach.lastGlobal)
+                    prev.area, current.getValue(candidate).area, atMs - prev.atMs, approach.lastGlobal) &&
+                    DepthConfirm.confirmsGrowth(prev.closeness, current.getValue(candidate).closeness)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -426,7 +430,7 @@ class VehicleStateWatcher(
     }
 
     /** Véhicules moteurs vus par clé (surface max, miroir du veto). */
-    private fun currentByKey(detections: List<Detection>): Map<String, Current> {
+    private fun currentByKey(detections: List<Detection>, depthByBox: Map<List<Float>, Float>?): Map<String, Current> {
         val best = LinkedHashMap<String, Current>()
         for (detection in detections) {
             if (!wanted(detection.label)) continue
@@ -439,6 +443,7 @@ class VehicleStateWatcher(
                 area = box.area,
                 cx = center?.let { (it[0] + it[2]) / 2f },
                 cy = center?.let { (it[1] + it[3]) / 2f },
+                closeness = depthByBox?.get(detection.box)?.takeIf { it.isFinite() }, // PISTE2
             )
             val key = vehicleKey(detection.label)
             if ((best[key]?.area ?: -1f) < seen.area) best[key] = seen
