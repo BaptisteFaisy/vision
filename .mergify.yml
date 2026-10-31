@@ -15,7 +15,12 @@
 #   - app Mergify installée (id 10562) ;
 #   - Mergify **acteur de contournement** du ruleset 25911098, mode `exempt`
 #     (sinon `strict` + `pull_request` bloquent les branches de file) ;
-#   - `ci.yml` et `couche0.yml` tournent sur `push` vers `mergify/merge-queue/**`.
+#   - `ci.yml` et `couche0.yml` se déclenchent sur la **PR de lot** que la file
+#     ouvre sur `mergify/merge-queue/**` (`pull_request`) — et surtout PAS sur
+#     le `push` de cette branche : le run en double était annulé par la
+#     concurrency et l'agrégateur `ci` publiait un `FAILURE` transitoire sur le
+#     SHA du lot, que Mergify lisait pour éjecter la PR (`CHECKS_FAILED`,
+#     « ci fails with this pull request »). Retiré le 31/10.
 #
 # Le balayeur `pr-auto-merge.yml` ne merge plus ni ne rebase quand la file est
 # active : il ne garde que les conflits (`DIRTY`) et les relances de panne.

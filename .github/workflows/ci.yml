@@ -30,10 +30,17 @@ on:
   push:
     branches:
       - master
-      # Branches de la file de merge Mergify (`mergify/merge-queue/...`) : la
-      # file y pousse l'arbre fusionné du lot et attend les trois checks
-      # requis. Sans ce déclencheur, le lot n'aurait jamais de verdict.
-      - 'mergify/merge-queue/**'
+      # PAS de `mergify/merge-queue/**` ici (retiré le 31/10) : le verdict du
+      # lot vient de la PR que Mergify ouvre sur sa branche de lot, pas du
+      # `push`. Mergify poussait le lot ET ouvrait la PR, donc deux suites pour
+      # la même tête ; la concurrency annulait celle du `push`, et l'agrégateur
+      # `ci` (`if: always()`) voyait ses deux moitiés `cancelled` → il publiait
+      # `ci = FAILURE` sur le SHA du lot. Mergify lisait ce FAILURE — même une
+      # fois le `ci = SUCCESS` du run `pull_request` publié sur le même SHA —
+      # et éjectait la PR (`CHECKS_FAILED`, « ci fails with this pull
+      # request ») : #634 à 16:30, #637 à 16:36 le 31/10, boucle sans fin.
+      # Vérifié sur les lots du 31/10 : la suite `pull_request` publie bien
+      # `ci`, `ci-budget` et `couche0` sur l'arbre fusionné, seule.
   # File de merge native (29/10) : le groupe construit un commit temporaire
   # (`master` + les PR de la file) et rejoue **les mêmes** checks dessus.
   # Sans ce déclencheur, `ci` et `ci-budget` n'existent jamais sur
@@ -43,19 +50,18 @@ on:
   merge_group:
 
 concurrency:
-  # Une branche de file (`mergify/merge-queue/**`) reçoit DEUX déclenchements
-  # pour la même tête : le `push` que Mergify fait sur sa branche, et la PR que
-  # Mergify ouvre dessus. Même arbre, mêmes checks, même verdict — un seul
-  # passage suffit (mesuré le 31/10 : ~24 runs `CI` et ~78 `couche0` par heure
-  # rien que pour ce doublon).
+  # Depuis le 31/10 il n'y a plus qu'UNE suite par tête sur une branche de
+  # file (le `push` sur `mergify/merge-queue/**` a été retiré, cf. `on.push`).
+  # La clé reste par TÊTE pour ce cas : la concurrency de GitHub ne suit pas
+  # le SHA des événements `pull_request` d'une PR de lot (elle suit
+  # `refs/pull/N/merge`), donc sans cette clé le run d'un lot pourrait être
+  # annulé par celui du lot suivant avant d'avoir publié ses checks.
   #
   # Pourquoi une clé par TÊTE et pas un saut de job : un job sauté publie un
   # check `skipped`, et Mergify lit le check le plus récent portant le nom
   # requis — `skipped` n'est pas `success`, donc le lot serait éjecté et la
   # file se bloquerait (même incident que le `## Scope` absent sur une PR de
-  # lot, le 29/10). Ici les deux déclenchements partagent le groupe : le second
-  # annule le premier, et le survivant est forcément le dernier à publier son
-  # verdict.
+  # lot, le 29/10).
   #
   # Hors branche de file, rien ne change : `github.ref` (`refs/pull/N/merge`)
   # continue d'annuler le run précédent quand un nouveau commit arrive sur la

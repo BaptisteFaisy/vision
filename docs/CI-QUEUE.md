@@ -142,7 +142,11 @@ neuf). C'est donc **Mergify** qui tient la file (`.mergify.yml`) :
 
 Trois prérequis côté dépôt : l'app Mergify installée (id 10562), Mergify **acteur de contournement
 du ruleset en mode `exempt`** (sinon `strict` et la règle `pull_request` bloquent les branches de
-file), et `ci.yml` / `couche0.yml` déclenchés sur `push` vers `mergify/merge-queue/**`.
+file), et `ci.yml` / `couche0.yml` déclenchés sur la **PR de lot** (`pull_request` sur
+`mergify/merge-queue/**`) — pas sur le `push` de cette branche : le run en double y était annulé par
+la concurrency, et l'agrégateur `ci` (`if: always()`) publiait un `FAILURE` transitoire sur le SHA du
+lot que Mergify lisait pour éjecter la PR (`CHECKS_FAILED`). Constaté sur #634 (16:30) et #637
+(16:36) le 31/10, déclencheurs `push` retirés le même jour.
 
 Quand la file est active (`QUEUE`, lu à la source dans le ruleset), le balayeur **ne merge plus et
 ne rebase plus** : la file met à jour les PR contre `master`. Il ne garde que ce qu'une file ne
