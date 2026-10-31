@@ -96,7 +96,12 @@ private fun GuidingHead(
         GuidanceSummary(state)
         if (navSnapshot != null) {
             // Carte : où le guidage m'emmène (rues + tracé + passages + position).
-            GuidanceMapCard(navSnapshot, state.update, Modifier.fillMaxWidth().height(170.dp))
+            GuidanceMapCard(
+                navSnapshot,
+                state.update,
+                Modifier.fillMaxWidth().height(170.dp),
+                showAttribution = false,
+            )
         }
         GuidanceProgress(state)
     }

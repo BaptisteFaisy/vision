@@ -65,6 +65,7 @@ internal fun IseeConfirmBlock(
                 viewModel::confirmNavSnapshot,
                 initialGuidance(summary),
                 Modifier.fillMaxWidth().height(150.dp),
+                showAttribution = false,
             )
         }
         ConfirmButtons(state, viewModel, Modifier.fillMaxWidth())
