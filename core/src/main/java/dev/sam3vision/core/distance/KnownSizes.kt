@@ -21,8 +21,8 @@ import java.text.Normalizer
  * pour « curb » (bordure de 10-15 cm vue sous tous les angles : aucune
  * hauteur typique projetable, le `CurbWatcher` lit la profondeur) et pour
  * les souvenirs du 31/10 (« souvenir shop », devanture de taille
- * quelconque ; « beanie » et « socks », trop petits et variables pour un
- * sténopé fiable). La distance de ces défauts vient de la branche
+ * quelconque ; « beanie », « socks » et « keys », trop petits et variables
+ * pour un sténopé fiable). La distance de ces défauts vient de la branche
  * profondeur (`DepthReadings`) ou du plan de sol, jamais du sténopé (voir
  * [DEPTH_ONLY] et `StairConcepts`).
  */
@@ -170,7 +170,7 @@ object KnownSizes {
         // de sol. `traffic light` reste (saisie manuelle d'un feu voiture :
         // jamais de sténopé dessus non plus).
         "pedestrian traffic light", "pedestrian signal head",
-        "souvenir shop", "beanie", "socks",
+        "souvenir shop", "beanie", "socks", "keys",
     )
 
     /** Repli par premier mot connu : « sac à dos » trouve « sac ». */
