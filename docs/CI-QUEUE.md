@@ -86,7 +86,7 @@ succès : l'APK est produit sans clé et l'utilisateur saisit la sienne dans Ré
   toute déclaration doit servir ;
 - `forbidden` : motifs refusés dans les lignes ajoutées du diff, plus une liste de fichiers de garde
   gelés — `.github/ci-budget/`, `.github/couche0/`, `.github/workflows/couche0.yml`,
-  `.github/workflows/ci-budget.yml`, `.github/workflows/ci.yml` (gelé le 26/10),
+  `.github/workflows/ci.yml` (gelé le 26/10 ; porte aussi le job `ci-budget` depuis le 29/10),
   `.github/workflows/ci-native.yml` et `.github/workflows/pr-auto-merge.yml` (gelés le 29/10 :
   vider `lint`/`apk` ou l'auto-merge passerait sinon inaperçu). Les toucher exige une
   mention explicite et le drapeau `SAMVISION_ALLOW_GUARD_BUMP`.
