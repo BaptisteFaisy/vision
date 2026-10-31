@@ -192,4 +192,14 @@ class GuidanceTest {
         assertTrue(decision.blocked)
         assertEquals("Left.", Guidance.phrase(decision))
     }
+
+    @Test
+    fun `contact mesure dit stop meme devant un inconnu elu`() {
+        val labels = listOf(placed("mur", 0.5f), placed("personne", 0.5f, 0.4f))
+        val decision = Guidance.decide(labels)
+
+        assertTrue(decision.blocked)
+        assertEquals("Stop.", Guidance.phrase(decision))
+        assertEquals("w|stop", Guidance.key(decision))
+    }
 }

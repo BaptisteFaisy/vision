@@ -101,4 +101,23 @@ class ProximityVoiceWordTest {
         assertTrue(attempts.isEmpty())
         assertEquals("Stop.", spoken.first())
     }
+
+    @Test
+    fun `mot doux avale par le chat se redit ensuite`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val pack = VoicePack(
+            filesDir = tempDir(),
+            packVoiceId = { "voix-test" },
+            bundledClip = { "faux-mp3".toByteArray() },
+        )
+        val voice = voice(pack, attempts, spoken)
+
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false)
+        assertTrue(spoken.isEmpty())
+
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true, urgent = false)
+
+        assertEquals("Gauche.", spoken.first())
+    }
 }
