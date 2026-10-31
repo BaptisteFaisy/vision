@@ -170,6 +170,57 @@ class VehicleApproachTest {
         assertEquals(Verdict.CAMERA_MOVED, approach.lastVerdicts[1]?.verdict)
     }
 
+    @Test
+    fun `voiture qui traverse le champ - lateral des la 3e frame, pas d approche`() {
+        val approach = VehicleApproach()
+        assertFalse(approach.update(listOf(carAt(100f, 200f)), atMs = 0L).lateralMoving)
+        assertFalse(approach.update(listOf(carAt(100f, 230f)), atMs = 100L).lateralMoving)
+        val third = approach.update(listOf(carAt(100f, 260f)), atMs = 200L)
+
+        assertTrue("47 %/s lissés > 8 %/s", third.lateralMoving)
+        assertEquals("car", third.lateralLabel)
+        assertFalse("taille stable : pas d'approche", third.approaching)
+        assertNull(third.ttcSeconds)
+    }
+
+    @Test
+    fun `derive lente - pas de lateral`() {
+        val approach = VehicleApproach()
+        approach.update(listOf(carAt(100f, 320f)), atMs = 0L)
+        approach.update(listOf(carAt(100f, 322f)), atMs = 100L)
+        val third = approach.update(listOf(carAt(100f, 324f)), atMs = 200L)
+
+        assertFalse("3 %/s : tremblé, pas traversée", third.lateralMoving)
+        assertNull(third.lateralLabel)
+    }
+
+    @Test
+    fun `approche frontale - lateral muet`() {
+        val approach = VehicleApproach()
+        approach.update(listOf(car(100f)), atMs = 0L)
+        approach.update(listOf(car(110f)), atMs = 100L)
+        val third = approach.update(listOf(car(120f)), atMs = 200L)
+
+        assertTrue(third.approaching)
+        assertFalse("vitesse x nulle", third.lateralMoving)
+    }
+
+    @Test
+    fun `camera qui panoramique - le lateral se tait quand la boite suit le fond`() {
+        // Même glissade franche que la traversée (+30 px/frame), mais le fond
+        // défile pareil : résidu nul, la piste accuse la caméra.
+        val motion = lateralMotion(dxPx = 4.5f)
+        val approach = VehicleApproach()
+        var last = ApproachVerdict(false, null, null)
+        repeat(13) { index ->
+            last = approach.update(listOf(carAt(100f, 100f + index * 30f)), atMs = index * 100L, motion = motion)
+        }
+
+        assertFalse("piste embarquée par la caméra : pas de latéral", last.lateralMoving)
+        assertNull(last.lateralLabel)
+        assertTrue(approach.cameraMoved)
+    }
+
     /** Mouvement global latéral piloté : [dxPx] px par frame sur plan 96, dt 100 ms. */
     private fun lateralMotion(dxPx: Float): FrameMotion =
         FrameMotion(MotionSample(dxPx, 0f, 1f, 0.9f), lumaWidth = 96, lumaHeight = 96, dtMs = 100L)
