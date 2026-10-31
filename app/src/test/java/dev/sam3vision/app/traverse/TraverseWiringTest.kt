@@ -187,13 +187,13 @@ class TraverseWiringTest {
     }
 
     @Test
-    fun `vert maintenu sans vehicule - traversez parle une fois`() = runBlocking {
+    fun `vert maintenu sans vehicule - traversez parle puis se repete`() = runBlocking {
         val tts = FakeTts()
         val wiring = voicedWiring(tts)
         wiring.updateLight(CrossingState.Green)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertEquals(listOf("Vert, traversez."), tts.asked)
+        assertEquals(listOf("Vert, traversez.", "Vert, traversez."), tts.asked)
     }
 
     @Test
