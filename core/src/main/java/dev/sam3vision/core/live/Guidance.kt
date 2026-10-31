@@ -92,6 +92,12 @@ object Guidance {
      * centre ⇒ à gauche. Cap latéral : le passage est le plus libre des deux
      * autres secteurs, le centre en premier à égalité — on y marche droit,
      * c'est le plus naturel.
+     *
+     * Cap droit : le côté conseillé vient du chemin optimal ([PeoplePath.plan]) —
+     * le cap hors des bandes interdites le plus proche de tout droit — quand il
+     * existe et tient ([PeoplePath.fits]) ; sinon, repli sur le côté le moins
+     * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
+     * sans issue, ou aucun obstacle à portée).
      */
     fun decide(
         labels: List<PlacedLabel>,
@@ -106,7 +112,8 @@ object Guidance {
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
         if (cap == SteeringCap.Straight) {
-            val side = freerSide(cleaned, obstacle, rangeMeters)
+            val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
+            val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
             return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
         }
