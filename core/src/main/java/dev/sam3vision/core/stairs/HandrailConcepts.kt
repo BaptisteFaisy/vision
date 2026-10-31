@@ -7,9 +7,9 @@ import dev.sam3vision.core.live.LivePrompts
  * Concept rampe d'escalier : ce que SAM doit suivre pour signaler une main
  * courante (« Rampe, à 2 heures. »).
  *
- * Un seul prompt, en anglais (la forme que SAM segmente le mieux) : 12
- * concepts par défaut sur [LivePrompts.MAX] (16), donc 4 slots libres côté
- * rue/extérieur (9 côté maison) — « handrail » (8 lettres, ≤ 32) y tient.
+ * Un seul prompt, en anglais (la forme que SAM segmente le mieux) : 13
+ * concepts par défaut sur [LivePrompts.MAX] (17), donc 4 slots libres côté
+ * rue/extérieur (10 côté maison) — « handrail » (8 lettres, ≤ 32) y tient.
  * Le français reste reconnu côté client ([isHandrail]) : un label « rampe »
  * compte comme un « handrail ».
  *
