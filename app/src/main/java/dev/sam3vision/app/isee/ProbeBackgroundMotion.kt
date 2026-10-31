@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.live.MotionLog
 import dev.sam3vision.app.traverse.backgroundOf
+import dev.sam3vision.core.live.MotionGapStats
 import dev.sam3vision.core.traverse.BackgroundFrame
 import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.MovingVerdict
@@ -24,6 +25,16 @@ internal object ProbeBackgroundMotion {
 
     /** Dernier mouvement global estimé (`null` = pas de paire ou estimateur muet). */
     var lastMotion: FrameMotion? = null
+        private set
+
+    /** Fenêtre glissante des écarts boîte-fond (px) : le panneau debug y lit moy/p95. */
+    private val gaps = MotionGapStats()
+
+    /**
+     * Derniers chiffres mouvement publiés (`null` = rien de jugé) : lus par
+     * l'émission d'état suivante — le panneau a une frame de retard, assumé.
+     */
+    var lastDebug: MotionDebug? = null
         private set
 
     /**
@@ -52,6 +63,14 @@ internal object ProbeBackgroundMotion {
     fun reset() {
         prev = null
         lastMotion = null
+        lastDebug = null
+        gaps.reset()
+    }
+
+    /** Enregistre les écarts (px) et expose les chiffres au panneau debug. */
+    fun noteGaps(label: String, gapPx: List<Float>) {
+        gapPx.forEach(gaps::record)
+        lastDebug = MotionDebug(label, 0f, gaps.averagePx, gaps.p95Px)
     }
 }
 
@@ -78,4 +97,5 @@ internal fun logMotionTransition(
     val gaps = verdicts.map { hypot(it.boxDx - it.globalDx, it.boxDy - it.globalDy) * frameWidth * dtSeconds }
     val sorted = gaps.sorted()
     MotionLog.logTransition(label, 0f, gaps.average().toFloat(), sorted[(sorted.size * 95 / 100).coerceIn(0, sorted.size - 1)])
+    ProbeBackgroundMotion.noteGaps(label, gaps)
 }
