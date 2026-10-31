@@ -20,12 +20,14 @@ import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.toDetections
+import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.Flow
@@ -212,6 +214,81 @@ internal object CrossingOfferWatch {
 }
 
 /**
+ * Bascule **automatique** vers le mode Traversée : quand le passage piéton
+ * apparaît dans le champ (montée de l'offre, une fois par apparition), le mode
+ * s'arme seul et le dit (« Mode traversée activé. ») — une personne aveugle ne
+ * voit pas la pastille, sans cette phrase l'activation surprise n'existe pas
+ * pour elle. [setAuto] ne fait rien si le mode est déjà actif.
+ */
+internal fun observeCrossingAuto(
+    offers: Flow<Boolean>,
+    scope: CoroutineScope,
+    language: () -> SpeechLanguage,
+    setAuto: (Boolean) -> Unit,
+    say: suspend (String) -> Unit,
+) {
+    scope.launch {
+        offers.distinctUntilChanged().filter { it }.collect {
+            setAuto(true)
+            say(CrossingText.mode(true, language()))
+        }
+    }
+}
+
+/**
+ * Vue traversée par frame publiée : l'état sonde émet aussi entre deux frames
+ * (poste « pixel » de la chronologie, [LiveProbe.noteDrawn]) — sans ce filtre,
+ * le compteur de perte compterait deux fois chaque frame et couperait le mode
+ * deux fois trop tôt. Une émission par valeur de [LiveProbeState.frames].
+ */
+internal fun Flow<LiveProbeState>.crossingSightPerFrame(): Flow<Pair<Boolean, Boolean>> =
+    distinctUntilChangedBy { it.frames }.map { it.crossingActive to it.crossingVisible }
+
+/**
+ * Retour **automatique** au mode normal : ni passage ni feu ([states] porte
+ * actif + scène vue, voir [crossingSightPerFrame]) 4 frames de suite ou 4 s
+ * d'horloge ([CrossingLossGate]) coupe le mode et le dit (« Mode traversée
+ * coupé. »). Les frames seules ne coupent que le mode armé par la vision
+ * ([visionArmed]) ; l'horloge coupe aussi le manuel et le GPS (un mode armé
+ * sur du vide ne reste pas coincé).
+ */
+internal fun observeCrossingLoss(
+    states: Flow<Pair<Boolean, Boolean>>,
+    scope: CoroutineScope,
+    language: () -> SpeechLanguage,
+    visionArmed: () -> Boolean,
+    setAuto: (Boolean) -> Unit,
+    say: suspend (String) -> Unit,
+) {
+    scope.launch {
+        val gate = CrossingLossGate()
+        var lastActive = false
+        suspend fun cut() {
+            gate.reset()
+            lastActive = false
+            setAuto(false)
+            say(CrossingText.mode(false, language()))
+        }
+        launch {
+            while (true) {
+                delay(CrossingLossGate.TICK_MS)
+                if (lastActive && gate.expired(System.currentTimeMillis())) cut()
+            }
+        }
+        states.collect { (active, visible) ->
+            lastActive = active
+            if (!active) {
+                gate.reset()
+                return@collect
+            }
+            gate.noteFrame(visible, System.currentTimeMillis())
+            val frameCut = visionArmed() && !gate.onFrame(visible)
+            if (frameCut || gate.expired(System.currentTimeMillis())) cut()
+        }
+    }
+}
+
+/**
  * Labels sans passage piéton : le guidage obstacles les reçoit filtrés pour
  * que le sol peint ne dise jamais « Stop ». Le passage se rejoint (guidage
  * latéral doux), il ne se contourne pas.
@@ -252,12 +329,30 @@ internal fun crossingMetersOf(
     principalY: Float,
     imageH: Int,
 ): Float? {
-    val depth = readings.firstOrNull { it.box == box }
+    val exact = readings.firstOrNull { it.box == box }
         ?.meters?.takeIf { it.isFinite() && it > 0f }
+    val depth = exact ?: readings
+        .filter { CrossingOffer.isCrosswalkLabel(it.label) }
+        .mapNotNull { reading ->
+            val meters = reading.meters.takeIf { it.isFinite() && it > 0f } ?: return@mapNotNull null
+            iouOf(reading.box, box) to meters
+        }
+        .filter { it.first >= CROSSING_BOX_MATCH_IOU }
+        .maxByOrNull { it.first }
+        ?.second
     val ground = if (box.size >= 4 && pose != null) {
         CrossingDistance.groundMeters(box[3], pose, focalPx, principalY, imageH)
     } else null
     return CrossingDistance.bestMeters(depth, ground)
+}
+
+/** Recouvrement min pour rattacher une lecture au passage (repli IoU). */
+internal const val CROSSING_BOX_MATCH_IOU = 0.3f
+
+private fun iouOf(a: List<Float>, b: List<Float>): Float {
+    val first = Box.fromProto(a) ?: return 0f
+    val second = Box.fromProto(b) ?: return 0f
+    return first.iou(second)
 }
 
 /**

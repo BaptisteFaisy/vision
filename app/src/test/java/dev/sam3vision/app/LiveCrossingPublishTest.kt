@@ -40,4 +40,12 @@ class LiveCrossingPublishTest {
         assertEquals(CrossingState.Red, out.crossing)
         assertEquals(box, out.crossingBox)
     }
+
+    @Test
+    fun `mode coupe efface le cadre perime de la traversee precedente`() {
+        val before = LiveUiState(crossing = CrossingState.Green, crossingBox = box)
+        val out = before.withCrossing(false, null)
+        assertNull(out.crossing)
+        assertNull(out.crossingBox)
+    }
 }

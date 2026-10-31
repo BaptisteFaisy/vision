@@ -1,8 +1,8 @@
 {
   "_doc": "Pack voix ElevenLabs : une entrée = un concept parlé (fichiers vp_<id>_fr.mp3 / vp_<id>_en.mp3 dans app/src/main/res/raw + voix dans assets/vp_voice.txt). Les textes sont le MIROIR du Kotlin (CrossingText, VoiceNavPolicy) — tools/check-voicepack.py refuse tout écart. Les entrées 'parts' sont composées en code (vérifiées morceau par morceau). Génération : ELEVENLABS_API_KEY=… python3 tools/gen-voicepack.py (clé jamais stockée ni affichée).",
   "clips": [
-    {"id": "cross_red", "fr": "Rouge, attendez.", "en": "Red, wait."},
-    {"id": "cross_green", "fr": "Vert, traversez.", "en": "Green, cross now."},
+    {"id": "cross_red", "fr": "Rouge, attendez.", "en": "Don't cross yet"},
+    {"id": "cross_green", "fr": "Vert, traversez.", "en": "You can cross"},
     {"id": "cross_on", "fr": "Mode traversée activé.", "en": "Crossing mode on."},
     {"id": "cross_off", "fr": "Mode traversée coupé.", "en": "Crossing mode off."},
     {"id": "nav_offroute", "fr": "Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", "en": "You are off route. Recalculating."},

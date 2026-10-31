@@ -94,7 +94,7 @@ data class LiveProbeState(
     val traversePhase: dev.sam3vision.core.traverse.TraversePhase? = null,
     /** Un passage piéton est dans le champ : le mode Traversée s'arme seul (retombe quand le passage disparaît). */
     val crossingOffer: Boolean = false,
-    /** Passage piéton vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
+    /** Passage ou feu vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
     val crossingVisible: Boolean = false,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
