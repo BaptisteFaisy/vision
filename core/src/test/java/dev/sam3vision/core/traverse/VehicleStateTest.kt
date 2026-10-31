@@ -453,4 +453,28 @@ class VehicleStateTest {
         )
     }
 
+    @Test
+    fun `flag moving distingue le roule de l'arrete`() {
+        val rolling = VehicleStateWatcher()
+        rolling.update(listOf(det("car", box(100f))), listOf(reading("car", 12f, box(100f))), atMs = 0L)
+        rolling.update(listOf(det("car", box(110f))), listOf(reading("car", 12f, box(110f))), atMs = 100L)
+        val moving = rolling.update(
+            listOf(det("car", box(120f))),
+            listOf(reading("car", 12f, box(120f))),
+            atMs = 200L,
+        )
+
+        assertTrue(moving!!.moving)
+
+        val parked = VehicleStateWatcher()
+        parked.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 0L)
+        parked.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 100L)
+        val stopped = parked.update(
+            listOf(det("car", box(100f))),
+            listOf(reading("car", 2f, box(100f))),
+            atMs = 200L,
+        )
+
+        assertFalse(stopped!!.moving)
+    }
 }

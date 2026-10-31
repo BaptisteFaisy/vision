@@ -19,7 +19,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * loin) ; `null` sinon
  * (mouvement loin, arrêt — la sécurité ne parle que du danger qui roule).
  * [movingCount] compte les types mobiles à l'annonce (1 = singulier,
- * 2+ = pluriel générique « N vehicles moving »).
+ * 2+ = pluriel générique « N vehicles moving »). [moving] vrai quand ça
+ * roule (P1, prioritaire), faux à l'arrêt (dit avec le reste).
  */
 data class VehicleStateCue(
     val phrase: String,
@@ -27,6 +28,7 @@ data class VehicleStateCue(
     val urgent: Boolean = false,
     val safetyPhrase: String? = null,
     val movingCount: Int = 1,
+    val moving: Boolean = true,
 )
 
 /**
@@ -327,7 +329,10 @@ class VehicleStateWatcher(
         } else {
             null
         }
-        return VehicleStateCue(phrase, pick.meters, pick.urgent, safety, pick.movingCount)
+        return VehicleStateCue(
+            phrase, pick.meters, pick.urgent, safety, pick.movingCount,
+            moving = pick.state == State.MOVING,
+        )
     }
 
     /** Oublie pistes, mémoire et annonces (nouvelle traversée, nouveau direct). */
