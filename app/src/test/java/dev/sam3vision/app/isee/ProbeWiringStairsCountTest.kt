@@ -123,6 +123,30 @@ class ProbeWiringStairsCountTest {
         }
     }
 
+    @Test
+    fun `boite sam borne le comptage`() = runTest {
+        val (probe, fake, watcher, scope) = harness(this)
+        try {
+            // Sans ROI : 2 marches basses comptées (prouve qu'elles sont visibles).
+            StairCannyCount.offerLuma(stairsLuma(86, 94))
+            assertEquals(2, StairCannyCount.lineCount())
+
+            // Réponse SAM : la ROI se pose sur la boîte (100,200,400,900 / 512×1138).
+            respond(probe, fake, "A")
+            advanceUntilIdle()
+
+            // Mêmes marches (lignes 86,94 : sous la boîte, bas 81) : ignorées.
+            StairCannyCount.offerLuma(stairsLuma(86, 94))
+            assertEquals(0, StairCannyCount.lineCount())
+
+            // Marches dans la boîte (lignes 18..81) : comptées.
+            StairCannyCount.offerLuma(stairsLuma(40, 48, 56, 64, 72, 80))
+            assertTrue(StairCannyCount.lineCount() >= 4)
+        } finally {
+            scope.cancel()
+        }
+    }
+
     private data class Wiring(
         val probe: LiveProbe,
         val fake: ProbeTestClient,
