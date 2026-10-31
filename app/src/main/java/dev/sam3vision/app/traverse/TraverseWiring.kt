@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.glasses.GlassesVoiceRoute
+import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.ttsClient
@@ -103,6 +104,7 @@ class TraverseWiring(
     ): ShownFrame {
         if (active) updateLight(crossingLightOf(frame, jpegB64))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
+        CalibrationSnapshots.note(out.detections, width, height, atMs)
         logTransition(out.decision)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }

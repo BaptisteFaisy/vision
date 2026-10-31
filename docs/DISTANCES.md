@@ -96,6 +96,17 @@ Pastilles, plus proche et ligne d'état dérivent de `distanceLayer` : une info 
 plus de 150 ms n'existe plus à l'écran. La voix garde ses propres grilles (4 s) : 150 ms,
 c'est le rythme de l'information, pas du discours.
 
+## Étalonnage guidé
+
+Le biais systématique de focale (capteur ±2-3 %) s'annule en une mesure : un aidant de
+taille exacte se tient à une distance mesurée au mètre ruban, le direct le vise
+(`CalibrationSnapshots` retient la plus grande personne : score ≥ 0,5, non coupée), et
+les Réglages résolvent le champ (`CalibrationSolver` : focale `h × D / H`, champ
+`2·atan(W / 2f)`, refus sous 20 px ou hors bornes 15-130°). La valeur mesurée atterrit
+dans `cameraFovDeg` (prioritaire, comme un champ saisi) et `CalibrationStore` se souvient
+qu'elle est mesurée ; « Clear calibration » revient au capteur. Incertitude affichée :
+`±(1 px / h + 0,5 %)` — viser grand (340 px à 2 m : ±0,5°).
+
 ## Précision — ce que le chiffre vaut
 
 Le « ±15-20 % sur un objet **debout et entier** » reste **non confronté à un mètre ruban** — estimation
@@ -193,6 +204,9 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   rle réduit, png/none/inconnu/cassé nuls, tracker.
 - `app.live.DistanceTickerTest` (**6**) : pas ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
 - `app.isee.ProbeMetersPredictionsTest` (**1**) : ticker sonde insensible au temps virtuel (non-régression `advanceUntilIdle`).
+- `core.distance.CalibrationSolverTest` (**3**) : focale retrouvée, tolérance par taille, refus.
+- `app.live.CalibrationSnapshotsTest` (**3**) : plus grande personne, coupures/vide, fraîcheur.
+- `app.DistanceLayoutTest` (+2) : saisie métrique, résolution (visée/saisie).
 - `core.distance.DistanceFusionTest` (**14**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
   sténopé gardé en divergence, poids par tolérance, sténopé dominant de loin, centre optique décentré.
 - `core.distance.ReadingQualityTest` (**10**) : occlusion (contenue, scores égaux, masqueur faible gardé, NaN, seuil exact, malformée), confiance (quantification, accord des branches), poids sol (dépression, plancher).
@@ -220,13 +234,10 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 ## Pistes (non faites)
 
 Fait depuis : pose IMU temps réel (`PitchMeter`, `docs/POSE-IMU.md`), hauteur/pieds du masque
-(`Detection.maskBox`, dormant sur PNG), profondeur affine (`AffineScale`), Kalman par piste +
-ticker 120 ms, protocole et script de recette (`docs/RECETTE-DISTANCES.md`,
-`scripts/mesure-distances.sh`).
-
-- **Étalonnage guidé** : « tiens-toi à 2 m » → ajustement du champ de vision. Le plus gros biais
-  systématique restant (focale capteur ±2-3 %, hauteur d'épaule supposée) ; une mesure connue
-  l'annule d'un coup pour cet appareil et cet utilisateur.
+(`Detection.maskBox`, `bits` demandés par le client — actives si le serveur déployé suit),
+profondeur affine (`AffineScale`), Kalman par piste + ticker 120 ms, protocole et script de
+recette (`docs/RECETTE-DISTANCES.md`, `scripts/mesure-distances.sh`), étalonnage guidé
+(`CalibrationSolver`, section Réglages — voir « Étalonnage »).
 - **Masques compacts en production** : demander `bits`/`poly` au direct (au lieu du PNG) pour
   activer les étendues de masque partout — ou cache de décodage partagé overlay↔distances
   (pas de double décodage PNG par frame).
