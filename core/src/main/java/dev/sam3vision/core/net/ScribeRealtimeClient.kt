@@ -148,13 +148,18 @@ class ScribeRealtimeSession(
             transport.send(chunkMessage(tail, commit = true))
         }
         if (!sent) return fail(ApiError.Network("Scribe realtime : envoi refusé"))
+        // Pas de `return` dans le bloc (`withTimeoutOrNull` n'est pas inline) :
+        // la cause remonte par variable, puis échoue hors du délai.
+        var failure: ApiError? = null
         val text = withTimeoutOrNull(commitTimeoutMs) {
             try {
                 committed.await()
             } catch (e: ApiError) {
-                return fail(e)
+                failure = e
+                null
             }
         }
+        failure?.let { return fail(it) }
         synchronized(lock) { done = true }
         runCatching { transport.close() }
         if (text == null) return fail(ApiError.Timeout("Scribe realtime : commit sans réponse"))
