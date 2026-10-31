@@ -181,13 +181,10 @@ object VehicleStateText {
  * [confirmFrames] positifs consécutifs, puis silence pendant le cooldown de
  * l'état (4 s en mouvement, 10 s à l'arrêt).
  *
- * En mouvement = approche confirmée (tau < 3 s via [VehicleApproach], classe
- * existante réutilisée), traversée latérale du champ à taille stable (même
- * classe, le danger n° 1 d'un piéton) ou boîte croissante sur deux frames
- * (miroir du veto instantané) — sauf veto fond : quand le signal
- * `MovingVerdict` accuse la caméra avec confiance, la dérive des boîtes ne
- * conclut plus (doute/silence). À l'arrêt = dérive du centre sous
- * [STILL_SPEED] et seau-mètre
+ * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
+ * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
+ * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
+ * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
  * stable (deux transitions stables, trois frames) — mesuré et dans le
  * couloir marché. Le reste est doute/silence : jamais d'arrêt inventé.
  *
@@ -261,12 +258,7 @@ class VehicleStateWatcher(
     /** Vrai quand chaque piste évaluée accuse la caméra : le mouvement se tait. */
     val cameraMoved: Boolean get() = approach.cameraMoved
 
-    /**
-     * Mouvement brut de la dernière frame (`pick == MOVING`, avant
-     * confirmation et cooldowns) : le scan traversée y lit « un véhicule
-     * est en mouvement dans cette vue » et fait sa propre confirmation par
-     * côté. `false` tant qu'aucune frame n'a été vue.
-     */
+    /** Brut de la dernière frame (`pick == MOVING`, lu par le scan traversée). */
     var movingThisFrame: Boolean = false
         private set
 
@@ -370,13 +362,12 @@ class VehicleStateWatcher(
         hushed: Set<String>,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
-        val lateralKey = tau.lateralLabel?.takeIf { tau.lateralMoving }?.let(::vehicleKey)
         val moving = current.keys
             .filter { candidate ->
                 if (candidate in hushed) return@filter false
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
-                val lateralHit = lateralKey != null && lateralKey == candidate
+                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && current.getValue(candidate).area > prev.area
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }

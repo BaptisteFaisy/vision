@@ -753,8 +753,10 @@ approche muette, panoramique tuée par le fond), `VehicleStateLateralTest`
 (2 : latéral annoncé, brut par frame) et `CrosswalkScanWiringTest`
 (10 : déclencheur 2 m, priorités).
 
-Recette téléphone : sur un passage, téléphone tenu face — « Stop.
-Regardez à gauche. … Rien à gauche. Regardez à droite. … Rien à droite. » ;
-virage à droite quand on a demandé la gauche : attente (pas de validation) ;
-voiture qui passe pendant un côté → « Attention, voiture à … » —
-**non mesuré**, exige un APK de cette branche sur appareil réel.
+Recette téléphone : fumée Redmi OK (install + lancement + pid vivant,
+capteur rotation présent sur les deux téléphones) ; sur un passage,
+téléphone tenu face — « Stop. Regardez à gauche. … Rien à gauche.
+Regardez à droite. … Rien à droite. » ; virage à droite quand on a
+demandé la gauche : attente (pas de validation) ; voiture qui passe
+pendant un côté → « Attention, voiture à … » puis re-vérification —
+recette passage réel **non mesurée**, exige une sortie rue.
