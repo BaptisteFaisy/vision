@@ -1,6 +1,5 @@
 package dev.sam3vision.core.traverse
 
-import dev.sam3vision.core.danger.ApproachThresholds
 import dev.sam3vision.core.depth.DepthConfirm
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
@@ -309,11 +308,10 @@ class VehicleApproach {
 }
 
 /**
- * Seuils d'expansion des véhicules pour
- * [dev.sam3vision.core.danger.ApproachEstimator] (PISTE2) : un véhicule est
- * un danger grave — seuil de grossissement abaissé (0,02), couloir élargi
- * (0,30, un véhicule large menace même excentré), TTC plafonné à 4 s.
- * Priors à recaler sur téléphone, comme [VehicleApproach.TTC_SECONDS].
+ * Seuils d'expansion des véhicules (PISTE2) : un véhicule est un danger
+ * grave — seuil de grossissement abaissé (0,02), couloir élargi (0,30, un
+ * véhicule large menace même excentré), TTC plafonné à 4 s. Priors à recaler
+ * sur téléphone, comme [VehicleApproach.TTC_SECONDS].
  */
 val VEHICLE_APPROACH_THRESHOLDS = ApproachThresholds(
     minGrowthPerSec = 0.02f,
@@ -322,11 +320,8 @@ val VEHICLE_APPROACH_THRESHOLDS = ApproachThresholds(
 )
 
 /**
- * Seuils d'expansion par label pour
- * [dev.sam3vision.core.danger.ApproachEstimator] (PISTE2) : [vehicle] pour
- * les labels de [VehicleConcepts], [person] pour tout le reste — à passer
- * en `thresholdsForLabel` (`ApproachEstimator(thresholdsForLabel =
- * ::approachThresholdsFor)`).
+ * Seuils d'expansion par label (PISTE2) : [vehicle] pour les labels de
+ * [VehicleConcepts], [person] pour tout le reste.
  */
 fun approachThresholdsFor(
     label: String,
