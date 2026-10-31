@@ -461,7 +461,7 @@ _state.update { it.cleared() }
                 detour = if (_state.value.crossingActive) false else voice.detour,
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive, crossingOfferMeters(readings, distances.pose, distances.lensSpec, frame.width, frame.height), frame.height),
-                crossingVisible = CrossingOfferWatch.lastVisible,
+                crossingVisible = CrossingOfferWatch.lastVisible || cross?.box != null,
                 transport = transportLabel(active),
                 error = null,
             )

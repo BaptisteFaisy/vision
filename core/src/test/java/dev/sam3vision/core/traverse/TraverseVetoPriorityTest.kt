@@ -15,7 +15,7 @@ import org.junit.Test
  *
  * Verrouille le mot d'ordre exact (« attendez », jamais « prêt » ni
  * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
- * la chaîne veto→phrase « Red, wait. » et les littéraux FR préchauffés.
+ * la chaîne veto→phrase « Don't cross yet » et les littéraux FR préchauffés.
  *
  * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN strict, 15 m,
  * ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
@@ -120,20 +120,20 @@ class TraverseVetoPriorityTest {
         assertNull(announcer.onFrame(0L, first.crossingState()))
         val second = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
         val cue = announcer.onFrame(200L, second.crossingState())
-        assertEquals("Red, wait.", cue?.phrase)
+        assertEquals("Don't cross yet", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
         assertEquals(CrossingState.Red, cue?.state)
     }
 
     @Test
     fun `phrases prechauffees - litteraux anglais exacts`() {
-        assertEquals("Red, wait.", TraversePhrases.RED)
-        assertEquals("Green, cross now.", TraversePhrases.GREEN)
+        assertEquals("Don't cross yet", TraversePhrases.RED)
+        assertEquals("You can cross", TraversePhrases.GREEN)
         assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
         assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
-                "Red, wait.", "Green, cross now.",
+                "Don't cross yet", "You can cross",
                 "Sidewalk across the street.", "On the crosswalk.",
             ),
             TraversePhrases.ALL,

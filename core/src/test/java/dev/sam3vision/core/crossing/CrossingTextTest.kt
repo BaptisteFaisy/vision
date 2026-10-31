@@ -14,13 +14,13 @@ class CrossingTextTest {
 
     @Test
     fun `phrases anglaises courtes, binaire rouge vert`() {
-        assertEquals("Red, wait.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.En))
-        assertEquals("Green, cross now.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.En))
+        assertEquals("Don't cross yet", CrossingText.phrase(CrossingState.Red, SpeechLanguage.En))
+        assertEquals("You can cross", CrossingText.phrase(CrossingState.Green, SpeechLanguage.En))
     }
 
     @Test
     fun `l'anglais est le defaut des fonctions pures`() {
-        assertEquals("Red, wait.", CrossingText.phrase(CrossingState.Red))
+        assertEquals("Don't cross yet", CrossingText.phrase(CrossingState.Red))
     }
 
     @Test
