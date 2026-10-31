@@ -9,17 +9,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.sam3vision.core.depth.DepthBackend
-import dev.sam3vision.core.settings.Settings
 
 /**
  * Section « Depth (beta) » des Réglages : moteur embarqué DA2 Small par
  * ONNX (100 % sur le téléphone, 0 GPU Modal) + bouton de banc (5 inférences
  * sur image synthétique, verdict en bas de page et dans logcat `DepthBench`).
- * Active par défaut (DA2, seuil < 200 ms tenu).
+ * Toujours active (DA2, seuil < 200 ms tenu) — plus d'option Coupée.
  */
 @Composable
-fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: () -> Unit) {
+fun DepthSettings(onTestDepth: () -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Depth (beta)",
@@ -27,32 +25,14 @@ fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: ()
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        DepthBackend.entries.forEach { backend ->
-            DepthBackendButton(draft, backend, onChange)
-        }
         Text(
             "Monocular depth map estimated on the phone " +
-                "(Depth Anything V2 Small). Model downloaded once at the " +
-                "first test (~26 MB), 100% local inference after that — " +
+                "(Depth Anything V2 Small), always on. Model downloaded once at the " +
+                "first run (~26 MB), 100% local inference after that — " +
                 "no Modal GPU.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
         BigButton("Test depth (5 inferences)", true, AppColors.surfaceHigh, onTestDepth)
     }
-}
-
-/** Un bouton pleine largeur par moteur, le moteur actif en couleur pleine. */
-@Composable
-private fun DepthBackendButton(draft: Settings, backend: DepthBackend, onChange: (Settings) -> Unit) {
-    var color = AppColors.surfaceHigh
-    if (draft.depthBackend == backend) {
-        color = AppColors.primary
-    }
-    BigButton(
-        label = backend.label,
-        enabled = true,
-        color = color,
-        onClick = { onChange(draft.copy(depthBackend = backend)) },
-    )
 }

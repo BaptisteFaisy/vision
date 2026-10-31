@@ -34,9 +34,9 @@ object DepthModels {
         bytes = 27516544,
     )
 
+    /** Spec du modèle demandé (DA2 seul : la profondeur est toujours active). */
     fun forBackend(backend: DepthBackend): DepthModelSpec? = when (backend) {
         DepthBackend.DA2 -> DA2
-        DepthBackend.OFF -> null
     }
 }
 

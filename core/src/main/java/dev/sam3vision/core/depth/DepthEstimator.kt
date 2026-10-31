@@ -3,7 +3,9 @@ package dev.sam3vision.core.depth
 /**
  * Moteur de profondeur embarqué : Depth Anything V2 Small (ONNX), 100 % sur
  * le téléphone — 0 GPU Modal. Moteur unique depuis le 2026-10-29 (repli
- * MiDaS supprimé : DA2 est plus précis et ~1,6x plus rapide sur Redmi).
+ * MiDaS supprimé : DA2 est plus précis et ~1,6x plus rapide sur Redmi), et
+ * seule option depuis le 31/10 (Coupée supprimée : la profondeur est
+ * toujours active, ordre user).
  */
 enum class DepthBackend(
     /** Libellé des Réglages : tient sur une ligne, en pleine largeur. */
@@ -11,20 +13,15 @@ enum class DepthBackend(
     /** Code court pour les pastilles et les journaux. */
     val code: String,
 ) {
-    DA2(label = "Depth Anything V2 Small", code = "DA2"),
-    OFF(label = "Off", code = "OFF");
+    DA2(label = "Depth Anything V2 Small", code = "DA2");
 
     companion object {
         /**
-         * Nom persisté → moteur. `AUTO`/`MIDAS` (réglages pré-29/10) migrent
-         * vers [DA2] (la profondeur reste active) ; valeur inconnue ou
-         * absente ⇒ [OFF] (sur, mesuré).
+         * Nom persisté → moteur. `OFF` (réglages pré-31/10), valeur inconnue
+         * ou absente ⇒ [DA2] : la profondeur est toujours active.
          */
-        fun fromName(name: String?): DepthBackend {
-            if (name.equals("AUTO", ignoreCase = true)) return DA2
-            if (name.equals("MIDAS", ignoreCase = true)) return DA2
-            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: OFF
-        }
+        fun fromName(name: String?): DepthBackend =
+            entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: DA2
     }
 }
 
@@ -45,16 +42,6 @@ interface DepthEstimator : AutoCloseable {
 
     /** Carte de proximité de l'image ; échec = modèle absent ou inférence tombée. */
     suspend fun estimate(argb: IntArray, width: Int, height: Int): Result<DepthResult>
-}
-
-/** Moteur coupé : tout appel échoue proprement (l'appelant affiche « depth off »). */
-object NoOpDepthEstimator : DepthEstimator {
-    override val backend: DepthBackend = DepthBackend.OFF
-
-    override suspend fun estimate(argb: IntArray, width: Int, height: Int): Result<DepthResult> =
-        Result.failure(IllegalStateException("depth off"))
-
-    override fun close() = Unit
 }
 
 /**

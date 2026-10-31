@@ -186,8 +186,9 @@ data class Settings(
     val routeBaseUrl: String = "",
     /**
      * Moteur de profondeur embarqué (100 % sur le téléphone, 0 GPU Modal).
-     * Actif par défaut (DA2, seuil < 200 ms tenu sur Redmi) ; OFF le coupe.
-     * Réglages pré-29/10 (AUTO, MIDAS) migrés vers DA2 par fromName.
+     * Toujours actif (DA2, seuil < 200 ms tenu sur Redmi) — l'option Coupée
+     * est supprimée (31/10). Réglages anciens (AUTO, MIDAS, OFF) migrés
+     * vers DA2 par fromName.
      */
     val depthBackend: DepthBackend = DepthBackend.DA2,
 ) {

@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.DepthEstimator
-import dev.sam3vision.core.depth.NoOpDepthEstimator
 
 /**
  * Sélecteur du moteur de profondeur : n'échoue jamais — un moteur sans modèle
@@ -13,10 +12,8 @@ import dev.sam3vision.core.depth.NoOpDepthEstimator
  */
 object DepthEstimators {
 
-    fun open(context: Context, backend: DepthBackend): DepthEstimator {
-        if (backend == DepthBackend.OFF) return NoOpDepthEstimator
-        return openDa2(context)
-    }
+    /** Ouvre DA2, seul moteur (la profondeur est toujours active). */
+    fun open(context: Context, backend: DepthBackend): DepthEstimator = openDa2(context)
 
     private fun openDa2(context: Context): DepthEstimator {
         val outcome = runCatching { OnnxDepthEstimator.open(context) }
