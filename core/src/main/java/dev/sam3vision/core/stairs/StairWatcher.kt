@@ -65,6 +65,23 @@ object StairText {
     }
 
     /**
+     * « 5 marches. » — le comptage oral des marches vues, dit quand
+     * l'escalier est reconnu (voix du compteur, [StairCountVoice]), à ne pas
+     * confondre avec [countdown] (le « Plus que N » de la montée). Singulier
+     * gardé (« 1 marche. », jamais « 1 marches. »).
+     */
+    fun stepCount(count: Int, language: SpeechLanguage): String {
+        if (count == 1) return when (language) {
+            SpeechLanguage.Fr -> "1 marche."
+            SpeechLanguage.En -> "1 step."
+        }
+        return when (language) {
+            SpeechLanguage.Fr -> "$count marches."
+            SpeechLanguage.En -> "$count steps."
+        }
+    }
+
+    /**
      * « Dernière marche. » — plus qu'une marche (compteur lissé ≤ 1) ou le
      * palier à moins d'un mètre. En descente, le palier est nommé (« Dernière
      * marche, palier. ») : on arrive quelque part, pas dans le vide.
