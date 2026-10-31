@@ -90,12 +90,12 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   mesure). Visibilité brute (`crossingVisible`), sortie (4 frames vides)
   et armements manuel, vocal, GPS inchangés. Sonde +0 ligne (appel étendu
   sur place, fichier au plafond).
-- Preuves : `:app:testDebugUnitTest` 1 272 tests 0 échec (dont lookup
-  offre), `:core:testDebugUnitTest` (`CrossingOfferTest` 19/19, dont 8
-  nouveaux) ; `assembleDebug` vert ; `check-kotlin-limits.py` vert. 5
-  échecs `:core` pré-existants hors périmètre
-  (`PrivateFileSettingsStoreTest`, POSIX sous Windows) + 1 mesure
-  d'allocation flaky (`MaskRobustnessTest`, verte isolément).
+- Preuves (rebase `4094b683`) : `:app:testDebugUnitTest` 1 289 tests 0
+  échec (dont lookup offre), `:core:testDebugUnitTest` 2 208 tests
+  (`CrossingOfferTest` 19/19, dont 8 nouveaux) ; `assembleDebug` vert ;
+  `check-kotlin-limits.py` vert. 5 échecs `:core` pré-existants hors
+  périmètre (`PrivateFileSettingsStoreTest`, POSIX sous Windows).
+
 
 ## 2026-10-30 — traversée : les voitures disent si elles roulent ou sont arrêtées (branche `feat/isee-crossing-vehicle-state`)
 
