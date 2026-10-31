@@ -1,0 +1,7 @@
+# Dépendances du seul réentraînement feu (`tools/train_light.py`, manuel,
+# occasionnel) : résolues par uv, jamais installées en CI ni sur le système.
+# Versions gelées le 2026-10-31 (reproductibilité de l'arbre candidat).
+# Usage : uv run --with-requirements tools/requirements-train.txt tools/train_light.py ...
+scikit-learn==1.9.1
+numpy==2.5.4
+pillow==13.0.0

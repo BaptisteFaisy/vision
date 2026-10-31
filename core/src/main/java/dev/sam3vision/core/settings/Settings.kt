@@ -67,6 +67,15 @@ data class Settings(
     /** Distances affichées sur le direct (hauteurs connues + sténopé, sans GPU). */
     val distanceOverlayEnabled: Boolean = true,
     /**
+     * Collecte des crops de feux piétons pour le réentraînement (désactivée
+     * par défaut, interrupteur TECHNICAL SETTINGS) : chaque crop classifié
+     * (≤ 48 px, PNG) est ajouté à `lightcrops-*.jsonl` dans les fichiers
+     * privés de l'app, avec sa boîte et son verdict. Crops seuls, jamais la
+     * scène entière : pas de visages, pas de plaques. Voir
+     * `docs/COLLECTE-FEUX.md` (protocole + étiquetage + réentraînement).
+     */
+    val collectLightCrops: Boolean = false,
+    /**
      * Direct avec détecteur : les frames partent à SAM `/live` sur Modal pendant que la
      * caméra tourne (masques, objets, distances, journal), comme demandé par le user le
      * 2026-10-26. Les **questions** partent quand même directement au LLM, sans attendre
@@ -363,6 +372,7 @@ data class Settings(
             "museRealtime=$museRealtime, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
+        "collectLightCrops=$collectLightCrops, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, continuousCadenceEnabled=$continuousCadenceEnabled, " +
         "adaptiveUploadEnabled=$adaptiveUploadEnabled, keyframeSchedulerEnabled=$keyframeSchedulerEnabled, " +

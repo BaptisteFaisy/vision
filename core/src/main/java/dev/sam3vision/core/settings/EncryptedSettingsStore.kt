@@ -55,6 +55,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             introEnabled = prefs.getBoolean(KEY_INTRO_ENABLED, default.introEnabled),
             introPlayed = prefs.getBoolean(KEY_INTRO_PLAYED, default.introPlayed),
             distanceOverlayEnabled = prefs.getBoolean(KEY_DISTANCE_OVERLAY, default.distanceOverlayEnabled),
+            collectLightCrops = prefs.getBoolean(KEY_COLLECT_LIGHT_CROPS, default.collectLightCrops),
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             adaptiveUploadEnabled = prefs.getBoolean(KEY_ADAPTIVE_UPLOAD, default.adaptiveUploadEnabled),
@@ -102,6 +103,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_INTRO_ENABLED, s.introEnabled)
             .putBoolean(KEY_INTRO_PLAYED, s.introPlayed)
             .putBoolean(KEY_DISTANCE_OVERLAY, s.distanceOverlayEnabled)
+            .putBoolean(KEY_COLLECT_LIGHT_CROPS, s.collectLightCrops)
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_ADAPTIVE_UPLOAD, s.adaptiveUploadEnabled)
@@ -147,6 +149,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_INTRO_ENABLED = "intro_enabled"
         const val KEY_INTRO_PLAYED = "intro_played"
         const val KEY_DISTANCE_OVERLAY = "distance_overlay"
+        const val KEY_COLLECT_LIGHT_CROPS = "collect_light_crops"
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_ADAPTIVE_UPLOAD = "adaptive_upload"

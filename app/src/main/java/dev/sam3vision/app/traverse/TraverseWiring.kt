@@ -4,8 +4,10 @@ import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.glasses.GlassesVoiceRoute
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.isee.CrossingLight
+import dev.sam3vision.app.isee.LightCropLogger
 import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.crossing.CrossingPrompts
@@ -85,6 +87,9 @@ class TraverseWiring(
      */
     val display: CrossingLight? get() = light?.copy(state = pipeline.lastAnnounced ?: CrossingState.Red)
 
+    /** Collecte des crops (voir [LightCropLogger]) : `null` = interrupteur coupé. */
+    private var cropLogger: LightCropLogger? = null
+
     /** Clé de la dernière transition journalisée : les répétitions se taisent. */
     private var lastKey: String = ""
 
@@ -102,7 +107,7 @@ class TraverseWiring(
         language: SpeechLanguage,
         jpegB64: String = "",
     ): ShownFrame {
-        if (active) updateLight(crossingLightOf(frame, jpegB64))
+        if (active) updateLight(crossingLightOf(frame, jpegB64, onCrop = cropLogger?.tap()))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
         CalibrationSnapshots.note(out.detections, width, height, atMs)
         logTransition(out.decision)
@@ -152,7 +157,9 @@ class TraverseWiring(
         if (active) {
             this.active = true
             quiet()
-            relaunch(attach(requireNotNull(app), settings, scope, prompts))
+            val application = requireNotNull(app)
+            cropLogger = if (settings.collectLightCrops) LightCropLogger(File(application.filesDir, "lightcrops"), BuildConfig.VERSION_NAME) else null
+            relaunch(attach(application, settings, scope, prompts))
             log("traversee mode=ON")
         } else {
             deactivate(quiet)
@@ -173,6 +180,7 @@ class TraverseWiring(
         pipeline.reset()
         lightGreen = false
         light = null
+        cropLogger = null
         quiet()
     }
 
