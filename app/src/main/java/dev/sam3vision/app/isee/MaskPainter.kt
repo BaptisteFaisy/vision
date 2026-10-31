@@ -54,8 +54,8 @@ class MaskPainter(
         android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms")
     }
 
-    /** Colore [gray] de l'emplacement [index] dans le bitmap réutilisé en cours. */
-    private fun paint(index: Int, gray: GrayMask, argb: Int): Bitmap {
+    /** Colore [gray] de l'emplacement [index] (`null` = bitmap increé, masque sauté). */
+    private fun paint(index: Int, gray: GrayMask, argb: Int): Bitmap? {
         val buffer = scratchFor(index, gray.size)
         val pair = targetsFor(index)
         return colorizeGrayToBitmap(gray, lutFor(argb), buffer, pair[front]).also { pair[front] = it }
