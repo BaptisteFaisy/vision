@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.isee.vm.PictoUiState
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.picto.PictoPlaceMode
 import java.io.File
 
 /** Le seul écran iSee : le chat plein écran, la caméra vit dans une fenêtre flottante. */
@@ -53,6 +54,8 @@ data class IseeUiState(
     val openSettings: Boolean = false,
     /** Repères visuels : génération en cours, relecture aidant, objets reconnus. */
     val picto: PictoUiState = PictoUiState(),
+    /** Lieu du picto (dedans par défaut) : dehors, les pictos sont muets ; bascule à la voix uniquement, sans témoin visuel. */
+    val placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,
     /**
      * Photo des lunettes en cours d'affichage (`null` = aucune) : dans la rue,
      * à l'emplacement caméra ([GlassesPhotoStreet]), posée même depuis un autre

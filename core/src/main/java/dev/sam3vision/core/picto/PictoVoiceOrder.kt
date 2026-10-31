@@ -53,6 +53,9 @@ object PictoVoiceOrder {
     /** Mots élidés après « picto » : articles FR/EN ([FIND_LEADERS]) et prépositions anglaises (« for », « of »). */
     private val CREATE_LEADERS = FIND_LEADERS + setOf("for", "of")
 
+    /** Articles et possessifs retirés après « où est/sont » (« mes clés »). */
+    private val OU_SONT_LEADERS = setOf("mes", "mon", "ma", "les", "le", "la")
+
     /** Démonstratifs : l'objet est filmé, aucun nom à guider (« de ça »). */
     private val NAMELESS = setOf("ca", "cela")
 
@@ -108,6 +111,23 @@ object PictoVoiceOrder {
         if (words.contains("my")) return label
         if (isHousehold(label)) return label
         return null
+    }
+
+    /**
+     * Concept SAM maison de l'ordre « Où est/sont X » porté par [text], `null`
+     * si ce n'en est pas un (« où sont mes clés » → « keys », « où est mon
+     * téléphone » → « phone »). Le libellé français ne fait qu'un seul mot,
+     * articles et possessifs retirés : un label inconnu ou composé reste une
+     * question pour le LLM. Singulier et pluriel gérés par
+     * [HomeModes.conceptForWord] — jamais vide, jamais traduit.
+     */
+    fun parseOuSont(text: String): String? {
+        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        if (words.size < 3 || words[0] != "ou") return null
+        if (words[1] != "est" && words[1] != "sont") return null
+        val rest = words.drop(2).dropWhile { OU_SONT_LEADERS.contains(it) }
+        if (rest.size != 1) return null
+        return HomeModes.conceptForWord(rest[0])
     }
 
     /** Vrai si [label] est un concept maison, au singulier ou au pluriel. */

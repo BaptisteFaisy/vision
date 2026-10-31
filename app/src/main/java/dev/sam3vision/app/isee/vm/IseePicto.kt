@@ -12,6 +12,7 @@ import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
 import dev.sam3vision.core.picto.PictoHit
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.picto.matchTemplate
 import dev.sam3vision.core.settings.Settings
@@ -47,6 +48,8 @@ data class PictoUiState(
  *
  * Un seul vol à la fois (`busy`) : le bouton est muet pendant la génération
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
+ * Dehors, tout est muet (bouton, ordres, relecture, reconnaissance sur
+ * frames) : seul dedans suit des pictos.
  */
 class IseePicto(
     private val media: MediaCacheStore,
@@ -61,6 +64,7 @@ class IseePicto(
     private val frameGray: (String) -> GrayImage? = ::decodeFrameGray,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
+    private val placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
 ) {
 
     /** Brouillon en relecture : photo d'origine (régénération), gabarit, PNG. */
@@ -105,9 +109,10 @@ class IseePicto(
 
     /**
      * Bouton « Picto » de la carte : photo de l'objet filmé, puis pictogramme.
-     * Muet si une génération est en vol, ou si la caméra n'est pas prête.
+     * Muet dehors, pendant une génération en vol, ou si la caméra n'est pas prête.
      */
     fun onPictoButton() {
+        if (!placeMode().pictoEnabled) return
         if (busy) return
         busy = true
         update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting), status = null) }
@@ -126,9 +131,10 @@ class IseePicto(
      * Ordre « Find the X » : photo de l'objet filmé, pictogramme Muse, puis
      * stockage direct — sans relecture, l'utilisateur est seul devant la
      * caméra. Le repère est cherché dès la frame suivante et l'overlay le
-     * montre à son emplacement. Muet si une génération est en vol.
+     * montre à son emplacement. Muet dehors ou si une génération est en vol.
      */
     fun findObject(label: String) {
+        if (!placeMode().pictoEnabled) return
         if (busy || label.isBlank()) return
         busy = true
         update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
@@ -145,6 +151,7 @@ class IseePicto(
 
     /** L'aidant valide : le repère est stocké et la détection l'arme aussitôt. */
     fun confirmDraft(label: String) {
+        if (!placeMode().pictoEnabled) return
         val pending = draft ?: return
         draft = null
         scope.launch(io) {
@@ -160,6 +167,7 @@ class IseePicto(
 
     /** L'aidant n'aime pas le dessin : régénération avec son nom comme indice. */
     fun regenerateDraft(label: String) {
+        if (!placeMode().pictoEnabled) return
         val pending = draft ?: return
         if (busy) return
         busy = true
@@ -179,6 +187,7 @@ class IseePicto(
      * toutes les [MATCH_EVERY_MS] — 2 Hz, l'overlay garde le dernier passage.
      */
     fun onFrame(jpegB64: String) {
+        if (!placeMode().pictoEnabled) return
         val known = pictos
         if (known.isEmpty()) return
         val now = clock()
