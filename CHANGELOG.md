@@ -3,6 +3,20 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — CI : un runner non provisionné ne brûle plus l'unique tentative de l'agent `fw` (branche `ci/agent-code3`)
+
+- **Constat sur #652** (brouillon jetable aux tests rouges) : la v23 a bien
+  appelé l'agent à 17:38:49 — mais il a répondu `zeroclaw introuvable sur ce
+  runner`, et le pilote a quand même posé sa marque `<!-- test-agent sha=6ee9c52 -->` :
+  **l'unique tentative de la tête était consommée** deux minutes avant la pose
+  du binaire sur `r630` (faite depuis en `394a9686`).
+- **Fait** : `test_agent.py` distingue l'outillage manquant — code **3**,
+  **aucune marque**, aucun commentaire — d'un vrai échec de l'agent ; le
+  balayeur journalise « aucune tentative consommée, réessai au prochain passage ».
+- **Preuves** : `test_test_agent.py` **22/22** (2 nouveaux : outillage absent →
+  code 3 sans marque, sans label, sans push ; échec hors infra → compte rendu
+  normal) ; `bash -n` et parse YAML du balayeur verts.
+
 ## 2026-10-31 — iSee : les escaliers parlent GPS coupé, sécurité avant silence (branche `fix-stairs-gps-gate`)
 
 - **Constat** : GPS coupé, escalier à 2 m masqué à l'écran, voix muette —
