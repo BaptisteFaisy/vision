@@ -167,4 +167,32 @@ class CrossingLateralTest {
         )
         assertNull(CrossingLateralWatch.flow.value)
     }
+
+    @Test
+    fun `feed en traversee guide passage proche, tait passage loin`() {
+        CrossingLateralWatch.reset()
+        val box = listOf(10f, 100f, 100f, 500f)
+        val objects = listOf(obj("crosswalk", box))
+        feedCrossingLateral(
+            true, objects, 512, 1138, listOf(reading("crosswalk", 2.5f, box)), null,
+            LensSpec.Default, 0L, SpeechLanguage.Fr,
+        )
+        assertEquals("Gauche.", CrossingLateralWatch.flow.value?.lateral)
+        feedCrossingLateral(
+            true, objects, 512, 1138, listOf(reading("crosswalk", 5.0f, box)), null,
+            LensSpec.Default, 200L, SpeechLanguage.Fr,
+        )
+        assertNull(CrossingLateralWatch.flow.value)
+    }
+
+    @Test
+    fun `feed en traversee prouve sous les pieds sans mesure`() {
+        CrossingLateralWatch.reset()
+        val box = listOf(0f, 900f, 512f, 1137f)
+        feedCrossingLateral(
+            true, listOf(obj("crosswalk", box)), 512, 1138, emptyList(), null,
+            LensSpec.Default, 0L, SpeechLanguage.Fr,
+        )
+        assertEquals("Tout droit.", CrossingLateralWatch.flow.value?.lateral)
+    }
 }
