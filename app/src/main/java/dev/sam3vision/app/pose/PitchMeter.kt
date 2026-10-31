@@ -23,9 +23,9 @@ class PitchMeter(
     private val heights: CameraHeightStore = CameraHeightStore(context),
 ) {
 
-    private val sensors: SensorManager? =
-        context.applicationContext.getSystemService(SensorManager::class.java)
-    private val sensor: Sensor? = sensors?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    private val endpoint = RotationVector.sensorOf(context)
+    private val sensors: SensorManager? = endpoint?.first
+    private val sensor: Sensor? = endpoint?.second
 
     /** Vrai si le téléphone a un vecteur de rotation ; faux = sténopé seul. */
     val hasSensor: Boolean get() = sensor != null
@@ -72,10 +72,7 @@ class PitchMeter(
 
     /** Vecteur de rotation → tangage filtré → pose fraîche (hauteur relue à chaque fois). */
     private fun onRotation(values: FloatArray) {
-        val rotation = FloatArray(9)
-        SensorManager.getRotationMatrixFromVector(rotation, values)
-        val orientation = FloatArray(3)
-        SensorManager.getOrientation(rotation, orientation)
+        val orientation = RotationVector.orientationOf(values) ?: return
         val filtered = PitchMath.lowPass(pitchRad, PitchMath.pitchRadFromOrientation(orientation[1]))
         pitchRad = filtered
         lastAtMs = System.currentTimeMillis()
