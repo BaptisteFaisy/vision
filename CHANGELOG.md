@@ -366,9 +366,15 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   complet, seuls échecs `PrivateFileSettingsStoreTest` (permissions
   POSIX sous Windows — pré-existants, reproduits sur master intact le
   31/10, hors périmètre) ; `HazardWatchTest`, `HazardConceptsTest`,
+  `docs/VOIX-DANGER.md` § 23. Rebasé sur master du 31/10 (§ 22).
+- Preuves (rebase 770fb3e4) : `:app:testDebugUnitTest` 1 412 tests
+  0 échec dont `ObstacleArbiterTest` 10/10 (nouveau) ;
+  `:core:testDebugUnitTest` 2 506 tests, 5 échecs
+  `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows —
+  pré-existants, reproduits sur master intact le 31/10, hors
+  périmètre) ; `HazardWatchTest`, `HazardConceptsTest`,
   `VehicleStateTest` verts ; `check-kotlin-limits.py` vert,
-  `assembleDebug` vert (`app-debug.apk`). Chiffres exacts au rebase :
-  voir rapports XML du jour.
+  `check-isee-design.py` vert, `assembleDebug` vert (`app-debug.apk`).
 ## 2026-10-31 — iSee : pictos Find/Where affichés sur la page blanche, chasse sans Direct (branche `feat/isee-picto-page-blanche`)
 
 - **Demande** : « Find my keys » doit trouver sur l'image, créer le gros
