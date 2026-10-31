@@ -228,8 +228,10 @@ le 30/10, il n'est plus proposé — le mode **s'arme seul**, et le dit.
 Ordre user : plus de proposition manuelle — le passage détecté arme le mode,
 le passage perdu le coupe, et les personnes restent annoncées en traversée.
 
-- **entrée** : le passage vu 3 frames sur 5 (`CrossingOfferGate`, seuils
-  inchangés) arme le mode et dit « Mode traversée activé. » **une fois**
+- **entrée** : le passage proche 3 frames sur 5 (`CrossingOfferGate`,
+  ≤ 2 m mesurés (`OFFER_MAX_METERS`, sinon boîte prouvée sous les pieds —
+  sans preuve de proximité, silence) arme le mode et dit
+  « Mode traversée activé. » **une fois**
   par apparition (`observeCrossingAuto` : `distinctUntilChanged` + `filter`
   sur l'état d'offre, comme avant — jamais une phrase par frame) ;
 - **sortie** : le passage perdu 4 frames publiées de suite (`CrossingLossGate`,

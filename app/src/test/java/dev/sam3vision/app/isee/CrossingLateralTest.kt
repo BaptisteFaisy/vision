@@ -148,6 +148,16 @@ class CrossingLateralTest {
     }
 
     @Test
+    fun `lookup offre, profondeur lue ou nulle sans mesure`() {
+        val box = listOf(156f, 700f, 356f, 1100f)
+        val objects = listOf(obj("crosswalk", box))
+        val near = crossingOfferMeters(listOf(reading("crosswalk", 1.5f, box)), null, LensSpec.Default, 512, 1138)
+        assertEquals(1.5f, near(objects[0])!!, 0f)
+        val unknown = crossingOfferMeters(emptyList(), null, LensSpec.Default, 512, 1138)
+        assertNull(unknown(objects[0]))
+    }
+
+    @Test
     fun `feed silencieux sans passage`() {
         CrossingLateralWatch.reset()
         val box = listOf(10f, 100f, 100f, 500f)
