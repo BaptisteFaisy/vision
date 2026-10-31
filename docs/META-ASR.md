@@ -66,12 +66,14 @@ ne reste que le repli batch.
   la section dictée. Ni `keywords` ni `languageBias` envoyés : détection
   du modèle, comme le batch qui ne biaise rien non plus.
 
-**Non mesuré ici** : aucun aller-retour realtime n'a été instrumenté dans
-cet arbre (ni téléphone, ni banc) — et le compte est bloqué en facturation
-(§ ci-dessus), donc le chemin vit n'a pas été rejoué. Ce qui est prouvé
-ici : le contrat (poignée, trames, fin de tour, erreurs) et le câblage,
-par les tests JVM ; un refus de poignée `billing_not_configured` est
-couvert comme cas nominal d'aujourd'hui.
+**En direct le 2026-10-31** (clé ASR du build, silence, pas le téléphone) :
+poignée acceptée, trames binaires 80 ms acceptées, `endStream` → transcript
+`final:true`, fermeture propre — le contrat ci-dessus est celui du serveur
+réel, pas seulement de la recette. Non observés : les partiels cumulatifs
+(le silence n'en déclenche pas) et tout le trajet depuis l'app (micro du
+téléphone, affichage sous la boule). Le refus de poignée
+`billing_not_configured` reste couvert par les tests comme cas de compte
+non régularisé.
 
 Où ça vit dans le code : `core/.../net/MetaRealtimeClient.kt` (session),
 `app/isee/vm/IseeStreamDictation.kt` (tenue), `DictationRecorder.onChunk`
@@ -179,7 +181,7 @@ fun speechClient(settings: Settings): SpeechClient? {
 - Conséquence pratique : **une dictée peut réussir même avec un compte Meta bloqué**,
   puisque la clé ElevenLabs des Réglages sert aux deux (TTS et STT).
 
-## ⚠️ Blocage de facturation Meta — statut **non re-vérifié**
+## Facturation Meta — régularisée le 2026-10-31
 
 Le compte renvoyait sur **tout** appel d'inférence (chat, images, asr) :
 
@@ -187,15 +189,21 @@ Le compte renvoyait sur **tout** appel d'inférence (chat, images, asr) :
 402 billing_error — {"error":{"code":"billing_not_configured","message":"Billing verification failed"}}
 ```
 
-À régulariser côté compte (page de facturation de la console Meta) : ajout d'un moyen de
-paiement, acte personnel que l'agent ne peut pas faire. Le chemin complet avait été validé
-**depuis l'appareil** : micro ouvert, WAV construit, requête acceptée (plus de 400), réponse 402
-remontée telle quelle dans le bandeau. Dès que la facturation est OK, la dictée fonctionne sans
-changer une ligne.
+Régularisé côté compte le 2026-10-31 (moyen de paiement, acte personnel du
+user). Preuves mesurées le jour même, clé ASR du build, depuis un poste (pas
+le téléphone) : batch 1 s de silence → **HTTP 200**
+`{"sessionId":"voyager/transcribe/…","transcript":"","audioDurationMs":1040,"turns":[]}` ;
+temps réel : poignée acceptée → `{"sessionId":…}` nu → 2 s de PCM binaire →
+`endStream` → `{"type":"transcript","transcript":"","final":true,"audioProcessedMs":2000}`,
+fermeture propre. Le chemin complet avait déjà été validé **depuis
+l'appareil** avant la régularisation : micro ouvert, WAV construit, réponse
+402 remontée telle quelle dans le bandeau.
 
-**Statut : non mesuré ici** (aucune requête réseau lancée depuis cette fiche). Même cause, même
-remède pour `custom.muse` côté ZeroClaw et pour le pont local `meta-asr-bridge.service`
-(127.0.0.1:8788) des notes vocales.
+Reste non rejoué : un appel avec de la vraie parole (partiels cumulatifs non
+observés — le silence n'en déclenche pas), et tout le chemin depuis l'app
+(micro du téléphone → session → sous-titres). Même compte, même remède pour
+`custom.muse` côté ZeroClaw et le pont local `meta-asr-bridge.service`
+(127.0.0.1:8788) — non re-vérifiés.
 
 ## Deux pièges d'intégration (conservés)
 

@@ -4,6 +4,19 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct
+
+- **Demande** : la facturation Meta est régularisée — retester.
+- Mesuré (aucun code, que des constats, clé ASR du build, depuis un poste) :
+  batch 1 s de silence → **HTTP 200**
+  (`transcript` top-level, valide l'extraction défensive) ; realtime :
+  poignée acceptée → `{"sessionId":…}` nu → 2 s de PCM binaire 80 ms →
+  `endStream` → transcript `final:true`, fermeture propre.
+- Reste non rejoué : vraie parole (partiels cumulatifs), chemin complet
+  depuis l'app (micro téléphone → sous-titres).
+- `docs/META-ASR.md` mis à jour (facturation + § temps réel vérifié).
+
+
 ## 2026-10-31 — iSee : dictée temps réel (WebSocket Muse, branche `scribe-realtime-ws`)
 
 - **Demande** : dire si un WebSocket pour la transcription réduirait la latence
