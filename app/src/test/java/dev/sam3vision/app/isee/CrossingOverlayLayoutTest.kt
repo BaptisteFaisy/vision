@@ -88,7 +88,7 @@ class CrossingOverlayLayoutTest {
     }
 
     @Test
-    fun `boite vide inversee hors champ ou NaN : toujours rien`() {
+    fun `boite vide inversee hors champ ou NaN - toujours rien`() {
         // Le marqueur minimal ne s'applique qu'à une détection réelle : sans
         // détection, pas de marqueur — on ne montre jamais un feu imaginaire.
         assertNull(lightMarker(listOf(0.3f, 0.3f, 0.3f, 0.5f), 100, 100, 100f, 100f))
