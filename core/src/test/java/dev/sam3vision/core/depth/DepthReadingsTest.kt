@@ -61,6 +61,72 @@ class DepthReadingsTest {
     }
 
     @Test
+    fun `masque - le fond hors masque est exclu de la mediane`() {
+        // bande objet 5.0 (x 40..59), fond 1.0 ailleurs : la fenêtre érodée de
+        // la boîte pleine image est majoritairement du fond, l'intersection
+        // avec le masque est pure objet
+        val values = FloatArray(100 * 100) { i ->
+            val x = i % 100
+            if (x in 40..59) 5f else 1f
+        }
+        val map = DepthMap(100, 100, values)
+        val box = listOf(0f, 0f, 100f, 100f)
+        assertEquals(1f, DepthReadings.boxCloseness(map, box, 100, 100)!!, 0.001f)
+        assertEquals(
+            5f,
+            DepthReadings.boxCloseness(map, box, 100, 100, listOf(40f, 0f, 59f, 100f))!!,
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `masque - intersection vide ou masque invalide, repli fenetre erodee`() {
+        val values = FloatArray(100 * 100) { i ->
+            val x = i % 100
+            if (x in 40..59) 5f else 1f
+        }
+        val map = DepthMap(100, 100, values)
+        val box = listOf(0f, 0f, 100f, 100f)
+        val plain = DepthReadings.boxCloseness(map, box, 100, 100)!!
+        // disjoint : intersection vide -> repli
+        assertEquals(
+            plain,
+            DepthReadings.boxCloseness(map, box, 100, 100, listOf(200f, 200f, 300f, 300f))!!,
+            0.001f,
+        )
+        // dégénéré (largeur nulle) -> repli
+        assertEquals(
+            plain,
+            DepthReadings.boxCloseness(map, box, 100, 100, listOf(10f, 10f, 10f, 20f))!!,
+            0.001f,
+        )
+        // non fini -> repli
+        assertEquals(
+            plain,
+            DepthReadings.boxCloseness(map, box, 100, 100, listOf(40f, 0f, Float.NaN, 100f))!!,
+            0.001f,
+        )
+        assertEquals(
+            listOf(40f, 25f, 59f, 75f),
+            DepthReadings.maskedWindow(listOf(25f, 25f, 75f, 75f), listOf(40f, 0f, 59f, 100f)),
+        )
+    }
+
+    @Test
+    fun `masque - refine propage la confiance du stenepe, pas 1`() {
+        val map = stepMap()
+        val person = Detection(
+            "personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100,
+            maskBox = listOf(0f, 0f, 24f, 99f),
+        )
+        val pinhole = listOf(DistanceReading(7, "personne", 2f, 2f, person.box, 0.6f))
+        val out = DepthReadings.refine(100, 100, listOf(person), pinhole, map)
+        assertEquals(1, out.size)
+        assertEquals(2f, out[0].meters, 0.01f)
+        assertEquals(0.6f, out[0].confidence, 0.001f)
+    }
+
+    @Test
     fun `echelle - mediane des ancres, vide - null`() {
         val scale = DepthReadings.scaleFromAnchors(
             listOf(DepthAnchor(2f, 10f), DepthAnchor(10f, 2f), DepthAnchor(4f, 5f)),
