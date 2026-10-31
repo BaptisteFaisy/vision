@@ -81,6 +81,25 @@ class GuidanceObstaclesTest {
         return ChainOut(refined, placed, Guidance.decide(placed))
     }
 
+    /**
+     * Poteau depth-only (sans hauteur sténopé) mesuré par la profondeur :
+     * la personne à 3 m calibre l'échelle (ancre), le poteau sort à 4 m.
+     */
+    private fun depthPolePath(): ChainOut {
+        val personBox = boxFor("personne", 3f, centerX = 0.55f)
+        val poleBox = listOf(0.30f * WIDTH - 50f, TOP_PX, 0.30f * WIDTH + 50f, 300f)
+        val frame = frameOf(
+            seg("personne", personBox, depth = 0.8f),
+            seg("poteau", poleBox, depth = 0.6f),
+        )
+        val detections = frame.objects.toDetections(frame.width, frame.height)
+        val pinhole = DistanceMeter().measure(frame.width, frame.height, detections)
+        val server = DepthReadings.serverCloseness(frame.objects)
+        val refined = DepthReadings.refineWithCloseness(detections, pinhole, server)
+        val placed = placedLabels(frame, refined)
+        return ChainOut(refined, placed, Guidance.decide(placed))
+    }
+
     private data class ChainOut(
         val readings: List<DistanceReading>,
         val placed: List<PlacedLabel>,
@@ -185,6 +204,19 @@ class GuidanceObstaclesTest {
         assertTrue(out.readings.isEmpty())
         assertTrue(out.decision.blocked)
         assertEquals("Left.", Guidance.phrase(out.decision))
+    }
+
+    @Test
+    fun `poteau depth-only mesure par la profondeur participe au chemin optimal`() {
+        assertNull(KnownSizes.heightMeters("poteau"))
+        val out = depthPolePath()
+
+        val pole = out.readings.first { it.label == "poteau" }
+        assertEquals(4f, pole.meters, 0.05f)
+        assertTrue(out.decision.blocked)
+        // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
+        assertEquals(GuidanceSide.Left, out.decision.side)
+        assertEquals("Gauche.", Guidance.phrase(out.decision, SpeechLanguage.Fr))
     }
 
     @Test

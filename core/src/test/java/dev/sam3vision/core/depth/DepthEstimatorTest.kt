@@ -1,6 +1,5 @@
 package dev.sam3vision.core.depth
 
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,22 +8,13 @@ import org.junit.Test
 class DepthEstimatorTest {
 
     @Test
-    fun `fromName migre l heritage et tolere l inconnu`() {
+    fun `fromName migre tout vers DA2, profondeur toujours active`() {
         assertEquals(DepthBackend.DA2, DepthBackend.fromName("da2"))
         assertEquals(DepthBackend.DA2, DepthBackend.fromName("MIDAS"))
         assertEquals(DepthBackend.DA2, DepthBackend.fromName("Auto"))
-        assertEquals(DepthBackend.OFF, DepthBackend.fromName("n importe quoi"))
-        assertEquals(DepthBackend.OFF, DepthBackend.fromName(null))
-    }
-
-    @Test
-    fun `NoOp echoue proprement`() {
-        val outcome = runBlocking {
-            NoOpDepthEstimator.estimate(IntArray(4), 2, 2)
-        }
-        assertTrue(outcome.isFailure)
-        assertEquals(DepthBackend.OFF, NoOpDepthEstimator.backend)
-        NoOpDepthEstimator.close()
+        assertEquals(DepthBackend.DA2, DepthBackend.fromName("OFF"))
+        assertEquals(DepthBackend.DA2, DepthBackend.fromName("n importe quoi"))
+        assertEquals(DepthBackend.DA2, DepthBackend.fromName(null))
     }
 
     @Test
