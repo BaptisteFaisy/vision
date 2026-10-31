@@ -4,12 +4,14 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraverseVeto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -112,5 +114,54 @@ class CrossingWiringTest {
 
         assertEquals("Rouge, attendez.", patch?.cue?.phrase)
         assertEquals(CrossingState.Red, patch?.state)
+    }
+
+    @Test
+    fun `vert sans boite - jamais une decision verte`() {
+        // Fail-closed (ex-`boxOf()` null de la pompe locale) : seul un vert
+        // AVEC boîte traverse ; seuils inchangés, c'est l'interprétation
+        // qui verrouille, pas l'arbre ni la porte.
+        assertFalse(CrossingLight(null, CrossingState.Green).greenForDecision)
+        assertFalse(CrossingLight(null, CrossingState.Red).greenForDecision)
+        assertFalse(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Red).greenForDecision)
+        assertTrue(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green).greenForDecision)
+    }
+
+    @Test
+    fun `sans feu pieton - rouge, sans boite, pas de collecte`() {
+        // Objets non-feu seuls : rien à lire → rouge, boîte nulle, rien à
+        // journaliser. Les feux voiture ne sont jamais lus (31/10).
+        var calls = 0
+        val frame = LiveFrame(640, 480, 0L, listOf(SegObject("car", 0.9f, listOf(0f, 0f, 200f, 200f), "")))
+        val light = crossingLightOf(frame, "") { _, _, _ -> calls++ }
+
+        assertEquals(CrossingState.Red, light.state)
+        assertNull(light.box)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `boite lue mais image illisible - rouge, boite gardee, pas de collecte`() {
+        // JPEG vide : le crop échoue avant tout décodage (JVM-safe) → rouge,
+        // la boîte reste pour l'overlay, rien à journaliser.
+        var calls = 0
+        val objects = listOf(SegObject("pedestrian traffic light", 0.9f, listOf(10f, 10f, 100f, 200f), ""))
+        val light = crossingLightOf(LiveFrame(640, 480, 0L, objects), "") { _, _, _ -> calls++ }
+
+        assertEquals(CrossingState.Red, light.state)
+        assertNotNull(light.box)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `dimensions inconnues - rouge sans boite`() {
+        // Taille de frame inconnue : aucune boîte normalisable → rouge, null.
+        var calls = 0
+        val objects = listOf(SegObject("pedestrian traffic light", 0.9f, listOf(10f, 10f, 100f, 200f), ""))
+        val light = crossingLightOf(LiveFrame(0, 0, 0L, objects), "") { _, _, _ -> calls++ }
+
+        assertEquals(CrossingState.Red, light.state)
+        assertNull(light.box)
+        assertEquals(0, calls)
     }
 }

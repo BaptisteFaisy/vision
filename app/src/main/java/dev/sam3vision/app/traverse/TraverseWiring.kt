@@ -9,6 +9,7 @@ import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.app.isee.LightCropLogger
 import dev.sam3vision.app.isee.crossingLightOf
+import dev.sam3vision.app.isee.greenForDecision
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
@@ -119,10 +120,14 @@ class TraverseWiring(
         lightGreen = state == CrossingState.Green
     }
 
-    /** Même règle, en gardant la boîte : l'affichage du direct en a besoin. */
+    /**
+     * Même règle, en gardant la boîte : l'affichage du direct en a besoin.
+     * Fail-closed ([greenForDecision]) : un vert sans boîte ne traverse pas —
+     * l'équivalent binaire de l'ancien « Doute », seuils inchangés.
+     */
     fun updateLight(light: CrossingLight) {
         this.light = light
-        lightGreen = light.state == CrossingState.Green
+        lightGreen = light.greenForDecision
     }
 
     /**
