@@ -208,8 +208,7 @@ internal object SettingsCodec {
             liveLlmApiKey = values[K_LIVE_LLM_API_KEY].orEmpty(),
             introEnabled = values[K_INTRO_ENABLED]?.toBooleanStrictOrNull() ?: default.introEnabled,
             introPlayed = values[K_INTRO_PLAYED]?.toBooleanStrictOrNull() ?: default.introPlayed,
-            distanceOverlayEnabled = values[K_DISTANCE_OVERLAY]?.toBooleanStrictOrNull()
-                ?: default.distanceOverlayEnabled,
+            distanceOverlayEnabled = values[K_DISTANCE_OVERLAY]?.toBooleanStrictOrNull() ?: default.distanceOverlayEnabled,
             collectLightCrops = values[K_COLLECT_LIGHT_CROPS]?.toBooleanStrictOrNull() ?: default.collectLightCrops,
             liveSamEnabled = values[K_LIVE_SAM]?.toBooleanStrictOrNull() ?: default.liveSamEnabled,
             boxPredictionEnabled = values[K_BOX_PREDICTION]?.toBooleanStrictOrNull()
