@@ -276,3 +276,26 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   jetée. Vélos et trottinettes sans voix traversée (le veto les couvre) ;
   `observeVehicleState` reste coupé en traversée (une seule voix, pas de
   doublon). Sonde +1 ligne (`LiveProbe.kt` à 499).
+
+### Guidage sur le passage proche, même en Traversée (31/10)
+
+Ordre user : à moins de 3 m en face, iSee aligne l'user à la voix pour qu'il
+soit bien sur le passage. Avant, le latéral retombait dès que le mode
+s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
+« Sur le passage. ».
+
+- **seuil** : `CrossingGuidance.GUIDE_METERS = 3,0 m` — au-delà ou sans
+  preuve de proximité (mesure ou boîte prouvée sous les pieds,
+  `CrossingOffer.seesNearCrosswalk` avec `maxMeters = GUIDE_METERS`,
+  fail-closed), silence comme avant ;
+- **mots** : les mêmes qu'hors traversée (« Gauche. », « Droite. »,
+  « Tout droit. » en clips < 100 ms, « Sur le passage. » après 2 frames),
+  doux (`urgent = false`) — le feu, le veto et les véhicules gardent la
+  priorité du son, le latéral attend le silence ;
+- **câblage** : `feedCrossingLateral` (`isee/CrossingWiring.kt`) — hors
+  traversée inchangé, en traversée guidage si proche sinon retombée ;
+  `LiveProbe` inchangée (499 lignes, au plafond) ;
+- **limite connue** : en traversée dense (piéton sur les zébrures + user
+  décentré), l'évitement (`CrossingPeopleWatch`) et l'alignement peuvent
+  alterner des mots opposés — les deux sont vrais, l'arbitrage commun est
+  un suivi, pas ici.
