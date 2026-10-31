@@ -6,6 +6,7 @@ import android.location.LocationManager
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.navigation.AndroidGeocoderSource
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
+import dev.sam3vision.app.navigation.awaitFirstFix
 import dev.sam3vision.app.perms.hasPerm
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
@@ -74,7 +75,7 @@ class IseeVoiceNav(
             appContext = context,
             settings = settings,
             geocode = { address, near -> chain.geocode(address, near = near) },
-            originNow = ::lastKnownOrigin,
+            originNow = ::awaitOrigin,
             scope = scope,
             onUpdate = ::pushGuidanceUpdate,
             speakRoute = speakRoute,
@@ -92,7 +93,7 @@ class IseeVoiceNav(
     val session: VoiceNavSession by lazy {
         val loader = ValhallaRouteLoader(
             geocode = { address, near -> chain.geocode(address, near = near) },
-            originNow = ::lastKnownOrigin,
+            originNow = ::awaitOrigin,
             baseUrl = { settings().routeBaseUrl },
         )
         VoiceNavSession(
@@ -254,8 +255,13 @@ class IseeVoiceNav(
         scope.launch { session.onGuidanceUpdate(update) }
     }
 
-    /** Dernière position connue (GPS puis réseau), `null` sans permission ni fix. */
-    private fun lastKnownOrigin(): RoutePoint? {
+    /**
+     * Position de départ : dernier fix connu (GPS puis réseau), sinon attente
+     * bornée d'un fix frais — sans elle, une installation neuve (aucun fix en
+     * cache) échouait systématiquement (« I can't open the guidance ») alors
+     * que le GPS n'avait jamais été écouté. `null` sans permission ni fix.
+     */
+    private suspend fun awaitOrigin(): RoutePoint? {
         try {
             if (!hasPerm(context, Manifest.permission.ACCESS_FINE_LOCATION) &&
                 !hasPerm(context, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -263,17 +269,25 @@ class IseeVoiceNav(
                 return null
             }
             val locations = context.getSystemService(LocationManager::class.java) ?: return null
-            val fix = runCatching {
-                locations.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            }.getOrNull()
-                ?: runCatching {
-                    locations.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                }.getOrNull()
-            fix ?: return null
-            if (!fix.latitude.isFinite() || !fix.longitude.isFinite()) return null
-            return RoutePoint(fix.latitude, fix.longitude)
+            lastKnown(locations)?.let { return it }
+            val fresh = awaitFirstFix(locations) ?: return null
+            if (!fresh.latitude.isFinite() || !fresh.longitude.isFinite()) return null
+            return RoutePoint(fresh.latitude, fresh.longitude)
         } catch (_: SecurityException) {
             return null
         }
+    }
+
+    /** Dernier fix connu (GPS puis réseau), `null` sans fix en cache. */
+    private fun lastKnown(locations: LocationManager): RoutePoint? {
+        val fix = runCatching {
+            locations.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+        }.getOrNull()
+            ?: runCatching {
+                locations.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            }.getOrNull()
+        fix ?: return null
+        if (!fix.latitude.isFinite() || !fix.longitude.isFinite()) return null
+        return RoutePoint(fix.latitude, fix.longitude)
     }
 }

@@ -193,4 +193,30 @@ class VoiceNavSessionAutoStartTest {
         assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
     }
 
+    @Test
+    fun `auto-start echec perime ne tue pas le demarrage suivant`() = runBlocking {
+        val gate = CompletableDeferred<Boolean>()
+        val launcher = AutoStartLauncher()
+        val session = session(
+            launcher,
+            engine = { destination, _ -> if (destination == "la gare") gate.await() else true },
+            autoStart = true,
+        )
+        val first = async { session.onVoiceTranscript("va à la gare") }
+        delay(50)
+        assertTrue((session.state.value as VoiceNavUiState.Confirming).loading)
+
+        // Deuxième dictée pendant que le moteur de la première travaille :
+        // elle démarre aussitôt et son guidage doit survivre à l'échec tardif
+        // de la première (ni retour au repos, ni annonce périmée).
+        assertTrue(session.onVoiceTranscript("va à la tour Eiffel"))
+        assertTrue(session.state.value is VoiceNavUiState.Guiding)
+
+        gate.complete(false)
+        assertTrue(first.await())
+
+        val state = session.state.value as VoiceNavUiState.Guiding
+        assertEquals("la tour Eiffel", state.destination)
+        assertTrue(spoken.none { it == NavigationPhrases.GUIDANCE_UNAVAILABLE })
+    }
 }
