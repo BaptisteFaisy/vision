@@ -47,6 +47,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   nouveaux) ; UBS : 0 finding nouveau (6 critiques `currentTimeMillis` sur
   `LiveProbe.kt` hors diff, faux positifs pré-existants ; exit 2 Kotlin
   connu) ; fichiers < 500 lignes (`LiveProbe.kt` 497).
+## 2026-10-31 — iSee : traversée sans annonces de personnes, évitement seul (branche `crossing-sans-personnes`)
+
+- **Ordre user** : en mode Traversée, ne plus décrire les humains
+  (« Personne à 9 heures ») — dire seulement « Droite. » / « Gauche. »
+  pour les éviter au maximum.
+- **Fait** : `CrossingPeopleWatch` ne consulte plus `PositionAnnouncer`
+  (champ, reset et imports supprimés) : évitement sur passage puis décalage
+  opposé aux approches, silence sinon. `docs/TRAVERSEE.md` § 8 mis à jour.
+- **Preuve** : `CrossingPeopleTest` (19 tests) réécrit — personnes seules
+  muettes, non-réarmement du quiet prouvé par l'évitement ;
+  `CrossingVehicleTest` (9 tests, file véhicules puis silence) ;
+  suite `:app` 1484/1484, garde tailles OK.
 
 ## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
 

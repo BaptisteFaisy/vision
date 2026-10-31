@@ -6,9 +6,7 @@ import dev.sam3vision.core.crossing.CrossingOnPathTracker
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LateralNudgeTracker
-import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.PlacedLabel
-import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -69,26 +67,26 @@ internal fun crossingPhraseOf(
  * des 500 lignes que `CrossingLateralWatch`) : l'évitement des personnes sur le
  * passage d'abord (statiques comprises — « Droite. », mot nouveau seul, clip
  * < 100 ms), le décalage opposé aux approches ensuite (miroir du guidage
- * normal), les positions au cadran sinon (« Personne à 9 heures »),
- * débouncées comme toute annonce.
+ * normal), silence sinon. Les positions au cadran (« Personne à 9 heures »)
+ * ne se disent plus en traversée (ordre user du 31/10) : seuls les mots
+ * d'évitement parlent, pour esquiver au maximum.
  */
 internal object CrossingPeopleWatch {
 
-    private val announcer = PositionAnnouncer()
     private val nudge = LateralNudgeTracker()
     private val onPath = CrossingOnPathTracker()
     private val quiet = CrossingCueQuiet()
     private var lastWord: String? = null
 
     /**
-     * Voix douce de la frame, `null` = silence (rien, déjà dit, le feu parle,
-     * ou ordre du feu à laisser entier). [cue] non nul = le feu parle sur
-     * cette frame : l'ordre est mémorisé (priorité ci-dessous) et la voix
-     * douce se tait sans consommer sa scène. Les décalages sont nourris avant
-     * le silence : ils traversent le quiet et parlent après. [objects]
-     * ([width] x [height], boîtes SAM brutes — pas les détections
-     * reconstruites des lectures, qui perdent le score et les non-mesurés)
-     * nourrit l'évitement, [readings] sa portée.
+     * Voix douce de la frame, `null` = silence (rien à éviter, déjà dit, le
+     * feu parle, ou ordre du feu à laisser entier). [cue] non nul = le feu
+     * parle sur cette frame : l'ordre est mémorisé (priorité ci-dessous) et
+     * la voix douce se tait. Les décalages sont nourris avant le silence :
+     * ils traversent le quiet et parlent après. [objects] ([width] x
+     * [height], boîtes SAM brutes — pas les détections reconstruites des
+     * lectures, qui perdent le score et les non-mesurés) nourrit
+     * l'évitement, [readings] sa portée.
      */
     fun update(
         placed: List<PlacedLabel>,
@@ -113,13 +111,14 @@ internal object CrossingPeopleWatch {
             lastWord = word
             return word
         }
+        // Silence sinon : les personnes ne sont jamais décrites, seulement
+        // évitées.
         lastWord = null
-        return announcer.onFrame(atMs, placed.filter { PersonLabels.isPerson(it.label) }, language)
+        return null
     }
 
-    /** Mode coupé : la prochaine traversée ré-annonce sa scène. */
+    /** Mode coupé : la prochaine traversée repart vierge. */
     fun reset() {
-        announcer.reset()
         nudge.reset()
         onPath.reset()
         quiet.reset()
