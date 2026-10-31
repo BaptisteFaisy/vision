@@ -33,7 +33,6 @@ import dev.sam3vision.core.settings.resolveSamEndpoint
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -150,19 +149,13 @@ internal fun spokenClipId(text: String): String? =
 /**
  * Chaque phrase de la sonde est confiée à la voix, y compris redite à
  * l'identique (direction stable : [LiveProbeState.spokenSeq] distingue les
- * émissions, `distinctUntilChanged` ne les avale plus). [playerIdle] vrai =
- * aucune bulle du chat en cours de lecture. Dernier-gagnant : une phrase
- * plus fraîche annule la synthèse en cours au lieu de faire la queue
- * derrière — une consigne datée ne sert à rien (overwrite).
- * Les mots du guidage partent en clips (< 100 ms), le reste (positions) en
- * synthèse réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent],
- * mot stop) : seul le stop coupe la lecture en cours, chat compris
- * (« obstacle, arrêtez-vous. » TwinLite, « Stop. » urgence externe,
- * « Stop, car moving. » en Traversée) —
- * les mots doux attendent le silence, en file (`queue`, redits au silence
- * par le guetteur mobilier : sans file, ils se perdaient dès que la route
- * ou le chat parlait). Le flag ne change qu'avec la phrase,
- * donc la paire reste aussi stable que la phrase seule.
+ * émissions). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
+ * La règle d'écrasement vit dans [observeSpokenEmissions] (répétition
+ * identique en vol gardée, phrase fraîche dernier-gagnant). Les mots du
+ * guidage partent en clips (< 100 ms), le reste (positions) en synthèse
+ * réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent], mot
+ * stop) : seul le stop coupe la lecture en cours, chat compris — les mots
+ * doux attendent le silence, en file (`queue`, redits au silence).
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -170,14 +163,12 @@ internal fun LiveProbe.observeSpoken(
     playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
 ) {
-    scope.launch {
-        state.map { Triple(it.spoken, it.spokenUrgent, it.spokenSeq) }.distinctUntilChanged()
-            .collectLatest { (phrase, urgent, _) ->
-                val text = phrase ?: return@collectLatest
-                val clipId = spokenClipId(text)
-                if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
-                else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
-            }
+    scope.observeSpokenEmissions(
+        state.map { SpokenEmission(it.spoken, it.spokenUrgent, it.spokenSeq) }.distinctUntilChanged(),
+    ) { text, urgent ->
+        val clipId = spokenClipId(text)
+        if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
+        else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
     }
 }
 

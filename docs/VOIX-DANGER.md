@@ -768,3 +768,44 @@ Regardez à droite. … Rien à droite. » ; virage à droite quand on a
 demandé la gauche : attente (pas de validation) ; voiture qui passe
 pendant un côté → « Attention, voiture à … » puis re-vérification —
 recette passage réel **non mesurée**, exige une sortie rue.
+## 24. La voix du guidage ne se tait plus sans raison (fix du 31/10)
+
+Le user marche avec l'app : le guidage (right/left/straight) s'arrête
+d'un coup, ne dit plus rien, puis reprend tout seul — écran allumé.
+Trois causes lues dans le code, trois correctifs :
+
+- **répétition identique qui annulait sa propre synthèse (régression
+  §7)** : le `spokenSeq` (directions en continu, § 10) faisait passer
+  chaque ré-émission dans `collectLatest`, qui annulait la synthèse
+  réseau en vol de la même phrase — synthèse lente + redites 2 s =
+  silence (voix non-Laure, premier cache, positions). Nouveau contrat :
+  seule une phrase fraîche écrase (`observeSpokenEmissions` : répétition
+  identique en vol gardée, changed = dernier-gagnant, clips rejoués
+  après fin) — le §6 ne visait que les phrases fraîches ;
+- **attentes silencieuses qui taisaient la sécurité** : `canAnnounce`
+  (transcription, réflexion LLM, synthèse réseau — jusqu'à 75 s) taisait
+  les mots du guidage sans qu'aucun son ne joue. Nouveau contrat : la
+  voix du guidage cède au son réel (lecture chat, voix du user en
+  tenue) mais jamais au silence (`canGuideSpeech`) ; l'état parlant du
+  chat lu en continu ne couvre que la lecture réelle, tranche par
+  tranche (`IseePlayback`) — le guidage s'intercale dans les synthèses ;
+- **famine de boucle muette** : panne SAM/réseau ou conteneur froid =
+  `spoken` figé, silence total sans explication. Nouveau contrat : passé
+  6 s sans consigne fraîche alors qu'on guide (vidéo, guidage, hors
+  Traversée), la voix de sécurité prévient (« Guidance paused.
+  Reconnecting. », TTS système hors-ligne — la famine, c'est souvent le
+  réseau), puis annonce la reprise (« Guidance resumed. ») —
+  `GuidanceStarvation` (core pur) + `observeStarvation`.
+
+Verrouillé par `GuidanceStarvationTest` (7 : seuil, unicité, reprise,
+hors guidage, reset, phrases EN/FR), `ProbeSpokenFlowTest` (5 :
+répétition gardée, overwrite, rejeu, nul, porte), `IseePlaybackTest`
+(+1 : état parlant = lecture réelle) et `ProbeWiringSpokenTest`
+(inchangé, adaptateur).
+
+Recette téléphone : conteneur froid au départ → « Guidance paused.
+Reconnecting. » puis « Guidance resumed. » à la première frame ;
+question posée en marchant → le guidage continue pendant la réflexion
+et entre les tranches lues ; voix non-Laure → les mots finissent par
+se dire puis partent en clips — **non mesuré**, exige un APK de cette
+branche sur appareil réel.
