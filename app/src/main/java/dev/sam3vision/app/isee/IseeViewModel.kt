@@ -303,8 +303,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun onGlassesListening() = silenceForGlasses()
     fun onGlassesHeard(text: String, pcm: ByteArray) = glassesInbox.heard(text, pcm)
 
-    /** iSee se tait (lecture + guidage) : la voix du user a priorité. */
+    /** iSee se tait (réponse en vol + lecture + guidage) : la voix du user a priorité. */
     private fun silenceForGlasses() {
+        answers.cancelInFlight()
         if (!playerIdle()) {
             player.stop()
             update { it.copy(speakingEntryId = null) }
