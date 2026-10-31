@@ -183,8 +183,8 @@ object VehicleStateText {
  * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
  * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
  * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
- * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre stable,
- * mesuré ou non (l'heure situe), partout dans le champ, hors fond franc
+ * À l'arrêt = boîte figée (dérive sous [STILL_SPEED], taille stable) et
+ * seau-mètre stable, mesuré ou non (l'heure situe), partout, hors fond franc
  * (le suivi coupe l'arrêt). Le reste est doute : piste jeune, seau instable,
  * hors portée.
  *
@@ -385,7 +385,7 @@ class VehicleStateWatcher(
         return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size)
     }
 
-    /** Véhicule à l'arrêt : dérive faible et seau stable, mesuré ou non, partout dans le champ. */
+    /** Véhicule à l'arrêt : boîte figée (dérive, taille) et seau stable, mesuré ou non, partout. */
     private fun stoppedPick(
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -400,7 +400,7 @@ class VehicleStateWatcher(
                 val prev = previous[candidate] ?: return@filter false
                 val measured = meters[candidate]
                 if (measured != null && measured > MOVING_METERS) return@filter false
-                if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)) return@filter false
+                if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs) || seen.area > prev.area) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { meters[it] ?: Float.MAX_VALUE }
