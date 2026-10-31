@@ -29,6 +29,48 @@ la voix des bruits ambiants. Au relâchement, la transcription complète
 existante reste la seule question envoyée au modèle ; aucun aperçu n'entre
 dans l'historique. Le son récent n'est écrit dans aucun fichier.
 
+## Dictée temps réel (WebSocket Scribe v2 Realtime, 2026-10-31)
+
+Quand la clé ElevenLabs est renseignée et le drapeau `scribeRealtime` actif
+(défaut), l'appui long iSee ne fait plus d'aperçus batch : le PCM part en
+WebSocket **pendant** la tenue, et le relâchement ne coûte qu'un commit —
+au lieu d'un envoi complet + une inférence sur tout l'énoncé.
+
+- Endpoint : `wss://api.elevenlabs.io/v1/speech-to-text/realtime` —
+  `model_id=scribe_v2_realtime`, `commit_strategy=manual`,
+  `audio_format=pcm_16000`, clé en en-tête `xi-api-key` (même modèle de
+  confiance que le batch : la clé est déjà côté téléphone, aucun jeton
+  single-use à frapper). Référence AsyncAPI officielle relue le 2026-10-31.
+- Montant : `input_audio_chunk` base64 de PCM16 16 kHz mono, trames de
+  100 ms (3 200 octets), **dernière trame retenue** pour porter le commit
+  (`commit:true`) — jamais de commit vide. Avant `session_started`, le PCM
+  est tamponné (≤ ~10 s) puis flushé : le handshake ne perd pas le début.
+- Descendant : `session_started`, `partial_transcript` (sous-titres, ~150 ms
+  annoncés, affichés seulement tant que le doigt est posé),
+  `committed_transcript` (texte final du relâchement) ; erreurs typées comme
+  le batch (`auth_error` → clé, `quota_exceeded` → 402, `rate_limited` → 429).
+- Replis, dans l'ordre : pas de clé / drapeau coupé → aperçus batch ;
+  session morte en route → aperçus batch redémarrés (seulement si le doigt
+  est encore posé) + moteur final batch ; commit en échec → batch sur le
+  WAV complet. Le PCM complet reste en mémoire : le MP3 du cache et le
+  refus local des tenues trop courtes (< 400 ms) sont inchangés.
+- Réglages : `scribeRealtime` (défaut `true`), persisté, interrupteur dans
+  la section dictée. Pas de `language_code` envoyé : détection smart de
+  Scribe, comme le batch qui n'en envoie pas non plus.
+- Meta temps réel (`wss://api.meta.ai/v1/asr/realtime`) existe d'après des
+  sources tierces, sans documentation publique et avec le compte bloqué en
+  facturation : non implémenté. Scribe est documenté officiellement et sa
+  clé est vérifiée sur le compte.
+
+**Non mesuré ici** : les ~150 ms et le coût du commit sont des chiffres
+ElevenLabs — aucun aller-retour realtime n'a été instrumenté dans cet arbre
+(ni téléphone, ni banc). Ce qui est prouvé ici : le contrat (trames, commit,
+erreurs) et le câblage, par les tests JVM.
+
+Où ça vit dans le code : `core/.../net/ScribeRealtimeClient.kt` (session),
+`app/isee/vm/IseeStreamDictation.kt` (tenue), `DictationRecorder.onChunk`
+(morceaux micro), `IseeDictation.onSettled` (fermeture session).
+
 ```
 POST {asrBaseUrl}/asr/transcribe          (MetaAsrClient.kt:31-47)
 Authorization: Bearer <clé Meta>

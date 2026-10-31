@@ -4,6 +4,29 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : dictée temps réel (WebSocket Scribe v2 Realtime, branche `scribe-realtime-ws`)
+
+- **Demande** : dire si un WebSocket pour la transcription réduirait la latence
+  iSee, et l'implémenter si oui. Réponse : oui — le batch envoie le WAV complet
+  au relâchement puis infère sur tout l'énoncé, alors que le stream fait partir
+  le PCM pendant la tenue (partiels ~150 ms annoncés) et ne coûte au
+  relâchement que la queue audio + un commit.
+- Fait : `ScribeRealtimeSession` (`:core`, handshake `xi-api-key`, trames
+  `input_audio_chunk` 100 ms PCM16 16 kHz, dernière trame retenue pour le
+  commit, `commit_strategy=manual`) ; `IseeStreamDictation` (`:app`, partiels
+  sous la boule, commit final au relâchement) ; `DictationRecorder.onChunk`,
+  `IseeDictation.onSettled`, réglage `scribeRealtime` (défaut on, repli batch
+  automatique à chaque étage). Meta temps réel (`wss://…/asr/realtime`)
+  existe d'après des sources tierces, sans doc publique et compte bloqué :
+  non implémenté, Scribe documenté officiellement et clé vérifiée.
+- Preuves : `ScribeRealtimeClientTest` (9 : URL, trames, parsing, barème) +
+  `ScribeRealtimeContractTest` (14 : cycle de vie sans réseau) +
+  `IseeStreamDictationTest` (9 : câblage, replis) + `SettingsAsrTest` (drapeau) —
+  suites `:core` + `:app` vertes via build serveur. **Non mesuré** : aucun
+  aller-retour realtime instrumenté (ni téléphone ni banc), les ~150 ms sont
+  un chiffre ElevenLabs.
+
+
 ## 2026-10-30 — iSee : évitement — humain, objet ou poteau en face dit d'aller de l'autre côté (branche `evitement-2m`)
 
 - **Demande** : quand iSee détecte un humain, un objet ou un poteau en face,
