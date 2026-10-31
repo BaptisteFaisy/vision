@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.curb.SidewalkKeep
 import dev.sam3vision.core.curb.SidewalkPosition
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.GuidanceDecision
 import dev.sam3vision.core.live.PlacedLabel
@@ -82,19 +83,23 @@ internal class ProbeVoice(
      * sol peint se rejoint (guidage latéral doux), il ne dit jamais « Stop ».
      * [passage] est le passage conseillé par SAM (`null` = backend antérieur :
      * la décision gauche/droite reste locale).
+     * [hfovDeg] est le champ porté par la largeur de l'image analysée
+     * ([LensSpec.widthFovDeg], axe vertical en portrait) : le trait, le
+     * décalage chiffré et le chemin optimal s'y projettent.
      */
     fun phrase(
         atMs: Long,
         placed: List<PlacedLabel>,
         manualCap: SteeringCap,
         passage: Passage? = null,
+        hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): String? {
         if (guide) {
             val safe = placed.withoutCrosswalk()
             val sidewalk = SidewalkKeep.positionOf(safe)
             return guidance.onFrame(
                 atMs, safe, language, manualCap, routeCap,
-                sidewalk = sidewalk, samPassage = passage,
+                sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg,
             )
         }
         if (!announce) return null

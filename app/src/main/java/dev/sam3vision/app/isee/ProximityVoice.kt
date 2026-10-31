@@ -135,10 +135,13 @@ class ProximityVoice(
         urgent: Boolean = true,
     ) {
         if (text == lastPhrase) return
-        lastPhrase = text
         val current = settings()
         if (!current.ttsConfigured) return
         if (!urgent && !playerIdle) return
+        // Mémorisé au moment de parler seulement, comme onPhrase : un mot doux
+        // avalé par un garde transitoire (chat occupé) se redit à la prochaine
+        // émission au lieu d'être tu comme un déjà-dit.
+        lastPhrase = text
         if (urgent) player.stop()
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
