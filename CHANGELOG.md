@@ -119,6 +119,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   masques compacts en production, précision chiffrée, profondeur sur masque, sol non plan.
 
 
+## 2026-10-31 — iSee : suivi du chemin parlé quand il n'y a rien à dire (branche `feat/isee-suivi-chemin-silence`)
+
+- **Demande** (ordre user) : quand iSee n'a rien à dire, détecter le chemin
+  sur lequel marche l'utilisateur (comme aujourd'hui : couloir libre + flèche)
+  et lui dire comment le suivre — par exemple « continue tout droit ».
+- Fait (`core.live`, `app.isee`, `docs/GUIDAGE-TOUT-DROIT.md`) :
+  `ContinueWord` nouveau (3 rappels FR/EN, entrées cache `guide_continue_*`,
+  hors catalogue embarqué) ; `GuidanceAnnouncer` reparle sur voie libre
+  stable toutes les 8 s (`DEFAULT_IDLE_REPEAT_MS`), rappel et mot en
+  alternance (chaque émission reste distincte pour les déduplications aval) ;
+  le bouché ne se rappelle jamais. Routage `spokenClipId` (`ProbeWiring`) :
+  les rappels partent en `speakWord` (synthèse à la 1re occurrence, clip
+  cache 30 j ensuite). Ni la décision, ni les directions, ni les mots
+  réactifs ne changent : le rappel reformule la consigne stable, il ne
+  l'invente pas.
+- Preuves : `:core` `GuidanceAnnouncerTest` 30/30 (dont 7 rappel : échéance,
+  alternance, bouché muet, mot nouveau relance, retour trottoir FR,
+  bouché-puis-libre, langue courante) + `ContinueWordTest` 7/7 (nouveau) ;
+  `:app` `ProbeWiringSpokenTest` 4/4 (dont routage clip) ;
+  `check-kotlin-limits.py` et `check-voicepack.py` verts.
+- Reste : embarquer les 6 MP3 `vp_guide_continue_*` au catalogue (1re
+  occurrence < 100 ms, zéro réseau) ; rappel paramétrable (délai, on/off) ;
+  suivi des virages du chemin (géométrie du sol, distinction
+  chemin-suivable / route-circulée — jamais d'ordre vers la chaussée).
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)
 
 - **Demande** : calcul des distances beaucoup plus précis, le plus précis possible.
