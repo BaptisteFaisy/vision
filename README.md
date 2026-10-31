@@ -32,7 +32,7 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. This page describes
 > what the tree **actually ships**, re-checked on **31/10/2026** against
-> `origin/master` (`ec90a63b`). The tree counts in [Figures](#figures) are the
+> `origin/master` (`57a550af`). The tree counts in [Figures](#figures) are the
 > output of `python3 tools/count-tree.py`; measured figures elsewhere are dated
 > and marked as measurements, not as code guarantees.
 
@@ -114,9 +114,10 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   only the current sentence below the bubble. Tap = video, long-press = speak; the
   whole surface is the interface (`app/src/main/java/dev/sam3vision/app/isee/`,
   `docs/ISEE-DESIGN-PORTRAIT.md`).
-- **Live** — **16 tracked concepts** by default (`person`, `car`, `bus`, `bicycle`,
-  `pedestrian traffic light`, `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`,
-  `barrier`, `fence`, `gate`, `souvenir shop`, `beanie`, `socks`), **16 at most**
+- **Live** — **17 tracked concepts** by default (`person`, `car`, `bus`, `bicycle`,
+  `pedestrian traffic light`, `pedestrian signal head`, `curb`, `sidewalk`,
+  `crosswalk`, `pole`, `stairs`, `barrier`, `fence`, `gate`, `souvenir shop`,
+  `beanie`, `socks`), **17 at most**
   (`LivePrompts.MAX`), one frame in flight (WebSocket `/live/ws`, or tracker sessions
   when the *Tracker* chip is on), pills, distances, and voice announcements
   (`docs/LIVE-SPEC.md`). The Direct tries the tracker first and falls back to `/live`
@@ -258,16 +259,16 @@ python3 tools/count-tree.py                                # the Figure table be
 
 ## Figures
 
-Measured on `origin/master` (`ec90a63b`), 31/10/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`57a550af`) with this cleanup applied, 31/10/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1116** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **128,907** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **69,910** — `:core` 254 f. / 30,308 l. · `:app` 342 f. / 39,602 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **3,880** — `:core` 2,493 · `:app` 1,387 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **1112** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **129,044** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **69,918** — `:core` 251 f. / 30,276 l. · `:app` 342 f. / 39,642 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **3,880** — `:core` 2,489 · `:app` 1,391 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
 | Backend Python (`server/backend`) | **40** fichiers, **7,912** lignes | `find server/backend -name '*.py' \| wc -l` |
