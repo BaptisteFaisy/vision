@@ -5,7 +5,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Proximité prouvée d'un passage piéton : étiquettes et distance (guidage latéral). */
+/**
+ * Proximité prouvée d'un passage piéton : étiquettes et distance (guidage
+ * latéral), plus la mémoire de perte ([CrossingLossGate], décision de
+ * sortie — l'horloge est couverte par `CrossingTriggerExitDecisionTest`).
+ */
 class CrossingOfferTest {
 
     private val h = 1138
@@ -52,5 +56,40 @@ class CrossingOfferTest {
         assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(2.99f), h, maxMeters = max))
         assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(3.0f), h, maxMeters = max))
         assertFalse(CrossingOffer.seesNearCrosswalk(walk, at(3.01f), h, maxMeters = max))
+    }
+
+    @Test
+    fun `quatre frames vides de suite font retomber le mode auto`() {
+        val gate = CrossingLossGate()
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse("4e frame vide : retour au mode normal", gate.onFrame(false))
+    }
+
+    @Test
+    fun `une reapparition remet le compteur de perte a zero`() {
+        val gate = CrossingLossGate()
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.onFrame(false)
+        assertTrue(gate.onFrame(true))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse(gate.onFrame(false))
+    }
+
+    @Test
+    fun `reset efface les frames vides accumulees`() {
+        val gate = CrossingLossGate()
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.onFrame(false)
+        gate.reset()
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertTrue(gate.onFrame(false))
+        assertFalse(gate.onFrame(false))
     }
 }

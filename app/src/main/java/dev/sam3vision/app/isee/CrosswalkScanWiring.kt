@@ -64,7 +64,7 @@ internal fun resetCrossingWatches() {
 
 /**
  * Scan traversée, un par processus (même garde des 500 lignes que
- * [CrossingOfferWatch]) : la machine [CrosswalkScan] + le lacet [YawMeter],
+ * [CrossingLateralWatch]) : la machine [CrosswalkScan] + le lacet [YawMeter],
  * écouté le temps du scan seul (démarré au déclencheur confirmé, coupé au
  * verdict ou à l'abandon — pas d'écoute permanente pour ~10 s par
  * traversée). Sans capteur, le scan reste temporisé (voir [CrosswalkScan]).
