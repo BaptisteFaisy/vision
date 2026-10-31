@@ -97,7 +97,8 @@ class TraversePipeline(
         // au plus juste (voir `Detection.maskBox`).
         val detections = filtered.toDetectionsWithExtents(width, height)
         noteBackground(background, atMs)
-        // PISTE2 : proximités serveur (SegObject.depth) vers le veto suivi — repli quand l'embarqué est muet.
+        // PISTE2 (câblage sonde embarquée reporté) : proximités serveur (SegObject.depth),
+        // seule source branchée — pas un repli, `boxCloseness` n'est câblée nulle part.
         val depthByBox = DepthReadings.serverCloseness(filtered).takeIf { it.isNotEmpty() }
         val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion, depthByBox)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
