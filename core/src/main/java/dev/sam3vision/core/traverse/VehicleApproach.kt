@@ -4,6 +4,7 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
 import dev.sam3vision.core.predict.MotionModel
+import dev.sam3vision.core.predict.Shift
 
 /**
  * Verdict d'approche : un véhicule fonce-t-il ([label] du plus dangereux) et
@@ -14,6 +15,24 @@ data class ApproachVerdict(
     val ttcSeconds: Float?,
     val label: String?,
 )
+
+/**
+ * Veto fond V1 : vrai quand le fond accuse la caméra avec assez de confiance
+ * pour invalider la dérive des boîtes (règle produit : fond identique + boîte
+ * qui bouge ⇒ c'est le porteur qui bouge, pas la voiture). `null` (pas de
+ * signal fond) ne met jamais le veto : comportement strictement inchangé.
+ *
+ * API attendue (`VehicleBackground.kt`, lane vbg-core, absente de ce
+ * worktree) : `data class MovingVerdict(val motion: BackgroundMotion, val
+ * confidence: Float)` et `enum class BackgroundMotion { STABLE, CAMERA_MOVED,
+ * SCENE_MOVED }` dans ce package, confiance dans [0, 1]. Seuil [Shift.TRUST_MIN]
+ * (0,12 : `docs/VEHICLE-BACKGROUND.md`, confiance min. du mouvement global
+ * pour décider). Si les noms livrés diffèrent, seul ce point est à renommer.
+ */
+internal fun MovingVerdict?.isCameraMoved(): Boolean {
+    if (this == null) return false
+    return motion == BackgroundMotion.CAMERA_MOVED && confidence >= Shift.TRUST_MIN
+}
 
 /**
  * Approche véhicules sur boîtes SAM : le direct `/live` ne donnant pas d'ids
@@ -47,11 +66,21 @@ class VehicleApproach {
         nextId = 0
     }
 
-    /** Verdict pour une frame datée de [atMs] (ms, monotone). */
-    fun update(detections: List<Detection>, atMs: Long): ApproachVerdict {
+    /**
+     * Verdict pour une frame datée de [atMs] (ms, monotone). [background]
+     * (`null` = pas de signal fond) met le veto quand la caméra bouge avec
+     * confiance : la croissance des boîtes ne conclut plus l'approche (les
+     * pistes restent suivies, seul le verdict se tait).
+     */
+    fun update(
+        detections: List<Detection>,
+        atMs: Long,
+        background: MovingVerdict? = null,
+    ): ApproachVerdict {
         val frameWidth = detections.maxOfOrNull { it.width }?.takeIf { it > 0 } ?: FALLBACK_WIDTH
         associate(vehiclesOf(detections), atMs, frameWidth)
         dropStale(atMs)
+        if (background.isCameraMoved()) return ApproachVerdict(false, null, null)
         return verdict(frameWidth)
     }
 

@@ -165,7 +165,9 @@ object VehicleStateText {
  *
  * En mouvement = approche confirmée (tau < 3 s via [VehicleApproach], classe
  * existante réutilisée) ou boîte croissante sur deux frames (miroir du veto
- * instantané). À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
+ * instantané) — sauf veto fond : quand le signal `MovingVerdict` accuse la
+ * caméra avec confiance, la dérive des boîtes ne conclut plus (doute/silence).
+ * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
  * stable (deux transitions stables, trois frames) — mesuré et dans le
  * couloir marché. Le reste est doute/silence : jamais d'arrêt inventé.
  *
@@ -238,18 +240,21 @@ class VehicleStateWatcher(
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]
      * porte les boîtes SAM, [readings] les distances affinées ; [atMs] < 0
      * désactive le suivi temporel (croissance seule, comme le veto).
+     * [background] (`null` = pas de signal fond) met le veto mouvement quand
+     * la caméra bouge avec confiance : la dérive des boîtes ne conclut plus.
      */
     fun update(
         detections: List<Detection>,
         readings: List<DistanceReading>,
         atMs: Long,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
+        background: MovingVerdict? = null,
     ): VehicleStateCue? {
-        val tau = if (atMs >= 0L) approach.update(detections, atMs)
+        val tau = if (atMs >= 0L) approach.update(detections, atMs, background)
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections)
         val meters = metersByKey(readings)
-        val pick = pick(current, meters, tau, atMs)
+        val pick = pick(current, meters, tau, atMs, background.isCameraMoved())
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs)
         }
@@ -312,9 +317,10 @@ class VehicleStateWatcher(
         meters: Map<String, Float>,
         tau: ApproachVerdict,
         atMs: Long,
+        cameraMoved: Boolean,
     ): Pick? {
         if (current.isEmpty()) return null
-        movingPick(current, meters, tau)?.let { return it }
+        movingPick(current, meters, tau, cameraMoved)?.let { return it }
         return stoppedPick(current, meters, atMs)
     }
 
@@ -323,7 +329,9 @@ class VehicleStateWatcher(
         current: Map<String, Current>,
         meters: Map<String, Float>,
         tau: ApproachVerdict,
+        cameraMoved: Boolean,
     ): Pick? {
+        if (cameraMoved) return null
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
             .filter { candidate ->
