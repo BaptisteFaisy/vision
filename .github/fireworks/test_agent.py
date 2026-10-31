@@ -208,6 +208,10 @@ def config_isolee(source=None):
     dossier = tempfile.mkdtemp(prefix="zc-agent-")
     os.chmod(dossier, 0o700)
     try:
+        # `data/` doit exister en 700 AVANT le lancement : ZeroClaw le crée au
+        # umask du processus (002 sur les runners) et refuse un état partagé.
+        os.makedirs(os.path.join(dossier, "data"), mode=0o700, exist_ok=True)
+        os.chmod(os.path.join(dossier, "data"), 0o700)
         shutil.copyfile(conf, os.path.join(dossier, "config.toml"))
         shutil.copyfile(cle, os.path.join(dossier, ".secret_key"))
         os.chmod(os.path.join(dossier, "config.toml"), 0o600)
@@ -219,12 +223,30 @@ def config_isolee(source=None):
     return dossier
 
 
+def binaire_zeroclaw():
+    """Chemin de `zeroclaw` : PATH, puis les emplacements connus des runners."""
+    candidats = [shutil.which("zeroclaw")] + [
+        os.path.join(maison, ".cargo", "bin", "zeroclaw")
+        for maison in (os.path.expanduser("~"), "/home/baptiste")]
+    candidats.append("/usr/local/bin/zeroclaw")
+    for chemin in candidats:
+        if chemin and os.path.isfile(chemin) and os.access(chemin, os.X_OK):
+            return chemin
+    return None
+
+
+def _umask_prive():
+    """Umask 077 dans le processus fils (état ZeroClaw non partagé)."""
+    os.umask(0o077)
+
+
 def lancer_agent(prompt, dossier, budget=BUDGET_S):
     """Lance `zeroclaw agent --agent fw -m <prompt>`. Rend (ok, sortie)."""
-    binaire = shutil.which("zeroclaw") or os.path.expanduser(
-        "~/.cargo/bin/zeroclaw")
-    if not os.path.exists(binaire):
-        return False, "zeroclaw introuvable sur ce runner"
+    binaire = binaire_zeroclaw()
+    if binaire is None:
+        return False, ("zeroclaw introuvable sur ce runner (PATH, "
+                       "~/.cargo/bin, /home/baptiste/.cargo/bin, "
+                       "/usr/local/bin)")
     conf = config_isolee()
     if conf is None:
         return False, "config ZeroClaw absente (config.toml + .secret_key)"
@@ -232,7 +254,7 @@ def lancer_agent(prompt, dossier, budget=BUDGET_S):
         proc = subprocess.run([binaire, "--config-dir", conf, "agent",
                                "--agent", "fw", "-m", prompt],
                               capture_output=True, text=True, timeout=budget,
-                              cwd=dossier)
+                              cwd=dossier, preexec_fn=_umask_prive)
     except subprocess.TimeoutExpired:
         return False, "budget de %d s dépassé" % budget
     except (OSError, subprocess.SubprocessError) as exc:

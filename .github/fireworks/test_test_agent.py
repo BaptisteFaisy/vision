@@ -30,6 +30,25 @@ class PromptTest(unittest.TestCase):
         self.assertIn("indisponible", prompt)
 
 
+class BinaireTest(unittest.TestCase):
+    """Localisation du binaire : PATH, puis les emplacements des runners."""
+
+    def test_absent_partout(self):
+        with mock.patch.object(test_agent.shutil, "which", return_value=None), \
+                mock.patch.object(test_agent.os.path, "isfile",
+                                  return_value=False):
+            self.assertIsNone(test_agent.binaire_zeroclaw())
+
+    def test_trouve_dans_le_path(self):
+        with mock.patch.object(test_agent.shutil, "which",
+                               return_value="/usr/local/bin/zeroclaw"), \
+                mock.patch.object(test_agent.os.path, "isfile",
+                                  return_value=True), \
+                mock.patch.object(test_agent.os, "access", return_value=True):
+            self.assertEqual(test_agent.binaire_zeroclaw(),
+                             "/usr/local/bin/zeroclaw")
+
+
 class DiffTest(unittest.TestCase):
     """Le pilote refuse les gardes, le volume et le hors-cadre."""
 
