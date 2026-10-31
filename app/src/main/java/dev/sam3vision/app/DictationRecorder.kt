@@ -26,6 +26,15 @@ class DictationRecorder(
     private val captured = ByteArrayOutputStream()
     private val preview = PcmPreviewBuffer()
 
+    /**
+     * Morceaux de PCM au fil de la capture (`count` octets valides) : la
+     * dictée temps réel les streame pendant la tenue. Appelé sur le thread
+     * de pompe ; **le tableau est réutilisé, copier avant de conserver**.
+     * `null` (défaut) = comportement batch inchangé.
+     */
+    @Volatile
+    var onChunk: ((chunk: ByteArray, count: Int) -> Unit)? = null
+
     /** Copie bornée du son récent, sans arrêter l'enregistrement principal. */
     fun preview(): PcmPreview = preview.snapshot()
 
@@ -80,6 +89,7 @@ class DictationRecorder(
             // Flux continu : chaque chunk part dans le tampon mémoire, jamais sur disque.
             synchronized(captured) { captured.write(chunk, 0, read) }
             preview.append(chunk, read)
+            onChunk?.invoke(chunk, read)
         }
         // Plafond atteint : on coupe la source, les données restent récupérables.
         if (record === rec) runCatching { rec.stop() }

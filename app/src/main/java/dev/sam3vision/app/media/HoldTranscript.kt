@@ -20,6 +20,11 @@ class HoldTranscript(private val recorder: DictationRecorder = DictationRecorder
     /** Le même micro alimente les sous-titres pendant la tenue. */
     fun preview() = recorder.preview()
 
+    /** Brancher/débrancher le stream temps réel sur la pompe du micro. */
+    fun setChunkListener(listener: ((ByteArray, Int) -> Unit)?) {
+        recorder.onChunk = listener
+    }
+
     /** Coupe le micro puis rend le texte transcrit avec le PCM capté (thread I/O). */
     suspend fun stop(client: SpeechClient): Result<Pair<String, ByteArray>> = withContext(Dispatchers.IO) {
         val pcm = recorder.stopAndCollect()
