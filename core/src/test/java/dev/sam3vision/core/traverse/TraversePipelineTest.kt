@@ -3,7 +3,10 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.motion.MotionSample
+import dev.sam3vision.core.motion.MotionSource
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -160,6 +163,29 @@ class TraversePipelineTest {
         assertNull(pipe.lastAnnounced)
         repeat(4) { pipe.frame(emptyList(), green = true, index = it + 1) }
         assertEquals(CrossingState.Green, pipe.lastAnnounced)
+    }
+
+    @Test
+    fun `fond qui defile - l estimateur nourrit le veto suivi`() = runBlocking {
+        // Estimateur piloté : la première frame arme la paire, la deuxième
+        // produit le mouvement global consommé par le veto suivi.
+        val sample = MotionSample(7.5f, 0f, 1f, 0.9f)
+        val pipe = TraversePipeline(motionSource = object : MotionSource {
+            override fun estimateSince(prevLuma: GrayMask, curLuma: GrayMask): MotionSample = sample
+        })
+        val frame = BackgroundFrame(96, 96, ByteArray(96 * 96))
+        pipe.onFrame(emptyList(), 640, 480, true, 0f, 0L, background = frame)
+
+        assertNull("une seule frame : pas de paire", pipe.lastFrameMotion)
+        assertNull(pipe.lastBackgroundMoving)
+        pipe.onFrame(emptyList(), 640, 480, true, 0f, 100L, background = frame)
+
+        assertNotNull("la paire estimée nourrit le veto", pipe.lastFrameMotion)
+        assertEquals(true, pipe.lastBackgroundMoving)
+        pipe.reset()
+
+        assertNull(pipe.lastFrameMotion)
+        assertNull(pipe.lastBackgroundMoving)
     }
 
     @Test

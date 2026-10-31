@@ -1,6 +1,7 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -131,6 +132,55 @@ class VehicleApproachTest {
         assertNull(third.ttcSeconds)
         assertNull(third.label)
         assertEquals(1, approach.trackCount)
+    }
+
+    @Test
+    fun `camera qui suit - l approche se tait quand la boite suit le fond`() {
+        // Fond qui défile à la vitesse de la boîte (50 px/s) : résidu nul,
+        // la piste accuse la caméra et l'approche se tait.
+        val motion = lateralMotion(dxPx = 0.75f)
+        val approach = VehicleApproach()
+        var last = ApproachVerdict(false, null, null)
+        repeat(13) { index ->
+            last = approach.update(listOf(driftingCar(index)), atMs = index * 100L, motion = motion)
+        }
+
+        assertFalse("piste embarquée par la caméra : pas d'approche", last.approaching)
+        assertNull(last.ttcSeconds)
+        assertTrue(approach.cameraMoved)
+        assertEquals(Verdict.CAMERA_MOVED, approach.lastVerdicts.values.single().verdict)
+    }
+
+    @Test
+    fun `camera qui suit mais voiture qui roule - le veto tient piste par piste`() {
+        // Même défilement, mais la voiture centrée grandit sans dériver :
+        // résidu franc, la piste roule et le veto tient malgré la caméra.
+        val motion = lateralMotion(dxPx = 0.75f)
+        val approach = VehicleApproach()
+        var last = ApproachVerdict(false, null, null)
+        repeat(13) { index ->
+            val detections = listOf(car(100f + index * 10f), driftingBus(index))
+            last = approach.update(detections, atMs = index * 100L, motion = motion)
+        }
+
+        assertTrue("la voiture qui roule n'est pas tue par la caméra", last.approaching)
+        assertEquals("car", last.label)
+        assertFalse("unanimité rompue : pas de veto global", approach.cameraMoved)
+        assertEquals(Verdict.VEHICLE_MOVED, approach.lastVerdicts[0]?.verdict)
+        assertEquals(Verdict.CAMERA_MOVED, approach.lastVerdicts[1]?.verdict)
+    }
+
+    /** Mouvement global latéral piloté : [dxPx] px par frame sur plan 96, dt 100 ms. */
+    private fun lateralMotion(dxPx: Float): FrameMotion =
+        FrameMotion(MotionSample(dxPx, 0f, 1f, 0.9f), lumaWidth = 96, lumaHeight = 96, dtMs = 100L)
+
+    /** Voiture qui grandit (+10 px/frame) en dérivant (+5 px/frame). */
+    private fun driftingCar(index: Int): Detection = carAt(100f + index * 10f, 320f + index * 5f)
+
+    /** Bus à largeur constante qui dérive comme le fond (+5 px/frame). */
+    private fun driftingBus(index: Int): Detection {
+        val cx = 500f + index * 5f
+        return Detection("bus", 0.9f, listOf(cx - 50f, 300f, cx + 50f, 360f), width = 640, height = 480)
     }
 
     /** Voiture centrée de [widthPx] de large (ratio voiture 5:3). */

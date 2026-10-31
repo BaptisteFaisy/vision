@@ -17,6 +17,21 @@ et une boîte qui s'écarte du fond signale un véhicule en mouvement
 (même poursuivi par la caméra : une boîte fixe sur fond qui défile
 veut dire que le véhicule compense le mouvement du porteur).
 
+## Câblage
+
+Le mouvement global voyage dans `FrameMotion` (échantillon + grille +
+dt) ; `VehicleApproach` juge **chaque piste** (`CAMERA_MOVED` = la piste
+suit le fond, exclue de l'approche) et expose le veto global
+`cameraMoved` (unanimité des pistes évaluées, jamais à l'aveugle).
+
+- Traversée : `TraversePipeline` estime le global sur ses paires de
+  luminance (`BlockMotionSource` réutilisé) et nourrit `TraverseVeto` —
+  le veto instantané (surface, proximité) reste conservateur.
+- Sonde : `LiveProbe.onFrame` offre son JPEG à `ProbeBackgroundMotion`,
+  `observeVehicleState` y lit le dernier `FrameMotion` pour le veilleur.
+- Journal : `MotionLog` (`adb logcat -s iSeeMotion`) aux transitions
+  seules, 1/s max ; panneau debug (`state.motion`, écarts) en suivi.
+
 ## Seuils initiaux (à calibrer)
 
 | Seuil | Valeur | Rôle |
