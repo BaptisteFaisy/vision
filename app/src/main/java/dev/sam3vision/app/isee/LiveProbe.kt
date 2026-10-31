@@ -80,9 +80,9 @@ class LiveProbe(
         LiveMaskTransport.clientFor(base, timeout, marks, this@LiveProbe.depthEngine != DepthBackend.OFF)
     }
     /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
-    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine }) { alert ->
-        _state.update { it.copy(dangerAlert = alert?.line()) }
-    }
+    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
+        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer) } },
+        onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
     private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
     private val _state = MutableStateFlow(LiveProbeState())
@@ -221,14 +221,14 @@ resetPipeline()
 resetPipeline()
         _state.update { it.cleared() }
         markWarming()
-        pulse.start()
+        pulse.start(); meters.startPredictions(distances)
     }
 
     /** Masques et chiffres remis à zéro (sortie d'écran) sans oublier l'endpoint. */
     fun clear() {
         chronology.reset()
 _state.update { it.cleared() }
-        pulse.stop()
+        pulse.stop(); meters.stopPredictions()
     }
 
     /**
@@ -428,7 +428,7 @@ _state.update { it.cleared() }
         }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
-        pulse.feed(at, voice.lastDecision, placed)
+        pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
         _state.update { current ->
             current.copy(
                 masks = overlays,
