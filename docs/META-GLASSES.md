@@ -411,6 +411,9 @@ Le téléphone a un « tap maintenu pour parler » ; le bouton capture des lunet
 que des appuis discrets (court, long, double), sans événement de relâchement : il n'y a
 donc pas de vrai « maintenu puis relâché ». L'équivalent retenu est une **bascule** :
 
+- **Ouverture auto à la session** : dès que le flux monte après une ouverture
+  de session, l'écoute s'ouvre seule (même bip, même envoi à 20 s) — sans
+  appui long. Micro indisponible : rien ne s'ouvre, le refus s'est déjà dit ;
 - **1er appui long** sur le bouton capture : le micro des lunettes s'ouvre (un bip dans
   les lunettes, iSee se tait), la photo-contexte est captée en parallèle ;
 - **2e appui long** : la question part aussitôt (deux bips), sinon **envoi auto à 20 s** ;
@@ -419,7 +422,7 @@ donc pas de vrai « maintenu puis relâché ». L'équivalent retenu est une **b
 Sans les mains du tout : **« Hey Meta, ouvre iSee »** ouvre la session (si besoin) puis
 l'écoute — mais exige un projet Developer Center avec la permission Voice Invocation ;
 en pur Developer Mode, l'invocation peut ne jamais arriver et l'appui long reste le seul
-déclencheur. Micro indisponible : repli annoncé (photo → chat, comme avant).
+déclencheur manuel. Micro indisponible : repli annoncé (photo → chat, comme avant).
 
 Recette sans matériel (debug) : Réglages → META GLASSES → « Simuler un appui long
 (parler) » et « Simuler ouvre iSee (voix) » ; ou `adb shell am start --es glasses_talk "..."`

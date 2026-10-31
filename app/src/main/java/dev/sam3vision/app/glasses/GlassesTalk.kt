@@ -73,6 +73,18 @@ class GlassesTalk(
         }
     }
 
+    /**
+     * Ouverture auto à la session : ouvre l'écoute si personne ne parle et
+     * que le micro est prêt (`true`), sinon rien (`false`). Le micro absent
+     * reste silencieux : il s'est déjà dit à l'ouverture de la session ; le
+     * micro qui refuse, lui, se dit (`start` l'annonce).
+     */
+    fun autoStart(): Boolean {
+        val source = audio()
+        if (!GlassesTalkPolicy.autoListen(phase, micReady = source != null)) return false
+        return start(source!!)
+    }
+
     /** Fin du délai : envoie si l'écoute est toujours en cours, sinon rien. */
     fun timeout() {
         if (GlassesTalkPolicy.timeout(phase)) send()
@@ -184,6 +196,11 @@ internal class GlassesTalkHost(
 
     /** Un appui long : ouvre l'écoute, ou envoie la question en cours. */
     fun press(): TalkPress = talk.press()
+
+    /** Ouverture auto à la session : ouvre l'écoute si tout est prêt. */
+    fun autoListen() {
+        talk.autoStart()
+    }
 
     /** Vrai dès que l'écoute est ouverte, transcription comprise. */
     val busy: Boolean get() = talk.busy
