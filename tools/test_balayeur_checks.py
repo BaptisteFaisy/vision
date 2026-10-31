@@ -26,6 +26,26 @@ RACINE = os.path.dirname(ICI)
 WORKFLOW = os.path.join(RACINE, ".github", "workflows", "pr-auto-merge.yml")
 
 
+def trouver_jq() -> str | None:
+    """`jq` du PATH, sinon un emplacement connu.
+
+    Les runners `r630-vision-*` n'ont pas `/usr/bin` complet dans le PATH du
+    job : sans cette recherche, les tests de comportement étaient tous
+    **sautés** en silence (`OK (skipped=4)`), et la garde ne gardait rien.
+    """
+    trouve = shutil.which("jq")
+    if trouve:
+        return trouve
+    for candidat in ("/usr/bin/jq", "/bin/jq", "/usr/local/bin/jq",
+                     os.path.expanduser("~/bin/jq"), "/snap/bin/jq"):
+        if os.access(candidat, os.X_OK):
+            return candidat
+    return None
+
+
+JQ = trouver_jq()
+
+
 def extraire_jq(texte: str) -> str:
     """Le programme jq de `checks_pr()`, tel qu'il est dans le workflow."""
     debut = texte.index("checks_pr() {")
@@ -44,7 +64,7 @@ def contexte(nom: str, conclusion: str, run: int, job: int, debut: str) -> dict:
     }
 
 
-@unittest.skipIf(shutil.which("jq") is None, "jq absent")
+@unittest.skipIf(JQ is None, "jq introuvable sur ce runner")
 class VerdictChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -53,7 +73,7 @@ class VerdictChecks(unittest.TestCase):
 
     def verdict(self, check_runs: list[dict]) -> dict[str, dict]:
         sortie = subprocess.run(
-            ["jq", "-c", self.jq],
+            [JQ, "-c", self.jq],
             input=json.dumps({"check_runs": check_runs}),
             capture_output=True, text=True, check=True,
         ).stdout
@@ -99,6 +119,52 @@ class VerdictChecks(unittest.TestCase):
         c = self.verdict(runs)
         self.assertEqual(c["Mergify Merge Queue"]["bucket"], "cancel")
         self.assertEqual(c["couche0"]["bucket"], "pass")
+
+
+def corps_fonction(texte: str, nom: str) -> str:
+    """Le corps bash de `<nom>() {` jusqu'à sa ligne de fermeture (10 espaces)."""
+    debut = texte.index(f"\n          {nom}() {{") + 1
+    lignes = texte[debut:].split("\n")
+    garde = [lignes[0]]
+    for ligne in lignes[1:]:
+        if ligne == "          }":
+            garde.append(ligne)
+            break
+        garde.append(ligne)
+    return "\n".join(garde)
+
+
+class StructureBalayeur(unittest.TestCase):
+    """Garde sans `jq` : les invariants de lecture du workflow lui-même.
+
+    Les tests de comportement sautent si `jq` manque sur le runner — ils
+    étaient donc TOUS sautés en CI (runners `r630-vision-*`, PATH réduit) et la
+    garde ne gardait rien. Ces assertions-ci tournent partout.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(WORKFLOW, encoding="utf-8") as f:
+            cls.texte = f.read()
+
+    def test_checks_pr_departage_par_run(self) -> None:
+        corps = corps_fonction(self.texte, "checks_pr")
+        self.assertIn("sort_by(.name, .run, .debut)", corps)
+        self.assertNotIn("sort_by(.name, .debut)", corps.replace(
+            "sort_by(.name, .run, .debut)", ""))
+        self.assertIn('capture("/runs/(?<id>[0-9]+)")', corps,
+                      "l'identifiant de run doit être extrait de l'URL du check")
+
+    def test_suite_en_cours_est_utilisee_par_les_trois_relances(self) -> None:
+        self.assertIn("suite_en_cours() {", self.texte)
+        for fonction in ("relancer", "relancer_annules", "relancer_couche0"):
+            corps = corps_fonction(self.texte, fonction)
+            self.assertIn("suite_en_cours \"$wf_run\" \"$sha_run\"", corps,
+                          f"{fonction} doit refuser de relancer pendant une suite")
+            # La garde passe AVANT la relance, sinon elle ne sert à rien.
+            self.assertLess(corps.index("suite_en_cours"),
+                            corps.index("run rerun"),
+                            f"{fonction} : la garde doit précéder le rerun")
 
 
 if __name__ == "__main__":
