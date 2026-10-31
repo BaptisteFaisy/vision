@@ -298,11 +298,30 @@ class GuidanceAnnouncerTest {
         assertEquals("left.", announcer.onFrame(0L, bloque))
         assertEquals("left.", announcer.onFrame(2_000L, bloque))
         // Contact latéral : plus de stop (ordre user du 31/10 — on se faufile, on
-        // ne s'arrête pas devant un obstacle). Le contact se contourne comme le
-        // reste, et la direction se redit toutes les 2 s.
+        // ne s'arrête pas devant un obstacle). Le contact se contourne côté
+        // dégagé à 80 cm (pas vers la personne), et la direction se redit
+        // toutes les 2 s.
         val contact = listOf(PlacedLabel("personne", 0.2f, 0.5f, 0.4f))
         val contactAnnouncer = GuidanceAnnouncer()
-        assertEquals("straight ahead.", contactAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left))
-        assertEquals("straight ahead.", contactAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
+        assertEquals("right.", contactAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left))
+        assertEquals("right.", contactAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
+    }
+
+    @Test
+    fun `passage SAM bascule cote degage a 80cm`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = true, side = "left", label = "person")
+        val gauche = listOf(PlacedLabel("personne", 0.3f, 0.5f, 1f))
+
+        assertEquals("right.", announcer.onFrame(0L, gauche, samPassage = sam))
+    }
+
+    @Test
+    fun `passage SAM garde son cote si l autre ne degage pas`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = true, side = "left", label = "person")
+        val centre = listOf(PlacedLabel("personne", 0.5f, 0.5f, 1f))
+
+        assertEquals("left.", announcer.onFrame(0L, centre, samPassage = sam))
     }
 }

@@ -60,7 +60,91 @@ data class PeoplePath(
         /** Côté du cap : à gauche sous l'axe, à droite dessus (pile au centre ⇒ droite). */
         private fun sideOf(headingX: Float): GuidanceSide =
             if (headingX < 0.5f) GuidanceSide.Left else GuidanceSide.Right
+
+        /**
+         * Vrai si marcher côté [side] garantit 80 cm à toute personne : aucune
+         * personne à portée avec un écart latéral < corps + 0,8 m
+         * ([MIN_CLEARANCE_M]), aucune personne non mesurée de ce côté
+         * (prudence : l'inconnu bloque le côté — une personne plein centre
+         * non mesurée bloque les deux). Les obstacles non humains ne comptent
+         * pas (le couloir les contourne déjà à 25 cm). Pur, testé en JVM.
+         */
+        fun clearsSide(
+            labels: List<PlacedLabel>,
+            side: GuidanceSide,
+            rangeMeters: Float = Guidance.RANGE_METERS,
+            hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        ): Boolean {
+            val halfTangent = LensSpec.halfTangent(hfovDeg)
+            if (!halfTangent.isFinite() || halfTangent <= 0f) return false
+            for (label in labels) {
+                if (!PersonLabels.isPerson(label.label)) continue
+                if (!onSide(label.centerX, side)) continue
+                val meters = label.meters
+                if (meters == null || !meters.isFinite() || meters <= 0f) return false
+                if (meters > rangeMeters) continue
+                val perX = lateralPerX(meters, halfTangent)
+                val lateral = abs(label.centerX - 0.5f) * perX
+                if (lateral < bodyHalfM(label, perX) + MIN_CLEARANCE_M) return false
+            }
+            return true
+        }
+
+        /**
+         * Vrai si marcher dans l'axe garantit 80 cm à toute personne : aucune
+         * personne à portée avec un écart latéral à l'axe < corps + 0,8 m,
+         * aucune personne non mesurée dans la bande centrale (miroir du
+         * couloir : hors bande, l'inconnu passe au large).
+         */
+        fun clearsAhead(
+            labels: List<PlacedLabel>,
+            rangeMeters: Float = Guidance.RANGE_METERS,
+            hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        ): Boolean {
+            val halfTangent = LensSpec.halfTangent(hfovDeg)
+            if (!halfTangent.isFinite() || halfTangent <= 0f) return false
+            for (label in labels) {
+                if (!PersonLabels.isPerson(label.label)) continue
+                val meters = label.meters
+                if (meters == null || !meters.isFinite() || meters <= 0f) {
+                    if (!label.centerX.isFinite() || label.centerX in PositionText.SIDE_EDGE..1f - PositionText.SIDE_EDGE) return false
+                    continue
+                }
+                if (meters > rangeMeters) continue
+                val perX = lateralPerX(meters, halfTangent)
+                if (abs(label.centerX - 0.5f) * perX < bodyHalfM(label, perX) + MIN_CLEARANCE_M) return false
+            }
+            return true
+        }
+
+        /** [centerX] côté [side] (le centre pile bloque les deux côtés, prudence). */
+        private fun onSide(centerX: Float, side: GuidanceSide): Boolean {
+            if (!centerX.isFinite()) return true
+            return if (side == GuidanceSide.Left) centerX <= 0.5f else centerX >= 0.5f
+        }
     }
+}
+
+/**
+ * Demi-largeur de boîte en mètres (`null` = bords inconnus), partagée
+ * bandes ([ObstacleBands]) et garantie 80 cm ([PeoplePath.clearsSide]).
+ */
+internal fun halfBoxM(label: PlacedLabel, lateralPerX: Float): Float? {
+    val x0 = label.x0
+    val x1 = label.x1
+    if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite()) return null
+    val width = abs(x1 - x0)
+    if (width <= 0f) return null
+    return width * 0.5f * lateralPerX
+}
+
+/**
+ * Demi-corps en mètres : boîte mesurée, sinon épaules par défaut pour une
+ * personne, zéro pour le reste (un poteau ne déborde pas de sa mesure).
+ */
+internal fun bodyHalfM(label: PlacedLabel, lateralPerX: Float): Float {
+    val halfBox = halfBoxM(label, lateralPerX)
+    return if (PersonLabels.isPerson(label.label)) halfBox ?: PeoplePath.BODY_HALF_WIDTH_M else halfBox ?: 0f
 }
 
 /** Frontière de bande : en deçà, le cap est hors bande (le bord lui-même passe). */
@@ -104,9 +188,8 @@ private class ObstacleBands(size: Int) {
             val center = label.centerX
             if (!center.isFinite()) return false
             val lateralPerX = lateralPerX(depth, halfTangent)
-            val halfBox = halfBoxM(label, lateralPerX)
             val person = PersonLabels.isPerson(label.label)
-            val body = if (person) halfBox ?: PeoplePath.BODY_HALF_WIDTH_M else halfBox ?: 0f
+            val body = bodyHalfM(label, lateralPerX)
             val margin = if (person) PeoplePath.MIN_CLEARANCE_M else Guidance.RAY_HALF_WIDTH_M
             val half = (body + margin) / lateralPerX
             val start = center - half
@@ -123,22 +206,9 @@ private class ObstacleBands(size: Int) {
     }
 
     /**
-     * Demi-boîte en mètres, `null` si inconnue (bords absents, non finis ou
-     * largeur nulle) : la boîte inversée est tolérée (largeur absolue).
-     */
-    private fun halfBoxM(label: PlacedLabel, lateralPerX: Float): Float? {
-        val x0 = label.x0
-        val x1 = label.x1
-        if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite()) return null
-        val width = abs(x1 - x0)
-        if (width <= 0f) return null
-        return width * 0.5f * lateralPerX
-    }
-
-    /**
      * Cap valide le plus proche de [aim] : la visée si elle passe, sinon le
      * bord de bande valide le plus proche (`null` = tout est bouché). À égalité,
-     * le plus petit cap (à gauche, comme la V1).
+     * le plus grand écart au corps, puis le plus petit cap (à gauche).
      */
     fun select(aim: Float): Float? {
         if (isFree(aim, -1)) return aim
@@ -149,7 +219,7 @@ private class ObstacleBands(size: Int) {
             if (x < PeoplePath.EDGE_X || x > 1f - PeoplePath.EDGE_X || !isFree(x, skip)) return
             val dist = abs(x - aim)
             if (!found || dist < bestDist - TIE_EPS ||
-                (abs(dist - bestDist) <= TIE_EPS && x < best)
+                (abs(dist - bestDist) <= TIE_EPS && tieWins(x, best))
             ) {
                 best = x
                 bestDist = dist
@@ -165,6 +235,15 @@ private class ObstacleBands(size: Int) {
             i++
         }
         return if (found) best else null
+    }
+
+    /** Égalité de distance : [x] gagne sur [best] au plus grand écart, puis au plus petit cap. */
+    private fun tieWins(x: Float, best: Float): Boolean {
+        val gapX = clearance(x)
+        val gapBest = clearance(best)
+        if (gapX > gapBest + TIE_EPS) return true
+        if (gapBest > gapX + TIE_EPS) return false
+        return x < best
     }
 
     /** Vrai si [x] est hors de toute bande sauf celle de [skip] (son propre bord passe). */

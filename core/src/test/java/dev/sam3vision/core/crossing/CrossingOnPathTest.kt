@@ -171,6 +171,28 @@ class CrossingOnPathTest {
     }
 
     @Test
+    fun `personne cote cible meme hors passage fait taire`() {
+        val occupant = personOn(0.4f)
+        val veto = personOn(0.8f, feetY = 0.2f)
+        val objects = listOf(crosswalk(), occupant, veto)
+        val track = tracker()
+
+        assertNull(track.onFrame(0L, objects, width, height))
+        assertNull(track.onFrame(200L, objects, width, height))
+    }
+
+    @Test
+    fun `personne cote occupe hors passage laisse parler`() {
+        val occupant = personOn(0.4f)
+        val loin = personOn(0.15f, feetY = 0.2f)
+        val objects = listOf(crosswalk(), occupant, loin)
+        val track = tracker()
+
+        assertNull(track.onFrame(0L, objects, width, height))
+        assertEquals(SteeringCap.Right, track.onFrame(200L, objects, width, height))
+    }
+
+    @Test
     fun `corps qui touche la boite avec tolerance`() {
         assertTrue(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.4f, 0.35f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
         assertTrue(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.09f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))

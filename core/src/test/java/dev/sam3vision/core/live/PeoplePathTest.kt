@@ -252,4 +252,66 @@ class PeoplePathTest {
         assertEquals(0.051f, loin.headingX, 0.005f)
         assertEquals(0.74f, vraieClearance(vrais, loin.headingX), 0.01f)
     }
+
+    @Test
+    fun `clearsSide personne proche bloque son cote seul`() {
+        val proche = listOf(placed("personne", 0.3f, 2f))
+
+        assertFalse(PeoplePath.clearsSide(proche, GuidanceSide.Left))
+        assertTrue(PeoplePath.clearsSide(proche, GuidanceSide.Right))
+    }
+
+    @Test
+    fun `clearsSide personne loin passe`() {
+        val loin = listOf(placed("personne", 0.1f, 4f))
+
+        assertTrue(PeoplePath.clearsSide(loin, GuidanceSide.Left))
+    }
+
+    @Test
+    fun `clearsSide personne non mesuree bloque son cote seul`() {
+        val inconnue = listOf(placed("personne", 0.3f, null))
+
+        assertFalse(PeoplePath.clearsSide(inconnue, GuidanceSide.Left))
+        assertTrue(PeoplePath.clearsSide(inconnue, GuidanceSide.Right))
+    }
+
+    @Test
+    fun `clearsSide personne centree non mesuree bloque les deux`() {
+        val centre = listOf(placed("personne", 0.5f, null))
+
+        assertFalse(PeoplePath.clearsSide(centre, GuidanceSide.Left))
+        assertFalse(PeoplePath.clearsSide(centre, GuidanceSide.Right))
+    }
+
+    @Test
+    fun `clearsSide ignore les obstacles non humains`() {
+        val poteau = listOf(placed("poteau", 0.3f, 1f))
+
+        assertTrue(PeoplePath.clearsSide(poteau, GuidanceSide.Left))
+        assertTrue(PeoplePath.clearsAhead(poteau))
+    }
+
+    @Test
+    fun `clearsAhead ecart a l axe, bande centrale si inconnue`() {
+        assertTrue(PeoplePath.clearsAhead(emptyList()))
+        assertFalse(PeoplePath.clearsAhead(listOf(placed("personne", 0.4f, 2f))))
+        assertTrue(PeoplePath.clearsAhead(listOf(placed("personne", 0.1f, 4f), placed("personne", 0.9f, 4f))))
+        assertFalse(PeoplePath.clearsAhead(listOf(placed("personne", 0.5f, null))))
+        assertTrue(PeoplePath.clearsAhead(listOf(placed("personne", 0.1f, null))))
+    }
+
+    @Test
+    fun `egalite de distance le plus grand ecart gagne`() {
+        val perX = 2f * 2f * LensSpec.halfTangent(LensSpec.DEFAULT_H_FOV_DEG)
+        val labels = listOf(
+            placed("personne", 0.9f - 1.05f / perX, 2f),
+            placed("poteau", 0.1f + 0.25f / perX, 2f),
+        )
+        val path = PeoplePath.plan(labels)!!
+
+        assertTrue(path.fits)
+        assertEquals(0.9f, path.headingX, 0.01f)
+        assertEquals(GuidanceSide.Right, path.side)
+    }
 }

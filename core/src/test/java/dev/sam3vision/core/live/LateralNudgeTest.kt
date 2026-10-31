@@ -228,4 +228,28 @@ class LateralNudgeTest {
 
         assertNull(suivi.onFrame(500L, listOf(personne(0.65f, 2.2f))))
     }
+
+    @Test
+    fun `personne non mesuree cote cible bloque le decalage`() {
+        val suivi = LateralNudgeTracker()
+        val gauche = { m: Float -> PlacedLabel("poteau", 0.35f, 0.5f, m) }
+        suivi.onFrame(0L, listOf(gauche(3.0f)))
+        suivi.onFrame(250L, listOf(gauche(2.6f)))
+
+        val bloque = suivi.onFrame(500L, listOf(gauche(2.2f), PlacedLabel("personne", 0.7f, 0.5f, null)))
+
+        assertNull(bloque)
+    }
+
+    @Test
+    fun `personne non mesuree cote approche laisse parler`() {
+        val suivi = LateralNudgeTracker()
+        val gauche = { m: Float -> PlacedLabel("poteau", 0.35f, 0.5f, m) }
+        suivi.onFrame(0L, listOf(gauche(3.0f), PlacedLabel("personne", 0.3f, 0.5f, null)))
+        suivi.onFrame(250L, listOf(gauche(2.6f), PlacedLabel("personne", 0.3f, 0.5f, null)))
+
+        val nudge = suivi.onFrame(500L, listOf(gauche(2.2f), PlacedLabel("personne", 0.3f, 0.5f, null)))
+
+        assertEquals(SteeringCap.Right, nudge!!.side)
+    }
 }

@@ -68,7 +68,7 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame(listOf(personneGauche())))
         advanceUntilIdle()
 
-        assertEquals("straight ahead.", probe.state.value.spoken)
+        assertEquals("right.", probe.state.value.spoken)
     }
 
     @Test
@@ -84,7 +84,7 @@ class LiveProbeSteeringTest {
         assertTrue("chemin attendu dans l'état", cue != null)
         assertEquals(SteeringCap.Left, cue?.cap)
         assertEquals(true, cue?.blocked)
-        assertEquals(SteeringCap.Straight, cue?.arrowDir())
+        assertEquals(SteeringCap.Right, cue?.arrowDir())
     }
 
     @Test

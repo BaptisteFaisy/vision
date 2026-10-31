@@ -84,12 +84,20 @@ class LateralNudgeTracker {
     }
 
     /**
-     * Vrai si une personne mesurée se tient côté [away], dans la fenêtre :
-     * s'écarter vers elle serait foncer dedans — le décalage se tait (même
-     * fenêtre que l'approche : hors fenêtre, elle passe au large).
+     * Vrai si une personne se tient côté [away] : mesurée dans la fenêtre,
+     * ou non mesurée de ce côté (prudence : l'inconnu bloque le côté) —
+     * s'écarter vers elle serait foncer dedans, le décalage se tait (hors
+     * fenêtre, une personne mesurée passe au large).
      */
     private fun personAhead(labels: List<PlacedLabel>, away: SteeringCap, hfovDeg: Float): Boolean =
-        labels.any { PersonLabels.isPerson(it.label) && inFront(it, away, hfovDeg) }
+        labels.any { PersonLabels.isPerson(it.label) && (inFront(it, away, hfovDeg) || unmeasuredAside(it, away)) }
+
+    /** Personne non mesurée côté [side] (sans géométrie : bloque, prudence). */
+    private fun unmeasuredAside(label: PlacedLabel, side: SteeringCap): Boolean {
+        if (label.meters != null && label.meters.isFinite() && label.meters > 0f) return false
+        if (!label.centerX.isFinite()) return true
+        return if (side == SteeringCap.Left) label.centerX <= SIDE_MID else label.centerX >= SIDE_MID
+    }
 
     /**
      * Obstacle du côté [side], dans la fenêtre : écart latéral à l'axe

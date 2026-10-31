@@ -948,3 +948,49 @@ Recette téléphone : voiture qui roule + marche + poteau cadrés ensemble
 → « Bordure à 0,5 mètre. Poteau, passez à droite. » puis « Car moving,
 12 meters away. … » en doux, premier son immédiat, aucun « Stop » —
 **non mesuré**, exige un APK de cette branche sur appareil réel.
+## 27. Évitement 80 cm partout, mesuré ou non (ordre user du 31/10)
+
+Le user marche avec l'app : la garantie 80 cm aux personnes ne tenait
+que par le chemin calculé (`PeoplePath.plan`, cap droit bouché à
+géométrie complète) — décalage, repli sans mesure, retour trottoir et
+côté serveur pouvaient envoyer vers quelqu'un. Nouveau contrat : tout
+ordre d'évitement garantit 80 cm à toute personne, mesurée ou non.
+
+- **prédicat partagé** (`PeoplePath.clearsSide`/`clearsAhead`) : un côté
+  (ou l'axe) est dégagé si aucune personne à portée n'est à moins de
+  corps + 0,8 m d'écart latéral, et aucune personne non mesurée de ce
+  côté (prudence : l'inconnu bloque le côté) ;
+- **repli et passage** (`Guidance.freerSide`, `bestPassage`) : un seul
+  côté/secteur dégagé à 80 cm → lui, sinon l'ancien départage (foule :
+  on se faufile) ; égalité de cap → le plus grand écart d'abord
+  (`select`, puis la gauche comme avant) ;
+- **décalage** (`LateralNudgeTracker`) : une personne non mesurée côté
+  cible bloque le mot (la mesurée le bloquait déjà) ;
+- **passage piéton** (`CrossingOnPathTracker`) : une personne côté
+  cible, mesurée ou non, fait taire l'évitement (le couloir parle s'il
+  est bouché) ;
+- **côté serveur et retour trottoir** (`GuidanceAnnouncer`) : le côté
+  SAM bascule si l'autre garantit 80 cm ; le retour trottoir garde le
+  cap au lieu de revenir vers une personne proche ;
+- **traversée direct** (`TraverseVeto`) : une personne non mesurable
+  garde le guidage obstacles actif ;
+- **inchangé** : `plan` (déjà 80 cm), `collect` (le repli est sûr
+  maintenant), le passage serveur (veto local devant), `word` (sans
+  labels, pas de vérification possible).
+
+Verrouillé par `PeoplePathTest` (+7 : garantie par côté/axe, inconnues,
+non-humains, égalité au plus grand écart), `GuidanceSteeringTest` (+2 :
+repli et passage 80 cm — 5 réécrits : le dégagé prime sur le centre),
+`LateralNudgeTest` (+2 : veto inconnue cible, témoin côté
+approche), `CrossingOnPathTest` (+2 : veto cible, témoin côté occupé),
+`GuidanceAnnouncerTest` (+2 : bascule SAM, garde sans dégagement —
+contact latéral réécrit « right. »), `GuidanceAnnouncerSidewalkTest`
+(+2 : retour gardé, retour parlé), `TraverseVetoTest` (+2 : inconnue
+garde, véhicule non), `SteeringTest` + `LiveProbeSteeringTest` (1 + 2
+réécrits : passage dégagé).
+
+Recette téléphone : personne à gauche à 1 m, couloir bouché sans
+mesure → « Droite. » ; approche gauche + personne à droite (même non
+mesurée) → silence, pas de « Droite. » ; retour trottoir vers une
+personne proche → le cap au lieu du retour — **non mesuré**, exige un
+APK de cette branche sur appareil réel.

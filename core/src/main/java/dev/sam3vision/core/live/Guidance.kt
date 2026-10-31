@@ -108,11 +108,11 @@ object Guidance {
         )
         if (cap == SteeringCap.Straight) {
             val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
-            val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters)
+            val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters, hfovDeg)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
             return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
         }
-        val passage = bestPassage(cleaned, cap, rangeMeters)
+        val passage = bestPassage(cleaned, cap, rangeMeters, hfovDeg)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
         return GuidanceDecision(true, obstacle, null, cap, passage, shift)
     }
@@ -225,16 +225,21 @@ object Guidance {
     }
 
     /**
-     * Côté le moins encombré : sans personne d'abord (on ne contourne jamais
-     * vers quelqu'un), sinon moins d'objets, sinon obstacle le plus loin,
-     * sinon décalage. À égalité de personnes des deux côtés, l'ancien
-     * départage s'applique : dans une foule on se faufile, on ne s'arrête pas.
+     * Côté le moins encombré : 80 cm garantis d'abord (un seul côté dégagé :
+     * lui), sinon sans personne (on ne contourne jamais vers quelqu'un),
+     * sinon moins d'objets, sinon obstacle le plus loin, sinon décalage. À
+     * égalité de personnes des deux côtés, l'ancien départage s'applique :
+     * dans une foule on se faufile, on ne s'arrête pas.
      */
     private fun freerSide(
         labels: List<PlacedLabel>,
         obstacle: PlacedLabel,
         rangeMeters: Float,
+        hfovDeg: Float,
     ): GuidanceSide {
+        val leftOk = PeoplePath.clearsSide(labels, GuidanceSide.Left, rangeMeters, hfovDeg)
+        val rightOk = PeoplePath.clearsSide(labels, GuidanceSide.Right, rangeMeters, hfovDeg)
+        if (leftOk != rightOk) return if (leftOk) GuidanceSide.Left else GuidanceSide.Right
         val edge = PositionText.SIDE_EDGE
         val left = labels.filter { it.centerX < edge && inRange(it, rangeMeters) }
         val right = labels.filter { it.centerX > 1f - edge && inRange(it, rangeMeters) }
@@ -253,28 +258,42 @@ object Guidance {
     }
 
     /**
-     * Passage conseillé quand un cap latéral est bouché : le plus libre des
-     * deux autres secteurs (sans personne d'abord, sinon moins d'objets à
-     * portée, sinon obstacle connu le plus loin), le centre en premier à
-     * égalité.
+     * Passage conseillé quand un cap latéral est bouché : parmi les secteurs
+     * à 80 cm garantis quand il y en a, sinon parmi les deux autres secteurs
+     * (sans personne d'abord, sinon moins d'objets à portée, sinon obstacle
+     * connu le plus loin), le centre en premier à égalité.
      */
     private fun bestPassage(
         labels: List<PlacedLabel>,
         cap: SteeringCap,
         rangeMeters: Float,
+        hfovDeg: Float,
     ): SteeringCap {
         val others = if (cap == SteeringCap.Left) {
             listOf(SteeringCap.Straight, SteeringCap.Right)
         } else {
             listOf(SteeringCap.Straight, SteeringCap.Left)
         }
-        return others.minWith(
+        val cleared = others.filter { clearsSector(labels, it, rangeMeters, hfovDeg) }
+        return cleared.ifEmpty { others }.minWith(
             compareBy(
                 { sectorPersons(labels, it, rangeMeters) },
                 { sectorCount(labels, it, rangeMeters) },
                 { -(sectorNearest(labels, it, rangeMeters) ?: 0f) },
             ),
         )
+    }
+
+    /** Secteur à 80 cm garantis : côté dégagé, ou axe dégagé pour le centre. */
+    private fun clearsSector(
+        labels: List<PlacedLabel>,
+        cap: SteeringCap,
+        rangeMeters: Float,
+        hfovDeg: Float,
+    ): Boolean = when (cap) {
+        SteeringCap.Left -> PeoplePath.clearsSide(labels, GuidanceSide.Left, rangeMeters, hfovDeg)
+        SteeringCap.Right -> PeoplePath.clearsSide(labels, GuidanceSide.Right, rangeMeters, hfovDeg)
+        SteeringCap.Straight -> PeoplePath.clearsAhead(labels, rangeMeters, hfovDeg)
     }
 
     /** Objets du secteur [cap] à portée (les mêmes seuils que le couloir). */

@@ -61,12 +61,12 @@ class GuidanceSteeringTest {
     }
 
     @Test
-    fun `passage le centre en premier a egalite`() {
+    fun `passage prefere le degage a 80cm au centre`() {
         val bloqueGauche = listOf(placed("personne", 0.2f, 2f))
         val bloqueDroite = listOf(placed("personne", 0.8f, 2f))
 
-        assertEquals(SteeringCap.Straight, Guidance.decide(bloqueGauche, SteeringCap.Left).passage)
-        assertEquals(SteeringCap.Straight, Guidance.decide(bloqueDroite, SteeringCap.Right).passage)
+        assertEquals(SteeringCap.Right, Guidance.decide(bloqueGauche, SteeringCap.Left).passage)
+        assertEquals(SteeringCap.Left, Guidance.decide(bloqueDroite, SteeringCap.Right).passage)
     }
 
     @Test
@@ -142,7 +142,7 @@ class GuidanceSteeringTest {
         val decision = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
         assertNull(decision.side)
-        assertEquals(SteeringCap.Straight, decision.passage)
+        assertEquals(SteeringCap.Right, decision.passage)
     }
 
     @Test
@@ -159,14 +159,14 @@ class GuidanceSteeringTest {
     fun `mot cap bouche avec passage`() {
         val gauche = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
-        assertEquals("Straight.", Guidance.phrase(gauche))
+        assertEquals("Right.", Guidance.phrase(gauche))
     }
 
     @Test
     fun `mot cap bouche anglais et sans distance`() {
         val droite = Guidance.decide(listOf(placed("person", 0.8f, 2f)), SteeringCap.Right)
 
-        assertEquals("Straight.", Guidance.phrase(droite, SpeechLanguage.En))
+        assertEquals("Left.", Guidance.phrase(droite, SpeechLanguage.En))
         val sansDistance = Guidance.decide(listOf(placed("personne", 0.2f)), SteeringCap.Left)
 
         assertEquals("Straight.", Guidance.phrase(sansDistance))
@@ -178,6 +178,21 @@ class GuidanceSteeringTest {
 
         val bloque = Guidance.decide(listOf(placed("personne", 0.2f, 2.4f)), SteeringCap.Left)
 
-        assertEquals("w|straight", Guidance.key(bloque))
+        assertEquals("w|right", Guidance.key(bloque))
+    }
+
+    @Test
+    fun `repli 80cm prefere le cote degage au comptage`() {
+        val labels = listOf(placed("personne", 0.6f, null), placed("personne", 0.1f, 4f))
+
+        assertEquals(GuidanceSide.Left, Guidance.decide(labels).side)
+    }
+
+    @Test
+    fun `passage lateral prefere le secteur a 80cm garantis`() {
+        val bloque = Guidance.decide(listOf(placed("personne", 0.3f, 1f)), SteeringCap.Left)
+
+        assertTrue(bloque.blocked)
+        assertEquals(SteeringCap.Right, bloque.passage)
     }
 }

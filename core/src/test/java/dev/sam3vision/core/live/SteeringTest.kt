@@ -106,7 +106,7 @@ class SteeringTest {
         val cue = SteeringCue.from(Guidance.decide(labels, SteeringCap.Left))
 
         assertEquals(true, cue.blocked)
-        assertEquals(SteeringCap.Straight, cue.passage)
-        assertEquals(SteeringCap.Straight, cue.arrowDir())
+        assertEquals(SteeringCap.Right, cue.passage)
+        assertEquals(SteeringCap.Right, cue.arrowDir())
     }
 }
