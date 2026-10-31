@@ -63,6 +63,18 @@ class StairCannyCountTest {
     }
 
     @Test
+    fun `age du compte connu puis oublie`() {
+        assertEquals(null, StairCannyCount.countAgeMs())
+
+        StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+        val age = StairCannyCount.countAgeMs()
+        assertTrue((age ?: Long.MAX_VALUE) <= StairCannyCount.FRESH_MS)
+
+        StairCannyCount.clear()
+        assertEquals(null, StairCannyCount.countAgeMs())
+    }
+
+    @Test
     fun `plan incomplet ignore`() {
         StairCannyCount.offerLuma(ByteArray(10) { 20 })
 

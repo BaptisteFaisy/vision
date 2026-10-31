@@ -24,8 +24,8 @@ data class StairSignal(
  * Détecteur d'escaliers classique, secours quand SAM ne segmente pas les
  * marches (constaté au téléphone le 28/10 : aucun concept escalier ne répond).
  * Adapté de `stair_detector.py` de `github.com/agrimbillowria/blind-project`
- * (licence MIT, voir `NOTICE` racine) : ROI bas 60 % → Canny(50, 150) →
- * lignes quasi-horizontales (±15°) → escalier si ≥ 4 lignes.
+ * (licence MIT, voir `NOTICE` racine) : ROI bas 60 % → Canny(30, 90) →
+ * lignes quasi-horizontales (±25°) → escalier si ≥ 4 lignes.
  *
  * Variante **projection horizontale** au lieu du Hough probabiliste : chaque
  * ligne de l'image compte ses pixels de contour quasi-horizontaux, une ligne
@@ -38,17 +38,17 @@ data class StairSignal(
  * Limites héritées du MIT (à documenter, pas à corriger ici) :
  * - ROI fixe (bas 60 %) : un escalier cadré en haut est invisible ;
  * - aucune distinction montée/descente ;
- * - faux positifs sur stores vénitiens, rayures et zébrures horizontales ;
- * - seuils calibrés webcam 640×480, à recalibrer sur captures du téléphone.
+ * - faux positifs sur stores vénitiens, rayures et zébrures horizontales.
+ * Seuils et flou recalibrés pour la luminance téléphone 256×103 (voir
+ * `StairsConfig`) : les valeurs MIT 640×480 laissaient le compteur à 0.
  *
  * Branché à la voix du direct : l'analyseur caméra offre le plan de luminance
  * (`StairCannyCount`, ni overlay ni affichage des marches) et le guetteur
  * escaliers le relit quand SAM nomme l'escalier — le compte à rebours
  * (« Plus que N marches. ») parle alors, au lieu de l'annonce sèche.
- * Bloqueur restant : seuils à recalibrer sur captures réelles — une fausse
- * annonce « escalier » à un utilisateur aveugle est une décision de sécurité,
- * pas un défaut. En attendant, l'annonce reste conditionnée aux libellés SAM
- * (le Canny seul ne parle jamais).
+ * Garde-fou inchangé : l'annonce reste conditionnée aux libellés SAM (le
+ * Canny seul ne parle jamais) — une fausse annonce « escalier » à un
+ * utilisateur aveugle est une décision de sécurité, pas un défaut.
  * (NanoDet, un temps envisagé comme hôte on-device, est en cours de
  * suppression de l'app : ne pas câbler vers `app/detect`.)
  *

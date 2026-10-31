@@ -4,25 +4,28 @@ import dev.sam3vision.core.mask.GrayMask
 import kotlin.math.tan
 
 /**
- * Canny pur JVM (flou gaussien 5×5 séparable, Sobel, suppression des
+ * Canny pur JVM (flou gaussien 3×3 séparable, Sobel, suppression des
  * non-maxima, hystérésis), restreint à la ROI et aux contours
  * quasi-horizontaux — le port des étapes 3-4 de `stair_detector.py`
- * (`GaussianBlur` + `Canny(50, 150)`, MIT, voir `NOTICE` racine).
+ * (`GaussianBlur` + Canny, MIT, voir `NOTICE` racine), recalibré téléphone.
  *
  * Un contour quasi-horizontal a son gradient quasi-vertical : le test se fait
  * sur le rapport `|gy| / |gx|`, sans `atan2` par pixel. La magnitude est la
- * norme L1 (`|gx| + |gy|`, comme OpenCV sans `L2gradient`), pour que les
- * seuils 50/150 gardent leur sens d'origine.
+ * norme L1 (`|gx| + |gy|`, comme OpenCV sans `L2gradient`).
  *
  * Fonction totale : image vide ou incohérente = carte vide, jamais d'exception.
  */
 object StairsCanny {
 
-    /** Noyau gaussien 5×5 (σ implicite d'OpenCV pour cette taille), somme 16. */
-    private val BLUR_KERNEL = intArrayOf(1, 4, 6, 4, 1)
+    /**
+     * Noyau gaussien 3×3, somme 4 : à 103 px de haut, le 5×5 MIT couvre
+     * ~5 % de l'image (contre ~1 % en 480p) et écrase les nez de marche
+     * rapprochés — le 3×3 lisse le bruit en gardant les pics de gradient.
+     */
+    private val BLUR_KERNEL = intArrayOf(1, 2, 1)
 
-    private const val BLUR_DIVISOR = 16
-    private const val BLUR_RADIUS = 2
+    private const val BLUR_DIVISOR = 4
+    private const val BLUR_RADIUS = 1
 
     /** `tan(67,5°)` en millième : frontière des secteurs NMS à 45°. */
     private const val NMS_SLOPE = 2414
@@ -55,7 +58,7 @@ object StairsCanny {
     /** Gradients de Sobel plein format (zéro hors ROI). */
     private class Gradients(val gx: IntArray, val gy: IntArray)
 
-    /** Flou gaussien 5×5 séparable, bords dupliqués (miroir de `GaussianBlur`). */
+    /** Flou gaussien 3×3 séparable, bords dupliqués (miroir de `GaussianBlur`). */
     private fun blur(mask: GrayMask): IntArray {
         val width = mask.width
         val height = mask.height
