@@ -38,6 +38,17 @@ def test_concepts_crossing(concepts) -> None:
     # Sens voiture préservé (suivi manuel possible, jamais pour traverser).
     check("traversée : feu tricolore -> traffic light (sens préservé)",
           concepts.model_concept("feu tricolore") == "traffic light")
+    # Petites boîtes (31/10, ordre user : SAM cadre la tête du feu piéton,
+    # la couleur se lit dessus en local) : FR→EN vers le concept tête,
+    # distinct du caisson générique (deux prompts, deux jeux de boîtes).
+    for fr in ["boîtier feu piéton", "boîtiers feu piéton",
+               "petit feu piéton", "petits feux piétons"]:
+        check(f"traversée : {fr} -> pedestrian signal head",
+              concepts.model_concept(fr) == "pedestrian signal head")
+    check("traversée : tête distincte du caisson (pas de dédoublonnage)",
+          concepts.model_concept("pedestrian signal head") == "pedestrian signal head"
+          and concepts.model_concept("pedestrian signal head")
+          != concepts.model_concept("pedestrian traffic light"))
     # Robustesse casse/articles/accents (même plomberie que les alias rue).
     check("traversée : casse, articles et accents (Feu Piéton, un feu pieton)",
           concepts.model_concept("Feu Piéton") == "pedestrian traffic light"
