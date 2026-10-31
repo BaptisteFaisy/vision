@@ -9,68 +9,66 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Propriétaire de l'armement Traversée : seul le mode armé par la vision
- * retombe tout seul quand le passage disparaît — le manuel et le GPS
- * restent jusqu'à leur propre coupe.
+ * Bascule manuelle du mode Traversée : puce et ordre vocal (« traverser »,
+ * « crossing mode on/off ») — plus aucun armement automatique.
  */
 class IseeSteeringOrdersTest {
 
     @Test
-    fun `l armement vision marque le mode comme auto`() = runTest {
+    fun `la bascule manuelle active puis coupe`() = runTest {
         val (probe, _) = probeHarness(this)
         val orders = orders(probe)
 
-        orders.setAutoCrossing(true, vision = true)
+        orders.toggleCrossing()
 
         assertTrue(probe.state.value.crossingActive)
-        assertTrue(orders.visionArmed)
-    }
-
-    @Test
-    fun `l armement GPS ne marque pas le mode comme auto`() = runTest {
-        val (probe, _) = probeHarness(this)
-        val orders = orders(probe)
-
-        orders.setAutoCrossing(true)
-
-        assertTrue(probe.state.value.crossingActive)
-        assertFalse(orders.visionArmed)
-    }
-
-    @Test
-    fun `la bascule manuelle reprend la main`() = runTest {
-        val (probe, _) = probeHarness(this)
-        val orders = orders(probe)
-        orders.setAutoCrossing(true, vision = true)
 
         orders.toggleCrossing()
 
         assertFalse(probe.state.value.crossingActive)
-        assertFalse(orders.visionArmed)
     }
 
     @Test
-    fun `l ordre vocal reprend la main`() = runTest {
+    fun `l ordre vocal crossing mode on active`() = runTest {
         val (probe, _) = probeHarness(this)
         val orders = orders(probe)
-        orders.setAutoCrossing(true, vision = true)
+
+        orders.runCrossing("crossing mode on")
+
+        assertTrue(probe.state.value.crossingActive)
+    }
+
+    @Test
+    fun `l ordre vocal crossing mode off coupe`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val orders = orders(probe)
+        orders.toggleCrossing()
+
+        orders.runCrossing("crossing mode off")
+
+        assertFalse(probe.state.value.crossingActive)
+    }
+
+    @Test
+    fun `l ordre vocal traverser active stop traverser coupe`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val orders = orders(probe)
+
+        orders.runCrossing("je veux traverser")
+        assertTrue(probe.state.value.crossingActive)
 
         orders.runCrossing("stop traverser")
-
         assertFalse(probe.state.value.crossingActive)
-        assertFalse(orders.visionArmed)
     }
 
     @Test
-    fun `la coupe auto efface la marque`() = runTest {
+    fun `un texte ordinaire ne touche pas au mode`() = runTest {
         val (probe, _) = probeHarness(this)
         val orders = orders(probe)
-        orders.setAutoCrossing(true, vision = true)
 
-        orders.setAutoCrossing(false, vision = true)
+        orders.runCrossing("décris-moi la pièce")
 
         assertFalse(probe.state.value.crossingActive)
-        assertFalse(orders.visionArmed)
     }
 
     private fun orders(probe: LiveProbe) =

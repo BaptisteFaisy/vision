@@ -10,7 +10,6 @@ import dev.sam3vision.app.speech.VoiceNavAnnouncer
 import dev.sam3vision.app.speech.VoiceNavEvent
 import dev.sam3vision.app.speech.VoiceNavPhrases
 import dev.sam3vision.app.speech.VoiceNavSpeaker
-import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.DetourReroute
@@ -44,8 +43,6 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * - [onRouteCap] reçoit le cap de chaque manœuvre (`null` en fin de guidage),
  *   pour la sonde SAM (`LiveProbe.setRouteCap`) : tant qu'il est posé, la
  *   sonde marche le couloir de la route (fusion itinéraire × obstacle).
- * - [onAutoCrossing] bascule le mode traversée (`true` = le rappel proche
- *   d'une traversée l'arme, `false` = traversée passée ou guidage coupé).
  * - [speakRoute] dit les manœuvres par la voix Laure (`null` = voix système) :
  *   la phrase (même politique que le canal système) + son urgence (sortie de
  *   trace et recalcul coupent, le reste attend). Une seule voix : GPS et
@@ -66,12 +63,11 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * session annonce (« Arrivée à destination », une seule voix).
  *
  * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
- * quand la cible est un passage protégé — de loin, simple préavis parlé ;
- * de près, le mode traversée s'active ([onAutoCrossing]) et sa voix prend
- * le relais (vert + veto véhicules) pendant que la progression se tait.
- * [NavEvent.CrossingPassed] (ou [onTraverseModeChanged]`(false)`, coupe
- * manuelle) rend la parole au guidage. Seul le mode activé ici est coupé
- * ici : un mode manuel survit au passage ([autoCrossing]).
+ * quand la cible est un passage protégé — simple préavis parlé (« Crosswalk
+ * in X »), de loin comme de près. Le pilote n'arme plus le mode traversée :
+ * l'user le bascule lui-même (puce, ordre vocal « crossing mode on/off »).
+ * [NavEvent.CrossingPassed] annonce « Crossing finished. », le guidage
+ * reprend.
  *
  * Ne lève jamais après construction : tout échec de démarrage rend `false`,
  * tout échec en guidage est avalé (le moteur réémettra).
@@ -85,7 +81,6 @@ class VoiceNavEngineDriver(
     private val scope: CoroutineScope,
     private val onUpdate: (GuidanceUpdate) -> Unit,
     private val onRouteCap: (SteeringCap?) -> Unit = {},
-    private val onAutoCrossing: (Boolean) -> Unit = {},
     private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
     private val stopRoute: () -> Unit = {},
     /** L'utilisateur parle (dictée en cours) : la voix ordinaire se tait. */
@@ -103,9 +98,6 @@ class VoiceNavEngineDriver(
     @Volatile
     private var legs: GuidingLegs? = null
     private var rerouting = false
-
-    /** Mode traversée activé par le guidage (lui seul est coupé ici). */
-    @Volatile private var autoCrossing = false
 
     /**
      * Démarre le guidage vers [destination] : `true` si le moteur tourne
@@ -176,7 +168,6 @@ class VoiceNavEngineDriver(
     fun stop() {
         legs = null
         rerouting = false
-        clearAutoCrossing()
         runCatching { onRouteCap(null) }
         runCatching { stopRoute() }
         detourReroute.reset()
@@ -194,15 +185,6 @@ class VoiceNavEngineDriver(
      */
     fun stopVoice() {
         if (speakerLazy.isInitialized()) runCatching { speaker.stop() }
-    }
-
-    /**
-     * La sonde signale l'état du mode traversée : coupé manuellement, le
-     * guidage reprend la parole (le mode auto ne se réarmera pas — le front
-     * proche est consommé). Activé manuellement : sans effet ici.
-     */
-    fun onTraverseModeChanged(active: Boolean) {
-        if (!active) autoCrossing = false
     }
 
     /** Libération finale : le canal vocal n'accepte plus rien ensuite. */
@@ -265,36 +247,15 @@ class VoiceNavEngineDriver(
         }
     }
 
-    /**
-     * Traversée en vue : de loin, simple préavis ; de près, le mode
-     * traversée s'arme (une seule fois) et sa voix prend le relais.
-     */
+    /** Traversée en vue : simple préavis parlé, le mode ne s'arme plus seul. */
     private fun speakCrossing(event: NavEvent.CrossingAhead) {
-        if (!event.near) {
-            val phrase = VoiceNavPhrases.crossingAhead(event.distM)
-            say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
-            return
-        }
-        if (autoCrossing) return
-        autoCrossing = true
-        val phrase = CrossingText.mode(true, settings().speechLanguage)
+        val phrase = VoiceNavPhrases.crossingAhead(event.distM)
         say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
-        runCatching { onAutoCrossing(true) }
     }
 
-    /** Traversée passée : le mode auto se coupe, le guidage reprend. */
+    /** Traversée passée : annonce, le guidage reprend. */
     private fun onCrossingPassed() {
-        if (!autoCrossing) return
-        autoCrossing = false
         say(VoiceNavEvent.Literal(VoiceNavPhrases.CROSSING_DONE)) { speaker.onLiteral(VoiceNavPhrases.CROSSING_DONE) }
-        runCatching { onAutoCrossing(false) }
-    }
-
-    /** Fin du guidage : le mode auto éventuel se coupe, sans annonce. */
-    private fun clearAutoCrossing() {
-        if (!autoCrossing) return
-        autoCrossing = false
-        runCatching { onAutoCrossing(false) }
     }
 
     /** État écran : instruction + « dans X » + reste estimé du trajet. */

@@ -12,10 +12,12 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * Ordres courts d'iSee autour de la caméra : bascule du mode Traversée,
- * ordre vocal « traverser », ordre de cap (« va à gauche ») et le guidage
- * automatique que le pilote de navigation arme et coupe. Extrait d'
- * [IseeViewModel] (limite 500 lignes) : la logique ne change pas, elle vit
- * simplement à côté — même motif que `ProbeWiring`, `IseeVoiceNav` et sœurs.
+ * ordre vocal (« traverser », « crossing mode on/off ») et ordre de cap
+ * (« va à gauche »). Le mode Traversée ne s'arme plus seul : ni la vision
+ * ni le guidage ne le basculent, seuls la puce et l'ordre vocal le font.
+ * Extrait d'[IseeViewModel] (limite 500 lignes) : la logique ne change pas,
+ * elle vit simplement à côté — même motif que `ProbeWiring`, `IseeVoiceNav`
+ * et sœurs.
  *
  * Les confirmations partent par le même chemin voix ([speak]) : une seule
  * source sonore, jamais une réponse par-dessus. Sans effet si la sonde est
@@ -28,42 +30,19 @@ class IseeSteeringOrders(
     private val update: StateUpdate,
 ) {
 
-    /**
-     * Mode armé par la vision (passage détecté) : lui seul retombe tout seul
-     * quand le passage disparaît. Un armement manuel ou GPS reste jusqu'à sa
-     * propre coupe (un passage sans bandes se traverse sans zébrures).
-     */
-    internal var visionArmed: Boolean = false
-        private set
-
     /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
     fun toggleCrossing() {
-        visionArmed = false
         setActive(!probe.state.value.crossingActive)
     }
 
     /**
-     * Guidage auto : le rappel proche d'une traversée arme le mode, le
-     * passage le coupe (la voix du mode parle, pas d'annonce ici). Sans
-     * effet si le mode est déjà dans l'état demandé. [vision] vrai =
-     * armement par détection du passage : lui seul retombe tout seul quand
-     * le passage disparaît ([visionArmed]).
-     */
-    fun setAutoCrossing(wantActive: Boolean, vision: Boolean = false) {
-        val was = probe.state.value.crossingActive
-        setActive(wantActive, auto = true)
-        if (!wantActive) visionArmed = false
-        else if (vision && !was) visionArmed = true
-    }
-
-    /**
-     * Ordre « traverser » : consommé ici (jamais LLM), confirmé à voix
-     * haute par le chemin navigation. Vrai si [text] portait l'ordre.
+     * Ordre « traverser » / « crossing mode on/off » : consommé ici (jamais
+     * LLM), confirmé à voix haute par le chemin navigation. Vrai si [text]
+     * portait l'ordre.
      */
     suspend fun runCrossing(text: String): Boolean {
         val command = CrossingVoiceCommand.parse(text) ?: return false
         val wantActive = command == CrossingVoiceAction.Activate
-        visionArmed = false
         setActive(wantActive)
         speak(CrossingText.mode(wantActive, settings().speechLanguage))
         return true
@@ -84,9 +63,9 @@ class IseeSteeringOrders(
     }
 
     /** Bascule commune : sans effet si la sonde est déjà dans l'état demandé. */
-    private fun setActive(wantActive: Boolean, auto: Boolean = false) {
+    private fun setActive(wantActive: Boolean) {
         if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings(), wantActive, auto)
+            probe.setCrossingActive(settings(), wantActive)
         }
     }
 }

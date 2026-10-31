@@ -6,9 +6,10 @@ import dev.sam3vision.core.distance.KnownSizes
 enum class CrossingVoiceAction { Activate, Deactivate }
 
 /**
- * Ordre vocal du mode Traversée : « traverser » l'active, « arrête la
- * traversée » le coupe. Appelé sur le texte dicté avant l'envoi au LLM, comme
- * la phrase de coupe de l'intro — une commande ne fait jamais un appel réseau.
+ * Ordre vocal du mode Traversée : « traverser » ou « crossing mode on »
+ * l'active, « arrête la traversée » ou « crossing mode off » le coupe.
+ * Appelé sur le texte dicté avant l'envoi au LLM, comme la phrase de coupe
+ * de l'intro — une commande ne fait jamais un appel réseau.
  *
  * Tolérant : casse, accents et ponctuation neutralisés par
  * [KnownSizes.canonical]. Le « travers » nu de « à travers la pièce » ne
@@ -24,11 +25,11 @@ object CrossingVoiceCommand {
         "cross", "crossing",
     )
 
-    /** Formes qui coupent le mode (« stop traverser », « arrête la traversée »). */
+    /** Formes qui coupent le mode (« stop traverser », « arrête la traversée », « crossing mode off »). */
     private val STOP_WORDS = setOf(
         "stop", "stoppe", "arrete", "arreter", "arret",
         "annule", "annuler", "coupe", "couper",
-        "quitte", "quitter", "desactive", "desactiver", "cancel",
+        "quitte", "quitter", "desactive", "desactiver", "cancel", "off",
     )
 
     /**
