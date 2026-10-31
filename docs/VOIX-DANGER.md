@@ -697,7 +697,7 @@ et amende les §§ 16/17/19 et le § 21 pluriel :
   au catalogue (miroir `tools/voicepack-catalog.json`, inutilisés).
 
 Verrouillé par `GuidanceTest` + `GuidanceAnnouncerTest` +
-`GuidanceObstaclesTest` + `DangerVoiceTest` (contact ⇒ côté),
+`GuidanceObstaclesTest` (contact ⇒ côté),
 `VehicleStateTextTest` (+2 : `isSafetyPhrase`, singulier + pluriel),
 `CurbAnnounceTest` (consigne sans stop), `CrossingVehicleTest` (stop
 EN/FR en Traversée), `LiveProbeGuidanceTest` (contact ⇒ côté non

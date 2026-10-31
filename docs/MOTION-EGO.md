@@ -55,7 +55,7 @@ Branchement :
   `approachVerdict(depthByBox)`
 - `core/traverse/TraversePipeline.kt` : `DepthReadings.serverCloseness` vers
   le veto (repli serveur ; sonde embarquée non branchée — voir § 8)
-- `core/danger/ApproachEstimator.kt` : `thresholdsForLabel` ;
+- `core/traverse/ApproachThresholds.kt` : seuils par défaut (personnes) ;
   `core/traverse/VehicleApproach.kt` : `VEHICLE_APPROACH_THRESHOLDS`,
   `approachThresholdsFor`
 
@@ -130,7 +130,7 @@ Couvert par `VerdictFusionTest` (7 tests).
 | `EgoCompensator.GROWTH_EPS` | 0,005 /s | plancher de bruit d'une croissance | idem |
 | `DepthConfirm.MIN_RISE_ABS` | 0,005 | hausse absolue min. de proximité | `depth/DepthConfirm.kt` |
 | `DepthConfirm.MIN_RISE_REL` | 0,02 | hausse relative min. (2 %) | idem |
-| `ApproachThresholds` personnes | 0,03 / 0,25 / pas de plafond | défauts historiques inchangés | `danger/ApproachEstimator.kt` |
+| `ApproachThresholds` personnes | 0,03 / 0,25 / pas de plafond | défauts historiques inchangés | `traverse/ApproachThresholds.kt` |
 | `VEHICLE_APPROACH_THRESHOLDS` | 0,02 / 0,30 / TTC 4 s | véhicules : seuil ↓, couloir ↑, TTC plafonné | `traverse/VehicleApproach.kt` |
 | `SamResidu.IOU_MOVED_MAX` | 0,75 | sous ce seuil, objet mobile | `predict/SamResidu.kt` |
 | `SamResidu.IOU_STILL_MIN` | 0,85 | au-dessus, caméra ; entre les deux, doute | idem |
@@ -192,7 +192,7 @@ Scénarios (téléphone tenu vertical, portrait, caméra arrière) :
 `EgoCompensatorTest`, `EgoVoteWatcherTest` (séquences caméra : pan, suivi,
 zoom, dilatation), `DepthConfirmTest`, `TraverseVetoDepthTest`,
 `VehicleApproachDepthTest`, `VehicleStateDepthTest`,
-`TraversePipelineDepthTest`, `ApproachThresholdsTest`, `ApproachLabelsTest`,
+`TraversePipelineDepthTest`, `ApproachLabelsTest`,
 `MaskShiftTest`, `SamResiduTest` (14 tests), `GyroCompensationTest`,
 `VehicleBackgroundTest` (repli gyro), `VerdictFusionTest`,
 `BlockShiftTest` (via `ShiftScenes` partagé).

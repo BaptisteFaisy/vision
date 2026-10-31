@@ -9,17 +9,14 @@
 >   model, loaded with Hugging Face `transformers`
 > - **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small`, Apache-2.0) —
 >   on-device depth model, via `onnx-community/depth-anything-v2-small`
-> - **YOLO11n** (Ultralytics, AGPL-3.0) — on-device person detector used by the
->   approaching-person warning
 > - **Valhalla** — open-source routing engine (CPU backend)
 > - Standard open-source libraries: AndroidX (Compose, CameraX, Room, WorkManager),
 >   OkHttp, ONNX Runtime, PyTorch, FastAPI
 > - **Meta Wearable Device Access SDK** — camera and microphone access on Ray-Ban Meta
 >   glasses
 >
-> Third-party attributions and licences: `NOTICE` (code),
-> `app/src/main/assets/NOTICE-depth.txt` (depth model) and
-> `app/src/main/assets/NOTICE-detect.txt` (YOLO11n).
+> Third-party attributions and licences: `NOTICE` (code) and
+> `app/src/main/assets/NOTICE-depth.txt` (depth model).
 
 # iSee — eyes that speak
 
@@ -131,10 +128,6 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 - **On-device depth (beta)** — a proximity map 100% on the phone (Depth Anything V2
   Small, ONNX Runtime, the 27 MB `.ort` model downloaded once and checked by
   sha256), fused with the masks (`docs/DEPTH.md`).
-- **Approaching-person warning** — YOLO11n runs on the phone (ONNX Runtime CPU,
-  640 px), a ByteTrack-style tracker follows people, and a voice alert fires when
-  contact is estimated within 6 s (`DangerAlert.ALERT_TTC_SEC`)
-  (`app/src/main/java/dev/sam3vision/app/danger/`, `core/src/main/java/dev/sam3vision/core/danger/`).
 - **Voice navigation** — "take me to X" geocodes with Android's `Geocoder`, falls
   back to the French BAN (`api-adresse.data.gouv.fr`), routes with Valhalla (CPU
   backend, `/route`), draws the trip on an in-app MapLibre map
@@ -166,8 +159,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 
 | Block | Role |
 |---|---|
-| `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla), pacing and frame gate, masks, distances, pure depth, gestures, crossing/traverse, danger, navigation, voice, encrypted settings, design tokens (`iseedesign`) |
-| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, depth (ONNX), YOLO person warning, in-app map (MapLibre), voice navigation, companion share, capture purge |
+| `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla), pacing and frame gate, masks, distances, pure depth, gestures, crossing/traverse, navigation, voice, encrypted settings, design tokens (`iseedesign`) |
+| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, depth (ONNX), in-app map (MapLibre), voice navigation, companion share, capture purge |
 | `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), the photo-era app (`backend/modal_app.py`, not called by the current app), Baseten host config (`backend/baseten/` — sources synced by `scripts/baseten_sync.py`, not versioned), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`); its Vercel deployment is abandoned, but `api/` still serves the local preview tests |
 | `suivi-relais/` | The relay actually used (Cloudflare Worker + D1 + one Durable Object per stream): `POST /api/share`, `GET /api/state`, `GET /ws` (live camera frames) |
@@ -187,7 +180,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly capture purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin, no direct import) |
 | Network | OkHttp 4.12.0 (a single client, a single pool), `org.json` (shipped with Android; real `org.json` only in JVM tests), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (`eleven_v4_turbo` TTS, `scribe_v1` STT fallback), Meta ASR batch + realtime (dictation), jump3r 1.0.4 (pure-Java MP3 for the media cache) |
-| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0 (depth + YOLO11n) |
+| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0 (depth) |
 | Map | MapLibre 13.7.1 (guidance screen, OSM raster tiles, `docs/CARTE-OSM.md`) |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
@@ -332,29 +325,6 @@ check that makes the 1/6 citable.
 Four attempts to lift that 1/6 to 4/6 (new features, retrained tree, another crop framing,
 another prompt) **all failed without a single false green**; the numbers and the reasons are
 in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
-
-## YOLO11n person benchmark (base COCO weights)
-
-The approaching-person warning (YOLO11n + ByteTrack-style tracker + a voice alert on a
-6 s time-to-contact) was measured on two axes on 29/10/2026. **Quality**: 100 hold-out
-street views (Panoramax, day/night, eye-verified, stems disjoint from train —
-`yolo-eval/`, outside this tree).
-**Speed**: Samsung SM-G780G, median of 5 (`DangerBench`, full NMS decode included),
-Settings "Test YOLO11n" button or `DangerBenchDeviceTest`.
-
-| Metric | Base yolo11n |
-|---|---|
-| mAP50 (eval, conf 0.25) | **0.383** |
-| mAP50-95 | 0.234 |
-| Precision / Recall | 0.737 / 0.412 |
-| Recall small persons | 0.29 |
-| False positives / 100 img | 13 (capture rig) |
-| Phone 640 CPU (Samsung) | **6.2 fps** (sess 130 ms + dec 37 ms) |
-
-Base weights: Ultralytics COCO export (`app/src/main/assets/yolo11n.onnx`, AGPL-3.0,
-`NOTICE-detect.txt`). Small-person recall is the metric to watch. Uncapped NMS measured
-0.4 fps before the fix — the 6.2 fps includes the capped decode. No fine-tuned weights are
-versioned in this tree; the training/eval code lives outside it.
 
 ## CI and merge queue
 

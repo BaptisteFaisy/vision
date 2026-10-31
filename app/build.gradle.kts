@@ -155,10 +155,8 @@ android {
     // Profondeur : DA2 embarqué en .ort (prouvé sur Redmi : le paquet -mobile
     // refuse le .onnx par ORT_INVALID_ARGUMENT et ne sait pas exécuter le
     // ConvInteger quantifié — ORT_NOT_IMPLEMENTED — d'où le paquet ORT
-    // complet). Les deux modèles restent stockés bruts (lecture fiable des
-    // gros assets + mmap).
+    // complet). Stocké brut (lecture fiable des gros assets + mmap).
     androidResources {
-        noCompress.add("onnx")
         noCompress.add("ort")
     }
 
