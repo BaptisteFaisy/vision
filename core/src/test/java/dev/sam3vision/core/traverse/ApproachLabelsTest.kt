@@ -1,6 +1,5 @@
 package dev.sam3vision.core.traverse
 
-import dev.sam3vision.core.danger.ApproachThresholds
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
