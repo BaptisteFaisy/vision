@@ -44,6 +44,13 @@ const val EXTRA_ROUTE = "route"
 const val EXTRA_DESTINATION = "destination"
 
 /**
+ * Extra adb `--es voice <texte>` (debug seul) : injecte un transcript comme si
+ * le direct l'avait entendu — mêmes parseurs que les ordres voix du direct
+ * (navigation, traversée), sans passer par la STT (recette voix sans voix).
+ */
+const val EXTRA_VOICE = "voice"
+
+/**
  * Demande d'écran posée de l'extérieur : `MainActivity` y dépose le nom,
  * `AppNav` la consomme et pousse la route (inconnue = accueil, jamais vide).
  */
