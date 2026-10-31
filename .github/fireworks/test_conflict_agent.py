@@ -12,6 +12,7 @@ import time
 import unittest
 from unittest import mock
 
+import compilation_gate
 import conflict_agent
 
 
@@ -316,6 +317,140 @@ class UnionSansModeleTest(unittest.TestCase):
                 "http://x", "K", "M", time.time() + 60)
         self.assertEqual(resolved, ["CHANGELOG.md"])
         self.assertFalse(conflict_agent.rebase_in_progress())
+
+
+
+class TachesCompilationTest(unittest.TestCase):
+    """Quels modules la porte compile pour un diff donné (v3, 31/10)."""
+
+    def test_docs_ne_compilent_rien(self):
+        self.assertEqual(
+            compilation_gate.taches_compilation(["docs/A.md", "CHANGELOG.md"]),
+            ([], []))
+
+    def test_core(self):
+        self.assertEqual(
+            compilation_gate.taches_compilation(["core/src/X.kt"]),
+            ([":core:compileDebugKotlin"], []))
+
+    def test_app_et_core_dedoublonnes(self):
+        gradle, python = compilation_gate.taches_compilation(
+            ["app/a/X.kt", "core/b/Y.kt", "app/c/X2.kt"])
+        self.assertEqual(gradle, [":app:compileDebugKotlin",
+                                  ":core:compileDebugKotlin"])
+        self.assertEqual(python, [])
+
+    def test_python(self):
+        self.assertEqual(
+            compilation_gate.taches_compilation(["server/backend/x.py"]),
+            ([], ["server/backend/x.py"]))
+
+    def test_kt_hors_module_gradle_ignore(self):
+        # Aucun `.kt` hors `core/`/`app/` ne se compile seul : le compiler
+        # demanderait un module qui n'existe pas.
+        self.assertEqual(
+            compilation_gate.taches_compilation(["tools/x.kt",
+                                               "build.gradle.kts"]),
+            ([], []))
+
+
+MARQUEUR = "<!-- agent-conflit sha=abc123 -->\n\nConflit réconcilié."
+
+
+class PorteCompilationTest(unittest.TestCase):
+    """Une résolution qui ne compile pas n'atteint jamais la branche."""
+
+    def test_desactivee_par_variable(self):
+        with mock.patch.dict(os.environ, {"CONFLICT_COMPILE_GATE": "0"}):
+            ok, message = compilation_gate.verifier_compilation(["core/a.kt"])
+        self.assertTrue(ok)
+        self.assertIn("désactivée", message)
+
+    def test_sans_gradlew_ne_bloque_rien(self):
+        # Un clone sans outillage (test local, ancien déploiement) ne doit pas
+        # empêcher le rebase : la CI reste la preuve.
+        tmp = tempfile.mkdtemp()
+        ancien = os.getcwd()
+        os.chdir(tmp)
+        try:
+            ok, message = compilation_gate.verifier_compilation(["core/a.kt"])
+        finally:
+            os.chdir(ancien)
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertTrue(ok)
+        self.assertIn("gradlew", message)
+
+    def test_compilation_rouge_refusee_avec_extrait(self):
+        tmp = tempfile.mkdtemp()
+        ancien = os.getcwd()
+        os.chdir(tmp)
+        try:
+            with open("gradlew", "w", encoding="utf-8") as fichier:
+                fichier.write("#!/bin/sh\nexit 0\n")
+            os.chmod("gradlew", 0o755)
+
+            def faux_run(argv, **kw):
+                if argv[0] == "./gradlew":
+                    return mock.Mock(
+                        returncode=1, stdout="",
+                        stderr="e: file:///x.kt:12:3 Unresolved reference "
+                               "'hushed'")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(conflict_agent.subprocess, "run",
+                                   side_effect=faux_run):
+                ok, message = compilation_gate.verifier_compilation(
+                    ["core/src/X.kt"])
+        finally:
+            os.chdir(ancien)
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertFalse(ok)
+        self.assertIn("Unresolved reference", message)
+
+    def test_finish_ne_pousse_pas_un_arbre_casse(self):
+        # Régression 31/10 (#615) : la réconciliation avait poussé une tête
+        # qui ne compilait pas, le balayeur l'a classée « échec réel » et plus
+        # aucun agent n'écrit de correctif de code → PR morte en silence.
+        appels = []
+
+        def faux_run(argv, **kw):
+            appels.append(argv)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(conflict_agent, "porte_compilation",
+                               return_value=(False, "e: x", "")), \
+                mock.patch.object(conflict_agent.subprocess, "run",
+                                  side_effect=faux_run):
+            rc = conflict_agent.finish("O/R", "1", "br", "sha", ["f.kt"])
+        self.assertEqual(rc, 1)
+        self.assertEqual([a for a in appels if a[:2] == ["git", "push"]], [])
+
+    def test_marqueur_de_tete_dans_le_compte_rendu(self):
+        # Le balayeur cherche `<!-- agent-conflit sha=<tête> -->` mot pour mot
+        # pour dire sur un échec réel que la résolution est en cause.
+        corps = []
+        with mock.patch.object(conflict_agent, "porte_compilation",
+                               return_value=(True, "ok", MARQUEUR)), \
+                mock.patch.object(conflict_agent, "comment",
+                                  side_effect=lambda r, p, b: corps.append(b)), \
+                mock.patch.object(conflict_agent, "add_label"), \
+                mock.patch.object(conflict_agent.subprocess, "run",
+                                  return_value=mock.Mock(
+                                      returncode=0, stdout="", stderr="")):
+            rc = conflict_agent.finish("O/R", "1", "br", "sha", ["f.kt"])
+        self.assertEqual(rc, 0)
+        self.assertIn("<!-- agent-conflit sha=abc123 -->", corps[0])
+
+    def test_prepare_push_porte_le_marqueur_de_tete(self):
+        with mock.patch.object(compilation_gate, "verifier_compilation",
+                               return_value=(True, "ok")), \
+                mock.patch.object(compilation_gate, "tete_git",
+                                  return_value="deadbeef"):
+            ok, message, corps = compilation_gate.prepare_push(
+                ["core/b.kt", "core/a.kt"], "br")
+        self.assertTrue(ok)
+        self.assertTrue(corps.startswith("<!-- agent-conflit sha=deadbeef -->"))
+        self.assertIn("2 fichier(s) (core/a.kt, core/b.kt)", corps)
 
 
 if __name__ == "__main__":

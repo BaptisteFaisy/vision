@@ -1,29 +1,18 @@
 #!/usr/bin/env python3
 """Agent de conflit Fireworks pour la file pr-auto-merge.
 
-Quand le sweep de pr-auto-merge échoue à rebaser une PR (conflit), il appelle
-ce script DANS son clone, rebase en cours (fichiers non fusionnés présents).
-Le script demande à un modèle Fireworks la résolution de chaque conflit
-élémentaire, recopie le reste du fichier à l'identique (jamais de
-réécriture complète : un gros fichier serait tronqué), puis boucle sur les
-arrêts du rebase (multi-passes : chaque nouveau conflit est résolu, chaque
-commit vidé est sauté), pousse sur la branche de la PR et rend compte.
+Appelé par le sweep DANS son clone quand un rebase bute sur un conflit : il
+fait résoudre chaque conflit élémentaire par un modèle Fireworks, recopie le
+reste du fichier intact (jamais de réécriture complète : un gros fichier serait
+tronqué), boucle sur les arrêts (commits vidés sautés), pousse et rend compte.
+`union_journal.py` réunit les journaux sans modèle ; `quota.py` borne les
+saisines (cooldown, plafond horaire, 3 par PR en 30 min).
 
-Ajouts purs (v2, 29/10) : les journaux (`CHANGELOG.md`) ne passent jamais par
-le modèle — deux entrées en tête ne sont pas un désaccord, elles sont réunies
-sans perte (`union_journal.py`). Quota dans `quota.py` : cooldown, plafond
-horaire et 3 saisines par PR en 30 min, qu'une seule PR ne peut plus épuiser.
-
-Bibliothèque standard uniquement. Usage :
-
-  FIREWORKS_API_KEY=... python3 conflict_agent.py resolve \\
-      --repo BaptisteFaisy/vision --pr 118 --branch feat/x --sha <sha>
-
-  python3 conflict_agent.py resolve --dry-run --repo ... --pr ...  # prompt seul
-
-Codes de sortie : 0 = rebase poussé (file reprendra) ; 1 = échec avec compte
-rendu sur la PR ; 2 = rien à faire (désactivé, déjà tenté, labels) — l'appelant
-saute la PR sans bruit. Jamais de secret dans les messages ni les commentaires.
+Porte de compilation (v3, 31/10) : une résolution qui ne compile pas n'est
+**jamais poussée** (`compilation_gate.py`). Motif : #615, réconciliation cassée
+classée « échec réel » puis abandonnée. Coupe-circuit : `CONFLICT_COMPILE_GATE=0`.
+Usage : `resolve --repo O/R --pr N --branch b --sha s` (`--dry-run` : prompt
+seul). Codes : 0 poussé, 1 échec commenté, 2 rien à faire. Aucun secret dedans.
 """
 
 import argparse
@@ -58,6 +47,8 @@ def _charger(nom):
 
 union_journal = _charger("union_journal")
 quota = _charger("quota")
+# v3 : porte de compilation à côté (`compilation_gate.py`) : plafond de 500 lignes.
+compilation_gate = _charger("compilation_gate")
 
 MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
 API_DEFAULT = "https://api.fireworks.ai/inference/v1/chat/completions"
@@ -320,9 +311,8 @@ def preflight(repo, pr, sha, dry_run, now):
     labels = pr_labels(repo, pr)
     if "hold" in labels or LABEL_HUMAN in labels:
         raise Skip("labels %s : main humaine" % ",".join(labels))
-    # Cooldown et plafonds sont vérifiés à l'instant de la saisine
-    # (autorisation_saisine) : un conflit d'ajouts purs se règle sans modèle,
-    # même plafond épuisé.
+    # Cooldown et plafonds à l'instant de la saisine : un conflit d'ajouts purs
+    # se règle sans modèle, même plafond épuisé.
     try:
         files = unmerged_files()
     except AgentError as exc:
@@ -427,8 +417,23 @@ def finish_loop(api_url, key, model, deadline, autorisation=None):
     raise AgentError("rebase à plus de %d arrêts, main humaine" % MAX_ROUNDS)
 
 
+def porte_compilation(files, branch):
+    """(ok, message, corps) ; neutre si le module voisin n'est pas joignable."""
+    if compilation_gate is None:
+        return True, "", "Conflit réconcilié, rebase poussé sur `%s`." % branch
+    return compilation_gate.prepare_push(files, branch)
+
+
 def finish(repo, pr, branch, sha, files):
     """Pousse le rebase terminé avec bail, rend compte. Rend 0 ou 1."""
+    ok, message, corps = porte_compilation(files, branch)
+    if not ok:
+        # Rien n'est poussé : branche intacte, PR DIRTY (retour au tour suivant).
+        comment(repo, pr, "Résolution **non compilable** : rien n'est poussé, "
+                "la branche reste intacte.\n\n%s" % message)
+        add_label(repo, pr, LABEL_HUMAN)
+        log("porte de compilation rouge : rien n'est poussé")
+        return 1
     push = subprocess.run(["git", "push",
                            "--force-with-lease=%s:%s" % (branch, sha),
                            push_url(repo), "HEAD:%s" % branch],
@@ -437,12 +442,9 @@ def finish(repo, pr, branch, sha, files):
         log("push refusé (bail, prochain passage) : %s"
             % push.stderr.strip()[:150])
         return 1
-    unique = sorted(set(files))
-    comment(repo, pr, "Conflit réconcilié par l'agent : %d fichier(s) "
-            "(%s), rebase poussé sur `%s`. La file reprend."
-            % (len(unique), ", ".join(unique), branch))
+    comment(repo, pr, corps)   # corps porte le marqueur de tête (blayeur)
     add_label(repo, pr, LABEL_OK)
-    log("PR #%s rebasée et poussée (%d fichiers)" % (pr, len(unique)))
+    log("PR #%s rebasée et poussée (%d fichiers)" % (pr, len(set(files))))
     return 0
 
 
@@ -465,14 +467,13 @@ def cmd_resolve(args):
         except AgentError as exc:
             return fail(repo, pr, str(exc))
         return 0
-    # Le dry-run ne touche jamais l'empreinte : une simulation ne doit ni
-    # déclencher le cooldown ni consommer le plafond horaire.
+    # Le dry-run ne touche jamais l'empreinte (ni cooldown ni plafond horaire).
     try:
         resolved = finish_loop(api_url, key, model, deadline,
                                lambda: autorisation_saisine(pr, args.sha))
     except Skip as exc:
-        # Union déterministe faite, saisine modèle refusée : rien n'est poussé,
-        # le rebase est abandonné par l'appelant, la PR repart au prochain tour.
+        # Union faite, saisine refusée : rien n'est poussé, l'appelant abandonne
+        # le rebase et la PR repart au prochain tour.
         log(str(exc))
         return 2
     except AgentError as exc:
