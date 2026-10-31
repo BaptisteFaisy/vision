@@ -482,3 +482,35 @@ Recette téléphone : voiture qui roule cadrée → « Stop, car moving. »
 coupe le chat en lecture ; rebord sous le pied en dictée → « Stop, step
 up. » parlé quand même — **non mesuré**, exige un APK de cet arbre sur
 appareil réel.
+
+## 17. Véhicules : mouvement annoncé à 15 m, stop sous 8 m (ordre user du 30/10)
+
+Le user veut entendre les voitures en mouvement jusqu'à 15 m, et en
+Traversée savoir si elles roulent ou sont arrêtées — tout en anglais
+(langue de la voix, défaut En comme avant).
+
+- **portée** : le mouvement parle jusqu'à 15 m (`MOVING_METERS`, même
+  `VehicleStateWatcher`, mêmes 2 frames, mêmes cooldowns) — en normal
+  comme en Traversée (même watcher, mêmes phrases) ;
+- **deux bandes** : proche (sous 8 m, `NEAR_MOVING_METERS`, ou non mesuré
+  — jamais prouvé loin) = alerte immédiate « Stop, car moving. »
+  (voix de sécurité, §16) ; loin (8-15 m) = info douce « Car moving,
+  12 meters away. » (voix ElevenLabs, attend le silence) ;
+- **cooldowns** : le stop a son propre cooldown 4 s — une info lointaine
+  ne fait jamais taire un stop qui suit ; à l'inverse une info ne reparle
+  pas dans les 4 s d'un stop (le danger vient d'être dit) ;
+- **Traversée** : câblage inchangé — `CrossingVehicleWatch` parle
+  `.phrase` (info douce après le feu) : le mouvement ≤ 15 m et l'arrêt
+  ≤ 3 m s'y disent (« Car moving/stopped, X meters away. »), le veto
+  rouge restant l'autorité sécurité (pas de « Stop » en Traversée) ;
+- **inchangé** : arrêt ≤ 3 m, cycles (`CycleWatcher`), urgent (tau + ≤ 8 m
+  + centre), anglais par défaut.
+
+Verrouillé par `VehicleStateTest` (+3 : info loin 12 m douce, stop proche
+sans attendre le cooldown, cooldown 4 s entre stops ; portée 9 m → 16 m)
+et `CrossingVehicleTest` (+1 : mouvement 12 m annoncé en Traversée).
+
+Recette téléphone : voiture qui roule à ~12 m → « Car moving, 12 meters
+away. » doux ; qui s'approche sous 8 m → « Stop, car moving. » coupe tout ;
+en Traversée idem en doux + « Car stopped… » — **non mesuré**, exige un
+APK de cet arbre sur appareil réel.
