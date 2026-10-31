@@ -43,7 +43,24 @@ on:
   merge_group:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Une branche de file (`mergify/merge-queue/**`) reçoit DEUX déclenchements
+  # pour la même tête : le `push` que Mergify fait sur sa branche, et la PR que
+  # Mergify ouvre dessus. Même arbre, mêmes checks, même verdict — un seul
+  # passage suffit (mesuré le 31/10 : ~24 runs `CI` et ~78 `couche0` par heure
+  # rien que pour ce doublon).
+  #
+  # Pourquoi une clé par TÊTE et pas un saut de job : un job sauté publie un
+  # check `skipped`, et Mergify lit le check le plus récent portant le nom
+  # requis — `skipped` n'est pas `success`, donc le lot serait éjecté et la
+  # file se bloquerait (même incident que le `## Scope` absent sur une PR de
+  # lot, le 29/10). Ici les deux déclenchements partagent le groupe : le second
+  # annule le premier, et le survivant est forcément le dernier à publier son
+  # verdict.
+  #
+  # Hors branche de file, rien ne change : `github.ref` (`refs/pull/N/merge`)
+  # continue d'annuler le run précédent quand un nouveau commit arrive sur la
+  # PR.
+  group: ci-${{ github.workflow }}-${{ (startsWith(github.ref_name, 'mergify/merge-queue/') || startsWith(github.event.pull_request.head.ref || '', 'mergify/merge-queue/')) && (github.event.pull_request.head.sha || github.sha) || github.ref }}
   cancel-in-progress: true
 
 permissions:
