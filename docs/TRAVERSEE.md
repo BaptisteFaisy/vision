@@ -333,3 +333,13 @@ s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
   ni aux sorties confirmées — il ne publie que des mots latéraux doux, sous
   la priorité du feu, du veto et des véhicules ; l'état annoncé reste le
   dernier confirmé (rouge par défaut).
+
+## 10. Collecte et réentraînement (31/10)
+
+Le rappel vert (1/6 sur crops SAM, §6) ne se répare que par des données :
+interrupteur `collectLightCrops` (TECHNICAL SETTINGS, coupé par défaut),
+journalisation des crops classifiés (PNG exact, boîte, verdict, 2000/session
+max), étiquetage (`review_light_crops.py`), réentraînement
+(`train_light.py`, porte et planchers fixes) et barrière GO (20 ancres
+parfaites + précision vert ≥ 0,99 sur hold-out + rappel ≥ actuel).
+Protocole complet : `docs/COLLECTE-FEUX.md`.
