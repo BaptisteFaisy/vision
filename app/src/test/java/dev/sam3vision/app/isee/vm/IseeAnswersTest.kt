@@ -308,6 +308,58 @@ class IseeAnswersTest {
         assertEquals("un seul appel LLM", 1, calls.get())
     }
 
+    @Test
+    fun `nouvel appui pendant la question — la precedente est coupee, la suivante passe`() = runBlocking {
+        val calls = AtomicInteger()
+        val gate = CompletableDeferred<Result<String>>()
+        val answers = answers({ _, _, _ ->
+            calls.incrementAndGet()
+            gate.await()
+        })
+        val row = seedRow()
+        val first = launch { answers.answer(row, "première") }
+        withTimeout(2_000) { while (calls.get() == 0) delay(5) }
+
+        // Nouvel appui : la réponse en vol est coupée au lieu de jeter la suivante.
+        answers.cancelInFlight()
+        first.join()
+
+        assertFalse("le « … » est retiré après la coupe", state.value.thinking)
+
+        gate.complete(Result.success("reprise"))
+        answers.answer(row, "seconde")
+
+        assertEquals("la question suivante passe", "reprise", dao.byId(row.id)?.texteIA)
+    }
+
+    @Test
+    fun `nouvel appui pendant la voix — la lecture est coupee, le « … » est retire`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val streaming = playback(
+            synthesize = { byteArrayOf(1, 2) },
+            playSlice = { entered.complete(Unit); release.await(); Result.success(PlaybackEnd.Done) },
+        )
+        val answers = IseeAnswers(
+            media = media,
+            settings = { settings },
+            update = ::update,
+            transcript = transcript,
+            playback = streaming,
+            photo = shots,
+            prune = {},
+            ask = { _, _, _ -> Result.success("Devant toi") },
+        )
+        val job = launch { answers.answer(seedRow(), "question") }
+        withTimeout(2_000) { entered.await() }
+
+        answers.cancelInFlight()
+        job.join()
+
+        assertFalse("le « … » est retiré après la coupe", state.value.thinking)
+        assertNull("l'état parlant est rendu", state.value.speakingEntryId)
+    }
+
     private fun seedRow(): MessageMultimedia =
         dao.seed(MessageMultimedia(timestamp = 1L, texteUtilisateur = "question"))
 
