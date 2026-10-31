@@ -74,8 +74,8 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  *
  * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
  * l'appelant a passé les défauts ([LivePrompts.default], [LivePrompts.indoor]
- * ou une liste vide) ; une liste explicite (champ « Suivre », « Find the X »)
- * traverse inchangée.
+ * ou une liste vide) ; une liste explicite (Traversée feu+voitures, champ
+ * « Follow », « Find the X ») traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,

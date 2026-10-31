@@ -252,7 +252,7 @@ class CurbWatcher(
      * quand le compte de confirmation est atteint ([CurbCue.urgent] pour le
      * seul imminent), `null` sinon.
      */
-    fun onSignal(signal: CurbSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.Fr): CurbCue? {
+    fun onSignal(signal: CurbSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): CurbCue? {
         if (signal.detected) {
             flatHits = 0
             flatSpoken = false

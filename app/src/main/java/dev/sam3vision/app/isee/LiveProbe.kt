@@ -131,8 +131,8 @@ class LiveProbe(
      */
     private val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
 
-    /** Langue de la voix (Réglages) : le français reste le défaut des fonctions pures. */
-    private var speechLanguage: SpeechLanguage = SpeechLanguage.Fr
+    /** Langue de la voix : l'anglais est le défaut partout (produit anglophone seul). */
+    private var speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT
 
     /** Un réveil `/health` est en cours (un seul à la fois). */
     private var warming = false
@@ -152,7 +152,7 @@ class LiveProbe(
         lens: LensSpec = LensSpec.Default,
         distancesOn: Boolean = true,
         maxObjects: Int = 0,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         crossingActive: Boolean = false,
         modelsLine: String = "",
         depth: DepthBackend = DepthBackend.OFF,
@@ -179,7 +179,7 @@ resetPipeline()
                 modelsLine = modelsLine,
                 conceptsSent = LivePrompts.normalize(prompts),
                 transport = TRANSPORT_WS,
-                error = if (clean.isBlank()) "aucun endpoint (Réglages)" else null,
+                error = if (clean.isBlank()) "no endpoint (Settings)" else null,
                 crossingActive = crossingActive,
             )
         }
@@ -380,7 +380,7 @@ _state.update { it.cleared() }
         if (frame == null) {
             // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
             // restent les derniers connus, seul le message d'erreur change.
-            val error = result.exceptionOrNull() ?: ApiError.BadResponse("échec de l'appel SAM")
+            val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
             android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
             _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
             return

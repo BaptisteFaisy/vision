@@ -35,7 +35,7 @@ data class DirectionalReport(
     }
 }
 
-/** Alertes directionnelles (`feedback.py:44-126`), message en français. */
+/** Alertes directionnelles (`feedback.py:44-126`), message en anglais. */
 object DirectionalFeedback {
 
     /**
@@ -80,10 +80,10 @@ object DirectionalFeedback {
         val text = StringBuilder(baseMessage(summary))
         val danger = ArrayList<String>()
         for (zone in zones) {
-            if (zone.risk >= RiskZones.WARNING) danger.add(frenchName(zone.direction))
+            if (zone.risk >= RiskZones.WARNING) danger.add(englishName(zone.direction))
         }
         if (danger.isNotEmpty()) {
-            text.append(" Danger : ")
+            text.append(" Danger: ")
             text.append(danger.joinToString(", "))
             text.append('.')
         }
@@ -93,19 +93,19 @@ object DirectionalFeedback {
             if (zone.risk > worst) worst = zone.risk
         }
         if (zones[safest].risk < worst) {
-            text.append(" Direction la plus sûre : ")
-            text.append(frenchName(zones[safest].direction))
+            text.append(" Safest direction: ")
+            text.append(englishName(zones[safest].direction))
             text.append('.')
         }
         return text.toString()
     }
 
     private fun baseMessage(summary: PathSummary): String {
-        if (summary.overall == PathRisk.CLEAR) return "Chemin dégagé. Vous pouvez avancer."
-        val dist = String.format(Locale.FRANCE, "%.1f", summary.closestHazardM)
-        if (summary.overall == PathRisk.CRITICAL) return "Stop, obstacle très proche à $dist mètres !"
-        if (summary.overall == PathRisk.WARNING) return "Attention, obstacle devant à $dist mètres."
-        return "Attention, obstacle détecté à $dist mètres."
+        if (summary.overall == PathRisk.CLEAR) return "Path clear. You can move forward."
+        val dist = String.format(Locale.US, "%.1f", summary.closestHazardM)
+        if (summary.overall == PathRisk.CRITICAL) return "Stop, obstacle very close at $dist meters!"
+        if (summary.overall == PathRisk.WARNING) return "Caution, obstacle ahead at $dist meters."
+        return "Caution, obstacle detected at $dist meters."
     }
 
     private fun safestZone(zones: Array<ZoneFeedback>): Int {
@@ -116,9 +116,9 @@ object DirectionalFeedback {
         return safest
     }
 
-    private fun frenchName(direction: SteerDirection): String {
-        if (direction == SteerDirection.LEFT) return "gauche"
-        if (direction == SteerDirection.RIGHT) return "droite"
-        return "centre"
+    private fun englishName(direction: SteerDirection): String {
+        if (direction == SteerDirection.LEFT) return "left"
+        if (direction == SteerDirection.RIGHT) return "right"
+        return "center"
     }
 }

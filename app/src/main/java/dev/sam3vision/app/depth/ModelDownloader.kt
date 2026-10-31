@@ -74,7 +74,7 @@ object ModelDownloader {
     ): Result<File> {
         val spec = DepthModels.forBackend(backend)
         if (spec == null) {
-            return Result.failure(IllegalArgumentException("moteur sans modèle : " + backend.code))
+            return Result.failure(IllegalArgumentException("engine without model: " + backend.code))
         }
         return ensureSpec(appDir, spec, onProgress = onProgress)
     }
@@ -140,7 +140,7 @@ object ModelDownloader {
             conn.setInstanceFollowRedirects(true)
             conn.connect()
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                throw IllegalStateException("téléchargement refusé (HTTP " + conn.getResponseCode() + ")")
+                throw IllegalStateException("download refused (HTTP " + conn.getResponseCode() + ")")
             }
             val total = conn.getContentLengthLong().takeIf { it > 0 } ?: spec.bytes
             conn.getInputStream().use { input ->
@@ -190,7 +190,7 @@ object ModelDownloader {
         is java.net.UnknownHostException,
         is java.net.SocketTimeoutException,
         is java.net.ConnectException,
-            -> IllegalStateException("réseau indisponible — vérifiez la connexion", e)
+            -> IllegalStateException("network unavailable — check the connection", e)
         else -> e
     }
 }

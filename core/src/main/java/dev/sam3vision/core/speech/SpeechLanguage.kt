@@ -4,14 +4,15 @@ package dev.sam3vision.core.speech
  * Langue de la **voix** de l'app : ce que la personne nous dit (annonces de scène,
  * réponses du chat lues à voix haute) et la langue dans laquelle le LLM répond.
  *
- * L'interface reste en français : seul le parler change. C'est le réglage « Voix »
- * des Réglages, persisté (`speech_language` / `speechLanguage`).
+ * Produit anglophone seul : l'interface comme le parler sont en anglais, sans
+ * réglage de langue. [Fr] n'est plus atteignable en production (voir fromStored) :
+ * il ne sert qu'aux tests JVM des branches françaises.
  *
  * [code] est le code ISO utilisé par ElevenLabs, [llmName] le nom de la langue tel
  * qu'on l'écrit dans une consigne adressée au modèle.
  */
 enum class SpeechLanguage(
-    /** Libellé du bouton des Réglages : tient sur une ligne, en pleine largeur. */
+    /** Libellé de langue (journaux et tests ; plus aucun bouton en production). */
     val label: String,
     /** Code court (« fr », « en ») pour les journaux et les tests. */
     val code: String,
@@ -24,10 +25,10 @@ enum class SpeechLanguage(
 
     companion object {
         /**
-         * Langue par défaut : **anglais**. L'intro embarquée (`res/raw/intro_isee.mp3`,
-         * voix Laure) est déjà en anglais, et c'est la demande du 2026-10-26 :
-         * « dans l'app isee, la personne nous parle en anglais ». Le français reste
-         * à un bouton de distance dans les Réglages.
+         * Langue unique : **anglais**. L'intro embarquée (`res/raw/intro_isee.mp3`,
+         * voix Laure) est déjà en anglais, et la demande produit est l'anglais
+         * exclusif : l'app iSee parle et comprend l'anglais uniquement, sans réglage
+         * de langue.
          */
         val DEFAULT: SpeechLanguage = En
 
@@ -38,5 +39,15 @@ enum class SpeechLanguage(
         /** Code ISO → langue (« en » → [En]) ; code inconnu ⇒ [DEFAULT]. */
         fun fromCode(code: String?): SpeechLanguage =
             entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: DEFAULT
+
+        /**
+         * Valeur persistée → langue de production : un « Fr » stocké par une version
+         * antérieure migre vers l'anglais (produit anglophone seul, sans réglage).
+         */
+        fun fromStored(name: String?): SpeechLanguage =
+            when (fromName(name)) {
+                Fr -> En
+                En -> En
+            }
     }
 }

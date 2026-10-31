@@ -89,7 +89,7 @@ class TrackRunner(
             if (failedAt != null && clock() - failedAt < START_RETRY_MS) return Result.failure(cached)
         }
         if (!gate.tryStart()) {
-            return Result.failure(ApiError.BadResponse("tracker : ouverture déjà en cours"))
+            return Result.failure(ApiError.BadResponse("tracker: open already in progress"))
         }
         try {
             val normalized = LivePrompts.normalize(prompts)
@@ -122,7 +122,7 @@ class TrackRunner(
         val startedAt = clock()
         try {
             val session = current
-                ?: return Result.failure(ApiError.BadResponse("tracker : session non démarrée"))
+                ?: return Result.failure(ApiError.BadResponse("tracker: session not started"))
             val frame = if (startedAt - session.startedAtMs >= rekeyMs) {
                 rekey(session, jpegB64)
             } else {

@@ -346,7 +346,7 @@ class LiveAskSession(
             },
             onFailure = { error ->
                 state.update {
-                    it.copy(memory = it.memory.copy(asking = false, error = error.message ?: "réponse impossible"))
+                    it.copy(memory = it.memory.copy(asking = false, error = error.message ?: "answer impossible"))
                 }
             },
         )

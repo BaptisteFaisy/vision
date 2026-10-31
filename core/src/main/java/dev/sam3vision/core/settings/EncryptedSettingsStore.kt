@@ -77,7 +77,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         DepthBackend.fromName(prefs.getString(KEY_DEPTH_BACKEND, default.depthBackend.name))
 
     private fun speechOf(prefs: SharedPreferences, default: Settings): SpeechLanguage =
-        SpeechLanguage.fromName(prefs.getString(KEY_SPEECH_LANGUAGE, default.speechLanguage.name))
+        SpeechLanguage.fromStored(prefs.getString(KEY_SPEECH_LANGUAGE, default.speechLanguage.name))
 
     override suspend fun save(s: Settings) = withContext(Dispatchers.IO) {
         prefs.edit()

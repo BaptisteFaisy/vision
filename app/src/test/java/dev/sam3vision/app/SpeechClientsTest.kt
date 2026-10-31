@@ -54,7 +54,7 @@ class SpeechClientsTest {
         val error = ttsClient(Settings.Default).synthesize("Bonjour").exceptionOrNull()
 
         assertTrue("clé absente : refus local du client", error is ApiError.InvalidKey)
-        assertTrue("le message doit dire quoi renseigner", error?.message.orEmpty().contains("Réglages"))
+        assertTrue("le message doit dire quoi renseigner", error?.message.orEmpty().contains("Settings"))
     }
 
     @Test
@@ -63,6 +63,6 @@ class SpeechClientsTest {
         val error = ttsClient(settings).synthesize("Bonjour").exceptionOrNull()
 
         assertTrue("voix absente : refus local du client", error is ApiError.BadResponse)
-        assertTrue("le refus doit nommer la voix", error?.message.orEmpty().contains("voix"))
+        assertTrue("le refus doit nommer la voix", error?.message.orEmpty().contains("voice"))
     }
 }

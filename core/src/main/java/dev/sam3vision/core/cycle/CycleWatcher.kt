@@ -105,7 +105,7 @@ class CycleWatcher(
         detections: List<Detection>,
         readings: List<DistanceReading>,
         atMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): CycleCue? {
         val verdict = motion.update(detections, atMs)
         val pick = pick(detections, readings, verdict)

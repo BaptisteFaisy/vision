@@ -30,7 +30,7 @@ import dev.sam3vision.core.nav.DestinationQuery
  *         // transcript : texte STT brut (lecture vocale « Navigation vers … »).
  *     }
  *     .onFailure { error ->
- *         // error.message est affichable/annonçable tel quel, en français :
+ *         // error.message est affichable/annonçable tel quel, en anglais :
  *         // trop court, aucune parole, STT injoignable, ou pas de destination.
  *     }
  * ```
@@ -38,7 +38,7 @@ import dev.sam3vision.core.nav.DestinationQuery
  * Règles : [dictate] injectée (les tests branchent une doublure, l'app branche
  * `DictationUseCase`) ; [parse] et [normalize] injectés avec leurs défauts ;
  * jamais d'exception — l'échec (STT, pas d'intention, normalisation vide) se
- * rend par [Result.failure] avec un message français.
+ * rend par [Result.failure] avec un message anglais.
  */
 class VoiceDestinationUseCase(
     private val dictate: suspend (ByteArray) -> Result<String>,
@@ -67,5 +67,5 @@ sealed class VoiceDestinationError(message: String) : Exception(message) {
 
     /** La dictée ne contient aucun ordre de navigation reconnu. */
     class NoDestination :
-        VoiceDestinationError("aucune destination reconnue : dis par exemple « direction gare de Lyon »")
+        VoiceDestinationError("no destination recognized: say for example \"take me to the train station\"")
 }

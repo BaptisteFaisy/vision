@@ -189,18 +189,18 @@ fun PermissionGate(onAllow: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.padding(28.dp),
         ) {
-            Text("Accès à la caméra requis", color = AppColors.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Camera access required", color = AppColors.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(
-                "SAM Vision photographie la scène à analyser ; sans caméra, choisis une image depuis la galerie.",
+                "SAM Vision photographs the scene to analyze; without a camera, pick an image from the gallery.",
                 color = AppColors.textMuted,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
             )
-            BigButton("Autoriser", true, AppColors.primary, onAllow)
+            BigButton("Allow", true, AppColors.primary, onAllow)
             // Refus permanent (« Ne plus demander ») : redemander ne sert à rien,
             // seuls les Réglages système peuvent réactiver la caméra.
             OutlinedButton(onClick = { openAppSettings(context) }) {
-                Text("Ouvrir les Réglages", fontSize = 13.sp)
+                Text("Open Settings", fontSize = 13.sp)
             }
         }
     }
@@ -225,9 +225,9 @@ fun ScreenHeader(
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onBack != null) OutlinedButton(onBack) { Text("Retour") }
+            if (onBack != null) OutlinedButton(onBack) { Text("Back") }
             Spacer(Modifier.weight(1f))
-            if (onSettings != null) OutlinedButton(onSettings) { Text("Réglages") }
+            if (onSettings != null) OutlinedButton(onSettings) { Text("Settings") }
         }
         Text(title, color = AppColors.text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
         if (subtitle != null) Text(subtitle, color = AppColors.textMuted, fontSize = 13.sp)
@@ -252,7 +252,7 @@ fun PhotoStage(
     Box(modifier.fillMaxWidth().aspectRatio(ratio), contentAlignment = Alignment.Center) {
         Image(
             bitmap = image,
-            contentDescription = "Photo analysée",
+            contentDescription = "Analyzed photo",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
@@ -330,9 +330,9 @@ fun SpeakRow(
     }
 }
 
-/** Libellé du bouton : « Écouter », une action nommée, ou « Stop » pendant la lecture. */
+/** Libellé du bouton : « Listen », une action nommée, ou « Stop » pendant la lecture. */
 private fun glyphWithLabel(active: Boolean, actionLabel: String?): String = when {
     active -> "$STOP_GLYPH Stop"
     actionLabel != null -> "$SPEAK_GLYPH $actionLabel"
-    else -> "$SPEAK_GLYPH Écouter"
+    else -> "$SPEAK_GLYPH Listen"
 }

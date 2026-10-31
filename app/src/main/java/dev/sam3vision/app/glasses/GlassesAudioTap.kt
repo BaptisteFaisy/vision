@@ -43,7 +43,7 @@ internal class GlassesAudioTap(
         if (job != null) return
         job = scope.launch {
             runCatching { frames.collect(::deliver) }
-                .onFailure { onLog("micro lunettes interrompu : ${it.message}") }
+                .onFailure { onLog("glasses mic interrupted: ${it.message}") }
         }
     }
 
@@ -63,7 +63,7 @@ internal class GlassesAudioTap(
         dictation.tryEmit(AudioFrame(ByteBuffer.wrap(bytes), frame.presentationTimeUs))
         received += 1
         if (received == 1L || received % 500 == 0L) {
-            onLog("micro lunettes : $received trames (${bytes.size} o)")
+            onLog("glasses mic: $received frames (${bytes.size} B)")
         }
     }
 }

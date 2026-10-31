@@ -82,7 +82,7 @@ class PictoVoiceOrderTest {
     @Test
     fun `la demo montre un mur et une fenetre fixes`() {
         val hits = PictoVoiceOrder.demoHits()
-        assertEquals(listOf("mur", "fenêtre"), hits.map { it.label })
+        assertEquals(listOf("wall", "window"), hits.map { it.label })
         assertEquals(0.5f, hits[0].x + hits[0].w / 2f)
     }
 

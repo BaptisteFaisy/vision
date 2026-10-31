@@ -12,7 +12,7 @@ class HomeModesTest {
     @Test
     fun `trois presets, sept concepts chacun, dans l ordre des pastilles`() {
         assertEquals(listOf("essentiels", "sante", "cuisine"), HomeModes.ALL.map { it.id })
-        assertEquals(listOf("Essentiels", "Santé", "Cuisine & salon"), HomeModes.ALL.map { it.labelFr })
+        assertEquals(listOf("Essentials", "Health", "Kitchen & living room"), HomeModes.ALL.map { it.label })
         HomeModes.ALL.forEach { assertEquals(7, it.prompts.size) }
     }
 
@@ -57,18 +57,18 @@ class HomeModesTest {
     }
 
     @Test
-    fun `french traduit les 21 concepts maison`() {
-        assertEquals("clés", HomeModes.french("keys"))
-        assertEquals("boîte de médicaments", HomeModes.french("medicine box"))
-        assertEquals("verre", HomeModes.french("drinking glass"))
-        assertEquals("interrupteur", HomeModes.french("  Light Switch "))
+    fun `display rend l anglais tel quel rogne`() {
+        assertEquals("keys", HomeModes.display("keys"))
+        assertEquals("medicine box", HomeModes.display("medicine box"))
+        assertEquals("drinking glass", HomeModes.display("drinking glass"))
+        assertEquals("Light Switch", HomeModes.display("  Light Switch "))
     }
 
     @Test
-    fun `french laisse intacts les labels hors maison`() {
-        assertEquals("person", HomeModes.french("person"))
-        assertEquals("electric scooter", HomeModes.french("electric scooter"))
-        assertEquals("", HomeModes.french(""))
+    fun `display laisse intacts les labels non vides`() {
+        assertEquals("person", HomeModes.display("person"))
+        assertEquals("electric scooter", HomeModes.display("electric scooter"))
+        assertEquals("", HomeModes.display(""))
     }
 
     @Test

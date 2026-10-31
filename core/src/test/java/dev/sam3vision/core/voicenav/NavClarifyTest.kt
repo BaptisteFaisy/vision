@@ -87,4 +87,37 @@ class NavClarifyTest {
             NavClarifyText.ask(SpeechLanguage.En),
         )
     }
+
+    @Test
+    fun `english orders without destination ask for it`() {
+        assertUnclear("I want to go")
+        assertUnclear("I want to go to")
+        assertUnclear("take me")
+        assertUnclear("take me to")
+        assertUnclear("navigate")
+        assertUnclear("navigate to")
+        assertUnclear("guide me")
+        assertUnclear("I'm going to")
+        assertUnclear("go to")
+        assertUnclear("directions")
+        assertUnclear("directions to")
+        assertUnclear("I need to go")
+        assertUnclear("I have to go")
+    }
+
+    @Test
+    fun `english understood orders are not unclear`() {
+        assertNotUnclear("I want to go to the station")
+        assertNotUnclear("take me to the airport")
+        assertNotUnclear("navigate to Orly airport")
+        assertNotUnclear("go to the pharmacy")
+        assertNotUnclear("directions to the station")
+    }
+
+    @Test
+    fun `english ordinary phrases stay with the LLM`() {
+        assertNotUnclear("hello")
+        assertNotUnclear("where is the station?")
+        assertNotUnclear("describe what you see")
+    }
 }

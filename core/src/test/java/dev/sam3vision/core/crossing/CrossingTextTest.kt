@@ -21,8 +21,8 @@ class CrossingTextTest {
     }
 
     @Test
-    fun `le francais est le defaut des fonctions pures`() {
-        assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red))
+    fun `l'anglais est le defaut des fonctions pures`() {
+        assertEquals("Red, wait.", CrossingText.phrase(CrossingState.Red))
     }
 
     @Test
@@ -32,8 +32,8 @@ class CrossingTextTest {
 
     @Test
     fun `confirmation parlee du mode`() {
-        assertEquals("Mode traversée activé.", CrossingText.mode(true))
-        assertEquals("Mode traversée coupé.", CrossingText.mode(false))
+        assertEquals("Crossing mode on.", CrossingText.mode(true))
+        assertEquals("Crossing mode off.", CrossingText.mode(false))
         assertEquals("Crossing mode on.", CrossingText.mode(true, SpeechLanguage.En))
         assertEquals("Crossing mode off.", CrossingText.mode(false, SpeechLanguage.En))
     }

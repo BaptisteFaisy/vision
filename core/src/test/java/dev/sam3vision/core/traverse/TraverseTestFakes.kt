@@ -44,7 +44,7 @@ internal class FakePlayer(
 
 /** TTS système factice : langue effective et rendus programmés. */
 internal class FakeSystemTts(
-    private val language: String = "fr-FR",
+    private val language: String = "en-US",
     private val failOn: Set<String> = emptySet(),
     private val store: MutableMap<String, String>,
 ) : TraverseSystemTts {

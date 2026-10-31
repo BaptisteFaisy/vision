@@ -40,7 +40,7 @@ object DangerBench {
     ): DangerBenchVerdict {
         val detector = runCatching { PersonDetector.open(context) }.getOrNull()
         if (detector == null) {
-            val missing = DangerBenchVerdict(emptyList(), 0, 0, 0, "", 0, "modèle absent — asset yolo11n.onnx manquant")
+            val missing = DangerBenchVerdict(emptyList(), 0, 0, 0, "", 0, "model missing — yolo11n.onnx asset missing")
             return logged(missing)
         }
         try {
@@ -55,7 +55,7 @@ object DangerBench {
                 val outcome = detector.detect(argb, width, height)
                 val result = outcome.getOrNull()
                 if (result == null) {
-                    error = outcome.exceptionOrNull()?.message ?: "échec inférence"
+                    error = outcome.exceptionOrNull()?.message ?: "inference failed"
                     break
                 }
                 times.add(result.inferenceMs)
@@ -75,7 +75,7 @@ object DangerBench {
 
     /** Une ligne : « model=YOLO11n medianMs=88 sess=80 dec=8 runs=5 out=84x8400 boxes=0 fps=11.4 ». */
     fun summary(result: DangerBenchVerdict): String {
-        if (!result.ok) return "model=$CODE KO — ${result.error}"
+        if (!result.ok) return "model=$CODE FAIL — ${result.error}"
         // Locale.US : point décimal même sur téléphone français (parsé par la recette).
         val fps = if (result.medianMs <= 0) "?" else "%.1f".format(java.util.Locale.US, 1000f / result.medianMs)
         return "model=$CODE medianMs=${result.medianMs} sess=${result.sessionMs} dec=${result.decodeMs} " +

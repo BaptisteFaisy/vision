@@ -116,7 +116,7 @@ class CycleWatcherTest {
         listOf(bikeBox(430f), bikeBox(450f), bikeBox(470f), bikeBox(490f)).forEachIndexed { index, box ->
             cue = moving.update(listOf(det("bicycle", box)), emptyList(), atMs = index * 100L)
         }
-        assertEquals("Attention, vélo en mouvement, à 2 heures.", cue!!.phrase)
+        assertEquals("Attention, bicycle moving, at 2 o'clock.", cue!!.phrase)
         assertNull(cue.meters)
 
         val stopped = CycleWatcher()
@@ -145,7 +145,7 @@ class CycleWatcherTest {
             val box = bikeBox(x1)
             replay = watcher.update(listOf(det("bicycle", box)), listOf(reading("bicycle", 5f, box)), atMs = atMs) ?: replay
         }
-        assertEquals("Attention, vélo en mouvement, à 3 heures.", replay!!.phrase)
+        assertEquals("Attention, bicycle moving, at 3 o'clock.", replay!!.phrase)
     }
 
     @Test
@@ -165,7 +165,7 @@ class CycleWatcherTest {
         listOf(10_400L, 10_500L).forEach { atMs ->
             replay = watcher.update(listOf(det("scooter", box)), listOf(reading("scooter", 2f, box)), atMs = atMs) ?: replay
         }
-        assertEquals("Trottinette arrêtée, à midi.", replay!!.phrase)
+        assertEquals("Scooter stopped, at 12 o'clock.", replay!!.phrase)
     }
 
     @Test

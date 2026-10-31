@@ -62,7 +62,7 @@ class TraversePipeline(
         lightGreen: Boolean,
         focalPx: Float,
         atMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): TraverseOutput {
         val filtered = state.update(objects)
         val detections = filtered.toDetections(width, height)

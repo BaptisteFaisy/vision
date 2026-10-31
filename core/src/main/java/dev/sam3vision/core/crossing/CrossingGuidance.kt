@@ -198,7 +198,7 @@ class CrossingLateralAnnouncer(
     fun onFrame(
         atMs: Long,
         centerX: Float?,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
         val valid = centerX?.takeIf { it.isFinite() }
         if (valid == null) {
@@ -242,7 +242,7 @@ class CrossingArrivalWatcher(
         private set
 
     /** Positif de la frame : le signal à prononcer, ou `null` (silence). */
-    fun onFrame(detected: Boolean, language: SpeechLanguage = SpeechLanguage.Fr): CrossingArrivalCue? {
+    fun onFrame(detected: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): CrossingArrivalCue? {
         if (!detected) {
             hits = 0
             announced = false

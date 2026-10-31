@@ -109,11 +109,11 @@ class TapSession(
         scope.launch {
             try {
                 if (!permissionsGranted()) {
-                    fail("permission caméra ou micro refusée", Announcement.FAILED)
+                    fail("camera or microphone permission denied", Announcement.FAILED)
                     return@launch
                 }
                 if (!video.ready && video.bind(owner()).isFailure) {
-                    fail("caméra vidéo indisponible", Announcement.FAILED)
+                    fail("video camera unavailable", Announcement.FAILED)
                     return@launch
                 }
                 record()
@@ -127,14 +127,14 @@ class TapSession(
     private fun record() {
         val needsMic = TapConfig.VIDEO_WITH_AUDIO
         if (needsMic && !MicBus.acquire(MicBus.Owner.TAP_VIDEO)) {
-            fail("micro occupé par la dictée", Announcement.FAILED)
+            fail("microphone busy with dictation", Announcement.FAILED)
             return
         }
         val file = newVideoFile()
         val started = video.start(file, withAudio = needsMic)
         if (started.isFailure) {
             if (needsMic) MicBus.release(MicBus.Owner.TAP_VIDEO)
-            fail(started.exceptionOrNull()?.message ?: "démarrage vidéo refusé", Announcement.FAILED)
+            fail(started.exceptionOrNull()?.message ?: "video start refused", Announcement.FAILED)
             return
         }
         phase = TapPhase.RECORDING
@@ -166,7 +166,7 @@ class TapSession(
         // La prise est écrite : le micro est libre, la dictée peut reprendre pendant l'envoi.
         MicBus.release(MicBus.Owner.TAP_VIDEO)
         if (ready == null) {
-            fail("aucune vidéo à envoyer", Announcement.FAILED)
+            fail("no video to send", Announcement.FAILED)
             return
         }
         upload(ready)
@@ -181,8 +181,8 @@ class TapSession(
                 onStatus(TapStatus.Sent(summary))
                 announce(Announcement.SENT)
             },
-            onFailure = { error -> fail(error.message ?: "envoi refusé", Announcement.FAILED) },
-        ) ?: fail("délai d'envoi dépassé", Announcement.FAILED)
+            onFailure = { error -> fail(error.message ?: "send refused", Announcement.FAILED) },
+        ) ?: fail("send timed out", Announcement.FAILED)
     }
 
     /** Échec : libellé à l'écran + mot annoncé (jamais autre chose que les trois mots). */

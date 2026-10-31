@@ -33,8 +33,8 @@ data class LiveVoiceState(
  */
 fun voiceBlocker(settings: Settings, micGranted: Boolean, micBusy: Boolean): String? = when {
     !micGranted -> PermTexts.MIC_DENIED
-    !settings.sttConfigured -> "aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"
-    micBusy -> "micro déjà occupé"
+    !settings.sttConfigured -> "no dictation engine: Meta or ElevenLabs key (Settings)"
+    micBusy -> "microphone already busy"
     else -> null
 }
 
@@ -64,7 +64,7 @@ class LiveVoice(
         }
         val mic = transcript ?: MuseTranscript().also { transcript = it }
         if (!mic.start()) {
-            fail("micro indisponible")
+            fail("microphone unavailable")
             return
         }
         MicBus.acquire(MicBus.Owner.DICTATION)
@@ -82,7 +82,7 @@ class LiveVoice(
         scope.launch {
             val client = speechClient(settings())
             val outcome = if (client == null) {
-                Result.failure(ApiError.InvalidKey("aucun moteur de dictée configuré"))
+                Result.failure(ApiError.InvalidKey("no dictation engine configured"))
             } else {
                 mic.stop(client)
             }
@@ -91,7 +91,7 @@ class LiveVoice(
                     onState(LiveVoiceState(phase = LiveVoicePhase.IDLE, text = text))
                     if (text.isNotBlank()) onText(text)
                 },
-                onFailure = { error -> fail(error.message ?: "dictée impossible") },
+                onFailure = { error -> fail(error.message ?: "dictation failed") },
             )
         }
     }

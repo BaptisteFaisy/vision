@@ -117,10 +117,10 @@ class GpuMonitor(
         const val DEFAULT_PROBE_INTERVAL_MS = 10_000L
 
         /** Motif d'un `/health` qui répond 2xx sans `ok` (même lecture que le client). */
-        const val HEALTH_FALSE_REASON = "/health a répondu faux"
+        const val HEALTH_FALSE_REASON = "/health answered false"
     }
 }
 
 /** Motif affichable d'un échec : le message du client, jamais vide ni muet. */
 private fun reasonOf(error: Throwable?): String =
-    error?.message?.takeIf { it.isNotBlank() } ?: "échec inconnu"
+    error?.message?.takeIf { it.isNotBlank() } ?: "unknown failure"

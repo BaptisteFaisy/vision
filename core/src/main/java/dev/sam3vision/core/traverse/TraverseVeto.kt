@@ -64,7 +64,7 @@ enum class TraversePhase {
  */
 data class TraverseDecision(
     val state: TraversePhase,
-    /** Mot d'ordre (« attendez », « prêt », « traversez ») — la voix l'habille. */
+    /** Mot d'ordre (« wait », « ready », « cross ») — la voix l'habille. */
     val cue: String,
     /** Vrai quand un véhicule force l'attente malgré un vert éventuel. */
     val veto: Boolean,
@@ -207,9 +207,9 @@ class TraverseVeto {
     }
 
     private fun cueOf(state: TraversePhase): String = when (state) {
-        TraversePhase.ATTENDRE, TraversePhase.ALERTE -> "attendez"
-        TraversePhase.PRET -> "prêt"
-        TraversePhase.TRAVERSER -> "traversez"
+        TraversePhase.ATTENDRE, TraversePhase.ALERTE -> "wait"
+        TraversePhase.PRET -> "ready"
+        TraversePhase.TRAVERSER -> "cross"
     }
 
     /** Clé de suivi d'un véhicule entre deux frames (« Cars » et « car » fusionnent). */

@@ -9,24 +9,25 @@ import dev.sam3vision.core.distance.KnownSizes
  * on bascule par les pastilles sans quitter le direct.
  *
  * Les concepts sont en anglais (comme [LivePrompts.default]) : c'est la langue que
- * SAM 3.1 segmente le mieux. [french] traduit les labels pour les pastilles.
+ * SAM 3.1 segmente le mieux. L'affichage garde l'anglais ; [FRENCH] ne sert
+ * qu'à comprendre les mots français dictés.
  */
 object HomeModes {
 
-    /** Un preset : identifiant stable, nom français, concepts SAM. */
-    data class Preset(val id: String, val labelFr: String, val prompts: List<String>)
+    /** Un preset : identifiant stable, nom anglais, concepts SAM. */
+    data class Preset(val id: String, val label: String, val prompts: List<String>)
 
     /** Objets qu'on égare partout dans l'appartement. */
     val ESSENTIELS = Preset(
         id = "essentiels",
-        labelFr = "Essentiels",
+        label = "Essentials",
         prompts = listOf("keys", "phone", "wallet", "glasses", "tv remote", "charger", "mug"),
     )
 
     /** Santé : la boîte de médicaments, le pilulier, le thermomètre… */
     val SANTE = Preset(
         id = "sante",
-        labelFr = "Santé",
+        label = "Health",
         prompts = listOf(
             "medicine box", "pill bottle", "blister pack", "thermometer",
             "glasses case", "tissue box", "bandage",
@@ -36,7 +37,7 @@ object HomeModes {
     /** Cuisine et salon : le verre, la bouteille, les ciseaux… */
     val CUISINE = Preset(
         id = "cuisine",
-        labelFr = "Cuisine & salon",
+        label = "Kitchen & living room",
         prompts = listOf(
             "drinking glass", "bottle", "scissors", "pen", "book", "newspaper", "light switch",
         ),
@@ -48,7 +49,7 @@ object HomeModes {
     /** Preset d'ouverture du bouton Maison : les essentiels. */
     val DEFAULT: Preset = ESSENTIELS
 
-    /** Libellés français des 21 concepts maison (pastilles du bas du direct). */
+    /** Libellés français des 21 concepts maison (compréhension vocale). */
     private val FRENCH = mapOf(
         "keys" to "clés",
         "phone" to "téléphone",
@@ -79,15 +80,15 @@ object HomeModes {
     /**
      * Identifiant du preset dont les concepts sont exactement [prompts]
      * (la liste d'état du direct, déjà normalisée), `null` sinon (rue, champ
-     * « Suivre », traversée…).
+     * « Follow », traversée…).
      */
     fun activeId(prompts: List<String>): String? = ALL.firstOrNull { it.prompts == prompts }?.id
 
     /**
-     * Libellé français d'un label SAM, ou le label brut s'il n'est pas un objet
-     * maison : le mode rue garde ses étiquettes inchangées.
+     * Libellé affiché d'un label SAM : l'anglais tel quel (les concepts maison
+     * sont déjà anglais), rogné ; le mode rue garde ses étiquettes.
      */
-    fun french(label: String): String = FRENCH[label.trim().lowercase()] ?: label
+    fun display(label: String): String = label.trim()
 
     /** Les 21 concepts maison, toutes pastilles : le vocabulaire chassable à la voix. */
     val CONCEPTS: Set<String> = ALL.flatMap { it.prompts }.toSet()
@@ -140,7 +141,7 @@ object HomeModes {
     /**
      * Vrai quand le direct suit des concepts maison : un preset ([activeId]) ou
      * la chasse lancée par un mot parlé (un ou plusieurs concepts maison). La
-     * rue, la traversée et le champ « Suivre » libre n'y sont pas.
+     * rue, la traversée et le champ « Follow » libre n'y sont pas.
      */
     fun isHome(prompts: List<String>): Boolean {
         if (prompts.isEmpty()) return false

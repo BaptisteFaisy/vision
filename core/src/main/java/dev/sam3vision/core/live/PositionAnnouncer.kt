@@ -33,7 +33,7 @@ class PositionAnnouncer(
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
         val key = PositionText.key(labels)
         if (key.isEmpty()) {

@@ -95,29 +95,29 @@ class ValhallaRouteLoader(
 }
 
 /**
- * Entrée manquante : motif français actionnable (jamais un résumé à zéro,
- * que l'écran afficherait comme des distances — « Dans 0 m »).
+ * Entrée manquante : motif anglais actionnable (jamais un résumé à zéro,
+ * que l'écran afficherait comme des distances — « In 0 m »).
  */
 private fun missingInputFailure(noOrigin: Boolean): Throwable =
     IllegalStateException(
         if (noOrigin) {
-            "position de départ indisponible (activez la localisation)"
+            "starting position unavailable (enable location)"
         } else {
-            "service d'itinéraire non configuré"
+            "route service not configured"
         },
     )
 
 /** Fragment stable du refus Valhalla quand le vol d'oiseau dépasse son plafond (peu importe sa valeur). */
 private const val VALHALLA_DISTANCE_LIMIT = "exceeds the max distance limit"
 
-/** Échec `/route` final : motif français actionnable pour l'écran (jamais du JSON brut). */
+/** Échec `/route` final : motif anglais actionnable pour l'écran (jamais du JSON brut). */
 private fun routeFailure(cause: Throwable): Throwable {
     val reason = when (cause) {
-        is TimeoutCancellationException -> "délai dépassé"
+        is TimeoutCancellationException -> "timeout"
         else -> {
-            val raw = cause.message?.trim().orEmpty().ifEmpty { "réseau inaccessible" }
-            if (VALHALLA_DISTANCE_LIMIT in raw) "destination trop éloignée à pied" else raw
+            val raw = cause.message?.trim().orEmpty().ifEmpty { "network unreachable" }
+            if (VALHALLA_DISTANCE_LIMIT in raw) "destination too far on foot" else raw
         }
     }
-    return IllegalStateException("itinéraire indisponible ($reason)")
+    return IllegalStateException("route unavailable ($reason)")
 }

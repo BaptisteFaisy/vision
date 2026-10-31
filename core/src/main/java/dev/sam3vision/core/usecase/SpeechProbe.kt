@@ -8,5 +8,5 @@ object SpeechProbe {
     const val TEXT = "SAM Vision, voice check."
 
     /** Verdict lisible d'un test de synthèse (vide = texte non joué, mais réseau bon). */
-    fun verdict(bytes: Int): String = "Voix OK — %d octets MP3 reçus.".format(bytes)
+    fun verdict(bytes: Int): String = "Voice OK — %d MP3 bytes received.".format(bytes)
 }

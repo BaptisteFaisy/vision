@@ -82,8 +82,8 @@ class ProbeWiringSpokenTest {
             advanceUntilIdle()
         }
 
-        assertEquals(listOf("gauche."), attempts)
-        assertEquals(listOf("gauche."), completions)
+        assertEquals(listOf("left."), attempts)
+        assertEquals(listOf("left."), completions)
     }
 
     @Test
@@ -110,10 +110,10 @@ class ProbeWiringSpokenTest {
         }
 
         assertEquals(
-            listOf("gauche.", "droite."),
+            listOf("left.", "right."),
             attempts,
         )
-        assertEquals(listOf("droite."), completions)
+        assertEquals(listOf("right."), completions)
     }
 
     @Test

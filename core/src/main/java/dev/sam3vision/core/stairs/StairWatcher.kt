@@ -155,7 +155,7 @@ class StairWatcher(
     fun onSignal(
         signal: StairSignal,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         direction: StairDirection = StairDirection.Unknown,
         centerX: Float? = null,
         meters: Float? = null,

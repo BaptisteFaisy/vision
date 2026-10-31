@@ -77,12 +77,12 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
     )
 }
 
-/** « Dans 50 m · Encore 2,4 km · 12 min », ou « calcul en cours » sans résumé. */
+/** « In 50 m · 2.4 km left · 12 min », ou « calcul en cours » sans résumé. */
 private fun remainingLine(state: VoiceNavUiState.Guiding): String =
     if (state.summary == null && !state.update.arrived) {
-        "Calcul de l'itinéraire…"
+        "Calculating the route…"
     } else {
-        "${state.update.maneuverFr()} · ${state.update.remainingFr()}"
+        "${state.update.maneuver()} · ${state.update.remaining()}"
     }
 
 /** Bouton d'arrêt : même rouge danger que l'écran de guidage historique. */
@@ -93,7 +93,7 @@ private fun StopGuidanceButton(onStop: () -> Unit, zones: NavButtonZones, modifi
         modifier = modifier.navZone(NAV_STOP_ID, zones).height(48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = AppColors.danger),
     ) {
-        Text("Arrêter le guidage", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text("Stop guidance", fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
 

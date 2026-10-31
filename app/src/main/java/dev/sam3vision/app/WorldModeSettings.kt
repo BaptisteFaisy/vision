@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Monde » des Réglages : l'interrupteur dehors/dedans câblé
+ * Section « World » des Réglages : l'interrupteur dehors/dedans câblé
  * sur [Settings.outdoorMode] (`outdoor_mode` en prefs).
  *
  * Dehors (défaut à l'installation) : la sonde suit les 12 dangers de la rue,
@@ -23,16 +23,16 @@ import dev.sam3vision.core.settings.Settings
 internal fun WorldModeSettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Monde — dehors / dedans",
+            "World — outdoors / indoors",
             color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        SwitchRow("Dehors : rue + GPS (éteint = dedans)", draft.outdoorMode) {
+        SwitchRow("Outdoors: street + GPS (off = indoors)", draft.outdoorMode) {
             onChange(draft.copy(outdoorMode = it))
         }
         Text(
-            "Dedans : objets d'intérieur, pas de GPS.",
+            "Indoors: indoor objects, no GPS.",
             color = SettingsLight.muted,
             fontSize = 12.sp,
         )

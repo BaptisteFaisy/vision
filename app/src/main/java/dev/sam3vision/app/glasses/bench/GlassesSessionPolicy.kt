@@ -72,14 +72,14 @@ internal data class RegistrationDecision(val step: RegistrationStep, val message
  */
 internal fun registrationDecision(state: RegistrationState): RegistrationDecision = when (state) {
     RegistrationState.REGISTERED ->
-        RegistrationDecision(RegistrationStep.OPEN_SESSION, "lunettes enregistrées")
+        RegistrationDecision(RegistrationStep.OPEN_SESSION, "glasses registered")
 
     RegistrationState.AVAILABLE ->
-        RegistrationDecision(RegistrationStep.REQUEST_REGISTRATION, "en attente d'enregistrement")
+        RegistrationDecision(RegistrationStep.REQUEST_REGISTRATION, "waiting for registration")
 
-    RegistrationState.REGISTERING -> logOnly("enregistrement en cours")
-    RegistrationState.UNREGISTERING -> logOnly("désenregistrement en cours")
-    RegistrationState.UNAVAILABLE -> logOnly("aucune paire de lunettes disponible")
+    RegistrationState.REGISTERING -> logOnly("registration in progress")
+    RegistrationState.UNREGISTERING -> logOnly("unregistration in progress")
+    RegistrationState.UNAVAILABLE -> logOnly("no glasses pair available")
 }
 
 private fun logOnly(message: String) =
@@ -176,22 +176,22 @@ private fun registrationHelp(state: RegistrationState): String? = when (state) {
 }
 
 private const val DEV_MODE_HELP =
-    "Developer Mode inactif : app Meta AI → Settings → App Info → taper 5× le numéro de version, puis Enable"
+    "Developer Mode inactive: Meta AI app → Settings → App Info → tap the version number 5×, then Enable"
 
 private const val REGISTRATION_HELP =
-    "enregistrement à accepter : la fenêtre de l'app Meta AI va s'ouvrir, confirme-la"
+    "registration to accept: the Meta AI app window is about to open, confirm it"
 
 private const val REGISTERING_HELP =
-    "enregistrement en cours : reste dans l'app Meta AI jusqu'à la confirmation"
+    "registration in progress: stay in the Meta AI app until confirmed"
 
 private const val NO_REGISTRATION_HELP =
-    "aucune paire disponible pour l'enregistrement : lunettes allumées, portées et appairées dans Meta AI"
+    "no pair available for registration: glasses on, worn and paired in Meta AI"
 
 private const val NO_DEVICE_HELP =
-    "le SDK ne voit aucune lunette : appaire la paire dans l'app Meta AI (lunettes en mode appairage, Bluetooth allumé), puis relance"
+    "the SDK sees no glasses: pair them in the Meta AI app (glasses in pairing mode, Bluetooth on), then restart"
 
 private const val CAMERA_HELP =
-    "caméra non accordée à cette app : Meta AI → Settings → App connections → SAM Vision (spike lunettes) → Caméra → Always allow"
+    "camera not granted to this app: Meta AI → Settings → App connections → SAM Vision (glasses spike) → Camera → Always allow"
 
 private const val READY_HELP =
-    "prêt : %d paire(s) vue(s) par le SDK, caméra accordée"
+    "ready: %d pair(s) seen by the SDK, camera granted"

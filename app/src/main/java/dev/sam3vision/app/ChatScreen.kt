@@ -65,9 +65,9 @@ fun ChatScreen(
         }
     }
     Column(Modifier.fillMaxSize().background(AppColors.background).statusBarsPadding().navigationBarsPadding()) {
-        ScreenHeader("Questions sur la photo", null, onBack, null)
+        ScreenHeader("Questions about the photo", null, onBack, null)
         if (state.chat.isEmpty() && !state.asking) {
-            StatusBanner("Pose ta question sur la photo — le modèle répond à partir de l'image.", AppColors.surfaceHigh)
+            StatusBanner("Ask your question about the photo — the model answers from the image.", AppColors.surfaceHigh)
         }
         MessageList(state, onSpeak, onStopVoice, Modifier.weight(1f))
         state.statusLine?.let { StatusBanner(it, AppColors.warning) }
@@ -114,7 +114,7 @@ private fun MessageList(
     }
 }
 
-/** Champ de saisie + bouton « Dicter » (Meta, repli Scribe) + envoi. */
+/** Champ de saisie + bouton « Dictate » (Meta, repli Scribe) + envoi. */
 @Composable
 private fun ChatComposer(
     state: UiState,
@@ -146,7 +146,7 @@ private fun ChatComposer(
         OutlinedTextField(
             value = draft,
             onValueChange = onDraft,
-            placeholder = { Text("Ex. : qu'y a-t-il à gauche ?", color = AppColors.textMuted, fontSize = 14.sp) },
+            placeholder = { Text("E.g.: what's on the left?", color = AppColors.textMuted, fontSize = 14.sp) },
             singleLine = true,
             enabled = !state.asking,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -155,18 +155,18 @@ private fun ChatComposer(
         )
         DictationButton(state.dictation, toggleMic)
         TextButton(onClick = onSend, enabled = draft.isNotBlank() && !state.asking) {
-            Text("Envoyer", fontSize = 15.sp)
+            Text("Send", fontSize = 15.sp)
         }
     }
 }
 
-/** Libellé selon l'état : « Dicter », « Stop », ou points de suspension pendant la transcription. */
+/** Libellé selon l'état : « Dictate », « Stop », ou points de suspension pendant la transcription. */
 @Composable
 private fun DictationButton(dictation: DictationState, onClick: () -> Unit) {
     val label = when {
         dictation.busy -> "…"
         dictation.recording -> "Stop"
-        else -> "Dicter"
+        else -> "Dictate"
     }
     TextButton(onClick = onClick, enabled = !dictation.busy) {
         Text(label, fontSize = 15.sp, color = if (dictation.recording) AppColors.danger else AppColors.primary)

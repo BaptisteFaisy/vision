@@ -50,7 +50,7 @@ class SettingsStoreParityTest {
         googleMapsApiKey = "cle-google-persistee",
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
-        speechLanguage = SpeechLanguage.Fr,
+        speechLanguage = SpeechLanguage.En,
         routeBaseUrl = "https://route.test",
     )
 
@@ -72,7 +72,7 @@ class SettingsStoreParityTest {
         assertEquals(true, relu.adaptiveUploadEnabled)
         assertEquals(true, relu.keyframeSchedulerEnabled)
         assertEquals(SamRegion.Us, relu.samRegion)
-        assertEquals(SpeechLanguage.Fr, relu.speechLanguage)
+        assertEquals(SpeechLanguage.En, relu.speechLanguage)
         assertEquals("https://route.test", relu.routeBaseUrl)
     }
 

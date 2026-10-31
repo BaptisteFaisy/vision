@@ -49,22 +49,22 @@ class ModelPinTest {
         val noKey = Settings.Default.copy(llmApiKey = "")
         val keyed = Settings.Default.copy(llmApiKey = "une-cle")
 
-        assertEquals("clé LLM : absente", llmKeyStatus(noKey, null))
+        assertEquals("LLM key: missing", llmKeyStatus(noKey, null))
         assertEquals(
-            "clé LLM : renseignée, non testée (« Tester le LLM »)",
+            "LLM key: entered, untested (“Test LLM”)",
             llmKeyStatus(keyed, null),
         )
         assertEquals(
-            "clé LLM : renseignée, non testée (« Tester le LLM »)",
+            "LLM key: entered, untested (“Test LLM”)",
             llmKeyStatus(keyed, "Réglages enregistrés."),
         )
         assertEquals(
-            "clé LLM : chauffée (dernier test OK)",
+            "LLM key: warmed (last test OK)",
             llmKeyStatus(keyed, "LLM OK — « un mur vert »"),
         )
         assertEquals(
-            "clé LLM : en échec (dernier test KO)",
-            llmKeyStatus(keyed, "LLM KO — 401"),
+            "LLM key: failing (last test failed)",
+            llmKeyStatus(keyed, "LLM failed — 401"),
         )
     }
 
@@ -76,14 +76,14 @@ class ModelPinTest {
             "LLM OK — « ok »",
         )
 
-        val questions = lines.single { it.startsWith("questions :") }
-        val direct = lines.single { it.startsWith("direct :") }
+        val questions = lines.single { it.startsWith("questions:") }
+        val direct = lines.single { it.startsWith("live:") }
 
         assertTrue(questions.contains("meta-models/muse-spark-open-1026"))
         assertTrue(questions.contains("https://inference.baseten.co/v1"))
         assertTrue(direct.contains("meta-models/muse-spark-open-1026"))
         assertTrue(direct.contains("https://inference.baseten.co/v1"))
-        assertTrue(lines.any { it.contains("chauffée") })
+        assertTrue(lines.any { it.contains("warmed") })
         assertTrue(lines.none { it.startsWith("⚠") })
     }
 
@@ -92,8 +92,8 @@ class ModelPinTest {
         val line = debugModelsLine(Settings.Default.copy(liveLlmApiKey = "cle-live"))
 
         assertTrue(line.contains("meta-models/muse-spark-open-1026"))
-        assertTrue(line.contains("live : meta-models/muse-spark-open-1026"))
-        assertTrue(line.contains("clé OK"))
-        assertTrue(debugModelsLine(Settings.Default).contains("sans clé"))
+        assertTrue(line.contains("live: meta-models/muse-spark-open-1026"))
+        assertTrue(line.contains("key OK"))
+        assertTrue(debugModelsLine(Settings.Default).contains("no key"))
     }
 }

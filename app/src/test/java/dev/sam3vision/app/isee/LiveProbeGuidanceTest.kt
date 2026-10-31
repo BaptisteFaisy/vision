@@ -60,7 +60,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Tout droit.", probe.state.value.spoken)
+        assertEquals("Straight.", probe.state.value.spoken)
     }
 
     @Test
@@ -79,7 +79,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("gauche.", probe.state.value.spoken)
+        assertEquals("left.", probe.state.value.spoken)
     }
 
     @Test
@@ -94,7 +94,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Tout droit.", probe.state.value.spoken)
+        assertEquals("Straight.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
 
         probe.onFrame("C", captureAtNs = 20_000_000L)
@@ -102,7 +102,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("gauche.", probe.state.value.spoken)
+        assertEquals("left.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
 
         val (sonde, faux) = harness(this, guide = false, announce = true)
@@ -131,7 +131,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame(listOf(gobelet())))
         advanceUntilIdle()
 
-        assertEquals("obstacle, arrêtez-vous.", probe.state.value.spoken)
+        assertEquals("obstacle, stop.", probe.state.value.spoken)
         assertTrue(probe.state.value.spokenUrgent)
     }
 

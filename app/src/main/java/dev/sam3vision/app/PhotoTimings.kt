@@ -36,7 +36,7 @@ class PhotoTimings(
     /** Durée d'un jalon depuis le début, -1 si non mesuré. */
     fun sinceStart(name: String): Long = marks[name]?.let { it - startedAt } ?: -1L
 
-    /** `photo charge=40 sam=60 analyse=800 overlays=48 total=1000` (deltas). */
+    /** `photo load=40 sam=60 analysis=800 overlays=48 total=1000` (deltas). */
     fun summary(): String = buildString {
         append("photo")
         var prev = startedAt

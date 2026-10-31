@@ -74,7 +74,7 @@ class GlassesVoice(
      * « lunettes » : ce choix prend aussi une paire d'écouteurs si elle est là.
      */
     fun routeToGlasses(preferredName: String? = null): String {
-        val manager = audio ?: return logLine("voix : sortie par défaut (AudioManager indisponible)")
+        val manager = audio ?: return logLine("voice: default output (AudioManager unavailable)")
         // Lecture d'`AudioManager` et rang des types : partagés avec la production
         // (`glasses/GlassesAudioRoute.kt`), une seule décision pour les deux.
         val available = bluetoothOutputs(manager)
@@ -82,9 +82,9 @@ class GlassesVoice(
         route = available.firstOrNull { it.first == picked }?.second
         return logLine(
             if (picked != null) {
-                "voix : Bluetooth « ${picked.name} » (type ${picked.type})"
+                "voice: Bluetooth « ${picked.name} » (type ${picked.type})"
             } else {
-                "voix : haut-parleur — aucune sortie Bluetooth utilisable"
+                "voice: speaker — no usable Bluetooth output"
             },
         )
     }
@@ -128,7 +128,7 @@ class GlassesVoice(
             val mp = MediaPlayer().also { player = it }
             val settled = Settle(cont)
             runCatching { prepare(mp, mp3, settled) }.onFailure { error ->
-                settled.finish("lecture audio impossible : ${shortErrorMessage(error)}")
+                settled.finish("audio playback impossible: ${shortErrorMessage(error)}")
                 releasePlayer(mp)
             }
             cont.invokeOnCancellation { mainHandler.post { releasePlayer(mp) } }
@@ -148,7 +148,7 @@ class GlassesVoice(
         }
         mp.setOnCompletionListener { done -> releasePlayer(done) }
         mp.setOnErrorListener { failed, what, extra ->
-            settled.finish("lecture audio impossible ($what/$extra)")
+            settled.finish("audio playback impossible ($what/$extra)")
             releasePlayer(failed)
             true
         }
@@ -168,7 +168,7 @@ class GlassesVoice(
         /** Au-delà de [timeoutMs] sans démarrage, [onLate] libère le lecteur et l'attente rend la main. */
         fun arm(timeoutMs: Long, onLate: () -> Unit) {
             val late = Runnable {
-                finish("lecture audio : délai dépassé")
+                finish("audio playback: timed out")
                 onLate()
             }
             watchdog = late

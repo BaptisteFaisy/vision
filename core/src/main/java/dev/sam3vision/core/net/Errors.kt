@@ -7,23 +7,23 @@ package dev.sam3vision.core.net
  */
 sealed class ApiError(message: String, cause: Throwable? = null) : Exception(message, cause) {
 
-    class InvalidKey(message: String = "clé invalide (401)") : ApiError(message)
+    class InvalidKey(message: String = "invalid key (401)") : ApiError(message)
 
-    class RateLimited(message: String = "limite atteinte (429)") : ApiError(message)
+    class RateLimited(message: String = "limit reached (429)") : ApiError(message)
 
     /**
      * 402 : compte sans crédits ou facturation non configurée (Meta ASR), ou voix de
      * bibliothèque ElevenLabs refusée en plan free — prendre alors une voix premade.
      */
     class PaymentRequired(
-        message: String = "paiement requis (402) : compte sans crédits ou facturation non " +
-            "configurée (voix ElevenLabs de bibliothèque ? prends une premade, ex. Sarah)",
+        message: String = "payment required (402): account out of credits or billing not " +
+            "configured (ElevenLabs library voice? take a premade one, e.g. Sarah)",
     ) : ApiError(message)
 
-    class Timeout(message: String = "backend injoignable : délai dépassé") : ApiError(message)
+    class Timeout(message: String = "backend unreachable: timeout") : ApiError(message)
 
     class Network(
-        message: String = "backend injoignable : réseau",
+        message: String = "backend unreachable: network",
         cause: Throwable? = null,
     ) : ApiError(message, cause)
 
@@ -33,11 +33,11 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
      * il faut la redéployer. Le message parle à l'utilisateur du téléphone, pas à un shell.
      */
     class BackendStopped(
-        message: String = "GPU SAM éteint — demande à b de l'allumer",
+        message: String = "SAM GPU off — ask b to turn it on",
     ) : ApiError(message)
 
     class Http(val code: Int, val body: String) :
-        ApiError("erreur HTTP $code" + if (body.isBlank()) "" else " : ${body.take(160)}")
+        ApiError("HTTP error $code" + if (body.isBlank()) "" else ": ${body.take(160)}")
 
     companion object {
         /**
@@ -49,10 +49,10 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
         fun isRouteMissing(error: Throwable): Boolean = error is Http && error.code == 404
     }
 
-    class BadResponse(detail: String) : ApiError("réponse inattendue : $detail")
+    class BadResponse(detail: String) : ApiError("unexpected response: $detail")
 
     /** Le moteur principal et son repli ont tous deux échoué (messages déjà rédigés). */
-    class AllProviders(detail: String) : ApiError("dictée impossible : $detail")
+    class AllProviders(detail: String) : ApiError("dictation failed: $detail")
 
     /** Opération que ce client ne sait pas rendre (ex. question sans image) : rien à réessayer. */
     class NotSupported(message: String) : ApiError(message)

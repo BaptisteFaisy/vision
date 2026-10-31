@@ -93,14 +93,14 @@ data class NavRoute(
  */
 sealed class RouteError(message: String) : Exception(message) {
     /** Moins de deux manœuvres : pas de départ ni d'arrivée à guider. */
-    class TooFewManeuvers : RouteError("itinéraire vide : départ et arrivée requis")
+    class TooFewManeuvers : RouteError("empty route: start and arrival required")
 
     /** La première manœuvre n'est pas un départ. */
-    class MissingStart : RouteError("itinéraire sans point de départ")
+    class MissingStart : RouteError("route without a start point")
 
     /** La dernière manœuvre n'est pas une arrivée. */
-    class MissingArrival : RouteError("itinéraire sans point d'arrivée")
+    class MissingArrival : RouteError("route without an arrival point")
 
     /** Coordonnées non finies à la manœuvre [index]. */
-    class BadPoint(val index: Int) : RouteError("manœuvre $index sans coordonnées")
+    class BadPoint(val index: Int) : RouteError("maneuver $index without coordinates")
 }

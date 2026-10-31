@@ -103,7 +103,7 @@ class HandrailWatcher(
     fun onSignal(
         signal: HandrailSignal,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): HandrailCue? {
         if (!signal.detected) {
             hits = 0

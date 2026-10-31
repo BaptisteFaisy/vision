@@ -49,7 +49,7 @@ class FenceOpeningWatcher(
     fun onSignal(
         signal: FenceOpeningSignal,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         centerX: Float? = null,
     ): FenceOpeningCue? {
         val state = signal.state

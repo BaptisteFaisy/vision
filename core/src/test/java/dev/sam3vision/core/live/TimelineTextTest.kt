@@ -22,16 +22,16 @@ class TimelineTextTest {
 
     @Test
     fun `le temps relatif est lisible`() {
-        assertEquals("à l'instant", TimelineText.ago(1_000L, 1_000L))
-        assertEquals("il y a 3 s", TimelineText.ago(4_000L, 1_000L))
-        assertEquals("il y a 1 min 05 s", TimelineText.ago(66_000L, 1_000L))
+        assertEquals("just now", TimelineText.ago(1_000L, 1_000L))
+        assertEquals("3 s ago", TimelineText.ago(4_000L, 1_000L))
+        assertEquals("1 min 05 s ago", TimelineText.ago(66_000L, 1_000L))
     }
 
     @Test
     fun `la position suit le cadran horaire`() {
-        assertEquals("à 9 heures", TimelineText.position(track(centerX = 0.1f)))
-        assertEquals("à midi", TimelineText.position(track(centerX = 0.5f)))
-        assertEquals("à 3 heures", TimelineText.position(track(centerX = 0.9f)))
+        assertEquals("at 9 o'clock", TimelineText.position(track(centerX = 0.1f)))
+        assertEquals("at 12 o'clock", TimelineText.position(track(centerX = 0.5f)))
+        assertEquals("at 3 o'clock", TimelineText.position(track(centerX = 0.9f)))
     }
 
     @Test
@@ -46,29 +46,29 @@ class TimelineTextTest {
         val line = TimelineText.describe(summary)
 
         assertTrue(line.contains("personne"))
-        assertTrue(line.contains("9 heures"))
-        assertTrue(line.contains("il y a 3 s"))
+        assertTrue(line.contains("9 o'clock"))
+        assertTrue(line.contains("3 s ago"))
     }
 
     @Test
     fun `une fenetre vide le dit`() {
         val summary = TimelineSummary(0L, 10_000L, emptyList())
-        assertTrue(TimelineText.describe(summary).contains("rien de visible"))
+        assertTrue(TimelineText.describe(summary).contains("nothing visible"))
     }
 
     @Test
     fun `le contexte reunit la fenetre globale et le point focal`() {
         val global = TimelineSummary(0L, 10_000L, listOf(track()))
         val focus = TimelineSummary(4_000L, 6_000L, listOf(track(lastAtMs = 5_000L)))
-        val context = TimelineText.context(global, focus, "Il y a 5 s")
+        val context = TimelineText.context(global, focus, "5 s ago")
 
-        assertTrue(context.contains("Ce que la caméra a vu récemment"))
-        assertTrue(context.contains("Il y a 5 s"))
+        assertTrue(context.contains("What the camera saw recently"))
+        assertTrue(context.contains("5 s ago"))
     }
 
     @Test
     fun `l etiquette des pastilles est compacte`() {
         val label = TimelineText.chipLabel(8_000L, track(label = "chien", lastAtMs = 5_000L))
-        assertEquals("chien · il y a 3 s", label)
+        assertEquals("chien · 3 s ago", label)
     }
 }

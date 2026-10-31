@@ -196,9 +196,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
-    /** Bouton « Démarrer » de la confirmation sur l'accueil. */
+    /** Bouton « Start » de la confirmation sur l'accueil. */
     fun confirmVoiceNavDestination() = viewModelScope.launch { voiceNav.session.confirmDestination() }
-    /** Bouton « Annuler » de la confirmation sur l'accueil. */
+    /** Bouton « Cancel » de la confirmation sur l'accueil. */
     fun cancelVoiceNavConfirmation() = voiceNav.session.cancelConfirmation()
     /** Saisie clavier sur l'accueil : pseudo-dictée « aller à … » vers la session. */
     fun submitTypedVoiceNavDestination(text: String) = voiceNav.submitTyped(text)

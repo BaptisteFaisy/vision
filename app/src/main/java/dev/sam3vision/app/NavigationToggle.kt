@@ -30,7 +30,7 @@ internal fun NavigationToggle(draft: Settings, onChange: (Settings) -> Unit) {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        SwitchRow("Guider vers la destination confirmée", draft.navigationGuidanceEnabled) {
+        SwitchRow("Guide to the confirmed destination", draft.navigationGuidanceEnabled) {
             onChange(draft.copy(navigationGuidanceEnabled = it))
         }
         LabeledField("URL Valhalla (vide = guidage Google Maps uniquement)", draft.routeBaseUrl, false) {

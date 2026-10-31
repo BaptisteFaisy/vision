@@ -38,7 +38,7 @@ class TapPhotoFallbackTest {
             frames = { "fake-jpeg-b64" },
         )
 
-        assertEquals("objets : personne (92 %), chaise (78 %)", sender(clip).getOrNull())
+        assertEquals("objects: personne (92 %), chaise (78 %)", sender(clip).getOrNull())
         assertEquals(1, segment.calls)
     }
 
@@ -73,7 +73,7 @@ class TapPhotoFallbackTest {
 
         val failure = sender(clip).exceptionOrNull()
         assertTrue(failure is ApiError.BadResponse)
-        assertTrue(failure?.message.orEmpty().contains("première frame illisible"))
+        assertTrue(failure?.message.orEmpty().contains("first frame unreadable"))
         assertEquals(0, segment.calls)
     }
 
@@ -91,13 +91,13 @@ class TapPhotoFallbackTest {
 
     @Test
     fun `segment vide donne aucun objet detecte`() {
-        assertEquals("aucun objet détecté", segmentSummary(segmentOf()))
+        assertEquals("no object detected", segmentSummary(segmentOf()))
     }
 
     @Test
     fun `le resume cite au plus huit objets`() {
         val result = segmentSummary(segmentOf("a", "b", "c", "d", "e", "f", "g", "h", "i"))
-        assertTrue(result.startsWith("objets : "))
+        assertTrue(result.startsWith("objects: "))
         assertTrue(result.endsWith(", …"))
         assertTrue(!result.contains("i ("))
     }

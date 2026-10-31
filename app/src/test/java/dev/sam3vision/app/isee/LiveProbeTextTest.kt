@@ -32,10 +32,10 @@ class LiveProbeTextTest {
     @Test
     fun `ligne compacte avec des chiffres`() {
         val line = liveProbeHeadline(ready())
-        assertTrue(line.startsWith("SAM · 1,4 ips"))
+        assertTrue(line.startsWith("SAM · 1.4 fps"))
         assertTrue(line.contains("640 ms"))
-        assertTrue(line.contains("8 objets"))
-        assertTrue(line.endsWith("8 objets"))
+        assertTrue(line.contains("8 objects"))
+        assertTrue(line.endsWith("8 objects"))
     }
 
     @Test
@@ -53,12 +53,12 @@ class LiveProbeTextTest {
     @Test
     fun `detail complet quand une frame est passee`() {
         val details = liveProbeDetails(ready())
-        assertTrue(details.any { it.startsWith("endpoint : baptiste-faisy--") })
-        assertTrue(details.contains("frame : 512×384"))
-        assertTrue(details.contains("latence : 640 ms · p95 910 ms · serveur 520 ms"))
-        assertTrue(details.contains("12 frames · 0 masques"))
-        assertTrue(details.contains("reconnus : person, chair"))
-        assertTrue(details.contains("gpu : A100-SXM4-40GB"))
+        assertTrue(details.any { it.startsWith("endpoint: baptiste-faisy--") })
+        assertTrue(details.contains("frame: 512×384"))
+        assertTrue(details.contains("latency: 640 ms · p95 910 ms · server 520 ms"))
+        assertTrue(details.contains("12 frames · 0 masks"))
+        assertTrue(details.contains("recognized: person, chair"))
+        assertTrue(details.contains("gpu: A100-SXM4-40GB"))
     }
 
     @Test
@@ -69,7 +69,7 @@ class LiveProbeTextTest {
     @Test
     fun `erreur ajoutee au detail`() {
         val details = liveProbeDetails(LiveProbeState(frames = 1, error = "délai dépassé"))
-        assertTrue(details.contains("erreur : délai dépassé"))
+        assertTrue(details.contains("error: délai dépassé"))
     }
 
     @Test
@@ -100,15 +100,15 @@ class LiveProbeTextTest {
             distanceLayer = DistanceLayer(512, 384, listOf(reading("person", 3.2f), reading("chair", 1.1f))),
         )
         val line = liveProbeHeadline(state)
-        assertTrue(line.contains("8 objets"))
-        assertTrue(line.contains("plus proche ≈ 1,1 m"))
-        assertTrue(line.endsWith("plus proche ≈ 1,1 m"))
+        assertTrue(line.contains("8 objects"))
+        assertTrue(line.contains("closest ≈ 1.1 m"))
+        assertTrue(line.endsWith("closest ≈ 1.1 m"))
     }
 
     @Test
     fun `sans distance mesuree rien n_est ajoute`() {
         assertEquals(
-            "SAM · 1,4 ips · 640 ms · 8 objets",
+            "SAM · 1.4 fps · 640 ms · 8 objects",
             liveProbeHeadline(ready()),
         )
     }
@@ -124,8 +124,8 @@ class LiveProbeTextTest {
             spoken = "Personne à gauche, à 3,2 mètres",
         )
         val details = liveProbeDetails(state)
-        assertTrue(details.contains("distances : laptop ≈ 85 cm · chair ≈ 1,1 m · person ≈ 3,2 m"))
-        assertTrue(details.contains("dit : Personne à gauche, à 3,2 mètres"))
+        assertTrue(details.contains("distances: laptop ≈ 85 cm · chair ≈ 1.1 m · person ≈ 3.2 m"))
+        assertTrue(details.contains("said: Personne à gauche, à 3,2 mètres"))
     }
 
     @Test
@@ -137,10 +137,10 @@ class LiveProbeTextTest {
     @Test
     fun `sans masque on dit pourquoi`() {
         assertEquals(
-            "réveil du GPU SAM… (≈ 30 s au premier lancement)",
+            "waking the SAM GPU… (≈ 30 s on first launch)",
             liveProbeNotice(LiveProbeState(warming = true)),
         )
-        assertEquals("en attente de la première analyse…", liveProbeNotice(LiveProbeState()))
+        assertEquals("waiting for the first analysis…", liveProbeNotice(LiveProbeState()))
         assertEquals(
             "GPU SAM éteint — demande à b de l'allumer",
             liveProbeNotice(LiveProbeState(error = "GPU SAM éteint — demande à b de l'allumer")),
@@ -155,8 +155,8 @@ class LiveProbeTextTest {
     @Test
     fun `le panneau montre les huit concepts suivis`() {
         val details = liveProbeDetails(ready())
-        assertTrue(details.contains("suivis (8) : person, chair, table, laptop, bottle, cup, bag, door"))
-        assertTrue(details.contains("reconnus : person, chair"))
+        assertTrue(details.contains("tracked (8): person, chair, table, laptop, bottle, cup, bag, door"))
+        assertTrue(details.contains("recognized: person, chair"))
     }
 
     /** Chronologie complète d'une frame, telle que les marques réelles la produisent. */
@@ -179,40 +179,40 @@ class LiveProbeTextTest {
     @Test
     fun `la chronologie tient sur une seule ligne du panneau`() {
         val line = liveProbeTimingsLine(ready().copy(timings = timed()))
-        assertEquals("latence 348 · capt 22 · up 61 · srv 92 · rtt 153 · masque 37 · pixel 8", line)
+        assertEquals("latency 348 · capt 22 · up 61 · srv 92 · rtt 153 · mask 37 · pixel 8", line)
         assertFalse(line.contains("\n"))
     }
 
     @Test
     fun `le detail ajoute la chronologie et les etages serveur`() {
         val details = liveProbeDetails(ready().copy(timings = timed()))
-        assertTrue(details.contains("capture → jpeg : 22 ms"))
-        assertTrue(details.contains("envoi → réponse : 153 ms (dont serveur 92 ms, réseau + file 61 ms)"))
-        assertTrue(details.contains("latence perçue : 348 ms"))
-        assertTrue(details.contains("serveur : vision 47 ms · detr 38 ms"))
+        assertTrue(details.contains("capture → jpeg: 22 ms"))
+        assertTrue(details.contains("send → response: 153 ms (incl. server 92 ms, network + queue 61 ms)"))
+        assertTrue(details.contains("perceived latency: 348 ms"))
+        assertTrue(details.contains("server: vision 47 ms · detr 38 ms"))
     }
 
     @Test
     fun `sans chronologie le detail ne rajoute aucune ligne`() {
         val details = liveProbeDetails(ready())
         assertFalse(details.any { it.startsWith("capture → jpeg") })
-        assertFalse(details.any { it.startsWith("serveur :") })
+        assertFalse(details.any { it.startsWith("server:") })
     }
 
     @Test
     fun `le panneau reste muet sur les concepts avant la premiere frame`() {
         val details = liveProbeDetails(LiveProbeState())
-        assertTrue(details.none { it.startsWith("suivis") })
+        assertTrue(details.none { it.startsWith("tracked") })
     }
 
     @Test
     fun `l'echec dit reveil gpu sur delai depasse`() {
         assertEquals(
-            "réveil du GPU en cours… (nouvel essai à la frame suivante)",
+            "GPU waking up… (retrying on the next frame)",
             probeFailureText(ApiError.Timeout()),
         )
-        assertEquals("réponse inattendue : boom", probeFailureText(ApiError.BadResponse("boom")))
-        assertEquals("échec de l'appel SAM", probeFailureText(RuntimeException()))
+        assertEquals("unexpected response: boom", probeFailureText(ApiError.BadResponse("boom")))
+        assertEquals("SAM call failed", probeFailureText(RuntimeException()))
     }
 
     @Test

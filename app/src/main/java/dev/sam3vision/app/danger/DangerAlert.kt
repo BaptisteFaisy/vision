@@ -11,7 +11,7 @@ data class DangerAlert(
     val persons: Int,
 ) {
     /** Ligne lue à la voix plus tard, affichée en statut dès maintenant. */
-    fun line(): String = "⚠ Personne droit devant — contact dans ~${ttcSec.coerceAtLeast(1f).toInt()} s"
+    fun line(): String = "⚠ Person straight ahead — contact in ~${ttcSec.coerceAtLeast(1f).toInt()} s"
 
     companion object {
         /**

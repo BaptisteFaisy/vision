@@ -37,7 +37,7 @@ internal const val FALLBACK_LLM_MODEL = Settings.DEFAULT_LLM_MODEL
 
 /** 402 côté LLM : budget du fournisseur, jamais la voix ElevenLabs. */
 private const val LLM_PAYMENT_LINE =
-    "IA refusée (402) : aucun fournisseur dans ton budget — augmente le plafond ou change de modèle"
+    "AI refused (402): no provider in your budget — raise the cap or change model"
 
 /**
  * Implémentation OkHttp d'un endpoint compatible OpenAI (`POST {baseUrl}/chat/completions`).
@@ -136,7 +136,7 @@ class HttpLlmClient(
      */
     private suspend fun postChat(messages: JSONArray, maxTokens: Int = MAX_TOKENS): Result<String> {
         if (apiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("clé API absente — renseigne-la dans Réglages"))
+            return Result.failure(ApiError.InvalidKey("API key missing — enter it in Settings"))
         }
         endpointRefusal("endpoint LLM", baseUrl, "/chat/completions")?.let { return Result.failure(it) }
         var current = model
@@ -180,16 +180,16 @@ class HttpLlmClient(
     }
 
     private fun extractContent(raw: String): String {
-        val json = parse(raw) ?: throw ApiError.BadResponse("corps de réponse illisible")
+        val json = parse(raw) ?: throw ApiError.BadResponse("unreadable response body")
         json.optJSONObject("error")?.let { refused ->
-            val message = refused.optString("message").ifBlank { "erreur" }.take(160)
-            throw ApiError.BadResponse("le fournisseur a refusé : $message")
+            val message = refused.optString("message").ifBlank { "error" }.take(160)
+            throw ApiError.BadResponse("the provider refused: $message")
         }
         val choices = json.optJSONArray("choices") ?: throw ApiError.BadResponse("pas de choices")
         val first = choices.optJSONObject(0) ?: throw ApiError.BadResponse("choices vide")
-        val message = first.optJSONObject("message") ?: throw ApiError.BadResponse("pas de message")
+        val message = first.optJSONObject("message") ?: throw ApiError.BadResponse("no message")
         val content = messageContent(message)
-        if (content.isBlank()) throw ApiError.BadResponse("contenu vide")
+        if (content.isBlank()) throw ApiError.BadResponse("empty content")
         return content
     }
 }

@@ -80,8 +80,8 @@ private fun MemoryHeader(onClose: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Mémoire du direct", color = AppColors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Chip("Fermer", AppColors.surfaceHigh, onClose)
+        Text("Live memory", color = AppColors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Chip("Close", AppColors.surfaceHigh, onClose)
     }
 }
 
@@ -89,7 +89,7 @@ private fun MemoryHeader(onClose: () -> Unit) {
 @Composable
 private fun SeenChips(tracks: List<SeenTrack>, nowMs: Long) {
     if (tracks.isEmpty()) {
-        Text("Rien vu pour l'instant.", color = AppColors.textMuted, fontSize = 13.sp)
+        Text("Nothing seen yet.", color = AppColors.textMuted, fontSize = 13.sp)
         return
     }
     Row(
@@ -110,7 +110,7 @@ private fun FocusChips(selected: Int, onFocus: (Int) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         FOCUS_CHOICES.forEach { seconds ->
-            val label = if (seconds == 0) "maintenant" else "il y a $seconds s"
+            val label = if (seconds == 0) "now" else "$seconds s ago"
             val color = if (seconds == selected) AppColors.success else AppColors.surfaceHigh
             Chip(label, color, onClick = { onFocus(seconds) })
         }
@@ -137,7 +137,7 @@ private fun AskRow(
             value = draft,
             onValueChange = onChange,
             singleLine = true,
-            placeholder = { Text("Qu'y avait-il à gauche il y a 5 s ?", color = AppColors.textMuted, fontSize = 13.sp) },
+            placeholder = { Text("What was on the left 5 s ago?", color = AppColors.textMuted, fontSize = 13.sp) },
             modifier = Modifier.weight(1f),
         )
         VoiceChip(voice, asking, onVoiceStart, onVoiceStop)
@@ -148,7 +148,7 @@ private fun AskRow(
                 modifier = Modifier.size(24.dp),
             )
         } else {
-            Chip("Demander", AppColors.primary, onClick = { if (draft.isNotBlank()) onSend() })
+            Chip("Ask", AppColors.primary, onClick = { if (draft.isNotBlank()) onSend() })
         }
     }
 }
@@ -167,7 +167,7 @@ private fun VoiceChip(voice: LiveVoiceState, asking: Boolean, onStart: () -> Uni
             modifier = Modifier.size(24.dp),
         )
         voice.listening -> Chip("Stop", AppColors.danger, onStop)
-        asking -> Chip("Parler", AppColors.surfaceHigh, null)
+        asking -> Chip("Speak", AppColors.surfaceHigh, null)
         else -> HoldChip(onStart, onStop)
     }
 }
@@ -188,7 +188,7 @@ private fun HoldChip(onStart: () -> Unit, onStop: () -> Unit) {
             }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Text("Parler", color = contentOn(AppColors.primary), fontSize = 13.sp, maxLines = 1)
+        Text("Speak", color = contentOn(AppColors.primary), fontSize = 13.sp, maxLines = 1)
     }
 }
 

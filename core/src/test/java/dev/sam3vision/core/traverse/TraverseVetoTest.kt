@@ -25,11 +25,11 @@ class TraverseVetoTest {
         val veto = TraverseVeto()
         val first = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
         assertEquals(TraversePhase.PRET, first.state)
-        assertEquals("prêt", first.cue)
+        assertEquals("ready", first.cue)
         assertFalse(first.veto)
         val second = veto.update(lightGreen = true, detections = emptyList(), focalPx = focalPx)
         assertEquals(TraversePhase.TRAVERSER, second.state)
-        assertEquals("traversez", second.cue)
+        assertEquals("cross", second.cue)
         assertFalse(second.keepObstacleGuidance)
     }
 
@@ -40,7 +40,7 @@ class TraverseVetoTest {
         val decision = veto.update(true, listOf(nearCar), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
-        assertEquals("attendez", decision.cue)
+        assertEquals("wait", decision.cue)
         assertEquals("car", decision.blockingLabel)
         assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
         assertTrue(decision.keepObstacleGuidance)
@@ -56,7 +56,7 @@ class TraverseVetoTest {
         val nearer = detection("car", 0.9f, listOf(0f, 0f, 80f, 60f))
         val second = veto.update(true, listOf(nearer), focalPx)
         assertTrue(second.veto)
-        assertEquals("attendez", second.cue)
+        assertEquals("wait", second.cue)
         assertEquals(24.17f, second.blockingMeters!!, 0.05f)
     }
 
@@ -105,7 +105,7 @@ class TraverseVetoTest {
             focalPx,
         )
         assertEquals(TraversePhase.ALERTE, alert.state)
-        assertEquals("attendez", alert.cue)
+        assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
         val reconfirmed = veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.PRET, reconfirmed.state)
@@ -124,7 +124,7 @@ class TraverseVetoTest {
             focalPx,
         )
         assertEquals(TraversePhase.ALERTE, alert.state)
-        assertEquals("attendez", alert.cue)
+        assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
         val reconfirmed = veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.PRET, reconfirmed.state)
@@ -137,7 +137,7 @@ class TraverseVetoTest {
         val veto = TraverseVeto()
         val decision = veto.update(false, emptyList(), focalPx)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
-        assertEquals("attendez", decision.cue)
+        assertEquals("wait", decision.cue)
         assertFalse(decision.veto)
     }
 

@@ -44,7 +44,7 @@ class MaisonEnterCommandTest {
             "Home mode on. Looking for household objects.",
             MaisonEnterText.entered(SpeechLanguage.En),
         )
-        assertEquals(MaisonEnterText.entered(), MaisonEnterText.entered(SpeechLanguage.Fr))
+        assertEquals(MaisonEnterText.entered(), MaisonEnterText.entered(SpeechLanguage.En))
         assertEquals("Déjà en mode maison.", MaisonEnterText.already(SpeechLanguage.Fr))
         assertEquals("Already in home mode.", MaisonEnterText.already(SpeechLanguage.En))
     }

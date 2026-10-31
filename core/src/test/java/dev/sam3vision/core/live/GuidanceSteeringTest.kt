@@ -98,8 +98,8 @@ class GuidanceSteeringTest {
 
     @Test
     fun `mot voie libre par cap`() {
-        assertEquals("Gauche.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left)))
-        assertEquals("Droite.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Right)))
+        assertEquals("Left.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left)))
+        assertEquals("Right.", Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Right)))
         assertEquals(
             "Left.",
             Guidance.phrase(Guidance.decide(emptyList(), SteeringCap.Left), SpeechLanguage.En),
@@ -110,7 +110,7 @@ class GuidanceSteeringTest {
     fun `mot cap bouche avec passage`() {
         val gauche = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
-        assertEquals("Tout droit.", Guidance.phrase(gauche))
+        assertEquals("Straight.", Guidance.phrase(gauche))
     }
 
     @Test
@@ -120,7 +120,7 @@ class GuidanceSteeringTest {
         assertEquals("Straight.", Guidance.phrase(droite, SpeechLanguage.En))
         val sansDistance = Guidance.decide(listOf(placed("personne", 0.2f)), SteeringCap.Left)
 
-        assertEquals("Tout droit.", Guidance.phrase(sansDistance))
+        assertEquals("Straight.", Guidance.phrase(sansDistance))
     }
 
     @Test

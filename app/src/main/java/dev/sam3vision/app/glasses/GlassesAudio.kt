@@ -88,6 +88,6 @@ class GlassesAudio(
     }
 
     private companion object {
-        const val WAV_PREFIX = "lunettes"
+        const val WAV_PREFIX = "glasses"
     }
 }

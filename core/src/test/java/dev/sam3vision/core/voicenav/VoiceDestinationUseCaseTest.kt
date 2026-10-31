@@ -59,7 +59,7 @@ class VoiceDestinationUseCaseTest {
         val error = result.exceptionOrNull()
         assertTrue(error is VoiceDestinationError.NoDestination)
         assertEquals(
-            "aucune destination reconnue : dis par exemple « direction gare de Lyon »",
+            "no destination recognized: say for example \"take me to the train station\"",
             error?.message,
         )
     }

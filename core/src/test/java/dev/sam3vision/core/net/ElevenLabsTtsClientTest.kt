@@ -50,7 +50,7 @@ class ElevenLabsTtsClientTest {
 
             assertTrue(error.toString(), error is ApiError.PaymentRequired)
             assertTrue(error!!.message!!.contains("402"))
-            assertTrue(error.message!!.contains("crédits"))
+            assertTrue(error.message!!.contains("credits"))
         }
     }
 
@@ -78,7 +78,7 @@ class ElevenLabsTtsClientTest {
 
             assertTrue(vide.toString(), vide is ApiError.BadResponse)
             assertTrue(sansCle.toString(), sansCle is ApiError.InvalidKey)
-            assertTrue(sansCle!!.message!!.contains("Réglages"))
+            assertTrue(sansCle!!.message!!.contains("Settings"))
             assertEquals(0, server.requests.size)
         }
     }
@@ -101,7 +101,7 @@ class ElevenLabsTtsClientTest {
                 .synthesize("Bonjour.").exceptionOrNull()
 
             assertTrue(error.toString(), error is ApiError.BadResponse)
-            assertTrue(error!!.message!!.contains("audio vide"))
+            assertTrue(error!!.message!!.contains("empty audio"))
         }
     }
 

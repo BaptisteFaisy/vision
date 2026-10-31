@@ -38,9 +38,9 @@ class ElevenLabsTtsClient(
 
     /** Refus locaux, avant tout appel réseau : message déjà affichable dans l'UI. */
     private fun localRefusal(text: String): ApiError? = when {
-        text.isBlank() -> ApiError.BadResponse("rien à lire : texte vide")
-        apiKey.isBlank() -> ApiError.InvalidKey("clé ElevenLabs absente — renseigne-la dans Réglages")
-        voiceId.isBlank() -> ApiError.BadResponse("voix ElevenLabs absente — renseigne-la dans Réglages")
+        text.isBlank() -> ApiError.BadResponse("nothing to read: empty text")
+        apiKey.isBlank() -> ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings")
+        voiceId.isBlank() -> ApiError.BadResponse("ElevenLabs voice missing — enter it in Settings")
         else -> null
     }
 
@@ -90,7 +90,7 @@ private fun ensureAudio(bytes: ByteArray): Result<ByteArray> =
     if (bytes.isNotEmpty() && !looksLikeText(bytes)) {
         Result.success(bytes)
     } else {
-        Result.failure(ApiError.BadResponse("audio vide reçu d'ElevenLabs"))
+        Result.failure(ApiError.BadResponse("empty audio received from ElevenLabs"))
     }
 
 /**

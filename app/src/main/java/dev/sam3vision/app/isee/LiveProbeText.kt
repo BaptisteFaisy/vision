@@ -13,21 +13,21 @@ const val ENDPOINT_MAX_CHARS = 46
 const val DISTANCE_LINES_MAX = 3
 
 /**
- * Ligne compacte du bandeau : « SAM · 1,2 ips · 640 ms · 8 objets · plus proche ≈ 3,2 m ».
+ * Ligne compacte du bandeau : « SAM · 1.2 fps · 640 ms · 8 objects · closest ≈ 3.2 m ».
  * Fonction pure, testée en JVM — l'UI ne formate jamais de nombre elle-même.
  */
 fun liveProbeHeadline(state: LiveProbeState): String {
     if (state.error != null && state.frames == 0) return "SAM · ${state.error}"
-    val rate = if (state.fps <= 0f) "…" else "${DistanceText.decimal(state.fps, 1, Locale.FRANCE)} ips"
+    val rate = if (state.fps <= 0f) "…" else "${DistanceText.decimal(state.fps, 1, Locale.US)} fps"
     val latency = if (state.latencyMs <= 0L) "…" else "${state.latencyMs} ms"
-    val objects = if (state.frames == 0) "…" else "${state.objects} objets"
-    val near = state.nearest?.let { " · plus proche ${DistanceText.approximate(it.meters)}" }.orEmpty()
+    val objects = if (state.frames == 0) "…" else "${state.objects} objects"
+    val near = state.nearest?.let { " · closest ${DistanceText.approximate(it.meters)}" }.orEmpty()
     return "SAM · $rate · $latency · $objects$near"
 }
 
 /**
- * Chronologie **sur une seule ligne** (« latence 348 · capt 22 · up 61 · srv 92 · rtt 153 ·
- * masque 37 · pixel 8 »), chaîne vide avant la première frame mesurée. Le formatage est
+ * Chronologie **sur une seule ligne** (« latency 348 · capt 22 · up 61 · srv 92 · rtt 153 ·
+ * mask 37 · pixel 8 »), chaîne vide avant la première frame mesurée. Le formatage est
  * celui de [TimingsText] : une seule implémentation, testée en JVM.
  */
 fun liveProbeTimingsLine(state: LiveProbeState): String = TimingsText.compact(state.timings)
@@ -38,31 +38,31 @@ fun liveProbeTimingsLine(state: LiveProbeState): String = TimingsText.compact(st
  * distances mesurées, phrase annoncée et dernière erreur. Liste vide = rien à montrer.
  */
 fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
-    if (state.endpoint.isNotBlank()) add("endpoint : ${shortEndpoint(state.endpoint)}")
-    if (state.width > 0 && state.height > 0) add("frame : ${state.width}×${state.height}")
+    if (state.endpoint.isNotBlank()) add("endpoint: ${shortEndpoint(state.endpoint)}")
+    if (state.width > 0 && state.height > 0) add("frame: ${state.width}×${state.height}")
     if (state.frames > 0) {
-        add("latence : ${state.latencyMs} ms · p95 ${state.p95Ms} ms · serveur ${state.serverMs} ms")
-        add("${state.frames} frames · ${state.masks.size} masques")
-        add("transport : ${state.transport}")
+        add("latency: ${state.latencyMs} ms · p95 ${state.p95Ms} ms · server ${state.serverMs} ms")
+        add("${state.frames} frames · ${state.masks.size} masks")
+        add("transport: ${state.transport}")
     }
     if (state.timings.known) {
         addAll(TimingsText.detail(state.timings))
         add(TimingsText.servers(state.timings.server))
     }
     if (state.conceptsSent.isNotEmpty()) {
-        add("suivis (${state.conceptsSent.size}) : ${state.conceptsSent.joinToString(", ")}")
+        add("tracked (${state.conceptsSent.size}): ${state.conceptsSent.joinToString(", ")}")
     }
-    if (state.labels.isNotEmpty()) add("reconnus : ${state.labels.joinToString(", ")}")
-    if (state.gpu.isNotBlank()) add("gpu : ${state.gpu}")
+    if (state.labels.isNotEmpty()) add("recognized: ${state.labels.joinToString(", ")}")
+    if (state.gpu.isNotBlank()) add("gpu: ${state.gpu}")
     if (state.modelsLine.isNotBlank()) add(state.modelsLine)
-    distanceSummary(state.distanceLayer?.readings.orEmpty())?.let { add("distances : $it") }
-    state.spoken?.let { add("dit : $it") }
-    state.error?.let { add("erreur : $it") }
+    distanceSummary(state.distanceLayer?.readings.orEmpty())?.let { add("distances: $it") }
+    state.spoken?.let { add("said: $it") }
+    state.error?.let { add("error: $it") }
 }
 
 /**
- * Distance de chaque objet mesuré, du plus proche au plus loin : « chaise ≈ 1,1 m ·
- * personne ≈ 3,2 m ». Fonction pure (aucun Android) : testée en JVM.
+ * Distance de chaque objet mesuré, du plus proche au plus loin : « chair ≈ 1.1 m ·
+ * person ≈ 3.2 m ». Fonction pure (aucun Android) : testée en JVM.
  */
 fun distanceSummary(readings: List<DistanceReading>): String? {
     val usable = readings.filter { it.meters.isFinite() && it.meters > 0f }.sortedBy { it.meters }
@@ -88,8 +88,8 @@ fun shortEndpoint(endpoint: String): String {
 fun liveProbeNotice(state: LiveProbeState): String? {
     if (state.frames > 0) return null
     state.error?.let { return it }
-    if (state.warming) return "réveil du GPU SAM… (≈ 30 s au premier lancement)"
-    return "en attente de la première analyse…"
+    if (state.warming) return "waking the SAM GPU… (≈ 30 s on first launch)"
+    return "waiting for the first analysis…"
 }
 
 /**
@@ -97,5 +97,5 @@ fun liveProbeNotice(state: LiveProbeState): String? {
  * réveil) : on le dit, et la frame suivante réessaie d'elle-même.
  */
 fun probeFailureText(error: Throwable): String =
-    if (error is ApiError.Timeout) "réveil du GPU en cours… (nouvel essai à la frame suivante)"
-    else error.message ?: "échec de l'appel SAM"
+    if (error is ApiError.Timeout) "GPU waking up… (retrying on the next frame)"
+    else error.message ?: "SAM call failed"

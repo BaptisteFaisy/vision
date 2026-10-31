@@ -53,9 +53,9 @@ class IseeGlassesPhotoTest {
 
     @Test
     fun `libelle — ASK attend une question dictee, PHOTO ne fait qu afficher`() {
-        assertEquals("Photo des lunettes : dictez votre question", glassesPhotoLabel(CaptureAction.ASK))
-        assertEquals("Photo des lunettes affichée", glassesPhotoLabel(CaptureAction.PHOTO))
-        assertEquals("Photo des lunettes affichée", glassesPhotoLabel(CaptureAction.LIVE))
+        assertEquals("Glasses photo: dictate your question", glassesPhotoLabel(CaptureAction.ASK))
+        assertEquals("Glasses photo displayed", glassesPhotoLabel(CaptureAction.PHOTO))
+        assertEquals("Glasses photo displayed", glassesPhotoLabel(CaptureAction.LIVE))
     }
 
     @Test

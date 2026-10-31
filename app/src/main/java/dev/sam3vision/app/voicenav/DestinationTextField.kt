@@ -30,8 +30,8 @@ import dev.sam3vision.core.nav.DestinationQuery
  * Saisie clavier de secours : quand la dictée échoue (bruit, malentendant),
  * l'utilisateur tape l'adresse au lieu de la dicter.
  *
- * Replié au départ (un simple lien sous « Dicter une autre destination »),
- * le champ s'ouvre au clavier à l'appui, se valide par « Valider » ou la
+ * Replié au départ (un simple lien sous « Dictate another destination »),
+ * le champ s'ouvre au clavier à l'appui, se valide par « Confirm » ou la
  * touche Terminé, puis se referme vide. [onSubmitText] reçoit le texte brut
  * saisi — c'est l'appelant ([VoiceNavViewModel.submitTypedDestination], câblé
  * par l'intégrateur) qui le convertit via [typedDestinationQuery].
@@ -47,7 +47,7 @@ fun DestinationTextField(
             onClick = { expanded = true },
             modifier = modifier.fillMaxWidth(),
         ) {
-            Text("Saisir une adresse au clavier", fontSize = 18.sp, color = AppColors.primary)
+            Text("Type an address", fontSize = 18.sp, color = AppColors.primary)
         }
         return
     }
@@ -66,7 +66,7 @@ fun DestinationTextField(
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.success),
         ) {
-            Text("Valider", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Confirm", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -77,8 +77,8 @@ private fun AddressField(value: String, onValueChange: (String) -> Unit, onDone:
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("Adresse", color = AppColors.textMuted, fontSize = 18.sp) },
-        placeholder = { Text("Ex. : gare de Lyon", color = AppColors.textMuted, fontSize = 20.sp) },
+        label = { Text("Address", color = AppColors.textMuted, fontSize = 18.sp) },
+        placeholder = { Text("E.g.: Lyon station", color = AppColors.textMuted, fontSize = 20.sp) },
         singleLine = true,
         textStyle = TextStyle(color = AppColors.text, fontSize = 22.sp),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -96,11 +96,11 @@ private fun AddressField(value: String, onValueChange: (String) -> Unit, onDone:
 
 /**
  * Pseudo-transcript dictée équivalent au texte [raw] saisi au clavier :
- * « aller à … », reconnu par le routeur existant ([VoiceNavSession] intacte,
+ * « go to … », reconnu par le routeur existant ([VoiceNavSession] intacte,
  * aucun parseur ajouté). Normalisation partagée ([DestinationQuery]) : espaces
  * rognés et réduits, ponctuation des bords retirée, `null` si rien à dire.
  */
 fun typedDestinationQuery(raw: String): String? {
     val clean = DestinationQuery.normalize(raw).getOrNull() ?: return null
-    return "aller à $clean"
+    return "go to $clean"
 }

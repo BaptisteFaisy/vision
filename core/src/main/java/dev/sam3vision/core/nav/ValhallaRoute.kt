@@ -157,17 +157,17 @@ object ValhallaRoute {
  */
 sealed class RouteParseError(message: String) : Exception(message) {
     /** Le corps n'est pas du JSON objet. */
-    class InvalidJson : RouteParseError("réponse d'itinéraire illisible")
+    class InvalidJson : RouteParseError("unreadable route response")
 
     /** Pas de `trip.legs[0]` dans la réponse. */
-    class MissingLeg : RouteParseError("itinéraire sans étape")
+    class MissingLeg : RouteParseError("route without a leg")
 
     /** `shape` vide, tronquée ou hors alphabet. */
-    class BadShape : RouteParseError("tracé d'itinéraire illisible")
+    class BadShape : RouteParseError("unreadable route shape")
 
     /** Trop peu de manœuvres (départ + arrivée requis). */
-    class EmptyManeuvers : RouteParseError("itinéraire sans manœuvre")
+    class EmptyManeuvers : RouteParseError("route without maneuvers")
 
     /** `begin_shape_index` de la manœuvre [index] hors du tracé. */
-    class BadShapeIndex(val index: Int) : RouteParseError("manœuvre $index hors tracé")
+    class BadShapeIndex(val index: Int) : RouteParseError("maneuver $index off shape")
 }

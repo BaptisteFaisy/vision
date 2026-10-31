@@ -36,9 +36,9 @@ internal class GlassesFrameVoice(
             val current = settings()
             voice.say(current, text)
             when {
-                current.ttsApiKey.isBlank() -> "voix coupée (clé TTS absente)"
-                GlassesVoiceRoute.targetsGlasses -> "lunettes"
-                else -> "haut-parleur"
+                current.ttsApiKey.isBlank() -> "voice off (TTS key missing)"
+                GlassesVoiceRoute.targetsGlasses -> "glasses"
+                else -> "speaker"
             }
         },
     )

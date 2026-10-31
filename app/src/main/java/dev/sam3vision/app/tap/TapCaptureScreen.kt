@@ -97,11 +97,11 @@ private fun rememberTapSession(
         )
     }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        if (granted.values.any { !it }) onStatus(TapStatus.Failed("permission caméra ou micro refusée"))
+        if (granted.values.any { !it }) onStatus(TapStatus.Failed("camera or microphone permission refused"))
     }
     LaunchedEffect(dependencies) {
         dependencies.video.bind(context.findLifecycleOwner()).onFailure {
-            onStatus(TapStatus.Failed(it.message ?: "caméra indisponible"))
+            onStatus(TapStatus.Failed(it.message ?: "camera unavailable"))
         }
         dependencies.announcements.prewarm()
         if (!tapPermissionsGranted(context)) permissions.launch(TAP_PERMISSIONS)
@@ -131,22 +131,22 @@ private fun TapOverlay(status: TapStatus, onBack: () -> Unit, sendReady: Boolean
             Text(title, color = color, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(detail, color = AppColors.textMuted, fontSize = 15.sp)
         }
-        BigButton("Quitter", true, AppColors.surfaceHigh, onBack)
+        BigButton("Quit", true, AppColors.surfaceHigh, onBack)
     }
 }
 
 /** Libellé + couleur par état, sans dépendre du son (accessible aux malvoyants). */
 private fun statusText(status: TapStatus, sendReady: Boolean): Triple<String, String, Color> = when (status) {
     TapStatus.Idle if (!sendReady) -> Triple(
-        "Envoi désactivé",
-        TapConfig.sendBlockedReason() ?: "endpoint SAM 3.1 non configuré.",
+        "Send disabled",
+        TapConfig.sendBlockedReason() ?: "SAM 3.1 endpoint not configured.",
         AppColors.warning,
     )
-    TapStatus.Idle -> Triple("Touchez l'écran", "Un tap lance la vidéo ; un second tap l'envoie à SAM 3.1.", AppColors.text)
-    TapStatus.Recording -> Triple("Enregistrement", "Touchez l'écran pour arrêter et envoyer.", AppColors.danger)
-    TapStatus.Sending -> Triple("Envoi…", "La vidéo part à SAM 3.1.", AppColors.warning)
-    is TapStatus.Sent -> Triple("Envoyé", status.summary, AppColors.success)
-    is TapStatus.Failed -> Triple("Échec", status.reason, AppColors.danger)
+    TapStatus.Idle -> Triple("Tap the screen", "One tap starts the video; a second tap sends it to SAM 3.1.", AppColors.text)
+    TapStatus.Recording -> Triple("Recording", "Tap the screen to stop and send.", AppColors.danger)
+    TapStatus.Sending -> Triple("Sending…", "The video is on its way to SAM 3.1.", AppColors.warning)
+    is TapStatus.Sent -> Triple("Sent", status.summary, AppColors.success)
+    is TapStatus.Failed -> Triple("Failed", status.reason, AppColors.danger)
 }
 
 /** Dépendances de l'écran, construites une fois par configuration de réglages. */

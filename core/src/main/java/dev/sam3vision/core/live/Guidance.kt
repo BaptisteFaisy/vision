@@ -163,7 +163,7 @@ object Guidance {
      */
     fun phrase(
         decision: GuidanceDecision,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String = word(decision).text(language)
 
     /**

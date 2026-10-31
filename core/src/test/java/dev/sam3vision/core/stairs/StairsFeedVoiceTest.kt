@@ -28,11 +28,11 @@ class StairsFeedVoiceTest {
 
         assertEquals("", feed.observe(luma, 0L, speak = spoken::add))
         assertEquals("", feed.observe(luma, 33L, speak = spoken::add))
-        assertEquals("Escalier devant.", feed.observe(luma, 66L, speak = spoken::add))
+        assertEquals("Stairs ahead.", feed.observe(luma, 66L, speak = spoken::add))
 
         assertEquals(1, spoken.size)
         assertTrue("compteur réel, pas 0 : ${spoken[0].lineCount}", spoken[0].lineCount >= 4)
-        assertEquals("Escalier devant.", spoken[0].phrase)
+        assertEquals("Stairs ahead.", spoken[0].phrase)
     }
 
     @Test
@@ -42,7 +42,7 @@ class StairsFeedVoiceTest {
 
         feed.tick(luma, 0L)
         feed.tick(luma, 33L)
-        assertEquals("Escalier devant.", feed.tick(luma, 66L))
+        assertEquals("Stairs ahead.", feed.tick(luma, 66L))
 
         assertNotNull(feed.lastCue)
         assertTrue(feed.lastSignal.lineCount >= 4)
@@ -55,7 +55,7 @@ class StairsFeedVoiceTest {
 
         assertEquals("", feed.observe(luma, 0L, meters = 0.8f, speak = {}))
         assertEquals("", feed.observe(luma, 33L, meters = 0.8f, speak = {}))
-        assertEquals("Dernière marche.", feed.observe(luma, 66L, meters = 0.8f, speak = {}))
+        assertEquals("Last step.", feed.observe(luma, 66L, meters = 0.8f, speak = {}))
     }
 
     @Test

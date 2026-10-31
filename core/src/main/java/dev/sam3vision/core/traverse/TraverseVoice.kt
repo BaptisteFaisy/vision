@@ -8,7 +8,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.net.TtsClient
 
 /**
- * Phrases du mode traversée, en français. Liste fermée : le pipeline ne fait
+ * Phrases du mode traversée, en anglais. Liste fermée : le pipeline ne fait
  * jamais prononcer autre chose, et ce sont exactement ces phrases que
  * [TraverseVoice.prewarm] pré-génère en cache hors-ligne au premier lancement.
  *
@@ -28,16 +28,16 @@ object TraversePhrases {
 
     /** But (non urgent) : le trottoir d'en face, une fois le vert parlé. */
     val SIDEWALK_ACROSS: String =
-        requireNotNull(SidewalkText.phrase(SidewalkPosition.Across, SpeechLanguage.Fr))
+        requireNotNull(SidewalkText.phrase(SidewalkPosition.Across, SpeechLanguage.En))
 
     /** Arrivée (non urgent) : dite une fois, sur le passage. */
-    val ON_CROSSWALK: String = CrossingText.arrived(SpeechLanguage.Fr)
+    val ON_CROSSWALK: String = CrossingText.arrived(SpeechLanguage.En)
 
     /** Toutes les phrases à pré-générer hors-ligne. */
     val ALL: List<String> = listOf(RED, GREEN, UNKNOWN, SIDEWALK_ACROSS, ON_CROSSWALK)
 
-    /** Préfixe BCP-47 attendu du moteur système (« fr », « fr-FR », …). */
-    const val LANGUAGE_PREFIX = "fr"
+    /** Préfixe BCP-47 attendu du moteur système (« en », « en-US », …). */
+    const val LANGUAGE_PREFIX = "en"
 }
 
 /** Où la phrase a été jouée — ou pourquoi elle ne l'a pas été. */
@@ -60,7 +60,7 @@ data class TraversePrewarm(
     val ready: Int,
     val generated: Int,
     val missing: List<String>,
-    /** Vrai si le moteur système parle effectivement français. */
+    /** Vrai si le moteur système parle effectivement anglais. */
     val languageOk: Boolean
 )
 
@@ -99,7 +99,7 @@ interface TraverseSystemTts {
     /** Rend [phrase] dans le fichier [path] ; le chemin écrit, ou l'échec. */
     suspend fun renderToFile(phrase: String, path: String): Result<String>
 
-    /** Langue effective du moteur (« fr-FR », « en-US », …) — vérifiée FR au préchauffage. */
+    /** Langue effective du moteur (« en-US », « en-GB », …) — vérifiée EN au préchauffage. */
     fun effectiveLanguage(): String
 }
 
@@ -127,9 +127,9 @@ interface TraverseClipStore {
  * - **non urgente** — tue ([TraverseVoiceOutcome.SKIPPED_BUSY]) si le lecteur
  *   parle déjà, sinon même chaîne ElevenLabs puis cache.
  *
- * Hors-ligne ([prewarm], au premier lancement) : chaque phrase FR est rendue une
+ * Hors-ligne ([prewarm], au premier lancement) : chaque phrase EN est rendue une
  * fois par le TTS système dans le cache local, et la langue effective du moteur
- * est vérifiée FR ([TraversePrewarm.languageOk]). Le repli est ensuite automatique
+ * est vérifiée EN ([TraversePrewarm.languageOk]). Le repli est ensuite automatique
  * : ElevenLabs en échec ou sans clé rejoue le clip local, sans intervention.
  *
  * Pur et testé en JVM : aucune API Android ici, les quatre ports sont moqués.
@@ -141,7 +141,7 @@ class TraverseVoice(
     private val store: TraverseClipStore,
 ) {
     /**
-     * Pré-génère les phrases FR via le TTS système. À appeler au premier
+     * Pré-génère les phrases EN via le TTS système. À appeler au premier
      * lancement ; les appels suivants ne coûtent qu'une vérification de présence.
      */
     suspend fun prewarm(phrases: List<String> = TraversePhrases.ALL): TraversePrewarm {
@@ -157,7 +157,7 @@ class TraverseVoice(
                 missing += phrase
             }
         }
-        return TraversePrewarm(ready, generated, missing, languageOk = isFrench())
+        return TraversePrewarm(ready, generated, missing, languageOk = isEnglish())
     }
 
     /**
@@ -190,7 +190,7 @@ class TraverseVoice(
         return player.playFile(clip)
     }
 
-    /** Le moteur système parle-t-il français ? (« fr », « fr-FR », « fra », …). */
-    private fun isFrench(): Boolean =
+    /** Le moteur système parle-t-il anglais ? (« en », « en-US », « eng », …). */
+    private fun isEnglish(): Boolean =
         systemTts.effectiveLanguage().trim().lowercase().startsWith(TraversePhrases.LANGUAGE_PREFIX)
 }

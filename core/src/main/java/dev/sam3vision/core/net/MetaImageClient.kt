@@ -26,10 +26,10 @@ class MetaImageClient(
 
     override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
         if (apiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("clé Meta absente — renseigne-la dans Réglages"))
+            return Result.failure(ApiError.InvalidKey("Meta key missing — enter it in Settings"))
         }
         if (photoJpeg.isEmpty()) {
-            return Result.failure(ApiError.BadResponse("photo vide"))
+            return Result.failure(ApiError.BadResponse("empty photo"))
         }
         endpointRefusal("endpoint Meta", baseUrl, EDITS_PATH)?.let { return Result.failure(it) }
         return http.executeBuilt {

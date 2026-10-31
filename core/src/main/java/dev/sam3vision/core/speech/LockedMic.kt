@@ -100,36 +100,36 @@ data class LockedMicState(
 
     /** Le texte exact de la notification et de l'annonce, pour cette phase. */
     fun view(): LockedMicView = when (phase) {
-        LockedMicPhase.OFF -> LockedMicView(LockedMic.TITLE, "Micro arrêté.", null, null)
+        LockedMicPhase.OFF -> LockedMicView(LockedMic.TITLE, "Mic stopped.", null, null)
         LockedMicPhase.READY -> LockedMicView(
             title = LockedMic.TITLE,
-            message = "Touche la notification pour parler, même écran verrouillé.",
+            message = "Tap the notification to speak, even with the screen locked.",
             action = LockedMic.ACTION_LISTEN,
             spoken = null,
         )
         LockedMicPhase.LISTENING -> LockedMicView(
             title = LockedMic.TITLE_LISTENING,
-            message = "Parle, puis touche la notification pour « ${LockedMic.ACTION_SEND} ».",
+            message = "Speak, then tap the notification for “${LockedMic.ACTION_SEND}”.",
             action = LockedMic.ACTION_SEND,
-            spoken = "J'écoute",
+            spoken = "Listening",
         )
         LockedMicPhase.THINKING -> LockedMicView(
             title = LockedMic.TITLE_THINKING,
-            message = transcript.ifBlank { "Un instant…" }.shortened(),
+            message = transcript.ifBlank { "One moment…" }.shortened(),
             action = null,
             spoken = null,
         )
         LockedMicPhase.ANSWERED -> LockedMicView(
             title = LockedMic.TITLE_ANSWER,
-            message = answer.ifBlank { "réponse vide" }.shortened(),
+            message = answer.ifBlank { "empty answer" }.shortened(),
             action = LockedMic.ACTION_LISTEN,
             spoken = answer,
         )
         LockedMicPhase.FAILED -> LockedMicView(
             title = LockedMic.TITLE_FAILED,
-            message = error.ifBlank { "échec sans message" }.shortened(),
+            message = error.ifBlank { "failure without message" }.shortened(),
             action = LockedMic.ACTION_LISTEN,
-            spoken = "Échec. ${error.ifBlank { "échec sans message" }}",
+            spoken = "Failed. ${error.ifBlank { "failure without message" }}",
         )
     }
 
@@ -153,12 +153,12 @@ object LockedMic {
     /** Longueur maximale d'une ligne de notification (au-delà, le texte est coupé). */
     const val MAX_MESSAGE_CHARS = 160
 
-    const val TITLE = "iSee — micro"
-    const val TITLE_LISTENING = "iSee — j'écoute"
+    const val TITLE = "iSee — mic"
+    const val TITLE_LISTENING = "iSee — listening"
     const val TITLE_THINKING = "iSee — transcription"
-    const val TITLE_ANSWER = "iSee — réponse"
-    const val TITLE_FAILED = "iSee — échec"
+    const val TITLE_ANSWER = "iSee — answer"
+    const val TITLE_FAILED = "iSee — failed"
 
-    const val ACTION_LISTEN = "Écouter"
-    const val ACTION_SEND = "Envoyer"
+    const val ACTION_LISTEN = "Listen"
+    const val ACTION_SEND = "Send"
 }

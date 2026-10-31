@@ -1,5 +1,6 @@
 package dev.sam3vision.core.crossing
 
+import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,7 +13,7 @@ import org.junit.Test
  * Verrouille ce que les tests existants ne disent pas littéralement :
  * le doute isolé se tait, le rouge après un vert exige quand même deux
  * frames, le doute après un vert se tait dans le délai puis parle sans
- * couper hors délai, et les trois phrases FR sont des littéraux exacts.
+ * couper hors délai, et les phrases exactes des deux langues sont verrouillées.
  *
  * Seuils lus dans [CrossingAnnouncer] (4f vert / 2f rouge / 2,5 s /
  * rouge répété 1 s) : ce fichier les vérifie, il ne les change pas.
@@ -31,7 +32,7 @@ class CrossingVoiceHysteresisTest {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Unknown))
         val cue = announcer.onFrame(200L, CrossingState.Unknown)
-        assertEquals("Doute, attendez.", cue?.phrase)
+        assertEquals("Unsure, wait.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
         assertEquals(CrossingState.Unknown, cue?.state)
     }
@@ -42,7 +43,7 @@ class CrossingVoiceHysteresisTest {
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
         assertNull("une seule frame rouge ne suffit pas", announcer.onFrame(800L, CrossingState.Red))
         val cue = announcer.onFrame(1_000L, CrossingState.Red)
-        assertEquals("Rouge, attendez.", cue?.phrase)
+        assertEquals("Red, wait.", cue?.phrase)
         assertTrue(cue?.urgent ?: false)
     }
 
@@ -61,7 +62,7 @@ class CrossingVoiceHysteresisTest {
         repeat(4) { announcer.onFrame(it * 200L, CrossingState.Green) }
         assertNull(announcer.onFrame(4_000L, CrossingState.Unknown))
         val cue = announcer.onFrame(4_200L, CrossingState.Unknown)
-        assertEquals("Doute, attendez.", cue?.phrase)
+        assertEquals("Unsure, wait.", cue?.phrase)
         assertFalse("seul le retour au rouge est urgent", cue?.urgent ?: true)
     }
 
@@ -71,15 +72,15 @@ class CrossingVoiceHysteresisTest {
         announcer.onFrame(0L, CrossingState.Red)
         announcer.onFrame(200L, CrossingState.Red)
         repeat(4) { announcer.onFrame(3_000L + it * 200L, CrossingState.Green) }
-        assertEquals("Vert, traversez.", announcer.lastCue?.phrase)
+        assertEquals("Green, cross now.", announcer.lastCue?.phrase)
         assertFalse(announcer.lastCue?.urgent ?: true)
     }
 
     @Test
     fun `phrases francaises litterales de la voix`() {
-        assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red))
-        assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green))
-        assertEquals("Doute, attendez.", CrossingText.phrase(CrossingState.Unknown))
+        assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
+        assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
+        assertEquals("Doute, attendez.", CrossingText.phrase(CrossingState.Unknown, SpeechLanguage.Fr))
     }
 
     @Test

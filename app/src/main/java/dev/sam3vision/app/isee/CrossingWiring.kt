@@ -182,12 +182,12 @@ internal fun LiveProbe.observeCrossingActive(scope: CoroutineScope, onChanged: (
  * dernier état connu du feu. Pur, testé en JVM.
  */
 internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: Boolean = false): String {
-    if (!active && offer) return "Passage piéton — traversée ?"
-    if (!active) return "Traversée : OFF"
+    if (!active && offer) return "Crosswalk — cross?"
+    if (!active) return "Crossing: OFF"
     return when (state) {
-        CrossingState.Green -> "Traversée : VERT"
-        CrossingState.Red -> "Traversée : ROUGE"
-        CrossingState.Unknown, null -> "Traversée : …"
+        CrossingState.Green -> "Crossing: GREEN"
+        CrossingState.Red -> "Crossing: RED"
+        CrossingState.Unknown, null -> "Crossing: …"
     }
 }
 

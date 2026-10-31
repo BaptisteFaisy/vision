@@ -47,10 +47,10 @@ sealed interface NavRoute {
 
 /** Échecs du lanceur, messages déjà affichables (même motif que `ApiError`). */
 sealed class NavLaunchError(message: String) : Exception(message) {
-    class InvalidDestination(detail: String) : NavLaunchError("destination invalide : $detail")
+    class InvalidDestination(detail: String) : NavLaunchError("invalid destination: $detail")
 
     data object NoHandler :
-        NavLaunchError("aucune application pour ouvrir l'itinéraire (ni Maps, ni navigateur)")
+        NavLaunchError("no app to open the route (neither Maps nor browser)")
 }
 
 /**
@@ -80,18 +80,18 @@ internal fun validate(destination: NavDestination): NavLaunchError.InvalidDestin
     when (destination) {
         is NavDestination.Query ->
             if (destination.query.isBlank()) {
-                NavLaunchError.InvalidDestination("requête vide")
+                NavLaunchError.InvalidDestination("empty query")
             } else {
                 null
             }
         is NavDestination.Coordinates -> when {
             !destination.latitude.isFinite() || destination.latitude !in -90.0..90.0 ->
                 NavLaunchError.InvalidDestination(
-                    "latitude ${destination.latitude} hors limites (-90..90)",
+                    "latitude ${destination.latitude} out of range (-90..90)",
                 )
             !destination.longitude.isFinite() || destination.longitude !in -180.0..180.0 ->
                 NavLaunchError.InvalidDestination(
-                    "longitude ${destination.longitude} hors limites (-180..180)",
+                    "longitude ${destination.longitude} out of range (-180..180)",
                 )
             else -> null
         }
@@ -135,7 +135,7 @@ class AndroidNavigationLauncher(
 
     override fun openPlace(query: String): Result<NavRoute> {
         if (query.isBlank()) {
-            return Result.failure(NavLaunchError.InvalidDestination("requête vide"))
+            return Result.failure(NavLaunchError.InvalidDestination("empty query"))
         }
         val url = placeUrl(query).getOrNull()
             ?: return Result.failure(NavLaunchError.NoHandler)

@@ -36,13 +36,13 @@ fun parseMicStartAction(action: String?): MicStartAction = when (action) {
 /** Motifs de refus, affichés dans la tuile et la notification, prononcés par TalkBack. */
 object MicStartRefus {
     /** Le geste a échoué : le micro verrouillé n'est pas disponible. */
-    const val UNAVAILABLE = "micro verrouillé indisponible"
+    const val UNAVAILABLE = "locked mic unavailable"
 
     /** L'armement est refusé : il faut ouvrir iSee (premier plan interdit en arrière-plan). */
-    const val OPEN_ISEE = "ouvre iSee pour armer le micro"
+    const val OPEN_ISEE = "open iSee to arm the mic"
 
     /** Le geste a levé après l'armement : le service reste armé, l'échec est dit. */
-    const val TOGGLE_FAILED = "micro indisponible (geste refusé)"
+    const val TOGGLE_FAILED = "mic unavailable (gesture refused)"
 }
 
 /**

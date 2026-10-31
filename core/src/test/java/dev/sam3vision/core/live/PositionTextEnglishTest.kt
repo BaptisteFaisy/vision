@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * La voix en anglais : mêmes heures, mêmes bandes, mots anglais.
- * Le français reste la référence (les tests de [PositionTextTest] le verrouillent).
+ * L'anglais reste la référence ; le français est verrouillé par des appels explicites.
  */
 class PositionTextEnglishTest {
 
@@ -57,8 +57,8 @@ class PositionTextEnglishTest {
     }
 
     @Test
-    fun `le francais par defaut`() {
+    fun `l'anglais par defaut`() {
         val phrase = PositionText.phrase(listOf(placed("personne", 0.1f, meters = 1.44f)))
-        assertEquals("Personne à 1 mètre.", phrase)
+        assertEquals("Personne 1 meter away.", phrase)
     }
 }

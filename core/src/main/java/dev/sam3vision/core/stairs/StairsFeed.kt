@@ -57,7 +57,7 @@ class StairsFeed(
     fun tick(
         luma: ByteArray?,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         direction: StairDirection = StairDirection.Unknown,
         centerX: Float? = null,
         meters: Float? = null,
@@ -87,7 +87,7 @@ class StairsFeed(
     fun observe(
         luma: ByteArray?,
         nowMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
         direction: StairDirection = StairDirection.Unknown,
         centerX: Float? = null,
         meters: Float? = null,

@@ -5,8 +5,8 @@ package dev.sam3vision.core.nav
  * ce que l'écran de guidage affiche (prochaine instruction, distances,
  * progression) jusqu'au prochain [GuidanceUpdate].
  *
- * [instruction] est la prochaine manœuvre en français (« Tournez à droite
- * sur la rue de Rivoli »), [distanceToManeuverMeters] la distance avant de
+ * [instruction] est la prochaine manœuvre en anglais (« Turn right
+ * onto rue de Rivoli »), [distanceToManeuverMeters] la distance avant de
  * l'exécuter, [remainingDistanceMeters] / [remainingDurationSeconds] le reste
  * du trajet, [arrived] l'arrivée signalée par le moteur, [offRoute] l'écart
  * de route en cours (recalcul, bandeau affiché).
@@ -27,19 +27,19 @@ data class GuidanceUpdate(
     val offRoute: Boolean = false,
 ) {
     init {
-        require(instruction.isNotBlank()) { "instruction vide" }
-        require(distanceToManeuverMeters >= 0) { "distance manœuvre négative" }
-        require(remainingDistanceMeters >= 0) { "distance restante négative" }
-        require(remainingDurationSeconds >= 0) { "durée restante négative" }
+        require(instruction.isNotBlank()) { "empty instruction" }
+        require(distanceToManeuverMeters >= 0) { "negative maneuver distance" }
+        require(remainingDistanceMeters >= 0) { "negative remaining distance" }
+        require(remainingDurationSeconds >= 0) { "negative remaining duration" }
     }
 
-    /** « Dans 150 m » : distance avant la manœuvre, format français. */
-    fun maneuverFr(): String = "Dans ${formatDistanceFr(distanceToManeuverMeters)}"
+    /** « In 150 m » : distance avant la manœuvre, format anglais. */
+    fun maneuver(): String = "In ${formatDistance(distanceToManeuverMeters)}"
 
-    /** « Encore 2,4 km · 12 min » : reste du trajet, format français. */
-    fun remainingFr(): String =
-        "Encore ${formatDistanceFr(remainingDistanceMeters)} · " +
-            formatDurationFr(remainingDurationSeconds)
+    /** « 2.4 km left · 12 min » : reste du trajet, format anglais. */
+    fun remaining(): String =
+        "${formatDistance(remainingDistanceMeters)} left · " +
+            formatDuration(remainingDurationSeconds)
 }
 
 /**
@@ -48,7 +48,7 @@ data class GuidanceUpdate(
  */
 fun initialGuidance(summary: RouteSummary): GuidanceUpdate =
     GuidanceUpdate(
-        instruction = "Direction ${summary.destination}",
+        instruction = "Heading to ${summary.destination}",
         distanceToManeuverMeters = summary.distanceMeters,
         remainingDistanceMeters = summary.distanceMeters,
         remainingDurationSeconds = summary.durationSeconds,

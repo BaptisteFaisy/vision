@@ -50,7 +50,7 @@ class LiveNarration(
                     result == null -> current.copy(narrationBusy = false)
                     result.isFailure -> current.copy(
                         narrationBusy = false,
-                        narrationError = result.exceptionOrNull()?.message ?: "analyse LLM impossible",
+                        narrationError = result.exceptionOrNull()?.message ?: "LLM analysis impossible",
                     )
                     else -> current.copy(
                         narration = result.getOrNull().orEmpty(),

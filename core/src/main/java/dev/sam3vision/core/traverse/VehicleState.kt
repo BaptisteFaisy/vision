@@ -204,7 +204,7 @@ class VehicleStateWatcher(
         detections: List<Detection>,
         readings: List<DistanceReading>,
         atMs: Long,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): VehicleStateCue? {
         val tau = if (atMs >= 0L) approach.update(detections, atMs)
         else ApproachVerdict(false, null, null)

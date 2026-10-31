@@ -19,7 +19,7 @@ class GuidanceTest {
         val decision = Guidance.decide(emptyList())
 
         assertFalse(decision.blocked)
-        assertEquals("Tout droit.", Guidance.phrase(decision))
+        assertEquals("Straight.", Guidance.phrase(decision))
         assertEquals("Straight.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
@@ -41,7 +41,7 @@ class GuidanceTest {
 
         assertTrue(decision.blocked)
         assertEquals(GuidanceSide.Right, decision.side)
-        assertEquals("Droite.", Guidance.phrase(decision))
+        assertEquals("Right.", Guidance.phrase(decision))
     }
 
     @Test
@@ -49,7 +49,7 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Gauche.", Guidance.phrase(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
         assertEquals("Left.", Guidance.phrase(decision, SpeechLanguage.En))
     }
 
@@ -124,7 +124,7 @@ class GuidanceTest {
         val onze = Guidance.decide(listOf(placed("personne", 0.36f, 2f)))
 
         assertEquals("w|right", Guidance.key(onze))
-        assertEquals("Droite.", Guidance.phrase(onze))
+        assertEquals("Right.", Guidance.phrase(onze))
     }
 
     @Test
@@ -182,7 +182,7 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("curb", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Gauche.", Guidance.phrase(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
     }
 
     @Test
@@ -190,6 +190,6 @@ class GuidanceTest {
         val decision = Guidance.decide(listOf(placed("crosswalk", 0.5f)))
 
         assertTrue(decision.blocked)
-        assertEquals("Gauche.", Guidance.phrase(decision))
+        assertEquals("Left.", Guidance.phrase(decision))
     }
 }

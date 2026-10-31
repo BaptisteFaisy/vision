@@ -74,7 +74,7 @@ class LockedMicAnswerTest {
         val error = LockedMicAnswer(null, llm, speak = { dits += it; Result.success(Unit) }).run(pcm).exceptionOrNull()
 
         assertTrue("attendu InvalidKey, obtenu $error", error is ApiError.InvalidKey)
-        assertTrue(error!!.message.orEmpty().contains("Réglages"))
+        assertTrue(error!!.message.orEmpty().contains("Settings"))
         assertEquals(0, llm.texts)
         assertTrue("rien à dire sans texte", dits.isEmpty())
     }

@@ -23,12 +23,12 @@ class SerialRunGuard {
 
     /**
      * Exécute [block] seul (aucun chevauchement avec un autre `run()` ni avec
-     * la libération) ; échec « moteur fermé » si `close()` est déjà passé.
+     * la libération) ; échec « engine closed » si `close()` est déjà passé.
      */
     suspend fun <T> run(block: () -> T): Result<T> {
         mutex.withLock {
             if (isClosed()) {
-                return Result.failure(IllegalStateException("moteur fermé"))
+                return Result.failure(IllegalStateException("engine closed"))
             }
             try {
                 val value = block()

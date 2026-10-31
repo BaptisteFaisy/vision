@@ -57,7 +57,7 @@ class HttpRequestsTest {
             assertTrue("attendu BadResponse (contrat historique), obtenu $failure", failure is ApiError.BadResponse)
             assertTrue(
                 "message actionnable attendu, obtenu ${failure?.message}",
-                failure?.message?.contains("Réglages") == true,
+                failure?.message?.contains("Settings") == true,
             )
         } finally {
             video.delete()
@@ -87,5 +87,5 @@ class HttpRequestsTest {
 private fun assertActionableNetwork(result: Result<*>) {
     val error = result.exceptionOrNull()
     assertTrue("attendu Network, obtenu $error", error is ApiError.Network)
-    assertTrue("message actionnable attendu, obtenu ${error?.message}", error?.message?.contains("Réglages") == true)
+    assertTrue("message actionnable attendu, obtenu ${error?.message}", error?.message?.contains("Settings") == true)
 }

@@ -34,7 +34,7 @@ class LockedMicAnswer(
      */
     suspend fun run(pcm: ByteArray): Result<Done> {
         val engine = speech
-            ?: return Result.failure(ApiError.InvalidKey("aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)"))
+            ?: return Result.failure(ApiError.InvalidKey("no dictation engine: Meta or ElevenLabs key (Settings)"))
         val transcript = dictation(engine).invoke(pcm).getOrElse { return Result.failure(it) }
         val answer = llm.askText(transcript, emptyList()).getOrElse { return Result.failure(it) }
         speak(answer).getOrElse { return Result.failure(it) }

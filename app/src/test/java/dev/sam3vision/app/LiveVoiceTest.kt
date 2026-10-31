@@ -12,18 +12,18 @@ class LiveVoiceTest {
 
     @Test
     fun `micro refuse est dit clairement`() {
-        assertEquals("Micro non autorisé", voiceBlocker(withEngine, micGranted = false, micBusy = false))
+        assertEquals("Microphone not allowed", voiceBlocker(withEngine, micGranted = false, micBusy = false))
     }
 
     @Test
     fun `sans moteur de dictee on renvoie vers les reglages`() {
         val message = voiceBlocker(Settings.Default, micGranted = true, micBusy = false)
-        assertEquals("aucun moteur de dictée : clé Meta ou ElevenLabs (Réglages)", message)
+        assertEquals("no dictation engine: Meta or ElevenLabs key (Settings)", message)
     }
 
     @Test
     fun `micro deja pris par une autre fonction`() {
-        assertEquals("micro déjà occupé", voiceBlocker(withEngine, micGranted = true, micBusy = true))
+        assertEquals("microphone already busy", voiceBlocker(withEngine, micGranted = true, micBusy = true))
     }
 
     @Test

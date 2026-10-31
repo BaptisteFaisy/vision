@@ -56,7 +56,7 @@ class TapSessionTest {
         harness.session.onTap()
         advanceUntilIdle()
 
-        assertEquals(TapStatus.Failed("permission caméra ou micro refusée"), harness.statuses.single())
+        assertEquals(TapStatus.Failed("camera or microphone permission denied"), harness.statuses.single())
         assertEquals(0, harness.calls())
     }
 
@@ -101,7 +101,7 @@ class TapSessionTest {
         harness.session.onTap()
         advanceUntilIdle()
 
-        assertEquals(TapStatus.Failed("limite atteinte (429)"), harness.statuses.last())
+        assertEquals(TapStatus.Failed("limit reached (429)"), harness.statuses.last())
     }
 
     @Test

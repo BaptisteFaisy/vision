@@ -12,7 +12,7 @@ enum class DepthBackend(
     val code: String,
 ) {
     DA2(label = "Depth Anything V2 Small", code = "DA2"),
-    OFF(label = "Coupée", code = "OFF");
+    OFF(label = "Off", code = "OFF");
 
     companion object {
         /**
@@ -47,12 +47,12 @@ interface DepthEstimator : AutoCloseable {
     suspend fun estimate(argb: IntArray, width: Int, height: Int): Result<DepthResult>
 }
 
-/** Moteur coupé : tout appel échoue proprement (l'appelant affiche « coupée »). */
+/** Moteur coupé : tout appel échoue proprement (l'appelant affiche « depth off »). */
 object NoOpDepthEstimator : DepthEstimator {
     override val backend: DepthBackend = DepthBackend.OFF
 
     override suspend fun estimate(argb: IntArray, width: Int, height: Int): Result<DepthResult> =
-        Result.failure(IllegalStateException("profondeur coupée"))
+        Result.failure(IllegalStateException("depth off"))
 
     override fun close() = Unit
 }

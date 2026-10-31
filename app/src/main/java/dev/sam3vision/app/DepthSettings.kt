@@ -13,7 +13,7 @@ import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Profondeur (bêta) » des Réglages : moteur embarqué DA2 Small par
+ * Section « Depth (beta) » des Réglages : moteur embarqué DA2 Small par
  * ONNX (100 % sur le téléphone, 0 GPU Modal) + bouton de banc (5 inférences
  * sur image synthétique, verdict en bas de page et dans logcat `DepthBench`).
  * Active par défaut (DA2, seuil < 200 ms tenu).
@@ -22,7 +22,7 @@ import dev.sam3vision.core.settings.Settings
 fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: () -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Profondeur (bêta)",
+            "Depth (beta)",
             color = AppColors.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
@@ -31,14 +31,14 @@ fun DepthSettings(draft: Settings, onChange: (Settings) -> Unit, onTestDepth: ()
             DepthBackendButton(draft, backend, onChange)
         }
         Text(
-            "Carte de profondeur monoculaire estimée sur le téléphone " +
-                "(Depth Anything V2 Small). Modèle téléchargé une fois au " +
-                "premier test (~26 Mo), inférence 100 % locale ensuite — " +
-                "ni GPU Modal.",
+            "Monocular depth map estimated on the phone " +
+                "(Depth Anything V2 Small). Model downloaded once at the " +
+                "first test (~26 MB), 100% local inference after that — " +
+                "no Modal GPU.",
             color = AppColors.textMuted,
             fontSize = 11.sp,
         )
-        BigButton("Tester la profondeur (5 inférences)", true, AppColors.surfaceHigh, onTestDepth)
+        BigButton("Test depth (5 inferences)", true, AppColors.surfaceHigh, onTestDepth)
     }
 }
 

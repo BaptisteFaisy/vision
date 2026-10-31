@@ -33,7 +33,7 @@ interface LlmClient {
         question: String,
         history: List<ChatTurn>,
         context: String? = null,
-    ): Result<String> = Result.failure(ApiError.NotSupported("ce client ne répond pas sans image"))
+    ): Result<String> = Result.failure(ApiError.NotSupported("this client does not answer without an image"))
 }
 
 /** Client de segmentation SAM 3.1 (endpoint HTTP optionnel, contrat de l'ancien backend Modal). */

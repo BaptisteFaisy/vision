@@ -84,7 +84,7 @@ class AppAnalysisTest {
         assertFalse(screen.value.segmentationActive)
         assertEquals(
             "la note nomme la GPU injoignable",
-            AppStatusText.samDownNote("backend injoignable : réseau"),
+            AppStatusText.samDownNote("backend unreachable: network"),
             screen.value.segmentationNote,
         )
     }
@@ -125,7 +125,7 @@ class AppAnalysisTest {
         runner(llm, noteSam = { endpoint, result -> noted += endpoint to result }).analyze("photo")
 
         assertTrue("SAM non appelé : rien à noter", noted.isEmpty())
-        assertEquals("Aucun objet segmenté sur cette image.", screen.value.segmentationNote)
+        assertEquals("No object segmented on this image.", screen.value.segmentationNote)
     }
 
     @Test

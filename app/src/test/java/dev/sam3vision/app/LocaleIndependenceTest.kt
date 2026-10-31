@@ -32,19 +32,19 @@ class LocaleIndependenceTest {
     }
 
     @Test
-    fun `la ligne du direct garde la virgule quelle que soit la locale`() {
+    fun `la ligne du direct garde le point quelle que soit la locale`() {
         val locales = listOf(Locale.US, Locale.GERMANY, Locale.FRANCE, Locale.ROOT)
         for (locale in locales) {
             Locale.setDefault(locale)
             val line = formatLiveStatus(true, 1.4f, 780, "A100-SXM4-40GB", 8)
-            assertTrue("locale $locale : « $line »", line.contains("1,4 ips"))
+            assertTrue("locale $locale : « $line »", line.contains("1.4 fps"))
             assertTrue("locale $locale : « $line »", line.contains("780 ms"))
-            assertTrue("locale $locale : « $line »", line.contains("8 objets"))
+            assertTrue("locale $locale : « $line »", line.contains("8 objects"))
         }
     }
 
     @Test
-    fun `decimal garde la virgule quelle que soit la locale`() {
+    fun `decimal garde le point quelle que soit la locale`() {
         for (locale in listOf(Locale.US, Locale.GERMANY, Locale.FRANCE, Locale.ROOT)) {
             Locale.setDefault(locale)
             assertEquals("locale $locale", "1,4", DistanceText.decimal(1.4f, 1, Locale.FRANCE))

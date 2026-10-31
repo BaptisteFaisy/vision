@@ -16,6 +16,6 @@ class PermDecisionTest {
 
     @Test
     fun `libelle micro reprend l historique des bandeaux`() {
-        assertEquals("Micro non autorisé", PermTexts.MIC_DENIED)
+        assertEquals("Microphone not allowed", PermTexts.MIC_DENIED)
     }
 }

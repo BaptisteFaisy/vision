@@ -11,8 +11,8 @@ data class RoutePoint(
 
 /**
  * Une manœuvre d'un itinéraire Valhalla : le `type` numérique du serveur
- * (1 = départ, 4 = arrivée, 8 = tout droit… — voir `maneuverShortFr`), les
- * consignes du serveur (français demandé à la requête), les noms de rue et le
+ * (1 = départ, 4 = arrivée, 8 = tout droit… — voir `maneuverShort`), les
+ * consignes du serveur (anglais demandé à la requête), les noms de rue et le
  * coût du pas. Longueur en **mètres**, temps en **secondes** : le serveur parle
  * en kilomètres, la conversion est faite au parsing, une fois pour toutes.
  */

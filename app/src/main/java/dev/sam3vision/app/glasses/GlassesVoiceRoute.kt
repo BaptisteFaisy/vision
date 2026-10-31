@@ -64,12 +64,12 @@ object GlassesVoiceRoute {
     fun current(context: Context): AudioDeviceInfo? {
         if (!targetsGlasses) return null
         val manager = context.applicationContext.getSystemService(AudioManager::class.java)
-            ?: return log(null, "voix : haut-parleur (AudioManager indisponible)")
+            ?: return log(null, "voice: speaker (AudioManager unavailable)")
         val candidates = bluetoothOutputs(manager)
         val picked = pickBluetoothOutput(candidates.map { it.first }, glasses.deviceName)
-        if (picked == null) return log(null, "voix : haut-parleur — aucune sortie Bluetooth utilisable")
+        if (picked == null) return log(null, "voice: speaker — no usable Bluetooth output")
         val device = candidates.first { it.first == picked }.second
-        return log(device, "voix : Bluetooth « ${picked.name} » (type ${picked.type})")
+        return log(device, "voice: Bluetooth « ${picked.name} » (type ${picked.type})")
     }
 
     /** Journalise une décision, et seulement quand elle change (une phrase = zero ligne). */

@@ -51,7 +51,7 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame())
         advanceUntilIdle()
 
-        assertEquals("Gauche.", probe.state.value.spoken)
+        assertEquals("Left.", probe.state.value.spoken)
         assertEquals(SteeringCap.Left, probe.state.value.steeringCap)
     }
 
@@ -68,7 +68,7 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame(listOf(personneGauche())))
         advanceUntilIdle()
 
-        assertEquals("tout droit.", probe.state.value.spoken)
+        assertEquals("straight ahead.", probe.state.value.spoken)
     }
 
     @Test
@@ -114,7 +114,7 @@ class LiveProbeSteeringTest {
         advanceUntilIdle()
 
         assertEquals(SteeringCap.Straight, probe.state.value.steeringCap)
-        assertEquals("Tout droit.", probe.state.value.spoken)
+        assertEquals("Straight.", probe.state.value.spoken)
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */

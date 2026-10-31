@@ -45,7 +45,7 @@ class DictationUseCaseTest {
         val speech = FakeSpeech(Result.success("   "))
         val error = runBlocking { DictationUseCase(speech).invoke(oneSecondOfSilence()) }.exceptionOrNull()
         assertTrue(error is ApiError.BadResponse)
-        assertTrue(error?.message.orEmpty().contains("aucune parole"))
+        assertTrue(error?.message.orEmpty().contains("no speech"))
     }
 
     @Test

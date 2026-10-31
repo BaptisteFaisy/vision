@@ -75,7 +75,7 @@ class AppDiagnosticsTest {
 
         diagnostics(sam = sam).testSam()
 
-        assertEquals("SAM KO — réseau", screen.value.statusLine)
+        assertEquals("SAM failed — réseau", screen.value.statusLine)
     }
 
     @Test
@@ -124,7 +124,7 @@ class AppDiagnosticsTest {
         diagnostics(llm = llm).testLlm()
 
         assertEquals(1, llm.describeCalls)
-        assertEquals("LLM OK — « ${long.take(70)} »", screen.value.statusLine)
+        assertEquals("LLM OK — \"${long.take(70)}\"", screen.value.statusLine)
     }
 
     @Test
@@ -133,6 +133,6 @@ class AppDiagnosticsTest {
 
         diagnostics(llm = llm).testLlm()
 
-        assertEquals("LLM KO — clé invalide (401)", screen.value.statusLine)
+        assertEquals("LLM failed — clé invalide (401)", screen.value.statusLine)
     }
 }

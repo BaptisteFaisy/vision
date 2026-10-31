@@ -52,9 +52,9 @@ class GuidanceMapDataTest {
         assertEquals(8f, overlays.accuracyM)
         assertEquals(listOf(RoutePoint(48.8525, 2.3550)), overlays.crossings)
         assertEquals(3, overlays.maneuvers.size)
-        assertEquals("Départ", overlays.maneuvers[0].label)
-        assertEquals("Tournez à droite sur rue de Rivoli", overlays.maneuvers[1].label)
-        assertEquals("Arrivée — Gare de Lyon", overlays.maneuvers[2].label)
+        assertEquals("Start", overlays.maneuvers[0].label)
+        assertEquals("Turn right on rue de Rivoli", overlays.maneuvers[1].label)
+        assertEquals("Arrived — Gare de Lyon", overlays.maneuvers[2].label)
         assertTrue(overlays.maneuvers.all { !it.upcoming })
 
         // Caméra d'ensemble : le tracé entier tient dans le cadre (la

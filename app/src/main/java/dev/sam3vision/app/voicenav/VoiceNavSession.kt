@@ -28,7 +28,7 @@ typealias RouteLoader = suspend (destination: String) -> Result<RouteSummary>
 
 /** Chargeur par défaut : résumé indisponible, l'adresse reste affichable. */
 val UnavailableRouteLoader: RouteLoader = {
-    Result.failure(IllegalStateException("résumé d'itinéraire indisponible"))
+    Result.failure(IllegalStateException("route summary unavailable"))
 }
 
 /**
@@ -443,14 +443,14 @@ class VoiceNavSession(
 /**
  * Premier état de guidage : résumé entier, ou « calcul en cours » quand le
  * chargeur a échoué mais que le moteur a quand même démarré — jamais des
- * zéros présentés comme des distances (« Dans 0 m »).
+ * zéros présentés comme des distances (« In 0 m »).
  */
 private fun initialUpdate(destination: String, summary: RouteSummary?): GuidanceUpdate =
     summary?.let(::initialGuidance)
-        ?: GuidanceUpdate("Calcul de l'itinéraire vers $destination…", 0, 0, 0)
+        ?: GuidanceUpdate("Calculating the route to $destination…", 0, 0, 0)
 
-/** Texte d'échec du chargeur : son message, ou le repli français. */
+/** Texte d'échec du chargeur : son message, ou le repli anglais. */
 private fun summaryError(cause: Throwable): String {
     val detail = cause.message?.trim().orEmpty()
-    return detail.ifEmpty { "résumé d'itinéraire indisponible" }
+    return detail.ifEmpty { "route summary unavailable" }
 }

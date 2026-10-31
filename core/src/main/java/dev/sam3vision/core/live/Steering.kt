@@ -71,7 +71,7 @@ object SteeringText {
     fun confirm(
         cap: SteeringCap,
         guided: Boolean,
-        language: SpeechLanguage = SpeechLanguage.Fr,
+        language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String = when (language) {
         SpeechLanguage.Fr -> confirmFrench(cap, guided)
         SpeechLanguage.En -> confirmEnglish(cap, guided)

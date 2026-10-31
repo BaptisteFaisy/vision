@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Section « Carte debug » : tracé schématique de l'itinéraire guidé + position
+ * Section « Debug map » : tracé schématique de l'itinéraire guidé + position
  * GPS en fond de l'écran iSee. Visible seulement pendant un guidage actif ;
  * sans guidage, l'écran est inchangé.
  */
@@ -20,12 +20,12 @@ import dev.sam3vision.core.settings.Settings
 internal fun DebugMapSettings(draft: Settings, onChange: (Settings) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Carte debug",
+            "Debug map",
             color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        SwitchRow("Carte itinéraire en fond (guidage actif)", draft.debugRouteMapEnabled) {
+        SwitchRow("Background route map (active guidance)", draft.debugRouteMapEnabled) {
             onChange(draft.copy(debugRouteMapEnabled = it))
         }
     }

@@ -35,7 +35,7 @@ class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
         val clean = text.trim()
         if (clean.isEmpty()) return Result.success(Unit)
         if (settings.ttsApiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("clé ElevenLabs absente — renseigne-la dans Réglages"))
+            return Result.failure(ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings"))
         }
         player.speed = settings.ttsSpeed
         val audio = ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId)

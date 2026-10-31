@@ -21,7 +21,7 @@ class DirectionalFeedbackTest {
         assertEquals(0, report.center.risk)
         assertEquals(0, report.right.risk)
         assertEquals(0f, report.left.intensity, 0f)
-        assertEquals("Chemin dégagé. Vous pouvez avancer.", report.message)
+        assertEquals("Path clear. You can move forward.", report.message)
     }
 
     @Test
@@ -41,8 +41,8 @@ class DirectionalFeedbackTest {
         assertEquals(1.0f, report.left.intensity, 0f)
         assertEquals(0.6f, report.center.intensity, 0f)
         assertEquals(
-            "Stop, obstacle très proche à 0,8 mètres ! Danger : gauche, centre. " +
-                "Direction la plus sûre : droite.",
+            "Stop, obstacle very close at 0.8 meters! Danger: left, center. " +
+                "Safest direction: right.",
             report.message,
         )
     }
@@ -82,7 +82,7 @@ class DirectionalFeedbackTest {
 
         val report = DirectionalFeedback.describe(obstacles, summary, 90)
 
-        assertTrue(report.message.startsWith("Attention, obstacle devant à 2,0 mètres."))
-        assertFalse(report.message.contains("plus sûre"))
+        assertTrue(report.message.startsWith("Caution, obstacle ahead at 2.0 meters."))
+        assertFalse(report.message.contains("Safest"))
     }
 }
