@@ -64,7 +64,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `:app:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanWiringTest`
   10/10, suites traversée sans régression) ;
   `check-kotlin-limits.py` vert ; `assembleDebug` vert (`app-debug.apk`). Recette téléphone :
-  **non mesurée** (verdicts et virages à valider sur un vrai passage).
+  fumée Redmi OK (install + lancement + pid vivant) ; recette passage réel **non mesurée**
+  (constats, virages et re-vérification à valider rue).
+
+## 2026-10-31 — iSee : écoute auto à l'ouverture de la session lunettes (branche `feat/isee-ecoute-auto-session`)
+
+- **Demande** : au démarrage d'une session lunettes, le mode speech (écoute
+  mains-libres) doit s'activer seul, sans appui long ni téléphone.
+- Fait : `GlassesAutoListen` (porte armée à l'attache caméra, tirée au premier
+  flux montant, une seule fois par session) ; `GlassesTalkPolicy.autoListen`
+  (n'ouvre que micro prêt et repos, jamais d'envoi seul) ;
+  `GlassesTalk.autoStart` + branchement contrôleur (`arm` à l'attache caméra,
+  `onStreaming`, `disarm` à la fermeture). Micro absent : rien ne s'ouvre
+  (le refus s'est déjà dit) ; « Hey Meta, ouvre iSee » inchangé (une seule
+  écoute, pas de double déclenchement avec l'invocation vocale).
+- Preuves : `:app:testDebugUnitTest` ciblé — `GlassesTalkTest` 14/14,
+  `GlassesTalkPolicyTest` 8/8, `GlassesAutoListenTest` 5/5 (11 nouveaux tests,
+  0 échec, rapports XML du 31/10) ; `check-kotlin-limits.py` vert. Suite
+  complète `:app` et `assembleDebug` non rejoués (boîte chargée, changement
+  additif au périmètre lunettes).
 
 ## 2026-10-31 — traversée : le feu dit rouge ou vert toutes les 2 s (branche `vert-repete-2s`)
 
