@@ -3,7 +3,7 @@ package dev.sam3vision.core.util
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Test **jetable** : rouge tant que [DemoDoublage.doubler] ne double pas. */
+/** Test **jetable** : rouge tant que [DemoDoublage.doubler] ne double pas (v2). */
 class DemoDoublageTest {
 
     @Test
