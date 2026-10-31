@@ -333,9 +333,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(statusLine = "Depth: download failed — $cause") }
             return@launch
         }
-        _state.update { it.copy(statusLine = "Testing depth… (${backend.code})") }
+        _state.update { it.copy(statusLine = "Testing depth… (${target.code})") }
         val verdict = withContext(Dispatchers.Default) {
-            val estimator = DepthEstimators.open(getApplication(), backend)
+            val estimator = DepthEstimators.open(getApplication(), target)
             try {
                 val image = syntheticGradientArgb(BENCH_SIZE, BENCH_SIZE)
                 DepthBench.run(estimator, image, BENCH_SIZE, BENCH_SIZE)
