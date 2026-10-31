@@ -135,6 +135,23 @@ class NoLightCrossingTest {
     }
 
     @Test
+    fun `sans feu - voix vehicules douce devant droite et gauche`() {
+        resetWatches()
+        val language = SpeechLanguage.En
+        fun far(widthPx: Float, atMs: Long): String? {
+            val frame = carBox(widthPx)
+            return crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(carReading(12f, frame)),
+                atMs, language, noLight = true, steering = "Droite.",
+            )
+        }
+
+        assertEquals("Droite.", far(100f, 0L))
+        assertEquals("Droite.", far(110f, 100L))
+        assertEquals("Car moving, 12 meters away.", far(120f, 200L))
+    }
+
+    @Test
     fun `sans feu - voiture au-dela de 15 m parle quand elle bouge`() {
         resetWatches()
         val language = SpeechLanguage.En
