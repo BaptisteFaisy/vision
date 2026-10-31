@@ -170,7 +170,19 @@ jobs:
       - name: Lister les PR internes ouvertes
         id: build
         env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
+          # v18 — lectures avec le token de l'installation (quota propre).
+          # Le PAT de Baptiste partage ses 5000 points/h GraphQL avec tous ses
+          # agents ; saturé, il faisait tomber `discover` sur
+          # « API rate limit already exceeded » → « liste des PR illisible —
+          # file en pause » → plus AUCUNE PR n'entrait en file (vécu le 31/10
+          # de 15:00 à 15:25). Les écritures (commentaires, merges, relances,
+          # pushes) gardent le PAT : elles portent son identité.
+          GH_TOKEN: ${{ github.token }}
+          # Lectures d'administration (protection, rulesets) : REST, quota
+          # `core` du PAT, que le balayage n'entame pas — et que le token de
+          # l'installation n'a pas le droit de lire.
+          GH_ECRITURE: ${{ secrets.AUTOMERGE_PAT }}
+          PAT_OK: ${{ secrets.AUTOMERGE_PAT != '' }}
           EVENT: ${{ github.event_name }}
           # v17 — la tête qui a déclenché le balayage (vide hors `workflow_run`).
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -182,7 +194,7 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
-          if [ -z "$GH_TOKEN" ]; then
+          if [ "${PAT_OK:-false}" != "true" ]; then
             echo "AUTOMERGE_PAT absent : file en pause (voir l'en-tête du workflow)"
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
             exit 0
@@ -203,12 +215,13 @@ jobs:
           # Le dépôt exige-t-il une branche à jour avant merge ? La protection
           # classique et le ruleset peuvent diverger : on lit les deux, le
           # ruleset gagne (il est actif sur `master`).
-          STRICT=$( { gh api "repos/$GITHUB_REPOSITORY/branches/master/protection" \
+          ghp() { GH_TOKEN="$GH_ECRITURE" gh "$@"; } # lectures REST d'administration
+          STRICT=$( { ghp api "repos/$GITHUB_REPOSITORY/branches/master/protection" \
               --jq '.required_status_checks.strict' 2>/dev/null || echo false; } )
           QUEUE=false
-          RULESET=$( { gh api "repos/$GITHUB_REPOSITORY/rulesets" --jq '.[].id' 2>/dev/null || true; } )
+          RULESET=$( { ghp api "repos/$GITHUB_REPOSITORY/rulesets" --jq '.[].id' 2>/dev/null || true; } )
           for rs in $RULESET; do
-            regles=$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$rs" 2>/dev/null || true)
+            regles=$(ghp api "repos/$GITHUB_REPOSITORY/rulesets/$rs" 2>/dev/null || true)
             [ -n "$regles" ] || continue
             s_rs=$(printf '%s' "$regles" | jq -r '[.rules[]? | select(.type=="required_status_checks")
                       | .parameters.strict_required_status_checks_policy] | first // false' 2>/dev/null || echo false)
@@ -284,7 +297,12 @@ jobs:
     steps:
       - name: Rebase / résout / merge la PR ${{ matrix.pr }}
         env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
+          # v18 — même partage qu'en `discover` : `gh` lit avec le token de
+          # l'installation (quota séparé du PAT, que tous les agents de
+          # Baptiste épuisent), et n'écrit qu'avec le PAT (`ghe`), parce que
+          # `github-actions[bot]` n'a pas le droit de commander à Mergify.
+          GH_TOKEN: ${{ github.token }}
+          GH_ECRITURE: ${{ secrets.AUTOMERGE_PAT }}
           FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
           FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
           FIREWORKS_AGENT_RESOLVE: ${{ vars.FIREWORKS_AGENT_RESOLVE }}
@@ -300,6 +318,7 @@ jobs:
           QUEUE: ${{ needs.discover.outputs.queue }}
         run: |
           export PATH="$HOME/bin:/usr/local/bin:/usr/bin:$PATH" # gh + jq : r630 en espace user, runners Dell en système (127 vu 28/10 sur vision-3)
+          ghe() { GH_TOKEN="$GH_ECRITURE" gh "$@"; } # écritures : identité du PAT
           green() { # 0 si les 3 checks requis de la PR $1 sont SUCCESS
             gh pr checks "$1" --json name,state 2>/dev/null | jq -e '
               ["ci","ci-budget","couche0"] as $req |
@@ -329,7 +348,7 @@ jobs:
           }
           commente_une_fois() { # $1=pr $2=marque $3=corps (le corps porte la marque)
             [ "$(marques "$1" "$2")" -gt 0 ] && return 0
-            gh pr comment "$1" --body "$3" >/dev/null 2>&1 || true
+            ghe pr comment "$1" --body "$3" >/dev/null 2>&1 || true
             return 0
           }
           commits_de_fusion() { # nb de commits de fusion dans une PR (100 commits max lus)
@@ -379,10 +398,10 @@ jobs:
             corps=$(printf '%s\nsha=%s master=%s state=%s pf=%s\n\n%s' \
               "$ETAT_MARQUE" "$SHA" "$MASTER" "$STATE" "$PF" "$1")
             if [ -n "${cid:-}" ] && [ "$cid" != "null" ]; then
-              gh api -X PATCH "repos/$REPO/issues/comments/$cid" \
+              ghe api -X PATCH "repos/$REPO/issues/comments/$cid" \
                 -f body="$corps" >/dev/null 2>&1 || true
             else
-              gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+              ghe pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
             fi
           }
           # ── fusion sans rebase ──────────────────────────────────────────
@@ -428,7 +447,7 @@ jobs:
               # le budget de 5 min par job — on le dit, une fois par tête.
               if [ -z "$etapes" ] || printf '%s' "$etapes" |
                    grep -qE 'Set up job|heckout|Setup Gradle|Post |Récupérer|cache|périmètre|chaîne d.outils'; then
-                if gh run rerun "$run" --failed >/dev/null 2>&1; then
+                if ghe run rerun "$run" --failed >/dev/null 2>&1; then
                   echo "  run $run relancé (panne d'infrastructure)"
                   rc=0
                 else
@@ -460,7 +479,7 @@ jobs:
               fi
               # Rejeu COMPLET : un job annulé n'est pas un job en échec,
               # `--failed` ne relancerait rien.
-              if gh run rerun "$run" >/dev/null 2>&1; then
+              if ghe run rerun "$run" >/dev/null 2>&1; then
                 echo "  run $run relancé (run annulé)"
                 rc=0
               else
@@ -477,7 +496,7 @@ jobs:
           # Auth git : PAT dans l'URL (x-access-token), passée par commande —
           # rien n'est persisté dans la conf git du runner. Le helper gh
           # ('!gh auth git-credential') rend 403 sur les runners (vu 28/10).
-          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          AUTH_URL="https://x-access-token:${GH_ECRITURE}@github.com/${REPO}.git"
           CLONE_FAIT=""
           preparer_clone() { # 0 = dépôt prêt, 1 = clone impossible
             [ -n "$CLONE_FAIT" ] && return 0
@@ -597,7 +616,7 @@ jobs:
                     printf -v corps '%s\n' \
                       "<!-- automerge-attribution sha=$SHA -->" \
                       "$NON_ATTRIBUES commit(s) dont l'auteur n'était rattaché à aucun compte GitHub : réattribués à l'auteur de la PR (\`$SHA\`), CI relancée. Sans ça la règle \`require_extra_approval_for_unattributed_changes\` laissait la PR \`BLOCKED\` avec tous ses checks verts."
-                    gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                    ghe pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
                     echo "PR #$PR : $NON_ATTRIBUES commit(s) réattribués, CI relancée"
                   else
                     echo "PR #$PR : $NON_ATTRIBUES commit(s) non attribués, réattribution impossible"
@@ -605,7 +624,7 @@ jobs:
                   exit 0
                 fi
                 if [ "$DRAFT" != "true" ] && green "$PR" && ! deja_balayee; then
-                  if gh pr comment "$PR" --body "@mergifyio queue" >/dev/null 2>&1; then
+                  if ghe pr comment "$PR" --body "@mergifyio queue" >/dev/null 2>&1; then
                     echo "PR #$PR : mise en file demandée"
                     noter_etat "mise en file demandée (\`@mergifyio queue\`) : le lot est testé sur l'arbre fusionné."
                   else
@@ -629,7 +648,7 @@ jobs:
           # (O(N²)). Ici on fusionne, point.
           if [ "${STRICT:-true}" != "true" ] && [ "$STATE" = "BEHIND" ] \
             && [ "$DRAFT" != "true" ] && green "$PR" && ! recouvrement_fichiers; then
-            if err=$(gh pr merge --rebase --match-head-commit "$SHA" "$PR" 2>&1); then
+            if err=$(ghe pr merge --rebase --match-head-commit "$SHA" "$PR" 2>&1); then
               echo "PR #$PR mergée sans rebase (base en retard, fichiers disjoints)"
               noter_etat "mergée sans rebase : base en retard, fichiers disjoints, CI relancée pour rien évitée."
               exit 0
@@ -646,7 +665,7 @@ jobs:
               if [ "$DRAFT" = "true" ]; then
                 echo "PR #$PR : brouillon à jour, pas de merge"
               elif green "$PR"; then
-                if gh pr merge --rebase --match-head-commit "$SHA" "$PR" >/dev/null 2>&1; then
+                if ghe pr merge --rebase --match-head-commit "$SHA" "$PR" >/dev/null 2>&1; then
                   echo "PR #$PR mergée"
                 else
                   echo "PR #$PR : merge refusé (base bougée ?), prochain passage"
@@ -671,7 +690,7 @@ jobs:
                     printf -v corps '%s\n' \
                       "<!-- automerge-recancel sha=$SHA -->" \
                       "Relance automatique ($((n + 1))/2) du run annulé sur \`${SHA:0:7}\` — aucun verdict à juger, on rejoue le run entier."
-                    gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                    ghe pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
                   else
                     echo "PR #$PR : run annulé d'un autre commit, pas de relance"
                   fi
@@ -717,7 +736,7 @@ jobs:
                           printf -v corps '%s\n' \
                             "<!-- automerge-retry sha=$SHA -->" \
                             "Relance automatique ($((n + 1))/2) des checks requis en échec sur \`${SHA:0:7}\` — redémarrage des jobs, aucun nouveau commit."
-                          gh pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
+                          ghe pr comment "$PR" --body "$corps" >/dev/null 2>&1 || true
                           ;;
                         1)
                           printf -v corps '%s\n' \
