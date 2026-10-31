@@ -125,10 +125,10 @@ data class CurbSignal(
 /**
  * Ordre d'annonce « trottoir » : [phrase] dans la langue de la voix, [meters]
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
- * palier, [urgent] vrai pour la seule marche imminente (coupe la voix ;
- * tout le reste attend le silence), [safetyPhrase] la consigne immédiate
- * (« Montez le rebord. ») pour la seule marche imminente (`null` pour la
- * pré-alerte à 1 m comme pour le bateau — info douce, pas d'alerte).
+ * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
+ * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
+ * palier 0,5 m (`null` pour la détection, les paliers doux et le bateau —
+ * info douce, pas d'alerte).
  */
 data class CurbCue(
     val phrase: String,
@@ -139,39 +139,49 @@ data class CurbCue(
 )
 
 /**
- * Phrases trottoir, FR/EN comme les positions (`PositionText`) : la pré-alerte
- * douce à 1 m (« Marche dans 1 mètre » / « Step up in 1 meter », avec l'heure),
- * l'imminent à 0,7 m (« Marche, maintenant. » / « Step up now. », urgent, sans
- * heure : à un pas, l'heure retarde la consigne) et le bateau (« Bateau, pas
- * de marche », doux, une fois). Liste fermée : le préchauffage hors-ligne
- * sait quels clips générer.
+ * Phrases bordure, FR/EN comme les positions (`PositionText`) : la détection
+ * (« Bordure détectée » / « Curb detected », avec l'heure quand le centre
+ * est connu — c'est elle qui situe le bord), le compte à rebours 2 / 1,5 /
+ * 1 / 0,7 / 0,5 m (« Bordure à … » / « Curb at … », sans heure : courts
+ * pour s'enchaîner) et le bateau (« Bateau, pas de marche », doux, une
+ * fois). Liste fermée : le préchauffage hors-ligne sait quels clips générer.
  */
 object CurbText {
-    /** Pré-alerte douce à 1 m, sensée : « Marche dans 1 mètre, à midi. » (`null` = sans heure). */
-    fun phrase(edge: CurbEdge, language: SpeechLanguage, centerX: Float? = null): String {
+    /** Détection confirmée : « Bordure détectée, à midi. » (`null` = sans heure). */
+    fun detectedPhrase(language: SpeechLanguage, centerX: Float? = null): String {
         val base = when (language) {
-            SpeechLanguage.Fr -> when (edge) {
-                CurbEdge.Up -> "Marche dans 1 mètre"
-                CurbEdge.Down -> "Descente dans 1 mètre"
-            }
-            SpeechLanguage.En -> when (edge) {
-                CurbEdge.Up -> "Step up in 1 meter"
-                CurbEdge.Down -> "Step down in 1 meter"
-            }
+            SpeechLanguage.Fr -> "Bordure détectée"
+            SpeechLanguage.En -> "Curb detected"
         }
         return PositionText.withHour(base, centerX, language)
     }
 
-    /** Marche imminente à 0,7 m, sans heure : « Step up now. » en montée, « Step down now. » sinon. */
-    fun stepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> when (edge) {
-            CurbEdge.Up -> "Marche, maintenant."
-            CurbEdge.Down -> "Descente, maintenant."
-        }
-        SpeechLanguage.En -> when (edge) {
-            CurbEdge.Up -> "Step up now."
-            CurbEdge.Down -> "Step down now."
-        }
+    /**
+     * Palier du compte à rebours : « Bordure à 2 mètres. » — [palier] vaut
+     * toujours un [CurbWatcher.COUNTDOWN_METERS] ; toute autre distance se
+     * dit quand même (virgule FR, accord), jamais d'exception.
+     */
+    fun distancePhrase(palier: Float, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "Bordure à ${frenchMeters(palier)}."
+        SpeechLanguage.En -> "Curb at ${englishMeters(palier)}."
+    }
+
+    /** « 2 mètres », « 1,5 mètre » (singulier sous 2 m, virgule décimale). */
+    private fun frenchMeters(meters: Float): String {
+        val digits = digits(meters).replace('.', ',')
+        return if (meters >= 2f) "$digits mètres" else "$digits mètre"
+    }
+
+    /** « 2 meters », « 1 meter » (pluriel sauf 1 m). */
+    private fun englishMeters(meters: Float): String {
+        val digits = digits(meters)
+        return if (meters == 1f) "$digits meter" else "$digits meters"
+    }
+
+    /** « 2 », « 1.5 » : l'entier sans décimale, le reste brut (point, la virgule est FR). */
+    private fun digits(meters: Float): String {
+        val whole = meters.toInt()
+        return if (meters == whole.toFloat()) whole.toString() else meters.toString()
     }
 
     /** Bateau : « Bateau, pas de marche. » — plan continu, pas de danger, dit une fois. */
@@ -179,41 +189,24 @@ object CurbText {
         SpeechLanguage.Fr -> "Bateau, pas de marche."
         SpeechLanguage.En -> "Dropped curb, no step."
     }
-
-    /**
-     * Consigne immédiate d'un bord détecté : monter ou descendre le
-     * rebord, dans la langue de la voix — jamais de « Stop » (ordre user
-     * du 31/10 : le stop ne se dit qu'en Traversée, voitures en
-     * mouvement). Parlée par la voix de sécurité, qui coupe tout, dictée
-     * du user comprise.
-     */
-    fun safetyStepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> when (edge) {
-            CurbEdge.Up -> "Montez le rebord."
-            CurbEdge.Down -> "Descendez le rebord."
-        }
-        SpeechLanguage.En -> when (edge) {
-            CurbEdge.Up -> "Step up."
-            CurbEdge.Down -> "Step down."
-        }
-    }
 }
 
 /**
  * Lissage temporel du [CurbSignal], miroir de `StairWatcher` : un positif
- * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs (dont
- * [NEAR_CONFIRM_FRAMES] pour l'imminent), puis silence pendant [cooldownMs]
- * (un trottoir ne bouge pas).
+ * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs, puis
+ * silence pendant [cooldownMs] (un trottoir ne bouge pas).
  *
- * Deux paliers annoncés : la pré-alerte [CurbTier.FAR] à 1 m (douce, une fois
- * par approche) puis la marche imminente [CurbTier.NEAR] à 0,7 m (compteur
- * séparé, parole urgente même en cooldown : la première vue parle). Le suivi
- * reste actif jusqu'à [CURB_METERS] mais n'annonce plus au-delà de
- * [FAR_ANNOUNCE_METERS]. Hystérésis 1,0 / 1,4 m (pré-alerte) et 0,7 / 0,9 m
- * (imminent) : après une annonce, il faut s'éloigner au-delà de
- * [FAR_REARM_METERS] / [STEP_REARM_METERS] ou perdre le signal pour ré-armer.
+ * Détection dite aussitôt confirmée (« Bordure détectée. », une fois par
+ * approche), puis compte à rebours [COUNTDOWN_METERS] (2 / 1,5 / 1 / 0,7 /
+ * 0,5 m) : chaque palier dit une fois par approche dès [confirmFrames]
+ * frames sous le seuil, **sans** cooldown entre paliers — l'approche à pied
+ * les enchaîne en ~2 s, un cooldown les tuerait. Verrous + hystérésis
+ * ([REARM_MARGIN_METERS] : recul au-delà = le palier reparle) tiennent le
+ * silence à la place ; palier survolé entre deux frames = sauté sans
+ * rattrapage (jamais de distance périmée) ; signal perdu = détection et
+ * paliers ré-armés. Sans distance, le compte à rebours attend.
  * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence, jamais
- * juste après une marche (traversée du bord, pas un bateau).
+ * juste après un palier proche (traversée du bord, pas un bateau).
  *
  * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
  * trottoir ne parle pas d'un bord — le plan sous les pieds (bas collé en bas
@@ -222,35 +215,37 @@ object CurbText {
  * priors, à valider sur captures du téléphone : en cas de doute le bord
  * parle, jamais l'inverse.
  *
- * Pur JVM et testé. Sécurité : la marche imminente parle en alerte immédiate
+ * Pur JVM et testé. Sécurité : le palier 0,5 m parle en alerte immédiate
  * ([CurbCue.safetyPhrase], voix de sécurité qui coupe tout, dictée du user
- * comprise) — la pré-alerte à 1 m et le bateau attendent le silence (pas
+ * comprise) — détection, paliers doux et bateau attendent leur tour (pas
  * d'alerte, juste l'info).
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
     private val cooldownMs: Long = DEFAULT_COOLDOWN_MS,
-    private val nearConfirmFrames: Int = NEAR_CONFIRM_FRAMES,
 ) {
-    /** Pré-alertes consécutives en cours (autre chose remet à zéro). */
+    /** Détections consécutives en cours (un trou remet à zéro). */
     private var hits: Int = 0
 
-    /** Imminents consécutifs en cours (autre chose remet à zéro). */
-    private var nearHits: Int = 0
+    /** Frames consécutives sous le palier visé (autre chose remet à zéro). */
+    private var palierHits: Int = 0
+
+    /** Palier visé en cours de confirmation, `null` si aucun. */
+    private var palierTarget: Float? = null
+
+    /** Paliers déjà dits (ou sautés car survolés) de l'approche en cours. */
+    private val spokenPaliers = mutableSetOf<Float>()
 
     /** Bateaux consécutifs en cours (autre chose remet à zéro). */
     private var flatHits: Int = 0
 
-    /** Imminent déjà dit, en attente de ré-armement (> 0,9 m ou signal perdu). */
-    private var nearSpoken: Boolean = false
-
-    /** Pré-alerte déjà dite, en attente de ré-armement (> 1,4 m ou signal perdu). */
-    private var farSpoken: Boolean = false
+    /** Détection déjà dite pour la présence en cours. */
+    private var detectedSpoken: Boolean = false
 
     /** Bateau déjà dit pour la présence en cours. */
     private var flatSpoken: Boolean = false
 
-    /** Instant de la dernière marche imminente dite, [NO_INSTANT] si aucune. */
+    /** Instant du dernier palier proche dit (0,7 / 0,5 m), [NO_INSTANT] si aucun. */
     private var lastNearAtMs: Long = NO_INSTANT
 
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
@@ -260,32 +255,32 @@ class CurbWatcher(
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
 
-    /** Dernière marche imminente, `null` si aucune (P2 : le poteau attend quand elle est fraîche). */
+    /** Dernier palier proche, `null` si aucun (P2 : le poteau attend quand il est frais). */
     val lastNearMs: Long?
         get() = lastNearAtMs.takeIf { it != NO_INSTANT }
 
     /**
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
-     * quand le compte de confirmation est atteint ([CurbCue.urgent] pour le
-     * seul imminent), `null` sinon.
+     * quand le compte de confirmation est atteint ([CurbCue.urgent] pour les
+     * seuls paliers proches), `null` sinon.
      */
     fun onSignal(signal: CurbSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): CurbCue? {
         if (signal.detected) {
             flatHits = 0
             flatSpoken = false
-            return if (signal.tier == CurbTier.NEAR) onNear(signal, nowMs, language)
-            else onFar(signal, nowMs, language)
+            return onDetected(signal, nowMs, language)
         }
         hits = 0
-        nearHits = 0
-        nearSpoken = false
-        farSpoken = false
+        palierHits = 0
+        palierTarget = null
+        detectedSpoken = false
+        spokenPaliers.clear()
         if (!signal.flatPass) {
             flatHits = 0
             flatSpoken = false
             return null
         }
-        // Marche traversée : le plan sous les pieds n'est pas un bateau.
+        // Bord traversé : le plan sous les pieds n'est pas un bateau.
         if (lastNearAtMs != NO_INSTANT && nowMs - lastNearAtMs < FLAT_AFTER_STEP_SUPPRESS_MS) return null
         flatHits++
         if (flatHits < confirmFrames) return null
@@ -297,51 +292,29 @@ class CurbWatcher(
         return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false)
     }
 
-    /** Imminent à 0,7 m : parle vite, urgent, même en cooldown (la première vue parle). */
-    private fun onNear(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
-        hits = 0
-        nearHits++
-        if (nearHits < nearConfirmFrames) return null
-        if (nearSpoken) return null
-        nearSpoken = true
-        farSpoken = true
-        lastCueAtMs = nowMs
-        lastNearAtMs = nowMs
-        nearHits = 0
-        val edge = signal.edge ?: CurbEdge.Up
-        return CurbCue(
-            CurbText.stepPhrase(edge, language),
-            signal.meters,
-            CurbTier.NEAR,
-            urgent = true,
-            safetyPhrase = CurbText.safetyStepPhrase(edge, language),
-        )
+    /**
+     * Bordure en vue : le recul ré-arme les paliers dépassés, puis la
+     * détection parle (une fois), puis le compte à rebours.
+     */
+    private fun onDetected(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
+        val meters = signal.meters
+        if (meters != null) spokenPaliers.removeAll { palier -> meters > palier + REARM_MARGIN_METERS }
+        if (!detectedSpoken) return onDetection(signal, nowMs, language)
+        return onCountdown(signal, nowMs, language)
     }
 
-    /**
-     * Pré-alerte douce à 1 m, une fois par approche ; entre 1 et 3 m le suivi
-     * reste silencieux. Au-delà des réarmements, l'imminent puis la pré-alerte
-     * se ré-arment.
-     */
-    private fun onFar(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
-        nearHits = 0
-        val meters = signal.meters
-        if (meters != null && meters > STEP_REARM_METERS) nearSpoken = false
-        if (meters != null && meters > FAR_REARM_METERS) farSpoken = false
-        if (meters == null || meters > FAR_ANNOUNCE_METERS) {
-            hits = 0
-            return null
-        }
-        if (farSpoken) return null
+    /** Détection : parle vite, une fois par approche (le clignotement attend le cooldown). */
+    private fun onDetection(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
+        palierHits = 0
+        palierTarget = null
         hits++
         if (hits < confirmFrames) return null
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
-        farSpoken = true
+        detectedSpoken = true
         lastCueAtMs = nowMs
         hits = 0
-        val edge = signal.edge ?: CurbEdge.Up
         return CurbCue(
-            CurbText.phrase(edge, language, signal.centerX),
+            CurbText.detectedPhrase(language, signal.centerX),
             signal.meters,
             CurbTier.FAR,
             urgent = false,
@@ -349,13 +322,51 @@ class CurbWatcher(
         )
     }
 
+    /**
+     * Compte à rebours : le palier visé est le plus proche restant à dire
+     * sous lequel on est passé ; les paliers survolés sont verrouillés muets
+     * (périmés), le recul les ré-arme (voir [onDetected]).
+     */
+    private fun onCountdown(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
+        val meters = signal.meters ?: return null
+        val target = COUNTDOWN_METERS.filter { it >= meters && it !in spokenPaliers }.minOrNull()
+        if (target == null) {
+            palierHits = 0
+            palierTarget = null
+            return null
+        }
+        spokenPaliers.addAll(COUNTDOWN_METERS.filter { it > target })
+        if (target != palierTarget) {
+            palierTarget = target
+            palierHits = 1
+            return null
+        }
+        palierHits++
+        if (palierHits < confirmFrames) return null
+        palierTarget = null
+        palierHits = 0
+        spokenPaliers.add(target)
+        lastCueAtMs = nowMs
+        val near = target <= STEP_NEAR_METERS
+        if (near) lastNearAtMs = nowMs
+        val phrase = CurbText.distancePhrase(target, language)
+        return CurbCue(
+            phrase,
+            signal.meters,
+            if (near) CurbTier.NEAR else CurbTier.FAR,
+            urgent = near,
+            safetyPhrase = phrase.takeIf { target == SAFETY_PALIER_METERS },
+        )
+    }
+
     /** Oublie les comptes, les verrous et l'annonce (nouvelle séance de direct). */
     fun reset() {
         hits = 0
-        nearHits = 0
+        palierHits = 0
+        palierTarget = null
+        spokenPaliers.clear()
         flatHits = 0
-        nearSpoken = false
-        farSpoken = false
+        detectedSpoken = false
         flatSpoken = false
         lastNearAtMs = NO_INSTANT
         lastCueAtMs = NO_INSTANT
@@ -368,7 +379,7 @@ class CurbWatcher(
         /** Silence entre deux annonces douces (le trottoir ne bouge pas). */
         const val DEFAULT_COOLDOWN_MS = 10_000L
 
-        /** Au-delà de cette distance (m), un bord n'est même plus suivi (annonce dès 1 m). */
+        /** Au-delà de cette distance (m), un bord n'est même plus suivi (détection dite dès confirmée). */
         const val CURB_METERS = 3f
 
         /**
@@ -384,23 +395,23 @@ class CurbWatcher(
         /** Haut de plan minimal (fraction) : en deçà + pieds = descente, sinon sol. */
         const val PLANE_TOP_MIN = 0.5f
 
-        /** Sous cette distance lissée (m), le bord est imminent : parole urgente. */
+        /** Sous cette distance lissée (m), le bord est proche : parole urgente. */
         const val STEP_NEAR_METERS = 0.7f
 
-        /** Au-delà (m), l'imminent se ré-arme : hystérésis 0,7 / 0,9. */
-        const val STEP_REARM_METERS = 0.9f
+        /** Paliers du compte à rebours (m), du plus loin au plus proche. */
+        val COUNTDOWN_METERS = listOf(2.0f, 1.5f, 1.0f, 0.7f, 0.5f)
 
-        /** Sous cette distance (m), la pré-alerte parle ; au-delà, suivi silencieux. */
-        const val FAR_ANNOUNCE_METERS = 1.0f
+        /**
+         * Hystérésis : un palier dit se ré-arme quand on recule au-delà de
+         * T + marge (chaque palier se redit en s'approchant à nouveau).
+         */
+        const val REARM_MARGIN_METERS = 0.2f
 
-        /** Au-delà (m), la pré-alerte se ré-arme : hystérésis 1,0 / 1,4. */
-        const val FAR_REARM_METERS = 1.4f
+        /** Palier le plus proche : parlé en alerte immédiate (voix de sécurité). */
+        const val SAFETY_PALIER_METERS = 0.5f
 
-        /** Après une marche dite, le bateau reste muet (traversée du bord). */
+        /** Après un palier proche dit, le bateau reste muet (traversée du bord). */
         const val FLAT_AFTER_STEP_SUPPRESS_MS = 10_000L
-
-        /** Imminents consécutifs avant de parler (la première vue parle vite). */
-        const val NEAR_CONFIRM_FRAMES = 2
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

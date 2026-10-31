@@ -768,7 +768,42 @@ Regardez à droite. … Rien à droite. » ; virage à droite quand on a
 demandé la gauche : attente (pas de validation) ; voiture qui passe
 pendant un côté → « Attention, voiture à … » puis re-vérification —
 recette passage réel **non mesurée**, exige une sortie rue.
-## 24. La voix du guidage ne se tait plus sans raison (fix du 31/10)
+## 24. Bordure dite dès détection puis à 2 / 1,5 / 1 / 0,7 / 0,5 m (ordre user du 31/10)
+
+Le user marche avec l'app : la bordure n'était dite qu'à 1 m puis à
+0,7 m (§§ 19/21). Nouveau contrat, qui **remplace** la double annonce
+des §§ 19/21 (gardés pour mémoire) : dès qu'une bordure est détectée
+dans le couloir marché, elle est dite aussitôt, puis redite à chaque
+palier franchi en s'approchant :
+
+- **phrases** (`CurbText`, FR/EN) : détection `Bordure détectée.` /
+  `Curb detected.` (avec l'heure du cadran quand le centre est connu,
+  § 12) ; paliers `Bordure à 2 mètres.` / `Bordure à 1,5 mètre.` /
+  `Bordure à 1 mètre.` / `Bordure à 0,7 mètre.` / `Bordure à 0,5
+  mètre.` (`Curb at 2 meters.` / `1.5 meters` / `1 meter` /
+  `0.7 meters` / `0.5 meters`), sans heure — courts pour s'enchaîner ;
+- **paliers** (`CurbWatcher`) : suivi jusqu'à 3 m (inchangé), détection
+  confirmée en 2 frames, une fois par approche (cooldown 10 s contre
+  le clignotement) ; chaque palier dit une fois par approche dès
+  2 frames sous le seuil, **sans** cooldown entre paliers (l'approche
+  à pied les enchaîne en ~2 s) ; hystérésis +0,2 m par palier (recul
+  au-delà = le palier reparle) ; palier survolé entre deux frames =
+  sauté sans rattrapage (jamais de distance périmée) ; signal perdu =
+  détection et paliers ré-armés ;
+- **sécurité gardée** : 0,7 m et 0,5 m urgents (`NEAR`, passent en
+  Traversée comme l'imminent § 19) ; 0,5 m porté par la voix de
+  sécurité (coupe tout, §§ 16/22) avec le même texte — plus de
+  « Montez le rebord. » ; bateau inchangé.
+
+Verrouillé par `CurbAnnounceTest` (20 : détection, compte à rebours
+FR/EN, entrée directe proche, palier survolé, hystérésis, cooldowns,
+bateau) et `CurbWatcherTest` (phrases détection + paliers FR/EN).
+
+Recette téléphone : approche réelle d'une bordure → « Bordure
+détectée. », « Bordure à 2 mètres. » … « Bordure à 0,5 mètre. » —
+**non mesurée**, exige une sortie rue.
+
+## 25. La voix du guidage ne se tait plus sans raison (fix du 31/10, ex-§24)
 
 Le user marche avec l'app : le guidage (right/left/straight) s'arrête
 d'un coup, ne dit plus rien, puis reprend tout seul — écran allumé.
@@ -809,3 +844,8 @@ question posée en marchant → le guidage continue pendant la réflexion
 et entre les tranches lues ; voix non-Laure → les mots finissent par
 se dire puis partent en clips — **non mesuré**, exige un APK de cette
 branche sur appareil réel.
+
+*Note de fusion : les deux sections « 24 » concurrentes sont conservées
+en entier — celle de la branche reste le §24 (priorité en cas de
+doute), celle de master est renumérotée §25 (ex-§24) ; aucun des deux
+contrats n'est fusionné ni abandonné.*
