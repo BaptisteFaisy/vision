@@ -20,7 +20,7 @@ object FenceOpeningConcepts {
     /**
      * Concepts à suivre côté SAM : 3 prompts, chacun sous
      * [dev.sam3vision.core.live.LivePrompts.MAX_LENGTH] et bien sous
-     * `PROMPT_LIMIT = 17` comme [dev.sam3vision.core.live.LivePrompts.MAX].
+     * `PROMPT_LIMIT = 18` comme [dev.sam3vision.core.live.LivePrompts.MAX].
      */
     val PROMPTS: List<String> = listOf("fence", "barrier", "gate")
 

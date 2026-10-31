@@ -7,17 +7,18 @@ package dev.sam3vision.core.live
  * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
  * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
  * pas par un concept suivi ni par le LLM. Ces prompts sont des noms de concepts SAM 3.1
- * (17 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
+ * (18 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
  * aucun sens et volerait un slot de suivi.
  */
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **17** concepts extérieurs — mobiles (« person »,
+     * Concepts par défaut : **18** concepts extérieurs — mobiles (« person »,
      * « car », « bus », « bicycle ») puis feux piétons et cheminement
      * (« pedestrian traffic light », « pedestrian signal head », « curb »,
      * « sidewalk », « crosswalk ») puis statiques (« pole », « stairs »,
-     * « fence », « gate ») et les clés (« keys », ordre user du 31/10 :
+     * « fence », « gate », « wall », ordre user du 31/10 : iSee détecte
+     * les murs) et les clés (« keys », ordre user du 31/10 :
      * « barrier » cède son slot, « fence » garde le sien) puis souvenirs (« souvenir shop »,
      * « beanie », « socks », boutique du square, ordre user du 31/10),
      * modifiables à chaud dans le direct (champ « Follow »).
@@ -28,18 +29,21 @@ object LivePrompts {
      * ici, la bascule ne change plus les prompts. « truck », « motorcycle »,
      * « scooter » et « electric scooter » n'y sont plus (ordre user du 31/10,
      * boutique du square) : le veto les reconnaît encore par le champ
-     * « Follow », mais la traversée ne les suit plus. « door », « wall » et
-     * « window » ont cédé leurs slots aux véhicules, au feu et à la bordure.
+     * « Follow », mais la traversée ne les suit plus. « door » et « window »
+     * ont cédé leurs slots aux véhicules, au feu et à la bordure ; « wall »
+     * y est revenu le 31/10 (plafond 17 → 18, rien ne sort).
      *
      * Historique des plafonds : 2 (26/10, le tracker tronquait à
      * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
      * tous les dangers extérieurs), 17 (31/10, ordre user : tête du feu
-     * piéton en plus du caisson) — [MAX] et `PROMPT_LIMIT` montent ensemble.
+     * piéton en plus du caisson), 18 (31/10, ordre user : iSee détecte
+     * les murs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
      * Historique des défauts : 10 (28/10), 12 (29/10, ordre user : portes et
      * barrières reconnues en plus), 14 (30/10 : clôtures et portails reconnus
      * en plus), 16 (30/10 : unification traversée/normal ; 31/10 : camion,
      * moto et trottinette cèdent leurs slots aux souvenirs), 17 (31/10 :
-     * tête du feu piéton en plus du caisson, « barrier » à « keys »).
+     * tête du feu piéton en plus du caisson, « barrier » à « keys »),
+     * 18 (31/10 : « wall » en plus, rien ne sort).
      * Sur `/live` les
      * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts
      * = 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
@@ -48,7 +52,8 @@ object LivePrompts {
     val default: List<String> = listOf(
         "person", "car", "bus", "bicycle", "pedestrian traffic light",
         "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-        "stairs", "keys", "fence", "gate", "souvenir shop", "beanie", "socks",
+        "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
+        "beanie", "socks",
     )
 
     /**
@@ -61,7 +66,7 @@ object LivePrompts {
      * détecté en permanence hors mode traversée pour anticiper les passages
      * protégés. Bascule depuis la pastille « Extérieur » du direct, sans passer
      * par le champ « Follow ». Tient sous [MAX] comme [default], qui reste les
-     * 17 concepts (pastille « Rue »).
+     * 18 concepts (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
         "person", "pole", "bollard", "fence", "barrier", "gate", "sign", "tree",
@@ -82,7 +87,7 @@ object LivePrompts {
     )
 
     /**
-     * Liste du monde sensoriel : dehors = [default] (les 17 concepts
+     * Liste du monde sensoriel : dehors = [default] (les 18 concepts
      * extérieurs, traversée incluse), dedans = [indoor] (les 7 objets
      * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
      * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
@@ -102,13 +107,13 @@ object LivePrompts {
     }
 
     /**
-     * Nombre maximal de concepts : **17** (16 dangers extérieurs du 28/10
-     * plus la tête du feu piéton, ordre user du 31/10). Le backend suit :
-     * `MAX_PROMPTS = 17` sur `/live`, `PROMPT_LIMIT = 17` côté tracker ;
+     * Nombre maximal de concepts : **18** (17 du 31/10 plus les murs,
+     * ordre user du 31/10 : iSee détecte les murs). Le backend suit :
+     * `MAX_PROMPTS = 18` sur `/live`, `PROMPT_LIMIT = 18` côté tracker ;
      * le client ne doit pas en envoyer davantage — sinon l'app affiche
      * des concepts jamais détectés.
      */
-    const val MAX = 17
+    const val MAX = 18
 
     /** Longueur maximale d'un prompt : au-delà, ce n'est plus un concept. */
     const val MAX_LENGTH = 32

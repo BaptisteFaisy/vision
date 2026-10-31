@@ -16,12 +16,12 @@ class LivePromptsNavigationTest {
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks",
+                "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
+                "beanie", "socks",
             ),
             LivePrompts.default,
         )
-        assertEquals(17, LivePrompts.MAX)
+        assertEquals(18, LivePrompts.MAX)
     }
 
     @Test
