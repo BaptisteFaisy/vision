@@ -1,5 +1,6 @@
 package dev.sam3vision.core.usecase
 
+import dev.sam3vision.core.nav.KnownPlaces
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -9,7 +10,8 @@ import org.junit.Test
  *
  * Contrat de [NavigationRouter.route] : rend [NavigationRequest.destination] quand le
  * texte demande un guidage, `null` sinon (pas une navigation, texte vide ou blanc).
- * La destination est rendue telle que dite (articles et accents gardés), trimmée ;
+ * La destination est rendue telle que dite (articles et accents gardés), trimmée,
+ * sauf les lieux connus qui partent vers leur adresse ([KnownPlaces]) ;
  * la détection est insensible à la casse, aux accents et à la ponctuation finale.
  */
 class NavigationRouterTest {
@@ -102,5 +104,12 @@ class NavigationRouterTest {
         val request = router.route("guide-moi jusqu'à l'hôpital")
 
         assertEquals("l'hôpital", request?.destination)
+    }
+
+    @Test
+    fun `sacre-coeur dicte part vers son adresse`() {
+        val request = router.route("I want to go to the Sacré Coeur")
+
+        assertEquals("35 Rue du Chevalier de la Barre", request?.destination)
     }
 }
