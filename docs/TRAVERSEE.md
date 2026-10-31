@@ -392,3 +392,28 @@ on/off » et « traverser » conservés).
   l'ambre `CROSSING_ACCENT_OFFER` (bandeau de scan) ; `CrossingLossGate`
   et ses tests (décision de sortie, horloge couverte par
   `CrossingTriggerExitDecisionTest`).
+
+## 13. Sans feu : pas de « regardez à gauche/droite », verdict toutes les 2 s (31/10)
+
+Ordre user : sur un passage **sans feu**, le scan gauche/droite est coupé —
+iSee dit les voitures en mouvement en permanence (voix véhicules, priorité
+absolue en traversée, même loin) et, toutes les 2 s, si on peut traverser :
+« Traversez. » / « Cross. » sans danger, « Attendez. » / « Wait. » sur
+danger. Avec feu : inchangé (feu > scan > véhicules > personnes).
+
+- **porte** : `NoLightGate` (core) — 4 frames sans boîte de feu → sans-feu
+  (le faux « sans feu » se prouve comme un vert) ; toute boîte réapparue
+  rebascule aussitôt côté feu (direction sûre) ;
+- **verdict** : `NoLightAnnouncer` (core) — 2 frames stables avant de parler,
+  redit toutes les 2 s dans les deux sens ; « Attendez. » coupe le délai
+  après un « Traversez. » (miroir du rouge après vert) ; la voix véhicules
+  recule le verdict (pas de doublon avec la phrase prioritaire) ;
+- **danger** : veto trafic OU véhicule brut en mouvement — même en cooldown
+  voix, jamais « Traversez. » sur un doute ;
+- **câblage** : `crossingPatchOf` tait le feu et publie rouge (aucun vert lu —
+  pastille, bouton et vibrations inchangés), `crossingPhraseOf` coupe le scan
+  et parle véhicules d'abord (`NoLightCrossWatch`, reset avec les autres voix) ;
+- **limites** : portée véhicules 15 m mesurés (non mesuré = parlé comme
+  proche, « Stop, … » urgent comme avant) ; un feu cadré hors champ 4 frames
+  passe en sans-feu — viser le feu quand il y en a un ; écran Direct
+  inchangé (fail-closed : « attendez » sans vert).

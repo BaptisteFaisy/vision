@@ -30,6 +30,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   Traversée). `IseeViewModel` tient ses 498 lignes (câblage extrait).
 - **Preuve** : 8 tests nouveaux (`ProximityVoiceArrivalTest` 6,
   `CrossingLateralTest` 2) ; suite `:app` 1492/1492 sur r630 ; garde tailles OK.
+## 2026-10-31 — iSee : traversée sans feu — scan coupé, verdict toutes les 2 s (branche `isee-traversee-sans-feu`)
+
+- **Ordre user** : en mode Traversée **sans feu**, plus de « Regardez à
+  gauche / à droite » — iSee dit les voitures en mouvement en permanence
+  (priorité absolue, même loin) et, toutes les 2 s, si on peut traverser
+  (« Traversez. » / « Cross. » sans danger, « Attendez. » / « Wait. » sur
+  danger). Avec feu : inchangé.
+- **Fait** : `NoLightGate` (4 frames sans boîte → sans-feu, retour feu
+  immédiat) + `NoLightAnnouncer` (« Attendez. » coupe le délai après
+  « Traversez. », voix véhicules prioritaire) en core ; `crossingPatchOf`
+  tait le feu, `crossingPhraseOf` coupe le scan ; pastille/bouton/vibrations
+  inchangés (rouge, aucun vert lu) ; écran Direct inchangé.
+- **Preuve** : `:core:testDebugUnitTest` 2 668 + `:app:testDebugUnitTest`
+  1 494 verts sur r630 (0 échec, dont 12 + 10 tests `NoLightCrossingTest`
+  nouveaux) ; UBS : 0 finding nouveau (6 critiques `currentTimeMillis` sur
+  `LiveProbe.kt` hors diff, faux positifs pré-existants ; exit 2 Kotlin
+  connu) ; fichiers < 500 lignes (`LiveProbe.kt` 497).
 
 ## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
 
