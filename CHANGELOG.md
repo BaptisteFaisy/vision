@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
+
+- **Constat sur #688** : l'agent de périmètre avait écrit le `## Scope`
+  manquant à 19:00, mais aucun run `couche0` n'a suivi — la PR restait
+  `BLOCKED` sur un verdict périmé (débloquée à la main par `gh run rerun`,
+  vert aussitôt). Cause : le sweep appelait `fw-scope.py` avec le token de
+  l'installation, et GitHub n'émet aucun `pull_request edited` pour une
+  édition du bot (anti-boucle) — même cause que l'agent de conflit en v21.
+- **Fait** : le sweep appelle l'agent de périmètre avec le PAT
+  (`GH_TOKEN="$GH_ECRITURE"`, v27 de `pr-auto-merge.yml`), donc l'édition du
+  corps redéclenche `couche0`. Filet : quand `couche0` reste en échec alors
+  que le fix est écrit (marque scope posée), son run est relancé — une fois
+  par tête (`automerge-scope-rerun`), le garde relisant le corps courant.
+- **Preuve** : `InvocationSweepTest` (2 tests) échoue sur l'ancien workflow
+  et passe sur le nouveau ; gates du périmètre verts (`test_scope_agent` 22,
+  `test_conflict_agent` 28, `test_test_agent` 23, `test_union_journal` 6,
+  `test_quota` 2, `test_check_couche0` 24) ; YAML valide, `bash -n` OK sur les
+  deux blocs `run`.
+
 ## 2026-10-31 — iSee : destination GPS en mémoire pour les questions LLM (branche `feat/isee-gps-destination-memoire-llm`)
 
 - **Constat** : pendant un guidage GPS, les questions sur la destination
