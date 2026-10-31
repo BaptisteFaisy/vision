@@ -57,9 +57,8 @@ data class ResiduDecision(
  *
  * Seuils = priors à recaler sur téléphone, direction sûre : le doute ne tranche
  * jamais (ni « objet mobile » sur un bruit de segmentation, ni « caméra » sur un
- * masque vide). Mapping vers le chemin véhicule (`traverse.Verdict`, à l'intégrateur) :
- * `OBJECT_MOVED → VEHICLE_MOVED`, `CAMERA_MOVED + ego ≈ 0 → STATIC`, `CAMERA_MOVED +
- * ego franc → CAMERA_MOVED`, `UNCERTAIN → conserver le verdict V1`.
+ * masque vide). Mapping vers le chemin véhicule ([dev.sam3vision.core.traverse.Verdict]) :
+ * [dev.sam3vision.core.traverse.toVerdict] (`null` = doute, garder le verdict V1).
  */
 object SamResidu {
 
