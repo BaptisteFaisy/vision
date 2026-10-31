@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.core.types.DeviceSessionError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -102,5 +103,66 @@ class GlassesPolicyTest {
         assertTrue(lost?.text.orEmpty().contains("Register with Meta AI"))
         // Désenregistrement demandé par l'utilisateur : pas une perte, on se tait.
         assertNull(registrationLostMessage(wasRegistered = true, registered = false, wanted = true))
+    }
+
+    @Test
+    fun `UNEXPECTED post-STOPPED n ecrase pas l erreur causale affichee`() {
+        // Régression : « The glasses closed the session » (SESSION_ENDED_BY_DEVICE) puis STOPPED,
+        // le SDK émet UNEXPECTED_ERROR 1-3 ms après ; note() écrasait le causal par le générique.
+        val ended = sessionErrorMessage(DeviceSessionError.SESSION_ENDED_BY_DEVICE)
+        assertEquals(MessageKind.ERROR, ended.kind)
+        assertFalse(sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, SessionPhase.STOPPED, ended))
+        val lost = sessionErrorMessage(DeviceSessionError.DEVICE_DISCONNECTED)
+        assertFalse(sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, SessionPhase.STOPPED, lost))
+    }
+
+    @Test
+    fun `UNEXPECTED isole se dit`() {
+        // Sans message affiché, l'écho est la seule trace : il se dit.
+        assertTrue(sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, SessionPhase.STOPPED, null))
+    }
+
+    @Test
+    fun `UNEXPECTED sur INFO ou WARNING se dit`() {
+        // INFO/WARNING ne sont pas une cause : l'erreur apporte une information neuve.
+        val info = GlassesMessages.mockReady()
+        val warning = GlassesMessages.noCamera()
+        assertEquals(MessageKind.INFO, info.kind)
+        assertEquals(MessageKind.WARNING, warning.kind)
+        assertTrue(sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, SessionPhase.STOPPED, info))
+        assertTrue(sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, SessionPhase.STOPPED, warning))
+    }
+
+    @Test
+    fun `erreur causale sur UNEXPECTED affiche se dit`() {
+        // Seul le générique est filtré : une cause réelle remplace toujours l'écran.
+        val generic = sessionErrorMessage(DeviceSessionError.UNEXPECTED_ERROR)
+        assertEquals(MessageKind.ERROR, generic.kind)
+        assertTrue(
+            sessionErrorWorthTelling(
+                DeviceSessionError.SESSION_ENDED_BY_DEVICE,
+                SessionPhase.STOPPED,
+                generic,
+            ),
+        )
+        assertTrue(
+            sessionErrorWorthTelling(
+                DeviceSessionError.BATTERY_CRITICAL,
+                SessionPhase.STOPPED,
+                generic,
+            ),
+        )
+    }
+
+    @Test
+    fun `hors STOPPED tout se dit`() {
+        // Le filtre ne vaut que pour l'écho post-arrêt : avant, même le générique se dit.
+        val causal = sessionErrorMessage(DeviceSessionError.SESSION_ENDED_BY_DEVICE)
+        listOf(SessionPhase.IDLE, SessionPhase.STARTING, SessionPhase.STARTED).forEach { phase ->
+            assertTrue(
+                phase.name,
+                sessionErrorWorthTelling(DeviceSessionError.UNEXPECTED_ERROR, phase, causal),
+            )
+        }
     }
 }

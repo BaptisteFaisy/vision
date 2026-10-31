@@ -422,6 +422,12 @@ fun registrationErrorWorthTelling(error: RegistrationError): Boolean =
     error != RegistrationError.ALREADY_REGISTERED && error != RegistrationError.ALREADY_UNREGISTERED
 
 /**
+ * Écho `UNEXPECTED_ERROR` post-`STOPPED` : le SDK en émet un 1-3 ms après la fin causale,
+ * il ne doit pas écraser le message causal affiché. Miroir de [registrationErrorWorthTelling].
+ */
+fun sessionErrorWorthTelling(error: DeviceSessionError, phase: SessionPhase, current: GlassesMessage?): Boolean = !(error == DeviceSessionError.UNEXPECTED_ERROR && phase == SessionPhase.STOPPED && current?.kind == MessageKind.ERROR)
+
+/**
  * Ce que la **perte** d'enregistrement doit dire, et quand se taire : rien au premier état
  * (au démarrage, `wasRegistered` est faux), rien quand c'est l'utilisateur qui s'est
  * désenregistré (`wanted`), sinon l'avertissement. Pur, donc testé en JVM.
