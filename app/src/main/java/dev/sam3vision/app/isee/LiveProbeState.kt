@@ -58,8 +58,9 @@ data class LiveProbeState(
      * [spoken] est-elle le mot stop ? Publié avec la phrase, dans la même
      * écriture : la voix coupe la lecture en cours pour le dire (chat
      * compris), sans relire un état qui aurait déjà bougé. Faux pour les
-     * mots doux (gauche/tout droit/droite), les positions et la Traversée
-     * (balise nulle) : ils attendent le silence.
+     * mots doux (gauche/tout droit/droite), les positions et le feu de
+     * Traversée : ils attendent le silence. Vrai pour le seul stop
+     * Traversée (« Stop, car moving. », voitures en mouvement).
      */
     val spokenUrgent: Boolean = false,
     /** Cap demandé à la voix (tout droit par défaut) : le couloir que le guidage marche. */

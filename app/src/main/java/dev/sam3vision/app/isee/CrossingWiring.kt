@@ -64,9 +64,9 @@ class CrossingChipZone {
  * modes), seule la voix bascule (feu + veto trafic au lieu du guidage). Les
  * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
  * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
- * est coupé tant que le mode est actif : « Stop, obstacle » et
- * « Vert, traversez » ne doivent jamais se mélanger. La coupe fait taire la
- * proposition un moment : toute bascule est manuelle (puce, ordre vocal).
+ * est coupé tant que le mode est actif : ses mots et « Vert, traversez »
+ * ne doivent jamais se mélanger. La coupe fait taire la proposition un
+ * moment : toute bascule est manuelle (puce, ordre vocal).
  */
 internal fun LiveProbe.setCrossingActive(
     settings: Settings,

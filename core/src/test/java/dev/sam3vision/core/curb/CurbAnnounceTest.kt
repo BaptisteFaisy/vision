@@ -95,7 +95,7 @@ class CurbAnnounceTest {
         val second = watcher.onSignal(near, 4_000L, SpeechLanguage.En)
         assertEquals("Step up now.", second!!.phrase)
         assertTrue(second.urgent)
-        assertEquals("Stop, step up.", second.safetyPhrase)
+        assertEquals("Step up.", second.safetyPhrase)
     }
 
     @Test
@@ -350,21 +350,22 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `imminent - phrase securite stop rebord montant ou descendant`() {
+    fun `imminent - consigne monter ou descendre le rebord`() {
         val up = CurbWatcher()
         val upSignal = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Up)
         up.onSignal(upSignal, 1000L, SpeechLanguage.En)
         val upCue = up.onSignal(upSignal, 2000L, SpeechLanguage.En)
 
-        assertEquals("Stop, step up.", upCue!!.safetyPhrase)
+        assertEquals("Step up.", upCue!!.safetyPhrase)
 
         val down = CurbWatcher()
         val downSignal = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Down)
         down.onSignal(downSignal, 1000L, SpeechLanguage.En)
         val downCue = down.onSignal(downSignal, 2000L, SpeechLanguage.En)
 
-        assertEquals("Stop, step down.", downCue!!.safetyPhrase)
-        assertEquals("Stop, rebord descendant.", CurbText.safetyStepPhrase(CurbEdge.Down, SpeechLanguage.Fr))
+        assertEquals("Step down.", downCue!!.safetyPhrase)
+        assertEquals("Descendez le rebord.", CurbText.safetyStepPhrase(CurbEdge.Down, SpeechLanguage.Fr))
+        assertEquals("Montez le rebord.", CurbText.safetyStepPhrase(CurbEdge.Up, SpeechLanguage.Fr))
     }
 
     @Test

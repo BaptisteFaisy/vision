@@ -3,9 +3,10 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Les quatre mots TwinLite de l'obstacle (ordre user du 29/10) : quand le
- * couloir est bouché, c'est cette voix qui parle — consigne d'arrêt au
- * contact (« obstacle, arrêtez-vous. »), côté de sortie sinon. Sur voie
+ * Les quatre mots TwinLite de l'obstacle (ordre user du 29/10, stop retiré
+ * le 31/10) : quand le couloir est bouché, c'est cette voix qui parle —
+ * côté de sortie, même au contact (le mot stop reste au catalogue,
+ * inutilisé). Sur voie
  * libre, les mots SAM ([GuidanceWord]) reprennent : un seul parle à la fois,
  * jamais de doublon ([GuidanceAnnouncer] arbitre, une seule porte).
  *

@@ -36,7 +36,7 @@ class CrossingVehicleTest {
     }
 
     @Test
-    fun `voiture en mouvement annoncee en anglais a la 3e frame`() {
+    fun `voiture proche en mouvement dit stop en traversee`() {
         CrossingVehicleWatch.reset()
         val language = SpeechLanguage.En
 
@@ -49,7 +49,25 @@ class CrossingVehicleTest {
             language,
         )
 
-        assertEquals("Car moving, 5 meters away.", third)
+        assertEquals("Stop, car moving.", third)
+    }
+
+    @Test
+    fun `voiture proche en mouvement dit stop en francais en traversee`() {
+        CrossingVehicleWatch.reset()
+        val at = { width: Float, ms: Long ->
+            val frame = box(width)
+            CrossingVehicleWatch.update(
+                listOf(det("car", frame)),
+                listOf(reading("car", 5f, frame)),
+                ms,
+                SpeechLanguage.Fr,
+            )
+        }
+
+        assertNull(at(100f, 0L))
+        assertNull(at(110f, 100L))
+        assertEquals("Stop, voiture en mouvement.", at(120f, 200L))
     }
 
     @Test

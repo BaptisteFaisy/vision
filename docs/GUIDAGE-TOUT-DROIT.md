@@ -12,11 +12,13 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 ## 1. Le contrat, en une phrase
 
 Dire à voix haute **où mettre le prochain pas** — la direction dite **en
-continu toutes les 2 s, en moins de 100 ms** (ordre user du 31/10) : voix
-TwinLite quand le couloir est bouché (toujours le côté de sortie, même au
-contact), mots SAM sur voie libre (cap, décalage, retour trottoir) — calculé
-**sur le téléphone depuis les seuls objets SAM** — **aucun appel LLM**, le mot
-part en clip pré-synthétisé, jamais de synthèse réseau au moment de parler.
+continu toutes les 2 s**, un mot dit **en moins de 100 ms** (ordre user du
+31/10) : voix TwinLite quand le couloir est bouché (toujours le côté de
+sortie, même au contact — jamais de stop), mots SAM sur voie libre
+(cap, décalage, retour trottoir) — calculé **sur le téléphone depuis les
+seuls objets SAM** — **aucun appel LLM**, le mot part en clip
+pré-synthétisé, jamais de synthèse réseau au moment de parler — sauf le rappel
+de suivi, synthétisé une fois puis mis en cache (voir § 4.5).
 
 ## 2. Le trait et la portée
 
@@ -35,11 +37,10 @@ part en clip pré-synthétisé, jamais de synthèse réseau au moment de parler.
   mesurée (classe inconnue, boîte coupée) bloque quand même, et le mot reste
   le côté de sortie (`inRange`, `nearRank`, `Guidance.kt`) — on ne juge pas le
   contact sans distance.
-- **Jamais de stop cap droit** : le couloir bouché dit toujours le côté de
-  sortie, même au contact mesuré — dans une foule on se faufile, on ne
-  s'arrête pas (ordre user). `STOP_METERS = 0,6f` (`Guidance.kt`) ne vaut
-  plus que pour les caps latéraux ; le danger imminent reste couvert par
-  la voix de sécurité, hors d'ici.
+- **Contact mesuré** : même à 0,5 m, le mot reste le côté de sortie —
+  jamais de stop pour un obstacle, cap droit (on se faufile dans une
+  foule) comme caps latéraux (ordre user du 31/10, `STOP_METERS`
+  supprimé de `Guidance.kt`) : la voix dit directement comment l'éviter.
 - **Côté de sortie** : le moins encombré — moins d'objets à portée, sinon obstacle
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
@@ -52,6 +53,7 @@ part en clip pré-synthétisé, jamais de synthèse réseau au moment de parler.
 | Voie libre | Tout droit. | Straight. |
 | Obstacle, sortie à gauche | gauche. (TwinLite) | left. (TwinLite) |
 | Obstacle, sortie à droite | droite. (TwinLite) | right. (TwinLite) |
+| Obstacle au contact | gauche. / droite. (TwinLite) | left. / right. (TwinLite) |
 | Décalage latéral | Gauche. / Droite. | Left. / Right. |
 | Retour trottoir | Gauche. / Droite. | Left. / Right. |
 | Direction stable (répétée toutes les 2 s) | Tout droit. / Gauche. / Droite. | Straight. / Left. / Right. |
@@ -71,22 +73,28 @@ part en clip pré-synthétisé, jamais de synthèse réseau au moment de parler.
 1. **mot nouveau (overwrite)** — un mot différent du précédent parle **dès la
    1re frame** (`firstSight`), **sans délai ni stabilité** : à 5 ips, attendre,
    c'est rater le pas. Il parle aussitôt, sans attendre l'échéance de
-   répétition.
+   répétition. Le même mot bouché ne se répète jamais (scène bouchée stable =
+   silence, pas de bégaiement) ; la voie libre stable rappelle (voir 2).
 2. **répétition** — la même direction se redit toutes les 2 s
    (`GuidanceAnnouncer.DEFAULT_REPEAT_MS`, comme le rouge répété) tant qu'elle
-   dure, libre comme bouchée (côtés TwinLite inclus). Seul le stop ne se répète
+   dure, libre comme bouchée (côtés TwinLite inclus) ; la voie libre stable
+   rappelle. Exception : le même mot bouché ne se répète jamais (scène
+   bouchée stable = silence, pas de bégaiement). Seul le stop ne se répète
    jamais : parlé une fois, il ne se rabâche pas.
 3. **signature** — le mot (`w|left` SAM, `tl|left` TwinLite,
-   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil ;
-4. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact),
-   libre ⇒ mots SAM (décalage, retour trottoir, cap marché). Une
-   seule porte : un seul parle à la fois, jamais de doublon. Le bouché prime
-   toujours : la sécurité ne négocie jamais.
+   `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil, seule
+   une consigne différente fait reparler ;
+4. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact —
+   jamais de stop), libre ⇒ mots SAM (décalage, retour trottoir, cap marché).
+   Une seule porte : un seul parle à la fois, jamais de doublon. Le bouché
+   prime toujours : la sécurité ne négocie jamais.
 5. **urgence** — seul le stop coupe la lecture en cours, chat compris
-   (`LiveProbeState.spokenUrgent`, vrai pour le seul mot stop : « obstacle,
-   arrêtez-vous. » TwinLite sur caps latéraux au contact, « Stop. » SAM
-   pour l'urgence externe) : les mots doux (gauche/tout droit/droite)
-   attendent le silence (`ProbeWiring.observeSpoken`). Le cap droit ne dit
+   (`LiveProbeState.spokenUrgent`, `ProbeWiring.spokenUrgentOf`, vrai pour le
+   seul mot stop : « obstacle, arrêtez-vous. » TwinLite sur caps latéraux au
+   contact, « Stop. » SAM pour l'urgence externe) : les mots doux
+   (gauche/tout droit/droite) et le feu de Traversée attendent le silence
+   (`ProbeWiring.observeSpoken`). « Stop. » (urgence externe) et « Stop, car
+   moving. » (Traversée, voitures en mouvement) coupent. Le cap droit ne dit
    jamais stop (`docs/URGENCE-EXTERNE.md` pour l'urgence externe).
 
 Différence assumée avec les positions : **la voie libre se dit** (« Tout droit. »,
@@ -136,11 +144,12 @@ stop unique, urgence externe coupe le chat en clip).
 2. page caméra, champ vide → « Straight. » (ou « Tout droit. »), redit toutes
    les 2 s tant que le champ reste vide ;
 3. une personne entre au centre à ~2 m → « gauche. » (TwinLite — ou à droite
-   si la gauche est encombrée), **aussitôt** (overwrite), puis redit toutes les 2 s ;
-4. la personne s'approche → même mot redit toutes les 2 s (continu) ;
-5. la personne est à ~0,5 m → « gauche. » redit (le cap droit ne dit jamais
-   stop) ; main devant l'objectif (boîte coupée, non mesurée) → « gauche. » ;
-6. le couloir se dégage → « Tout droit. » aussitôt, puis redit toutes les 2 s ;
+   si la gauche est encombrée), **aussitôt** (overwrite) ;
+4. la personne s'approche → silence (même mot) ;
+5. la personne est à ~0,5 m → « gauche. » (même mot, silence si déjà dit —
+   jamais de stop) ; main devant l'objectif (boîte coupée,
+   non mesurée) → « gauche. » ;
+6. le couloir se dégage → « Tout droit. » aussitôt ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
 ## 7. État des mesures (28/10/2026, appareil Redmi 2312DRA50G)
@@ -175,8 +184,8 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
   pas de lecture sténopé, le couloir bloque par prudence avec le côté de sortie
   (`GuidanceObstaclesTest.kt:90`). Mesuré (~3 m) : blocage + décalage chiffré
   (`:109`). À 0,5 m le mot reste le côté de sortie (« right. », voix
-  TwinLite), mesuré ou non — le cap droit contourne toujours ; la mesure
-  profondeur (`:119`, ancre personne + `with_depth`) sert le décalage et
+  TwinLite), mesuré ou non — jamais de stop ; la mesure profondeur
+  (`:119`, ancre personne + `with_depth`) sert le décalage et
   l'obstacle élu — même physique que la main devant l'objectif de la
   recette § 6.5.
 - **Liste user** : barrière 1,00 m, voiture 1,45 m, humain 1,70 m, vélo 1,10 m
