@@ -213,30 +213,6 @@ internal fun LiveProbe.observeCurb(
 internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
     cue.tier == CurbTier.NEAR || !crossingActive
 
-/** P1 en cours : un « véhicule en mouvement » couvre les 4 s qui suivent (son cooldown). */
-internal const val P1_BUSY_MS = 4_000L
-
-/** P2 en cours : une marche imminente couvre les 2 s qui suivent (miroir `shouldSpeakCurb`). */
-internal const val P2_BUSY_MS = 2_000L
-
-/**
- * P1/P2 en cours à [nowMs] : véhicule en mouvement dit il y a moins de [P1_BUSY_MS],
- * ou marche imminente dite il y a moins de [P2_BUSY_MS] — le poteau (P3) attend alors
- * (doux + file, jamais de coupure). Fenêtres provisoires, non mesurées : à valider rue
- * (si P3 parle sur P1/P2, élargir ; s'il se tait trop, resserrer). Pur, testé en JVM.
- */
-internal fun p1p2Busy(nowMs: Long, lastMovingAlertMs: Long?, lastNearMs: Long?): Boolean {
-    if (lastMovingAlertMs != null && nowMs - lastMovingAlertMs < P1_BUSY_MS) return true
-    if (lastNearMs != null && nowMs - lastNearMs < P2_BUSY_MS) return true
-    return false
-}
-
-/**
- * Le poteau coupe : imminent ([cueUrgent]) et P1/P2 silencieux ([busy] faux — le
- * poteau est P3). Pur, testé en JVM.
- */
-internal fun shouldCutForHazard(cueUrgent: Boolean, busy: Boolean): Boolean = cueUrgent && !busy
-
 /**
  * Guetteur escaliers de la sonde, miroir du trottoir : les libellés SAM
  * « stairs » lus dans l'état (lectures de distance + dimensions, déjà
@@ -314,8 +290,9 @@ internal fun LiveProbe.observeHazard(
                 voice.flushPending(playerIdle()) { p1p2Busy(System.currentTimeMillis()) }
                 return@collect
             }
-            val urgent = shouldCutForHazard(cue.urgent, p1p2Busy(nowMs))
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = urgent, queue = true)
+            val busyNow = p1p2Busy(nowMs)
+            val urgent = shouldCutForHazard(cue.urgent, busyNow)
+            voice.onPhrase(cue.phrase, playerIdle(), urgent = urgent, queue = true, busy = { busyNow })
         }
     }
     return watcher

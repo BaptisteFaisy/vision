@@ -66,12 +66,20 @@ class ProximityVoice(
      * [queue] : la phrase douce tue par le chat ou la route est gardée (une seule,
      * la plus fraîche) et redite par [flushPending] dès le silence, dans
      * [PENDING_TTL_MS] — sans file, elle est perdue comme avant.
+     * [busy] : P1/P2 en cours, vus par l'appelant — la phrase douce part en
+     * file si [queue], est perdue sinon (jamais de chevauchement SafetyVoice).
      */
-    suspend fun onPhrase(phrase: String, playerIdle: Boolean, urgent: Boolean = false, queue: Boolean = false) {
+    suspend fun onPhrase(
+        phrase: String,
+        playerIdle: Boolean,
+        urgent: Boolean = false,
+        queue: Boolean = false,
+        busy: () -> Boolean = { false },
+    ) {
         if (phrase == lastPhrase) return
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && (!playerIdle || routeSpeaking())) {
+        if (!urgent && (!playerIdle || routeSpeaking() || busy())) {
             if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
             else lastPhrase = phrase
             return
