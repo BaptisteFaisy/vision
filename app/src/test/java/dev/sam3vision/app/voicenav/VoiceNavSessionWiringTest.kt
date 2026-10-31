@@ -5,6 +5,7 @@ import dev.sam3vision.app.navigation.NavRoute
 import dev.sam3vision.app.navigation.NavigationLauncher
 import dev.sam3vision.app.navigation.TravelMode
 import dev.sam3vision.app.speech.NavigationAnnouncer
+import dev.sam3vision.app.speech.NavigationPhrases
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.settings.Settings
@@ -88,22 +89,22 @@ class VoiceNavSessionWiringTest {
     }
 
     @Test
-    fun `moteur refuse ou en panne bascule sur Maps pieton et repos`() = runBlocking {
+    fun `moteur refuse ou en panne garde la confirmation avec motif`() = runBlocking {
         val refused = WiredLauncher()
         val sessionRefused = session(launcher = refused, engine = { _, _ -> false })
         assertTrue(sessionRefused.onVoiceTranscript("emmène-moi à la gare"))
         sessionRefused.confirmDestination()
-        assertEquals(1, refused.launched.size)
-        assertEquals(listOf(TravelMode.WALK), refused.modes)
-        assertEquals(VoiceNavUiState.Idle, sessionRefused.state.value)
+        val refusedState = sessionRefused.state.value as VoiceNavUiState.Confirming
+        assertEquals(NavigationPhrases.GUIDANCE_UNAVAILABLE, refusedState.error)
+        assertTrue(refused.launched.isEmpty())
 
         val broken = WiredLauncher()
         val sessionBroken = session(launcher = broken, engine = { _, _ -> throw IllegalStateException("panne") })
         assertTrue(sessionBroken.onVoiceTranscript("emmène-moi à la gare"))
         sessionBroken.confirmDestination()
-        assertEquals(1, broken.launched.size)
-        assertEquals(listOf(TravelMode.WALK), broken.modes)
-        assertEquals(VoiceNavUiState.Idle, sessionBroken.state.value)
+        val brokenState = sessionBroken.state.value as VoiceNavUiState.Confirming
+        assertEquals(NavigationPhrases.GUIDANCE_UNAVAILABLE, brokenState.error)
+        assertTrue(broken.launched.isEmpty())
     }
 
     @Test
@@ -114,9 +115,10 @@ class VoiceNavSessionWiringTest {
         assertTrue(wired.onVoiceTranscript("emmène-moi à la gare"))
         wired.cancelConfirmation()
         assertEquals(1, idles)
-        assertTrue(wired.onVoiceTranscript("emmène-moi à la gare"))
-        wired.confirmDestination()
-        wired.stopGuidance()
+        val driving = session(idled = { idles++ }, engine = { _, _ -> true })
+        assertTrue(driving.onVoiceTranscript("emmène-moi à la gare"))
+        driving.confirmDestination()
+        driving.stopGuidance()
         assertEquals(2, idles)
     }
 
@@ -138,7 +140,7 @@ class VoiceNavSessionWiringTest {
     }
 
     @Test
-    fun `auto-start moteur refuse bascule sur Maps pieton`() = runBlocking {
+    fun `auto-start moteur refuse annonce sans app externe`() = runBlocking {
         val launcher = WiredLauncher()
         val wired = session(
             launcher = launcher,
@@ -149,7 +151,8 @@ class VoiceNavSessionWiringTest {
         assertTrue(wired.onVoiceTranscript("emmène-moi à la gare"))
 
         assertEquals(VoiceNavUiState.Idle, wired.state.value)
-        assertEquals(listOf(TravelMode.WALK), launcher.modes)
+        assertTrue(launcher.launched.isEmpty())
+        assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
     }
 
     @Test

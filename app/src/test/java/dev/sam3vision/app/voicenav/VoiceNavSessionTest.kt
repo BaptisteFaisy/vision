@@ -131,17 +131,20 @@ class VoiceNavSessionTest {
     }
 
     @Test
-    fun `confirmer sans moteur bascule sur Maps pieton et revient au repos`() = runBlocking {
+    fun `confirmer sans moteur affiche le motif sans app externe`() = runBlocking {
         val launcher = FakeLauncher()
         val session = session(launcher, engine = null)
         session.onVoiceTranscript("va à la gare")
 
         session.confirmDestination()
 
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
-        assertEquals(listOf(TravelMode.WALK), launcher.modes)
-        assertEquals(listOf(questionGare, "Navigating to la gare"), spoken)
+        val state = session.state.value as VoiceNavUiState.Confirming
+        assertEquals(NavigationPhrases.GUIDANCE_UNAVAILABLE, state.error)
+        assertTrue(launcher.launched.isEmpty())
+        assertEquals(
+            listOf(questionGare, NavigationPhrases.GUIDANCE_UNAVAILABLE),
+            spoken,
+        )
     }
 
     @Test
@@ -174,14 +177,16 @@ class VoiceNavSessionTest {
     }
 
     @Test
-    fun `lancement refuse reste en confirmation avec motif`() = runBlocking {
-        val session = session(FakeLauncher(fail = true), engine = null)
+    fun `moteur absent garde la confirmation avec motif`() = runBlocking {
+        val launcher = FakeLauncher()
+        val session = session(launcher, engine = null)
         session.onVoiceTranscript("va à la gare")
 
         session.confirmDestination()
 
         val state = session.state.value as VoiceNavUiState.Confirming
         assertEquals(NavigationPhrases.GUIDANCE_UNAVAILABLE, state.error)
+        assertTrue(launcher.launched.isEmpty())
         assertEquals(
             listOf(questionGare, NavigationPhrases.GUIDANCE_UNAVAILABLE),
             spoken,
@@ -327,108 +332,6 @@ class VoiceNavSessionTest {
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertTrue(launcher.launched.isEmpty())
         assertTrue(launcher.opened.isEmpty())
-    }
-
-    @Test
-    fun `auto-start moteur demarre sans confirmation`() = runBlocking {
-        val launcher = FakeLauncher()
-        val session = session(launcher, autoStart = true)
-
-        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
-
-        val state = session.state.value as VoiceNavUiState.Guiding
-        assertEquals("la gare", state.destination)
-        assertTrue(launcher.launched.isEmpty())
-        // Une seule voix : le moteur dit « Navigating to X », pas la session.
-        assertTrue(spoken.isEmpty())
-    }
-
-    @Test
-    fun `auto-start charge le résumé pour l'état initial, jamais des zéros`() = runBlocking {
-        var askedSummary: RouteSummary? = null
-        val launcher = FakeLauncher()
-        val session = session(
-            launcher,
-            engine = { _, loaded -> askedSummary = loaded; true },
-            autoStart = true,
-        )
-
-        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
-
-        val state = session.state.value as VoiceNavUiState.Guiding
-        assertEquals(summary, askedSummary)
-        assertEquals(summary, state.summary)
-        assertEquals(2450L, state.update.distanceToManeuverMeters)
-        assertEquals(2450L, state.update.remainingDistanceMeters)
-        assertEquals(900L, state.update.remainingDurationSeconds)
-    }
-
-    @Test
-    fun `auto-start résumé en échec affiche le calcul en cours`() = runBlocking {
-        val launcher = FakeLauncher()
-        val session = session(
-            launcher,
-            loader = { Result.failure(IllegalStateException("panne")) },
-            autoStart = true,
-        )
-
-        assertTrue(session.onVoiceTranscript("va à la gare"))
-
-        val state = session.state.value as VoiceNavUiState.Guiding
-        assertEquals(null, state.summary)
-        assertEquals("Calculating the route to la gare…", state.update.instruction)
-        assertTrue(launcher.launched.isEmpty())
-    }
-
-    @Test
-    fun `auto-start sans moteur bascule sur Maps pieton et revient au repos`() = runBlocking {
-        val launcher = FakeLauncher()
-        val session = session(launcher, engine = null, autoStart = true)
-
-        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
-
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf(NavDestination.Query("la gare")), launcher.launched)
-        assertEquals(listOf(TravelMode.WALK), launcher.modes)
-        assertEquals(listOf("Navigating to la gare"), spoken)
-    }
-
-    @Test
-    fun `auto-start moteur en panne bascule sur Maps pieton`() = runBlocking {
-        val launcher = FakeLauncher()
-        val session = session(
-            launcher,
-            engine = { _, _ -> throw IllegalStateException("panne") },
-            autoStart = true,
-        )
-
-        assertTrue(session.onVoiceTranscript("va à la gare"))
-
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf(TravelMode.WALK), launcher.modes)
-    }
-
-    @Test
-    fun `auto-start guidage eteint ouvre la fiche lieu`() = runBlocking {
-        val launcher = FakeLauncher()
-        val session = session(launcher, guidance = false, autoStart = true)
-
-        assertTrue(session.onVoiceTranscript("va à la tour Eiffel"))
-
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf("la tour Eiffel"), launcher.opened)
-        assertTrue(launcher.launched.isEmpty())
-        assertEquals(listOf("Here is the page for la tour Eiffel"), spoken)
-    }
-
-    @Test
-    fun `auto-start Maps en echec annonce sans ecran`() = runBlocking {
-        val session = session(FakeLauncher(fail = true), engine = null, autoStart = true)
-
-        assertTrue(session.onVoiceTranscript("va à la gare"))
-
-        assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
     }
 
     @Test

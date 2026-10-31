@@ -268,7 +268,7 @@ ont dérivé sans MAJ de cette table ; à recaler séparément.
 - **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapReleaseTest 2, TapSessionTest 6, TapZonesTest 4
 - **traverse** (21) : TraverseClipStoreTest 4, TraverseWiringTest 17
 - **vm** (39) : AppAnalysisTest 9, AppChatTest 6, AppDiagnosticsTest 10, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
-- **voicenav** (88) : DestinationTextFieldTest 6, GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, RouteMapSnapshotTest 5, ValhallaRouteLoaderTest 8, VoiceNavEngineDriverTest 4, VoiceNavHoldTest 14, VoiceNavSessionArrivedTest 6, VoiceNavSessionTest 26, VoiceNavSessionWiringTest 8
+- **voicenav** (90) : GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, RouteLoadingSpinTest 3, RouteMapSnapshotTest 5, ValhallaRouteLoaderTest 8, VoiceNavEngineDriverTest 4, VoiceNavHoldTest 14, VoiceNavSessionArrivedTest 6, VoiceNavSessionAutoStartTest 8, VoiceNavSessionTest 23, VoiceNavSessionWiringTest 8
 
 ## 7. Gardes et limites connues
 

@@ -20,25 +20,18 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
    Scribe. Une destination non comprise est redemandée à voix haute (« Je
    n'ai pas compris où tu veux aller… »), jamais remplacée par une
    description de la scène.
-3. **Secours texte** : si la dictée échoue (bruit, malentendance), l'accueil
-   propose un champ de saisie clavier — la saisie vaut une dictée : elle
-   ouvre la confirmation, sans redicter.
-4. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
+3. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
 
 ## 2. Voir (les écrans)
 
-- **Destination** (sur l'accueil, depuis le 30/10) : la dictée n'ouvre
-  aucun écran — adresse géocodée + résumé (distance · durée) + carte
-  d'aperçu du tracé, boutons « Démarrer » / « Annuler », « oui » / « non »
-  à la voix, saisie clavier de secours. L'appui long reste une question
-  libre et le tap la vidéo. Le départ direct sans bouton
-  (`autoStartOnVoice`) est abandonné : trop de
-  guidages partaient sur une question ou une dictée malentendue
-  (« comment aller à… ? » devenait un ordre). Sans position GPS ou sans URL
-  Valhalla : adresse + motif, ni carte ni résumé. Si l'itinéraire
-  échoue : adresse + motif en rouge, et « Démarrer » bascule sur Google
-  Maps, **à pied**.
+- **Calcul** (sur l'accueil, depuis le 31/10) : la dictée part
+  directement — « Finding the best route », boule iSee en rotation
+  rapide, sans destination affichée, ni boutons, ni question vocale.
+  L'appui long reste une question libre et le tap la vidéo. Si le
+  moteur ne peut pas démarrer (adresse, GPS, réseau, itinéraire) :
+  retour au repos + annonce « I can't open the guidance », jamais
+  Google Maps.
 - **Guidage** : sur l'accueil iSee, sous la caméra — carte (tracé +
   position), prochaine instruction, distances restantes, bouton
   « Arrêter le guidage », dictée « arrête le guidage ». Le guidage est
@@ -79,7 +72,7 @@ Le guidage continue l'app en fond : GPS + voix ininterrompus, **notification
 permanente** avec bouton **Arrêter** (même effet que « arrête le guidage »).
 
 - Retour arrière = **Réglages** (plus d'écran navigation à quitter,
-  l'accueil porte le guidage) : la confirmation et le guidage restent
+  l'accueil porte le guidage) : le calcul et le guidage restent
   visibles au retour sur l'accueil.
 - Accueil / verrouillage = **maintien** : le service garde le guidage, la
   voix continue, l'écran de guidage se rouvre au retour dans l'app.

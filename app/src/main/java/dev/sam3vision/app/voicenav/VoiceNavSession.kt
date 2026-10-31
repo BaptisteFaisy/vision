@@ -1,8 +1,6 @@
 package dev.sam3vision.app.voicenav
 
-import dev.sam3vision.app.navigation.NavDestination
 import dev.sam3vision.app.navigation.NavigationLauncher
-import dev.sam3vision.app.navigation.TravelMode
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.NavigationPhrases
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
@@ -78,13 +76,14 @@ sealed interface VoiceNavUiState {
  *   poursuit son chemin normal (question LLM) ; intention reconnue (routeur
  *   ou [extraParsers] ou ordre GPS) → `true` (consommé) et, si
  *   [autoStartOnVoice] est vrai (câblage iSee), démarrage direct sans
- *   bouton : moteur embarqué si possible, sinon Maps piéton ;
+ *   bouton ni question : chargement affiché, moteur embarqué, sinon
+ *   repos + annonce (jamais d'app externe) ;
  * - [autoStartOnVoice] faux → écran de confirmation + question vocale
  *   (« Do you really want to go to X? … », [ConfirmAnswerParser] : « yes »
  *   = [confirmDestination], « no » = annuler) ;
- * - repli Maps toujours piéton ([TravelMode.WALK]) et **sans** état
- *   [VoiceNavUiState.Guiding] : iSee ne montre jamais un faux guidage quand
- *   c'est Maps qui guide ;
+ * - moteur en panne : pas de repli externe — repos + annonce
+ *   d'indisponibilité (le lanceur ne sert qu'à la fiche lieu,
+ *   guidage éteint) ;
  * - ordre stop en session ([Confirming] ou [Guiding]) → retour au repos +
  *   annonce « Guidage arrêté », `true` ; sur [Arrived] → fermé sans annonce
  *   (l'arrivée est déjà dite), `true` ; hors session → `false` ;
@@ -93,9 +92,9 @@ sealed interface VoiceNavUiState {
  * - ordre « active le GPS » → fonction rallumée (réglage persisté), accusé
  *   « GPS activé », toujours consommé (le guidage reste à la demande) ;
  * - [confirmDestination] : guidage actif → moteur embarqué ([engineStart])
- *   puis repli Maps ; écran de guidage + annonce « Navigation vers X » dans
- *   les deux cas ; guidage éteint → fiche lieu + annonce « Voici la fiche
- *   de X » + repos ; échec → motif affiché + annonce ; hors [Confirming]
+ *   puis écran de guidage ; moteur en panne → motif sur l'écran + annonce
+ *   d'indisponibilité ; guidage éteint → fiche lieu + annonce
+ *   « Voici la fiche de X » + repos ; hors [Confirming]
  *   (dont [Arrived]) → rien ;
  * - [onGuidanceUpdate] : l'intégrateur pousse l'état du moteur ; arrivée
  *   signalée → écran [Arrived] + annonce « Arrivée à destination » (unique :
@@ -121,8 +120,8 @@ class VoiceNavSession(
     private val extraParsers: List<(String) -> String?> = emptyList(),
     /**
      * Démarrage du moteur embarqué (destination, résumé) : `true` = guidé
-     * in-app (le moteur parle, pas d'annonce ici), `false`/`null` = repli
-     * Google Maps. `null` = Maps direct.
+     * in-app (le moteur parle, pas d'annonce ici), `false`/`null` =
+     * indisponible annoncée, sans app externe.
      */
     private val engineStart: (suspend (destination: String, summary: RouteSummary?) -> Boolean)? = null,
     /** Notifié à chaque retour au repos (le pilote coupe le moteur). */
@@ -197,24 +196,31 @@ class VoiceNavSession(
     }
 
     /**
-     * Démarrage direct : résumé chargé d'abord (l'état initial affiche ses
-     * totaux, jamais des zéros), puis moteur embarqué s'il peut démarrer,
-     * sinon Maps piéton. Aucun écran de confirmation n'est ouvert et
-     * **aucune annonce ici** : le moteur dit « Navigation vers X », le
-     * repli Maps le dit aussi — une seule voix, jamais deux annonces qui
-     * se chevauchent.
+     * Démarrage direct : l'état de chargement s'affiche aussitôt (la boule
+     * tourne pendant le calcul), le résumé est chargé d'abord (l'état
+     * initial affiche ses totaux, jamais des zéros), puis le moteur
+     * embarqué démarre — sans lui, repos + annonce d'indisponibilité,
+     * jamais d'app externe. **Aucune annonce ici** en cas de succès : le
+     * moteur dit « Navigation vers X » — une seule voix, jamais deux
+     * annonces qui se chevauchent. Un ordre stop (ou une autre
+     * destination) pendant le chargement annule ce démarrage : l'état
+     * courant n'est plus le nôtre, on s'arrête là.
      */
     private suspend fun startFromVoice(destination: String) {
         if (!guidanceEnabled()) {
             openPlace(destination)
             return
         }
+        val loading = VoiceNavUiState.Confirming(destination, null, true, null)
+        _state.value = loading
         val summary = loadSummaryResult(destination).getOrNull()
+        if (_state.value !== loading) return
         if (startEngine(destination, summary)) {
-            _state.value = guiding(destination, summary)
+            if (_state.value === loading) _state.value = guiding(destination, summary)
             return
         }
-        launchMaps(destination)
+        goIdle()
+        announcer.announceGuidanceUnavailable()
     }
 
     /**
@@ -263,13 +269,14 @@ class VoiceNavSession(
         }
     }
 
-    /** Confirmation manuelle : moteur si possible, sinon Maps piéton + repos. */
+    /** Confirmation manuelle : moteur si possible, sinon motif + annonce, jamais Maps. */
     private suspend fun confirmGuided(current: VoiceNavUiState.Confirming) {
         if (startEngine(current.destination, current.summary)) {
             _state.value = guiding(current.destination, current.summary)
             return
         }
-        launchMaps(current.destination, current)
+        fail(current)
+        announcer.announceGuidanceUnavailable()
     }
 
     /** Tente le moteur embarqué ; `false` si absent, en échec ou s'il jette. */
@@ -280,30 +287,6 @@ class VoiceNavSession(
         } catch (_: Exception) {
             false
         }
-    }
-
-    /**
-     * Repli Maps piéton. Succès : la session revient au repos, donc aucun
-     * écran de guidage iSee fantôme. Échec : motif sur la confirmation si
-     * elle existe, sinon annonce seule.
-     */
-    private suspend fun launchMaps(
-        destination: String,
-        confirmation: VoiceNavUiState.Confirming? = null,
-    ) {
-        val outcome = runCatching {
-            launcher.launch(NavDestination.Query(destination), TravelMode.WALK)
-        }.getOrElse { Result.failure(it) }
-        outcome.fold(
-            onSuccess = {
-                announcer.announceStarted(destination)
-                goIdle()
-            },
-            onFailure = {
-                fail(confirmation)
-                announcer.announceGuidanceUnavailable()
-            },
-        )
     }
 
     private suspend fun confirmPlace(current: VoiceNavUiState.Confirming) {

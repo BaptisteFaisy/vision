@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.ShareRelay
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.speechClient
@@ -23,9 +24,9 @@ import dev.sam3vision.core.settings.Settings
  * iSee (caméra + carte dessous) ; leurs branches ne sont ici que transitoires.
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
- * - dictée sur place ([VoiceNavHoldButton], même moteur que l'accueil iSee) :
- *   « oui »/« non »/destination sur la confirmation, destination ou ordre
- *   stop en guidage — tout l'écran est faisable à la voix, sans retour ;
+ * - dictée sur place en guidage ([VoiceNavHoldButton], même moteur que
+ *   l'accueil iSee) : destination ou ordre stop — tout l'écran est
+ *   faisable à la voix, sans retour ;
  * - quitter l'écran (retour) = annuler la confirmation ou refermer
  *   l'arrivée — le guidage n'a plus d'écran (il vit sur l'accueil) et
  *   s'arrête par son bouton ou par « arrête le guidage » ;
@@ -89,14 +90,9 @@ private fun VoiceNavScreen(
 ) {
     when (val current = state) {
         is VoiceNavUiState.Idle -> Box(Modifier.fillMaxSize())
-        is VoiceNavUiState.Confirming -> DestinationConfirmScreen(
+        is VoiceNavUiState.Confirming -> RouteLoadingBlock(
             state = current,
-            onConfirm = nav::confirmDestination,
-            onCancel = nav::cancelConfirmation,
-            hold = hold,
-            settings = settings,
-            onHoldTranscript = { nav.session().onVoiceTranscript(it) },
-            onSubmitText = nav::submitTypedDestination,
+            textColor = AppColors.text,
         )
         is VoiceNavUiState.Guiding -> GuidingRoute(
             isee = isee,
