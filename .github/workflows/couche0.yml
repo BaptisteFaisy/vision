@@ -18,10 +18,12 @@ on:
   push:
     branches:
       - 'gh-readonly-queue/**'
-      # Branche de lot de la file Mergify : on y rejoue le contrôle pour que
-      # le check existe sur l'arbre fusionné (le vrai jugement a eu lieu sur
-      # chaque PR avant son entrée en file).
-      - 'mergify/merge-queue/**'
+      # PAS de `mergify/merge-queue/**` (retiré le 31/10) : la PR que la file
+      # ouvre sur sa branche de lot déclenche déjà `pull_request` (types
+      # `opened` / `synchronize`), donc le check existe sur l'arbre fusionné.
+      # Le `push` en plus ne servait qu'à créer un deuxième run pour la même
+      # tête, que la concurrency annulait aussitôt : un `couche0 = cancelled`
+      # de plus sur le SHA du lot, que Mergify peut lire comme un échec.
   workflow_dispatch:
     inputs:
       pr:
