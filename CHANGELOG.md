@@ -20,6 +20,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   fork) → 2 approuvés, fork ignoré ; PAT sans `actions: write` → repli sur le
   jeton d'installation ; PAT absent → jeton d'installation seul ; les deux cas
   passent. `bash -n` sur chaque `run:` et parse YAML des deux workflows : verts.
+## 2026-10-31 — bancs : `LatencyBenchTest` ne tombe plus sur une pause de l'hôte (branche `test/latency-bench-anti-flake`)
+
+- **Symptôme** : `ci-core` rouge sur `LatencyBenchTest > cout d instrumentation borne`
+  (1 test sur 2532, 31/10 à 16:49) alors que le même arbre mesure **0,18 µs/op**
+  pour un budget de 2,00 — dix fois de marge. L'hôte, lui, variait de 0,18 à
+  1,02 µs sur cinq mesures consécutives.
+- **Fait** : la mesure se fait en **rounds** (5 rounds × 5 passes). Un round
+  au-dessus du budget est **refait** après 200 ms au lieu de condamner le code ;
+  le budget ne bouge pas, le message d'échec liste tous les rounds.
+- **Preuves** : `:core:testDebugUnitTest --tests "*LatencyBenchTest*"` vert en
+  local ; chemin d'échec vérifié avec un budget forcé à 0,02 µs/op → « meilleur
+  de 5 rounds : 0,25 / 0,18 / 0,18 / 0,68 / 1,02 » ; `check-kotlin-limits.py`
+  vert (139 lignes, fonctions < 50).
 
 ## 2026-10-31 — CI : un lot de la file ne peut plus être éjecté par un `ci` en échec fantôme (branche `ci/fix-doublon-check-file`)
 
