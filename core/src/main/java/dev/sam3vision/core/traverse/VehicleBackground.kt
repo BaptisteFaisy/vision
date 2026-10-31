@@ -1,5 +1,6 @@
 package dev.sam3vision.core.traverse
 
+import dev.sam3vision.core.motion.GyroHint
 import dev.sam3vision.core.motion.MotionSample
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -89,6 +90,15 @@ object VehicleBackground {
      * [lumaWidth]/[lumaHeight] la grille du plan de luminance (unités de
      * [global]), [dtMs] le délai inter-frames (> 0), [bgChangeScore] la part
      * de fond changé (0..1, hors bornes = ramené, non fini = 0).
+     *
+     * [gyro] (PISTE4, `null` = verdicts visuels seuls, inchangés) : déplacement
+     * gyro attendu en pixels du plan de luminance. Ordre avec la piste 1
+     * (compensation ego-motion) : le résidu **visuel** (boîte − fond mesuré)
+     * passe d'abord — si [global] est utilisable, [gyro] est ignoré ; le résidu
+     * gyro ne sert qu'en **complément** quand le bloc-matching sature en rotation
+     * rapide (fond muet ou peu confiant), où le résidu décisionnel devient
+     * boîte − gyro. Si la piste 1 corrige [global] en entrée, ce hook la reçoit
+     * déjà corrigée : translation ego d'abord, rotation gyro ensuite, sans conflit.
      */
     fun decide(
         trackId: Int,
@@ -99,19 +109,18 @@ object VehicleBackground {
         lumaHeight: Int,
         dtMs: Long,
         bgChangeScore: Float,
+        gyro: GyroHint? = null,
     ): MovingVerdict {
         val bg = bgChangeScore.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
-        val sample = global
-        if (sample == null || dtMs <= 0L || lumaWidth <= 0 || lumaHeight <= 0) {
-            return unknown(trackId, sample, bg)
+        if (dtMs <= 0L || lumaWidth <= 0 || lumaHeight <= 0) {
+            return unknown(trackId, global, bg)
         }
-        if (!sample.confidence.isFinite() || sample.confidence < TRUST_MIN) {
-            return unknown(trackId, sample, bg)
-        }
-        if (!sample.dx.isFinite() || !sample.dy.isFinite() || !sample.scale.isFinite()) {
-            return unknown(trackId, sample, bg)
-        }
-        if (!boxDx.isFinite() || !boxDy.isFinite()) return unknown(trackId, sample, bg)
+        if (!boxDx.isFinite() || !boxDy.isFinite()) return unknown(trackId, global, bg)
+        // PISTE4 : résidu visuel d'abord ; le gyro ne prend le relais (fond de
+        // repli, rotation pure) que si le fond mesuré est inutilisable — pan rapide
+        // qui sature le bloc-matching. Sans gyro, chemin strictement inchangé.
+        val sample = global?.takeIf { visualUsable(it) } ?: gyro?.toSample()
+        if (sample == null) return unknown(trackId, global, bg)
         val dtSeconds = dtMs / 1000f
         val gx = sample.dx / lumaWidth / dtSeconds
         val gy = sample.dy / lumaHeight / dtSeconds
@@ -141,6 +150,15 @@ object VehicleBackground {
             abs(global.scale - 1f) / dtSeconds
         return ground.takeIf { it.isFinite() }
     }
+
+    /**
+     * Fond visuel exploitable : les mêmes exigences que [decide] avant la PISTE4
+     * (confiance et valeurs finies). Un fond qui échoue ici laisse la place au
+     * repli gyro au lieu de conclure [Verdict.UNKNOWN] tout de suite.
+     */
+    private fun visualUsable(sample: MotionSample): Boolean =
+        sample.confidence.isFinite() && sample.confidence >= TRUST_MIN &&
+            sample.dx.isFinite() && sample.dy.isFinite() && sample.scale.isFinite()
 
     /** Résidu franc = le véhicule roule ; résidu nul + fond franc = la caméra ; sinon doute ou arrêt. */
     private fun classify(residual: Float, ground: Float): Verdict = when {

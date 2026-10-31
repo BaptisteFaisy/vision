@@ -7,8 +7,8 @@ import kotlin.math.hypot
 /**
  * Rotation caméra entre deux instants (radians).
  *
- * Convention image (c'est [GyroSource][dev.sam3vision.app.GyroSource] qui convertit
- * les deltas capteur bruts vers elle) :
+ * Convention image (c'est `GyroSource`, côté app, qui convertit les deltas
+ * capteur bruts vers elle) :
  * - `dYawRad > 0` = pan vers la gauche : la scène apparente part vers la **droite** ;
  * - `dPitchRad > 0` = tilt vers le haut : la scène apparente part vers le **bas**.
  *
@@ -124,7 +124,7 @@ object GyroCompensation {
     /**
      * Delta angulaire signé le plus court de [fromRad] à [toRad], dans `]−π, π]` :
      * l'azimut capteur s'enroule à ±π, un pan qui traverse le nord donnerait sinon
-     * un delta de ~2π. Pur et testable — utilisé par [GyroSource][dev.sam3vision.app.GyroSource].
+     * un delta de ~2π. Pur et testable — utilisé par `GyroSource` (côté app).
      */
     fun shortestDelta(fromRad: Float, toRad: Float): Float {
         val twoPi = 2f * PI.toFloat()
