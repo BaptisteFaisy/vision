@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : les escaliers parlent GPS coupé, sécurité avant silence (branche `fix-stairs-gps-gate`)
+
+- **Constat** : GPS coupé, escalier à 2 m masqué à l'écran, voix muette —
+  alors que le contrat `IseeVoiceGate` promet que les escaliers (sécurité)
+  contournent la sourdine GPS. Cause : les deux voix escaliers (annonce +
+  compteur) passaient par `canAnnounce()`, qui exige `ambientAllowed()`.
+- **Fait** : porte propre `stairsAudible = !speechBusy()` (chat libre suffit,
+  GPS ou pas), filée par `observeHazards` aux deux voix escaliers ; les autres
+  voix douces gardent `canAnnounce()`. KDoc `IseeVoiceGate` alignée sur le code.
+- **Preuve** : `ProbeStairsGateTest` (+2 : annonce GPS coupé/chat libre,
+  silence porte fermée) ; suites `:core` + `:app` vertes, `assembleDebug` OK.
+
 
 ## 2026-10-31 — Voix : « crossing mode on » arme la traversée depuis le direct et annonce le passage (branche `crossing-voix-direct`)
 

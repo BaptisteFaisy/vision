@@ -25,11 +25,13 @@ import kotlinx.coroutines.launch
  * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
  * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
  * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ * [stairsAudible] ignore la sourdine GPS (chat libre suffit) : la sécurité
+ * passe avant le silence (contrat `IseeVoiceGate`).
  */
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
     voice: ProximityVoice,
-    playerIdle: () -> Boolean,
+    stairsAudible: () -> Boolean,
     language: () -> SpeechLanguage,
 ): StairWatcher {
     // Deux frames suffisent côté voix (le flux Canny d'affichage garde trois) :
@@ -68,7 +70,7 @@ internal fun LiveProbe.observeStairs(
                 )
             }
             cue ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+            voice.onPhrase(cue.phrase, stairsAudible(), urgent = false)
         }
     }
     return watcher
@@ -107,11 +109,12 @@ internal fun stairsRoiOf(found: StairLabelSignal, width: Int, height: Int): Stai
  * jamais pour une synthèse lente (le lecteur coupe le précédent, dernier
  * gagnant). Sans escalier nommé ou sans compte frais : silence (auto-muet
  * caméra coupée, séance finie). Rend le compteur pour le `reset()` de séance.
+ * [stairsAudible] ignore la sourdine GPS, comme l'annonce (sécurité).
  */
 internal fun LiveProbe.observeStairsCount(
     scope: CoroutineScope,
     voice: ProximityVoice,
-    playerIdle: () -> Boolean,
+    stairsAudible: () -> Boolean,
     language: () -> SpeechLanguage,
     tickMs: Long = StairCountVoice.COUNT_MS,
 ): StairCountVoice {
@@ -125,7 +128,7 @@ internal fun LiveProbe.observeStairsCount(
             val phrase = counter.onTick(
                 true, StairCannyCount.lineCount(), System.currentTimeMillis(), language(),
             ) ?: continue
-            scope.launch { voice.onPhrase(phrase, playerIdle(), urgent = false) }
+            scope.launch { voice.onPhrase(phrase, stairsAudible(), urgent = false) }
         }
     }
     return counter
