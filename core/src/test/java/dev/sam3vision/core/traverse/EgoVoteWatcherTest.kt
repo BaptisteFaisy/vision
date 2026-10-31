@@ -101,12 +101,15 @@ class EgoVoteWatcherTest {
     @Test
     fun `zoom fond + croissance lente - decotee, silence`() {
         // +1 %/frame sous zoom 2 %/frame, glissade latérale (piste jugée
-        // roulante, pas tue par l'ancien veto) : seule la décote fait taire.
+        // roulante, pas tuée par le veto) : seule la décote fait taire. La
+        // glissade (3 px/frame ≈ 4,7 %/s) reste entre le résidu franc
+        // (2 %/s, sinon la piste suivrait le fond) et la traversée scan
+        // (8 %/s, sinon le mouvement latéral parlerait légitimement).
         val motion = FrameMotion(MotionSample(0f, 0f, 1.02f, 0.9f), 256, 103, 100L)
         val muted = VehicleStateWatcher()
         val loud = VehicleStateWatcher()
         repeat(5) { index ->
-            val frame = box(100f + index, cx = 320f + index * 30f)
+            val frame = box(100f + index, cx = 320f + index * 3f)
             val atMs = index * 100L
             assertNull(
                 "croissance expliquée par le zoom : silence",
