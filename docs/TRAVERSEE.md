@@ -98,6 +98,13 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
    reste la preuve sur crops SAM réels (cadrage exact inconnu).
 4. **Rappel SAM** sur feux piétons FR jamais mesuré (inconnue n° 1).
 
+**31/10 — cadrage tête** (branche `feat/isee-feux-pietons-boitier,
+ordre user). SAM suit désormais la petite boîte en plus du caisson
+(`pedestrian signal head`, 17e concept) et c'est sa boîte qui part au
+classifieur entraîné (`CrossingPrompts.selectLightBox` la préfère,
+repli caisson sans tête). Reste à prouver sur le terrain : rappel du
+prompt tête et couleur lue sur boîtes tête téléphone, non mesurés.
+
 ## 7. Ce que la vidéo montre (29/10)
 
 L'état du feu n'est plus seulement une pastille en bas de carte et une phrase :
