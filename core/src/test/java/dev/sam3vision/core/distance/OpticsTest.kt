@@ -228,4 +228,11 @@ class OpticsTest {
         // téléobjectif : 3,8° horizontaux, hors bornes comme par la voie mm
         assertNull(Optics.lensSpecFromIntrinsics(60000f, 60000f, 1999f, 1499f, ARRAY_W, ARRAY_H))
     }
+
+    @Test
+    fun `mesure mire sur zone active pleine rejoint la voie millimetres`() {
+        val sensor = Optics.activeSensor(PHYS_W, PHYS_H, ARRAY_W, ARRAY_H, ARRAY_W, ARRAY_H)!!
+        val measured = LensSpec.fromMeasured(FOCAL, sensor.widthMm, sensor.heightMm, ARRAY_W, ARRAY_H)
+        assertEquals(Optics.lensSpec(FOCAL, sensor), measured)
+    }
 }
