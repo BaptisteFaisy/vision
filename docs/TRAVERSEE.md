@@ -87,8 +87,10 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 1. **Calibration FR** (lot 1 sans terrain, fait 10/2026) : arbre validé
    sur 235 lampes FR (Panoramax, jour) — couleur 97,9 %, 0 vert sur
    90 rouges ; porte recalibrée (fraction 0,004, élancement 1,5,
-   bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. Reste :
-   poses larges, corpus téléphone + seuil bloquant faux verts.
+   bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. **31/10,
+   ordre user (détection au plus large) : fraction 0,002, élancement
+   1,0 — chiffres ci-dessus caducs, disques admis, A2 levé.**
+   Reste : corpus téléphone + remesure sur les 235.
    **Nuit et pluie sortis du périmètre le 29/10** (décision produit, voir
    `docs/CALIBRAGE-FEU.md` §9) : le mode ne traite que le jour.
 2. **Terrain** : aucun test téléphone — crop réel, voix sur appareil, veto
