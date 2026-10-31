@@ -96,6 +96,12 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v20 (31/10) échec attribuable : quand la tête en échec a été poussée par
+#       l'agent de conflit (`<!-- agent-conflit sha=<tête> -->`), le compte
+#       rendu dit que c'est la **résolution** qui casse et pose le label
+#       `intervention-humaine`. La porte de compilation de l'agent
+#       (conflict_agent.py v3) rend le cas rare ; ce filet couvre la porte
+#       sautée (outillage absent, délai dépassé).
 #   v17 (31/10) débit : le balayeur ne se réveille plus pour les branches de
 #       lot, ne se réveille plus sur un run annulé, et ne clone plus que la
 #       PR qui a parlé. Mesure sur 62 min (31/10, 14h → 15h) : 291 runs de ce
@@ -820,6 +826,25 @@ jobs:
                           printf -v corps '%s\n' \
                             "<!-- automerge-echec sha=$SHA -->" \
                             "Échec **réel** de la CI (étape « ${ECHELLE_ETAPES} ») : la file ne relance pas un test rouge, ça ne prouverait rien. Il faut un correctif, pas un re-run."
+                          # v20 (31/10) — cet échec est-il le nôtre ? Si la tête
+                          # courante a été poussée par l'agent de conflit, c'est
+                          # sa résolution qu'il faut relire avant le code de
+                          # l'auteur (#615 : réconciliation non compilable,
+                          # classée « échec réel », PR abandonnée en silence
+                          # jusqu'à une reprise humaine). La porte de
+                          # compilation de l'agent est censée rendre ce cas
+                          # impossible : si on le voit ici, elle a été sautée
+                          # (outillage absent, délai) — on le dit et on pose le
+                          # label, plutôt que de laisser la PR mourir muette.
+                          if commentaires "$PR" | grep -qF "<!-- agent-conflit sha=$SHA -->"; then
+                            # printf plutôt qu'une chaîne multi-ligne : une
+                            # ligne non indentée couperait le bloc `run: |`.
+                            printf -v motif '%s\n%s' "$corps" \
+                              "La tête \`${SHA:0:7}\` vient de **l'agent de conflit** : c'est la résolution qui échoue, pas le code de l'auteur. Label \`intervention-humaine\` posé — relire la réconciliation (ou rebaser à la main) avant de relancer."
+                            corps="$motif"
+                            ghe pr edit "$PR" --add-label intervention-humaine >/dev/null 2>&1 || true
+                            echo "PR #$PR : échec sur une tête de l'agent de conflit, label intervention-humaine"
+                          fi
                           commente_une_fois "$PR" "<!-- automerge-echec sha=$SHA -->" "$corps"
                           ;;
                         *)
