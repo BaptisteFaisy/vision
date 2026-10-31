@@ -28,6 +28,7 @@ import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
+import dev.sam3vision.app.live.MotionLog
 import dev.sam3vision.core.live.placedLabels
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
@@ -233,6 +234,8 @@ resetPipeline()
         chronology.reset()
 _state.update { it.cleared() }
         pulse.stop(); meters.stopPredictions()
+        ProbeBackgroundMotion.reset()
+        MotionLog.reset()
     }
 
     /**
@@ -251,6 +254,8 @@ _state.update { it.cleared() }
         traverseVeto.reset()
         meters.reset()
         adaptive.reset()
+        ProbeBackgroundMotion.reset()
+        MotionLog.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */
@@ -314,6 +319,8 @@ _state.update { it.cleared() }
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
         meters.offer(jpegB64) // profondeur + danger, même sans session SAM.
+        val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
+        ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")

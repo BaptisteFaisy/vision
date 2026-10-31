@@ -3,9 +3,12 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.motion.BlockMotionSource
+import dev.sam3vision.core.motion.MotionSource
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -48,24 +51,35 @@ class TraversePipeline(
     /** Voix du mode, attachée par l'appelant (`null` = muet). */
     @Volatile var voice: TraverseVoice? = null,
     /**
-     * Sonde fond V1 (voiture-bouge), attachée par l'appelant (`null` = coupée) :
-     * verdict log-only dans [lastBackgroundMoving], le veto n'en dépend pas.
+     * Estimateur du mouvement global fond (bloc-matching JVM, réutilisé sans
+     * allocation) : chaque paire prev/cur donne le [FrameMotion] du veto suivi.
      */
-    @Volatile var backgroundProbe: BackgroundMotionProbe? = null,
+    var motionSource: MotionSource = BlockMotionSource(),
 ) {
 
     /** Dernière luminance reçue (`null` = aucune) : fait le prev de la prochaine frame. */
     private var lastBackground: BackgroundFrame? = null
 
-    /** Dernier verdict fond V1 (`null` = pas de paire prev/cur ou sonde coupée), log-only. */
+    /** Date de la dernière luminance reçue : fait le dt de la prochaine paire. */
+    private var lastBackgroundAtMs: Long = 0L
+
+    /** Dernier mouvement global estimé (`null` = pas de paire ou estimateur muet). */
+    var lastFrameMotion: FrameMotion? = null
+        private set
+
+    /**
+     * Dernier défilement du fond (`null` = pas d'estimation) : vrai quand le
+     * fond défile franchement — le journal du câblage, pas le veto.
+     */
     var lastBackgroundMoving: Boolean? = null
         private set
 
     /**
      * Traite une frame : [objects] filtrés, convertis en [width]×[height],
      * soumis au veto ([focalPx] ≤ 0 : distance indisponible, seule
-     * l'approche compte), annoncés puis parlés à [atMs]. [background] alimente
-     * la sonde fond V1 (verdict log-only, veto inchangé).
+     * l'approche compte), annoncés puis parlés à [atMs]. [background] estime
+     * le mouvement global fond, qui fait taire l'approche suivie des pistes
+     * embarquées par la caméra (le veto instantané reste conservateur).
      */
     suspend fun onFrame(
         objects: List<SegObject>,
@@ -81,8 +95,8 @@ class TraversePipeline(
         // Extrêmes masque inclus : le veto lit `.box` (inchangé), le direct mesure
         // au plus juste (voir `Detection.maskBox`).
         val detections = filtered.toDetectionsWithExtents(width, height)
-        val decision = veto.update(lightGreen, detections, focalPx, atMs)
-        noteBackground(background, detections)
+        noteBackground(background, atMs)
+        val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)
         return TraverseOutput(filtered, detections, decision, cue, outcome)
@@ -101,6 +115,8 @@ class TraversePipeline(
         veto.reset()
         announcer.reset()
         lastBackground = null
+        lastBackgroundAtMs = 0L
+        lastFrameMotion = null
         lastBackgroundMoving = null
     }
 
@@ -111,22 +127,33 @@ class TraversePipeline(
     }
 
     /**
-     * Sonde fond V1 : paire [cur] au prev, `decide()` quand la paire est complète
-     * et la sonde attachée — verdict dans [lastBackgroundMoving], log-only (le
-     * veto n'en dépend pas). Dimensions différentes = paire jetée (recadrage).
+     * Fond V1 : paire [cur] au prev, estimation du mouvement global quand la
+     * paire est complète — [lastFrameMotion] pour le veto suivi,
+     * [lastBackgroundMoving] pour le journal. Dimensions différentes = paire
+     * jetée (recadrage) ; estimateur muet = pas de signal (comportement inchangé).
      */
-    private fun noteBackground(cur: BackgroundFrame?, detections: List<Detection>) {
+    private fun noteBackground(cur: BackgroundFrame?, atMs: Long) {
         val prev = lastBackground
         lastBackground = cur
-        val probe = backgroundProbe ?: return
-        if (prev == null || cur == null) return
-        if (prev.width != cur.width || prev.height != cur.height) return
-        lastBackgroundMoving = probe.decide(prev, cur, vehicleBoxes(detections))
+        if (prev == null || cur == null) {
+            lastFrameMotion = null
+            lastBackgroundMoving = null
+            if (cur != null) lastBackgroundAtMs = atMs
+            return
+        }
+        if (prev.width != cur.width || prev.height != cur.height) {
+            lastFrameMotion = null
+            lastBackgroundMoving = null
+            lastBackgroundAtMs = atMs
+            return
+        }
+        val dtMs = atMs - lastBackgroundAtMs
+        lastBackgroundAtMs = atMs
+        val sample = motionSource.estimateSince(prev.toGray(), cur.toGray())
+        lastFrameMotion = sample?.let { FrameMotion(it, cur.width, cur.height, dtMs) }
+        val ground = VehicleBackground.groundOf(sample, cur.width, cur.height, dtMs)
+        lastBackgroundMoving = ground?.let { it > VehicleBackground.LATERAL_RATIO }
     }
-
-    /** Boîtes des véhicules de la frame, tous scores (la sonde fond compare hors véhicules). */
-    private fun vehicleBoxes(detections: List<Detection>): List<List<Float>> =
-        detections.filter { VehicleConcepts.isVehicle(it.label) }.map { it.box }
 
     companion object {
         /**
@@ -141,19 +168,13 @@ class TraversePipeline(
 }
 
 /**
- * Luminance d'une frame pour la sonde fond V1 : [width]×[height], plan Y 0..255
- * en ligne majeure. Le fond seul décide : fond qui change ⇒ voiture qui bouge.
+ * Luminance d'une frame pour le fond V1 : [width]×[height], plan Y 0..255
+ * en ligne majeure. Le plan part tel quel à l'estimateur, sans recopie.
  */
-data class BackgroundFrame(val width: Int, val height: Int, val luma: ByteArray)
+data class BackgroundFrame(val width: Int, val height: Int, val luma: ByteArray) {
 
-/**
- * Sonde fond V1 (voiture-bouge) : [decide] compare le fond hors [boxes]
- * (véhicules, boîtes proto `x1,y1,x2,y2`) entre [prev] et [cur] (mêmes
- * dimensions) — `true` = fond qui change = voiture qui bouge, `false` = fond
- * identique (une bbox qui bouge seule vaut caméra qui bouge, pas veto).
- */
-fun interface BackgroundMotionProbe {
-    fun decide(prev: BackgroundFrame, cur: BackgroundFrame, boxes: List<List<Float>>): Boolean
+    /** Même plan vu comme masque 8 bits pour l'estimateur (zéro recopie). */
+    fun toGray(): GrayMask = GrayMask(width, height, luma)
 }
 
 /**

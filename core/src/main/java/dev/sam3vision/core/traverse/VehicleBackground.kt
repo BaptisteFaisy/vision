@@ -42,6 +42,19 @@ data class MovingVerdict(
 )
 
 /**
+ * Mouvement global d'une frame pour le veto fond : [global] l'estimation
+ * inter-frames (`BlockMotionSource`, pixels du plan de luminance
+ * [lumaWidth]×[lumaHeight]), [dtMs] le délai entre les deux frames (> 0).
+ * `null` = pas de signal fond : comportement strictement inchangé.
+ */
+data class FrameMotion(
+    val global: MotionSample,
+    val lumaWidth: Int,
+    val lumaHeight: Int,
+    val dtMs: Long,
+)
+
+/**
  * Qui bouge, le véhicule ou la caméra (V1, règle produit : le fond qui change
  * pendant que la boîte s'en écarte, c'est le véhicule qui roule ; le fond qui
  * défile pendant que la boîte le suit, c'est la caméra).
@@ -112,6 +125,21 @@ object VehicleBackground {
         val residual = hypot(bx - gx, by - gy)
         val ground = hypot(gx, gy) + scaleRate
         return MovingVerdict(trackId, gx, gy, sample.scale, sample.confidence, bx, by, bg, classify(residual, ground))
+    }
+
+    /**
+     * Vitesse du fond seul (fractions d'image/s, zoom inclus), `null` si
+     * inutilisable (confiance sous [TRUST_MIN], temps ou dimensions invalides,
+     * valeurs non finies). Même normalisation que [decide].
+     */
+    fun groundOf(global: MotionSample?, lumaWidth: Int, lumaHeight: Int, dtMs: Long): Float? {
+        if (global == null || dtMs <= 0L || lumaWidth <= 0 || lumaHeight <= 0) return null
+        if (!global.confidence.isFinite() || global.confidence < TRUST_MIN) return null
+        if (!global.dx.isFinite() || !global.dy.isFinite() || !global.scale.isFinite()) return null
+        val dtSeconds = dtMs / 1000f
+        val ground = hypot(global.dx / lumaWidth / dtSeconds, global.dy / lumaHeight / dtSeconds) +
+            abs(global.scale - 1f) / dtSeconds
+        return ground.takeIf { it.isFinite() }
     }
 
     /** Résidu franc = le véhicule roule ; résidu nul + fond franc = la caméra ; sinon doute ou arrêt. */
