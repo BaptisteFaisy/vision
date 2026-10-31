@@ -20,7 +20,7 @@ import dev.sam3vision.core.traverse.VehicleStateWatcher
  * les états moteurs se disent, après le feu et avant les personnes
  * ([crossingPhraseOf]). Vélos et trottinettes exclus, comme en normal
  * (`CycleWatcher` les annonce en normal ; en Traversée, pas de voix cycles —
- * le veto trafic, lui, protège des sept véhicules dans les deux modes).
+ * le veto trafic, lui, ne suit plus que voiture/bus/vélo depuis le 31/10).
  */
 internal object CrossingVehicleWatch {
 

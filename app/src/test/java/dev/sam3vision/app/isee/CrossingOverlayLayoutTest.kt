@@ -32,29 +32,26 @@ class CrossingOverlayLayoutTest {
     }
 
     @Test
-    fun `chaque etat a sa couleur et son etiquette`() {
+    fun `chaque etat a sa couleur et son etiquette, binaire`() {
         assertEquals("GREEN", crossingTag(true, CrossingState.Green))
         assertEquals("RED", crossingTag(true, CrossingState.Red))
-        assertEquals("UNSURE", crossingTag(true, null))
-        assertEquals("UNSURE", crossingTag(true, CrossingState.Unknown))
+        assertEquals("RED", crossingTag(true, null))
         assertEquals(CROSSING_ACCENT_GREEN, crossingAccent(true, CrossingState.Green))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, CrossingState.Red))
-        assertEquals(CROSSING_ACCENT_DOUBT, crossingAccent(true, CrossingState.Unknown))
+        assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, null))
     }
 
     @Test
     fun `l etiquette de la video dit la meme chose que la pastille de carte`() {
-        // Deux surfaces, un seul vocabulaire pour les états tranchés : si l'une
-        // dérive, l'utilisateur lit deux mots différents pour le même feu.
-        // Le doute est le seul écart assumé : la pastille écrit « … » (rien
-        // d'annoncé), le cadre écrit « UNSURE » (un feu est là, on ne sait pas).
+        // Deux surfaces, un seul vocabulaire : si l'une dérive, l'utilisateur
+        // lit deux mots différents pour le même feu.
         for (state in listOf(CrossingState.Green, CrossingState.Red)) {
             val chip = crossingButtonLabel(true, state)
             assertTrue("pastille « $chip » vs étiquette « ${crossingTag(true, state)} »",
                 chip.endsWith(crossingTag(true, state)))
         }
-        assertEquals("Crossing: …", crossingButtonLabel(true, CrossingState.Unknown))
-        assertEquals("UNSURE", crossingTag(true, CrossingState.Unknown))
+        assertEquals("Crossing: RED", crossingButtonLabel(true, null))
+        assertEquals("RED", crossingTag(true, null))
     }
 
     @Test

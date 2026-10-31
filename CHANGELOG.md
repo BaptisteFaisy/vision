@@ -4,6 +4,121 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — Distances : étalonnage guidé du champ de vision
+
+- **Demande** : encore plus précis — annuler le biais systématique de focale.
+- Fait (solveur + visée + UI) : `CalibrationSolver` (focale depuis taille et
+  distance connues, refus < 20 px / hors bornes, tolérance ±(1 px + 0,5 %)) ;
+  `CalibrationSnapshots` (plus grande personne du direct, score ≥ 0,5, entière) ;
+  section Réglages (visée, taille, distance ruban, résolution, effacement) ;
+  valeur mesurée dans `cameraFovDeg` (prioritaire), témoin `CalibrationStore`.
+- Preuves : `CalibrationSolverTest` 3, `CalibrationSnapshotsTest` 3,
+  `DistanceLayoutTest` +2 (saisie, résolution) ; garde Kotlin verte.
+- Protocole : aidant à distance ruban (2 m conseillés) + taille exacte →
+  « Calibrate from last sighting » → ±0,5° à 340 px ; « Clear » revient au capteur.
+## 2026-10-31 — Distances : médiane profondeur sur fenêtre centrale (anti-fond)
+
+- **Demande** : encore plus précis — la médiane lisait le fond des bords de boîte.
+- Fait (`DepthReadings.boxCloseness`) : érosion 25 % par côté avant la médiane
+  (le cœur porte l'objet) ; repli boîte entière si la fenêtre dégénère.
+- Preuves : `DepthReadingsTest` +2 (contraste centre/fond, dégénérescence) ;
+  garde Kotlin verte.
+## 2026-10-31 — iSee : profondeur toujours active, Coupée supprimée (branche `isee-depth-always`)
+
+- **Demande** : contournement toujours optimal + profondeur toujours activée
+  (les poteaux depth-only doivent être mesurés, donc participer au chemin).
+- Fait : option Coupée supprimée (`DepthBackend.OFF` et `NoOp` effacés, bouton
+  Réglages retiré, `with_depth` toujours demandé) ; réglages anciens
+  (`OFF`, inconnu) migrés vers DA2 ; repli sténopé gardé si modèle absent.
+  Le compilateur prouve l'absence d'OFF (plus aucune référence). Doc
+  `DEPTH.md` alignée.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 744 tests, 0 échec — dont poteau depth-only mesuré à 4 m via ancre,
+  chemin optimal à gauche contre comptage à droite) ;
+  `check-kotlin-limits.py` vert.
+
+
+## 2026-10-31 — iSee : cap droit contourne toujours, jamais stop (branche `isee-droit-sans-stop`)
+
+- **Demande** : couloir bouché = toujours un côté de contournement, jamais
+  « stop » — dans une foule on se faufile, on ne s'arrête pas.
+- Fait : `Guidance.word` cap droit rend le côté (chemin optimal ou repli),
+  même au contact mesuré ; `STOP_METERS` ne vaut plus que pour les caps
+  latéraux ; voix de sécurité (danger imminent) inchangée, hors d'ici.
+  Docs `GUIDAGE-TOUT-DROIT.md` et `URGENCE-EXTERNE.md` alignées.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 731 tests, 0 échec — 13 flips constatés rouge avant, tous dans le
+  périmètre prédit, réécrits en conséquences correctes) ;
+  `check-kotlin-limits.py` vert.
+
+
+## 2026-10-31 — iSee : écart mini aux humains 0,5 → 0,8 m (branche `isee-clearance-80`)
+
+- **Demande** : monter la marge du chemin optimal à 80 cm (la latence ~0,5 s
+  peut manger les 50 cm quand une personne marche vers le cap).
+- Fait : `PeoplePath.MIN_CLEARANCE_M` à 0,8 m, seule constante touchée (stop
+  0,6 m, marge objets et quarts de mètre inchangés) ; attentes des tests
+  recalculées en double précision (16 flips, tous dans `PeoplePathTest`,
+  aucun ailleurs — le côté mono-obstacle est indépendant de la marge).
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 731 tests, 0 échec) ; `check-kotlin-limits.py` vert.
+
+
+## 2026-10-31 — iSee : durcissement du chemin optimal avant recette (branche `isee-chemin-durci`)
+
+- **Demande** : être quasiment certain que le chemin optimal (50 cm) fonctionne
+  avant la recette téléphone.
+- Fait : `PeoplePath` refuse la géométrie non finie (champ/visée/bande NaN →
+  `null`, repli ancien comportement) ; `Guidance` dit « Stop » dès qu'un
+  bloquant quelconque est au contact (l'inconnu élu ne masque plus) ; le
+  couloir projette avec le champ de l'axe image (`widthFovDeg`, ~52,8° en
+  portrait au lieu de 67° — le « 50 cm » annoncé en valait ~31) ; mot doux
+  avalé par le chat redit à l'émission suivante. Voix, caps latéraux,
+  traversée et constantes (50 cm, stop 0,6 m) inchangés.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 682 tests, 0 échec — dont fuzz déterministe 2 000 scènes, 12 cas de
+  bruit chiffrés avec seuils de falaise, chaque correctif rouge avant / vert
+  après) ; `check-kotlin-limits.py` vert (`LiveProbe.kt` à 499 lignes).
+## 2026-10-31 — Traversée binaire rouge/vert, sorties confirmées, fuzz anti-inversion
+
+- **Demande** (ordre user) : fini le doute — rouge ou vert, et une
+  différenciation certaine, absolument.
+- **Fait** : `CrossingState` binaire (tout non-vert attend rouge :
+  classifieurs, porte, voix, vibration, affichage, voicepack — clip
+  `cross_unsure` et MP3 supprimés) ; voix, vibration et affichage suivent
+  le dernier état **annoncé** (trou trouvé par audit : 1 frame verte
+  suffisait à vibrer vert et afficher VERT, même sous veto) ; pompe
+  locale ≤ 150 ms supprimée (contournait la confirmation) ;
+  `PedLightGateFuzzTest` (~230 assertions, graines fixées : rouges ×
+  photométrie/géométrie/bruit/balance — jamais verts).
+- **Non fait, assumé** : porte intouchée (pas de retouche sans données) ;
+  fusion arbre+HSV abandonnée (no-op prouvé) ; verts illisibles disent
+  rouge (même action sûre) — seul un corpus téléphone remontera le rappel.
+- Preuves : tests JVM `:core`/`:app` à 0 échec (r630), UBS 0 critique,
+  gardes `ci-core` locales OK ; checks PR (`ci`, `ci-budget`, `couche0`).
+## 2026-10-31 — Distances : pose IMU, affine, Kalman, masque, recette, câblage + fraîcheur 150 ms (phases 2-3)
+
+- **Demande** : ultra-précis + info distance au maximum toutes les 150 ms (essentiel).
+- Fait (5 branches parallèles + câblage) :
+  pose IMU temps réel (`PitchMeter` + hauteur en Réglages, direct et sonde) ;
+  profondeur affine robuste (`AffineScale`, échelle + décalage, aberrantes rejetées) ;
+  Kalman position+vitesse par piste (défaut, EMA en repli) ; géométrie de masque
+  (`MaskExtent`, poly sans décodage) ; protocole et script de recette terrain ;
+  câblage : bbox masque mesurée (`Detection.maskBox`, direct + sonde), pose volatile,
+  ticker 120 ms (`DistanceTicker`, `LiveSensors`, `ProbeMeters`) republiant
+  `DistanceMeter.predictions` (pistes extrapolées + non-suivis maintenus, confiance
+  dégradée, oubli 2 s) — pastilles, plus proche et ligne d'état à ≤ 150 ms.
+- Preuves : `:core` + `:app` verts — `DistanceMeterTest` 22, `DistanceKalmanTest` 10,
+  `MaskDetectionsTest` 9 (nouveau), `DistanceTickerTest` 6 (nouveau),
+  `ProbeMetersPredictionsTest` 1 (nouveau), `DepthAffineTest`, `MaskGeometryTest`,
+  `PitchMathTest`, `test_scripts.sh` ; garde Kotlin verte.
+- Limites honnêtes : étendues de masque dormantes sur PNG (serveur envoie PNG —
+  piste `bits`/`poly` ou cache partagé) ; sonde sans suivi (maintien statique) ;
+  ±15-20 % toujours non confronté au mètre ruban (protocole prêt).
+- Reste (pistes `docs/DISTANCES.md`) : étalonnage guidé (plus gros biais restant),
+  masques compacts en production, précision chiffrée, profondeur sur masque, sol non plan.
+
+
 ## 2026-10-31 — Distances : calibrage exact, tolérances, occlusion, banc de précision (phase 1)
 
 - **Demande** : calcul des distances beaucoup plus précis, le plus précis possible.
@@ -16,9 +131,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   banc `DistanceBenchmarkTest` (aller-retour au cm, enveloppe ±1 px :
   ±0,5 % à 2 m, ±1 % à 5 m, ±2 % à 10 m, ±4 % à 20 m).
 - Preuves : `:core` tests distance — `LensSpecTest` 12, `OpticsTest` 27,
-  `KnownSizesTest` 16, `DistanceMeterTest` 15, `DistanceFusionTest` 13,
-  `ReadingQualityTest` 6 (nouveau), `DistanceBenchmarkTest` 5 (nouveau),
+  `KnownSizesTest` 16, `DistanceMeterTest` 15, `DistanceFusionTest` 14,
+  `ReadingQualityTest` 10 (nouveau), `DistanceBenchmarkTest` 5 (nouveau),
   `GroundPlaneTest` 17 ; garde `check-kotlin-limits.py` verte.
+- Revue adversariale (6 corrigés, 1 reporté) : calibration lue contre la zone
+  avant correction, poids sol selon la dépression, garde NaN, commentaires et
+  comptages redressés ; confiance de la voie profondeur propagée à l'intégration
+  affine (même fichier, pas de conflit).
 - Reste (pistes `docs/DISTANCES.md`) : pose IMU temps réel, hauteur/pieds du
   masque, profondeur affine, Kalman par piste.
 ## 2026-10-31 — iSee : chemin optimal parmi les humains, passage à 50 cm (branche `isee-chemin-humains`)
@@ -56,7 +175,26 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `test_units.py` 400/400 (nouveau groupe `concepts : feux piétons
   (traversée)`), UBS 0 critique, gardes `ci-core` locales OK ; checks PR
   (`ci`, `ci-budget`, `couche0`) sur la PR.
+## 2026-10-31 — iSee : souvenirs suivis par défaut, camion/moto/trottinette sortis
 
+- **Demande** : filmer le square Louise-Michel (boutique de souvenirs au pied du
+  Sacré-Cœur) et qu'iSee annonce la boutique et ses articles.
+- `LivePrompts.default` : `truck`, `motorcycle`, `electric scooter` cèdent leurs
+  slots à `souvenir shop`, `beanie`, `socks` (16 concepts, plafond inchangé) ;
+  `VehicleConcepts.PROMPTS` passe de 7 à 3 (`car`, `bus`, `bicycle`).
+- Traversée : le veto ne suit plus camion/moto/trottinette (choix user assumé) ;
+  `isVehicle`, `KnownSizes`, `CycleConcepts` et les alias serveur FR→EN inchangés
+  (reconnaissance intacte via le champ « Follow »).
+- Distances : les 3 souvenirs en `DEPTH_ONLY` (pas de hauteur sténopé défendable).
+- Tests : `:core` 2270/2275 verts ; 5 échecs `PrivateFileSettingsStoreTest`
+  pré-existants sur l'arbre vierge (permissions fichiers Windows, hors scope).
+
+## 2026-10-31 — iSee : alertes P1/P2 immédiates, la nouvelle coupe l'ancienne (branche `fix/isee-alertes-voitures-rebords-immediates`)
+
+- **Demande** : latences de plusieurs secondes entre les obstacles détectés et la parole ; tout doit être dit au plus vite, un par un, priorité aux voitures et aux rebords.
+- Cause : `SafetyVoice.speak` parlait en `QUEUE_ADD` quand le TTS système parlait déjà — une alerte P1/P2 attendait la fin de la précédente en file (contrat § 16 de `docs/VOIX-DANGER.md`).
+- Fait : `SafetyVoice.speak` parle en `QUEUE_FLUSH` toujours — la nouvelle alerte (voiture en mouvement, rebord) coupe l'alerte en cours, un par un, la plus fraîche gagne ; coupe toujours la lecture ElevenLabs avant, survit à la dictée, hors-ligne sans clé inchangés. § 16 amendé + § 20.
+- Preuves : `SafetyVoiceTest` (4, vert) ; suite `:app` complète (1314 tests, 0 échec) ; `check-kotlin-limits.py` vert. **Non mesuré** : recette téléphone (deux alertes rapprochées → la seconde coupe la première) exige un APK de cette branche sur appareil réel.
 
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct
 

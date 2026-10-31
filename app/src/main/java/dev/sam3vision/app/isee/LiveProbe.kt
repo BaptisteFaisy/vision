@@ -63,7 +63,7 @@ class LiveProbe(
     private val background: CoroutineDispatcher = Dispatchers.Default,
     /** Moteur (Réglages) : lu via this@LiveProbe (un défaut y verrait le paramètre OFF). */
     @Volatile
-    private var depthEngine: DepthBackend = DepthBackend.OFF,
+    private var depthEngine: DepthBackend = DepthBackend.DA2,
     /**
      * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
      * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
@@ -77,12 +77,12 @@ class LiveProbe(
 ) {
 
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
-        LiveMaskTransport.clientFor(base, timeout, marks, this@LiveProbe.depthEngine != DepthBackend.OFF)
+        LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
     /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
-    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine }) { alert ->
-        _state.update { it.copy(dangerAlert = alert?.line()) }
-    }
+    private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
+        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer) } },
+        onDangerAlert = { alert -> _state.update { it.copy(dangerAlert = alert?.line()) } })
     private val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
     private val _state = MutableStateFlow(LiveProbeState())
@@ -110,7 +110,7 @@ class LiveProbe(
     val jpegQuality: Int get() = adaptive.jpegQuality
 
     /** Distances (sténopé sur hauteurs connues) : 100 % téléphone, aucun appel en plus. */
-    private val distances = DistanceMeter()
+    internal val distances = DistanceMeter()
 
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
     internal val voice = ProbeVoice()
@@ -155,7 +155,7 @@ class LiveProbe(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         crossingActive: Boolean = false,
         modelsLine: String = "",
-        depth: DepthBackend = DepthBackend.OFF,
+        depth: DepthBackend = DepthBackend.DA2,
     ) {
         val clean = baseUrl.trim()
         closeSessions()
@@ -221,14 +221,14 @@ resetPipeline()
 resetPipeline()
         _state.update { it.cleared() }
         markWarming()
-        pulse.start()
+        pulse.start(); meters.startPredictions(distances)
     }
 
     /** Masques et chiffres remis à zéro (sortie d'écran) sans oublier l'endpoint. */
     fun clear() {
         chronology.reset()
 _state.update { it.cleared() }
-        pulse.stop()
+        pulse.stop(); meters.stopPredictions()
     }
 
     /**
@@ -424,11 +424,11 @@ _state.update { it.cleared() }
         } else {
             CrossingPeopleWatch.reset()
             CrossingVehicleWatch.reset()
-            voice.phrase(at, placed, _state.value.steeringCap, frame.passage)
+            voice.phrase(at, placed, _state.value.steeringCap, frame.passage, hfovDeg = distances.lensSpec.widthFovDeg(frame.width, frame.height))
         }
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
-        pulse.feed(at, voice.lastDecision, placed)
+        pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
         _state.update { current ->
             current.copy(
                 masks = overlays,

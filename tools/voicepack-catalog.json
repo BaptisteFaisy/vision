@@ -3,7 +3,6 @@
   "clips": [
     {"id": "cross_red", "fr": "Rouge, attendez.", "en": "Red, wait."},
     {"id": "cross_green", "fr": "Vert, traversez.", "en": "Green, cross now."},
-    {"id": "cross_unsure", "fr": "Doute, attendez.", "en": "Unsure, wait."},
     {"id": "cross_on", "fr": "Mode traversée activé.", "en": "Crossing mode on."},
     {"id": "cross_off", "fr": "Mode traversée coupé.", "en": "Crossing mode off."},
     {"id": "nav_offroute", "fr": "Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", "en": "You are off route. Recalculating."},

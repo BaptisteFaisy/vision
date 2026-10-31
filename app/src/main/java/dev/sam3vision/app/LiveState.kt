@@ -116,7 +116,7 @@ data class LiveUiState(
     val stairsLine: String = "",
     /** Mode traversée actif : prompts véhicules + veto + voix (pastille du bandeau). */
     val traverseActive: Boolean = false,
-    /** Dernier état du feu piéton lu par le mode Traversée (`null` = rien encore). */
+    /** Dernier état du feu piéton annoncé par le mode Traversée (`null` = rien encore, affiché rouge). */
     val crossing: dev.sam3vision.core.crossing.CrossingState? = null,
     /** Boîte normalisée de ce feu (`x1,y1,x2,y2` en 0..1) : où le dessiner sur la vidéo. */
     val crossingBox: List<Float>? = null,

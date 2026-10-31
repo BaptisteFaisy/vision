@@ -25,9 +25,10 @@ import org.junit.Test
  *
  * Physique assumée, pas contournée : un mur à 2 m remplit l'image (boîte
  * coupée haut/bas), donc le sténopé ne le mesure pas — le couloir bloque par
- * prudence avec le côté de sortie. Le « stop » à 0,5 m demande une mesure :
+ * prudence avec le côté de sortie. Le contact à 0,5 m demande une mesure :
  * profondeur (serveur `with_depth` ou carte embarquée) ou petit objet
- * mesurable au sténopé. Aucune distance inventée nulle part.
+ * mesurable au sténopé — et le cap droit contourne toujours, même au
+ * contact. Aucune distance inventée nulle part.
  */
 class GuidanceObstaclesTest {
 
@@ -80,6 +81,25 @@ class GuidanceObstaclesTest {
         return ChainOut(refined, placed, Guidance.decide(placed))
     }
 
+    /**
+     * Poteau depth-only (sans hauteur sténopé) mesuré par la profondeur :
+     * la personne à 3 m calibre l'échelle (ancre), le poteau sort à 4 m.
+     */
+    private fun depthPolePath(): ChainOut {
+        val personBox = boxFor("personne", 3f, centerX = 0.55f)
+        val poleBox = listOf(0.30f * WIDTH - 50f, TOP_PX, 0.30f * WIDTH + 50f, 300f)
+        val frame = frameOf(
+            seg("personne", personBox, depth = 0.8f),
+            seg("poteau", poleBox, depth = 0.6f),
+        )
+        val detections = frame.objects.toDetections(frame.width, frame.height)
+        val pinhole = DistanceMeter().measure(frame.width, frame.height, detections)
+        val server = DepthReadings.serverCloseness(frame.objects)
+        val refined = DepthReadings.refineWithCloseness(detections, pinhole, server)
+        val placed = placedLabels(frame, refined)
+        return ChainOut(refined, placed, Guidance.decide(placed))
+    }
+
     private data class ChainOut(
         val readings: List<DistanceReading>,
         val placed: List<PlacedLabel>,
@@ -116,7 +136,7 @@ class GuidanceObstaclesTest {
     }
 
     @Test
-    fun `mur à 0,5 m mesuré par la profondeur dit stop`() {
+    fun `mur à 0,5 m mesuré par la profondeur contourne a droite`() {
         val out = depthWallStop()
 
         assertEquals(2, out.readings.size)
@@ -124,20 +144,20 @@ class GuidanceObstaclesTest {
         assertEquals(0.5f, wall.meters, 0.02f)
         assertTrue(out.decision.blocked)
         assertEquals("mur", out.decision.obstacle!!.label)
-        assertEquals(GuidanceWord.Stop, Guidance.word(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision, SpeechLanguage.En))
-        assertEquals("w|stop", Guidance.key(out.decision))
+        assertEquals(GuidanceWord.Right, Guidance.word(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision, SpeechLanguage.En))
+        assertEquals("w|right", Guidance.key(out.decision))
     }
 
     @Test
-    fun `petit objet à 0,5 m mesuré au sténopé dit stop`() {
+    fun `petit objet à 0,5 m mesuré au sténopé contourne a gauche`() {
         val out = pinholeChain(frameOf(seg("chat", boxFor("chat", 0.5f))))
 
         assertEquals(0.5f, out.readings.single().meters, 0.02f)
         assertTrue(out.decision.blocked)
-        assertEquals(GuidanceWord.Stop, Guidance.word(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision))
+        assertEquals(GuidanceWord.Left, Guidance.word(out.decision))
+        assertEquals("Left.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -187,6 +207,19 @@ class GuidanceObstaclesTest {
     }
 
     @Test
+    fun `poteau depth-only mesure par la profondeur participe au chemin optimal`() {
+        assertNull(KnownSizes.heightMeters("poteau"))
+        val out = depthPolePath()
+
+        val pole = out.readings.first { it.label == "poteau" }
+        assertEquals(4f, pole.meters, 0.05f)
+        assertTrue(out.decision.blocked)
+        // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
+        assertEquals(GuidanceSide.Left, out.decision.side)
+        assertEquals("Gauche.", Guidance.phrase(out.decision, SpeechLanguage.Fr))
+    }
+
+    @Test
     fun `l'annonceur dit le mot du mur une seule fois`() {
         val announcer = GuidanceAnnouncer()
         val wallBox = listOf(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
@@ -194,7 +227,7 @@ class GuidanceObstaclesTest {
 
         assertEquals("left.", announcer.onFrame(0L, cut))
         assertNull(announcer.onFrame(100L, cut))
-        assertEquals("obstacle, stop.", announcer.onFrame(200L, depthWallStop().placed))
+        assertEquals("right.", announcer.onFrame(200L, depthWallStop().placed))
     }
 
     companion object {

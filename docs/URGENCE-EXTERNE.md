@@ -24,8 +24,9 @@ Le modèle externe est câblé au niveau du ViewModel (c'est lui qui possède
 
 ## 2. En attendant : le stop interne reste
 
-`TwinLiteWord.Stop` (« obstacle, arrêtez-vous. », contact mesuré ≤ 0,6 m,
-`Guidance.STOP_METERS`) est le seul urgent de la sonde
+`TwinLiteWord.Stop` (« obstacle, arrêtez-vous. », contact mesuré ≤ 0,6 m
+sur caps latéraux — le cap droit contourne toujours —, `Guidance.STOP_METERS`)
+est le seul urgent de la sonde
 (`LiveProbeState.spokenUrgent`, via `isStopPhrase`). Quand le modèle
 externe est branché et validé, le stop interne est **supprimé** (mot, seuil,
 clip `tl_stop`, tests) — la suppression est un commit à part, pas un

@@ -283,3 +283,60 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   jetée. Vélos et trottinettes sans voix traversée (le veto les couvre) ;
   `observeVehicleState` reste coupé en traversée (une seule voix, pas de
   doublon). Sonde +1 ligne (`LiveProbe.kt` à 499).
+
+## 9. Binaire rouge/vert + sorties confirmées (31/10)
+
+Ordre user : fini le doute — rouge ou vert, et une différenciation certaine.
+
+- **Binaire** : `CrossingState` n'a plus que `Red` et `Green`. Tout non-vert
+  attend rouge (pas de boîte, crop illisible, couleur indécise, porte refusée)
+  : classifieurs, porte, voix, vibration, affichage et voicepack suivent (le
+  clip `cross_unsure` et ses MP3 sont supprimés). Le chemin vert est inchangé
+  (arbre + porte + 4 frames) : seul le sens sûr change de nom.
+- **Sorties confirmées** : audit du 31/10 — la voix exigeait 4 frames mais
+  l'haptique et l'overlay suivaient la lecture brute (1 frame verte erronée
+  suffisait à vibrer vert et afficher VERT, même sous veto). Depuis : l'état
+  publié est le dernier **annoncé** (rouge par défaut), voix, vibration et
+  affichage parlent d'une seule voix. La pompe locale ≤ 150 ms contournait la
+  confirmation : supprimée (`CrossingLocalLight`, `LightClock` et leurs tests).
+- **Fuzz anti-inversion** (`PedLightGateFuzzTest`, ~230 assertions, graines
+  fixées) : rouges réels et synthétiques × photométrie, géométrie, bruit,
+  balance des blancs — jamais verts. Pré-validé sur un modèle Python fidèle
+  (412/413, l'écart expliqué : ligne 1 px = doute tri-state du modèle, rouge
+  binaire en Kotlin).
+- **Non fait, assumé** : aucune retouche de la porte (colonnes 1-3 px et
+  pixels chauds isolés restent acceptés en théorie — comportement documenté
+  par les planchers de sensibilité, à régler sur données, voir §6 et la
+  spec de collecte) ; la fusion arbre+HSV proposée est formellement subsumée
+  par la porte (no-op sur le vert) et n'a pas été implémentée.
+- **Conséquence honnête du binaire** : les verts illisibles (rappel 1/6 sur
+  crops SAM, §6) disent désormais « Rouge, attendez. » au lieu de douter —
+  même action sûre (attendre), couleur annoncée fausse. Seule la collecte
+  (crops téléphone labellisés) remontera le rappel.
+
+## 10. Guidage sur le passage proche, même en Traversée (31/10)
+
+Ordre user : à moins de 3 m en face, iSee aligne l'user à la voix pour qu'il
+soit bien sur le passage. Avant, le latéral retombait dès que le mode
+s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
+« Sur le passage. ».
+
+- **seuil** : `CrossingGuidance.GUIDE_METERS = 3,0 m` — au-delà ou sans
+  preuve de proximité (mesure ou boîte prouvée sous les pieds,
+  `CrossingOffer.seesNearCrosswalk` avec `maxMeters = GUIDE_METERS`,
+  fail-closed), silence comme avant ;
+- **mots** : les mêmes qu'hors traversée (« Gauche. », « Droite. »,
+  « Tout droit. » en clips < 100 ms, « Sur le passage. » après 2 frames),
+  doux (`urgent = false`) — le feu, le veto et les véhicules gardent la
+  priorité du son, le latéral attend le silence ;
+- **câblage** : `feedCrossingLateral` (`isee/CrossingWiring.kt`) — hors
+  traversée inchangé, en traversée guidage si proche sinon retombée ;
+  `LiveProbe` inchangée (499 lignes, au plafond) ;
+- **limite connue** : en traversée dense (piéton sur les zébrures + user
+  décentré), l'évitement (`CrossingPeopleWatch`) et l'alignement peuvent
+  alterner des mots opposés — les deux sont vrais, l'arbitrage commun est
+  un suivi, pas ici.
+- **coexistence avec §9** : le guidage ne touche pas au binaire rouge/vert
+  ni aux sorties confirmées — il ne publie que des mots latéraux doux, sous
+  la priorité du feu, du veto et des véhicules ; l'état annoncé reste le
+  dernier confirmé (rouge par défaut).

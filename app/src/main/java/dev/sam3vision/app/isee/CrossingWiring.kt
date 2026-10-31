@@ -95,24 +95,25 @@ data class CrossingLight(
  * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
  * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
  * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
- * [CrossingState.Unknown] (le doute vaut « attendez »).
+ * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10).
  *
  * Appelée **une fois par frame** par la sonde : le décodage du crop est le poste
  * coûteux, le refaire pour l'affichage doublerait le travail.
  */
 internal fun crossingLightOf(frame: LiveFrame, jpegB64: String): CrossingLight {
     val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-        ?: return CrossingLight(null, CrossingState.Unknown)
+        ?: return CrossingLight(null, CrossingState.Red)
     val crop = CrossingPixels.frame(jpegB64, box)
-        ?: return CrossingLight(box, CrossingState.Unknown)
+        ?: return CrossingLight(box, CrossingState.Red)
     return CrossingLight(box, PedLightGate.verdict(crop.argb, crop.width, crop.height))
 }
 
 /**
  * Ce que la sonde publie pour le feu sur une frame : la phrase à dire
- * ([cue], `null` = rester muet), l'état affiché et la boîte à marquer sur la
- * vidéo. Un seul aller-retour, pour que l'étiquette ne désigne jamais un autre
- * feu que celui qui vient d'être annoncé.
+ * ([cue], `null` = rester muet), l'état confirmé affiché (dernier annoncé,
+ * rouge par défaut) et la boîte lue sur la frame. Un seul aller-retour,
+ * pour que l'étiquette ne désigne jamais un autre feu que celui qui vient
+ * d'être annoncé.
  */
 internal data class CrossingPatch(
     val cue: CrossingCue?,
@@ -141,12 +142,20 @@ internal fun crossingPatchOf(
     val focalPx = lens.focalPx(frame.width, frame.height)
     val decision = veto.update(light.state == CrossingState.Green, detections, focalPx, atMs)
     val vetoed = decision.crossingState()
-    return CrossingPatch(announcer.onFrame(atMs, vetoed, language), light.state, light.box, decision.state)
+    val cue = announcer.onFrame(atMs, vetoed, language)
+    // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
+    // publié est le dernier annoncé (rouge tant que rien n'est annoncé), jamais
+    // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
+    // sent (ordre user du 31/10, certitude rouge/vert).
+    val confirmed = announcer.lastCue?.state ?: CrossingState.Red
+    return CrossingPatch(cue, confirmed, light.box, decision.state)
 }
 
 /**
- * Chaque nouvel état du feu fait vibrer le téléphone (vert = double salve,
- * rouge = créneau long), en plus de la voix déjà câblée par `observeSpoken`.
+ * Chaque nouvel état **confirmé** du feu fait vibrer le téléphone (vert =
+ * double salve, rouge = créneau long), en plus de la voix déjà câblée par
+ * `observeSpoken` — l'état publié étant le dernier annoncé, un glitch
+ * d'une frame ne vibre jamais.
  */
 internal fun LiveProbe.observeCrossing(scope: CoroutineScope, haptics: IseeHaptics) {
     var last: CrossingState? = null
@@ -186,8 +195,7 @@ internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: 
     if (!active) return "Crossing: OFF"
     return when (state) {
         CrossingState.Green -> "Crossing: GREEN"
-        CrossingState.Red -> "Crossing: RED"
-        CrossingState.Unknown, null -> "Crossing: …"
+        CrossingState.Red, null -> "Crossing: RED"
     }
 }
 
@@ -429,8 +437,13 @@ internal object CrossingLateralWatch {
 
 /**
  * Alimente le guidage latéral depuis la sonde : hors traversée le mot et
- * l'arrivée suivent chaque frame publiée ; en traversée le veto parle seul
- * et la mémoire latérale retombe (une ligne côté sonde, plafond respecté).
+ * l'arrivée suivent chaque frame publiée ; en traversée ils ne suivent que
+ * passage proche (≤ 3 m mesurés ou boîte prouvée sous les pieds,
+ * [CrossingOffer.seesNearCrosswalk] — fail-closed) : à moins de 3 m en face,
+ * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
+ * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
+ * doux, `urgent = false`). Loin ou invisible, la mémoire retombe (une ligne
+ * côté sonde, plafond respecté).
  */
 internal fun feedCrossingLateral(
     traversing: Boolean,
@@ -443,9 +456,19 @@ internal fun feedCrossingLateral(
     atMs: Long,
     language: SpeechLanguage,
 ) {
-    if (traversing) CrossingLateralWatch.reset() else CrossingLateralWatch.update(
-        objects, width, height, readings, pose, lens, atMs, language,
+    if (!traversing) {
+        CrossingLateralWatch.update(objects, width, height, readings, pose, lens, atMs, language)
+        return
+    }
+    val near = CrossingOffer.seesNearCrosswalk(
+        objects, crossingOfferMeters(readings, pose, lens, width, height), height,
+        maxMeters = CrossingGuidance.GUIDE_METERS,
     )
+    if (near) {
+        CrossingLateralWatch.update(objects, width, height, readings, pose, lens, atMs, language)
+    } else {
+        CrossingLateralWatch.reset()
+    }
 }
 
 /**

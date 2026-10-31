@@ -11,8 +11,8 @@ import org.junit.Test
  * quand la classe est inconnue, refus de l'objet coupé et bornes 0,3-60 m côté sol.
  *
  * Fixture du fichier voisin : image 512×384, calibrage par défaut 67° → f = 386,774 px, centre
- * optique (256, 192). Les nombres attendus sont calculés à la main avec les deux formules :
- * sténopé `H·f/h_px`, sol `h_cam / tan(atan((y_pieds − 192)/f) + pitch)`.
+ * optique (255,5, 191,5). Les nombres attendus sont calculés à la main avec les deux formules :
+ * sténopé `H·f/h_px`, sol `h_cam / tan(atan((y_pieds − 191,5)/f) + pitch)`.
  */
 class DistanceFusionTest {
 
@@ -58,17 +58,17 @@ class DistanceFusionTest {
         val reading = meter(CameraPose(1.5f, 0.2f))
             .measure(WIDTH, HEIGHT, listOf(detection("licorne", listOf(100f, 100f, 200f, 296f))))
             .firstOrNull()!!
-        // 1,5 / tan(atan(104/386,774) + 0,2) = 3,007 m
-        assertEquals(3.007f, reading.meters, 0.02f)
+        // 1,5 / tan(atan(104,5/386,774) + 0,2) = 2,998 m
+        assertEquals(2.998f, reading.meters, 0.01f)
     }
 
     @Test
-    fun `branches coherentes fusionnees en moyenne pour une personne a 3 m`() {
+    fun `branches coherentes fusionnees en moyenne ponderee pour une personne a 3 m`() {
         val reading = meter(CameraPose(1.5f, 0.15f))
             .measure(WIDTH, HEIGHT, listOf(detection("personne", tallPersonBox())))
             .firstOrNull()!!
-        // sténopé 1,70·386,774/200 = 3,288 m ; sol 3,338 m ; moyenne 3,313 m
-        assertEquals(3.313f, reading.meters, 0.02f)
+        // sténopé 1,70·386,774/200 = 3,288 m ; sol 3,328 m ; pondérée (0,943/1) 3,308 m
+        assertEquals(3.308f, reading.meters, 0.01f)
         assertEquals(reading.rawMeters, reading.meters, 0.001f)
     }
 
@@ -77,8 +77,8 @@ class DistanceFusionTest {
         val reading = meter(CameraPose(1.5f))
             .measure(WIDTH, HEIGHT, listOf(detection("personne", tallPersonBox())))
             .firstOrNull()!!
-        // sol 5,372 m contre sténopé 3,288 m (rapport 1,63 > 1,5) : le sténopé garde la main
-        assertEquals(3.288f, reading.meters, 0.02f)
+        // sol 5,347 m contre sténopé 3,288 m (rapport 1,63 > 1,5) : le sténopé garde la main
+        assertEquals(3.288f, reading.meters, 0.01f)
     }
 
     @Test
@@ -129,6 +129,24 @@ class DistanceFusionTest {
         val ground = GroundPlane.forwardMeters(300f, CameraPose(1.5f, 0.15f), FOCAL_PX, 191.5f, HEIGHT)!!
         val expected = (standing * (1f / 1.06f) + ground) / (1f / 1.06f + 1f)
         assertEquals(expected, fused.meters, 0.01f)
+    }
+
+    @Test
+    fun `de loin, le stenope pese plus que le sol dans la fusion`() {
+        // pieds à 10 m (dépression 0,149 rad → poids sol 0,74), boîte un peu courte (stenope 10,5 m)
+        val box = listOf(100f, 186.9f, 200f, 249.52f)
+        val fused = meter(CameraPose(1.5f))
+            .measure(WIDTH, HEIGHT, listOf(detection("personne", box)))
+            .firstOrNull()!!
+        val standing = Pinhole.distanceMeters(box, 1.70f, FOCAL_PX)!!
+        val ground = GroundPlane.forwardMeters(249.52f, CameraPose(1.5f), FOCAL_PX, 191.5f, HEIGHT)!!
+        val depression = GroundPlane.depressionRad(249.52f, CameraPose(1.5f), FOCAL_PX, 191.5f)
+        val groundWeight = GroundWeight.of(depression)
+        val standingWeight = KnownSizes.fusionWeight("personne")
+        assertTrue("dépression $depression sous la référence", depression < GroundWeight.REFERENCE_RAD)
+        assertTrue("sol $groundWeight sous sténopé $standingWeight", groundWeight < standingWeight)
+        val expected = (standing * standingWeight + ground * groundWeight) / (standingWeight + groundWeight)
+        assertEquals(expected, fused.meters, 0.005f)
     }
 
     @Test

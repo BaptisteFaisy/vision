@@ -22,6 +22,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * [dev.sam3vision.core.distance.KnownSizes]) — profondeur médiane calibrée
  * d'abord, plan de sol ensuite ([CrossingDistance]). Arrivée : « Sur le
  * passage. » ([CrossingText.arrived]), douce, 2 frames, changement seul.
+ * En Traversée, le mot ne parle que passage proche (≤ [GUIDE_METERS],
+ * [CrossingOffer.seesNearCrosswalk]) — le feu et le veto gardent la priorité.
  *
  * Pur et testé en JVM : aucune image, aucun Android, aucune horloge implicite.
  */
@@ -35,6 +37,9 @@ object CrossingGuidance {
 
     /** En deçà, la profondeur dit « arrivé » (mètres, profondeur ou sol). */
     const val ARRIVAL_METERS = 1.5f
+
+    /** En deçà, le passage proche se rejoint à la voix, même en Traversée (ordre user 31/10). */
+    const val GUIDE_METERS = 3.0f
 
     /** Bas de boîte normalisé qui touche le bas du cadre (arrivée). */
     const val BOTTOM_TOUCH_FRACTION = 0.98f

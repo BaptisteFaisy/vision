@@ -7,17 +7,15 @@ import org.junit.Test
 class CrossingTextTest {
 
     @Test
-    fun `phrases francaises courtes`() {
+    fun `phrases francaises courtes, binaire rouge vert`() {
         assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
         assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
-        assertEquals("Doute, attendez.", CrossingText.phrase(CrossingState.Unknown, SpeechLanguage.Fr))
     }
 
     @Test
-    fun `phrases anglaises courtes`() {
+    fun `phrases anglaises courtes, binaire rouge vert`() {
         assertEquals("Red, wait.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.En))
         assertEquals("Green, cross now.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.En))
-        assertEquals("Unsure, wait.", CrossingText.phrase(CrossingState.Unknown, SpeechLanguage.En))
     }
 
     @Test

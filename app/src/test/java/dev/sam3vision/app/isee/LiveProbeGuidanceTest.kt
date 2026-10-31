@@ -48,6 +48,15 @@ class LiveProbeGuidanceTest {
         maskEncoding = MASK_ENCODING_NONE,
     )
 
+    /** Personne centrée à ~3,8 m (sténopé 1,70 m / 231 px sur frame portrait). */
+    private fun personneLoin() = SegObject(
+        label = "person",
+        score = 0.9f,
+        box = listOf(206f, 400f, 306f, 631f),
+        maskPngB64 = "",
+        maskEncoding = MASK_ENCODING_NONE,
+    )
+
     @Test
     fun `guidage dit tout droit sur voie libre`() = runTest {
         val (probe, fake) = harness(this, guide = true)
@@ -120,7 +129,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `stop interne au contact mesure = urgent`() = runTest {
+    fun `contact mesure contourne, non urgent`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -131,8 +140,26 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame(listOf(gobelet())))
         advanceUntilIdle()
 
-        assertEquals("obstacle, stop.", probe.state.value.spoken)
-        assertTrue(probe.state.value.spokenUrgent)
+        assertEquals("left.", probe.state.value.spoken)
+        assertFalse(probe.state.value.spokenUrgent)
+    }
+
+    @Test
+    fun `portrait le couloir projette avec le champ vertical`() = runTest {
+        val (probe, fake) = harness(this, guide = true)
+        probe.onFrame("A", captureAtNs = 8_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("B", captureAtNs = 14_000_000L)
+        advanceUntilIdle()
+        fake.respond("A", frame(listOf(personneLoin())))
+        advanceUntilIdle()
+        fake.respond("B", frame(listOf(personneLoin())))
+        advanceUntilIdle()
+
+        // Frame portrait 512×1138 : l'axe x porte le champ vertical (~52,8°),
+        // pas 67° — le décalage chiffré passe de 1,5 m à 1,0 m, la voix reste « left. ».
+        assertEquals("left.", probe.state.value.spoken)
+        assertEquals(1.0f, probe.voice.lastDecision?.shiftMeters!!, 0.001f)
     }
 
     @Test

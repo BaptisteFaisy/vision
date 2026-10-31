@@ -14,10 +14,9 @@ class LivePromptsNavigationTest {
     fun `la navigation n'ajoute aucun concept suivi`() {
         assertEquals(
             listOf(
-                "person", "car", "bus", "truck", "motorcycle", "bicycle",
-                "electric scooter", "pedestrian traffic light", "pedestrian signal head",
-                "curb", "sidewalk", "crosswalk", "pole", "stairs", "barrier",
-                "fence", "gate",
+                "person", "car", "bus", "bicycle", "pedestrian traffic light",
+                "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
+                "stairs", "barrier", "fence", "gate", "souvenir shop", "beanie", "socks",
             ),
             LivePrompts.default,
         )

@@ -9,16 +9,16 @@ import dev.sam3vision.core.predict.Box
 /**
  * Concepts véhicules du veto trafic : ce que SAM doit suivre en mode traversée.
  *
- * Les sept véhicules du contrat, en anglais (la forme que SAM segmente le mieux).
+ * Les trois véhicules du contrat (31/10, ordre user : camion, moto et
+ * trottinettes sortis, voiture/bus/vélo gardés), en anglais (la forme que
+ * SAM segmente le mieux).
  * Le français reste reconnu côté veto ([isVehicle]) : un label « voiture » bloque
  * comme un « car », « trottinette » comme un « scooter ».
  */
 object VehicleConcepts {
 
-    /** Les sept véhicules du contrat : voiture, bus, camion, moto, vélo et trottinette. */
-    val PROMPTS: List<String> = listOf(
-        "car", "bus", "truck", "motorcycle", "bicycle", "scooter", "electric scooter",
-    )
+    /** Les trois véhicules du contrat : voiture, bus et vélo. */
+    val PROMPTS: List<String> = listOf("car", "bus", "bicycle")
 
     private val KEYS = setOf(
         "car", "bus", "buses", "truck", "motorcycle", "bicycle", "bike",
@@ -36,7 +36,7 @@ object VehicleConcepts {
 
     /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — dix-sept concepts, donc les sept véhicules plus toute
+     * [LivePrompts.MAX] — dix-sept concepts, donc les trois véhicules plus toute
      * la base du direct (dangers, feu, passage…).
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =

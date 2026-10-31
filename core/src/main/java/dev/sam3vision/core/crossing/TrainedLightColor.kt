@@ -8,17 +8,16 @@ package dev.sam3vision.core.crossing
  * (profondeur 6, feuille min 20). Traits : [FEATURE_NAMES] dans l'ordre.
  *
  * Sous le plancher de pureté de la feuille atteinte, la réponse est
- * [CrossingState.Unknown] : un doute vaut mieux qu'une couleur fragile.
- * Le vert se tranche plus large ([GREEN_MIN_PURITY]) que le rouge
- * ([MIN_PURITY]) — un vert raté fait attendre, mais un vert jamais détecté
- * ne sert à rien — avec un garde-fou : sans pixels verts
- * ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert (le noir reste
- * un doute). Reste à valider sur feux français et boîtes SAM réelles
- * (non mesuré).
+ * [CrossingState.Red] : binaire, une couleur fragile attend (ordre user du
+ * 31/10, fini le doute). Le vert se tranche plus large ([GREEN_MIN_PURITY])
+ * que le rouge ([MIN_PURITY]) — un vert raté fait attendre, mais un vert
+ * jamais détecté ne sert à rien — avec un garde-fou : sans pixels verts
+ * ([PedLightGate.GREEN_MIN_FRACTION]), pas de verdict vert (le noir attend).
+ * Reste à valider sur feux français et boîtes SAM réelles (non mesuré).
  */
 object TrainedLightColor {
 
-    /** Pureté minimale de la feuille pour trancher rouge (sinon doute). */
+    /** Pureté minimale exigée d'une feuille rouge (une feuille fragile attend quand même : binaire). */
     const val MIN_PURITY = 0.80f
 
     /**
@@ -45,10 +44,10 @@ object TrainedLightColor {
 
     /**
      * État du feu cadré par [argb] ([width] x [height], ARGB 32 bits).
-     * Tableau vide ou incohérent ⇒ [CrossingState.Unknown], comme HSV.
+     * Tableau vide ou incohérent ⇒ [CrossingState.Red], comme HSV.
      */
     fun classify(argb: IntArray, width: Int, height: Int): CrossingState {
-        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Unknown
+        if (width <= 0 || height <= 0 || argb.size != width * height) return CrossingState.Red
         val features = CrossingFeatures.extract(argb, width, height)
         var node = 0
         while (LEFT[node] >= 0) {
@@ -56,9 +55,9 @@ object TrainedLightColor {
         }
         val leafGreen = LEAF_CLASS[node] == 1
         val floor = if (leafGreen) GREEN_MIN_PURITY else MIN_PURITY
-        if (LEAF_PURITY[node] < floor) return CrossingState.Unknown
+        if (LEAF_PURITY[node] < floor) return CrossingState.Red
         if (leafGreen && features[GREEN_FRAC_INDEX] < PedLightGate.GREEN_MIN_FRACTION) {
-            return CrossingState.Unknown
+            return CrossingState.Red
         }
         return if (leafGreen) CrossingState.Green else CrossingState.Red
     }

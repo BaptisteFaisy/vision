@@ -4,8 +4,8 @@ import android.app.Application
 import android.util.Log
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.glasses.GlassesVoiceRoute
+import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.isee.CrossingLight
-import dev.sam3vision.app.isee.CrossingLocalLight
 import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.ttsClient
 import dev.sam3vision.core.crossing.CrossingPrompts
@@ -22,7 +22,6 @@ import dev.sam3vision.core.traverse.TraverseVoice
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -80,19 +79,11 @@ class TraverseWiring(
         private set
 
     /**
-     * Couleur du feu relue localement (≤ 150 ms) sur la frame caméra la plus
-     * fraîche : la boîte vient de [light], qui n'a pas besoin d'être fraîche.
+     * Feu affiché : la boîte lue sur la frame SAM, l'état confirmé annoncé
+     * (rouge par défaut) — l'affichage suit la voix, jamais la lecture brute
+     * (ordre user du 31/10, certitude rouge/vert). `null` = mode coupé.
      */
-    private var pump: CrossingLocalLight? = null
-        private set
-
-    /** Dernière lecture locale, `null` tant qu'aucune frame n'a été lue. */
-    val local: CrossingLight? get() = pump?.ui?.value
-
-    /** Frame caméra : relit la couleur si le mode est actif et le créneau libre. */
-    fun offerLightFrame(jpegB64: String) {
-        if (active) pump?.offerFrame(jpegB64)
-    }
+    val display: CrossingLight? get() = light?.copy(state = pipeline.lastAnnounced ?: CrossingState.Red)
 
     /** Clé de la dernière transition journalisée : les répétitions se taisent. */
     private var lastKey: String = ""
@@ -113,11 +104,12 @@ class TraverseWiring(
     ): ShownFrame {
         if (active) updateLight(crossingLightOf(frame, jpegB64))
         val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language)
+        CalibrationSnapshots.note(out.detections, width, height, atMs)
         logTransition(out.decision)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }
 
-    /** Seul un vert tranché autorise la traversée ; rouge et doute attendent. */
+    /** Seul un vert tranché autorise la traversée ; tout le reste attend (binaire). */
     fun updateLight(state: CrossingState) {
         lightGreen = state == CrossingState.Green
     }
@@ -159,7 +151,6 @@ class TraverseWiring(
         if (active == this.active) return
         if (active) {
             this.active = true
-            pump = CrossingLocalLight(scope, Dispatchers.Default, boxOf = { light?.box })
             quiet()
             relaunch(attach(requireNotNull(app), settings, scope, prompts))
             log("traversee mode=ON")
@@ -182,8 +173,6 @@ class TraverseWiring(
         pipeline.reset()
         lightGreen = false
         light = null
-        pump?.clear()
-        pump = null
         quiet()
     }
 
@@ -192,7 +181,6 @@ class TraverseWiring(
         pipeline.reset()
         lightGreen = false
         light = null
-        pump?.clear()
     }
 
     /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */

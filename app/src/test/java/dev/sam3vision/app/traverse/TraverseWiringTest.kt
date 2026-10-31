@@ -125,8 +125,6 @@ class TraverseWiringTest {
         assertTrue(wiring.lightGreen)
         wiring.updateLight(CrossingState.Red)
         assertFalse(wiring.lightGreen)
-        wiring.updateLight(CrossingState.Unknown)
-        assertFalse(wiring.lightGreen)
     }
 
     @Test
@@ -152,20 +150,21 @@ class TraverseWiringTest {
     }
 
     @Test
-    fun `le seau local reste vide hors mode actif`() {
-        // Sans activation il n'y a pas de seau : aucune frame n'est décodée pour rien.
+    fun `display - boite lue, etat confirme rouge par defaut`() {
         val wiring = wiring()
-        wiring.offerLightFrame("jpeg")
-        assertEquals(null, wiring.local)
+        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green))
+
+        assertEquals(listOf(0.1f, 0.1f, 0.2f, 0.2f), wiring.display?.box)
+        assertEquals(CrossingState.Red, wiring.display?.state)
     }
 
     @Test
-    fun `offrir une frame hors mode ne casse rien`() {
+    fun `display - vert seulement apres annonce`() = runBlocking {
         val wiring = wiring()
-        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Red))
-        wiring.offerLightFrame("")
-        assertEquals(null, wiring.local)
-        assertEquals(CrossingState.Red, wiring.light?.state)
+        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Green))
+        repeat(5) { wiring.at(emptyList(), it + 1) }
+
+        assertEquals(CrossingState.Green, wiring.display?.state)
     }
 
     @Test

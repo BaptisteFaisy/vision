@@ -23,14 +23,18 @@ object DepthReadings {
      * Médiane de proximité des pixels finis de [box] (pixels image 0..1
      * ramenés à la carte) ; `null` si la boîte est vide ou hors champ.
      */
+    /** Érosion par côté avant la médiane : les bords portent le fond, le cœur porte l'objet. */
+    const val EROSION_FRACTION = 0.25f
+
     fun boxCloseness(depth: DepthMap, box: List<Float>, frameW: Int, frameH: Int): Float? {
         if (box.size < 4 || frameW <= 0 || frameH <= 0) return null
         if (depth.width <= 0 || depth.height <= 0) return null
         if (box[2] <= 0f || box[0] >= frameW || box[3] <= 0f || box[1] >= frameH) return null
-        val x1 = ((box[0] / frameW) * depth.width).toInt().coerceIn(0, depth.width - 1)
-        val x2 = ((box[2] / frameW) * depth.width).toInt().coerceIn(x1, depth.width - 1)
-        val y1 = ((box[1] / frameH) * depth.height).toInt().coerceIn(0, depth.height - 1)
-        val y2 = ((box[3] / frameH) * depth.height).toInt().coerceIn(y1, depth.height - 1)
+        val inner = erodedBox(box) ?: box
+        val x1 = ((inner[0] / frameW) * depth.width).toInt().coerceIn(0, depth.width - 1)
+        val x2 = ((inner[2] / frameW) * depth.width).toInt().coerceIn(x1, depth.width - 1)
+        val y1 = ((inner[1] / frameH) * depth.height).toInt().coerceIn(0, depth.height - 1)
+        val y2 = ((inner[3] / frameH) * depth.height).toInt().coerceIn(y1, depth.height - 1)
         val kept = FloatArray((x2 - x1 + 1) * (y2 - y1 + 1))
         var count = 0
         for (y in y1..y2) {
@@ -43,6 +47,20 @@ object DepthReadings {
         }
         if (count == 0) return null
         return DepthFusion.quickselectMedian(kept, count)
+    }
+
+    /**
+     * Fenêtre centrale de [box] ([EROSION_FRACTION] rognée par côté) : la médiane
+     * y lit l'objet, pas le fond qui déborde des bords détecteur. `null` si la
+     * fenêtre dégénère (petite boîte : l'appelant garde la boîte entière).
+     */
+    fun erodedBox(box: List<Float>): List<Float>? {
+        if (box.size < 4) return null
+        val dx = (box[2] - box[0]) * EROSION_FRACTION
+        val dy = (box[3] - box[1]) * EROSION_FRACTION
+        if (dx <= 0f || dy <= 0f) return null
+        val inner = listOf(box[0] + dx, box[1] + dy, box[2] - dx, box[3] - dy)
+        return inner.takeIf { it[2] > it[0] && it[3] > it[1] }
     }
 
     /**
@@ -117,10 +135,10 @@ object DepthReadings {
                 anchors += DepthAnchor(meters, closeness)
             }
         }
-        val scale = scaleFromAnchors(anchors)
+        val cal = AffineScale.calibrate(anchors)
         val refined = ArrayList<DistanceReading>(detections.size)
         for (detection in detections) {
-            refined += refinedOne(detection, byBox[detection.box], closeByBox[detection.box], scale)
+            refined += refinedOne(detection, byBox[detection.box], closeByBox[detection.box], cal)
                 ?: continue
         }
         return refined
@@ -130,22 +148,24 @@ object DepthReadings {
         detection: Detection,
         base: DistanceReading?,
         closeness: Float?,
-        scale: Float?,
+        cal: AffineCalibration?,
     ): DistanceReading? {
         var meters: Float? = null
-        if (closeness != null && scale != null) {
-            meters = toMeters(closeness, scale)
+        if (closeness != null && cal != null) {
+            meters = toMeters(closeness, cal)
         }
         if (meters != null) {
             val id = base?.trackId ?: DistanceMeter.UNTRACKED_ID
-            return DistanceReading(id, detection.label, meters, meters, detection.box)
+            // La confiance du sténopé traverse : les mètres viennent de la profondeur,
+            // calibrée par ces mêmes ancres — pas une certitude neuve.
+            return DistanceReading(id, detection.label, meters, meters, detection.box, base?.confidence ?: 1f)
         }
         return base
     }
 
     /** Proximité → mètres bornés plausibles ; `null` si hors bornes. */
-    private fun toMeters(closeness: Float, scale: Float): Float? {
-        val meters = DepthFusion.closenessToMeters(closeness, scale) ?: return null
+    private fun toMeters(closeness: Float, cal: AffineCalibration): Float? {
+        val meters = AffineScale.apply(closeness, cal) ?: return null
         if (!meters.isFinite()) return null
         return meters.coerceIn(Pinhole.MIN_METERS, Pinhole.MAX_METERS)
     }

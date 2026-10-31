@@ -30,34 +30,34 @@ class PedLightColorTest {
     }
 
     @Test
-    fun `un cadre gris est un doute`() {
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(grayFrame(10, 10), 10, 10))
+    fun `un cadre gris attend rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightColor.classify(grayFrame(10, 10), 10, 10))
     }
 
     @Test
-    fun `un cadre noir est un doute`() {
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(IntArray(100) { BLACK }, 10, 10))
+    fun `un cadre noir attend rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100) { BLACK }, 10, 10))
     }
 
     @Test
-    fun `un match nul rouge vert est un doute`() {
+    fun `un match nul rouge vert attend rouge, binaire`() {
         val pixels = IntArray(100) { index -> if (index % 2 == 0) RED else GREEN }
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(pixels, 10, 10))
+        assertEquals(CrossingState.Red, PedLightColor.classify(pixels, 10, 10))
     }
 
     @Test
-    fun `quelques pixels rouges perdus sont un doute`() {
+    fun `quelques pixels rouges perdus attendent rouge, binaire`() {
         val pixels = IntArray(100) { BLACK }
         pixels[0] = RED
         pixels[1] = RED
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(pixels, 10, 10))
+        assertEquals(CrossingState.Red, PedLightColor.classify(pixels, 10, 10))
     }
 
     @Test
-    fun `un tableau incoherent est un doute`() {
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(IntArray(0), 0, 0))
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(IntArray(10), 10, 10))
-        assertEquals(CrossingState.Unknown, PedLightColor.classify(IntArray(100), -1, 10))
+    fun `un tableau incoherent attend rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(0), 0, 0))
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(10), 10, 10))
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100), -1, 10))
     }
 
     private fun redFrame(w: Int, h: Int) = IntArray(w * h) { RED }

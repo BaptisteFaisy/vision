@@ -35,6 +35,32 @@ class DepthReadingsTest {
     }
 
     @Test
+    fun `mediane sur fenetre centrale, fond des bords ecarte`() {
+        // objet 5.0 au centre (cellules 25..74), fond 1.0 autour : la boîte entière
+        // est majoritairement du fond, la fenêtre érodée est pure objet
+        val values = FloatArray(100 * 100) { i ->
+            val x = i % 100
+            val y = i / 100
+            if (x in 25..74 && y in 25..74) 5f else 1f
+        }
+        val map = DepthMap(100, 100, values)
+        assertEquals(5f, DepthReadings.boxCloseness(map, listOf(0f, 0f, 100f, 100f), 100, 100)!!, 0.001f)
+    }
+
+    @Test
+    fun `erosion degeneree - repli boite entiere, jamais null abusif`() {
+        assertEquals(listOf(25f, 25f, 75f, 75f), DepthReadings.erodedBox(listOf(0f, 0f, 100f, 100f)))
+        assertNull(DepthReadings.erodedBox(listOf(0f, 0f, 10f)))
+        val values = FloatArray(10 * 10) { 3f }
+        val map = DepthMap(10, 10, values)
+        // 1 px : fenêtre réduite mais valide
+        assertEquals(3f, DepthReadings.boxCloseness(map, listOf(4f, 4f, 5f, 5f), 10, 10)!!, 0.001f)
+        // largeur nulle : érosion dégénérée, la boîte entière sert quand même
+        assertNull(DepthReadings.erodedBox(listOf(4f, 4f, 4f, 6f)))
+        assertEquals(3f, DepthReadings.boxCloseness(map, listOf(4f, 4f, 4f, 6f), 10, 10)!!, 0.001f)
+    }
+
+    @Test
     fun `echelle - mediane des ancres, vide - null`() {
         val scale = DepthReadings.scaleFromAnchors(
             listOf(DepthAnchor(2f, 10f), DepthAnchor(10f, 2f), DepthAnchor(4f, 5f)),

@@ -11,10 +11,10 @@ import org.junit.Test
 
 /**
  * Évitement des personnes SUR le passage piéton en mode Traversée : le côté
- * occupé (pieds dans la boîte du passage) conseille de passer de l'autre
- * côté — statique compris, contrairement au nudge d'approche
- * ([dev.sam3vision.core.live.LateralNudgeTracker], verrou « statique → rien »
- * intact, autre tracker, autre condition).
+ * occupé (corps qui touche la boîte du passage, dans l'axe de marche)
+ * conseille de passer de l'autre côté — statique compris, contrairement au
+ * nudge d'approche ([dev.sam3vision.core.live.LateralNudgeTracker], verrou
+ * « statique → rien » intact, autre tracker, autre condition).
  */
 class CrossingOnPathTest {
 
@@ -40,7 +40,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `personne statique a gauche sur passage conseille la droite`() {
-        val person = personOn(0.3f)
+        val person = personOn(0.4f)
         val objects = listOf(crosswalk(), person)
         val readings = listOf(reading(person.box, 2.0f))
         val track = tracker()
@@ -51,7 +51,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `personne statique a droite sur passage conseille la gauche`() {
-        val person = personOn(0.7f)
+        val person = personOn(0.6f)
         val objects = listOf(crosswalk(), person)
         val readings = listOf(reading(person.box, 2.0f))
         val track = tracker()
@@ -61,13 +61,13 @@ class CrossingOnPathTest {
     }
 
     @Test
-    fun `personne sur passage pres du bord conseille quand meme`() {
-        val person = personOn(0.12f)
+    fun `personne sur passage hors axe reste muette`() {
+        val person = personOn(0.15f)
         val objects = listOf(crosswalk(), person)
         val track = tracker()
 
         assertNull(track.onFrame(0L, objects, width, height))
-        assertEquals(SteeringCap.Right, track.onFrame(200L, objects, width, height))
+        assertNull(track.onFrame(200L, objects, width, height))
     }
 
     @Test
@@ -82,7 +82,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `personne sur passage sans distance conseille quand meme`() {
-        val person = personOn(0.3f)
+        val person = personOn(0.4f)
         val objects = listOf(crosswalk(), person)
         val track = tracker()
 
@@ -92,7 +92,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `personne trop loin ne conseille pas`() {
-        val person = personOn(0.3f)
+        val person = personOn(0.4f)
         val objects = listOf(crosswalk(), person)
         val readings = listOf(reading(person.box, 5.0f))
         val track = tracker()
@@ -103,7 +103,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `des deux cotes sur passage on ne conseille rien`() {
-        val objects = listOf(crosswalk(), personOn(0.3f), personOn(0.7f))
+        val objects = listOf(crosswalk(), personOn(0.4f), personOn(0.6f))
         val track = tracker()
 
         assertNull(track.onFrame(0L, objects, width, height))
@@ -112,7 +112,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `personne hors passage statique ne conseille rien`() {
-        val person = personOn(0.3f, feetY = 0.5f)
+        val person = personOn(0.45f, feetY = 0.5f)
         val objects = listOf(crosswalk(), person)
         val track = tracker()
 
@@ -122,7 +122,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `sans passage visible on ne conseille rien`() {
-        val objects = listOf(personOn(0.3f))
+        val objects = listOf(personOn(0.4f))
         val track = tracker()
 
         assertNull(track.onFrame(0L, objects, width, height))
@@ -131,7 +131,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `entree-sortie fugace ne parle pas`() {
-        val on = listOf(crosswalk(), personOn(0.3f))
+        val on = listOf(crosswalk(), personOn(0.4f))
         val off = listOf(crosswalk())
         val track = tracker()
 
@@ -142,7 +142,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `reset oublie la gene`() {
-        val objects = listOf(crosswalk(), personOn(0.3f))
+        val objects = listOf(crosswalk(), personOn(0.4f))
         val track = tracker()
 
         assertNull(track.onFrame(0L, objects, width, height))
@@ -152,7 +152,7 @@ class CrossingOnPathTest {
 
     @Test
     fun `piste perimee apres silence ne parle pas tout de suite`() {
-        val objects = listOf(crosswalk(), personOn(0.3f))
+        val objects = listOf(crosswalk(), personOn(0.4f))
         val track = tracker()
 
         assertNull(track.onFrame(0L, objects, width, height))
@@ -161,10 +161,21 @@ class CrossingOnPathTest {
     }
 
     @Test
-    fun `pieds dans boite avec tolerance`() {
-        assertTrue(CrossingOnPath.feetOnCrosswalk(0.3f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertTrue(CrossingOnPath.feetOnCrosswalk(0.09f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertFalse(CrossingOnPath.feetOnCrosswalk(0.05f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
-        assertFalse(CrossingOnPath.feetOnCrosswalk(0.3f, 0.5f, 0.1f, 0.6f, 0.9f, 0.95f))
+    fun `personne proche pieds coupes parle quand meme`() {
+        val person = obj("person", box = listOf(350f, 500f, 450f, 1000f))
+        val objects = listOf(crosswalk(), person)
+        val track = tracker()
+
+        assertNull(track.onFrame(0L, objects, width, height))
+        assertEquals(SteeringCap.Right, track.onFrame(200L, objects, width, height))
+    }
+
+    @Test
+    fun `corps qui touche la boite avec tolerance`() {
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.4f, 0.35f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.09f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertTrue(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.5f, 0.35f, 1.0f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertFalse(CrossingOnPath.bodyOnCrosswalk(0.0f, 0.7f, 0.05f, 0.8f, 0.1f, 0.6f, 0.9f, 0.95f))
+        assertFalse(CrossingOnPath.bodyOnCrosswalk(0.25f, 0.1f, 0.35f, 0.5f, 0.1f, 0.6f, 0.9f, 0.95f))
     }
 }

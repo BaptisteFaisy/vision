@@ -35,9 +35,9 @@ class LiveCrossingPublishTest {
     }
 
     @Test
-    fun `le doute se publie aussi - c est un etat a afficher`() {
-        val out = LiveUiState().withCrossing(true, CrossingLight(box, CrossingState.Unknown))
-        assertEquals(CrossingState.Unknown, out.crossing)
+    fun `le rouge se publie comme un etat a afficher`() {
+        val out = LiveUiState().withCrossing(true, CrossingLight(box, CrossingState.Red))
+        assertEquals(CrossingState.Red, out.crossing)
         assertEquals(box, out.crossingBox)
     }
 }

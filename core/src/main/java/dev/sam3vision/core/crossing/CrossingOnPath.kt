@@ -9,17 +9,17 @@ import dev.sam3vision.core.model.SegObject
 /**
  * Personnes SUR le passage piéton : le prédicat spatial que la voix douce de
  * Traversée utilise pour dire « Gauche. » / « Droite. » d'évitement. Le test
- * est pieds-dans-boîte (les pieds sont au sol, le centre d'une personne haute
- * est au-dessus du passage en perspective — un test au centre raterait) :
- * `feetX` dans la largeur du passage, `feetY` (bas de boîte) dans sa hauteur,
- * à [TOL] près. Boîtes normalisées 0..1, jamais de pixels bruts.
+ * est corps-qui-touche (la boîte de la personne touche celle du passage, à
+ * [TOL] près — les pieds seuls rateraient quand ils sont cachés ou coupés :
+ * masqués par une voiture, sous le cadre de près). Boîtes normalisées 0..1,
+ * jamais de pixels bruts.
  *
  * Pur et testé en JVM : aucune image, aucun Android, aucune horloge implicite.
  */
 object CrossingOnPath {
 
     /**
-     * Marge du test pieds-dans-boîte : la même convention « touche » que le
+     * Marge du test corps-qui-touche : la même convention « touche » que le
      * bas du cadre ([CrossingGuidance.BOTTOM_TOUCH_FRACTION]) — ~10 px en x,
      * ~23 px en y à 512x1138, un septième de bande de cadran.
      */
@@ -46,22 +46,26 @@ object CrossingOnPath {
     }
 
     /**
-     * Pieds (`feetX`, `feetY`, normalisés) dans la boîte du passage
-     * (`cx0`, `cy0`, `cx1`, `cy1`, normalisés), à [tol] près. Géométrie
+     * Corps (`px0`, `py0`, `px1`, `py2`, normalisés) qui touche la boîte du
+     * passage (`cx0`, `cy0`, `cx1`, `cy1`, normalisés), à [tol] près :
+     * chevauchement des deux rectangles, pas d'IoU (une boîte verticale sur
+     * une bande horizontale aurait une IoU ~0 même dessus). Géométrie
      * illisible = faux, jamais de consigne devinée.
      */
-    fun feetOnCrosswalk(
-        feetX: Float,
-        feetY: Float,
+    fun bodyOnCrosswalk(
+        px0: Float,
+        py0: Float,
+        px1: Float,
+        py2: Float,
         cx0: Float,
         cy0: Float,
         cx1: Float,
         cy1: Float,
         tol: Float = TOL,
     ): Boolean {
-        if (!feetX.isFinite() || !feetY.isFinite()) return false
-        return feetX >= cx0 - tol && feetX <= cx1 + tol &&
-            feetY >= cy0 - tol && feetY <= cy1 + tol
+        if (!px0.isFinite() || !py0.isFinite() || !px1.isFinite() || !py2.isFinite()) return false
+        return px0 <= cx1 + tol && px1 >= cx0 - tol &&
+            py0 <= cy1 + tol && py2 >= cy0 - tol
     }
 }
 
@@ -79,9 +83,12 @@ object CrossingOnPath {
  * personne est mesurée — sans mesure, la boîte seule suffit, comme
  * [dev.sam3vision.core.live.Guidance] qui traite l'inconnu comme à portée),
  * péremption ([LateralNudgeTracker.STALE_MS]). Pas de fenêtre avant : la
- * boîte du passage borne déjà latéralement (un occupant au bord des zébrures
- * se contourne aussi). Les deux côtés à la fois = silence (le couloir bouché
- * parle s'il est bouché).
+ * boîte du passage borne déjà latéralement, et le couloir central
+ * ([CrossingGuidance.LEFT_EDGE]-[CrossingGuidance.RIGHT_EDGE], le milieu de
+ * l'image = l'axe de marche) ne garde que les occupants qui bouchent le
+ * passage de l'utilisateur — un occupant sur les zébrures mais hors d'axe ne
+ * déclenche pas d'évitement (les positions le disent au cadran). Les deux
+ * côtés à la fois = silence (le couloir bouché parle s'il est bouché).
  *
  * Pur JVM, deux passes sans collection intermédiaire (boucles manuelles,
  * O(n), zéro allocation) : le meilleur passage, puis les occupants.
@@ -165,12 +172,16 @@ class CrossingOnPathTracker(
         if (obj.score < personMinScore || !PersonLabels.isPerson(obj.label)) return null
         val box = obj.box
         if (box.size < 4) return null
-        val feetX = (box[0] + box[2]) / 2f / width
-        val feetY = box[3] / height
-        if (!CrossingOnPath.feetOnCrosswalk(feetX, feetY, cx0, cy0, cx1, cy1)) return null
+        val px0 = box[0] / width
+        val py0 = box[1] / height
+        val px1 = box[2] / width
+        val py2 = box[3] / height
+        if (!CrossingOnPath.bodyOnCrosswalk(px0, py0, px1, py2, cx0, cy0, cx1, cy1)) return null
         if (!closeEnough(box, readings)) return null
-        if (feetX < LateralNudgeTracker.SIDE_MID) return SteeringCap.Left
-        if (feetX > LateralNudgeTracker.SIDE_MID) return SteeringCap.Right
+        val centerX = (px0 + px1) / 2f
+        if (centerX < CrossingGuidance.LEFT_EDGE || centerX > CrossingGuidance.RIGHT_EDGE) return null
+        if (centerX < LateralNudgeTracker.SIDE_MID) return SteeringCap.Left
+        if (centerX > LateralNudgeTracker.SIDE_MID) return SteeringCap.Right
         return null
     }
 

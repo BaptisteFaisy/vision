@@ -1,6 +1,7 @@
 package dev.sam3vision.core.distance
 
 import dev.sam3vision.core.model.Detection
+import kotlin.jvm.Volatile
 
 /**
  * Distance estimée d'un objet de la frame courante.
@@ -72,9 +73,10 @@ object Pinhole {
  * un meuble). D'où la règle, et une seule :
  *
  * - les deux valeurs **concordent** (rapport ≤ [COHERENCE_RATIO]) : leur moyenne
- *   **pondérée** — deux mesures indépendantes se trompent rarement du même côté,
- *   et la branche la plus sûre (poids [KnownSizes.fusionWeight] côté sténopé)
- *   tire le résultat ;
+ *   **pondérée** — deux mesures indépendantes se trompent rarement du même côté ;
+ *   le sténopé pèse [KnownSizes.fusionWeight] (0,77-0,97 selon sa classe), le sol
+ *   [GroundWeight] (0,25-1 selon la dépression des pieds) : de près le sol tire,
+ *   de loin le sténopé reprend la main ;
  * - elles **divergent** : une hypothèse est cassée, sans qu'on sache laquelle ; le sténopé
  *   garde la main — c'est la branche validée sur le téléphone, elle ne dépend ni de la pose ni
  *   du fait que l'objet soit posé, et les poids ne changent rien à cette prudence ;
@@ -111,8 +113,8 @@ object DistanceFusion {
 
 /**
  * Mesure des distances du direct : calibrage caméra ([LensSpec]), tailles connues
- * ([KnownSizes]), plan de sol facultatif ([GroundPlane]) et lissage par piste
- * ([DistanceSmoother]).
+ * ([KnownSizes]), plan de sol facultatif ([GroundPlane]) et suivi par piste
+ * ([DistanceKalman], [DistanceSmoother] en repli).
  *
  * Sans objet mesurable dans la frame, [measure] renvoie une liste vide : l'overlay
  * n'affiche alors rien du tout.
@@ -120,28 +122,75 @@ object DistanceFusion {
 class DistanceMeter(
     private var lens: LensSpec = LensSpec.Default,
     private val smoother: DistanceSmoother = DistanceSmoother(),
+    private val kalman: DistanceKalman = DistanceKalman(),
 ) {
 
     /** Coupé par le réglage utilisateur : aucune mesure, aucun coût. */
     var enabled: Boolean = true
 
+    /** Suivi Kalman (défaut) ou EMA historique : le repli ne prédit pas ([predictions]). */
+    var kalmanEnabled: Boolean = true
+
     /**
-     * Pose de la caméra pour la mesure au sol (Réglages) ; `null` par défaut : seule la
-     * branche sténopé travaille alors, exactement comme avant le plan de sol. Une pose
-     * inexploitable est ignorée par [GroundPlane], jamais devinée.
+     * Pose de la caméra pour la mesure au sol (IMU temps réel, `null` sans capteur) ;
+     * `null` : seule la branche sténopé travaille. Volatile : écrite par le thread
+     * capteur, lue par le thread des frames. Une pose inexploitable est ignorée par
+     * [GroundPlane], jamais devinée.
      */
+    @Volatile
     var pose: CameraPose? = null
 
     /** Calibrage courant (celui du capteur, sinon le réglage). */
     val lensSpec: LensSpec get() = lens
+
+    /** Non-suivis de la dernière mesure, maintenus par [predictions] jusqu'à l'oubli. */
+    private var untracked: List<DistanceReading> = emptyList()
+    private var untrackedAtMs: Long = 0L
 
     /** Applique un calibrage plausible ; un [spec] inutilisable laisse l'ancien en place. */
     fun setLens(spec: LensSpec?) {
         if (spec != null && spec.usable) lens = spec
     }
 
-    /** Oublie les valeurs lissées (nouvelle session de direct). */
-    fun reset() = smoother.reset()
+    /** Oublie pistes, maintien et valeurs lissées (nouvelle session de direct). */
+    fun reset() {
+        smoother.reset()
+        kalman.reset()
+        untracked = emptyList()
+    }
+
+    /**
+     * Distances à [atMs] pour les objets connus, sans mesure nouvelle : pistes
+     * Kalman extrapolées par leur vitesse + objets non suivis maintenus tels quels
+     * (la sonde ne suit pas : sans maintien, ses pastilles s'éteindraient entre deux
+     * inférences). L'info reste fraîche entre deux frames (à 1 image/s, un tick à
+     * 120 ms donne ~8 rafraîchissements). Vide sans Kalman ([kalmanEnabled]), sans
+     * objet vivant, ou mesures coupées. Confiance dégradée par l'âge, oubli au
+     * [DistanceKalman.timeoutMs] — jamais de prédiction au-delà.
+     */
+    fun predictions(atMs: Long = System.currentTimeMillis()): List<DistanceReading> {
+        if (!enabled || !kalmanEnabled) return emptyList()
+        val tracked = kalman.predictions(atMs).map {
+            DistanceReading(it.trackId, it.label, it.meters, it.meters, it.box, it.confidence)
+        }
+        return tracked + heldUntracked(atMs)
+    }
+
+    /**
+     * Objets non suivis de la dernière mesure, maintenus jusqu'à l'oubli (même
+     * horizon que le Kalman) : pas de vitesse estimée, valeur figée, confiance
+     * dégradée comme une prédiction.
+     */
+    private fun heldUntracked(atMs: Long): List<DistanceReading> {
+        if (untracked.isEmpty()) return emptyList()
+        val age = atMs - untrackedAtMs
+        if (age < 0 || age > kalman.timeoutMs) return emptyList()
+        val factor = (1f - age.toFloat() / kalman.timeoutMs)
+            .coerceIn(DistanceKalman.MIN_PREDICT_CONFIDENCE, 1f)
+        return untracked.map {
+            it.copy(confidence = (it.confidence * factor).coerceIn(DistanceKalman.MIN_PREDICT_CONFIDENCE, 1f))
+        }
+    }
 
     /**
      * Une lecture par objet exploitable, dans l'ordre de [detections]. [trackIds]
@@ -160,10 +209,13 @@ class DistanceMeter(
         val focalPx = lens.focalPx(width, height)
         if (focalPx <= 0f) return emptyList()
         val principalY = lens.principalPx(width, height).second
-        return detections.mapIndexedNotNull { index, detection ->
+        val readings = detections.mapIndexedNotNull { index, detection ->
             if (Occlusion.isOccluded(detections, index)) null
             else readOne(height, detection, trackIds.getOrNull(index), focalPx, principalY)
         }
+        untracked = readings.filter { it.trackId == UNTRACKED_ID }
+        untrackedAtMs = System.currentTimeMillis()
+        return readings
     }
 
     private fun readOne(
@@ -173,32 +225,59 @@ class DistanceMeter(
         focalPx: Float,
         principalY: Float,
     ): DistanceReading? {
-        if (Pinhole.isVerticallyCut(detection.box, height)) return null
-        val raw = rawMeters(height, detection, focalPx, principalY) ?: return null
+        // La bbox du masque, quand elle est fiable, remplace la boîte détecteur pour
+        // la mesure (hauteur vraie, pieds exacts) ; la lecture garde la boîte
+        // détecteur (overlay, appariement profondeur).
+        val box = detection.maskBox?.takeIf { it.size >= 4 } ?: detection.box
+        if (Pinhole.isVerticallyCut(box, height)) return null
+        val raw = rawMeters(detection.label, box, focalPx, principalY, height) ?: return null
         val id = trackId ?: UNTRACKED_ID
-        val smoothed = if (trackId == null) raw.meters else smoother.smooth(trackId, raw.meters)
+        val smoothed = if (trackId == null) {
+            raw.meters
+        } else if (kalmanEnabled) {
+            kalman.filter(trackId, raw.meters, raw.confidence, label = detection.label, box = detection.box).meters
+        } else {
+            smoother.smooth(trackId, raw.meters)
+        }
         return DistanceReading(id, detection.label, smoothed, raw.meters, detection.box, raw.confidence)
     }
 
     /**
      * La mesure brute d'une frame : les deux branches de la lane, fusionnées par
-     * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], sol à 1). Un objet
-     * sans hauteur de classe connue peut donc être mesuré s'il est posé au sol et
-     * que la pose est réglée — sans jamais inventer de chiffre.
+     * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], poids sol
+     * [GroundWeight] depuis la dépression des pieds). Un objet sans hauteur de
+     * classe connue peut donc être mesuré s'il est posé au sol et que la pose est
+     * réglée — sans jamais inventer de chiffre.
      */
     private fun rawMeters(
-        height: Int,
-        detection: Detection,
+        label: String,
+        box: List<Float>,
         focalPx: Float,
         principalY: Float,
+        height: Int,
     ): RawReading? {
-        val standing = KnownSizes.heightMeters(detection.label)
-            ?.let { Pinhole.distanceMeters(detection.box, it, focalPx) }
-        val ground = groundMeters(detection.box, focalPx, principalY, height)
-        val meters = DistanceFusion.combine(standing, ground, KnownSizes.fusionWeight(detection.label))
-            ?: return null
-        val confidence = ReadingConfidence.of(detection.box, height, standing, ground)
+        val standing = KnownSizes.heightMeters(label)
+            ?.let { Pinhole.distanceMeters(box, it, focalPx) }
+        val ground = groundMeters(box, focalPx, principalY, height)
+        val meters = DistanceFusion.combine(
+            standing,
+            ground,
+            KnownSizes.fusionWeight(label),
+            groundWeight(box, focalPx, principalY),
+        ) ?: return null
+        val confidence = ReadingConfidence.of(box, standing, ground)
         return RawReading(meters, confidence)
+    }
+
+    /**
+     * Poids de la branche sol pour cette boîte : plein pot quand les pieds plongent
+     * (dépression franche), plancher vers l'horizon ([GroundWeight]). `1f` sans pose
+     * (poids inutilisé, la branche sol est alors muette).
+     */
+    private fun groundWeight(box: List<Float>, focalPx: Float, principalY: Float): Float {
+        val current = pose ?: return 1f
+        if (box.size < 4) return GroundWeight.MIN_WEIGHT
+        return GroundWeight.of(GroundPlane.depressionRad(box[3], current, focalPx, principalY))
     }
 
     /**

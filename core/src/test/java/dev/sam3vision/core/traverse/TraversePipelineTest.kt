@@ -150,11 +150,19 @@ class TraversePipelineTest {
     }
 
     @Test
+    fun `dernier annonce - rien puis vert confirme`() = runBlocking {
+        val pipe = pipeline(withVoice = false)
+        assertNull(pipe.lastAnnounced)
+        repeat(4) { pipe.frame(emptyList(), green = true, index = it + 1) }
+        assertEquals(CrossingState.Green, pipe.lastAnnounced)
+    }
+
+    @Test
     fun `prompts - vehicules puis bordure et trottoir, bornes au plafond`() {
         assertEquals(VehicleConcepts.PROMPTS + listOf("curb", "sidewalk"), TraversePipeline.promptsFor())
         val prompts = TraversePipeline.promptsFor(listOf("traffic light"))
-        assertEquals(VehicleConcepts.PROMPTS, prompts.take(7))
-        assertEquals(listOf("curb", "sidewalk"), prompts.drop(7).take(2))
+        assertEquals(VehicleConcepts.PROMPTS, prompts.take(3))
+        assertEquals(listOf("curb", "sidewalk"), prompts.drop(3).take(2))
         assertEquals("traffic light", prompts.last())
         assertTrue(prompts.size <= LivePrompts.MAX)
         val full = TraversePipeline.promptsFor((1..20).map { "objet$it" })

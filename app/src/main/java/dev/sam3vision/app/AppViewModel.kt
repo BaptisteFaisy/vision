@@ -14,7 +14,6 @@ import dev.sam3vision.app.vm.AppImageLoader
 import dev.sam3vision.app.vm.AppStatusText
 import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
-import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.depth.syntheticGradientArgb
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.app.danger.DangerBench
@@ -319,17 +318,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun testSam() = viewModelScope.launch { diagnostics.testSam() }
 
     /**
-     * Banc profondeur embarqué : 5 inférences du moteur choisi sur une image
-     * synthétique, verdict dans la ligne de statut (et logcat `DepthBench`).
-     * Moteur coupé ⇒ message immédiat, aucun chargement de modèle.
+     * Banc profondeur embarqué : 5 inférences DA2 sur une image synthétique,
+     * verdict dans la ligne de statut (et logcat `DepthBench`).
      */
     fun testDepth() = viewModelScope.launch {
-        val backend = _state.value.settings.depthBackend
-        if (backend == DepthBackend.OFF) {
-            _state.update { it.copy(statusLine = "Depth off — pick an engine.") }
-            return@launch
-        }
-        val target = backend
+        val target = _state.value.settings.depthBackend
         _state.update { it.copy(statusLine = "Model ${target.code}: checking…") }
         val ensured = ModelDownloader.ensure(getApplication(), target) { done, total ->
             val pct = (done * 100 / total.coerceAtLeast(1)).toInt()
@@ -340,9 +333,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(statusLine = "Depth: download failed — $cause") }
             return@launch
         }
-        _state.update { it.copy(statusLine = "Testing depth… (${backend.code})") }
+        _state.update { it.copy(statusLine = "Testing depth… (${target.code})") }
         val verdict = withContext(Dispatchers.Default) {
-            val estimator = DepthEstimators.open(getApplication(), backend)
+            val estimator = DepthEstimators.open(getApplication(), target)
             try {
                 val image = syntheticGradientArgb(BENCH_SIZE, BENCH_SIZE)
                 DepthBench.run(estimator, image, BENCH_SIZE, BENCH_SIZE)

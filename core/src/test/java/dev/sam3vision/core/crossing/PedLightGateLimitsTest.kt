@@ -31,11 +31,11 @@ class PedLightGateLimitsTest {
     }
 
     @Test
-    fun `verdict incoherent - doute`() {
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(0), 0, 0))
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(10), 10, 10))
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100), -1, 10))
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 0, 10))
+    fun `verdict incoherent - rouge, binaire`() {
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(0), 0, 0))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(10), 10, 10))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100), -1, 10))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 0, 10))
     }
 
     @Test
@@ -69,7 +69,7 @@ class PedLightGateLimitsTest {
             CrossingState.Green,
             PedLightGate.verdict(disc(10, 10, 5, RED), 20, 20),
         )
-        assertEquals(CrossingState.Unknown, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(100) { BLACK }, 10, 10))
     }
 
     /** Barre verte 4x10 dans la moitié basse, plus [reds] pixels rouges en haut. */

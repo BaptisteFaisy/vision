@@ -3,9 +3,9 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -29,8 +29,7 @@ data class TraverseOutput(
  * 3. [TraverseVeto] : un véhicule qui approche ou proche force « attendez » ;
  * 4. [CrossingAnnouncer] : le signal vocal, confirmé sur plusieurs frames —
  *    [TraversePhase.PRET] et [TraversePhase.TRAVERSER] valent vert, `ATTENDRE`
- *    et `ALERTE` valent rouge (le doute parle comme le rouge, voir
- *    [CrossingAnnouncer]) ;
+ *    et `ALERTE` valent rouge (binaire, voir [CrossingAnnouncer]) ;
  * 5. [TraverseVoice.speak] avec `cue.phrase` et `cue.urgent` : le retour au
  *    rouge après un vert annoncé coupe la lecture en cours.
  *
@@ -65,12 +64,21 @@ class TraversePipeline(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): TraverseOutput {
         val filtered = state.update(objects)
-        val detections = filtered.toDetections(width, height)
+        // Extrêmes masque inclus : le veto lit `.box` (inchangé), le direct mesure
+        // au plus juste (voir `Detection.maskBox`).
+        val detections = filtered.toDetectionsWithExtents(width, height)
         val decision = veto.update(lightGreen, detections, focalPx, atMs)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)
         return TraverseOutput(filtered, detections, decision, cue, outcome)
     }
+
+    /**
+     * Dernier état annoncé (`null` tant que rien n'est annoncé) : l'affichage
+     * direct suit la voix, jamais la lecture brute — un glitch d'une frame ne
+     * se voit pas (ordre user du 31/10, certitude rouge/vert).
+     */
+    val lastAnnounced: CrossingState? get() = announcer.lastCue?.state
 
     /** Oublie pistes, veto et annonces (nouvelle traversée, nouvelle séance). */
     fun reset() {
@@ -90,7 +98,7 @@ class TraversePipeline(
          * Prompts du mode traversée : véhicules d'abord (voir
          * [VehicleConcepts]), puis bordure et trottoir (le bord et le but se
          * suivent en traversée), [base] ensuite, bornés au plafond du direct
-         * ([LivePrompts.MAX] : 7 véhicules + 2 + base tronquée à 17).
+         * ([LivePrompts.MAX] : 3 véhicules + 2 + base, le tout borné à 17).
          */
         fun promptsFor(base: List<String> = emptyList()): List<String> =
             VehicleConcepts.promptsFor(listOf("curb", "sidewalk") + base)
@@ -99,8 +107,8 @@ class TraversePipeline(
 
 /**
  * Phase du veto vue par l'annonceur : vert confirmé ou maintenu = vert,
- * attente ou alerte = rouge (le doute parle comme le rouge). Publique :
- * la sonde iSee y lit le même verdict que le direct.
+ * attente ou alerte = rouge (binaire). Publique : la sonde iSee y lit le
+ * même verdict que le direct.
  */
 fun TraverseDecision.crossingState(): CrossingState = when (state) {
     TraversePhase.PRET, TraversePhase.TRAVERSER -> CrossingState.Green

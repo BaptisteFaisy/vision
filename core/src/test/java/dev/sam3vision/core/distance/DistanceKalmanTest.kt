@@ -91,4 +91,42 @@ class DistanceKalmanTest {
         assertEquals(4.5f, high.meters, 0.2f)
         assertTrue(low.meters > 4.6f)
     }
+
+    @Test
+    fun `prediction extrapole la vitesse sans modifier la piste`() {
+        val kalman = DistanceKalman()
+        kalman.filter(1, 10f, atMs = t0)
+        repeat(5) { step -> kalman.filter(1, 10f - (step + 1), atMs = t0 + (step + 1) * 1_000L) }
+        val predicted = kalman.predict(1, t0 + 5_500L)!!
+        // ~5 m à t0+5 s, vitesse ≈ −1 m/s : 0,5 s plus tard ≈ 4,5 m
+        assertEquals(4.5f, predicted.meters, 0.4f)
+        assertEquals(1, predicted.trackId)
+        // prédire n'est pas mesurer : la piste n'a pas bougé
+        val again = kalman.predict(1, t0 + 5_500L)!!
+        assertEquals(predicted.meters, again.meters, 0f)
+        assertEquals(1, kalman.size())
+    }
+
+    @Test
+    fun `prediction garde label boite et degrade la confiance`() {
+        val kalman = DistanceKalman(timeoutMs = 2_000L)
+        val box = listOf(10f, 20f, 30f, 120f)
+        kalman.filter(1, 5f, confidence = 0.8f, atMs = t0, label = "personne", box = box)
+        val predicted = kalman.predict(1, t0 + 1_000L)!!
+        assertEquals("personne", predicted.label)
+        assertEquals(box, predicted.box)
+        assertEquals(5f, predicted.meters, 0.001f)
+        assertEquals(0.4f, predicted.confidence, 0.001f)
+    }
+
+    @Test
+    fun `prediction inconnue perimee ou passee rend null`() {
+        val kalman = DistanceKalman(timeoutMs = 2_000L)
+        kalman.filter(1, 5f, atMs = t0)
+        assertEquals(null, kalman.predict(99, t0 + 500L))
+        assertEquals(null, kalman.predict(1, t0 + 2_001L))
+        assertEquals(null, kalman.predict(1, t0 - 1L))
+        assertEquals(1, kalman.predictions(t0 + 500L).size)
+        assertTrue(kalman.predictions(t0 + 2_001L).isEmpty())
+    }
 }

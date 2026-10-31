@@ -20,7 +20,7 @@ data class PeoplePath(
     companion object {
 
         /** Écart mini au corps d'une personne (m) : on ne frôle pas les gens. */
-        const val MIN_CLEARANCE_M = 0.5f
+        const val MIN_CLEARANCE_M = 0.8f
 
         /**
          * Demi-largeur de corps (m) quand la boîte est inconnue : les épaules
@@ -33,9 +33,11 @@ data class PeoplePath(
 
         /**
          * Cap qui passe au plus près de [aimX] ([Guidance.RANGE_METERS] et champ
-         * [hfovDeg] comme le couloir) : `null` si rien n'est à portée ou si un
+         * [hfovDeg] comme le couloir) : `null` si rien n'est à portée, si un
          * obstacle à portée a une géométrie incomplète (sans distance finie > 0
-         * ou sans centre fini — repli : l'appelant garde son ancien comportement).
+         * ou sans centre fini), ou si le champ ou la visée sont infaisables
+         * (`coerceIn` propage NaN : une projection NaN rendrait tout cap
+         * « libre » — repli : l'appelant garde son ancien comportement).
          * Une passe O(n), un seul `tan`, tampons pré-alloués, pur et testé en JVM.
          */
         fun plan(
@@ -44,8 +46,11 @@ data class PeoplePath(
             hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
             aimX: Float = 0.5f,
         ): PeoplePath? {
+            val halfTangent = LensSpec.halfTangent(hfovDeg)
+            if (!halfTangent.isFinite() || halfTangent <= 0f) return null
+            if (!aimX.isFinite()) return null
             val bands = ObstacleBands(labels.size)
-            if (!bands.collect(labels, rangeMeters, LensSpec.halfTangent(hfovDeg))) return null
+            if (!bands.collect(labels, rangeMeters, halfTangent)) return null
             val aim = aimX.coerceIn(EDGE_X, 1f - EDGE_X)
             val heading = bands.select(aim)
             if (heading == null) return PeoplePath(aim, sideOf(aim), bands.clearance(aim), false)
@@ -104,8 +109,11 @@ private class ObstacleBands(size: Int) {
             val body = if (person) halfBox ?: PeoplePath.BODY_HALF_WIDTH_M else halfBox ?: 0f
             val margin = if (person) PeoplePath.MIN_CLEARANCE_M else Guidance.RAY_HALF_WIDTH_M
             val half = (body + margin) / lateralPerX
-            lo[count] = center - half
-            hi[count] = center + half
+            val start = center - half
+            val end = center + half
+            if (!start.isFinite() || !end.isFinite()) return false
+            lo[count] = start
+            hi[count] = end
             centers[count] = center
             bodies[count] = body
             widths[count] = lateralPerX

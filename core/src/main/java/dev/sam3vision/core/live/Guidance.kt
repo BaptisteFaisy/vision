@@ -31,6 +31,12 @@ data class GuidanceDecision(
      * sur voie libre ou distance inconnue (la consigne reste alors non chiffrée).
      */
     val shiftMeters: Float? = null,
+    /**
+     * Contact mesuré : un bloquant à [STOP_METERS] ou moins. Le mot n'est
+     * « stop » que sur les caps latéraux (le cap droit contourne toujours) ;
+     * l'inconnu élu ne masque plus un contact mesuré.
+     */
+    val stop: Boolean = false,
 )
 
 /**
@@ -111,15 +117,16 @@ object Guidance {
         val obstacle = blocking.minWith(
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
+        val stop = blocking.any { contactOf(it) }
         if (cap == SteeringCap.Straight) {
             val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
             val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift)
+            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, stop)
         }
         val passage = bestPassage(cleaned, cap, rangeMeters)
         val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift)
+        return GuidanceDecision(true, obstacle, null, cap, passage, shift, stop)
     }
 
     /**
@@ -148,19 +155,30 @@ object Guidance {
     }
 
     /**
-     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie,
-     * contact mesuré ([STOP_METERS] ou moins) ⇒ stop. Sans mesure, le mot
-     * reste le côté de sortie (on ne juge pas le contact sans distance).
+     * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie.
+     * Cap droit : toujours le côté de contournement, jamais « stop » — dans
+     * une foule on se faufile, on ne s'arrête pas (ordre user ; le danger
+     * imminent reste couvert par la voix de sécurité, hors d'ici). Caps
+     * latéraux : contact mesuré ([STOP_METERS] ou moins, sur un bloquant
+     * quelconque) ⇒ stop. Sans mesure, le mot reste le côté de sortie (on
+     * ne juge pas le contact sans distance).
      */
     fun word(decision: GuidanceDecision): GuidanceWord {
         val obstacle = decision.obstacle
         if (!decision.blocked || obstacle == null) return GuidanceWord.fromCap(decision.cap)
-        val meters = obstacle.meters?.takeIf { it.isFinite() }
-        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
         if (decision.cap == SteeringCap.Straight) {
             return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left)
         }
+        if (decision.stop) return GuidanceWord.Stop
+        val meters = obstacle.meters?.takeIf { it.isFinite() }
+        if (meters != null && meters <= STOP_METERS) return GuidanceWord.Stop
         return GuidanceWord.fromCap(decision.passage ?: SteeringCap.Straight)
+    }
+
+    /** Contact du label : mesuré fini à [STOP_METERS] ou moins. */
+    private fun contactOf(label: PlacedLabel): Boolean {
+        val meters = label.meters
+        return meters != null && meters.isFinite() && meters <= STOP_METERS
     }
 
     /**

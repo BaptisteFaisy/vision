@@ -4,8 +4,8 @@ package dev.sam3vision.core.crossing
  * Porte anti-confusion du vert piéton : un vert classifié ne devient un ordre
  * de traverser que s'il ressemble à un bonhomme — élancé, pas confiné en
  * haut, sans rouge franc mélangé. Un feu de voiture (disque rond), un reflet
- * ou un bruit retombe en doute : la porte ne fabrique jamais de vert, elle
- * n'en refuse que.
+ * ou un bruit retombe en rouge : la porte ne fabrique jamais de vert, elle
+ * n'en refuse que (binaire, ordre user du 31/10).
  *
  * Seuils calibrés sur feux français (10/2026, corpus Panoramax 235 lampes
  * labellisées, crops ≤ 48 px comme en production) : 0 vert sur 90 rouges,
@@ -15,7 +15,7 @@ package dev.sam3vision.core.crossing
  * la boîte SAM serre la lampe (lampe centrée, le « bas du cadre » d'avant
  * ne sépare plus rien) — [GREEN_BOTTOM_MIN] n'est plus un prior de
  * position mais une garde anti-bruit-haut. Poses larges et pictogrammes
- * non standard : doute documenté (voir test `pose large`).
+ * non standard : rouge documenté (voir test `pose large`).
  * Pur Kotlin, testé en JVM (synthétique + échantillons `feuxfr/`, `feuxfr2/`).
  *
  * R1b (29/10/2026, lot FR jour 6 573 détections SAM triées) : dans la
@@ -29,7 +29,7 @@ object PedLightGate {
     /** Le vert ne doit pas être confiné en haut (bruit sur un rouge). */
     private const val GREEN_BOTTOM_MIN = 0.35f
 
-    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
+    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, rouge). */
     private const val RED_MAX_FRACTION = 0.02f
 
     /**
@@ -63,14 +63,14 @@ object PedLightGate {
 
     /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne
-     * passe que la porte, le reste (rouge, doute) passe tel quel — ces deux-là
-     * disent déjà « attendez ».
+     * passe que la porte, tout le reste vaut [CrossingState.Red] — binaire,
+     * un refus attend (ordre user du 31/10, fini le doute).
      */
     fun verdict(argb: IntArray, width: Int, height: Int): CrossingState {
         val raw = TrainedLightColor.classify(argb, width, height)
-        if (raw != CrossingState.Green) return raw
+        if (raw != CrossingState.Green) return CrossingState.Red
         if (acceptGreen(argb, width, height)) return CrossingState.Green
-        return CrossingState.Unknown
+        return CrossingState.Red
     }
 
     /** Vrai si le vert du crop a la position et la forme d'un bonhomme. */

@@ -35,6 +35,15 @@ Le **centre optique** n'est plus supposé au milieu de l'image : `LensSpec` le p
 les donne, et le plan de sol (`DistanceMeter.groundMeters`) comme le nuage de points
 (`CameraIntrinsics.fromLens`) s'en servent. Le sténopé n'en a pas besoin (hauteurs seules).
 
+**Hauteur et pieds du masque** : quand le masque est fiable (`Detection.maskBox`, posée par
+`toDetectionsWithExtents` pour les encodages compacts — `poly` sans décodage, `bits`/`rle`
+décodés — non fragmenté), le sténopé mesure la hauteur vraie de l'objet et le sol prend la
+ligne des pieds exacte, au lieu de la boîte détecteur. `maskBox` coupée ⇒ pas de mesure,
+comme une boîte coupée. La lecture garde la boîte détecteur (overlay, appariement
+profondeur). Le PNG n'est pas décodé sur ce chemin (décodeur Android, tests JVM) : tant
+que le serveur envoie du PNG, le repli boîte s'applique — passer le direct en masques
+`bits`/`poly` activerait les étendues en production (piste ci-dessous).
+
 **Bornes de plausibilité** (`Pinhole`) : rien sous **0,3 m** (`MIN_METERS`),
 rien au-delà de **60 m** (`MAX_METERS`), rien pour une boîte de moins de **4 px** de haut (`MIN_BOX_PX`). Hors bornes ⇒ pas d'affichage.
 
@@ -45,16 +54,16 @@ restent acceptés : seule la hauteur porte la mesure.
 
 **Objet masqué par une meilleure détection ⇒ pas de distance** (`Occlusion.isOccluded`) : une boîte
 contenue à **60 %** dans celle d'une détection mieux scorée ne mesure plus son objet (la personne
-derrière la voiture sortirait trop loin). Recouvrement partiel ou scores égaux : les deux sont mesurés.
+derrière la voiture sortirait trop loin). Recouvrement partiel, scores égaux ou masqueur moins bien
+scoré : les deux sont mesurés — choix conservateur (une pastille de trop plutôt qu'une manquante),
+au prix d'une boîte tronquée mesurée trop loin quand le masqueur est mal scoré.
 
 ## Lissage : lisible à 1-2 images par seconde
 
-`DistanceSmoother` : moyenne mobile exponentielle **par piste** (l'identité stable du journal du direct —
-`LiveTimeline.record` renvoie l'id de chaque détection ; un objet non identifié est affiché **brut**, sans
-lisser, `DistanceMeter.readOne`). Deux vitesses — **0,35** pour accompagner un objet qui s'approche, **0,85**
-quand la mesure fait un bond de plus de **50 %** (l'objet a réellement bougé, ou la piste a été reprise). Une
-piste muette plus de **2 s** est oubliée : l'objet qui revient est mesuré à neuf. Valeurs aux défauts du
-constructeur (`DistanceSmoother.kt:17-22`), testées dans `DistanceMeterTest`.
+Suivi **Kalman position + vitesse par piste** (`DistanceKalman`, voir « Suivi et fraîcheur ») ;
+l'EMA historique (`DistanceSmoother` : 0,35/0,85, bond 50 %, oubli 2 s) reste en repli
+(`kalmanEnabled = false`). L'identité stable vient du journal du direct (`LiveTimeline.record`) ;
+un objet non identifié est affiché **brut**, sans lisser, et maintenu tel quel par les prédictions.
 
 Sur la page caméra iSee (REC) : **pas de journal de pistes, mesure brute**
 (`LiveProbe.readingsOf` n'appelle jamais `record`) — la pastille y bouge donc
@@ -64,12 +73,41 @@ un peu plus qu'en Direct.
 
 Quand le sténopé et le plan de sol parlent tous deux et concordent (rapport ≤ 1,5), la lecture est leur
 **moyenne pondérée** (`DistanceFusion.combine`) : le sténopé pèse `1 / (1 + tolérance de sa classe)`
-(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse 1. En cas de divergence, le sténopé garde
-la main quels que soient les poids — la pose du sol peut être fausse, le sténopé est la branche validée.
+(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse selon la dépression de ses pieds
+(`GroundWeight` : 1 dès 0,2 rad, 0,25 vers l'horizon — de près le sol tire, de loin le sténopé
+reprend la main). En cas de divergence, le sténopé garde la main quels que soient les poids —
+la pose du sol peut être fausse, le sténopé est la branche validée.
 
 Chaque lecture porte sa **confiance** (`ReadingConfidence`, 0..1) : `1 − 1 px / hauteur de boîte`
 (quantification : 0,995 à 200 px, 0,90 à 10 px), multipliée par l'accord des branches quand les deux
-parlent (1 si elles coïncident, 0 si leur rapport atteint 2).
+parlent (1 si elles coïncident, 0 si leur rapport atteint 2). La voie profondeur propage la
+confiance de ses ancres au lieu de la remettre à 1 (`DepthReadings`, calibration affine
+`mètres = échelle/proximité + décalage`, moindres carrés robustes dès 3 ancres) et lit sa
+médiane sur la fenêtre centrale de la boîte (25 % rognés par côté : les bords portent le
+fond, le cœur porte l'objet ; repli boîte entière si dégénérée).
+
+## Suivi et fraîcheur (≤ 150 ms)
+
+Le suivi par piste est un **Kalman position + vitesse** (`DistanceKalman`, défaut ;
+`DistanceSmoother`/EMA en repli par `kalmanEnabled = false`) : dt variable, bruit adapté
+par la confiance, gating à 3 σ, oubli à 2 s. Entre deux inférences (~1 image/s), le
+**ticker à 120 ms** (`DistanceTicker`, direct via `LiveSensors`, sonde via `ProbeMeters`)
+republie `DistanceMeter.predictions` : pistes extrapolées par leur vitesse, objets non
+suivis maintenus (la sonde ne suit pas), confiance dégradée par l'âge, oubli au timeout.
+Pastilles, plus proche et ligne d'état dérivent de `distanceLayer` : une info vieille de
+plus de 150 ms n'existe plus à l'écran. La voix garde ses propres grilles (4 s) : 150 ms,
+c'est le rythme de l'information, pas du discours.
+
+## Étalonnage guidé
+
+Le biais systématique de focale (capteur ±2-3 %) s'annule en une mesure : un aidant de
+taille exacte se tient à une distance mesurée au mètre ruban, le direct le vise
+(`CalibrationSnapshots` retient la plus grande personne : score ≥ 0,5, non coupée), et
+les Réglages résolvent le champ (`CalibrationSolver` : focale `h × D / H`, champ
+`2·atan(W / 2f)`, refus sous 20 px ou hors bornes 15-130°). La valeur mesurée atterrit
+dans `cameraFovDeg` (prioritaire, comme un champ saisi) et `CalibrationStore` se souvient
+qu'elle est mesurée ; « Clear calibration » revient au capteur. Incertitude affichée :
+`±(1 px / h + 0,5 %)` — viser grand (340 px à 2 m : ±0,5°).
 
 ## Précision — ce que le chiffre vaut
 
@@ -157,16 +195,26 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage` 1,50 · `gate`/`portail` 1,75,
   `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions (« clôture grillagée »),
   concept inconnu ; postures assises et sous-types de véhicules ; tolérances par classe et poids de fusion.
-- `core.distance.DistanceMeterTest` (**15**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
+- `core.distance.DistanceMeterTest` (**22**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
   deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes, occlusion (masquée
-  écartée, partielle/égaux gardés), confiance croissante avec la boîte.
-- `core.distance.DistanceFusionTest` (**13**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
-  sténopé gardé en divergence, poids par tolérance, centre optique décentré.
-- `core.distance.ReadingQualityTest` (**6**) : occlusion (contenue, scores égaux, seuil, malformée), confiance (quantification, accord des branches).
+  écartée, partielle/égaux gardés), confiance croissante avec la boîte, bbox masque (mesure, coupée),
+  repli EMA, reset Kalman, prédictions (piste, maintien, oubli, vide).
+- `core.distance.DistanceKalmanTest` (**10**) : convergence, vitesse, outlier, saut, timeout, confiance,
+  prédiction (extrapolation, label/boîte/confiance, inconnue/périmée/passée).
+- `core.mask.MaskDetectionsTest` (**9**) : poly (exact, réduit, hors cadre), bits (exact, épars, dimensions),
+  rle réduit, png/none/inconnu/cassé nuls, tracker.
+- `app.live.DistanceTickerTest` (**6**) : pas ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
+- `app.isee.ProbeMetersPredictionsTest` (**1**) : ticker sonde insensible au temps virtuel (non-régression `advanceUntilIdle`).
+- `core.distance.CalibrationSolverTest` (**3**) : focale retrouvée, tolérance par taille, refus.
+- `app.live.CalibrationSnapshotsTest` (**3**) : plus grande personne, coupures/vide, fraîcheur.
+- `app.DistanceLayoutTest` (+2) : saisie métrique, résolution (visée/saisie).
+- `core.distance.DistanceFusionTest` (**14**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
+  sténopé gardé en divergence, poids par tolérance, sténopé dominant de loin, centre optique décentré.
+- `core.distance.ReadingQualityTest` (**10**) : occlusion (contenue, scores égaux, masqueur faible gardé, NaN, seuil exact, malformée), confiance (quantification, accord des branches), poids sol (dépression, plancher).
 - `core.distance.DistanceBenchmarkTest` (**5**) : banc de précision — aller-retour sténopé 0,5-50 m, aller-retour sol (3 pitchs, centre décentré), enveloppe ±1 px, fusion à branches d'accord.
 - `core.distance.GroundPlaneTest` (**17**) : horizon, dépression, ligne à distance, pieds→mètres, latéral, point complet.
-- `core.distance.DistanceTextTest` (**7**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
+- `core.distance.DistanceTextTest` (**8**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
 - `core.live.LiveTimelineTest` (**10**, dont le test « record rend l'identité **dans l'ordre des détections** »,
   `null` pour une détection inexploitable).
 - `core.live.PositionTextTest` (**10**) + `PositionAnnouncerTest` (**8**) : secteurs, ordre de lecture, distance
@@ -187,14 +235,17 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 
 ## Pistes (non faites)
 
-- **Pose IMU temps réel** : le plan de sol (`GroundPlane`, fait) attend toujours sa pose — `DistanceMeter.pose`
-  n'est alimenté nulle part ; lire le pitch du vecteur de rotation + hauteur en Réglages l'activerait pour
-  de bon, avec arbitrage des postures (assis/debout) par la fusion pondérée.
-- **Hauteur et pieds du masque** : le masque SAM (déjà reçu) donne la hauteur vraie de l'objet et la ligne
-  des pieds exacte, au lieu de la boîte — remplace `box[3] - box[1]` et `box[3]` quand le masque est là.
-- **Profondeur affine** : calibrer `mètres = échelle / proximité + décalage` (DA2 est relatif) sur plusieurs
-  ancres robustes au lieu d'une échelle seule, et médiane sur le masque au lieu de la boîte.
-- **Kalman par piste** : remplacer l'EMA par position + vitesse radiale (prédiction inter-frame, temps avant contact).
-- **Étalonnage guidé** : « tiens-toi à 2 m » → ajustement du champ de vision.
-- **Précision chiffrée** : une fois pour toutes, comparer 10 objets à un mètre ruban et remplacer « ±15-20 %
-  non mesuré » par un chiffre daté.
+Fait depuis : pose IMU temps réel (`PitchMeter`, `docs/POSE-IMU.md`), hauteur/pieds du masque
+(`Detection.maskBox`, `bits` demandés par le client — actives si le serveur déployé suit),
+profondeur affine (`AffineScale`), Kalman par piste + ticker 120 ms, protocole et script de
+recette (`docs/RECETTE-DISTANCES.md`, `scripts/mesure-distances.sh`), étalonnage guidé
+(`CalibrationSolver`, section Réglages — voir « Étalonnage »).
+- **Masques compacts en production** : demander `bits`/`poly` au direct (au lieu du PNG) pour
+  activer les étendues de masque partout — ou cache de décodage partagé overlay↔distances
+  (pas de double décodage PNG par frame).
+- **Précision chiffrée** : passer le protocole `docs/RECETTE-DISTANCES.md` au mètre ruban et
+  remplacer « ±15-20 % non mesuré » par un chiffre daté.
+- **Profondeur sur masque** : médiane de proximité sur le masque au lieu de la boîte (fonds
+  exclus) ; modèle de profondeur plus gros côté serveur.
+- **Sol non plan** : ajuster le plan au sol mesuré (RANSAC sur la profondeur) au lieu du plan
+  horizontal supposé — trottoirs, pentes, bateaux.
