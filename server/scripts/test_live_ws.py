@@ -281,6 +281,41 @@ def test_ws_disconnect_closes(live_app) -> None:
           socket.closes == [1000], str(socket.closes))
 
 
+def test_ws_depth(live_app) -> None:
+    """WS transmet ``with_depth`` et renvoie les médianes avec l'``id``."""
+    from live_ws import parse_frame
+
+    service, api = _live_service(live_app)
+    png = sample_png()
+    parsed = parse_frame(json.dumps({"id": 5, "image_b64": "x" * 300, "with_depth": True}))
+    check("WS: with_depth analysé depuis le message",
+          parsed["error"] is None and parsed["request"].with_depth is True,
+          str(parsed)[:120])
+    check("WS: with_depth absent → False",
+          parse_frame(json.dumps({"id": 6, "image_b64": "x" * 300}))[
+              "request"].with_depth is False)
+
+    seen: list = []
+
+    def run(image_b64, prompts, max_objects, work_edge, batch_prompts=None, edge=None,
+            mask_encoding=None, with_depth=False):
+        seen.append(with_depth)
+        objects = [] if not with_depth else [
+            {"label": "person", "score": 0.9, "box": [1, 2, 3, 4], "depth": 0.75}]
+        return {"width": 64, "height": 40, "elapsed_ms": 12, "objects": objects,
+                "mask_encoding": mask_encoding or "png"}
+
+    service._live_sync = run
+    sent = asyncio.run(ws_session(api, [frame(7, png, with_depth=True), frame(8, png)]))
+    answers = replies(sent)
+    check("WS: with_depth transmis (True puis False)", seen == [True, False], str(seen))
+    check("WS: médiane renvoyée avec l'id",
+          answers[0].get("id") == 7
+          and answers[0]["objects"][0].get("depth") == 0.75, str(answers[0])[:160])
+    check("WS: client muet → objets sans depth",
+          answers[1].get("id") == 8 and answers[1]["objects"] == [], str(answers[1])[:160])
+
+
 RUNNERS = (
     ("schéma LiveWsRequest", "schemas", test_schema),
     ("protocole WS (parse_frame)", "live_ws", test_parse_frame),
@@ -291,6 +326,7 @@ RUNNERS = (
     ("WS: frame lente → 503", "live_app_fast", test_ws_slow_frame_keeps_connection),
     ("WS: réponse géante → 1009", "live_app_fast", test_ws_huge_reply_closes),
     ("WS: disconnect → close()", "live_app_fast", test_ws_disconnect_closes),
+    ("WS: with_depth → médianes", "live_app_fast", test_ws_depth),
 )
 
 
