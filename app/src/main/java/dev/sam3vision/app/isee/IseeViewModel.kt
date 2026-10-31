@@ -49,7 +49,6 @@ import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -178,7 +177,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
-        onAutoCrossing = { steering.setAutoCrossing(it) },
         speakRoute = { text, urgent -> proximity.onRoutePhrase(text, canAnnounce(), urgent) },
         // Fin de guidage : le lecteur coupé ne termine jamais (`onComplete`
         // ne part pas) — le flag est remis à zéro ici, sinon toute la voix
@@ -256,15 +254,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             intro.playIfPending()
         }
         probe.observeSpoken(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage })
-        // Passage piéton reconnu : le mode Traversée s'arme seul et le dit, une
-        // fois par apparition — sinon l'activation surprise n'existe que pour
-        // ceux qui voient la pastille. Perdu de vue, retour au normal, dit aussi.
-        observeCrossingAuto(probe.state.map { it.crossingOffer }, viewModelScope, { settings.speechLanguage }, { steering.setAutoCrossing(it, vision = true) }) { speakNavigation(it) }
-        observeCrossingLoss(probe.state.crossingSightPerFrame(), viewModelScope, { settings.speechLanguage }, { steering.visionArmed }, { steering.setAutoCrossing(it, vision = true) }) { speakNavigation(it) }
         // Placement sur le passage (mot doux + « Sur le passage. », jamais Stop).
         observeCrossingLateral(CrossingLateralWatch.flow, viewModelScope, { clip, text -> proximity.speakWord(clip, text, settings.speechLanguage, canAnnounce(), urgent = false, queue = true) }) { speakNavigation(it) }
         probe.observeCrossing(viewModelScope, haptics)
-        probe.observeCrossingActive(viewModelScope, voiceNav::onTraverseModeChanged)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety)
     }
@@ -413,7 +405,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // part jamais au LLM ; sans destination comprise, la voix la redemande.
         if (voiceNav.run(text)) return
         if (navigation.onTranscript(text)) return
-        // Ordre « traverser » : consommé ici (mode Traversée + voix), jamais une question LLM.
+        // Ordre « traverser » / « crossing mode on/off » : consommé ici (mode Traversée + voix), jamais une question LLM.
         if (steering.runCrossing(text)) return
         // Ordre navigation sans destination comprise : demande, jamais une description LLM.
         if (navClarify.run(text)) return

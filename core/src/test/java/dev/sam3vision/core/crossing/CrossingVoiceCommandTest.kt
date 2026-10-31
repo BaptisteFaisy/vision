@@ -52,4 +52,14 @@ class CrossingVoiceCommandTest {
     fun `cross the street active`() {
         assertEquals(CrossingVoiceAction.Activate, CrossingVoiceCommand.parse("cross the street"))
     }
+
+    @Test
+    fun `crossing mode on active`() {
+        assertEquals(CrossingVoiceAction.Activate, CrossingVoiceCommand.parse("crossing mode on"))
+    }
+
+    @Test
+    fun `crossing mode off coupe`() {
+        assertEquals(CrossingVoiceAction.Deactivate, CrossingVoiceCommand.parse("crossing mode off"))
+    }
 }

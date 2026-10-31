@@ -8,8 +8,6 @@ import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingDistance
 import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
-import dev.sam3vision.core.crossing.CrossingText
-import dev.sam3vision.core.crossing.CrossingLossGate
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingOfferGate
 import dev.sam3vision.core.crossing.CrossingState
@@ -30,12 +28,9 @@ import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 
 /**
  * Câblage du **mode Traversée** de la sonde : mêmes masques qu'en mode normal
@@ -70,17 +65,15 @@ class CrossingChipZone {
  * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
  * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
  * est coupé tant que le mode est actif : « Stop, obstacle » et
- * « Vert, traversez » ne doivent jamais se mélanger. [auto] vrai (bascule
- * auto vision ou GPS) : la coupe ne fait pas taire la proposition — seul un
- * refus manuel (bouton, ordre vocal) vaut refus.
+ * « Vert, traversez » ne doivent jamais se mélanger. La coupe fait taire la
+ * proposition un moment : toute bascule est manuelle (puce, ordre vocal).
  */
 internal fun LiveProbe.setCrossingActive(
     settings: Settings,
     active: Boolean,
-    auto: Boolean = false,
     sensorLens: LensSpec? = null,
 ) {
-    if (!active && !auto) CrossingOfferWatch.declined(System.currentTimeMillis())
+    if (!active) CrossingOfferWatch.declined(System.currentTimeMillis())
     configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens)
 }
 
@@ -169,23 +162,6 @@ internal fun LiveProbe.observeCrossing(scope: CoroutineScope, haptics: IseeHapti
 }
 
 /**
- * Chaque bascule du mode Traversée (bouton, ordre vocal, guidage auto)
- * est signalée à [onChanged] : le guidage y reprend la parole après une
- * coupe manuelle. Sans répétition (front seul).
- */
-internal fun LiveProbe.observeCrossingActive(scope: CoroutineScope, onChanged: (Boolean) -> Unit) {
-    var last: Boolean? = null
-    scope.launch {
-        state.collect { st ->
-            val active = st.crossingActive
-            if (active == last) return@collect
-            last = active
-            runCatching { onChanged(active) }
-        }
-    }
-}
-
-/**
  * Libellé du bouton Traversée : l'état du mode et, quand il est actif, le
  * dernier état connu du feu. Pur, testé en JVM.
  */
@@ -199,9 +175,11 @@ internal fun crossingButtonLabel(active: Boolean, state: CrossingState?, offer: 
 }
 
 /**
- * Mémoire de la bascule auto « passage piéton → mode Traversée », une par
- * processus : la sonde la consulte à chaque frame publiée (1 ligne, la garde des
- * 500 lignes ne laisse pas de place à un champ de plus dans `LiveProbe`).
+ * Mémoire de la proposition « passage piéton » (pastille de la carte), une
+ * par processus : la sonde la consulte à chaque frame publiée (1 ligne, la
+ * garde des 500 lignes ne laisse pas de place à un champ de plus dans
+ * `LiveProbe`). La proposition n'arme plus le mode : elle s'affiche, l'user
+ * bascule (puce, ordre vocal).
  */
 internal object CrossingOfferWatch {
 
@@ -230,68 +208,6 @@ internal object CrossingOfferWatch {
     fun reset() {
         gate.reset()
         lastVisible = false
-    }
-}
-
-/**
- * Bascule **automatique** vers le mode Traversée : quand le passage piéton
- * apparaît dans le champ (montée de l'offre, une fois par apparition), le mode
- * s'arme seul et le dit (« Mode traversée activé. ») — une personne aveugle ne
- * voit pas la pastille, sans cette phrase l'activation surprise n'existe pas
- * pour elle. [setAuto] ne fait rien si le mode est déjà actif.
- */
-internal fun observeCrossingAuto(
-    offers: Flow<Boolean>,
-    scope: CoroutineScope,
-    language: () -> SpeechLanguage,
-    setAuto: (Boolean) -> Unit,
-    say: suspend (String) -> Unit,
-) {
-    scope.launch {
-        offers.distinctUntilChanged().filter { it }.collect {
-            setAuto(true)
-            say(CrossingText.mode(true, language()))
-        }
-    }
-}
-
-/**
- * Vue traversée par frame publiée : l'état sonde émet aussi entre deux frames
- * (poste « pixel » de la chronologie, [LiveProbe.noteDrawn]) — sans ce filtre,
- * le compteur de perte compterait deux fois chaque frame et couperait le mode
- * deux fois trop tôt. Une émission par valeur de [LiveProbeState.frames].
- */
-internal fun Flow<LiveProbeState>.crossingSightPerFrame(): Flow<Pair<Boolean, Boolean>> =
-    distinctUntilChangedBy { it.frames }.map { it.crossingActive to it.crossingVisible }
-
-/**
- * Retour **automatique** au mode normal : le passage perdu plusieurs frames de
- * suite ([CrossingLossGate]) coupe le mode armé par la vision et le dit
- * (« Mode traversée coupé. »). [visionArmed] faux (mode manuel ou GPS) = le
- * mode reste, seul son propriétaire le coupe. [states] porte (actif, vu) par
- * frame publiée (voir [crossingSightPerFrame]).
- */
-internal fun observeCrossingLoss(
-    states: Flow<Pair<Boolean, Boolean>>,
-    scope: CoroutineScope,
-    language: () -> SpeechLanguage,
-    visionArmed: () -> Boolean,
-    setAuto: (Boolean) -> Unit,
-    say: suspend (String) -> Unit,
-) {
-    scope.launch {
-        val gate = CrossingLossGate()
-        states.collect { (active, visible) ->
-            if (!active || !visionArmed()) {
-                gate.reset()
-                return@collect
-            }
-            if (!gate.onFrame(visible)) {
-                gate.reset()
-                setAuto(false)
-                say(CrossingText.mode(false, language()))
-            }
-        }
     }
 }
 
