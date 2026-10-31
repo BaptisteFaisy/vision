@@ -182,6 +182,44 @@ class LateralNudgeTest {
     }
 
     @Test
+    fun `mur qui s approche conseille de s en eloigner`() {
+        val suivi = LateralNudgeTracker()
+        val mur = { m: Float -> PlacedLabel("mur", 0.35f, 0.5f, m) }
+        suivi.onFrame(0L, listOf(mur(3.0f)))
+        suivi.onFrame(250L, listOf(mur(2.6f)))
+
+        val nudge = suivi.onFrame(500L, listOf(mur(2.2f)))
+
+        assertEquals(SteeringCap.Right, nudge!!.side)
+    }
+
+    @Test
+    fun `on ne s ecarte pas vers une personne`() {
+        // Mur qui s'approche à gauche, personne immobile à droite dans la
+        // fenêtre : se taire plutôt que d'envoyer l'utilisateur dessus.
+        val suivi = LateralNudgeTracker()
+        val frames = { m: Float -> listOf(PlacedLabel("mur", 0.35f, 0.5f, m), personne(0.65f, 2.0f)) }
+        suivi.onFrame(0L, frames(3.0f))
+        suivi.onFrame(250L, frames(2.6f))
+
+        assertNull(suivi.onFrame(500L, frames(2.2f)))
+    }
+
+    @Test
+    fun `personne hors fenetre cote cible on conseille quand meme`() {
+        // Même approche, personne à 0,99/4 m (2,6 m de l'axe : passe au large) —
+        // le décalage à droite reste conseillé.
+        val suivi = LateralNudgeTracker()
+        val frames = { m: Float -> listOf(PlacedLabel("mur", 0.35f, 0.5f, m), personne(0.99f, 4.0f)) }
+        suivi.onFrame(0L, frames(3.0f))
+        suivi.onFrame(250L, frames(2.6f))
+
+        val nudge = suivi.onFrame(500L, frames(2.2f))
+
+        assertEquals(SteeringCap.Right, nudge!!.side)
+    }
+
+    @Test
     fun `reset oublie l approche`() {
         val suivi = LateralNudgeTracker()
         suivi.onFrame(0L, listOf(personne(0.65f, 3.0f)))

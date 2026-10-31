@@ -89,6 +89,55 @@ class GuidanceSteeringTest {
     }
 
     @Test
+    fun `cap droit on ne contourne pas vers une personne`() {
+        // Mur au centre sans distance (repli freerSide) : personne à gauche,
+        // chaise à droite — l'évitement part à droite, loin de la personne.
+        val labels = listOf(
+            placed("mur", 0.5f),
+            placed("personne", 0.2f, 2f),
+            placed("chaise", 0.8f, 2f),
+        )
+
+        val decision = Guidance.decide(labels, SteeringCap.Straight)
+
+        assertTrue(decision.blocked)
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals(SteeringCap.Right, decision.passage)
+    }
+
+    @Test
+    fun `cap droit des personnes des deux cotes on se faufile quand meme`() {
+        // Foule : le cap droit ne dit jamais stop — à égalité de personnes,
+        // l'ancien départage (côté opposé au décalage) s'applique.
+        val labels = listOf(
+            placed("mur", 0.5f),
+            placed("personne", 0.2f, 2f),
+            placed("personne", 0.8f, 2f),
+        )
+
+        val decision = Guidance.decide(labels, SteeringCap.Straight)
+
+        assertTrue(decision.blocked)
+        assertEquals(GuidanceSide.Left, decision.side)
+    }
+
+    @Test
+    fun `cap lateral le passage evite le secteur avec une personne`() {
+        // Cap gauche bouché par un mur : personne au centre, chaise à droite —
+        // le passage part à droite, pas vers la personne.
+        val labels = listOf(
+            placed("mur", 0.2f, 2f),
+            placed("personne", 0.5f, 2f),
+            placed("chaise", 0.8f, 2f),
+        )
+
+        val decision = Guidance.decide(labels, SteeringCap.Left)
+
+        assertTrue(decision.blocked)
+        assertEquals(SteeringCap.Right, decision.passage)
+    }
+
+    @Test
     fun `cap lateral pas de cote V1`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.2f, 2f)), SteeringCap.Left)
 
