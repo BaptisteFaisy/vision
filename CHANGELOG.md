@@ -162,6 +162,29 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   499 lignes). 5 échecs `:core` pré-existants et hors périmètre
   (`PrivateFileSettingsStoreTest`, permissions POSIX sous Windows +
   1 assertion — identiques sur master vierge sans ce changement).
+## 2026-10-30 — iSee : rebord dit à 1 m puis à 0,4 m, montée comme descente (branche `feat/isee-rebord-1m-40cm`)
+
+- **Demande** : les rebords sont détectés mais iSee ne les dit pas ; quand
+  un rebord est détecté, le dire 1 m avant puis à 40 cm avant de monter /
+  descendre la marche, en anglais.
+- Fait : double palier `CurbWatcher` (pré-alerte douce sensée à 1 m
+  `Step up/down in 1 meter.`, imminent urgent à 0,4 m `Step up/down now.`
+  + `Stop, step up/down.`, hystérésis 1,0/1,4 et 0,4/0,6, une fois par
+  approche, bateau post-marche supprimé, `lastNearMs` exposé pour P3) ;
+  `rebord`, `curb ramp`, `bateau`, `ramp`, `gutter`, `caniveau`
+  reconnus côté client (`curb` déjà suivi par la liste unique à 16) ;
+  tracker FR→EN (`model_concept` dans `tracking.start`, dédup sur le
+  concept modèle) ; porte traversée avant le watcher ; voix douce en
+  coroutine fille ; trottoir latéral = plan seul (`isGround`).
+  Contrat `docs/VOIX-DANGER.md` §19.
+- Preuves : `:core:testDebugUnitTest` 2 230 tests, 5 échecs préexistants
+  `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows,
+  identiques sur base pristine) ; `:app:testDebugUnitTest` vert
+  (1 300 tests, 0 échec) ; `check-kotlin-limits.py` vert ;
+  `test_units.py` 311 OK, 6 KO `fastapi` absent (env, groupes
+  HTTP seuls, sans rapport).
+
+
 ## 2026-10-30 — iSee : stop sécurité immédiat voiture en mouvement + rebord (branche `fix/isee-stop-voiture-rebord-immediat`)
 
 - **Demande** : quand une voiture en mouvement ou un rebord est détecté, le

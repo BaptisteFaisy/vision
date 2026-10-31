@@ -24,6 +24,8 @@ import shutil
 import time
 from pathlib import Path
 
+from concepts import model_concept
+
 def _env_int(name: str, default: int) -> int:
     """Entier d'environnement (le conteneur ne voit que ce que `image.env()` a écrit)."""
     try:
@@ -37,7 +39,6 @@ CKPT_DIR = os.environ.get("TRACK_CKPT_DIR", "/root/ckpts")
 CKPT_FILES = ["sam3.1_multiplex.pt", "config.json"]  # le BPE vient de sam3/assets
 MUX_COUNT = 16          # objets par bucket multiplex (figé par le checkpoint)
 MAX_TRACKED_OBJECTS = 16  # objets par concept — aussi le pas d'offset des ids
-
 
 
 CAPACITY_DEFAULT = 900  # frames par session (30 s à 30 fps), surchargeable par TRACK_CAPACITY
@@ -288,11 +289,11 @@ def objects_from_output(outputs, label: str, id_offset: int, size) -> list:
 
 
 def clean_prompts(prompts) -> list:
-    """Concepts du direct : dédoublonnés, bornées à PROMPT_LIMIT (le coût est linéaire)."""
+    """Concepts du direct : dédoublonnés sur le concept modèle, bornés à PROMPT_LIMIT (le coût est linéaire)."""
     cleaned: list[str] = []
     for raw in prompts or []:
         text = " ".join(str(raw).split())[:64]
-        if text and text not in cleaned:
+        if text and all(model_concept(text) != model_concept(done) for done in cleaned):
             cleaned.append(text)
     if not cleaned:
         raise PromptTooLong("prompts must contain at least one non-empty concept")
@@ -348,7 +349,7 @@ class LiveSession:
         return self.predictor._get_session(tracker_id)["state"]
 
     def start(self) -> list:
-        """Ouvre une sous-session par concept, pose le prompt texte sur la frame 0, rend les objets."""
+        """Ouvre une sous-session par concept, pose le concept modèle (FR→EN, label brut gardé) sur la frame 0, rend les objets."""
         objects: list[dict] = []
         for step, prompt in enumerate(self.prompts):
             tracker_id = self.predictor.handle_request(
@@ -356,7 +357,7 @@ class LiveSession:
             )["session_id"]
             outputs = self.predictor.handle_request({
                 "type": "add_prompt", "session_id": tracker_id, "frame_index": 0,
-                "text": prompt, "output_prob_thresh": OUTPUT_PROB_THRESH,
+                "text": model_concept(prompt), "output_prob_thresh": OUTPUT_PROB_THRESH,
             })["outputs"]
             self.subsessions.append({"prompt": prompt, "tracker_id": tracker_id,
                                      "offset": step * MAX_TRACKED_OBJECTS,

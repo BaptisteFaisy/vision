@@ -45,7 +45,7 @@ object SidewalkKeep {
     fun positionOf(labels: List<PlacedLabel>): SidewalkPosition {
         val cleaned = labels.filter { it.label.isNotBlank() }
         if (cleaned.isEmpty()) return SidewalkPosition.Ahead
-        val walks = cleaned.filter { CurbConcepts.isCurb(it.label) }
+        val walks = cleaned.filter { CurbConcepts.isGround(it.label) }
         if (walks.isEmpty()) return SidewalkPosition.Absent
         val edge = PositionText.SIDE_EDGE
         if (walks.any { it.centerX >= edge && it.centerX <= 1f - edge }) return SidewalkPosition.Ahead

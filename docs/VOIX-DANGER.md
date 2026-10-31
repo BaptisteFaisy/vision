@@ -452,9 +452,9 @@ escaliers, cycles) parle toujours en douceur.
 - **phrases** (langue de la voix, anglais par défaut) :
   - mouvement : `Stop, car moving.` / `Stop, voiture en mouvement.` (nom du
     véhicule : bus, camion, moto — `VehicleStateText.safetyPhrase`) ;
-  - rebord : `Stop, step up.` / `Stop, step down.` (`Stop, rebord montant.`
-    / `Stop, rebord descendant.` — `CurbText.safetyStepPhrase`), pré-alerte
-    comme imminent ;
+  - rebord imminent : `Stop, step up.` / `Stop, step down.` (`Stop, rebord
+    montant.` / `Stop, rebord descendant.` — `CurbText.safetyStepPhrase`) ;
+    la pré-alerte à 1 m est douce depuis le § 19 (plus d'alerte immédiate) ;
 - **canal** : voix de sécurité dédiée (`SafetyVoice`, TTS système
   hors-ligne) — pas de synthèse réseau, pas de clé exigée, parle sans
   condition de silence ; coupe la lecture ElevenLabs en cours avant de
@@ -465,10 +465,9 @@ escaliers, cycles) parle toujours en douceur.
   système ne rend pas de fin, un fanion sans fin bloquerait la dictée) ;
 - **gardes gardées** : confirmation 2 frames (un positif isolé ne crie
   jamais « Stop »), cooldowns des guetteurs (4 s mouvement, 10 s trottoir,
-  ré-armement imminent à 1,2 m) ; coupé en mode Traversée sauf l'imminent
-  sous le pied (sa voix rouge/vert est propriétaire du son — un « Stop »
-  à 3 m arrêterait le user au milieu) ; le bateau (« Bateau, pas de
-  marche. ») et la voiture à l'arrêt restent doux ;
+  ré-armements § 19) ; coupé en mode Traversée sauf l'imminent sous le
+  pied (sa voix rouge/vert est propriétaire du son) ; le bateau
+  (« Bateau, pas de marche. ») et la voiture à l'arrêt restent doux ;
 - **supprimé** : la priorité stop > marche imminente (`ProbeVoice.stopRecent`,
   fenêtre 2 s) — une alerte de sécurité ne se tait pour rien.
 
@@ -543,6 +542,56 @@ parle sur P1/P2, élargir ; s'il se tait trop, resserrer).
 Verrouillé par `HazardWatchTest` (+5 : poteau 3,5 m détecté, 4,5 m muet,
 2 frames doux, imminent urgent, ré-armement), `HazardConceptsTest` (+1 :
 `isPole`), `VehicleStateTest` (+1 : `lastMovingAlertMs`),
-`CurbWatcherTest` (+1 : `lastNearMs`), `ProbeWiringWatchersTest` (+2 :
+`CurbAnnounceTest` (+1 : `lastNearMs`), `ProbeWiringWatchersTest` (+2 :
 `p1p2Busy`, `shouldCutForHazard`) et `ProximityVoiceQueueTest` (8 : file,
 péremption, P1/P2, fraîcheur, route, reset, sans-file-perdu, busy).
+
+## 19. Rebord dit à 1 m puis à 0,4 m, montée comme descente (ordre user du 30/10)
+
+Le user marche avec l'app : les rebords sont détectés (masques SAM) mais
+iSee ne les dit pas. Contrat tranché : un rebord dans le couloir marché
+parle **deux fois** — à 1 m (info douce, avec l'heure) puis à 0,4 m
+(imminent, alerte immédiate § 16) — en montant comme en descendant,
+anglais par défaut :
+
+- **phrases** : 1 m `Step up in 1 meter.` / `Step down in 1 meter.`
+  (`Marche dans 1 mètre.` / `Descente dans 1 mètre.`, `CurbText.phrase`,
+  heure du cadran quand le centre est connu) ; 0,4 m `Step up now.` /
+  `Step down now.` (`Marche, maintenant.` / `Descente, maintenant.`,
+  `CurbText.stepPhrase`, sans heure : à un pas, l'heure retarde la
+  consigne) + `Stop, step up.` / `Stop, step down.` en alerte immédiate ;
+- **paliers** (`CurbWatcher`) : suivi jusqu'à 3 m mais annonce dès 1 m
+  (`FAR_ANNOUNCE_METERS`), imminent à 0,4 m (`STEP_NEAR_METERS`) ;
+  hystérésis 1,0 / 1,4 m (pré-alerte, une fois par approche) et
+  0,4 / 0,6 m (imminent) ; confirmation 2 frames partout ; entrée
+  directe en imminent = seul l'urgent parle (pas de rattrapage) ;
+  bateau supprimé 10 s après une marche (traversée du bord) ;
+- **pourquoi c'était muet** : `rebord`, `curb ramp`, `bateau`,
+  `gutter`, `caniveau` renvoyés par le serveur mais rejetés par
+  `CurbConcepts` (ajoutés) ; le tracker envoyait le FR brut au CLIP
+  anglais (traduit par `model_concept` dans `tracking.start`, dédup
+  sur le concept modèle) ; la pré-alerte coupée en traversée
+  consommait le cooldown (porte déplacée avant le watcher) ; la
+  synthèse douce bloquait les frames suivantes (coroutine fille) ;
+  (`curb` est suivi par la liste unique à 16 de
+  `LivePrompts.default`) ;
+- **non tranché, à valider sur téléphone (non mesuré)** : montée vs
+  descente reste une heuristique de boîte (priors 0,95 / 0,5, bord
+  `curb`/`step` lu montant par défaut — en cas de doute ça parle
+  montant, jamais l'inverse) ; sans profondeur ni ancre, un trottoir
+  seul ne produit aucune lecture de distance (silence, voir `R1-R3`
+  d'audit) ; `max_objects` réglé à 8 par le user peut évincer un
+  rebord faible score (comportement global, réglable à 32).
+
+Verrouillé par `CurbWatcherTest` + `CurbAnnounceTest` (double annonce
+EN 1 m / 0,4 m, hystérésis, verrous, bateau post-marche),
+`KnownSizesTest` (famille bordure profondeur), `SidewalkKeepTest`
+(marches ≠ trottoir), `concepts_street_tests.py` (formes longues,
+`kerb`, `rigole`, `passage bateau`) et `test_tracking` (dédup FR/EN,
+texte traduit).
+
+Recette téléphone : marques craie à 1,0 m et 0,4 m, montée puis
+descente — premier son ≤ 1 s après confirmation, bande 1,0 ± 0,3 m /
+0,4 ± 0,25 m, sens juste 4/4 jour, bateau 0 `Stop`, traversée :
+pré-alerte tuée et imminent passant — **non mesuré**, exige un APK de
+cette branche sur appareil réel.

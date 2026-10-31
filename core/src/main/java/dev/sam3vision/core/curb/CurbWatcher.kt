@@ -127,8 +127,8 @@ data class CurbSignal(
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
  * palier, [urgent] vrai pour la seule marche imminente (coupe la voix, comme
  * le stop ; tout le reste attend le silence), [safetyPhrase] l'alerte
- * immédiate (« Stop, … ») pour un bord détecté, pré-alerte comme imminent
- * (`null` pour le bateau — pas de marche, pas d'alerte).
+ * immédiate (« Stop, … ») pour la seule marche imminente (`null` pour la
+ * pré-alerte à 1 m comme pour le bateau — info douce, pas d'alerte).
  */
 data class CurbCue(
     val phrase: String,
@@ -140,30 +140,38 @@ data class CurbCue(
 
 /**
  * Phrases trottoir, FR/EN comme les positions (`PositionText`) : la pré-alerte
- * douce (« Attention à la marche »), l'imminent (« Marche » / « Descente »,
- * urgent) et le bateau (« Bateau, pas de marche », doux, une fois). Liste
- * fermée : le préchauffage hors-ligne sait quels clips générer.
+ * douce à 1 m (« Marche dans 1 mètre » / « Step up in 1 meter », avec l'heure),
+ * l'imminent à 0,4 m (« Marche, maintenant. » / « Step up now. », urgent, sans
+ * heure : à un pas, l'heure retarde la consigne) et le bateau (« Bateau, pas
+ * de marche », doux, une fois). Liste fermée : le préchauffage hors-ligne
+ * sait quels clips générer.
  */
 object CurbText {
-    /** Pré-alerte douce : « Attention à la marche, à midi. » (`null` = sans heure). */
-    fun phrase(language: SpeechLanguage, centerX: Float? = null): String = when (language) {
-        SpeechLanguage.Fr -> PositionText.withHour("Attention à la marche", centerX, language)
-        SpeechLanguage.En -> PositionText.withHour("Attention, step", centerX, language)
-    }
-
-    /** Marche imminente : « Marche, à midi. » en montée, « Descente, à midi. » sinon. */
-    fun stepPhrase(edge: CurbEdge, language: SpeechLanguage, centerX: Float? = null): String {
+    /** Pré-alerte douce à 1 m, sensée : « Marche dans 1 mètre, à midi. » (`null` = sans heure). */
+    fun phrase(edge: CurbEdge, language: SpeechLanguage, centerX: Float? = null): String {
         val base = when (language) {
             SpeechLanguage.Fr -> when (edge) {
-                CurbEdge.Up -> "Marche"
-                CurbEdge.Down -> "Descente"
+                CurbEdge.Up -> "Marche dans 1 mètre"
+                CurbEdge.Down -> "Descente dans 1 mètre"
             }
             SpeechLanguage.En -> when (edge) {
-                CurbEdge.Up -> "Step"
-                CurbEdge.Down -> "Step down"
+                CurbEdge.Up -> "Step up in 1 meter"
+                CurbEdge.Down -> "Step down in 1 meter"
             }
         }
         return PositionText.withHour(base, centerX, language)
+    }
+
+    /** Marche imminente à 0,4 m, sans heure : « Step up now. » en montée, « Step down now. » sinon. */
+    fun stepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> when (edge) {
+            CurbEdge.Up -> "Marche, maintenant."
+            CurbEdge.Down -> "Descente, maintenant."
+        }
+        SpeechLanguage.En -> when (edge) {
+            CurbEdge.Up -> "Step up now."
+            CurbEdge.Down -> "Step down now."
+        }
     }
 
     /** Bateau : « Bateau, pas de marche. » — plan continu, pas de danger, dit une fois. */
@@ -191,15 +199,19 @@ object CurbText {
 
 /**
  * Lissage temporel du [CurbSignal], miroir de `StairWatcher` : un positif
- * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs (seulement
+ * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs (dont
  * [NEAR_CONFIRM_FRAMES] pour l'imminent), puis silence pendant [cooldownMs]
  * (un trottoir ne bouge pas).
  *
- * Deux voies : la pré-alerte [CurbTier.FAR] (douce, inchangée) et la marche
- * imminente [CurbTier.NEAR] (compteur séparé, parole urgente même en cooldown :
- * la première vue parle). Hystérésis 0,9 / 1,2 m : après un imminent, il faut
- * s'éloigner au-delà de [STEP_REARM_METERS] ou perdre le signal pour ré-armer.
- * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence.
+ * Deux paliers annoncés : la pré-alerte [CurbTier.FAR] à 1 m (douce, une fois
+ * par approche) puis la marche imminente [CurbTier.NEAR] à 0,4 m (compteur
+ * séparé, parole urgente même en cooldown : la première vue parle). Le suivi
+ * reste actif jusqu'à [CURB_METERS] mais n'annonce plus au-delà de
+ * [FAR_ANNOUNCE_METERS]. Hystérésis 1,0 / 1,4 m (pré-alerte) et 0,4 / 0,6 m
+ * (imminent) : après une annonce, il faut s'éloigner au-delà de
+ * [FAR_REARM_METERS] / [STEP_REARM_METERS] ou perdre le signal pour ré-armer.
+ * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence, jamais
+ * juste après une marche (traversée du bord, pas un bateau).
  *
  * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
  * trottoir ne parle pas d'un bord — le plan sous les pieds (bas collé en bas
@@ -208,10 +220,10 @@ object CurbText {
  * priors, à valider sur captures du téléphone : en cas de doute le bord
  * parle, jamais l'inverse.
  *
- * Pur JVM et testé. Sécurité : un bord détecté (pré-alerte comme
- * imminent) parle en alerte immédiate ([CurbCue.safetyPhrase], voix de
- * sécurité qui coupe tout, dictée du user comprise) — seul le bateau
- * attend le silence (pas de marche, pas d'alerte).
+ * Pur JVM et testé. Sécurité : la marche imminente parle en alerte immédiate
+ * ([CurbCue.safetyPhrase], voix de sécurité qui coupe tout, dictée du user
+ * comprise) — la pré-alerte à 1 m et le bateau attendent le silence (pas
+ * d'alerte, juste l'info).
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -227,17 +239,20 @@ class CurbWatcher(
     /** Bateaux consécutifs en cours (autre chose remet à zéro). */
     private var flatHits: Int = 0
 
-    /** Imminent déjà dit, en attente de ré-armement (> 1,2 m ou signal perdu). */
+    /** Imminent déjà dit, en attente de ré-armement (> 0,6 m ou signal perdu). */
     private var nearSpoken: Boolean = false
+
+    /** Pré-alerte déjà dite, en attente de ré-armement (> 1,4 m ou signal perdu). */
+    private var farSpoken: Boolean = false
 
     /** Bateau déjà dit pour la présence en cours. */
     private var flatSpoken: Boolean = false
 
+    /** Instant de la dernière marche imminente dite, [NO_INSTANT] si aucune. */
+    private var lastNearAtMs: Long = NO_INSTANT
+
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
     private var lastCueAtMs: Long = NO_INSTANT
-
-    /** Instant de la dernière marche imminente, [NO_INSTANT] si aucune. */
-    private var lastNearAtMs: Long = NO_INSTANT
 
     /** Dernière annonce, `null` si aucune. */
     val lastAlertMs: Long?
@@ -262,11 +277,14 @@ class CurbWatcher(
         hits = 0
         nearHits = 0
         nearSpoken = false
+        farSpoken = false
         if (!signal.flatPass) {
             flatHits = 0
             flatSpoken = false
             return null
         }
+        // Marche traversée : le plan sous les pieds n'est pas un bateau.
+        if (lastNearAtMs != NO_INSTANT && nowMs - lastNearAtMs < FLAT_AFTER_STEP_SUPPRESS_MS) return null
         flatHits++
         if (flatHits < confirmFrames) return null
         if (flatSpoken) return null
@@ -277,19 +295,20 @@ class CurbWatcher(
         return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false)
     }
 
-    /** Imminent : parle vite, urgent, même en cooldown (la première vue parle). */
+    /** Imminent à 0,4 m : parle vite, urgent, même en cooldown (la première vue parle). */
     private fun onNear(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
         hits = 0
         nearHits++
         if (nearHits < nearConfirmFrames) return null
         if (nearSpoken) return null
         nearSpoken = true
+        farSpoken = true
         lastCueAtMs = nowMs
         lastNearAtMs = nowMs
         nearHits = 0
         val edge = signal.edge ?: CurbEdge.Up
         return CurbCue(
-            CurbText.stepPhrase(edge, language, signal.centerX),
+            CurbText.stepPhrase(edge, language),
             signal.meters,
             CurbTier.NEAR,
             urgent = true,
@@ -297,23 +316,34 @@ class CurbWatcher(
         )
     }
 
-    /** Pré-alerte douce, inchangée ; au-delà du réarmement, l'imminent se ré-arme. */
+    /**
+     * Pré-alerte douce à 1 m, une fois par approche ; entre 1 et 3 m le suivi
+     * reste silencieux. Au-delà des réarmements, l'imminent puis la pré-alerte
+     * se ré-arment.
+     */
     private fun onFar(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
         nearHits = 0
         val meters = signal.meters
         if (meters != null && meters > STEP_REARM_METERS) nearSpoken = false
+        if (meters != null && meters > FAR_REARM_METERS) farSpoken = false
+        if (meters == null || meters > FAR_ANNOUNCE_METERS) {
+            hits = 0
+            return null
+        }
+        if (farSpoken) return null
         hits++
         if (hits < confirmFrames) return null
         if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
+        farSpoken = true
         lastCueAtMs = nowMs
         hits = 0
         val edge = signal.edge ?: CurbEdge.Up
         return CurbCue(
-            CurbText.phrase(language, signal.centerX),
+            CurbText.phrase(edge, language, signal.centerX),
             signal.meters,
             CurbTier.FAR,
             urgent = false,
-            safetyPhrase = CurbText.safetyStepPhrase(edge, language),
+            safetyPhrase = null,
         )
     }
 
@@ -323,19 +353,20 @@ class CurbWatcher(
         nearHits = 0
         flatHits = 0
         nearSpoken = false
+        farSpoken = false
         flatSpoken = false
-        lastCueAtMs = NO_INSTANT
         lastNearAtMs = NO_INSTANT
+        lastCueAtMs = NO_INSTANT
     }
 
     companion object {
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
-        const val DEFAULT_CONFIRM_FRAMES = 3
+        const val DEFAULT_CONFIRM_FRAMES = 2
 
         /** Silence entre deux annonces douces (le trottoir ne bouge pas). */
         const val DEFAULT_COOLDOWN_MS = 10_000L
 
-        /** Au-delà de cette distance (m), un bord ne fait pas lever la jambe. */
+        /** Au-delà de cette distance (m), un bord n'est même plus suivi (annonce dès 1 m). */
         const val CURB_METERS = 3f
 
         /**
@@ -352,10 +383,19 @@ class CurbWatcher(
         const val PLANE_TOP_MIN = 0.5f
 
         /** Sous cette distance lissée (m), le bord est imminent : parole urgente. */
-        const val STEP_NEAR_METERS = 0.9f
+        const val STEP_NEAR_METERS = 0.4f
 
-        /** Au-delà (m), l'imminent se ré-arme : hystérésis 0,9 / 1,2. */
-        const val STEP_REARM_METERS = 1.2f
+        /** Au-delà (m), l'imminent se ré-arme : hystérésis 0,4 / 0,6. */
+        const val STEP_REARM_METERS = 0.6f
+
+        /** Sous cette distance (m), la pré-alerte parle ; au-delà, suivi silencieux. */
+        const val FAR_ANNOUNCE_METERS = 1.0f
+
+        /** Au-delà (m), la pré-alerte se ré-arme : hystérésis 1,0 / 1,4. */
+        const val FAR_REARM_METERS = 1.4f
+
+        /** Après une marche dite, le bateau reste muet (traversée du bord). */
+        const val FLAT_AFTER_STEP_SUPPRESS_MS = 10_000L
 
         /** Imminents consécutifs avant de parler (la première vue parle vite). */
         const val NEAR_CONFIRM_FRAMES = 2
