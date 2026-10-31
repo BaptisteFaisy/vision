@@ -111,7 +111,6 @@ private fun PerceptionSettings(
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
         WorldModeSettings(draft) { onChange(it) }
-        DebugMapSettings(draft) { onChange(it) }
         DepthSettings(onTestDepth)
         DangerSettings(onTestDanger)
     }

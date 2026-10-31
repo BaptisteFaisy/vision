@@ -62,7 +62,6 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             keyframeSchedulerEnabled = prefs.getBoolean(KEY_KEYFRAME_SCHEDULER, default.keyframeSchedulerEnabled),
             localOverlayEnabled = prefs.getBoolean(KEY_LOCAL_OVERLAY, default.localOverlayEnabled),
             continuousCadenceEnabled = prefs.getBoolean(KEY_CONTINUOUS_CADENCE, default.continuousCadenceEnabled),
-            debugRouteMapEnabled = prefs.getBoolean(KEY_DEBUG_ROUTE_MAP, default.debugRouteMapEnabled),
             navigationGuidanceEnabled = prefs.getBoolean(KEY_NAVIGATION_GUIDANCE, default.navigationGuidanceEnabled),
             outdoorMode = prefs.getBoolean(KEY_OUTDOOR_MODE, default.outdoorMode),
             routeBaseUrl = prefs.getString(KEY_ROUTE_BASE_URL, default.routeBaseUrl).orEmpty(),
@@ -110,7 +109,6 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_KEYFRAME_SCHEDULER, s.keyframeSchedulerEnabled)
             .putBoolean(KEY_LOCAL_OVERLAY, s.localOverlayEnabled)
             .putBoolean(KEY_CONTINUOUS_CADENCE, s.continuousCadenceEnabled)
-            .putBoolean(KEY_DEBUG_ROUTE_MAP, s.debugRouteMapEnabled)
             .putBoolean(KEY_NAVIGATION_GUIDANCE, s.navigationGuidanceEnabled)
             .putBoolean(KEY_OUTDOOR_MODE, s.outdoorMode)
             .putString(KEY_ROUTE_BASE_URL, s.routeBaseUrl)
@@ -156,7 +154,6 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_KEYFRAME_SCHEDULER = "keyframe_scheduler"
         const val KEY_LOCAL_OVERLAY = "local_overlay"
         const val KEY_CONTINUOUS_CADENCE = "continuous_cadence"
-        const val KEY_DEBUG_ROUTE_MAP = "debug_route_map"
         const val KEY_NAVIGATION_GUIDANCE = "navigation_guidance"
         const val KEY_OUTDOOR_MODE = "outdoor_mode"
         const val KEY_ROUTE_BASE_URL = "route_base_url"
