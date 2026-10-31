@@ -137,6 +137,7 @@ class CrossingPeopleTest {
     @Test
     fun `le feu prime sur le silence`() {
         CrossingPeopleWatch.reset()
+        CrossingLightDueWatch.reset()
         val cue = CrossingCue("Vert, traversez.", false, CrossingState.Green)
 
         assertEquals("Vert, traversez.", crossingPhraseOf(cue, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
@@ -188,13 +189,15 @@ class CrossingPeopleTest {
     }
 
     @Test
-    fun `le mot evitement passe devant le feu`() {
+    fun `le mot evitement couvre le feu frais, pas le feu du`() {
         CrossingPeopleWatch.reset()
         CrosswalkScanWatch.reset()
+        CrossingLightDueWatch.reset()
         val objects = onPathLeft()
 
         assertEquals("Tout droit.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
-        assertEquals("Droite.", crossingPhraseOf(red(), emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Rouge, attendez.", crossingPhraseOf(red(), emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", crossingPhraseOf(red(), emptyList(), emptyList(), emptyList(), 600L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 
     @Test
