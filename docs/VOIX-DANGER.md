@@ -850,7 +850,7 @@ occupé par la section « Voix obstacles » de la branche, conservée
 ci-dessous telle quelle) ; aucun des deux contrats n'est fusionné ni
 abandonné.*
 
-## 25. Voix obstacles : hiérarchie P1-P5, poteau imminent en sécurité (ordre user du 31/10)
+## 26. Voix obstacles : hiérarchie P1-P5, poteau imminent en sécurité (ordre user du 31/10)
 
 Le user marche avec l'app : quand SAM confirme plusieurs obstacles en même
 temps, l'ordre de parole n'était pas défini (trois guetteurs indépendants,
@@ -863,7 +863,7 @@ Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
 - **un seul guetteur** (`LiveProbe.observeObstacles`) calcule les trois
   signaux (véhicules, bordure, mobilier) sur la même frame et parle une
   fois : les alertes de sécurité fusionnent dans l'ordre des rangs
-  (« Montez le rebord. Poteau, passez à droite. », voix de sécurité,
+  (« Bordure à 0,5 mètre. Poteau, passez à droite. », voix de sécurité,
   immédiat, sans « Stop »), les phrases douces aussi (voix ElevenLabs,
   file d'attente au silence) — une alerte confirmée ne se perd plus,
   elle attend son rang ; le véhicule ne fournit que du doux ici (son
@@ -897,6 +897,6 @@ gardé, sorte divers), `HazardConceptsTest` (+2 : `isBarrier`, `kindOf`),
 (`p1p2Busy`/`shouldCutForHazard` supprimés, remplacés par l'arbitre).
 
 Recette téléphone : voiture qui roule + marche + poteau cadrés ensemble
-→ « Montez le rebord. Poteau, passez à droite. » puis « Car moving,
+→ « Bordure à 0,5 mètre. Poteau, passez à droite. » puis « Car moving,
 12 meters away. … » en doux, premier son immédiat, aucun « Stop » —
 **non mesuré**, exige un APK de cette branche sur appareil réel.
