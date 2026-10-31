@@ -1,6 +1,5 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
 import org.junit.Assert.assertEquals
@@ -80,11 +79,11 @@ class ProbeVoiceTest {
     }
 
     @Test
-    fun `mur au contact - stop`() {
+    fun `mur au contact - contournement`() {
         val voice = guided()
         val phrase = voice.phrase(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f, 0.5f)), SteeringCap.Straight)
 
-        assertTrue(GuidanceWord.isStopPhrase(phrase!!))
+        assertEquals("left.", phrase)
     }
 
     @Test

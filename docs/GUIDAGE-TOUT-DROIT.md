@@ -12,8 +12,8 @@ Les mesures d'appareil sont datées et attribuées. Ce qui n'a pas été relevé
 ## 1. Le contrat, en une phrase
 
 Dire à voix haute **où mettre le prochain pas** — un mot dit **en moins de
-100 ms** : voix TwinLite quand le couloir est bouché (arrêt « obstacle,
-arrêtez-vous. » au contact, côté de sortie sinon), mots SAM sur voie libre
+100 ms** : voix TwinLite quand le couloir est bouché (toujours le côté de
+sortie, même au contact), mots SAM sur voie libre
 (cap, décalage, retour trottoir) — calculé **sur le téléphone depuis les
 seuls objets SAM** — **aucun appel LLM**, le mot part en clip
 pré-synthétisé, jamais de synthèse réseau au moment de parler.
@@ -35,10 +35,11 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
   mesurée (classe inconnue, boîte coupée) bloque quand même, et le mot reste
   le côté de sortie (`inRange`, `nearRank`, `Guidance.kt`) — on ne juge pas le
   contact sans distance.
-- **Stop** (contact mesuré) : `STOP_METERS = 0,6f` (`Guidance.kt`) — en deçà
-  (mesuré), contourner n'est plus un pas : le mot est « obstacle,
-  arrêtez-vous. » (voix TwinLite). À 1,2 m/s, 0,6 m c'est un pas avant le
-  contact.
+- **Jamais de stop cap droit** : le couloir bouché dit toujours le côté de
+  sortie, même au contact mesuré — dans une foule on se faufile, on ne
+  s'arrête pas (ordre user). `STOP_METERS = 0,6f` (`Guidance.kt`) ne vaut
+  plus que pour les caps latéraux ; le danger imminent reste couvert par
+  la voix de sécurité, hors d'ici.
 - **Côté de sortie** : le moins encombré — moins d'objets à portée, sinon obstacle
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
@@ -51,7 +52,6 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
 | Voie libre | Tout droit. | Straight. |
 | Obstacle, sortie à gauche | gauche. (TwinLite) | left. (TwinLite) |
 | Obstacle, sortie à droite | droite. (TwinLite) | right. (TwinLite) |
-| Contact mesuré (≤ 0,6 m) | obstacle, arrêtez-vous. (TwinLite) | obstacle, stop. (TwinLite) |
 | Décalage latéral | Gauche. / Droite. | Left. / Right. |
 | Retour trottoir | Gauche. / Droite. | Left. / Right. |
 
@@ -74,16 +74,16 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
 2. **signature** — le mot (`w|left` SAM, `tl|left` TwinLite,
    `GuidanceWord.key`, `TwinLiteWord.key`) : tout le reste est pareil, seule
    une consigne différente fait reparler ;
-3. **arbitrage** — bouché ⇒ voix TwinLite (arrêt au contact, côté de sortie
-   sinon), libre ⇒ mots SAM (décalage, retour trottoir, cap marché). Une
+3. **arbitrage** — bouché ⇒ voix TwinLite (côté de sortie, même au contact),
+   libre ⇒ mots SAM (décalage, retour trottoir, cap marché). Une
    seule porte : un seul parle à la fois, jamais de doublon. Le bouché prime
    toujours : la sécurité ne négocie jamais.
 4. **urgence** — seul le stop coupe la lecture en cours, chat compris
    (`LiveProbeState.spokenUrgent`, vrai pour le seul mot stop : « obstacle,
-   arrêtez-vous. » TwinLite, « Stop. » SAM pour l'urgence externe) : les mots
-   doux (gauche/tout droit/droite) attendent le silence
-   (`ProbeWiring.observeSpoken`). Le stop interne (contact ≤ 0,6 m) est gardé
-   en attendant le modèle d'urgence externe (`docs/URGENCE-EXTERNE.md`).
+   arrêtez-vous. » TwinLite sur caps latéraux au contact, « Stop. » SAM
+   pour l'urgence externe) : les mots doux (gauche/tout droit/droite)
+   attendent le silence (`ProbeWiring.observeSpoken`). Le cap droit ne dit
+   jamais stop (`docs/URGENCE-EXTERNE.md` pour l'urgence externe).
 
 Différence assumée avec les positions : **la voie libre se dit** (« Tout droit. »,
 une fois par période libre) là où une scène vide reste muette
@@ -117,7 +117,7 @@ bout, § 8),
 `GuidanceAnnouncerTest` (18, dont l'arbitrage des deux voix),
 `SettingsGuidanceTest` (4), `LiveProbeGuidanceTest` (5, sonde branchée sur un faux
 client SAM : voie libre → mot, obstacle → voix TwinLite, mots doux + positions
-non urgents, stop interne TwinLite au contact mesuré = urgent, positions seules
+non urgents, contact mesuré = contournement non urgent, positions seules
 → silence sur voie libre),
 `ProbeWiringSpokenTest` (3 : même mot ré-émis → une synthèse qui aboutit, mot frais →
 dernier gagnant, mot doux → muet chat en lecture), `ProximityVoiceWordTest` (4 :
@@ -133,9 +133,9 @@ chat en clip).
 3. une personne entre au centre à ~2 m → « gauche. » (TwinLite — ou à droite
    si la gauche est encombrée), **aussitôt** ;
 4. la personne s'approche → silence (même mot) ;
-5. la personne est à ~0,5 m → « obstacle, arrêtez-vous. », qui coupe la phrase
-   en cours, chat compris ; main devant l'objectif (boîte coupée, non
-   mesurée) → « gauche. » ;
+5. la personne est à ~0,5 m → « gauche. » (même mot, silence si déjà dit —
+   le cap droit ne dit jamais stop) ; main devant l'objectif (boîte coupée,
+   non mesurée) → « gauche. » ;
 6. le couloir se dégage → « Tout droit. » aussitôt ;
 7. bascule **coupée** → retour aux annonces de positions, voie libre muette.
 
@@ -170,11 +170,11 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
   (`KnownSizes.kt:68`). À ~2 m le mur remplit l'image (boîte coupée haut/bas) :
   pas de lecture sténopé, le couloir bloque par prudence avec le côté de sortie
   (`GuidanceObstaclesTest.kt:90`). Mesuré (~3 m) : blocage + décalage chiffré
-  (`:109`). À 0,5 m le stop n'est parlé (« obstacle, arrêtez-vous. », voix
-  TwinLite) que mesuré — par la profondeur (`:119`, ancre personne +
-  `with_depth`) ; au sténopé seul, un mur ou une personne à 0,5 m remplit
-  le cadre (coupé) et le mot reste le côté de sortie — même physique que
-  la main devant l'objectif de la recette § 6.5.
+  (`:109`). À 0,5 m le mot reste le côté de sortie (« right. », voix
+  TwinLite), mesuré ou non — le cap droit contourne toujours ; la mesure
+  profondeur (`:119`, ancre personne + `with_depth`) sert le décalage et
+  l'obstacle élu — même physique que la main devant l'objectif de la
+  recette § 6.5.
 - **Liste user** : barrière 1,00 m, voiture 1,45 m, humain 1,70 m, vélo 1,10 m
   (`KnownSizes.kt:52-71`) — à 2 m, lus ≈ 2,0 m et bloquants (`:144`).
   Escaliers et marches (`stairs`, `escalier`, `step`, `steps`, `marche`) : sans

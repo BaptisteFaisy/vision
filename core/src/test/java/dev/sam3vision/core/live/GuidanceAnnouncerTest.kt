@@ -52,11 +52,13 @@ class GuidanceAnnouncerTest {
     @Test
     fun `seul le changement de mot fait reparler`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
+        fun decale(x: Float, meters: Float) = PlacedLabel("personne", x, 0.5f, meters)
 
-        assertEquals("left.", announcer.onFrame(0L, listOf(personne(3.4f))))
-        assertNull(announcer.onFrame(200L, listOf(personne(2.4f))))
-        assertNull(announcer.onFrame(400L, listOf(personne(1.4f))))
-        assertEquals("obstacle, stop.", announcer.onFrame(600L, listOf(personne(0.4f))))
+        assertEquals("left.", announcer.onFrame(0L, listOf(decale(0.6f, 3.4f))))
+        assertNull(announcer.onFrame(200L, listOf(decale(0.6f, 2.4f))))
+        // le côté change : reparle aussitôt, sans attendre le cooldown
+        assertEquals("right.", announcer.onFrame(400L, listOf(decale(0.4f, 0.4f))))
+        assertNull(announcer.onFrame(600L, listOf(decale(0.4f, 0.4f))))
     }
 
     @Test
@@ -102,11 +104,11 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `contact dit obstacle TwinLite des la premiere frame`() {
+    fun `contact dit le cote TwinLite des la premiere frame`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
         fun proche(meters: Float) = PlacedLabel("personne", 0.5f, 0.5f, meters)
 
-        assertEquals("obstacle, stop.", announcer.onFrame(0L, listOf(proche(0.4f))))
+        assertEquals("left.", announcer.onFrame(0L, listOf(proche(0.4f))))
         // même mot : rien de neuf
         assertNull(announcer.onFrame(200L, listOf(proche(0.45f))))
     }
@@ -188,22 +190,22 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `pas de doublon, cote de sortie seul sans arret devant`() {
+    fun `pas de doublon, contact garde le cote sans repeter`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
-        // bouché à 2 m : le côté parle seul, jamais « obstacle » + côté ensemble
+        // bouché à 2 m : le côté parle seul
         assertEquals("left.", announcer.onFrame(0L, listOf(personne(2f))))
-        // contact ensuite : l'arrêt remplace le côté, une seule phrase aussi
-        assertEquals("obstacle, stop.", announcer.onFrame(200L, listOf(personne(0.4f))))
+        // contact ensuite : même côté, rien de neuf
+        assertNull(announcer.onFrame(200L, listOf(personne(0.4f))))
         assertNull(announcer.onFrame(400L, listOf(personne(0.4f))))
     }
 
     @Test
-    fun `contact anglais dit obstacle stop`() {
+    fun `contact anglais dit le cote`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
         assertEquals(
-            "obstacle, stop.",
+            "left.",
             announcer.onFrame(0L, listOf(personne(0.4f)), SpeechLanguage.En),
         )
         assertNull(announcer.onFrame(200L, listOf(personne(0.45f)), SpeechLanguage.En))
@@ -228,12 +230,12 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `passage SAM bouche avec mesure proche dit stop`() {
+    fun `passage SAM bouche avec mesure proche dit le cote`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true, side = "left", label = "person")
 
         assertEquals(
-            "obstacle, stop.",
+            "left.",
             announcer.onFrame(0L, listOf(personne(0.4f)), samPassage = sam),
         )
     }

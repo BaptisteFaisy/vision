@@ -25,9 +25,10 @@ import org.junit.Test
  *
  * Physique assumée, pas contournée : un mur à 2 m remplit l'image (boîte
  * coupée haut/bas), donc le sténopé ne le mesure pas — le couloir bloque par
- * prudence avec le côté de sortie. Le « stop » à 0,5 m demande une mesure :
+ * prudence avec le côté de sortie. Le contact à 0,5 m demande une mesure :
  * profondeur (serveur `with_depth` ou carte embarquée) ou petit objet
- * mesurable au sténopé. Aucune distance inventée nulle part.
+ * mesurable au sténopé — et le cap droit contourne toujours, même au
+ * contact. Aucune distance inventée nulle part.
  */
 class GuidanceObstaclesTest {
 
@@ -116,7 +117,7 @@ class GuidanceObstaclesTest {
     }
 
     @Test
-    fun `mur à 0,5 m mesuré par la profondeur dit stop`() {
+    fun `mur à 0,5 m mesuré par la profondeur contourne a droite`() {
         val out = depthWallStop()
 
         assertEquals(2, out.readings.size)
@@ -124,20 +125,20 @@ class GuidanceObstaclesTest {
         assertEquals(0.5f, wall.meters, 0.02f)
         assertTrue(out.decision.blocked)
         assertEquals("mur", out.decision.obstacle!!.label)
-        assertEquals(GuidanceWord.Stop, Guidance.word(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision, SpeechLanguage.En))
-        assertEquals("w|stop", Guidance.key(out.decision))
+        assertEquals(GuidanceWord.Right, Guidance.word(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision, SpeechLanguage.En))
+        assertEquals("w|right", Guidance.key(out.decision))
     }
 
     @Test
-    fun `petit objet à 0,5 m mesuré au sténopé dit stop`() {
+    fun `petit objet à 0,5 m mesuré au sténopé contourne a gauche`() {
         val out = pinholeChain(frameOf(seg("chat", boxFor("chat", 0.5f))))
 
         assertEquals(0.5f, out.readings.single().meters, 0.02f)
         assertTrue(out.decision.blocked)
-        assertEquals(GuidanceWord.Stop, Guidance.word(out.decision))
-        assertEquals("Stop.", Guidance.phrase(out.decision))
+        assertEquals(GuidanceWord.Left, Guidance.word(out.decision))
+        assertEquals("Left.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -194,7 +195,7 @@ class GuidanceObstaclesTest {
 
         assertEquals("left.", announcer.onFrame(0L, cut))
         assertNull(announcer.onFrame(100L, cut))
-        assertEquals("obstacle, stop.", announcer.onFrame(200L, depthWallStop().placed))
+        assertEquals("right.", announcer.onFrame(200L, depthWallStop().placed))
     }
 
     companion object {
