@@ -88,6 +88,27 @@ object Optics {
     )
 
     /**
+     * Calibrage depuis `LENS_INTRINSIC_CALIBRATION` (`[fxPx], [fyPx], [cxPx], [cyPx]`,
+     * en pixels de la zone active `[activeWidthPx]`×`[activeHeightPx]`) : focale **et**
+     * centre optique mesurés par le driver, plus justes que la focale (mm) + centre
+     * supposé. `null` si une entrée est incohérente ou si les angles sortent de
+     * [LensSpec.usable] — l'appelant retombe alors sur [lensSpec] (mm), puis les Réglages.
+     * Peu de drivers exposent cette clé : c'est une voie bonus, jamais exigée.
+     */
+    fun lensSpecFromIntrinsics(
+        fxPx: Float,
+        fyPx: Float,
+        cxPx: Float,
+        cyPx: Float,
+        activeWidthPx: Int,
+        activeHeightPx: Int,
+    ): LensSpec? {
+        val spec = LensSpec.fromFocalPx(fxPx, fyPx, cxPx, cyPx, activeWidthPx, activeHeightPx)
+            ?: return null
+        return if (spec.usable) spec else null
+    }
+
+    /**
      * `f_px` d'une image `[imageWidth]`×`[imageHeight]` pour les caractéristiques brutes
      * d'un capteur : le chiffre que réclame le sténopé. `0f` (jamais un `NaN`) quand le
      * capteur ne permet pas de conclure — l'appelant n'affiche alors aucune distance.

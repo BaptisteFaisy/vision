@@ -7,7 +7,8 @@ import dev.sam3vision.core.model.Detection
  *
  * [meters] est la valeur **lissée** (celle qu'on affiche), [rawMeters] la mesure
  * brute de cette frame (celle qu'on journalise), [box] la boîte en pixels de
- * l'image analysée pour retrouver l'objet à l'écran.
+ * l'image analysée pour retrouver l'objet à l'écran, [confidence] la confiance
+ * de la mesure brute (voir [ReadingConfidence]).
  */
 data class DistanceReading(
     val trackId: Int,
@@ -15,6 +16,7 @@ data class DistanceReading(
     val meters: Float,
     val rawMeters: Float,
     val box: List<Float>,
+    val confidence: Float = 1f,
 )
 
 /**
@@ -69,11 +71,13 @@ object Pinhole {
  * taille autre que celle de sa classe, le sol sur un objet **hors du sol** (porté, posé sur
  * un meuble). D'où la règle, et une seule :
  *
- * - les deux valeurs **concordent** (rapport ≤ [COHERENCE_RATIO]) : leur moyenne — deux mesures
- *   indépendantes se trompent rarement du même côté, la moyenne resserre les ±15-20 % ;
+ * - les deux valeurs **concordent** (rapport ≤ [COHERENCE_RATIO]) : leur moyenne
+ *   **pondérée** — deux mesures indépendantes se trompent rarement du même côté,
+ *   et la branche la plus sûre (poids [KnownSizes.fusionWeight] côté sténopé)
+ *   tire le résultat ;
  * - elles **divergent** : une hypothèse est cassée, sans qu'on sache laquelle ; le sténopé
  *   garde la main — c'est la branche validée sur le téléphone, elle ne dépend ni de la pose ni
- *   du fait que l'objet soit posé ;
+ *   du fait que l'objet soit posé, et les poids ne changent rien à cette prudence ;
  * - une seule branche parle (classe inconnue, pas de pose réglée): c'est elle, sans invention.
  */
 object DistanceFusion {
@@ -81,12 +85,23 @@ object DistanceFusion {
     /** Au-delà, les deux branches ne parlent plus du même objet. */
     const val COHERENCE_RATIO = 1.5f
 
-    /** Distance fusionnée, `null` si aucune branche n'a de valeur. */
-    fun combine(standingMeters: Float?, groundMeters: Float?): Float? {
+    /**
+     * Distance fusionnée, `null` si aucune branche n'a de valeur. Les poids ne
+     * jouent que sur la moyenne cohérente ; en divergence, le sténopé garde la
+     * main (la pose du sol peut être fausse, le sténopé est la branche validée).
+     */
+    fun combine(
+        standingMeters: Float?,
+        groundMeters: Float?,
+        standingWeight: Float = 1f,
+        groundWeight: Float = 1f,
+    ): Float? {
         if (standingMeters == null) return groundMeters
         if (groundMeters == null) return standingMeters
         if (ratio(standingMeters, groundMeters) > COHERENCE_RATIO) return standingMeters
-        return (standingMeters + groundMeters) / 2f
+        val standing = standingWeight.takeIf { it.isFinite() && it > 0f } ?: 1f
+        val ground = groundWeight.takeIf { it.isFinite() && it > 0f } ?: 1f
+        return (standingMeters * standing + groundMeters * ground) / (standing + ground)
     }
 
     /** Écart relatif entre deux mesures, ≥ 1 (la plus grande sur la plus petite). */
@@ -132,6 +147,8 @@ class DistanceMeter(
      * Une lecture par objet exploitable, dans l'ordre de [detections]. [trackIds]
      * porte l'identité stable du journal du direct (`null` = objet non identifié :
      * la mesure n'est alors pas lissée, mais elle est quand même rendue).
+     * Les boîtes masquées par une meilleure détection ([Occlusion]) sont écartées :
+     * leur hauteur ne mesure plus l'objet.
      */
     fun measure(
         width: Int,
@@ -142,8 +159,10 @@ class DistanceMeter(
         if (!enabled) return emptyList()
         val focalPx = lens.focalPx(width, height)
         if (focalPx <= 0f) return emptyList()
+        val principalY = lens.principalPx(width, height).second
         return detections.mapIndexedNotNull { index, detection ->
-            readOne(height, detection, trackIds.getOrNull(index), focalPx)
+            if (Occlusion.isOccluded(detections, index)) null
+            else readOne(height, detection, trackIds.getOrNull(index), focalPx, principalY)
         }
     }
 
@@ -152,39 +171,58 @@ class DistanceMeter(
         detection: Detection,
         trackId: Int?,
         focalPx: Float,
+        principalY: Float,
     ): DistanceReading? {
         if (Pinhole.isVerticallyCut(detection.box, height)) return null
-        val raw = rawMeters(height, detection, focalPx) ?: return null
+        val raw = rawMeters(height, detection, focalPx, principalY) ?: return null
         val id = trackId ?: UNTRACKED_ID
-        val smoothed = if (trackId == null) raw else smoother.smooth(trackId, raw)
-        return DistanceReading(id, detection.label, smoothed, raw, detection.box)
+        val smoothed = if (trackId == null) raw.meters else smoother.smooth(trackId, raw.meters)
+        return DistanceReading(id, detection.label, smoothed, raw.meters, detection.box, raw.confidence)
     }
 
     /**
      * La mesure brute d'une frame : les deux branches de la lane, fusionnées par
-     * [DistanceFusion]. Un objet sans hauteur de classe connue peut donc être mesuré s'il est
-     * posé au sol et que la pose est réglée — sans jamais inventer de chiffre.
+     * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], sol à 1). Un objet
+     * sans hauteur de classe connue peut donc être mesuré s'il est posé au sol et
+     * que la pose est réglée — sans jamais inventer de chiffre.
      */
-    private fun rawMeters(height: Int, detection: Detection, focalPx: Float): Float? {
+    private fun rawMeters(
+        height: Int,
+        detection: Detection,
+        focalPx: Float,
+        principalY: Float,
+    ): RawReading? {
         val standing = KnownSizes.heightMeters(detection.label)
             ?.let { Pinhole.distanceMeters(detection.box, it, focalPx) }
-        return DistanceFusion.combine(standing, groundMeters(detection.box, focalPx, height))
+        val ground = groundMeters(detection.box, focalPx, principalY, height)
+        val meters = DistanceFusion.combine(standing, ground, KnownSizes.fusionWeight(detection.label))
+            ?: return null
+        val confidence = ReadingConfidence.of(detection.box, height, standing, ground)
+        return RawReading(meters, confidence)
     }
 
     /**
      * Plan de sol : la ligne des **pieds** (bas de la boîte) donne la distance sans rien savoir
-     * de la classe. Le centre optique est supposé au centre de l'image — l'hypothèse déjà faite
-     * par le reste du fichier — et la ligne des pieds vient d'une boîte non coupée : c'est
-     * [Pinhole.isVerticallyCut], en amont, qui l'a garanti.
+     * de la classe. Le centre optique est celui du calibrage ([LensSpec.principalPx],
+     * centre de l'image par défaut) et la ligne des pieds vient d'une boîte non coupée :
+     * c'est [Pinhole.isVerticallyCut], en amont, qui l'a garanti.
      */
-    private fun groundMeters(box: List<Float>, focalPx: Float, imageHeight: Int): Float? {
+    private fun groundMeters(
+        box: List<Float>,
+        focalPx: Float,
+        principalY: Float,
+        imageHeight: Int,
+    ): Float? {
         val current = pose ?: return null
         if (box.size < 4) return null
-        return GroundPlane.forwardMeters(box[3], current, focalPx, imageHeight / 2f, imageHeight)
+        return GroundPlane.forwardMeters(box[3], current, focalPx, principalY, imageHeight)
     }
 
     companion object {
         /** Identité des objets que le journal n'a pas encore identifiés. */
         const val UNTRACKED_ID = -1
     }
+
+    /** Mesure brute d'une frame : mètres fusionnés + confiance de la mesure. */
+    private data class RawReading(val meters: Float, val confidence: Float)
 }

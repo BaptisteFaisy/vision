@@ -22,13 +22,15 @@ data class CameraIntrinsics(
     companion object {
         /**
          * Intrinsèques depuis le [LensSpec] du téléphone : pixels carrés
-         * (`fx = fy`) et centre optique au milieu de l'image analysée.
-         * `null` si la focale est inutilisable pour cette taille.
+         * (`fx = fy`) et centre optique du calibrage ([LensSpec.principalPx],
+         * milieu de l'image par défaut). `null` si la focale est inutilisable
+         * pour cette taille.
          */
         fun fromLens(spec: LensSpec, width: Int, height: Int): CameraIntrinsics? {
             val focal = spec.focalPx(width, height)
             if (!focal.isFinite() || focal <= 0f) return null
-            return CameraIntrinsics(focal, focal, (width - 1) / 2f, (height - 1) / 2f)
+            val (cx, cy) = spec.principalPx(width, height)
+            return CameraIntrinsics(focal, focal, cx, cy)
         }
     }
 }
