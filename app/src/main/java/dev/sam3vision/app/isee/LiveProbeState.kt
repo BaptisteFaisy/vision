@@ -96,6 +96,12 @@ data class LiveProbeState(
     val crossingOffer: Boolean = false,
     /** Passage ou feu vu sur la dernière frame publiée (brut, sans mémoire ni silence). */
     val crossingVisible: Boolean = false,
+    /**
+     * Lignes du scan traversée (`null` = inactif : rien à l'écran) : consigne
+     * ou constat en cours + constats latéraux déjà rendus, lus sur la vidéo
+     * ([CrosswalkScanBanner]). Publiées avec la phrase, dans la même écriture.
+     */
+    val scanLines: CrosswalkScanLines? = null,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     val error: String? = null,
