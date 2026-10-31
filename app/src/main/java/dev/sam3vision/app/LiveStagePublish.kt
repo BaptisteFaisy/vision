@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.model.LiveFrame
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +34,11 @@ internal fun LiveViewModel.publishStages(frame: LiveFrame?) {
     pixel.publish(snapshot)
 }
 
-internal fun LiveViewModel.publishDrawnStages() =
-    pixel.publish(chronology.snapshot(_state.value.timings))
+internal fun LiveViewModel.publishDrawnStages() {
+    val snapshot = chronology.snapshot(_state.value.timings)
+    pixel.publish(snapshot)
+    LiveLatencyLog.frame(snapshot)
+}
 
 /** Boîtes prédites de la frame caméra, posées si la couche a changé. */
 internal fun LiveViewModel.publishPrediction() {
