@@ -41,25 +41,6 @@ class CrossingWiringTest {
     }
 
     @Test
-    fun `un passage pieton propose sans activer`() {
-        // La proposition ne remplace pas le libelle d'etat : hors mode, elle
-        // annonce ce qui est reconnu et laisse la main a l'utilisateur.
-        assertEquals("Crosswalk — cross?", crossingButtonLabel(false, null, offer = true))
-        assertEquals("Crosswalk — cross?", crossingButtonLabel(false, CrossingState.Green, offer = true))
-    }
-
-    @Test
-    fun `en mode actif la proposition ne change rien`() {
-        assertEquals("Crossing: GREEN", crossingButtonLabel(true, CrossingState.Green, offer = true))
-        assertEquals("Crossing: RED", crossingButtonLabel(true, CrossingState.Red, offer = true))
-    }
-
-    @Test
-    fun `sans proposition le libelle reste celui d avant`() {
-        assertEquals("Crossing: OFF", crossingButtonLabel(false, null, offer = false))
-    }
-
-    @Test
     fun `mode actif libelle l etat du feu`() {
         assertEquals("Crossing: GREEN", crossingButtonLabel(true, CrossingState.Green))
         assertEquals("Crossing: RED", crossingButtonLabel(true, CrossingState.Red))

@@ -50,7 +50,7 @@ internal fun crossingPhraseOf(
 
 /**
  * Voix douce des personnes en mode Traversée, une par processus (même garde
- * des 500 lignes que `CrossingOfferWatch`) : l'évitement des personnes sur le
+ * des 500 lignes que `CrossingLateralWatch`) : l'évitement des personnes sur le
  * passage d'abord (statiques comprises — « Droite. », mot nouveau seul, clip
  * < 100 ms), le décalage opposé aux approches ensuite (miroir du guidage
  * normal), les positions au cadran sinon (« Personne à 9 heures »),
