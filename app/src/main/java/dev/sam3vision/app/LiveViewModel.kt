@@ -16,6 +16,7 @@ import dev.sam3vision.app.live.LiveFpsMeter
 import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
+import dev.sam3vision.app.pose.PitchMeter
 import dev.sam3vision.app.live.LivePositionVoice
 import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
@@ -84,6 +85,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Distances caméra→objets : sténopé + hauteurs connues, lissées par piste. */
     private val distances = DistanceMeter()
+    private val pitch = PitchMeter(app, distances) // IMU → pose, null sans capteur
 
     /** Chemins centraux des objets suivis : le centre de chaque boîte allonge sa piste. */
     private val centerTrails = CenterTrails()
@@ -240,7 +242,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         asker.reset()
         centerTrails.reset()
         distances.enabled = settings.distanceOverlayEnabled
-        distances.reset()
+        distances.reset(); pitch.start()
         prediction = LivePrediction(enabled = settings.boxPredictionEnabled)
         adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)
         distances.setLens(chosenLens(settings.cameraFovDeg, sensorLens))
@@ -442,7 +444,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val wasRunning = _state.value.running
         foregroundGate.onBackground(wasRunning)
         if (!wasRunning) return
-        pipeline?.reset()
+        pipeline?.reset(); pitch.stop()
         val closing = tracker
         session = null
         tracker = null
@@ -472,7 +474,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // Fermeture de session côté backend, sans bloquer l'arrêt de l'écran.
         LiveTransportLog.info("stop session track fermee tracker=" + (closing != null))
         viewModelScope.launch { closing?.stop() }
-        distances.reset()
+        distances.reset(); pitch.stop()
         prediction.reset()
         adaptive.reset()
         wake.reset()
