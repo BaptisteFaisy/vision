@@ -24,14 +24,21 @@ name: auto-approve
 # propriétaire, `actions: write`), puis le jeton de l'installation en repli
 # (il peut approuver un run du dépôt ; s'il refuse, on le dit et on continue).
 on:
-  # Le vrai déclencheur : chaque fin de `CI` ou de `couche0` dans le dépôt.
+  # Le vrai déclencheur : chaque fin de `CI` dans le dépôt.
   # Mesuré le 31/10 : le `schedule` de ce dépôt est étalé par GitHub à **3-5 h**
   # (17 passages en 3 jours pour un cron `*/5` de `pr-auto-merge`), donc un cron
   # seul ne tient pas la promesse « approuvé dans les 5 min ». Les fins de `CI`
-  # et de `couche0` arrivent plusieurs fois par heure : le balayage est alors
-  # gratuit (un job de ~6 s) et quasi immédiat.
+  # arrivent plusieurs fois par heure : le balayage est alors gratuit (un job de
+  # ~6 s) et quasi immédiat.
+  # `couche0` n'y est plus (31/10) : il finit ~9 s après un push, donc son
+  # réveil tombait toujours avant le verdict et ne trouvait aucun run en
+  # attente. Mesuré le 31/10 (25 balayages échantillonnés entre 19h et 22h) :
+  # 160 runs vus, **0 approuvé** — que du passé périmé, jamais un run frais.
+  # Un push au jeton d'action, lui, ne produit AUCUN run terminé (tout naît en
+  # `action_required`) : c'est le cron ci-dessous qui rattrape, et la prochaine
+  # fin de `CI` d'une autre PR qui donne le coup de pouce.
   workflow_run:
-    workflows: ["CI", "couche0"]
+    workflows: ["CI"]
     types: [completed]
   # Filet pour le cas où plus rien ne tourne (push au jeton d'action : aucun run
   # n'aboutit, donc aucun `workflow_run` ne réveille).

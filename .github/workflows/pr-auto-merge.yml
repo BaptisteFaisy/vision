@@ -97,6 +97,14 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v27 (31/10) réveils : `couche0` ne déclenche plus le balayage. Il finit
+#       ~9 s après un push, `CI` ~115 s : son réveil tombait toujours avant le
+#       verdict et ne pouvait que constater « CI en cours ». Mesuré de 20:10 à
+#       22:10 : 41 fins de `couche0` pour 21 runs `CI` — la moitié des
+#       balayages de la fenêtre pour rien. Les deux cas qu'il couvrait encore
+#       sont pris ailleurs : un `couche0` rouge arrive par la fin de `CI` de la
+#       même tête, un `couche0` réarmé seul (bloc `## Scope` réécrit) arrive
+#       par `pull_request: edited`.
 #   v26 (31/10) couverture des états actionnables : le balayage ciblé joint
 #       toujours les PR `DIRTY`/`BLOCKED`/`DRAFT` — un run ciblé annulé par une
 #       rafale de concurrency laissait sinon sa tête sans réveil (#652).
@@ -162,16 +170,27 @@ on:
   # Uniquement les moments où le balayage peut *faire* quelque chose : les
   # événements `pull_request` larges (opened/synchronize/reopened) arrivaient
   # avant que le moindre check existe (52 runs/jour pour rien, mesuré le 29/10).
+  # `edited` (v26, 31/10) : une réécriture de corps de PR — le bloc `## Scope`
+  # posé par l'agent de périmètre — réarme `couche0` seul, sans nouveau `CI`.
+  # C'était le seul réveil que la fin de `couche0` apportait encore ; il est
+  # maintenant pris à la source, sans réveiller le balayeur pour rien.
   pull_request:
-    types: [ready_for_review]
+    types: [ready_for_review, edited]
   push:
     branches: [master]
   schedule:
     - cron: '*/5 * * * *'
   workflow_run:
-    # `ci-budget` est un job de `CI` depuis le 29/10 : ces deux workflows
-    # couvrent les trois checks requis.
-    workflows: ["CI", "couche0"]
+    # `ci-budget` est un job de `CI` depuis le 29/10 : `CI` couvre les trois
+    # checks requis. `couche0` n'y est PLUS (v26, 31/10) : il finit ~9 s après
+    # un push quand `CI` met ~115 s, donc son réveil arrivait toujours avant le
+    # verdict — il ne pouvait structurellement rien faire d'autre que constater
+    # « CI en cours ». Mesuré de 20:10 à 22:10 : 41 fins de `couche0` pour
+    # 21 runs `CI`, soit ~la moitié des 69 balayages de la fenêtre.
+    # Ce qui reste couvert : un `couche0` rouge arrive par la fin de `CI` de la
+    # même tête (elle est postérieure, même sans rapport entre les deux jobs),
+    # et un `couche0` réarmé seul arrive par `pull_request: edited`.
+    workflows: ["CI"]
     types: [completed]
 
 # Un seul balayage à la fois (v16), sans annulation.
