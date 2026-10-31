@@ -83,4 +83,17 @@ class TwinLiteWordTest {
         assertFalse(TwinLiteWord.isStopPhrase("Stop."))
         assertFalse(TwinLiteWord.isStopPhrase("personne devant à 2 mètres."))
     }
+
+    @Test
+    fun `virage gauche droite, pas tout droit ni stop`() {
+        assertTrue(TwinLiteWord.isTurnWord("gauche."))
+        assertTrue(TwinLiteWord.isTurnWord("droite."))
+        assertTrue(TwinLiteWord.isTurnWord("left."))
+        assertTrue(TwinLiteWord.isTurnWord("right."))
+        assertFalse(TwinLiteWord.isTurnWord("tout droit."))
+        assertFalse(TwinLiteWord.isTurnWord("straight ahead."))
+        assertFalse(TwinLiteWord.isTurnWord("obstacle, arrêtez-vous."))
+        assertFalse(TwinLiteWord.isTurnWord("Gauche."))
+        assertFalse(TwinLiteWord.isTurnWord(""))
+    }
 }

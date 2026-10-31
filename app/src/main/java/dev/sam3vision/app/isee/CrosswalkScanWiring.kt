@@ -65,6 +65,15 @@ internal fun resetCrossingWatches() {
 }
 
 /**
+ * Procédure scan en cours : l'user est arrêté sur les zébrures, le scan
+ * garde la voix (consignes « regardez à gauche/droite » + constats) et
+ * l'évitement marche se tait (§ 25 — un ordre « Gauche. » au milieu du
+ * « Regardez à gauche. » ferait confondre marcher et regarder).
+ */
+internal fun scanRunning(): Boolean =
+    CrosswalkScanWatch.phase().let { it != CrosswalkScanPhase.Idle && it != CrosswalkScanPhase.Done }
+
+/**
  * Scan traversée, un par processus (même garde des 500 lignes que
  * [CrossingLateralWatch]) : la machine [CrosswalkScan] + le lacet [YawMeter],
  * écouté le temps du scan seul (démarré au déclencheur confirmé, coupé au

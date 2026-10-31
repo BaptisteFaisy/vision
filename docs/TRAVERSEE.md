@@ -261,23 +261,22 @@ seuls les mots d'évitement parlent.
   passage sans bandes se traverse sans zébrures), et seul un refus manuel
   fait taire la proposition une minute (`setCrossingActive(auto = …)`) ;
 - **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
-  (12 concepts, plafond 16 tenu) ; le feu parle en premier, et sur son
-  silence seuls les mots d'évitement parlent (« Droite. » / « Gauche. »,
-  `CrossingPeopleWatch`) — les annonces au cadran (« Personne à 9 heures »)
-  sont coupées depuis le 31/10 (ordre user : esquiver au maximum, sans décrire) ;
+  (12 concepts, plafond 16 tenu) ; les mots d'évitement passent devant le
+  feu (§ 25 : ordre d'évitement d'abord, feu ensuite), les annonces au
+  cadran (« Personne à 9 heures ») sont coupées depuis le 31/10 (ordre
+  user : esquiver au maximum, sans décrire) ;
 - **décalage opposé** (30/10, après-midi, étendu le soir aux obstacles) : des
   gens proches qui s'approchent d'un côté disent d'aller de l'autre
   (« Droite. », mot nouveau seul, clip < 100 ms — le même `LateralNudgeTracker`
   que le guidage normal, sans positions en traversée — supprimées le 31/10) ;
   depuis le soir, tout obstacle proche qui s'approche (objet, poteau — même
   filtre que le couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
-  (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; un ordre du feu nouveau
-  fait taire la voix
-  douce 2,5 s (`CUE_QUIET_MS`, les répétitions — même phrase, rouge ou
-  vert — ne réarment pas) — sans ce silence, le `collectLatest` côté sonde
-  jetterait l'ordre pas encore joué (`CrossingPeopleVoice.kt`, la sonde ne
-  change que d'une ligne) ; depuis le 31/10 le vert se répète toutes les
-  2 s comme le rouge, un ordre jeté se rattrape à la répétition suivante ;
+  (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; les mots ne sont
+  plus tus par le feu (§ 25, 31/10 : ils passent devant — le silence doux
+  2,5 s `CUE_QUIET_MS` ne couvre plus que les véhicules, ordre du feu
+  nouveau, répétitions non réarmantes) ; depuis le 31/10 le vert se répète
+  toutes les 2 s comme le rouge, un ordre jeté se rattrape à la répétition
+  suivante ;
 - **états moteurs** (30/10, soir ; stop déplacé le 31/10) : en traversée,
   les voitures disent si elles roulent ou sont arrêtées (« Stop, car
   moving. » — « Stop, 2 vehicles moving. » au pluriel — si le mouvement
@@ -403,7 +402,8 @@ Ordre user : sur un passage **sans feu**, le scan gauche/droite est coupé —
 iSee dit les voitures en mouvement en permanence (voix véhicules, priorité
 absolue en traversée, même loin) et, toutes les 2 s, si on peut traverser :
 « Traversez. » / « Cross. » sans danger, « Attendez. » / « Wait. » sur
-danger. Avec feu : inchangé (feu > scan > véhicules > personnes).
+danger. Avec feu : scan > stop urgent > évitement > feu > véhicules doux
+(§ 25 ; le scan garde la voix pendant sa procédure).
 
 - **porte** : `NoLightGate` (core) — 4 frames sans boîte de feu → sans-feu
   (le faux « sans feu » se prouve comme un vert) ; toute boîte réapparue
