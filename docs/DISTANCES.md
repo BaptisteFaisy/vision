@@ -45,7 +45,9 @@ restent acceptés : seule la hauteur porte la mesure.
 
 **Objet masqué par une meilleure détection ⇒ pas de distance** (`Occlusion.isOccluded`) : une boîte
 contenue à **60 %** dans celle d'une détection mieux scorée ne mesure plus son objet (la personne
-derrière la voiture sortirait trop loin). Recouvrement partiel ou scores égaux : les deux sont mesurés.
+derrière la voiture sortirait trop loin). Recouvrement partiel, scores égaux ou masqueur moins bien
+scoré : les deux sont mesurés — choix conservateur (une pastille de trop plutôt qu'une manquante),
+au prix d'une boîte tronquée mesurée trop loin quand le masqueur est mal scoré.
 
 ## Lissage : lisible à 1-2 images par seconde
 
@@ -64,8 +66,10 @@ un peu plus qu'en Direct.
 
 Quand le sténopé et le plan de sol parlent tous deux et concordent (rapport ≤ 1,5), la lecture est leur
 **moyenne pondérée** (`DistanceFusion.combine`) : le sténopé pèse `1 / (1 + tolérance de sa classe)`
-(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse 1. En cas de divergence, le sténopé garde
-la main quels que soient les poids — la pose du sol peut être fausse, le sténopé est la branche validée.
+(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse selon la dépression de ses pieds
+(`GroundWeight` : 1 dès 0,2 rad, 0,25 vers l'horizon — de près le sol tire, de loin le sténopé
+reprend la main). En cas de divergence, le sténopé garde la main quels que soient les poids —
+la pose du sol peut être fausse, le sténopé est la branche validée.
 
 Chaque lecture porte sa **confiance** (`ReadingConfidence`, 0..1) : `1 − 1 px / hauteur de boîte`
 (quantification : 0,995 à 200 px, 0,90 à 10 px), multipliée par l'accord des branches quand les deux
@@ -161,12 +165,12 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
   deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes, occlusion (masquée
   écartée, partielle/égaux gardés), confiance croissante avec la boîte.
-- `core.distance.DistanceFusionTest` (**13**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
-  sténopé gardé en divergence, poids par tolérance, centre optique décentré.
-- `core.distance.ReadingQualityTest` (**6**) : occlusion (contenue, scores égaux, seuil, malformée), confiance (quantification, accord des branches).
+- `core.distance.DistanceFusionTest` (**14**) : cohérence, sol seul, coupé, bornes sol, moyenne pondérée,
+  sténopé gardé en divergence, poids par tolérance, sténopé dominant de loin, centre optique décentré.
+- `core.distance.ReadingQualityTest` (**10**) : occlusion (contenue, scores égaux, masqueur faible gardé, NaN, seuil exact, malformée), confiance (quantification, accord des branches), poids sol (dépression, plancher).
 - `core.distance.DistanceBenchmarkTest` (**5**) : banc de précision — aller-retour sténopé 0,5-50 m, aller-retour sol (3 pitchs, centre décentré), enveloppe ±1 px, fusion à branches d'accord.
 - `core.distance.GroundPlaneTest` (**17**) : horizon, dépression, ligne à distance, pieds→mètres, latéral, point complet.
-- `core.distance.DistanceTextTest` (**7**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
+- `core.distance.DistanceTextTest` (**8**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
 - `core.live.LiveTimelineTest` (**10**, dont le test « record rend l'identité **dans l'ordre des détections** »,
   `null` pour une détection inexploitable).
 - `core.live.PositionTextTest` (**10**) + `PositionAnnouncerTest` (**8**) : secteurs, ordre de lecture, distance

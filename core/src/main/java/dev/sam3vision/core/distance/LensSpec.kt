@@ -105,7 +105,9 @@ data class LensSpec(
          * (`cx`, `cy`), dans les coordonnées de la zone active
          * `[refWidthPx]`×`[refHeightPx]` — le contenu de `LENS_INTRINSIC_CALIBRATION`.
          * `null` si une entrée est incohérente ou si le centre sort du capteur.
-         * Le tour est exact : [focalPx] et [principalPx] retrouvent les entrées.
+         * Le tour est exact à taille de référence : [focalPx] et [principalPx]
+         * y retrouvent les entrées (aux échelles réduites, ~0,1 px d'écart sur
+         * le centre, la focale scalant en `W/2` et le centre en `(W−1)/2`).
          */
         fun fromFocalPx(
             fxPx: Float,
