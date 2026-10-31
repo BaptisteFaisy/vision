@@ -16,6 +16,7 @@ import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.picto.matchTemplate
 import dev.sam3vision.core.settings.Settings
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -110,14 +111,14 @@ class IseePicto(
         if (busy) return
         busy = true
         update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting), status = null) }
-        scope.launch(io) {
+        launchGuarded {
             val shot = shoot()
             if (shot == null) {
                 fail(IseeStatusText.PICTO_PHOTO_FAILED)
-                return@launch
+            } else {
+                update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
+                generate(shot.first, shot.second, "")
             }
-            update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-            generate(shot.first, shot.second, "")
         }
     }
 
@@ -131,14 +132,14 @@ class IseePicto(
         if (busy || label.isBlank()) return
         busy = true
         update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
-        scope.launch(io) {
+        launchGuarded {
             val shot = shoot()
             if (shot == null) {
                 fail(IseeStatusText.PICTO_PHOTO_FAILED)
-                return@launch
+            } else {
+                update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
+                generateAndArm(shot.first, shot.second, label)
             }
-            update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-            generateAndArm(shot.first, shot.second, label)
         }
     }
 
@@ -147,7 +148,11 @@ class IseePicto(
         val pending = draft ?: return
         draft = null
         scope.launch(io) {
-            runCatching { store.save(label, pending.png, pending.template) }
+            val saved = runCatching { store.save(label, pending.png, pending.template) }
+            if (saved.isFailure) {
+                fail(IseeStatusText.pictoFailed(saved.exceptionOrNull() ?: IllegalStateException("save failed")))
+                return@launch
+            }
             load()
             update { it.copy(picto = PictoUiState(armed = pictos.size), status = IseeStatusText.PICTO_SAVED) }
         }
@@ -159,7 +164,7 @@ class IseePicto(
         if (busy) return
         busy = true
         update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-        scope.launch(io) { generate(pending.photo, pending.template, label) }
+        launchGuarded { generate(pending.photo, pending.template, label) }
     }
 
     /** L'aidant abandonne : rien n'est stocké, rien ne reste armé de plus. */
@@ -229,13 +234,29 @@ class IseePicto(
         val result = clientOf(settings()).editToPictogram(photo, label)
         result.fold(
             onSuccess = { png ->
-                runCatching { store.save(label, png, template) }
+                runCatching { store.save(label, png, template) }.onFailure {
+                    fail(IseeStatusText.pictoFailed(it))
+                    return
+                }
                 load()
                 busy = false
                 update { it.copy(picto = PictoUiState(armed = pictos.size), status = IseeStatusText.PICTO_SAVED) }
             },
             onFailure = { fail(IseeStatusText.pictoFailed(it)) },
         )
+    }
+
+    /** Tâche gardée : une levée inattendue (caméra…) rend un motif, jamais un blocage. */
+    private fun launchGuarded(block: suspend () -> Unit) {
+        scope.launch(io) {
+            try {
+                block()
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                fail(IseeStatusText.pictoFailed(e))
+            }
+        }
     }
 
     /** Échec : repos, brouillon jeté, motif affiché. */

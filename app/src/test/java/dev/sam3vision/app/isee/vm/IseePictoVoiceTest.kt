@@ -7,7 +7,6 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,10 +45,11 @@ class IseePictoVoiceTest {
     }
 
     @Test
-    fun `mot visant un repere ouvre le direct en guidage muet`() = runBlocking {
+    fun `mot visant un repere reste sur place et confirme`() = runBlocking {
         assertTrue(voice().run("médicament"))
-        assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoHunt = "medicament"), null)), opened)
-        assertTrue(spoken.isEmpty())
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Je cherche medicament."), spoken)
+        assertEquals("Je cherche medicament.", state.status)
     }
 
     @Test
@@ -62,9 +62,8 @@ class IseePictoVoiceTest {
     @Test
     fun `le repere prime sur sam`() = runBlocking {
         assertTrue(voice(listOf("clés")).run("clé"))
-        assertEquals(1, opened.size)
-        assertEquals("cle", opened.single().first.pictoHunt)
-        assertNull(opened.single().second)
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Je cherche cle."), spoken)
     }
 
     @Test
@@ -101,11 +100,12 @@ class IseePictoVoiceTest {
     }
 
     @Test
-    fun `find prime sur la chasse d un repere arme`() = runBlocking {
+    fun `find avec repere arme chasse au lieu de regenerer`() = runBlocking {
         val found = mutableListOf<String>()
         assertTrue(voice(listOf("keys"), found = found).run("find the keys"))
-        assertEquals(listOf("keys"), found)
+        assertTrue(found.isEmpty())
         assertTrue(opened.isEmpty())
+        assertEquals(listOf("Je cherche keys."), spoken)
     }
 
     @Test
@@ -130,12 +130,13 @@ class IseePictoVoiceTest {
     }
 
     @Test
-    fun `where avec repere arme chasse au lieu de regenerer`() = runBlocking {
+    fun `where avec repere arme chasse sur place au lieu de regenerer`() = runBlocking {
         val found = mutableListOf<String>()
         assertTrue(voice(listOf("keys"), SpeechLanguage.En, found).run("Where are my keys"))
         assertTrue(found.isEmpty())
-        assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoHunt = "keys"), null)), opened)
-        assertTrue(spoken.isEmpty())
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf("Looking for keys."), spoken)
+        assertEquals("Looking for keys.", state.status)
     }
 
     @Test

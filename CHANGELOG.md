@@ -4,6 +4,31 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — iSee : pictos Find/Where affichés sur la page blanche, chasse sans Direct (branche `feat/isee-picto-page-blanche`)
+
+- **Demande** : « Find my keys » doit trouver sur l'image, créer le gros
+  pictogramme jaune/noir et l'afficher au-dessus des clés quand il est
+  généré — tout sur la page blanche, jamais le Direct. Constats téléphone
+  (captures 14:04/14:18, APK 1.0.1-dc88114) : boîte « Generating… » puis rien
+  affiché alors que 3 repères sont armés, et renvoi vers le Direct dès que le
+  repère existe.
+- Fait : `picturingToMatcher` (porte pure, `IseeVisionCard.kt`) — les repères
+  armés sont cherchés dès que la caméra est active, plus seulement quand la
+  vidéo tourne ; `IseePictoVoice` — la chasse d'un repère armé reste sur
+  place (overlay + confirmation vocale), « Find »/« Where » avec repère armé
+  chassent au lieu de régénérer (fini les doublons à 0,01 $) ;
+  `IseePicto.launchGuarded` — une levée inattendue (caméra…) rend un motif au
+  lieu de bloquer la boîte, sauvegardes vérifiées (jamais « Picto saved » si
+  l'écriture a raté). Création FR, démo et mot maison seul partent toujours
+  au Direct (inchangé).
+- Preuves : `:app:testDebugUnitTest` 1 373 tests 0 échec dont
+  `PicturingGateTest` 4/4, `IseePictoVoiceTest` 14/14, `IseePictoTest` 13/13
+  (7 rouges avant le correctif, verts après) ;
+  `:core:testDebugUnitTest` 2 448 tests, 5 échecs pré-existants
+  `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows, classe hors
+  périmètre — reproduits sur master intact en worktree le 31/10) ;
+  `check-kotlin-limits.py` vert, `check-isee-design.py` vert, `assembleDebug`
+  vert (`app-debug.apk`).
 ## 2026-10-31 — Distances : intrinsèques du téléphone mesurées et verrouillées
 
 - **Demande** : étudier la caméra du téléphone pour exploiter ses caractéristiques réelles.
