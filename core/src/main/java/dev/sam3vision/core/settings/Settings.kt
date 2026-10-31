@@ -118,12 +118,6 @@ data class Settings(
      */
     val continuousCadenceEnabled: Boolean = false,
     /**
-     * Carte de debug : tracé schématique de l'itinéraire guidé + position GPS,
-     * en fond de l'écran iSee (derrière la boule et les textes). `true` par
-     * défaut ; sans guidage actif, rien n'est dessiné et l'écran est inchangé.
-     */
-    val debugRouteMapEnabled: Boolean = true,
-    /**
      * Guidage GPS : la destination confirmée (« emmène-moi à X ») part en guidage
      * Google Maps (`google.navigation:` puis repli URL universelle). Éteint : seule
      * la fiche du lieu s'affiche, sans lancer de guidage. `true` par défaut.
@@ -368,7 +362,6 @@ data class Settings(
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, continuousCadenceEnabled=$continuousCadenceEnabled, " +
         "adaptiveUploadEnabled=$adaptiveUploadEnabled, keyframeSchedulerEnabled=$keyframeSchedulerEnabled, " +
-        "debugRouteMapEnabled=$debugRouteMapEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "outdoorMode=$outdoorMode, " +
         "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +

@@ -53,7 +53,6 @@ import kotlinx.coroutines.delay
 fun IseeScenePane(
     state: IseeUiState,
     viewModel: IseeViewModel,
-    debugMapEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val glue = rememberCameraGlue(viewModel)
@@ -63,8 +62,6 @@ fun IseeScenePane(
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        // Carte de debug : derrière la rue, la boule et les textes.
-        DebugRouteMapLayer(debugMapEnabled, viewModel, Modifier.fillMaxSize())
         PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }
 }

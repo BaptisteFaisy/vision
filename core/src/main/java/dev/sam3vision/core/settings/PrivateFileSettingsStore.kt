@@ -121,7 +121,6 @@ internal object SettingsCodec {
     private const val K_KEYFRAME_SCHEDULER = "keyframeSchedulerEnabled"
     private const val K_LOCAL_OVERLAY = "localOverlayEnabled"
     private const val K_CONTINUOUS_CADENCE = "continuousCadenceEnabled"
-    private const val K_DEBUG_ROUTE_MAP = "debugRouteMapEnabled"
     private const val K_NAVIGATION_GUIDANCE = "navigationGuidanceEnabled"
     private const val K_OUTDOOR_MODE = "outdoorMode"
     private const val K_ROUTE_BASE_URL = "routeBaseUrl"
@@ -164,7 +163,6 @@ internal object SettingsCodec {
         appendLine("$K_KEYFRAME_SCHEDULER=${s.keyframeSchedulerEnabled}")
         appendLine("$K_LOCAL_OVERLAY=${s.localOverlayEnabled}")
         appendLine("$K_CONTINUOUS_CADENCE=${s.continuousCadenceEnabled}")
-        appendLine("$K_DEBUG_ROUTE_MAP=${s.debugRouteMapEnabled}")
         appendLine("$K_NAVIGATION_GUIDANCE=${s.navigationGuidanceEnabled}")
         appendLine("$K_OUTDOOR_MODE=${s.outdoorMode}")
         appendLine("$K_ROUTE_BASE_URL=${s.routeBaseUrl}")
@@ -216,8 +214,6 @@ internal object SettingsCodec {
             localOverlayEnabled = values[K_LOCAL_OVERLAY]?.toBooleanStrictOrNull()
                 ?: default.localOverlayEnabled,
             continuousCadenceEnabled = values[K_CONTINUOUS_CADENCE]?.toBooleanStrictOrNull() ?: default.continuousCadenceEnabled,
-            debugRouteMapEnabled = values[K_DEBUG_ROUTE_MAP]?.toBooleanStrictOrNull()
-                ?: default.debugRouteMapEnabled,
             navigationGuidanceEnabled = values[K_NAVIGATION_GUIDANCE]?.toBooleanStrictOrNull()
                 ?: default.navigationGuidanceEnabled,
             outdoorMode = values[K_OUTDOOR_MODE]?.toBooleanStrictOrNull() ?: default.outdoorMode,
