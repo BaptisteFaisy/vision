@@ -44,6 +44,47 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   0 échec, rapports XML du 31/10) ; `check-kotlin-limits.py` vert. Suite
   complète `:app` et `assembleDebug` non rejoués (boîte chargée, changement
   additif au périmètre lunettes).
+## 2026-10-31 — iSee : scan traversée « stop, regardez à gauche et à droite » (branche `feat/scan-traversee`)
+
+- **Demande** : « si iSee détecte un passage piéton à moins de 2 m et si l'user est sur le
+  passage, dire stop et regarder à droite et à gauche pour vérifier qu'une voiture n'est pas en
+  mouvement » — consigne à l'user + verdict explicite (choix user du 31/10).
+- Fait : `CrosswalkScan` (machine core pure : « Stop. » → consigne gauche → virage à gauche
+  prouvé, 60° signés depuis le cap du scan, ou timeout 6 s → observation 2,5 s → constat parlé
+  (« Attention, voiture à gauche. » / « Rien à gauche. ») → même chose à droite → silence si
+  libre, sinon re-vérification obligatoire (attente 3 s + nouveau cycle, max 3 cycles, puis
+  release au veto), horloges gelées pendant le feu, consigne corrigée « Non, regardez à … »
+  si l'user tourne du mauvais côté) ; bandeau écran miroir (consigne + constats latéraux
+  « Pas de voiture à … en mouvement » / « Voiture à … ! ») ; mouvement latéral véhicules
+  (`VehicleApproach` : vitesse x lissée > 8 %/s — le tau ne voyait pas la traversée du champ
+  à taille stable, suivi par les annonces d'état, pas par le veto, tué par le véto fond
+  caméra comme l'approche) ; `YawMeter` (lacet écouté le temps du scan seul, helper
+  `RotationVector` partagé avec `PitchMeter`) ; priorité feu > scan > véhicules > personnes
+  (`crossingPhraseOf` via `phraseOf`).
+- Preuves : `:core:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanTest`
+  21/21, `VehicleApproachTest` 16/16, `VehicleStateLateralTest` 2/2) ;
+  `:app:testDebugUnitTest` vert (BUILD SUCCESSFUL — `CrosswalkScanWiringTest`
+  10/10, `CrosswalkScanDisplayTest` 10/10, suites traversée sans régression) ;
+  `check-kotlin-limits.py` vert ; `assembleDebug` vert (`app-debug.apk`). Recette téléphone :
+  fumée Redmi OK (install + lancement + pid vivant) ; recette passage réel **non mesurée**
+  (constats, virages et re-vérification à valider rue).
+
+## 2026-10-31 — iSee : écoute auto à l'ouverture de la session lunettes (branche `feat/isee-ecoute-auto-session`)
+
+- **Demande** : au démarrage d'une session lunettes, le mode speech (écoute
+  mains-libres) doit s'activer seul, sans appui long ni téléphone.
+- Fait : `GlassesAutoListen` (porte armée à l'attache caméra, tirée au premier
+  flux montant, une seule fois par session) ; `GlassesTalkPolicy.autoListen`
+  (n'ouvre que micro prêt et repos, jamais d'envoi seul) ;
+  `GlassesTalk.autoStart` + branchement contrôleur (`arm` à l'attache caméra,
+  `onStreaming`, `disarm` à la fermeture). Micro absent : rien ne s'ouvre
+  (le refus s'est déjà dit) ; « Hey Meta, ouvre iSee » inchangé (une seule
+  écoute, pas de double déclenchement avec l'invocation vocale).
+- Preuves : `:app:testDebugUnitTest` ciblé — `GlassesTalkTest` 14/14,
+  `GlassesTalkPolicyTest` 8/8, `GlassesAutoListenTest` 5/5 (11 nouveaux tests,
+  0 échec, rapports XML du 31/10) ; `check-kotlin-limits.py` vert. Suite
+  complète `:app` et `assembleDebug` non rejoués (boîte chargée, changement
+  additif au périmètre lunettes).
 
 ## 2026-10-31 — traversée : le feu dit rouge ou vert toutes les 2 s (branche `vert-repete-2s`)
 

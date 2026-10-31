@@ -432,8 +432,9 @@ _state.update { it.cleared() }
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
             onCrop = cropLogger?.tap(),
         )
+        val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec)
         val phrase = phraseOf(cross, placed, readings, frame, at, speechLanguage,
-            distances.lensSpec.widthFovDeg(frame.width, frame.height))
+            distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger)
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
         pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
@@ -462,6 +463,7 @@ _state.update { it.cleared() }
                 crossing = cross?.state ?: current.crossing, crossingBox = cross?.box, traversePhase = cross?.phase,
                 crossingOffer = CrossingOfferWatch.update(frame.objects, at, _state.value.crossingActive, crossingOfferMeters(readings, distances.pose, distances.lensSpec, frame.width, frame.height), frame.height),
                 crossingVisible = CrossingOfferWatch.lastVisible || cross?.box != null,
+                scanLines = CrosswalkScanWatch.display(speechLanguage),
                 transport = transportLabel(active),
                 error = null,
             )

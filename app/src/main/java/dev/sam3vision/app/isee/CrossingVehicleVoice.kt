@@ -30,6 +30,13 @@ internal object CrossingVehicleWatch {
     private val quiet = CrossingCueQuiet()
 
     /**
+     * Mouvement brut de la dernière frame vue ([VehicleStateWatcher]) :
+     * le scan traversée y lit « un véhicule est en mouvement dans cette
+     * vue ». Lu après [update] (qui nourrit le guetteur), `false` avant.
+     */
+    val movingNow: Boolean get() = watcher.movingThisFrame
+
+    /**
      * Voix de la frame, `null` = silence (rien, déjà dit, le feu parle,
      * ou ordre du feu à laisser entier). [cue] non nul = le feu parle sur
      * cette frame : l'ordre est mémorisé et la voix se tait. Mouvement

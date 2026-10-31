@@ -403,13 +403,13 @@ internal fun LiveProbe.phraseOf(
     at: Long,
     language: SpeechLanguage,
     hfovDeg: Float,
+    scanTrigger: Boolean = false,
 ): String? {
     if (state.value.crossingActive) {
         return crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height),
-            readings, at, language, frame.objects, frame.width, frame.height)
+            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger)
     }
-    CrossingPeopleWatch.reset()
-    CrossingVehicleWatch.reset()
+    resetCrossingWatches()
     return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
 }
 
