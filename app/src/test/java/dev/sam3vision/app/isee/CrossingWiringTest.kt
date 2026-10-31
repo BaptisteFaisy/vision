@@ -147,6 +147,32 @@ class CrossingWiringTest {
     }
 
     @Test
+    fun `poteau seul sans decodage - rouge, sans boite, branche sans-feu intacte`() {
+        // Repli poteau sans JPEG : pas de lampe vérifiable → boîte nulle
+        // (le sans-feu compte les nulles), rouge, rien à journaliser.
+        var calls = 0
+        val objects = listOf(SegObject("pole", 0.9f, listOf(96f, 40f, 104f, 380f), ""))
+        val light = crossingLightOf(LiveFrame(640, 480, 0L, objects), "") { _, _, _ -> calls++ }
+
+        assertEquals(CrossingState.Red, light.state)
+        assertNull(light.box)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `feu prioritaire sur poteau meme sans decodage`() {
+        // Les deux boîtes en vue : le feu gagne, le repli ne sert pas.
+        val objects = listOf(
+            SegObject("pole", 0.99f, listOf(96f, 40f, 104f, 380f), ""),
+            SegObject("pedestrian traffic light", 0.60f, listOf(10f, 10f, 100f, 200f), ""),
+        )
+        val light = crossingLightOf(LiveFrame(640, 480, 0L, objects), "")
+
+        assertEquals(CrossingState.Red, light.state)
+        assertEquals(listOf(10f / 640f, 10f / 480f, 100f / 640f, 200f / 480f), light.box)
+    }
+
+    @Test
     fun `dimensions inconnues - rouge sans boite`() {
         // Taille de frame inconnue : aucune boîte normalisable → rouge, null.
         var calls = 0

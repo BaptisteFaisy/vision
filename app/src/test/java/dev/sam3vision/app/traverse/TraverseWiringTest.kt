@@ -283,6 +283,7 @@ class TraverseWiringTest {
         val prompts = traversePrompts(listOf("person"))
 
         assertTrue(CrossingPrompts.LIGHT in prompts)
+        assertTrue("pole" in prompts)
         assertTrue("car" in prompts)
         assertTrue("person" in prompts)
     }
