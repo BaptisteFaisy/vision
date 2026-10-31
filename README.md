@@ -51,6 +51,12 @@ iSee is built on Meta AI, end to end:
   with `muse-voice-transcribe-1.0`
   (`core/src/main/java/dev/sam3vision/core/net/MetaAsrClient.kt`,
   `docs/META-ASR.md`).
+- **Image generation — Meta Muse Image** (`muse-image-1.0`): a filmed object's
+  photo becomes its black-on-yellow landmark pictogram via
+  `POST {meta}/images/edits` (same base URL and key as dictation)
+  (`core/src/main/java/dev/sam3vision/core/net/MetaImageClient.kt`,
+  `core/src/main/java/dev/sam3vision/core/picto/PictoPrompt.kt`,
+  `docs/META-IMAGE.md`).
 - **Glasses — Meta Wearables SDK** (`com.meta.wearable:mwdat`): camera and
   microphone on Ray-Ban Meta glasses (`docs/META-GLASSES.md`).
 
@@ -125,6 +131,9 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   crossing and never switches by itself; once on, it reads the light on-device and
   vetoes approaching vehicles (`docs/TRAVERSEE.md`). Its green-detection recall is
   measured below: 1 true green out of 6.
+- **Landmark pictograms** — film an object, Meta Muse Image (`muse-image-1.0`)
+  redraws its photo as a black-on-yellow pictogram, approved by the companion,
+  then recognised on live video on-device with no network (`docs/META-IMAGE.md`).
 - **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.0), test bench built
   into the app (`docs/META-GLASSES.md`).
 - **Companion follow-up** — a share link to a real-time page: current sentence, nearby
