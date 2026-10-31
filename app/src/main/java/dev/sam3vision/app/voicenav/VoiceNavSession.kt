@@ -101,6 +101,9 @@ sealed interface VoiceNavUiState {
  *   un second `arrived` est ignoré, on n'est plus en [Guiding]) ;
  *   [dismissArrived] referme l'arrivée vers le repos (le pilote coupe le
  *   moteur à ce moment-là, pas à l'arrivée).
+ * - [onActiveDestination] : la destination guidée, republiée à chaque
+ *   changement d'état (`null` hors [Guiding]) — la mémoire GPS du LLM la
+ *   suit sans discontinuité.
  *
  * Ne lève jamais : un collaborateur qui jetterait est replié (routeur qui
  * jette = pas d'intention, chargeur/lanceur qui jette = échec annoncé).
@@ -136,6 +139,11 @@ class VoiceNavSession(
     private val onGpsDisabled: suspend () -> Unit = {},
     /** Ordre « active le GPS » : persiste l'état guidage rallumé. */
     private val onGpsEnabled: suspend () -> Unit = {},
+    /**
+     * Destination guidée en continu (`null` hors guidage) : notifiée à
+     * chaque changement d'état — `GpsDestinationMemory` la suit.
+     */
+    private val onActiveDestination: (String?) -> Unit = {},
 ) {
 
     private val _state = MutableStateFlow<VoiceNavUiState>(VoiceNavUiState.Idle)
@@ -212,11 +220,11 @@ class VoiceNavSession(
             return
         }
         val loading = VoiceNavUiState.Confirming(destination, null, true, null)
-        _state.value = loading
+        setState(loading)
         val summary = loadSummaryResult(destination).getOrNull()
         if (_state.value !== loading) return
         if (startEngine(destination, summary)) {
-            if (_state.value === loading) _state.value = guiding(destination, summary)
+            if (_state.value === loading) setState(guiding(destination, summary))
             return
         }
         goIdle()
@@ -229,13 +237,14 @@ class VoiceNavSession(
      * sans le temps si le résumé a échoué — le repli Maps reste possible).
      */
     private suspend fun openConfirmation(destination: String) {
-        _state.value = VoiceNavUiState.Confirming(destination, null, true, null)
+        setState(VoiceNavUiState.Confirming(destination, null, true, null))
         val loaded = loadSummaryResult(destination)
         val summary = loaded.getOrNull()
-        _state.value = loaded.fold(
+        val confirmed = loaded.fold(
             onSuccess = { VoiceNavUiState.Confirming(destination, it, false, null) },
             onFailure = { VoiceNavUiState.Confirming(destination, null, false, summaryError(it)) },
         )
+        setState(confirmed)
         voice.announceConfirmQuestion(destination, summary?.durationEn())
     }
 
@@ -272,7 +281,7 @@ class VoiceNavSession(
     /** Confirmation manuelle : moteur si possible, sinon motif + annonce, jamais Maps. */
     private suspend fun confirmGuided(current: VoiceNavUiState.Confirming) {
         if (startEngine(current.destination, current.summary)) {
-            _state.value = guiding(current.destination, current.summary)
+            setState(guiding(current.destination, current.summary))
             return
         }
         fail(current)
@@ -318,10 +327,10 @@ class VoiceNavSession(
         if (confirmation == null) {
             goIdle()
         } else {
-            _state.value = confirmation.copy(
+            setState(confirmation.copy(
                 loading = false,
                 error = NavigationPhrases.GUIDANCE_UNAVAILABLE,
-            )
+            ))
         }
     }
 
@@ -334,8 +343,20 @@ class VoiceNavSession(
 
     /** Retour au repos : le pilote est notifié (il coupe le moteur). */
     private fun goIdle() {
-        _state.value = VoiceNavUiState.Idle
+        setState(VoiceNavUiState.Idle)
         runCatching { onSessionIdle() }
+    }
+
+    /**
+     * Seule écriture d'état : chaque transition republie la destination
+     * active — [VoiceNavUiState.Guiding] la porte, les autres états
+     * (`Idle`, `Confirming`, `Arrived`) l'effacent (`null`). Le rappel ne
+     * fait jamais lever la session (contrat « ne lève jamais »).
+     */
+    private fun setState(next: VoiceNavUiState) {
+        _state.value = next
+        val active = (next as? VoiceNavUiState.Guiding)?.destination?.takeIf { it.isNotBlank() }
+        runCatching { onActiveDestination(active) }
     }
 
     /** Bouton « Arrêter » : ferme le guidage + annonce « Guidage arrêté ». */
@@ -399,10 +420,10 @@ class VoiceNavSession(
     suspend fun onGuidanceUpdate(update: GuidanceUpdate) {
         val current = _state.value as? VoiceNavUiState.Guiding ?: return
         if (update.arrived) {
-            _state.value = VoiceNavUiState.Arrived(current.destination, current.summary)
+            setState(VoiceNavUiState.Arrived(current.destination, current.summary))
             voice.announceArrived()
         } else {
-            _state.value = current.copy(update = update)
+            setState(current.copy(update = update))
         }
     }
 

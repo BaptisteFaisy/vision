@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -57,6 +58,7 @@ class VoiceNavSessionTest {
         loader: RouteLoader = { Result.success(summary) },
         engine: (suspend (String, RouteSummary?) -> Boolean)? = { _, _ -> true },
         autoStart: Boolean = false,
+        remembered: MutableList<String?>? = null,
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { guidance },
@@ -68,6 +70,7 @@ class VoiceNavSessionTest {
         autoStartOnVoice = autoStart,
         onGpsDisabled = { gpsFlags += false },
         onGpsEnabled = { gpsFlags += true },
+        onActiveDestination = { remembered?.add(it) },
     )
 
     @Test
@@ -381,6 +384,61 @@ class VoiceNavSessionTest {
         assertFalse(session.onVoiceTranscript("où est le GPS le plus proche ?"))
         assertTrue(gpsFlags.isEmpty())
         assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `guidage demarre — la destination est rappelee puis oubliee a l'arret`() = runBlocking {
+        val remembered = mutableListOf<String?>()
+        val session = session(autoStart = true, remembered = remembered)
+
+        assertTrue(session.onVoiceTranscript("va à la gare"))
+        assertTrue(session.state.value is VoiceNavUiState.Guiding)
+        assertEquals("la gare", remembered.last())
+
+        session.stopGuidance()
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertNull(remembered.last())
+    }
+
+    @Test
+    fun `confirmation seule — rien n'est rappele, le demarrage rappelle`() = runBlocking {
+        val remembered = mutableListOf<String?>()
+        val session = session(remembered = remembered)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+        assertTrue("pas de destination hors guidage", remembered.isNotEmpty() && remembered.all { it == null })
+
+        session.confirmDestination()
+
+        assertEquals("la gare", remembered.last())
+    }
+
+    @Test
+    fun `arrivee — la destination est oubliee`() = runBlocking {
+        val remembered = mutableListOf<String?>()
+        val session = session(remembered = remembered)
+        session.onVoiceTranscript("emmène-moi à la gare")
+        session.confirmDestination()
+        assertEquals("la gare", remembered.last())
+
+        session.onGuidanceUpdate(GuidanceUpdate("Arrivée", 0, 0, 0, arrived = true))
+
+        assertTrue(session.state.value is VoiceNavUiState.Arrived)
+        assertNull(remembered.last())
+    }
+
+    @Test
+    fun `desactiver le GPS en guidage — la destination est oubliee`() = runBlocking {
+        val remembered = mutableListOf<String?>()
+        val session = session(autoStart = true, remembered = remembered)
+        session.onVoiceTranscript("va à la gare")
+        assertEquals("la gare", remembered.last())
+
+        assertTrue(session.onVoiceTranscript("désactive le GPS"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertNull(remembered.last())
     }
 
     @Test

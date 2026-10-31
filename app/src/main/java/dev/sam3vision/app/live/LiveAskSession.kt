@@ -15,6 +15,7 @@ import dev.sam3vision.app.isee.StoredPicto
 import dev.sam3vision.app.isee.decodeFrameGray
 import dev.sam3vision.app.isee.vm.IseePicto
 import dev.sam3vision.app.timelineContextOrNull
+import dev.sam3vision.app.voicenav.GpsDestinationMemory
 import dev.sam3vision.core.live.HomeModes
 import dev.sam3vision.core.live.LiveTimeline
 import dev.sam3vision.core.live.MaisonEnterCommand
@@ -22,6 +23,7 @@ import dev.sam3vision.core.live.MaisonEnterText
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.ChatTurn
+import dev.sam3vision.core.nav.GpsDestinationText
 import dev.sam3vision.core.net.LlmClient
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.net.PictoImageClient
@@ -77,6 +79,8 @@ class LiveAskSession(
     private val llm: (Settings) -> LlmClient,
     /** Fenêtre du journal envoyée au LLM : 30 s suffisent pour « il y a 5 s ». */
     private val windowMs: Long,
+    /** Destination GPS en cours (`null` hors guidage) : rejoint le contexte du LLM. */
+    private val destination: () -> String? = { GpsDestinationMemory.destination.value },
     /** Chasse SAM d'un mot maison seul : relance le direct, jamais le LLM. */
     private val restart: (List<String>) -> Unit = {},
     /** Dossier des repères : le magasin est partagé avec l'écran iSee. */
@@ -326,18 +330,22 @@ class LiveAskSession(
         }
     }
 
-    /** Envoi au LLM : image + journal (s'il y a des pistes), puis mise à jour de l'état. */
+    /** Destination lue sans jamais lever (un fournisseur qui jette = pas de contexte). */
+    private fun readDestination(): String? = runCatching { destination() }.getOrNull()
+
+    /** Envoi au LLM : image + journal + destination GPS, puis mise à jour de l'état. */
     private suspend fun askWithContext(question: String, jpegB64: String, focusSeconds: Int) {
         val now = System.currentTimeMillis()
         val global = timeline.recent(now, windowMs)
         val window = focusWindow(now, focusSeconds)
         val focus = timeline.summary(window.first, window.last)
-        val context = timelineContextOrNull(
+        val journal = timelineContextOrNull(
             global,
             focus,
             focusLabel(focusSeconds, settings().speechLanguage),
             settings().speechLanguage,
         )
+        val context = GpsDestinationText.combine(journal, readDestination(), settings().speechLanguage)
         val useCase = AskUseCase(llm(settings()))
         useCase.invoke(jpegB64, question, history, context).fold(
             onSuccess = { answer ->
