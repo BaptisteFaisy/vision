@@ -49,10 +49,14 @@ class ProximityVoice(
     /** Phrase douce gardée ([onPhrase] avec file), `null` si aucune. */
     private var pending: Pending? = null
 
+    /** Consigne route gardée ([onRoutePhrase] douce), `null` si aucune. */
+    private var pendingRoute: Pending? = null
+
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
         pending = null
+        pendingRoute = null
     }
 
     /**
@@ -86,22 +90,53 @@ class ProximityVoice(
     }
 
     /**
-     * Redit la phrase douce gardée par [onPhrase] (`queue = true`) dès que plus
-     * rien ne parle : chat silencieux ([playerIdle]), route tue et [busy] faux
-     * (P1/P2 en cours, vu par l'appelant). Périmée ([PENDING_TTL_MS]) ou déjà
+     * Consigne de guidage GPS (manœuvres, même voix Laure que les obstacles) :
+     * l'urgence coupe, la douce attend le silence en file dédiée (une seule,
+     * la plus fraîche — une consigne périme vite) et se redit par
+     * [flushPending] avant toute douce d'obstacle (danger > route > doux).
+     * La route ne s'attend pas elle-même ([routeSpeaking] ignoré : en mode
+     * Laure la voix route part d'ici, pas du haut-parleur paresseux).
+     */
+    suspend fun onRoutePhrase(
+        phrase: String,
+        playerIdle: Boolean,
+        urgent: Boolean = false,
+    ) {
+        if (phrase == lastPhrase) return
+        val current = settings()
+        if (!current.ttsConfigured) return
+        if (!urgent && !playerIdle) {
+            pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            return
+        }
+        speak(phrase, current, urgent)
+    }
+
+    /**
+     * Redit les phrases gardées dès que plus rien ne parle : chat silencieux
+     * ([playerIdle]), route tue et [busy] faux (P1/P2 en cours, vu par
+     * l'appelant) — la consigne route d'abord, puis la douce d'obstacle (une
+     * seule par appel, jamais de rafale). Périmée ([PENDING_TTL_MS]) ou déjà
      * dite : jetée. À appeler à chaque frame par le guetteur en file.
      */
     suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
-        val due = pending ?: return
-        if (due.phrase == lastPhrase || nowMs() >= due.expiresAtMs) {
-            pending = null
-            return
-        }
         if (!playerIdle || routeSpeaking() || busy()) return
         val current = settings()
         if (!current.ttsConfigured) return
-        pending = null
+        if (flushOne(pendingRoute, current) { pendingRoute = null }) return
+        flushOne(pending, current) { pending = null }
+    }
+
+    /** Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée. */
+    private suspend fun flushOne(due: Pending?, current: Settings, clear: () -> Unit): Boolean {
+        if (due == null) return false
+        if (due.phrase == lastPhrase || nowMs() >= due.expiresAtMs) {
+            clear()
+            return false
+        }
+        clear()
         speak(due.phrase, current, urgent = false)
+        return true
     }
 
     /** Synthèse + lecture d'une phrase admise (mémorisée : dite une fois). */
@@ -125,7 +160,11 @@ class ProximityVoice(
     /**
      * Mot du guidage (`GuidanceWord`) : clip local quand le pack l'a (< 100
      * ms, zéro réseau), sinon synthèse réseau mise en cache pour la suite.
-     * Mêmes garde-fous que [onPhrase] (dédupliqué, clé exigée, urgent coupe).
+     * Mêmes garde-fous que [onPhrase] (dédupliqué, clé exigée, urgent coupe) :
+     * seul ce qui a vraiment parlé est mémorisé — un mot avalé par un garde
+     * transitoire ne tait pas ses réémissions. [queue] : le mot doux tué
+     * part en file et se redit par [flushPending] (en synthèse, pas en
+     * clip : parlé lentement vaut mieux que perdu).
      */
     suspend fun speakWord(
         clipId: String,
@@ -133,19 +172,20 @@ class ProximityVoice(
         language: SpeechLanguage,
         playerIdle: Boolean,
         urgent: Boolean = true,
+        queue: Boolean = false,
     ) {
         if (text == lastPhrase) return
         val current = settings()
         if (!current.ttsConfigured) return
-        if (!urgent && !playerIdle) return
-        // Mémorisé au moment de parler seulement, comme onPhrase : un mot doux
-        // avalé par un garde transitoire (chat occupé) se redit à la prochaine
-        // émission au lieu d'être tu comme un déjà-dit.
-        lastPhrase = text
+        if (!urgent && !playerIdle) {
+            if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
+            return
+        }
         if (urgent) player.stop()
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
             coroutineContext.ensureActive()
+            lastPhrase = text
             onSpeaking(text)
             player.playFile(file).onFailure { onSpeaking("") }
             return
@@ -155,6 +195,7 @@ class ProximityVoice(
         coroutineContext.ensureActive()
         if (bytes.isNotEmpty() && (urgent || canPlay())) {
             clips?.put(clipId, language, current.ttsVoiceId, bytes)
+            lastPhrase = text
             onSpeaking(text)
             player.play(bytes).onFailure { onSpeaking("") }
         }

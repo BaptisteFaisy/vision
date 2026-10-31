@@ -87,6 +87,46 @@ class ProximityVoiceWordTest {
     }
 
     @Test
+    fun `mot doux avale puis reemis, parle`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val pack = VoicePack(
+            filesDir = tempDir(),
+            packVoiceId = { "voix-test" },
+            bundledClip = { "faux-mp3".toByteArray() },
+        )
+        val voice = voice(pack, attempts, spoken)
+
+        // Avalé par la route (voie occupée) : rien dit, rien mémorisé.
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false)
+        assertTrue(spoken.isEmpty())
+
+        // Réémis au silence : parlé (pas d'empoisonnement de la dédup).
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true, urgent = false)
+
+        assertEquals("Gauche.", spoken.first())
+    }
+
+    @Test
+    fun `mot doux en file rejoue au silence`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val pack = VoicePack(
+            filesDir = tempDir(),
+            packVoiceId = { "voix-test" },
+            bundledClip = { "faux-mp3".toByteArray() },
+        )
+        val voice = voice(pack, attempts, spoken)
+
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false, queue = true)
+        assertTrue(spoken.isEmpty())
+
+        voice.flushPending(playerIdle = true)
+
+        assertEquals("Gauche.", spoken.first())
+    }
+
+    @Test
     fun `urgence externe coupe le chat en clip`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
