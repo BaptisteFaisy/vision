@@ -30,6 +30,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
@@ -399,11 +400,12 @@ internal fun LiveProbe.phraseOf(
     language: SpeechLanguage,
     hfovDeg: Float,
     scanTrigger: Boolean = false,
+    motion: FrameMotion? = null,
 ): String? {
     if (state.value.crossingActive) {
         return crossingPhraseOf(cross?.cue, placed, detections,
             readings, at, language, frame.objects, frame.width, frame.height, scanTrigger,
-            cross?.noLight == true, cross?.veto == true, steeringOf(placed, frame, at, hfovDeg))
+            cross?.noLight == true, steeringOf(placed, frame, at, hfovDeg), motion)
     }
     resetCrossingWatches()
     return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)

@@ -109,8 +109,6 @@ internal data class CrossingPatch(
     val state: CrossingState,
     val box: List<Float>?,
     val phase: TraversePhase,
-    /** Vrai quand un véhicule force l'attente (branche sans-feu : tait le « Traversez. »). */
-    val veto: Boolean = false,
     /** Vrai une fois l'absence de feu confirmée (voix sans-feu, feu muet). */
     val noLight: Boolean = false,
 )
@@ -144,7 +142,7 @@ internal fun crossingPatchOf(
         // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
         // pour un feu absent), l'état publié reste rouge (aucun vert lu —
         // pastille, bouton et vibrations inchangés).
-        return CrossingPatch(null, CrossingState.Red, null, decision.state, decision.veto, true)
+        return CrossingPatch(null, CrossingState.Red, null, decision.state, true)
     }
     val vetoed = decision.crossingState()
     val cue = announcer.onFrame(atMs, vetoed, language)
@@ -153,7 +151,7 @@ internal fun crossingPatchOf(
     // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
     // sent (ordre user du 31/10, certitude rouge/vert).
     val confirmed = announcer.lastCue?.state ?: CrossingState.Red
-    return CrossingPatch(cue, confirmed, light.box, decision.state, decision.veto, false)
+    return CrossingPatch(cue, confirmed, light.box, decision.state)
 }
 
 /**

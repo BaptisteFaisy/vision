@@ -5,6 +5,7 @@ import dev.sam3vision.core.crossing.CrossingCueQuiet
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 
 /**
@@ -50,7 +51,9 @@ internal object CrossingVehicleWatch {
      * dès la parole rendue. Exception sans feu : le guetteur reste nourri
      * sous quiet (transition feu→sans-feu) pour que le brut [movingNow]
      * reste frais — seule la phrase est tue, le verdict « Attendez. » ne
-     * rate aucun danger.
+     * rate aucun danger. [motion] (`null` = pas de signal fond) fait juger
+     * chaque piste par le fond : une boîte qui suit la caméra (pan sur une
+     * voiture garée) ne conclut plus le mouvement — sans feu seul.
      */
     fun update(
         detections: List<Detection>,
@@ -59,11 +62,13 @@ internal object CrossingVehicleWatch {
         language: SpeechLanguage,
         cue: CrossingCue? = null,
         noLight: Boolean = false,
+        motion: FrameMotion? = null,
     ): String? {
         val hushed = quiet.hush(cue, atMs)
         if (hushed && !noLight) return null
         val range = if (noLight) Float.POSITIVE_INFINITY else VehicleStateWatcher.MOVING_METERS
-        val found = watcher.update(detections, readings, atMs, language, movingMeters = range) ?: return null
+        val felt = if (noLight) motion else null
+        val found = watcher.update(detections, readings, atMs, language, motion = felt, movingMeters = range) ?: return null
         if (hushed) return null
         return found.safetyPhrase ?: found.phrase
     }

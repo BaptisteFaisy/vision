@@ -90,7 +90,7 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     )
     val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec)
     val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
-        distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger)
+        distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger, ProbeBackgroundMotion.lastMotion)
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
