@@ -85,6 +85,34 @@ class GlassesVideoLinkTest {
     }
 
     @Test
+    fun `le seq rendu est publie, puis oublie a l arret`() {
+        GlassesVideoLink.setStreaming(true)
+        GlassesVideoLink.push(frame())
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        assertNull(GlassesVideoLink.renderedSeq.value)
+        GlassesVideoLink.markRendered(seq)
+        assertEquals(seq, GlassesVideoLink.renderedSeq.value)
+        GlassesVideoLink.setStreaming(false)
+        assertNull(GlassesVideoLink.renderedSeq.value)
+    }
+
+    @Test
+    fun `un rendu sans seq allume live sans publier de seq`() {
+        GlassesVideoLink.markRendered()
+        assertTrue(GlassesVideoLink.live.value)
+        assertNull(GlassesVideoLink.renderedSeq.value)
+    }
+
+    @Test
+    fun `l horodatage d arrivee vaut 0 par defaut et ne change pas l identite`() {
+        val plain = frame()
+        assertEquals(0L, plain.arrivedAtNs)
+        val stamped = plain.copy(arrivedAtNs = 123L)
+        assertEquals(plain, stamped)
+        assertEquals(plain.hashCode(), stamped.hashCode())
+    }
+
+    @Test
     fun `les notes vont au controleur, puis nulle part apres detachement`() {
         val received = mutableListOf<GlassesMessage>()
         GlassesVideoLink.attachNotes(received::add)

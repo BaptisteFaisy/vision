@@ -35,12 +35,12 @@ internal fun GlassesLive(modifier: Modifier) {
     val size by GlassesVideoLink.videoSize.collectAsState()
     LaunchedEffect(decoder) {
         launch(Dispatchers.Default) {
-            // Un essai par poussée, sans attendre : le flux bat à 30 i/s, la suivante
-            // réessaie 33 ms plus tard. Boucler ici affamerait le décodeur (constaté :
-            // 200 entrées en 4 min au lieu de 30/s, première sortie à +4 min).
+            // Un essai par poussée, sans attendre : le flux bat à 15 i/s, la suivante
+            // réessaie ~66 ms plus tard. Boucler ici affamerait le décodeur (constaté :
+            // 200 entrées en 4 min au lieu de 15/s, première sortie à +4 min).
             GlassesVideoLink.frames.collect { box ->
                 val frame = box?.frame ?: return@collect
-                if (decoder.render(frame)) GlassesVideoLink.markRendered()
+                if (decoder.render(frame)) GlassesVideoLink.markRendered(box.seq)
             }
         }
     }

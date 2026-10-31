@@ -11,6 +11,7 @@ import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoFrame
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DeviceSessionError
+import android.os.SystemClock
 import android.util.Log
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -144,10 +145,13 @@ internal class GlassesCamera(
 
     /** Copie défensive vers l'accueil : le SDK peut réutiliser ses buffers, pas nos octets. */
     private fun pushCopy(frame: VideoFrame) {
+        // Datée à l'entrée : l'écart pts → arrivée borne le transit radio (voir GlassesClockOffset).
+        val arrivedAtNs = SystemClock.elapsedRealtimeNanos()
         val bytes = runCatching { frame.buffer.readRemainingBytes() }.getOrNull() ?: return
         pushed += 1
         if (pushed == 1L || pushed % 150 == 0L) {
-            Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o)")
+            Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o," +
+                " ptsUs=${frame.presentationTimeUs}, rxMs=${arrivedAtNs / 1_000_000L})")
         }
         val copy = GlassesFrame(
             bytes = bytes,
@@ -156,9 +160,11 @@ internal class GlassesCamera(
             presentationTimeUs = frame.presentationTimeUs,
             compressed = frame.isCompressed,
             codecConfig = frame.isCodecConfig,
+            arrivedAtNs = arrivedAtNs,
         )
-        recorder?.consume(copy)
+        // L'accueil d'abord : une cale du muxeur ne doit jamais retarder l'image affichée.
         GlassesVideoLink.push(copy)
+        recorder?.consume(copy)
     }
 
     private fun watch(attached: Camera) {

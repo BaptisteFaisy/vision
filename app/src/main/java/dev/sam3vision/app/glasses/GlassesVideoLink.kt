@@ -16,6 +16,13 @@ data class GlassesFrame(
     val presentationTimeUs: Long,
     val compressed: Boolean,
     val codecConfig: Boolean,
+    /**
+     * Instant d'arrivée côté téléphone (`SystemClock.elapsedRealtimeNanos()`), posé par
+     * la pompe à la collecte ; `0` = non daté (banc, mock). Hors `equals`/`hashCode` :
+     * c'est une métadonnée de mesure, pas l'identité de l'image (la conflation compare
+     * les pixels, pas l'heure).
+     */
+    val arrivedAtNs: Long = 0L,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -62,6 +69,7 @@ object GlassesVideoLink {
     private val _live = MutableStateFlow(false)
     private val _streaming = MutableStateFlow(false)
     private val _frames = MutableStateFlow<GlassesFrameBox?>(null)
+    private val _renderedSeq = MutableStateFlow<Long?>(null)
     private var seq = 0L
     private val _videoSize = MutableStateFlow<VideoSize?>(null)
 
@@ -135,10 +143,20 @@ object GlassesVideoLink {
         _frames.value = GlassesFrameBox(seq, frame)
     }
 
-    /** Une frame vient d'être rendue : le direct est prouvé vivant. */
-    fun markRendered() {
+    /**
+     * Numéro de la dernière frame rendue (`null` = aucune) : apparié au `seq` de la
+     * poussée, il borne la latence collecte → rendu. Publié par [markRendered].
+     */
+    val renderedSeq: StateFlow<Long?> = _renderedSeq.asStateFlow()
+
+    /**
+     * Une frame vient d'être rendue : le direct est prouvé vivant. [seq] = le numéro
+     * de la poussée rendue (`-1` = inconnu, `live` seul est allumé).
+     */
+    fun markRendered(seq: Long = -1L) {
         if (!_live.value) Log.i(TAG, "direct lunettes : première image rendue, live=true")
         _live.value = true
+        if (seq >= 0L) _renderedSeq.value = seq
     }
 
     /**
@@ -151,6 +169,7 @@ object GlassesVideoLink {
             _live.value = false
             _frames.value = null
             _videoSize.value = null
+            _renderedSeq.value = null
         }
     }
 
