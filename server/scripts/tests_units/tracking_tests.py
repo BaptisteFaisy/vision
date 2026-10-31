@@ -8,8 +8,8 @@ def test_tracking(tracking) -> None:
     """Plafond PROMPT_LIMIT + FR→EN (dédup et texte, label brut gardé)."""
     from test_units import check, raises
 
-    check("tracker : plafond 16 (décision user 28/10)",
-          tracking.PROMPT_LIMIT == 17, str(tracking.PROMPT_LIMIT))
+    check("tracker : plafond 18 (murs iSee, ordre user 31/10)",
+          tracking.PROMPT_LIMIT == 18, str(tracking.PROMPT_LIMIT))
     many = [f"c{i}" for i in range(20)]
     check("tracker : troncature au plafond",
           tracking.clean_prompts(many) == many[:tracking.PROMPT_LIMIT])
