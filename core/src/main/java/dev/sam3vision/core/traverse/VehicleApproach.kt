@@ -4,7 +4,6 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
 import dev.sam3vision.core.predict.MotionModel
-import dev.sam3vision.core.predict.Shift
 
 /**
  * Verdict d'approche : un véhicule fonce-t-il ([label] du plus dangereux) et
@@ -18,20 +17,15 @@ data class ApproachVerdict(
 
 /**
  * Veto fond V1 : vrai quand le fond accuse la caméra avec assez de confiance
- * pour invalider la dérive des boîtes (règle produit : fond identique + boîte
- * qui bouge ⇒ c'est le porteur qui bouge, pas la voiture). `null` (pas de
- * signal fond) ne met jamais le veto : comportement strictement inchangé.
- *
- * API attendue (`VehicleBackground.kt`, lane vbg-core, absente de ce
- * worktree) : `data class MovingVerdict(val motion: BackgroundMotion, val
- * confidence: Float)` et `enum class BackgroundMotion { STABLE, CAMERA_MOVED,
- * SCENE_MOVED }` dans ce package, confiance dans [0, 1]. Seuil [Shift.TRUST_MIN]
- * (0,12 : `docs/VEHICLE-BACKGROUND.md`, confiance min. du mouvement global
- * pour décider). Si les noms livrés diffèrent, seul ce point est à renommer.
+ * pour invalider la dérive des boîtes ([Verdict.CAMERA_MOVED] = la boîte suit
+ * le défilement du fond, le véhicule est fixe, c'est le porteur qui bouge).
+ * `null` (pas de signal fond) ne met jamais le veto : comportement
+ * strictement inchangé. Le contrôle de confiance redouble [VehicleBackground]
+ * (qui ne rend ce verdict qu'au-dessus de [VehicleBackground.TRUST_MIN]).
  */
 internal fun MovingVerdict?.isCameraMoved(): Boolean {
     if (this == null) return false
-    return motion == BackgroundMotion.CAMERA_MOVED && confidence >= Shift.TRUST_MIN
+    return verdict == Verdict.CAMERA_MOVED && globalConf >= VehicleBackground.TRUST_MIN
 }
 
 /**
