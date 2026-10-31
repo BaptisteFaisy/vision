@@ -413,6 +413,16 @@ jobs:
             gh api "repos/$REPO/pulls/$1/commits?per_page=100" \
               --jq '[.[] | select((.parents | length) > 1)] | length' 2>/dev/null || echo 0
           }
+          refus_de_rebase() { # 0 si la file a éjecté la PR faute de pouvoir la rebaser
+            # La file merge en `rebase` ; quand un commit ne se rejoue pas sur
+            # `master` (fichier supprimé d'un côté, modifié de l'autre), GitHub
+            # répond « Pull request must be rebased manually » et la PR sort.
+            # Une branche **linéaire** peut donc être refusée : compter les
+            # commits de fusion ne suffit pas, il faut lire le verdict.
+            gh api "repos/$REPO/issues/$1/comments?per_page=100" \
+              --jq '[.[] | select(.body | contains("Mergify Payload"))] | last | .body // ""' \
+              2>/dev/null | grep -q 'GITHUB_REBASE_MERGE_REFUSED'
+          }
           commits_non_attribues() { # nb de commits dont l'auteur n'est rattaché à aucun compte
             gh api "repos/$REPO/pulls/$1/commits?per_page=100" \
               --jq '[.[] | select(.author == null)] | length' 2>/dev/null || echo 0
@@ -653,12 +663,22 @@ jobs:
                 # de CI brûlées à chaque tour). On linéarise avant la file.
                 FUSIONS="$(commits_de_fusion "$PR")"
                 case "$FUSIONS" in ''|*[!0-9]*) FUSIONS=0 ;; esac
-                if [ "$DRAFT" != "true" ] && [ "$FUSIONS" -gt 0 ]; then
+                # Même traitement pour une branche linéaire que la file vient
+                # d'éjecter parce que GitHub n'arrivait pas à la rebaser : le
+                # refus est le symptôme, le rebase local est le remède.
+                REFUS=false
+                if [ "$FUSIONS" -eq 0 ] && refus_de_rebase "$PR"; then REFUS=true; fi
+                if [ "$DRAFT" != "true" ] && { [ "$FUSIONS" -gt 0 ] || [ "$REFUS" = true ]; } \
+                  && [ "$(marques "$PR" "<!-- automerge-linearise sha=$SHA -->")" -eq 0 ]; then
                   if ! preparer_clone; then
-                    echo "PR #$PR : $FUSIONS commit(s) de fusion, clone impossible — pas de mise en file"
+                    echo "PR #$PR : linéarisation nécessaire, clone impossible — pas de mise en file"
                     exit 0
                   fi
-                  echo "PR #$PR : $FUSIONS commit(s) de fusion — linéarisation avant la file"
+                  printf -v corps '%s\n' \
+                    "<!-- automerge-linearise sha=$SHA -->" \
+                    "Branche non fusionnable telle quelle ($FUSIONS commit(s) de fusion, file refusée : $REFUS) : rebasée sur \`master\` et repoussée, CI relancée."
+                  gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$corps" >/dev/null 2>&1 || true
+                  echo "PR #$PR : linéarisation avant la file (fusions=$FUSIONS refus=$REFUS)"
                   rebaser
                   exit 0
                 fi
