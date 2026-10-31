@@ -23,4 +23,21 @@ class LiveLensTest {
     fun `sans capteur ni réglage le repli grand-angle s'applique`() {
         assertEquals(LensSpec.Default, chosenLens(0f, null))
     }
+
+    @Test
+    fun `côté lunettes le calibrage lunettes prime sur le capteur téléphone`() {
+        val glasses = LensSpec(60f, 90f, sensorLandscape = false)
+        assertEquals(glasses, chosenLens(0f, sensor, glasses, fromGlasses = true))
+    }
+
+    @Test
+    fun `côté lunettes sans calibrage le repli s'applique, pas le capteur`() {
+        assertEquals(LensSpec.Default, chosenLens(0f, sensor, glasses = null, fromGlasses = true))
+    }
+
+    @Test
+    fun `côté téléphone le calibrage lunettes est ignoré`() {
+        val glasses = LensSpec(60f, 90f, sensorLandscape = false)
+        assertEquals(sensor, chosenLens(0f, sensor, glasses, fromGlasses = false))
+    }
 }
