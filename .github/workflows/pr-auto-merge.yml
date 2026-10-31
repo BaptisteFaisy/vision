@@ -70,7 +70,10 @@
 #      file, les met à jour contre `master` et rejoue les checks sur l'arbre
 #      fusionné du lot. Le balayeur ne merge plus et ne rebase plus ; il ne
 #      garde que ce qu'une file ne sait pas faire — conflit (`DIRTY`, rebase +
-#      agent Fireworks) et panne d'infrastructure (`BLOCKED`, relance bornée).
+#      agent Fireworks), panne d'infrastructure (`BLOCKED`, relance bornée), et
+#      **branche non linéaire** (v16) : une PR qui a mergé `master` au lieu de
+#      le rebaser n'est pas `BEHIND`, la file la prend puis GitHub refuse son
+#      rebase-merge (`GITHUB_REBASE_MERGE_REFUSED`) ; on la linéarise avant.
 #   2. **Sans file** : ancien chemin complet — rebase des PR `BEHIND`, merge
 #      quand les trois checks sont verts, relance des échecs d'infrastructure.
 #
@@ -278,6 +281,10 @@ jobs:
             gh pr comment "$1" --body "$3" >/dev/null 2>&1 || true
             return 0
           }
+          commits_de_fusion() { # nb de commits de fusion dans une PR (100 commits max lus)
+            gh api "repos/$REPO/pulls/$1/commits?per_page=100" \
+              --jq '[.[] | select((.parents | length) > 1)] | length' 2>/dev/null || echo 0
+          }
           etapes_cassees() { # $1=run id → étapes en échec (vide = job perdu)
             gh run view "$1" --json jobs --jq '
               [.jobs[] | select(.conclusion=="failure")
@@ -407,6 +414,63 @@ jobs:
             done
             return $rc
           }
+          # ── clone à la demande ──────────────────────────────────────────
+          # Le clone ne sert qu'aux chemins qui écrivent sur une branche :
+          # rebase (BEHIND, DIRTY), linéarisation avant la file, agent de
+          # périmètre. Il est donc **paresseux** : une PR verte qui entre en
+          # file n'en paie pas le coût.
+          # Auth git : PAT dans l'URL (x-access-token), passée par commande —
+          # rien n'est persisté dans la conf git du runner. Le helper gh
+          # ('!gh auth git-credential') rend 403 sur les runners (vu 28/10).
+          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          CLONE_FAIT=""
+          preparer_clone() { # 0 = dépôt prêt, 1 = clone impossible
+            [ -n "$CLONE_FAIT" ] && return 0
+            rm -rf repo
+            git clone --quiet --filter=blob:none "$AUTH_URL" repo || return 1
+            cd repo || return 1
+            # Journal additif : `union` garde les deux entrées au lieu de lever
+            # un conflit. Posé dans `info/attributes` et pas seulement dans
+            # `.gitattributes` : une branche ancienne ne porte pas encore le
+            # fichier, et c'est justement elle qui conflicte. Sans ça, chaque
+            # mouvement de `master` relançait l'agent Fireworks sur CHANGELOG.md
+            # → un push → une CI → un mouvement de `master` (livelock, 29/10).
+            printf 'CHANGELOG.md merge=union\n' >> .git/info/attributes
+            # Identité du propriétaire (règle du dépôt) : un commit poussé par
+            # le balayage doit être attribuable, jamais anonyme.
+            git config user.name "BaptisteFaisy"
+            git config user.email "119856854+BaptisteFaisy@users.noreply.github.com"
+            export GIT_EDITOR=true
+            CLONE_FAIT=1
+          }
+          rebaser() { # rebase la PR sur master ; l'agent Fireworks résout les conflits
+              if git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null \
+                && git checkout -q "pr-$PR" 2>/dev/null \
+                && git rebase -q origin/master >/dev/null 2>&1; then
+                if git push -q --force-with-lease="$BRANCH:$SHA" "$AUTH_URL" "HEAD:$BRANCH" 2>&1; then
+                  echo "PR #$PR rebasée sur master"
+                else
+                  echo "PR #$PR : a bougé entre-temps, prochain passage"
+                fi
+              else
+                # Rebase en conflit : l'agent lit le script sur master (la
+                # branche de la PR peut être antérieure), résout, termine
+                # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
+                # compte rendu, 2 = rien à faire : on saute sans bruit.
+                rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
+                # un exit != 0 de l'agent tuerait tout le sweep.
+                git show origin/master:.github/fireworks/conflict_agent.py \
+                  > /tmp/fw-agent.py 2>/dev/null \
+                  && python3 /tmp/fw-agent.py resolve --repo "$REPO" \
+                    --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc=$?
+                git rebase --abort >/dev/null 2>&1 || true
+                git checkout -q master 2>/dev/null || true
+                case "$rc" in
+                  0) echo "PR #$PR : conflit résolu par l'agent Fireworks" ;;
+                  *) echo "PR #$PR sautée (conflit, à l'auteur de rebaser)" ;;
+                esac
+              fi
+          }
           # ── file de merge (Mergify) ──────────────────────────────────────
           # Quand une file est active, le balayeur ne merge plus et ne rebase
           # plus : c'est la file qui met en file, qui met à jour la PR contre
@@ -422,6 +486,27 @@ jobs:
                 # dépend d'un second produit Mergify ; la commande, elle, ne
                 # dépend de rien (vérifié le 29/10 : « produit à activer » →
                 # « waiting for queue conditions » après activation).
+                #
+                # Linéarité d'abord : la file merge en `rebase`, et GitHub
+                # refuse le rebase-merge d'une branche qui porte des commits
+                # de fusion (« Pull request must be rebased manually »,
+                # GITHUB_REBASE_MERGE_REFUSED). Une branche qui a *mergé*
+                # `master` au lieu de le rebaser n'est pas `BEHIND` — sa base
+                # est un ancêtre — donc rien ne la signalait : la file
+                # l'acceptait, la rejetait au merge, le balayage la remettait.
+                # Boucle sans fin (3 éjections de la PR #525 le 31/10, ~2 min
+                # de CI brûlées à chaque tour). On linéarise avant la file.
+                FUSIONS="$(commits_de_fusion "$PR")"
+                case "$FUSIONS" in ''|*[!0-9]*) FUSIONS=0 ;; esac
+                if [ "$DRAFT" != "true" ] && [ "$FUSIONS" -gt 0 ]; then
+                  if ! preparer_clone; then
+                    echo "PR #$PR : $FUSIONS commit(s) de fusion, clone impossible — pas de mise en file"
+                    exit 0
+                  fi
+                  echo "PR #$PR : $FUSIONS commit(s) de fusion — linéarisation avant la file"
+                  rebaser
+                  exit 0
+                fi
                 if [ "$DRAFT" != "true" ] && green "$PR" && ! deja_balayee; then
                   if gh pr comment "$PR" --body "@mergifyio queue" >/dev/null 2>&1; then
                     echo "PR #$PR : mise en file demandée"
@@ -454,51 +539,7 @@ jobs:
             fi
             echo "PR #$PR : merge direct refusé ($(printf '%s' "$err" | tail -1 | cut -c1-160)), on rebase"
           fi
-          rm -rf repo
-          # Auth git : PAT dans l'URL (x-access-token), passée par commande —
-          # rien n'est persisté dans la conf git du runner. Le helper gh
-          # ('!gh auth git-credential') rend 403 sur les runners (vu 28/10).
-          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          git clone --quiet --filter=blob:none "$AUTH_URL" repo
-          cd repo
-          # Journal additif : `union` garde les deux entrées au lieu de lever
-          # un conflit. Posé dans `info/attributes` et pas seulement dans
-          # `.gitattributes` : une branche ancienne ne porte pas encore le
-          # fichier, et c'est justement elle qui conflicte. Sans ça, chaque
-          # mouvement de `master` relançait l'agent Fireworks sur CHANGELOG.md
-          # → un push → une CI → un mouvement de `master` (livelock, 29/10).
-          printf 'CHANGELOG.md merge=union\n' >> .git/info/attributes
-          git config user.name "isee-automerge"
-          git config user.email "isee-automerge@users.noreply.github.com"
-          export GIT_EDITOR=true
-          rebaser() { # rebase la PR sur master ; l'agent Fireworks résout les conflits
-              if git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null \
-                && git checkout -q "pr-$PR" 2>/dev/null \
-                && git rebase -q origin/master >/dev/null 2>&1; then
-                if git push -q --force-with-lease="$BRANCH:$SHA" "$AUTH_URL" "HEAD:$BRANCH" 2>&1; then
-                  echo "PR #$PR rebasée sur master"
-                else
-                  echo "PR #$PR : a bougé entre-temps, prochain passage"
-                fi
-              else
-                # Rebase en conflit : l'agent lit le script sur master (la
-                # branche de la PR peut être antérieure), résout, termine
-                # le rebase et pousse lui-même. 0 = poussé, 1 = échec avec
-                # compte rendu, 2 = rien à faire : on saute sans bruit.
-                rc=0 # "|| rc=$?" : le step tourne sous bash -e, sans ça
-                # un exit != 0 de l'agent tuerait tout le sweep.
-                git show origin/master:.github/fireworks/conflict_agent.py \
-                  > /tmp/fw-agent.py 2>/dev/null \
-                  && python3 /tmp/fw-agent.py resolve --repo "$REPO" \
-                    --pr "$PR" --branch "$BRANCH" --sha "$SHA" || rc=$?
-                git rebase --abort >/dev/null 2>&1 || true
-                git checkout -q master 2>/dev/null || true
-                case "$rc" in
-                  0) echo "PR #$PR : conflit résolu par l'agent Fireworks" ;;
-                  *) echo "PR #$PR sautée (conflit, à l'auteur de rebaser)" ;;
-                esac
-              fi
-          }
+          preparer_clone || { echo "clone impossible, rien à faire"; exit 0; }
           case "$STATE" in
             DIRTY) rebaser ;;
             # `BEHIND` : le chemin rapide a déjà dit non (fichiers qui se
