@@ -52,16 +52,16 @@ class StairConceptsTest {
     }
 
     @Test
-    fun `defauts dangers exterieur dont stairs, plafond seize`() {
+    fun `defauts dangers exterieur dont stairs, plafond dix sept`() {
         assertEquals(
             listOf(
-                "person", "car", "bus", "bicycle", "pedestrian traffic light", "curb",
-                "sidewalk", "crosswalk", "pole", "stairs", "barrier", "fence",
-                "gate", "souvenir shop", "beanie", "socks",
+                "person", "car", "bus", "bicycle", "pedestrian traffic light",
+                "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
+                "stairs", "barrier", "fence", "gate", "souvenir shop", "beanie", "socks",
             ),
             LivePrompts.default,
         )
-        assertEquals(16, LivePrompts.MAX)
+        assertEquals(17, LivePrompts.MAX)
         assertEquals(
             listOf("car", "bus", "bicycle"),
             VehicleConcepts.PROMPTS,
