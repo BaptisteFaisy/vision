@@ -112,7 +112,7 @@ private fun PerceptionSettings(
         NavigationToggle(draft) { onChange(it) }
         WorldModeSettings(draft) { onChange(it) }
         DebugMapSettings(draft) { onChange(it) }
-        DepthSettings(draft, onChange, onTestDepth)
+        DepthSettings(onTestDepth)
         DangerSettings(onTestDanger)
     }
 }

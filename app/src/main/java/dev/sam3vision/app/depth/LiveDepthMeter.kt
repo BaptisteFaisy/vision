@@ -17,14 +17,14 @@ import kotlinx.coroutines.launch
 /**
  * Profondeur du direct : infère la dernière frame JPEG en tâche de fond
  * (~176 ms DA2, ~5 Hz face aux 7 i/s du direct) et affine les lectures
- * sténopé en mètres calibrés. Coupé (OFF), modèle manquant, carte périmée :
- * le sténopé passe tel quel — le direct ne s'arrête jamais pour la profondeur.
+ * sténopé en mètres calibrés. Toujours active ; modèle manquant ou carte
+ * périmée : le sténopé passe tel quel — le direct ne s'arrête jamais.
  */
 class LiveDepthMeter(
     private val scope: CoroutineScope,
     private val appContext: Context,
     private val background: CoroutineDispatcher = Dispatchers.Default,
-    private val backend: () -> DepthBackend = { DepthBackend.OFF },
+    private val backend: () -> DepthBackend = { DepthBackend.DA2 },
 ) : DepthMeter {
     private val lock = Any()
     private var pendingJpeg: String? = null
@@ -33,7 +33,6 @@ class LiveDepthMeter(
     private var latestAtMs = 0L
     private var estimator: DepthEstimator? = null
     private var engineTriedMs = 0L
-    private var offLogged = false
 
     override fun offer(jpegB64: String) {
         if (jpegB64.isBlank()) return
@@ -123,15 +122,6 @@ class LiveDepthMeter(
     private suspend fun ensureEngine(): DepthEstimator? {
         synchronized(lock) { estimator }?.let { return it }
         val target = backend()
-        if (target == DepthBackend.OFF) {
-            synchronized(lock) {
-                if (!offLogged) {
-                    offLogged = true
-                    Log.i(TAG, "profondeur coupée à la frame (backend=OFF)")
-                }
-            }
-            return null
-        }
         if (nowMs() - engineTriedMs < RETRY_MS) return null
         engineTriedMs = nowMs()
         val ensured = ModelDownloader.ensure(appContext, target)

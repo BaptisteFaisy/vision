@@ -33,15 +33,16 @@ le repli (hors-ligne, ancien backend, tracker).
 - `:core` (pur JVM) : `depth/DepthMap.kt` (proximité, bilinéaire),
   `depth/DepthFusion.kt` (médiane par masque en une passe, quickselect O(n),
   ordre, occlusion, calibration), `depth/DepthEstimator.kt` (interface,
-  `DepthBackend`, `NoOp`, image synthétique), `model/Geometry.kt`
+  `DepthBackend`, image synthétique), `model/Geometry.kt`
   (rétroprojection, Box3D). Tests JVM à côté.
 - `:app` : `depth/OnnxDepthEstimator.kt`, `depth/DepthEstimators.kt`
   (sélecteur + banc), `depth/ModelDownloader.kt` (téléchargement +
   vérification sha256), `DepthSettings.kt` (Réglages → Profondeur). Modèle
   absent ⇒ message + téléchargement au premier test, jamais de crash.
-- Réglage `depthBackend` (défaut **DA2**, seuil < 200 ms tenu : 174 ms
-  mesurés sur Redmi), persisté dans les deux stores. Réglages pré-29/10
-  (`AUTO`, `MIDAS`) migrés vers DA2 par `DepthBackend.fromName`.
+- Réglage `depthBackend` (toujours **DA2**, seuil < 200 ms tenu : 174 ms
+  mesurés sur Redmi), persisté dans les deux stores. L'option Coupée est
+  supprimée (31/10, ordre user) : réglages anciens (`AUTO`, `MIDAS`, `OFF`)
+  migrés vers DA2 par `DepthBackend.fromName`.
 - Contrainte d'écriture (parseur UBS, exit 2 sinon) : pas de `while`
   (`for` bornés + `break`), pas de `if`-expression (instructions + retours),
   pas de sélection de propriété sur ressource fermable (lire le modèle en
@@ -68,12 +69,12 @@ consignes « va à gauche, 2 mètres », flèches) :
   sinon. Mètres bornés [0,3 m, 60 m].
 - `:app` `depth/LiveDepthMeter.kt` : infère la dernière frame JPEG en fond
   (~5 Hz), moteur paresseux (téléchargement puis ouverture), carte de plus
-  d'une seconde = repli sténopé. OFF = zéro coût.
-- `with_depth` (même carte Modal, `WS /live/ws`) : la trame demande les
-  médianes quand le moteur n'est pas OFF (`LiveProbe`, via
-  `LiveMaskTransport`) ; `SegObject.depth` (0..1, grand = proche) ; le
-  mesureur préfère `refineWithCloseness` (serveur) à la carte embarquée.
-  Serveur muet ou ancien backend : repli embarqué puis sténopé, sans erreur.
+  d'une seconde = repli sténopé.
+- `with_depth` (même carte Modal, `WS /live/ws`) : la trame demande toujours
+  les médianes (`LiveProbe`, via `LiveMaskTransport`) ;
+  `SegObject.depth` (0..1, grand = proche) ; le mesureur préfère
+  `refineWithCloseness` (serveur) à la carte embarquée. Serveur muet ou
+  ancien backend : repli embarqué puis sténopé, sans erreur.
 - `LiveProbe.publish` : `offer(jpegB64)` puis `readingsFor` avant
   pastilles/voix/consignes (3 lignes) ; voix et flèches inchangées (une
   seule voix, le danger parle d'abord).
@@ -83,10 +84,10 @@ consignes « va à gauche, 2 mètres », flèches) :
 1. `build-serveur <worktree>` puis installation sur le téléphone du créneau
    (`PHONE_SERIAL` : Redmi `2c6852ac` ou Samsung `RF8T11NBMCV` — créneau via
    le manager tests, cron `vision-phone-latest` gelé pendant le run).
-2. Réglages → Profondeur → moteur → « Tester la profondeur (5 inférences) »
+2. Réglages → Profondeur → « Tester la profondeur (5 inférences) »
    (télécharge le modèle au premier appui : ~26 Mo).
 3. Verdict : bas de page + `phone-adb -s $PHONE_SERIAL logcat -d | grep DepthBench`
    (`backend=DA2 medianMs=… runs=5 map=252x252`).
-4. Seuil < 200 ms tenu (DA2 : 174 ms) : actif par défaut depuis le câblage
-   guidage — pastilles, voix et consignes reçoivent les mètres affinés,
-   OFF reste disponible dans les Réglages.
+4. Seuil < 200 ms tenu (DA2 : 174 ms) : profondeur toujours active depuis
+   le 31/10 (option Coupée supprimée) — pastilles, voix et consignes
+   reçoivent les mètres affinés.

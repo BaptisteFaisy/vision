@@ -63,7 +63,7 @@ class LiveProbe(
     private val background: CoroutineDispatcher = Dispatchers.Default,
     /** Moteur (Réglages) : lu via this@LiveProbe (un défaut y verrait le paramètre OFF). */
     @Volatile
-    private var depthEngine: DepthBackend = DepthBackend.OFF,
+    private var depthEngine: DepthBackend = DepthBackend.DA2,
     /**
      * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
      * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
@@ -77,7 +77,7 @@ class LiveProbe(
 ) {
 
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
-        LiveMaskTransport.clientFor(base, timeout, marks, this@LiveProbe.depthEngine != DepthBackend.OFF)
+        LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
     /** Profondeur + danger de la sonde : mêmes frames capturées, resets communs. */
     private val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
@@ -155,7 +155,7 @@ class LiveProbe(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         crossingActive: Boolean = false,
         modelsLine: String = "",
-        depth: DepthBackend = DepthBackend.OFF,
+        depth: DepthBackend = DepthBackend.DA2,
     ) {
         val clean = baseUrl.trim()
         closeSessions()
