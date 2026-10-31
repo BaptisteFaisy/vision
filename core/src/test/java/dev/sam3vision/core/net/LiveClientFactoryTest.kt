@@ -102,6 +102,7 @@ class LiveClientFactoryTest {
 private class FailingWsTransport : WsTransport {
     override fun open(
         url: String, onText: (String) -> Unit, onClosed: (Throwable?) -> Unit, onOpen: () -> Unit,
+        headers: Map<String, String>,
     ): Boolean = false
 
     override fun send(text: String): Boolean = false

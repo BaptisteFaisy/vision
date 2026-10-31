@@ -276,6 +276,7 @@ class WsLiveClientTest {
                 onText: (String) -> Unit,
                 onClosed: (Throwable?) -> Unit,
                 onOpen: () -> Unit,
+                headers: Map<String, String>,
             ): Boolean {
                 opens += 1
                 return true
@@ -401,6 +402,7 @@ class WsLiveClientTest {
             onText: (String) -> Unit,
             onClosed: (Throwable?) -> Unit,
             onOpen: () -> Unit,
+            headers: Map<String, String>,
         ): Boolean {
             this.onText = onText
             onOpen()
