@@ -108,6 +108,20 @@
 #   v26 (31/10) couverture des états actionnables : le balayage ciblé joint
 #       toujours les PR `DIRTY`/`BLOCKED`/`DRAFT` — un run ciblé annulé par une
 #       rafale de concurrency laissait sinon sa tête sans réveil (#652).
+#   v27 (31/10) relance sans course + verdict lu comme GitHub le lit :
+#       (a) `checks_pr` départageait deux runs du même check par `started_at`,
+#       alors que GitHub rattache un check requis à la **suite la plus récente**
+#       (le run le plus récent). Quand un `couche0` annulé vivait à côté d'un
+#       vert plus ancien, le balayeur croyait la PR verte et ne soignait rien
+#       (#702 : BLOCKED 20 min avec tous ses checks verts). On départage donc
+#       par identifiant de run, puis par début d'essai.
+#       (b) une relance ne part plus pendant qu'une suite du **même** workflow
+#       démarre sur la même tête : `concurrency` annulait alors la suite
+#       fraîche, et son `cancelled` (run plus récent que le vert) devenait le
+#       verdict que GitHub et Mergify lisent — PR bloquée sans aucun rouge,
+#       définitivement (#702 : couche0 vert 20:32:26, annulé 20:32:18 sur le
+#       run 41239350675 lancé par l'`edited` de la note d'état, que la relance
+#       du run en échec a tué).
 #   v25 (31/10) outillage : `test_agent.py` rend **3** quand le runner n'a ni
 #       `zeroclaw` ni sa config — sans poser sa marque, donc l'unique tentative
 #       de la tête n'est pas brûlée (#652 : binaire posé 2 min trop tard).
@@ -440,10 +454,18 @@ jobs:
             # ne garde que le plus récent par nom, comme GitHub pour une porte
             # de fusion — sinon un `couche0` annulé à côté du vert compte deux
             # fois et la PR n'est jamais « verte ».
+            # v27 — départage par **run** (suite) et non par `started_at` :
+            # GitHub attache un check requis à la suite la plus récente, donc
+            # un `couche0` annulé par un `edited` reste le verdict même si un
+            # essai plus ancien, lui, est vert (#702). `started_at` ne sert
+            # plus qu'à départager deux essais d'un même run.
             gh api "repos/$REPO/commits/$(tete "$1")/check-runs?per_page=100" --jq '
               [ .check_runs[] | { name: .name, conclusion: .conclusion,
-                                  link: .html_url, debut: .started_at } ]
-              | sort_by(.name, .debut)
+                                  link: .html_url, debut: .started_at,
+                                  run: ((.html_url // ""
+                                         | capture("/runs/(?<id>[0-9]+)")
+                                         | .id | tonumber) // 0) } ]
+              | sort_by(.name, .run, .debut)
               | group_by(.name) | map(.[-1])
               | map({ name: .name,
                       state: ((.conclusion // "pending") | ascii_upcase),
@@ -583,8 +605,27 @@ jobs:
             return 1
           }
           ECHELLE_ETAPES=""
+          # v27 — une relance ne doit jamais atterrir pendant qu'une suite du
+          # même workflow démarre sur la même tête : la `concurrency` du
+          # workflow annule alors la suite fraîche, et son `cancelled` — run
+          # plus récent que le vert — devient le verdict lu par GitHub et
+          # Mergify. Résultat : PR bloquée pour toujours, sans un seul rouge
+          # (#702, 31/10). On laisse la suite en cours rendre son verdict.
+          suite_en_cours() { # $1=workflow id $2=sha → 0 si une suite tourne déjà
+            local wf="${1:-}" sha="${2:-}" n
+            [ -n "$wf" ] && [ -n "$sha" ] || return 1
+            [ "$wf" != "0" ] || return 1
+            n=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&per_page=100" \
+                  --jq --argjson wf "$wf" '
+                    [ .workflow_runs[]
+                      | select(.workflow_id == $wf)
+                      | select(.status == "queued" or .status == "in_progress"
+                               or .status == "waiting" or .status == "requested"
+                               or .status == "pending") ] | length' 2>/dev/null || echo 0)
+            [ "${n:-0}" -gt 0 ]
+          }
           relancer() { # $1=pr ; 0 = relancé, 1 = échec réel, 2 = rien à relancer
-            local pr="$1" runs run sha_run etapes rc=2
+            local pr="$1" runs run sha_run wf_run etapes rc=2
             runs=$(checks_pr "$pr" \
               | jq -r '[.[] | select(.bucket=="fail")
                          | select(.name=="ci" or .name=="ci-budget") | .link][]
@@ -594,9 +635,15 @@ jobs:
             for run in $runs; do
               # Ne jamais relancer un run d'un autre commit : ça ne changerait
               # pas les checks de cette PR, ça brûlerait juste un runner.
-              sha_run=$(gh run view "$run" --json headSha --jq .headSha 2>/dev/null || true)
+              read -r sha_run wf_run <<<"$(gh run view "$run" \
+                --json headSha,workflowDatabaseId \
+                --jq '"\(.headSha) \(.workflowDatabaseId)"' 2>/dev/null || true)" || true
               if [ "$sha_run" != "$SHA" ]; then
                 echo "  run $run : autre commit, pas de relance"
+                continue
+              fi
+              if suite_en_cours "$wf_run" "$sha_run"; then
+                echo "  run $run : suite du même workflow déjà en cours sur ${sha_run:0:7}, relance sautée"
                 continue
               fi
               etapes=$(etapes_cassees "$run")
@@ -620,7 +667,7 @@ jobs:
             return $rc
           }
           relancer_annules() { # $1=pr ; 0 = relancé, 1 = rien à relancer
-            local pr="$1" runs run sha_run rc=1
+            local pr="$1" runs run sha_run wf_run rc=1
             runs=$(checks_pr "$pr" \
               | jq -r '[.[] | select(.bucket=="cancel")
                          | select(.name=="ci" or .name=="ci-budget" or .name=="couche0") | .link][]
@@ -630,9 +677,15 @@ jobs:
             for run in $runs; do
               # Même garde que relancer() : jamais de relance d'un run
               # d'un autre commit (remplacé, il ne changerait rien ici).
-              sha_run=$(gh run view "$run" --json headSha --jq .headSha 2>/dev/null || true)
+              read -r sha_run wf_run <<<"$(gh run view "$run" \
+                --json headSha,workflowDatabaseId \
+                --jq '"\(.headSha) \(.workflowDatabaseId)"' 2>/dev/null || true)" || true
               if [ "$sha_run" != "$SHA" ]; then
                 echo "  run $run : autre commit, pas de relance"
+                continue
+              fi
+              if suite_en_cours "$wf_run" "$sha_run"; then
+                echo "  run $run : suite du même workflow déjà en cours sur ${sha_run:0:7}, relance sautée"
                 continue
               fi
               # Rejeu COMPLET : un job annulé n'est pas un job en échec,
@@ -652,7 +705,7 @@ jobs:
             # relit le corps courant via l'API, donc relancer son run en échec
             # suffit — même SHA, verdict frais. Mêmes gardes que relancer() :
             # jamais de relance d'un run d'un autre commit.
-            local pr="$1" runs run sha_run rc=1
+            local pr="$1" runs run sha_run wf_run rc=1
             runs=$(checks_pr "$pr" \
               | jq -r '[.[] | select(.bucket=="fail")
                          | select(.name=="couche0") | .link][]
@@ -660,9 +713,15 @@ jobs:
               | sed -n 's#.*/runs/\([0-9][0-9]*\).*#\1#p' | sort -u)
             [ -n "$runs" ] || return 1
             for run in $runs; do
-              sha_run=$(gh run view "$run" --json headSha --jq .headSha 2>/dev/null || true)
+              read -r sha_run wf_run <<<"$(gh run view "$run" \
+                --json headSha,workflowDatabaseId \
+                --jq '"\(.headSha) \(.workflowDatabaseId)"' 2>/dev/null || true)" || true
               if [ "$sha_run" != "$SHA" ]; then
                 echo "  run $run : autre commit, pas de relance"
+                continue
+              fi
+              if suite_en_cours "$wf_run" "$sha_run"; then
+                echo "  run $run : suite du même workflow déjà en cours sur ${sha_run:0:7}, relance sautée"
                 continue
               fi
               if ghe run rerun "$run" --failed >/dev/null 2>&1; then
