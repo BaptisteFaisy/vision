@@ -441,7 +441,29 @@ bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
   la phrase est tue) — le verdict « Attendez. » ne rate aucun danger, même
   à plus de 15 m, dès la perte du feu.
 
-## 15. Sans feu : une garée ne bloque jamais, même caméra en mouvement (31/10)
+## 15. Repli haut-de-poteau, veto tricolore et garée jamais bloquante (31/10)
+
+### 15.1 Repli haut-de-poteau + veto tricolore
+
+Le feu piéton est sur poteau (ordre user) : quand SAM rate le boîtier mais
+voit le fût, la couleur se lit dans un carré ancré en haut du poteau
+(`CrossingPrompts.selectPoleTopBox`, côté 3 largeurs de fût, plancher
+24 px — serré comme la tête pour la garde bas de la porte). Sans lampe
+allumée vue (`PedLightGate.hasLampSignal`), pas de boîte : la branche
+sans-feu (`NoLightGate`) reste intacte. Le feu garde la priorité sur le
+poteau ; `pole` rejoint les prompts traversée (sonde : déjà dans
+`LivePrompts.default`).
+
+Le prompt piéton capte aussi les gros feux voiture (même tête visuelle,
+étiquette = wording du prompt) : `CarLightVeto` écarte les boîtes
+piétonnes inscrites à moitié au moins dans un caisson voiture
+(contenance, pas IoU — tailles disparates). **Veto inactif** : le wording
+`vehicle traffic light` n'est envoyé nulle part tant que rappel voiture
+et 0 capture piéton ne sont pas mesurés (~15 photos, `MESURES` §1) —
+testable au champ « Follow » en attendant. Le carré poteau est vetoé
+comme un feu.
+
+### 15.2 Sans feu : une garée ne bloque jamais, même caméra en mouvement
 
 Ordre user : seule une voiture **en mouvement** dit « Attendez. » — une
 voiture garée (immobile) ne bloque jamais le « Traversez. », même proche,

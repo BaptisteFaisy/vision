@@ -1,6 +1,7 @@
 package dev.sam3vision.core.crossing
 
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
@@ -156,17 +157,65 @@ object CrossingPrompts {
      * (boîte sous le dixième de la plus grande de sa classe — un reflet
      * de 384 px ne bat jamais un caisson, §5a) sont écartés avant le tri
      * au score, **par classe** : une petite tête ne se fait jamais écarter
-     * comme un éclat du caisson. La normalisation suit
-     * [Detection.normalizedBox] : la boîte se reporte sur le Bitmap décodé
-     * côté `:app`, quelle que soit sa taille.
+     * comme un éclat du caisson. Avant tout : le veto tricolore
+     * ([CarLightVeto]) écarte les boîtes inscrites dans un caisson voiture.
+     * La normalisation suit [Detection.normalizedBox] : la boîte se reporte
+     * sur le Bitmap décodé côté `:app`, quelle que soit sa taille.
      */
     fun selectLightBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
         if (width <= 0 || height <= 0) return null
+        val carBoxes = CarLightVeto.carBoxes(objects)
         val lights = objects.filter { isLightLabel(it.label) }
+            .filterNot { CarLightVeto.isVetoed(it.box, carBoxes) }
         if (lights.isEmpty()) return null
         val (heads, housings) = lights.partition { isHeadLabel(it.label) }
         return bestBox(heads, width, height) ?: bestBox(housings, width, height)
     }
+
+    /**
+     * Repli haut-de-poteau : sans boîte de feu, le carré ancré en haut du
+     * meilleur poteau ([HazardConcepts.isPole], même tri au score et
+     * anti-éclats que [bestBox]), `null` sans poteau ou sans carré valide.
+     * Le feu piéton est sur poteau (ordre user du 31/10) : quand SAM rate
+     * le boîtier mais voit le fût, la lampe se lit en haut du poteau. Le
+     * carré ([poleTopSquare]) est vetoé comme un feu ([CarLightVeto]) :
+     * un haut de poteau dans un caisson voiture ne part pas au classifieur.
+     * L'appelant vérifie ensuite la lampe ([PedLightGate.hasLampSignal]) :
+     * un poteau sans feu reste `null` côté boîte (branche sans-feu intacte).
+     */
+    fun selectPoleTopBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
+        if (width <= 0 || height <= 0) return null
+        val poles = objects.filter { HazardConcepts.isPole(it.label) }
+        val pick = bestPick(poles) ?: return null
+        val square = poleTopSquare(pick.box, width, height)
+        if (CarLightVeto.isVetoed(square, CarLightVeto.carBoxes(objects))) return null
+        return Detection(pick.label, pick.score, square, width, height).normalizedBox()
+            ?.takeIf { box -> box.size == 4 && box[2] > box[0] && box[3] > box[1] }
+    }
+
+    /**
+     * Carré de lecture en haut du poteau [poleBox] (pixels) : côté trois
+     * largeurs de fût ([POLE_TOP_WIDTH_FACTOR], plancher [POLE_TOP_MIN_PX]),
+     * centré sur le fût, haut aligné sur le haut du poteau, clampé au cadre.
+     * Serré comme la tête : la lampe (plus large que le fût) y chevauche la
+     * médiane, ce que la garde bas de la porte exige (`PedLightGate`) — une
+     * moitié haute de poteau serait rejetée (vert confiné en haut).
+     */
+    private fun poleTopSquare(poleBox: List<Float>, width: Int, height: Int): List<Float> {
+        val x1 = poleBox[0]
+        val y1 = poleBox[1]
+        val side = maxOf((poleBox[2] - x1) * POLE_TOP_WIDTH_FACTOR, POLE_TOP_MIN_PX)
+        val cx = (x1 + poleBox[2]) / 2f
+        val left = (cx - side / 2f).coerceIn(0f, maxOf(0f, width - side))
+        val top = y1.coerceIn(0f, maxOf(0f, height - side))
+        return listOf(left, top, minOf(left + side, width.toFloat()), minOf(top + side, height.toFloat()))
+    }
+
+    /** Largeurs de fût du carré haut-de-poteau (la lampe déborde du fût). */
+    private const val POLE_TOP_WIDTH_FACTOR = 3f
+
+    /** Côté minimal du carré haut-de-poteau, en pixels (pas un point). */
+    private const val POLE_TOP_MIN_PX = 24f
 
     /**
      * Meilleure boîte d'une classe (tête ou caisson) : éclats écartés sous
@@ -174,14 +223,23 @@ object CrossingPrompts {
      * candidat valide — l'appelant bascule sur l'autre classe.
      */
     private fun bestBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
+        return bestPick(objects)
+            ?.let { Detection(it.label, it.score, it.box, width, height).normalizedBox() }
+            ?.takeIf { box -> box.size == 4 && box[2] > box[0] && box[3] > box[1] }
+    }
+
+    /**
+     * Meilleur objet d'une classe : éclats écartés sous le dixième de la
+     * plus grande aire, tri au score. `null` sans candidat — partagé par
+     * [bestBox] (feu) et [selectPoleTopBox] (poteau), mêmes règles.
+     */
+    private fun bestPick(objects: List<SegObject>): SegObject? {
         val areas = objects.map { boxArea(it.box) }
         val biggest = areas.maxOrNull() ?: return null
         if (biggest <= 0f) return null
         return objects.asSequence()
             .filterIndexed { index, _ -> areas[index] >= biggest / SLIVER_RATIO }
             .maxByOrNull { it.score }
-            ?.let { Detection(it.label, it.score, it.box, width, height).normalizedBox() }
-            ?.takeIf { box -> box.size == 4 && box[2] > box[0] && box[3] > box[1] }
     }
 
     /** Éclats ignorés sous le dixième de la plus grande boîte feu (§5a). */

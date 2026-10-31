@@ -208,6 +208,95 @@ class CrossingStateTest {
         assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
     }
 
+    @Test
+    fun `repli poteau - sans poteau pas de carre`() {
+        val objects = listOf(light("car", 0.99f, listOf(0f, 0f, 10f, 10f)))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(objects, 200, 400))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(emptyList(), 200, 400))
+        val pole = listOf(light("pole", 0.9f, listOf(96f, 40f, 104f, 380f)))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(pole, 0, 400))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(pole, 200, 0))
+    }
+
+    @Test
+    fun `repli poteau - carre exact ancre en haut`() {
+        val objects = listOf(light("pole", 0.9f, listOf(96f, 40f, 104f, 380f)))
+        assertEquals(listOf(0.44f, 0.1f, 0.56f, 0.16f), CrossingPrompts.selectPoleTopBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `repli poteau - meilleur score gagne, eclat ecarte`() {
+        val objects = listOf(
+            light("pole", 0.60f, listOf(90f, 40f, 110f, 380f)),
+            light("pole", 0.99f, listOf(0f, 0f, 10f, 10f)),
+        )
+        assertEquals(listOf(0.35f, 0.1f, 0.65f, 0.25f), CrossingPrompts.selectPoleTopBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `repli poteau - etiquettes pole poteau poteaux reconnues`() {
+        listOf("pole", "poteau", "poteaux", "Pole").forEach { label ->
+            val objects = listOf(light(label, 0.9f, listOf(96f, 40f, 104f, 380f)))
+            assertEquals(label, listOf(0.44f, 0.1f, 0.56f, 0.16f), CrossingPrompts.selectPoleTopBox(objects, 200, 400))
+        }
+        val car = listOf(light("car", 0.9f, listOf(96f, 40f, 104f, 380f)))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(car, 200, 400))
+        val housing = listOf(light("pedestrian traffic light", 0.9f, listOf(96f, 40f, 104f, 380f)))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(housing, 200, 400))
+    }
+
+    @Test
+    fun `repli poteau - carre vetoe dans un caisson voiture, voisin garde`() {
+        val pole = light("pole", 0.9f, listOf(96f, 40f, 104f, 380f))
+        val inside = listOf(pole, light("vehicle traffic light", 0.9f, listOf(0f, 0f, 200f, 200f)))
+        assertEquals(null, CrossingPrompts.selectPoleTopBox(inside, 200, 400))
+        val aside = listOf(pole, light("vehicle traffic light", 0.9f, listOf(150f, 200f, 200f, 400f)))
+        assertEquals(listOf(0.44f, 0.1f, 0.56f, 0.16f), CrossingPrompts.selectPoleTopBox(aside, 200, 400))
+    }
+
+    @Test
+    fun `veto tricolore - boite inscrite a 80 pourcent ecartee`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.9f, listOf(0f, 0f, 100f, 100f)),
+            light("vehicle traffic light", 0.9f, listOf(0f, 0f, 80f, 100f)),
+        )
+        assertEquals(null, CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `veto tricolore - recouvrement 20 pourcent conserve`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.9f, listOf(0f, 0f, 100f, 100f)),
+            light("vehicle traffic light", 0.9f, listOf(80f, 0f, 200f, 100f)),
+        )
+        assertEquals(listOf(0f, 0f, 0.5f, 0.25f), CrossingPrompts.selectLightBox(objects, 200, 400))
+    }
+
+    @Test
+    fun `veto tricolore - seuil 0,5 des deux cotes`() {
+        val ped = light("pedestrian traffic light", 0.9f, listOf(0f, 0f, 100f, 100f))
+        val half = listOf(ped, light("vehicle traffic light", 0.9f, listOf(0f, 0f, 50f, 100f)))
+        assertEquals(null, CrossingPrompts.selectLightBox(half, 200, 400))
+        val under = listOf(ped, light("vehicle traffic light", 0.9f, listOf(51f, 0f, 200f, 100f)))
+        assertEquals(listOf(0f, 0f, 0.5f, 0.25f), CrossingPrompts.selectLightBox(under, 200, 400))
+    }
+
+    @Test
+    fun `veto tricolore - etiquettes voiture reconnues, le reste non`() {
+        listOf(
+            "vehicle traffic light", "Vehicle Traffic Light", "vehicle traffic lights",
+            "feu voiture", "feux voiture", "feu tricolore", "Feux Tricolores",
+        ).forEach { label ->
+            assertTrue(label, CarLightVeto.isCarLightLabel(label))
+        }
+        listOf(
+            "pedestrian traffic light", "pedestrian signal head", "car",
+            "traffic light", "pole", "feu piéton", "",
+        ).forEach { label ->
+            assertFalse(label, CarLightVeto.isCarLightLabel(label))
+        }
+    }
+
     private fun light(label: String, score: Float, box: List<Float>) =
         dev.sam3vision.core.model.SegObject(label, score, box, "")
 }

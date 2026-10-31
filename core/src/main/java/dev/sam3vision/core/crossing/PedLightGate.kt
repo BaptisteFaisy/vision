@@ -78,6 +78,19 @@ object PedLightGate {
         return CrossingState.Red
     }
 
+    /**
+     * Vrai si le crop [argb] ([width] x [height]) montre une lampe allumée :
+     * fraction rouge ou verte au plancher [GREEN_MIN_FRACTION]. Garde du
+     * repli haut-de-poteau (`CrossingPrompts.selectPoleTopBox`) : un poteau
+     * sans feu reste sans boîte (branche sans-feu intacte), seul un poteau
+     * à lampe vue devient un rouge d'attente. Public : l'appelant est `:app`.
+     */
+    fun hasLampSignal(argb: IntArray, width: Int, height: Int): Boolean {
+        if (width <= 0 || height <= 0 || argb.size != width * height) return false
+        val scan = scan(argb, width, height)
+        return (scan.red + scan.green).toFloat() / argb.size >= GREEN_MIN_FRACTION
+    }
+
     /** Vrai si le vert du crop a la position et la forme d'un bonhomme. */
     fun acceptGreen(argb: IntArray, width: Int, height: Int): Boolean {
         if (width <= 0 || height <= 0 || argb.size != width * height) return false

@@ -251,12 +251,13 @@ class TraverseWiring(
 }
 
 /**
- * Prompts du mode : le feu piéton devant, véhicules + base ensuite.
+ * Prompts du mode : le feu piéton devant, son poteau juste derrière (repli
+ * haut-de-poteau quand SAM rate le boîtier), véhicules + base ensuite.
  * Sans le concept feu, aucun vert ne serait jamais lu. Pur, testé en JVM
  * (l'activation autour touche Android : TTS, cache, appareil seul).
  */
 internal fun traversePrompts(prompts: List<String>): List<String> =
-    TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT) + prompts)
+    TraversePipeline.promptsFor(listOf(CrossingPrompts.LIGHT, "pole") + prompts)
 
 /**
  * Ligne de décision traversée, stable pour `adb logcat` et les recettes :

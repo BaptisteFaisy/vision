@@ -99,6 +99,16 @@ class PedLightGateTest {
     }
 
     @Test
+    fun `lampe allumee - vert et rouge vrais, le reste faux`() {
+        assertTrue(PedLightGate.hasLampSignal(barBottom(), 20, 20))
+        assertTrue(PedLightGate.hasLampSignal(IntArray(100) { RED }, 10, 10))
+        assertFalse(PedLightGate.hasLampSignal(IntArray(100) { BLACK }, 10, 10))
+        assertFalse(PedLightGate.hasLampSignal(IntArray(100) { GRAY }, 10, 10))
+        assertFalse(PedLightGate.hasLampSignal(IntArray(10), 10, 10))
+        assertFalse(PedLightGate.hasLampSignal(IntArray(0), 0, 0))
+    }
+
+    @Test
     fun `seuil fraction - 3px elances passent, 1px refuse`() {
         assertTrue(PedLightGate.acceptGreen(bar(1, 3), 20, 20))
         assertFalse(PedLightGate.acceptGreen(bar(1, 2), 20, 20))
