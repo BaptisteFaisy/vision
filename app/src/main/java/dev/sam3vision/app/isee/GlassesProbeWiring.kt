@@ -8,7 +8,6 @@ import androidx.compose.runtime.LaunchedEffect
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.uprightScaled
-import kotlinx.coroutines.delay
 
 /**
  * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit et que la sonde
@@ -17,15 +16,19 @@ import kotlinx.coroutines.delay
  * distances et voix suivent alors le même chemin que le mode téléphone : parité par
  * construction, sans toucher à [Guidance][core.live.Guidance]. Le compteur de marches
  * part aussi (même photo → Canny), sinon la voix ne connaît jamais leur nombre.
+ *
+ * Piloté par les poussées du flux (conflaté : la plus fraîche gagne), jamais sondé :
+ * l'ancien sondage ajoutait jusqu'à 500 ms à chaque envoi. [LiveProbe.wantsFrame] reste
+ * le seul garde (créneau libre + cadence échue), donc le serveur ne voit pas plus de
+ * frames qu'avant — il les voit plus tôt.
  */
 @Composable
 internal fun GlassesProbeWiring(probe: LiveProbe, glassesLive: Boolean) {
     LaunchedEffect(probe, glassesLive) {
         if (!glassesLive) return@LaunchedEffect
-        while (true) {
-            delay(BRIDGE_POLL_MS)
-            if (!probe.wantsFrame()) continue
-            val jpeg = snapshotJpeg() ?: continue
+        GlassesVideoLink.frames.collect { box ->
+            if (box == null || !probe.wantsFrame()) return@collect
+            val jpeg = snapshotJpeg() ?: return@collect
             probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
         }
     }
@@ -66,4 +69,3 @@ private fun countSnapshot() {
 }
 
 private const val TAG = "GlassesBridge"
-private const val BRIDGE_POLL_MS = 500L
