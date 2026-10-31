@@ -10,7 +10,7 @@ import org.junit.Test
  * Porte anti-confusion : cas limites complémentaires à [PedLightGateTest].
  *
  * Chaque test vise une frontière exacte du code lu dans [PedLightGate]
- * (fractions rouge/vert, élancement 1,5, plancher R1b 20 %, bande 20-35 %) :
+ * (fractions rouge/vert, élancement 1,0, plancher R1b 20 %, bande 20-35 %) :
  * un pixel de plus ou de moins fait basculer le verdict. Aucun seuil
  * n'est modifié ici — ce fichier les verrouille.
  *
@@ -45,15 +45,15 @@ class PedLightGateLimitsTest {
     }
 
     @Test
-    fun `fraction verte - 39px refuse, 40px accepte sur 100x100`() {
-        assertFalse(PedLightGate.acceptGreen(verticalLine(39), 100, 100))
-        assertTrue(PedLightGate.acceptGreen(verticalLine(40), 100, 100))
+    fun `fraction verte - 19px refuse, 20px accepte sur 100x100`() {
+        assertFalse(PedLightGate.acceptGreen(verticalLine(19), 100, 100))
+        assertTrue(PedLightGate.acceptGreen(verticalLine(20), 100, 100))
     }
 
     @Test
-    fun `elancement exact - 4x6 accepte, 4x5 refuse`() {
-        assertTrue(PedLightGate.acceptGreen(barSized(4, 6), 20, 20))
-        assertFalse(PedLightGate.acceptGreen(barSized(4, 5), 20, 20))
+    fun `elancement assoupli - 4x4 accepte, 5x4 refuse`() {
+        assertTrue(PedLightGate.acceptGreen(barSized(4, 4), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(barSized(5, 4), 20, 20))
     }
 
     @Test

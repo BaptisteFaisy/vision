@@ -192,8 +192,8 @@ object VehicleStateText {
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
- * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS], mesuré ou
- * non — toute voiture vue se dit, en mouvement ou à l'arrêt.
+ * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS] (sauf [update] : sans-feu = infini),
+ * mesuré ou non — toute voiture vue se dit, en mouvement ou à l'arrêt.
  *
  * Le pluriel est générique : deux types mobiles ou plus dans la même frame
  * disent « 2 vehicles moving… » (distance du plus proche), pas le nom du
@@ -270,8 +270,8 @@ class VehicleStateWatcher(
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]
      * porte les boîtes SAM, [readings] les distances affinées ; [atMs] < 0
      * désactive le suivi temporel (croissance seule, comme le veto).
-     * [motion] (`null` = pas de signal fond) fait juger chaque piste par le
      * fond : une piste qui suit la caméra ne conclut plus le mouvement.
+     * [movingMeters] borne la portée du mouvement (sans-feu : infini — toute voiture qui bouge se dit).
      */
     fun update(
         detections: List<Detection>,
@@ -279,13 +279,14 @@ class VehicleStateWatcher(
         atMs: Long,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         motion: FrameMotion? = null, depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte — null = repli géométrie.
+        movingMeters: Float = MOVING_METERS,
     ): VehicleStateCue? {
         val tau = if (atMs >= 0L) approach.update(detections, atMs, motion, depthByBox) // PISTE2
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
-        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc)
+        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness) // PISTE2
         }
@@ -355,9 +356,10 @@ class VehicleStateWatcher(
         atMs: Long,
         hushed: Set<String>,
         fondFranc: Boolean,
+        movingMeters: Float,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, hushed, atMs) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
+        return movingPick(current, meters, tau, hushed, atMs, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -367,6 +369,7 @@ class VehicleStateWatcher(
         tau: ApproachVerdict,
         hushed: Set<String>,
         atMs: Long, // PISTE1 : date la croissance pour la décote zoom
+        movingMeters: Float,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
@@ -378,7 +381,7 @@ class VehicleStateWatcher(
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
                     seen.area, seen.closeness, atMs, approach.lastGlobal)
-                (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
+                (tauHit || lateralHit || growth) && inMovingRange(meters[candidate], movingMeters)
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
             ?: return null
@@ -455,7 +458,7 @@ class VehicleStateWatcher(
         VehicleConcepts.isVehicle(label) && !CycleConcepts.isCycle(label)
 
     /** Portée du mouvement : mesuré sous le seuil, ou non mesuré (l'heure situe). */
-    private fun inMovingRange(meters: Float?): Boolean = meters == null || meters <= MOVING_METERS
+    private fun inMovingRange(meters: Float?, movingMeters: Float): Boolean = meters == null || meters <= movingMeters
 
     /** Mouvement proche : mesuré sous la bande sécurité, ou non mesuré (jamais prouvé loin). */
     private fun isNear(meters: Float?): Boolean = meters == null || meters <= NEAR_MOVING_METERS

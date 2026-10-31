@@ -53,14 +53,25 @@ internal fun scanTriggerFor(
 }
 
 /**
- * Mode Traversée coupé : les trois voix (personnes, véhicules, scan)
- * ré-annonceront la prochaine scène. Une ligne côté sonde (même plafond).
+ * Mode Traversée coupé : les quatre voix (personnes, véhicules, scan,
+ * « traversez » sans feu) ré-annonceront la prochaine scène. Une ligne côté
+ * sonde (même plafond).
  */
 internal fun resetCrossingWatches() {
     CrossingPeopleWatch.reset()
     CrossingVehicleWatch.reset()
     CrosswalkScanWatch.reset()
+    NoLightCrossWatch.reset()
 }
+
+/**
+ * Procédure scan en cours : l'user est arrêté sur les zébrures, le scan
+ * garde la voix (consignes « regardez à gauche/droite » + constats) et
+ * l'évitement marche se tait (§ 25 — un ordre « Gauche. » au milieu du
+ * « Regardez à gauche. » ferait confondre marcher et regarder).
+ */
+internal fun scanRunning(): Boolean =
+    CrosswalkScanWatch.phase().let { it != CrosswalkScanPhase.Idle && it != CrosswalkScanPhase.Done }
 
 /**
  * Scan traversée, un par processus (même garde des 500 lignes que

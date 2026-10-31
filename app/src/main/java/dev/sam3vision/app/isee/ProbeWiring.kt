@@ -385,8 +385,9 @@ internal fun LiveProbe.steeringCueOf(): SteeringCue? =
 
 /**
  * Phrase à dire pour la frame (`null` = silence) : voix rouge/vert en
- * Traversée, sinon guidage (cap route, sinon cap manuel) puis positions.
- * Extraite de `LiveProbe.publish` (plafond 50 lignes/fonction).
+ * Traversée — sauf ordre d'évitement du guidage ([steeringOf], § 25),
+ * sinon guidage (cap route, sinon cap manuel) puis positions. Extraite
+ * de `LiveProbe.publish` (plafond 50 lignes/fonction).
  */
 internal fun LiveProbe.phraseOf(
     cross: CrossingPatch?,
@@ -401,7 +402,8 @@ internal fun LiveProbe.phraseOf(
 ): String? {
     if (state.value.crossingActive) {
         return crossingPhraseOf(cross?.cue, placed, detections,
-            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger)
+            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger,
+            cross?.noLight == true, cross?.veto == true, steeringOf(placed, frame, at, hfovDeg))
     }
     resetCrossingWatches()
     return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)

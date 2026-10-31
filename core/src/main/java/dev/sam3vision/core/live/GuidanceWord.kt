@@ -79,5 +79,13 @@ enum class GuidanceWord {
          */
         fun isStopPhrase(phrase: String): Boolean =
             phrase == "Stop." || TwinLiteWord.isStopPhrase(phrase)
+
+        /**
+         * Vrai si [phrase] est un mot de virage (gauche/droite, FR ou EN) :
+         * l'ordre d'évitement, qui passe devant la voix traversée (§ 25 —
+         * « Tout droit. » ne couvre jamais le feu, il n'est pas un virage).
+         */
+        fun isTurnWord(phrase: String): Boolean =
+            clipIdFor(phrase) == Left.clipId || clipIdFor(phrase) == Right.clipId
     }
 }

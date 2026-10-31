@@ -11,6 +11,8 @@ import org.junit.Test
  * seuils) + échantillon réel `feuxfr/` (9 crops Panoramax ≤ 48 px, voir
  * ATTRIBUTION.md). Les seuils sont calibrés sur feux français (10/2026) :
  * ces tests verrouillent 0 vert sur rouge et le rappel bonhomme.
+ * Détection au plus large (31/10, ordre user) : les disques verts sont
+ * admis, seuls les rouges, les éteints et le bruit restent refusés.
  */
 class PedLightGateTest {
 
@@ -20,13 +22,13 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `disque vert centre - refuse (feu rond, pas bonhomme)`() {
-        assertFalse(PedLightGate.acceptGreen(disc(10, 10, 5), 20, 20))
+    fun `disque vert centre - admis (detection au plus large)`() {
+        assertTrue(PedLightGate.acceptGreen(disc(10, 10, 5), 20, 20))
     }
 
     @Test
-    fun `disque vert bas - refuse malgre la position`() {
-        assertFalse(PedLightGate.acceptGreen(disc(10, 14, 5), 20, 20))
+    fun `disque vert bas - admis (detection au plus large)`() {
+        assertTrue(PedLightGate.acceptGreen(disc(10, 14, 5), 20, 20))
     }
 
     @Test
@@ -70,9 +72,9 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - cadre tout vert attend rouge (pas elance, pas bonhomme)`() {
+    fun `verdict - cadre tout vert annonce vert (detection au plus large)`() {
         assertEquals(
-            CrossingState.Red,
+            CrossingState.Green,
             PedLightGate.verdict(IntArray(100) { CYAN_GREEN }, 10, 10),
         )
     }
@@ -104,9 +106,9 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `seuil elancement - 1,67 accepte, 1,43 refuse`() {
-        assertTrue(PedLightGate.acceptGreen(bar(6, 10), 20, 20))
-        assertFalse(PedLightGate.acceptGreen(bar(7, 10), 20, 20))
+    fun `seuil elancement - 1,0 accepte, plus large que haut refuse`() {
+        assertTrue(PedLightGate.acceptGreen(bar(4, 4), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(bar(5, 4), 20, 20))
     }
 
     @Test
@@ -134,14 +136,14 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `feux fr - disques voiture refuses`() {
-        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.ppm"))
-        assertNotEquals(CrossingState.Green, verdictOf("fr_cardisc_367.ppm"))
+    fun `feux fr - disques voiture admis (31-10, A2 leve)`() {
+        assertEquals(CrossingState.Green, verdictOf("fr_cardisc_close_183.ppm"))
+        assertEquals(CrossingState.Green, verdictOf("fr_cardisc_367.ppm"))
     }
 
     @Test
-    fun `feux fr - pose large rouge documente, jamais vert`() {
-        assertNotEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.ppm"))
+    fun `feux fr - pose large verte admise (rappel)`() {
+        assertEquals(CrossingState.Green, verdictOf("fr_green_widepose_355.ppm"))
     }
 
     @Test
@@ -158,11 +160,15 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `r1b - rouges et disques toujours refuses`() {
+    fun `r1b - rouges toujours refuses`() {
         assertEquals(CrossingState.Red, verdict2Of("st_r01.ppm"))
         assertEquals(CrossingState.Red, verdict2Of("st_r02.ppm"))
-        assertNotEquals(CrossingState.Green, verdict2Of("st_c01.ppm"))
-        assertNotEquals(CrossingState.Green, verdict2Of("st_c02.ppm"))
+    }
+
+    @Test
+    fun `r1b - disques admis (detection au plus large)`() {
+        assertEquals(CrossingState.Green, verdict2Of("st_c01.ppm"))
+        assertEquals(CrossingState.Green, verdict2Of("st_c02.ppm"))
     }
 
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */

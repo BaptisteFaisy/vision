@@ -87,8 +87,10 @@ Le veto recevait `lightGreen = false` en dur : le mode ne disait jamais
 1. **Calibration FR** (lot 1 sans terrain, fait 10/2026) : arbre validé
    sur 235 lampes FR (Panoramax, jour) — couleur 97,9 %, 0 vert sur
    90 rouges ; porte recalibrée (fraction 0,004, élancement 1,5,
-   bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. Reste :
-   poses larges, corpus téléphone + seuil bloquant faux verts.
+   bas 0,35) : rappel bonhomme 28/42, 0/47 disques de face. **31/10,
+   ordre user (détection au plus large) : fraction 0,002, élancement
+   1,0 — chiffres ci-dessus caducs, disques admis, A2 levé.**
+   Reste : corpus téléphone + remesure sur les 235.
    **Nuit et pluie sortis du périmètre le 29/10** (décision produit, voir
    `docs/CALIBRAGE-FEU.md` §9) : le mode ne traite que le jour.
 2. **Terrain** : aucun test téléphone — crop réel, voix sur appareil, veto
@@ -240,7 +242,8 @@ quand la sonde le voit — silence sinon, jamais de chiffre deviné.
 ### Bascule automatique (30/10)
 
 Ordre user : plus de proposition manuelle — le passage détecté arme le mode,
-le passage perdu le coupe, et les personnes restent annoncées en traversée.
+le passage perdu le coupe ; les personnes ne sont plus annoncées (31/10) —
+seuls les mots d'évitement parlent.
 
 - **entrée** : le passage proche 3 frames sur 5 (`CrossingOfferGate`,
   ≤ 2 m mesurés (`OFFER_MAX_METERS`, sinon boîte prouvée sous les pieds —
@@ -258,22 +261,22 @@ le passage perdu le coupe, et les personnes restent annoncées en traversée.
   passage sans bandes se traverse sans zébrures), et seul un refus manuel
   fait taire la proposition une minute (`setCrossingActive(auto = …)`) ;
 - **personnes** : les prompts traversée ajoutent `person` et `crosswalk`
-  (12 concepts, plafond 16 tenu) ; le feu parle en premier, et sur son
-  silence les personnes sont annoncées au cadran (« Personne à 9 heures, à
-  2 mètres », `CrossingPeopleWatch`, débouncé comme toute annonce) ;
+  (12 concepts, plafond 16 tenu) ; les mots d'évitement passent devant le
+  feu (§ 25 : ordre d'évitement d'abord, feu ensuite), les annonces au
+  cadran (« Personne à 9 heures ») sont coupées depuis le 31/10 (ordre
+  user : esquiver au maximum, sans décrire) ;
 - **décalage opposé** (30/10, après-midi, étendu le soir aux obstacles) : des
   gens proches qui s'approchent d'un côté disent d'aller de l'autre
   (« Droite. », mot nouveau seul, clip < 100 ms — le même `LateralNudgeTracker`
-  que le guidage normal, qui prime sur les positions comme lui), et depuis le
-  soir tout obstacle proche qui s'approche (objet, poteau — même filtre que le
-  couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
-  (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; un ordre du feu nouveau
-  fait taire la voix
-  douce 2,5 s (`CUE_QUIET_MS`, les répétitions — même phrase, rouge ou
-  vert — ne réarment pas) — sans ce silence, le `collectLatest` côté sonde
-  jetterait l'ordre pas encore joué (`CrossingPeopleVoice.kt`, la sonde ne
-  change que d'une ligne) ; depuis le 31/10 le vert se répète toutes les
-  2 s comme le rouge, un ordre jeté se rattrape à la répétition suivante ;
+  que le guidage normal, sans positions en traversée — supprimées le 31/10) ;
+  depuis le soir, tout obstacle proche qui s'approche (objet, poteau — même
+  filtre que le couloir, sol et panneaux hauts exclus), dans les 2 m de l'axe de marche
+  (`AVOID_HALF_WIDTH_M`, portée 4 m comme le couloir) ; les mots ne sont
+  plus tus par le feu (§ 25, 31/10 : ils passent devant — le silence doux
+  2,5 s `CUE_QUIET_MS` ne couvre plus que les véhicules, ordre du feu
+  nouveau, répétitions non réarmantes) ; depuis le 31/10 le vert se répète
+  toutes les 2 s comme le rouge, un ordre jeté se rattrape à la répétition
+  suivante ;
 - **états moteurs** (30/10, soir ; stop déplacé le 31/10) : en traversée,
   les voitures disent si elles roulent ou sont arrêtées (« Stop, car
   moving. » — « Stop, 2 vehicles moving. » au pluriel — si le mouvement
@@ -298,9 +301,11 @@ Ordre user : fini le doute — rouge ou vert, et une différenciation certaine.
 - **Binaire** : `CrossingState` n'a plus que `Red` et `Green`. Tout non-vert
   attend rouge (pas de boîte, crop illisible, couleur indécise, porte refusée)
   : classifieurs, porte, voix, vibration, affichage et voicepack suivent (le
-  clip `cross_unsure` et ses MP3 sont supprimés). Le chemin vert est inchangé
-  (arbre + porte + 4 frames) : seul le sens sûr change de nom.
-- **Sorties confirmées** : audit du 31/10 — la voix exigeait 4 frames mais
+  clip `cross_unsure` et ses MP3 sont supprimés). Le chemin vert est
+  (arbre + porte + annonce immédiate) : seul le sens sûr change de nom.
+- **Sorties confirmées** : audit du 31/10 — la voix exigeait alors 4 frames
+  (1 depuis, même jour, ordres user : à 4, P(annonce) = p⁴ ; à 2,
+  l'intermittence ratait encore des verts persistants), mais
   l'haptique et l'overlay suivaient la lecture brute (1 frame verte erronée
   suffisait à vibrer vert et afficher VERT, même sous veto). Depuis : l'état
   publié est le dernier **annoncé** (rouge par défaut), voix, vibration et
@@ -336,6 +341,10 @@ s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
   « Tout droit. » en clips < 100 ms, « Sur le passage. » après 2 frames),
   doux (`urgent = false`) — le feu, le veto et les véhicules gardent la
   priorité du son, le latéral attend le silence ;
+- **arrivée dernière** (ordre user du 31/10) : « Sur le passage. » passe
+  derrière toutes les autres annonces (danger > route > doux > arrivée) —
+  parlée au silence seul, sinon gardée et redite en dernier, y compris en
+  Traversée (rattrapage latéral, file obstacles coupée) ;
 - **câblage** : `feedCrossingLateral` (`isee/CrossingWiring.kt`) — hors
   traversée inchangé, en traversée guidage si proche sinon retombée ;
   `LiveProbe` inchangée (499 lignes, au plafond) ;
@@ -386,3 +395,45 @@ on/off » et « traverser » conservés).
   l'ambre `CROSSING_ACCENT_OFFER` (bandeau de scan) ; `CrossingLossGate`
   et ses tests (décision de sortie, horloge couverte par
   `CrossingTriggerExitDecisionTest`).
+
+## 13. Sans feu : pas de « regardez à gauche/droite », verdict toutes les 2 s (31/10)
+
+Ordre user : sur un passage **sans feu**, le scan gauche/droite est coupé —
+iSee dit les voitures en mouvement en permanence (voix véhicules, priorité
+absolue en traversée, même loin) et, toutes les 2 s, si on peut traverser :
+« Traversez. » / « Cross. » sans danger, « Attendez. » / « Wait. » sur
+danger. Avec feu : scan > stop urgent > évitement > feu > véhicules doux
+(§ 25 ; le scan garde la voix pendant sa procédure).
+
+- **porte** : `NoLightGate` (core) — 4 frames sans boîte de feu → sans-feu
+  (le faux « sans feu » se prouve comme un vert) ; toute boîte réapparue
+  rebascule aussitôt côté feu (direction sûre) ;
+- **verdict** : `NoLightAnnouncer` (core) — 2 frames stables avant de parler,
+  redit toutes les 2 s dans les deux sens ; « Attendez. » coupe le délai
+  après un « Traversez. » (miroir du rouge après vert) ; la voix véhicules
+  recule le verdict (pas de doublon avec la phrase prioritaire) ;
+- **danger** : veto trafic OU véhicule brut en mouvement — même en cooldown
+  voix, jamais « Traversez. » sur un doute ;
+- **câblage** : `crossingPatchOf` tait le feu et publie rouge (aucun vert lu —
+  pastille, bouton et vibrations inchangés), `crossingPhraseOf` coupe le scan
+  et parle véhicules d'abord (`NoLightCrossWatch`, reset avec les autres voix) ;
+- **limites** : un feu cadré hors champ 4 frames passe en sans-feu —
+  viser le feu quand il y en a un ; écran Direct inchangé (fail-closed :
+  « attendez » sans vert).
+
+## 14. Sans feu : le mouvement se dit à toute portée (31/10)
+
+Ordre user : sans feu, une voiture en mouvement se dit **dès qu'elle est
+détectée, même au-delà de 15 m** (« Car moving, 30 meters away. »). Seul le
+mouvement est illimité : l'arrêt garde 15 m (une voiture garée loin ne
+bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
+15 m.
+
+- **noyau** : `VehicleStateWatcher.update` prend `movingMeters` (défaut
+  `MOVING_METERS`) — la portée ne touche que le mouvement, jamais l'arrêt ;
+- **câblage** : `CrossingVehicleWatch.update(noLight = true)` passe l'infini
+  (branche sans-feu seule) ; le brut `movingNow` qui tait le verdict suit la
+  même portée — au-delà de 15 m, « Attendez. » toutes les 2 s aussi ;
+- **urgence inchangée** : loin = doux mais premier, proche ou non mesuré =
+  « Stop, … » qui coupe tout (une voiture lointaine non mesurée reste dite
+  comme proche, règle conservatrice existante).

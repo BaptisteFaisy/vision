@@ -134,6 +134,36 @@ class CrosswalkScanWiringTest {
     }
 
     @Test
+    fun `priorite - procedure scan, le guidage se tait devant le feu`() {
+        resetWatches()
+        val language = SpeechLanguage.Fr
+        val cue = CrossingCue("Rouge, attendez.", true, CrossingState.Red)
+
+        crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, language, scanTrigger = true)
+        crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 100L, language, scanTrigger = true)
+        assertTrue(scanRunning())
+        assertEquals(
+            "Rouge, attendez.",
+            crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), 200L, language, scanTrigger = true, steering = "Gauche."),
+        )
+        resetWatches()
+    }
+
+    @Test
+    fun `priorite - le stop vehicules passe devant le guidage`() {
+        resetWatches()
+        val language = SpeechLanguage.Fr
+
+        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(100f))), listOf(carReading(5f, carBox(100f))), 0L, language))
+        assertNull(crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(110f))), listOf(carReading(5f, carBox(110f))), 100L, language))
+        assertEquals(
+            "Stop, voiture en mouvement.",
+            crossingPhraseOf(null, emptyList(), listOf(det("car", carBox(120f))), listOf(carReading(5f, carBox(120f))), 200L, language, steering = "Gauche."),
+        )
+        resetWatches()
+    }
+
+    @Test
     fun `sans declencheur - vehicules seuls, scan au repos`() {
         resetWatches()
         val language = SpeechLanguage.Fr

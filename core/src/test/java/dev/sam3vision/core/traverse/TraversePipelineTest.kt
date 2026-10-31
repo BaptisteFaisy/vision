@@ -51,15 +51,15 @@ class TraversePipelineTest {
     ): TraverseOutput = onFrame(objects, 640, 480, green, focalPx, index * 1000L)
 
     @Test
-    fun `premiere frame - hysteresis cache, veto sans objet, silence`() = runBlocking {
+    fun `premiere frame - hysteresis cache, vert annonce aussitot`() = runBlocking {
         val out = pipeline().frame(listOf(seg()), green = true, index = 1)
 
         assertTrue(out.objects.isEmpty())
         assertTrue(out.detections.isEmpty())
         assertEquals(TraversePhase.PRET, out.decision.state)
         assertFalse(out.decision.veto)
-        assertNull(out.cue)
-        assertNull(out.voice)
+        assertEquals(CrossingText.phrase(CrossingState.Green), out.cue?.phrase)
+        assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
     }
 
     @Test
@@ -93,8 +93,8 @@ class TraversePipelineTest {
                 assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
             }
         }
-        assertEquals("annonce à 4 s, répétition à 6 s", 2, cues)
-        assertEquals(listOf("play", "play"), player.events)
+        assertEquals("annonce à 1 s, répétitions à 3 s et 5 s", 3, cues)
+        assertEquals(listOf("play", "play", "play"), player.events)
     }
 
     @Test
@@ -103,13 +103,9 @@ class TraversePipelineTest {
         val pipe = pipeline(player = player)
         repeat(5) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
         val repeat = pipe.frame(listOf(seg()), green = true, index = 6)
-        assertEquals(
-            "piste non confirmée : le vert se répète à 6 s",
-            CrossingText.phrase(CrossingState.Green), repeat.cue?.phrase,
-        )
-        assertFalse(repeat.cue?.urgent ?: true)
+        assertNull("piste non confirmée : vert maintenu, répétition pas encore due", repeat.cue)
         val alert = pipe.frame(listOf(seg()), green = true, index = 7)
-        assertNull(alert.cue)
+        assertNull("piste confirmée : veto force le rouge, une seule frame ne suffit pas", alert.cue)
         val out = pipe.frame(listOf(seg()), green = true, index = 8)
 
         assertTrue(out.decision.veto)
@@ -118,14 +114,14 @@ class TraversePipelineTest {
         assertTrue(out.cue!!.urgent)
         assertEquals(CrossingText.phrase(CrossingState.Red), out.cue.phrase)
         assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
-        assertEquals(listOf("play", "play", "stop", "play"), player.events)
+        assertEquals(listOf("play", "play", "play", "stop", "play"), player.events)
     }
 
     @Test
     fun `sans voix - signal calcule mais rien de parle`() = runBlocking {
         val pipe = pipeline(withVoice = false)
-        repeat(3) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val out = pipe.frame(emptyList(), green = true, index = 4)
+        repeat(2) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
+        val out = pipe.frame(emptyList(), green = true, index = 3)
 
         assertNotNull(out.cue)
         assertNull(out.voice)
@@ -137,8 +133,8 @@ class TraversePipelineTest {
         val player = FakePlayer()
         val tts = FakeTts(Result.failure(RuntimeException("402")))
         val pipe = pipeline(player = player, tts = tts)
-        repeat(3) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val out = pipe.frame(emptyList(), green = true, index = 4)
+        repeat(2) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
+        val out = pipe.frame(emptyList(), green = true, index = 3)
 
         assertEquals(TraverseVoiceOutcome.OFFLINE, out.voice)
         assertEquals("/cache/vert.wav", player.playedPath)
@@ -154,7 +150,7 @@ class TraversePipelineTest {
 
         assertTrue(out.objects.isEmpty())
         assertEquals(TraversePhase.PRET, out.decision.state)
-        assertNull(out.cue)
+        assertEquals("annonceur oublié : la 1re frame parle", CrossingText.phrase(CrossingState.Green), out.cue?.phrase)
     }
 
     @Test

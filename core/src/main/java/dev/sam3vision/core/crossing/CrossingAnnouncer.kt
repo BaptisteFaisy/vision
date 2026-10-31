@@ -10,14 +10,14 @@ import dev.sam3vision.core.speech.SpeechLanguage
 data class CrossingCue(val phrase: String, val urgent: Boolean, val state: CrossingState)
 
 /**
- * Déclencheur du **mode Traversée** : parle aux changements d'état du feu,
- * jamais sur un scintillement. Pendant de
+ * Déclencheur du **mode Traversée** : le vert parle aussitôt, le rouge
+ * après confirmation (jamais sur un scintillement rouge). Pendant de
  * [dev.sam3vision.core.live.GuidanceAnnouncer], avec l'asymétrie inversée :
  *
- * 1. **le vert se confirme puis répète** — [GREEN_MIN_FRAMES] frames vertes
- *    de suite avant « traversez » (un faux vert engage sur la chaussée, un
- *    vert raté fait juste attendre), puis « Vert, traversez. » redit toutes
- *    les [GREEN_REPEAT_MS] ms tant que le vert dure ;
+ * 1. **le vert parle aussitôt puis répète** — 1 frame suffit (31/10,
+ *    ordre user : vert extrêmement facile ; la porte par frame porte seule
+ *    la sûreté), puis « Vert, traversez. » redit toutes les
+ *    [GREEN_REPEAT_MS] ms tant que le vert dure ;
  * 2. **le rouge parle vite et répète** — [RED_MIN_FRAMES] frames suffisent,
  *    puis « Rouge, attendez. » redit toutes les [RED_REPEAT_MS] ms tant que
  *    le rouge dure : manquer un rouge coûte plus qu'une fausse alerte, et
@@ -95,7 +95,7 @@ class CrossingAnnouncer(
         lastCue = null
     }
 
-    /** Frames stables exigées : le vert se prouve (4), le rouge moins (2). */
+    /** Frames stables exigées : le vert parle aussitôt (1), le rouge se prouve (2). */
     private fun required(state: CrossingState): Int =
         if (state == CrossingState.Green) greenMinFrames else redMinFrames
 
@@ -110,8 +110,13 @@ class CrossingAnnouncer(
     }
 
     companion object {
-        /** Frames vertes de suite avant « traversez » (≈ 0,8 s à 5 ips). */
-        const val GREEN_MIN_FRAMES = 4
+        /**
+         * « Traversez » dès la 1re frame verte (31/10, ordre user : vert
+         * extrêmement facile — à 2, l'intermittence ratait encore des verts
+         * persistants). La porte par frame garde la sûreté ; un vert isolé
+         * parle, seul le rouge exige 2 frames.
+         */
+        const val GREEN_MIN_FRAMES = 1
 
         /** Frames rouges de suite avant « attendez ». */
         const val RED_MIN_FRAMES = 2

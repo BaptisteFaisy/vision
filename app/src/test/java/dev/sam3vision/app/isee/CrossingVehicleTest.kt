@@ -98,7 +98,7 @@ class CrossingVehicleTest {
     }
 
     @Test
-    fun `les vehicules priment sur les personnes sans perdre leur mot`() {
+    fun `les vehicules priment, puis les personnes se taisent`() {
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
         val (detections, readings) = stoppedCar()
@@ -107,14 +107,14 @@ class CrossingVehicleTest {
         // Confirmation de l'arrêt hors phrase (2 frames).
         assertNull(CrossingVehicleWatch.update(detections, readings, 0L, SpeechLanguage.En))
         assertNull(CrossingVehicleWatch.update(detections, readings, 100L, SpeechLanguage.En))
-        // 3e frame : l'arrêt parle, les personnes attendent (annonceur vierge).
+        // 3e frame : l'arrêt parle, les personnes attendent.
         assertEquals(
             "Car stopped, 2 meters away.",
             crossingPhraseOf(null, placed, detections, readings, 200L, SpeechLanguage.En),
         )
-        // 4e frame : l'arrêt est en cooldown, la personne parle — rien de perdu.
-        assertEquals(
-            "Person at 9 o'clock.",
+        // 4e frame : l'arrêt est en cooldown, et les personnes ne se
+        // décrivent plus en traversée — seuls les mots d'évitement parlent.
+        assertNull(
             crossingPhraseOf(null, placed, detections, readings, 300L, SpeechLanguage.En),
         )
     }
@@ -188,5 +188,29 @@ class CrossingVehicleTest {
         assertNull(at(100f, 0L))
         assertNull(at(110f, 100L))
         assertEquals("Car moving, 12 meters away.", at(120f, 200L))
+    }
+
+    @Test
+    fun `mouvement a 30 m muet avec feu, parle sans feu`() {
+        CrossingVehicleWatch.reset()
+        val at = { width: Float, ms: Long, noLight: Boolean ->
+            val frame = box(width)
+            CrossingVehicleWatch.update(
+                listOf(det("car", frame)),
+                listOf(reading("car", 30f, frame)),
+                ms,
+                SpeechLanguage.En,
+                noLight = noLight,
+            )
+        }
+
+        assertNull(at(100f, 0L, false))
+        assertNull(at(110f, 100L, false))
+        assertNull(at(120f, 200L, false))
+
+        CrossingVehicleWatch.reset()
+        assertNull(at(100f, 0L, true))
+        assertNull(at(110f, 100L, true))
+        assertEquals("Car moving, 30 meters away.", at(120f, 200L, true))
     }
 }

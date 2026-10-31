@@ -81,5 +81,13 @@ enum class TwinLiteWord {
          */
         fun isStopPhrase(phrase: String): Boolean =
             phrase == Stop.text(SpeechLanguage.Fr) || phrase == Stop.text(SpeechLanguage.En)
+
+        /**
+         * Vrai si [phrase] est un côté de sortie (gauche/droite, FR ou EN) :
+         * l'ordre d'évitement du couloir bouché, qui passe devant la voix
+         * traversée (§ 25 — « tout droit. » ne couvre jamais le feu).
+         */
+        fun isTurnWord(phrase: String): Boolean =
+            clipIdFor(phrase) == Left.clipId || clipIdFor(phrase) == Right.clipId
     }
 }

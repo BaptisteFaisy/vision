@@ -4,12 +4,15 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Voix du compteur de marches : quand un escalier est reconnu, dit combien de
- * marches sont vues (« 5 marches. »), au plus toutes les [COUNT_MS].
+ * marches sont vues (« 5 marches. »), au plus toutes les [COUNT_MS] à chaque
+ * changement — et le même compte se répète toutes les [REPEAT_MS] tant que
+ * l'escalier reste vu (dans l'escalier, le compte reste utile ; un passage
+ * devant, plus bref, ne déclenche pas la répétition).
  *
- * Changements seuls : le même compte ne se répète pas (la voix synthétise en
- * ~1 s, répéter à 300 ms l'étoufferait et bloquerait les urgences), et deux
- * comptes différents restent espacés d'au moins [COUNT_MS] (un pic isolé du
- * compteur Canny ne fait pas bégayer). Un compte à 0 sur un positif = compteur
+ * La voix synthétise en ~1 s : répéter à 300 ms l'étoufferait et bloquerait
+ * les urgences — d'où le silence entre deux répétitions, et deux comptes
+ * différents espacés d'au moins [COUNT_MS] (un pic isolé du compteur Canny
+ * ne fait pas bégayer). Un compte à 0 sur un positif = compteur
  * indisponible (voie labels SAM, qui nomme sans compter) : silence, comme
  * [StairWatcher] — 0 n'est pas « zéro marche », c'est « non compté ».
  *
@@ -25,7 +28,8 @@ class StairCountVoice {
 
     /**
      * Compte vu à [nowMs] : la phrase à dire (« 5 marches. »), ou `null`
-     * (pas d'escalier, pas de compteur, même compte, ou 300 ms pas écoulées).
+     * (pas d'escalier, pas de compteur, même compte dit il y a moins de
+     * [REPEAT_MS], ou 300 ms pas écoulées depuis un autre compte).
      */
     fun onTick(
         detected: Boolean,
@@ -37,7 +41,11 @@ class StairCountVoice {
             lastCount = NO_COUNT
             return null
         }
-        if (count == lastCount) return null
+        if (count == lastCount) {
+            if (lastSaidAtMs == NO_INSTANT || nowMs - lastSaidAtMs < REPEAT_MS) return null
+            lastSaidAtMs = nowMs
+            return StairText.stepCount(count, language)
+        }
         if (lastSaidAtMs != NO_INSTANT && nowMs - lastSaidAtMs < COUNT_MS) return null
         lastCount = count
         lastSaidAtMs = nowMs
@@ -53,6 +61,13 @@ class StairCountVoice {
     companion object {
         /** Intervalle minimal entre deux comptes dits : l'info suit la caméra à 300 ms. */
         const val COUNT_MS = 300L
+
+        /**
+         * Silence avant de redire le même compte : 4 s, le temps de dire une
+         * phrase courte (miroir du délai entre annonces) — dans l'escalier, le
+         * compte se répète sans bégayer.
+         */
+        const val REPEAT_MS = 4_000L
 
         /** Aucun compte dit encore (ou escalier perdu de vue). */
         private const val NO_COUNT = -1

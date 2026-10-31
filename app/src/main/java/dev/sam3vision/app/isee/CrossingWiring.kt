@@ -11,6 +11,7 @@ import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
@@ -27,7 +28,6 @@ import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.traverse.crossingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,8 +64,9 @@ class CrossingChipZone {
  * modes), seule la voix bascule (feu + veto trafic au lieu du guidage). Les
  * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
  * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
- * est coupé tant que le mode est actif : ses mots et « Vert, traversez »
- * ne doivent jamais se mélanger. Toute bascule est manuelle (puce, ordre vocal).
+ * n'est plus coupé (§ 25) : ses ordres d'évitement (« Gauche. », « Droite. »,
+ * stop) passent devant la voix rouge/vert, « Tout droit. » restant tu tant
+ * que le mode est actif. Toute bascule est manuelle (puce, ordre vocal).
  */
 internal fun LiveProbe.setCrossingActive(
     settings: Settings,
@@ -108,12 +109,19 @@ internal data class CrossingPatch(
     val state: CrossingState,
     val box: List<Float>?,
     val phase: TraversePhase,
+    /** Vrai quand un véhicule force l'attente (branche sans-feu : tait le « Traversez. »). */
+    val veto: Boolean = false,
+    /** Vrai une fois l'absence de feu confirmée (voix sans-feu, feu muet). */
+    val noLight: Boolean = false,
 )
 
 /**
  * Signal traversée de la frame, ou `null` quand le mode est coupé : la sonde
  * reste alors muette et ne marque aucun feu. Le veto ne voit un vert que
- * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente.
+ * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente — sauf
+ * absence de feu confirmée ([noLightGate], `null` = voix feu seule, legacy),
+ * où le feu se tait et la phrase vient de la branche sans-feu (véhicules
+ * puis « Traversez. », ordre user du 31/10).
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
@@ -125,12 +133,19 @@ internal fun crossingPatchOf(
     atMs: Long,
     language: SpeechLanguage,
     onCrop: CrossingCropTap? = null,
+    noLightGate: NoLightGate? = null,
 ): CrossingPatch? {
     if (!active) return null
     val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
     val decision = veto.update(light.greenForDecision, detections, focalPx, atMs)
+    if (noLightGate?.onFrame(light.box) == true) {
+        // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
+        // pour un feu absent), l'état publié reste rouge (aucun vert lu —
+        // pastille, bouton et vibrations inchangés).
+        return CrossingPatch(null, CrossingState.Red, null, decision.state, decision.veto, true)
+    }
     val vetoed = decision.crossingState()
     val cue = announcer.onFrame(atMs, vetoed, language)
     // Voix, vibration et affichage parlent d'une seule voix confirmée : l'état
@@ -138,7 +153,7 @@ internal fun crossingPatchOf(
     // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
     // sent (ordre user du 31/10, certitude rouge/vert).
     val confirmed = announcer.lastCue?.state ?: CrossingState.Red
-    return CrossingPatch(cue, confirmed, light.box, decision.state)
+    return CrossingPatch(cue, confirmed, light.box, decision.state, decision.veto, false)
 }
 
 /**
@@ -355,25 +370,52 @@ internal fun feedCrossingLateral(
 
 /**
  * Parole latérale : le mot via [speakWord] (clip local < 100 ms, doux :
- * appelant `urgent = false`), l'annonce et l'arrivée via [say] (douces
- * aussi). Les guetteurs dédupliquent déjà : rien à filtrer, le silence ne dit rien.
+ * appelant `urgent = false`), l'annonce localisée via [say], l'arrivée via
+ * [sayArrival] (voie séparée : l'arrivée passe en dernier — ordre user du
+ * 31/10 — donc jamais par la même voix que l'annonce). Les guetteurs
+ * dédupliquent déjà : le silence ne dit rien. [flush] (rattrapage au
+ * silence) tourne à chaque émission, même vide.
  */
 internal fun observeCrossingLateral(
     patches: Flow<CrossingLateralPatch?>,
     scope: CoroutineScope,
     speakWord: suspend (clipId: String, text: String) -> Unit,
     say: suspend (String) -> Unit,
+    sayArrival: suspend (String) -> Unit = say,
+    flush: (suspend () -> Unit)? = null,
 ) {
     scope.launch {
-        patches.filter { it != null && (it.lateral != null || it.arrival != null || it.approach != null) }.collect { patch ->
-            patch ?: return@collect
-            val lateral = patch.lateral
-            val clip = patch.lateralClip
-            if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
-            val approach = patch.approach
-            if (approach != null) runCatching { say(approach) }
-            val arrival = patch.arrival
-            if (arrival != null) runCatching { say(arrival) }
+        patches.collect { patch ->
+            if (patch != null) {
+                val lateral = patch.lateral
+                val clip = patch.lateralClip
+                if (lateral != null && clip != null) runCatching { speakWord(clip, lateral) }
+                val approach = patch.approach
+                if (approach != null) runCatching { say(approach) }
+                val arrival = patch.arrival
+                if (arrival != null) runCatching { sayArrival(arrival) }
+            }
+            if (flush != null) runCatching { flush() }
         }
     }
 }
+
+/**
+ * Voix du guidage latéral sur [ProximityVoice] : mot en clip doux (file au
+ * silence), annonce localisée en doux obstacle (file au silence), arrivée
+ * (« Sur le passage. ») en file dernière — jamais devant une autre annonce
+ * (ordre user du 31/10) — et rattrapage arrivée à chaque frame, aussi en
+ * Traversée (où la file obstacles est coupée). Rien ne coupe ici.
+ */
+internal fun observeCrossingVoice(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    language: () -> SpeechLanguage,
+) = observeCrossingLateral(
+    CrossingLateralWatch.flow, scope,
+    speakWord = { clip, text -> voice.speakWord(clip, text, language(), playerIdle(), urgent = false, queue = true) },
+    say = { voice.onPhrase(it, playerIdle(), queue = true) },
+    sayArrival = { voice.onArrivalPhrase(it, playerIdle()) },
+    flush = { voice.flushArrival(playerIdle()) },
+)

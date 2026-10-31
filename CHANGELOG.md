@@ -3,6 +3,112 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : sans feu, le mouvement se dit à toute portée (branche `isee-traversee-loin-sans-feu`)
+
+- **Ordre user** : sans feu, une voiture en mouvement se dit dès qu'elle est
+  détectée, même au-delà de 15 m. Seul le mouvement est illimité (l'arrêt
+  garde 15 m) et seule la branche sans-feu (avec feu / normal : 15 m).
+- **Fait** : `VehicleStateWatcher.update(movingMeters)` (défaut 15 m) ;
+  `CrossingVehicleWatch` passe l'infini sans feu ; verdict « Attendez. »
+  toutes les 2 s au-delà de 15 m aussi ; urgence inchangée.
+- **Preuve** : `:core:testDebugUnitTest` 2 671 + `:app:testDebugUnitTest`
+  1 508 verts sur r630 (0 échec, dont 3 `VehicleStateRangeTest` + 1
+  `NoLightCrossingTest` + 1 `CrossingVehicleTest` nouveaux) ; UBS : 0
+  finding ; fichiers < 500 lignes (`VehicleState.kt` 498).
+## 2026-10-31 — iSee : évitement prioritaire en Traversée, gauche/droite d'abord (branche `priorite-guidage-traversee`)
+
+- **Ordre user** : dire gauche/droite et éviter les humains passe devant
+  tout, même en mode Traversée — combiné à la traversée muette (même
+  jour) : seuls les mots d'évitement parlent, en premier.
+- **Fait** : `crossingPhraseOf` parle scan > stop urgent voiture >
+  évitement (mot du guidage `steeringOf`, puis mot personnes) > feu >
+  véhicules doux > silence (sans feu : stop > évitement > doux >
+  verdict) ; procédure scan en cours : le scan garde la voix
+  (`scanRunning`) ; mots d'évitement jamais tus par le feu
+  (`wordsMuted`, `isTurnWord`, `preemptsCrossing`) ; `docs/VOIX-DANGER.md`
+  § 25, `docs/TRAVERSEE.md` amendé.
+- **Preuve** : `CrossingSteeringTest` (8 nouveaux),
+  `CrossingPeopleTest` + `CrosswalkScanWiringTest` (+2 chacun),
+  `GuidanceWordTest` + `TwinLiteWordTest` (+1 chacun) ; suite
+  `:core` + `:app` verte sur serveur (verdict final au merge).
+
+## 2026-10-31 — iSee : obstacles et positions se redisent (branche `isee-muet`)
+
+- **Demande** : iSee muet (« plus de son »), puis incomplet (« pas tout, pas
+  tout le temps ») — le user veut les deux voix et l'esquive objets/personnes
+  en priorité maximale.
+- **Constat** : deux causes. 1) Porte GPS fermée persistée
+  (`navigation_guidance=false` après « désactive le GPS ») : voix ambiante
+  muette jusqu'à « active le GPS » — vérifié avec le user (la voix est
+  revenue à l'ordre, le chat n'a jamais été coupé). 2) Déduplication aval
+  infinie : `ProximityVoice` jetait toute phrase identique à la dernière
+  dite, pour toujours — un danger présent ne se redisait jamais et le retour
+  d'une scène restait muet.
+- **Fait** : déduplication bornée (`REPEAT_TTL_MS` 4 s : redite au-delà,
+  anti-bégaiement en deçà) sur `onPhrase`/`onRoutePhrase`/`onArrivalPhrase`
+  ; le stop garde sa règle (jamais répété). Les Réglages « Guider tout
+  droit » / « Annoncer les objets » sont déjà à `true` par défaut : rien à
+  forcer.
+- **Preuve** : 6 tests nouveaux (`ProximityVoiceRepeatTest`, 4 échouaient
+  sans le fix) ; suite `:app` 1502/1502 sur r630 ; `check-kotlin-limits.py`
+  vert (1288 fichiers, aucun dépassement).
+## 2026-10-31 — iSee : le micro verrouillé reçoit la destination GPS (branche `feat/isee-micro-verrouille-destination`)
+
+- **Constat** : écran verrouillé, les questions partaient au LLM sans la
+  destination guidée (`LockedMicAnswer` appelait `askText` sans contexte) —
+  « c'est encore loin ? » restait sans réponse utile, téléphone dans la poche.
+- **Fait** : `LockedMicAnswer` joint la destination (`GpsDestinationMemory`,
+  ligne `GpsDestinationText` EN/FR selon la langue de la voix) au contexte
+  `askText`, comme iSee et le direct ; un fournisseur qui jette = pas de
+  contexte, jamais d'échec.
+- **Preuve** : 4 tests nouveaux (`LockedMicAnswerTest`, 10/10 avec les 6
+  existants) ; `check-kotlin-limits.py` vert (1284 fichiers, aucun dépassement).
+## 2026-10-31 — iSee : « Sur le passage. » en dernière priorité voix (branche `feat-arrivee-passage-derniere`)
+
+- **Demande** : l'annonce d'arrivée sur le passage piéton (« Sur le passage. »)
+  passe derrière tous les autres types d'annonce.
+- **Constat** : elle partait par `speakNavigation`, sans garde — et
+  `SpeechPlayer.play` coupe la lecture en cours : l'arrivée couvrait le feu,
+  la route, les obstacles et le chat. Les docs la disaient douce (`urgent =
+  false`), le câblage coupait.
+- **Fait** : voie arrivée dédiée dans `ProximityVoice` (`onArrivalPhrase` :
+  parlée au silence seul, sinon gardée et redite en dernier — danger > route
+  > doux > arrivée) ; l'annonce localisée (« Passage piéton à gauche… »)
+  passe en doux obstacle ; rattrapage arrivée à chaque frame y compris en
+  Traversée (`flushArrival`, sans toucher à la file obstacles, coupée en
+  Traversée). `IseeViewModel` tient ses 498 lignes (câblage extrait).
+- **Preuve** : 8 tests nouveaux (`ProximityVoiceArrivalTest` 6,
+  `CrossingLateralTest` 2) ; suite `:app` 1492/1492 sur r630 ; garde tailles OK.
+## 2026-10-31 — iSee : traversée sans feu — scan coupé, verdict toutes les 2 s (branche `isee-traversee-sans-feu`)
+
+- **Ordre user** : en mode Traversée **sans feu**, plus de « Regardez à
+  gauche / à droite » — iSee dit les voitures en mouvement en permanence
+  (priorité absolue, même loin) et, toutes les 2 s, si on peut traverser
+  (« Traversez. » / « Cross. » sans danger, « Attendez. » / « Wait. » sur
+  danger). Avec feu : inchangé.
+- **Fait** : `NoLightGate` (4 frames sans boîte → sans-feu, retour feu
+  immédiat) + `NoLightAnnouncer` (« Attendez. » coupe le délai après
+  « Traversez. », voix véhicules prioritaire) en core ; `crossingPatchOf`
+  tait le feu, `crossingPhraseOf` coupe le scan ; pastille/bouton/vibrations
+  inchangés (rouge, aucun vert lu) ; écran Direct inchangé.
+- **Preuve** : `:core:testDebugUnitTest` 2 668 + `:app:testDebugUnitTest`
+  1 494 verts sur r630 (0 échec, dont 12 + 10 tests `NoLightCrossingTest`
+  nouveaux) ; UBS : 0 finding nouveau (6 critiques `currentTimeMillis` sur
+  `LiveProbe.kt` hors diff, faux positifs pré-existants ; exit 2 Kotlin
+  connu) ; fichiers < 500 lignes (`LiveProbe.kt` 497).
+## 2026-10-31 — iSee : traversée sans annonces de personnes, évitement seul (branche `crossing-sans-personnes`)
+
+- **Ordre user** : en mode Traversée, ne plus décrire les humains
+  (« Personne à 9 heures ») — dire seulement « Droite. » / « Gauche. »
+  pour les éviter au maximum.
+- **Fait** : `CrossingPeopleWatch` ne consulte plus `PositionAnnouncer`
+  (champ, reset et imports supprimés) : évitement sur passage puis décalage
+  opposé aux approches, silence sinon. `docs/TRAVERSEE.md` § 8 mis à jour.
+- **Preuve** : `CrossingPeopleTest` (19 tests) réécrit — personnes seules
+  muettes, non-réarmement du quiet prouvé par l'évitement ;
+  `CrossingVehicleTest` (9 tests, file véhicules puis silence) ;
+  suite `:app` 1484/1484, garde tailles OK.
+
 ## 2026-10-31 — CI : le fix de périmètre auto redéclenche `couche0`, filet de relance (branche `fix/sweep-scope-pat-rerun`)
 
 - **Constat sur #688** : l'agent de périmètre avait écrit le `## Scope`
