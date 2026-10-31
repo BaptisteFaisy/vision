@@ -45,9 +45,9 @@ class PedLightGateLimitsTest {
     }
 
     @Test
-    fun `fraction verte - 39px refuse, 40px accepte sur 100x100`() {
-        assertFalse(PedLightGate.acceptGreen(verticalLine(39), 100, 100))
-        assertTrue(PedLightGate.acceptGreen(verticalLine(40), 100, 100))
+    fun `fraction verte - 19px refuse, 20px accepte sur 100x100`() {
+        assertFalse(PedLightGate.acceptGreen(verticalLine(19), 100, 100))
+        assertTrue(PedLightGate.acceptGreen(verticalLine(20), 100, 100))
     }
 
     @Test

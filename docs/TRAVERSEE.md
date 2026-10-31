@@ -298,9 +298,11 @@ Ordre user : fini le doute — rouge ou vert, et une différenciation certaine.
 - **Binaire** : `CrossingState` n'a plus que `Red` et `Green`. Tout non-vert
   attend rouge (pas de boîte, crop illisible, couleur indécise, porte refusée)
   : classifieurs, porte, voix, vibration, affichage et voicepack suivent (le
-  clip `cross_unsure` et ses MP3 sont supprimés). Le chemin vert est inchangé
-  (arbre + porte + 4 frames) : seul le sens sûr change de nom.
-- **Sorties confirmées** : audit du 31/10 — la voix exigeait 4 frames mais
+  clip `cross_unsure` et ses MP3 sont supprimés). Le chemin vert est
+  (arbre + porte + 2 frames) : seul le sens sûr change de nom.
+- **Sorties confirmées** : audit du 31/10 — la voix exigeait alors 4 frames
+  (2 depuis, même jour, ordre user : à 4, P(annonce) = p⁴ et le vert restait
+  inatteignable), mais
   l'haptique et l'overlay suivaient la lecture brute (1 frame verte erronée
   suffisait à vibrer vert et afficher VERT, même sous veto). Depuis : l'état
   publié est le dernier **annoncé** (rouge par défaut), voix, vibration et
