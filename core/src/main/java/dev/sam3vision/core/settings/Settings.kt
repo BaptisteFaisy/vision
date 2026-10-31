@@ -245,14 +245,6 @@ data class Settings(
         fun clampTtsSpeed(value: Float): Float = value.coerceIn(MIN_TTS_SPEED, MAX_TTS_SPEED)
 
         /**
-         * Voix « Jade US » du compte ElevenLabs (l'intro embarquée parlait cette voix
-         * jusqu'au 2026-10-28, voix Laure depuis). Proposée dans les Réglages, mais pas
-         * par défaut : voix de bibliothèque, elle répond 402 sur un compte free, là où
-         * Sarah est premade.
-         */
-        const val JADE_US_VOICE_ID = "TOXPlnYC7z5SQSV2Zgc5"
-
-        /**
          * Narration du Direct : **même endpoint et même modèle Meta** que les questions
          * (Baseten, `muse-spark-open-1026`) — tout le LLM de l'app parle à un seul
          * fournisseur. Seule la clé diffère (`liveLlmApiKey`, Réglages / build) : sans
