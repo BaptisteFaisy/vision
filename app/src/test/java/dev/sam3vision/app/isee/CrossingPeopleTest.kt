@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -172,5 +173,53 @@ class CrossingPeopleTest {
         CrossingPeopleWatch.reset()
 
         assertEquals("Personne à 9 heures.", crossingPhraseOf(null, listOf(person(0.1f)), emptyList(), emptyList(), 0L, SpeechLanguage.Fr))
+    }
+
+    private fun seg(label: String, box: List<Float>) =
+        SegObject(label = label, score = 0.8f, box = box, maskPngB64 = "")
+
+    private fun onPathLeft() = listOf(
+        seg("crosswalk", listOf(100f, 600f, 900f, 950f)),
+        seg("person", listOf(250f, 400f, 350f, 800f)),
+    )
+
+    @Test
+    fun `evitement sur passage parle des la confirmation`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `evitement prime sur les positions`() {
+        CrossingPeopleWatch.reset()
+        val placed = listOf(person(0.1f))
+        val objects = onPathLeft()
+
+        assertEquals("Personne à 9 heures.", CrossingPeopleWatch.update(placed, 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(placed, 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `ordre du feu neuf tait l evitement puis le rend`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(CrossingPeopleWatch.update(emptyList(), 0L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 200L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.update(emptyList(), 300L, SpeechLanguage.Fr, red(), objects, 1000, 1000))
+        assertNull(CrossingPeopleWatch.update(emptyList(), 2900L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+        assertEquals("Droite.", CrossingPeopleWatch.update(emptyList(), 3100L, SpeechLanguage.Fr, null, objects, 1000, 1000))
+    }
+
+    @Test
+    fun `evitement parle via crossingPhraseOf`() {
+        CrossingPeopleWatch.reset()
+        val objects = onPathLeft()
+
+        assertNull(crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, objects, 1000, 1000))
+        assertEquals("Droite.", crossingPhraseOf(null, emptyList(), emptyList(), emptyList(), 200L, SpeechLanguage.Fr, objects, 1000, 1000))
     }
 }
