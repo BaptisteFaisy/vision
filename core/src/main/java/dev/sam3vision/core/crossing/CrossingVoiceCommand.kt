@@ -18,7 +18,10 @@ enum class CrossingVoiceAction { Activate, Deactivate }
  * « crosswalk » seul n'est **pas** un ordre : le guidage dit lui-même
  * « Crosswalk in 50 meters » et « On the crosswalk. », et le micro peut
  * réentendre le haut-parleur — seul « on »/« off » **après** « crosswalk »
- * compte (« crosswalk on », « turn the crosswalk off »).
+ * compte (« crosswalk on », « turn the crosswalk off »). L'ASR coupe
+ * parfois le mot (« cross walk on ») : recollé avant tout, avec la même
+ * règle — sinon « cross » seul déclencherait, y compris sur
+ * « cross walk in 50 meters » réentendu.
  * Pur et testé en JVM.
  */
 object CrossingVoiceCommand {
@@ -42,7 +45,7 @@ object CrossingVoiceCommand {
      * part alors au LLM comme avant).
      */
     fun parse(text: String): CrossingVoiceAction? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        val words = glueCrosswalk(KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() })
         val walkAt = words.indexOf("crosswalk")
         if (walkAt >= 0) {
             val tail = words.drop(walkAt + 1)
@@ -52,5 +55,25 @@ object CrossingVoiceCommand {
         if (words.none { CROSS_WORDS.contains(it) }) return null
         return if (words.any { STOP_WORDS.contains(it) }) CrossingVoiceAction.Deactivate
         else CrossingVoiceAction.Activate
+    }
+
+    /**
+     * Recolle « cross walk » (coupure ASR) en « crosswalk », pour la règle
+     * ci-dessus : « cross walk on/off » compte, « cross walk in 50 meters »
+     * et « Find the cross walk » ne déclenchent pas.
+     */
+    private fun glueCrosswalk(words: List<String>): List<String> {
+        val glued = ArrayList<String>(words.size)
+        var i = 0
+        while (i < words.size) {
+            if (i + 1 < words.size && words[i] == "cross" && words[i + 1] == "walk") {
+                glued.add("crosswalk")
+                i += 2
+            } else {
+                glued.add(words[i])
+                i += 1
+            }
+        }
+        return glued
     }
 }

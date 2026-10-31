@@ -15,9 +15,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Ordres courts d'iSee autour de la caméra : bascule du mode Traversée,
- * ordre vocal (« traverser », « crossing mode on/off ») et ordre de cap
- * (« va à gauche »). Le mode Traversée ne s'arme plus seul : ni la vision
- * ni le guidage ne le basculent, seuls la puce et l'ordre vocal le font.
+ * ordre vocal (« traverser », « crossing mode on/off », « crosswalk on/off »)
+ * et ordre de cap (« va à gauche »). Le mode Traversée ne s'arme plus
+ * seul : ni la vision ni le guidage ne le basculent, seuls la puce et
+ * l'ordre vocal le font.
  * Extrait d'[IseeViewModel] (limite 500 lignes) : la logique ne change pas,
  * elle vit simplement à côté — même motif que `ProbeWiring`, `IseeVoiceNav`
  * et sœurs.
@@ -49,10 +50,10 @@ class IseeSteeringOrders(
     }
 
     /**
-     * Ordre « traverser » / « crossing mode on/off » : consommé ici (jamais
-     * LLM), confirmé à voix haute par le chemin navigation — puis, à
-     * l'activation, le passage en vue est annoncé (« Passage piéton devant,
-     * à 5 mètres. »). Vrai si [text] portait l'ordre.
+     * Ordre « traverser » / « crossing mode on/off » / « crosswalk on/off » :
+     * consommé ici (jamais LLM), confirmé à voix haute par le chemin
+     * navigation — puis, à l'activation, le passage en vue est annoncé
+     * (« Passage piéton devant, à 5 mètres. »). Vrai si [text] portait l'ordre.
      */
     suspend fun runCrossing(text: String): Boolean {
         val command = CrossingVoiceCommand.parse(text) ?: return false

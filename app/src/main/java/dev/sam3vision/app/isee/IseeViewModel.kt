@@ -413,7 +413,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // part jamais au LLM ; sans destination comprise, la voix la redemande.
         if (voiceNav.run(text)) return
         if (navigation.onTranscript(text)) return
-        // Ordre « traverser » / « crossing mode on/off » : consommé ici (mode Traversée + voix), jamais une question LLM.
+        // Ordre « traverser » / « crossing mode on/off » / « crosswalk on/off » : consommé ici (mode Traversée + voix), jamais une question LLM.
         if (steering.runCrossing(text)) return
         // Ordre navigation sans destination comprise : demande, jamais une description LLM.
         if (navClarify.run(text)) return
