@@ -424,13 +424,8 @@ _state.update { it.cleared() }
             crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
             onCrop = cropLogger?.tap(),
         )
-        val phrase = if (_state.value.crossingActive) {
-            crossingPhraseOf(cross?.cue, placed, detectionsOf(readings, frame.width, frame.height), readings, at, speechLanguage, frame.objects, frame.width, frame.height)
-        } else {
-            CrossingPeopleWatch.reset()
-            CrossingVehicleWatch.reset()
-            voice.phrase(at, placed, _state.value.steeringCap, frame.passage, hfovDeg = distances.lensSpec.widthFovDeg(frame.width, frame.height))
-        }
+        val phrase = phraseOf(cross, placed, readings, frame, at, speechLanguage,
+            distances.lensSpec.widthFovDeg(frame.width, frame.height))
         feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.pose, distances.lensSpec, at, speechLanguage)
         val steering = steeringCueOf()
         pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
@@ -449,6 +444,7 @@ _state.update { it.cleared() }
                 fps = rate.rate,
                 distanceLayer = distanceLayerOf(frame, readings),
                 spoken = phrase ?: current.spoken,
+                spokenSeq = if (phrase != null) current.spokenSeq + 1 else current.spokenSeq,
                 spokenUrgent = if (phrase != null) GuidanceWord.isStopPhrase(phrase) else current.spokenUrgent,
                 steering = steering,
                 samPassage = frame.passage,

@@ -20,10 +20,11 @@ class GuidanceAnnouncerSteeringTest {
     }
 
     @Test
-    fun `meme cap meme scene reste muet`() {
+    fun `meme cap meme scene muet avant l echeance puis redit`() {
         val announcer = GuidanceAnnouncer()
 
         assertEquals("Droite.", announcer.onFrame(0L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
         assertNull(announcer.onFrame(1_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
+        assertEquals("Droite.", announcer.onFrame(2_000L, emptyList(), SpeechLanguage.Fr, SteeringCap.Right))
     }
 }

@@ -10,15 +10,17 @@ import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
 /**
- * Voix de proximité de la fenêtre caméra : dit **une fois** chaque nouvelle phrase de
- * [LiveProbe] (« Personne à 1 mètre. »).
+ * Voix de proximité de la fenêtre caméra : directions dites en continu
+ * ([speakWord], sauf le stop unique), positions dites une fois par scène
+ * ([onPhrase], « Personne à 1 mètre. »).
  *
- * Cinq garde-fous : la même phrase n'est jamais répétée, rien n'est dit sans clé
- * ElevenLabs, rien par-dessus la réponse du chat (une seule source sonore à la
- * fois — c'est l'appelant qui dit si le lecteur est libre), rien par-dessus la
- * voix route (sauf urgence : l'obstacle attend la fin du virage), et une synthèse
- * annulée (phrase plus fraîche arrivée entre-temps, `collectLatest` côté sonde)
- * n'est jamais jouée.
+ * Cinq garde-fous : rien n'est dit sans clé ElevenLabs, rien par-dessus la
+ * réponse du chat (une seule source sonore à la fois — c'est l'appelant qui
+ * dit si le lecteur est libre), rien par-dessus la voix route (sauf urgence :
+ * l'obstacle attend la fin du virage), et une synthèse annulée (phrase plus
+ * fraîche arrivée entre-temps, `collectLatest` côté sonde) n'est jamais
+ * jouée. Le stop seul ne se répète jamais ; les directions douces reparlent
+ * à chaque émission (ordre user du 31/10).
  *
  * [urgent] = stop (mot du guidage ou modèle d'urgence externe) : coupe la
  * lecture en cours et parle quand même, y compris pendant une dictée — la
@@ -160,8 +162,10 @@ class ProximityVoice(
     /**
      * Mot du guidage (`GuidanceWord`) : clip local quand le pack l'a (< 100
      * ms, zéro réseau), sinon synthèse réseau mise en cache pour la suite.
-     * Mêmes garde-fous que [onPhrase] (dédupliqué, clé exigée, urgent coupe) :
-     * seul ce qui a vraiment parlé est mémorisé — un mot avalé par un garde
+     * Directions douces redites en continu (ordre user du 31/10) : le même
+     * mot reparle à chaque émission, sauf le stop (unique, jamais répété).
+     * Mêmes garde-fous que [onPhrase] (clé exigée, urgent coupe) : seul ce
+     * qui a vraiment parlé est mémorisé — un mot avalé par un garde
      * transitoire ne tait pas ses réémissions. [queue] : le mot doux tué
      * part en file et se redit par [flushPending] (en synthèse, pas en
      * clip : parlé lentement vaut mieux que perdu).
@@ -174,7 +178,7 @@ class ProximityVoice(
         urgent: Boolean = true,
         queue: Boolean = false,
     ) {
-        if (text == lastPhrase) return
+        if (text == lastPhrase && GuidanceWord.isStopPhrase(text)) return
         val current = settings()
         if (!current.ttsConfigured) return
         if (!urgent && !playerIdle) {
