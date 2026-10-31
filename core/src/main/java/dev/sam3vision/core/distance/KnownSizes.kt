@@ -144,15 +144,13 @@ object KnownSizes {
         "bus" to 0.08f, "moto" to 0.12f, "motorcycle" to 0.12f,
         "suv" to 0.08f, "van" to 0.10f, "camionnette" to 0.10f, "pickup" to 0.10f, "pick up" to 0.10f,
         "velo" to 0.10f, "bicycle" to 0.10f, "bike" to 0.10f,
-        "chaise" to 0.10f, "chair" to 0.10f, "table" to 0.10f, "lit" to 0.15f, "bed" to 0.15f,
+        "chaise" to 0.10f, "chair" to 0.10f, "table" to 0.10f,
         "porte" to 0.03f, "door" to 0.03f, "mur" to 0.20f, "wall" to 0.20f,
         "panneau" to 0.25f, "sign" to 0.25f, "arbre" to 0.30f, "tree" to 0.30f,
         "borne" to 0.20f, "bollard" to 0.20f, "plot" to 0.20f, "potelet" to 0.20f,
         "cloture" to 0.25f, "fence" to 0.25f, "grillage" to 0.25f,
-        "portail" to 0.15f, "gate" to 0.15f, "barriere" to 0.15f, "barrier" to 0.15f,
         "bouteille" to 0.20f, "bottle" to 0.20f, "verre" to 0.20f, "glass" to 0.20f,
         "sac" to 0.25f, "bag" to 0.25f, "backpack" to 0.20f, "sacados" to 0.20f,
-        "valise" to 0.15f, "suitcase" to 0.15f,
     )
 
     /**
