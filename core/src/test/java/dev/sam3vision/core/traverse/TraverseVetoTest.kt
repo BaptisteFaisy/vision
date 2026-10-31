@@ -292,4 +292,20 @@ class TraverseVetoTest {
         val width = 100f + frame * 20f
         return detection("car", 0.9f, listOf(320f - width / 2f, 240f - width * 0.3f, 320f + width / 2f, 240f + width * 0.3f))
     }
+
+    @Test
+    fun `personne non mesurable garde le guidage obstacles`() {
+        val veto = TraverseVeto()
+        val person = detection("person", 0.9f, listOf(300f, 200f, 340f, 400f))
+
+        assertTrue(veto.update(true, listOf(person), 0f).keepObstacleGuidance)
+    }
+
+    @Test
+    fun `vehicule non mesurable ne garde pas le guidage`() {
+        val veto = TraverseVeto()
+        val car = detection("car", 0.9f, listOf(300f, 200f, 340f, 400f))
+
+        assertFalse(veto.update(true, listOf(car), 0f).keepObstacleGuidance)
+    }
 }

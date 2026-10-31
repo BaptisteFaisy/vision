@@ -82,4 +82,20 @@ class GuidanceAnnouncerSidewalkTest {
 
         assertEquals("Straight.", announcer.onFrame(0L, loin, sidewalk = SidewalkPosition.Absent))
     }
+
+    @Test
+    fun `retour trottoir vers une personne proche garde le cap`() {
+        val announcer = GuidanceAnnouncer()
+        val proche = listOf(PlacedLabel("personne", 0.3f, 0.5f, 1f))
+
+        assertEquals("Straight.", announcer.onFrame(0L, proche, sidewalk = SidewalkPosition.Left))
+    }
+
+    @Test
+    fun `retour trottoir cote degage parle quand meme`() {
+        val announcer = GuidanceAnnouncer()
+        val loin = listOf(PlacedLabel("personne", 0.05f, 0.5f, 4f))
+
+        assertEquals("Left.", announcer.onFrame(0L, loin, sidewalk = SidewalkPosition.Left))
+    }
 }

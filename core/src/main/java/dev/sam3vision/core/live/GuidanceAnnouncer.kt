@@ -101,7 +101,7 @@ class GuidanceAnnouncer(
             return speak(atMs, tl.key, tl.text(language), again)
         }
         val word = nudgeOf(atMs, labels, hfovDeg)?.let { GuidanceWord.fromCap(it.side) }
-            ?: sidewalkWord(sidewalk, decision.cap)
+            ?: clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg)
         return speak(atMs, word.key, word.text(language), repeatMs)
     }
 
@@ -109,7 +109,9 @@ class GuidanceAnnouncer(
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur
      * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
      * mesures du téléphone. Sans côté (contrat rompu), la gauche — comme
-     * l'égalité côté serveur.
+     * l'égalité côté serveur. Veto local 80 cm : si le côté serveur ne
+     * garantit pas 80 cm à une personne et que l'autre côté les garantit,
+     * on bascule (la sécurité locale prime sur le juge lointain).
      */
     private fun samDecision(
         passage: Passage,
@@ -119,7 +121,15 @@ class GuidanceAnnouncer(
     ): GuidanceDecision {
         if (!passage.blocked) return GuidanceDecision(blocked = false, cap = cap)
         val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
-        val exit = if (side == GuidanceSide.Right) SteeringCap.Right else SteeringCap.Left
+        val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
+        val use = if (!PeoplePath.clearsSide(labels, side, rangeMeters, hfovDeg) &&
+            PeoplePath.clearsSide(labels, other, rangeMeters, hfovDeg)
+        ) {
+            other
+        } else {
+            side
+        }
+        val exit = if (use == GuidanceSide.Right) SteeringCap.Right else SteeringCap.Left
         val obstacle = labels
             .mapNotNull { label -> label.meters?.takeIf { it.isFinite() }?.let { label to it } }
             .minByOrNull { it.second }?.first
@@ -131,7 +141,7 @@ class GuidanceAnnouncer(
         return GuidanceDecision(
             blocked = true,
             obstacle = obstacle,
-            side = if (cap == SteeringCap.Straight) side else null,
+            side = if (cap == SteeringCap.Straight) use else null,
             cap = cap,
             passage = exit,
             shiftMeters = Guidance.shiftOf(obstacle?.meters, half, hfovDeg),
@@ -153,6 +163,25 @@ class GuidanceAnnouncer(
         SidewalkPosition.Left -> GuidanceWord.Left
         SidewalkPosition.Right -> GuidanceWord.Right
         else -> GuidanceWord.fromCap(cap)
+    }
+
+    /**
+     * Ordre de retour trottoir garanti 80 cm : si le retour va vers une
+     * personne à moins de 80 cm, on marche le cap au lieu de revenir vers
+     * elle (le cap lui-même n'est jamais corrigé ici — le couloir s'en
+     * charge quand il est bouché).
+     */
+    private fun clearedReturnWord(
+        sidewalk: SidewalkPosition,
+        cap: SteeringCap,
+        labels: List<PlacedLabel>,
+        hfovDeg: Float,
+    ): GuidanceWord {
+        val word = sidewalkWord(sidewalk, cap)
+        val capWord = GuidanceWord.fromCap(cap)
+        if (word == capWord) return word
+        val side = if (word == GuidanceWord.Left) GuidanceSide.Left else GuidanceSide.Right
+        return if (PeoplePath.clearsSide(labels, side, rangeMeters, hfovDeg)) word else capWord
     }
 
     /**

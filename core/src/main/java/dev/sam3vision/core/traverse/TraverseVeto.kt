@@ -3,6 +3,7 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
@@ -275,11 +276,17 @@ class TraverseVeto {
         return Pinhole.distanceMeters(detection.box, realHeight, focalPx)
     }
 
-    /** Un objet calibré proche (véhicule ou non) : le guidage obstacles reste actif. */
+    /**
+     * Un objet calibré proche (véhicule ou non) : le guidage obstacles reste
+     * actif. Une personne non mesurable compte comme proche (prudence :
+     * l'inconnu ne coupe jamais le guidage devant un humain).
+     */
     private fun hasNearObject(detections: List<Detection>, focalPx: Float): Boolean =
         detections.any { detection ->
-            detection.score > SCORE_MIN &&
-                distanceOf(detection, focalPx)?.let { it < VETO_METERS } == true
+            if (detection.score <= SCORE_MIN) return@any false
+            val meters = distanceOf(detection, focalPx)
+            meters?.let { it < VETO_METERS } == true ||
+                (meters == null && PersonLabels.isPerson(detection.label))
         }
 
     /** Transition : le veto prime sur le vert, l'alerte exige une reconfirmation. */

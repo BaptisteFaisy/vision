@@ -145,9 +145,30 @@ class CrossingOnPathTracker(
         val leftOk = leftHits >= confirmFrames
         val rightOk = rightHits >= confirmFrames
         if (leftOk && rightOk) return null
-        if (leftOk) return SteeringCap.Right
-        if (rightOk) return SteeringCap.Left
+        if (leftOk && !personAside(objects, width, SteeringCap.Right)) return SteeringCap.Right
+        if (rightOk && !personAside(objects, width, SteeringCap.Left)) return SteeringCap.Left
         return null
+    }
+
+    /**
+     * Personne côté [side], mesurée ou non (boîte seule suffit, prudence) :
+     * l'évitement n'envoie jamais vers elle — silence, le couloir parle
+     * s'il est bouché. Le centre pile bloque les deux côtés.
+     */
+    private fun personAside(objects: List<SegObject>, width: Int, side: SteeringCap): Boolean {
+        if (width <= 0) return false
+        return objects.any { obj ->
+            PersonLabels.isPerson(obj.label) && obj.score >= personMinScore && obj.box.size >= 4 &&
+                aside(obj.box, width, side)
+        }
+    }
+
+    /** Centre de [box] côté [side] (pixels sur [width] — le centre pile bloque les deux). */
+    private fun aside(box: List<Float>, width: Int, side: SteeringCap): Boolean {
+        val centerX = (box[0] + box[2]) / 2f / width
+        if (!centerX.isFinite()) return true
+        return if (side == SteeringCap.Left) centerX <= LateralNudgeTracker.SIDE_MID
+        else centerX >= LateralNudgeTracker.SIDE_MID
     }
 
     /** Oublie les deux côtés (nouvelle séance, fin de traversée). */
