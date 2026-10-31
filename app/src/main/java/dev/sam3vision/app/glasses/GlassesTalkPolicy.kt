@@ -70,4 +70,12 @@ object GlassesTalkPolicy {
 
     /** Fin du délai : n'envoie que si l'écoute est toujours en cours. */
     fun timeout(phase: GlassesTalkPhase): Boolean = phase == GlassesTalkPhase.LISTENING
+
+    /**
+     * Ouverture auto à la session : l'écoute ne s'ouvre que si personne ne
+     * parle (`IDLE`) et que le micro est prêt. Hors `IDLE`, ne jamais envoyer
+     * seule : l'envoi reste un geste (second appui long) ou le délai.
+     */
+    fun autoListen(phase: GlassesTalkPhase, micReady: Boolean): Boolean =
+        phase == GlassesTalkPhase.IDLE && micReady
 }

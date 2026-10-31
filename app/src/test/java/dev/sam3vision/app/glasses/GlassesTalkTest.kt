@@ -138,6 +138,46 @@ class GlassesTalkTest {
         assertTrue(heard.isEmpty())
     }
 
+    @Test
+    fun `l ecoute auto ouvre le micro sans appui`() {
+        val talk = talk(mic = fakeMic())
+
+        assertTrue(talk.autoStart())
+        assertTrue(talk.listening)
+        assertEquals(listOf(GlassesTalkCue.LISTENING), cues)
+        assertEquals(listOf(true), listeningStates)
+    }
+
+    @Test
+    fun `l ecoute auto ne part qu une fois, sans envoyer`() {
+        val talk = talk(mic = fakeMic(), transcript = "où sont les toilettes")
+        assertTrue(talk.autoStart())
+
+        assertFalse(talk.autoStart())
+        assertTrue(talk.listening)
+        assertTrue(heard.isEmpty())
+        assertEquals(listOf(GlassesTalkCue.LISTENING), cues)
+    }
+
+    @Test
+    fun `l ecoute auto sans micro reste silencieuse`() {
+        val talk = talk(mic = null)
+
+        assertFalse(talk.autoStart())
+        assertFalse(talk.listening)
+        assertTrue(notes.isEmpty())
+        assertTrue(heard.isEmpty())
+    }
+
+    @Test
+    fun `l ecoute auto dit le micro qui refuse`() {
+        val talk = talk(mic = fakeMic(starts = false))
+
+        assertFalse(talk.autoStart())
+        assertFalse(talk.listening)
+        assertEquals(1, notes.size)
+    }
+
     private fun talk(
         mic: FakeMic?,
         transcript: String = "bonjour",

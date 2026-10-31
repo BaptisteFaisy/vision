@@ -43,4 +43,16 @@ class GlassesTalkPolicyTest {
     fun `le plafond d ecoute vaut 20 secondes`() {
         assertEquals(20_000L, GlassesTalkPolicy.MAX_LISTEN_MS)
     }
+
+    @Test
+    fun `a la session, l ecoute auto n ouvre que micro pret et repos`() {
+        assertTrue(GlassesTalkPolicy.autoListen(GlassesTalkPhase.IDLE, micReady = true))
+        assertFalse(GlassesTalkPolicy.autoListen(GlassesTalkPhase.IDLE, micReady = false))
+    }
+
+    @Test
+    fun `l ecoute auto n envoie jamais seule`() {
+        assertFalse(GlassesTalkPolicy.autoListen(GlassesTalkPhase.LISTENING, micReady = true))
+        assertFalse(GlassesTalkPolicy.autoListen(GlassesTalkPhase.SENDING, micReady = true))
+    }
 }
