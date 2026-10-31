@@ -31,6 +31,13 @@ data class Settings(
     val asrApiKey: String = "",
     val asrModel: String = DEFAULT_ASR_MODEL,
     /**
+     * Dictée temps réel (WebSocket Scribe v2 Realtime) pendant l'appui long :
+     * le PCM part en direct, le relâchement ne coûte qu'un commit. `true` par
+     * défaut ; coupé, ou sans clé ElevenLabs, ou si la session meurt : le
+     * batch actuel (Meta puis Scribe) reprend, sans régression.
+     */
+    val scribeRealtime: Boolean = true,
+    /**
      * Narration continue du **Direct** : même modèle Meta que les questions
      * ([DEFAULT_LIVE_LLM_MODEL]), mais avec sa **propre clé** — la narration ne part
      * **que** si cette clé est renseignée (vide = Direct muet, aucune narration).
@@ -328,6 +335,9 @@ data class Settings(
     /** Vrai si la dictée a un moteur : Meta, à défaut le repli ElevenLabs (clé TTS). */
     val sttConfigured: Boolean get() = asrConfigured || ttsApiKey.isNotBlank()
 
+    /** Vrai si l'appui long peut streamer (drapeau + clé ElevenLabs). */
+    val scribeRealtimeReady: Boolean get() = scribeRealtime && ttsApiKey.isNotBlank()
+
     /** Vrai si un champ de vision de repli a été saisi (sinon : lecture capteur). */
     val cameraFovForced: Boolean get() = cameraFovDeg > 0f
 
@@ -348,6 +358,7 @@ data class Settings(
         "ttsAutoplay=$ttsAutoplay, ttsAnnouncePositions=$ttsAnnouncePositions, " +
         "ttsGuidanceStraight=$ttsGuidanceStraight, " +
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
+            "scribeRealtime=$scribeRealtime, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +

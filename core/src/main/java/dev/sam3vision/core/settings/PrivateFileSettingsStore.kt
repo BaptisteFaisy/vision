@@ -109,6 +109,7 @@ internal object SettingsCodec {
     private const val K_ASR_BASE_URL = "asrBaseUrl"
     private const val K_ASR_API_KEY = "asrApiKey"
     private const val K_ASR_MODEL = "asrModel"
+    private const val K_SCRIBE_REALTIME = "scribeRealtime"
     private const val K_LIVE_LLM_API_KEY = "liveLlmApiKey"
     private const val K_INTRO_ENABLED = "introEnabled"
     private const val K_INTRO_PLAYED = "introPlayed"
@@ -150,6 +151,7 @@ internal object SettingsCodec {
         appendLine("$K_ASR_BASE_URL=${s.asrBaseUrl}")
         appendLine("$K_ASR_API_KEY=${s.asrApiKey}")
         appendLine("$K_ASR_MODEL=${s.asrModel}")
+        appendLine("$K_SCRIBE_REALTIME=${s.scribeRealtime}")
         appendLine("$K_LIVE_LLM_API_KEY=${s.liveLlmApiKey}")
         appendLine("$K_INTRO_ENABLED=${s.introEnabled}")
         appendLine("$K_INTRO_PLAYED=${s.introPlayed}")
@@ -224,8 +226,13 @@ internal object SettingsCodec {
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
             depthBackend = DepthBackend.fromName(values[K_DEPTH_BACKEND]),
-        ).let { decodeShare(values, it) }.let { decodeAdaptive(values, it) }
+        ).let { decodeShare(values, it) }.let { decodeAdaptive(values, it) }.let { decodeStream(values, it) }
     }
+
+    /** Drapeau temps réel : à part pour que [decode] reste sous 50 lignes. */
+    private fun decodeStream(values: Map<String, String>, default: Settings): Settings = default.copy(
+        scribeRealtime = values[K_SCRIBE_REALTIME]?.toBooleanStrictOrNull() ?: default.scribeRealtime,
+    )
 
     /** Flags adaptatifs (Q8+Q9) : à part pour que [decode] reste sous 50 lignes. */
     private fun decodeAdaptive(values: Map<String, String>, default: Settings): Settings = default.copy(
