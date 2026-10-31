@@ -132,6 +132,8 @@ internal class ContractWsTransport(
     private var reply: (JSONObject) -> List<String> = { emptyList() },
 ) : WsTransport {
 
+    private var replyBytes: ((ByteArray) -> List<String>)? = null
+
     val sent = mutableListOf<String>()
     val sentBytes = mutableListOf<ByteArray>()
     val received = mutableListOf<String>()
@@ -172,10 +174,12 @@ internal class ContractWsTransport(
         return true
     }
 
-    /** Trame binaire : enregistrée, jamais rejouée (le serveur n'y répond pas en sync). */
+    /** Trame binaire : enregistrée, rejouée si [replyBytes] est posé (sinon silence). */
     override fun sendBytes(bytes: ByteArray): Boolean {
         sentBytes += bytes
-        return sendResult
+        if (!sendResult) return false
+        replyBytes?.invoke(bytes)?.forEach { message -> deliver(message) }
+        return true
     }
 
     /** Message serveur injecté hors d'un envoi (trame tardive, réponse asynchrone). */
@@ -187,6 +191,11 @@ internal class ContractWsTransport(
     /** Le serveur change de comportement en cours de test (silence, puis réponses). */
     fun answerWith(handler: (JSONObject) -> List<String>) {
         reply = handler
+    }
+
+    /** Même bascule pour les trames binaires (M1) : silence tant qu'elle n'est pas posée. */
+    fun answerBytesWith(handler: (ByteArray) -> List<String>) {
+        replyBytes = handler
     }
 
     /** Fermeture côté serveur (ou coupure réseau) pendant qu'une frame est en vol. */

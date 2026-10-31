@@ -347,27 +347,76 @@ internal fun liveFrameJson(
     out.append('{')
     if (id != null) out.append("\"id\":").append(id).append(',')
     out.append("\"image_b64\":\"").append(jpegB64).append("\",")
-    out.append("\"prompts\":")
-    if (prompts == null) {
-        out.append("null")
-    } else {
-        out.append('[')
-        prompts.forEachIndexed { index, prompt ->
-            if (index > 0) out.append(',')
-            out.append('"').append(jsonEscape(prompt)).append('"')
-        }
-        out.append(']')
-    }
-    out.append(",\"work_edge\":").append(workEdge)
-    out.append(",\"max_objects\":").append(maxObjects)
-    out.append(",\"mask_encoding\":\"").append(if (masks) MASK_ENCODING_BITS else MASK_ENCODING_NONE).append('"')
-    if (masks && maskFormat != null) {
-        out.append(",\"mask_format\":\"").append(jsonEscape(maskFormat)).append('"')
-        if (maskEdge > 0) out.append(",\"mask_edge\":").append(maskEdge)
-    }
-    if (withDepth) out.append(",\"with_depth\":true")
+    out.appendFrameKnobs(prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
     out.append('}')
     return out.toString()
+}
+
+/**
+ * Knobs d'une frame, partagés par le corps JSON (avec `image_b64`) et l'en-tête binaire
+ * (sans image) : une seule description des champs pour les deux transports, qui ne
+ * dérivent jamais l'un de l'autre.
+ */
+private fun StringBuilder.appendFrameKnobs(
+    prompts: List<String>?, workEdge: Int, maxObjects: Int, maskFormat: String?,
+    maskEdge: Int, withDepth: Boolean, masks: Boolean,
+) {
+    append("\"prompts\":")
+    if (prompts == null) {
+        append("null")
+    } else {
+        append('[')
+        prompts.forEachIndexed { index, prompt ->
+            if (index > 0) append(',')
+            append('"').append(jsonEscape(prompt)).append('"')
+        }
+        append(']')
+    }
+    append(",\"work_edge\":").append(workEdge)
+    append(",\"max_objects\":").append(maxObjects)
+    append(",\"mask_encoding\":\"").append(if (masks) MASK_ENCODING_BITS else MASK_ENCODING_NONE).append('"')
+    if (masks && maskFormat != null) {
+        append(",\"mask_format\":\"").append(jsonEscape(maskFormat)).append('"')
+        if (maskEdge > 0) append(",\"mask_edge\":").append(maskEdge)
+    }
+    if (withDepth) append(",\"with_depth\":true")
+}
+
+/** Préfixe de longueur d'une trame WS binaire : N sur 4 octets big-endian. */
+internal const val WS_HEADER_LEN_BYTES = 4
+
+/**
+ * En-tête JSON d'une trame WS binaire (M1) : exactement [liveFrameJson] sans `image_b64`
+ * — le JPEG suit en brut après le préfixe de longueur. L'`id` reste obligatoire.
+ */
+internal fun liveFrameHeaderJson(
+    id: Int, prompts: List<String>?, workEdge: Int, maxObjects: Int,
+    maskFormat: String? = null, maskEdge: Int = 0, withDepth: Boolean = false, masks: Boolean = true,
+): String = buildString(256) {
+    append("{\"id\":").append(id).append(',')
+    appendFrameKnobs(prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
+    append('}')
+}
+
+/**
+ * Trame WS binaire M1 : longueur N de l'en-tête sur 4 octets big-endian, en-tête JSON
+ * UTF-8 (sans `image_b64`), JPEG brut tel que sorti de l'encodeur. Le base64 de la frame
+ * n'est jamais construit sur ce chemin (plus de passage par `String` à la montée).
+ */
+internal fun frameMessageBinary(
+    id: Int, jpeg: ByteArray, prompts: List<String>?, workEdge: Int, maxObjects: Int,
+    maskFormat: String? = null, maskEdge: Int = 0, withDepth: Boolean = false, masks: Boolean = true,
+): ByteArray {
+    val header = liveFrameHeaderJson(id, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
+        .toByteArray(Charsets.UTF_8)
+    val out = ByteArray(WS_HEADER_LEN_BYTES + header.size + jpeg.size)
+    out[0] = (header.size shr 24).toByte()
+    out[1] = (header.size shr 16).toByte()
+    out[2] = (header.size shr 8).toByte()
+    out[3] = header.size.toByte()
+    header.copyInto(out, WS_HEADER_LEN_BYTES)
+    jpeg.copyInto(out, WS_HEADER_LEN_BYTES + header.size)
+    return out
 }
 
 /** Échappement JSON minimal pour les champs texte libre (prompts, `mask_format`). */

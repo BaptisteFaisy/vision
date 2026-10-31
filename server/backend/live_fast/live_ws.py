@@ -21,11 +21,16 @@ exactement la même requête, et la réponse porte la représentation **appliqu�
 
 Une erreur de frame ne ferme jamais la connexion : ``id`` vaut ``-1`` quand il est
 illisible (JSON invalide, ``id`` absent ou non entier).
+
+Trame binaire M1 (même réponse texte) : uint32 big-endian N + en-tête JSON UTF-8
+(les champs de ``LiveWsRequest`` **sans** ``image_b64``) + JPEG brut. Zéro base64
+à la montée ; la réponse et les erreurs sont inchangées (``id`` de l'en-tête).
 """
 
 from __future__ import annotations
 
 import json
+import struct
 
 from pydantic import ValidationError
 
@@ -33,8 +38,15 @@ from http_errors import MAX_DETAIL_CHARS, validation_detail
 from schemas import LiveWsRequest
 
 UNKNOWN_ID = -1
-__all__ = ["UNKNOWN_ID", "error_message", "error_payload", "frame_id", "parse_frame",
-           "success_message"]
+# En-tête binaire > 4 Ko = 400 (des knobs tiennent en ~200 o ; borne anti-abus).
+MAX_WS_HEADER_BYTES = 4096
+HEADER_LEN_BYTES = 4
+# ``LiveWsRequest`` exige ``image_b64`` : l'en-tête binaire n'en a pas (le JPEG
+# suit en brut), on bouche avec ce factice — jamais décodé, jamais servi.
+_BINARY_IMAGE_PLACEHOLDER = "M1-binary-frame"
+__all__ = ["HEADER_LEN_BYTES", "MAX_WS_HEADER_BYTES", "UNKNOWN_ID", "error_message",
+           "error_payload", "frame_id", "parse_frame", "parse_frame_bytes",
+           "stuck_id", "success_message"]
 
 
 def frame_id(value) -> int:
@@ -78,3 +90,60 @@ def parse_frame(raw: str) -> dict:
         return {"id": known_id, "request": None,
                 "error": error_payload(400, validation_detail(exc.errors()))}
     return {"id": request.id, "request": request, "error": None}
+
+
+def _binary_error(known_id: int, detail: str) -> dict:
+    """Erreur 400 d'une trame binaire : ``id`` connu (ou ``-1``), connexion gardée."""
+    return {"id": known_id, "request": None, "jpeg": b"",
+            "error": error_payload(400, detail)}
+
+
+def parse_frame_bytes(raw: bytes) -> dict:
+    """Trame binaire → ``{"id", "request", "jpeg", "error"}`` (``error`` exclusif).
+
+    Même contrat que :func:`parse_frame`, le JPEG voyageant en brut après
+    l'en-tête : ``request`` porte les knobs validés (``image_b64`` bouché, à
+    ignorer), ``jpeg`` les octets à décoder. Longueur manquante, en-tête > 4 Ko,
+    tronqué ou non-JSON, ``id`` absent, JPEG vide : 400, connexion maintenue.
+    """
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) < HEADER_LEN_BYTES:
+        return _binary_error(UNKNOWN_ID, "truncated binary frame: missing header length")
+    (size,) = struct.unpack(">I", bytes(raw[:HEADER_LEN_BYTES]))
+    if size > MAX_WS_HEADER_BYTES:
+        return _binary_error(UNKNOWN_ID,
+                             f"binary header too large: {size}B > {MAX_WS_HEADER_BYTES}B")
+    if len(raw) < HEADER_LEN_BYTES + size:
+        return _binary_error(UNKNOWN_ID, "truncated binary frame: header exceeds message")
+    try:
+        payload = json.loads(bytes(raw[HEADER_LEN_BYTES:HEADER_LEN_BYTES + size]).decode("utf-8"))
+    except (TypeError, ValueError) as exc:
+        return _binary_error(UNKNOWN_ID, f"invalid binary header: {exc}")
+    if not isinstance(payload, dict):
+        return _binary_error(UNKNOWN_ID, "invalid binary header: expected a JSON object")
+    known_id = frame_id(payload.get("id"))
+    payload["image_b64"] = _BINARY_IMAGE_PLACEHOLDER
+    try:
+        request = LiveWsRequest(**payload)
+    except ValidationError as exc:
+        return _binary_error(known_id, validation_detail(exc.errors()))
+    jpeg = bytes(raw[HEADER_LEN_BYTES + size:])
+    if not jpeg:
+        return _binary_error(request.id, "empty JPEG payload in binary frame")
+    return {"id": request.id, "request": request, "jpeg": jpeg, "error": None}
+
+
+def stuck_id(raw) -> int:
+    """``id`` d'une frame lente (texte ou binaire) : ``-1`` si illisible.
+
+    Voie unique de l'erreur 503 : l'en-tête binaire est relu comme à la
+    réception, un texte non-JSON rend ``-1`` — jamais d'exception.
+    """
+    if isinstance(raw, (bytes, bytearray)):
+        return parse_frame_bytes(bytes(raw))["id"]
+    if not isinstance(raw, str):
+        return UNKNOWN_ID
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        return UNKNOWN_ID
+    return frame_id(payload.get("id")) if isinstance(payload, dict) else UNKNOWN_ID
