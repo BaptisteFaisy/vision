@@ -125,7 +125,7 @@ class StairCannyCountTest {
     }
 
     @Test
-    fun `roi sam : marches hors boite ignorees`() {
+    fun `roi sam = marches hors boite ignorees`() {
         // ROI = moitié basse : les 2 marches du haut (44,45) ne comptent plus.
         StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
         StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
@@ -134,7 +134,7 @@ class StairCannyCountTest {
     }
 
     @Test
-    fun `roi effacee : balayage entier`() {
+    fun `roi effacee = balayage entier`() {
         StairCannyCount.setRoi(StairRoi(0f, 0.5f, 1f, 1f))
         StairCannyCount.offerLuma(stairsLuma(44, 45, 60, 68, 76, 84))
         assertEquals(4, StairCannyCount.lineCount())
