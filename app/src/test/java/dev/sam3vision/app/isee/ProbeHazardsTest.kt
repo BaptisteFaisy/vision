@@ -14,6 +14,7 @@ import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairSignal
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.traverse.VehicleStateWatcher
@@ -22,14 +23,14 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Reset commun des guetteurs de la sonde : bordure + escaliers + mobilier +
- * grillage + véhicules + cycles + trottoir oublient leur annonce à chaque
- * début de séance (guidage SAM seul, plus de TwinLite à faire taire).
+ * Reset commun des guetteurs de la sonde : bordure + escaliers + compteur +
+ * mobilier + grillage + véhicules + cycles + trottoir oublient leur annonce à
+ * chaque début de séance (guidage SAM seul, plus de TwinLite à faire taire).
  */
 class ProbeHazardsTest {
 
     private fun dangers() = ProbeHazards(
-        CurbWatcher(), StairWatcher(), HazardWatcher(), FenceOpeningWatcher(),
+        CurbWatcher(), StairWatcher(), StairCountVoice(), HazardWatcher(), FenceOpeningWatcher(),
         VehicleStateWatcher(), CycleWatcher(), SidewalkWatcher(),
     )
 
@@ -134,6 +135,17 @@ class ProbeHazardsTest {
         dangers.reset()
 
         assertNull(dangers.vehicle.lastAlertMs)
+    }
+
+    @Test
+    fun `reset oublie le compte dit`() {
+        val dangers = dangers()
+        assertEquals("5 marches.", dangers.count.onTick(true, 5, 1_000L))
+        assertNull(dangers.count.onTick(true, 5, 2_000L))
+
+        dangers.reset()
+
+        assertEquals("5 marches.", dangers.count.onTick(true, 5, 3_000L))
     }
 
     @Test

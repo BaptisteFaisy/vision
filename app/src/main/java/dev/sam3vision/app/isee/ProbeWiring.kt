@@ -26,6 +26,7 @@ import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
 import dev.sam3vision.core.traverse.VehicleStateWatcher
@@ -409,20 +410,22 @@ internal fun LiveProbe.observeSidewalk(
     return watcher
 }
 
-/** Les sept guetteurs de la sonde (bordure + escaliers + mobilier + grillage + véhicules + cycles + trottoir), reset commun. */
+/** Les huit guetteurs de la sonde (bordure + escaliers + compteur + mobilier + grillage + véhicules + cycles + trottoir), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
+    val count: StairCountVoice,
     val hazard: HazardWatcher,
     val fence: FenceOpeningWatcher,
     val vehicle: VehicleStateWatcher,
     val cycle: CycleWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les sept guetteurs et le compte caméra (nouvelle séance). */
+    /** Oublie les huit guetteurs et le compte caméra (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
+        count.reset()
         hazard.reset()
         fence.reset()
         vehicle.reset()
@@ -433,7 +436,7 @@ internal class ProbeHazards(
 }
 
 /**
- * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * Les huit guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeCurb`, même contrat). Bordure et véhicules sont
  * construits ici pour que le mobilier lise P1/P2 ([p1p2Busy] : le poteau est P3).
  */
@@ -450,6 +453,7 @@ internal fun LiveProbe.observeHazards(
     return ProbeHazards(
         observeCurb(scope, voice, playerIdle, language, safety, curb),
         observeStairs(scope, voice, playerIdle, language),
+        observeStairsCount(scope, voice, playerIdle, language),
         observeHazard(scope, voice, playerIdle, language, busy),
         observeFenceOpening(scope, voice, playerIdle, language),
         observeVehicleState(scope, voice, playerIdle, language, safety, vehicle),
