@@ -8,6 +8,7 @@ import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.Passage
 
 /**
@@ -46,6 +47,8 @@ data class LiveProbeState(
     val modelsLine: String = "",
     val frames: Int = 0,
     val distanceLayer: DistanceLayer? = null,
+    /** Détections SAM confirmées de la dernière frame, mesurées ou non : la voix y voit ce que l'écran montre. */
+    val samDetections: List<Detection> = emptyList(),
     val spoken: String? = null,
     /**
      * Compteur d'émissions de [spoken] : incrémenté à chaque phrase produite,
