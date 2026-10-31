@@ -74,9 +74,14 @@ class CrossingChipZone {
  * auto vision ou GPS) : la coupe ne fait pas taire la proposition — seul un
  * refus manuel (bouton, ordre vocal) vaut refus.
  */
-internal fun LiveProbe.setCrossingActive(settings: Settings, active: Boolean, auto: Boolean = false) {
+internal fun LiveProbe.setCrossingActive(
+    settings: Settings,
+    active: Boolean,
+    auto: Boolean = false,
+    sensorLens: LensSpec? = null,
+) {
     if (!active && !auto) CrossingOfferWatch.declined(System.currentTimeMillis())
-    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active)
+    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens)
 }
 
 /**

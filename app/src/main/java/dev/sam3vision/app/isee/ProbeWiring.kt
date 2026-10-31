@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
+import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
@@ -79,6 +80,7 @@ internal fun LiveProbe.configureFrom(
     settings: Settings,
     prompts: List<String> = LivePrompts.default,
     crossingActive: Boolean = false,
+    sensorLens: LensSpec? = null,
 ) {
     android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
@@ -91,7 +93,7 @@ internal fun LiveProbe.configureFrom(
         prompts = effective,
         announce = settings.announcePositions,
         guide = settings.guideStraight,
-        lens = LensSpec.fromSettings(settings.cameraFovDeg),
+        lens = chosenLens(settings.cameraFovDeg, sensorLens),
         distancesOn = settings.distanceOverlayEnabled,
         collectCrops = settings.collectLightCrops,
         maxObjects = settings.objectsOnScreen,

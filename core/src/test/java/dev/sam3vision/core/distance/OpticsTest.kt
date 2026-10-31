@@ -211,6 +211,19 @@ class OpticsTest {
     }
 
     @Test
+    fun `intrinseques du Redmi de test donnent 73,32 par 58,34 degres`() {
+        // Mesuré le 31/10/2026 (`dumpsys media.camera`, cam 0 arrière du 2c6852ac) :
+        // LENS_INTRINSIC_CALIBRATION = [2741,07, 2741,07, 2040, 1530], zone 4080×3060.
+        val spec = Optics.lensSpecFromIntrinsics(2741.0713f, 2741.0713f, 2040f, 1530f, 4080, 3060)!!
+        assertEquals(73.32f, spec.horizontalFovDeg, 0.02f)
+        assertEquals(58.34f, spec.verticalFovDeg, 0.02f)
+        assertEquals(0.5f, spec.principalXFrac, 0.001f)
+        assertEquals(0.5f, spec.principalYFrac, 0.001f)
+        assertEquals(344f, spec.focalPx(512, 384), 0.5f)
+        assertTrue(spec.usable)
+    }
+
+    @Test
     fun `calibration intrinseque decentree garde son centre`() {
         val spec = Optics.lensSpecFromIntrinsics(2986.1f, 2986.1f, 2050f, 1450f, ARRAY_W, ARRAY_H)!!
         assertEquals(2050f / 3999f, spec.principalXFrac, 0.0001f)
