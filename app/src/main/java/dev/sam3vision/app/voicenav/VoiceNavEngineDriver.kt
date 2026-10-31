@@ -65,7 +65,8 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
  * quand la cible est un passage protégé — simple préavis parlé (« Crosswalk
  * in X »), de loin comme de près. Le pilote n'arme plus le mode traversée :
- * l'user le bascule lui-même (puce, ordre vocal « crossing mode on/off »).
+ * l'user le bascule lui-même (puce, ordre vocal « crossing mode on/off »,
+ * « crosswalk on/off »).
  * [NavEvent.CrossingPassed] annonce « Crossing finished. », le guidage
  * reprend.
  *
