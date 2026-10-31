@@ -731,7 +731,7 @@ Nouveau contrat, en mode Traversée seul :
   compté : stop, consignes et constats se disent entiers après (jamais
   couverts ni tronqués) ;
 - **re-vérification obligatoire** : un constat danger relance un cycle
-  complet après 10 s d'attente silencieuse (le temps que le véhicule
+  complet après 3 s d'attente silencieuse (le temps que le véhicule
   passe — consignes seules, sans « Stop. »), jusqu'à 3 cycles par
   traversée ; au-delà, le scan rend la voix (le veto garde la traversée,
   les voix douces reprennent) ;
