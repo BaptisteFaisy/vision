@@ -21,6 +21,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `GroundPlaneTest` 17 ; garde `check-kotlin-limits.py` verte.
 - Reste (pistes `docs/DISTANCES.md`) : pose IMU temps réel, hauteur/pieds du
   masque, profondeur affine, Kalman par piste.
+## 2026-10-31 — iSee : chemin optimal parmi les humains, passage à 50 cm (branche `isee-chemin-humains`)
+
+- **Demande** : quand des humains bouchent le couloir de marche, guider vers
+  le passage optimal entre eux au lieu d'un simple côté de sortie ; le chemin
+  peut passer à 50 cm des gens, jamais plus près.
+- Fait : `PeoplePath` nouveau (`:core`, paquet `live`, pur JVM) — cap optimal
+  au plus près de tout droit qui tient chaque personne mesurée à 50 cm de son
+  corps (`MIN_CLEARANCE_M`, boîte SAM ou épaules supposées), non-personnes à
+  la marge marcheur ; `Guidance.decide` (cap droit) le suit quand il tient,
+  sinon repli sur le côté le moins encombré (géométrie incomplète, mur de
+  personnes). Voix, décalage chiffré, caps latéraux et traversée inchangés.
+- Preuves : `:core:testDebugUnitTest :app:testDebugUnitTest` verts sur r630
+  (3 603 tests, 0 échec — dont `PeoplePathTest` 10/10, T9 rouge avant le
+  branchement) ; `check-kotlin-limits.py` vert.
 
 
 ## 2026-10-31 — Meta : facturation régularisée, batch + realtime retestés en direct
