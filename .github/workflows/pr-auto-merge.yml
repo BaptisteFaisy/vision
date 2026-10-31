@@ -96,6 +96,10 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v23 (31/10) brouillons maintenus : l'état `DRAFT` n'était traité nulle
+#       part, donc un brouillon aux tests rouges ne déclenchait ni relance ni
+#       agent. Il suit désormais le chemin `BLOCKED` (jamais mergé, mais
+#       réparé) et sort de la déduplication à vie.
 #   v22 (31/10) réparation des tests : un échec RÉEL déclenche l'agent
 #       zeroclaw `fw` (`test_agent.py`) — il lit le journal, corrige dans le
 #       clone et le pilote ne pousse qu'un diff borné qui compile. Une
@@ -771,7 +775,7 @@ jobs:
           # assez court pour qu'une PR ne pourrisse pas une demi-journée.
           if deja_balayee; then
             case "$STATE" in
-              DIRTY|BLOCKED)
+              DIRTY|BLOCKED|DRAFT)
                 age="$(age_etat_minutes)"
                 if [ "${age:-999}" -lt 10 ]; then
                   echo "PR #$PR : $STATE, dernière tentative il y a ${age} min (< 10), on attend"
@@ -818,7 +822,13 @@ jobs:
                 echo "PR #$PR : CI pas encore verte"
               fi
               ;;
-            BLOCKED)
+            BLOCKED|DRAFT)
+              # v23 (31/10) — un brouillon ne se merge jamais, mais il se
+              # **maintient** : la v6 le rebasait déjà, or l'état `DRAFT` n'était
+              # traité nulle part dans cette machine, donc un brouillon aux
+              # tests rouges ne déclenchait rien (vécu sur #652 : l'agent de test
+              # n'a jamais été appelé). Même chemin que `BLOCKED` : relance
+              # bornée des runs annulés, agent de périmètre, agent de test.
               # Trou v15 (cas réel : #434) : un run ANNULÉ (runner perdu,
               # annulation manuelle) n'a aucun verdict — bucket `cancel`,
               # pas `fail` — donc `echecs_requis` le manquait et la PR
