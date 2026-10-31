@@ -44,6 +44,7 @@ class NoLightCrossingTest {
         CrossingVehicleWatch.reset()
         CrosswalkScanWatch.reset()
         NoLightCrossWatch.reset()
+        CrossingLightDueWatch.reset()
     }
 
     private fun calm(language: SpeechLanguage, atMs: Long): String? =
@@ -169,16 +170,15 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `sans feu - transition feu tait la phrase mais le verdict dit attendez`() {
+    fun `sans feu - transition feu, la voiture parle au lieu du verdict`() {
         resetWatches()
-        // Ordre feu nouveau : le quiet tait les voix douces 2,5 s.
         val cue = CrossingCue("Rouge, attendez.", false, CrossingState.Red)
         assertEquals(
             "Rouge, attendez.",
             crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr),
         )
-        // Le feu sort du champ, une voiture à 30 m roule : la phrase est tue
-        // (quiet) mais le guetteur reste nourri — le verdict dit « Wait. ».
+        // Le feu sort du champ, une voiture à 30 m roule : la voix
+        // véhicules parle (devant le verdict), sans attendre.
         fun far(widthPx: Float, atMs: Long): String? {
             val frame = carBox(widthPx)
             return crossingPhraseOf(
@@ -189,7 +189,7 @@ class NoLightCrossingTest {
 
         assertNull(far(100f, 100L))
         assertNull(far(110f, 200L))
-        assertEquals("Wait.", far(120f, 300L))
+        assertEquals("Car moving, 30 meters away.", far(120f, 300L))
     }
 
     @Test

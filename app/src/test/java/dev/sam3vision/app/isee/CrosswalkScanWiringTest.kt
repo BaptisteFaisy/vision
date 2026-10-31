@@ -183,5 +183,6 @@ class CrosswalkScanWiringTest {
         CrosswalkScanWatch.reset()
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
+        CrossingLightDueWatch.reset()
     }
 }

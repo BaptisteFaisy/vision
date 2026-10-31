@@ -20,10 +20,11 @@ import org.junit.Test
 
 /**
  * Priorité du guidage en Traversée (§ 25) : l'ordre d'évitement
- * (« Gauche. », « Droite. », stop) passe devant la voix rouge/vert —
- * sauf procédure scan en cours (le scan garde la voix) et stop urgent
- * « voiture en mouvement » (absolu). « Tout droit. » ne couvre jamais
- * le feu. Sonde branchée sur un faux client muet.
+ * (« Gauche. », « Droite. », stop) couvre le statut frais, mais le
+ * statut perce au moins toutes les 4 s (dû : jamais dit, ou muet 4 s) —
+ * sauf procédure scan en cours (le scan garde la voix) et voix
+ * véhicules (stop comme douce, absolue). « Tout droit. » ne couvre
+ * jamais le statut. Sonde branchée sur un faux client muet.
  */
 class CrossingSteeringTest {
 
@@ -54,11 +55,15 @@ class CrossingSteeringTest {
     }
 
     @Test
-    fun `le mot du guidage passe devant le feu`() {
+    fun `le statut parle d abord, le guidage couvre le statut frais`() {
         resetWatches()
         val cue = CrossingCue("Rouge, attendez.", false, CrossingState.Red)
+        fun guided(atMs: Long): String? =
+            crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), atMs, SpeechLanguage.Fr, steering = "Gauche.")
 
-        assertEquals("Gauche.", crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.Fr, steering = "Gauche."))
+        assertEquals("Rouge, attendez.", guided(0L))
+        assertEquals("Gauche.", guided(2_000L))
+        assertEquals("statut muet 4 s : il perce", "Rouge, attendez.", guided(4_000L))
         resetWatches()
     }
 
@@ -136,6 +141,7 @@ class CrossingSteeringTest {
         CrosswalkScanWatch.reset()
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
+        CrossingLightDueWatch.reset()
     }
 
     /** Faux client : le direct n'est jamais pompé (`begin` non appelé), tout appel échoue. */

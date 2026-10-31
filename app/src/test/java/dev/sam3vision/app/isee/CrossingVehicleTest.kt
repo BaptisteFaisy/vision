@@ -11,9 +11,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Voix douce des véhicules moteurs en mode Traversée : en mouvement ou à
- * l'arrêt, dans la langue de la voix (anglais par défaut) — après le feu,
- * avant les personnes, et muette sur un ordre du feu nouveau.
+ * Voix des véhicules moteurs en mode Traversée : en mouvement ou à l'arrêt,
+ * dans la langue de la voix (anglais par défaut) — devant l'évitement et
+ * le statut, même sur un ordre du feu nouveau (ordre user du 31/10).
  */
 class CrossingVehicleTest {
 
@@ -27,8 +27,6 @@ class CrossingVehicleTest {
         val heightPx = widthPx * 0.6f
         return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
     }
-
-    private fun red() = CrossingCue("Don't cross yet", false, CrossingState.Red)
 
     private fun stoppedCar(widthPx: Float = 100f): Pair<List<Detection>, List<DistanceReading>> {
         val frame = box(widthPx)
@@ -84,16 +82,38 @@ class CrossingVehicleTest {
     }
 
     @Test
-    fun `le feu prime sur les vehicules`() {
+    fun `les vehicules priment sur le feu`() {
         CrossingVehicleWatch.reset()
         CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
+        CrossingLightDueWatch.reset()
         val (detections, readings) = stoppedCar()
         val placed = listOf(PlacedLabel("person", centerX = 0.1f))
         val cue = CrossingCue("You can cross", false, CrossingState.Green)
 
+        assertNull(CrossingVehicleWatch.update(detections, readings, 0L, SpeechLanguage.En))
+        assertNull(CrossingVehicleWatch.update(detections, readings, 100L, SpeechLanguage.En))
         assertEquals(
-            "You can cross",
-            crossingPhraseOf(cue, placed, detections, readings, 0L, SpeechLanguage.En),
+            "Car stopped, 2 meters away.",
+            crossingPhraseOf(cue, placed, detections, readings, 200L, SpeechLanguage.En),
+        )
+    }
+
+    @Test
+    fun `les vehicules couvrent le feu meme quand il est du`() {
+        CrossingVehicleWatch.reset()
+        CrossingPeopleWatch.reset()
+        CrosswalkScanWatch.reset()
+        CrossingLightDueWatch.reset()
+        val (detections, readings) = stoppedCar()
+        val cue = CrossingCue("You can cross", false, CrossingState.Green)
+
+        assertEquals("You can cross", crossingPhraseOf(cue, emptyList(), emptyList(), emptyList(), 0L, SpeechLanguage.En))
+        assertNull(CrossingVehicleWatch.update(detections, readings, 3_800L, SpeechLanguage.En))
+        assertNull(CrossingVehicleWatch.update(detections, readings, 3_900L, SpeechLanguage.En))
+        assertEquals(
+            "Car stopped, 2 meters away.",
+            crossingPhraseOf(cue, emptyList(), detections, readings, 4_000L, SpeechLanguage.En),
         )
     }
 
@@ -116,22 +136,6 @@ class CrossingVehicleTest {
         assertEquals(
             "Straight.",
             crossingPhraseOf(null, placed, detections, readings, 300L, SpeechLanguage.En),
-        )
-    }
-
-    @Test
-    fun `un ordre du feu nouveau fait taire puis rend la parole`() {
-        CrossingVehicleWatch.reset()
-        val (detections, readings) = stoppedCar()
-
-        assertNull(CrossingVehicleWatch.update(detections, readings, 0L, SpeechLanguage.En))
-        assertNull(CrossingVehicleWatch.update(detections, readings, 100L, SpeechLanguage.En))
-        assertNull("le feu parle : silence", CrossingVehicleWatch.update(detections, readings, 200L, SpeechLanguage.En, red()))
-        assertNull("ordre récent : silence", CrossingVehicleWatch.update(detections, readings, 300L, SpeechLanguage.En))
-        // La confirmation a survécu à la pause : la parole rendue parle aussitôt.
-        assertEquals(
-            "Car stopped, 2 meters away.",
-            CrossingVehicleWatch.update(detections, readings, 2700L, SpeechLanguage.En),
         )
     }
 
