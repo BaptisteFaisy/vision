@@ -4,6 +4,25 @@ Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entr�
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
 
+## 2026-10-31 — CI : un runner non provisionné ne brûle plus l'unique tentative de l'agent `fw` (branche `ci/agent-outillage`)
+
+- **Constat sur #652** (PR jetable, brouillon aux tests rouges) : la v23 a bien
+  appelé l'agent — `<!-- test-agent sha=6ee9c52 -->` posé à 17:38:49 — mais il a
+  répondu `zeroclaw introuvable sur ce runner` : l'unique tentative de la tête
+  était consommée, deux minutes avant que le binaire et la config n'arrivent sur
+  `r630`.
+- **Fait** : `test_agent.py` distingue l'outillage manquant (code 3, **aucune
+  marque**, aucun commentaire) d'un vrai échec de l'agent ; le balayeur journalise
+  « aucune tentative consommée, réessai au prochain passage ». Deuxième défaut
+  trouvé en rejouant l'agent à la main : `zeroclaw` refuse de démarrer si son
+  répertoire d'état `data` est accessible en écriture aux autres — il le crée en
+  775 (umask 002 du runner), donc `config_isolee()` le pose maintenant en 700.
+- **Preuves** : `zeroclaw --config-dir <tmp> agent --agent fw -m "Réponds
+  uniquement: OK"` → `OK` sur `r630` une fois `data` en 700 (et l'erreur
+  `config lifecycle directory … writable by other users` sans) ;
+  `test_test_agent.py` 21/21 (2 nouveaux : outillage absent → code 3 sans
+  marque ; `data` en 700) ; YAML et `bash -n` du balayeur verts.
+
 ## 2026-10-31 — CI : l'approbation automatique se réveille à chaque fin de `CI`, pas au cron (branche `ci/approve-declencheur`)
 
 - **Constat** : le `schedule` de ce dépôt est étalé par GitHub. Mesure : le cron

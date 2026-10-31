@@ -185,6 +185,43 @@ class FixTest(unittest.TestCase):
         self.assertEqual(rc, 1)
         actifs["pousser"].assert_not_called()
 
+    def test_config_isolee_prepare_data_en_700(self):
+        """Le CLI refuse un `data` inscriptible par les autres (umask 002)."""
+        source = tempfile.mkdtemp(prefix="zc-src-")
+        self.addCleanup(shutil.rmtree, source, True)
+        with open(os.path.join(source, "config.toml"), "w") as fh:
+            fh.write("[agents]\n")
+        with open(os.path.join(source, ".secret_key"), "w") as fh:
+            fh.write("k")
+        dossier = test_agent.config_isolee(source)
+        self.addCleanup(shutil.rmtree, dossier, True)
+        data = os.path.join(dossier, "data")
+        self.assertTrue(os.path.isdir(data))
+        self.assertEqual(os.stat(data).st_mode & 0o777, 0o700)
+
+    def test_outillage_absent_ne_consomme_pas_l_essai(self):
+        """Runner non provisionné : code 3, aucune marque, aucun label."""
+        patchs = self._patchs()
+        patchs["lancer_agent"] = mock.patch.object(
+            test_agent, "lancer_agent",
+            return_value=(False, test_agent.INFRA + "zeroclaw introuvable"))
+        rc, actifs = self._lancer(patchs)
+        self.assertEqual(rc, 3)
+        actifs["comment"].assert_not_called()
+        actifs["add_label"].assert_not_called()
+        actifs["pousser"].assert_not_called()
+
+    def test_echec_agent_sans_infra_reste_un_echec(self):
+        """Un vrai échec de l'agent (pas d'outillage en cause) reste livré."""
+        patchs = self._patchs()
+        patchs["lancer_agent"] = mock.patch.object(
+            test_agent, "lancer_agent", return_value=(False, "ABANDON raison"))
+        patchs["changements"] = mock.patch.object(test_agent, "changements",
+                                                  return_value=[])
+        rc, actifs = self._lancer(patchs)
+        self.assertEqual(rc, 2)
+        actifs["comment"].assert_called()
+
     def test_correctif_pousse(self):
         patchs = self._patchs()
         gate = mock.Mock()

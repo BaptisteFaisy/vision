@@ -96,6 +96,9 @@
 #   v16 `BLOCKED` sur run annulé : le bucket `cancel` n'est pas `fail`
 #       (cas réel : #434, run CI annulé sans remplaçant, PR bloquée à
 #       jamais) — le run entier est rejoué, 2 fois max par tête.
+#   v24 (31/10) outillage : un runner sans `zeroclaw` ne consomme plus l'unique
+#       tentative de l'agent de test (`test_agent.py` rend 3, sans marque) —
+#       #652 avait brûlé son essai deux minutes avant la pose du binaire.
 #   v23 (31/10) brouillons maintenus : l'état `DRAFT` n'était traité nulle
 #       part, donc un brouillon aux tests rouges ne déclenchait ni relance ni
 #       agent. Il suit désormais le chemin `BLOCKED` (jamais mergé, mais
@@ -933,6 +936,13 @@ jobs:
                               0) printf -v corps '%s\n%s' "$corps" \
                                    "Correctif de l'agent \`fw\` poussé (compilation vérifiée) : la CI rejuge." ;;
                               2) echo "PR #$PR : agent de test sans proposition (voir son commentaire)" ;;
+                              # v24 (31/10) — runner non provisionné : ce n'est
+                              # pas un échec de l'agent, et il n'a posé aucune
+                              # marque. On le dit sans rien promettre, et la
+                              # tête garde son essai pour le passage suivant
+                              # (vécu sur #652 : `zeroclaw` installé 2 min trop
+                              # tard, l'unique tentative était déjà brûlée).
+                              3) echo "PR #$PR : outillage de l'agent absent sur le runner — aucune tentative consommée, réessai au prochain passage" ;;
                               *) printf -v corps '%s\n%s' "$corps" \
                                    "L'agent \`fw\` n'a pas pu corriger (voir son commentaire) — main humaine." ;;
                             esac
