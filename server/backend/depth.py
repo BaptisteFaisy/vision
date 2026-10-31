@@ -14,9 +14,16 @@ importable sans GPU, comme ``segmentation``.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
+# Poids embarqués dans l'image (FAST_DEPTH_MODEL_DIR, téléchargés au build comme
+# sam3.1) : le boot est hermétique offline (HF_HUB_OFFLINE=1), sans répertoire
+# local `from_pretrained` échoue et with_depth reste sans effet (depth=null).
+MODEL_DIR = os.environ.get("FAST_DEPTH_MODEL_DIR", "") or ""
+MODEL_SOURCE = MODEL_DIR or MODEL_ID
 # Carte plate (aucune information) : ni proche ni loin.
 NEUTRAL_DEPTH = 0.5
 
@@ -25,11 +32,13 @@ def load_depth(device: str, dtype):
     """Charge DA2-Small une fois (conteneur) : ``(modèle, processeur)``."""
     from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
-    model = AutoModelForDepthEstimation.from_pretrained(MODEL_ID)
+    model = AutoModelForDepthEstimation.from_pretrained(
+        MODEL_SOURCE, local_files_only=bool(MODEL_DIR))
     model.to(device)
     if dtype is not None:
         model.to(dtype)
-    return model.eval(), AutoImageProcessor.from_pretrained(MODEL_ID)
+    return model.eval(), AutoImageProcessor.from_pretrained(
+        MODEL_SOURCE, local_files_only=bool(MODEL_DIR))
 
 
 def ensure_depth(ctx: dict, device: str, dtype) -> None:

@@ -383,6 +383,7 @@ RUNNERS = (
     ("profondeur : contrat with_depth binaire", "live_app_fast",
      depth_tests.test_depth_contract_binary),
     ("profondeur : médianes (sans GPU)", "depth", depth_tests.test_depth_math),
+    ("profondeur : poids locaux (build)", "depth", depth_tests.test_depth_local_weights),
     ("profondeur : run_frame joint les médianes", "fast_core",
      depth_tests.test_run_frame_depth),
     ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
