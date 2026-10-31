@@ -3,6 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-10-31 — iSee : sans feu, le mouvement se dit à toute portée (branche `isee-traversee-loin-sans-feu`)
+
+- **Ordre user** : sans feu, une voiture en mouvement se dit dès qu'elle est
+  détectée, même au-delà de 15 m. Seul le mouvement est illimité (l'arrêt
+  garde 15 m) et seule la branche sans-feu (avec feu / normal : 15 m).
+- **Fait** : `VehicleStateWatcher.update(movingMeters)` (défaut 15 m) ;
+  `CrossingVehicleWatch` passe l'infini sans feu ; verdict « Attendez. »
+  toutes les 2 s au-delà de 15 m aussi ; urgence inchangée.
+- **Preuve** : `:core:testDebugUnitTest` 2 671 + `:app:testDebugUnitTest`
+  1 508 verts sur r630 (0 échec, dont 3 `VehicleStateRangeTest` + 1
+  `NoLightCrossingTest` + 1 `CrossingVehicleTest` nouveaux) ; UBS : 0
+  finding ; fichiers < 500 lignes (`VehicleState.kt` 498).
+
 ## 2026-10-31 — iSee : le micro verrouillé reçoit la destination GPS (branche `feat/isee-micro-verrouille-destination`)
 
 - **Constat** : écran verrouillé, les questions partaient au LLM sans la
