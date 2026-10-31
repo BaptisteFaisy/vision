@@ -18,9 +18,9 @@ import dev.sam3vision.core.settings.Settings
  *   coupe le lecteur ElevenLabs et la voix route, pas ce moteur) ne taisent
  *   une alerte.
  *
- * Deux alertes de sécurité ne se coupent jamais : la seconde attend la fin
- * de la première (mise en file) au lieu de la tronquer. Hors-ligne, parle
- * quand même (voix système embarquée, aucune clé).
+ * Priorité absolue (31/10/2026) : la nouvelle alerte coupe l'alerte en cours
+ * (flush toujours) au lieu d'attendre sa fin — un par un, la plus fraîche gagne.
+ * Hors-ligne, parle quand même (voix système embarquée, aucune clé).
  *
  * L'état de parole (`speakingEntryId`) n'est pas touché : le TTS système ne
  * rend pas de fin de lecture, et un fanion posé sans fin bloquerait la
@@ -37,13 +37,12 @@ class SafetyVoice(
     private val stopCurrent: () -> Unit = player::stop,
 ) {
 
-    /** Parle [phrase] aussitôt : coupe, puis TTS système (file si déjà parlé). */
+    /** Parle [phrase] aussitôt : coupe tout, puis TTS système en flush (jamais de file). */
     fun speak(phrase: String) {
         if (phrase.isBlank()) return
         stopCurrent()
         val current = settings()
-        val flush = !system.speaking
-        system.speak(phrase, flush, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed)
+        system.speak(phrase, true, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed)
     }
 
     /** Libération finale (moteur TTS système). */

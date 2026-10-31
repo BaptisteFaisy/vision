@@ -63,7 +63,7 @@ class SafetyVoiceTest {
     }
 
     @Test
-    fun `alerte sur alerte - mise en file, jamais coupee`() {
+    fun `alerte sur alerte - la nouvelle coupe l ancienne, jamais de file`() {
         val driver = FakeSafetyDriver(speakingValue = true)
         val stops = mutableListOf<Unit>()
 
@@ -71,7 +71,7 @@ class SafetyVoiceTest {
 
         assertEquals(listOf(Unit), stops)
         assertEquals(1, driver.calls.size)
-        assertFalse(driver.calls.single().flush)
+        assertTrue(driver.calls.single().flush)
     }
 
     @Test
