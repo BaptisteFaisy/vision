@@ -9,18 +9,33 @@ import org.junit.Test
 class CrossingStateTest {
 
     @Test
-    fun `quatre prompts exactement, plafond client respecte`() {
-        assertEquals(4, CrossingPrompts.PROMPTS.size)
+    fun `six prompts exactement, plafond client respecte`() {
+        assertEquals(6, CrossingPrompts.PROMPTS.size)
         assertTrue(CrossingPrompts.PROMPTS.size <= LivePrompts.MAX)
         assertEquals(CrossingPrompts.PROMPTS, LivePrompts.normalize(CrossingPrompts.PROMPTS))
     }
 
     @Test
-    fun `les prompts suivent le feu pieton les voitures les personnes et le passage`() {
+    fun `les prompts suivent le feu pieton en trois variantes plus voitures personnes et passage`() {
         assertEquals(
-            listOf("pedestrian traffic light", "car", "person", "crosswalk"),
+            listOf(
+                "pedestrian traffic light", "pedestrian light", "pedestrian signal",
+                "car", "person", "crosswalk",
+            ),
             CrossingPrompts.PROMPTS,
         )
+    }
+
+    @Test
+    fun `les trois wordings feu sont envoyes et reconnus, alignement`() {
+        assertEquals(
+            listOf("pedestrian traffic light", "pedestrian light", "pedestrian signal"),
+            CrossingPrompts.LIGHTS,
+        )
+        CrossingPrompts.LIGHTS.forEach { wording ->
+            assertTrue(wording, wording in CrossingPrompts.PROMPTS)
+            assertTrue(wording, CrossingPrompts.isLightLabel(wording))
+        }
     }
 
     @Test
@@ -111,12 +126,31 @@ class CrossingStateTest {
     }
 
     @Test
+    fun `les variantes feu concourent a la boite comme le wording principal`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.60f, listOf(0f, 0f, 100f, 200f)),
+            light("pedestrian signal", 0.91f, listOf(50f, 100f, 150f, 300f)),
+        )
+        assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(objects, 200, 400))
+        val short = listOf(light("pedestrian light", 0.9f, listOf(50f, 100f, 150f, 300f)))
+        assertEquals(listOf(0.25f, 0.25f, 0.75f, 0.75f), CrossingPrompts.selectLightBox(short, 200, 400))
+    }
+
+    @Test
     fun `sans feu detecte pas de boite`() {
         val objects = listOf(light("car", 0.99f, listOf(0f, 0f, 10f, 10f)))
         assertEquals(null, CrossingPrompts.selectLightBox(objects, 200, 400))
         val carsOnly = listOf(light("traffic light", 0.99f, listOf(0f, 0f, 100f, 200f)))
         assertEquals(null, CrossingPrompts.selectLightBox(carsOnly, 200, 400))
         assertEquals(null, CrossingPrompts.selectLightBox(emptyList(), 200, 400))
+    }
+
+    @Test
+    fun `les wordings voiture seuls ne donnent jamais de boite, aucun faux vert`() {
+        listOf("traffic light", "traffic signal", "stoplight", "feu tricolore").forEach { label ->
+            val objects = listOf(light(label, 0.99f, listOf(0f, 0f, 100f, 200f)))
+            assertEquals(label, null, CrossingPrompts.selectLightBox(objects, 200, 400))
+        }
     }
 
     @Test
