@@ -83,9 +83,12 @@ object CrossingOnPath {
  * personne est mesurée — sans mesure, la boîte seule suffit, comme
  * [dev.sam3vision.core.live.Guidance] qui traite l'inconnu comme à portée),
  * péremption ([LateralNudgeTracker.STALE_MS]). Pas de fenêtre avant : la
- * boîte du passage borne déjà latéralement (un occupant au bord des zébrures
- * se contourne aussi). Les deux côtés à la fois = silence (le couloir bouché
- * parle s'il est bouché).
+ * boîte du passage borne déjà latéralement, et le couloir central
+ * ([CrossingGuidance.LEFT_EDGE]-[CrossingGuidance.RIGHT_EDGE], le milieu de
+ * l'image = l'axe de marche) ne garde que les occupants qui bouchent le
+ * passage de l'utilisateur — un occupant sur les zébrures mais hors d'axe ne
+ * déclenche pas d'évitement (les positions le disent au cadran). Les deux
+ * côtés à la fois = silence (le couloir bouché parle s'il est bouché).
  *
  * Pur JVM, deux passes sans collection intermédiaire (boucles manuelles,
  * O(n), zéro allocation) : le meilleur passage, puis les occupants.
@@ -176,6 +179,7 @@ class CrossingOnPathTracker(
         if (!CrossingOnPath.bodyOnCrosswalk(px0, py0, px1, py2, cx0, cy0, cx1, cy1)) return null
         if (!closeEnough(box, readings)) return null
         val centerX = (px0 + px1) / 2f
+        if (centerX < CrossingGuidance.LEFT_EDGE || centerX > CrossingGuidance.RIGHT_EDGE) return null
         if (centerX < LateralNudgeTracker.SIDE_MID) return SteeringCap.Left
         if (centerX > LateralNudgeTracker.SIDE_MID) return SteeringCap.Right
         return null
