@@ -14,12 +14,14 @@ import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Phrase traversée de la frame : le feu d'abord ([cue], jamais couvert), les
- * véhicules moteurs ensuite (en mouvement ou à l'arrêt), la voix douce des
- * personnes sinon ([CrossingPeopleWatch]). Chaque voix douce est nourrie à
- * chaque frame pour suivre les approches même quand le feu parle ; les
- * personnes ne sont consultées que sur le silence des véhicules, pour ne pas
- * perdre un mot de décalage au profit d'une phrase jetée.
+ * Phrase traversée de la frame : le feu d'abord ([cue], jamais couvert), le
+ * scan « stop, regardez à gauche et à droite » ensuite ([CrosswalkScanWatch],
+ * sur le passage à moins de 2 m), les véhicules moteurs puis la voix douce
+ * des personnes sinon ([CrossingPeopleWatch]). Chaque voix douce est nourrie
+ * à chaque frame pour suivre les approches même quand le feu parle (le
+ * guetteur véhicules l'est avant le scan, qui lit son brut) ; les personnes
+ * ne sont consultées que sur le silence des véhicules, pour ne pas perdre un
+ * mot de décalage au profit d'une phrase jetée.
  */
 internal fun crossingPhraseOf(
     cue: CrossingCue?,
@@ -31,13 +33,18 @@ internal fun crossingPhraseOf(
     objects: List<SegObject> = emptyList(),
     width: Int = 0,
     height: Int = 0,
+    scanTrigger: Boolean = false,
 ): String? {
     if (cue != null) {
         CrossingVehicleWatch.update(detections, readings, atMs, language, cue)
         CrossingPeopleWatch.update(placed, atMs, language, cue, objects, width, height, readings)
+        CrosswalkScanWatch.update(atMs, scanTrigger, movingNow = false, feu = true, language)
         return cue.phrase
     }
-    CrossingVehicleWatch.update(detections, readings, atMs, language, null)?.let { return it }
+    val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, null)
+    CrosswalkScanWatch.update(atMs, scanTrigger, CrossingVehicleWatch.movingNow, feu = false, language)
+        ?.let { return it }
+    vehiclePhrase?.let { return it }
     return CrossingPeopleWatch.update(placed, atMs, language, null, objects, width, height, readings)
 }
 

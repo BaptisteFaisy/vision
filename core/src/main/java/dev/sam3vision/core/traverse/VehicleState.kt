@@ -181,10 +181,9 @@ object VehicleStateText {
  * [confirmFrames] positifs consécutifs, puis silence pendant le cooldown de
  * l'état (4 s en mouvement, 10 s à l'arrêt).
  *
- * En mouvement = approche confirmée (tau < 3 s via [VehicleApproach], classe
- * existante réutilisée) ou boîte croissante sur deux frames (miroir du veto
- * instantané) — sauf veto fond : quand le signal `MovingVerdict` accuse la
- * caméra avec confiance, la dérive des boîtes ne conclut plus (doute/silence).
+ * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
+ * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
+ * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
  * À l'arrêt = dérive du centre sous [STILL_SPEED] et seau-mètre
  * stable (deux transitions stables, trois frames) — mesuré et dans le
  * couloir marché. Le reste est doute/silence : jamais d'arrêt inventé.
@@ -259,6 +258,10 @@ class VehicleStateWatcher(
     /** Vrai quand chaque piste évaluée accuse la caméra : le mouvement se tait. */
     val cameraMoved: Boolean get() = approach.cameraMoved
 
+    /** Brut de la dernière frame (`pick == MOVING`, lu par le scan traversée). */
+    var movingThisFrame: Boolean = false
+        private set
+
     /**
      * Alimente le lissage avec la frame à [atMs] : l'annonce quand le compte
      * de confirmation est atteint hors cooldown, `null` sinon. [detections]
@@ -283,6 +286,7 @@ class VehicleStateWatcher(
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs)
         }
+        movingThisFrame = pick?.state == State.MOVING
         if (pick == null) {
             hits = 0
             armed = null
@@ -334,6 +338,7 @@ class VehicleStateWatcher(
         lastMovingAtMs = NO_INSTANT
         lastNearMovingAtMs = NO_INSTANT
         lastStoppedAtMs = NO_INSTANT
+        movingThisFrame = false
     }
 
     /** Le candidat de la frame : le mouvement d'abord (le plus proche), l'arrêt ensuite. */
@@ -349,7 +354,7 @@ class VehicleStateWatcher(
         return stoppedPick(current, meters, atMs)
     }
 
-    /** Véhicule en mouvement : tau confirmé ou croissance, dans la portée (ou non mesuré). */
+    /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
     private fun movingPick(
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -362,8 +367,9 @@ class VehicleStateWatcher(
                 if (candidate in hushed) return@filter false
                 val prev = previous[candidate]
                 val tauHit = tauKey != null && tauKey == candidate
+                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && current.getValue(candidate).area > prev.area
-                (tauHit || growth) && inMovingRange(meters[candidate])
+                (tauHit || lateralHit || growth) && inMovingRange(meters[candidate])
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
             ?: return null
