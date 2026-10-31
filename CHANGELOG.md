@@ -367,7 +367,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   POSIX sous Windows — pré-existants, reproduits sur master intact le
   31/10, hors périmètre) ; `HazardWatchTest`, `HazardConceptsTest`,
   `docs/VOIX-DANGER.md` § 23. Rebasé sur master du 31/10 (§ 22).
-- Preuves (rebase caef1829) : `:app:testDebugUnitTest` 1 451 tests
+- Preuves (rebase 23dea2f4) : `:app:testDebugUnitTest` 1 455 tests
   0 échec dont `ObstacleArbiterTest` 10/10 (nouveau) ;
   `:core:testDebugUnitTest` 2 646 tests, 5 échecs
   `PrivateFileSettingsStoreTest` (permissions POSIX sous Windows —
