@@ -16,7 +16,7 @@ import dev.sam3vision.core.distance.LensSpec
  * - `OAKLEY_META_HSTN` → 70° (labo) ;
  * - `OAKLEY_META_VANGUARD` → 95° (dérivation validée FUP : marketing 122°
  *   confirmé 8+ sources, méthode prouvée à 1,1° sur HSTN labo, bande [90, 97],
- *   confirmation mire non bloquante, protocole dans /tmp/glasses-calib-FUP.md) ;
+ *   confirmation mire non bloquante, protocole dans docs/LUNETTES-VANGUARD.md) ;
  * - autres / `UNKNOWN` / sans SDK → 68° (défaut R4, milieu de [66, 70]).
  *
  * Le flux DAT HIGH 720×1280 est la fenêtre 9:16 centrale pleine hauteur du

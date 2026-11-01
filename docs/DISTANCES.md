@@ -23,7 +23,7 @@ Deux entrées, deux sources :
 | Entrée | D'où elle vient |
 |---|---|
 | **Hauteur réelle** | `KnownSizes.TABLE` : table label → mètres (personne 1,70 · personne assise 1,25 · cycliste 1,75 · voiture 1,45 · SUV 1,65 · camionnette 1,95 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · borne 0,80 · clôture 1,50 · portail 1,75…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Les défauts sans hauteur défendable n'ont volontairement pas d'entrée sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau, feu, bordures…) : leur distance vient de la profondeur ou du plan de sol. Chaque entrée porte en plus son incertitude (`KnownSizes.TOLERANCE` : porte ±3 % · adulte ±6 % · enfant/arbre ±15-30 %) qui pondère la fusion. |
-| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **lecture Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt`) — d'abord la **calibration intrinsèque** (`LENS_INTRINSIC_CALIBRATION`, focale + centre optique en pixels, `Optics.lensSpecFromIntrinsics`) quand le driver l'expose, sinon **focale mm + taille physique** (`Optics.lensSpec`) — sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Règle unique des deux côtés (`chooseLens`, `LiveLens.kt`) : champ forcé (borné 15–130°) > capteur réel > repli. **Voie lunettes** : champ lunettes forcé (`glassesFovDeg`, aspect 9:16 du flux) > mire quand elle est posée (`glassesLens`) > repli estimé 60,6° (`LensSpec.Glasses`, 100° diagonaux constructeur ramenés au 9:16 — `fromGlassesSettings`), jamais le capteur du téléphone. La sonde bascule à chaud (`observeGlassesLive`) et converge à la reconfiguration (`configureFrom`, `fromGlasses`). |
+| **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **lecture Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt`) — d'abord la **calibration intrinsèque** (`LENS_INTRINSIC_CALIBRATION`, focale + centre optique en pixels, `Optics.lensSpecFromIntrinsics`) quand le driver l'expose, sinon **focale mm + taille physique** (`Optics.lensSpec`) — sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Règle unique des deux côtés (`chooseLens`, `LiveLens.kt`) : champ forcé (borné 15–130°) > capteur réel > repli. **Voie lunettes** : champ lunettes forcé (`glassesFovDeg`, aspect 9:16 du flux) > mire quand elle est posée (`glassesLens`) > profil flux du modèle détecté (`connectedGlassesStreamLens`, `GlassesLens.kt`, D1) > repli estimé 53,7° (`LensSpec.Glasses`, fenêtre 9:16 du capteur 12 MP — `glassesStreamForSensorH`), jamais le capteur du téléphone. La focale flux est recadrée par photo envoyée (`CropGeometry.afterCrop`, D2/E5) : pleine largeur = FOV horizontal inchangé. Voir `docs/META-GLASSES.md` §15. La sonde bascule à chaud (`observeGlassesLive`) et converge à la reconfiguration (`configureFrom`, `fromGlasses`). |
 
 L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`)
 — le direct redresse chaque frame avant envoi (`uprightScaled`, `LiveScreen.kt`). La mesure est indépendante de la
@@ -76,7 +76,7 @@ Quand le sténopé et le plan de sol parlent tous deux et concordent (rapport �
 (porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse selon la dépression de ses pieds
 (`GroundWeight` : 1 dès 0,2 rad, 0,25 vers l'horizon — de près le sol tire, de loin le sténopé
 reprend la main). En cas de divergence, le sténopé garde la main quels que soient les poids —
-la pose du sol peut être fausse, le sténopé est la branche validée.
+la pose du sol peut être fausse, le sténopé est la branche validée. En lunettes-live, la branche sol est coupée explicitement (`groundPlaneEnabled = false`, `LiveProbe.setGlassesLive`, D3) : le tangage du téléphone ne vise pas où visent les lunettes, donc sténopé seul — jamais de valeur téléphone silencieuse.
 
 Chaque lecture porte sa **confiance** (`ReadingConfidence`, 0..1) : `1 − 1 px / hauteur de boîte`
 (quantification : 0,995 à 200 px, 0,90 à 10 px), multipliée par l'accord des branches quand les deux
@@ -192,20 +192,20 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   aucun calibrage). À saisir après mesure mire, ou pour affiner — même
   contrôle à 2 m, lunettes portées, tête droite.
 
-## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-31, par `grep -c '@Test'`)
+## Où c'est testé (comptages `@Test` de cet arbre, 2026-10-31, par `grep -c '@Test'` ; LensSpec/Optics/DistanceMeter recomptés le 2026-11-01, +3 D3)
 
-- `core.distance.LensSpecTest` (**17**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical, centre optique (défaut, échelle, bornes), focale en pixels (`fromFocalPx`, aller-retour, refus), repli lunettes 60,6°/9:16 et son réglage (`fromGlassesSettings`).
-- `core.distance.OpticsTest` (**27**) : zone active, recadrages, bornes mm/px, calibration intrinsèque (exacte, décentrée, incohérente).
+- `core.distance.LensSpecTest` (**18**) : focale paysage/portrait, capteur natif portrait, bornes, déduction du champ vertical, centre optique (défaut, échelle, bornes), focale en pixels (`fromFocalPx`, aller-retour, refus), repli lunettes 53,7°/9:16 (fenêtre du capteur, D1) et son réglage (`fromGlassesSettings`).
+- `core.distance.OpticsTest` (**30**) : zone active, recadrages, bornes mm/px, calibration intrinsèque (exacte, décentrée, incohérente).
 - `core.distance.KnownSizesTest` (**16**) : chaque défaut du direct est calibré au sténopé **ou**
   explicitement profondeur (`DEPTH_ONLY` — voir le KDoc de `KnownSizes`) ; extérieur couvert
   (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage` 1,50 · `gate`/`portail` 1,75,
   `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions (« clôture grillagée »),
   concept inconnu ; postures assises et sous-types de véhicules ; tolérances par classe et poids de fusion.
-- `core.distance.DistanceMeterTest` (**22**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
+- `core.distance.DistanceMeterTest` (**29**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
   deux bords, lissage doux vs bond, oubli après silence, mesure réelle dans les bornes, occlusion (masquée
   écartée, partielle/égaux gardés), confiance croissante avec la boîte, bbox masque (mesure, coupée),
-  repli EMA, reset Kalman, prédictions (piste, maintien, oubli, vide).
+  repli EMA, reset Kalman, prédictions (piste, maintien, oubli, vide), sol coupé/rouvert en lunettes-live (3, D3).
 - `core.distance.DistanceKalmanTest` (**10**) : convergence, vitesse, outlier, saut, timeout, confiance,
   prédiction (extrapolation, label/boîte/confiance, inconnue/périmée/passée).
 - `core.mask.MaskDetectionsTest` (**9**) : poly (exact, réduit, hors cadre), bits (exact, épars, dimensions),
@@ -233,10 +233,14 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   son coin, empilement vers le bas quand deux pastilles se recouvrent, deux pastilles éloignées qui ne bougent
   pas, pastille plus large que le cadre), bord touché par le fil (`leadY`), saisie du champ (± bornes),
   pastilles du bas, préfixe du concept.
-- `app.isee.IseeDistancesTest` (**5**) : pastilles d'une photo segmentée — personne haute mesurée (≈ 3,9 m),
-  une pastille par objet, concept inconnu ignoré, photo vide ou de taille nulle, boîte coupée par le bord bas
-  non mesurée.
+- `app.isee.IseeDistancesTest` : **retiré de cette liste le 2026-11-01** — le fichier n'existe pas dans cet arbre (liste du 31/10 périmée).
 - `app.isee.LiveProbeTextTest` : ligne d'état REC avec `plus proche ≈ 1,1 m` et détail `distances :` trié.
+- `app.glasses.GlassesLensTest` (**10**, D1) : modèle → champ (66/66/70/95/68°), resserrement au flux 9:16, repli sans modèle, sonde sans SDK.
+- `core.distance.CropGeometryTest` (**9**, D2) : 16:9 du HIGH, remplit-la-vue, FOV effectif (H′ = 68°, V′ = 41,6°), piège du mauvais axe (−44 %), live 1000×1600, mapping des boîtes, crops impossibles.
+- `app.glasses.GlassesSelectTest` (**6**, D5) : sélection lunettes vs téléphone (réglages indépendants, étage le plus mesuré, profil par modèle, MEDIUM/HIGH même FOV, ratio des focales, forcé via les réglages).
+- `core.distance.CropFovLimitsTest` (**5**, D5) : FOV dégénérés, crop minuscule refusé, centre hors crop refusé, MEDIUM bout en bout, plein cadre.
+- `app.isee.ProbeFrameTest` (+**3**, D5) : pose effective (IMU si sol ouvert, `null` si sol coupé).
+- `core.distance.PhoneLensDefaultsTest` (**6**, D5) : non-régression des défauts téléphone (67°, focales 512/320 px, bornes, demi-tangente).
 - Recette sur téléphone réel (1220×2712, relevé non rejoué ici) : ligne d'état
   « Direct · 1,5 ips · 635 ms · 4 objets · plus proche 2,0 m · NVIDIA A100 », pastilles
   « ≈ 2,0 m / ≈ 2,1 m / ≈ 2,3 m » superposées aux masques, section Réglages « Distances » rendue.

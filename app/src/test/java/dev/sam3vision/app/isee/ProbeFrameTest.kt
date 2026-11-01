@@ -1,9 +1,11 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,5 +40,28 @@ class ProbeFrameTest {
             detectionsAndReadingsOf(DistanceMeter(), frame(listOf(car), width = 0, height = 0))
         assertTrue(noSizeDetections.isEmpty())
         assertTrue(noSizeReadings.isEmpty())
+    }
+
+    @Test
+    fun `sol ouvert, la pose effective est la pose IMU`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f, 0.1f)
+        assertEquals(CameraPose(1.5f, 0.1f), meter.effectivePose())
+    }
+
+    @Test
+    fun `sol coupe en lunettes-live, la pose effective est nulle`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f, 0.1f)
+        meter.groundPlaneEnabled = false
+        assertNull(meter.effectivePose())
+    }
+
+    @Test
+    fun `sans pose, la pose effective est nulle sol ouvert ou coupe`() {
+        val meter = DistanceMeter()
+        assertNull(meter.effectivePose())
+        meter.groundPlaneEnabled = false
+        assertNull(meter.effectivePose())
     }
 }
