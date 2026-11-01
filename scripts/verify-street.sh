@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Recette rue en UNE prise (~15 min) : destination dictée à 200 m, guidage
-# in-app Valhalla, obstacles imposés (poteau, poubelle/benne, panneau bas,
-# passage piéton, animal si possible), virage, traversée auto au rappel
-# proche, arrivée. L'intégrateur marche et parle, le script capture
-# l'observable (phrases entendues horodatées, écran, crash) et rend la
-# checklist. Téléphone via le verrou ~/bin/phone, jamais de force
-# (PHONE_WAIT=0 : occupé = on s'arrête, on relance plus tard).
+# Recette rue v4 en UNE prise (~15 min) : destination dictée (« mode GPS »),
+# obstacles en clips anglais (voiture, humain, mobilier, bordure, escalier,
+# passage piéton), virage synthèse, traversée (mode + verdict), rappel GPS,
+# repli, arrivée. Miroir exact de docs/RECETTE-RUE.md (les phrases E2E sont
+# recopiées à l'identique ici et dans la fiche — § 8 de test_scripts.sh).
+# L'intégrateur marche et parle, le script capture l'observable (phrases
+# entendues horodatées, écran, crash) et rend la checklist. Téléphone via le
+# verrou ~/bin/phone, jamais de force (PHONE_WAIT=0 : occupé = on s'arrête,
+# on relance plus tard).
 # Env : PHONE_SERIAL (défaut 2c6852ac), APK, ADB, PHONE_BIN, PHONE_WAIT, EXPECT_REF (défaut master).
 set -euo pipefail
 export LC_ALL=C.UTF-8 LANG=C.UTF-8
@@ -15,16 +17,17 @@ export LC_ALL=C.UTF-8 LANG=C.UTF-8
 read -r -d '' USAGE <<'EOF' || true
 Usage : verify-street.sh [--help]
 
-Recette rue en une prise (~15 min), sur téléphone réel (jamais d'émulateur :
-GPS, Valhalla et marche réelle ne s'y prêtent pas). Installe l'APK, vérifie
-que le build vient du HEAD attendu sur origin (EXPECT_REF, défaut master —
-règle ISEE-TEST-MASTER-SEUL, qui se lit « HEAD de la ref recettée »),
-puis déroule le parcours — dictée d'une destination à ~200 m, obstacles,
-virage, traversée, arrivée — en demandant à l'intégrateur de marcher et de
-noter chaque phrase entendue, et imprime la checklist remplie (observé +
-réponses, horodatés). Script de diagnostic : il raconte ce qu'il voit, il
-ne valide pas par un code de sortie (seule une panne d'infrastructure —
-appareil, APK, SHA, verrou — interrompt).
+Recette rue v4 en une prise (~15 min), sur téléphone réel (jamais
+d'émulateur : GPS, Valhalla et marche réelle ne s'y prêtent pas). Installe
+l'APK, vérifie que le build vient du HEAD attendu sur origin (EXPECT_REF,
+défaut master — règle ISEE-TEST-MASTER-SEUL, qui se lit « HEAD de la ref
+recettée »), puis déroule le parcours v4 — dictée « mode GPS », obstacles
+en clips anglais, virage, traversée, rappel GPS, repli, arrivée — en
+demandant à l'intégrateur de marcher et de noter chaque phrase entendue,
+et imprime la checklist remplie (observé + réponses, horodatés). Script de
+diagnostic : il raconte ce qu'il voit, il ne valide pas par un code de
+sortie (seule une panne d'infrastructure — appareil, APK, SHA, verrou —
+interrompt). Miroir de docs/RECETTE-RUE.md (phrases E2E à l'identique).
 
 Tout le téléphone passe par le verrou ~/bin/phone (règle AGENTS.md §10,
 jamais d'adb nu), avec PHONE_WAIT=0 : téléphone occupé = arrêt immédiat,
@@ -235,105 +238,126 @@ main() {
   sleep 9
   back_to_isee
   note "  clés voix renseignées (ElevenLabs + voix) : $(ask 'Réglages iSee : clé ElevenLabs et voix renseignées')"
-  note "  bascule « Guider vers la destination confirmée » sur OUI : $(ask 'Réglages iSee : la bascule guidage est-elle sur OUI')"
-  note "  bascule « Guider tout droit (caméra iSee) » activée : $(ask 'Réglages iSee : la bascule tout-droit est-elle activée')"
   note "  URL Valhalla renseignée (routeBaseUrl) : $(ask 'Réglages iSee : l\u2019URL Valhalla est-elle renseignée')"
   note "  terrain (IdF, GPS, réseau, jour) : $(ask 'Êtes-vous en Île-de-France, GPS fixé, réseau OK, de jour')"
-  note "  parcours (~200 m, poteau + poubelle + panneau bas + passage piéton sur le trajet) : $(ask 'Le parcours de ~200 m passe-t-il par ces obstacles')"
+  note "  parcours (~200 m, voiture + humain + poteau + mur + bordure + escalier + passage piéton + virage) : $(ask 'Le parcours de ~200 m passe-t-il par ces imposés')"
 
-  note "### 1. dictée (destination à ~200 m)"
+  note "### 1. dictée ordre (« mode GPS I want to go to X »)"
   require_phone
   local dest=""
   printf '  Destination choisie (adresse à ~200 m, Île-de-France) : '
   read -r dest || dest=""
   note "  destination : ${dest:-non saisie}"
+  dire "mode GPS I want to go to ${dest:-...}"
+  sleep 4
+  hear "confirmation (attendu « Guidance started. », pas de question LLM)"
+  note "  écran après dictée : $(ui)"
+  note "  crash iSee : $(crashes) | pid : $(call "pidof $PKG" | tr -d '\r ')"
   dire "je veux aller à ${dest:-...}"
   sleep 4
-  note "  écran après dictée : $(ui)"
-  note "  transcription affichée : $(ask 'La transcription de votre dictée s\u2019affiche-t-elle')"
-  note "  crash iSee : $(crashes) | pid : $(call "pidof $PKG" | tr -d '\r ')"
+  note "  contre-essai sans « mode » parti au LLM (pas de guidage) : $(ask 'Sans « mode », êtes-vous parti en question LLM (pas de guidage)')"
 
-  note "### 2. confirmation (question + « Démarrer »)"
-  hear "question de confirmation (« Do you really want to go to … ? »)"
-  printf '\n  Répondez « yes » (ou tapez « Démarrer »).\n'
-  printf '  Entrée quand le guidage a démarré : '
+  note "### 2. voiture (« Car. », 4 s, garée = silence)"
+  require_phone
+  printf '\n  Marchez vers la destination. Une voiture bouge à < 20 m.\n'
+  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
   local _junk=""
   read -r _junk || _junk=""
-  hear "départ (« Navigation vers … »)"
-  note "  écran : $(ui)"
+  hear "voiture (attendu « Car. » ou « Cars. », sans cadran ni distance, 4 s)"
+  note "  garée = silence : $(ask 'Une voiture garée est-elle restée silencieuse')"
 
-  note "### 3. poteau (« Attention au poteau, à … heure »)"
+  note "### 3. humain (« Person. », 2 s, « Stop. » à ≤ 2 m)"
+  printf '\n  Approchez une personne (< 10 m), dont un passage à ≤ 2 m.\n'
+  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
+  _junk=""
+  read -r _junk || _junk=""
+  hear "humain (attendu « Person. » + heure du cadran + distance, 2 s)"
+  hear "imminent ≤ 2 m (attendu « Stop. » immédiat)"
+
+  note "### 4. mobilier (« Pole. », 2 s / 4 s)"
+  printf '\n  Continuez. Poteau, lampadaire, panneau, grillage, mur, barrière à < 6 m.\n'
+  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
+  _junk=""
+  read -r _junk || _junk=""
+  hear "mobilier (attendu le nom seul « Pole. », « Wall. », …, 2 s poteaux/mobilier, 4 s grillages/murs/barrières)"
+  note "  capture : $(shot mobilier)"
+
+  note "### 5. bordures (« Curb up. » / « Curb down. », 2 s)"
+  printf '\n  Montée puis descente de bordure.\n'
+  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
+  _junk=""
+  read -r _junk || _junk=""
+  hear "bordures (attendu « Curb up. » puis « Curb down. », 2 s)"
+
+  note "### 6. escalier (jalons 4/2/1 + marches)"
   require_phone
-  printf '\n  Marchez vers la destination. Approchez un poteau dans le couloir (≤ 4 m).\n'
-  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
+  printf '\n  Marchez vers un escalier.\n'
+  printf '  Entrée après le passage : '
   _junk=""
   read -r _junk || _junk=""
-  hear "poteau (attendu « Attention au poteau, à … heure »)"
-  note "  délai annonce < 1 s après confirmation : $(ask 'L\u2019annonce est-elle partie moins d\u2019une seconde après confirmation (2ᵉ frame)')"
-  note "  mot de côté aussi entendu (« gauche. »/« droite. ») : $(ask 'Un mot de côté a-t-il aussi été dit')"
-  note "  capture : $(shot poteau)"
+  hear "escalier (attendu jalons « Stairs up, 4 meters. », … + marches « Five. Steps. »)"
 
-  note "### 4. poubelle ou benne (position ou prudence)"
-  printf '\n  Continuez. Passez près d\u2019une poubelle (ou d\u2019une benne).\n'
-  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
+  note "### 7. passage piéton (« Crosswalk ahead », 1 fois par vue)"
+  printf '\n  Continuez vers le passage piéton.\n'
+  printf '  Entrée après le passage : '
   _junk=""
   read -r _junk || _junk=""
-  hear "poubelle/benne (attendu position « … à N mètres » et/ou mot de côté)"
-  note "  délai annonce < 1 s après confirmation : $(ask 'L\u2019annonce est-elle partie moins d\u2019une seconde après confirmation')"
+  hear "passage (attendu « Crosswalk ahead/left/right. » 1 fois par vue, « Aligned with the crosswalk. » au changement, « On the crosswalk. » 1 fois)"
+  note "  doublon : $(ask 'Avez-vous entendu un doublon (annonce répétée sans changement)')"
 
-  note "### 5. panneau bas (mot de côté)"
-  printf '\n  Continuez. Passez sous ou près d\u2019un panneau bas.\n'
-  printf '  Entrée quand l\u2019annonce est passée (ou après 30 s sans rien) : '
-  _junk=""
-  read -r _junk || _junk=""
-  hear "panneau bas (attendu mot de côté « gauche. »/« droite. »)"
-  note "  délai annonce < 1 s après confirmation : $(ask 'L\u2019annonce est-elle partie moins d\u2019une seconde après confirmation')"
-
-  note "### 6. animal (si possible, facultatif)"
-  note "  animal rencontré : $(ask 'Un animal (chien, chat) est-il passé dans le champ')"
-  hear "animal (attendu position « chien/chat à N mètres », ou « non rencontré »)"
-
-  note "### 7. virage (consigne + 0 chevauchement)"
+  note "### 8. virage (manœuvre synthèse + 0 chevauchement)"
   require_phone
   printf '\n  Continuez jusqu\u2019au premier virage de l\u2019itinéraire.\n'
   printf '  Entrée quand la consigne est passée : '
   _junk=""
   read -r _junk || _junk=""
-  hear "virage (attendu « Continuez dans cette direction[, rue X] » puis « Tournez à …[, rue X] », sans distance)"
+  hear "virage (attendu manœuvre en synthèse réseau)"
   note "  0 chevauchement virage/obstacle : $(ask 'Virage et obstacle ne se sont-ils jamais parlé dessus (jamais deux voix)')"
   note "  capture : $(shot virage)"
 
-  note "### 8. traversée (préavis, rappel proche, feu, retour)"
-  printf '\n  Continuez jusqu\u2019au passage piéton de l\u2019itinéraire.\n'
-  printf '  Entrée au préavis : '
+  note "### 9. traversée (« Crossing mode on. », verdict, GPS/chat muets)"
+  printf '\n  Au passage piéton de l\u2019itinéraire, dictez « mode crossing on ».\n'
+  dire "mode crossing on"
+  sleep 3
+  hear "mode (attendu « Crossing mode on. », chat et GPS muets, dictée active)"
+  hear "verdict (attendu « Cross. » / « Don't cross. », 3 s, changement immédiat)"
+  note "  humains (101) puis bordures (102) après le verdict : $(ask 'Humains puis bordures ont-ils parlé après le verdict')"
+  printf '  Traversez (si le verdict le permet). Entrée une fois passé : '
   _junk=""
   read -r _junk || _junk=""
-  hear "préavis (attendu « Passage protégé dans … »)"
-  printf '  Avancez jusqu\u2019au rappel proche. Entrée quand le mode parle : '
-  _junk=""
-  read -r _junk || _junk=""
-  note "  relais au rappel proche (« Mode traversée activé. », progression tue) : $(ask 'Avez-vous entendu « Mode traversée activé »')"
-  hear "feu (attendu « Vert, traversez. » / « Rouge, attendez. » / « Doute, attendez. »)"
-  printf '  Traversez (si le feu le permet). Entrée une fois passé : '
-  _junk=""
-  read -r _junk || _junk=""
-  note "  fin de traversée (« Traversée terminée. ») : $(ask 'Avez-vous entendu « Traversée terminée »')"
-  note "  retour au libre après (consigne route ou « Tout droit. ») : $(ask 'Le guidage a-t-il repris après la traversée')"
+  dire "mode crossing off"
+  sleep 2
+  hear "retour (attendu « Crossing mode off. », le guidage reprend)"
   note "  capture : $(shot traversee)"
 
-  note "### 9. arrivée (moteur embarqué)"
+  note "### 10. rappel GPS (15 s de silence)"
   require_phone
+  printf '\n  Marchez 15 s sans annonce.\n'
+  printf '  Entrée après le rappel (ou après 30 s sans rien) : '
+  _junk=""
+  read -r _junk || _junk=""
+  hear "rappel (attendu dernière consigne répétée + distance restante, synthèse)"
+
+  note "### 11. repli (300 ms de silence)"
+  hear "repli (attendu « Left. » / « Right. » / « Straight. », une fois)"
+
+  note "### 12. arrivée (une seule fois)"
   printf '\n  Marchez jusqu\u2019à la destination.\n'
   printf '  Entrée quand l\u2019arrivée est annoncée : '
   _junk=""
   read -r _junk || _junk=""
-  hear "arrivée (attendu « Vous êtes arrivé à … »)"
+  hear "arrivée (attendue une seule fois)"
   note "  crash iSee : $(crashes) | pid : $(call "pidof $PKG" | tr -d '\r ')"
   call "am start -n $PKG/.MainActivity" >/dev/null || :
   sleep 4
   note "  retour iSee : $(ui | cut -c1-120)"
   note "  capture : $(shot arrivee)"
 
+  note "### 13. interdits v4 (0 bus/vélo/camion/moto, 0 clés dehors, 0 Maps, 0 FR)"
+  note "  aucun bus/vélo/camion/moto entendu : $(ask 'Avez-vous entendu bus, vélo, camion ou moto')"
+  note "  aucune clé dehors : $(ask 'Avez-vous entendu les clés dehors')"
+  note "  aucun passage Google Maps : $(ask 'Le guidage est-il passé par Google Maps')"
+  note "  aucune voix FR hors chat/GPS : $(ask 'Avez-vous entendu du français hors chat et GPS')"
   note ""
   note "Fin — procès-verbal : $REPORT (captures : ${EVIDENCE}/shot-*.png)"
 }
