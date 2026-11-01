@@ -3,6 +3,34 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : cycles sans heure, et mouvements joués en mp3 enregistré (branche `fix/mouvement-clip-mp3`)
+
+- **Fait** : suite de l'ordre du 01/11 (« ne me dis plus l'emplacement de la
+  voiture si tu vois une voiture qui bouge »), complété le même jour :
+  « supprime juste l'annonce de la position avec les heures et que cela soit
+  un mp3 enregistré ». (1) `CycleText.movingPhrase` perd son `centerX` : un
+  vélo ou une trottinette qui roule dit « Attention, vélo en mouvement. » /
+  « Attention, bicycle moving. », sans heure (l'arrêt garde la sienne). (2)
+  Comme la phrase ne varie plus, elle est **enregistrée** : les mouvements de
+  véhicules et de cycles sont joués depuis le pack voix (`vehicle_car_moving`,
+  `cycle_trott_moving`… — mp3 embarqués, < 100 ms, zéro réseau), via
+  `VehicleStateText.clipIdFor` / `CycleText.clipIdFor`, une table unique lue
+  par `recordedClipId` (`app/isee/RecordedPhrase.kt`) que partagent la voix
+  normale et la Traversée. Clip absent (voix changée) → synthèse mise en cache
+  sous la même clé. Le stop reste en voix de sécurité, pas en clip ; l'arrêt,
+  le stationnement et le pluriel (mesure ou compte) restent en synthèse.
+- **Preuve** : `:core:testDebugUnitTest` 3 016 verts,
+  `:app:testDebugUnitTest` 1 838 verts (0 échec), dont 1 test
+  `CycleWatcherTest` (`mouvement enregistre - arret situe en synthese`), 1
+  `VehicleStateTextTest` (clips) et 5 neufs `ProximityVoiceRecordedTest` (mp3
+  joué sans synthèse pour voiture et cycle, synthèse pour l'arrêt situé et le
+  pluriel, repli sans pack, table phrase → clip) ; `check-kotlin-limits` OK
+  (`ProximityVoice` 499 l., `ProbeWiring` 493 l., nouveau `RecordedPhrase.kt`),
+  voicepack / isee-design / budget / voice-nav-doc OK,
+  `scripts/test_scripts.sh` 176/176. Docs : § 32 de `VOIX-DANGER.md` réécrit,
+  `VOICEPACK.md` (état de mouvement = clip, ce qui n'est jamais un clip).
+  Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — iSee : une voiture qui roule ne dit plus où elle est (branche `fix/vehicule-mobile-sans-emplacement`)
 
 - **Fait** : ordre user « ne me dis plus l'emplacement de la voiture si tu

@@ -35,9 +35,9 @@ import kotlin.coroutines.coroutineContext
  * signal [VoiceOfflineFallback].
  *
  * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test —
- * miroir `IseePlayback`), [clips] le pack voix des mots doux (clip local
- * < 100 ms, synthèse + cache sinon), [routeSpeaking] dit si la voix route
- * parle. [flushPending] redit la phrase gardée dès le silence, dans
+ * miroir `IseePlayback`), [clips] le pack voix (mots doux **et** phrases fixes
+ * d'état, clip < 100 ms — voir `RecordedPhrase.kt`), [routeSpeaking] dit si la
+ * voix route parle. [flushPending] redit la phrase gardée dès le silence, dans
  * [PENDING_TTL_MS] ; l'arrivée sur le passage ([onArrivalPhrase]) passe en
  * dernier — la plus basse priorité de toutes les annonces.
  *
@@ -338,24 +338,18 @@ class ProximityVoice(
     }
 
     /**
-     * Urgence admise (jamais dite récemment, jamais un stop déjà dit) : voix
-     * de sécurité aussitôt (grave, hors-ligne, coupe tout — [SafetyVoice]),
-     * mémorisée comme le doux (redite après [REPEAT_TTL_MS] si elle dure).
-     * Orale seule : aucun sous-titre ni fanion (le TTS système ne rend pas
-     * de fin, un fanion sans fin muterait la voix douce — voir `cutSpeaking`).
-     * Sans sécurité câblée (tests) : synthèse immédiate, sans garde — une
-     * urgence ne se perd jamais. L'urgent échappe à la redite ([cadence] :
-     * `urgent = true` court-circuite la fenêtre de 20 s, seul son propre
-     * silence de 2 s est tenu) ; [trackId] garde la clé de la personne.
+     * Urgence admise : voix de sécurité aussitôt (grave, hors-ligne, coupe tout
+     * — [SafetyVoice]), orale seule (aucun sous-titre ni fanion : le TTS système
+     * ne rend pas de fin). Sans sécurité câblée (tests) : synthèse immédiate —
+     * une urgence ne se perd jamais. L'urgent échappe à la redite (seule sa
+     * fenêtre de 2 s est tenue) ; [trackId] garde la clé de la personne.
      */
     private suspend fun speakUrgent(phrase: String, trackId: Int? = null) {
         if (phrase.isBlank()) return
         val cut = safety
         if (cut != null) {
             cut.speak(phrase)
-            lastPhrase = phrase
-            lastPhraseAtMs = nowMs()
-            cadence.record(phrase, nowMs(), urgent = true, trackId = trackId)
+            markSpoken(phrase, trackId, urgent = true, subtitle = false)
             return
         }
         player.stop()
@@ -364,23 +358,34 @@ class ProximityVoice(
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase).getOrElse { return }
         coroutineContext.ensureActive()
         if (bytes.isEmpty()) return
-        lastPhrase = phrase
-        lastPhraseAtMs = nowMs()
-        cadence.record(phrase, nowMs(), urgent = true, trackId = trackId)
-        cutForUserDone = false
-        onSpeaking(phrase)
+        markSpoken(phrase, trackId, urgent = true)
         player.play(bytes).onFailure { onSpeaking("") }
     }
 
+    /** Marquée dite (redite, cadence) ; sous-titre sauf voix de sécurité, orale seule. */
+    private fun markSpoken(phrase: String, trackId: Int?, urgent: Boolean = false, subtitle: Boolean = true) {
+        lastPhrase = phrase
+        lastPhraseAtMs = nowMs()
+        cadence.record(phrase, nowMs(), urgent = urgent, trackId = trackId)
+        if (!subtitle) return
+        cutForUserDone = false
+        onSpeaking(phrase)
+    }
+
     /**
-     * Synthèse + lecture d'une phrase douce admise ; `true` si parlée (ou
-     * confiée au TTS système). Sans clé, ou voix réseau en panne (401/402/429) :
-     * repli système ([VoiceOfflineFallback]), jamais de silence quand un moteur est
-     * câblé. Mémorisée au moment de parler seulement. [trackId] : la personne
-     * que la phrase concerne, pour la clé de [cadence].
+     * Lecture d'une phrase douce admise (clip enregistré d'abord, synthèse ensuite) ; `true` si parlée
+     * ou confiée au TTS système. Mémorisée au moment de parler seulement ; [trackId] : clé de [cadence].
      */
     private suspend fun speak(phrase: String, current: Settings, trackId: Int? = null): Boolean {
         coroutineContext.ensureActive()
+        // Phrase fixe (mouvement, stop — ordre user du 01/11) : clip du pack, zéro réseau.
+        val recorded = recordedFileFor(phrase, current, clips)
+        if (recorded != null) {
+            if (!canPlay() || systemBusy()) return false
+            markSpoken(phrase, trackId)
+            player.playFile(recorded).onFailure { onSpeaking("") }
+            return true
+        }
         if (!current.ttsConfigured) return offline.speak(phrase, current)
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { error ->
@@ -388,6 +393,9 @@ class ProximityVoice(
             }
         coroutineContext.ensureActive()
         if (bytes.isEmpty() || !canPlay() || systemBusy()) return false
+        // Une version parlée d'une phrase fixe devient le clip local : la
+        // prochaine fois, zéro réseau (le pack embarqué reste prioritaire).
+        recordedClipId(phrase)?.let { clips?.put(it, current.speechLanguage, current.ttsVoiceId, bytes) }
         // Mémorisée au moment de parler seulement : un avalement transitoire
         // (chat, route, système, porte, synthèse) ne tait pas les réémissions.
         lastPhrase = phrase
@@ -400,20 +408,13 @@ class ProximityVoice(
     }
 
     /**
-     * Mot du guidage (`GuidanceWord`) : doux en clip local quand le pack l'a
-     * (< 100 ms, zéro réseau), sinon synthèse réseau mise en cache pour la
-     * suite (repli système sans clé ou sur 401/402/429, comme [onPhrase]).
-     * Directions douces redites en continu (ordre user du 31/10) : le même
-     * mot reparle à chaque émission ; le stop part en voix de sécurité
-     * ([speakUrgent], unique, jamais répété — ses clips sont l'héritage
-     * d'avant, l'urgent ne les joue plus). Mêmes garde-fous que [onPhrase]
-     * (urgent coupe) : seul ce qui a vraiment parlé est mémorisé — un mot
-     * avalé par un garde transitoire ne tait pas ses réémissions. [queue] :
-     * le mot doux tué part en file et se redit par [flushPending] (en
-     * synthèse, pas en clip : parlé lentement vaut mieux que perdu).
-     * [trackId] : la personne suivie que [text] concerne (même clé de
-     * cadence que [onPhrase], une personne = un tour) ; `null` par défaut,
-     * aucun appelant cassé.
+     * Mot du guidage : clip local quand le pack l'a (< 100 ms, zéro réseau),
+     * sinon synthèse mise en cache (repli système sans clé ou sur 401/402/429).
+     * Le stop part en voix de sécurité ([speakUrgent], unique, jamais répété) ;
+     * les autres mots reparlent à chaque émission (ordre user du 31/10). Seul
+     * ce qui a vraiment parlé est mémorisé. [queue] : le mot tué attend le
+     * silence et se redit en synthèse ; [trackId] : clé de cadence (une
+     * personne = un tour, `null` = comme avant le patch P0).
      */
     suspend fun speakWord(
         clipId: String,
