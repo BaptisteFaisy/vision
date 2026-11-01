@@ -1,6 +1,8 @@
 package dev.sam3vision.app
 
+import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.media.MediaPlayer
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.iseedesign.SpeechPosition
@@ -31,6 +33,8 @@ enum class PlaybackEnd { Done, Stopped }
  * (`preferredDevice`) : c'est ainsi que la voix des lunettes sort dans la paire
  * quand la session est ouverte ([dev.sam3vision.app.glasses.GlassesVoiceRoute]),
  * sans toucher au reste de l'audio du téléphone. `null` = sortie par défaut.
+ * Attributs parole d'accessibilité sur flux musique, comme le banc prouvé sur
+ * paire (`bt_a2dp`, 27/10) : la production rejoue le chemin qui s'entend.
  */
 class SpeechPlayer(
     private val dir: File,
@@ -113,6 +117,7 @@ class SpeechPlayer(
     private fun playBlocking(file: File, onDone: () -> Unit, onError: (String) -> Unit) {
         val mp = MediaPlayer()
         player = mp
+        mp.setAudioAttributes(audioAttributes())
         // Sortie de la phrase : relue ici, jamais mémorisée à la construction — la
         // paire des lunettes apparaît en Bluetooth quelques secondes après la session.
         // Un appareil refusé par la plateforme laisse la sortie par défaut : le son
@@ -130,6 +135,17 @@ class SpeechPlayer(
         runCatching { mp.playbackParams = mp.playbackParams.setSpeed(speed) }
         mp.start()
     }
+
+    /**
+     * Accessibilité + parole : la voix doit s'entendre et se comprendre dehors.
+     * Mêmes attributs que le banc (`bench/GlassesVoice`) : le flux musique y a
+     * prouvé la sortie A2DP de la paire, aucun mode global n'est touché.
+     */
+    private fun audioAttributes(): AudioAttributes = AudioAttributes.Builder()
+        .setLegacyStreamType(AudioManager.STREAM_MUSIC)
+        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
 
     /** Arrête et libère la lecture en cours ; une file en attente rend [PlaybackEnd.Stopped]. */
     fun stop() {

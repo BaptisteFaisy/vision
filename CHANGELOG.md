@@ -56,6 +56,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `:core:testDebugUnitTest` + `:app:testDebugUnitTest` verts sur
   r630 (dont `AttentionCadenceTest` 7, `ProximityVoiceUserTest` 7,
   `SoftHeldForUserTest` 4) ; `check-kotlin-limits.py` OK.
+## 2026-11-01 — iSee : voix audible dans les lunettes, SCO exclu (branche `fix/isee-voix-lunettes-inaudible`)
+
+- **Ordre user** : sur Xiaomi avec les lunettes Meta, son au max, le
+  texte s'affichait mais la voix d'iSee ne s'entendait pas ; sans les
+  lunettes, la voix sortait par le téléphone.
+- **Cause** : la sortie Bluetooth était choisie BLE d'abord, et le nom
+  de la paire pouvait retenir le canal SCO « Hands-Free » (appel) :
+  le flux musique du `MediaPlayer` ne s'y rend pas, sans aucune
+  erreur — silence total avec lecture « réussie ».
+- **Fait** : A2DP d'abord (seule sortie prouvée sur paire, `bt_a2dp`
+  27/10), SCO jamais choisi (`null` = haut-parleur), homonymes au
+  meilleur type ; `SpeechPlayer` rejoue les attributs du banc prouvé
+  (parole d'accessibilité, flux musique).
+- **Preuve** : `:app:testDebugUnitTest` 1 678 verts (0 échec, dont 11 `GlassesAudioRouteTest`, rouge-avant
+  5/11 constaté) ; `check-kotlin-limits.py` OK. À entendre sur paire
+  (`adb logcat -s GlassesVoice` dit la sortie choisie).
 
 ## 2026-11-01 — iSee : voix danger aux humains, poteau muet (branche `hazard-person-not-pole`)
 
