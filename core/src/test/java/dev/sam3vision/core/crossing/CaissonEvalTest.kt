@@ -6,21 +6,22 @@ import org.junit.Test
 
 /**
  * Éval JVM détection→verdict sur caissons type SAM + rappel petits objets
- * versionné (`feuxevel/RECALL-v2.json`).
+ * versionné (`feuxevel/RECALL-v3.json`).
  *
  * Les 6 cas `green-h*` balayent la taille du caisson (64 → 8 px de haut) :
- * rappel piné 3/6 depuis la v2 (31/10, ordre user : détection au plus
- * large, élancement 1,0 — h32/h24/h16 admis, h64 refusé par l'arbre,
- * h12/h08 trop petits). Les cas `real-*` prouvent que la chaîne rend du
- * vert sur de vrais crops.
+ * rappel piné 5/6 depuis la v3 (01/11 : souche green_frac + vert
+ * cyan/délavé — h32/h24/h16/h12/h08 admis, h64 refusé par la porte).
+ * Les cas `real-*` prouvent que la chaîne rend du vert sur de vrais crops.
+ * Le disque synthétique est admis (A2 levé 31/10, ordre user) : piné vert
+ * dans le doré, exclu du 0-vert qui ne couvre que rouges/éteints.
  * Joue dans `:core:testDebugUnitTest` (CI existante, aucun workflow ajouté).
  */
 class CaissonEvalTest {
 
     @Test
-    fun `la chaine detection-verdict suit le dore v2`() {
+    fun `la chaine detection-verdict suit le dore v3`() {
         val golden = loadGolden(javaClass.classLoader)
-        assertEquals("version du doré", 2, golden.version)
+        assertEquals("version du doré", 3, golden.version)
         val cases = evalCases(javaClass.classLoader)
         assertEquals("cas dorés", golden.verdicts.keys.sorted(), cases.map { it.id }.sorted())
         for (c in cases) {
@@ -29,7 +30,7 @@ class CaissonEvalTest {
     }
 
     @Test
-    fun `le rappel petits objets vaut le dore v2`() {
+    fun `le rappel petits objets vaut le dore v3`() {
         val cases = evalCases(javaClass.classLoader)
         val verdicts = cases.associate { it.id to runChain(it) }
         val golden = loadGolden(javaClass.classLoader)
@@ -42,14 +43,14 @@ class CaissonEvalTest {
         assertEquals("rappel verts", golden.recall["synthetic_green"], recallOf(greens, verdicts))
         assertEquals("rappel grands", golden.recall["synthetic_green_grand"], recallOf(greens.filter { heightOf(it) > 24 }, verdicts))
         assertEquals("rappel petits", golden.recall["synthetic_green_petit"], recallOf(greens.filter { heightOf(it) <= 24 }, verdicts))
-        val reds = cases.filter { it.truth == CrossingState.Red }.map { it.id }
+        val reds = cases.filter { it.truth == CrossingState.Red && it.id !in ADMITTED_DISCS }.map { it.id }
         assertEquals("faux verts", golden.recall["false_green"], recallOf(reds, verdicts))
     }
 
     @Test
     fun `aucun vert sur les cas non verts`() {
         for (c in evalCases(javaClass.classLoader)) {
-            if (c.truth == CrossingState.Red) {
+            if (c.truth == CrossingState.Red && c.id !in ADMITTED_DISCS) {
                 assertEquals("${c.id} : jamais vert", CrossingState.Red, runChain(c))
             }
         }
