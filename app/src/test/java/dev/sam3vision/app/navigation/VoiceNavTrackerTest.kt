@@ -4,6 +4,7 @@ import dev.sam3vision.app.NO_ACCURACY_M
 import dev.sam3vision.core.nav.NavState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,5 +50,19 @@ class VoiceNavTrackerTest {
     fun `pas de reprise au repos ni apres l arrivee`() {
         assertFalse(shouldResume(listening = false, NavState.Idle))
         assertFalse(shouldResume(listening = false, NavState.Finished))
+    }
+
+    @Test
+    fun `cap suivi repris quand le gps marche`() {
+        val fix = navFixOf(48.85, 2.35, 8f, hasAccuracy = true, atMs = 1_000L, headingDeg = 90f)
+
+        assertTrue(fix.headingDeg == 90f)
+    }
+
+    @Test
+    fun `sans cap le fix reste muet sur la direction`() {
+        val fix = navFixOf(48.85, 2.35, 8f, hasAccuracy = true, atMs = 1_000L)
+
+        assertNull(fix.headingDeg)
     }
 }

@@ -9,8 +9,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Faux pilote : enregistre les appels, échec programmable. */
-private class FakeSpeakerDriver(var fail: Boolean = false) : TtsDriver {
+// Faux pilote : enregistre les appels, échec programmable.
+/** Faux pilote partagé des tests du haut-parleur (voir aussi `VoiceNavSpeakerRepeatTest`). */
+internal class FakeSpeakerDriver(var fail: Boolean = false) : TtsDriver {
     data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
 
     val calls = mutableListOf<Call>()

@@ -103,6 +103,22 @@ ne contient plus « dans X mètres ». Inchangés : demi-tour
 route dans X »), traversée (« Passage protégé dans X ») et arrivée
 (« Vous êtes arrivé à X »).
 
+### Rappel toutes les 5 s (consigne relative, sans rue)
+
+Entre les annonces du moteur, le rappel redit où aller au premier fix GPS
+qui suit l'échéance de 5 s (`core/.../nav/PeriodicGuidance.kt`,
+`VoiceNavEngineDriver.onTrackerFix`) : six ordres anglais, jamais de nom
+de rue ni de distance — « Continue straight ahead. », « Turn left. »,
+« Turn right. », « Turn around. », « Cross the street. »,
+« At the roundabout, follow the road. ». La consigne est relative au cap
+**suivi** GPS (direction de marche quand l'utilisateur avance) vers la
+prochaine manœuvre du tracé ; immobile ou sans cap, repli sur la consigne
+absolue de la manœuvre (traversée proche = « Cross the street. »). Une
+annonce moteur recale la cadence (pas de doublon) ; hors guidage et écart :
+silence ; dictée : la voix du user passe d'abord. L'orientation du
+téléphone (boussole) n'est pas utilisée : l'appareil est souvent en poche,
+son orientation ne dit pas où marche son porteur.
+
 ### Recette appareil — wording virage (protocole, non rejoué)
 
 ⚠️ **Protocole consigné sans téléphone** : aucune étape ci-dessous n'a été
@@ -116,8 +132,8 @@ Prérequis : build du HEAD de `origin/master`, `routeBaseUrl` renseignée
 
 1. Dicter une destination dont l'itinéraire commence par plus de 100 m
    puis un virage franc nommé (rue X). Attendu : une seule fois
-   « Continuez dans cette direction, rue X. », puis silence jusqu'au
-   carrefour (aucune répétition à distance intermédiaire).
+   « Continuez dans cette direction, rue X. », puis rappel toutes les 5 s
+   jusqu'au carrefour (« Turn left. » répété, sans rue ni distance).
 2. Marcher jusqu'au carrefour. Attendu : « Tournez à gauche, rue X. »
    (ou droite), **sans distance**, audible avant d'avoir à tourner.
 3. Pendant tout le trajet : vérifier qu'aucun virage franc entendu ne

@@ -287,6 +287,15 @@ object VoiceNavPhrases {
     /** Traversée passée : le guidage reprend (miroir `nav_voice_crossing_done`). */
     const val CROSSING_DONE = "Crossing finished."
 
+    /** Rappel 5 s : demi-tour (consigne relative, jamais de rue ni de distance). */
+    const val TURN_AROUND = "Turn around."
+
+    /** Rappel 5 s : traverser (immobile près d'un passage, jamais de rue). */
+    const val CROSS_NOW = "Cross the street."
+
+    /** Rappel 5 s : giratoire (repli sans cap, même verbe que [verb]). */
+    const val ROUNDABOUT_FOLLOW = "At the roundabout, follow the road."
+
     /** Traversée passée, voix française de compatibilité (clip pack `nav_crossing_done`). */
     const val CROSSING_DONE_FR = "Traversée terminée."
 
