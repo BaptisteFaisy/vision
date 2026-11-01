@@ -69,12 +69,14 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
             glassesFovDeg = prefs.getFloat(KEY_GLASSES_FOV, default.glassesFovDeg)
                 .takeIf { it > 0f } ?: default.glassesFovDeg,
-            maxObjects = ObjectLimits.clamp(
-                prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
-            ),
+            maxObjects = objectsOf(prefs, default),
             depthBackend = depthOf(prefs, default),
+            cameraHalBareEnabled = prefs.getBoolean(KEY_CAMERA_HAL_BARE, default.cameraHalBareEnabled),
         ).let { readShareSettings(prefs, it) }
     }
+
+    private fun objectsOf(prefs: SharedPreferences, default: Settings): Int =
+        ObjectLimits.clamp(prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects))
 
     private fun depthOf(prefs: SharedPreferences, default: Settings): DepthBackend =
         DepthBackend.fromName(prefs.getString(KEY_DEPTH_BACKEND, default.depthBackend.name))
@@ -125,6 +127,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putString(KEY_CAREGIVER_INVITE, s.caregiverInvite)
             .putInt(KEY_MAX_OBJECTS, s.objectsOnScreen)
             .putString(KEY_DEPTH_BACKEND, s.depthBackend.name)
+            .putBoolean(KEY_CAMERA_HAL_BARE, s.cameraHalBareEnabled)
             .apply()
     }
 
@@ -170,6 +173,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_SHARE_WRITE_KEY = "share_write_key"
         const val KEY_CAREGIVER_INVITE = "caregiver_invite"
         const val KEY_DEPTH_BACKEND = "depth_backend"
+        const val KEY_CAMERA_HAL_BARE = "camera_hal_bare_enabled"
 
         /** Lève si le Keystore est indisponible : le factory retombe alors sur un fichier chiffré. */
         internal fun createPrefs(context: Context): SharedPreferences {

@@ -23,6 +23,7 @@ import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.captureStamp
+import dev.sam3vision.core.settings.SettingsStoreFactory
 import dev.sam3vision.core.share.STREAM_FRAME_MS
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -192,6 +193,7 @@ class IseeCameraHost(private val context: Context) {
     suspend fun bind(owner: LifecycleOwner): String? {
         val provider = withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
         val view = boundPreview ?: return "Preview not attached yet"
+        val halBare = withContext(Dispatchers.IO) { readHalFlag() }
         // L'aperçu prend **sa** résolution : sans `ResolutionSelector` propre, CameraX le
         // faisait descendre dans la famille de l'analyse (320 px) et la carte l'étirait
         // ~3× — aplats de couleur de ~3 px mesurés sur le téléphone.
@@ -219,12 +221,17 @@ class IseeCameraHost(private val context: Context) {
                 analysis,
             )
             boundCamera = camera
-            applySensorTuning(camera)
+            CameraHalProcessing.resolveAndApply(halBare, camera)
             exposure.init(camera)
             recorder.attach(image, video)
             null
         }.getOrElse { "Camera binding failed: ${it.message}" }
     }
+
+    /** Drapeau HAL dépouillé des Réglages, `false` si illisible (jamais d'exception). */
+    private suspend fun readHalFlag(): Boolean = runCatching {
+        SettingsStoreFactory.create(context).load().cameraHalBareEnabled
+    }.getOrDefault(false)
 
     /** Analyseur de frames 480 px, une frame à la fois (les anciennes sont jetées). */
     private fun newAnalysis(): ImageAnalysis = ImageAnalysis.Builder()
