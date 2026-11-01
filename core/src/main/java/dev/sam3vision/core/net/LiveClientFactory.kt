@@ -29,10 +29,10 @@ fun liveClient(
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     masks: Boolean = true,
     /**
-     * Envoi WS binaire M1 (JPEG brut, −33 % à la montée). `false` par défaut : exige un
-     * serveur déployé qui sait lire le binaire — à activer après, jamais avant.
+     * Envoi WS binaire M1 (JPEG brut, −33 % à la montée). `true` par défaut : le
+     * serveur déployé lit le binaire, avec repli JSON si le serveur le refuse.
      */
-    binaryWs: Boolean = false,
+    binaryWs: Boolean = true,
 ): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks, binaryWs) { milliseconds ->
     OkHttpWsTransport(liveWsClient(milliseconds / 1000))
 }
@@ -46,7 +46,7 @@ internal fun liveClientWith(
     maskEdge: Int = 0,
     withDepth: Boolean = false,
     masks: Boolean = true,
-    binaryWs: Boolean = false,
+    binaryWs: Boolean = true,
     transportFor: (Long) -> WsTransport,
 ): LiveClient = WsLiveClient(
     baseUrl,
