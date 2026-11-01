@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
+import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.traverse.VehicleStateCue
@@ -60,21 +61,6 @@ object OutdoorLevel {
     const val FALLBACK = 12
 }
 
-/**
- * Traversée exclusive : verdict (feu piéton puis voitures — rouge ou
- * mouvement = ne passe pas, sinon passe), puis humains, puis bordures ;
- * chat et GPS muets.
- */
-object CrossingLevel {
-    /** Verdict : feu piéton puis voitures (voiture uniquement). */
-    const val VERDICT = 100
-
-    /** Humains en Traversée. */
-    const val HUMAN = 101
-
-    /** Bordures en Traversée. */
-    const val CURB = 102
-}
 
 /**
  * Vœu de parole d'une frame : [level] son niveau sur l'échelle, [text] sa
@@ -86,6 +72,7 @@ internal data class VoiceWish(
     val text: String,
     val key: String,
     val clipId: String? = null,
+    val clips: List<String> = emptyList(),
 )
 
 /**
@@ -115,7 +102,7 @@ internal fun vehicleWish(cue: VehicleStateCue?): VoiceWish? {
 internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
     if (crossingActive && cue.kind != HazardKind.PERSON) return null
-    val level = if (crossingActive) CrossingLevel.HUMAN else cue.level
+    val level = if (crossingActive) CrossingLevels.HUMAN else cue.level
     val clip = GuidanceWord.clipIdFor(cue.phrase).takeIf { cue.urgent }
     return VoiceWish(level, cue.phrase, cue.antiRepeatKey, clip)
 }
@@ -126,7 +113,7 @@ internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): Voice
 internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
     return VoiceWish(
-        if (crossingActive) CrossingLevel.CURB else OutdoorLevel.CURB,
+        if (crossingActive) CrossingLevels.CURB else OutdoorLevel.CURB,
         cue.phrase, AntiRepeat.KEY_CURB,
     )
 }
@@ -138,6 +125,6 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
 internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (wish == null || wish.text.isBlank()) return false
     if (!AntiRepeat.allow(wish.key, nowMs)) return false
-    VoiceBus.post(wish.level, wish.text, wish.clipId)
+    VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips)
     return true
 }

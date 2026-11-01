@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 
 import dev.sam3vision.app.DistanceLayer
@@ -34,15 +35,15 @@ import org.junit.Test
 
 /** Porte-parole faux : parole scriptée, dits enregistrés. */
 private class FakeSpeaker(var idleValue: Boolean = true) : VoiceBusSpeaker {
-    data class Said(val level: Int, val text: String, val clipId: String?)
+    data class Said(val level: Int, val text: String, val clipId: String?, val clips: List<String> = emptyList())
 
     val said = mutableListOf<Said>()
     var cuts = 0
 
     override fun idle(): Boolean = idleValue
 
-    override fun say(level: Int, text: String, clipId: String?) {
-        said += Said(level, text, clipId)
+    override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+        said += Said(level, text, clipId, clips)
     }
 
     override fun cut() {
@@ -104,9 +105,9 @@ class EchelleOverwriteTest {
 
     @Test
     fun `niveaux traversee verdict puis humains puis bordures`() {
-        assertEquals(100, CrossingLevel.VERDICT)
-        assertEquals(101, CrossingLevel.HUMAN)
-        assertEquals(102, CrossingLevel.CURB)
+        assertEquals(100, CrossingLevels.VERDICT)
+        assertEquals(101, CrossingLevels.HUMAN)
+        assertEquals(102, CrossingLevels.CURB)
     }
 
     // Décision par frame.
@@ -199,7 +200,7 @@ class EchelleOverwriteTest {
             crossingActive = true,
         )
 
-        assertEquals(CrossingLevel.HUMAN, person?.level)
+        assertEquals(CrossingLevels.HUMAN, person?.level)
         assertNull(
             hazardWish(
                 HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER, level = OutdoorLevel.FENCE, antiRepeatKey = AntiRepeat.KEY_FENCE),
@@ -220,7 +221,7 @@ class EchelleOverwriteTest {
 
         assertEquals(OutdoorLevel.CURB, curbWish(cue)?.level)
         assertEquals(AntiRepeat.KEY_CURB, curbWish(cue)?.key)
-        assertEquals(CrossingLevel.CURB, curbWish(cue, crossingActive = true)?.level)
+        assertEquals(CrossingLevels.CURB, curbWish(cue, crossingActive = true)?.level)
         assertNull(curbWish(null))
     }
 
@@ -431,7 +432,7 @@ class EchelleOverwriteTest {
         obstacleFrame(etat(2, personne, traversee = true), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
 
         assertEquals(1, speaker.said.size)
-        assertEquals(CrossingLevel.HUMAN, speaker.said.single().level)
+        assertEquals(CrossingLevels.HUMAN, speaker.said.single().level)
 
         val (voix2, securite2, guetteurs2) = rig()
         val voiture = lecture("car", 100f, 5f)
