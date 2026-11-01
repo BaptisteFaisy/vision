@@ -72,7 +72,7 @@ class HazardConceptsTest {
     }
 
     @Test
-    fun `poteaux reconnus FR EN pluriel, reconnus mais muets`() {
+    fun `poteaux reconnus FR EN pluriel, reconnus et parles`() {
         assertTrue(HazardConcepts.isPole("pole"))
         assertTrue(HazardConcepts.isPole("poteau"))
         assertTrue(HazardConcepts.isPole("POTEAUX"))
@@ -82,9 +82,9 @@ class HazardConceptsTest {
         assertFalse(HazardConcepts.isPole("  "))
         assertTrue(HazardConcepts.isHazard("pole"))
         assertTrue(HazardConcepts.isHazard("poteau"))
-        assertFalse(HazardConcepts.isSpoken("pole"))
-        assertFalse(HazardConcepts.isSpoken("poteau"))
-        assertFalse(HazardConcepts.isSpoken("POTEAUX"))
+        assertTrue(HazardConcepts.isSpoken("pole"))
+        assertTrue(HazardConcepts.isSpoken("poteau"))
+        assertTrue(HazardConcepts.isSpoken("POTEAUX"))
     }
 
     @Test
