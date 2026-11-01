@@ -83,7 +83,7 @@ sealed interface NavUiState {
     }
 
     /**
-     * Échec affichable ([NavError] déjà convertie en texte). Overlay rouge
+     * Échec affichable (erreur déjà convertie en texte). Overlay rouge
      * ([NavMessages.ERROR_TITLE]) + voix, sauf `speak = false`
      * (panne TTS : on ne parle pas d'une panne de voix à la voix, § c.6 —
      * le lancement Maps a quand même lieu).
