@@ -165,10 +165,11 @@ class ProbeSlicesTest {
         assertNoticesFollowFrames(notices)
     }
 
-    /** `begin` raz le warming d'état : la notice initiale est froide, puis suit frames. */
+    /** Préambule de chauffe puis frames : la notice part chaude, s'éteint au réveil GPU, puis suit frames 1..2 — jamais les pixels. */
     private fun assertNoticesFollowFrames(notices: List<ProbeNoticeKey>) {
         assertEquals("notice : frames 1..2, une fois chacun, jamais les pixels",
             listOf(
+                ProbeNoticeKey(frames = 0, error = null, warming = true),
                 ProbeNoticeKey(frames = 0, error = null, warming = false),
                 ProbeNoticeKey(frames = 1, error = null, warming = false),
                 ProbeNoticeKey(frames = 2, error = null, warming = false),
