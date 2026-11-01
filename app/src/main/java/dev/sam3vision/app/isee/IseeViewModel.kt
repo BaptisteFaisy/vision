@@ -85,11 +85,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** SAM quand la caméra est active : masques, distances, latence et phrase à dire. */
     val probe = LiveProbe(viewModelScope, appContext = getApplication())
-    private val lensQuality = dev.sam3vision.app.live.LensQualityStore(getApplication())
+    private val lensFeeds = dev.sam3vision.app.live.IseeLensFeeds(getApplication())
     private val pitch = PitchMeter(app, probe.distances) // IMU → pose, null sans capteur
 
     /** Ordres cap/Traversée + guidage auto, extraits du ViewModel (limite 500). */
-    private val steering = IseeSteeringOrders(probe, { settings }, ::speakNavigation, ::update)
+    private val steering = IseeSteeringOrders(probe, { settings }, ::speakNavigation, ::update, phoneLens = { camera?.lensSpec }, glassesLens = lensFeeds::mire)
 
     /** Repères visuels : photo → picto Muse (même clé que l'ASR) → overlay temps réel. */
     val picto = IseePicto(
@@ -262,7 +262,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Placement sur le passage (mot + approche doux, arrivée en file dernière, jamais Stop).
         observeCrossingVoice(viewModelScope, proximity, ::canAnnounce, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
-        probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() })
+        probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() }, lensFeeds::mire)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(
             viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety,
@@ -350,7 +350,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Les Réglages pilotent la sonde SAM (mode Traversée préservé) et la vitesse de lecture. */
     private fun syncProbe() {
-        probe.setCrossingActive(settings, probe.state.value.crossingActive, sensorLens = camera?.lensSpec, onLens = lensQuality::note)
+        probe.setCrossingActive(settings, probe.state.value.crossingActive, sensorLens = camera?.lensSpec, onLens = lensFeeds::note, glassesLens = lensFeeds.mire())
         probe.cadence.continuous = settings.continuousCadenceEnabled
         player.speed = settings.ttsSpeed
     }
@@ -395,7 +395,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordres « Find the X » / « Where are my keys » : X rejoint les masques SAM, son picto se crée et s'arme. */
     private fun runFindOrder(label: String) {
-        probe.ensureConcept(settings, label, camera?.lensSpec, lensQuality::note)
+        probe.ensureConcept(settings, label, camera?.lensSpec, lensFeeds::note, lensFeeds.mire())
         picto.findObject(label)
     }
 

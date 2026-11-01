@@ -8,6 +8,7 @@ import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
 import dev.sam3vision.core.crossing.CrossingVoiceCommand
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.SteeringCommand
 import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.settings.Settings
@@ -42,6 +43,10 @@ class IseeSteeringOrders(
     private val update: StateUpdate,
     /** Passage vu par la sonde (`null` = rien en vue) : dit à l'activation vocale. */
     private val crossingAhead: () -> CrossingAhead? = ::liveAhead,
+    /** Capteur téléphone courant : survit aux toggles Traversée (ex-repli 67°). */
+    private val phoneLens: () -> LensSpec? = { null },
+    /** Mire lunettes persistée : survit aux toggles en vol lunettes. */
+    private val glassesLens: () -> LensSpec? = { null },
 ) {
 
     /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
@@ -82,7 +87,7 @@ class IseeSteeringOrders(
     /** Bascule commune : sans effet si la sonde est déjà dans l'état demandé. */
     private fun setActive(wantActive: Boolean) {
         if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings(), wantActive)
+            probe.setCrossingActive(settings(), wantActive, sensorLens = phoneLens(), glassesLens = glassesLens())
         }
     }
 

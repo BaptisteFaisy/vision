@@ -88,20 +88,25 @@ téléphone (primitifs embarqués, sans GPU) ; le GPU reste le chemin lent/async
 (masques SAM lourds, LLM). Un modèle embarqué (ExecuTorch/NNAPI) est un chantier
 séparé, hors de cette branche.
 
-## 6. Calibrage optique sur mire (repli estimé posé, mire restant)
+## 6. Calibrage optique sur mire (outillage livré, prise terrain restante)
 
 Le SDK n'expose ni FOV ni distorsion. En attendant la mire, la voie lunettes
-mesure sur un repli estimé : `LensSpec.Glasses` (100° diagonaux constructeur
-ramenés au 9:16, ≈ 60,6° × 92,1°), affinable par le réglage `glassesFovDeg`,
-avec la pose yeux `CameraPose.Glasses` — routage branché (`chooseLens`,
-`observeGlassesLive`, `configureFrom`). Reste :
+mesure sur un repli estimé (`LensSpec.Glasses`, affinable par `glassesFovDeg`)
+— routage, store et solveur sont livrés, reste la prise terrain :
 
-1. Mire plane à distance connue, photo via le flux HIGH (720×1280), coins relevés.
-2. Résoudre focale px + centre optique + (k1, k2) radiaux (demi-diagonale).
-3. Poser `LensSpec(horizontal, vertical, sensorLandscape = false, …)` + `.copy(distortion = …)`
-   (voir `LensSpec.fromMeasured`) et fournir le `LensSpec` en `glassesLens`
-   (store à définir, `configureFrom` le consomme déjà).
-4. Recette : distance sténopé sur objet connu à ±10 % (3 distances).
+1. Imprimer : `python3 tools/solve_glasses_mire.py gen-mire --corners 9x6 --square-mm 25 --out mire.svg`
+   — 100 %, vérifier la case au réglet.
+2. Photographier : ≥ 3 photos du damier via le flux HIGH (720×1280), angles
+   variés (face, penché ±30°, coins et centre du cadre couverts).
+3. Résoudre : `uv run --with opencv-python-headless --with numpy tools/solve_glasses_mire.py solve --photos DIR --corners 9x6 --square-mm 25 --out mire.json`
+   — exige pixels carrés (±2 %), sinon rephotographier ; viser rms < 1 px.
+4. Coller : le bloc `mire v1` dans Réglages → Distances → Mire solver block
+   → Save mire (persisté `GlassesMireStore`, étage SENSOR de la voie lunettes).
+5. Recette : distance sténopé sur objet connu à ±10 % (3 distances).
+
+Conventions : k1/k2 OpenCV (norme focale) convertis en norme demi-diagonale
+(`opencv_to_distortion`, testé en CI) ; capteur natif portrait ; tangentielle
+nulle (le modèle embarqué ne porte que k1/k2 radiaux).
 
 ## 7. Grille PASS/FAIL (une ligne par scénario, à remplir sur matériel)
 
