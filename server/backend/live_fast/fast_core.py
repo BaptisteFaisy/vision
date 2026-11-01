@@ -9,7 +9,8 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_COMPILE=1``       — ``torch.compile`` de l'encodeur vision + warm-up explicite ;
 * ``FAST_CUDA_GRAPH=1``    — capture CUDA graph de l'encodeur vision (exclusive de compile) ;
 * ``FAST_DTYPE=bf16|fp16|fp32`` ;
-* ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de banc) ;
+* ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de
+  banc) ; ``FAST_SYNC_TIMING=1`` = barrière CUDA/poste ;
 * ``FAST_DEPTH_EVERY=5``   — carte depth 1 frame WS sur N (médianes répétées entre deux) ;
 * ``FAST_PREPROCESS=fast`` — ``pixel_values`` fusionnés torch (resize + normalisation en
   une passe, sur GPU si dispo) au lieu de l'appel HF ; ``hf`` (défaut) garde le chemin
@@ -60,11 +61,12 @@ EDGE = env_int(os.environ.get("FAST_EDGE"))
 RUNTIME_EDGE = env_bool(os.environ.get("FAST_EDGE_RUNTIME"))
 COMPILE = env_bool(os.environ.get("FAST_COMPILE"))
 CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
-# Graphe CUDA de la passe DETR (voir `detr_graph.py`) : le vision est déjà graphé, DETR
-# est le dernier gros poste (~55 ms mesurés fin octobre pour ~1,5 ms de calcul).
+# Graphe CUDA de la passe DETR (voir `detr_graph.py`) : ~35 ms de vrai calcul GPU
+# (pas 1,5 : sans sync, detr_ms ne mesurait que le lancement, le post payait le reste).
 DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
 WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
+SYNC_TIMING = env_bool(os.environ.get("FAST_SYNC_TIMING"))
 # Throttle depth WS (voir depth.py) : 1 carte calculée sur N frames demandées
 # (défaut 5 ≈ 6 Hz à 30 images/s), médianes répétées entre deux. 1 = chaque
 # frame (throttle coupé) ; borne 30 ≈ 1 s à 30 Hz, sous les 1500 ms de
@@ -84,14 +86,59 @@ def levers() -> dict:
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
             "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
-            "warmups": WARMUPS, "timing": TIMING, "depth_every": DEPTH_EVERY,
-            "preprocess": PREPROCESS}
+            "warmups": WARMUPS, "timing": TIMING, "sync_timing": SYNC_TIMING,
+            "depth_every": DEPTH_EVERY, "preprocess": PREPROCESS}
+
+
+def clamp_int(value, default: int, low: int, high: int) -> int:
+    """Ramener un knob optionnel dans [low, high] ; absent ou non numérique -> default."""
+    if value is None:
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
+def gpu_name() -> str:
+    """Nom du GPU réellement alloué, relevé une fois (nvidia-smi, secours torch)."""
+    import subprocess
+
+    try:
+        result = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                                capture_output=True, text=True, timeout=15)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().splitlines()[0].strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return torch.cuda.get_device_name(0)
+    except Exception:  # noqa: BLE001 — /health ne doit jamais tomber pour un nom de GPU
+        pass
+    return "unknown"
 
 
 def _torch():
     import torch
 
     return torch
+
+
+def _sync_cuda() -> None:
+    """Barrière CUDA pour des chronos honnêtes (``FAST_SYNC_TIMING`` seul, défaut off :
+    sans sync, ``detr_ms`` ne mesure que le lancement et le post paie le calcul)."""
+    if not SYNC_TIMING:
+        return
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+    except ImportError:
+        pass
 
 
 def vision_grid(model) -> int:
@@ -306,11 +353,13 @@ def _detections(model, processor, device, dtype, vision, concepts, work_size, ti
 
     started = now()
     outputs = graphs(forward, embeds, inputs) if graphs is not None else forward(embeds, inputs)
+    _sync_cuda()
     add_ms(timers, "detr_ms", elapsed_ms(started))
     started = now()
     found = processor.post_process_instance_segmentation(
         outputs, threshold=SCORE_THRESHOLD, mask_threshold=MASK_THRESHOLD,
         target_sizes=[(work_size[1], work_size[0])] * len(concepts))
+    _sync_cuda()
     add_ms(timers, "post_ms", elapsed_ms(started))
     return found
 
@@ -343,6 +392,7 @@ def _vision(ctx, pixels, timers: dict):
     started = now()
     with torch.inference_mode():
         vision = ctx["model"].vision_encoder(pixels.to(device=ctx["device"], dtype=ctx["dtype"]))
+    _sync_cuda()
     add_ms(timers, "vision_ms", elapsed_ms(started))
     return vision
 
@@ -369,8 +419,10 @@ def _collect(ctx, vision, prompts, concepts, work_size, image_size, batch: bool,
                              vision, [concept], work_size, timers)
             pairs.append((one[0], prompt))
     entries: list[dict] = []
+    started = now()
     for detection, label in pairs:
         entries.extend(detection_entries(detection, label, work_size, image_size, keep))
+    add_ms(timers, "d2h_ms", elapsed_ms(started))
     return entries
 
 

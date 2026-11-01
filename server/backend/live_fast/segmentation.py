@@ -132,19 +132,29 @@ def detection_entries(detection, label: str, work_size, image_size,
     était payé pour **chaque** détection, y compris celles jetées par ``max_objects`` : il
     est donc reporté après le tri global, dans :func:`finalize`. Le ``label`` reste le prompt
     tel que saisi (pas le concept anglais) — contrat historique.
+
+    Le transfert GPU→CPU est réduit au strict utile : les scores (quelques Ko) partent
+    d'abord, le top-k est calculé dessus, puis **seuls** les masques gardés traversent —
+    en uint8 (le post transformers binarise en int64 0/1 : valeurs identiques, 8x moins
+    d'octets PCIe). Mesuré 3060 Ti : 10 masques 768x576, 12,5 ms → 0,9 ms.
     """
+    if keep <= 0:
+        return []
     scale_x, scale_y = scale_factors(work_size, image_size)
     boxes = detection["boxes"].float().cpu().numpy()
     scores = detection["scores"].float().cpu().numpy()
-    masks = detection["masks"].cpu().numpy()
+    top = _top_indices(scores, keep)
+    if not top:
+        return []
+    masks = detection["masks"][top].byte().cpu().numpy()
     return [
         {
             "label": label,
             "score": round(float(scores[index]), 4),
             "box": _clamp_box(boxes[index], scale_x, scale_y, image_size),
-            "mask": masks[index],
+            "mask": masks[position],
         }
-        for index in _top_indices(scores, keep)
+        for position, index in enumerate(top)
     ]
 
 

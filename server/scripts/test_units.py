@@ -441,6 +441,7 @@ RUNNERS = (
     ("live_fast : coords detr sans sync", "timing", live_fast_perf_tests.test_detr_coords_no_sync),
     ("live_fast : coords detr niveaux", "timing", live_fast_perf_tests.test_detr_coords_levels),
     ("live_fast : coords detr statique capture", "timing", live_fast_perf_tests.test_detr_coords_capture_static),
+    ("live_fast : sync timing + poste d2h", "timing", live_fast_perf_tests.test_sync_timing),
     ("feux : garde serveur (labels/slot/work_edge)", "timing", feux_guard_tests.test_feux_guard),
     ("live_fast : pré-traitement (levier FAST_PREPROCESS)", "timing",
      preproc_tests.test_preprocess_lever),

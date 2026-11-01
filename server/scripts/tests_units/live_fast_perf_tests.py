@@ -289,3 +289,80 @@ def test_detr_coords_capture_static(_timing) -> None:
               ".item(" not in src and ".tolist(" not in src)
     finally:
         _release_detr(live_fast, saved_torch)
+
+
+class _SyncTensor:
+    """Tensor factice : ``detection_entries`` (``[top].byte().cpu().numpy()``)."""
+
+    def __init__(self, array) -> None:
+        import numpy as np
+
+        self._array = np.asarray(array)
+
+    def __getitem__(self, key):
+        return _SyncTensor(self._array[key])
+
+    def byte(self):
+        return _SyncTensor(self._array.astype("uint8"))
+
+    def float(self):
+        return self
+
+    def cpu(self):
+        return self
+
+    def numpy(self):
+        return self._array
+
+
+def _sync_detection(count):
+    """Détection factice : ``count`` boîtes/scores/masques uint8 (doublure passe DETR)."""
+    import numpy as np
+
+    scores = np.linspace(0.9, 0.1, count)
+    boxes = np.tile(np.array([0.0, 0.0, 4.0, 4.0]), (count, 1))
+    masks = np.zeros((count, 8, 8), dtype=np.uint8)
+    masks[:, 1, 1] = 1
+    return {"boxes": _SyncTensor(boxes), "scores": _SyncTensor(scores),
+            "masks": _SyncTensor(masks)}
+
+
+def test_sync_timing(_timing) -> None:
+    """``FAST_SYNC_TIMING`` off par défaut ; ``_sync_cuda`` no-op sans GPU ; poste ``d2h_ms``."""
+    import importlib.util
+    import sys
+
+    from test_units import BACKEND_DIR, check
+
+    live_fast = str(BACKEND_DIR / "live_fast")
+    sys.path.insert(0, live_fast)
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "fast_core_sync_test", BACKEND_DIR / "live_fast" / "fast_core.py")
+        fast_core = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fast_core)
+        check("sync_timing : levier éteint par défaut", fast_core.SYNC_TIMING is False)
+        saved_torch = sys.modules.pop("torch", None)
+        fast_core.SYNC_TIMING = True
+        try:
+            fast_core._sync_cuda()
+            check("sync_timing : no-op sans torch ni CUDA", True)
+        finally:
+            fast_core.SYNC_TIMING = False
+            if saved_torch is not None:
+                sys.modules["torch"] = saved_torch
+        check("sync_timing : exposé dans levers()",
+              fast_core.levers().get("sync_timing") is False, str(sorted(fast_core.levers())))
+        real = fast_core._detections
+        fast_core._detections = lambda *a, **k: [_sync_detection(4), _sync_detection(4)]
+        try:
+            timers: dict = {}
+            ctx = {"model": None, "processor": None, "device": "cpu", "dtype": None}
+            entries = fast_core._collect(ctx, "vision", ["a", "b"], ["a", "b"],
+                                         (8, 8), (8, 8), True, 4, timers)
+        finally:
+            fast_core._detections = real
+        check("d2h : poste mesuré dans _collect", "d2h_ms" in timers, str(sorted(timers)))
+        check("d2h : objets intacts", len(entries) == 8, str(len(entries)))
+    finally:
+        sys.path.remove(live_fast)
