@@ -14,28 +14,38 @@ import dev.sam3vision.core.speech.SpeechLanguage
  */
 object VehicleStateText {
 
-    /** Nom parlé du véhicule : [fr] et [en] capitalisés (« Voiture », « Car »). */
-    data class VehicleName(val fr: String, val en: String)
+    /**
+     * Nom parlé du véhicule : [fr] et [en] capitalisés (« Voiture », « Car ») et
+     * [clipKey], la clé du pack voix (`vehicle_<clipKey>_moving`, `vehicle_stop_<clipKey>`).
+     */
+    data class VehicleName(val fr: String, val en: String, val clipKey: String)
 
     /** Alerte pluriel : « Stop, N vehicles moving. » / « Stop, N véhicules en mouvement. ». */
     private val PLURAL_ALERT = Regex("^Stop, \\d+ (vehicles moving|véhicules en mouvement)\\.$")
 
+    private val CAR = VehicleName("Voiture", "Car", "car")
+    private val BUS = VehicleName("Bus", "Bus", "bus")
+    private val TRUCK = VehicleName("Camion", "Truck", "truck")
+    private val MOTO = VehicleName("Moto", "Motorcycle", "moto")
+    private val BIKE = VehicleName("Vélo", "Bicycle", "bike")
+    private val SCOOTER = VehicleName("Trottinette", "Scooter", "scooter")
+
     private val NAMES: Map<String, VehicleName> = mapOf(
-        "car" to VehicleName("Voiture", "Car"),
-        "voiture" to VehicleName("Voiture", "Car"),
-        "bus" to VehicleName("Bus", "Bus"),
-        "buses" to VehicleName("Bus", "Bus"),
-        "truck" to VehicleName("Camion", "Truck"),
-        "camion" to VehicleName("Camion", "Truck"),
-        "motorcycle" to VehicleName("Moto", "Motorcycle"),
-        "moto" to VehicleName("Moto", "Motorcycle"),
-        "bicycle" to VehicleName("Vélo", "Bicycle"),
-        "bike" to VehicleName("Vélo", "Bicycle"),
-        "velo" to VehicleName("Vélo", "Bicycle"),
-        "scooter" to VehicleName("Trottinette", "Scooter"),
-        "electric scooter" to VehicleName("Trottinette", "Scooter"),
-        "trottinette" to VehicleName("Trottinette", "Scooter"),
-        "trottinette electrique" to VehicleName("Trottinette", "Scooter"),
+        "car" to CAR,
+        "voiture" to CAR,
+        "bus" to BUS,
+        "buses" to BUS,
+        "truck" to TRUCK,
+        "camion" to TRUCK,
+        "motorcycle" to MOTO,
+        "moto" to MOTO,
+        "bicycle" to BIKE,
+        "bike" to BIKE,
+        "velo" to BIKE,
+        "scooter" to SCOOTER,
+        "electric scooter" to SCOOTER,
+        "trottinette" to SCOOTER,
+        "trottinette electrique" to SCOOTER,
     )
 
     /** Nom parlé de [label], `null` si ce n'est pas un véhicule nommé. */
@@ -74,6 +84,35 @@ object VehicleStateText {
         SpeechLanguage.Fr -> "Stop, ${name.fr.replaceFirstChar { it.lowercase() }} en mouvement."
         SpeechLanguage.En -> "Stop, ${name.en.replaceFirstChar { it.lowercase() }} moving."
     }
+
+    /**
+     * Clip du pack voix pour un mouvement (ordre user du 01/11) : la phrase est
+     * fixe (« Voiture en mouvement. »), donc elle est **enregistrée** —
+     * `vehicle_car_moving` & co, joués sans réseau ni synthèse.
+     */
+    fun movingClipId(name: VehicleName): String = "vehicle_${name.clipKey}_moving"
+
+    /**
+     * Clip d'une phrase **fixe** de l'état véhicule (`null` = variable, à
+     * synthétiser) : les mouvements, jamais les phrases situées (arrêt et
+     * stationnement portent une distance ou une heure). Le stop, lui, part par la
+     * voix de sécurité (grave, hors ligne), pas par le pack. Une seule table,
+     * bâtie depuis les noms : aucune phrase ne peut se désynchroniser de son
+     * clip. Pure, testée en JVM.
+     */
+    fun clipIdFor(phrase: String): String? = CLIPS[phrase]
+
+    private val CLIPS: Map<String, String> by lazy {
+        names().flatMap { name ->
+            listOf(
+                movingPhrase(name, SpeechLanguage.Fr) to movingClipId(name),
+                movingPhrase(name, SpeechLanguage.En) to movingClipId(name),
+            )
+        }.toMap()
+    }
+
+    /** Les six noms distincts (« Cars » et « car » fusionnent). */
+    private fun names(): List<VehicleName> = NAMES.values.distinct()
 
     /** Alerte immédiate pluriel : « Stop, 2 vehicles moving. » — même canal sécurité. */
     fun safetyPluralPhrase(count: Int, language: SpeechLanguage): String = when (language) {

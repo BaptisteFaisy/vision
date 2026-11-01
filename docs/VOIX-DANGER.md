@@ -1153,24 +1153,42 @@ la personne seule ; alerte rebord + voiture → le rebord d'abord, la
 voiture juste après — **non mesuré**, exige un APK de cette branche sur
 appareil réel.
 
-## 32. Un mobile ne dit plus son emplacement (ordre user du 01/11)
+## 32. Un mobile ne dit plus son emplacement — et se dit en mp3 (ordres user du 01/11)
 
 Le user marche avec l'app : « ne me dis plus l'emplacement de la voiture
-si tu vois une voiture qui bouge ». Une distance ou une heure dite sur un
-véhicule qui roule est périmée avant la fin de la phrase — et l'app la
-redit toutes les 4 s.
+si tu vois une voiture qui bouge », puis « supprime juste l'annonce de la
+position avec les heures et que cela soit un mp3 enregistré ». Une
+distance ou une heure dite sur un véhicule qui roule est périmée avant la
+fin de la phrase — et l'app la redit toutes les 4 s. La conclusion du
+user : si la phrase ne bouge plus, qu'elle soit **enregistrée**, pas
+synthétisée.
 
 - **mouvement** : « Voiture en mouvement. » / « Car moving. » — nu, sans
   distance ni heure, singulier comme pluriel (« 2 vehicles moving. ») ;
   `VehicleStateText.movingPhrase` / `movingPluralPhrase` n'ont plus de
   paramètre de position (le compilateur garde la règle) ;
+- **cycles aussi** (2e ordre) : « Attention, vélo en mouvement. » /
+  « Attention, bicycle moving. » — `CycleText.movingPhrase` perd son
+  `centerX`, plus d'heure sur un engin qui roule ; l'arrêt d'un cycle
+  garde la sienne (« Vélo arrêté, à midi. »), même logique que la voiture
+  à l'arrêt (repère stable) ;
+- **enregistré** : phrase fixe = clip du pack voix (mp3 embarqué,
+  < 100 ms, zéro réseau) — `vehicle_car_moving`, `vehicle_bus_moving`,
+  `vehicle_truck_moving`, `vehicle_moto_moving`, `vehicle_bike_moving`,
+  `vehicle_scooter_moving`, `cycle_velo_moving`, `cycle_trott_moving` ;
+  table unique `VehicleStateText.clipIdFor` / `CycleText.clipIdFor`, lue
+  par `recordedClipId` (`RecordedPhrase.kt`) que les deux chemins de voix
+  partagent (normal et Traversée) ; clip manquant (voix changée, pack
+  absent) → synthèse mise en cache sous la même clé, comme le guidage ;
 - **danger conservé** : le proche (sous 8 m, ou non mesuré) garde son
-  « Stop, car moving. » (voix de sécurité, § 29) ; l'urgence du canal
-  doux (`VehicleStateCue.urgent`, `safetyPhrase`) ne bouge pas ;
+  « Stop, car moving. » — voix de sécurité (§ 29), pas de clip : une
+  alerte ne se paie pas d'une synthèse réseau ; l'urgence du canal doux
+  (`VehicleStateCue.urgent`) ne bouge pas ;
 - **immobiles inchangés** : l'arrêt et le stationnement situent toujours
   (« Voiture à l'arrêt, à 2 mètres. », « Bus en stationnement, à 8
   mètres. », heure du cadran sans mesure) — c'est le repère qui ne bouge
-  pas, donc la seule position qui tient ;
+  pas, donc la seule position qui tient, et la seule phrase qui reste en
+  synthèse (elle porte une mesure) ;
 - **portée inchangée** : le mouvement se dit toujours jusqu'à
   `MOVING_METERS` (infini sans feu, § 14 de `TRAVERSEE.md`) ; seule la
   position tombe ;
@@ -1179,16 +1197,18 @@ redit toutes les 4 s.
   position, rien à couper.
 
 Verrouillé par `VehicleStateTextTest` (`mouvement jamais situe - arret et
-stationnement si`, FR/EN, singulier/pluriel, arrêt et stationnement
-conservés) et par les attentes réécrites de `VehicleStateTest`,
-`VehicleStateRangeTest`, `VehicleStateBackgroundTest`,
-`VehicleStateLateralTest`, `VehicleStateDepthTest`, `EgoVoteWatcherTest`,
-`NoLightCrossingTest`, `CrossingVehicleTest`, `LiveVehicleVoiceTest`.
+stationnement si`, `mouvements et stops enregistres - le reste en
+synthese`), `CycleWatcherTest` (`mouvement enregistre - arret situe en
+synthese`), `ProximityVoiceRecordedTest` (5 : mouvement de voiture et de
+cycle joués en mp3 sans synthèse, arrêt situé et pluriel en synthèse,
+sans pack la phrase se synthétise, table phrase → clip) et les attentes
+réécrites de `VehicleStateTest`, `VehicleStateRangeTest`,
+`VehicleStateBackgroundTest`, `VehicleStateLateralTest`,
+`VehicleStateDepthTest`, `EgoVoteWatcherTest`, `NoLightCrossingTest`,
+`CrossingVehicleTest`, `LiveVehicleVoiceTest`.
 
-Reste à trancher : les cycles (`CycleWatcher`, « Attention, vélo en
-mouvement, à 2 heures. ») disent encore leur heure — même problème, mais
-l'ordre ne parlait que de « la voiture ». Recette téléphone **non
-mesurée**.
+Reste : « deux-roues » (label générique) n'a pas encore de clip — sa clé
+existe, il retombe en synthèse. Recette téléphone **non mesurée**.
 
 ## 33. Compteur de marches prioritaire : dit chaque seconde, coupe le doux (ordre user du 01/11)
 

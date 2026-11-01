@@ -8,7 +8,10 @@ coupe la précédente). Fini les deux moteurs qui se parlent dessus.
 ## Principe
 
 1. Les phrases fixes vivent dans `tools/voicepack-catalog.json` (miroir du
-   Kotlin : `CrossingText`, `VoiceNavPolicy`).
+   Kotlin : `CrossingText`, `VoiceNavPolicy`) — y compris les **états de
+   mouvement** (`vehicle_car_moving`, `cycle_velo_moving`… : depuis le
+   01/11 un mobile ne dit plus sa position, donc sa phrase ne varie plus,
+   donc elle est enregistrée — § 32 de `VOIX-DANGER.md`).
 2. `tools/gen-voicepack.py` les synthétise **une fois** (voix Laure par défaut,
    mêmes paramètres que l'app) en `app/src/main/res/raw/vp_<id>_<lang>.mp3` +
    `assets/vp_voice.txt` (voix du pack).
@@ -33,6 +36,15 @@ ne colle pas à la voix réglée). `--regenerate` régénère tout.
 `python3 tools/check-voicepack.py` (CI) : chaque texte existe dans le Kotlin,
 chaque MP3 existe et pèse > 0, `vp_voice.txt` = `LAURE_VOICE_ID`.
 `--allow-missing` pour les branches qui codent avant de générer.
+
+## Ce qui n'est jamais un clip
+
+Les phrases qui portent une **mesure** ou un **compte** restent en synthèse :
+arrêt et stationnement (« Voiture à l'arrêt, à 2 mètres. »), pluriel générique
+(« 2 vehicles moving. »), positions (« Personne à 1 heure. »). `clipIdFor` rend
+`null` pour elles — c'est la table qui décide, pas l'appelant
+(`VehicleStateText.clipIdFor`, `CycleText.clipIdFor`, lues par
+`recordedClipId`).
 
 ## Ajouter une phrase
 

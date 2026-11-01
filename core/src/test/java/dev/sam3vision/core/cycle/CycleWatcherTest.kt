@@ -44,7 +44,7 @@ class CycleWatcherTest {
             if (index < 3) assertNull("vitesse puis confirmation : silence", cue)
         }
 
-        assertEquals("Attention, vélo en mouvement, à 2 heures.", cue!!.phrase)
+        assertEquals("Attention, vélo en mouvement.", cue!!.phrase)
         assertEquals(5f, cue.meters!!, 0.001f)
         assertFalse("latéral seul, pas d'approche : doux", cue.urgent)
     }
@@ -82,7 +82,7 @@ class CycleWatcherTest {
             )
         }
 
-        assertEquals("Attention, vélo en mouvement, à midi.", cue!!.phrase)
+        assertEquals("Attention, vélo en mouvement.", cue!!.phrase)
         assertTrue("croissance + proche + centre : urgent", cue.urgent)
     }
 
@@ -116,7 +116,7 @@ class CycleWatcherTest {
         listOf(bikeBox(430f), bikeBox(450f), bikeBox(470f), bikeBox(490f)).forEachIndexed { index, box ->
             cue = moving.update(listOf(det("bicycle", box)), emptyList(), atMs = index * 100L)
         }
-        assertEquals("Attention, bicycle moving, at 2 o'clock.", cue!!.phrase)
+        assertEquals("Attention, bicycle moving.", cue!!.phrase)
         assertNull(cue.meters)
 
         val stopped = CycleWatcher()
@@ -145,7 +145,7 @@ class CycleWatcherTest {
             val box = bikeBox(x1)
             replay = watcher.update(listOf(det("bicycle", box)), listOf(reading("bicycle", 5f, box)), atMs = atMs) ?: replay
         }
-        assertEquals("Attention, bicycle moving, at 3 o'clock.", replay!!.phrase)
+        assertEquals("Attention, bicycle moving.", replay!!.phrase)
     }
 
     @Test
@@ -172,20 +172,35 @@ class CycleWatcherTest {
     fun `phrases FR EN`() {
         val velo = CycleConcepts.nameOf("bicycle")!!
         val trottinette = CycleConcepts.nameOf("trottinette")!!
-        assertEquals(
-            "Attention, vélo en mouvement, à 2 heures.",
-            CycleText.movingPhrase(velo, SpeechLanguage.Fr, 0.8f),
-        )
-        assertEquals(
-            "Attention, bicycle moving, at 2 o'clock.",
-            CycleText.movingPhrase(velo, SpeechLanguage.En, 0.8f),
-        )
+        assertEquals("Attention, vélo en mouvement.", CycleText.movingPhrase(velo, SpeechLanguage.Fr))
+        assertEquals("Attention, bicycle moving.", CycleText.movingPhrase(velo, SpeechLanguage.En))
         assertEquals("Vélo arrêté, à midi.", CycleText.stoppedPhrase(velo, SpeechLanguage.Fr, 0.5f))
         assertEquals(
             "Bicycle stopped, at 12 o'clock.",
             CycleText.stoppedPhrase(velo, SpeechLanguage.En, 0.5f),
         )
         assertEquals("Trottinette arrêtée.", CycleText.stoppedPhrase(trottinette, SpeechLanguage.Fr))
+    }
+
+    /**
+     * Ordre user du 01/11 : le mouvement d'un cycle ne dit plus son heure, donc
+     * la phrase est fixe — et le pack voix la joue telle quelle. L'arrêt situé
+     * (heure) reste variable : synthèse.
+     */
+    @Test
+    fun `mouvement enregistre - arret situe en synthese`() {
+        val velo = CycleConcepts.nameOf("bicycle")!!
+        val trott = CycleConcepts.nameOf("trottinette")!!
+        assertEquals("cycle_velo_moving", CycleText.clipIdFor("Attention, vélo en mouvement."))
+        assertEquals("cycle_velo_moving", CycleText.clipIdFor("Attention, bicycle moving."))
+        assertEquals("cycle_trott_moving", CycleText.clipIdFor("Attention, scooter moving."))
+        assertEquals("cycle_velo_stopped", CycleText.clipIdFor("Vélo arrêté."))
+        assertNull("arrêt situé : pas de clip", CycleText.clipIdFor("Vélo arrêté, à midi."))
+        // « deux-roues » n'a pas encore de fichier dans le pack : la clé existe,
+        // le clip manquant retombe en synthèse (comportement du pack : clip absent).
+        assertEquals("cycle_deuxroues_moving", CycleText.clipIdFor("Attention, deux-roues en mouvement."))
+        assertEquals("cycle_trott_moving", CycleText.movingClipId(trott))
+        assertEquals("cycle_velo_stopped", CycleText.stoppedClipId(velo))
     }
 
     @Test

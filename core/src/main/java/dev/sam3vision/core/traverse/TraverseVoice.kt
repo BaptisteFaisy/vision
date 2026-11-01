@@ -48,7 +48,7 @@ object TraversePhrases {
 object TraverseParkedText {
     /** « Voiture en stationnement… » : même source que le guetteur, nom voiture seul. */
     fun parkedPhrase(meters: Float?, centerX: Float?, language: SpeechLanguage): String =
-        VehicleStateText.parkedPhrase(VehicleStateText.VehicleName("Voiture", "Car"), meters, centerX, language)
+        VehicleStateText.parkedPhrase(VehicleStateText.VehicleName("Voiture", "Car", "car"), meters, centerX, language)
 }
 
 /** Où la phrase a été jouée — ou pourquoi elle ne l'a pas été. */

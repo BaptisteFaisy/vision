@@ -3,6 +3,7 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -59,5 +60,23 @@ class VehicleStateTextTest {
             "Voiture en stationnement, à 8 mètres.",
             VehicleStateText.parkedPhrase(car, 8f, null, SpeechLanguage.Fr),
         )
+    }
+
+    /**
+     * La phrase fixe du mouvement (et le stop) est **enregistrée** : le pack
+     * voix la joue sans réseau (ordre user du 01/11). Ce qui porte encore une
+     * mesure (arrêt, stationnement) ou un compte (pluriel) reste en synthèse.
+     */
+    @Test
+    fun `mouvements et stops enregistres - le reste en synthese`() {
+        val car = VehicleStateText.nameOf("car")!!
+        assertEquals("vehicle_car_moving", VehicleStateText.clipIdFor("Voiture en mouvement."))
+        assertEquals("vehicle_car_moving", VehicleStateText.clipIdFor("Car moving."))
+        assertEquals("vehicle_bus_moving", VehicleStateText.clipIdFor("Bus moving."))
+        assertEquals("vehicle_car_moving", VehicleStateText.movingClipId(car))
+        assertNull("le stop part en voix de sécurité, pas en clip", VehicleStateText.clipIdFor("Stop, car moving."))
+        assertNull(VehicleStateText.clipIdFor("Voiture à l'arrêt, à 2 mètres."))
+        assertNull(VehicleStateText.clipIdFor("Voiture en stationnement, à 8 mètres."))
+        assertNull("pluriel variable, rien à enregistrer", VehicleStateText.clipIdFor("2 vehicles moving."))
     }
 }

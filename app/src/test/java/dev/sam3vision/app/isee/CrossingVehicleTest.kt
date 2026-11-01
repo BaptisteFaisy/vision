@@ -177,7 +177,7 @@ class CrossingVehicleTest {
         assertNull(at(100f, 0L))
         assertNull(at(110f, 100L))
         assertNull("vitesse non établie : silence", at(120f, 200L))
-        assertEquals("Attention, bicycle moving, at 12 o'clock.", at(130f, 300L))
+        assertEquals("Attention, bicycle moving.", at(130f, 300L))
     }
 
     @Test
@@ -218,7 +218,7 @@ class CrossingVehicleTest {
         // Moteur en cooldown ; le cycle ne voit que sa 3e frame (la 200 ms est
         // partie au moteur) : vitesse établie, confirmation en cours.
         assertNull(at(130f, 300L))
-        assertEquals("Attention, bicycle moving, at 12 o'clock.", at(140f, 400L))
+        assertEquals("Attention, bicycle moving.", at(140f, 400L))
     }
 
     @Test

@@ -154,12 +154,6 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLe
     configureFrom(settings, next, false, sensorLens, onLens, glassesLens)
 }
 
-/**
- * Entrée clip d'une phrase de la sonde (`null` = synthèse réseau) : mots SAM,
- * mots TwinLite. Pur, testé en JVM.
- */
-internal fun spokenClipId(text: String): String? =
-    GuidanceWord.clipIdFor(text) ?: TwinLiteWord.clipIdFor(text)
 
 /**
  * Chaque phrase de la sonde est confiée à la voix, y compris redite à
