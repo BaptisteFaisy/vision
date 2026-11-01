@@ -121,15 +121,19 @@ class HazardWatchTest {
         val first = HazardWatcher()
         val second = HazardWatcher()
         val third = HazardWatcher()
+        val fourth = HazardWatcher()
         val atLeft = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.4f)
         val atRight = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.8f)
         val unknown = HazardSignal(detected = true, meters = 1.5f, label = "person")
+        val centered = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.5f)
 
         assertEquals("Droite.", first.onSignal(atLeft, 1_000L, SpeechLanguage.Fr)!!.phrase)
         assertEquals("Gauche.", second.onSignal(atRight, 1_000L, SpeechLanguage.Fr)!!.phrase)
         assertEquals("Right.", third.onSignal(unknown, 1_000L, SpeechLanguage.En)!!.phrase)
+        assertEquals("Droite.", fourth.onSignal(centered, 1_000L, SpeechLanguage.Fr)!!.phrase)
         assertEquals(SteeringCap.Right, HazardText.avoidSide(null))
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.4f))
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.5f))
         assertEquals(SteeringCap.Left, HazardText.avoidSide(0.8f))
     }
 
@@ -194,6 +198,10 @@ class HazardWatchTest {
         assertEquals(
             "Attention à la personne, passez à droite.",
             HazardText.personPhrase(person, SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Attention à la personne, à midi, passez à droite.",
+            HazardText.personPhrase(person, SpeechLanguage.Fr, 0.5f),
         )
 
         val watcher = HazardWatcher()

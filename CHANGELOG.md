@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : axe pile = droite, comme documenté (branche `hazard-avoidside-axis`)
+
+- **Ordre user** : néant (correctif repris d'un point noté en
+  recette direction permanente en foule).
+- **Fait** : `HazardText.avoidSide` : `centerX <= AXIS_MID` (l'axe
+  pile donnait gauche, le commentaire dit droite par défaut) —
+  mot imminent et phrase douce 0,5 parlent « Droite. » / « passez
+  à droite » ; tests `HazardWatchTest` : `avoidSide(0.5f)`,
+  mot centré, phrase douce « à midi ».
+- **Preuve** : `:core:testDebugUnitTest` 2 823 +
+  `:app:testDebugUnitTest` 1 692 verts sur r630 (0 échec, 0 sauté,
+  dont `HazardWatchTest` 26, `GuidanceAnnouncerTest` 30,
+  `ProximityVoiceQueueTest` 8, `DistanceKalmanTest` 11) ;
+  `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
+  finding (scanner Kotlin indisponible, comme avant).
+
 ## 2026-11-01 — iSee : humain imminent = mot seul répété 300 ms (branche `hazard-person-300ms`)
 
 - **Ordre user** : juste « humain, passez à droite / gauche », en
