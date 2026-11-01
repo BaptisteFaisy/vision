@@ -10,6 +10,9 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_CUDA_GRAPH=1``    — capture CUDA graph de l'encodeur vision (exclusive de compile) ;
 * ``FAST_DTYPE=bf16|fp16|fp32`` ;
 * ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de banc) ;
+* ``FAST_PREPROCESS=fast`` — ``pixel_values`` fusionnés torch (resize + normalisation en
+  une passe, sur GPU si dispo) au lieu de l'appel HF ; ``hf`` (défaut) garde le chemin
+  historique ;
 * ``FAST_SNAPSHOT=1``      — snapshot mémoire Modal (poids figés, réveil 2-7 s).
 
 Les poids et leurs chargements vivent dans ``weights.py`` (ré-exportés ici).
@@ -66,6 +69,9 @@ CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
 DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
 WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
+# Pré-traitement : "hf" (appel processeur historique) ou "fast" (pixels_fast fusionné,
+# même sémantique à ±1 LSB 8 bits près, repli HF si la config sort du supporté).
+PREPROCESS = (os.environ.get("FAST_PREPROCESS") or "hf").strip().lower()
 # Snapshot mémoire Modal (poids figés après le 1er démarrage) : défaut False — honnête
 # pour Baseten (pas de snapshot) ; le déploiement Modal pose FAST_SNAPSHOT=1.
 SNAPSHOT = env_bool(os.environ.get("FAST_SNAPSHOT"))
@@ -76,7 +82,7 @@ def levers() -> dict:
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
             "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
-            "warmups": WARMUPS, "timing": TIMING}
+            "warmups": WARMUPS, "timing": TIMING, "preprocess": PREPROCESS}
 
 
 def clamp_int(value, default: int, low: int, high: int) -> int:
@@ -338,11 +344,24 @@ def _detections(model, processor, device, dtype, vision, concepts, work_size, ti
     return found
 
 
+def _fast_pixels(ctx, work):
+    """``pixel_values`` fusionnés (levier ``FAST_PREPROCESS=fast``) ; None = repli HF."""
+    if PREPROCESS != "fast":
+        return None
+    from imaging import try_pixels_fast
+
+    return try_pixels_fast(work, ctx.get("processor"), ctx.get("device") or "cpu",
+                           ctx.get("dtype"))
+
+
 def _preprocess(ctx, image, work_edge: int):
-    """Étage CPU : remise à l'échelle + ``pixel_values`` (le préprocesseur, pas le GPU)."""
+    """Remise à l'échelle + ``pixel_values`` (HF historique, ou fusionné si levier)."""
     from imaging import resize_max_edge
 
     work = resize_max_edge(image, work_edge)
+    fast = _fast_pixels(ctx, work)
+    if fast is not None:
+        return work, fast
     return work, ctx["processor"](images=work, return_tensors="pt")["pixel_values"]
 
 

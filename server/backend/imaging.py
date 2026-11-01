@@ -100,6 +100,95 @@ def scale_factors(source_size: tuple[int, int], target_size: tuple[int, int]) ->
     return target_width / max(source_width, 1), target_height / max(source_height, 1)
 
 
+def pixels_fast(image: Image.Image, edge: int, mean=(0.5, 0.5, 0.5),
+                std=(0.5, 0.5, 0.5), device="cpu", dtype=None):
+    """``pixel_values`` façon SAM 3.1, sans le framework HF (torch uniquement).
+
+    Reproduit la chaîne exacte de ``Sam3ImageProcessor`` (backend torchvision) :
+    tenseur uint8 CHW contiguous → resize carré ``edge``×``edge`` bilinéaire
+    antialiasé → ``(x / 255 - mean) / std`` — en une passe, sur CPU ou GPU.
+    ``mean``/``std``/``edge`` se lisent sur le préprocesseur en vigueur, jamais en
+    dur côté appelant (le levier ``FAST_EDGE`` reste honoré).
+
+    Écart vs HF de l'ordre d'1 LSB de l'image 8 bits redimensionnée : le resize
+    se fait en float32 ici contre uint8 côté HF, et le noyau torchvision
+    lui-même varie d'1 LSB selon le layout mémoire d'entrée — ~7,9e-3 en unités
+    normalisées pour std=0,5 (mesuré ≤ 7,87e-3 sur 96 cas adversariaux ;
+    tolérance de test 1,6e-2, soit 2 LSB). ``device="cuda"`` sans GPU retombe
+    sur CPU (jamais d'exception pour un pré-traitement). torch est importé ici,
+    pas en tête : ce module reste importable sans stack GPU.
+    """
+    side = int(edge)
+    if side <= 0:
+        raise ValueError(f"pixels_fast needs a positive edge, got {edge!r}")
+    import torch
+    import torch.nn.functional as functional
+
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    target = device or "cpu"
+    if str(target).startswith("cuda") and not torch.cuda.is_available():
+        target = "cpu"
+    tensor = torch.from_numpy(np.array(image, dtype=np.uint8)).to(torch.float32)
+    tensor = tensor.permute(2, 0, 1).unsqueeze(0).contiguous().to(target)
+    if tuple(tensor.shape[-2:]) != (side, side):
+        tensor = functional.interpolate(tensor, size=(side, side), mode="bilinear",
+                                        align_corners=False, antialias=True)
+    mean_t = torch.tensor(tuple(mean), dtype=torch.float32, device=tensor.device)
+    std_t = torch.tensor(tuple(std), dtype=torch.float32, device=tensor.device)
+    # Même ordre que le ``normalize`` fusionné HF : (x - mean*255) / (std*255).
+    pixels = tensor.sub_(mean_t.mul_(255.0).view(1, 3, 1, 1))
+    pixels = pixels.div_(std_t.mul_(255.0).view(1, 3, 1, 1))
+    return pixels.to(dtype) if dtype is not None else pixels
+
+
+def fast_params(image_processor):
+    """``(edge, mean, std)`` couverts par :func:`pixels_fast`, ou None (repli HF).
+
+    Seule la config servie est couverte (resize carré bilinéaire + rescale +
+    normalisation) : fonction totale, toute autre config — ou tout objet
+    inattendu (préprocesseur factice des tests) — rend None, jamais d'exception.
+    """
+    size = getattr(image_processor, "size", None)
+    try:
+        height, width = int(size.get("height")), int(size.get("width"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if height != width or height <= 0:
+        return None
+    try:
+        bilinear = int(getattr(image_processor, "resample", None)) == 2
+    except (TypeError, ValueError):
+        return None
+    if not bilinear:
+        return None
+    for flag in ("do_resize", "do_rescale", "do_normalize"):
+        if not getattr(image_processor, flag, False):
+            return None
+    mean = getattr(image_processor, "image_mean", None)
+    std = getattr(image_processor, "image_std", None)
+    if mean is None or std is None:
+        return None
+    return height, tuple(mean), tuple(std)
+
+
+def try_pixels_fast(work, processor, device="cpu", dtype=None):
+    """pixels_fast si le préprocesseur est couvert, sinon None (repli HF).
+
+    Voie unique du levier ``FAST_PREPROCESS=fast`` : lecture des paramètres
+    servis, puis une passe fusionnée. Sans torch, repli silencieux (le chemin
+    HF historique prend le relais) — jamais d'exception pour un pré-traitement.
+    """
+    params = fast_params(getattr(processor, "image_processor", None))
+    if params is None:
+        return None
+    edge, mean, std = params
+    try:
+        return pixels_fast(work, edge, mean=mean, std=std, device=device, dtype=dtype)
+    except ImportError:
+        return None
+
+
 def mask_to_uint8(mask, size: tuple[int, int]) -> np.ndarray:
     """Normalise a binary mask (torch tensor or array) to an 8-bit 0/255 map."""
     array = mask.detach().cpu().numpy() if hasattr(mask, "detach") else np.asarray(mask)

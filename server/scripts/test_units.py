@@ -29,7 +29,8 @@ if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__m
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
                          depth_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
-                         native_tests, tracking_tests, weights_tests, ws_binary_tests)
+                         native_tests, preproc_tests, tracking_tests, weights_tests,
+                         ws_binary_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -432,6 +433,18 @@ RUNNERS = (
     ("live_fast : coords detr niveaux", "timing", live_fast_perf_tests.test_detr_coords_levels),
     ("live_fast : coords detr statique capture", "timing", live_fast_perf_tests.test_detr_coords_capture_static),
     ("feux : garde serveur (labels/slot/work_edge)", "timing", feux_guard_tests.test_feux_guard),
+    ("live_fast : pré-traitement (levier FAST_PREPROCESS)", "timing",
+     preproc_tests.test_preprocess_lever),
+    ("live_fast : pré-traitement (matrice de repli)", "timing",
+     preproc_tests.test_preprocess_fallback),
+    ("live_fast : pré-traitement (câblage _preprocess)", "timing",
+     preproc_tests.test_preprocess_wiring),
+    ("live_fast : pré-traitement (pixels + équivalence HF)", "timing",
+     preproc_tests.test_preprocess_pixels),
+    ("live_fast : pré-traitement (équivalence HF directe)", "timing",
+     preproc_tests.test_preprocess_equivalence),
+    ("live_fast : pré-traitement (levier déployé)", "timing",
+     preproc_tests.test_preprocess_deploy),
 )
 
 
