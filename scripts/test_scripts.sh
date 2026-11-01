@@ -16,7 +16,9 @@ LATEST="${HERE}/install-phone-latest.sh"
 VERIFY_NAV="${HERE}/verify-voice-nav.sh"
 VERIFY_STREET="${HERE}/verify-street.sh"
 MESURE="${HERE}/mesure-distances.sh"
-SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET" "$MESURE")
+SIM="${HERE}/isee-sim.sh"
+REPLAY="${HERE}/sim/route-replay.py"
+SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET" "$MESURE" "$SIM")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
 trap 'safe_rm_rf "$TMP"' EXIT
@@ -284,6 +286,77 @@ expect_nonzero 'mesure-distances signale des seuils ratés'
 expect_grep 'SEUILS NON ATTEINTS' 'mesure-distances rend le verdict seuils'
 run bash "$MESURE" --help
 expect_status 0 'mesure-distances --help sort 0'
+
+# --- 10. isee-sim.sh : gardes du harnais de balade ------------------------
+# Le harnais boote un émulateur : aucun test ne doit aller jusque-là. On
+# vérifie seulement qu'il refuse tôt, proprement, en nommant le coupable.
+echo "== 10. isee-sim.sh : gardes du harnais =="
+run bash "$SIM"
+expect_status 2 'isee-sim.sh sans --video sort 2'
+expect_grep '\-\-video' 'isee-sim.sh nomme --video'
+
+run bash "$SIM" --video "${TMP}/balade-absente.mp4" --no-build
+expect_nonzero 'isee-sim.sh refuse une vidéo absente'
+expect_grep 'vidéo absente' 'isee-sim.sh nomme la vidéo manquante'
+
+printf 'pas une video\n' >"${TMP}/fausse-balade.mp4"
+run bash "$SIM" --video "${TMP}/fausse-balade.mp4" --seconds abc
+expect_nonzero 'isee-sim.sh refuse un --seconds non numérique'
+expect_grep '\-\-seconds' 'isee-sim.sh nomme --seconds'
+
+run env PATH="$PATH_BIN" EMULATOR="${TMP}/pas-emulateur" bash "$SIM" \
+  --video "${TMP}/fausse-balade.mp4" --no-build --seconds 5
+expect_nonzero 'isee-sim.sh échoue proprement sans émulateur'
+expect_grep 'émulateur introuvable' 'isee-sim.sh nomme l émulateur manquant'
+
+printf '#!/bin/sh\nexit 0\n' >"${TMP}/bin/emulator"
+chmod +x "${TMP}/bin/emulator"
+run env PATH="$PATH_BIN" FFMPEG="${TMP}/pas-ffmpeg" bash "$SIM" \
+  --video "${TMP}/fausse-balade.mp4" --no-build --seconds 5
+expect_nonzero 'isee-sim.sh refuse un ffmpeg absent'
+expect_grep 'ffmpeg introuvable' 'isee-sim.sh nomme ffmpeg'
+
+run env PATH="$PATH_BIN" APK="${TMP}/absent.apk" bash "$SIM" \
+  --video "${TMP}/fausse-balade.mp4" --no-build --seconds 5
+expect_nonzero 'isee-sim.sh refuse un APK absent en --no-build'
+expect_grep 'APK absent' 'isee-sim.sh nomme l APK manquant'
+run grep -q -- '--no-build' "$SIM"
+expect_status 0 'isee-sim.sh documente --no-build'
+
+# --- 11. route-replay.py : trajets CSV et GPX -----------------------------
+echo "== 11. route-replay.py : lecture des trajets =="
+cat >"${TMP}/trajet.csv" <<'CSV'
+lat,lon
+48.8566,2.3522
+48.8570,2.3530
+CSV
+run python3 "$REPLAY" --route "${TMP}/trajet.csv" --dry-run
+expect_status 0 'route-replay lit un CSV avec en-tête'
+expect_grep '2 points' 'route-replay compte deux points CSV'
+expect_grep '2.352200' 'route-replay rend la longitude du point 1'
+
+cat >"${TMP}/trajet.gpx" <<'GPX'
+<?xml version="1.0"?>
+<gpx version="1.1"><trk><trkseg>
+<trkpt lat="48.8566" lon="2.3522"><ele>35</ele></trkpt>
+<trkpt lat="48.8570" lon="2.3530"><ele>35</ele></trkpt>
+</trkseg></trk></gpx>
+GPX
+run python3 "$REPLAY" --route "${TMP}/trajet.gpx" --dry-run
+expect_status 0 'route-replay lit un GPX'
+expect_grep '2 points' 'route-replay compte deux points GPX'
+
+printf '48.8566\n' >"${TMP}/trajet-ko.csv"
+run python3 "$REPLAY" --route "${TMP}/trajet-ko.csv" --dry-run
+expect_status 2 'route-replay refuse un CSV sans longitude'
+run python3 "$REPLAY" --route "${TMP}/trajet.csv"
+expect_status 2 'route-replay exige --serial hors dry-run'
+run python3 "$REPLAY" --help
+expect_status 0 'route-replay --help sort 0'
+expect_grep 'Usage' 'route-replay --help affiche l usage'
+run python3 "$REPLAY" --bogus
+expect_status 2 'route-replay --bogus sort 2'
+expect_grep 'argument inconnu' 'route-replay nomme l argument inconnu'
 
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"
