@@ -15,7 +15,7 @@ class ProbeEnsureConceptTest {
     @Test
     fun `concept absent rejoint les masques sam`() = runTest {
         val (probe, _) = probeHarness(this)
-        // Liste d'intérieur (7 concepts) : il reste de la place sous le plafond.
+        // Liste d'intérieur (9 concepts) : il reste de la place sous le plafond.
         probe.configure(PROBE_TEST_ENDPOINT, prompts = LivePrompts.indoor)
         probe.ensureConcept(Settings.Default, "keys")
         advanceUntilIdle()
@@ -44,9 +44,9 @@ class ProbeEnsureConceptTest {
     @Test
     fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
         // Liste unique normal/Traversée (30/10) : 18 concepts, au plafond —
-        // « Find the X » dehors fait sortir le 18e (« socks ») puis reconfigure
-        // (« keys » est déjà dans les défauts depuis le 31/10, démontré avec
-        // « wallet ») : sans ça iSee dit « Looking for … » puis reste muet.
+        // « Find the X » dehors fait sortir le 18e (« dog » depuis l'audit
+        // foule du 01/11) puis reconfigure : sans ça iSee dit
+        // « Looking for … » puis reste muet.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "wallet")
@@ -55,7 +55,7 @@ class ProbeEnsureConceptTest {
         val sent = probe.state.value.conceptsSent
         assertEquals(18, sent.size)
         assertTrue(sent.contains("wallet"))
-        assertFalse(sent.contains("socks"))
+        assertFalse(sent.contains("dog"))
     }
 
     @Test
@@ -63,8 +63,8 @@ class ProbeEnsureConceptTest {
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "Person")
-        // « keys » est dans les défauts (31/10) : déjà suivi, pas de reconfiguration.
-        probe.ensureConcept(Settings.Default, "keys")
+        // « dog » est dans les défauts (01/11) : déjà suivi, pas de reconfiguration.
+        probe.ensureConcept(Settings.Default, "dog")
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
         assertEquals(LivePrompts.normalize(LivePrompts.default), probe.state.value.conceptsSent)

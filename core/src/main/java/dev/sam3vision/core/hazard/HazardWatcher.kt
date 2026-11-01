@@ -1,5 +1,6 @@
 package dev.sam3vision.core.hazard
 
+import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PositionText
@@ -33,6 +34,8 @@ data class HazardSignal(
     val label: String?,
     val centerX: Float? = null,
     val alt: HazardAlt? = null,
+    /** Piste de la personne retenue (voir [HazardCue.trackId] ; `null` sans suivi). */
+    val trackId: Int? = null,
 ) {
     companion object {
         /** Signal vide : jamais d'exception sur le chemin du direct. */
@@ -63,12 +66,12 @@ data class HazardSignal(
             val alt = if (person != null) other?.let { HazardAlt(it.meters, it.label, it.centerX) } else null
             return HazardSignal(
                 detected = true, meters = best.meters, label = best.label,
-                centerX = best.centerX, alt = alt,
+                centerX = best.centerX, alt = alt, trackId = best.trackId,
             )
         }
 
         /** Danger proche candidat : distance, libellé et centre normalisé. */
-        private data class Hit(val meters: Float, val label: String, val centerX: Float)
+        private data class Hit(val meters: Float, val label: String, val centerX: Float, val trackId: Int?)
 
         /** Candidat si [reading] est un danger parlé proche, `null` sinon. */
         private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
@@ -84,7 +87,8 @@ data class HazardSignal(
             // Personne imminente : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
             val nearPerson = person && meters <= HazardWatcher.PERSON_FAST_METERS
             if (!nearPerson && (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE)) return null
-            return Hit(meters, reading.label, centerX)
+            val trackId = reading.trackId.takeIf { it != DistanceMeter.UNTRACKED_ID }
+            return Hit(meters, reading.label, centerX, trackId)
         }
     }
 }
@@ -105,6 +109,12 @@ data class HazardCue(
     val urgent: Boolean = false,
     val kind: HazardKind = HazardKind.OTHER,
     val safetyPhrase: String? = null,
+    /**
+     * Personne suivie que cette annonce concerne (`null` : pas de piste).
+     * La couche voix s'en sert comme clé de cadence : une annonce par
+     * **personne**, pas une par côté toutes les 20 s (audit foule du 01/11).
+     */
+    val trackId: Int? = null,
 )
 
 /**
@@ -218,6 +228,7 @@ class HazardWatcher(
         val name: HazardConcepts.HazardName,
         val meters: Float?,
         val centerX: Float?,
+        val trackId: Int? = null,
     )
 
     /**
@@ -266,9 +277,11 @@ class HazardWatcher(
             val altLabel = alt.label ?: return null
             if (!HazardConcepts.isSpoken(altLabel)) return null
             val altName = HazardConcepts.nameOf(altLabel) ?: return null
-            return Candidate(HazardConcepts.kindOf(altLabel), altName, alt.meters, alt.centerX)
+            return Candidate(HazardConcepts.kindOf(altLabel), altName, alt.meters, alt.centerX,
+                trackId = signal.trackId)
         }
-        return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX)
+        return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX,
+            trackId = signal.trackId)
     }
 
     /**
@@ -287,7 +300,7 @@ class HazardWatcher(
             personSpoken = true
             personQuiet = 0
             personHits = 0
-            return HazardCue(word, meters, urgent = true, kind = HazardKind.PERSON)
+            return HazardCue(word, meters, urgent = true, kind = HazardKind.PERSON, trackId = candidate.trackId)
         }
         personHits++
         if (personHits < confirmFrames) return null
@@ -298,7 +311,7 @@ class HazardWatcher(
         personQuiet = 0
         return HazardCue(
             HazardText.personPhrase(candidate.name, language, candidate.centerX),
-            meters, kind = HazardKind.PERSON,
+            meters, kind = HazardKind.PERSON, trackId = candidate.trackId,
         )
     }
 
@@ -312,7 +325,7 @@ class HazardWatcher(
         otherHits = 0
         return HazardCue(
             HazardText.phrase(candidate.name, language, candidate.centerX),
-            candidate.meters, kind = candidate.kind,
+            candidate.meters, kind = candidate.kind, trackId = candidate.trackId,
         )
     }
 

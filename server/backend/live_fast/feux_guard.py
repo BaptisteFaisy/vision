@@ -172,19 +172,25 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
     un appel par famille manquante (première place de chacune) plus les autres
     sur le reste, fusionnés par score décroissant — mêmes masques, mêmes
     ``mask_scale`` RLE, mêmes clés ``depth``.
+
+    Les familles **déjà** dans le top concourent normalement, dans le même pool
+    que les autres objets : les exclure toutes avant de ne réserver qu'aux
+    familles manquantes effaçait un feu pourtant premier au score (0,99) dès
+    qu'un passage à 0,10 prenait sa place réservée — la garde évinçait
+    précisément ce qu'elle protège (reel audit foule 01/11).
     """
     others, feu, walk, curb = _split_guarded(entries)
-    missing = []
-    if feu and not _top_keeps(entries, max_objects, is_feu_label):
-        missing.append(feu)
-    if walk and not _top_keeps(entries, max_objects, is_crosswalk_label):
-        missing.append(walk)
-    if curb and not _top_keeps(entries, max_objects, is_curb_label):
-        missing.append(curb)
+    families = ((feu, is_feu_label), (walk, is_crosswalk_label), (curb, is_curb_label))
+    missing = [fam for fam, is_guarded in families
+               if fam and not _top_keeps(entries, max_objects, is_guarded)]
     if not missing or max_objects <= len(missing):
         return finalize(entries, image_size, max_objects, mask_encoding,
                         mask_format=mask_format, mask_edge=mask_edge)
-    kept = finalize(others, image_size, max_objects - len(missing), mask_encoding,
+    pool = list(others)
+    for fam, _is_guarded in families:
+        if fam and all(fam is not reserved for reserved in missing):
+            pool.extend(fam)
+    kept = finalize(pool, image_size, max_objects - len(missing), mask_encoding,
                     mask_format=mask_format, mask_edge=mask_edge)
     merged = list(kept["objects"])
     for family in missing:

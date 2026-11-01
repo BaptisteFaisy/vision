@@ -25,12 +25,25 @@ import java.text.Normalizer
  * pour un sténopé fiable). La distance de ces défauts vient de la branche
  * profondeur (`DepthReadings`) ou du plan de sol, jamais du sténopé (voir
  * [DEPTH_ONLY] et `StairConcepts`).
+ *
+ * **Foule (P0 point 7)** : les concepts qui peuplent un trottoir ont chacun
+ * leur entrée — enfant, poussette, fauteuil roulant, trottinette, chien — avec
+ * leur tolérance propre, parce que leur hauteur n'est pas celle d'un adulte
+ * debout. `person` (1,70 m) reste l'**adulte debout** et ne peut pas couvrir
+ * un enfant : ce n'est pas une question de tolérance mais de hauteur réelle
+ * (1,20 m = adulte × 0,71). Lu comme un adulte, un enfant de 1,20 m à 3 m sort
+ * à `1,70 × 3 / 1,20 = 4,26 m`, **hors de la portée de contact de 4 m** : il
+ * cesse de bloquer alors qu'il est à trois pas. Une hauteur par catégorie est
+ * donc la seule correction possible ; élargir la tolérance de `person` ne
+ * changerait que le poids de fusion, jamais la distance.
  */
 object KnownSizes {
 
     /**
      * Hauteur réelle typique de [label], `null` si le concept n'est pas calibré.
-     * Tolérant : casse, accents, espaces et pluriel simple sont neutralisés.
+     * Tolérant : casse, accents, espaces et pluriel sont neutralisés — y compris
+     * le pluriel d'une clé composée (« fauteuils roulants » → « fauteuil roulant »,
+     * voir [singularKey]).
      */
     fun heightMeters(label: String): Float? {
         val key = canonical(label)
@@ -38,6 +51,7 @@ object KnownSizes {
         TABLE[key]?.let { return it }
         if (key.endsWith("s") && key.length > 3) TABLE[key.dropLast(1)]?.let { return it }
         if (!key.contains(' ')) return null
+        TABLE[singularKey(key)]?.let { return it }
         // Tête du composé : premier mot en français (« sac à dos » → « sac »),
         // dernier en anglais (« a traffic sign » → « sign ») — voir FIRST_WORD.
         FIRST_WORD[key.substringBefore(' ')]?.let { return it }
@@ -57,11 +71,23 @@ object KnownSizes {
         TOLERANCE[key]?.let { return it }
         if (key.endsWith("s") && key.length > 3) TOLERANCE[key.dropLast(1)]?.let { return it }
         if (key.contains(' ')) {
+            TOLERANCE[singularKey(key)]?.let { return it }
             FIRST_WORD_TOLERANCE[key.substringBefore(' ')]?.let { return it }
             FIRST_WORD_TOLERANCE[key.substringAfterLast(' ')]?.let { return it }
         }
         return DEFAULT_TOLERANCE
     }
+
+    /**
+     * Clé composée ramenée au singulier mot à mot : « fauteuils roulants » →
+     * « fauteuil roulant ». La coupe du « s » final de [heightMeters] ne suffit
+     * que pour les clés d'un seul mot ; les mots de trois lettres ou moins
+     * (« bus », « dos ») ne sont pas touchés.
+     */
+    private fun singularKey(key: String): String =
+        key.split(' ').joinToString(" ") { word ->
+            if (word.length > 3 && word.endsWith("s")) word.dropLast(1) else word
+        }
 
     /**
      * Poids de la branche sténopé dans [DistanceFusion] : `1 / (1 + tolérance)` —
@@ -85,14 +111,25 @@ object KnownSizes {
         // Personnes et animaux
         "person" to 1.70f, "personne" to 1.70f, "humain" to 1.70f, "human" to 1.70f,
         "homme" to 1.75f, "man" to 1.75f, "femme" to 1.68f, "woman" to 1.68f,
-        "enfant" to 1.20f, "child" to 1.20f, "kid" to 1.20f,
+        // Enfant : 1,20 m (4-9 ans, ordre de grandeur, pas une mesure). « children »
+        // est écrit en clair — pas de « s » final, la coupe du pluriel ne l'attrape
+        // pas ; « enfants » passe par elle. `person` ne peut pas le couvrir (KDoc).
+        "enfant" to 1.20f, "child" to 1.20f, "kid" to 1.20f, "children" to 1.20f,
+        // Poussette : 1,05 m, poignée d'une poussette citadine (0,9-1,2 m).
+        "poussette" to 1.05f, "stroller" to 1.05f, "pram" to 1.05f, "buggy" to 1.05f,
         // Postures : une personne assise (1,25 m, dossier inclus) mesurée comme
         // debout (1,70 m) sort 36 % trop loin — les concepts chassés/suivis qui
         // portent la posture (champ « Follow », chasse iSee) ont leur entrée.
         "personne assise" to 1.25f, "seated person" to 1.25f, "sitting person" to 1.25f,
         "homme assis" to 1.28f, "seated man" to 1.28f, "femme assise" to 1.23f, "seated woman" to 1.23f,
         "cycliste" to 1.75f, "cyclist" to 1.75f,
-        "fauteuil roulant" to 1.25f, "wheelchair" to 1.25f,
+        // Fauteuil roulant : 0,95 m de dossier, personne assise sur ses roues
+        // (0,8-1,1 m). Doute assumé : une boîte qui inclut la tête de l'occupant
+        // mesure plutôt 1,25-1,35 m, hors de la tolérance de 25 % — à trancher sur
+        // captures ; l'ancien 1,25 m (taille assise sur une chaise) surestimait la
+        // distance de 32 %.
+        "fauteuil roulant" to 0.95f, "wheelchair" to 0.95f,
+        // Chien : 0,55 m au garrot (petit à moyen, 0,3-0,8 m).
         "chien" to 0.55f, "dog" to 0.55f, "chat" to 0.25f, "cat" to 0.25f,
         "cheval" to 1.60f, "horse" to 1.60f,
         "animal" to 0.60f, "animaux" to 0.60f,
@@ -100,8 +137,12 @@ object KnownSizes {
         "voiture" to 1.45f, "car" to 1.45f, "camion" to 2.80f, "truck" to 2.80f,
         "bus" to 3.00f, "moto" to 1.40f, "motorcycle" to 1.40f,
         "suv" to 1.65f, "van" to 1.95f, "camionnette" to 1.95f, "pickup" to 1.75f, "pick up" to 1.75f,
-        "velo" to 1.10f, "bicycle" to 1.10f, "bike" to 1.10f, "trottinette" to 1.00f,
-        "trottinette electrique" to 1.00f, "scooter" to 1.00f, "electric scooter" to 1.00f,
+        "velo" to 1.10f, "bicycle" to 1.10f, "bike" to 1.10f,
+        // Trottinette : 1,15 m guidon haut (0,9-1,25 m), électrique ou non. La
+        // trottinette d'un adulte est plus haute qu'un vélo vu de loin : 1,00 m
+        // la rapprochait à tort.
+        "trottinette" to 1.15f, "trottinette electrique" to 1.15f,
+        "scooter" to 1.15f, "electric scooter" to 1.15f,
         // Mobilier
         "chaise" to 0.90f, "chair" to 0.90f, "table" to 0.75f,
         "canape" to 0.80f, "sofa" to 0.80f, "couch" to 0.80f, "lit" to 0.60f, "bed" to 0.60f,
@@ -138,17 +179,24 @@ object KnownSizes {
     /**
      * Concepts → incertitude relative de leur hauteur typique. Seuls les concepts
      * qui s'écartent de [DEFAULT_TOLERANCE] y figurent : une porte normalisée (3 %),
-     * un adulte (5-6 %), un enfant ou un animal (15-30 %). Ordres de grandeur
+     * un adulte (5-6 %), un enfant ou un animal (20-30 %). Ordres de grandeur
      * assumés, à resserrer par la recette au mètre ruban.
      */
     val TOLERANCE: Map<String, Float> = mapOf(
         "person" to 0.06f, "personne" to 0.06f, "humain" to 0.06f, "human" to 0.06f,
         "homme" to 0.05f, "man" to 0.05f, "femme" to 0.05f, "woman" to 0.05f,
+        // Foule (P0 point 7) : la taille d'un enfant varie de 20 %, celle d'une
+        // poussette, d'une trottinette ou d'un fauteuil roulant de 25 %, celle d'un
+        // chien de 30 % (race). Une hauteur incertaine pèse moins dans la fusion.
+        "enfant" to 0.20f, "child" to 0.20f, "kid" to 0.20f, "children" to 0.20f,
+        "poussette" to 0.25f, "stroller" to 0.25f, "pram" to 0.25f, "buggy" to 0.25f,
+        "fauteuil roulant" to 0.25f, "wheelchair" to 0.25f,
+        "trottinette" to 0.25f, "trottinette electrique" to 0.25f,
+        "scooter" to 0.25f, "electric scooter" to 0.25f,
+        "chien" to 0.30f, "dog" to 0.30f, "chat" to 0.20f, "cat" to 0.20f,
         "personne assise" to 0.08f, "seated person" to 0.08f, "sitting person" to 0.08f,
         "homme assis" to 0.08f, "seated man" to 0.08f, "femme assise" to 0.08f, "seated woman" to 0.08f,
         "cycliste" to 0.10f, "cyclist" to 0.10f,
-        "fauteuil roulant" to 0.12f, "wheelchair" to 0.12f,
-        "chien" to 0.20f, "dog" to 0.20f, "chat" to 0.20f, "cat" to 0.20f,
         "cheval" to 0.10f, "horse" to 0.10f, "animal" to 0.30f, "animaux" to 0.30f,
         "voiture" to 0.08f, "car" to 0.08f, "camion" to 0.10f, "truck" to 0.10f,
         "bus" to 0.08f, "moto" to 0.12f, "motorcycle" to 0.12f,

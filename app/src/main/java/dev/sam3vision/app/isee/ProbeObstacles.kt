@@ -8,12 +8,61 @@ import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
+import dev.sam3vision.core.traverse.VehicleStateCue
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+/**
+ * Alerte de sécurité de la frame : **parole du user devant tout** (ordre user
+ * du 1/11) — l'alerte retenue attend le silence en file douce au lieu de couper
+ * le micro. Rend vrai quand elle a été retenue ([ObstacleDecision.safety] non
+ * nulle et le user parle). Extrait d'[obstacleFrame] (plafond 50 lignes).
+ */
+private fun speakSafety(
+    phrase: String?,
+    voice: ProximityVoice,
+    safety: SafetyVoice,
+    watchers: ObstacleWatchers,
+    nowMs: Long,
+): Boolean {
+    if (phrase == null) return false
+    if (voice.userIsSpeaking()) return true
+    safety.speak(phrase)
+    watchers.lastSafetyMs = nowMs
+    return false
+}
+
+/**
+ * Véhicule de la frame : **frames SAM seules** (ex-`observeVehicleState`), la
+ * porte avance à chaque compteur vu, Traversée ou non. Extrait d'[obstacleFrame]
+ * (plafond 50 lignes).
+ */
+private fun vehicleCueOf(
+    st: LiveProbeState,
+    readings: List<DistanceReading>,
+    watchers: ObstacleWatchers,
+    nowMs: Long,
+    lang: SpeechLanguage,
+    motion: FrameMotion?,
+): VehicleStateCue? {
+    val freshFrame = st.frames != watchers.lastVehicleFrames
+    watchers.lastVehicleFrames = st.frames
+    if (!freshFrame || st.crossingActive) return null
+    return watchers.vehicle.update(
+        detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion)
+        ?.also {
+            logMotionTransition(
+                watchers.vehicle.cameraMoved, watchers.vehicle.lastMotionVerdicts.values,
+                st.width, motion?.dtMs ?: 0L,
+            )
+        }
+}
 
 /**
  * Les trois guetteurs ordonnés (véhicules + bordure + mobilier) et l'instant
@@ -104,13 +153,7 @@ internal fun obstacleFrame(
     val nowMs = System.currentTimeMillis()
     val lang = language()
     val motion = ProbeBackgroundMotion.lastMotion
-    // Frames SAM seules pour les véhicules (ex-`observeVehicleState`) : la
-    // porte avance à chaque compteur vu, Traversée ou non.
-    val freshFrame = st.frames != watchers.lastVehicleFrames
-    watchers.lastVehicleFrames = st.frames
-    val vehicleCue = if (!freshFrame || st.crossingActive) null else watchers.vehicle.update(
-        detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion)
-        ?.also { logMotionTransition(watchers.vehicle.cameraMoved, watchers.vehicle.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L) }
+    val vehicleCue = vehicleCueOf(st, readings, watchers, nowMs, lang, motion)
     val curbSignal = CurbSignal.of(readings, st.width, st.height)
     val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
@@ -120,19 +163,20 @@ internal fun obstacleFrame(
     val wordClip = imminentWordClipId(hazardCue)
     val decision = decideObstacles(vehicleCue, curbCue, hazardCue.takeUnless { wordClip != null })
     val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
-    // Parole du user devant tout (ordre user du 1/11) : l'alerte retenue
-    // attend le silence en file douce au lieu de couper le micro.
-    val heldForUser = decision.safety != null && voice.userIsSpeaking()
-    if (decision.safety != null && !heldForUser) {
-        safety.speak(decision.safety)
-        watchers.lastSafetyMs = nowMs
-    }
+    val heldForUser = speakSafety(decision.safety, voice, safety, watchers, nowMs)
     launchImminentWord(scope, voice, playerIdle, softSpeech, lang, hazardCue, wordClip)
     val soft = softOf(decision, heldForUser)
     if (soft != null) {
         scope.launch {
             softSpeech.withLock {
-                voice.onPhrase(soft, playerIdle(), urgent = decision.urgent && !heldForUser, queue = true, busy = busy, preempt = decision.preempt)
+                // Clé de cadence par personne : une annonce « Attention à la
+                // personne » par piste, pas une par côté toutes les 20 s (audit
+                // foule du 01/11).
+                voice.onPhrase(
+                    soft, playerIdle(), urgent = decision.urgent && !heldForUser,
+                    queue = true, busy = busy, preempt = decision.preempt,
+                    trackId = hazardCue?.trackId,
+                )
             }
         }
     } else if (!st.crossingActive) {

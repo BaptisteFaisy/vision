@@ -276,4 +276,133 @@ class GuidanceTest {
         assertEquals("Left.", Guidance.phrase(decision))
         assertEquals("w|left", Guidance.key(decision))
     }
+
+    // — Audit foule P0, point 3 : un ordre ne pointe pas hors du trottoir —
+
+    /**
+     * Scène de l'audit : trottoir de 1,80 m, obstacle (chaise) à 3,50 m juste à
+     * gauche de l'axe. Sans espace mesuré, l'ordre chiffré dépasse le trottoir
+     * (1,50 m de décalage quand il s'arrête à 0,90 m) ; avec l'espace mesuré, le
+     * côté conseillé a de la place et le chiffre y tient.
+     */
+    @Test
+    fun `audit trottoir 1 80 m = l ordre tient dans le trottoir`() {
+        val labels = listOf(placed("chaise", 0.46f, 3.5f))
+        val historique = Guidance.decide(labels)
+        val mesure = Guidance.decide(labels, free = FreeSpace(0f, 0.9f))
+
+        assertEquals(GuidanceSide.Right, historique.side)
+        assertTrue("l'ordre historique dépasse le trottoir", historique.shiftMeters!! > 0.9f)
+        assertTrue(mesure.blocked)
+        assertNotEquals(GuidanceSide.Left, mesure.side)
+        assertTrue("le chiffre tient dans la place", mesure.shiftMeters!! <= 0.9f)
+    }
+
+    /** Le côté calculé sans marge (0,10 m) cède la place au côté large (0,90 m). */
+    @Test
+    fun `un cote sans place est ecarte au profit du plus large`() {
+        val labels = listOf(placed("chaise", 0.55f, 3.5f))
+        val mesure = Guidance.decide(labels, free = FreeSpace(0.1f, 0.9f))
+
+        assertEquals(GuidanceSide.Left, Guidance.decide(labels).side)
+        assertEquals(GuidanceSide.Right, mesure.side)
+        assertEquals("Right.", Guidance.phrase(mesure))
+    }
+
+    /** Gauche bouchée et droite à 0,40 m : la marge de bord suffit, on parle. */
+    @Test
+    fun `gauche bouchee et droite a 0 40 m = le conseil est conserve`() {
+        val labels = listOf(placed("chaise", 0.55f, 3.5f))
+        val mesure = Guidance.decide(labels, free = FreeSpace(0f, 0.4f))
+
+        assertTrue(mesure.blocked)
+        assertEquals(GuidanceSide.Right, mesure.side)
+        assertEquals("Right.", Guidance.phrase(mesure))
+    }
+
+    /** Aucun côté n'a la marge : le côté calculé est gardé, jamais de silence. */
+    @Test
+    fun `aucune place des deux cotes = le cote calcule est garde`() {
+        val labels = listOf(placed("chaise", 0.55f, 3.5f))
+        val mesure = Guidance.decide(labels, free = FreeSpace(0f, 0.1f))
+
+        assertTrue(mesure.blocked)
+        assertEquals(GuidanceSide.Left, mesure.side)
+        assertEquals(0f, mesure.shiftMeters!!, 0.001f)
+        assertEquals("Left.", Guidance.phrase(mesure))
+    }
+
+    /** 1,50 m de décalage sur 0,60 m de place : ramené au demi-mètre inférieur. */
+    @Test
+    fun `un ordre de 1 50 m sur 0 60 m de place est ramene a 0 50 m`() {
+        val labels = listOf(placed("chaise", 0.5f, 3.5f))
+        val mesure = Guidance.decide(labels, free = FreeSpace(0.6f, 0.6f))
+
+        assertEquals(GuidanceSide.Left, mesure.side)
+        assertEquals(0.5f, mesure.shiftMeters!!, 0.001f)
+    }
+
+    /** Invariant : le chiffre annoncé tient toujours dans la place du côté dit. */
+    @Test
+    fun `le decalage ne depasse jamais la place du cote conseille`() {
+        val labels = listOf(placed("chaise", 0.5f, 3.5f))
+        val espaces = listOf(
+            FreeSpace(0.6f, 0.6f),
+            FreeSpace(0f, 0.4f),
+            FreeSpace(1.2f, 0.5f),
+            FreeSpace(0.35f, 2f),
+        )
+
+        for (free in espaces) {
+            val decision = Guidance.decide(labels, free = free)
+            val side = decision.side!!
+            assertTrue(
+                "$free : ${decision.shiftMeters} > ${free.room(side)}",
+                decision.shiftMeters!! <= free.room(side),
+            )
+        }
+    }
+
+    /** À 2 m/s, l'horizon vaut 5,8 m : un obstacle à 5 m entre dans le couloir. */
+    /** Une portée fixée par l'appelant fait foi, vitesse ou pas. */
+    @Test
+    fun `une portee explicite fait foi sur la vitesse`() {
+        val cinq = listOf(placed("personne", 0.5f, 5f))
+
+        assertTrue(Guidance.decide(cinq, rangeMeters = 6f, axisRangeMeters = 6f).blocked)
+        assertFalse(
+            Guidance.decide(cinq, rangeMeters = 3f, speedMps = 2f, axisRangeMeters = 3f).blocked,
+        )
+    }
+
+    /** Espace inconnu (trottoir supposé) : rien ne change, scène historique. */
+    @Test
+    fun `free inconnu = comportement historique inchange`() {
+        val scene = listOf(placed("personne", 0.5f, 2f), placed("chaise", 0.1f, 1f))
+        val historique = Guidance.decide(scene)
+
+        assertEquals(historique, Guidance.decide(scene, free = FreeSpace.unknown()))
+        assertEquals(1f, historique.shiftMeters!!, 0.001f)
+        assertEquals("w|right", Guidance.key(historique))
+    }
+
+    /** Trottoir mesuré symétrique = trottoir supposé : décision identique. */
+    @Test
+    fun `trottoir symetrique mesure = decision identique`() {
+        val labels = listOf(placed("personne", 0.5f, 2.4f))
+
+        assertEquals(Guidance.decide(labels), Guidance.decide(labels, free = FreeSpace(0.9f, 0.9f)))
+    }
+
+    /** Cap latéral : le décalage est plafonné par la place, le passage reste dit. */
+    @Test
+    fun `cap lateral = le decalage est plafonne aussi`() {
+        val labels = listOf(placed("chaise", 0.2f, 3.5f))
+        val decision = Guidance.decide(labels, SteeringCap.Left, free = FreeSpace(0.6f, 0.6f))
+
+        assertTrue(decision.blocked)
+        assertNull(decision.side)
+        assertEquals(SteeringCap.Straight, decision.passage)
+        assertEquals(0.5f, decision.shiftMeters!!, 0.001f)
+    }
 }

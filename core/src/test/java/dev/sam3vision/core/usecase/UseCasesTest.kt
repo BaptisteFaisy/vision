@@ -50,13 +50,13 @@ private class FakeSam(private val result: Result<SegmentResult>) : SamClient {
 class UseCasesTest {
 
     @Test
-    fun `analyze garde au plus 8 objets a l'ecran`() = runBlocking {
+    fun `analyze garde au plus 16 objets a l'ecran`() = runBlocking {
         val llm = FakeLlm()
-        val many = (1..12).map { CHAIR.copy(label = "objet$it") }
+        val many = (1..20).map { CHAIR.copy(label = "objet$it") }
         val sam = FakeSam(Result.success(SegmentResult(10, 10, many)))
         val analysis = AnalyzeUseCase(llm, sam).invoke("QUJD").getOrThrow()
         assertEquals(ObjectLimits.DEFAULT_ON_SCREEN, analysis.objects.size)
-        assertEquals((1..8).map { "objet$it" }, llm.lastLabels)
+        assertEquals((1..16).map { "objet$it" }, llm.lastLabels)
     }
 
     @Test
