@@ -12,10 +12,11 @@ import dev.sam3vision.core.model.LiveFrame
 internal typealias CrossingCropTap = (box: List<Float>, crop: CrossingFrame, verdict: CrossingState) -> Unit
 
 /**
- * Lecture du feu sur une frame : boîte SAM au meilleur score, crop JPEG classifié
- * en local puis filtré par la porte anti-confusion ([PedLightGate], 100 %
- * embarqué, aucun réseau). Pas de feu en vue ou image illisible ⇒
- * [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10),
+ * Lecture du feu sur une frame : boîtes SAM candidates (tête puis caisson),
+ * crop JPEG classifié en local puis filtré par la porte anti-confusion
+ * ([PedLightGate], 100 % embarqué, aucun réseau). Tête sans lampe vue : le
+ * caisson est relu (mauvaise lentille) ; pas de feu en vue ou image
+ * illisible ⇒ [CrossingState.Red] — binaire, tout non-vert attend (ordre user du 31/10),
  * l'équivalent sûr de l'ancien « Doute » : jamais de vert sans boîte lue puis
  * crop classifié vert. Seuils inchangés (arbre + porte intacts).
  *
@@ -30,15 +31,24 @@ internal fun crossingLightOf(
     jpegB64: String,
     onCrop: CrossingCropTap? = null,
 ): CrossingLight {
-    val box = CrossingPrompts.selectLightBox(frame.objects, frame.width, frame.height)
-        ?: return poleFallbackOf(frame, jpegB64, onCrop)
-    val crop = CrossingPixels.frame(jpegB64, box)
-        ?: return CrossingLight(box, CrossingState.Red)
-    val verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height)
-    // Collecte (voir LightCropLogger) : seuls les crops classifiés partent,
-    // jamais les frames sans boîte ni les échecs de décodage.
-    if (onCrop != null) onCrop(box, crop, verdict)
-    return CrossingLight(box, verdict)
+    val boxes = CrossingPrompts.selectLightBoxes(frame.objects, frame.width, frame.height)
+    if (boxes.isEmpty()) return poleFallbackOf(frame, jpegB64, onCrop)
+    for (index in boxes.indices) {
+        val box = boxes[index]
+        val crop = CrossingPixels.frame(jpegB64, box)
+            ?: return CrossingLight(box, CrossingState.Red)
+        // Tête sans lampe (mauvaise lentille, 01/11 `nl_panda_10`) : relire le
+        // caisson au lieu de conclure — une tête à lampe vue tranche, même rouge.
+        if (index < boxes.lastIndex && !PedLightGate.hasLampSignal(crop.argb, crop.width, crop.height)) {
+            continue
+        }
+        val verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height)
+        // Collecte (voir LightCropLogger) : seuls les crops classifiés partent,
+        // jamais les frames sans boîte ni les échecs de décodage.
+        if (onCrop != null) onCrop(box, crop, verdict)
+        return CrossingLight(box, verdict)
+    }
+    return poleFallbackOf(frame, jpegB64, onCrop)
 }
 
 /**

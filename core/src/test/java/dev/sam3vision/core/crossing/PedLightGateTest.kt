@@ -135,6 +135,17 @@ class PedLightGateTest {
     }
 
     @Test
+    fun `verdict - micro bonhomme bas accepte (fraction 0,0035)`() {
+        // 48x48, barre 2x4 en bas : fraction 0,0035, dans l'ancienne bande
+        // (rouge aux seuils 0,0035 et 0,0048) — miroir Python en vis-à-vis.
+        val pixels = IntArray(48 * 48) { BLACK }
+        for (y in 44 until 48) {
+            for (x in 23..24) pixels[y * 48 + x] = GREEN
+        }
+        assertEquals(CrossingState.Green, PedLightGate.verdict(pixels, 48, 48))
+    }
+
+    @Test
     fun `lampe allumee - vert et rouge vrais, le reste faux`() {
         assertTrue(PedLightGate.hasLampSignal(barBottom(), 20, 20))
         assertTrue(PedLightGate.hasLampSignal(IntArray(100) { RED }, 10, 10))

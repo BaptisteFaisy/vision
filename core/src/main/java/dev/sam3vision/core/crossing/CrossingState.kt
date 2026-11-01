@@ -163,14 +163,24 @@ object CrossingPrompts {
      * La normalisation suit [Detection.normalizedBox] : la boîte se reporte
      * sur le Bitmap décodé côté `:app`, quelle que soit sa taille.
      */
-    fun selectLightBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? {
-        if (width <= 0 || height <= 0) return null
+    fun selectLightBox(objects: List<SegObject>, width: Int, height: Int): List<Float>? =
+        selectLightBoxes(objects, width, height).firstOrNull()
+
+    /**
+     * Boîtes candidates ordonnées (tête puis caisson, 0 à 2) : [selectLightBox]
+     * n'en garde que la première, mais une tête peut cadrer la mauvaise
+     * lentille (01/11, `nl_panda_10` : tête à 0,48 sur la lentille éteinte,
+     * caisson à 0,89 sur le boîtier allumé) — l'appelant relit le caisson
+     * quand la tête est sans lampe (voir `:app`, `crossingLightOf`).
+     */
+    fun selectLightBoxes(objects: List<SegObject>, width: Int, height: Int): List<List<Float>> {
+        if (width <= 0 || height <= 0) return emptyList()
         val carBoxes = CarLightVeto.carBoxes(objects)
         val lights = objects.filter { isLightLabel(it.label) }
             .filterNot { CarLightVeto.isVetoed(it.box, carBoxes) }
-        if (lights.isEmpty()) return null
+        if (lights.isEmpty()) return emptyList()
         val (heads, housings) = lights.partition { isHeadLabel(it.label) }
-        return bestBox(heads, width, height) ?: bestBox(housings, width, height)
+        return listOfNotNull(bestBox(heads, width, height), bestBox(housings, width, height))
     }
 
     /**
