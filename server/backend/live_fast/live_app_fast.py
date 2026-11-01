@@ -63,6 +63,9 @@ ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 60)
 # Warm pool : 0 = extinction après le bail (défaut) ; 1 = conteneur chaud permanent
 # (cold start supprimé, ~500 $/mois A100). Jamais plus de 1 : UN SEUL GPU, JAMAIS DEUX.
+# O2 : le défaut reste 0 (garde coût — règle user 27/10 « éteinte = 0 € ») ; le
+# pré-chauffe EXPLICITE remplace le pool : GET /warm (sans inférence, snapshot
+# créé au deploy par warmup_snapshot dans scripts/deploy-live-fast.sh).
 MIN_CONTAINERS = clamp_int(os.environ.get("FAST_MIN_CONTAINERS"), 0, 0, 1)
 SNAPSHOT = os.environ.get("FAST_SNAPSHOT", "1").strip().lower() in ("1", "true", "yes", "on")
 MODEL_DIR = os.environ.get("FAST_MODEL_DIR", "/opt/models/sam3.1")

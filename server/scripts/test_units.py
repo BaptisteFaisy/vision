@@ -434,6 +434,7 @@ RUNNERS = (
     ("contrat HTTP (payload /analyze)", "modal_app", native_tests.test_analyze_shape),
     ("llm : budget unique", "llm", llm_tests.test_llm_budget),
     ("live_fast : parité des vendored", "timing", test_live_fast_parity),
+    ("live_fast : serveur chaud O2 (défauts)", "timing", weights_tests.test_o2_warm_server),
     ("live_fast : cache tokenize", "timing", live_fast_perf_tests.test_tokenize_cache),
     ("live_fast : clone detr_graph", "timing", live_fast_perf_tests.test_detr_clone),
     ("live_fast : clés detr_graph", "timing", live_fast_perf_tests.test_detr_shape_scalars),
