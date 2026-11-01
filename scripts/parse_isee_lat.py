@@ -38,8 +38,18 @@ si `int` vaut 33 et `age` 81, alors l'écart entre les deux n'est ni l'expositio
 ni la cadence, et il faut chercher ailleurs (`int` ≫ 33 = cadence perdue ;
 `int` ≈ 33 = pipeline à l'heure, donc le délai est en amont de l'analyseur). Le tableau finit par la comparaison avec le `capt` mesuré
 du dump (`capt non mesuré dans ce dump` si la sonde n'a rien écrit). Code 0 si
-au moins une ligne `capsplit` est trouvée, 2 sinon. `--servers` et `--capsplit`
-sont exclusifs (usage, code 2).
+au moins une ligne `capsplit` est trouvée, 2 sinon.
+
+Mode `--decsplit` : même dump, mais agrège les lignes `decsplit` (décomposition du
+poste `mask`, `TimingsText.decsplit` sous le même tag, loggée 1 frame sur 20) :
+`b64` = base64 → octets, `img` = octets → niveaux (PNG, zlib `M1`, runs RLE,
+remplissage `poly`), `up` = grille réduite → taille de la frame, `paint` =
+coloriage par table + écriture dans le bitmap ping-pong, `total` = temps mural
+réponse → tampons prêts, `masks` = masques décodés. `b64 + img + up + paint`
+retrouve le `mask` de la sonde à ~1 ms près — c'est cette somme qui explique les
+dizaines de ms hors réseau. `total` et `masks` ne s'additionnent à rien. Le tableau
+finit par la comparaison avec le `mask` mesuré du dump. Code 0 si au moins une
+ligne `decsplit` est trouvée, 2 sinon. Les trois modes sont exclusifs (usage, code 2).
 
 Campagne de référence (écran iSee, A100 eu-west, GPU chaud, Wi-Fi figé,
 N >= 100 frames chaudes) : voir l'en-tête — `~/bin/phone run ... -- adb -s
@@ -52,6 +62,7 @@ Usage :
     python3 scripts/parse_isee_lat.py --servers lat.txt
     python3 scripts/parse_isee_lat.py --capsplit lat.txt
     adb -s <tel> logcat -d -s ISEE_LAT | python3 scripts/parse_isee_lat.py --capsplit
+    python3 scripts/parse_isee_lat.py --decsplit lat.txt
     python3 scripts/parse_isee_lat.py --selftest
 
 Bibliothèque standard seule ; aucun réseau, aucun fichier temporaire, aucun appareil.
@@ -71,8 +82,11 @@ ETAGE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s+(\d+|—)\s*ms")
 # seuls les quatre premiers postes le composent (`POSTES_CAPSPLIT[:4]`).
 POSTES_CAPSPLIT = ("age", "enc", "b64", "cb", "total", "int")
 LIGNE_CAPSPLIT = re.compile(r"ISEE_LAT:\s*capsplit\s+(.*)")
-# Postes capsplit sans suffixe `ms` ; `POSTES_CAPSPLIT[:4]` se somme en `capt`.
-POSTE_CAPSPLIT = re.compile(r"([a-z0-9]+)\s+(\d+|—)")
+# Postes des lignes `*split` sans suffixe `ms` (`capsplit` et `decsplit` partagent
+# le format) ; `POSTES_CAPSPLIT[:4]` se somme en `capt`, `POSTES_DECSPLIT[:4]` en `mask`.
+POSTE_SPLIT = re.compile(r"([a-z0-9]+)\s+(\d+|—)")
+POSTES_DECSPLIT = ("b64", "img", "up", "paint", "total", "masks")
+LIGNE_DECSPLIT = re.compile(r"ISEE_LAT:\s*decsplit\s+(.*)")
 CIBLE_MOYENNE = 300
 CIBLE_MAX = 500
 WARMUP_DEFAUT = 5
@@ -222,10 +236,74 @@ def parse_ligne_capsplit(brute):
     if not trouve:
         return None
     mesures = {}
-    for nom, valeur in POSTE_CAPSPLIT.findall(trouve.group(1)):
+    for nom, valeur in POSTE_SPLIT.findall(trouve.group(1)):
         if valeur != "—":
             mesures[nom] = int(valeur)
     return mesures or None
+
+
+def parse_ligne_decsplit(brute):
+    """Une ligne logcat -> dict poste->ms (postes `—` absents) ou None."""
+    trouve = LIGNE_DECSPLIT.search(brute)
+    if not trouve:
+        return None
+    mesures = {}
+    for nom, valeur in POSTE_SPLIT.findall(trouve.group(1)):
+        if valeur != "—":
+            mesures[nom] = int(valeur)
+    return mesures or None
+
+
+def parse_texte_decsplit(texte, skip=WARMUP_DEFAUT):
+    """Toutes les lignes `decsplit`, moins les `skip` premières (warmup)."""
+    lignes = [m for ligne in texte.splitlines() if (m := parse_ligne_decsplit(ligne))]
+    return lignes[skip:] if skip > 0 else lignes
+
+
+def ligne_mask(frames, moyenne_somme):
+    """Ligne comparative : `mask` mesuré vs somme decsplit, écart signé en ms."""
+    masks = [f["mask"] for f in frames if "mask" in f]
+    if not masks:
+        return "mask non mesuré dans ce dump"
+    moyenne_mask = resume(masks)[1]
+    if moyenne_somme is None:
+        return f"mask mesuré {moyenne_mask:.1f} · somme non calculable"
+    return (f"mask mesuré {moyenne_mask:.1f} · somme {moyenne_somme:.1f} · "
+            f"écart {moyenne_somme - moyenne_mask:+.1f} ms (somme - mask)")
+
+
+def tableau_decsplit(lignes, frames):
+    """n/moyenne/p50/p95/p99/max par poste, la `somme`, puis la comparaison `mask`."""
+    table = ["poste        n  moyenne   p50   p95   p99   max"]
+    for poste in POSTES_DECSPLIT:
+        valeurs = [m[poste] for m in lignes if poste in m]
+        if not valeurs:
+            table.append(f"{poste:10}   0  —")
+            continue
+        n, moyenne, p50, p95, p99, maxi = resume(valeurs)
+        table.append(f"{poste:10} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
+    # Somme frame par frame : seules les frames où les quatre postes existent.
+    sommes = [m["b64"] + m["img"] + m["up"] + m["paint"] for m in lignes
+              if all(p in m for p in POSTES_DECSPLIT[:4])]
+    moyenne_somme = None
+    if sommes:
+        n, moyenne_somme, p50, p95, p99, maxi = resume(sommes)
+        table.append(f"{'somme':10} {n:3} {moyenne_somme:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
+    else:
+        table.append(f"{'somme':10}   0  —")
+    table.append(ligne_mask(frames, moyenne_somme))
+    return table
+
+
+def main_decsplit(texte, skip):
+    """Affiche le tableau decsplit ; 0 si trouvé, 2 sinon (log 1 frame sur 20 ?)."""
+    lignes = parse_texte_decsplit(texte, skip)
+    if not lignes:
+        print("aucune ligne ISEE_LAT decsplit (log 1 frame sur 20 ? tag filtré ?)",
+              file=sys.stderr)
+        return 2
+    print("\n".join(tableau_decsplit(lignes, parse_texte(texte, skip))))
+    return 0
 
 
 def parse_texte_capsplit(texte, skip=WARMUP_DEFAUT):
@@ -280,141 +358,10 @@ def main_capsplit(texte, skip):
     return 0
 
 
-def selftest_frames():
-    """Formes, warmup, centiles, verdict : les assertions du mode par défaut."""
-    cas = [
-        ("I ISEE_LAT: latency 348 · capt 22 · up 61 · srv 92 · rtt 153 · mask 37 · pixel 8",
-         {"latency": 348, "capt": 22, "up": 61, "srv": 92, "rtt": 153,
-          "mask": 37, "pixel": 8}),
-        ("10-31 12:00:00.000 1 2 I ISEE_LAT: latency 12 · capt — · pixel 3",
-         {"latency": 12, "pixel": 3}),
-        ("I sam3vision: conversion: 5 ms", None),
-        ("I ISEE_LAT: latency — · capt 1", None),
-    ]
-    for brute, attendu in cas:
-        assert parse_ligne(brute) == attendu, brute
-    bloc = "\n".join(f"I ISEE_LAT: latency {v} · pixel 1" for v in (900, 800, 1, 2, 3, 4, 5))
-    assert [f["latency"] for f in parse_texte(bloc, skip=2)] == [1, 2, 3, 4, 5]
-    assert parse_texte(bloc, skip=0)[0]["latency"] == 900
-    assert resume([1, 2, 3, 4, 5]) == (5, 3.0, 3, 5, 5, 5)
-    assert resume(list(range(1, 101))) == (100, 50.5, 50, 95, 99, 100)
-    assert centile([10, 20], 50) == 10 and centile([10, 20], 95) == 20
-    assert centile(list(range(1, 101)), 99) == 99
-    assert gigue([100, 100, 100]) == 0.0 and gigue([42]) == 0.0
-    assert abs(gigue([100, 200]) - 50.0) < 1e-9
-    melange = ("I ISEE_LAT: latency — · capt 1\n"
-               "I ISEE_LAT: latency 12 · pixel 3\n"
-               "I sam3vision: conversion: 5 ms\n")
-    assert jetees(melange, skip=0) == 1
-    assert jetees(melange, skip=1) == 0    # le warmup mange la ligne jetée
-    assert jetees("I ISEE_LAT: latency 12 · pixel 3\n", skip=0) == 0
-    tenu, ok = verdict([{"latency": v} for v in (100, 200, 300)], 300, 500)
-    rate, ko = verdict([{"latency": v} for v in (100, 600)], 300, 500)
-    assert ok and not ko and any("TENU" in l for l in tenu)
-    assert any("NON TENU" in l for l in rate)
-    assert any("gigue(latency)" in l and "jetées 0" in l for l in tenu)
-    assert any("gigue(latency) 81,6" in l.replace(".", ",") for l in tenu)
-    return len(cas)
-
-
-def selftest_seuils():
-    """Verdict paramétrable : seuils optionnels inactifs à None, décisifs posés."""
-    base = [{"latency": v} for v in (100, 200, 300)]
-    assert verdict(base, 300, 500, seuil_p95=400)[1]
-    assert not verdict(base, 300, 500, seuil_p95=200)[1]
-    assert not verdict(base, 300, 500, seuil_p99=200)[1]
-    assert not verdict(base, 300, 500, seuil_gigue=10.0)[1]
-    assert verdict(base, 300, 500, seuil_jetees=0)[1]
-    assert not verdict(base, 300, 500, seuil_jetees=0, nb_jetees=2)[1]
-    assert verdict(base, 300, 500, seuil_jetees=2, nb_jetees=2)[1]
-    lignes_jetees = verdict(base, 300, 500, seuil_jetees=0, nb_jetees=2)[0]
-    assert any("jetées 2" in l for l in lignes_jetees)
-    # CLI : les nouveaux flags traversent jusqu'au verdict.
-    options, positionnels = extrait_options(["lat.txt", "--p95", "450", "--jitter", "12.5"])
-    assert options["--p95"] == 450 and options["--jitter"] == 12.5
-    assert options["--p99"] is None and positionnels == ["lat.txt"]
-
-
-def selftest_serveurs():
-    """Étages serveur : formes, ordre des rangs, CLI muette et parlante."""
-    srv = "I ISEE_LAT: server: preprocess 7 ms · detr 52 ms"
-    assert parse_ligne_server(srv) == {"preprocess": 7, "detr": 52}
-    assert parse_ligne_server("10-31 12:00:00.000 1 2 I ISEE_LAT: server: —") is None
-    assert parse_ligne_server("I ISEE_LAT: latency 12 · pixel 3") is None
-    assert parse_ligne("I ISEE_LAT: server: preprocess 7 ms") is None
-    melange = ("I ISEE_LAT: latency 100 · pixel 1\n" + srv + "\n"
-               "I ISEE_LAT: server: vision 47 ms · queue 3 ms · decode 2 ms\n")
-    assert parse_texte_server("I ISEE_LAT: latency 100 · pixel 1\n", skip=0) == []
-    assert parse_texte_server(melange, skip=1) == [{"vision": 47, "queue": 3, "decode": 2}]
-    rangs = tableau_serveurs(parse_texte_server(melange, skip=0))[1:]
-    noms = [l.split()[0] for l in rangs]
-    assert noms == ["preprocess", "vision", "detr", "depth", "masks", "total",
-                    "decode", "queue"]
-    tableau = tableau_serveurs([{"detr": v} for v in (10, 20, 30, 40, 50)])
-    assert [l.split() for l in tableau if l.split()[0] == "detr"] == [
-        ["detr", "5", "30.0", "30", "50", "50", "50"]]
-    import contextlib, io
-    vide, plein = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(vide), contextlib.redirect_stderr(vide):
-        assert main_serveurs("I ISEE_LAT: latency 1 · pixel 1\n", 0) == 2
-    with contextlib.redirect_stdout(plein), contextlib.redirect_stderr(plein):
-        assert main_serveurs(srv + "\n", 0) == 0
-    assert "detr" in plein.getvalue() and "aucune ligne" in vide.getvalue()
-
-
-def selftest_capsplit():
-    """Capsplit : formes, warmup, somme frame par frame, comparaison au `capt`."""
-    cap = "I ISEE_LAT: capsplit age 81 · enc 24 · b64 3 · cb 2 · total 30"
-    srv = "I ISEE_LAT: server: preprocess 7 ms · detr 52 ms"
-    assert parse_ligne_capsplit(cap) == {"age": 81, "enc": 24, "b64": 3, "cb": 2,
-                                         "total": 30}
-    assert "total" in parse_ligne_capsplit(cap)
-    assert parse_ligne_capsplit("I ISEE_LAT: capsplit age 81 · enc 24 · b64 3 · cb 2"
-                                " · total —") == {"age": 81, "enc": 24, "b64": 3, "cb": 2}
-    assert parse_ligne_capsplit("I ISEE_LAT: capsplit —") is None
-    assert parse_ligne_capsplit("I ISEE_LAT: latency 348 · capt 111 · pixel 8") is None
-    assert parse_ligne_capsplit(srv) is None
-    assert parse_ligne(cap) is None and parse_ligne_server(cap) is None
-    bloc_cap = "\n".join(f"I ISEE_LAT: capsplit age {v} · enc 1 · b64 1 · cb 1 · total 5"
-                         for v in (900, 800, 10, 11))
-    assert [l["age"] for l in parse_texte_capsplit(bloc_cap, skip=2)] == [10, 11]
-    assert parse_texte_capsplit(cap + "\n", skip=0) == [
-        {"age": 81, "enc": 24, "b64": 3, "cb": 2, "total": 30}]
-    cap_table = tableau_capsplit(
-        parse_texte_capsplit(cap + "\n", 0),
-        parse_texte("I ISEE_LAT: latency 348 · capt 111 · pixel 8\n", skip=0))
-    assert [l.split() for l in cap_table if l.split()[0] == "somme"] == [
-        ["somme", "1", "110.0", "110", "110", "110", "110"]]
-    assert any("écart -1.0" in l for l in cap_table)
-    assert tableau_capsplit([], [])[-1] == "capt non mesuré dans ce dump"
-    # L'intervalle : lu, affiché, jamais additionné au `capt`.
-    avec_int = "I ISEE_LAT: capsplit age 81 · enc 24 · b64 3 · cb 2 · total 30 · int 33"
-    assert parse_ligne_capsplit(avec_int) == {"age": 81, "enc": 24, "b64": 3, "cb": 2,
-                                              "total": 30, "int": 33}
-    table_int = tableau_capsplit(parse_texte_capsplit(avec_int + "\n", 0), [])
-    assert [l.split() for l in table_int if l.split()[0] == "int"] == [
-        ["int", "1", "33.0", "33", "33", "33", "33"]]
-    assert [l.split() for l in table_int if l.split()[0] == "somme"] == [
-        ["somme", "1", "110.0", "110", "110", "110", "110"]]   # sans `int`
-    # Un dump d'avant l'intervalle reste lisible : le poste est absent, pas faux.
-    assert "int" not in parse_ligne_capsplit(cap)
-    import contextlib, io
-    muet, parle = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(muet), contextlib.redirect_stderr(muet):
-        assert main_capsplit("I ISEE_LAT: latency 1 · pixel 1\n", 0) == 2
-    with contextlib.redirect_stdout(parle), contextlib.redirect_stderr(parle):
-        assert main_capsplit(cap + "\n", 0) == 0
-    assert "somme" in parle.getvalue() and "aucune ligne" in muet.getvalue()
-
-
 def selftest():
-    """Assertions du parseur : quatre blocs (frames, seuils, serveurs, capsplit)."""
-    cas = selftest_frames()
-    selftest_seuils()
-    selftest_serveurs()
-    selftest_capsplit()
-    print(f"OK   {cas + 55} assertions parse_isee_lat")  # 55 asserts + 4 cas
-    return 0
+    """Assertions du parseur : cinq blocs, dans le module compagnon."""
+    import parse_isee_lat_selftest
+    return parse_isee_lat_selftest.selftest()
 
 
 FLAGS_NOMBRES = {"--skip": int, "--mean": int, "--max": int, "--p95": int,
@@ -447,27 +394,30 @@ def extrait_options(args):
 
 def main(argv):
     """CLI : [fichier] [--skip K] [--mean M] [--max X] [--p95 P] [--p99 Q]
-    [--jitter J] [--drop D] [--servers|--capsplit] | --selftest."""
+    [--jitter J] [--drop D] [--servers|--capsplit|--decsplit] | --selftest."""
     if "--selftest" in argv:
         return selftest()
-    args = [a for a in argv if a not in ("--servers", "--capsplit")]
-    if "--servers" in argv and "--capsplit" in argv:
-        print("usage : --servers et --capsplit sont exclusifs (un dump, un mode)",
+    modes = [m for m in ("--servers", "--capsplit", "--decsplit") if m in argv]
+    args = [a for a in argv if a not in ("--servers", "--capsplit", "--decsplit")]
+    if len(modes) > 1:
+        print(f"usage : {' et '.join(modes)} sont exclusifs (un dump, un mode)",
               file=sys.stderr)
         return 2
     options, args = extrait_options(args)
     chemin = args.pop(0) if args and not args[0].startswith("-") else None
     if args or (chemin is None and sys.stdin.isatty()):
         print("usage : parse_isee_lat.py [fichier] [--skip K] [--mean M] [--max X]"
-              " [--p95 P] [--p99 Q] [--jitter J] [--drop D] [--servers|--capsplit]",
+              " [--p95 P] [--p99 Q] [--jitter J] [--drop D] [--servers|--capsplit|--decsplit]",
               file=sys.stderr)
         return 2
     texte = lit_entree(chemin)
     skip = options["--skip"]
-    if "--servers" in argv:
+    if "--servers" in modes:
         return main_serveurs(texte, skip)
-    if "--capsplit" in argv:
+    if "--capsplit" in modes:
         return main_capsplit(texte, skip)
+    if "--decsplit" in modes:
+        return main_decsplit(texte, skip)
     frames = parse_texte(texte, skip)
     if not frames:
         print("aucune frame ISEE_LAT complète (GPU froid ? tag filtré ?)", file=sys.stderr)
