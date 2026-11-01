@@ -9,6 +9,7 @@ import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.FrameMotion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -295,5 +296,54 @@ class CrossingVehicleTest {
         assertNull(at(100f, 0L, true))
         assertNull(at(110f, 100L, true))
         assertEquals("Car moving.", at(120f, 200L, true))
+    }
+
+    @Test
+    fun `pan sur voiture garee avec feu - arret compense, jamais stop`() {
+        // Pan caméra sur une garée, avec feu (défaut) : la dérive qui suit
+        // le fond prouve l'arrêt, et la croissance sous caméra ne parle
+        // jamais en mouvement (miroir de `VehicleStateBackgroundTest`,
+        // branché sur la voix traversée).
+        CrossingVehicleWatch.reset()
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        var stopped: String? = null
+        repeat(12) { index ->
+            val width = if (index < 8) 100f else 100f + (index - 7) * 10f
+            val frame = box(width, cx = 320f + index * 5f)
+            val said = CrossingVehicleWatch.update(
+                listOf(det("car", frame)),
+                listOf(reading("car", 5f, frame)),
+                index * 100L,
+                SpeechLanguage.En,
+                motion = motion,
+            )
+            if (index == 2) stopped = said
+            if (index >= 8) assertNull("croissance sous caméra : pas de mouvement", said)
+            assertFalse("jamais de stop sur une garée (frame $index)", (said ?: "").startsWith("Stop"))
+        }
+
+        assertEquals("Car stopped, 5 meters away.", stopped)
+        assertFalse(CrossingVehicleWatch.movingNow)
+    }
+
+    @Test
+    fun `phrase avec feu - pan sur garee ne dit jamais stop ni mouvement`() {
+        // Câblage : la phrase traversée avec feu transmet le signal fond
+        // jusqu'à la voix véhicules (comme sans feu) — le pan sur une
+        // garée ne dit ni « Stop » ni « moving », même en croissance.
+        resetCrossingWatches()
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        repeat(12) { index ->
+            val width = if (index < 8) 100f else 100f + (index - 7) * 10f
+            val frame = box(width, cx = 320f + index * 5f)
+            val said = crossingPhraseOf(
+                null, emptyList(), listOf(det("car", frame)), listOf(reading("car", 5f, frame)),
+                index * 100L, SpeechLanguage.En, motion = motion,
+            )
+            assertFalse("pan+garée avec feu : jamais de stop (frame $index)", (said ?: "").startsWith("Stop"))
+            assertFalse("pan+garée avec feu : jamais de mouvement (frame $index)", (said ?: "").contains("moving"))
+        }
+
+        assertFalse(CrossingVehicleWatch.movingNow)
     }
 }
