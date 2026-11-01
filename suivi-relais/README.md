@@ -1,121 +1,121 @@
-# Relais de suivi — Worker + D1
+# Tracking relay — Worker + D1
 
-Le relais que l'app utilise **par défaut** (`Settings.DEFAULT_PARENT_SITE_URL`).
-Il remplace l'API du site Vercel `suivi-parent/`, abandonné : ce déploiement était
-figé sur un commit du 27/10 et refusait toute écriture sans une clé que les
-téléphones n'ont pas (403 « clé invalide »), donc la carte du proche restait vide
-sans un mot.
+The relay the app uses **by default** (`Settings.DEFAULT_PARENT_SITE_URL`).
+It replaces the abandoned Vercel-site API in `suivi-parent/`: that deploy was
+frozen on a 27/10 commit and refused every write without a key the
+phones do not have (403 "invalid key"), so the loved one's map stayed empty
+without a word.
 
-## Contrat (inchangé pour la page embarquée dans l'APK)
+## Contract (unchanged for the page embedded in the APK)
 
 ```text
 POST /api/share   {shareId, writeKey, fix?:{lat,lon,accM,headingDeg,atMs,indoor},
                    objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking},
                    photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
-GET  /api/state?share=<identifiant>   → {ok, live, ageMs, fix?, objects, scene, photo, trip, serverAt}
+GET  /api/state?share=<id>            → {ok, live, ageMs, fix?, objects, scene, photo, trip, serverAt}
 GET  /health                          → {ok:true}
-GET  /ws?share=<id>&role=watch        → WebSocket : frames JPEG binaires du proche
-GET  /ws?share=<id>&role=push&key=<k> → WebSocket : le proche pousse ses frames
+GET  /ws?share=<id>&role=watch        → WebSocket: binary JPEG frames of the loved one
+GET  /ws?share=<id>&role=push&key=<k> → WebSocket: the loved one pushes their frames
 ```
 
-## Direct : `/ws`, une salle par flux (`src/durable.js`)
+## Live: `/ws`, one room per stream (`src/durable.js`)
 
-L'état lent (position, phrase, trajet) passe par D1 ; **l'image du direct ne
-passe pas par la base** — un Durable Object sert de salle, et les frames vont du
-téléphone aux aidants connectés sans être écrites nulle part. C'est la seule
-façon de tenir un vrai direct : à 6 im/s, D1 et son quota d'écritures ne suivraient
-pas (100 000 écritures/jour, soit **2,5 h** de direct, et 345 000 requêtes pour la
-même durée côté Worker).
+The slow state (position, sentence, trip) goes through D1; **the live picture
+never touches the base** — a Durable Object acts as the room, and frames flow
+from the phone to the connected caregivers without being written anywhere.
+It is the only way to hold a true live stream: at 6 fps, D1 and its write
+quota would never keep up (100,000 writes/day, i.e. **2.5 h** of live, and
+345,000 requests for the same duration Worker-side).
 
 ```text
-téléphone ──frames binaires──▶ RelayRoom (DO, un par identifiant) ──▶ aidants
+phone ──binary frames──▶ RelayRoom (DO, one per id) ──▶ caregivers
 
-téléphone ──{"type":"camera","on":…}──▶ RelayRoom ──{"type":"camera","on":…}──▶ aidants
+phone ──{"type":"camera","on":…}──▶ RelayRoom ──{"type":"camera","on":…}──▶ caregivers
                                       │
-                                      └─▶ {"type":"audience","watch":n}  (au téléphone)
+                                      └─▶ {"type":"audience","watch":n}  (to the phone)
 ```
 
-- **La caméra dit quand elle s'éteint** : le téléphone annonce
-  `{"type":"camera","on":…}` à chaque changement et la salle le transmet aux
-  aidants ; quand le dernier téléphone s'en va (fermeture, crash, réseau), la
-  salle émet elle-même `{"type":"camera","on":false}`. La page efface l'image
-  aussitôt — direct comme photo lente — au lieu de garder la dernière image
-  jusqu'à 8 s. Un aidant qui arrive sans téléphone apprend tout de suite que
-  la caméra est éteinte ; seul un `push` parle au nom de la caméra (un aidant
-  ne peut pas éteindre l'image des autres).
-- **Le téléphone n'émet que s'il est regardé** : à chaque arrivée ou départ
-  (aidant comme téléphone), la salle republie `{"type":"audience","watch":n}`
-  aux téléphones connectés ; à `n = 0`, la caméra se tait (forfait, batterie).
-  Un téléphone qui rejoint une salle déjà regardée apprend ainsi tout de
-  suite qu'on le regarde, au lieu de rester muet.
-- **Une frame ne revient jamais à son émetteur** et n'est jamais relue en base ;
-  au-delà de 512 Ko (`MAX_FRAME_BYTES`), elle est ignorée.
-- **L'écriture reste protégée** : `role=push` exige la clé du flux quand le flux
-  en a une (même règle que `/api/share`, liée au premier envoi) — un identifiant
-  deviné ne suffit pas à diffuser une fausse caméra chez l'aidant.
-- **Hibernation** : la salle utilise l'API d'hibernation (`acceptWebSocket` avec
-  étiquette de rôle), donc un aidant immobile ne coûte pas de durée. Sur l'offre
-  gratuite (100 000 requêtes/jour, messages WebSocket comptés au 1/20), une heure
-  de direct coûte ~1 900 requêtes : très en dessous du plafond.
-- **Repli** : la page garde la photo lente (`/api/state`, une frame toutes les 2 s)
-  si le WebSocket est indisponible. Un déploiement sans binding `RELAY_ROOM`
-  répond `503 {"ok":false,"error":"diffusion non déployée"}` et la page continue
-  de fonctionner.
+- **The camera tells when it turns off**: the phone announces
+  `{"type":"camera","on":…}` on every change and the room forwards it to
+  caregivers; when the last phone leaves (close, crash, network), the
+  room itself emits `{"type":"camera","on":false}`. The page clears the
+  picture at once — live and slow photo alike — instead of keeping the last
+  picture up to 8 s. A caregiver arriving with no phone learns at once that
+  the camera is off; only a `push` speaks for the camera (a caregiver
+  cannot turn off the others' picture).
+- **The phone only emits while watched**: on every arrival or departure
+  (caregiver or phone), the room republishes `{"type":"audience","watch":n}`
+  to the connected phones; at `n = 0`, the camera goes quiet (plan,
+  battery). A phone joining an already watched room thus learns at once
+  that it is watched, instead of staying mute.
+- **A frame never returns to its sender** and is never re-read from base;
+  past 512 KB (`MAX_FRAME_BYTES`), it is ignored.
+- **Writes stay protected**: `role=push` requires the stream key when the
+  stream has one (same rule as `/api/share`, bound on first send) — a guessed
+  id is not enough to broadcast a fake camera to the caregiver.
+- **Hibernation**: the room uses the hibernation API (`acceptWebSocket` with
+  a role tag), so a still caregiver costs no duration. On the free tier
+  (100,000 requests/day, WebSocket messages counted at 1/20), one hour
+  of live costs ~1,900 requests: far below the cap.
+- **Fallback**: the page keeps the slow photo (`/api/state`, one frame every
+  2 s) when the WebSocket is unavailable. A deploy without a `RELAY_ROOM`
+  binding answers `503 {"ok":false,"error":"streaming not deployed"}` and the
+  page keeps working.
 
-- `fix` (position), `photo` (JPEG base64 ≤ 120 000 caractères) et `trip`
-  (progression 0..1) sont facultatifs : un téléphone sans GPS publie quand
-  même sa caméra, sa phrase et ses repères, et un appareil d'avant continue
-  d'envoyer position, objets et phrase. Une écriture **sans** image (service
-  de suivi écran éteint) garde la dernière photo et son `atMs` : la page la
-  cache au lieu de la faire passer pour du direct. Un `trip` absent retire
-  la barre de progression.
+- `fix` (position), `photo` (base64 JPEG ≤ 120,000 chars) and `trip`
+  (0..1 progress) are optional: a phone without GPS still publishes
+  its camera, sentence and landmarks, and an older device keeps
+  sending position, objects and sentence. A write **without** a picture
+  (screen-off tracking service) keeps the last photo and its `atMs`: the
+  page hides it instead of passing it off as live. A missing `trip` removes
+  the progress bar.
 
-- **Un état par identifiant de flux** : deux proches suivis = deux `?share=`, deux
-  lignes distinctes. Plusieurs caregivers peuvent lire le même identifiant, aucun
-  ne peut écrire à la place d'un autre (`caregiverRole` le bloque côté app).
-- `live` dure **12 s** ; au-delà la page passe en SIGNAL LOST puis OFFLINE en
-  gardant la dernière position (`ageMs`, `serverAt`).
-- **Aucune clé à saisir** : la clé d'écriture est liée au flux au premier envoi
-  (`write_key` en base). Une clé différente ensuite → 403, ce qui empêche un
-  identifiant deviné d'injecter une fausse position. L'app génère cette clé à
-  l'installation (`defaultShareKey`), elle n'est jamais montrée ni partagée.
-- `SHARE_WRITE_KEY` (secret du Worker) reste possible comme verrou global : s'il
-  est défini, toutes les écritures doivent porter cette clé.
+- **One state per stream id**: two tracked loved ones = two `?share=`, two
+  separate rows. Several caregivers may read the same id, none
+  may write instead of another (`caregiverRole` blocks it app-side).
+- `live` lasts **12 s**; past that the page moves to SIGNAL LOST then OFFLINE,
+  keeping the last position (`ageMs`, `serverAt`).
+- **No key to type**: the write key binds to the stream on first send
+  (`write_key` in base). A different key later → 403, which stops a
+  guessed id from injecting a fake position. The app generates this key at
+  install (`defaultShareKey`); it is never shown nor shared.
+- `SHARE_WRITE_KEY` (Worker secret) stays available as a global lock: when
+  set, every write must carry that key.
 
-## Stockage
+## Storage
 
-D1, table `streams (id, doc, updated_at, write_key)`, schéma créé à la première
-requête. Un flux est conservé 24 h puis purgé (une écriture sur 200).
+D1, table `streams (id, doc, updated_at, write_key)`, schema created on first
+request. A stream is kept 24 h then pruned (one write in 200).
 
-## Vérifier
+## Check
 
 ```bash
 node --test suivi-relais/test/relais.test.mjs
 ```
 
-Les tests couvrent : isolement de deux flux, écriture sans clé, clé liée au flux
-(403), verrou global optionnel, corps invalides, lecture sans identifiant, âge de
-l'état, la publication sans position et le bornage du texte.
+Tests cover: two-stream isolation, keyless write, stream-bound key
+(403), optional global lock, invalid bodies, keyless read, state
+age, keyless-position publishing and text capping.
 
-## Déployer
+## Deploy
 
-Le Worker est publié par le manifeste `deploy.json` (modules ESM + binding `DB`).
-L'URL de production est recopiée dans `Settings.DEFAULT_PARENT_SITE_URL` côté
-`:core` ; la changer impose un APK neuf.
+The Worker ships through the `deploy.json` manifest (ESM modules + `DB`
+binding). The production URL is copied into `Settings.DEFAULT_PARENT_SITE_URL`
+on the `:core` side; changing it requires a fresh APK.
 
-**Déployer la salle** : `npx wrangler login`, puis `npx wrangler d1 list` (relever
-l'id de la base et le coller dans `wrangler.toml`), puis `npx wrangler deploy`
-depuis ce dossier. Le token wrangler de cette machine a expiré le 6/10/2026 — aucun
-déploiement n'est possible avant une nouvelle connexion.
+**Deploying the room**: `npx wrangler login`, then `npx wrangler d1 list`
+(note the base id and paste it into `wrangler.toml`), then `npx wrangler
+deploy` from this folder. This machine's wrangler token expired on
+6/10/2026 — no deploy is possible before logging in again.
 
-**URL de production (29/10) : `https://isee-suivi.duello.workers.dev/`** — c'est le
-Worker lui-même : `/health` → `{"ok":true}`, `/api/state?share=…` → l'état du flux, et
-il sert aussi la page de la WebView (`/`, `live.mjs`, `styles.css`). Le domaine
-d'apparence plus jolie retenu plus tôt (`…freebuff.page`) a rendu **502 « Site
-unavailable »** le 29/10 au soir alors que ce Worker répondait encore : la page
-caregiver restait en NO STREAM et la caméra du proche ne s'affichait plus. Un relais
-qui sert des personnes pointe sur l'infrastructure qu'on déploie, pas sur une
-redirection. Vérifier après tout déploiement :
+**Production URL (29/10): `https://isee-suivi.duello.workers.dev/`** — the
+Worker itself: `/health` → `{"ok":true}`, `/api/state?share=…` → the stream
+state, and it also serves the WebView page (`/`, `live.mjs`, `styles.css`).
+The prettier-looking domain picked earlier (`…freebuff.page`) returned **502
+"Site unavailable"** on the evening of 29/10 while this Worker still
+answered: the caregiver page stayed on NO STREAM and the loved one's camera
+no longer showed. A relay serving people points at infrastructure one
+deploys, not at a redirect. Check after every deploy:
 
 ```bash
 curl -s https://isee-suivi.duello.workers.dev/health      # {"ok":true}

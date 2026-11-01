@@ -1,28 +1,28 @@
-// Contrat du relais de suivi iSee : **un état par identifiant de flux**.
-// Même corps et même réponse que l'ancien relais du site, pour que la page
-// caregiver embarquée dans l'APK n'ait rien à changer.
+// iSee tracking relay contract: **one state per stream id**.
+// Same body and answer as the site's old relay, so the caregiver page
+// embedded in the APK has nothing to change.
 
 export const FRESH_MS = 12_000;
 export const MAX_OBJECTS = 8;
 export const MAX_TEXT = 2_000;
 export const MAX_KEY = 64;
 
-/** Frame JPEG base64 de la caméra iSee (320 px ≈ 24 k caractères). */
+/** Base64 JPEG frame of the iSee camera (320 px ≈ 24k chars). */
 export const MAX_PHOTO = 120_000;
 
-/** Nom de destination affiché au proche. */
+/** Destination name shown to the loved one. */
 export const MAX_DESTINATION = 80;
 
-/** Repères reconnus gardés au plus par rapport. */
+/** Recognized landmarks kept at most per report. */
 export const MAX_PICTOS = 4;
 
-/** PNG base64 d'un repère : dessin ≈ 3-11 k caractères. */
+/** Base64 PNG of a landmark: drawing ≈ 3-11k chars. */
 export const MAX_PICTO_PNG = 30_000;
 
-/** Nom d'un repère affiché au proche. */
+/** Name of a landmark shown to the loved one. */
 export const MAX_PICTO_LABEL = 40;
 
-/** Identifiant de flux : un par proche suivi, glissé dans `?share=`. */
+/** Stream id: one per tracked loved one, carried in `?share=`. */
 export function validId(id) {
   return typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
 }
@@ -31,10 +31,10 @@ function num(v, min, max) {
   return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 }
 
-/** Caractères d'un base64 (JPEG ou PNG) : le préfixe `data:` reste côté page. */
+/** Chars of a base64 (JPEG or PNG): the `data:` prefix stays page-side. */
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
-/** Phrase courante ; les anciennes versions de l'app ne l'envoient pas. */
+/** Current sentence; older app versions never send it. */
 function sceneOf(scene) {
   if (!scene || typeof scene.text !== 'string') return null;
   return {
@@ -45,11 +45,11 @@ function sceneOf(scene) {
 }
 
 /**
- * Image courante : `{jpeg, atMs}`. `null` = absente (ancien client, ou envoi du
- * service de suivi en arrière-plan, caméra fermée), `false` = présenté mais
- * illisible (le relais répond alors 400). Son `atMs` ne vieillit pas quand
- * l'image manque : la page cache une frame trop ancienne au lieu de la faire
- * passer pour du direct.
+ * Current picture: `{jpeg, atMs}`. `null` = missing (old client, or send from
+ * the background tracking service with a closed camera), `false` = present
+ * but unreadable (the relay then answers 400). Its `atMs` never ages when
+ * the picture is missing: the page hides too old a frame instead of passing
+ * it off as live.
  */
 function photoOf(photo, now) {
   if (photo === undefined || photo === null) return null;
@@ -63,8 +63,8 @@ function photoOf(photo, now) {
 }
 
 /**
- * Trajet guidé : `{destination, totalM, remainingM, remainingS, progress}`.
- * `null` = aucun guidage en cours, `false` = trajet illisible (400).
+ * Guided trip: `{destination, totalM, remainingM, remainingS, progress}`.
+ * `null` = no guidance in progress, `false` = unreadable trip (400).
  */
 function tripOf(trip) {
   if (trip === undefined || trip === null) return null;
@@ -84,10 +84,10 @@ function tripOf(trip) {
 }
 
 /**
- * Repères reconnus : `{atMs, items:[{label, png}]}`. `null` = aucun (paquet
- * sans détection, liste vide, ou ancien client), `false` = présenté mais
- * illisible (400). Suit le paquet comme le trajet : pas de conservation
- * d'un envoi à l'autre.
+ * Recognized landmarks: `{atMs, items:[{label, png}]}`. `null` = none (packet
+ * without detection, empty list, or old client), `false` = present but
+ * unreadable (400). Follows the packet like the trip: nothing kept from
+ * one send to the next.
  */
 function pictosOf(pictos, now) {
   if (pictos === undefined || pictos === null) return null;
@@ -128,38 +128,38 @@ function objectsOf(list) {
 }
 
 /**
- * Valide un corps `POST /api/share`.
+ * Validates a `POST /api/share` body.
  *
- * `SHARE_WRITE_KEY` (secret du relais) est **facultatif** et sert de verrou global :
- * sans lui, la clé appartient au **flux** (liée au premier envoi, voir l'écriture).
- * Retourne `{ok:true, id, key, doc(now)}` ou `{ok:false, code, error}`.
+ * `SHARE_WRITE_KEY` (the relay secret) is **optional** and acts as a global
+ * lock: without it, the key belongs to the **stream** (bound on first send,
+ * see the write). Returns `{ok:true, id, key, doc(now)}` or `{ok:false, code, error}`.
  */
 export function readShare(body, globalKey = '') {
-  if (!body || typeof body !== 'object') return fail(400, 'corps JSON attendu');
-  if (!validId(body.shareId)) return fail(400, 'shareId invalide');
+  if (!body || typeof body !== 'object') return fail(400, 'JSON body expected');
+  if (!validId(body.shareId)) return fail(400, 'invalid shareId');
   const key = typeof body.writeKey === 'string' ? body.writeKey : '';
-  if (key.length > MAX_KEY) return fail(400, 'writeKey invalide');
-  if (globalKey && key !== globalKey) return fail(403, 'clé invalide');
-  // La position est **optionnelle** : un téléphone sans GPS (intérieur, démarrage,
-  // permission refusée) publie quand même sa caméra, sa phrase et ses repères.
-  // Sans ça, la page caregiver restait OFFLINE alors que la caméra tournait.
-  // Une position présentée reste validée comme avant — seule son absence passe.
+  if (key.length > MAX_KEY) return fail(400, 'invalid writeKey');
+  if (globalKey && key !== globalKey) return fail(403, 'invalid key');
+  // The position is **optional**: a phone without GPS (indoors, starting up,
+  // refused permission) still publishes its camera, sentence and landmarks.
+  // Without this, the caregiver page stayed OFFLINE while the camera ran.
+  // A present position is still validated as before — only its absence passes.
   const f = body.fix;
   if (f !== undefined && f !== null) {
-    if (typeof f !== 'object') return fail(400, 'fix invalide');
+    if (typeof f !== 'object') return fail(400, 'invalid fix');
     if (!num(f.lat, -90, 90) || !num(f.lon, -180, 180) || !num(f.accM, 0, 500)) {
-      return fail(400, 'fix invalide');
+      return fail(400, 'invalid fix');
     }
   }
   const objects = objectsOf(body.objects);
-  if (objects === null) return fail(400, 'objet invalide');
+  if (objects === null) return fail(400, 'invalid object');
   const scene = sceneOf(body.scene);
   const photo = photoOf(body.photo, Date.now());
-  if (photo === false) return fail(400, 'photo invalide');
+  if (photo === false) return fail(400, 'invalid photo');
   const trip = tripOf(body.trip);
-  if (trip === false) return fail(400, 'trip invalide');
+  if (trip === false) return fail(400, 'invalid trip');
   const pictos = pictosOf(body.pictos, Date.now());
-  if (pictos === false) return fail(400, 'pictos invalides');
+  if (pictos === false) return fail(400, 'invalid pictos');
   return {
     ok: true,
     id: body.shareId,
@@ -169,12 +169,12 @@ export function readShare(body, globalKey = '') {
   };
 }
 
-/** État d'un flux encore jamais publié. */
+/** State of a stream never published yet. */
 export function emptyState() {
   return { ok: true, live: false };
 }
 
-/** Réponse `GET /api/state` ; `live` ne dure que [FRESH_MS]. */
+/** `GET /api/state` answer; `live` only lasts [FRESH_MS]. */
 export function stateOf(row, now) {
   const serverAt = row.serverAt;
   const ageMs = Math.max(0, now - serverAt);

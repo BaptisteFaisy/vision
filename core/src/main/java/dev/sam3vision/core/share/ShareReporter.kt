@@ -8,24 +8,24 @@ import okhttp3.Request
 import org.json.JSONObject
 
 /**
- * Résultat d'un envoi. Le refus du relais est un fait à part entière : avalé, il
- * donnait une carte vide indiscernable d'un proche qui n'a rien à envoyer.
+ * Result of a send. A relay refusal is a full fact: swallowed, it yielded
+ * an empty map indistinguishable from a loved one with nothing to send.
  */
 sealed interface ShareSend {
-    /** Le relais a pris l'état. */
+    /** The relay took the state. */
     data object Sent : ShareSend
 
-    /** Cadence : rien à envoyer avant [ShareReporter] n'ait laissé passer le délai. */
+    /** Rate: nothing to send before [ShareReporter] let the delay pass. */
     data object Skipped : ShareSend
 
-    /** Le relais a répondu hors 2xx (`403` = clé du flux différente). */
+    /** The relay answered outside 2xx (`403` = different stream key). */
     data class Refused(val code: Int) : ShareSend
 
-    /** Aucune réponse : réseau, DNS, TLS, délai dépassé. */
+    /** No answer: network, DNS, TLS, timeout. */
     data object Unreachable : ShareSend
 }
 
-/** Message montré dans les Settings ; `null` = rien à signaler. */
+/** Message shown in Settings; `null` = nothing to report. */
 fun shareSendMessage(result: ShareSend): String? = when (result) {
     ShareSend.Sent, ShareSend.Skipped -> null
     is ShareSend.Refused ->
@@ -35,8 +35,8 @@ fun shareSendMessage(result: ShareSend): String? = when (result) {
 }
 
 /**
- * Envoie l'état du partage au relais, au plus toutes les [minIntervalMs].
- * Rend le résultat au lieu d'un booléen : l'appelant peut le dire à l'utilisateur.
+ * Sends the share state to the relay, at most every [minIntervalMs].
+ * Returns the result instead of a boolean: the caller can tell the user.
  */
 class ShareReporter(
     private val client: OkHttpClient = liveHttpClient(),
@@ -59,5 +59,5 @@ class ShareReporter(
     }
 }
 
-/** Cadence d'envoi du partage : un état toutes les 2 s pendant le Direct. */
+/** Share send rate: one state every 2 s during the Direct. */
 const val SHARE_INTERVAL_MS = 2_000L

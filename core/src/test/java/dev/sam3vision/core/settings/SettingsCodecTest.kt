@@ -109,8 +109,8 @@ class SettingsCodecTest {
     }
 
     @Test
-    fun `le role caregiver survit a un aller-retour et reste aveugle par defaut`() {
-        // Défaut « Blind person » : une installation neuve ouvre iSee, pas la page suivi.
+    fun `the caregiver role survives a round trip and stays blind by default`() {
+        // "Blind person" default: a fresh install opens iSee, not the tracking page.
         assertEquals(CaregiverRole.Blind, Settings.Default.caregiverRole)
         assertEquals(CaregiverRole.Blind, SettingsCodec.decode("").caregiverRole)
 
@@ -119,7 +119,7 @@ class SettingsCodecTest {
             CaregiverRole.Caregiver,
             SettingsCodec.decode(SettingsCodec.encode(caregiver)).caregiverRole,
         )
-        // Un fichier écrit avant ce champ reprend le rôle aveugle, jamais le suivi.
+        // A file written before this field resumes the blind role, never tracking.
         val legacy = SettingsCodec.encode(Settings.Default).lines()
             .filterNot { it.startsWith("caregiverRole=") }
         assertEquals(CaregiverRole.Blind, SettingsCodec.decode(legacy.joinToString("\n")).caregiverRole)

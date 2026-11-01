@@ -13,11 +13,11 @@ import dev.sam3vision.core.share.shareIdOf
 import java.net.URLEncoder
 
 /**
- * Partage le suivi parent : ouvre WhatsApp avec le lien du site pré-rempli.
- * Sans WhatsApp, bascule sur wa.me dans le navigateur, puis sur l'app Messages
- * (SMS), puis sur le sélecteur Android générique. Le lien porte l'identifiant
- * **unique de ce téléphone**, attribué à l'installation : aucun prénom n'est
- * écrit en dur, rien n'est à renommer avant de partager.
+ * Shares parent tracking: opens WhatsApp with the site link prefilled.
+ * Without WhatsApp, falls back to wa.me in the browser, then to the Messages
+ * app (SMS), then to the generic Android picker. The link carries this
+ * phone's **unique** id, granted at install: no name is hardcoded,
+ * nothing needs renaming before sharing.
  */
 fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
     val link = shareLink(siteUrl, shareId)
@@ -30,7 +30,7 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
     val encoded = URLEncoder.encode(text, Charsets.UTF_8.name())
     val web = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/?text=$encoded"))
     if (startShare(context, web)) return
-    // Ni WhatsApp ni navigateur : bascule sur l'app Messages (SMS, destinataire à choisir).
+    // Neither WhatsApp nor browser: fall back to the Messages app (SMS, pick a recipient).
     val sms = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:"))
         .putExtra("sms_body", text)
     if (startShare(context, sms)) return
@@ -42,10 +42,10 @@ fun shareParentSite(context: Context, siteUrl: String, shareId: String) {
 }
 
 /**
- * Seul l'identifiant reçu choisit le suivi : ni le flux local de ce téléphone, ni
- * l'origine du lien ne décident quoi afficher. Le lien est reconstruit sur le relais
- * de l'app, donc un ancien lien `suivi-parent.vercel.app` désigne encore le bon
- * proche alors que ce site ne sert plus la carte.
+ * Only the received id picks the tracking: neither this phone's local stream
+ * nor the link origin decides what shows. The link is rebuilt on the app
+ * relay, so an old `suivi-parent.vercel.app` link still names the right
+ * loved one even though that site no longer serves the map.
  */
 fun caregiverShareLink(settings: Settings): String =
     shareIdOf(settings.caregiverInvite)?.let { relayShareLink(it) }
@@ -53,10 +53,10 @@ fun caregiverShareLink(settings: Settings): String =
         ?: ""
 
 /**
- * Lien envoyé au proche : le relais lit `?share=` pour ouvrir le bon flux, sur la
- * base des réglages (relais de l'app par défaut). Sans identifiant propre à ce
- * téléphone, aucun flux n'est deviné : l'ancien défaut commun « leo » n'est plus
- * jamais réutilisé, sinon le proche suivrait le téléphone d'un autre.
+ * Link sent to the loved one: the relay reads `?share=` to open the right
+ * stream, on the settings base (app relay by default). With no id of this
+ * phone's own, no stream is ever guessed: the old shared "leo" default is
+ * never reused, or the loved one would follow someone else's phone.
  */
 fun shareLink(siteUrl: String, shareId: String): String {
     val id = normalizeShareId(shareId)
@@ -64,7 +64,7 @@ fun shareLink(siteUrl: String, shareId: String): String {
     return relayShareLink(id, siteUrl) ?: relayShareLink(id) ?: Settings.DEFAULT_PARENT_SITE_URL
 }
 
-/** Lance un partage ; `false` si aucune app ne le prend en charge. */
+/** Fires a share; `false` when no app takes it. */
 private fun startShare(context: Context, intent: Intent): Boolean {
     if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     return try {

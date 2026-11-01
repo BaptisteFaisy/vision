@@ -10,24 +10,24 @@ import org.junit.Test
 
 class CaregiverPageTest {
     @Test
-    fun `le contenu embarque conserve le flux recu et oublie la cle de carte`() {
-        val url = caregiverPageUrl("https://proche.example/?share=telephone-b&key=ancienne").toHttpUrl()
-        assertEquals("proche.example", url.host)
-        assertEquals("telephone-b", url.queryParameter("share"))
-        // La carte n'existe plus : la clé d'un ancien lien ne part pas à la page.
+    fun `embedded content keeps the received stream and drops the map key`() {
+        val url = caregiverPageUrl("https://loved.example/?share=phone-b&key=old").toHttpUrl()
+        assertEquals("loved.example", url.host)
+        assertEquals("phone-b", url.queryParameter("share"))
+        // The map no longer exists: an old link key never reaches the page.
         assertNull(url.queryParameter("key"))
         assertEquals("1", url.queryParameter("embedded"))
         assertEquals(CAREGIVER_ASSET_PREFIX + "index.html", url.encodedPath)
     }
 
     @Test
-    fun `sans lien recu aucun flux local implicite n est selectionne`() {
+    fun `with no received link no implicit local stream is picked`() {
         val url = caregiverPageUrl("").toHttpUrl()
         assertFalse(url.queryParameterNames.contains("share"))
     }
 
     @Test
-    fun `un ancien lien du site ne garde que son identifiant, sur le relais`() {
+    fun `an old site link only keeps its id, on the relay`() {
         assertEquals(Settings.DEFAULT_PARENT_SITE_URL + "?share=marie", relayShareLink("Marïe"))
         assertEquals(
             "marie",
@@ -38,29 +38,29 @@ class CaregiverPageTest {
     }
 
     @Test
-    fun `un lien sans identifiant ou une url ne designe aucun flux`() {
+    fun `a link with no id or a bare url names no stream`() {
         assertNull(shareIdOf("https://example.com/"))
         assertNull(shareIdOf("javascript:alert(1)"))
         assertNull(shareIdOf("   "))
-        assertNull(relayShareLink("pas un identifiant"))
+        assertNull(relayShareLink("not an id"))
     }
 
     @Test
-    fun `publier ne repart jamais vers le site abandonne`() {
+    fun `publishing never leaves for the abandoned site`() {
         assertEquals(Settings.DEFAULT_PARENT_SITE_URL, relayBaseOf("https://suivi-parent.vercel.app/?share=leo"))
         assertEquals(Settings.DEFAULT_PARENT_SITE_URL, relayBaseOf("   "))
-        assertEquals("https://relais.example/", relayBaseOf("https://relais.example/"))
+        assertEquals("https://relay.example/", relayBaseOf("https://relay.example/"))
         assertTrue(isLegacyRelayUrl("https://suivi-parent.vercel.app"))
-        assertFalse(isLegacyRelayUrl("https://relais.example/"))
+        assertFalse(isLegacyRelayUrl("https://relay.example/"))
     }
 
     /**
-     * Le 29/10, l'hôte gratuit `…freebuff.page` a rendu 502 alors que le Worker
-     * répondait encore : la page caregiver restait en NO STREAM et la caméra du
-     * proche ne s'affichait plus. Un lien d'avant doit repointer sans être ressaisi.
+     * On 29/10, the free `…freebuff.page` host answered 502 while the Worker
+     * still responded: the caregiver page stayed on NO STREAM and the loved
+     * one's camera no longer showed. An older link must repoint with no retype.
      */
     @Test
-    fun `un lien de l hebergement gratuit tombe garde son identifiant et repointe`() {
+    fun `a link from the fallen free host keeps its id and repoints`() {
         val freebuff = "https://site-1607fe95049a481989380f019f9067f3.freebuff.page/?share=leo"
         assertTrue(isLegacyRelayUrl(freebuff))
         assertEquals(Settings.DEFAULT_PARENT_SITE_URL, relayBaseOf(freebuff))
@@ -69,11 +69,11 @@ class CaregiverPageTest {
     }
 
     /**
-     * Garde de régression : le défaut de l'app est l'adresse du Worker lui-même, pas
-     * un domaine d'apparence qui peut tomber sans que le relais bouge d'un octet.
+     * Regression guard: the app default is the Worker address itself, not a
+     * pretty domain that may fall while the relay never moves a byte.
      */
     @Test
-    fun `le relais par defaut est le worker et non un hebergement intermediaire`() {
+    fun `the default relay is the worker, not a middleman host`() {
         val url = Settings.DEFAULT_PARENT_SITE_URL.toHttpUrl()
         assertEquals("isee-suivi.duello.workers.dev", url.host)
         assertEquals("https", url.scheme)
@@ -85,23 +85,23 @@ class CaregiverPageTest {
     }
 
     @Test
-    fun `le lien du relais est stable et toujours sur la base de l app`() {
+    fun `the relay link is stable and always on the app base`() {
         assertEquals(
-            "https://relais.example/?share=maman",
-            relayShareLink("maman", "https://relais.example/"),
+            "https://relay.example/?share=mum",
+            relayShareLink("mum", "https://relay.example/"),
         )
         assertEquals(
-            "https://relais.example/?share=maman",
-            relayShareLink(" MAMAN ", "https://relais.example/?share=ancien"),
+            "https://relay.example/?share=mum",
+            relayShareLink(" MUM ", "https://relay.example/?share=old"),
         )
     }
 
     @Test
-    fun `seuls les assets de l interface sont interceptes sans toucher au relais`() {
-        val page = caregiverPageUrl("https://proche.example/?share=telephone-b")
-        assertEquals("live.mjs", caregiverAssetName("https://proche.example/.isee-caregiver/live.mjs", page))
-        assertNull(caregiverAssetName("https://proche.example/api/state?share=telephone-b", page))
-        assertNull(caregiverAssetName("https://autre.example/.isee-caregiver/live.mjs", page))
-        assertNull(caregiverAssetName("https://proche.example/.isee-caregiver/%2e%2e/secret", page))
+    fun `only the ui assets are intercepted, never touching the relay`() {
+        val page = caregiverPageUrl("https://loved.example/?share=phone-b")
+        assertEquals("live.mjs", caregiverAssetName("https://loved.example/.isee-caregiver/live.mjs", page))
+        assertNull(caregiverAssetName("https://loved.example/api/state?share=phone-b", page))
+        assertNull(caregiverAssetName("https://other.example/.isee-caregiver/live.mjs", page))
+        assertNull(caregiverAssetName("https://loved.example/.isee-caregiver/%2e%2e/secret", page))
     }
 }

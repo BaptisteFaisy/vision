@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import worker from '../src/worker.js';
 import { stateOf, readShare, FRESH_MS } from '../src/contrat.js';
 
-/** Base D1 en mémoire : ne rejoue que les quatre requêtes de `store.js`. */
-function baseFactice() {
+/** In-memory D1 base: only replays the four `store.js` queries. */
+function fakeDb() {
   const rows = new Map();
   return {
     rows,
@@ -32,7 +32,7 @@ function baseFactice() {
             rows.set(id, { doc, updated_at: at, write_key: key });
             return { success: true, meta: { changes: 1 } };
           }
-          throw new Error('SQL inattendu : ' + sql);
+          throw new Error('Unexpected SQL: ' + sql);
         },
       };
       return stmt;
@@ -40,7 +40,7 @@ function baseFactice() {
   };
 }
 
-const env = (extra = {}) => ({ DB: baseFactice(), ...extra });
+const env = (extra = {}) => ({ DB: fakeDb(), ...extra });
 
 async function call(handlerEnv, path, init = {}) {
   const response = await worker.fetch(new Request('https://relais.test' + path, init), handlerEnv);
@@ -53,73 +53,73 @@ const payload = (id, extra = {}) => ({
   shareId: id,
   writeKey: '',
   fix: { lat: 48.85, lon: 2.35, accM: 6, headingDeg: 90, atMs: Date.now(), indoor: false },
-  objects: [{ label: 'porte', distM: 2, angleDeg: 10 }],
-  scene: { text: 'Un obstacle à droite.', speaking: true, fromUser: false },
+  objects: [{ label: 'door', distM: 2, angleDeg: 10 }],
+  scene: { text: 'An obstacle on the right.', speaking: true, fromUser: false },
   ...extra,
 });
 
-test('deux identifiants de flux restent totalement séparés', async () => {
+test('two stream ids stay fully separate', async () => {
   const e = env();
   assert.equal((await call(e, '/api/share', post(payload('camille-a')))).code, 200);
   assert.equal((await call(e, '/api/share', post({
     ...payload('camille-b'),
     objects: [],
-    scene: { text: 'Autre trajet.' },
+    scene: { text: 'Another trip.' },
   }))).code, 200);
   const a = await call(e, '/api/state?share=camille-a');
   const b = await call(e, '/api/state?share=camille-b');
   assert.equal(a.body.live, true);
   assert.equal(a.body.fix.lat, 48.85);
-  assert.equal(a.body.objects[0].label, 'porte');
-  assert.equal(a.body.scene.text, 'Un obstacle à droite.');
+  assert.equal(a.body.objects[0].label, 'door');
+  assert.equal(a.body.scene.text, 'An obstacle on the right.');
   assert.deepEqual(b.body.objects, []);
-  assert.equal(b.body.scene.text, 'Autre trajet.');
+  assert.equal(b.body.scene.text, 'Another trip.');
   assert.equal(e.DB.rows.size, 2);
 });
 
-test('une installation neuve écrit sans aucune clé à saisir', async () => {
+test('a fresh install writes with no key to type', async () => {
   const e = env();
-  assert.equal((await call(e, '/api/share', post(payload('sans-cle')))).code, 200);
-  const state = await call(e, '/api/state?share=sans-cle');
+  assert.equal((await call(e, '/api/share', post(payload('no-key')))).code, 200);
+  const state = await call(e, '/api/state?share=no-key');
   assert.equal(state.body.live, true);
   assert.equal(state.body.fix.accM, 6);
 });
 
-test('la clé appartient au flux : la première écriture la fixe', async () => {
+test('the key belongs to the stream: the first write fixes it', async () => {
   const e = env();
-  assert.equal((await call(e, '/api/share', post(payload('cle-a', { writeKey: 'k1' })))).code, 200);
-  const autre = await call(e, '/api/share', post(payload('cle-a', { writeKey: 'k2' })));
-  assert.equal(autre.code, 403);
-  assert.equal(autre.body.error, 'clé invalide');
-  assert.equal((await call(e, '/api/share', post(payload('cle-a', { writeKey: 'k1' })))).code, 200);
-  // Un flux voisin garde la sienne : aucune clé globale n'a été imposée.
-  assert.equal((await call(e, '/api/share', post(payload('cle-b', { writeKey: 'k9' })))).code, 200);
+  assert.equal((await call(e, '/api/share', post(payload('key-a', { writeKey: 'k1' })))).code, 200);
+  const other = await call(e, '/api/share', post(payload('key-a', { writeKey: 'k2' })));
+  assert.equal(other.code, 403);
+  assert.equal(other.body.error, 'invalid key');
+  assert.equal((await call(e, '/api/share', post(payload('key-a', { writeKey: 'k1' })))).code, 200);
+  // A neighbouring stream keeps its own: no global key was imposed.
+  assert.equal((await call(e, '/api/share', post(payload('key-b', { writeKey: 'k9' })))).code, 200);
 });
 
-test('SHARE_WRITE_KEY, quand elle existe, verrouille tout le relais', async () => {
-  const e = env({ SHARE_WRITE_KEY: 'secret-du-relais' });
-  assert.equal((await call(e, '/api/share', post(payload('verrou')))).code, 403);
-  assert.equal((await call(e, '/api/share', post(payload('verrou', { writeKey: 'secret-du-relais' })))).code, 200);
+test('SHARE_WRITE_KEY, when set, locks the whole relay', async () => {
+  const e = env({ SHARE_WRITE_KEY: 'relay-secret' });
+  assert.equal((await call(e, '/api/share', post(payload('locked')))).code, 403);
+  assert.equal((await call(e, '/api/share', post(payload('locked', { writeKey: 'relay-secret' })))).code, 200);
 });
 
-test('les corps invalides sont refusés explicitement', async () => {
+test('invalid bodies are refused explicitly', async () => {
   const e = env();
   assert.equal((await call(e, '/api/share', post({ ...payload('ok'), shareId: 'Léo' }))).code, 400);
   assert.equal((await call(e, '/api/share', post({ ...payload('ok'), fix: { lat: 999, lon: 2, accM: 1 } }))).code, 400);
-  assert.equal((await call(e, '/api/share', post({ ...payload('ok'), objects: [{ label: 'porte', distM: 2 }] }))).code, 400);
+  assert.equal((await call(e, '/api/share', post({ ...payload('ok'), objects: [{ label: 'door', distM: 2 }] }))).code, 400);
   assert.equal((await call(e, '/api/share', post({ ...payload('ok'), writeKey: 'x'.repeat(65) }))).code, 400);
   assert.equal((await call(e, '/api/share', { method: 'GET' })).code, 405);
 });
 
-test('lecture : sans share ou inconnu, la page ne devine aucun flux', async () => {
+test('reading: with no share or an unknown one, the page guesses no stream', async () => {
   const e = env();
   assert.equal((await call(e, '/api/state')).code, 400);
   assert.equal((await call(e, '/api/state?share=..%2F')).code, 400);
-  const vide = await call(e, '/api/state?share=personne');
-  assert.deepEqual(vide.body, { ok: true, live: false });
+  const empty = await call(e, '/api/state?share=nobody');
+  assert.deepEqual(empty.body, { ok: true, live: false });
 });
 
-test('un état de plus de 12 s n est plus LIVE mais garde sa position', () => {
+test('a state over 12 s old is no longer LIVE but keeps its position', () => {
   const now = 1_000_000;
   const row = { fix: { lat: 1, lon: 2, accM: 3, headingDeg: null, atMs: now, indoor: false }, objects: [], scene: null, serverAt: now - FRESH_MS };
   const state = stateOf(row, now);
@@ -129,76 +129,76 @@ test('un état de plus de 12 s n est plus LIVE mais garde sa position', () => {
   assert.equal(stateOf({ ...row, serverAt: now }, now).live, true);
 });
 
-test('la photo et le trajet arrivent tels quels à la page caregiver', async () => {
+test('the photo and trip reach the caregiver page as-is', async () => {
   const e = env();
   const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
   const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
-  assert.equal((await call(e, '/api/share', post(payload('suivi-image', { photo, trip })))).code, 200);
-  const state = await call(e, '/api/state?share=suivi-image');
+  assert.equal((await call(e, '/api/share', post(payload('track-image', { photo, trip })))).code, 200);
+  const state = await call(e, '/api/state?share=track-image');
   assert.deepEqual(state.body.photo, photo);
   assert.deepEqual(state.body.trip, trip);
-  // Sans guidage, la barre disparaît au paquet suivant.
-  assert.equal((await call(e, '/api/share', post(payload('suivi-image')))).code, 200);
-  assert.equal((await call(e, '/api/state?share=suivi-image')).body.trip, null);
+  // Without guidance, the bar goes away on the next packet.
+  assert.equal((await call(e, '/api/share', post(payload('track-image')))).code, 200);
+  assert.equal((await call(e, '/api/state?share=track-image')).body.trip, null);
 });
 
-test('une photo refusée est explicite, et une image absente garde la dernière', async () => {
+test('a refused photo is explicit, and a missing picture keeps the last one', async () => {
   const e = env();
-  assert.equal((await call(e, '/api/share', post(payload('photo-cassee', { photo: { jpeg: '<script>' } })))).code, 400);
-  assert.equal((await call(e, '/api/share', post(payload('photo-longue', { photo: { jpeg: 'A'.repeat(120_001) } })))).code, 400);
-  assert.equal((await call(e, '/api/share', post(payload('trajet-casse', { trip: { destination: 'X', totalM: -1 } })))).code, 400);
+  assert.equal((await call(e, '/api/share', post(payload('broken-photo', { photo: { jpeg: '<script>' } })))).code, 400);
+  assert.equal((await call(e, '/api/share', post(payload('long-photo', { photo: { jpeg: 'A'.repeat(120_001) } })))).code, 400);
+  assert.equal((await call(e, '/api/share', post(payload('broken-trip', { trip: { destination: 'X', totalM: -1 } })))).code, 400);
   const photo = { jpeg: 'BBBB', atMs: 1 };
-  await call(e, '/api/share', post(payload('photo-garde', { photo })));
-  // Le service de suivi écran éteint republie sans image : la dernière reste, avec son âge.
-  await call(e, '/api/share', post(payload('photo-garde')));
-  assert.deepEqual((await call(e, '/api/state?share=photo-garde')).body.photo, photo);
+  await call(e, '/api/share', post(payload('kept-photo', { photo })));
+  // The screen-off tracking service republishes without a picture: the last one stays, with its age.
+  await call(e, '/api/share', post(payload('kept-photo')));
+  assert.deepEqual((await call(e, '/api/state?share=kept-photo')).body.photo, photo);
 });
 
-test('le texte est borné et reste absent quand il manque', () => {
+test('the text is bounded and stays missing when absent', () => {
   const long = readShare(payload('ok', { scene: { text: 'x'.repeat(3000) } }));
   assert.equal(long.doc(Date.now()).scene.text.length, 2000);
-  const sans = readShare(payload('ok', { scene: undefined }));
-  assert.equal(sans.doc(Date.now()).scene, null);
+  const missing = readShare(payload('ok', { scene: undefined }));
+  assert.equal(missing.doc(Date.now()).scene, null);
 });
 
-test('les repères reconnus arrivent en dessins à la page caregiver', async () => {
+test('recognized landmarks reach the caregiver page as drawings', async () => {
   const e = env();
   const pictos = { atMs: 1_700_000_000_000, items: [{ label: 'medics', png: 'AQID' }] };
-  assert.equal((await call(e, '/api/share', post(payload('suivi-picto', { pictos })))).code, 200);
-  const state = await call(e, '/api/state?share=suivi-picto');
+  assert.equal((await call(e, '/api/share', post(payload('track-picto', { pictos })))).code, 200);
+  const state = await call(e, '/api/state?share=track-picto');
   assert.deepEqual(state.body.pictos, pictos);
-  // Sans détection, le bandeau disparaît au paquet suivant.
-  assert.equal((await call(e, '/api/share', post(payload('suivi-picto')))).code, 200);
-  assert.equal((await call(e, '/api/state?share=suivi-picto')).body.pictos, null);
-  // Une liste vide explicite vaut absence, pas un objet vide stocké.
-  const vide = { atMs: 1, items: [] };
-  assert.equal((await call(e, '/api/share', post(payload('suivi-picto', { pictos: vide })))).code, 200);
-  assert.equal((await call(e, '/api/state?share=suivi-picto')).body.pictos, null);
+  // Without detection, the strip goes away on the next packet.
+  assert.equal((await call(e, '/api/share', post(payload('track-picto')))).code, 200);
+  assert.equal((await call(e, '/api/state?share=track-picto')).body.pictos, null);
+  // An explicit empty list counts as missing, not a stored empty object.
+  const empty = { atMs: 1, items: [] };
+  assert.equal((await call(e, '/api/share', post(payload('track-picto', { pictos: empty })))).code, 200);
+  assert.equal((await call(e, '/api/state?share=track-picto')).body.pictos, null);
 });
 
-test('sans position, la photo et la phrase passent quand même (caméra sans GPS)', async () => {
+test('without a position, photo and sentence still pass (camera without GPS)', async () => {
   const e = env();
   const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
-  const absent = { ...payload('sans-gps', { photo }), fix: undefined };
-  assert.equal((await call(e, '/api/share', post(absent))).code, 200);
-  const state = await call(e, '/api/state?share=sans-gps');
+  const missing = { ...payload('no-gps', { photo }), fix: undefined };
+  assert.equal((await call(e, '/api/share', post(missing))).code, 200);
+  const state = await call(e, '/api/state?share=no-gps');
   assert.equal(state.body.live, true);
   assert.equal(state.body.fix, null);
   assert.deepEqual(state.body.photo, photo);
-  // Un `null` explicite vaut absence, pas une erreur.
-  const nul = { ...payload('sans-gps-nul', { photo }), fix: null };
+  // An explicit `null` counts as missing, not an error.
+  const nul = { ...payload('no-gps-null', { photo }), fix: null };
   assert.equal((await call(e, '/api/share', post(nul))).code, 200);
-  assert.equal((await call(e, '/api/state?share=sans-gps-nul')).body.fix, null);
-  // Une position présentée mais invalide reste refusée.
-  const bad = { ...payload('sans-gps'), fix: { lat: 999, lon: 2, accM: 1 } };
+  assert.equal((await call(e, '/api/state?share=no-gps-null')).body.fix, null);
+  // A present but invalid position stays refused.
+  const bad = { ...payload('no-gps'), fix: { lat: 999, lon: 2, accM: 1 } };
   assert.equal((await call(e, '/api/share', post(bad))).code, 400);
 });
 
-test('des repères illisibles sont refusés explicitement', async () => {
+test('unreadable landmarks are refused explicitly', async () => {
   const e = env();
-  const bad = (pictos) => call(e, '/api/share', post(payload('picto-casse', { pictos })));
+  const bad = (pictos) => call(e, '/api/share', post(payload('broken-picto', { pictos })));
   assert.equal((await bad({ atMs: 1, items: [{ label: '', png: 'AQID' }] })).code, 400);
   assert.equal((await bad({ atMs: 1, items: [{ label: 'x', png: '<script>' }] })).code, 400);
   assert.equal((await bad({ atMs: 1, items: [{ label: 'x', png: 'A'.repeat(30_001) }] })).code, 400);
-  assert.equal((await bad({ atMs: 1, items: 'non' })).code, 400);
+  assert.equal((await bad({ atMs: 1, items: 'nope' })).code, 400);
 });

@@ -5,21 +5,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Le lien de la page Caregiver : l'identifiant reçu décide du flux, et le lien est
- * toujours reconstruit sur le relais de l'app (le site Vercel ne sert plus la carte).
+ * The Caregiver page link: the received id picks the stream, and the link is
+ * always rebuilt on the app relay (the Vercel site no longer serves the map).
  */
 class CaregiverShareLinkTest {
 
     private val relay = Settings.DEFAULT_PARENT_SITE_URL.trimEnd('/')
 
     @Test
-    fun `sans invitation aucun suivi local ne se substitue au proche`() {
+    fun `no invite means no local tracking stands in for the loved one`() {
         val settings = Settings.Default.copy(parentSiteUrl = relay, shareId = "leo")
         assertEquals("", caregiverShareLink(settings))
     }
 
     @Test
-    fun `un ancien lien du site ne garde que son identifiant`() {
+    fun `an old site link only keeps its id`() {
         val settings = Settings.Default.copy(
             caregiverInvite = "https://suivi-parent.vercel.app?share=marie",
             shareId = "leo",
@@ -28,13 +28,13 @@ class CaregiverShareLinkTest {
     }
 
     @Test
-    fun `code nu colle = identifiant sur le relais`() {
+    fun `pasted bare code means id on the relay`() {
         val settings = Settings.Default.copy(caregiverInvite = "marie", shareId = "leo")
         assertEquals("$relay/?share=marie", caregiverShareLink(settings))
     }
 
     @Test
-    fun `site seul colle ne reprend jamais l identifiant local`() {
+    fun `pasted lone site never resumes the local id`() {
         val settings = Settings.Default.copy(
             caregiverInvite = "https://suivi-parent.vercel.app/",
             shareId = "leo",
@@ -43,16 +43,16 @@ class CaregiverShareLinkTest {
     }
 
     @Test
-    fun `ancien lien recu dans le site est repris par son identifiant`() {
-        val legacy = "https://suivi-parent.vercel.app/?share=proche-distant"
-        assertEquals("$relay/?share=proche-distant", caregiverShareLink(Settings.Default.copy(parentSiteUrl = legacy)))
+    fun `old link received in the site is resumed by its id`() {
+        val legacy = "https://suivi-parent.vercel.app/?share=distant-loved"
+        assertEquals("$relay/?share=distant-loved", caregiverShareLink(Settings.Default.copy(parentSiteUrl = legacy)))
     }
 
     @Test
-    fun `code recu remplace l ancienne session`() {
+    fun `received code replaces the old session`() {
         val settings = Settings.Default.copy(
             caregiverInvite = "marie",
-            parentSiteUrl = "$relay/?share=ancien",
+            parentSiteUrl = "$relay/?share=old",
         )
         assertEquals("$relay/?share=marie", caregiverShareLink(settings))
     }

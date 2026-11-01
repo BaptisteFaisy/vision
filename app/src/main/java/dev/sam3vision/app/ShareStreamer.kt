@@ -18,23 +18,24 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 
 /**
- * Direct de la caméra du proche vers la page de l'aidant : un WebSocket vers la
- * salle du flux (`/ws?role=push`), et des frames JPEG binaires à
- * [STREAM_FRAME_MS]. Le relais D1 continue de porter position, phrase et trajet —
- * l'image ne passe **que** par ce tuyau, elle n'est jamais stockée.
+ * Live stream from the loved one's camera to the caregiver page: a WebSocket
+ * to the stream room (`/ws?role=push`), with binary JPEG frames at
+ * [STREAM_FRAME_MS]. The D1 relay keeps carrying position, sentence and
+ * trip — the picture passes **only** through this pipe, it is never stored.
  *
- * Trois règles de sobriété, apprises du partage lent :
- *  - **rien ne part sans spectateur** : le relais annonce le nombre d'aidants
- *    connectés (`{"type":"audience","watch":n}`), et la caméra se tait tant que
- *    ce nombre est nul — pas de données mobiles dépensées pour un écran fermé ;
- *  - **une frame n'est poussée qu'une fois** : le numéro de séquence de
- *    `SharedCameraFrame` évite de renvoyer la même image à chaque tour.
- *  - **la caméra dit quand elle s'éteint** : un avis `{"type":"camera","on":…}`
- *    à chaque changement, transmis par la salle aux aidants — l'image
- *    disparaît de leur page aussitôt, sans attendre que la dernière frame périme.
+ * Three frugality rules, learned from slow sharing:
+ *  - **nothing leaves without a watcher**: the relay announces the number of
+ *    connected caregivers (`{"type":"audience","watch":n}`), and the camera
+ *    stays quiet while that number is zero — no mobile data spent for a
+ *    closed screen;
+ *  - **a frame is pushed only once**: the `SharedCameraFrame` sequence number
+ *    avoids resending the same picture every turn.
+ *  - **the camera tells when it turns off**: a `{"type":"camera","on":…}`
+ *    notice on every change, forwarded by the room to caregivers — the picture
+ *    leaves their page at once, without waiting for the last frame to expire.
  *
- * Une coupure ne casse rien : le tuyau est rouvert après [STREAM_RETRY_MS], et
- * la page retombe sur la photo lente tant qu'aucune frame n'arrive.
+ * A drop breaks nothing: the pipe reopens after [STREAM_RETRY_MS], and the
+ * page falls back to the slow photo while no frame arrives.
  */
 class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
 
@@ -49,14 +50,14 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
 
     private var sentSeq = -1L
 
-    /** Dernier état caméra annoncé ; `null` force une republication au tour suivant. */
+    /** Last announced camera state; `null` forces a republication next turn. */
     @Volatile
     private var announced: Boolean? = null
 
-    /** Tours vides consécutifs : seul un silence durable annonce la caméra éteinte. */
+    /** Empty turns in a row: only lasting silence announces the camera off. */
     private var emptyTurns = 0
 
-    /** Frames poussées, tours sans frame fraîche, envois refusés par le tuyau. */
+    /** Frames pushed, turns with no fresh frame, sends refused by the pipe. */
     @Volatile
     var sentFrames = 0L
         private set
@@ -69,14 +70,14 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     var sendFailures = 0L
         private set
 
-    /** Intervalles d'envoi : le rythme **réel** du direct, pas la cadence demandée. */
+    /** Send gaps: the **real** live rhythm, not the requested rate. */
     private val fps = LiveFpsMeter()
     private val gaps = LongArray(LOG_EVERY_SENDS) { 0L }
 
     private val listener = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
-            // Chaque avis d'audience (aidant qui arrive ou part) republie l'état
-            // caméra : un aidant qui vient d'arriver l'apprend dans le tour suivant.
+            // Every audience notice (caregiver arriving or leaving) republishes
+            // the camera state: a just-arrived caregiver learns it next turn.
             audienceWatching(text)?.let {
                 watching = it
                 announced = null
@@ -97,14 +98,14 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         }
     }
 
-    /** Garde le direct ouvert jusqu'à [close] : réouverture après chaque coupure. */
+    /** Keeps the live stream open until [close]: reopened after every drop. */
     suspend fun run(url: String) {
         while (!closed) {
             val ws = client.newWebSocket(Request.Builder().url(url).build(), listener)
             socket = ws
-            // Écran éteint, partage coupé : le tuyau se ferme vraiment, même sur
-            // annulation — sinon la salle croirait le téléphone encore là et les
-            // aidants garderaient l'image.
+            // Screen off, share cut: the pipe really closes, even on
+            // cancellation — otherwise the room would believe the phone still
+            // there and caregivers would keep the picture.
             try {
                 pump(ws)
             } finally {
@@ -119,9 +120,9 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     }
 
     /**
-     * Pousse les frames tant que ce tuyau-là vit, à **échéance absolue** : un envoi
-     * lent ne décale pas les suivants (pas de `delay` fixe qui dérive), le tour
-     * suivant part à l'heure ou saute si l'échéance est déjà passée.
+     * Pushes frames while this pipe lives, on **absolute deadline**: a slow
+     * send never shifts the next ones (no drifting fixed `delay`), the next
+     * turn leaves on time or skips when the deadline already passed.
      */
     private suspend fun pump(ws: WebSocket) {
         var nextDue = System.currentTimeMillis()
@@ -129,11 +130,11 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
             nextDue += STREAM_FRAME_MS
             val wait = nextDue - System.currentTimeMillis()
             if (wait > 0) delay(wait) else nextDue = System.currentTimeMillis()
-            // Sans spectateur, rien ne part — et le retour de l'audience republie l'état.
+            // With no watcher, nothing leaves — and the audience return republishes the state.
             if (!watching) { announced = null; emptyTurns = 0; continue }
-            // Caméra fermée ou figée : les aidants l'apprennent après la grâce,
-            // au lieu de garder la dernière image jusqu'à 8 s. Un tour vide
-            // seul n'éteint rien, sinon chaque micro-trou fait clignoter leur page.
+            // Closed or frozen camera: caregivers learn it after the grace,
+            // instead of keeping the last picture up to 8 s. A lone empty
+            // turn turns nothing off, or every micro-gap would flicker their page.
             val frame = SharedCameraFrame.latestBytes(System.currentTimeMillis())
             if (frame == null || frame.jpeg.isEmpty()) {
                 droppedFrames += 1
@@ -154,9 +155,9 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     }
 
     /**
-     * Publie l'état de la caméra, une fois par changement : la salle le transmet
-     * aux aidants, qui effacent l'image dès `false`. Les remises à `null`
-     * (audience perdue, tuyau rouvert) forcent une republication au tour suivant.
+     * Publishes the camera state, once per change: the room forwards it to
+     * caregivers, who clear the picture on `false`. Resets to `null` (lost
+     * audience, reopened pipe) force a republication next turn.
      */
     private fun announce(ws: WebSocket, on: Boolean) {
         if (announced == on) return
@@ -164,7 +165,7 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         runCatching { ws.send(cameraNotice(on)) }
     }
 
-    /** Un envoi de plus : l'intervalle rejoint la fenêtre, le log part tous les 60. */
+    /** One more send: the gap joins the window, the log goes every 60. */
     private fun noteSent(nowMs: Long) {
         val gap = fps.gapAt(nowMs)
         sentFrames += 1
@@ -172,7 +173,7 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         if (sentFrames % LOG_EVERY_SENDS == 0L) logFps()
     }
 
-    /** Rythme réel du direct : médiane et p95 des intervalles d'envoi (N = 60). */
+    /** Real live rhythm: median and p95 of send gaps (N = 60). */
     private fun logFps() {
         val valid = gaps.filter { it > 0 }.sorted()
         if (valid.isEmpty()) return
@@ -180,21 +181,21 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
         val p95 = valid[(valid.size * 95 / 100).coerceAtMost(valid.size - 1)]
         Log.i(
             "sam3vision",
-            "direct: ${"%.1f".format(1000f / median)} ips " +
-                "(médiane $median ms, p95 $p95 ms, " +
-                "envoyées $sentFrames, jetées $droppedFrames, refus $sendFailures)",
+            "direct: ${"%.1f".format(1000f / median)} fps " +
+                "(median $median ms, p95 $p95 ms, " +
+                "sent $sentFrames, dropped $droppedFrames, refused $sendFailures)",
         )
     }
 
-    /** Ferme le direct (sortie de l'écran, partage coupé). */
+    /** Closes the live stream (leaving the screen, share cut). */
     fun close() {
         closed = true
         watching = false
-        // Dernier mot avant de raccrocher : la salle préviendra les aidants de
-        // toute façon en voyant le tuyau se fermer, mais l'avis part avant.
+        // Last word before hanging up: the room would tell caregivers anyway
+        // when it sees the pipe close, but the notice goes first.
         runCatching { socket?.send(cameraNotice(false)) }
         SharedCameraFrame.audience = false
-        runCatching { socket?.close(1000, "fin") }
+        runCatching { socket?.close(1000, "done") }
         socket = null
     }
 
@@ -206,7 +207,7 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     }
 
     companion object {
-        /** Une ligne de rythme tous les 60 envois (≈ 4 s à 15 im/s). */
+        /** One rhythm line every 60 sends (≈ 4 s at 15 fps). */
         private const val LOG_EVERY_SENDS = 60
     }
 }

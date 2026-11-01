@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.sam3vision.core.share.caregiverPageUrl
 
-/** La page Portrait embarquée dans l'APK ; son lien choisit uniquement le flux distant. */
+/** The Portrait page embedded in the APK; its link only picks the remote stream. */
 @Composable
 fun CaregiverScreen(link: String, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -48,9 +48,9 @@ fun CaregiverScreen(link: String, onBack: () -> Unit) {
     DisposableEffect(web) {
         onDispose { web.stopLoading(); web.destroy() }
     }
-    // Pas de navigationBarsPadding : la page gère elle-même l'encoche basse
-    // (caméra plein-bleed jusqu'au bord) ; un padding Compose laisserait une
-    // bande blanche sous l'image.
+    // No navigationBarsPadding: the page handles the bottom notch itself
+    // (full-bleed camera to the edge); a Compose padding would leave a
+    // white strip under the picture.
     Box(
         Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)
             .statusBarsPadding(),
@@ -82,13 +82,13 @@ private fun caregiverWeb(
     onLoading: (Boolean) -> Unit,
     onError: (String?) -> Unit,
 ): WebView = WebView(context).apply {
-    // WRAP_CONTENT laisse le viewport CSS à 0, même si Compose mesure la vue plein écran.
+    // WRAP_CONTENT leaves the CSS viewport at 0, even when Compose measures the view fullscreen.
     layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     setBackgroundColor(Color.WHITE)
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.cacheMode = WebSettings.LOAD_NO_CACHE
-    // L'image du proche se zoome au pincement : la WebView ne doit pas le bloquer.
+    // The loved one's picture pinch-zooms: the WebView must never block it.
     settings.setSupportZoom(true)
     settings.builtInZoomControls = true
     settings.displayZoomControls = false

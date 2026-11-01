@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-// Ces tests n'appellent jamais le stockage de production.
+// These tests never touch production storage.
 for (const key of ['UPSTASH_REDIS_REST_URL', 'KV_REST_API_URL', 'SHARE_WRITE_KEY']) delete process.env[key];
 const require = createRequire(import.meta.url);
 const share = require('../api/share.js');
@@ -21,24 +21,24 @@ async function request(handler, req) {
 
 const payload = id => ({
   shareId: id, fix: { lat: 48.85, lon: 2.35, accM: 5, headingDeg: 90 },
-  objects: [{ label: 'porte', distM: 2, angleDeg: 90 }],
-  scene: { text: 'Un obstacle à droite.', speaking: true, fromUser: false },
+  objects: [{ label: 'door', distM: 2, angleDeg: 90 }],
+  scene: { text: 'An obstacle on the right.', speaking: true, fromUser: false },
 });
 
-test('deux téléphones lisent des sessions distinctes avec texte et objets associés', async () => {
+test('two phones read separate sessions with their own text and objects', async () => {
   await request(share, { method: 'POST', body: payload('test-a') });
-  await request(share, { method: 'POST', body: { ...payload('test-b'), scene: { text: 'Autre trajet.' }, objects: [] } });
+  await request(share, { method: 'POST', body: { ...payload('test-b'), scene: { text: 'Another trip.' }, objects: [] } });
   const a = await request(state, { query: { share: 'test-a' } });
   const b = await request(state, { query: { share: 'test-b' } });
-  assert.equal(a.body.scene.text, 'Un obstacle à droite.');
+  assert.equal(a.body.scene.text, 'An obstacle on the right.');
   assert.equal(a.body.scene.speaking, true);
-  assert.equal(a.body.objects[0].label, 'porte');
-  assert.equal(b.body.scene.text, 'Autre trajet.');
+  assert.equal(a.body.objects[0].label, 'door');
+  assert.equal(b.body.scene.text, 'Another trip.');
   assert.deepEqual(b.body.objects, []);
   assert.equal((await request(state, { query: {} })).code, 400);
 });
 
-test('un ancien client sans texte reste lisible ; aucun texte antérieur ne fuit', async () => {
+test('an old client without text stays readable; no earlier text leaks', async () => {
   const body = payload('test-old');
   delete body.scene;
   await request(share, { method: 'POST', body });
@@ -47,7 +47,7 @@ test('un ancien client sans texte reste lisible ; aucun texte antérieur ne fuit
   assert.equal(response.body.objects.length, 1);
 });
 
-test('la photo et le trajet du téléphone arrivent à la page', async () => {
+test('the phone photo and trip reach the page', async () => {
   const photo = { jpeg: 'AAAA', atMs: 1_700_000_000_000 };
   const trip = { destination: 'Gare de Lyon', totalM: 1200, remainingM: 300, remainingS: 240, progress: 0.75 };
   await request(share, { method: 'POST', body: { ...payload('test-media'), photo, trip } });
@@ -59,7 +59,7 @@ test('la photo et le trajet du téléphone arrivent à la page', async () => {
   assert.equal((await request(state, { query: { share: 'test-media' } })).body.photo.jpeg, photo.jpeg);
 });
 
-test('texte borné et clé d’écriture toujours exigée quand configurée', async () => {
+test('bounded text, and write key always required when set', async () => {
   const body = { ...payload('test-long'), scene: { text: 'x'.repeat(3000) } };
   await request(share, { method: 'POST', body });
   assert.equal((await request(state, { query: { share: 'test-long' } })).body.scene.text.length, 2000);

@@ -1,28 +1,28 @@
 import { readShare, stateOf, emptyState, validId } from './contrat.js';
 import { d1Store } from './store.js';
 
-// La salle temps réel doit être **exportée par l'entrée** : sans ça `wrangler dev`
-// et `wrangler deploy` refusent le binding (« not exported in your entrypoint »).
+// The realtime room must be **exported by the entrypoint**: without it `wrangler dev`
+// and `wrangler deploy` refuse the binding ("not exported in your entrypoint").
 export { RelayRoom } from './durable.js';
 
-/** Nettoyage des flux abandonnés, une écriture sur [PRUNE_EVERY] (base bornée). */
+/** Cleanup of abandoned streams, one write in [PRUNE_EVERY] (bounded base). */
 const PRUNE_EVERY = 200;
 const KEEP_MS = 86_400_000;
 
 let writes = 0;
 
 /**
- * Relais du suivi iSee (Worker Cloudflare + D1).
+ * iSee tracking relay (Cloudflare Worker + D1).
  *
- * - `POST /api/share` : le téléphone accompagné dépose son état (`{shareId, writeKey,
- *   fix?, objects, scene, photo, trip, pictos}`), toutes les 2 s pendant iSee ou
- *   Direct. Un flux par identifiant : deux proches ne partagent jamais la même ligne.
- * - `GET /api/state?share=<id>` : la page caregiver lit ce seul flux.
- * - `GET /health` : sonde.
+ * - `POST /api/share`: the accompanied phone drops its state (`{shareId, writeKey,
+ *   fix?, objects, scene, photo, trip, pictos}`), every 2 s during iSee or
+ *   Direct. One stream per id: two loved ones never share the same row.
+ * - `GET /api/state?share=<id>`: the caregiver page reads that stream alone.
+ * - `GET /health`: probe.
  *
- * La clé d'écriture est **liée au flux** au premier envoi : un identifiant deviné
- * ne suffit pas à injecter une fausse position dans le suivi d'un autre. Sans
- * `SHARE_WRITE_KEY` côté Worker (défaut), aucune clé n'est exigée à l'installation.
+ * The write key is **bound to the stream** on first send: a guessed id is not
+ * enough to inject a fake position into someone else's tracking. Without
+ * `SHARE_WRITE_KEY` on the Worker (default), no key is required at install.
  */
 export default {
   async fetch(request, env) {
@@ -32,26 +32,26 @@ export default {
       if (url.pathname === '/api/state') return await state(url, env);
       if (url.pathname === '/ws') return await stream(request, url, env);
       if (url.pathname === '/health') return json({ ok: true }, 200);
-      return json({ ok: false, error: 'route inconnue' }, 404);
+      return json({ ok: false, error: 'unknown route' }, 404);
     } catch {
-      // Une panne de base ne doit jamais ressembler à « en attente du proche ».
-      return json({ ok: false, error: 'relais indisponible' }, 503);
+      // A base failure must never look like "waiting for the loved one".
+      return json({ ok: false, error: 'relay unavailable' }, 503);
     }
   },
 };
 
 async function share(request, env) {
-  if (request.method !== 'POST') return json({ ok: false, error: 'POST attendu' }, 405);
+  if (request.method !== 'POST') return json({ ok: false, error: 'POST expected' }, 405);
   const body = await request.json().catch(() => null);
   const parsed = readShare(body, env.SHARE_WRITE_KEY || '');
   if (!parsed.ok) return json({ ok: false, error: parsed.error }, parsed.code);
   const store = d1Store(env.DB);
   const existing = await store.read(parsed.id);
-  if (existing && existing.key !== parsed.key) return json({ ok: false, error: 'clé invalide' }, 403);
+  if (existing && existing.key !== parsed.key) return json({ ok: false, error: 'invalid key' }, 403);
   const now = Date.now();
-  // `write` refuse si une autre clé a lié le flux entre la lecture et l'écriture.
+  // `write` refuses when another key bound the stream between read and write.
   if (!(await store.write(parsed.id, withPreviousPhoto(parsed, existing), parsed.key, now))) {
-    return json({ ok: false, error: 'clé invalide' }, 403);
+    return json({ ok: false, error: 'invalid key' }, 403);
   }
   writes += 1;
   if (writes % PRUNE_EVERY === 0) await store.prune(now - KEEP_MS);
@@ -59,10 +59,10 @@ async function share(request, env) {
 }
 
 /**
- * Document à écrire : l'image du paquet précédent est **conservée** quand cet
- * envoi n'en porte pas (service de suivi écran éteint, caméra fermée) — son
- * `atMs` reste ancien, donc la page la cache au lieu de la présenter comme du
- * direct. Le trajet, lui, suit le paquet : plus de guidage = plus de barre.
+ * Document to write: the previous packet's picture is **kept** when this send
+ * carries none (screen-off tracking service, closed camera) — its `atMs`
+ * stays old, so the page hides it instead of passing it off as live. The
+ * trip follows the packet: no more guidance = no more bar.
  */
 function withPreviousPhoto(parsed, existing) {
   const doc = parsed.doc(Date.now());
@@ -71,24 +71,24 @@ function withPreviousPhoto(parsed, existing) {
 }
 
 async function state(url, env) {
-  if (url.searchParams.get('share') === null) return json({ ok: false, error: 'share invalide' }, 400);
+  if (url.searchParams.get('share') === null) return json({ ok: false, error: 'invalid share' }, 400);
   const id = url.searchParams.get('share');
-  if (!validId(id)) return json({ ok: false, error: 'share invalide' }, 400);
+  if (!validId(id)) return json({ ok: false, error: 'invalid share' }, 400);
   const row = await d1Store(env.DB).read(id);
   return json(row ? stateOf(row, Date.now()) : emptyState(), 200);
 }
 
 /**
- * Diffusion temps réel (`/ws?share=<id>&role=push|watch`) : une salle par flux,
- * portée par un Durable Object. Le Worker ne fait que router — les frames ne
- * touchent ni D1 ni le worker, elles passent de la caméra du proche aux aidants
- * connectés (`room.js` décrit le contrat, `durable.js` la salle).
+ * Realtime broadcast (`/ws?share=<id>&role=push|watch`): one room per stream,
+ * carried by a Durable Object. The Worker only routes — frames touch neither
+ * D1 nor the worker, they pass from the loved one's camera to the connected
+ * caregivers (`room.js` describes the contract, `durable.js` the room).
  */
 async function stream(request, url, env) {
   const id = url.searchParams.get('share');
-  if (!validId(id)) return json({ ok: false, error: 'share invalide' }, 400);
-  // Déploiement sans binding : le dire, au lieu de casser la page qui a un repli.
-  if (!env.RELAY_ROOM) return json({ ok: false, error: 'diffusion non déployée' }, 503);
+  if (!validId(id)) return json({ ok: false, error: 'invalid share' }, 400);
+  // Deploy without a binding: say so, instead of breaking the page that has a fallback.
+  if (!env.RELAY_ROOM) return json({ ok: false, error: 'streaming not deployed' }, 503);
   const room = env.RELAY_ROOM.get(env.RELAY_ROOM.idFromName(id));
   return room.fetch(request);
 }

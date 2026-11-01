@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STREAM_FRESH_MS, streamUrl, frameSrcOf, cameraOnOf, watchStream } from '../live-stream.mjs';
 
-test('le flux est sur la même origine, en wss quand la page est en https', () => {
+test('the stream stays on the same origin, wss when the page is https', () => {
   assert.equal(
     streamUrl('https://relais.example/?share=leo'),
     'wss://relais.example/ws?share=leo&role=watch',
@@ -14,7 +14,7 @@ test('le flux est sur la même origine, en wss quand la page est en https', () =
   assert.equal(STREAM_FRESH_MS, 600);
 });
 
-test('une frame vide n’est pas une image', () => {
+test('an empty frame is not a picture', () => {
   const create = (blob) => ({ blob });
   assert.equal(frameSrcOf(null, create), null);
   assert.equal(frameSrcOf(new Uint8Array([]), create), null);
@@ -23,7 +23,7 @@ test('une frame vide n’est pas une image', () => {
   assert.equal(view.blob.size, 2);
 });
 
-test('un Blob du socket passe tel quel, sans copie', () => {
+test('a socket Blob passes through as-is, with no copy', () => {
   const create = (blob) => ({ blob });
   const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
   const view = frameSrcOf(blob, create);
@@ -31,8 +31,8 @@ test('un Blob du socket passe tel quel, sans copie', () => {
   assert.equal(frameSrcOf(new Blob([]), create), null);
 });
 
-/** Onglet factice : on déclenche les évènements à la main. */
-function fauxSocket(url) {
+/** Fake tab: events fire by hand. */
+function fakeSocket(url) {
   return {
     url,
     binaryType: 'blob',
@@ -41,40 +41,40 @@ function fauxSocket(url) {
   };
 }
 
-function montage() {
+function setup() {
   const sockets = [];
   const frames = [];
   const cameras = [];
-  const etats = [];
+  const states = [];
   const timers = [];
-  const ouvertures = [];
-  const revoques = [];
-  const flux = watchStream({
+  const opened = [];
+  const revoked = [];
+  const stream = watchStream({
     href: 'https://relais.example/?share=leo',
     onFrame: (src) => frames.push(src),
-    onState: (etat) => etats.push(etat),
+    onState: (state) => states.push(state),
     onCamera: (on) => cameras.push(on),
-    open: (url) => { const socket = fauxSocket(url); sockets.push(socket); ouvertures.push(url); return socket; },
+    open: (url) => { const socket = fakeSocket(url); sockets.push(socket); opened.push(url); return socket; },
     create: () => 'blob:' + frames.length,
-    revoke: (src) => revoques.push(src),
+    revoke: (src) => revoked.push(src),
     timer: {
       set: (fn, ms) => { timers.push({ fn, ms }); return timers.length - 1; },
       clear: () => {},
     },
   });
-  return { flux, sockets, frames, etats, cameras, timers, ouvertures, revoques };
+  return { stream, sockets, frames, states, cameras, timers, opened, revoked };
 }
 
-test('l’aidant ouvre le flux du bon identifiant et passe en direct', () => {
-  const { sockets, etats, ouvertures } = montage();
-  assert.deepEqual(ouvertures, ['wss://relais.example/ws?share=leo&role=watch']);
+test('the caregiver opens the stream of the right id and goes live', () => {
+  const { sockets, states, opened } = setup();
+  assert.deepEqual(opened, ['wss://relais.example/ws?share=leo&role=watch']);
   assert.equal(sockets[0].binaryType, 'blob');
   sockets[0].onopen();
-  assert.deepEqual(etats, ['live']);
+  assert.deepEqual(states, ['live']);
 });
 
-test('chaque frame binaire devient une image, un texte est ignoré', () => {
-  const { sockets, frames } = montage();
+test('every binary frame becomes a picture, text is ignored', () => {
+  const { sockets, frames } = setup();
   sockets[0].onopen();
   sockets[0].onmessage({ data: new Blob([new Uint8Array([1, 2, 3])]) });
   sockets[0].onmessage({ data: 'audience' });
@@ -83,47 +83,47 @@ test('chaque frame binaire devient une image, un texte est ignoré', () => {
   assert.equal(frames[0], 'blob:0');
 });
 
-test('seuls les deux derniers blobs survivent, l’avant-dernier est révoqué', () => {
-  const { sockets, revoques } = montage();
+test('only the last two blobs survive, the one before is revoked', () => {
+  const { sockets, revoked } = setup();
   sockets[0].onopen();
   const frame = () => sockets[0].onmessage({ data: new Blob([new Uint8Array([1])]) });
   frame();
   frame();
-  assert.deepEqual(revoques, []);
+  assert.deepEqual(revoked, []);
   frame();
-  assert.deepEqual(revoques, ['blob:0']);
+  assert.deepEqual(revoked, ['blob:0']);
   frame();
-  assert.deepEqual(revoques, ['blob:0', 'blob:1']);
+  assert.deepEqual(revoked, ['blob:0', 'blob:1']);
 });
 
-test('une coupure repasse en état lent puis retente, avec un délai qui grandit', () => {
-  const { sockets, etats, timers } = montage();
+test('a drop falls back to the slow state then retries, with a growing delay', () => {
+  const { sockets, states, timers } = setup();
   sockets[0].onopen();
   sockets[0].onclose();
-  assert.deepEqual(etats, ['live', 'idle']);
+  assert.deepEqual(states, ['live', 'idle']);
   assert.equal(timers.length, 1);
   assert.equal(timers[0].ms, 500);
 });
 
-test('fermer le flux ne relance aucune connexion', () => {
-  const { flux, sockets, timers } = montage();
+test('closing the stream restarts no connection', () => {
+  const { stream, sockets, timers } = setup();
   sockets[0].onopen();
-  flux.close();
+  stream.close();
   assert.equal(timers.length, 0);
   assert.equal(sockets[0].closed, true);
 });
 
-test('l’avis caméra se lit strictement, le reste est ignoré', () => {
+test('the camera notice reads strictly, the rest is ignored', () => {
   assert.equal(cameraOnOf('{"type":"camera","on":true}'), true);
   assert.equal(cameraOnOf('{"type":"camera","on":false}'), false);
   assert.equal(cameraOnOf('{"type":"audience","watch":1}'), null);
-  assert.equal(cameraOnOf('{"type":"camera","on":"oui"}'), null);
+  assert.equal(cameraOnOf('{"type":"camera","on":"yes"}'), null);
   assert.equal(cameraOnOf('audience'), null);
   assert.equal(cameraOnOf(null), null);
 });
 
-test('l’avis caméra prévient la page, un autre texte est ignoré', () => {
-  const { sockets, cameras, frames } = montage();
+test('the camera notice tells the page, other text is ignored', () => {
+  const { sockets, cameras, frames } = setup();
   sockets[0].onopen();
   sockets[0].onmessage({ data: '{"type":"camera","on":false}' });
   sockets[0].onmessage({ data: 'audience' });
@@ -132,14 +132,14 @@ test('l’avis caméra prévient la page, un autre texte est ignoré', () => {
   assert.equal(frames.length, 0);
 });
 
-test('sans identifiant de flux, aucune connexion n’est tentée', () => {
-  const ouvertures = [];
-  const flux = watchStream({
+test('without a stream id, no connection is ever attempted', () => {
+  const opened = [];
+  const stream = watchStream({
     href: 'https://relais.example/',
-    onFrame: () => assert.fail('aucune frame attendue'),
-    open: (url) => { ouvertures.push(url); return fauxSocket(url); },
+    onFrame: () => assert.fail('no frame expected'),
+    open: (url) => { opened.push(url); return fakeSocket(url); },
     timer: { set: () => 0, clear: () => {} },
   });
-  assert.deepEqual(ouvertures, []);
-  flux.close();
+  assert.deepEqual(opened, []);
+  stream.close();
 });

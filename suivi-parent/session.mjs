@@ -1,4 +1,4 @@
-// Logique pure du suivi : aucune position ni phrase ne vient du téléphone du caregiver.
+// Pure tracking logic: no position or sentence ever comes from the caregiver's phone.
 export const LIVE_MS = 12_000;
 export const LOST_MS = 120_000;
 const METERS_PER_DEGREE = 111_320;
@@ -19,22 +19,22 @@ export function stateOf(live, now = Date.now()) {
 }
 
 /**
- * Le relais répond `{ok:true, live:false}` **sans `serverAt`** quand l'identifiant
- * n'a jamais publié, et avec `serverAt` quand le flux existe mais s'est tu. Sans
- * cette distinction, un lien devenu faux (app réinstallée → nouvel identifiant)
- * restait « en attente du proche » indéfiniment. Un flux purgé (24 h) retombe
- * naturellement dans ce cas : c'est exact, il n'existe plus.
+ * The relay answers `{ok:true, live:false}` **without `serverAt`** when the id
+ * never published, and with `serverAt` when the stream exists but went quiet.
+ * Without this distinction, a link gone stale (reinstalled app → new id)
+ * stayed "waiting for the loved one" forever. A pruned stream (24 h) falls
+ * naturally into this case: rightly so, it no longer exists.
  */
 export function neverPublished(snapshot) {
   return !!snapshot && snapshot.ok === true && snapshot.live === false
     && !Number.isFinite(snapshot.serverAt);
 }
 
-/** Message d'un lien qui ne désigne aucun flux : actionnable, jamais « en attente ». */
+/** Message for a link with no stream: actionable, never "waiting". */
 export const NO_STREAM_TEXT =
   "No tracking for this link: it may have changed (app reinstalled). Open iSee on your loved one's phone, then ask for the link again.";
 
-/** Ne pas transformer le bruit GPS, une consigne ou un saut de position en geste accompli. */
+/** Never turn GPS noise, an instruction or a position jump into a completed move. */
 export function movementBetween(before, after) {
   if (!before || !after) return '';
   const elapsed = after.atMs - before.atMs;
@@ -54,10 +54,10 @@ export function movementBetween(before, after) {
 }
 
 /**
- * Référence du prochain déplacement : le fix courant quand il n’y en a pas
- * encore, quand un geste vient d’être mesuré ou quand l’ancre a vieilli — et
- * `null` quand la position est inconnue (paquet sans GPS : la caméra et la
- * phrase passent quand même, sans inventer de mouvement).
+ * Reference for the next move: the current fix when there is none yet, when a
+ * move was just measured or when the anchor grew old — and `null` when the
+ * position is unknown (packet without GPS: camera and sentence still pass,
+ * without inventing movement).
  */
 export function anchorAfter(anchor, movement, fix) {
   if (!anchor || !fix || movement) return fix || null;

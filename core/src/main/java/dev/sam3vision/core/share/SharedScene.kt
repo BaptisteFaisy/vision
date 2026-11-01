@@ -5,7 +5,7 @@ import org.json.JSONObject
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 
-/** Phrase courante du téléphone accompagné, sans historique ni données du caregiver. */
+/** Current sentence of the accompanied phone, with no history or caregiver data. */
 data class SharedScene(
     val text: String,
     val fromUser: Boolean = false,
@@ -19,10 +19,10 @@ data class SharedScene(
 
 const val MAX_SHARED_TEXT = 2_000
 
-/** Un appareil caregiver ne doit jamais remplacer la position du téléphone accompagné. */
+/** A caregiver device must never replace the accompanied phone's position. */
 fun canPublishShare(settings: Settings): Boolean =
     settings.shareEnabled && settings.caregiverRole == CaregiverRole.Blind
 
-/** Le lien partagé peut avoir une query ; le relais reste à la racine de son origine. */
+/** The shared link may carry a query; the relay stays at its origin root. */
 fun shareEndpoint(siteUrl: String): String? = siteUrl.trim().toHttpUrlOrNull()
     ?.newBuilder()?.encodedPath("/api/share")?.query(null)?.fragment(null)?.build()?.toString()

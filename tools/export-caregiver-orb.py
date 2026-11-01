@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Porte le shader Portrait gelé vers WebGL ; la palette caregiver est injectée en JS.
+"""Ports the frozen Portrait shader to WebGL; the caregiver palette is injected in JS.
 
-Usage :
-    python3 tools/export-caregiver-orb.py          # régénère suivi-parent/orb-shader.mjs
-    python3 tools/export-caregiver-orb.py --check  # 0 = à jour, 1 = dérive (porte CI)
+Usage:
+    python3 tools/export-caregiver-orb.py          # regenerates suivi-parent/orb-shader.mjs
+    python3 tools/export-caregiver-orb.py --check  # 0 = fresh, 1 = drift (CI gate)
 """
 from pathlib import Path
 import re
@@ -25,7 +25,7 @@ def split_liquid(shader):
 def web_shader(source):
     match = re.search(r'\bconst\s+val\s+ORB_AGSL\s*=\s*"""(.*?)"""', source, re.S)
     if not match:
-        raise ValueError('Déclaration ORB_AGSL introuvable dans le shader Portrait')
+        raise ValueError('ORB_AGSL declaration not found in the Portrait shader')
     shader = match.group(1)
     shader = re.sub(r'\b(?:half|float)([234])\b', r'vec\1', shader)
     shader = re.sub(r'\bhalf\b', 'float', shader)
@@ -37,10 +37,10 @@ def web_shader(source):
 
 
 def render(source_text):
-    """Contenu complet du .mjs pour le source du shader donné (pur, testable)."""
+    """Full .mjs content for the given shader source (pure, testable)."""
     fragment = web_shader(source_text)
     fragment = fragment.replace('`', '\\`').replace('${', '\\${')
-    header = '// Généré depuis le shader Portrait : python tools/export-caregiver-orb.py\n'
+    header = '// Generated from the Portrait shader: python tools/export-caregiver-orb.py\n'
     return header + 'export const fragmentShader = `' + fragment + '`;\n'
 
 
@@ -49,7 +49,7 @@ def export():
 
 
 def check():
-    """Vrai si le .mjs versionné est celui que le shader Portrait produit."""
+    """True when the committed .mjs is the one the Portrait shader yields."""
     try:
         return TARGET.read_text(encoding='utf-8') == render(SOURCE.read_text(encoding='utf-8'))
     except (OSError, ValueError):
@@ -59,14 +59,14 @@ def check():
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--check':
         if check():
-            print('OK : orb-shader.mjs à jour')
+            print('OK: orb-shader.mjs is fresh')
         else:
-            print('DÉRIVE : suivi-parent/orb-shader.mjs ne correspond plus au shader '
-                  'Portrait — régénérer (python3 tools/export-caregiver-orb.py)',
+            print('DRIFT: suivi-parent/orb-shader.mjs no longer matches the '
+                  'Portrait shader — regenerate (python3 tools/export-caregiver-orb.py)',
                   file=sys.stderr)
             sys.exit(1)
     elif len(sys.argv) > 1:
-        print('usage : python3 tools/export-caregiver-orb.py [--check]', file=sys.stderr)
+        print('usage: python3 tools/export-caregiver-orb.py [--check]', file=sys.stderr)
         sys.exit(2)
     else:
         export()

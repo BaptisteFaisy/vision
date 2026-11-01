@@ -23,9 +23,9 @@ import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.delay
 
 /**
- * « Parent tracking » : le lien envoyé par WhatsApp, puis le suivi permanent.
- * L'identifiant de flux n'est pas modifiable — chaque téléphone reçoit le sien à la
- * première ouverture —, donc rien n'est à renommer avant de partager.
+ * "Parent tracking": the link sent over WhatsApp, then permanent tracking.
+ * The stream id is not editable — each phone gets its own on first open —,
+ * so nothing needs renaming before sharing.
  */
 @Composable
 internal fun ParentShareSettings(
@@ -50,7 +50,7 @@ internal fun ParentShareSettings(
         SwitchRow("Send position + objects to the site during Direct", draft.shareEnabled) {
             onChange(draft.copy(shareEnabled = it))
         }
-        // Interrupteur coupé : le lien existe mais aucun envoi ne part, sans un mot.
+        // Switch off: the link exists but no send goes out, not a word.
         if (!draft.shareEnabled) {
             Text(
                 "Sharing is off: no relative can follow this phone, even with the right link.",
@@ -61,8 +61,8 @@ internal fun ParentShareSettings(
         LabeledField("Relay write key (generated, never shared)", draft.shareWriteKey, true) {
             onChange(draft.copy(shareWriteKey = it))
         }
-        // Le suivi échoue peut-être sans rien dire : refus du relais, relais
-        // injoignable ou localisation coupée se lisent ici, jamais dans le vide.
+        // Tracking may fail silently: relay refusal, unreachable relay or
+        // cut location all read here, never into the void.
         shareProblem?.let {
             Text(it, color = SettingsLight.danger, fontSize = 12.sp)
         }
@@ -75,10 +75,10 @@ internal fun ParentShareSettings(
 }
 
 /**
- * Le lien exact qui part par WhatsApp, lisible **et** copiable depuis les Réglages.
- * Sans ça, la conversation était le seul endroit où le lire : impossible de vérifier
- * quel flux un téléphone publie, donc un lien devenu faux (app réinstallée, nouvel
- * identifiant) ressemblait trait pour trait à un proche qui n'a pas encore filmé.
+ * The exact link leaving over WhatsApp, readable **and** copyable from Settings.
+ * Without this, the conversation was the only place to read it: no way to check
+ * which stream a phone publishes, so a link gone stale (reinstalled app, new
+ * id) looked exactly like a loved one who has not filmed yet.
  */
 @Composable
 private fun TrackingLink(draft: Settings) {

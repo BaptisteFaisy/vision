@@ -33,26 +33,26 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Service de premier plan du suivi permanent : continue d'envoyer la position au
- * site parent quand l'écran est éteint ou que l'app est en arrière-plan.
+ * Foreground service of permanent tracking: keeps sending the position to
+ * the parent site while the screen is off or the app is in the background.
  *
- * Lancé par « 📤 Partager le suivi » (Réglages) : notification permanente
- * « Suivi en direct actif » avec bouton « Arrêter le suivi ». Publie
- * `{shareId, writeKey, fix}` — sans `objects`, la caméra est fermée hors
- * Direct — toutes les 2 s écran allumé, 15 s écran éteint ([ShareTrackingPolicy]).
- * Pendant le Direct l'écran publie déjà lui-même ([ShareGate]) : le service
- * s'efface pour ne pas doubler l'envoi.
+ * Started by "📤 Share tracking" (Settings): permanent "Live tracking
+ * active" notification with a "Stop tracking" button. Publishes
+ * `{shareId, writeKey, fix}` — no `objects`, the camera is closed outside
+ * the Direct — every 2 s with the screen on, 15 s with it off
+ * ([ShareTrackingPolicy]). During the Direct the screen already publishes
+ * itself ([ShareGate]): the service steps aside to never double-send.
  */
 class ShareTrackingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val reporter = ShareReporter()
 
-    /** Attachés dans onCreate : un Service n'a pas de Context avant attach(). */
+    /** Attached in onCreate: a Service has no Context before attach(). */
     private lateinit var positions: SharePosition
     private lateinit var store: SettingsStore
 
-    /** Une seule boucle d'envoi, relancée jamais (les start répétés sont no-op). */
+    /** A single send loop, never relaunched (repeated starts are no-op). */
     private var loop: kotlinx.coroutines.Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -85,9 +85,9 @@ class ShareTrackingService : Service() {
     }
 
     /**
-     * Boucle de partage : écoute GPS ouverte, envoi tant que la notification est
-     * vivante ; cadence décidée par [ShareTrackingPolicy] (écran allumé/éteint,
-     * Direct déjà en train de publier). Se coupe si canal manquant.
+     * Share loop: GPS listen open, send while the notification lives; rate
+     * decided by [ShareTrackingPolicy] (screen on/off, Direct already
+     * publishing). Cuts itself when the channel is missing.
      */
     private suspend fun track() {
         val power = getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -108,14 +108,14 @@ class ShareTrackingService : Service() {
         }
     }
 
-    /** Un envoi ; `false` = le partage doit s'arrêter (canal manquant). */
+    /** One send; `false` = sharing must stop (missing channel). */
     private suspend fun sendOnce(settings: Settings): Boolean {
         if (!canPublishShare(settings)) return false
         val id = normalizeShareId(settings.shareId)
         if (id.isBlank()) return false
-        if (ShareGate.screenPublishing) return true // le Direct publie déjà son état complet
+        if (ShareGate.screenPublishing) return true // the Direct already publishes its full state
         val fix = positions.lastFix
-        if (fix == null) { // pas encore de position : on patiente en le disant
+        if (fix == null) { // no position yet: wait, and say so
             ShareHealth.noFix()
             return true
         }
@@ -130,10 +130,10 @@ class ShareTrackingService : Service() {
         return true
     }
 
-    /** Relit les réglages enregistrés (le canal peut changer pendant le suivi). */
+    /** Re-reads the saved settings (the channel may change mid-tracking). */
     private suspend fun readSettings(): Settings = store.load()
 
-    /** Notification permanente obligatoire d'un service de premier plan. */
+    /** Mandatory permanent notification of a foreground service. */
     private fun showForeground() {
         val stop = PendingIntent.getService(
             this,
@@ -158,7 +158,7 @@ class ShareTrackingService : Service() {
         }
     }
 
-    /** Canal unique du suivi, créé une fois par installation. */
+    /** Single tracking channel, created once per install. */
     private fun createChannel() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
@@ -174,10 +174,10 @@ class ShareTrackingService : Service() {
         const val NOTIFICATION_ID = 42
         const val ACTION_STOP = "dev.sam3vision.app.share.STOP"
 
-        /** Drapeaux d'un PendingIntent autorisé depuis Android 12. */
+        /** Flags of a PendingIntent allowed since Android 12. */
         const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
-        /** Démarre le suivi ; no-op si déjà vivant (idempotent). */
+        /** Starts tracking; no-op when already alive (idempotent). */
         fun start(context: Context) {
             val intent = Intent(context, ShareTrackingService::class.java)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
@@ -185,15 +185,15 @@ class ShareTrackingService : Service() {
     }
 }
 
-/** État du suivi observable par l'interface (Réglages). */
+/** Tracking state observable by the UI (Settings). */
 object ShareTracking {
-    /** Vrai tant que le service de suivi tourne (notification affichée). */
+    /** True while the tracking service runs (notification showing). */
     val running: MutableStateFlow<Boolean> = MutableStateFlow(false)
 }
 
-/** Verrou anti-doublon : quand l'écran Direct publie, le service se retire. */
+/** Anti-duplicate latch: when the Direct screen publishes, the service steps back. */
 object ShareGate {
-    /** Vrai tant que le Direct publie lui-même (relais GPS des objets + position). */
+    /** True while the Direct publishes itself (GPS relay of objects + position). */
     @Volatile
     var screenPublishing: Boolean = false
 }

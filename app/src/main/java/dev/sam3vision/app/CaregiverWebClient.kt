@@ -9,7 +9,7 @@ import android.webkit.WebViewClient
 import dev.sam3vision.core.share.caregiverAssetName
 import java.io.IOException
 
-/** UI de la version installée ; /api/state reste servi par le téléphone partagé via le relais. */
+/** UI of the installed build; /api/state stays served by the shared phone through the relay. */
 internal class CaregiverWebClient(
     private val assets: AssetManager,
     private val pageUrl: String,

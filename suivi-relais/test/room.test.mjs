@@ -4,28 +4,28 @@ import { ROLES, MAX_FRAME_BYTES, roleOf, keyOf, shareOf, audienceNotice, cameraN
 import { RelayRoom } from '../src/durable.js';
 
 /**
- * Node refuse `status: 101` (hors 200-599) alors que le runtime de Cloudflare
- * l'exige pour une bascule WebSocket. La doublure garde l'API, seule la valeur
- * interne change : `response.status` rend bien 101.
+ * Node refuses `status: 101` (outside 200-599) while the Cloudflare runtime
+ * requires it for a WebSocket upgrade. The double keeps the API, only the
+ * inner value changes: `response.status` still yields 101.
  */
-const VraieReponse = globalThis.Response;
-globalThis.Response = class Reponse extends VraieReponse {
+const TrueResponse = globalThis.Response;
+globalThis.Response = class FakeResponse extends TrueResponse {
   constructor(body, init) {
-    const bascule = init && init.status === 101;
-    super(body, init ? { ...init, status: bascule ? 200 : init.status } : init);
-    this.bascule = bascule ? 101 : 0;
+    const upgraded = init && init.status === 101;
+    super(body, init ? { ...init, status: upgraded ? 200 : init.status } : init);
+    this.upgraded = upgraded ? 101 : 0;
     this.socket = init ? init.webSocket : null;
   }
-  get status() { return this.bascule || super.status; }
+  get status() { return this.upgraded || super.status; }
   get webSocket() { return this.socket; }
 };
 
 const url = (q) => new URL('https://relais.example/ws?' + q);
 
-/** Requête d'ouverture : la salle n'accepte qu'une vraie demande de WebSocket. */
-const ouvre = (q) => new Request('https://relais.example/ws?' + q, { headers: { Upgrade: 'websocket' } });
+/** Open request: the room only takes a real WebSocket ask. */
+const openReq = (q) => new Request('https://relais.example/ws?' + q, { headers: { Upgrade: 'websocket' } });
 
-test('le rôle d’un onglet est celui de l’URL, jamais autre chose', () => {
+test('a tab role is the URL one, never anything else', () => {
   assert.deepEqual(ROLES, ['push', 'watch']);
   assert.equal(roleOf(url('share=leo&role=watch')), 'watch');
   assert.equal(roleOf(url('share=leo&role=push')), 'push');
@@ -36,25 +36,25 @@ test('le rôle d’un onglet est celui de l’URL, jamais autre chose', () => {
   assert.equal(keyOf(url('share=leo')), '');
 });
 
-test('le téléphone n’émet que s’il est regardé', () => {
+test('the phone only emits while watched', () => {
   assert.equal(audienceNotice(0), '{"type":"audience","watch":0}');
   assert.equal(JSON.parse(audienceNotice(2)).watch, 2);
 });
 
-test('une frame va aux spectateurs et pas à son émetteur', () => {
+test('a frame goes to watchers, not back to its sender', () => {
   const a = { role: 'watch' }, b = { role: 'watch' }, phone = { role: 'push' };
   assert.deepEqual(frameTargets([a, b, phone], phone), [a, b]);
 });
 
-test('une frame vide ou démesurée est refusée', () => {
+test('an empty or oversized frame is refused', () => {
   assert.equal(frameOk(0), false);
   assert.equal(frameOk(-1), false);
   assert.equal(frameOk(MAX_FRAME_BYTES + 1), false);
   assert.equal(frameOk(24_000), true);
 });
 
-/** Base D1 en mémoire : seulement ce que `store.read` demande. */
-function baseFactice(key) {
+/** In-memory D1 base: only what `store.read` asks for. */
+function fakeDb(key) {
   return {
     prepare(sql) {
       const stmt = {
@@ -71,86 +71,86 @@ function baseFactice(key) {
   };
 }
 
-/** Salle d'un flux, avec de faux onglets : ce que le Durable Object reçoit en vrai. */
-function salle(key = '') {
+/** Room of a stream, with fake tabs: what the Durable Object really gets. */
+function makeRoom(key = '') {
   const tags = new Map();
   const sent = [];
   const state = {
     acceptWebSocket(socket, names) { tags.set(socket, names[0]); },
-    // Comme le runtime : au moment du `close`, l'onglet est **encore** dans la liste.
+    // Like the runtime: at `close` time, the tab is **still** in the list.
     getWebSockets(tag) {
       return [...tags.keys()].filter((s) => !tag || tags.get(s) === tag);
     },
   };
-  const room = new RelayRoom(state, { DB: baseFactice(key) });
+  const room = new RelayRoom(state, { DB: fakeDb(key) });
   return { room, state, sent, tags };
 }
 
-/** Onglet factice : `send` note le trafic, `close` le marque fermé. */
-function onglet(nom) {
+/** Fake tab: `send` logs traffic, `close` marks it closed. */
+function tab(name) {
   return {
-    nom,
-    recu: [],
-    ferme: false,
-    send(data) { this.recu.push(data); },
-    close() { this.ferme = true; },
+    name,
+    received: [],
+    closed: false,
+    send(data) { this.received.push(data); },
+    close() { this.closed = true; },
   };
 }
 
-test('la salle refuse un téléphone dont la clé n’est pas celle du flux', async () => {
-  const { room } = salle('cle-du-flux');
-  globalThis.WebSocketPair = class { constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); } };
-  const refus = await room.fetch(ouvre('share=leo&role=push&key=autre'));
-  assert.equal(refus.status, 403);
+test('the room refuses a phone whose key is not the stream one', async () => {
+  const { room } = makeRoom('stream-key');
+  globalThis.WebSocketPair = class { constructor() { this[0] = tab('client'); this[1] = tab('server'); } };
+  const denied = await room.fetch(openReq('share=leo&role=push&key=other'));
+  assert.equal(denied.status, 403);
 });
 
-test('un flux jamais écrit n’a rien à protéger : la salle accepte le premier téléphone', async () => {
-  const { room } = salle('');
-  globalThis.WebSocketPair = class { constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); } };
-  const ok = await room.fetch(ouvre('share=leo&role=push&key=quelconque'));
+test('a never-written stream has nothing to protect: the room takes the first phone', async () => {
+  const { room } = makeRoom('');
+  globalThis.WebSocketPair = class { constructor() { this[0] = tab('client'); this[1] = tab('server'); } };
+  const ok = await room.fetch(openReq('share=leo&role=push&key=whatever'));
   assert.equal(ok.status, 101);
 });
 
-test('sans `Upgrade: websocket`, la salle ne prend pas la connexion', async () => {
-  const { room } = salle('');
-  const refus = await room.fetch(new Request('https://relais.example/ws?share=leo&role=watch'));
-  assert.equal(refus.status, 426);
+test('without `Upgrade: websocket`, the room never takes the connection', async () => {
+  const { room } = makeRoom('');
+  const denied = await room.fetch(new Request('https://relais.example/ws?share=leo&role=watch'));
+  assert.equal(denied.status, 426);
 });
 
-test('la frame du téléphone arrive aux aidants, et à personne d’autre', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
+test('the phone frame reaches caregivers, and nobody else', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
+  state.acceptWebSocket(caregiver, ['watch']);
   const frame = new Uint8Array([1, 2, 3]);
   await room.webSocketMessage(phone, frame);
-  assert.equal(aidant.recu.length, 1);
-  assert.equal(phone.recu.length, 0);
+  assert.equal(caregiver.received.length, 1);
+  assert.equal(phone.received.length, 0);
 });
 
-test('sans aidant connecté, le téléphone ne reçoit qu’un avis d’audience à zéro', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
+test('with no caregiver connected, the phone only gets a zero audience notice', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
   state.acceptWebSocket(phone, ['push']);
   await room.webSocketMessage(phone, new Uint8Array([1, 2, 3]));
-  assert.deepEqual(phone.recu, []);
+  assert.deepEqual(phone.received, []);
 });
 
-test('un téléphone qui rejoint une salle déjà regardée émet tout de suite', async () => {
-  const { room, state } = salle('');
-  const aidant = onglet('aidant');
-  state.acceptWebSocket(aidant, ['watch']);
-  let serveur = null;
+test('a phone joining an already watched room emits at once', async () => {
+  const { room, state } = makeRoom('');
+  const caregiver = tab('caregiver');
+  state.acceptWebSocket(caregiver, ['watch']);
+  let server = null;
   globalThis.WebSocketPair = class {
-    constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); serveur = this[1]; }
+    constructor() { this[0] = tab('client'); this[1] = tab('server'); server = this[1]; }
   };
-  const ok = await room.fetch(ouvre('share=leo&role=push&key=k'));
+  const ok = await room.fetch(openReq('share=leo&role=push&key=k'));
   assert.equal(ok.status, 101);
-  assert.deepEqual(serveur.recu, ['{"type":"audience","watch":1}']);
+  assert.deepEqual(server.received, ['{"type":"audience","watch":1}']);
 });
 
-test('l’avis caméra se lit strictement : un booléen, rien d’autre', () => {
+test('the camera notice reads strictly: a boolean, nothing else', () => {
   assert.equal(cameraNotice(true), '{"type":"camera","on":true}');
   assert.equal(cameraNotice(false), '{"type":"camera","on":false}');
   assert.equal(cameraOnOf('{"type":"camera","on":true}'), true);
@@ -158,114 +158,114 @@ test('l’avis caméra se lit strictement : un booléen, rien d’autre', () => 
   assert.equal(cameraOnOf('{"type":"audience","watch":1}'), null);
   assert.equal(cameraOnOf('{"type":"camera","on":1}'), null);
   assert.equal(cameraOnOf('{"type":"camera"}'), null);
-  assert.equal(cameraOnOf('pas du json'), null);
+  assert.equal(cameraOnOf('not json'), null);
   assert.equal(cameraOnOf(''), null);
 });
 
-test('le dernier téléphone qui part éteint l’image des aidants', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
+test('the last phone leaving turns the caregivers picture off', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
+  state.acceptWebSocket(caregiver, ['watch']);
   await room.webSocketClose(phone);
-  assert.deepEqual(aidant.recu, ['{"type":"camera","on":false}']);
+  assert.deepEqual(caregiver.received, ['{"type":"camera","on":false}']);
 });
 
-test('une erreur du tuyau téléphone éteint l’image comme une fermeture', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
+test('a phone-pipe error turns the picture off like a close', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
+  state.acceptWebSocket(caregiver, ['watch']);
   await room.webSocketError(phone);
-  assert.deepEqual(aidant.recu, ['{"type":"camera","on":false}']);
+  assert.deepEqual(caregiver.received, ['{"type":"camera","on":false}']);
 });
 
-test('le départ d’un aidant ou d’un téléphone surnuméraire ne touche pas l’image', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const doublon = onglet('doublon');
-  const aidant = onglet('aidant');
+test('a leaving caregiver or spare phone never touches the picture', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const duplicate = tab('duplicate');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(doublon, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
-  await room.webSocketClose(doublon);
-  await room.webSocketClose(aidant);
-  assert.deepEqual(aidant.recu, []);
-  assert.deepEqual(phone.recu.filter((m) => m.includes('camera')), []);
+  state.acceptWebSocket(duplicate, ['push']);
+  state.acceptWebSocket(caregiver, ['watch']);
+  await room.webSocketClose(duplicate);
+  await room.webSocketClose(caregiver);
+  assert.deepEqual(caregiver.received, []);
+  assert.deepEqual(phone.received.filter((m) => m.includes('camera')), []);
 });
 
-test('le téléphone annonce sa caméra, la salle la transmet aux aidants', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
+test('the phone announces its camera, the room forwards it to caregivers', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
+  state.acceptWebSocket(caregiver, ['watch']);
   await room.webSocketMessage(phone, '{"type":"camera","on":false}');
   await room.webSocketMessage(phone, '{"type":"camera","on":true}');
-  await room.webSocketMessage(phone, 'bonjour');
-  assert.deepEqual(aidant.recu, ['{"type":"camera","on":false}', '{"type":"camera","on":true}']);
+  await room.webSocketMessage(phone, 'hello');
+  assert.deepEqual(caregiver.received, ['{"type":"camera","on":false}', '{"type":"camera","on":true}']);
 });
 
-test('un aidant ne peut pas éteindre l’image des autres', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
-  const autre = onglet('autre');
+test('a caregiver cannot turn off the others picture', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
+  const other = tab('other');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
-  state.acceptWebSocket(autre, ['watch']);
-  await room.webSocketMessage(aidant, '{"type":"camera","on":false}');
-  assert.deepEqual(autre.recu, []);
-  assert.deepEqual(phone.recu, []);
+  state.acceptWebSocket(caregiver, ['watch']);
+  state.acceptWebSocket(other, ['watch']);
+  await room.webSocketMessage(caregiver, '{"type":"camera","on":false}');
+  assert.deepEqual(other.received, []);
+  assert.deepEqual(phone.received, []);
 });
 
-test('un téléphone qui rejoint ne prétend pas que sa caméra tourne', async () => {
-  const { room, state } = salle('');
-  const aidant = onglet('aidant');
-  state.acceptWebSocket(aidant, ['watch']);
-  globalThis.WebSocketPair = class { constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); } };
-  const ok = await room.fetch(ouvre('share=leo&role=push&key=k'));
+test('a joining phone never claims its camera runs', async () => {
+  const { room, state } = makeRoom('');
+  const caregiver = tab('caregiver');
+  state.acceptWebSocket(caregiver, ['watch']);
+  globalThis.WebSocketPair = class { constructor() { this[0] = tab('client'); this[1] = tab('server'); } };
+  const ok = await room.fetch(openReq('share=leo&role=push&key=k'));
   assert.equal(ok.status, 101);
-  assert.deepEqual(aidant.recu, []);
+  assert.deepEqual(caregiver.received, []);
 });
 
-test('un aidant qui arrive sans téléphone apprend que la caméra est éteinte', async () => {
-  const { room } = salle('');
-  let serveur = null;
+test('a caregiver arriving with no phone learns the camera is off', async () => {
+  const { room } = makeRoom('');
+  let server = null;
   globalThis.WebSocketPair = class {
-    constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); serveur = this[1]; }
+    constructor() { this[0] = tab('client'); this[1] = tab('server'); server = this[1]; }
   };
-  const ok = await room.fetch(ouvre('share=leo&role=watch'));
+  const ok = await room.fetch(openReq('share=leo&role=watch'));
   assert.equal(ok.status, 101);
-  assert.deepEqual(serveur.recu, ['{"type":"camera","on":false}']);
+  assert.deepEqual(server.received, ['{"type":"camera","on":false}']);
 });
 
-test('un aidant qui arrive téléphone présent n’apprend rien de la salle', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
+test('a caregiver arriving with the phone present learns nothing from the room', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
   state.acceptWebSocket(phone, ['push']);
-  let serveur = null;
+  let server = null;
   globalThis.WebSocketPair = class {
-    constructor() { this[0] = onglet('client'); this[1] = onglet('serveur'); serveur = this[1]; }
+    constructor() { this[0] = tab('client'); this[1] = tab('server'); server = this[1]; }
   };
-  const ok = await room.fetch(ouvre('share=leo&role=watch'));
+  const ok = await room.fetch(openReq('share=leo&role=watch'));
   assert.equal(ok.status, 101);
-  assert.deepEqual(serveur.recu, []);
-  // … mais le téléphone, lui, apprend qu’on le regarde.
-  assert.deepEqual(phone.recu, ['{"type":"audience","watch":1}']);
+  assert.deepEqual(server.received, []);
+  // … but the phone learns it is being watched.
+  assert.deepEqual(phone.received, ['{"type":"audience","watch":1}']);
 });
 
-test('un aidant qui arrive prévient le téléphone, un qui part aussi', async () => {
-  const { room, state } = salle('');
-  const phone = onglet('phone');
-  const aidant = onglet('aidant');
+test('an arriving caregiver tells the phone, a leaving one too', async () => {
+  const { room, state } = makeRoom('');
+  const phone = tab('phone');
+  const caregiver = tab('caregiver');
   state.acceptWebSocket(phone, ['push']);
-  state.acceptWebSocket(aidant, ['watch']);
+  state.acceptWebSocket(caregiver, ['watch']);
   room.notifyAudience();
-  assert.deepEqual(phone.recu, ['{"type":"audience","watch":1}']);
-  phone.recu.length = 0;
-  await room.webSocketClose(aidant);
-  assert.deepEqual(phone.recu, ['{"type":"audience","watch":0}']);
+  assert.deepEqual(phone.received, ['{"type":"audience","watch":1}']);
+  phone.received.length = 0;
+  await room.webSocketClose(caregiver);
+  assert.deepEqual(phone.received, ['{"type":"audience","watch":0}']);
 });

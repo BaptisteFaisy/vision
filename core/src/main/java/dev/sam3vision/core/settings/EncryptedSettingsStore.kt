@@ -184,7 +184,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
     }
 }
 
-/** Rôle persisté ; clé absente (version antérieure) ou inconnue ⇒ [CaregiverRole.Blind]. */
+/** Persisted role; missing (older build) or unknown key ⇒ [CaregiverRole.Blind]. */
 private fun roleOf(prefs: SharedPreferences, default: Settings): CaregiverRole =
     CaregiverRole.fromName(prefs.getString(EncryptedSettingsStore.KEY_CAREGIVER_ROLE, default.caregiverRole.name))
 

@@ -3,20 +3,20 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.share.SharedPhoto
 
 /**
- * Dernière frame JPEG de la caméra iSee, pour la page du proche : base64 320 px
- * (photo lente) et binaire 480 px (direct).
+ * Latest JPEG frame of the iSee camera, for the loved one's page: 320 px
+ * base64 (slow photo) and 480 px binary (live).
  *
- * La caméra ne produit des frames que pendant qu'elle sert ([IseeCameraWiring]) :
- * cette copie de référence ne coûte donc rien et évite de faire transiter l'image
- * dans l'état Compose (une recomposition par frame à 20-30 ips).
+ * The camera only yields frames while it serves ([IseeCameraWiring]): this
+ * reference copy costs nothing and keeps the picture out of Compose state
+ * (one recomposition per frame at 20-30 fps).
  *
- * Une frame n'est proposée que [FRESH_MS] : quand l'enregistrement s'arrête, la
- * page montre l'image figée un court instant puis l'efface, au lieu d'une photo
- * périmée présentée comme du direct.
+ * A frame is only offered [FRESH_MS]: when recording stops, the page shows
+ * the frozen picture briefly then clears it, instead of a stale photo
+ * passed off as live.
  */
 internal object SharedCameraFrame {
 
-    /** Durée pendant laquelle une frame est encore considérée comme du direct. */
+    /** How long a frame still counts as live. */
     private const val FRESH_MS = 6_000L
 
     @Volatile
@@ -25,13 +25,14 @@ internal object SharedCameraFrame {
     @Volatile
     private var capturedAtMs: Long = 0L
 
-    /** Numéro de la frame : le direct ne renvoie jamais deux fois la même image. */
+    /** Frame number: the live stream never resends the same picture. */
     @Volatile
     private var seq: Long = 0L
 
     /**
-     * Vrai quand au moins un aidant regarde le direct (annoncé par le relais) :
-     * la caméra convertit des frames pour le proche même quand SAM n'en veut pas.
+     * True when at least one caregiver watches the live stream (announced by
+     * the relay): the camera converts frames for the loved one even when SAM
+     * wants none.
      */
     @Volatile
     var audience: Boolean = false
@@ -42,11 +43,11 @@ internal object SharedCameraFrame {
     @Volatile
     private var bytesAtMs: Long = 0L
 
-    /** Numéro de la frame binaire : même règle anti-doublon que [seq], autre tuyau. */
+    /** Binary frame number: same anti-duplicate rule as [seq], other pipe. */
     @Volatile
     private var bytesSeq: Long = 0L
 
-    /** Mémorise la frame qui vient d'être convertie par l'analyseur caméra. */
+    /** Stores the frame just converted by the camera analyzer. */
     fun offer(frame: String) {
         jpeg = frame
         capturedAtMs = System.currentTimeMillis()
@@ -54,9 +55,9 @@ internal object SharedCameraFrame {
     }
 
     /**
-     * Mémorise la frame **binaire** du direct : mêmes octets que le JPEG poussé
-     * sur le WebSocket, sans le détour base64 (la copie protège du tampon réutilisé
-     * de l'encodeur).
+     * Stores the **binary** live frame: same bytes as the JPEG pushed on the
+     * WebSocket, with no base64 detour (the copy guards the encoder's reused
+     * buffer).
      */
     fun offerBytes(frame: ByteArray) {
         jpegBytes = frame.copyOf()
@@ -65,36 +66,36 @@ internal object SharedCameraFrame {
     }
 
     /**
-     * Photo à publier au proche : la dernière frame si elle a moins de [FRESH_MS],
-     * horodatée à l'instant de l'envoi ([nowMs]) — c'est la fraîcheur de l'envoi
-     * qui compte côté page, pas celle du capteur.
+     * Photo to publish to the loved one: the latest frame when under [FRESH_MS]
+     * old, timestamped at send time ([nowMs]) — send freshness is what counts
+     * page-side, not sensor freshness.
      */
     fun photoOf(nowMs: Long): SharedPhoto? =
         jpeg?.takeIf { nowMs - capturedAtMs <= FRESH_MS }?.let { SharedPhoto(it, nowMs) }
 
     /**
-     * Frame à pousser au direct : son numéro et son base64, tant qu'elle vient
-     * d'être capturée ([maxAgeMs]). `null` = caméra fermée ou figée, rien à
-     * envoyer — le direct s'arrête de lui-même plutôt que de boucler une image.
+     * Frame to push live: its number and base64, while just captured
+     * ([maxAgeMs]). `null` = closed or frozen camera, nothing to send — the
+     * live stream stops itself rather than looping a picture.
      */
     fun latest(nowMs: Long, maxAgeMs: Long = dev.sam3vision.core.share.STREAM_FRAME_MAX_AGE_MS): Frame? =
         jpeg?.takeIf { nowMs - capturedAtMs <= maxAgeMs }?.let { Frame(seq, it) }
 
-    /** Une frame prête pour le direct. */
+    /** A frame ready for the live stream. */
     data class Frame(val seq: Long, val jpegBase64: String)
 
     /**
-     * Frame binaire à pousser au direct : numéro et octets JPEG, tant qu'elle
-     * vient d'être capturée ([maxAgeMs]). `null` = rien de frais, le direct
-     * s'arrête de lui-même plutôt que de boucler une image.
+     * Binary frame to push live: number and JPEG bytes, while just captured
+     * ([maxAgeMs]). `null` = nothing fresh, the live stream stops itself
+     * rather than looping a picture.
      */
     fun latestBytes(nowMs: Long, maxAgeMs: Long = dev.sam3vision.core.share.STREAM_FRAME_MAX_AGE_MS): FrameBytes? =
         jpegBytes?.takeIf { nowMs - bytesAtMs <= maxAgeMs }?.let { FrameBytes(bytesSeq, it) }
 
-    /** Une frame binaire prête pour le direct. */
+    /** A binary frame ready for the live stream. */
     data class FrameBytes(val seq: Long, val jpeg: ByteArray)
 
-    /** Caméra fermée : plus rien à montrer au proche. */
+    /** Camera closed: nothing left to show the loved one. */
     fun clear() {
         jpeg = null
         capturedAtMs = 0L

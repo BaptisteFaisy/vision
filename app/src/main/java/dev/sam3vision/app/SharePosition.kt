@@ -15,13 +15,13 @@ import dev.sam3vision.core.share.INDOOR_ACCURACY_M
 import dev.sam3vision.core.share.SharedFix
 
 /**
- * Position + cap du téléphone pendant le partage du Direct, sans dépendance
- * externe (ni Play Services, ni nouveau Gradle) : [LocationManager] (GPS puis
- * réseau) et boussole [SensorManager] (vecteur de rotation).
+ * Phone position + heading during Direct sharing, with no outside dependency
+ * (no Play Services, no new Gradle): [LocationManager] (GPS then network)
+ * and [SensorManager] compass (rotation vector).
  *
- * [lastFix] est lu par [LiveViewModel] à chaque frame publiée : `null` tant
- * qu'aucune position n'est connue ou si la permission a été refusée. L'envoi
- * reste alors silencieux — le site garde le dernier état et l'affiche périmé.
+ * [lastFix] is read by [LiveViewModel] on every published frame: `null`
+ * while no position is known or when permission was refused. Sending then
+ * stays silent — the site keeps the last state and shows it stale.
  */
 class SharePosition(context: Context) {
 
@@ -31,7 +31,7 @@ class SharePosition(context: Context) {
     private val sensors: SensorManager? =
         appContext.getSystemService(SensorManager::class.java)
 
-    /** Dernière position connue, lue depuis le thread du direct. */
+    /** Last known position, read from the live thread. */
     @Volatile
     var lastFix: SharedFix? = null
         private set
@@ -44,7 +44,7 @@ class SharePosition(context: Context) {
 
     private val listener = FixListener()
 
-    /** Démarre l'écoute GPS + boussole ; sans permission, ne fait rien. */
+    /** Starts the GPS + compass listen; with no permission, does nothing. */
     @SuppressLint("MissingPermission")
     fun start() {
         seedLastKnown()
@@ -59,7 +59,7 @@ class SharePosition(context: Context) {
         } catch (_: SecurityException) {
             return
         } catch (_: IllegalArgumentException) {
-            // Pas de GPS sur l'appareil : le réseau suffit pour une position grossière.
+            // No GPS on the device: network is enough for a coarse position.
         }
         try {
             locations?.requestLocationUpdates(
@@ -78,10 +78,10 @@ class SharePosition(context: Context) {
     }
 
     /**
-     * Amorce la position avec la dernière connue (GPS ou réseau, la plus fraîche) :
-     * sans elle, un téléphone qui ouvre iSee à l'intérieur ne publiait rien tant que
-     * le GPS n'accrochait pas. Une position peut dater : le relais horodate l'envoi,
-     * et les gestes exigent deux fixes frais (voir la page caregiver).
+     * Seeds the position with the last known (GPS or network, whichever is
+     * fresher): without it, a phone opening iSee indoors published nothing
+     * until GPS locked. A position may be old: the relay timestamps the send,
+     * and moves require two fresh fixes (see the caregiver page).
      */
     @SuppressLint("MissingPermission")
     private fun seedLastKnown() {
@@ -91,7 +91,7 @@ class SharePosition(context: Context) {
         if (best != null) onLocation(best)
     }
 
-    /** Coupe l'écoute et oublie la position (fin du Direct). */
+    /** Cuts the listen and forgets the position (end of the Direct). */
     fun stop() {
         try {
             locations?.removeUpdates(listener)
@@ -106,13 +106,13 @@ class SharePosition(context: Context) {
         lastFix = null
     }
 
-    /** Mémorise la position et republie le fix combiné au cap courant. */
+    /** Stores the position and republishes the fix combined with the current heading. */
     private fun onLocation(location: Location) {
         lastLocation = location
         lastFix = toFix(location, headingDeg)
     }
 
-    /** Convertit le vecteur de rotation en cap [0, 360[. */
+    /** Converts the rotation vector into a [0, 360[ heading. */
     private fun onRotation(values: FloatArray) {
         val rotation = FloatArray(9)
         SensorManager.getRotationMatrixFromVector(rotation, values)
@@ -135,14 +135,14 @@ class SharePosition(context: Context) {
     }
 
     private companion object {
-        /** Cadence GPS du partage : la même que l'envoi (un état toutes les 2 s). */
+        /** Share GPS rate: same as sending (one state every 2 s). */
         const val SHARE_GPS_MS = 2_000L
     }
 }
 
 /**
- * Fix partageable depuis une position brute : la précision annoncée décide du
- * badge « intérieur » ([INDOOR_ACCURACY_M]), pure fonction testable sans capteur.
+ * Shareable fix from a raw position: the announced accuracy decides the
+ * "indoor" badge ([INDOOR_ACCURACY_M]), a pure sensor-free testable function.
  */
 fun toFix(location: Location, heading: Float?): SharedFix {
     val acc = if (location.hasAccuracy()) location.accuracy else NO_ACCURACY_M
@@ -156,5 +156,5 @@ fun toFix(location: Location, heading: Float?): SharedFix {
     )
 }
 
-/** Précision de repli quand le fournisseur n'en annonce aucune : marquée intérieur. */
+/** Fallback accuracy when the provider announces none: flagged indoor. */
 const val NO_ACCURACY_M = 50f

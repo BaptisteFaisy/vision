@@ -1,4 +1,4 @@
-// Généré depuis le shader Portrait : python tools/export-caregiver-orb.py
+// Generated from the Portrait shader: python tools/export-caregiver-orb.py
 export const fragmentShader = `precision highp float;
 uniform vec2 uSize;
 

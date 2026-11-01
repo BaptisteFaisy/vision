@@ -235,12 +235,12 @@ class Nv21JpegEncoder {
         encodeFrame(proxy, edge, quality)?.jpegBase64
 
     /**
-     * Frame → JPEG **brut** (octets, pas de base64) : le direct de l'aidant pousse
-     * des frames binaires sur son WebSocket, le détour par le base64 (+33 % de
-     * CPU et de mémoire par frame) ne servait qu'à être défait aussitôt.
+     * Frame → **raw** JPEG (bytes, no base64): the caregiver live stream pushes
+     * binary frames on its WebSocket, the base64 detour (+33% CPU and memory
+     * per frame) only ever got undone at once.
      *
-     * `null` si le buffer n'est pas en YUV 4:2:0 : l'appelant garde alors son
-     * chemin `Bitmap` en repli.
+     * `null` when the buffer is not YUV 4:2:0: the caller then keeps its
+     * `Bitmap` path as a fallback.
      */
     fun encodeJpeg(proxy: ImageProxy, edge: Int, quality: Int): ByteArray? {
         val size = pack(proxy, edge) ?: return null

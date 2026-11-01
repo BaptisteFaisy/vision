@@ -12,13 +12,13 @@ import dev.sam3vision.core.share.relayBaseOf
 import dev.sam3vision.core.share.streamUrlOf
 
 /**
- * Le direct : la caméra d'iSee part à la page de l'aidant par le WebSocket de la
- * salle, tant que le partage est activé et l'écran vivant.
+ * The live stream: the iSee camera goes to the caregiver page over the room
+ * WebSocket, while sharing is on and the screen alive.
  *
- * Séparé de [IseeShare] exprès — celui-ci publie l'état lent (position, phrase,
- * trajet, photo de secours) toutes les 2 s, celui-là pousse des images. Deux
- * mécaniques, deux vies : couper le direct ne coupe pas le suivi, et l'inverse
- * non plus.
+ * Split from [IseeShare] on purpose — that one publishes the slow state
+ * (position, sentence, trip, backup photo) every 2 s, this one pushes
+ * pictures. Two mechanics, two lives: cutting the live stream never cuts
+ * tracking, and back.
  */
 @Composable
 internal fun IseeLiveStream(settings: Settings) {

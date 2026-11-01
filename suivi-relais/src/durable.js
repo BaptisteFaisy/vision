@@ -3,16 +3,16 @@ import { validId } from './contrat.js';
 import { d1Store } from './store.js';
 
 /**
- * Salle d'un flux (`/ws?share=<id>`), une instance de Durable Object par
- * identifiant. Le téléphone accompagne se connecte en `role=push`, chaque aidant
- * en `role=watch` ; les frames binaires passent de l'un aux autres sans être
- * stockées ni relues.
+ * Room of a stream (`/ws?share=<id>`), one Durable Object instance per id.
+ * The accompanied phone connects as `role=push`, each caregiver as
+ * `role=watch`; binary frames pass from one to the others, never stored
+ * nor re-read.
  *
- * L'API d'**hibernation** est utilisée exprès : une salle avec un spectateur
- * immobile ne coûte alors aucune durée, et les frames réveillent l'objet le temps
- * de les relayer. Les onglets sont étiquetés par rôle (`acceptWebSocket(ws,
- * [role])`), ce qui rend `getWebSockets('watch')` suffisant pour joindre
- * l'audience sans tenir de table en mémoire (perdue à chaque hibernation).
+ * The **hibernation** API is used on purpose: a room with a still watcher
+ * then costs no duration, and frames wake the object just long enough to
+ * relay them. Tabs are tagged by role (`acceptWebSocket(ws, [role])`), so
+ * `getWebSockets('watch')` alone reaches the audience with no in-memory
+ * table (lost at every hibernation).
  */
 export class RelayRoom {
   constructor(state, env) {
@@ -23,36 +23,36 @@ export class RelayRoom {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.headers.get('Upgrade') !== 'websocket') {
-      return new Response('websocket attendu', { status: 426 });
+      return new Response('websocket expected', { status: 426 });
     }
     const share = shareOf(url);
     const role = roleOf(url);
-    if (!validId(share) || !role) return new Response('flux ou rôle invalide', { status: 400 });
+    if (!validId(share) || !role) return new Response('invalid share or role', { status: 400 });
     if (role === 'push' && !(await this.pushAllowed(share, keyOf(url)))) {
-      return new Response('clé invalide', { status: 403 });
+      return new Response('invalid key', { status: 403 });
     }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server, [role]);
-    // Chaque arrivée republie l'audience : un téléphone qui rejoint une salle
-    // déjà regardée doit le savoir tout de suite, sinon il reste muet en
-    // attendant un aidant déjà là.
+    // Every arrival republishes the audience: a phone joining an already
+    // watched room must know at once, or it stays mute waiting for a
+    // caregiver already there.
     this.notifyAudience();
-    // Un aidant qui arrive pendant que le téléphone est parti apprend tout de
-    // suite que la caméra est éteinte, au lieu d'afficher une photo lente
-    // encore « fraîche ». Téléphone présent : c'est lui qui dit son état
-    // réel (caméra allumée ou non), et les frames parlent d'elles-mêmes.
+    // A caregiver arriving while the phone is away learns at once that the
+    // camera is off, instead of showing a slow photo still "fresh". Phone
+    // present: it tells its real state itself (camera on or not), and the
+    // frames speak for themselves.
     if (role === 'watch' && !this.state.getWebSockets('push').length) {
-      try { server.send(cameraNotice(false)); } catch { /* onglet déjà parti */ }
+      try { server.send(cameraNotice(false)); } catch { /* tab already gone */ }
     }
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /** Le téléphone parle aux aidants : frames binaires et état de sa caméra. */
+  /** The phone talks to caregivers: binary frames and its camera state. */
   async webSocketMessage(socket, message) {
-    // Le téléphone annonce sa caméra (allumée ou fermée) : transmis aux aidants
-    // après validation. Seul un `push` parle au nom de la caméra du proche —
-    // un aidant ne peut pas éteindre l'image des autres.
+    // The phone announces its camera (on or closed): forwarded to caregivers
+    // after validation. Only a `push` speaks for the loved one's camera —
+    // a caregiver cannot turn off the others' picture.
     if (typeof message === 'string') {
       const on = cameraOnOf(message);
       if (on !== null && this.state.getWebSockets('push').includes(socket)) this.notifyCamera(on);
@@ -62,7 +62,7 @@ export class RelayRoom {
     if (!frameOk(bytes)) return;
     if (!this.state.getWebSockets('watch').length) return;
     for (const target of frameTargets(this.state.getWebSockets('watch'), socket)) {
-      try { target.send(message); } catch { /* un onglet fermé n'arrête pas les autres */ }
+      try { target.send(message); } catch { /* one closed tab never stops the others */ }
     }
   }
 
@@ -79,39 +79,39 @@ export class RelayRoom {
   }
 
   closeQuietly(socket) {
-    try { socket.close(1000, 'fin'); } catch { /* déjà fermé */ }
+    try { socket.close(1000, 'done'); } catch { /* already closed */ }
   }
 
   /**
-   * Aidants encore là. À la fermeture, le runtime compte **encore** l'onglet qui
-   * s'en va : sans ce retrait, le téléphone apprendrait `watch:1` au départ du
-   * dernier aidant et continuerait d'émettre dans le vide.
+   * Caregivers still there. At close time, the runtime **still** counts the
+   * leaving tab: without this removal, the phone would learn `watch:1` when
+   * the last caregiver leaves and would keep emitting into the void.
    */
   watchersExcept(socket) {
     return this.state.getWebSockets('watch').filter((s) => s !== socket).length;
   }
 
   /**
-   * Téléphones encore là, hors celui qui s'en va : même lecture que
-   * `watchersExcept`, le runtime comptant encore l'onglet qui se ferme.
+   * Phones still there, minus the leaving one: same reading as
+   * `watchersExcept`, the runtime still counting the closing tab.
    */
   pushesExcept(socket) {
     return this.state.getWebSockets('push').filter((s) => s !== socket);
   }
 
-  /** Dit aux aidants si la caméra tourne : ils l'effacent dès qu'elle s'éteint. */
+  /** Tells caregivers whether the camera runs: they clear it as soon as it stops. */
   notifyCamera(on) {
     const notice = cameraNotice(on);
     for (const socket of this.state.getWebSockets('watch')) {
-      try { socket.send(notice); } catch { /* onglet fermé */ }
+      try { socket.send(notice); } catch { /* closed tab */ }
     }
   }
 
   /**
-   * Le dernier téléphone qui s'en va éteint l'image des aidants tout de
-   * suite : sans cet avis, la photo lente encore « fraîche » resterait
-   * affichée jusqu'à 8 s après la coupure. Le départ d'un aidant ou d'un
-   * téléphone surnuméraire ne change rien.
+   * The last phone leaving turns the caregivers' picture off right away:
+   * without this notice, the slow photo still "fresh" would stay on screen
+   * up to 8 s after the drop. A leaving caregiver or spare phone changes
+   * nothing.
    */
   cameraOffIfAlone(socket) {
     if (!this.state.getWebSockets('push').includes(socket)) return;
@@ -119,19 +119,19 @@ export class RelayRoom {
     this.notifyCamera(false);
   }
 
-  /** Dit aux téléphones combien d'aidants regardent : ils n'émettent que si > 0. */
+  /** Tells phones how many caregivers watch: they only emit when > 0. */
   notifyAudience(watch = this.state.getWebSockets('watch').length) {
     const notice = audienceNotice(watch);
     for (const socket of this.state.getWebSockets('push')) {
-      try { socket.send(notice); } catch { /* téléphone parti */ }
+      try { socket.send(notice); } catch { /* phone gone */ }
     }
   }
 
   /**
-   * Même règle que `/api/share` : la clé est liée au flux au premier envoi. Un
-   * flux encore jamais écrit n'a rien à protéger, donc on l'accepte ; dès qu'une
-   * clé existe, une autre clé est refusée — sinon un identifiant deviné suffirait
-   * à diffuser une fausse caméra chez l'aidant.
+   * Same rule as `/api/share`: the key binds to the stream on first send. A
+   * never-written stream has nothing to protect, so accept it; once a key
+   * exists, another key is refused — otherwise a guessed id would be enough
+   * to broadcast a fake camera to the caregiver.
    */
   async pushAllowed(share, key) {
     let row = null;

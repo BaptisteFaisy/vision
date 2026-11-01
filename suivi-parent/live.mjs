@@ -17,25 +17,25 @@ const tripBall = document.getElementById('trip-ball');
 const pictoEl = document.getElementById('pictos');
 const pictoStrip = document.getElementById('picto-strip');
 let live = null, polling = false, frameSrc = '', pictoSig = '';
-// Dernière peinture : son instant et son tuyau (direct ou photo lente). À la
-// perte du direct, l'image posée reste figée pendant la grâce au lieu
-// d'être arrachée — chaque micro-trou clignotait sinon.
+// Last paint: when, and through which pipe (live or slow photo). When the
+// live stream drops, the painted frame stays frozen during the grace instead
+// of being torn away — every micro-gap used to flicker otherwise.
 let shownAt = 0, showingDirect = false;
-// Direct de la caméra : dernière frame reçue par WebSocket et son instant.
+// Camera live stream: last frame received over WebSocket, and when.
 let streamSrc = '', streamAt = 0;
-// La salle a dit que la caméra est éteinte : le direct comme la photo lente
-// restent cachés jusqu'à l'avis contraire, ou une frame qui prouve le contraire.
+// The room said the camera is off: live and slow photo stay hidden until
+// told otherwise, or a frame proving otherwise.
 let cameraOff = false;
-/** Reprise du direct : une frame de moins que ça rallume l'image (hystérésis). */
+/** Live resume: a frame newer than this relights the picture (hysteresis). */
 const STREAM_RESUME_MS = 200;
 let streamLive = false;
-// Peinture latest-only : une seule image en vol (pré-décodage hors écran), le
-// surplus entre deux frames peintes est jeté au lieu d'avorter un décodage.
+// Latest-only painting: a single frame in flight (offscreen pre-decode), the
+// surplus between two painted frames is dropped instead of aborting a decode.
 const preload = new Image();
 let paintQueued = false, decoding = null;
 let paintedCount = 0, droppedPaints = 0, lastPaintAt = 0;
 const paintGaps = [];
-// Aucune réponse du relais encore : ne pas annoncer un lien mort sans preuve.
+// No relay answer yet: never announce a dead link without proof.
 let known = true;
 const STATES = {
   live: ['LIVE', 'green'], lost: ['SIGNAL LOST', 'orange'],
@@ -54,8 +54,8 @@ function render() {
 }
 
 /**
- * Objets reconnus : leurs dessins en bandeau, rien sans détection fraîche.
- * Mêmes repères : le bandeau n'est pas reconstruit, les images ne clignotent pas.
+ * Recognized objects: their drawings in a strip, nothing without a fresh detection.
+ * Same landmarks: the strip is not rebuilt, pictures never flicker.
  */
 function renderPictos(status) {
   const items = pictosOf(live, status);
@@ -82,9 +82,9 @@ function renderPictos(status) {
 }
 
 /**
- * Le direct est-il affiché ? Hystérésis : perdu après [STREAM_FRESH_MS] sans
- * frame, repris seulement sur une frame de moins de [STREAM_RESUME_MS] — entre
- * les deux, on garde l'état affiché au lieu de flapper direct/photo lente.
+ * Is the live stream showing? Hysteresis: lost after [STREAM_FRESH_MS] with no
+ * frame, resumed only on a frame under [STREAM_RESUME_MS] — in between, the
+ * shown state is kept instead of flapping live/slow photo.
  */
 function streamIsLive() {
   if (!streamSrc) return false;
@@ -93,17 +93,17 @@ function streamIsLive() {
 }
 
 /**
- * Ce que voit le proche : rien tant que sa caméra ne tourne pas. Une image
- * conservée après coupure resterait affichée alors que la caméra est éteinte.
+ * What the loved one sees: nothing until their camera runs. A picture kept
+ * after a drop would stay on screen while the camera is off.
  */
 function renderFrame(status) {
-  // Le direct passe devant la photo lente : une frame fraîche est la caméra qui
-  // tourne maintenant, pas un état figé par le relais.
+  // Live wins over the slow photo: a fresh frame is the camera running
+  // now, not a state frozen by the relay.
   const direct = streamIsLive();
   if (direct) {
-    // L'image du direct est peinte par paintStream (pré-décodage hors écran,
-    // latest-only) : render() n'y touche pas — écraser img.src ici forcerait
-    // un décodage hors pré-chargement à chaque poll et volerait une peinture.
+    // The live picture is painted by paintStream (offscreen pre-decode,
+    // latest-only): render() never touches it — overwriting img.src here would
+    // force an out-of-preload decode on every poll and steal one paint.
     noteEl.hidden = true;
     frameEl.hidden = false;
     viewEl.classList.remove('empty');
@@ -111,9 +111,9 @@ function renderFrame(status) {
     return;
   }
   const view = frameOf(live, status, Date.now(), cameraOff);
-  // Micro-coupure du direct : l'image posée reste figée pendant la grâce, au
-  // lieu d'être arrachée (reflow de toute la page) ou permutée avec la photo
-  // lente (flash + re-swap au retour).
+  // Live micro-drop: the painted frame stays frozen during the grace,
+  // instead of being torn away (whole-page reflow) or swapped with the slow
+  // photo (flash + re-swap on return).
   if (freezeFrameOf(frameSrc, shownAt, showingDirect, view)) {
     noteEl.hidden = true;
     frameEl.hidden = false;
@@ -125,8 +125,8 @@ function renderFrame(status) {
     streamSrc = '';
     frameEl.hidden = true;
     viewEl.classList.add('empty');
-    // Pas de texte d'attente : sans image, la section se replie. Seuls un lien
-    // absent et un lien mort s'écrivent dans la zone caméra (plus de phrase).
+    // No waiting text: without a picture, the section folds. Only a missing
+    // link and a dead link are written in the camera area (no sentence left).
     if (!shareId || status === 'unknown') {
       noteEl.textContent = !shareId ? 'Open the tracking link shared by your loved one.' : NO_STREAM_TEXT;
       noteEl.hidden = false;
@@ -140,17 +140,17 @@ function renderFrame(status) {
   frameEl.hidden = false;
   viewEl.classList.remove('empty');
   frameEl.alt = 'What your loved one sees, live';
-  // Une data URL identique n'est pas réassignée : l'image ne clignote pas à chaque poll.
+  // An identical data URL is never reassigned: the picture never flickers on each poll.
   if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; shownAt = Date.now(); showingDirect = false; }
 }
 
 /**
- * Une frame du direct : on ne repeint que l'image. Un `render()` complet à chaque
- * image (10 par seconde) reconstruirait le bandeau, le trajet et le badge pour rien.
+ * One live frame: only the picture repaints. A full `render()` per frame
+ * (10 a second) would rebuild the strip, the trip and the badge for nothing.
  *
- * Latest-only : les frames sont coalescées sur `requestAnimationFrame` (une seule
- * peinture par tour), et l'image est décodée **hors écran** avant le swap — écraser
- * `img.src` à chaque message avortait le décodage précédent et saccadait à 10/s.
+ * Latest-only: frames coalesce on `requestAnimationFrame` (a single paint
+ * per turn), and the picture decodes **offscreen** before the swap — crushing
+ * `img.src` on every message aborted the previous decode and stuttered at 10/s.
  */
 function paintStream() {
   if (!streamSrc) { render(); return; }
@@ -182,8 +182,8 @@ function paintStream() {
 }
 
 /**
- * Rythme **affiché** du direct (médiane et p95 des intervalles de peinture,
- * fenêtre de 60) : `window.__streamFps` est la preuve côté page des 10+ ips.
+ * **Displayed** live rate (median and p95 of paint gaps, window of 60):
+ * `window.__streamFps` is the page-side proof of 10+ fps.
  */
 function notePaint() {
   const now = performance.now();
@@ -205,7 +205,7 @@ function notePaint() {
   };
 }
 
-/** Le trajet en cours : départ → arrivée, le liquide suit l'avancement du proche. */
+/** The trip in progress: start → destination, the liquid follows the loved one's progress. */
 function renderTrip(status) {
   const trip = tripOf(live, status);
   tripEl.hidden = !trip;
@@ -221,13 +221,13 @@ function renderTrip(status) {
 }
 
 function receive(snapshot) {
-  // Identifiant jamais publié (ou flux purgé) : le dire, au lieu d'attendre à vie.
+  // Id never published (or stream pruned): say so, instead of waiting forever.
   if (neverPublished(snapshot)) {
     known = false; live = null;
     return;
   }
-  // La position peut manquer (téléphone sans GPS) : la caméra, la phrase et les
-  // repères passent quand même, seule la mesure des gestes s'interrompt.
+  // The position may be missing (phone without GPS): camera, sentence and
+  // landmarks still pass, only move measurement pauses.
   if (snapshot.ok && Number.isFinite(snapshot.serverAt)) {
     if (live && snapshot.serverAt < live.serverAt) return;
     known = true;
@@ -245,7 +245,7 @@ async function poll() {
       cache: 'no-store', signal: AbortSignal.timeout(8000),
     });
     if (response.ok) receive(await response.json());
-  } catch { /* L'âge du dernier paquet continue de croître : aucune fausse remise en direct. */ }
+  } catch { /* The last packet keeps aging: no fake return to live. */ }
   finally { polling = false; render(); }
 }
 
@@ -253,8 +253,8 @@ startOrb(document.getElementById('orb'));
 render(); poll();
 setInterval(poll, 2000);
 
-// Direct : la caméra du proche arrive par le WebSocket de la salle. Sans salle
-// (déploiement d'avant, réseau qui bloque `wss`), la page garde la photo lente.
+// Live: the loved one's camera arrives over the room WebSocket. With no room
+// (older deploy, network blocking `wss`), the page keeps the slow photo.
 if (shareId) {
   watchStream({
     href: location.href,
@@ -265,9 +265,9 @@ if (shareId) {
       streamLive = streamIsLive();
       paintStream();
     },
-    onState: () => { /* coupure : la fraîcheur fait retomber sur la photo lente */ },
-    // Caméra éteinte : l'image disparaît tout de suite, sans attendre que la
-    // dernière frame périme. Les doublons ne repeignent pas.
+    onState: () => { /* drop: freshness falls back to the slow photo */ },
+    // Camera off: the picture goes away at once, without waiting for the
+    // last frame to expire. Duplicates never repaint.
     onCamera: (on) => {
       if (cameraOff === !on) return;
       cameraOff = !on;
@@ -277,8 +277,8 @@ if (shareId) {
   });
 }
 
-// Onglet masqué : les peintures sont suspendues (`paintStream` ne fait rien),
-// au retour on repeint la dernière frame si elle est encore du direct.
+// Hidden tab: paints are suspended (`paintStream` does nothing), on return
+// the last frame repaints when it is still live.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && streamIsLive()) paintStream();
 });

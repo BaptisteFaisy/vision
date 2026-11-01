@@ -1,4 +1,4 @@
-// Même cadence et mêmes états de mots que IseePortrait.wordsSpoken / IseeSpokenLine.
+// Same cadence and word states as IseePortrait.wordsSpoken / IseeSpokenLine.
 export function wordsSpoken(text, elapsedMs) {
   const count = text.split(' ').filter(Boolean).length;
   const total = count * 385;
