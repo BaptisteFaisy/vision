@@ -1,7 +1,8 @@
 # ARCHITECTURE — iSee
 
 Ce document décrit **l'arbre de ce dépôt**, relu dans le code le **27/10/2026**, comptes
-recomptés le **28/10/2026** puis le **29/10/2026** (première rédaction le 26/10 après 19 h). Le service SAM 3.1 (GPU)
+recomptés le **28/10/2026**, le **29/10/2026** puis le **01/11/2026** (première rédaction
+le 26/10 après 19 h). Le service SAM 3.1 (GPU)
 vit dans **`server/` de ce dépôt** : source déployée `server/backend/live_fast/` (app
 `sam3-eu-a100`), contrats et mesures dans `server/docs/` (voir §8). Chaque chiffre ci-dessous
 est soit une constante du code (fichier + ligne cités), soit un comptage reproductible (commande
@@ -11,9 +12,9 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **216** fichiers | 249 fichiers / **1 835** `@Test` | — |
-| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **283** fichiers | 159 fichiers / **1 049** `@Test` | 4 fichiers / **9** tests |
-| `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **15** fichiers | 10 fichiers / **95** `@Test` | 1 fichier / **1** test |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **257** fichiers | 324 fichiers / **2 933** `@Test` | — |
+| `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **376** fichiers | 252 fichiers / **1 838** `@Test` | 4 fichiers / **9** tests |
+| `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **14** fichiers | 9 fichiers / **98** `@Test` | 1 fichier / **1** test |
 
 La dernière ligne compte un sous-dossier de `:app`, déjà comprise dans la ligne `:app` : le banc
 d'essai lunettes (l'ancien module séparé) n'est plus un module, il vit dans l'APK d'iSee.
@@ -24,15 +25,15 @@ dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus a
 `glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 216
-find core/src/test -name '*.kt' | wc -l            # 249
-find app/src/main -name '*.kt' | wc -l             # 283
-find app/src/test -name '*.kt' | wc -l             # 159
-find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 15
-find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 10
-grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 95
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 913
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 98 370
+find core/src/main -name '*.kt' | wc -l            # 257
+find core/src/test -name '*.kt' | wc -l            # 324
+find app/src/main -name '*.kt' | wc -l             # 376
+find app/src/test -name '*.kt' | wc -l             # 252
+find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 14
+find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 9
+grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 98
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 1222
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 152 813
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
@@ -55,14 +56,14 @@ Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PA
 `Application` maison (`android:name=".SamApp"`). `MainActivity.buildRoot` installe
 `IseeRootLayout` (un `FrameLayout` qui intercepte le toucher) et lui pose une `ComposeView`
 → `SamRoot` → `AppNav` (`app/AppNav.kt`). La route d'accueil est `Route.Isee` →
-`IseeHome` → **`IseeScenePane`** en plein écran (`app/isee/IseeHome.kt:33`) : bulle de
+`IseeHome` → **`IseeScenePane`** en plein écran (`app/isee/IseeHome.kt:40`) : bulle de
 verre, gros texte paginé, carte caméra qui se dissout.
 
 Gestes, tous câblés dans `MainActivity.buildRoot` :
 
 | Geste | Effet | Code |
 |---|---|---|
-| tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:248`) |
+| tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:363`) |
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu + photo filmée jointe | `core/gesture/LongPressTrigger.kt:102,105`, `IseePhotoShot` |
 | balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IseeRootLayout.kt` |
 
@@ -96,7 +97,7 @@ a aucun moyen de revenir à un message antérieur.
    `recordingVideo && probe.wantsFrame()` (`app/isee/IseeVisionCard.kt:262-265`).
 3. Pendant l'enregistrement, `host.onFrame` → `LiveProbe.onFrame` (`app/isee/LiveProbe.kt`) :
    sérialisation JPEG au côté long **320 px** (`ISEE_FRAME_EDGE`,
-   `app/isee/IseeCameraPane.kt:39`, qualité 55, `:42`).
+   `app/isee/IseeCameraPane.kt:43`, qualité 55, `:46`).
 4. `core/live/LiveSession` (`Cadence.Fast`) régule les créneaux, puis
    `core/net/WsLiveClient` envoie **un message JSON par frame sur `/live/ws`**, corrélé par
    `id` (une attente par `id`, pas une file FIFO).
@@ -142,9 +143,10 @@ bloque rien : `AnalyzeUseCase` décrit quand même l'image, sans objets (`sam?.s
 
 ### 2.5 Écran Direct (route `Live`)
 
-`app/LiveViewModel.kt` (411 lignes) + `app/LiveScreen.kt` : frames au côté long **512 px**
-(`LIVE_EDGE`, `LiveScreen.kt:45`), cadence `Cadence.Direct`, un `LiveClient` obtenu par
-`liveClient(base, marks)` (`LiveViewModel.kt:161`). « Poser une question » joint la dernière
+`app/LiveViewModel.kt` (498 lignes) + `app/LiveScreen.kt` : frames au côté long **480 px**
+(`LIVE_EDGE = FramePolicy.EDGE`, `LiveScreen.kt:59`), cadence `Cadence.Direct`, un `LiveClient`
+obtenu par `LiveMaskTransport.clientFor(base, marks)` (`LiveViewModel.kt:205`,
+`app/LiveMaskTransport.kt:17-45`). « Poser une question » joint la dernière
 frame et le journal de pistes (`LiveAskSession`, §2.3).
 
 ### 2.6 Mode tap (vidéo → SAM 3.1)
@@ -156,32 +158,32 @@ l'envoi si l'inférence est locale.
 
 ## 3. Le contrat HTTP, endpoint par endpoint
 
-Toutes les URL sont assemblées par `core/net/Http.kt:114` (`joinUrl` : base sans barre finale
+Toutes les URL sont assemblées par `core/net/Http.kt:201` (`joinUrl` : base sans barre finale
 + chemin, une seule barre oblique). Aucune URL de production n'est « officielle » : elle vient
-des Réglages, d'un preset de région (`core/settings/SamRegion.kt:21,26`) ou de
+des Réglages, d'un preset de région (`core/settings/SamRegion.kt:22,27`) ou de
 `local.properties`.
 
 | Endpoint | Client (fichier:ligne) | Requête | Réponse lue |
 |---|---|---|---|
-| `GET {sam}/health` | `core/net/HttpLiveClient.kt:64` | — (délai de réveil 180 s) | `ok`, `model`, `device`, `gpu` → `LiveHealth` |
-| `POST {sam}/segment` | `core/net/HttpSamClient.kt:22` | `{"image_b64", "prompts"\|null}` | `width`, `height`, `objects[{label,score,box,mask_b64}]` |
-| `POST {sam}/live` | `core/net/HttpLiveClient.kt:60` | même corps que la trame WS, **sans `id`** | idem ci-dessous + `elapsed_ms` |
-| `WS {sam}/live/ws` | `core/net/WsLiveClient.kt` (`LIVE_WS_PATH`, `WsTransport.kt:35`) | `{"id","image_b64","prompts","work_edge","max_objects","mask_encoding":"bits"}` | même forme que `/live`, **même `id`** ; erreur `{"error":{"status","detail"}}` |
-| `POST {sam}/release` | `core/net/SamLifecycle.kt:42` | corps `{}`, en-tête `x-sam-release: confirm` | `{"released":true}` → `ReleaseOutcome` |
-| `POST {sam31}/video` | `core/net/HttpSam31VideoClient.kt:67` | multipart : `model=sam3.1-video`, `video` (video/mp4), `prompt` | premier champ trouvé de `text`, `description`, `answer`, `caption` (tronqué à 600 caractères) |
-| `POST {llm}/chat/completions` | `core/net/HttpLlmClient.kt:78` | `{model, messages, temperature 0.2, max_tokens 800\|200}` ; image en `image_url` data-URL | `choices[0].message.content` |
-| `POST {elevenlabs}/text-to-speech/{voiceId}?output_format=mp3_44100_128` | `core/net/ElevenLabsTtsClient.kt:55-62` | `{text, model_id, voice_settings}`, en-tête `xi-api-key` | octets MP3 (un corps texte en 2xx = échec) |
-| `POST {elevenlabs}/speech-to-text` | `core/net/ElevenLabsSttClient.kt:42` | multipart `model_id` + `file` (audio/wav), en-tête `xi-api-key` | texte de transcription |
-| `POST {meta}/asr/transcribe` | `core/net/MetaAsrClient.kt:40` | multipart **2 parts** : `request` (JSON `{"model","audioEncoding":"WAV"}`) + `audio` (audio/wav), en-tête `Authorization: Bearer` | texte de transcription |
-| `POST {track}/session`, `POST {track}/frame`, `DELETE {track}/session/{id}`, `GET {track}/health` | `core/net/TrackClient.kt:39-74` | `{image_b64,prompts}` / `{session_id,image_b64}` | session + objets suivis (délai 15 s) |
+| `GET {sam}/health` | `core/net/HttpLiveClient.kt:129` | — (délai de réveil 180 s) | `ok`, `model`, `device`, `gpu` → `LiveHealth` |
+| `POST {sam}/segment` | `core/net/HttpSamClient.kt:15` | `{"image_b64", "prompts"\|null}` | `width`, `height`, `objects[{label,score,box,mask_b64}]` |
+| `POST {sam}/live` | `core/net/HttpLiveClient.kt:80` | même corps que la trame WS, **sans `id`** | idem ci-dessous + `elapsed_ms` |
+| `WS {sam}/live/ws` | `core/net/WsLiveClient.kt` (`LIVE_WS_PATH`, `WsTransport.kt:50`) | `{"id","image_b64","prompts","work_edge","max_objects","mask_encoding":"bits"}` | même forme que `/live`, **même `id`** ; erreur `{"error":{"status","detail"}}` |
+| `POST {sam}/release` | `core/net/SamLifecycle.kt:40` | corps `{}`, en-tête `x-sam-release: confirm` | `{"released":true}` → `ReleaseOutcome` |
+| `POST {sam31}/video` | `core/net/HttpSam31VideoClient.kt:35` | multipart : `model=sam3.1-video`, `video` (video/mp4), `prompt` | premier champ trouvé de `text`, `description`, `answer`, `caption` (tronqué à 600 caractères) |
+| `POST {llm}/chat/completions` | `core/net/HttpLlmClient.kt:87` | `{model, messages, temperature 0.2, max_tokens 800\|200}` ; image en `image_url` data-URL | `choices[0].message.content` |
+| `POST {elevenlabs}/text-to-speech/{voiceId}?output_format=mp3_44100_128` | `core/net/ElevenLabsTtsClient.kt:38` | `{text, model_id, voice_settings}`, en-tête `xi-api-key` | octets MP3 (un corps texte en 2xx = échec) |
+| `POST {elevenlabs}/speech-to-text` | `core/net/ElevenLabsSttClient.kt:24` | multipart `model_id` + `file` (audio/wav), en-tête `xi-api-key` | texte de transcription |
+| `POST {meta}/asr/transcribe` | `core/net/MetaAsrClient.kt:28` | multipart **2 parts** : `request` (JSON `{"model","audioEncoding":"WAV"}`) + `audio` (audio/wav), en-tête `Authorization: Bearer` | texte de transcription |
+| `POST {track}/session`, `POST {track}/frame`, `DELETE {track}/session/{id}`, `GET {track}/health` | `core/net/TrackClient.kt:34-53` | `{image_b64,prompts}` / `{session_id,image_b64}` | session + objets suivis (délai 15 s) |
 
 Précisions qui comptent :
 
 - **`POST /live` n'est plus le chemin des frames.** `liveClient()` (`core/net/LiveClientFactory.kt`)
   ne construit qu'un `WsLiveClient` ; le `HttpLiveClient` qu'il lui passe en délégué ne sert
-  qu'à `health()` (`WsLiveClient.kt:82`). `HttpLiveClient.live` n'est donc appelé que par les
+  qu'à `health()` (`WsLiveClient.kt:197`). `HttpLiveClient.live` n'est donc appelé que par les
   tests.
-- **`GET /health` n'est appelé que par le bouton « Tester SAM »** (`app/vm/AppDiagnostics.kt:63`)
+- **`GET /health` n'est appelé que par le bouton « Tester SAM »** (`app/vm/AppDiagnostics.kt:56`)
   et par la délégation ci-dessus. Aucune sonde périodique.
 - **Le tracker est câblé dans `:app`** : l'écran Direct construit `HttpTrackClient` +
   `TrackRunner` quand sa pastille « Tracker » est active (`app/LiveViewModel.kt`, `start()`) ;
@@ -190,15 +192,15 @@ Précisions qui comptent :
   lors d'un relevé antérieur — soit à peine mieux que `/live`, le serveur étant le facteur limitant).
 - **Il n'existe aucun endpoint `/ask`** : la question part au LLM par `POST {llm}/chat/completions`
   (`grep -rn '"/ask"' core/src/main app/src/main` : rien).
-- **Erreurs typées**, un seul barème (`core/net/Http.kt:191-207`) : 401/403 → `InvalidKey`,
+- **Erreurs typées**, un seul barème (`core/net/Http.kt:308-324`) : 401/403 → `InvalidKey`,
   402 → `PaymentRequired`, 409/429 → `RateLimited`, 404 « invalid function call » →
   `BackendStopped` (proxy Modal, pas de relance), sinon `Http`. Les clients renvoient des
   `Result` : un échec n'est jamais une exception qui remonte.
-- **Délais** : générique 60 s (`DEFAULT_TIMEOUT_SECONDS`, `Http.kt:28`), frame 10 s
-  (`LIVE_TIMEOUT_SECONDS`, `HttpLiveClient.kt:13`), réveil 180 s (`WAKE_TIMEOUT_SECONDS`,
-  `:21`), extinction 45 s (`RELEASE_TIMEOUT_SECONDS`, `SamLifecycle.kt:10`), vidéo 120 s
-  (`UPLOAD_TIMEOUT_SECONDS`, `HttpSam31VideoClient.kt:69`), tracker 15 s
-  (`TRACK_TIMEOUT_SECONDS`, `TrackClient.kt:11`).
+- **Délais** : générique 60 s (`DEFAULT_TIMEOUT_SECONDS`, `Http.kt:29`), frame 10 s
+  (`LIVE_TIMEOUT_SECONDS`, `HttpLiveClient.kt:17`), réveil 180 s (`WAKE_TIMEOUT_SECONDS`,
+  `:25`), extinction 45 s (`RELEASE_TIMEOUT_SECONDS`, `SamLifecycle.kt:12`), vidéo 120 s
+  (`UPLOAD_TIMEOUT_SECONDS`, `HttpSam31VideoClient.kt:75`), tracker 15 s
+  (`TRACK_TIMEOUT_SECONDS`, `TrackClient.kt:12`).
 
 ## 4. Les clés : d'où elles viennent, où elles vont
 
@@ -209,9 +211,9 @@ les porte vides, l'app refuse d'appeler et le dit (`ApiError.InvalidKey` — LLM
 
 | Étape | Emplacement | Noms (jamais de valeurs) |
 |---|---|---|
-| 1. build | `local.properties` (gitignoré) | `llm.base.url`, `llm.api.key`, `llm.model`, `tts.api.key`, `tts.voice.id`, `asr.api.key`, `sam31.endpoint`, `sam.base.url`, `sam.us.base.url`, `mwdat.application.id`, `mwdat.client.token` |
-| 2. injection | `BuildConfig` (`app/build.gradle.kts:100-116`) | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `TTS_API_KEY`, `TTS_VOICE_ID`, `ASR_API_KEY`, `SAM31_ENDPOINT`, `SAM_BASE_URL`, `SAM_US_BASE_URL` |
-| 2 bis. manifeste | placeholders `mwdat_*` (`app/build.gradle.kts:96-97`, lus dans `AndroidManifest.xml`) | `com.meta.wearable.mwdat.APPLICATION_ID`, `…CLIENT_TOKEN` |
+| 1. build | `local.properties` (gitignoré) | `llm.base.url`, `llm.api.key`, `llm.model`, `tts.api.key`, `tts.voice.id`, `asr.api.key`, `llm.live.api.key`, `google.maps.api.key`, `sam31.endpoint`, `sam.base.url`, `sam.us.base.url`, `route.base.url`, `live.local.overlay`, `mwdat.application.id`, `mwdat.client.token` |
+| 2. injection | `BuildConfig` (`app/build.gradle.kts:123-153`) | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `TTS_API_KEY`, `TTS_VOICE_ID`, `ASR_API_KEY`, `LIVE_LLM_API_KEY`, `GOOGLE_MAPS_API_KEY`, `SAM31_ENDPOINT`, `SAM_BASE_URL`, `SAM_US_BASE_URL`, `ROUTE_BASE_URL`, `LOCAL_OVERLAY` |
+| 2 bis. manifeste | placeholders `mwdat_*` (`app/build.gradle.kts:99-100`, lus dans `AndroidManifest.xml`) | `com.meta.wearable.mwdat.APPLICATION_ID`, `…CLIENT_TOKEN` |
 | 3. amorçage | `app/SettingsSeed.kt` (`seeded`) | remplit les champs **vides** (clé LLM, voix, dictée) ; une valeur saisie dans Réglages gagne toujours |
 | 4. stockage | `core/settings/EncryptedSettingsStore.kt` : `EncryptedSharedPreferences` fichier `sam3vision_secure_settings` (`:12`), clés `KEY_*` (`:90-108`) — repli `core/settings/PrivateFileSettingsStore.kt` : `filesDir/settings.enc`, AES-256/GCM, clé Keystore non exportable, choisi par `SettingsStoreFactory.create` | `llm_base_url`, `llm_api_key`, `llm_model`, `sam_base_url`, `sam_region`, `speech_language`, `tts_api_key`, `tts_voice_id`, `tts_autoplay`, `tts_announce_positions`, `asr_base_url`, `asr_api_key`, `asr_model`, `intro_enabled`, `intro_played`, `distance_overlay`, `live_sam`, `camera_fov_deg`, `max_objects` |
 | 5. envoi | en-têtes HTTP | `Authorization: Bearer` (LLM, Meta ASR), `xi-api-key` (ElevenLabs TTS/STT) ; **les endpoints SAM ne portent aucune clé** ; `/release` porte `x-sam-release: confirm` |
@@ -219,18 +221,19 @@ les porte vides, l'app refuse d'appeler et le dit (`ApiError.InvalidKey` — LLM
 Deux nuances : les URL SAM ne passent **pas** par `BuildConfig` à l'amorçage — elles sont
 résolues à l'appel par `Settings.samEndpoint()` (`app/SamEndpoint.kt`) ; et `BuildConfig` est
 bien la seule porte d'entrée d'une clé sans saisie manuelle, désormais pour la seule `:app`
-(`app/build.gradle.kts:100-116`).
+(`app/build.gradle.kts:123-153`).
 
 ## 5. Réglages par défaut et endpoint SAM
 
-`Settings.Default` (`core/settings/Settings.kt:84-102`) : base LLM
-`https://inference.baseten.co/v1` (`:87`), modèle `meta-models/muse-spark-open-1026` (`:88`), clé LLM vide,
-voix ElevenLabs = voix « premade » Sarah (`DEFAULT_TTS_VOICE_ID`, `Settings.kt:69` ; les voix
-de bibliothèque répondent 402 sans crédits, commentaire `Settings.kt:67-70`), langue de la voix = **anglais** (`SpeechLanguage.DEFAULT = En`,
-`core/speech/SpeechLanguage.kt:32`), ASR = base `https://api.meta.ai/v1` (`:81`), modèle
-`muse-voice-transcribe-1.0` (`:82`), `ttsAutoplay = true`, `ttsAnnouncePositions = true`,
-`introEnabled = true`, `distanceOverlayEnabled = true`, `liveSamEnabled = true`,
-`samRegion = Eu`, `cameraFovDeg = 0f` (0 = lu sur le capteur), `maxObjects = 8`.
+`Settings.Default` (`core/settings/Settings.kt:304-309`) : base LLM
+`https://inference.baseten.co/v1` (`:225`), modèle `meta-models/muse-spark-open-1026` (`:226`), clé LLM vide,
+voix ElevenLabs = Laure (`DEFAULT_TTS_VOICE_ID = LAURE_VOICE_ID`, `Settings.kt:236`, id `:229` ;
+Sarah n'est plus que l'ancien défaut, `SARAH_VOICE_ID` `:244`, migré par `SettingsSeed`), langue
+de la voix = **anglais** (`SpeechLanguage.DEFAULT = En`, `core/speech/SpeechLanguage.kt:33`),
+ASR = base `https://api.meta.ai/v1` (`:269`), modèle `muse-voice-transcribe-1.0` (`:270`),
+`ttsAutoplay = true`, `ttsAnnouncePositions = true`, `introEnabled = true`,
+`distanceOverlayEnabled = true`, `liveSamEnabled = true`, `samRegion = Eu`, `cameraFovDeg = 0f`
+(0 = lu sur le capteur), `maxObjects = 16` (`:179`, `ObjectLimits.DEFAULT_ON_SCREEN`).
 
 **Résolution de l'endpoint SAM** (`resolveSamEndpoint`, `core/settings/SamRegion.kt`), dans
 cet ordre : saisie manuelle qui n'est *pas* un preset → URL injectée au build pour la région
@@ -239,9 +242,9 @@ choisie → preset de la région. Une URL qui n'est qu'un preset est effacée au
 Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appelée
 (`SamRegion.kt:4-9`).
 
-**Plafonds** : `core/model/ObjectLimits.kt:16-19` → 8 objets affichés par défaut, réglable de
-1 à 32. `core/live/LivePrompts.kt` → **6 concepts suivis par défaut** (`person`, `door`,
-`bicycle`, `car`, `truck`, `electric scooter`, `:27`), maximum 6 (`:34`), 32 caractères (`:37`).
+**Plafonds** : `core/model/ObjectLimits.kt:26-28` → 16 objets affichés par défaut, réglable de
+1 à 32. `core/live/LivePrompts.kt` → **21 concepts suivis par défaut** (`:75-81`), maximum 22
+(`:156`), 32 caractères (`:159`).
 
 ## 6. Le direct : transport, cadence, délais
 
@@ -259,16 +262,16 @@ Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appel
   budget (`:168`). Créneau pris = frame **jetée** (`runFrame` renvoie `null`), jamais mise en
   attente.
 - **Réveil** : le conteneur est réveillé par la **première frame** ; `LiveProbe.markWarming()`
-  ne pose qu'un drapeau d'affichage, aucun appel réseau (`app/isee/LiveProbe.kt:441`). Côté
+  ne pose qu'un drapeau d'affichage, aucun appel réseau (`app/isee/LiveProbe.kt:480`). Côté
   Direct, `LiveWakeGuard` (`app/live/LiveWakeGuard.kt`) ouvre une fenêtre de 60 s pendant
   laquelle un échec s'affiche « réveil du GPU… ». L'app appelle `POST /release` quand elle se
   ferme (`MainActivity.onPause`/`onDestroy` → `AppViewModel.releaseGpu` →
-  `AppDiagnostics.releaseGpu`, `app/vm/AppDiagnostics.kt:97`).
+  `AppDiagnostics.releaseGpu`, `app/vm/AppDiagnostics.kt:100`).
 - **Masques** : le client demande l'encodage `bits` (`MASK_ENCODING_BITS`,
   `core/model/Models.kt:36`) ; un backend qui ignore le champ sert `png`, et la réponse dit ce
   qu'elle a réellement envoyé (`mask_encoding`, `Json.kt:291`).
 - **Distances** : sténopé sur le téléphone (`core/distance/DistanceEstimator.kt`), champ de
-  vision par défaut 67°, bornes 15°–130° (`core/distance/LensSpec.kt:43,46,49`), hauteurs
+  vision par défaut 67°, bornes 15°–130° (`core/distance/LensSpec.kt:80,83,86`), hauteurs
   connues dans `core/distance/KnownSizes.kt`, lissage 0,35 / 0,85
   (`DistanceSmoother.kt:18-19`). **Aucune requête, aucun GPU.**
 
