@@ -11,6 +11,7 @@ import dev.sam3vision.app.isee.IseeCameraActions
 import dev.sam3vision.app.isee.LiveProbeState
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
@@ -83,6 +84,7 @@ class IseePicto(
     private val clock: () -> Long = SystemClock::elapsedRealtime,
     private val placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
     probeState: StateFlow<LiveProbeState>? = null,
+    private val onFound: (label: String, clockHour: Int) -> Unit = { _, _ -> },
 ) {
 
     /**
@@ -131,6 +133,15 @@ class IseePicto(
     /** Ancrage live (boîte SAM du label chassé), prioritaire à l'affichage. */
     @Volatile
     private var liveHits: List<PictoHit> = emptyList()
+
+    /**
+    /**
+     * Cadran du dernier trouvé signalé ([onFound]), `null` si désancré :
+     * le trouvé ne se re-signale qu'au changement de cadran (le répéter au
+     * même cadran est le travail de l'anti-répétition, autre mission).
+     */
+    @Volatile
+    private var lastFoundClock: Int? = null
 
     /**
      * SAM voit les clés sur sa dernière publication : le gabarit des clés
@@ -216,8 +227,25 @@ class IseePicto(
         if (busy || label.isBlank()) return
         huntLabel = label.trim()
         liveHits = emptyList()
+        lastFoundClock = null
         update { it.copy(picto = it.picto.copy(hits = mergedHits(), armed = pictos.size), status = null) }
     }
+
+    /**
+     * « find off » : la chasse pendante est effacée — label, ancrage live
+     * et cadran du trouvé. L'affichage retombe sur les gabarits armés
+     * (repères conservés : une nouvelle chasse reprend sans régénérer).
+     * Idempotent : sans chasse, ne coûte rien. Le statut est au demandeur.
+     */
+    fun cancelHunt() {
+        huntLabel = null
+        liveHits = emptyList()
+        lastFoundClock = null
+        publishHits()
+    }
+
+    /** Label chassé en direct, `null` = pas de chasse en cours. */
+    fun hunting(): String? = huntLabel
 
     /**
      * Frame filmée (JPEG base64) : les repères armés y sont cherchés au plus
@@ -256,7 +284,9 @@ class IseePicto(
      * confirmation — l'utilisateur est seul devant la caméra. Repère armé :
      * l'overlay s'ancre sur la boîte détectée ; les clés sorties du
      * champ, le picto disparaît, et il réapparaît avec elles, sans
-     * régénérer. Muet dehors ; sans chasse, la publication ne fait que juger les clés.
+     * régénérer. Muet dehors ; sans chasse, la publication ne fait que juger
+     * les clés. Chaque ancrage frais (apparition ou changement de cadran)
+     * signale le trouvé ([onFound]) : le câblage le poste en clip, au cran find.
      */
     fun onDetections(dets: List<Detection>) {
         samKeysSeen = dets.any { matchesHunt(KEYS_LABEL, it.label) }
@@ -286,12 +316,20 @@ class IseePicto(
         }
         if (armed == null) return
         val box = seen?.normalizedBox()
-        liveHits = if (seen != null && box != null && box.size >= 4) {
-            listOf(PictoHit(armed.id, armed.label, box[0], box[1], box[2] - box[0], box[3] - box[1], seen.score))
-        } else {
-            emptyList()
+        if (seen == null || box == null || box.size < 4) {
+            liveHits = emptyList()
+            lastFoundClock = null
+            publishHits()
+            return
         }
+        val clock = PositionText.clockHour((box[0] + box[2]) / 2f)
+        val fresh = liveHits.none { it.pictoId == armed.id } || lastFoundClock != clock
+        liveHits = listOf(PictoHit(armed.id, armed.label, box[0], box[1], box[2] - box[0], box[3] - box[1], seen.score))
         publishHits()
+        if (fresh) {
+            lastFoundClock = clock
+            onFound(hunt, clock)
+        }
     }
 
     /** Relit le magasin et publie le nombre de repères armés. */
