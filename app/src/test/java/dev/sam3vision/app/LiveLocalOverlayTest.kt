@@ -48,7 +48,7 @@ class LiveLocalOverlayTest {
     }
 
     @Test
-    fun `la jambe texte du A/B ne s allume que sur vrai`() {
+    fun `la jambe texte du AB ne s allume que sur vrai`() {
         // `LiveMaskTransport.clientFor` : binaryWs = !buildFlagOn(WS_TEXT, false).
         assertEquals(false, !buildFlagOn("true", false))
         assertTrue(!buildFlagOn("", false))

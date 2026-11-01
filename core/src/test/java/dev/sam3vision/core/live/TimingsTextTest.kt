@@ -106,7 +106,7 @@ class TimingsTextTest {
     }
 
     @Test
-    fun `leg nomme la jambe du A/B en un mot`() {
+    fun `leg nomme la jambe AB en un mot`() {
         assertEquals("leg binary", TimingsText.leg(true))
         assertEquals("leg text", TimingsText.leg(false))
     }
