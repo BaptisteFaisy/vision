@@ -16,9 +16,9 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   de la manœuvre. Une annonce moteur recale la cadence, hors guidage et
   écart : silence, dictée prioritaire. L'orientation du téléphone
   (boussole) n'est volontairement pas utilisée (appareil souvent en poche).
-- **Preuve** : `:app:testDebugUnitTest` 1 796 verts (0 échec, dont 9
+- **Preuve** : `:app:testDebugUnitTest` 1 815 verts (0 échec, dont 9
   nouveaux : 2 `PeriodicVoiceTest`, 5 `VoiceNavSpeakerRepeatTest`, 2
-  `VoiceNavTrackerTest`) ; `:core:testDebugUnitTest` 2 895 verts + 5 échecs
+  `VoiceNavTrackerTest`) ; `:core:testDebugUnitTest` 2 896 verts + 5 échecs
   pré-existants `PrivateFileSettingsStoreTest` (permissions POSIX, identiques
   arbre nu — environnement Windows, hors changement), dont 14 nouveaux
   `PeriodicGuidanceTest` verts ; `check-kotlin-limits.py` OK ; recette rue
