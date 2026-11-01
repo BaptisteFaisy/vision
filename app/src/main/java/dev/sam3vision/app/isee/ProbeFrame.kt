@@ -74,11 +74,13 @@ internal const val WARM_SPOKEN = "Waking the server, up to a minute."
 internal const val COLD_TIMEOUT_SPOKEN = "Server still waking. Retrying."
 
 /**
- * Envoi prioritaire : priorité armée par un refus, alerte danger en cours, ou
- * détections à l'écran — ces frames sautent le garde temporel (jamais le créneau).
+ * Envoi prioritaire : priorité armée par un refus, ou détections à l'écran —
+ * ces frames sautent le garde temporel (jamais le créneau). L'urgence ne
+ * passe plus par l'état (tuyau danger supprimé) : la voix de sécurité parle
+ * direct, la priorité ne concerne que l'envoi.
  */
 internal fun probePriority(state: LiveProbeState, armed: Boolean): Boolean =
-    armed || state.dangerAlert != null || state.objects > 0
+    armed || state.objects > 0
 
 /** Un refus de conversion (réserve pleine) : compté dans l'état, jamais silencieux. */
 internal fun LiveProbe.noteSkipped() {

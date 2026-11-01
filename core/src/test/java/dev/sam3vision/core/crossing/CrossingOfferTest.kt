@@ -26,8 +26,8 @@ class CrossingOfferTest {
     @Test
     fun `le seuil client aligne le seuil serveur 035`() {
         assertEquals(0.35f, CrossingOffer.MIN_SCORE, 0f)
-        assertTrue(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.35f))))
-        assertFalse(CrossingOffer.seesCrosswalk(frame(obj("crosswalk", 0.34f))))
+        assertTrue(CrossingOffer.seesNearCrosswalk(frame(obj("crosswalk", 0.35f)), { 1.5f }, h))
+        assertFalse(CrossingOffer.seesNearCrosswalk(frame(obj("crosswalk", 0.34f)), { 1.5f }, h))
     }
 
     @Test
