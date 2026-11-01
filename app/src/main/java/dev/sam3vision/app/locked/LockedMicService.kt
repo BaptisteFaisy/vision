@@ -258,8 +258,8 @@ class LockedMicService : Service() {
 
     /**
      * Réglages lus hors du thread principal (Keystore : quelques dizaines de ms) **et amorcés
-     * par l'APK** (`loadedSettings`) : les clés embarquées au build ne sont pas dans le store,
-     * et sans cet amorçage un téléphone neuf répondrait « aucun moteur de dictée ».
+     * par l'APK** (`loadedSettings`, qui scelle les clés du build dans le store) : sans cet
+     * amorçage un téléphone neuf répondrait « aucun moteur de dictée ».
      */
     private suspend fun loadSettings(): Settings =
         withContext(Dispatchers.IO) { loadedSettings(store) }

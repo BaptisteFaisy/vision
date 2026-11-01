@@ -35,6 +35,13 @@ s'ouvre, parle et segmente ; seuls le LLM et la voix demandent une clé.
 Donc : une installation neuve hérite de tout ; quelqu'un qui a déjà saisi sa propre clé
 la garde. Pour repartir du build, vider le champ et enregistrer.
 
+Une clé du build qui comble un vide est **scellée dans le store** (`loadedSettings`) :
+sans ce scellement, une mise à jour vers un APK construit sans `local.properties`
+rendait l'app muette (01/11/2026 : texte affiché, silence total), la graine ne vivant
+qu'en mémoire. Le scellement ne change pas la priorité : un vide comblé hier par un
+build reste écrasable (vider le champ), et une clé révoquée côté fournisseur se
+remplace comme avant, à la main dans Réglages.
+
 Exception : une base inutilisable (vide ou sans `https://`, LLM comme SAM, route
 ou dictée) n'est pas un choix — le build (à défaut le défaut du code, le preset
 de région, Maps ou Scribe selon le champ) reprend la main tout seul.

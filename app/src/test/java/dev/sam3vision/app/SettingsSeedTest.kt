@@ -253,6 +253,47 @@ class SettingsSeedTest {
     }
 
     @Test
+    fun `les cles du build sont scellees dans le store des qu elles comblent un vide`() = runTest {
+        // Téléphone installé avec un build sans clés (identité déjà scellée, clés
+        // vides), puis mis à jour vers un build qui embarque les clés : la graine ne
+        // doit pas rester en mémoire, sinon la mise à jour suivante vers un build
+        // sans clés rend l'app muette (01/11/2026 : texte affiché, silence total).
+        val installe = Settings.Default.copy(
+            shareId = "aa11bb22cc33",
+            shareWriteKey = "cle-de-partage",
+            ttsApiKey = "",
+            asrApiKey = "",
+            llmApiKey = "",
+            liveLlmApiKey = "",
+        )
+        val store = MemorySettingsStore(installe)
+
+        loadedSettings(store, build)
+
+        val scelle = store.load()
+        assertEquals("cle-voix-du-build", scelle.ttsApiKey)
+        assertEquals("cle-dictee-du-build", scelle.asrApiKey)
+        assertEquals("cle-llm-du-build", scelle.llmApiKey)
+        assertEquals("cle-narration-du-build", scelle.liveLlmApiKey)
+    }
+
+    @Test
+    fun `une mise a jour vers un build sans cles garde la voix scellee`() = runTest {
+        val parle = Settings.Default.copy(
+            shareId = "aa11bb22cc33",
+            shareWriteKey = "cle-de-partage",
+            ttsApiKey = "cle-voix-du-build",
+        )
+        val store = MemorySettingsStore(parle)
+        val vide = BuildDefaults("", "", "", "", "", "")
+
+        val apres = loadedSettings(store, vide)
+
+        assertEquals("cle-voix-du-build", apres.ttsApiKey)
+        assertEquals("cle-voix-du-build", store.load().ttsApiKey)
+    }
+
+    @Test
     fun `une URL SAM manuelle sans scheme retombe sur le preset de la region`() {
         val cassee = Settings.Default.copy(samBaseUrl = "baptiste-faisy--sam3-eu-a100.web.modal.run")
 
