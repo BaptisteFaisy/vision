@@ -1,8 +1,14 @@
 package dev.sam3vision.core.speech
 
+import dev.sam3vision.core.picto.FindIndoorTarget
+import dev.sam3vision.core.picto.PictoVoiceOrder
+
 /**
- * Ordre de dictée iSee (spec v4) : l'un des 10 ordres préfixés par « mode ».
- * Tout le reste d'une phrase dictée est une question pour le LLM.
+ * Ordre de dictée iSee (spec v4) : l'un des 10 ordres préfixés par « mode »,
+ * ou une chasse sans « mode » visant l'une des 10 cibles dedans (« où sont
+ * mes clés », « where are my keys », « find my keys » — décision user du
+ * 01/11, la chasse picto d'avant-v4). Tout le reste d'une phrase dictée
+ * est une question pour le LLM.
  *
  * Les 10 ordres : outdoor, indoor, crossing on, crossing off, find my X,
  * find off, GPS I want to go to X, GPS off, glasses on, glasses off.
@@ -20,7 +26,7 @@ sealed interface DictationOrder {
     /** « mode crossing off » : couper le mode Traversée. */
     data object CrossingOff : DictationOrder
 
-    /** « mode find my X » : chercher l'objet [label] (libellé brut dicté). */
+    /** « mode find my X » ou chasse sans « mode » : chercher l'objet [label] (concept brut). */
     data class Find(val label: String) : DictationOrder
 
     /** « mode find off » : arrêter la recherche d'objet en cours. */
@@ -41,10 +47,12 @@ sealed interface DictationOrder {
 
 /**
  * Parseur des ordres de dictée : « mode » en premier mot, puis l'un des 10
- * ordres. Insensible à la casse et aux espaces/ponctuation superflus ; les
- * libellés (objet cherché, destination) gardent le texte dicté tel quel.
+ * ordres ; sans « mode », seule une chasse visant l'une des 10 cibles
+ * dedans est un ordre ([findWithoutMode]). Insensible à la casse et aux
+ * espaces/ponctuation superflus ; les libellés (objet cherché,
+ * destination) gardent le texte dicté tel quel.
  *
- * Règles strictes (spec v4) : la phrase doit COMMENCER par « mode » ; un
+ * Règles strictes (spec v4) : un « mode … » qui n'est aucun des 10 ordres
  * « mode … » qui n'est aucun des 10 ordres rend `null` (question LLM,
  * jamais un ordre deviné) ; les ordres fixes n'acceptent aucun mot
  * supplémentaire (« mode outdoor please » ⇒ `null`) ; les ordres à
@@ -63,7 +71,7 @@ object DictationOrders {
     fun parse(text: String): DictationOrder? {
         val words = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return null
-        if (!isWord(words[0], PREFIX)) return null
+        if (!isWord(words[0], PREFIX)) return findWithoutMode(text)
         val rest = words.drop(1)
         if (rest.isEmpty()) return null
         val keys = rest.map { key(it) }
@@ -85,6 +93,22 @@ object DictationOrders {
                 payload(rest, 6)?.let { DictationOrder.GpsGo(it) }
             else -> null
         }
+    }
+
+    /**
+     * Chasse sans « mode » : « où est/sont X », « where is/are X » ou
+     * « find/locate X » visant l'une des 10 cibles dedans ([FindIndoorTarget])
+     * — le concept canonique part en chasse (picto créé à sa première
+     * détection, comme « mode find my X »). Toute autre question (`null` :
+     * hors des 10, « where is the exit », « où est la gare ») part au LLM.
+     */
+    private fun findWithoutMode(text: String): DictationOrder? {
+        val label = PictoVoiceOrder.parseOuSont(text)
+            ?: PictoVoiceOrder.parseWhere(text)
+            ?: PictoVoiceOrder.parseFind(text)
+            ?: return null
+        val target = FindIndoorTarget.fromSpoken(label) ?: return null
+        return DictationOrder.Find(target.concept)
     }
 
     /** Vrai si [text] dicté est un ordre (consommé par le routeur). */

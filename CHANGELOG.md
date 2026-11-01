@@ -3,6 +3,24 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : « où sont mes clés » relance la chasse (branche `fix/isee-where-find-sans-mode`)
+
+- **Demande** : les pictos ne marchent plus — « où sont mes clés »
+  répond (LLM) mais ne crée aucun picto, et « mode find off »
+  n'arrête pas la chasse (décision user du 01/11 : les questions
+  « où »/« where »/« find » sans « mode » chassent aussi).
+- **Cause** : depuis le routeur v4, seul « mode … » atteint
+  `IseeModeOrders` — le chemin picto historique (« où sont… »,
+  « where are… », « find… ») partait au LLM sans rien armer.
+- **Fait** : `DictationOrders.parse` route une chasse sans « mode »
+  vers `Find(concept)` quand elle vise l'une des 10 cibles dedans
+  (hors des 10, « where is the exit », « où est la gare » : LLM) ;
+  `confirmFindStopped` et la sortie de dedans annulent la chasse
+  (`IseePicto.cancelHunt`, avant un no-op).
+- **Preuve** : `DictationOrderTest` (+4 : où/where/find sans mode,
+  hors-10 au LLM), `FindIndoorTest`, `PictoVoiceOrderTest` verts ;
+  `check-kotlin-limits.py` vert. Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — iSee : compteur de marches répété toutes les 0,5 s (branche `compteur-marches-500ms`)
 
 - **Demande** : « passer à 500 ms les n marche » — le user, dans
