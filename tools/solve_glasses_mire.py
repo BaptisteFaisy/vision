@@ -207,6 +207,22 @@ def parse_corners(text):
     return nx, ny
 
 
+def selftest_photo_geometry(check):
+    """Gardes lot HIGH : homogene et 720x1280 exiges (refus = rephotographier)."""
+
+    def refused(shapes):
+        try:
+            check_photo_geometry(shapes)
+        except SystemExit:
+            return True
+        return False
+
+    check("lot HIGH homogene accepte", not refused([(1280, 720)] * 3))
+    check("lot heterogene refuse", refused([(1280, 720), (1280, 719)]))
+    check("snapshot de vue refuse", refused([(405, 720)]))
+    check("mauvaises dimensions refusees", refused([(1280, 719)]))
+
+
 def selftest():
     """Autotest stdlib + bout-en-bout cv2 si présent (PARTIEL sinon, dit)."""
     fails = []
@@ -225,18 +241,7 @@ def selftest():
     except ValueError:
         check("pixels non carres refuses", True)
     check("fov 500px/720px", abs(focal_to_fov_deg(500.0, 720.0) - 71.51) < 0.01)
-
-    def refused(shapes):
-        try:
-            check_photo_geometry(shapes)
-        except SystemExit:
-            return True
-        return False
-
-    check("lot HIGH homogene accepte", not refused([(1280, 720)] * 3))
-    check("lot heterogene refuse", refused([(1280, 720), (1280, 719)]))
-    check("snapshot de vue refuse", refused([(405, 720)]))
-    check("mauvaises dimensions refusees", refused([(1280, 719)]))
+    selftest_photo_geometry(check)
     svg = gen_mire_svg(9, 6, 25.0)
     check("svg cases noires", svg.count('fill="black"') == 35)
     check("svg dimensions mm", 'width="270.00mm"' in svg and 'height="195.00mm"' in svg)
