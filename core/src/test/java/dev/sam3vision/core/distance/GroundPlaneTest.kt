@@ -117,6 +117,20 @@ class GroundPlaneTest {
     }
 
     @Test
+    fun `pose lunettes, hauteur des yeux tete droite`() {
+        assertEquals(1.6f, CameraPose.GLASSES_HEIGHT_M, 0f)
+        assertEquals(CameraPose(1.6f, 0f), CameraPose.Glasses)
+        assertTrue(CameraPose.Glasses.isValid)
+        assertEquals(CENTER_Y, GroundPlane.horizonRow(CameraPose.Glasses, FOCAL_PX, CENTER_Y), 0f)
+        // 720 + 1000·(1,60/3) = 1253,333 px ; pieds à 920 px → 8,0 m
+        assertEquals(1253.333f, GroundPlane.rowAt(3f, CameraPose.Glasses, FOCAL_PX, CENTER_Y)!!, 0.01f)
+        assertEquals(8f, GroundPlane.forwardMeters(920f, CameraPose.Glasses, FOCAL_PX, CENTER_Y, IMAGE_HEIGHT)!!, 0.01f)
+        // Bord bas : 1,60/0,72 = 2,222 m ; horizon : pas de distance
+        assertEquals(2.222f, GroundPlane.forwardMeters(IMAGE_HEIGHT.toFloat(), CameraPose.Glasses, FOCAL_PX, CENTER_Y, IMAGE_HEIGHT)!!, 0.01f)
+        assertNull(GroundPlane.forwardMeters(CENTER_Y, CameraPose.Glasses, FOCAL_PX, CENTER_Y, IMAGE_HEIGHT))
+    }
+
+    @Test
     fun `calibrage inutilisable ne mesure pas`() {
         assertNull(GroundPlane.forwardMeters(rowOf(3f), pose(), 0f, CENTER_Y, IMAGE_HEIGHT))
         assertNull(GroundPlane.forwardMeters(rowOf(3f), pose(), -1000f, CENTER_Y, IMAGE_HEIGHT))

@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * Les moteurs embarqués de la sonde derrière une seule façade (extrait de
  * `LiveProbe`, plafond 500 lignes) : la profondeur affine les distances, le
- * ticker republie les pastilles prédites toutes les 120 ms. Mêmes frames
+ * ticker republie les pastilles prédites toutes les [DistanceTicker.TICK_MS]. Mêmes frames
  * capturées offertes au moteur, resets communs, `null` sans contexte (tests).
  */
 internal class ProbeMeters(
@@ -63,7 +63,7 @@ internal class ProbeMeters(
         frameHeight = height
     }
 
-    /** Republie les pastilles prédites toutes les 120 ms (idempotent). */
+    /** Republie les pastilles prédites toutes les [DistanceTicker.TICK_MS] (idempotent). */
     fun startPredictions(distances: DistanceMeter) {
         predicted = distances
         ticker.start()

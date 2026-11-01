@@ -67,6 +67,8 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             routeBaseUrl = prefs.getString(KEY_ROUTE_BASE_URL, default.routeBaseUrl).orEmpty(),
             cameraFovDeg = prefs.getFloat(KEY_CAMERA_FOV, default.cameraFovDeg)
                 .takeIf { it > 0f } ?: default.cameraFovDeg,
+            glassesFovDeg = prefs.getFloat(KEY_GLASSES_FOV, default.glassesFovDeg)
+                .takeIf { it > 0f } ?: default.glassesFovDeg,
             maxObjects = ObjectLimits.clamp(
                 prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects),
             ),
@@ -113,6 +115,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_OUTDOOR_MODE, s.outdoorMode)
             .putString(KEY_ROUTE_BASE_URL, s.routeBaseUrl)
             .putFloat(KEY_CAMERA_FOV, s.cameraFovDeg)
+            .putFloat(KEY_GLASSES_FOV, s.glassesFovDeg)
             .putString(KEY_CAREGIVER_ROLE, s.caregiverRole.name)
             .putString(KEY_PARENT_SITE_URL, s.parentSiteUrl)
             .putBoolean(KEY_SHARE_ENABLED, s.shareEnabled)
@@ -158,6 +161,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_OUTDOOR_MODE = "outdoor_mode"
         const val KEY_ROUTE_BASE_URL = "route_base_url"
         const val KEY_CAMERA_FOV = "camera_fov_deg"
+        const val KEY_GLASSES_FOV = "glasses_fov_deg"
         const val KEY_CAREGIVER_ROLE = "caregiver_role"
         const val KEY_PARENT_SITE_URL = "parent_site_url"
         const val KEY_SHARE_ENABLED = "share_enabled"

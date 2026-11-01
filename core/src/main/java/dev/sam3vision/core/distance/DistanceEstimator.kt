@@ -187,7 +187,7 @@ class DistanceMeter(
      * Kalman extrapolées par leur vitesse + objets non suivis maintenus tels quels
      * (la sonde ne suit pas : sans maintien, ses pastilles s'éteindraient entre deux
      * inférences). L'info reste fraîche entre deux frames (à 1 image/s, un tick à
-     * 120 ms donne ~8 rafraîchissements). Vide sans Kalman ([kalmanEnabled]), sans
+     * 80 ms donne ~12 rafraîchissements). Vide sans Kalman ([kalmanEnabled]), sans
      * objet vivant, ou mesures coupées. Confiance dégradée par l'âge, oubli au
      * [DistanceKalman.timeoutMs] — jamais de prédiction au-delà.
      */

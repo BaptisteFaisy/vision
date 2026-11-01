@@ -47,6 +47,15 @@ Capteur absent, tangage manquant ou hauteur inexploitable → `pose = null` :
 seule la branche sténopé travaille, comme avant le plan de sol. `stop()` remet
 explicitement la pose à `null` (jamais de tangage périmé).
 
+## Session lunettes : pas d'IMU téléphone
+
+Téléphone en poche, son vecteur de rotation ne dit plus où regarde la tête :
+en session lunettes, l'écoute IMU est coupée et la pose tombe sur la constante
+`CameraPose.Glasses` (1,6 m, pitch 0 — hauteur des yeux, tête droite). Câblage :
+`observeGlassesLive` (bascule à chaud lens + pose, `GlassesCalibrationWiring.kt`)
+et `PitchMeter.startUnlessGlassesLive` (réactivations caméra sans bascule
+`live`). Au retour téléphone, l'IMU reprend (`pitch.start()`).
+
 ## Validation sur appareil
 
 1. Réglages → Distances : hauteur à sa valeur tenue (≈ 1,5 m).

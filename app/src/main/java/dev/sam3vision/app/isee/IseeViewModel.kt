@@ -262,6 +262,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Placement sur le passage (mot + approche doux, arrivée en file dernière, jamais Stop).
         observeCrossingVoice(viewModelScope, proximity, ::canAnnounce, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
+        probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() })
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(
             viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety,
@@ -297,7 +298,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.cameraActive == active) return
         update { it.copy(cameraActive = active) }
         if (active) {
-            pitch.start()
+            pitch.startUnlessGlassesLive()
             voiceNavVoiceGate.openWindow()
             syncProbe()
         } else {

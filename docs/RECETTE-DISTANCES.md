@@ -103,3 +103,18 @@ supposées ou cadrage, jamais en retouchant les relevés.
 Reporter dans `docs/DISTANCES.md` le biais médian, le p90 et le nombre de
 relevés mesurés, en remplaçant la mention « non mesuré » — travail de
 constat, pas de protocole, donc hors de cette fiche.
+
+## Variante lunettes (même protocole, 3 substitutions)
+
+Objets, distances, déroulé, seuils et script : inchangés. Seuls changent :
+
+- **Conditions** : lunettes portées, tête droite ; Réglages → « Champ de
+  vision lunettes (°) » — noter au procès-verbal le repli estimé (0) ou la
+  valeur saisie/mire active ;
+- **Déroulé** : mètre ruban posé au sol **depuis les lunettes portées**
+  (pas depuis le téléphone, qui reste en poche) ;
+- **Après** : reporter vers la section « Lunettes cibles » de
+  `docs/DISTANCES.md` (mêmes 3 chiffres + focale mesurée si mire).
+
+Variante allégée admise pour un premier passage : ±10 % sur objet connu à
+3 distances (`LUNETTES-RECETTE-TEL.md` § 6).

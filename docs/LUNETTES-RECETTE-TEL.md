@@ -88,16 +88,19 @@ téléphone (primitifs embarqués, sans GPU) ; le GPU reste le chemin lent/async
 (masques SAM lourds, LLM). Un modèle embarqué (ExecuTorch/NNAPI) est un chantier
 séparé, hors de cette branche.
 
-## 6. Calibrage optique sur mire (bloque les distances lunettes)
+## 6. Calibrage optique sur mire (repli estimé posé, mire restant)
 
-Le SDK n'expose ni FOV ni distorsion : `chosenLens(…, fromGlasses = true)` route
-déjà vers le calibrage lunettes, mais sa valeur est inconnue (repli grand-angle
-en attendant — faux pour les distances).
+Le SDK n'expose ni FOV ni distorsion. En attendant la mire, la voie lunettes
+mesure sur un repli estimé : `LensSpec.Glasses` (100° diagonaux constructeur
+ramenés au 9:16, ≈ 60,6° × 92,1°), affinable par le réglage `glassesFovDeg`,
+avec la pose yeux `CameraPose.Glasses` — routage branché (`chooseLens`,
+`observeGlassesLive`, `configureFrom`). Reste :
 
 1. Mire plane à distance connue, photo via le flux HIGH (720×1280), coins relevés.
 2. Résoudre focale px + centre optique + (k1, k2) radiaux (demi-diagonale).
 3. Poser `LensSpec(horizontal, vertical, sensorLandscape = false, …)` + `.copy(distortion = …)`
-   (voir `LensSpec.fromMeasured`) et câbler l'appelant iSee (`ProbeWiring`).
+   (voir `LensSpec.fromMeasured`) et fournir le `LensSpec` en `glassesLens`
+   (store à définir, `configureFrom` le consomme déjà).
 4. Recette : distance sténopé sur objet connu à ±10 % (3 distances).
 
 ## 7. Grille PASS/FAIL (une ligne par scénario, à remplir sur matériel)
