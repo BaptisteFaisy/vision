@@ -85,4 +85,33 @@ class VehicleStateLateralTest {
             else assertNull("cooldown mouvement", cue)
         }
     }
+
+    @Test
+    fun `churn lateral - la garee d a cote n est pas comptee mobile (attribution)`() {
+        // Une voiture qui glisse vite (latéral franc, label « car ») à côté
+        // d'une garée : sans attribution, le latéral s'impute aux deux (label
+        // seul) et la voix compte 2 mobiles ; avec, seule la glissante parle.
+        val watcher = VehicleStateWatcher()
+        val parkedBox = box(120f, cx = 500f)
+        var cue = watcher.update(
+            listOf(det("car", box(100f, cx = 60f)), det("car", parkedBox)),
+            listOf(reading("car", 12f, box(100f, cx = 60f)), reading("car", 5f, parkedBox)),
+            atMs = 0L, language = SpeechLanguage.Fr,
+        )
+        assertNull(cue)
+        val centers = listOf(100f, 140f, 180f)
+        centers.forEachIndexed { index, cx ->
+            val driftBox = box(100f, cx = cx)
+            cue = watcher.update(
+                listOf(det("car", driftBox), det("car", parkedBox)),
+                listOf(reading("car", 12f, driftBox), reading("car", 5f, parkedBox)),
+                atMs = (index + 1) * 100L, language = SpeechLanguage.Fr,
+            )
+            if (index < 2) assertNull(cue) else {
+                assertEquals("seule la glissante est mobile", "Voiture.", cue!!.phrase)
+                assertEquals("la garée n'est pas comptée", 1, cue!!.movingCount)
+                assertTrue(cue!!.moving)
+            }
+        }
+    }
 }
