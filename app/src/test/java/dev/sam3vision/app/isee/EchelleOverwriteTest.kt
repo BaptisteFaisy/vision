@@ -4,9 +4,6 @@ import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 
 import dev.sam3vision.app.DistanceLayer
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.app.speech.SystemTtsEngine
-import dev.sam3vision.app.speech.TtsDriver
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
@@ -15,14 +12,9 @@ import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.VehicleStateCue
 import dev.sam3vision.core.traverse.VehicleStateWatcher
-import java.io.File
-import java.nio.file.Files
-import java.util.Locale
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -51,13 +43,6 @@ private class FakeSpeaker(var idleValue: Boolean = true) : VoiceBusSpeaker {
     }
 }
 
-/** Pilote TTS système muet : la sécurité ne parle pas dans ce banc. */
-private class SilentDriver : TtsDriver {
-    override val speaking: Boolean get() = false
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean = true
-    override fun stop() = Unit
-    override fun shutdown() = Unit
-}
 
 /**
  * Échelle dehors SPEC v4 (0 à 12) + Traversée (100 à 102) : ordre des
@@ -140,12 +125,12 @@ class EchelleOverwriteTest {
 
     @Test
     fun `vehicule en mouvement niveau 0 avec clip, arret muet`() {
-        val moving = vehicleWish(VehicleStateCue("Voiture en mouvement.", meters = 5f, moving = true))
+        val moving = vehicleWish(VehicleStateCue("Voiture.", meters = 5f, moving = true))
 
         assertNotNull(moving)
         assertEquals(OutdoorLevel.CAR_MOVING, moving?.level)
         assertEquals(AntiRepeat.KEY_CAR_MOVING, moving?.key)
-        assertEquals("vehicle_car_moving", moving?.clipId)
+        assertEquals("car", moving?.clipId)
 
         assertNull(vehicleWish(VehicleStateCue("Voiture à l'arrêt.", meters = 5f, moving = false)))
         assertNull(vehicleWish(null))
@@ -290,15 +275,18 @@ class EchelleOverwriteTest {
     fun `parole user tait tout sauf niveau 0`() {
         VoiceBus.userSpeaking(true)
         VoiceBus.post(OutdoorLevel.HUMAN, "personne")
-        VoiceBus.post(OutdoorLevel.CAR_MOVING, "Voiture en mouvement.", "vehicle_car_moving")
+        VoiceBus.post(OutdoorLevel.CAR_MOVING, "Voiture.", "car")
 
         assertEquals(1, speaker.cuts)
         assertEquals(
-            listOf(FakeSpeaker.Said(OutdoorLevel.CAR_MOVING, "Voiture en mouvement.", "vehicle_car_moving")),
+            listOf(FakeSpeaker.Said(OutdoorLevel.CAR_MOVING, "Voiture.", "car")),
             speaker.said,
         )
 
         VoiceBus.userSpeaking(false)
+        // La voiture parlait encore : la fin du micro ne libère pas son
+        // rang — seule la fin de lecture rend le repos.
+        VoiceBus.onSpeechIdle()
         VoiceBus.post(OutdoorLevel.HUMAN, "personne")
         assertEquals(2, speaker.said.size)
     }
@@ -314,6 +302,8 @@ class EchelleOverwriteTest {
 
         VoiceBus.chatSpeaking(false)
         speaker.idleValue = true
+        // La personne parlait encore : seule la fin de lecture rend le repos.
+        VoiceBus.onSpeechIdle()
         VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
         assertEquals(2, speaker.said.size)
     }
@@ -332,21 +322,9 @@ class EchelleOverwriteTest {
 
     // Flux obstacles vers le bus.
 
-    private fun tempDir(): File = Files.createTempDirectory("echelle").toFile()
 
-    private fun rig(): Triple<ProximityVoice, SafetyVoice, ObstacleWatchers> {
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default },
-        )
-        val safety = SafetyVoice(
-            player = SpeechPlayer(File(tempDir(), "securite")),
-            system = SystemTtsEngine(SilentDriver()),
-            settings = { Settings.Default },
-            stopCurrent = {},
-        )
-        return Triple(voice, safety, ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher()))
-    }
+    private fun rig(): ObstacleWatchers =
+        ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
 
     /** Lecture centrée 640×480 : boîte de [largeur] px à [meters] m. */
     private fun lecture(label: String, largeur: Float, meters: Float): DistanceReading {
@@ -365,13 +343,12 @@ class EchelleOverwriteTest {
 
     @Test
     fun `personne confirmee postee niveau 2`() = runTest {
-        val (voice, safety, guetteurs) = rig()
-        val doux = Mutex()
+        val guetteurs = rig()
         val personne = lecture("person", 100f, 3f)
 
-        obstacleFrame(etat(1, personne), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(1, personne), { SpeechLanguage.Fr }, guetteurs)
         assertTrue(speaker.said.isEmpty())
-        obstacleFrame(etat(2, personne), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(2, personne), { SpeechLanguage.Fr }, guetteurs)
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.HUMAN, speaker.said.single().level)
@@ -381,12 +358,9 @@ class EchelleOverwriteTest {
 
     @Test
     fun `personne imminente postee niveau 2 en clip des la premiere frame`() = runTest {
-        val (voice, safety, guetteurs) = rig()
+        val guetteurs = rig()
 
-        obstacleFrame(
-            etat(1, lecture("person", 200f, 1.5f)), this, voice, { true },
-            { SpeechLanguage.Fr }, safety, guetteurs, Mutex(),
-        )
+        obstacleFrame(etat(1, lecture("person", 200f, 1.5f)), { SpeechLanguage.Fr }, guetteurs)
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.HUMAN, speaker.said.single().level)
@@ -396,48 +370,45 @@ class EchelleOverwriteTest {
 
     @Test
     fun `voiture qui approche postee niveau 0 avec clip`() = runTest {
-        val (voice, safety, guetteurs) = rig()
-        val doux = Mutex()
+        val guetteurs = rig()
 
-        obstacleFrame(etat(1, lecture("car", 100f, 8f)), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
-        obstacleFrame(etat(2, lecture("car", 120f, 7f)), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
-        obstacleFrame(etat(3, lecture("car", 145f, 6f)), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(1, lecture("car", 100f, 8f)), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(2, lecture("car", 120f, 7f)), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(3, lecture("car", 145f, 6f)), { SpeechLanguage.Fr }, guetteurs)
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.CAR_MOVING, speaker.said.single().level)
-        assertEquals("Voiture en mouvement.", speaker.said.single().text)
-        assertEquals("vehicle_car_moving", speaker.said.single().clipId)
+        assertEquals("Voiture.", speaker.said.single().text)
+        assertEquals("car", speaker.said.single().clipId)
     }
 
     @Test
     fun `voiture a l arret muette, rien de poste`() = runTest {
-        val (voice, safety, guetteurs) = rig()
-        val doux = Mutex()
+        val guetteurs = rig()
         val arret = lecture("car", 100f, 4f)
 
-        obstacleFrame(etat(1, arret), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
-        obstacleFrame(etat(2, arret), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
-        obstacleFrame(etat(3, arret), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(1, arret), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(2, arret), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(3, arret), { SpeechLanguage.Fr }, guetteurs)
 
         assertTrue(speaker.said.isEmpty())
     }
 
     @Test
     fun `traversee personne 101, voiture couverte par le verdict`() = runTest {
-        val (voice, safety, guetteurs) = rig()
-        val doux = Mutex()
+        val guetteurs = rig()
         val personne = lecture("person", 100f, 3f)
 
-        obstacleFrame(etat(1, personne, traversee = true), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
-        obstacleFrame(etat(2, personne, traversee = true), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(1, personne, traversee = true), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(2, personne, traversee = true), { SpeechLanguage.Fr }, guetteurs)
 
         assertEquals(1, speaker.said.size)
         assertEquals(CrossingLevels.HUMAN, speaker.said.single().level)
 
-        val (voix2, securite2, guetteurs2) = rig()
+        val guetteurs2 = rig()
         val voiture = lecture("car", 100f, 5f)
-        obstacleFrame(etat(1, voiture, traversee = true), this, voix2, { true }, { SpeechLanguage.Fr }, securite2, guetteurs2, doux)
-        obstacleFrame(etat(2, voiture, traversee = true), this, voix2, { true }, { SpeechLanguage.Fr }, securite2, guetteurs2, doux)
+        obstacleFrame(etat(1, voiture, traversee = true), { SpeechLanguage.Fr }, guetteurs2)
+        obstacleFrame(etat(2, voiture, traversee = true), { SpeechLanguage.Fr }, guetteurs2)
 
         assertEquals(1, speaker.said.size)
     }

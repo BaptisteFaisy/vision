@@ -154,7 +154,7 @@ object StairText {
  *   vue (pic lissé > 1, sinon un compte bas vu du haut ne conclut pas) **ou**
  *   profondeur [LAST_STEP_METERS] quand le compteur est indisponible (la
  *   proximité ne préempte jamais un compte qui montre des marches restantes) ;
- * - la séance expire après [cooldownMs] sans annonce : une rencontre plus
+ * - la séance expire après [SESSION_EXPIRY_MS] sans annonce : une rencontre plus
  *   tardive se ré-annonce en standard, pas en « Plus que N » d'une montée
  *   d'avant.
  *
@@ -263,6 +263,10 @@ class StairWatcher(
         }
         onCountdown(signal, nowMs, language, direction, meters)?.let { return it }
         if (hits < confirmFrames) return null
+        // Approche avec profondeur : les jalons ont la voix — le standard ne
+        // se répète ni entre deux paliers ni pendant qu'un palier se confirme
+        // (l'expiration de séance rouvre une approche neuve, standard parlé).
+        if (opened && meters != null && meters.isFinite()) return null
         if (!cooldownOk(nowMs, cooldownMs)) return null
         markApproach(nowMs)
         return StairCue(
@@ -399,9 +403,9 @@ class StairWatcher(
         resetTiers()
     }
 
-    /** Séance expirée ([cooldownMs] sans annonce) : la montée d'avant est oubliée. */
+    /** Séance expirée ([SESSION_EXPIRY_MS] sans annonce) : la montée d'avant est oubliée. */
     private fun expireClimb(nowMs: Long) {
-        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs >= cooldownMs) {
+        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs >= SESSION_EXPIRY_MS) {
             trend.clear()
             climbCount = null
             lastStepSaid = false
@@ -431,6 +435,14 @@ class StairWatcher(
 
         /** Silence entre deux annonces de montée (SPEC v4 : 2 s — le décor change à chaque pas). */
         const val CLIMB_COOLDOWN_MS = 2_000L
+
+        /**
+         * Mémoire de séance : 10 s sans annonce avant d'oublier la montée.
+         * Strictement plus long que les cooldowns de parole (2 s) — sinon
+         * l'expiration tuerait la montée au moment précis où le compte à
+         * rebours aurait le droit de parler.
+         */
+        const val SESSION_EXPIRY_MS = 10_000L
 
         /** Fenêtre du lissage : 3 derniers comptes (tendance 2-3 frames, pas le brut). */
         const val TREND_FRAMES = 3

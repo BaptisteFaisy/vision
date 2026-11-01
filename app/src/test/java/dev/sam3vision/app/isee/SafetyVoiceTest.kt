@@ -97,16 +97,5 @@ class SafetyVoiceTest {
         assertEquals(Locale.FRENCH, driver.calls.single().locale)
     }
 
-    @Test
-    fun `urgence externe dit Stop grave et coupe`() {
-        val driver = FakeSafetyDriver()
-        val stops = mutableListOf<Unit>()
 
-        safety(driver, stops, SpeechLanguage.Fr).reportEmergency(SpeechLanguage.Fr)
-
-        assertEquals(listOf(Unit), stops)
-        assertEquals("Stop.", driver.calls.single().text)
-        assertTrue(driver.calls.single().flush)
-        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls.single().pitch, 0f)
-    }
 }

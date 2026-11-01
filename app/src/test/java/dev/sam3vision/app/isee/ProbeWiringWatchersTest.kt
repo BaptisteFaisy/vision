@@ -1,22 +1,13 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.DistanceLayer
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.app.speech.SystemTtsEngine
-import dev.sam3vision.app.speech.TtsDriver
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardWatcher
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.VehicleStateWatcher
-import java.io.File
-import java.nio.file.Files
-import java.util.Locale
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,15 +25,6 @@ class ProbeWiringWatchersTest {
 
     private fun cue(tier: CurbTier) = CurbCue("marche", 0.5f, tier)
 
-    /** Pilote TTS système muet : la sécurité ne parle pas dans ce test (miroir ProbeStairsGateTest). */
-    private class SilentDriver : TtsDriver {
-        override val speaking: Boolean get() = false
-        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean = true
-        override fun stop() = Unit
-        override fun shutdown() = Unit
-    }
-
-    private fun tempDir(): File = Files.createTempDirectory("watchers").toFile()
 
     /** Voiture mesurée à [meters] m, boîte centrée de [largeur] px. */
     private fun voiture(largeur: Float, meters: Float): DistanceReading {
@@ -98,27 +80,15 @@ class ProbeWiringWatchersTest {
     }
 
     @Test
-    fun `reemission meme compteur, confirmation vehicule fige`() = runTest {
-        val safety = SafetyVoice(
-            player = SpeechPlayer(File(tempDir(), "securite")),
-            system = SystemTtsEngine(SilentDriver()),
-            settings = { Settings.Default },
-            stopCurrent = {},
-        )
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default },
-            safety = safety,
-        )
+    fun `reemission meme compteur, confirmation vehicule fige`() {
         val guetteurs = ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
-        val doux = Mutex()
 
-        obstacleFrame(etat(frames = 1, largeur = 100f, meters = 5f), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(frames = 1, largeur = 100f, meters = 5f), { SpeechLanguage.Fr }, guetteurs)
         assertFalse(guetteurs.vehicle.movingThisFrame)
 
         // Même compteur, boîte qui grandit et se rapproche : sans la porte,
         // `update` prouverait un mouvement (movingThisFrame à vrai).
-        obstacleFrame(etat(frames = 1, largeur = 110f, meters = 4.5f), this, voice, { true }, { SpeechLanguage.Fr }, safety, guetteurs, doux)
+        obstacleFrame(etat(frames = 1, largeur = 110f, meters = 4.5f), { SpeechLanguage.Fr }, guetteurs)
 
         assertFalse("compteur rejoué : update non relancé", guetteurs.vehicle.movingThisFrame)
         assertEquals(1, guetteurs.lastVehicleFrames)

@@ -1,18 +1,12 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.depth.DepthMeter
-import dev.sam3vision.app.speech.SystemTtsEngine
-import dev.sam3vision.app.speech.TtsDriver
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
-import java.io.File
-import java.nio.file.Files
-import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -24,16 +18,14 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * Porte escaliers hors sourdine GPS : GPS coupé (ambiance fermée) mais chat
- * libre — l'escalier nommé par SAM parle quand même (la sécurité passe avant
- * le silence, contrat `IseeVoiceGate`), et se tait si sa propre porte est
- * fermée. Escalier sans lecture de distance (labels seuls : ni hauteur connue,
- * ni pose, ni ancre) : le cas du terrain du 31/10.
+ * Annonce escaliers sans porte (SPEC v4) : l'escalier nommé par SAM parle
+ * au bus niveau 6, sans porte GPS ni porte escaliers — escalier sans
+ * lecture de distance (labels seuls : ni hauteur connue, ni pose, ni
+ * ancre) : le cas du terrain du 31/10.
  *
  * Jamais `advanceUntilIdle` ici : le compteur est une boucle infinie, seuls
  * `advanceTimeBy` + `runCurrent` avancent (miroir `ProbeStairsCountVoiceTest`).
@@ -41,13 +33,20 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsGateTest {
 
-    /** Pilote TTS système muet : la sécurité ne parle pas dans ce test. */
-    private class SilentDriver : TtsDriver {
-        override val speaking: Boolean get() = false
-        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean = true
-        override fun stop() = Unit
-        override fun shutdown() = Unit
+    /** Porte-parole faux : dits enregistrés (niveau, texte). */
+    private class FakeBusSpeaker : VoiceBusSpeaker {
+        data class Said(val level: Int, val text: String)
+
+        val said = mutableListOf<Said>()
+        override fun idle(): Boolean = true
+        override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+            said += Said(level, text)
+        }
+
+        override fun cut() = Unit
     }
+
+    private val speaker = FakeBusSpeaker()
 
     /** Sténopé seul : l'escalier nommé par SAM n'a aucune lecture de distance. */
     private class PinholeOnly : DepthMeter {
@@ -56,34 +55,32 @@ class ProbeStairsGateTest {
     }
 
     @Before
-    fun setUp() = StairCannyCount.clear()
+    fun setUp() {
+        StairCannyCount.clear()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        VoiceBus.speaker = speaker
+    }
 
     @After
-    fun tearDown() = StairCannyCount.clear()
-
-    @Test
-    fun `gps coupe mais chat libre, escalier annonce`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this, playerIdle = false, stairsAudible = true)
-        try {
-            respond(probe, fake, "A", "B")
-            advanceTimeBy(2_000L)
-            runCurrent()
-
-            assertEquals(1, spoken.count { it == "Escalier devant." })
-        } finally {
-            scope.cancel()
-        }
+    fun tearDown() {
+        VoiceBus.speaker = null
+        VoiceBus.reset()
+        AntiRepeat.reset()
+        StairCannyCount.clear()
     }
 
     @Test
-    fun `porte escaliers fermee, silence meme ambiance ouverte`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this, playerIdle = true, stairsAudible = false)
+    fun `escalier nomme poste niveau 6 sans porte`() = runTest {
+        val (probe, fake, scope) = harness(this)
         try {
             respond(probe, fake, "A", "B")
             advanceTimeBy(2_000L)
             runCurrent()
 
-            assertTrue(spoken.none { it.contains("Escalier") })
+            val annonce = speaker.said.filter { it.text == "Escalier devant." }
+            assertEquals(1, annonce.size)
+            assertEquals(OutdoorLevel.STAIRS, annonce.single().level)
         } finally {
             scope.cancel()
         }
@@ -92,12 +89,11 @@ class ProbeStairsGateTest {
     private data class Wiring(
         val probe: LiveProbe,
         val fake: ProbeTestClient,
-        val spoken: MutableList<String>,
         val scope: CoroutineScope,
     )
 
-    /** Les huit guetteurs sur faux client, voix capturée, portes imposées. */
-    private fun harness(scope: TestScope, playerIdle: Boolean, stairsAudible: Boolean): Wiring {
+    /** Les sept guetteurs sur faux client, branchés sur le bus. */
+    private fun harness(scope: TestScope): Wiring {
         val fake = ProbeTestClient(mutableListOf())
         val probe = LiveProbe(
             scope = scope,
@@ -109,23 +105,9 @@ class ProbeStairsGateTest {
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
-        val spoken = mutableListOf<String>()
-        val safety = SafetyVoice(
-            player = SpeechPlayer(File(tempDir(), "securite")),
-            system = SystemTtsEngine(SilentDriver()),
-            settings = { Settings.Default },
-            stopCurrent = {},
-        )
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
-            safety = safety,
-            onSpeaking = { spoken += it },
-            synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
-        )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        probe.observeHazards(watchers, voice, { playerIdle }, { SpeechLanguage.Fr }, safety, { stairsAudible })
-        return Wiring(probe, fake, spoken, watchers)
+        probe.observeHazards(watchers, { SpeechLanguage.Fr })
+        return Wiring(probe, fake, watchers)
     }
 
     /** Escalier nommé sans mesure : libellé seul, boîte quelconque, pas de masque. */
@@ -146,7 +128,4 @@ class ProbeStairsGateTest {
             advanceTimeBy(1_000L)
         }
     }
-
-    private fun tempDir(): File =
-        Files.createTempDirectory("stairsgatetest").toFile().apply { deleteOnExit() }
 }

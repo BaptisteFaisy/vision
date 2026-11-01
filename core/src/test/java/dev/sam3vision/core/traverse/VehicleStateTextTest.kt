@@ -13,11 +13,11 @@ class VehicleStateTextTest {
     @Test
     fun `alerte securite reconnue en anglais et francais`() {
         assertTrue(VehicleStateText.isSafetyPhrase("Stop, car moving."))
-        assertTrue(VehicleStateText.isSafetyPhrase("Stop, bus moving."))
         assertTrue(VehicleStateText.isSafetyPhrase("Stop, voiture en mouvement."))
-        assertTrue(VehicleStateText.isSafetyPhrase("Stop, camion en mouvement."))
         assertTrue(VehicleStateText.isSafetyPhrase("Stop, 2 vehicles moving."))
         assertTrue(VehicleStateText.isSafetyPhrase("Stop, 3 véhicules en mouvement."))
+        assertFalse("bus hors liste dehors", VehicleStateText.isSafetyPhrase("Stop, bus moving."))
+        assertFalse("camion hors liste dehors", VehicleStateText.isSafetyPhrase("Stop, camion en mouvement."))
     }
 
     @Test
@@ -39,13 +39,12 @@ class VehicleStateTextTest {
     @Test
     fun `mouvement jamais situe - arret et stationnement si`() {
         val car = VehicleStateText.nameOf("car")!!
-        val bus = VehicleStateText.nameOf("bus")!!
 
         // Mouvement : phrase nue, singulier et pluriel, FR et EN.
-        assertEquals("Voiture en mouvement.", VehicleStateText.movingPhrase(car, SpeechLanguage.Fr))
-        assertEquals("Car moving.", VehicleStateText.movingPhrase(car, SpeechLanguage.En))
-        assertEquals("2 véhicules en mouvement.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.Fr))
-        assertEquals("2 vehicles moving.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.En))
+        assertEquals("Voiture.", VehicleStateText.movingPhrase(car, SpeechLanguage.Fr))
+        assertEquals("Car.", VehicleStateText.movingPhrase(car, SpeechLanguage.En))
+        assertEquals("Voitures.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.Fr))
+        assertEquals("Cars.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.En))
 
         // Immobiles : emplacement conservé (distance mesurée, heure sinon).
         assertEquals(
@@ -53,8 +52,8 @@ class VehicleStateTextTest {
             VehicleStateText.stoppedPhrase(car, 2f, null, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Bus stopped, at 12 o'clock.",
-            VehicleStateText.stoppedPhrase(bus, null, 0.5f, SpeechLanguage.En),
+            "Car stopped, at 12 o'clock.",
+            VehicleStateText.stoppedPhrase(car, null, 0.5f, SpeechLanguage.En),
         )
         assertEquals(
             "Voiture en stationnement, à 8 mètres.",
@@ -70,13 +69,13 @@ class VehicleStateTextTest {
     @Test
     fun `mouvements et stops enregistres - le reste en synthese`() {
         val car = VehicleStateText.nameOf("car")!!
-        assertEquals("vehicle_car_moving", VehicleStateText.clipIdFor("Voiture en mouvement."))
-        assertEquals("vehicle_car_moving", VehicleStateText.clipIdFor("Car moving."))
-        assertEquals("vehicle_bus_moving", VehicleStateText.clipIdFor("Bus moving."))
-        assertEquals("vehicle_car_moving", VehicleStateText.movingClipId(car))
+        assertEquals("car", VehicleStateText.clipIdFor("Voiture."))
+        assertEquals("car", VehicleStateText.clipIdFor("Car."))
+        assertNull("bus hors liste dehors", VehicleStateText.clipIdFor("Bus moving."))
+        assertEquals("car", VehicleStateText.movingClipId(car))
+        assertEquals("cars", VehicleStateText.clipIdFor("Cars."))
         assertNull("le stop part en voix de sécurité, pas en clip", VehicleStateText.clipIdFor("Stop, car moving."))
         assertNull(VehicleStateText.clipIdFor("Voiture à l'arrêt, à 2 mètres."))
         assertNull(VehicleStateText.clipIdFor("Voiture en stationnement, à 8 mètres."))
-        assertNull("pluriel variable, rien à enregistrer", VehicleStateText.clipIdFor("2 vehicles moving."))
     }
 }

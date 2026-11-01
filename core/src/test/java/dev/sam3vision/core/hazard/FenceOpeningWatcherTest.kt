@@ -58,7 +58,7 @@ class FenceOpeningWatcherTest {
     }
 
     @Test
-    fun `cooldown dix secondes sans repetition`() {
+    fun `cooldown quatre secondes sans repetition`() {
         val watcher = FenceOpeningWatcher()
         val positive = closed()
 
@@ -66,9 +66,9 @@ class FenceOpeningWatcherTest {
         assertNotNull(watcher.onSignal(positive, 2_000L))
         assertNull(watcher.onSignal(positive, 3_000L))
         assertNull(watcher.onSignal(positive, 4_000L))
-        assertNull("encore en cooldown", watcher.onSignal(positive, 11_999L))
-        assertNotNull("cooldown écoulé", watcher.onSignal(positive, 12_000L))
-        assertNull("le compte repart de zéro", watcher.onSignal(positive, 13_000L))
+        assertNull("encore en cooldown", watcher.onSignal(positive, 5_999L))
+        assertNotNull("cooldown écoulé", watcher.onSignal(positive, 6_000L))
+        assertNull("le compte repart de zéro", watcher.onSignal(positive, 7_000L))
     }
 
     @Test

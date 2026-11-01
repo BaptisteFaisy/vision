@@ -77,8 +77,8 @@ class SidewalkKeepTest {
         assertTrue(CurbConcepts.isGround("footpath"))
         assertTrue(CurbConcepts.isGround("Trottoir"))
         assertTrue(CurbConcepts.isGround("sidewalks"))
-        assertTrue(CurbConcepts.isGround("curb ramp"))
-        assertTrue(CurbConcepts.isGround("bateau"))
+        assertFalse("bateau sorti v4", CurbConcepts.isGround("curb ramp"))
+        assertFalse("bateau sorti v4", CurbConcepts.isGround("bateau"))
 
         assertFalse(CurbConcepts.isGround("curb"))
         assertFalse(CurbConcepts.isGround("step"))

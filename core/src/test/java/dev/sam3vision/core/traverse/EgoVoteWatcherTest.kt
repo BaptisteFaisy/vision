@@ -48,7 +48,7 @@ class EgoVoteWatcherTest {
         val third = watcher.update(listOf(det("car", box(120f))), listOf(reading("car", 5f, box(120f))),
             atMs = 200L, language = SpeechLanguage.Fr, motion = motion)
 
-        assertEquals("Voiture en mouvement.", third!!.phrase)
+        assertEquals("Voiture.", third!!.phrase)
         assertTrue("tau + 5 m + centre : urgent", third.urgent)
     }
 

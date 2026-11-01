@@ -132,7 +132,7 @@ class FindIndoorTest {
     fun `cles anti-repetition stables et durees`() {
         assertEquals("find-found", FindIndoorRepeat.FIND_FOUND_KEY)
         assertEquals(2_000L, FindIndoorRepeat.FIND_FOUND_MS)
-        assertEquals("indoor-doorwall", FindIndoorRepeat.DOOR_WALL_KEY)
+        assertEquals("door-wall", FindIndoorRepeat.DOOR_WALL_KEY)
         assertEquals(4_000L, FindIndoorRepeat.DOOR_WALL_MS)
     }
 

@@ -15,8 +15,9 @@ import org.junit.Test
 
 /**
  * Voix de proximité SPEC v4 : parle ou se tait, sans file — clips
- * d'abord, synthèse sinon, coupe du lecteur partagé, parole du user
- * devant tout sauf le niveau 0, silence sans clé (repli supprimé).
+ * d'abord, synthèse GPS sinon (hors GPS sans clip : silence), coupe du
+ * lecteur partagé, parole du user devant tout sauf le niveau 0, silence
+ * sans clé (repli supprimé).
  */
 class ProximityVoiceEchelleTest {
 
@@ -52,15 +53,27 @@ class ProximityVoiceEchelleTest {
     }
 
     @Test
-    fun `phrase parlee en synthese, sans file ni attente`() = runTest {
+    fun `phrase GPS parlee en synthese, sans file ni attente`() = runTest {
         val rig = Rig()
         val voice = rig.voice()
 
-        assertTrue(voice.speak("Bordure détectée."))
-        assertTrue(voice.speak("Trottoir à gauche."))
+        assertTrue(voice.speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
+        assertTrue(voice.speak("Continue straight ahead.", level = OutdoorLevel.GPS_REMINDER))
 
-        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.attempts)
-        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.said())
+        assertEquals(listOf("Turn left in 20 meters.", "Continue straight ahead."), rig.attempts)
+        assertEquals(listOf("Turn left in 20 meters.", "Continue straight ahead."), rig.said())
+    }
+
+    @Test
+    fun `phrase hors GPS sans clip = silence sans appel reseau`() = runTest {
+        val rig = Rig()
+        val voice = rig.voice()
+
+        assertFalse(voice.speak("Bordure détectée."))
+        assertFalse(voice.speak("Trottoir à gauche."))
+
+        assertTrue(rig.attempts.isEmpty())
+        assertTrue(rig.said().isEmpty())
     }
 
     @Test
@@ -68,14 +81,14 @@ class ProximityVoiceEchelleTest {
         val rig = Rig()
         val voice = rig.voice()
         rig.clips.put(
-            "vehicle_car_moving", SpeechLanguage.Fr,
+            "car", SpeechLanguage.Fr,
             Settings.Default.ttsVoiceId, "mp3".toByteArray(),
         )
 
-        assertTrue(voice.speak("Voiture en mouvement."))
+        assertTrue(voice.speak("Voiture.", level = OutdoorLevel.CAR_MOVING))
 
         assertTrue(rig.attempts.isEmpty())
-        assertEquals(listOf("Voiture en mouvement."), rig.said())
+        assertEquals(listOf("Voiture."), rig.said())
     }
 
     @Test
@@ -94,9 +107,9 @@ class ProximityVoiceEchelleTest {
         val rig = Rig(fails = { Result.failure(IllegalStateException("401")) })
         val voice = rig.voice()
 
-        assertFalse(voice.speak("Bordure détectée."))
+        assertFalse(voice.speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
 
-        assertEquals(listOf("Bordure détectée."), rig.attempts)
+        assertEquals(listOf("Turn left in 20 meters."), rig.attempts)
         assertTrue(rig.said().isEmpty())
     }
 
@@ -119,11 +132,12 @@ class ProximityVoiceEchelleTest {
     fun `niveau 0 seul coupe la parole du user`() = runTest {
         val rig = Rig(userSpeaking = true)
         val voice = rig.voice()
+        rig.clips.put("car", SpeechLanguage.Fr, Settings.Default.ttsVoiceId, "mp3".toByteArray())
 
-        assertTrue(voice.speak("Voiture en mouvement.", level = OutdoorLevel.CAR_MOVING))
+        assertTrue(voice.speak("Voiture.", level = OutdoorLevel.CAR_MOVING))
 
-        assertEquals(listOf("Voiture en mouvement."), rig.attempts)
-        assertEquals(listOf("Voiture en mouvement."), rig.said())
+        assertTrue(rig.attempts.isEmpty())
+        assertEquals(listOf("Voiture."), rig.said())
     }
 
     @Test
@@ -132,9 +146,10 @@ class ProximityVoiceEchelleTest {
         val voice = rig.voice()
 
         assertFalse(voice.speak("Bordure détectée."))
-        assertTrue(voice.speak("Voiture en mouvement.", level = OutdoorLevel.CAR_MOVING))
+        rig.clips.put("car", SpeechLanguage.Fr, Settings.Default.ttsVoiceId, "mp3".toByteArray())
+        assertTrue(voice.speak("Voiture.", level = OutdoorLevel.CAR_MOVING))
 
-        assertEquals(listOf("Voiture en mouvement."), rig.attempts)
+        assertTrue(rig.attempts.isEmpty())
     }
 
     @Test
@@ -142,7 +157,7 @@ class ProximityVoiceEchelleTest {
         val rig = Rig(systemBusy = true)
         val voice = rig.voice()
 
-        assertFalse(voice.speak("Voiture en mouvement.", level = OutdoorLevel.CAR_MOVING))
+        assertFalse(voice.speak("Voiture.", level = OutdoorLevel.CAR_MOVING))
         assertTrue(rig.attempts.isEmpty())
     }
 
@@ -155,7 +170,7 @@ class ProximityVoiceEchelleTest {
         assertTrue(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
         assertTrue(rig.attempts.isEmpty())
 
-        assertTrue(voice.speakWord("guide_right", "Droite.", SpeechLanguage.Fr))
+        assertTrue(voice.speakWord("guide_right", "Droite.", SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
         assertEquals(listOf("Droite."), rig.attempts)
         assertTrue(
             rig.clips.clipFor("guide_right", SpeechLanguage.Fr, Settings.Default.ttsVoiceId)?.isFile == true,
@@ -168,14 +183,15 @@ class ProximityVoiceEchelleTest {
         val rig = Rig()
         val voice = rig.voice()
         val stop = GuidanceWord.Stop.text(SpeechLanguage.Fr)
+        rig.clips.put("guide_stop", SpeechLanguage.Fr, Settings.Default.ttsVoiceId, "mp3".toByteArray())
 
         assertTrue(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr))
         assertFalse(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr))
-        assertEquals(1, rig.attempts.size)
+        assertTrue(rig.attempts.isEmpty())
 
         voice.reset()
         assertTrue(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr))
-        assertEquals(1, rig.attempts.size)
+        assertTrue(rig.attempts.isEmpty())
         assertEquals(listOf(stop, stop), rig.said())
     }
 
@@ -184,11 +200,12 @@ class ProximityVoiceEchelleTest {
         val rig = Rig(userSpeaking = true)
         val voice = rig.voice()
 
+        rig.clips.put("guide_left", SpeechLanguage.Fr, Settings.Default.ttsVoiceId, "mp3".toByteArray())
         assertFalse(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
         assertTrue(
             voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.CAR_MOVING),
         )
-        assertEquals(listOf("Gauche."), rig.attempts)
+        assertTrue(rig.attempts.isEmpty())
     }
 
     @Test

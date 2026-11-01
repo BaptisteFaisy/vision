@@ -53,13 +53,3 @@ internal fun CoroutineScope.observeSpokenEmissions(
     }
 }
 
-/**
- * Porte de la voix du guidage (mots right/left/straight) : elle cède au
- * son réel — lecture du chat ([playerIdle]) et voix du user ([userHolding],
- * sinon la consigne pollue sa dictée) — mais jamais aux attentes
- * silencieuses (transcription, réflexion LLM, synthèse réseau) : muette
- * jusqu'à 75 s sans rien jouer, la voix de sécurité se taisait sans raison
- * audible. La porte GPS est supprimée (SPEC v4) : plus de troisième garde.
- */
-internal fun canGuideSpeech(playerIdle: Boolean, userHolding: Boolean): Boolean =
-    playerIdle && !userHolding

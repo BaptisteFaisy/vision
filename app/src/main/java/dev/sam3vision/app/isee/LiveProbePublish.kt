@@ -90,9 +90,8 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     // Traversée : le verdict parle au bus (niveau 100), la phrase parlée se
     // tait (humains et bordures passent par le guetteur obstacles, 101/102).
     if (_state.value.crossingActive) verdictEngine.onFrame(frame, readings, jpegB64, at)
-    val scanTrigger = scanTriggerFor(appContext, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec)
-    val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
-        distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger, ProbeBackgroundMotion.lastMotion)
+    val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
+        distances.lensSpec.widthFovDeg(frame.width, frame.height))
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).

@@ -101,13 +101,6 @@ class ProbeSpokenFlowTest {
         }
     }
 
-    @Test
-    fun `porte guidage — cede au son reel, pas aux attentes silencieuses`() {
-        assertEquals(true, canGuideSpeech(playerIdle = true, userHolding = false, ambientAllowed = true))
-        assertEquals(false, canGuideSpeech(playerIdle = false, userHolding = false, ambientAllowed = true))
-        assertEquals(false, canGuideSpeech(playerIdle = true, userHolding = true, ambientAllowed = true))
-        assertEquals(false, canGuideSpeech(playerIdle = true, userHolding = false, ambientAllowed = false))
-    }
 
     /**
      * Câble le collecteur sur un scope au même ordonnanceur (temps virtuel

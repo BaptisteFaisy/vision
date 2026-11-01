@@ -61,10 +61,10 @@ data class VehicleStateCue(
  * la fin de la phrase (ordre user du 01/11/2026). L'arrêt et le stationnement gardent leur
  * mesure — le repère stable — et le danger proche garde son alerte ([VehicleStateCue.safetyPhrase]).
  *
- * Le pluriel est générique : deux types mobiles ou plus dans la même frame
- * disent « 2 vehicles moving. » (même sans emplacement), pas le nom du
- * type — les pistes sont par type, pas par instance, et deux voitures sous
- * le même label comptent pour une (limite connue).
+ * Le pluriel est générique : deux mobiles ou plus dans la même frame disent
+ * « 2 vehicles moving. » (même sans emplacement), pas le nom du type — les
+ * pistes sont par instance (label + seau L/C/R, miroir de l'approche), et
+ * deux voitures à deux endroits comptent pour deux.
  *
  * Sécurité : le mouvement proche (sous [NEAR_MOVING_METERS], ou non mesuré —
  * on ne prouve pas qu'il est loin) parle en alerte immédiate
@@ -162,7 +162,7 @@ class VehicleStateWatcher(
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
         val pick = pick(gyro, announceStopped, current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
         previous = current.mapValues { (key, seen) ->
-            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness, seen.box) // PISTE2
+            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(metersFor(meters, key)), atMs, seen.closeness, seen.box) // PISTE2
         }
         movingThisFrame = pick?.state == State.MOVING
         if (pick == null) {
@@ -254,23 +254,25 @@ class VehicleStateWatcher(
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
             .filter { candidate ->
-                if (candidate in hushed) return@filter false
+                // Tait par instance (l'approche juge par instance) ou par
+                // label (jamais produit aujourd'hui, mais un veto par type
+                // resterait un veto : on ne réveille pas ce qu'on a tu).
+                if (candidate in hushed || labelPart(candidate) in hushed) return@filter false
                 val prev = previous[candidate]
                 val seen = current.getValue(candidate)
-                if (VehicleApproach.instanceKeyOf(seen.label, seen.cx ?: 0.5f) in hushed) return@filter false
-                val tauHit = tauKey != null && tauKey == candidate
-                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
+                val tauHit = tauKey != null && tauKey == labelPart(candidate)
+                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate)
                 val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
                     seen.area, seen.closeness, atMs, approach.lastGlobal) &&
                     !followingCamera(prev, seen, atMs, motion)
-                (tauHit || lateralHit || growth) && inMovingRange(meters[candidate], movingMeters)
+                (tauHit || lateralHit || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)
             }
-        val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
+        val key = moving.minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
-        val measured = meters[key]
-        val urgent = tau.approaching && tauKey == key && measured != null && measured <= NEAR_MOVING_METERS &&
+        val measured = metersFor(meters, key)
+        val urgent = tau.approaching && tauKey == labelPart(key) && measured != null && measured <= NEAR_MOVING_METERS &&
             seen.cx != null && seen.cx in CENTER_LO..CENTER_HI
         return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size)
     }
@@ -287,23 +289,23 @@ class VehicleStateWatcher(
     ): Pick? {
         val key = current.keys
             .filter { candidate ->
-                if (candidate in hushed) return@filter false // PISTE1+FUSION
+                if (candidate in hushed || labelPart(candidate) in hushed) return@filter false // PISTE1+FUSION
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
                 // Fond franc : l'arrêt brut est suspect — sauf piste suiveuse
                 // (arrêt compensé prouvé, pas un faux).
                 if (fondFranc && (motion == null && gyro == null || backgroundVerdict(prev, seen, atMs, motion, gyro) != Verdict.CAMERA_MOVED)) return@filter false
-                val measured = meters[candidate]
+                val measured = metersFor(meters, candidate)
                 if (measured != null && measured > PARKED_METERS) return@filter false
                 val grown = seen.area > prev.area * (1f + EgoCompensator.AREA_REL_EPS)
                 if (!still(prev, seen, atMs, motion, gyro) || grown) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
-            .minByOrNull { meters[it] ?: Float.MAX_VALUE }
+            .minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
-        val measured = meters[key]
+        val measured = metersFor(meters, key)
         val state = if (measured != null && measured > STOPPED_METERS) State.PARKED else State.STOPPED
         return Pick(state, name, measured, seen.cx, false)
     }
@@ -355,7 +357,10 @@ class VehicleStateWatcher(
                 closeness = depthByBox?.get(detection.box)?.takeIf { it.isFinite() }, // PISTE2
                 box = detection.box,
             )
-            candidates.getOrPut(vehicleKey(detection.label)) { mutableListOf() } += box to seen
+            // Clé d'instance (label + seau L/C/R, miroir de l'approche) : deux
+            // voitures se suivent séparément, le pluriel compte juste, et la
+            // jeune qu'on n'a jamais jugée ne dort pas du sommeil des autres.
+            candidates.getOrPut(VehicleApproach.instanceKeyOf(detection.label, seen.cx ?: 0.5f)) { mutableListOf() } += box to seen
         }
         return candidates.mapValues { (key, boxes) -> pickStable(boxes, previous[key]?.box) }
     }
@@ -370,7 +375,7 @@ class VehicleStateWatcher(
         return boxes.maxBy { it.second.area }.second
     }
 
-    /** Distance la plus courte par clé (labels non mesurés absents). */
+    /** Distance la plus courte par label (les lectures n'ont pas de cadre : repli par label pour les instances). */
     private fun metersByKey(readings: List<DistanceReading>): Map<String, Float> {
         val best = LinkedHashMap<String, Float>()
         for (reading in readings) {
@@ -395,6 +400,13 @@ class VehicleStateWatcher(
 
     /** Clé de suivi entre deux frames, miroir du veto (« Cars » et « car » fusionnent). */
     private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
+
+    /** Partie label d'une clé (instance « car@C » ou label nu « car » : même lecture). */
+    private fun labelPart(key: String): String = key.substringBefore('@')
+
+    /** Mesure d'une instance : la sienne, sinon la plus proche de son label. */
+    private fun metersFor(meters: Map<String, Float>, candidate: String): Float? =
+        meters[candidate] ?: meters[labelPart(candidate)]
 
     companion object {
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */

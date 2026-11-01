@@ -41,7 +41,7 @@ class CrossingVerdictWiringTest {
         assertEquals(1, out.posts.size)
         assertEquals(CrossingLevels.VERDICT, out.posts[0].level)
         assertEquals("Don't cross.", out.posts[0].text)
-        assertEquals("verdict-dont-cross", out.posts[0].clipId)
+        assertEquals("verdict_dont_cross", out.posts[0].clipId)
         assertEquals(out.posts, posted)
         assertEquals(CrossingState.Red, out.overlay)
         assertEquals(CrossingState.Red, out.haptic)

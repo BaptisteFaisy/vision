@@ -62,8 +62,8 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `au-dela de trois metres = silence`() {
-        val signal = HazardSignal.of(listOf(danger("barrier", 3.5f)), 512, 1138)
+    fun `au-dela de six metres = silence`() {
+        val signal = HazardSignal.of(listOf(danger("barrier", 6.5f)), 512, 1138)
 
         assertFalse(signal.detected)
     }
@@ -428,12 +428,13 @@ class HazardWatchTest {
         assertEquals("Gauche.", cue!!.phrase)
         assertFalse(cue.urgent)
         assertEquals(HazardKind.PERSON, cue.kind)
+        assertEquals(7, cue.level)
     }
 
     @Test
     fun `sorte renseignee - divers sans alerte`() {
         val watcher = HazardWatcher()
-        val signal = HazardSignal(detected = true, meters = 0.8f, label = "borne")
+        val signal = HazardSignal(detected = true, meters = 0.8f, label = "poubelle")
 
         watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
         val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)

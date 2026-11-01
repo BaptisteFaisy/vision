@@ -37,8 +37,8 @@ object CrossingVerdictText {
     const val DONT_CROSS = "Don't cross."
     const val CROSS = "Cross."
 
-    const val DONT_CROSS_CLIP = "verdict-dont-cross"
-    const val CROSS_CLIP = "verdict-cross"
+    const val DONT_CROSS_CLIP = "verdict_dont_cross"
+    const val CROSS_CLIP = "verdict_cross"
 
     fun phrase(verdict: CrossingVerdict): String = when (verdict) {
         CrossingVerdict.Cross -> CROSS

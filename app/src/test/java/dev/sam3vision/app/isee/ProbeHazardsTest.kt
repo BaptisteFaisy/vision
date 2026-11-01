@@ -4,7 +4,7 @@ import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.curb.SidewalkWatcher
-import dev.sam3vision.core.cycle.CycleWatcher
+
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.FenceOpeningPosition
 import dev.sam3vision.core.hazard.FenceOpeningSignal
@@ -31,7 +31,7 @@ class ProbeHazardsTest {
 
     private fun dangers() = ProbeHazards(
         CurbWatcher(), StairWatcher(), StairCountVoice(), HazardWatcher(), FenceOpeningWatcher(),
-        VehicleStateWatcher(), CycleWatcher(), SidewalkWatcher(),
+        VehicleStateWatcher(), SidewalkWatcher(),
     )
 
     private fun det(label: String, box: List<Float>): Detection =
@@ -148,20 +148,5 @@ class ProbeHazardsTest {
         assertEquals("5 marches.", dangers.count.onTick(true, 5, 3_000L))
     }
 
-    @Test
-    fun `reset oublie l'annonce cycle`() {
-        val dangers = dangers()
-        val frame = box(100f)
-        repeat(4) { index ->
-            dangers.cycle.update(
-                listOf(det("scooter", frame)), listOf(reading("scooter", 2f, frame)),
-                atMs = 7_000L + index * 100L, language = SpeechLanguage.Fr,
-            )
-        }
-        assertEquals(7_300L, dangers.cycle.lastAlertMs)
 
-        dangers.reset()
-
-        assertNull(dangers.cycle.lastAlertMs)
-    }
 }

@@ -61,7 +61,7 @@ class VehicleStateDepthTest {
         assertNull("confirmation en cours", frame(watcher, 110f, 100L, 0.5f))
         val third = frame(watcher, 120f, 200L, 0.6f, SpeechLanguage.Fr)
 
-        assertEquals("Voiture en mouvement.", third!!.phrase)
+        assertEquals("Voiture.", third!!.phrase)
         assertEquals(5f, third.meters!!, 0.001f)
         assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
     }
@@ -74,7 +74,7 @@ class VehicleStateDepthTest {
         val third = frame(watcher, 120f, 200L, null, SpeechLanguage.Fr)
 
         assertNotNull(third)
-        assertEquals("Voiture en mouvement.", third!!.phrase)
+        assertEquals("Voiture.", third!!.phrase)
     }
 
     @Test

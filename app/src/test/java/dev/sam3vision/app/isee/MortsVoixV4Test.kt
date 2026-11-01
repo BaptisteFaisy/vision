@@ -14,34 +14,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * SPEC v4 morts-voix : la porte GPS est supprimée ([canGuideSpeech] ne cède
- * qu'au chat et au user), le repli hors-ligne et son signal sont supprimés
- * (sans clé ou voix réseau en panne : silence, jamais de TTS système — seuls
- * les clips parlent sans réseau).
+ * SPEC v4 morts-voix : les portes et files sont supprimées (le bus
+ * arbitre), le repli hors-ligne et son signal sont supprimés (sans clé ou
+ * voix réseau en panne : silence, jamais de TTS système — seuls les clips
+ * parlent sans réseau, et seule la voix GPS synthétise).
  */
 class MortsVoixV4Test {
-
-    @Test
-    fun `porte guidage cede au chat et au user, sans porte GPS`() {
-        assertTrue(canGuideSpeech(playerIdle = true, userHolding = false))
-        assertFalse(canGuideSpeech(playerIdle = false, userHolding = false))
-        assertFalse(canGuideSpeech(playerIdle = true, userHolding = true))
-        assertFalse(canGuideSpeech(playerIdle = false, userHolding = true))
-    }
 
     @Test
     fun `sans cle, doux silencieux sans appel reseau`() = runTest {
         val rig = Rig()
         val voice = rig.voice(key = "")
 
-        voice.onPhrase("Personne à 1 mètre.", playerIdle = true)
-
-        assertTrue(rig.attempts.isEmpty())
-        assertTrue(rig.spoken.isEmpty())
-
-        // En file puis au silence : toujours silencieux, toujours sans appel.
-        voice.onPhrase("Personne à 1 mètre.", playerIdle = false, queue = true)
-        voice.flushPending(playerIdle = true)
+        assertFalse(voice.speak("Personne à 1 mètre.", level = OutdoorLevel.HUMAN))
 
         assertTrue(rig.attempts.isEmpty())
         assertTrue(rig.spoken.isEmpty())
@@ -59,9 +44,9 @@ class MortsVoixV4Test {
             rig.fails = { Result.failure(error) }
             val voice = rig.voice()
 
-            voice.onPhrase("Personne à 1 mètre.", playerIdle = true)
+            assertFalse(voice.speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
 
-            assertEquals(listOf("Personne à 1 mètre."), rig.attempts)
+            assertEquals(listOf("Turn left in 20 meters."), rig.attempts)
             assertTrue(rig.spoken.isEmpty())
         }
     }
@@ -71,7 +56,7 @@ class MortsVoixV4Test {
         val rig = Rig()
         val voice = rig.voice(key = "")
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        assertFalse(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
 
         assertTrue(rig.attempts.isEmpty())
         assertTrue(rig.spoken.isEmpty())
@@ -87,13 +72,13 @@ class MortsVoixV4Test {
         )
         val voice = rig.voice(key = "", clips = pack)
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        assertTrue(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
 
         assertTrue(rig.attempts.isEmpty())
         assertEquals(listOf("Gauche."), rig.spoken)
     }
 
-    /** Banc minimal, miroir de `ProximityVoiceTest.Rig` sans le moteur système (repli supprimé). */
+    /** Banc minimal : voix sans moteur système (repli supprimé). */
     private class Rig(
         val attempts: MutableList<String> = mutableListOf(),
         val spoken: MutableList<String> = mutableListOf(),

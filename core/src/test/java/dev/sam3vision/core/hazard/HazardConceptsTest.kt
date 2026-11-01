@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Danger suivi : personne + mobilier FR/EN reconnus, le reste ignoré, le poteau muet. */
+/** Danger suivi : personne + mobilier FR/EN reconnus, le reste ignoré, le poteau parlé niveau 7. */
 class HazardConceptsTest {
 
     @Test
@@ -15,9 +15,9 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("pole"))
         assertTrue(HazardConcepts.isHazard("person"))
         assertTrue(HazardConcepts.isHazard("human"))
-        assertTrue(HazardConcepts.isHazard("bollard"))
+        assertFalse("borne sortie v4", HazardConcepts.isHazard("bollard"))
         assertTrue(HazardConcepts.isHazard("fence"))
-        assertTrue(HazardConcepts.isHazard("gate"))
+        assertFalse("portail sorti v4", HazardConcepts.isHazard("gate"))
         assertTrue(HazardConcepts.isHazard("street lamp"))
         assertTrue(HazardConcepts.isHazard("sign"))
         assertTrue(HazardConcepts.isHazard("traffic sign"))
@@ -29,15 +29,15 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("POTEAU"))
         assertTrue(HazardConcepts.isHazard("Personne"))
         assertTrue(HazardConcepts.isHazard("humain"))
-        assertTrue(HazardConcepts.isHazard("borne"))
+        assertFalse("borne sortie v4", HazardConcepts.isHazard("borne"))
         assertTrue(HazardConcepts.isHazard("Clôture"))
-        assertTrue(HazardConcepts.isHazard("portail"))
+        assertFalse("portail sorti v4", HazardConcepts.isHazard("portail"))
         assertTrue(HazardConcepts.isHazard("Lampadaire"))
         assertTrue(HazardConcepts.isHazard("RÉVERBÈRE"))
         assertTrue(HazardConcepts.isHazard("Panneau"))
         assertTrue(HazardConcepts.isHazard("panneaux"))
-        assertTrue(HazardConcepts.isHazard("Potelet"))
-        assertTrue(HazardConcepts.isHazard("plot"))
+        assertFalse("potelet sorti v4", HazardConcepts.isHazard("Potelet"))
+        assertFalse("plot sorti v4", HazardConcepts.isHazard("plot"))
     }
 
     @Test
@@ -46,13 +46,13 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isHazard("poteaux"))
         assertTrue(HazardConcepts.isHazard("persons"))
         assertTrue(HazardConcepts.isHazard("humans"))
-        assertTrue(HazardConcepts.isHazard("portails"))
+        assertFalse("portail sorti v4", HazardConcepts.isHazard("portails"))
         assertTrue(HazardConcepts.isHazard("street lamps"))
         assertTrue(HazardConcepts.isHazard("lampadaires"))
         assertTrue(HazardConcepts.isHazard("signs"))
         assertTrue(HazardConcepts.isHazard("traffic signs"))
-        assertTrue(HazardConcepts.isHazard("potelets"))
-        assertTrue(HazardConcepts.isHazard("plots"))
+        assertFalse("potelet sorti v4", HazardConcepts.isHazard("potelets"))
+        assertFalse("plot sorti v4", HazardConcepts.isHazard("plots"))
     }
 
     @Test
@@ -67,8 +67,8 @@ class HazardConceptsTest {
         assertEquals("street lamp", HazardConcepts.nameOf("lampadaire")!!.en)
         assertEquals("au panneau", HazardConcepts.nameOf("sign")!!.fr)
         assertEquals("au panneau de signalisation", HazardConcepts.nameOf("traffic sign")!!.fr)
-        assertEquals("au potelet", HazardConcepts.nameOf("potelet")!!.fr)
-        assertEquals("bollard", HazardConcepts.nameOf("plot")!!.en)
+        assertNull("potelet sorti v4", HazardConcepts.nameOf("potelet"))
+        assertNull("plot sorti v4", HazardConcepts.nameOf("plot"))
     }
 
     @Test
@@ -149,8 +149,8 @@ class HazardConceptsTest {
         assertEquals("au fauteuil roulant", HazardConcepts.nameOf("wheelchair")!!.fr)
         assertEquals("wheelchair", HazardConcepts.nameOf("fauteuil roulant")!!.en)
         assertEquals("au fauteuil roulant", HazardConcepts.nameOf("fauteuils roulants")!!.fr)
-        assertEquals("à la trottinette", HazardConcepts.nameOf("electric scooter")!!.fr)
-        assertEquals("scooter", HazardConcepts.nameOf("Trottinettes")!!.en)
+        assertNull("trottinette sortie v4", HazardConcepts.nameOf("electric scooter"))
+        assertNull("trottinette sortie v4", HazardConcepts.nameOf("Trottinettes"))
         assertEquals("au chien", HazardConcepts.nameOf("dog")!!.fr)
         assertEquals("dog", HazardConcepts.nameOf("Chiens")!!.en)
         assertEquals("à l'enfant", HazardConcepts.nameOf("child")!!.fr)
@@ -162,7 +162,7 @@ class HazardConceptsTest {
         assertTrue(HazardConcepts.isSpoken("dog"))
         assertTrue(HazardConcepts.isSpoken("stroller"))
         assertTrue(HazardConcepts.isSpoken("wheelchair"))
-        assertTrue(HazardConcepts.isSpoken("electric scooter"))
+        assertFalse("trottinette sortie v4", HazardConcepts.isSpoken("electric scooter"))
         assertTrue(HazardConcepts.isSpoken("child"))
         assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("wheelchair"))
         assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("stroller"))

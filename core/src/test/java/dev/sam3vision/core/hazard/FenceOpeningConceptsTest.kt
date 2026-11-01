@@ -3,17 +3,18 @@ package dev.sam3vision.core.hazard
 import dev.sam3vision.core.live.LivePrompts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Clôture suivie : concepts FR/EN reconnus, portail distingué, le reste ignoré. */
+/** Clôture suivie : concepts FR/EN reconnus, portail sorti, le reste ignoré. */
 class FenceOpeningConceptsTest {
 
     @Test
     fun `concepts anglais reconnus`() {
         assertTrue(FenceOpeningConcepts.isFence("fence"))
         assertTrue(FenceOpeningConcepts.isFence("barrier"))
-        assertTrue(FenceOpeningConcepts.isFence("gate"))
+        assertFalse("portail sorti v4", FenceOpeningConcepts.isFence("gate"))
     }
 
     @Test
@@ -21,7 +22,7 @@ class FenceOpeningConceptsTest {
         assertTrue(FenceOpeningConcepts.isFence("Clôture"))
         assertTrue(FenceOpeningConcepts.isFence("grillage"))
         assertTrue(FenceOpeningConcepts.isFence("Barrière"))
-        assertTrue(FenceOpeningConcepts.isFence("PORTAIL"))
+        assertFalse("portail sorti v4", FenceOpeningConcepts.isFence("PORTAIL"))
     }
 
     @Test
@@ -29,14 +30,14 @@ class FenceOpeningConceptsTest {
         assertTrue(FenceOpeningConcepts.isFence("fences"))
         assertTrue(FenceOpeningConcepts.isFence("grillages"))
         assertTrue(FenceOpeningConcepts.isFence("barrières"))
-        assertTrue(FenceOpeningConcepts.isFence("portails"))
+        assertFalse("portail sorti v4", FenceOpeningConcepts.isFence("portails"))
         assertTrue(FenceOpeningConcepts.isFence("clôture grillagée"))
     }
 
     @Test
-    fun `portail distingue du grillage`() {
-        assertTrue(FenceOpeningConcepts.isGate("gate"))
-        assertTrue(FenceOpeningConcepts.isGate("Portails"))
+    fun `portail sorti, plus distingue de rien`() {
+        assertFalse(FenceOpeningConcepts.isGate("gate"))
+        assertFalse(FenceOpeningConcepts.isGate("Portails"))
 
         assertFalse(FenceOpeningConcepts.isGate("fence"))
         assertFalse(FenceOpeningConcepts.isGate("grillage"))
@@ -44,13 +45,13 @@ class FenceOpeningConceptsTest {
     }
 
     @Test
-    fun `hauteurs stenope barriere grillage portail`() {
+    fun `hauteurs stenope barriere grillage, portail sorti`() {
         assertEquals(1.00f, FenceOpeningConcepts.heightMeters("barrier")!!, 0.001f)
         assertEquals(1.50f, FenceOpeningConcepts.heightMeters("fence")!!, 0.001f)
-        assertEquals(1.75f, FenceOpeningConcepts.heightMeters("gate")!!, 0.001f)
         assertEquals(1.00f, FenceOpeningConcepts.heightMeters("Barrière")!!, 0.001f)
         assertEquals(1.50f, FenceOpeningConcepts.heightMeters("grillage")!!, 0.001f)
-        assertEquals(1.75f, FenceOpeningConcepts.heightMeters("portail")!!, 0.001f)
+        assertNull(FenceOpeningConcepts.heightMeters("gate"))
+        assertNull(FenceOpeningConcepts.heightMeters("portail"))
     }
 
     @Test

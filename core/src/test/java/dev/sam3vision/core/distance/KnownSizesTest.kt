@@ -28,10 +28,13 @@ class KnownSizesTest {
 
     @Test
     fun `famille bordure sans hauteur stenope, distance par profondeur`() {
-        listOf("kerb", "step", "steps", "bordure", "rebord", "curb ramp", "bateau").forEach { concept ->
+        listOf("kerb", "step", "steps", "bordure", "rebord").forEach { concept ->
             assertNull(KnownSizes.heightMeters(concept))
             assertTrue(concept in KnownSizes.DEPTH_ONLY)
         }
+        // Bateau sorti v4 : inconnu, ni hauteur ni profondeur documentée.
+        assertNull(KnownSizes.heightMeters("curb ramp"))
+        assertNull(KnownSizes.heightMeters("bateau"))
     }
 
     @Test
@@ -57,17 +60,17 @@ class KnownSizesTest {
     }
 
     @Test
-    fun `les vehicules suivis sont calibres en francais et en anglais`() {
-        assertEquals(1.10f, KnownSizes.heightMeters("bicycle")!!, 0.001f)
-        assertEquals(1.10f, KnownSizes.heightMeters("Vélo")!!, 0.001f)
+    fun `la voiture suivie est calibree, autres vehicules sortis`() {
         assertEquals(1.45f, KnownSizes.heightMeters("car")!!, 0.001f)
         assertEquals(1.45f, KnownSizes.heightMeters("voiture")!!, 0.001f)
-        assertEquals(2.80f, KnownSizes.heightMeters("truck")!!, 0.001f)
-        assertEquals(2.80f, KnownSizes.heightMeters("camion")!!, 0.001f)
-        // Trottinette : 1,15 m depuis le P0 point 7 (guidon haut, 0,9-1,25 m)
-        assertEquals(1.15f, KnownSizes.heightMeters("electric scooter")!!, 0.001f)
-        assertEquals(1.15f, KnownSizes.heightMeters("Trottinette électrique")!!, 0.001f)
-        assertEquals(1.15f, KnownSizes.heightMeters("scooter")!!, 0.001f)
+        // Spec v4 : vélo, camion et trottinette ne sont plus détectés.
+        assertNull(KnownSizes.heightMeters("bicycle"))
+        assertNull(KnownSizes.heightMeters("Vélo"))
+        assertNull(KnownSizes.heightMeters("truck"))
+        assertNull(KnownSizes.heightMeters("camion"))
+        assertNull(KnownSizes.heightMeters("electric scooter"))
+        assertNull(KnownSizes.heightMeters("Trottinette électrique"))
+        assertNull(KnownSizes.heightMeters("scooter"))
     }
 
     @Test
@@ -80,39 +83,45 @@ class KnownSizesTest {
     }
 
     @Test
-    fun `exterieur sept concepts calibres et poteau en profondeur`() {
-        listOf("person", "bollard", "fence", "barrier", "gate", "sign", "tree").forEach { concept ->
+    fun `exterieur concepts calibres et poteau en profondeur`() {
+        listOf("person", "fence", "barrier", "sign").forEach { concept ->
             assertNotNull("concept extérieur non calibré : $concept", KnownSizes.heightMeters(concept))
         }
+        // Spec v4 : borne, portail et arbre ne sont plus détectés.
+        assertNull(KnownSizes.heightMeters("bollard"))
+        assertNull(KnownSizes.heightMeters("gate"))
+        assertNull(KnownSizes.heightMeters("tree"))
         assertNull(KnownSizes.heightMeters("pole"))
         assertTrue("pole" in KnownSizes.DEPTH_ONLY)
     }
 
     @Test
     fun `synonymes exterieur donnent la hauteur du concept`() {
-        assertEquals(0.80f, KnownSizes.heightMeters("bollard")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("Borne")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("plot")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("potelet")!!, 0.001f)
         assertEquals(1.50f, KnownSizes.heightMeters("fence")!!, 0.001f)
         assertEquals(1.50f, KnownSizes.heightMeters("cloture")!!, 0.001f)
         assertEquals(1.50f, KnownSizes.heightMeters("grillage")!!, 0.001f)
-        assertEquals(1.75f, KnownSizes.heightMeters("gate")!!, 0.001f)
-        assertEquals(1.75f, KnownSizes.heightMeters("portail")!!, 0.001f)
         assertEquals(2.20f, KnownSizes.heightMeters("panneau")!!, 0.001f)
-        assertEquals(4.00f, KnownSizes.heightMeters("arbre")!!, 0.001f)
+        // Spec v4 : borne, portail et arbre ne sont plus détectés.
+        assertNull(KnownSizes.heightMeters("bollard"))
+        assertNull(KnownSizes.heightMeters("Borne"))
+        assertNull(KnownSizes.heightMeters("plot"))
+        assertNull(KnownSizes.heightMeters("potelet"))
+        assertNull(KnownSizes.heightMeters("gate"))
+        assertNull(KnownSizes.heightMeters("portail"))
+        assertNull(KnownSizes.heightMeters("arbre"))
     }
 
     @Test
     fun `accents pluriels et expressions exterieur`() {
         assertEquals(1.50f, KnownSizes.heightMeters("Clôtures")!!, 0.001f)
         assertEquals(1.50f, KnownSizes.heightMeters("grillages")!!, 0.001f)
-        assertEquals(1.75f, KnownSizes.heightMeters("Portails")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("bornes")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("potelets")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("plots")!!, 0.001f)
         assertEquals(1.50f, KnownSizes.heightMeters("clôture grillagée")!!, 0.001f)
-        assertEquals(0.80f, KnownSizes.heightMeters("borne anti-stationnement")!!, 0.001f)
+        // Spec v4 : portail et borne ne sont plus détectés, même au pluriel.
+        assertNull(KnownSizes.heightMeters("Portails"))
+        assertNull(KnownSizes.heightMeters("bornes"))
+        assertNull(KnownSizes.heightMeters("potelets"))
+        assertNull(KnownSizes.heightMeters("plots"))
+        assertNull(KnownSizes.heightMeters("borne anti-stationnement"))
     }
 
     @Test
@@ -153,7 +162,7 @@ class KnownSizesTest {
         assertEquals(0.06f, KnownSizes.toleranceFraction("personne"), 0.001f)
         assertEquals(0.05f, KnownSizes.toleranceFraction("homme"), 0.001f)
         assertEquals(0.03f, KnownSizes.toleranceFraction("porte"), 0.001f)
-        assertEquals(0.30f, KnownSizes.toleranceFraction("arbre"), 0.001f)
+        assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction("arbre"), 0.001f)
         assertEquals(0.08f, KnownSizes.toleranceFraction("personne assise"), 0.001f)
         assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction("licorne"), 0.001f)
         assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction(""), 0.001f)
@@ -229,13 +238,13 @@ class KnownSizesTest {
     }
 
     @Test
-    fun `trottinette a 1 15 m, electrique ou non`() {
+    fun `trottinette sortie, sans hauteur`() {
         val labels = listOf(
             "trottinette", "Trottinette électrique", "trottinettes électriques",
             "electric scooter", "scooter", "kick scooter",
         )
         labels.forEach { label ->
-            assertEquals("hauteur $label", 1.15f, KnownSizes.heightMeters(label)!!, 0.001f)
+            assertNull("hauteur $label", KnownSizes.heightMeters(label))
         }
     }
 
@@ -269,8 +278,8 @@ class KnownSizesTest {
         assertEquals(0.25f, KnownSizes.toleranceFraction("stroller"), 0.001f)
         assertEquals(0.25f, KnownSizes.toleranceFraction("wheelchair"), 0.001f)
         assertEquals(0.25f, KnownSizes.toleranceFraction("fauteuil roulant"), 0.001f)
-        assertEquals(0.25f, KnownSizes.toleranceFraction("trottinette"), 0.001f)
-        assertEquals(0.25f, KnownSizes.toleranceFraction("electric scooter"), 0.001f)
+        assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction("trottinette"), 0.001f)
+        assertEquals(KnownSizes.DEFAULT_TOLERANCE, KnownSizes.toleranceFraction("electric scooter"), 0.001f)
         assertEquals(0.30f, KnownSizes.toleranceFraction("chien"), 0.001f)
         assertEquals(0.30f, KnownSizes.toleranceFraction("dogs"), 0.001f)
         // l'adulte garde sa tolérance serrée : la foule n'a pas relâché sa mesure

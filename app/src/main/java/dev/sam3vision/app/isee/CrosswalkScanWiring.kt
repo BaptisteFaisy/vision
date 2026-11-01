@@ -54,16 +54,11 @@ internal fun scanTriggerFor(
 }
 
 /**
- * Mode Traversée coupé : les quatre voix (personnes, véhicules, scan,
- * « traversez » sans feu) ré-annonceront la prochaine scène, et le
- * prochain statut parlera. Une ligne côté sonde (même plafond).
+ * Mode Traversée coupé : l'affichage du scan est oublié (la voix
+ * traversée, elle, parle au bus — verdict, humains, bordures).
  */
 internal fun resetCrossingWatches() {
-    CrossingPeopleWatch.reset()
-    CrossingVehicleWatch.reset()
     CrosswalkScanWatch.reset()
-    NoLightCrossWatch.reset()
-    CrossingLightDueWatch.reset()
 }
 
 /**
