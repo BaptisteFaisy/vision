@@ -42,11 +42,19 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.WARNING, GlassesMessages.streamStopped().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
+        assertEquals(MessageKind.WARNING, GlassesMessages.frameRateFallback(60, 30).kind)
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.waitingForLink().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
+    }
+
+    @Test
+    fun `le repli de cadence annonce le demande et le tenu`() {
+        val text = GlassesMessages.frameRateFallback(60, 30).text
+        assertTrue(text, text.contains("60"))
+        assertTrue(text, text.contains("30"))
     }
 
     @Test

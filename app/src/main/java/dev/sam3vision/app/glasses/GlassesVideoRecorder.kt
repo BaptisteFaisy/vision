@@ -20,8 +20,8 @@ private const val TAG = "GlassesVideo"
 /** Dossier de la galerie où atterrissent les vidéos des lunettes. */
 private const val RELATIVE_DIR = "Movies/iSee"
 
-/** Images gardées le temps que la piste audio se déclare (~10 s à 15 i/s). */
-private const val MAX_PENDING_VIDEO = 150
+/** Images gardées le temps que la piste audio se déclare (4 s à 60 i/s : couvre [AUDIO_WAIT_MS]). */
+private const val MAX_PENDING_VIDEO = 240
 
 /** Paquets AAC gardés le temps que l'image arrive (~12 s de son). */
 private const val MAX_PENDING_AUDIO = 600

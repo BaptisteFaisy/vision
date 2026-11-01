@@ -155,7 +155,7 @@ class GlassesLinkStats(maxSamples: Int = LINK_WINDOW) {
     }
 
     companion object {
-        /** Fenêtre du lien : 100 mesures (~7 s à 15 i/s), pour un p99 significatif. */
-        const val LINK_WINDOW = 100
+        /** Fenêtre du lien : 200 mesures (~7 s à 30 i/s), pour un p99 significatif. */
+        const val LINK_WINDOW = 200
     }
 }

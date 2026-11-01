@@ -23,6 +23,9 @@ import kotlinx.coroutines.launch
 /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
 private const val TAG = "GlassesChain"
 
+/** Un essai de cadence refusé : le refus SDK et sa phrase, pour le verdict final. */
+private data class RateRefusal(val error: DeviceSessionError?, val reason: String)
+
 /** Caméra des lunettes : un flux (image **et** micro), une photo à la demande, aucun état global. */
 internal class GlassesCamera(
     private val session: DeviceSession,
@@ -67,21 +70,19 @@ internal class GlassesCamera(
      * Attache la caméra en descendant le plan audio ([GlassesAudioPlan]) : 16 kHz — le format
      * de la dictée — puis 48 kHz mono, puis caméra seule. Un codec refusé par le flux ne doit
      * ni priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
+     *
+     * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER]) : 60 i/s
+     * refusés ne privent pas l'app de caméra — le repli tenu (30, 24, puis 15)
+     * est annoncé, jamais muet.
      */
     fun start(): Boolean {
         if (camera != null) return true
         var reason = NO_REASON
         var refusal: DeviceSessionError? = null
-        for (choice in GlassesAudioPlan.ladder(audioAllowed)) {
-            val attempt = session.addCamera(configuration(choice))
-            val attached = attempt.getOrNull()
-            if (attached != null) {
-                adopt(attached, choice)
-                return true
-            }
-            refusal = attempt.errorOrNull() ?: refusal
-            reason = attempt.errorOrNull()?.description ?: reason
-            if (!choice.silent) onNote(GlassesMessages.audioRefused(choice.hertz, reason))
+        for (rate in GLASSES_FRAME_RATE_LADDER) {
+            val attempt = attachAtRate(rate) ?: return true
+            refusal = attempt.error ?: refusal
+            reason = attempt.reason
         }
         // Le refus est un `DeviceSessionError` : sa phrase dit quoi faire (autorisation,
         // paire absente, session ailleurs), pas seulement « caméra indisponible ».
@@ -90,8 +91,31 @@ internal class GlassesCamera(
         return false
     }
 
-    /** Flux iSee : qualité haute, 15 i/s, H.265 (réglages commentés dans [glassesStreamConfiguration]). */
-    private fun configuration(choice: AudioChoice) = glassesStreamConfiguration(choice.toCodec())
+    /**
+     * Un essai de cadence : le plan audio complet à [frameRate] fixe. `null` = caméra
+     * attachée et adoptée ; sinon le refus tenu, pour le verdict final de [start].
+     */
+    private fun attachAtRate(frameRate: Int): RateRefusal? {
+        var reason = NO_REASON
+        var refusal: DeviceSessionError? = null
+        for (choice in GlassesAudioPlan.ladder(audioAllowed)) {
+            val attempt = session.addCamera(configuration(choice, frameRate))
+            val attached = attempt.getOrNull()
+            if (attached != null) {
+                adopt(attached, choice, frameRate)
+                return null
+            }
+            refusal = attempt.errorOrNull() ?: refusal
+            reason = attempt.errorOrNull()?.description ?: reason
+            if (!choice.silent) onNote(GlassesMessages.audioRefused(choice.hertz, reason))
+        }
+        Log.i(TAG, "cadence $frameRate i/s refusée ($reason) : essai suivant")
+        return RateRefusal(refusal, reason)
+    }
+
+    /** Flux iSee : qualité haute, cadence [frameRate], H.265 (réglages commentés dans [glassesStreamConfiguration]). */
+    private fun configuration(choice: AudioChoice, frameRate: Int) =
+        glassesStreamConfiguration(choice.toCodec(), frameRate)
 
     /** Format du plan → codec du SDK ; `null` = pas de piste audio demandée. */
     private fun AudioChoice.toCodec(): AudioCodec? {
@@ -106,9 +130,13 @@ internal class GlassesCamera(
     }
 
     /** Le flux est là : micro prêt (si négocié), collecteurs lancés. */
-    private fun adopt(attached: Camera, choice: AudioChoice) {
+    private fun adopt(attached: Camera, choice: AudioChoice, frameRate: Int) {
         camera = attached
         stream = attached.stream
+        // Cadence tenue, annoncée si dégradée : 60 refusés puis 30 tenus ne doivent
+        // pas passer pour 60 — la mesure (`fpsSuffix`, `GlassesLink`) tranche ensuite.
+        Log.i(TAG, "caméra attachée : $frameRate i/s acceptés")
+        if (frameRate < GLASSES_FRAME_RATE) onNote(GlassesMessages.frameRateFallback(GLASSES_FRAME_RATE, frameRate))
         // L'enregistreur sait, avant la première image, s'il doit attendre une piste son.
         recorder?.expectAudio(choice)
         val tap = if (choice.silent) {
