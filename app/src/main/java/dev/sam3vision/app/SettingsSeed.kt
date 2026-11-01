@@ -20,7 +20,6 @@ internal data class BuildDefaults(
     val ttsVoiceId: String = BuildConfig.TTS_VOICE_ID,
     val asrApiKey: String = BuildConfig.ASR_API_KEY,
     val liveLlmApiKey: String = BuildConfig.LIVE_LLM_API_KEY,
-    val googleMapsApiKey: String = BuildConfig.GOOGLE_MAPS_API_KEY,
     val routeBaseUrl: String = BuildConfig.ROUTE_BASE_URL,
 ) {
     companion object {
@@ -43,9 +42,9 @@ fun seededFromBuild(loaded: Settings): Settings = seeded(loaded, BuildDefaults.F
 
 /** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
 internal fun seeded(loaded: Settings, build: BuildDefaults): Settings = seedShareRelay(
-    seedRouteBaseUrl(seedGoogleMaps(withTtsDefaults(
+    seedRouteBaseUrl(withTtsDefaults(
         seedAsr(seedLiveLlm(migrateLegacyVoice(seedVoice(healLlmModel(healLlmEndpoint(withLlmKey(migrateLegacyLlm(healAsrModel(healAsr(healRoute(healSamManual(dropPresetUrl(loaded)), build))), build), build), build), build), build), build), build), build),
-    ), build), build),
+    ), build),
 )
 
 /**
@@ -100,11 +99,6 @@ internal fun defaultShareKey(): String = java.util.UUID.randomUUID().toString().
 /** Identifiant de flux de ce téléphone : 12 hexadécimaux, un par installation. */
 internal fun defaultShareId(): String =
     java.util.UUID.randomUUID().toString().replace("-", "").take(12)
-
-/** L'installation et la mise à jour remplissent la clé de carte tant qu'elle est vide. */
-internal fun seedGoogleMaps(loaded: Settings, build: BuildDefaults): Settings =
-    if (loaded.googleMapsApiKey.isNotBlank() || build.googleMapsApiKey.isBlank()) loaded
-    else loaded.copy(googleMapsApiKey = build.googleMapsApiKey)
 
 /** L'installation et la mise à jour remplissent l'URL Valhalla tant qu'elle est vide. */
 internal fun seedRouteBaseUrl(loaded: Settings, build: BuildDefaults): Settings =

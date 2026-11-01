@@ -10,9 +10,7 @@ import dev.sam3vision.core.live.PositionText
  * du cadran, `null` = inconnue), [edge] le sens du bord (`null` = construction
  * manuelle, lue comme une montée ; [CurbEdge.Uncertain] = zone grise, consigne
  * prudente), [confidence] sa confiance (basse pour un chemin/une route, voir
- * [CurbConcepts.curbConfidence]), [label] son libellé SAM brut (journal),
- * [flatPass] quand un plan trottoir continu (bateau : pas de marche) remplit
- * le couloir sans bord proche.
+ * [CurbConcepts.curbConfidence]), [label] son libellé SAM brut (journal).
  *
  * [tier] dérive toujours de [detected]/[meters] : pas de signal incohérent.
  */
@@ -23,7 +21,6 @@ data class CurbSignal(
     val edge: CurbEdge? = null,
     val confidence: Float = 1f,
     val label: String? = null,
-    val flatPass: Boolean = false,
 ) {
     /** Palier instantané : imminent sous [CurbWatcher.STEP_NEAR_METERS]. */
     val tier: CurbTier
@@ -42,31 +39,20 @@ data class CurbSignal(
          * lissée) : un label [CurbConcepts] (bord, ou chemin/route en bord
          * incertain, confiance basse) dans le couloir ([PositionText.SIDE_EDGE]),
          * bas de boîte en bande basse et distance sous le seuil. Le plus proche
-         * gagne ; sans bord mais avec un plan
-         * continu (bateau), [flatPass]. Boîte illisible ou dimensions nulles =
-         * ignoré, pas d'exception.
+         * gagne. Boîte illisible ou dimensions nulles = ignoré, pas d'exception.
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): CurbSignal {
             if (frameW <= 0 || frameH <= 0) return none()
             var best: Hit? = null
-            var flat: Pair<Float, Float>? = null
             for (reading in readings) {
-                val hit = nearCurb(reading, frameW, frameH)
-                if (hit != null) {
-                    if (best == null || hit.meters < best.meters) best = hit
-                    continue
-                }
-                val pass = flatPass(reading, frameW, frameH) ?: continue
-                if (flat == null || pass.first < flat.first) flat = pass
+                val hit = nearCurb(reading, frameW, frameH) ?: continue
+                if (best == null || hit.meters < best.meters) best = hit
             }
             if (best != null) {
                 return CurbSignal(
                     detected = true, meters = best.meters, centerX = best.centerX,
                     edge = best.edge, confidence = best.confidence, label = best.label,
                 )
-            }
-            if (flat != null) {
-                return CurbSignal(detected = false, meters = flat.first, centerX = flat.second, flatPass = true)
             }
             return none()
         }
@@ -110,7 +96,7 @@ data class CurbSignal(
          * plan commence au-dessus des pieds (bas sous [CurbWatcher.PLANE_BOTTOM_MAX]) ;
          * descente = plan collé aux pieds mais borné en haut (haut au-dessus de
          * [CurbWatcher.PLANE_TOP_MIN]) ; plan plein cadre = le sol sur lequel on
-         * marche (`null`, bateau). Près des seuils (± [CurbWatcher.EDGE_GRAY_BAND]),
+         * marche (`null`, muet). Près des seuils (± [CurbWatcher.EDGE_GRAY_BAND]),
          * zone grise ([CurbEdge.Uncertain]) : la consigne prudente plutôt qu'un
          * sens faux (audit 31/10). Seuils : priors à valider sur captures téléphone.
          */
@@ -122,24 +108,6 @@ data class CurbSignal(
             if (top >= CurbWatcher.PLANE_TOP_MIN + CurbWatcher.EDGE_GRAY_BAND) return CurbEdge.Down
             if (top >= CurbWatcher.PLANE_TOP_MIN - CurbWatcher.EDGE_GRAY_BAND) return CurbEdge.Uncertain
             return null
-        }
-
-        /**
-         * Bateau : même filtre couloir/bande/distance que [nearCurb], mais pour
-         * un plan continu **sans** bord proche (le sol se prolonge : pas de
-         * marche, pas de danger). Distance + centre, `null` sinon.
-         */
-        private fun flatPass(reading: DistanceReading, frameW: Int, frameH: Int): Pair<Float, Float>? {
-            if (!CurbConcepts.isGround(reading.label)) return null
-            val meters = reading.meters.takeIf { it.isFinite() } ?: return null
-            if (meters > CurbWatcher.CURB_METERS) return null
-            val box = reading.box
-            if (box.size < 4) return null
-            val centerX = (box[0] + box[2]) / 2f / frameW
-            if (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE) return null
-            if (box[3] / frameH < CurbWatcher.LOWER_BAND_FRACTION) return null
-            if (edgeKind(box, frameH) != null) return null
-            return meters to centerX
         }
     }
 }

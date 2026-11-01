@@ -8,8 +8,9 @@ import dev.sam3vision.core.distance.KnownSizes
  * `sidewalk` et `curb` sont déjà dans les défauts du direct (dangers
  * extérieurs, ordre user du 28/10) ; les autres formes sont reconnues côté
  * client ([isCurb]) quand le backend les segmente. Le français reste reconnu :
- * « trottoir », « bordure », « rebord » et « bateau » comptent (le serveur
- * renvoie le label saisi, voir `concepts.py`). Les chemins et les routes
+ * « trottoir », « bordure » et « rebord » comptent (le serveur renvoie le
+ * label saisi, voir `concepts.py`). Le bateau (« bateau », « curb ramp »)
+ * n'est plus détecté (spec v4). Les chemins et les routes
  * ([isPathRoad]) y signalent un bord incertain, confiance basse
  * ([curbConfidence]) : seul le guidage obstacles les ignore, comme le plan
  * du trottoir.
@@ -28,11 +29,11 @@ object CurbConcepts {
     private val KEYS = setOf(
         "curb", "kerb", "sidewalk", "pavement", "footpath", "step", "steps",
         "trottoir", "bordure", "rebord", "marche",
-        "curb ramp", "bateau", "ramp", "rampe", "gutter", "caniveau",
+        "ramp", "rampe", "gutter", "caniveau",
     )
 
     /** Plan marchable du trottoir (pas le bord) : le guidage obstacles l'ignore. */
-    private val GROUND = setOf("sidewalk", "pavement", "footpath", "trottoir", "curb ramp", "bateau")
+    private val GROUND = setOf("sidewalk", "pavement", "footpath", "trottoir")
 
     /**
      * Chemins et routes (FR/EN, canoniques : « allée » vaut « allee ») : le

@@ -21,9 +21,8 @@ enum class CurbEdge { Up, Down, Uncertain }
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
  * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
  * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
- * palier 0,5 m (`null` pour la détection, les paliers doux et le bateau —
- * info douce, pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures) et
- * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s).
+ * palier 0,5 m (`null` pour la détection et les paliers doux — info douce,
+ * pas d'alerte).
  */
 data class CurbCue(
     val phrase: String,
@@ -44,9 +43,8 @@ data class CurbCue(
  * 1 / 0,7 / 0,5 m (« Bordure à … » / « Curb at … », sans heure : courts
  * pour s'enchaîner), les marches sensées ([phrase] à 1 m, [stepPhrase]
  * imminente, [safetyStepPhrase] consigne — montée, descente ou sens
- * incertain, reel audit 31/10) et le bateau (« Bateau, pas de marche »,
- * doux, une fois). Liste fermée : le préchauffage hors-ligne sait quels
- * clips générer.
+ * incertain, reel audit 31/10). Liste fermée : le préchauffage hors-ligne
+ * sait quels clips générer.
  */
 object CurbText {
     /** Détection confirmée : « Bordure détectée, à midi. » (`null` = sans heure). */
@@ -117,12 +115,6 @@ object CurbText {
         }
     }
 
-    /** Bateau : « Bateau, pas de marche. » — plan continu, pas de danger, dit une fois. */
-    fun flatPhrase(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Bateau, pas de marche."
-        SpeechLanguage.En -> "Dropped curb, no step."
-    }
-
     /**
      * Consigne immédiate d'un bord détecté : monter ou descendre le rebord
      * (« Attention bordure » si le sens est incertain), dans la langue de la
@@ -160,20 +152,18 @@ object CurbText {
  * silence à la place ; palier survolé entre deux frames = sauté sans
  * rattrapage (jamais de distance périmée) ; signal vraiment perdu (3 trous, voir
  * [GRACE_FRAMES]) = détection et paliers ré-armés. Sans distance, le compte à rebours attend.
- * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence, jamais
- * juste après un palier proche (traversée du bord, pas un bateau).
  *
  * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
- * trottoir ne parle pas d'un bord — le plan sous les pieds (bas collé en bas
- * de l'image, haut vers l'horizon) est un bateau, seuls les plans à bord
- * proche parlent (montée : bas décollé ; descente : haut borné). Seuils
- * priors, à valider sur captures du téléphone : en cas de doute le bord
- * parle (« Attention bordure » en zone grise), jamais l'inverse.
+ * trottoir ne parle pas d'un bord — seuls les plans à bord proche parlent
+ * (montée : bas décollé ; descente : haut borné), le plan sous les pieds
+ * reste muet. Seuils priors, à valider sur captures du téléphone : en cas
+ * de doute le bord parle (« Attention bordure » en zone grise), jamais
+ * l'inverse.
  *
  * Pur JVM et testé. Sécurité : le palier 0,5 m parle en alerte immédiate
  * ([CurbCue.safetyPhrase], voix de sécurité qui coupe tout, dictée du user
- * comprise) — détection, paliers doux et bateau attendent leur tour (pas
- * d'alerte, juste l'info).
+ * comprise) — détection et paliers doux attendent leur tour (pas d'alerte,
+ * juste l'info).
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -194,14 +184,8 @@ class CurbWatcher(
     /** Paliers déjà dits (ou sautés car survolés) de l'approche en cours. */
     private val spokenPaliers = mutableSetOf<Float>()
 
-    /** Bateaux consécutifs en cours (autre chose remet à zéro). */
-    private var flatHits: Int = 0
-
     /** Détection déjà dite pour la présence en cours. */
     private var detectedSpoken: Boolean = false
-
-    /** Bateau déjà dit pour la présence en cours. */
-    private var flatSpoken: Boolean = false
 
     /** Instant du dernier palier proche dit (0,7 / 0,5 m), [NO_INSTANT] si aucun. */
     private var lastNearAtMs: Long = NO_INSTANT
@@ -225,8 +209,6 @@ class CurbWatcher(
     fun onSignal(signal: CurbSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): CurbCue? {
         if (signal.detected) {
             misses = 0
-            flatHits = 0
-            flatSpoken = false
             return onDetected(signal, nowMs, language)
         }
         // Clignotement SAM nominal : 1-2 trous gardent l'approche en cours (voir GRACE_FRAMES).
@@ -239,28 +221,12 @@ class CurbWatcher(
         palierTarget = null
         detectedSpoken = false
         spokenPaliers.clear()
-        if (!signal.flatPass) {
-            flatHits = 0
-            flatSpoken = false
-            return null
-        }
-        // Bord traversé : le plan sous les pieds n'est pas un bateau.
-        if (lastNearAtMs != NO_INSTANT && nowMs - lastNearAtMs < FLAT_AFTER_STEP_SUPPRESS_MS) return null
-        flatHits++
-        if (flatHits < confirmFrames) return null
-        if (flatSpoken) return null
-        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
-        flatSpoken = true
-        lastCueAtMs = nowMs
-        flatHits = 0
-        return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false,
-            level = LEVEL, antiRepeatKey = KEY_CURB)
+        return null
     }
 
     /**
      * Approche en cours : détection en confirmation ([hits]), dite ([detectedSpoken]),
-     * ou paliers en jeu. Seuls les trous d'une approche sont graciés (voir [GRACE_FRAMES]) :
-     * au repos, le traitement historique tourne et le bateau parle comme avant.
+     * ou paliers en jeu. Seuls les trous d'une approche sont graciés (voir [GRACE_FRAMES]).
      */
     private fun hasPendingDetection(): Boolean =
         hits != 0 || palierHits != 0 || palierTarget != null || detectedSpoken || spokenPaliers.isNotEmpty()
@@ -348,9 +314,7 @@ class CurbWatcher(
         palierHits = 0
         palierTarget = null
         spokenPaliers.clear()
-        flatHits = 0
         detectedSpoken = false
-        flatSpoken = false
         lastNearAtMs = NO_INSTANT
         lastCueAtMs = NO_INSTANT
     }
@@ -364,11 +328,11 @@ class CurbWatcher(
 
         /**
          * Tolérance au clignotement SAM : jusqu'à [GRACE_FRAMES] frames consécutives
-         * non-détectées ([CurbSignal.detected] faux, plan bateau compris) ne réarment rien
-         * (comptes, verrous et dernière annonce inchangés) et rendent `null` ; la 3e frame
-         * consécutive sans détection ré-arme comme avant, puis le bateau se traite comme avant.
-         * Sans cette grâce, un seul trou remettait la détection à zéro et la reprise retombait
-         * sur le cooldown : compte à rebours inaccessible pendant toute une approche.
+         * non-détectées ([CurbSignal.detected] faux) ne réarment rien (comptes,
+         * verrous et dernière annonce inchangés) et rendent `null` ; la 3e frame
+         * consécutive sans détection ré-arme comme avant. Sans cette grâce, un
+         * seul trou remettait la détection à zéro et la reprise retombait sur le
+         * cooldown 10 s : compte à rebours inaccessible pendant toute une approche.
          */
         const val GRACE_FRAMES = 2
 
@@ -405,15 +369,6 @@ class CurbWatcher(
 
         /** Palier le plus proche : parlé en alerte immédiate (voix de sécurité). */
         const val SAFETY_PALIER_METERS = 0.5f
-
-        /** Après un palier proche dit, le bateau reste muet (traversée du bord). */
-        const val FLAT_AFTER_STEP_SUPPRESS_MS = 10_000L
-
-        /** Niveau VoiceBus v4 : bordures (< 6 m). */
-        const val LEVEL = 5
-
-        /** Clé AntiRepeat v4 : bordures (2 s). */
-        const val KEY_CURB = "curb"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

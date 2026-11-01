@@ -3,8 +3,8 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.distance.KnownSizes
 
 /**
- * Concept panneau : ce que SAM suit en preset extérieur (`LivePrompts.outdoor`
- * suit « sign ») et que le guidage obstacles doit savoir ignorer quand c'est
+ * Concept panneau : ce que SAM suit quand le backend le segmente (champ
+ * « Follow ») et que le guidage obstacles doit savoir ignorer quand c'est
  * hors de portée de tête.
  *
  * Une rue commerçante, c'est dix enseignes par vitrine : sans filtre, chacune

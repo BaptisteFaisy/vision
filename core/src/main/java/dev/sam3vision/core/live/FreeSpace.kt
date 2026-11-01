@@ -12,8 +12,8 @@ import dev.sam3vision.core.distance.LensSpec
  * rend le décalage à droite impossible. Le chiffre parlé se borne alors à ce
  * que le terrain permet, sans jamais promettre un pas dans le mur.
  *
- * Mesuré sur les **bords vus** (bordures, murs, clôtures, portails : les
- * labels que le modèle segmente comme limite de l'espace marchable), pur et
+ * Mesuré sur les **bords vus** (bordures, murs, clôtures : les labels que
+ * le modèle segmente comme limite de l'espace marchable), pur et
  * testé en JVM. L'inconnu n'est pas le vide : sans bord mesuré d'un côté, on
  * suppose le trottoir par défaut ([DEFAULT_HALF_M]) — la prudence du guidage
  * vient des obstacles, pas d'un bord qu'on n'a pas vu.
@@ -58,14 +58,13 @@ data class FreeSpace(val leftM: Float, val rightM: Float) {
          * reviendrait à s'interdire le trottoir lui-même (même partage que
          * `CurbConcepts.isGround`).
          */
-        private val EDGES = setOf("curb", "wall", "fence", "gate", "hedge", "barrier")
+        private val EDGES = setOf("curb", "wall", "fence", "hedge", "barrier")
 
         /** Trottoir supposé : rien de mesuré, des deux côtés la place par défaut. */
         fun unknown(): FreeSpace = FreeSpace(DEFAULT_HALF_M, DEFAULT_HALF_M)
 
         /**
-         * Estime la place libre depuis les bords vus : bordure, mur, clôture,
-         * portail.
+         * Estime la place libre depuis les bords vus : bordure, mur, clôture.
          *
          * Chaque bord mesuré donne sa distance **latérale** à l'axe (même
          * projection que `LateralNudge.lateralMeters`, [hfovDeg] calibre la
