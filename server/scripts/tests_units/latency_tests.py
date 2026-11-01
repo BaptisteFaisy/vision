@@ -320,3 +320,79 @@ def test_rle_finalize(segmentation) -> None:
           and "mask_scale" not in legacy["objects"][0])
     unknown = segmentation.finalize(entries, (512, 512), 4, "png", mask_format="poly")
     check("finalize knob inconnu: ignoré, pas d'erreur", unknown["mask_encoding"] == "png")
+
+
+def test_breakdown(timing) -> None:
+    """``breakdown_ms`` : vision / DETR / overhead, somme = total, résidu borné."""
+    from test_units import check
+
+    full = timing.build_breakdown({"vision_ms": 234.0, "detr_ms": 85.0}, 326.3)
+    check("breakdown: 3 clés exactes",
+          sorted(full) == ["detr_ms", "overhead_ms", "vision_ms"], str(sorted(full)))
+    check("breakdown: vision et DETR repris",
+          full["vision_ms"] == 234.0 and full["detr_ms"] == 85.0, str(full))
+    check("breakdown: overhead = résidu", full["overhead_ms"] == 7.3, str(full))
+    check("breakdown: somme = total",
+          round(full["vision_ms"] + full["detr_ms"] + full["overhead_ms"], 1) == 326.3,
+          str(full))
+    missing = timing.build_breakdown({}, 100.0)
+    check("breakdown: postes absents → 0, tout en overhead",
+          missing == {"vision_ms": 0.0, "detr_ms": 0.0, "overhead_ms": 100.0},
+          str(missing))
+    dirty = timing.build_breakdown({"vision_ms": "x", "detr_ms": None}, "y")
+    check("breakdown: non numérique → zéros",
+          dirty == {"vision_ms": 0.0, "detr_ms": 0.0, "overhead_ms": 0.0}, str(dirty))
+    over = timing.build_breakdown({"vision_ms": 200.0, "detr_ms": 200.0}, 100.0)
+    check("breakdown: résidu négatif borné à 0", over["overhead_ms"] == 0.0, str(over))
+    rounded = timing.build_breakdown({"vision_ms": 10.04, "detr_ms": 20.06}, 100.0)
+    check("breakdown: une décimale",
+          rounded == {"vision_ms": 10.0, "detr_ms": 20.1, "overhead_ms": 69.9},
+          str(rounded))
+
+
+def test_breakdown_live_wiring(_module) -> None:
+    """``/live`` déployé : ``breakdown_ms`` servi à chaque frame, sans levier."""
+    import sys
+    from types import SimpleNamespace
+
+    from test_units import check
+    from tests_units.weights_tests import _fresh_live_fast
+
+    service = _fresh_live_fast("service")
+    instance = service.Sam3LiveService()
+    instance.ctx = {"vision_accel": "none", "model": SimpleNamespace(
+        config=SimpleNamespace(_attn_implementation="?"))}
+    instance._gpu_lock = None  # la doublure n'infère pas, le verrou est inutilisé
+
+    def fake_frame(_ctx, _image, _concepts, _work, _cap, _batch, **kwargs):
+        kwargs["timers"].update({"vision_ms": 234.0, "detr_ms": 85.0})
+        return {"width": 64, "height": 40, "objects": [],
+                "_edge_applied": 512, "_edge_ok": True}
+
+    saved_frame, saved_guard = service.run_frame, sys.modules.get("feux_guard")
+    sys.modules["feux_guard"] = SimpleNamespace(
+        coherent_work_edge=lambda work, _size: work)
+    service.run_frame = fake_frame
+    timers: dict = {}
+    try:
+        # Départ antidaté : le total (~326 ms) dépasse vision + DETR, l'overhead
+        # est un vrai résidu, pas le plancher 0.
+        result = instance._live_from_image(SimpleNamespace(size=(64, 40)), ["person"],
+                                           12, 512, True, None, "none", None, 0,
+                                           timers, service.now() - 0.3263, False)
+    finally:
+        service.run_frame = saved_frame
+        if saved_guard is None:
+            sys.modules.pop("feux_guard", None)
+        else:
+            sys.modules["feux_guard"] = saved_guard
+    split = result.get("breakdown_ms") or {}
+    check("wiring: breakdown servi avec les postes du pipeline",
+          split.get("vision_ms") == 234.0 and split.get("detr_ms") == 85.0,
+          str(split))
+    check("wiring: overhead = total − vision − DETR",
+          split.get("overhead_ms") == round(timers["total_ms"] - 319.0, 1),
+          f"{split} total={timers.get('total_ms')}")
+    check("wiring: elapsed_ms et fast intacts",
+          isinstance(result.get("elapsed_ms"), int) and "fast" in result,
+          str(sorted(result)))

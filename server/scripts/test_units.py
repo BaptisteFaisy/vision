@@ -371,6 +371,8 @@ RUNNERS = (
     ("latence : dédup alias FR/EN", "segmentation", latency_tests.test_alias_dedup),
     ("latence : détection → objets", "segmentation", live_fast_tests.test_detection_entries),
     ("chronos : postes et Server-Timing", "timing", latency_tests.test_timing),
+    ("chronos : breakdown vision/detr/overhead", "timing", latency_tests.test_breakdown),
+    ("chronos : breakdown servi par /live", "timing", latency_tests.test_breakdown_live_wiring),
     ("chronos : levier FAST_TIMING", "fast_core", live_fast_tests.test_timing_gate),
     ("latence : équivalence du cap par concept", "segmentation", live_fast_tests.test_cap_equivalence),
     ("live_fast : ordre des étages / verrou", "fast_core", live_fast_tests.test_run_frame_order),
