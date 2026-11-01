@@ -18,16 +18,16 @@ object LivePrompts {
      * (« pedestrian traffic light », « pedestrian signal head », « curb »,
      * « sidewalk », « crosswalk ») puis statiques (« pole », « stairs »,
      * « fence », « gate », « wall », ordre user du 31/10 : iSee détecte
-     * les murs) et, en queue, la foule (« stroller », « child »,
-     * « electric scooter », « dog » — audit foule du 01/11 : en foule, iSee
-     * doit voir une poussette, un enfant, une trottinette, un chien).
+     * les murs), puis les clés et les souvenirs du 31/10 (« keys »,
+     * « souvenir shop », « beanie », « socks », boutique du square).
      *
-     * Remplaçants du 01/11 : les souvenirs du 31/10 (« souvenir shop »,
-     * « beanie », « socks », boutique du square) et les clés (« keys », qui
-     * avaient pris le slot de « barrier » le 31/10) cèdent leurs quatre slots
-     * à la foule — le décor de boutique ne barre pas un couloir, une
-     * poussette oui. Modifiables à chaud dans le direct (champ « Follow »),
-     * slot « curb » réservé.
+     * **Ordre user du 01/11 : les souvenirs et les clés restent.** L'audit
+     * foule les avait sortis au profit de « stroller », « child »,
+     * « electric scooter » et « dog » ; Baptiste a demandé de les remettre.
+     * La foule n'est donc plus suivie par le **défaut** mais par [outdoor],
+     * le preset de marche urbaine (pastille « Extérieur »), qui porte les
+     * trois concepts de corps qui manquaient. Modifiables à chaud dans le
+     * direct (champ « Follow »), slot « curb » réservé.
      *
      * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
      * dans les deux modes) : tout ce que la Traversée doit voir (voiture,
@@ -59,8 +59,8 @@ object LivePrompts {
     val default: List<String> = listOf(
         "person", "car", "bus", "bicycle", "pedestrian traffic light",
         "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-        "stairs", "fence", "gate", "wall",
-        "stroller", "child", "electric scooter", "dog",
+        "stairs", "keys", "fence", "gate", "souvenir shop", "beanie", "socks",
+        "wall",
     )
 
     /**
@@ -73,13 +73,17 @@ object LivePrompts {
      * 31/10 : « crosswalk » et « street lamp » en plus, « bollard » et « sign »
      * déjà suivis, non dupliqués), détecté en permanence hors mode traversée
      * pour anticiper les passages protégés. Bascule depuis la pastille
-     * « Extérieur » du direct, sans passer par le champ « Follow ». Tient sous
-     * [MAX] comme [default], qui reste les 18 concepts (pastille « Rue »).
+     * « Extérieur » du direct, sans passer par le champ « Follow ». Les trois
+     * concepts de foule ajoutés le 01/11 (« stroller », « child »,
+     * « electric scooter ») y vivent : la marche urbaine voit la poussette et
+     * l'enfant, le défaut garde la boutique. 18 concepts, au plafond, comme
+     * [default] (pastille « Rue »).
      */
     val outdoor: List<String> = listOf(
         "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
         "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
         "pedestrian traffic light", "pedestrian signal head",
+        "stroller", "child", "electric scooter",
     )
 
     /**
