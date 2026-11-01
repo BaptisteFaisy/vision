@@ -10,13 +10,16 @@ Un poste non mesuré vaut `—` (trait cadratin) : la frame reste comptée, le p
 est ignoré pour ce poste-là. Les K premières frames partent au warmup
 (`--skip`, défaut 5 : réveil GPU, caches froids).
 
-Sortie : n, moyenne, p50, p95, max par poste, puis le verdict
-(`moyenne(latency) <= 300` et `max(latency) <= 500`, modifiables par
-`--mean`/`--max`). Code 0 si tenu, 1 sinon.
+Sortie : n, moyenne, p50, p95, p99, max par poste, puis la gigue
+(écart-type de `latency`), les frames jetées (lignes `latency —`,
+mesures perdues, hors warmup) et le verdict (`moyenne <= 300` et
+`max <= 500` par défaut, modifiables par `--mean`/`--max` ; `--p95`,
+`--p99`, `--jitter`, `--drop` ajoutent des seuils optionnels, inactifs
+quand ils sont absents). Code 0 si tenu, 1 sinon.
 
 Mode `--servers` : même entrée, mais agrège les lignes `server:` (détail des
 étages, `LiveLatencyLog.serverLine` sous le même tag) au lieu du verdict —
-n, moyenne, p50, p95, max par étage (`preprocess`, `vision`, `detr`,
+n, moyenne, p50, p95, p99, max par étage (`preprocess`, `vision`, `detr`,
 `depth`, `masks`, `total`, puis les inconnus triés). Les frames sans ligne
 `server:` (FAST_TIMING éteint) ne comptent dans aucun étage. Code 0 si au
 moins une ligne `server:` est trouvée, 2 sinon. Le défaut reste le verdict.
@@ -44,6 +47,7 @@ N >= 100 frames chaudes) : voir l'en-tête — `~/bin/phone run ... -- adb -s
 
 Usage :
     python3 scripts/parse_isee_lat.py lat.txt
+    python3 scripts/parse_isee_lat.py lat.txt --mean 250 --p95 450 --drop 3
     adb -s <tel> logcat -d -s ISEE_LAT | python3 scripts/parse_isee_lat.py
     python3 scripts/parse_isee_lat.py --servers lat.txt
     python3 scripts/parse_isee_lat.py --capsplit lat.txt
@@ -54,6 +58,7 @@ Bibliothèque standard seule ; aucun réseau, aucun fichier temporaire, aucun ap
 """
 
 import re
+import statistics
 import sys
 
 POSTES = ("latency", "capt", "up", "srv", "rtt", "mask", "pixel")
@@ -98,29 +103,74 @@ def centile(tri, pourcent):
 
 
 def resume(valeurs):
-    """(n, moyenne, p50, p95, max) d'une série non vide."""
+    """(n, moyenne, p50, p95, p99, max) d'une série non vide."""
     tri = sorted(valeurs)
     return (len(tri), sum(tri) / len(tri), centile(tri, 50),
-            centile(tri, 95), tri[-1])
+            centile(tri, 95), centile(tri, 99), tri[-1])
 
 
-def verdict(frames, cible_moyenne=CIBLE_MOYENNE, cible_max=CIBLE_MAX):
-    """(lignes, ok) : tableau par poste + verdict sur `latency`."""
-    lignes = ["poste    n  moyenne   p50   p95   max"]
+def gigue(valeurs):
+    """Gigue d'une série non vide : écart-type population (0,0 si n = 1)."""
+    return statistics.pstdev(valeurs) if len(valeurs) > 1 else 0.0
+
+
+def jetees(texte, skip=WARMUP_DEFAUT):
+    """Frames jetées : lignes `latency` sans mesure (`—`), hors warmup.
+
+    Le warmup mange les `skip` premières lignes `ISEE_LAT: latency`
+    (complètes ou non), comme `parse_texte` mange les `skip` premières
+    frames complètes — GPU froid des deux côtés.
+    """
+    lignes = [l for l in texte.splitlines() if LIGNE.search(l)]
+    utiles = lignes[skip:] if skip > 0 else lignes
+    return sum(1 for l in utiles if parse_ligne(l) is None)
+
+
+def verdict(frames, cible_moyenne=CIBLE_MOYENNE, cible_max=CIBLE_MAX,
+            seuil_p95=None, seuil_p99=None, seuil_gigue=None,
+            seuil_jetees=None, nb_jetees=0):
+    """(lignes, ok) : tableau par poste + verdict sur `latency`.
+
+    Les seuils `None` sont inactifs : sans eux, le verdict reste
+    `moyenne <= --mean` et `max <= --max` (défauts 300 / 500).
+    `nb_jetees` vient de `jetees()` (le dump brut, pas les frames).
+    """
+    lignes = ["poste    n  moyenne   p50   p95   p99   max"]
     ok = True
     for poste in POSTES:
         valeurs = [f[poste] for f in frames if poste in f]
         if not valeurs:
             lignes.append(f"{poste:7} 0  —")
             continue
-        n, moyenne, p50, p95, maxi = resume(valeurs)
-        lignes.append(f"{poste:7} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {maxi:5}")
+        n, moyenne, p50, p95, p99, maxi = resume(valeurs)
+        lignes.append(f"{poste:7} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
         if poste == "latency":
-            ok = moyenne <= cible_moyenne and maxi <= cible_max
-            lignes.append(f"cible : moyenne <= {cible_moyenne}, max <= {cible_max}")
-            lignes.append(f"verdict : {'TENU' if ok else 'NON TENU'} "
-                          f"(moyenne {moyenne:.1f}, max {maxi})")
+            lignes.extend(bloc_verdict(valeurs, moyenne, p95, p99, maxi,
+                                       cible_moyenne, cible_max, seuil_p95,
+                                       seuil_p99, seuil_gigue, seuil_jetees,
+                                       nb_jetees))
+            ok = lignes[-1].startswith("verdict : TENU")
     return lignes, ok
+
+
+def bloc_verdict(valeurs, moyenne, p95, p99, maxi, cible_moyenne, cible_max,
+                 seuil_p95, seuil_p99, seuil_gigue, seuil_jetees, nb_jetees):
+    """Cible, gigue, jetées et verdict final sur la série `latency`."""
+    ecart = gigue(valeurs)
+    controles = [(moyenne <= cible_moyenne, f"moyenne {moyenne:.1f} <= {cible_moyenne}"),
+                 (maxi <= cible_max, f"max {maxi} <= {cible_max}")]
+    optionnels = [(p95, seuil_p95, "p95"), (p99, seuil_p99, "p99"),
+                  (ecart, seuil_gigue, "gigue"), (nb_jetees, seuil_jetees, "jetées")]
+    for valeur, seuil, nom in optionnels:
+        if seuil is not None:
+            affiche = f"{valeur:.1f}" if nom == "gigue" else str(valeur)
+            controles.append((valeur <= seuil, f"{nom} {affiche} <= {seuil}"))
+    tenu = all(passe for passe, _ in controles)
+    return [f"cible : moyenne <= {cible_moyenne}, max <= {cible_max}",
+            f"gigue(latency) {ecart:.1f} ms · jetées {nb_jetees} "
+            f"(lignes `latency —`)",
+            f"verdict : {'TENU' if tenu else 'NON TENU'} "
+            f"({'; '.join(texte for _, texte in controles)})"]
 
 
 def parse_ligne_server(brute):
@@ -142,16 +192,16 @@ def parse_texte_server(texte, skip=WARMUP_DEFAUT):
 
 
 def tableau_serveurs(lignes):
-    """n/moyenne/p50/p95/max par étage (connus, puis inconnus triés)."""
-    table = ["étage        n  moyenne   p50   p95   max"]
+    """n/moyenne/p50/p95/p99/max par étage (connus, puis inconnus triés)."""
+    table = ["étage        n  moyenne   p50   p95   p99   max"]
     autres = sorted({nom for m in lignes for nom in m} - set(ETAGES))
     for nom in ETAGES + tuple(autres):
         valeurs = [m[nom] for m in lignes if nom in m]
         if not valeurs:
             table.append(f"{nom:10}   0  —")
             continue
-        n, moyenne, p50, p95, maxi = resume(valeurs)
-        table.append(f"{nom:10} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {maxi:5}")
+        n, moyenne, p50, p95, p99, maxi = resume(valeurs)
+        table.append(f"{nom:10} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
     return table
 
 
@@ -197,22 +247,22 @@ def ligne_capt(frames, moyenne_somme):
 
 
 def tableau_capsplit(lignes, frames):
-    """n/moyenne/p50/p95/max par poste, la `somme`, puis la comparaison `capt`."""
-    table = ["poste        n  moyenne   p50   p95   max"]
+    """n/moyenne/p50/p95/p99/max par poste, la `somme`, puis la comparaison `capt`."""
+    table = ["poste        n  moyenne   p50   p95   p99   max"]
     for poste in POSTES_CAPSPLIT:
         valeurs = [m[poste] for m in lignes if poste in m]
         if not valeurs:
             table.append(f"{poste:10}   0  —")
             continue
-        n, moyenne, p50, p95, maxi = resume(valeurs)
-        table.append(f"{poste:10} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {maxi:5}")
+        n, moyenne, p50, p95, p99, maxi = resume(valeurs)
+        table.append(f"{poste:10} {n:3} {moyenne:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
     # Somme frame par frame : seules les frames où les quatre postes existent.
     sommes = [m["age"] + m["enc"] + m["b64"] + m["cb"] for m in lignes
               if all(p in m for p in POSTES_CAPSPLIT[:4])]
     moyenne_somme = None
     if sommes:
-        n, moyenne_somme, p50, p95, maxi = resume(sommes)
-        table.append(f"{'somme':10} {n:3} {moyenne_somme:7.1f} {p50:5} {p95:5} {maxi:5}")
+        n, moyenne_somme, p50, p95, p99, maxi = resume(sommes)
+        table.append(f"{'somme':10} {n:3} {moyenne_somme:7.1f} {p50:5} {p95:5} {p99:5} {maxi:5}")
     else:
         table.append(f"{'somme':10}   0  —")
     table.append(ligne_capt(frames, moyenne_somme))
@@ -246,13 +296,43 @@ def selftest_frames():
     bloc = "\n".join(f"I ISEE_LAT: latency {v} · pixel 1" for v in (900, 800, 1, 2, 3, 4, 5))
     assert [f["latency"] for f in parse_texte(bloc, skip=2)] == [1, 2, 3, 4, 5]
     assert parse_texte(bloc, skip=0)[0]["latency"] == 900
-    assert resume([1, 2, 3, 4, 5]) == (5, 3.0, 3, 5, 5)
+    assert resume([1, 2, 3, 4, 5]) == (5, 3.0, 3, 5, 5, 5)
+    assert resume(list(range(1, 101))) == (100, 50.5, 50, 95, 99, 100)
     assert centile([10, 20], 50) == 10 and centile([10, 20], 95) == 20
+    assert centile(list(range(1, 101)), 99) == 99
+    assert gigue([100, 100, 100]) == 0.0 and gigue([42]) == 0.0
+    assert abs(gigue([100, 200]) - 50.0) < 1e-9
+    melange = ("I ISEE_LAT: latency — · capt 1\n"
+               "I ISEE_LAT: latency 12 · pixel 3\n"
+               "I sam3vision: conversion: 5 ms\n")
+    assert jetees(melange, skip=0) == 1
+    assert jetees(melange, skip=1) == 0    # le warmup mange la ligne jetée
+    assert jetees("I ISEE_LAT: latency 12 · pixel 3\n", skip=0) == 0
     tenu, ok = verdict([{"latency": v} for v in (100, 200, 300)], 300, 500)
     rate, ko = verdict([{"latency": v} for v in (100, 600)], 300, 500)
     assert ok and not ko and any("TENU" in l for l in tenu)
     assert any("NON TENU" in l for l in rate)
+    assert any("gigue(latency)" in l and "jetées 0" in l for l in tenu)
+    assert any("gigue(latency) 81,6" in l.replace(".", ",") for l in tenu)
     return len(cas)
+
+
+def selftest_seuils():
+    """Verdict paramétrable : seuils optionnels inactifs à None, décisifs posés."""
+    base = [{"latency": v} for v in (100, 200, 300)]
+    assert verdict(base, 300, 500, seuil_p95=400)[1]
+    assert not verdict(base, 300, 500, seuil_p95=200)[1]
+    assert not verdict(base, 300, 500, seuil_p99=200)[1]
+    assert not verdict(base, 300, 500, seuil_gigue=10.0)[1]
+    assert verdict(base, 300, 500, seuil_jetees=0)[1]
+    assert not verdict(base, 300, 500, seuil_jetees=0, nb_jetees=2)[1]
+    assert verdict(base, 300, 500, seuil_jetees=2, nb_jetees=2)[1]
+    lignes_jetees = verdict(base, 300, 500, seuil_jetees=0, nb_jetees=2)[0]
+    assert any("jetées 2" in l for l in lignes_jetees)
+    # CLI : les nouveaux flags traversent jusqu'au verdict.
+    options, positionnels = extrait_options(["lat.txt", "--p95", "450", "--jitter", "12.5"])
+    assert options["--p95"] == 450 and options["--jitter"] == 12.5
+    assert options["--p99"] is None and positionnels == ["lat.txt"]
 
 
 def selftest_serveurs():
@@ -272,7 +352,7 @@ def selftest_serveurs():
                     "decode", "queue"]
     tableau = tableau_serveurs([{"detr": v} for v in (10, 20, 30, 40, 50)])
     assert [l.split() for l in tableau if l.split()[0] == "detr"] == [
-        ["detr", "5", "30.0", "30", "50", "50"]]
+        ["detr", "5", "30.0", "30", "50", "50", "50"]]
     import contextlib, io
     vide, plein = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(vide), contextlib.redirect_stderr(vide):
@@ -304,7 +384,7 @@ def selftest_capsplit():
         parse_texte_capsplit(cap + "\n", 0),
         parse_texte("I ISEE_LAT: latency 348 · capt 111 · pixel 8\n", skip=0))
     assert [l.split() for l in cap_table if l.split()[0] == "somme"] == [
-        ["somme", "1", "110.0", "110", "110", "110"]]
+        ["somme", "1", "110.0", "110", "110", "110", "110"]]
     assert any("écart -1.0" in l for l in cap_table)
     assert tableau_capsplit([], [])[-1] == "capt non mesuré dans ce dump"
     # L'intervalle : lu, affiché, jamais additionné au `capt`.
@@ -313,9 +393,9 @@ def selftest_capsplit():
                                               "total": 30, "int": 33}
     table_int = tableau_capsplit(parse_texte_capsplit(avec_int + "\n", 0), [])
     assert [l.split() for l in table_int if l.split()[0] == "int"] == [
-        ["int", "1", "33.0", "33", "33", "33"]]
+        ["int", "1", "33.0", "33", "33", "33", "33"]]
     assert [l.split() for l in table_int if l.split()[0] == "somme"] == [
-        ["somme", "1", "110.0", "110", "110", "110"]]   # sans `int`
+        ["somme", "1", "110.0", "110", "110", "110", "110"]]   # sans `int`
     # Un dump d'avant l'intervalle reste lisible : le poste est absent, pas faux.
     assert "int" not in parse_ligne_capsplit(cap)
     import contextlib, io
@@ -328,51 +408,74 @@ def selftest_capsplit():
 
 
 def selftest():
-    """Assertions du parseur : trois blocs indépendants (verdict, serveurs, capsplit)."""
+    """Assertions du parseur : quatre blocs (frames, seuils, serveurs, capsplit)."""
     cas = selftest_frames()
+    selftest_seuils()
     selftest_serveurs()
     selftest_capsplit()
-    print(f"OK   {cas + 36} assertions parse_isee_lat")  # 36 asserts + 4 cas
+    print(f"OK   {cas + 55} assertions parse_isee_lat")  # 55 asserts + 4 cas
     return 0
 
 
+FLAGS_NOMBRES = {"--skip": int, "--mean": int, "--max": int, "--p95": int,
+                 "--p99": int, "--drop": int, "--jitter": float}
+OPTIONS_DEFAUT = {"--skip": WARMUP_DEFAUT, "--mean": CIBLE_MOYENNE, "--max": CIBLE_MAX,
+                  "--p95": None, "--p99": None, "--drop": None, "--jitter": None}
+
+
+def lit_entree(chemin):
+    """Contenu du dump : fichier UTF-8, ou stdin quand aucun chemin n'est donné."""
+    if chemin is None:
+        return sys.stdin.read()
+    with open(chemin, encoding="utf-8") as fichier:
+        return fichier.read()
+
+
+def extrait_options(args):
+    """Consomme les `--flag valeur` numériques ; (options, positionnels restants)."""
+    options = dict(OPTIONS_DEFAUT)
+    positionnels, i = [], 0
+    while i < len(args):
+        if args[i] in FLAGS_NOMBRES:
+            options[args[i]] = FLAGS_NOMBRES[args[i]](args[i + 1])
+            i += 2
+        else:
+            positionnels.append(args[i])
+            i += 1
+    return options, positionnels
+
+
 def main(argv):
-    """CLI : [fichier] [--skip K] [--mean M] [--max X] [--servers|--capsplit] | --selftest."""
+    """CLI : [fichier] [--skip K] [--mean M] [--max X] [--p95 P] [--p99 Q]
+    [--jitter J] [--drop D] [--servers|--capsplit] | --selftest."""
     if "--selftest" in argv:
         return selftest()
-    skip, cible_moyenne, cible_max, chemin = WARMUP_DEFAUT, CIBLE_MOYENNE, CIBLE_MAX, None
-    args = list(argv)
-    mode_serveurs = "--servers" in args
-    mode_capsplit = "--capsplit" in args
-    args = [a for a in args if a not in ("--servers", "--capsplit")]
-    if mode_serveurs and mode_capsplit:
+    args = [a for a in argv if a not in ("--servers", "--capsplit")]
+    if "--servers" in argv and "--capsplit" in argv:
         print("usage : --servers et --capsplit sont exclusifs (un dump, un mode)",
               file=sys.stderr)
         return 2
-    for flag, place in (("--skip", 0), ("--mean", 1), ("--max", 2)):
-        while flag in args:
-            i = args.index(flag)
-            valeur = int(args[i + 1])
-            del args[i:i + 2]
-            (skip, cible_moyenne, cible_max) = (
-                valeur if place == 0 else skip, valeur if place == 1 else cible_moyenne,
-                valeur if place == 2 else cible_max)
-    if args and not args[0].startswith("-"):
-        chemin = args.pop(0)
+    options, args = extrait_options(args)
+    chemin = args.pop(0) if args and not args[0].startswith("-") else None
     if args or (chemin is None and sys.stdin.isatty()):
         print("usage : parse_isee_lat.py [fichier] [--skip K] [--mean M] [--max X]"
-              " [--servers|--capsplit]", file=sys.stderr)
+              " [--p95 P] [--p99 Q] [--jitter J] [--drop D] [--servers|--capsplit]",
+              file=sys.stderr)
         return 2
-    texte = open(chemin, encoding="utf-8").read() if chemin else sys.stdin.read()
-    if mode_serveurs:
+    texte = lit_entree(chemin)
+    skip = options["--skip"]
+    if "--servers" in argv:
         return main_serveurs(texte, skip)
-    if mode_capsplit:
+    if "--capsplit" in argv:
         return main_capsplit(texte, skip)
     frames = parse_texte(texte, skip)
     if not frames:
         print("aucune frame ISEE_LAT complète (GPU froid ? tag filtré ?)", file=sys.stderr)
         return 2
-    lignes, ok = verdict(frames, cible_moyenne, cible_max)
+    lignes, ok = verdict(frames, options["--mean"], options["--max"],
+                         options["--p95"], options["--p99"],
+                         options["--jitter"], options["--drop"],
+                         nb_jetees=jetees(texte, skip))
     print("\n".join(lignes))
     return 0 if ok else 1
 
