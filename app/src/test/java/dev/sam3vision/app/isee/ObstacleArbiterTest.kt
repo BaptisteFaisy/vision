@@ -189,6 +189,23 @@ class ObstacleArbiterTest {
     }
 
     @Test
+    fun `mot imminent personne = clip guide`() {
+        val cue = HazardCue(phrase = "Droite.", meters = 1.5f, urgent = true, kind = HazardKind.PERSON)
+
+        assertEquals("guide_right", imminentWordClipId(cue))
+        assertEquals("guide_left", imminentWordClipId(cue.copy(phrase = "Gauche.")))
+    }
+
+    @Test
+    fun `mot imminent = null hors personne urgente en mot`() {
+        assertNull(imminentWordClipId(null))
+        assertNull(imminentWordClipId(hazard("Attention à la personne, passez à droite.", HazardKind.PERSON)))
+        assertNull(imminentWordClipId(HazardCue("Droite.", 1.5f, urgent = true, kind = HazardKind.BARRIER)))
+        assertNull(imminentWordClipId(HazardCue("Droite.", 1.5f, urgent = true, kind = HazardKind.PERSON, safetyPhrase = "x")))
+        assertNull(imminentWordClipId(HazardCue("Passez à droite.", 1.5f, urgent = true, kind = HazardKind.PERSON)))
+    }
+
+    @Test
     fun `parole securite recente = occupee, ancienne ou absente = libre`() {
         assertTrue(safetyBusy(nowMs = 5_000L, lastSafetyMs = 4_000L))
         assertFalse(safetyBusy(nowMs = 8_000L, lastSafetyMs = 4_000L))

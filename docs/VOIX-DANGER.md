@@ -647,13 +647,15 @@ Nouveau contrat, qui amende les § 16-19 :
   distance du plus proche) ; le « Stop » suit (« Stop, 2 vehicles
   moving. ») ; le singulier est inchangé (`VehicleStateText`,
   `VehicleStateCue.movingCount`) ;
-- **personne + évitement** : « Attention à la personne, à 2 heures,
-  passez à gauche. » / « Attention, person, at 2 o'clock, pass on the
-  left. » — le côté conseillé est l'opposé de la personne (personne à
-  gauche de l'axe = on passe à droite) ; axe pile ou heure inconnue =
-  droite par défaut (prior, à valider rue : on serre à droite) ; doux
-  comme imminent (`HazardText.personPhrase`) ; les autres dangers restent
-  descriptifs ;
+- **personne + évitement** : phrase douce (2-4 m) « Attention à la
+  personne, à 2 heures, passez à gauche. » / « Attention, person, at 2
+  o'clock, pass on the left. » — le côté conseillé est l'opposé de la
+  personne (personne à gauche de l'axe = on passe à droite) ; axe pile
+  ou heure inconnue = droite par défaut (prior, à valider rue : on serre
+  à droite) (`HazardText.personPhrase`, `avoidSide` seule source du
+  côté) ; l'imminente (≤ 2 m) ne dit plus cette phrase : elle dit le mot
+  seul d'évitement en clip (voir § 26, ordre du 01/11) ; les autres
+  dangers restent descriptifs ;
 - **rebord à 0,7 m** : la marche imminente parle à 0,7 m
   (`STEP_NEAR_METERS`), hystérésis 0,7 / 0,9 m (`STEP_REARM_METERS`) ; la
   pré-alerte à 1 m, les phrases (« …, maintenant. » ≈ un pas), le sens
@@ -904,7 +906,7 @@ occupé par la section « Voix obstacles » de la branche, conservée
 ci-dessous telle quelle) ; aucun des deux contrats n'est fusionné ni
 abandonné.*
 
-## 26. Voix obstacles : hiérarchie P1-P5, personne imminente en sécurité (ordre user du 31/10)
+## 26. Voix obstacles : hiérarchie P1-P5, personne imminente en mot seul (ordres user des 31/10 et 01/11)
 
 Le user marche avec l'app : quand SAM confirme plusieurs obstacles en même
 temps, l'ordre de parole n'était pas défini (trois guetteurs indépendants,
@@ -917,19 +919,24 @@ Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
 - **un seul guetteur** (`LiveProbe.observeObstacles`) calcule les trois
   signaux (véhicules, bordure, danger) sur la même frame et parle une
   fois : les alertes de sécurité fusionnent dans l'ordre des rangs
-  (« Bordure à 0,5 mètre. Attention à la personne, passez à droite. »,
-  voix de sécurité,
-  immédiat, sans « Stop »), les phrases douces aussi (voix ElevenLabs,
-  file d'attente au silence) — une alerte confirmée ne se perd plus,
-  elle attend son rang ; le véhicule ne fournit que du doux ici (son
-  stop roulant ne se dit qu'en Traversée, § 22), P1 en tête ;
-- **personne imminente en sécurité** : à 2 m ou moins, « Attention à la
-  personne, passez à droite. » / « Attention, person, pass on the
-  right. » (côté d'évitement gardé, heure abandonnée : à un pas, le côté
-  prime — on garde « Attention à la personne » car « Personne, … » seul
-  s'entendrait comme nobody) — deuxième consigne de sécurité après le
-  rebord (§ 22), qui coupe tout ; l'imminente ne consomme pas le
-  cooldown doux (la barrière suit sans attendre 10 s) ;
+  (voix de sécurité, immédiat, sans « Stop » — le rebord seul : la
+  personne imminente ne passe plus par la voix de sécurité, voir
+  ci-dessous), les phrases douces aussi (voix ElevenLabs, file
+  d'attente au silence) — une alerte confirmée ne se perd plus, elle
+  attend son rang ; le véhicule ne fournit que du doux ici (son stop
+  roulant ne se dit qu'en Traversée, § 22), P1 en tête ;
+- **personne imminente en mot seul** (ordre du 01/11, remplace la
+  consigne de sécurité ci-dessus) : à 2 m ou moins, le mot seul
+  d'évitement « Droite. »/« Gauche. » / « Right. »/« Left. » (côté
+  opposé à la personne, `HazardText.avoidSide` — même côté que la
+  phrase douce), parlé en clip `guide_*` existant (départ < 100 ms,
+  jamais de synthèse réseau ni de voix de sécurité : à un pas, le mot
+  prime sur la phrase) et répété toutes les 300 ms tant que la personne
+  reste imminente (miroir du battement traversée, immédiat au
+  changement de mot) ; le mot contourne le verrou dit-une-fois (doux
+  puis approche = il parle) et ne consomme pas le cooldown doux (la
+  barrière suit sans attendre 10 s) ; la phrase douce 2-4 m
+  (« Attention à la personne, …, passez à … ») est inchangée ;
 - **personne avant barrière** : même frame, la personne parle d'abord
   (signal préféré), la barrière suit en repli dès la personne dite
   (compteurs de confirmation séparés par sorte, cooldown doux partagé) ;
@@ -947,14 +954,18 @@ Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
 Verrouillé par `ObstacleArbiterTest` (10 : ordre des rangs, fusion
 sécurité P2-P3, stop roulant ignoré en normal, doux ordonnés, urgent
 véhicule, barrière après personne, reste en ordre de détection, personne
-imminente, silence, fenêtre), `HazardWatchTest` (+6 : préférence personne,
-repli barrière, compteurs par sorte, consigne personne FR/EN, cooldown
-gardé, sorte divers), `HazardConceptsTest` (+2 : `isBarrier`, `kindOf`),
+imminente, silence, fenêtre ; +2 le 01/11 : clip du mot imminent,
+`null` hors personne urgente en mot), `HazardWatchTest` (+6 : préférence
+personne, repli barrière, compteurs par sorte, consigne personne FR/EN,
+cooldown gardé, sorte divers — mot seul imminent le 01/11 : la consigne
+sécurité devient le mot en clip, + répétition 300 ms et contournement du
+verrou dit-une-fois), `HazardConceptsTest` (+2 : `isBarrier`, `kindOf`),
 `VehicleStateTest` (+1 : flag `moving`) et `ProbeWiringWatchersTest`
 (`p1p2Busy`/`shouldCutForHazard` supprimés, remplacés par l'arbitre).
 
-Recette téléphone : voiture qui roule + marche + personne cadrées ensemble
-→ « Bordure à 0,5 mètre. Attention à la personne, passez à droite. »
+Recette téléphone : voiture qui roule + marche + personne imminente
+cadrées ensemble → « Montez le rebord. » en sécurité, « Droite. » ou
+« Gauche. » en clip immédiat,
 puis « Car moving,
 12 meters away. … » en doux, premier son immédiat, aucun « Stop » —
 **non mesuré**, exige un APK de cette branche sur appareil réel.

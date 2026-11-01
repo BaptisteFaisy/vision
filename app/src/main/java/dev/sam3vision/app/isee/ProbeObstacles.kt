@@ -5,6 +5,7 @@ import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
+import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -84,6 +85,8 @@ internal fun LiveProbe.observeObstacles(
  * Une frame d'obstacles : les trois signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), arbitrés ([decideObstacles])
  * puis parlés — sécurité aussitôt, doux en fille sérialisée, file au silence.
+ * Le mot seul d'une personne imminente est exclu de l'arbitrage et part en
+ * clip ([launchImminentWord], jamais fusionné).
  */
 internal fun obstacleFrame(
     st: LiveProbeState,
@@ -114,11 +117,13 @@ internal fun obstacleFrame(
     }
     val hazardCue = if (st.crossingActive) null
     else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
-    val decision = decideObstacles(vehicleCue, curbCue, hazardCue)
+    val wordClip = imminentWordClipId(hazardCue)
+    val decision = decideObstacles(vehicleCue, curbCue, hazardCue.takeUnless { wordClip != null })
     decision.safety?.let {
         safety.speak(it)
         watchers.lastSafetyMs = nowMs
     }
+    launchImminentWord(scope, voice, playerIdle, softSpeech, lang, hazardCue, wordClip)
     val soft = decision.soft
     val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
     if (soft != null) {
@@ -126,4 +131,23 @@ internal fun obstacleFrame(
     } else if (!st.crossingActive) {
         scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
     }
+}
+
+/**
+ * Mot seul d'une personne imminente : clip `guide_*` parlé en coroutine
+ * fille sérialisée (miroir Traversée : clip immédiat si libre, file sinon)
+ * — rien quand [wordClip] est `null` (chemin fusionné inchangé, défensif).
+ */
+internal fun launchImminentWord(
+    scope: CoroutineScope,
+    voice: ProximityVoice,
+    playerIdle: () -> Boolean,
+    softSpeech: Mutex,
+    lang: SpeechLanguage,
+    hazard: HazardCue?,
+    wordClip: String?,
+) {
+    val word = hazard?.phrase
+    if (wordClip == null || word == null) return
+    scope.launch { softSpeech.withLock { voice.speakWord(wordClip, word, lang, playerIdle(), urgent = false, queue = true) } }
 }

@@ -1,6 +1,7 @@
 package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -103,14 +104,60 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `personne imminente = annonce immediate urgente`() {
+    fun `personne imminente = mot seul immediat, urgent, sans securite`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 1.5f, label = "personne")
 
         val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la personne, passez à droite.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
         assertTrue(cue.urgent)
+        assertEquals(HazardKind.PERSON, cue.kind)
+        assertNull(cue.safetyPhrase)
+    }
+
+    @Test
+    fun `mot imminent = cote oppose a la personne, FR EN`() {
+        val first = HazardWatcher()
+        val second = HazardWatcher()
+        val third = HazardWatcher()
+        val atLeft = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.4f)
+        val atRight = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.8f)
+        val unknown = HazardSignal(detected = true, meters = 1.5f, label = "person")
+
+        assertEquals("Droite.", first.onSignal(atLeft, 1_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Gauche.", second.onSignal(atRight, 1_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Right.", third.onSignal(unknown, 1_000L, SpeechLanguage.En)!!.phrase)
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(null))
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.4f))
+        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.8f))
+    }
+
+    @Test
+    fun `mot imminent repete a 300 ms, immediat au changement`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 1.5f, label = "person")
+
+        assertEquals("Droite.", watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)!!.phrase)
+        assertNull(watcher.onSignal(signal, 1_299L, SpeechLanguage.Fr))
+        assertEquals("Droite.", watcher.onSignal(signal, 1_300L, SpeechLanguage.Fr)!!.phrase)
+        val moved = HazardSignal(detected = true, meters = 1.5f, label = "person", centerX = 0.8f)
+        assertEquals("Gauche.", watcher.onSignal(moved, 1_350L, SpeechLanguage.Fr)!!.phrase)
+    }
+
+    @Test
+    fun `doux puis imminent = le mot parle malgre le verrou`() {
+        val watcher = HazardWatcher()
+        val soft = HazardSignal(detected = true, meters = 3.5f, label = "person")
+
+        watcher.onSignal(soft, 1_000L, SpeechLanguage.Fr)
+        watcher.onSignal(soft, 2_000L, SpeechLanguage.Fr)
+        val imminent = HazardSignal(detected = true, meters = 1.5f, label = "person")
+        val cue = watcher.onSignal(imminent, 3_000L, SpeechLanguage.Fr)
+
+        assertEquals("Droite.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals(HazardKind.PERSON, cue.kind)
     }
 
     @Test
@@ -261,36 +308,12 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `personne imminente = alerte securite avec evitement, FR EN`() {
-        assertEquals(
-            "Attention à la personne, passez à droite.",
-            HazardText.safetyPersonPhrase(SpeechLanguage.Fr, null),
-        )
-        assertEquals(
-            "Attention à la personne, passez à gauche.",
-            HazardText.safetyPersonPhrase(SpeechLanguage.Fr, 0.8f),
-        )
-        assertEquals(
-            "Attention, person, pass on the right.",
-            HazardText.safetyPersonPhrase(SpeechLanguage.En, 0.4f),
-        )
-
-        val watcher = HazardWatcher()
-        val signal = HazardSignal(detected = true, meters = 1.5f, label = "personne", centerX = 0.8f)
-        val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
-
-        assertEquals("Attention à la personne, passez à gauche.", cue!!.safetyPhrase)
-        assertEquals(HazardKind.PERSON, cue.kind)
-        assertTrue(cue.urgent)
-    }
-
-    @Test
     fun `personne imminente ne consomme pas le cooldown doux`() {
         val watcher = HazardWatcher()
         val imminent = HazardSignal(detected = true, meters = 1.5f, label = "person")
         val barrier = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
 
-        watcher.onSignal(imminent, 1_000L, SpeechLanguage.Fr)
+        assertEquals("Droite.", watcher.onSignal(imminent, 1_000L, SpeechLanguage.Fr)!!.phrase)
         assertNull(watcher.onSignal(barrier, 2_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(barrier, 3_000L, SpeechLanguage.Fr)
 
