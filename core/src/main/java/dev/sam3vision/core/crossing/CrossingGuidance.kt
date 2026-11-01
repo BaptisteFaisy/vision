@@ -38,8 +38,8 @@ object CrossingGuidance {
     /** En deçà, la profondeur dit « arrivé » (mètres, profondeur ou sol). */
     const val ARRIVAL_METERS = 1.5f
 
-    /** En deçà, le passage proche se rejoint à la voix, même en Traversée (ordre user 31/10). */
-    const val GUIDE_METERS = 3.0f
+    /** En deçà, le passage se rejoint à la voix, même en Traversée (ordre user du 01/11 : annoncé à 6 m, guidé dès 6 m). */
+    const val GUIDE_METERS = 6.0f
 
     /** Bas de boîte normalisé qui touche le bas du cadre (arrivée). */
     const val BOTTOM_TOUCH_FRACTION = 0.98f
