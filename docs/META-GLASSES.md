@@ -177,15 +177,18 @@ Une relecture de permission qui échoue (lien instable) garde l'état connu au l
 révoquer à tort : un vrai refus se dit à l'attache (`CAPABILITY_DENIED`), pas sur une
 lecture ratée.
 
-## 5. Flux d'images : 15 i/s, photo à la demande
+## 5. Flux d'images : 60 i/s demandés (repli 30/24/15), photo à la demande
 
 - Configuration demandée au SDK : `StreamConfiguration(audioCodec = choice.toCodec(),
   videoQuality = HIGH, frameRate = GLASSES_FRAME_RATE, compressVideo = true)`
-  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 15`.
-  La haute qualité (720×1280) est un choix de piqué, **non validé sur matériel** : si
-  la rue saccade, revenir à `MEDIUM` au même endroit. La cadence réellement reçue et
-  rendue se lit au logcat (`logcat -s GlassesVideo,GlassesChain` : « N images rendues
-  (X i/s) », « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 15
+  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 60`
+  avec échelle `GLASSES_FRAME_RATE_LADDER` (60 → 30 → 24 → 15, repli annoncé).
+  Mesuré 01/11/2026 : 60 acceptés, ~30 i/s émis, ~24.5 i/s rendus à l'écran
+  (plafond CPU, voir `LUNETTES-RECETTE-TEL.md` §7). La haute qualité (720×1280)
+  reste un choix de piqué : si la rue saccade, revenir à `MEDIUM` au même endroit.
+  La cadence réellement reçue et rendue se lit au logcat
+  (`logcat -s GlassesVideo,GlassesChain` : « N images rendues (X i/s) »,
+  « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 30
   = c'est le lien qui ne suit pas.
 - L'audio n'est pas `null` : `grep -n "audioCodec = null" app/src/main` → 0. Le code monte un
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,

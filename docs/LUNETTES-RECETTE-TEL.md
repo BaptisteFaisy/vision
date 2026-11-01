@@ -32,6 +32,10 @@
 Queues à risque : jitter radio, vsync (0–16,7 ms), IDR manquante au démarrage.
 Le handshake (lien 2–30 s, session 0,1–2 s) est one-shot, hors budget.
 
+> Mesuré 01/11/2026 (60 s, n=1123, médianes) : lien ~34 ms, décodage ~3 ms,
+> affichage ~16 ms ; perçu p95 111 ms. Le jitter radio (p95 77 ms) fait à lui
+> seul manquer la cible B2 — voir § 7.
+
 ## 3. Mesure (B) : protocole
 
 1. **B1 — horloges (préalable bloquant).** Logger 150 frames
@@ -118,13 +122,20 @@ nulle (le modèle embarqué ne porte que k1/k2 radiaux).
 
 | id | scénario | attendu | mesuré | verdict |
 | --- | --- | --- | --- | --- |
-| A1 | flux simulé | frame rendue | | |
-| A2 | HIGH 720×1280 | rue nette, live=true | WxH = | |
-| A3 | recadrage | pas de déformation | | |
-| B1 | horloges | offset stable, drift < 1 ms/min | | |
-| B2 | e2e p95 60 s | < 100 ms | p50/p95/p99 = | |
-| B3 | budget | étages reportés § 2 | | |
-| C | envoi GPU | −500 ms vs master (poll supprimé) | t_envoi = | |
+| A1 | flux simulé | frame rendue | non rejoué (flux réel mesuré) | — |
+| A2 | HIGH 720×1280 | rue nette, live=true | WxH = 720×1280, 60 demandés acceptés, pompe ~30 i/s, rendu ~24.5 i/s (01/11/2026) | TENU (24 suffisant, user) |
+| A3 | recadrage | pas de déformation | capture 01/11 20:13 : rue nette, textes écran lisibles, pas d'étirement | TENU |
+| B1 | horloges | offset stable, drift < 1 ms/min | offset min-filtre actif (lien mesuré), drift non chiffré | — |
+| B2 | e2e p95 60 s | < 100 ms | p50/p95/p99 = 57/111/158 ms (n=1123, 01/11/2026) | NON TENU (jitter radio p95 77 ms) |
+| B3 | budget | étages reportés § 2 | lien ~34, décodage ~3, affichage ~16 ms (médianes, voir § 2) | TENU |
+| C | envoi GPU | −500 ms vs master (poll supprimé) | non rejoué (collectFrames=false pendant A/B) | — |
+
+Campagne du 01/11/2026 : master `0ed00788`, Redmi `2c6852ac`, Ray-Ban Meta
+01TK (30–34 %, portée), Meta AI v296, HIGH 720×1280 H.265. Lignes de preuve :
+`caméra attachée : 60 i/s acceptés` (pas de repli), `flux lunettes : … (29.9
+i/s)`, `direct lunettes : … images rendues (24.5 i/s)` ; verdict
+`scripts/parse_glasses_link.py --skip 5` (exit 1). Le rendu plafonne à ~24.5
+i/s, plafond CPU (app à ~300 % avec la sonde SAM téléphone en parallèle).
 
 `collectFrames` reste à `false` par défaut pendant A/B (pas de GPU) ; le passer à
 `true` uniquement pour C, sur une session courte, derrière la carte existante.

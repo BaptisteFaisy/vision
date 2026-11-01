@@ -184,6 +184,8 @@ plus lents que le lien.
 > avec échelle de repli 60 → 30 → 24 → 15 (`GLASSES_FRAME_RATE_LADDER`), repli annoncé
 > (`GlassesMessages.frameRateFallback`), cadence tenue mesurée (`LUNETTES-RECETTE-TEL` §3).
 > 60 n'est pas dans les cadences citées par la doc Meta : c'est un essai, le repli fait foi.
+> Mesuré 01/11/2026 : 60 acceptés sans repli, ~30 i/s émis, ~24.5 i/s rendus
+> (plafond CPU), B2 p95 111 ms — voir `LUNETTES-RECETTE-TEL.md` §7.
 
 ## 8. Matériel
 
