@@ -107,7 +107,7 @@ function renderFrame(status) {
     noteEl.hidden = true;
     frameEl.hidden = false;
     viewEl.classList.remove('empty');
-    frameEl.alt = 'Ce que voit ton proche, en direct';
+    frameEl.alt = 'What your loved one sees, live';
     return;
   }
   const view = frameOf(live, status, Date.now(), cameraOff);
@@ -128,7 +128,7 @@ function renderFrame(status) {
     // Pas de texte d'attente : sans image, la section se replie. Seuls un lien
     // absent et un lien mort s'écrivent dans la zone caméra (plus de phrase).
     if (!shareId || status === 'unknown') {
-      noteEl.textContent = !shareId ? 'Ouvre le lien de suivi partagé par ton proche.' : NO_STREAM_TEXT;
+      noteEl.textContent = !shareId ? 'Open the tracking link shared by your loved one.' : NO_STREAM_TEXT;
       noteEl.hidden = false;
       viewEl.classList.remove('empty');
     } else {
@@ -139,7 +139,7 @@ function renderFrame(status) {
   noteEl.hidden = true;
   frameEl.hidden = false;
   viewEl.classList.remove('empty');
-  frameEl.alt = 'Ce que voit ton proche, en direct';
+  frameEl.alt = 'What your loved one sees, live';
   // Une data URL identique n'est pas réassignée : l'image ne clignote pas à chaque poll.
   if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; shownAt = Date.now(); showingDirect = false; }
 }
@@ -169,7 +169,7 @@ function paintStream() {
       noteEl.hidden = true;
       frameEl.hidden = false;
       viewEl.classList.remove('empty');
-      frameEl.alt = 'Ce que voit ton proche, en direct';
+      frameEl.alt = 'What your loved one sees, live';
       frameSrc = src;
       frameEl.src = src;
       shownAt = Date.now();
@@ -211,7 +211,7 @@ function renderTrip(status) {
   tripEl.hidden = !trip;
   if (!trip) return;
   tripEl.classList.toggle('stale', status !== 'live');
-  tripDest.textContent = 'Vers ' + trip.destination;
+  tripDest.textContent = 'To ' + trip.destination;
   tripRest.textContent = tripRemaining(trip);
   const percent = tripPercent(trip);
   tripLiquid.style.width = percent + '%';

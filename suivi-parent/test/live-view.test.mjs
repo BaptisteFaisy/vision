@@ -48,7 +48,7 @@ test('la barre suit le trajet guidé, du départ à l’arrivée', () => {
   const current = tripOf({ trip }, 'live');
   assert.deepEqual(current, trip);
   assert.equal(tripPercent(current), 75);
-  assert.equal(tripRemaining(current), 'Encore 300 m · 4 min');
+  assert.equal(tripRemaining(current), '300 m to go · 4 min');
 });
 
 test('la barre disparaît hors guidage, à la coupure, et ne dépasse jamais ses bornes', () => {
@@ -83,9 +83,9 @@ test('gel du direct : sans vue on gèle, avec photo lente seulement si le direct
 });
 
 test('le reste du trajet se dit en mètres, kilomètres et heures', () => {
-  assert.equal(tripRemaining({ remainingM: 0, remainingS: 20 }), "Encore 0 m · moins d'une minute");
-  assert.equal(tripRemaining({ remainingM: 0, remainingS: 90 }), 'Encore 0 m · 2 min');
-  assert.equal(tripRemaining({ remainingM: 2450, remainingS: 0 }), 'Encore 2,5 km');
-  assert.equal(tripRemaining({ remainingM: 9000, remainingS: 3_600 }), 'Encore 9 km · 1 h 00');
+  assert.equal(tripRemaining({ remainingM: 0, remainingS: 20 }), '0 m to go · under a minute');
+  assert.equal(tripRemaining({ remainingM: 0, remainingS: 90 }), '0 m to go · 2 min');
+  assert.equal(tripRemaining({ remainingM: 2450, remainingS: 0 }), '2.5 km to go');
+  assert.equal(tripRemaining({ remainingM: 9000, remainingS: 3_600 }), '9 km to go · 1h 00');
   assert.equal(tripRemaining({}), '');
 });

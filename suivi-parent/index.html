@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,37 +11,37 @@
 <body>
   <div class="app">
     <header>
-      <button id="settings-button" type="button" aria-label="Paramètres">
+      <button id="settings-button" type="button" aria-label="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.7 2.1-2 .9-2-.5-2 3.5 1.5 1.6v2.8L2.8 15l2 3.5 2-.5 2 .9.7 2.1h5l.7-2.1 2-.9 2 .5 2-3.5-1.5-1.6v-2.8L21.2 9l-2-3.5-2 .5-2-.9-.7-2.1z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <span class="pill grey" id="live-badge" role="status">OFFLINE</span>
     </header>
     <main>
-      <section class="scene" aria-label="Boule iSee">
+      <section class="scene" aria-label="iSee orb">
         <div class="orb-frame" aria-hidden="true"><canvas id="orb"></canvas></div>
       </section>
-      <section id="pictos" aria-label="Objets reconnus" hidden>
+      <section id="pictos" aria-label="Recognized objects" hidden>
         <div id="picto-strip" role="list"></div>
       </section>
-      <section id="trip" aria-label="Trajet en cours" hidden>
+      <section id="trip" aria-label="Current trip" hidden>
         <p class="trip-head"><span id="trip-dest"></span><span id="trip-rest"></span></p>
-        <div id="trip-track" class="trip-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Avancement du trajet">
+        <div id="trip-track" class="trip-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Trip progress">
           <div id="trip-liquid" class="trip-liquid"></div>
           <div id="trip-ball" class="trip-ball" aria-hidden="true"></div>
         </div>
-        <p class="trip-ends"><span>Départ</span><span>Arrivée</span></p>
+        <p class="trip-ends"><span>Start</span><span>Destination</span></p>
       </section>
-      <section id="view" aria-label="Ce que voit ton proche">
-        <img id="view-frame" alt="Dernière image vue par ton proche" decoding="async" fetchpriority="high" hidden>
+      <section id="view" aria-label="What your loved one sees">
+        <img id="view-frame" alt="Last image seen by your loved one" decoding="async" fetchpriority="high" hidden>
         <p id="view-note" role="status" hidden></p>
       </section>
     </main>
   </div>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
-    <div class="settings-heading"><h1 id="settings-title">Paramètres</h1><button id="close-settings" type="button" aria-label="Fermer les paramètres">×</button></div>
+    <div class="settings-heading"><h1 id="settings-title">Settings</h1><button id="close-settings" type="button" aria-label="Close settings">×</button></div>
     <form id="shared-link-form">
-      <label for="shared-link">Lien reçu de ton proche</label>
-      <div class="input-row"><input id="shared-link" type="url" required autocomplete="off" placeholder="Colle le lien partagé"><button type="submit">Suivre</button></div>
+      <label for="shared-link">Link from your loved one</label>
+      <div class="input-row"><input id="shared-link" type="url" required autocomplete="off" placeholder="Paste the shared link"><button type="submit">Track</button></div>
     </form>
   </dialog>
 </body>

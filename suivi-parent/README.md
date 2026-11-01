@@ -65,7 +65,7 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   pleine largeur jusqu'au bord bas, sans cadre ni contour, fondue dans le
   blanc vers le haut. Hors de là, aucun cadre, aucune image ni texte : la
   section se replie et l'image la rouvre dès que la caméra tourne. Seuls un
-  lien absent (« Ouvre le lien de suivi partagé par ton proche. ») et un lien
+  lien absent (« Open the tracking link shared by your loved one. ») et un lien
   mort (`NO_STREAM_TEXT`) s'écrivent dans la zone caméra. L'avis caméra de la
   salle (`{"type":"camera","on":false}`) efface l'image aussitôt, direct comme
   photo lente, sans attendre les 8 s.
@@ -82,7 +82,7 @@ ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
   de moins de 8 s, comme l'image. Sans détection, pas de bandeau.
 - Trajet : pendant un guidage iSee, une barre du départ à l'arrivée. Le liquide
   (dégradé bleu → vert de la boule) et la bille avancent à `progress` ; le reste
-  s'écrit « Encore 300 m · 4 min ». La barre disparaît dès que le guidage
+  s'écrit « 300 m to go · 4 min ». La barre disparaît dès que le guidage
   s'arrête et se fige (atténuée) quand le flux n'est plus LIVE.
 - LIVE avant 12 s ; SIGNAL LOST jusqu'à 2 min (objets et position figés en gris) ;
   OFFLINE ensuite (aucun repère). Aucune simulation en production.

@@ -86,19 +86,19 @@ export function tripPercent(trip) {
   return Math.max(0, Math.min(100, progress * 100));
 }
 
-/** « Encore 300 m · 4 min » : même français que l'écran de guidage. */
+/** « 300 m to go · 4 min » : libellé anglais de la page aidant. */
 export function tripRemaining(trip) {
   const meters = Number(trip && trip.remainingM);
   if (!Number.isFinite(meters) || meters < 0) return '';
   const distance = meters < 1000
     ? Math.round(meters) + ' m'
-    : (Math.round(meters / 100) / 10).toFixed(1).replace('.', ',').replace(',0', '') + ' km';
+    : (Math.round(meters / 100) / 10).toFixed(1).replace(/\.0$/, '') + ' km';
   const seconds = Number(trip && trip.remainingS);
-  if (!Number.isFinite(seconds) || seconds <= 0) return 'Encore ' + distance;
+  if (!Number.isFinite(seconds) || seconds <= 0) return distance + ' to go';
   // Même arrondi que `formatDurationFr` (core) : minutes tronquées, demi-minute offerte.
   const minutes = Math.floor((seconds + 30) / 60);
-  const duration = seconds < 60 ? "moins d'une minute"
+  const duration = seconds < 60 ? 'under a minute'
     : minutes < 60 ? minutes + ' min'
-      : Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2, '0');
-  return 'Encore ' + distance + ' · ' + duration;
+      : Math.floor(minutes / 60) + 'h ' + String(minutes % 60).padStart(2, '0');
+  return distance + ' to go · ' + duration;
 }

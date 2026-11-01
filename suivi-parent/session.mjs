@@ -32,7 +32,7 @@ export function neverPublished(snapshot) {
 
 /** Message d'un lien qui ne désigne aucun flux : actionnable, jamais « en attente ». */
 export const NO_STREAM_TEXT =
-  'Aucun suivi pour ce lien : il a peut-être changé (app réinstallée). Ouvre iSee sur le téléphone de ton proche, puis redemande le lien.';
+  "No tracking for this link: it may have changed (app reinstalled). Open iSee on your loved one's phone, then ask for the link again.";
 
 /** Ne pas transformer le bruit GPS, une consigne ou un saut de position en geste accompli. */
 export function movementBetween(before, after) {
@@ -45,12 +45,12 @@ export function movementBetween(before, after) {
   const accuracy = before.accM + after.accM;
   if (distance <= Math.max(3, accuracy) || distance / (elapsed / 1000) > 3) return '';
   const meters = Math.round(distance);
-  if (!Number.isFinite(before.headingDeg)) return `S’est déplacé d’environ ${meters} m.`;
+  if (!Number.isFinite(before.headingDeg)) return `Moved about ${meters} m.`;
   const bearing = Math.atan2(east, north) / RAD;
   const relative = ((bearing - before.headingDeg + 540) % 360) - 180;
-  if (Math.abs(relative) < 45) return `A avancé d’environ ${meters} m.`;
-  if (Math.abs(relative) > 135) return `A reculé d’environ ${meters} m.`;
-  return `S’est décalé vers la ${relative > 0 ? 'droite' : 'gauche'} d’environ ${meters} m.`;
+  if (Math.abs(relative) < 45) return `Moved forward about ${meters} m.`;
+  if (Math.abs(relative) > 135) return `Moved back about ${meters} m.`;
+  return `Shifted to the ${relative > 0 ? 'right' : 'left'} by about ${meters} m.`;
 }
 
 /**
@@ -66,15 +66,15 @@ export function anchorAfter(anchor, movement, fix) {
 
 export function obstacleText(objects) {
   const nearest = [...(objects || [])].sort((a, b) => a.distM - b.distM).slice(0, 2);
-  if (!nearest.length) return 'Aucune détection partagée pour le moment.';
-  return nearest.map(o => `${o.label} à ${o.distM.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} m`).join(' ; ') + '.';
+  if (!nearest.length) return 'No shared detections yet.';
+  return nearest.map(o => `${o.label} at ${o.distM.toLocaleString('en-US', { maximumFractionDigits: 1 })} m`).join('; ') + '.';
 }
 
 export function narrationOf(live, status, movement = '', hasLink = true, known = true) {
-  if (!hasLink) return 'Ouvre le lien de suivi partagé par ton proche.';
+  if (!hasLink) return 'Open the tracking link shared by your loved one.';
   if (!known) return NO_STREAM_TEXT;
-  if (status === 'lost') return 'Signal perdu. La dernière position et les objets restent figés.';
-  if (status === 'offline') return 'En attente du téléphone de ton proche.';
+  if (status === 'lost') return 'Signal lost. The last position and objects stay frozen.';
+  if (status === 'offline') return "Waiting for your loved one's phone.";
   const text = live.scene?.text?.trim() || obstacleText(live.objects);
   return [text, movement].filter(Boolean).join(' ');
 }

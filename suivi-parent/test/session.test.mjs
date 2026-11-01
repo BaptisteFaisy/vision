@@ -21,9 +21,9 @@ test('le flux se périme par paliers même si le dernier paquet reste en mémoir
 });
 
 test('un déplacement mesuré distingue avance et décalage', () => {
-  assert.match(movementBetween(fix, { ...fix, lat: fix.lat + 10 / 111320, atMs: 11_000 }), /A avancé.*10 m/);
+  assert.match(movementBetween(fix, { ...fix, lat: fix.lat + 10 / 111320, atMs: 11_000 }), /Moved forward.*10 m/);
   const east = fix.lon + 10 / (111320 * Math.cos(fix.lat * Math.PI / 180));
-  assert.match(movementBetween(fix, { ...fix, lon: east, atMs: 11_000 }), /droite.*10 m/);
+  assert.match(movementBetween(fix, { ...fix, lon: east, atMs: 11_000 }), /right.*10 m/);
 });
 
 test('le bruit GPS, les sauts et la reconnexion ne deviennent pas des gestes inventés', () => {
@@ -44,15 +44,15 @@ test('sans position, la référence de déplacement s’efface au lieu d’inven
   assert.equal(anchorAfter(fix, '', vieux), vieux);
   // Un mouvement mesuré déplace l’ancre sur le fix courant.
   const mesure = { ...fix, atMs: fix.atMs + 1_000 };
-  assert.equal(anchorAfter(fix, 'A avancé.', mesure), mesure);
+  assert.equal(anchorAfter(fix, 'Moved forward.', mesure), mesure);
 });
 
 test('le texte vient du téléphone partagé et les états déconnectés arrêtent son annonce', () => {
   const live = { scene: { text: 'Porte à droite.' }, objects: [] };
-  assert.equal(narrationOf(live, 'live', 'A avancé.'), 'Porte à droite. A avancé.');
-  assert.match(narrationOf(live, 'lost'), /Signal perdu/);
-  assert.match(narrationOf(live, 'offline'), /En attente/);
-  assert.match(narrationOf(live, 'live', '', false), /lien de suivi/);
+  assert.equal(narrationOf(live, 'live', 'Moved forward.'), 'Porte à droite. Moved forward.');
+  assert.match(narrationOf(live, 'lost'), /Signal lost/);
+  assert.match(narrationOf(live, 'offline'), /Waiting for/);
+  assert.match(narrationOf(live, 'live', '', false), /tracking link/);
 });
 
 test('l’éclairage mot à mot suit la cadence Portrait, puis termine la phrase', () => {
@@ -69,6 +69,6 @@ test('un lien qui ne désigne aucun flux se dit, au lieu d’attendre à vie', (
   assert.equal(neverPublished({ ok: true, live: true, serverAt: 1000 }), false);
   assert.equal(neverPublished(null), false);
   assert.equal(narrationOf(null, 'offline', '', true, false), NO_STREAM_TEXT);
-  assert.match(NO_STREAM_TEXT, /réinstallée/);
-  assert.match(narrationOf(null, 'offline', '', false, false), /lien de suivi/);
+  assert.match(NO_STREAM_TEXT, /reinstalled/);
+  assert.match(narrationOf(null, 'offline', '', false, false), /tracking link/);
 });
