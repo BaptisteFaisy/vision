@@ -36,6 +36,18 @@ internal object ProbeBackgroundMotion {
     var lastGyro: GyroMotion? = null
         private set
 
+    /**
+     * Grille luma courante (0 = inconnue) : dimensions du plan [GyroMotion] pour le câblage
+     * (focale luma + normalisation gyro) quand [lastMotion] est nul (fond muet).
+     */
+    @Volatile
+    var lastLumaW: Int = 0
+        private set
+
+    @Volatile
+    var lastLumaH: Int = 0
+        private set
+
     /** Fenêtre glissante des écarts boîte-fond (px) : le panneau debug y lit moy/p95. */
     private val gaps = MotionGapStats()
 
@@ -128,6 +140,10 @@ internal object ProbeBackgroundMotion {
             val previous = prev
             val dtMs = job.atMs - prevAtMs
             prev = cur
+            if (cur != null) {
+                lastLumaW = cur.width
+                lastLumaH = cur.height
+            }
             prevAtMs = job.atMs
             Pair(previous, dtMs)
         }
@@ -155,6 +171,8 @@ internal object ProbeBackgroundMotion {
             prev = null
             lastMotion = null
             lastGyro = null
+            lastLumaW = 0
+            lastLumaH = 0
             lastDebug = null
             epoch += 1
         }
