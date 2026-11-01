@@ -27,9 +27,9 @@ import kotlinx.coroutines.sync.Semaphore
  *
  * Historique (backend précédent, A100 eu-west, relevé user hors de cet arbre) : 1 frame
  * en vol = 150 ms d'aller-retour, 8 en vol = 300 ms pour 5,9 ips. Le multi-frames coûtait
- * +150 ms et rendait 8× le débit. Le serveur actuel sérialise ses inférences
- * (`max_containers=1` + verrou GPU) : au-delà d'une frame en vol, on ne gagne plus de
- * débit, on ne fabrique que de la latence — d'où le régulateur de [Cadence.Fast].
+ * +150 ms et rendait 8× le débit. Mesures 01/11 (campagne Samsung, Wi-Fi) : serveur 83 ms
+ * pour un rtt de 173 ms — le second créneau remplit l'attente réseau, au-delà le GPU
+ * (`max_containers=1` + verrou GPU) sérialise — d'où le régulateur de [Cadence.Fast].
  */
 class LivePipeline(
     private val client: LiveClient,

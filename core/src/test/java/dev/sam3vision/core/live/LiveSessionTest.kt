@@ -196,6 +196,15 @@ class LiveSessionTest {
     }
 
     @Test
+    fun `la cadence rapide garde deux creneaux a 185 ms (campagne 01-11, budget 210)`() {
+        val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
+        assertEquals(210L, Cadence.Fast.latencyBudgetMs)
+        (1..3).forEach { _ -> session.stats.record(185L) }
+        session.regulate()
+        assertEquals("rtt 185 ms < budget : on pipeline", 2, session.slots)
+    }
+
+    @Test
     fun `le regulateur ne rouvre que sous la moitie du budget`() {
         val session = LiveSession(FakeLiveClient(), cadence = twoSlots())
         (1..3).forEach { _ -> session.stats.record(344L) }
