@@ -192,8 +192,11 @@ def test_deploy_script(_module) -> None:
                   "FAST_EDGE=512", "FAST_SNAPSHOT=1", "FAST_MODEL_DIR=/opt/models/sam3.1",
                   "FAST_ATTN=sdpa"):
         check(f"déploiement : {lever} présent", lever in script, "absent du script")
-    check("déploiement : FAST_DETR_GRAPH éteint (rollback crash replay)",
-          "FAST_DETR_GRAPH=1" not in script, "levier réactivé sans diagnostic")
+    check("déploiement : FAST_DETR_GRAPH=1 présent (diag 3060 Ti 01/11, PR #764)",
+          "FAST_DETR_GRAPH=1" in script, "absent du script")
+    check("déploiement : FAST_DETR_GRAPH justifié (diagnostic carte dédiée)",
+          "3060 Ti" in script and "PR #764" in script,
+          "justification du diagnostic absente du script")
     # GPU et nom d'app passent par des variables (`${FAST_GPU:-...}`) : on fige
     # l'intention (variable + valeur déployée), pas une affectation littérale.
     check("déploiement : GPU A100-40GB par défaut",
