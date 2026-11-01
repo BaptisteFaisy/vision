@@ -2,9 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.SystemTtsEngine
-import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Voix de sécurité d'iSee : TOUTE urgence parle ici (bordure, stop, danger
@@ -50,16 +48,6 @@ class SafetyVoice(
         stopCurrent()
         val current = settings()
         system.speak(phrase, true, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed, SystemTtsEngine.SAFETY_PITCH)
-    }
-
-    /**
-     * Stop d'urgence injecté par le modèle d'urgence externe (ordre user du
-     * 29/10, contrat `docs/URGENCE-EXTERNE.md`) : « Stop. » dit aussitôt par
-     * la voix de sécurité (système grave, hors-ligne), coupe tout (chat
-     * compris). Un « Stop. » déjà dit ne se répète pas (dédup côté appelant).
-     */
-    fun reportEmergency(language: SpeechLanguage) {
-        speak(GuidanceWord.Stop.text(language))
     }
 
     /** Libération finale (moteur TTS système). */

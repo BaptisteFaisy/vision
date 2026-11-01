@@ -86,9 +86,6 @@ class IseeVoiceNav(
     }
     private val driver: VoiceNavEngineDriver by driverLazy
 
-    /** Porte de la voix ambiante (annonces, voix du sol) : GPS désactivé = fermée. */
-    val voiceGate = IseeVoiceGate()
-
     /** Session de navigation (entrée vocale, confirmation, guidage). */
     val session: VoiceNavSession by lazy {
         val loader = ValhallaRouteLoader(
@@ -105,13 +102,12 @@ class IseeVoiceNav(
             extraParsers = listOf(VoiceDestinationParser::parseExtra),
             engineStart = { destination, _ -> driver.start(destination) },
             onSessionIdle = { driver.stop() },
-            // Ordres « désactive / active le GPS » : la porte de voix suit.
+            // Ordres « désactive / active le GPS » : seul le réglage persiste
+            // (SPEC v4 : la porte de voix ambiante est supprimée).
             onGpsDisabled = {
-                voiceGate.muteGps()
                 setGuidance(false)
             },
             onGpsEnabled = {
-                voiceGate.unmuteGps()
                 setGuidance(true)
             },
             // Départ direct : la destination dictée lance le moteur sans
@@ -137,22 +133,6 @@ class IseeVoiceNav(
     /** L'utilisateur prend la parole : la voix du guidage en cours se tait. */
     fun stopVoice() {
         if (driverLazy.isInitialized()) runCatching { driver.stopVoice() }
-    }
-
-    /** Réglages « guidage GPS » rallumés hors ordre : la porte se rouvre. */
-    fun resumeGps() {
-        if (voiceGate.ambientAllowed()) return
-        runCatching { if (settings().navigationGuidanceEnabled) voiceGate.unmuteGps() }
-    }
-
-    /**
-     * Synchronise la porte avec les réglages persistés (au chargement de
-     * session) : guidage désactivé (par ordre vocal, réglages ou relance)
-     * → la porte reste fermée même après un redémarrage — la voix ambiante
-     * ne reparle qu'au retour de l'utilisateur (question, photo, caméra).
-     */
-    fun syncGate() {
-        if (settings().navigationGuidanceEnabled) voiceGate.unmuteGps() else voiceGate.muteGps()
     }
 
     /** État de la navigation vocale (repos, confirmation, guidage, carte). */
