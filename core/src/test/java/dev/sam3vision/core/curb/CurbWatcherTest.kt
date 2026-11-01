@@ -282,10 +282,13 @@ class CurbWatcherTest {
 
         watcher.onSignal(positive, 1000L)
         assertNotNull(watcher.onSignal(positive, 2000L))
+        // 1-2 trous = clignotement gracié : il faut 3 trous pour ré-armer.
         watcher.onSignal(CurbSignal.none(), 3000L)
-        assertNull(watcher.onSignal(positive, 4000L))
-        assertNull(watcher.onSignal(positive, 5000L))
+        watcher.onSignal(CurbSignal.none(), 4000L)
+        watcher.onSignal(CurbSignal.none(), 5000L)
         assertNull(watcher.onSignal(positive, 6000L))
+        assertNull(watcher.onSignal(positive, 7000L))
+        assertNull(watcher.onSignal(positive, 8000L))
         assertNotNull("cooldown 10 s écoulé", watcher.onSignal(positive, 13000L))
     }
 
