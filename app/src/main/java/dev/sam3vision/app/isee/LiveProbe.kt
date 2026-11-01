@@ -43,6 +43,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.yield
 
 /**
@@ -133,6 +135,8 @@ class LiveProbe(
 
     /** Veto trafic du mode Traversée : un véhicule qui approche force l'attente. */
     internal val traverseVeto = TraverseVeto()
+
+    private val publishMutex = Mutex() // une seule publication à la fois
 
     /** Porte « sans feu » : 4 frames sans boîte de feu → voix véhicules + « Traversez. ». */
     internal val noLightGate = NoLightGate()
@@ -419,32 +423,35 @@ _state.update { it.cleared() }
 
     private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean) {
         val result = active.runFrameWith(jpegB64, prompts)
-        if (result == null) { adaptive.onDropped(); return drain() }
-        adaptive.onSettled(System.currentTimeMillis() - at, result, jpegB64.length)
-        // Réponse complète (corps lu et JSON tourné) : le poste « reçu » est posé ici.
-        chronology.markReceived()
-        // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
-        val shown = chronology.publishing()
-        if (result.isSuccess && !warmed) goWarm()
-        // La suivante part **avant** la publication : le créneau est déjà rendu, et les
-        // masques (~15 ms) ne doivent pas laisser le GPU inactif.
-        drain()
-        yield()
-        val frame = accumulated(result.getOrNull(), prompts, rotated)
-        if (frame == null) {
-            // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
-            // restent les derniers connus, seul le message d'erreur change.
-            val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
-            if (!warmed && error is ApiError.Timeout) sayColdTimeout()
-            android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
-            _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
-            return
+        // Réseau parallèle, publication sérialisée (instances partagées).
+        publishMutex.withLock {
+            if (result == null) { adaptive.onDropped(); return@withLock drain() }
+            adaptive.onSettled(System.currentTimeMillis() - at, result, jpegB64.length)
+            // Réponse complète (corps lu et JSON tourné) : le poste « reçu » est posé ici.
+            chronology.markReceived()
+            // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
+            val shown = chronology.publishing()
+            if (result.isSuccess && !warmed) goWarm()
+            // La suivante part **avant** la publication : le créneau est déjà rendu, et les
+            // masques (~15 ms) ne doivent pas laisser le GPU inactif.
+            drain()
+            yield()
+            val frame = accumulated(result.getOrNull(), prompts, rotated)
+            if (frame == null) {
+                // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
+                // restent les derniers connus, seul le message d'erreur change.
+                val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
+                if (!warmed && error is ApiError.Timeout) sayColdTimeout()
+                android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
+                _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
+                return@withLock
+            }
+            if (_state.value.frames == 0) {
+                android.util.Log.i("sam3vision", "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms")
+            }
+            noteCrowd(frame.objects.count { PersonLabels.isBody(it.label) })
+            publish(active, frame, jpegB64, at, shown)
         }
-        if (_state.value.frames == 0) {
-            android.util.Log.i("sam3vision", "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms")
-        }
-        noteCrowd(frame.objects.count { PersonLabels.isBody(it.label) })
-        publish(active, frame, jpegB64, at, shown)
     }
 
     /** Première frame aboutie : le conteneur est chaud, la session froide a fait son travail. */
