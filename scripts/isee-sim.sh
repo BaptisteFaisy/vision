@@ -476,8 +476,8 @@ main() {
   }
   require_uint "--seconds" "$SECONDS_REC"
   (( SECONDS_REC > 0 )) || die "--seconds doit être supérieur à 0"
-  ensure_apk
   resolve_tools
+  ensure_apk
   make_tmpdir
   OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/isee-sim-out.XXXXXX")" ||
     die "mktemp -d a échoué (TMPDIR='${TMPDIR:-/tmp}')"

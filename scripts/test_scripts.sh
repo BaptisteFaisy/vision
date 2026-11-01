@@ -300,18 +300,20 @@ expect_nonzero 'isee-sim.sh refuse une vidéo absente'
 expect_grep 'vidéo absente' 'isee-sim.sh nomme la vidéo manquante'
 
 printf 'pas une video\n' >"${TMP}/fausse-balade.mp4"
+printf 'faux apk\n' >"${TMP}/faux.apk"
 run bash "$SIM" --video "${TMP}/fausse-balade.mp4" --seconds abc
 expect_nonzero 'isee-sim.sh refuse un --seconds non numérique'
 expect_grep '\-\-seconds' 'isee-sim.sh nomme --seconds'
 
-run env PATH="$PATH_BIN" EMULATOR="${TMP}/pas-emulateur" bash "$SIM" \
+run env PATH="$PATH_BIN" APK="${TMP}/faux.apk" EMULATOR="${TMP}/pas-emulateur" bash "$SIM" \
   --video "${TMP}/fausse-balade.mp4" --no-build --seconds 5
 expect_nonzero 'isee-sim.sh échoue proprement sans émulateur'
 expect_grep 'émulateur introuvable' 'isee-sim.sh nomme l émulateur manquant'
 
 printf '#!/bin/sh\nexit 0\n' >"${TMP}/bin/emulator"
-chmod +x "${TMP}/bin/emulator"
-run env PATH="$PATH_BIN" FFMPEG="${TMP}/pas-ffmpeg" bash "$SIM" \
+printf '#!/bin/sh\nexit 0\n' >"${TMP}/bin/ffmpeg"
+chmod +x "${TMP}/bin/emulator" "${TMP}/bin/ffmpeg"
+run env PATH="$PATH_BIN" APK="${TMP}/faux.apk" FFMPEG="${TMP}/pas-ffmpeg" bash "$SIM" \
   --video "${TMP}/fausse-balade.mp4" --no-build --seconds 5
 expect_nonzero 'isee-sim.sh refuse un ffmpeg absent'
 expect_grep 'ffmpeg introuvable' 'isee-sim.sh nomme ffmpeg'
