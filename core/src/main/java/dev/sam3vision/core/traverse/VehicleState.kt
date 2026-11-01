@@ -71,10 +71,10 @@ class VehicleStateWatcher(
     /** État annoncé : ce qui roule, ce qui est à l'arrêt, ce qui est garé. */
     private enum class State { MOVING, STOPPED, PARKED }
 
-    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité. */
-    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?)
+    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité, boîte. */
+    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?, val box: List<Float>)
 
-    /** Mémoire d'une frame : surface, centre, seau-mètre, date et proximité. */
+    /** Mémoire d'une frame : surface, centre, seau-mètre, date, proximité et boîte. */
     private data class Prev(
         val area: Float,
         val cx: Float?,
@@ -82,6 +82,7 @@ class VehicleStateWatcher(
         val bucket: String,
         val atMs: Long,
         val closeness: Float?, // PISTE2
+        val box: List<Float>,
     )
 
     /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile. */
@@ -144,7 +145,7 @@ class VehicleStateWatcher(
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
         val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
         previous = current.mapValues { (key, seen) ->
-            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness) // PISTE2
+            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness, seen.box) // PISTE2
         }
         movingThisFrame = pick?.state == State.MOVING
         if (pick == null) {
@@ -312,9 +313,9 @@ class VehicleStateWatcher(
         ).verdict
     }
 
-    /** Véhicules moteurs vus par clé (surface max, miroir du veto). */
+    /** Véhicules moteurs vus par clé : même instance que la frame précédente tant qu'elle se recouvre, sinon surface max (miroir du veto). */
     private fun currentByKey(detections: List<Detection>, depthByBox: Map<List<Float>, Float>?): Map<String, Current> {
-        val best = LinkedHashMap<String, Current>()
+        val candidates = LinkedHashMap<String, MutableList<Pair<Box, Current>>>()
         for (detection in detections) {
             if (!wanted(detection.label)) continue
             if (detection.score <= TraverseVeto.SCORE_MIN) continue
@@ -327,11 +328,21 @@ class VehicleStateWatcher(
                 cx = center?.let { (it[0] + it[2]) / 2f },
                 cy = center?.let { (it[1] + it[3]) / 2f },
                 closeness = depthByBox?.get(detection.box)?.takeIf { it.isFinite() }, // PISTE2
+                box = detection.box,
             )
-            val key = vehicleKey(detection.label)
-            if ((best[key]?.area ?: -1f) < seen.area) best[key] = seen
+            candidates.getOrPut(vehicleKey(detection.label)) { mutableListOf() } += box to seen
         }
-        return best
+        return candidates.mapValues { (key, boxes) -> pickStable(boxes, previous[key]?.box) }
+    }
+
+    /** Même instance qu'avant si elle se recouvre (IoU), sinon surface max : pas de téléportation entre deux voitures. */
+    private fun pickStable(boxes: List<Pair<Box, Current>>, prevBox: List<Float>?): Current {
+        val prev = prevBox?.let(Box::fromProto)
+        if (prev != null) {
+            val kept = boxes.maxByOrNull { it.first.iou(prev) }
+            if (kept != null && kept.first.iou(prev) >= CONTINUITY_IOU_MIN) return kept.second
+        }
+        return boxes.maxBy { it.second.area }.second
     }
 
     /** Distance la plus courte par clé (labels non mesurés absents). */
@@ -388,6 +399,9 @@ class VehicleStateWatcher(
         /** Bande centrale de l'urgence : entre 30 % et 70 % de la largeur. */
         const val CENTER_LO = 0.3f
         const val CENTER_HI = 0.7f
+
+        /** Recouvrement minimal pour garder la même instance entre deux frames (téléportation interdite). */
+        private const val CONTINUITY_IOU_MIN = 0.3f
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE
