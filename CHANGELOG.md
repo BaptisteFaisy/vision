@@ -3,6 +3,16 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : le mur ne voile plus la rue (branche `isee-wall-mask-freeze`)
+
+- **Fait** : `VeilPolicy` (`core/.../live/VeilPolicy.kt`) — le décor suivi (`wall`)
+  garde pastille et voix mais son masque est peint transparent (`MaskPainter`,
+  alpha 0) : fini le voile bleu à mi-écran qui « coupait » la rue en deux
+  (rotation 3×7 + accumulation rejouaient ses octets 2 frames sur 3).
+- **Preuve** : `VeilPolicyTest` (4), `:core:testDebugUnitTest` vert sur r630 ;
+  recette chambre sur Redmi `2c6852ac` (build branche) : teinte bleue partie
+  (saturation haute 69→~30), couleurs du bas préservées, 6-7 objets suivis.
+
 ## 2026-11-01 — iSee : rail trottoir métrique, deux paliers (branche `feat/rail-trottoir`)
 
 - **Fait** : `SidewalkRail` (`core/.../curb/SidewalkRail.kt`) juge le maintien
