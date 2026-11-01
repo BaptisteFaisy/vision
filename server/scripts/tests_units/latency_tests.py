@@ -219,6 +219,27 @@ def test_max_objects_ceiling(segmentation) -> None:
           str(len(capped["objects"])))
     check("finalize: les 32 meilleurs scores gardés",
           [item["label"] for item in capped["objects"]] == [f"objet{i}" for i in range(32)])
+    _crowd_cap(segmentation, check)
+
+
+def _crowd_cap(segmentation, check) -> None:
+    """Plafond client 16 (patch foule 01/11) : 16 objets passent, le 17e est tronqué.
+
+    En foule, 10 personnes ; 8 objets = la moitié de la scène perdue. Le 17e tombé
+    est le moins bien classé : ``finalize`` trie au score seul, donc c'est bien le
+    dernier arrivé du tri qui saute, jamais un mieux classé.
+    """
+    crowd = [{"label": f"personne{i}", "score": 0.9 - i / 100.0,
+              "box": [0.0, 0.0, 8.0, 8.0], "mask": None} for i in range(17)]
+    sixteen = segmentation.finalize(crowd[:16], (8, 8), 16, "none")
+    check("foule : 16 objets passent au plafond client",
+          len(sixteen["objects"]) == 16, str(len(sixteen["objects"])))
+    trimmed = segmentation.finalize(crowd, (8, 8), 16, "none")
+    check("foule : le 17e objet est tronqué",
+          len(trimmed["objects"]) == 16, str(len(trimmed["objects"])))
+    labels = [item["label"] for item in trimmed["objects"]]
+    check("foule : le 17e tombé est le moins bien classé",
+          "personne16" not in labels and "personne15" in labels, str(labels[-3:]))
 
 
 def test_live_clamp_ceiling(live_app) -> None:

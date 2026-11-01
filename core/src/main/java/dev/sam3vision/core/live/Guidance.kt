@@ -7,6 +7,7 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 
 /** Côté vers lequel le guidage envoie l'utilisateur quand le couloir est bouché. */
 enum class GuidanceSide { Left, Right }
@@ -62,6 +63,11 @@ data class GuidanceDecision(
  * bloque la marche. Sans bords ou sans distance connus, repli prudent sur
  * la bande centrale historique (`centerX` entre 0,34 et 0,66) ; un objet
  * au-delà de la portée de l'axe ne bloque pas, même au centre.
+ *
+ * L'ordre est **borné par le trottoir** ([FreeSpace], audit foule P0 point 3) :
+ * un côté sans [FreeSpace.EDGE_MARGIN_M] de place est écarté au profit du plus
+ * large, le décalage chiffré ne dépasse jamais la place du côté conseillé —
+ * l'app conseillait **1,38 m à gauche** là où le trottoir s'arrêtait à **0,90 m**.
  *
  * Tout est pur et testé en JVM : la décision ([decide]), sa mise en mots
  * ([phrase], FR/EN comme les positions) et sa signature anti-répétition
@@ -137,6 +143,11 @@ object Guidance {
      * ([rangeMeters]). Un obstacle lointain sur l'axe bloque donc avec un
      * côté de sortie au jugé proche — le plus souvent l'opposé de son
      * décalage, le champ proche étant vide.
+     *
+     * **Un ordre ne pointe pas hors du trottoir** (audit foule P0 point 3 :
+     * 1,38 m conseillé, trottoir de 0,90 m) : [free] borne le côté et le
+     * décalage chiffré ([GuidanceBounds]). [speedMps] fait suivre la portée à
+     * l'horizon de décision ([Timing.rangeFor]) ; [rangeMeters] explicite fait foi.
      */
     fun decide(
         labels: List<PlacedLabel>,
@@ -144,11 +155,14 @@ object Guidance {
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         curbEdge: CurbEdge? = null,
+        free: FreeSpace = FreeSpace.unknown(),
+        speedMps: Float? = null,
         holeSide: GuidanceSide? = null,
         axisRangeMeters: Float = AXIS_RANGE_METERS,
     ): GuidanceDecision {
+        val range = GuidanceBounds.effectiveRange(rangeMeters, speedMps)
         val cleaned = labels.filter { isObstacle(it) }
-        val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg, axisRangeMeters) }
+        val blocking = cleaned.filter { blocks(it, cap, range, hfovDeg, axisRangeMeters) }
         val curbContact = curbAtContact(labels, cap)
         if (blocking.isEmpty()) {
             return GuidanceDecision(blocked = false, cap = cap, curbContact = curbContact, curbEdge = curbEdge)
@@ -157,26 +171,44 @@ object Guidance {
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
         if (cap == SteeringCap.Straight) {
-            val threat = contactThreat(blocking)
-            if (curbContact && threat != null) {
-                return GuidanceDecision(
-                    blocked = true, obstacle = threat, cap = cap,
-                    shiftMeters = shiftOf(threat.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg),
-                    curbContact = true, curbEdge = curbEdge, contactStop = true,
-                )
-            }
-            val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
-            val side = if (path != null && path.fits) {
+            contactStopDecision(blocking, cap, hfovDeg, curbContact, curbEdge)?.let { return it }
+            val path = PeoplePath.plan(cleaned, range, hfovDeg)
+            val computed = if (path != null && path.fits) {
                 path.side
             } else {
-                holeOrFreer(cleaned, obstacle, holeSide, rangeMeters, hfovDeg)
+                holeOrFreer(cleaned, obstacle, holeSide, range, hfovDeg)
             }
+            val side = GuidanceBounds.boundedSide(computed, free)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
-            return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, curbContact, curbEdge)
+            return GuidanceDecision(
+                true, obstacle, side, cap, side.toCap(),
+                GuidanceBounds.boundedShift(shift, GuidanceBounds.measuredRoom(free, side)), curbContact, curbEdge,
+            )
         }
-        val passage = bestPassage(cleaned, cap, rangeMeters, hfovDeg)
-        val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
-        return GuidanceDecision(true, obstacle, null, cap, passage, shift, curbContact, curbEdge)
+        return GuidanceBounds.lateralDecision(
+            cleaned, obstacle, cap, range, hfovDeg, free, curbContact, curbEdge,
+        )
+    }
+
+    /**
+     * Bordure au contact **et** obstacle mesuré au contact, cap droit : on
+     * s'arrête (audit 31/10 : on ne monte pas une bordure dans un obstacle).
+     * `null` sinon. Extrait de [decide] (plafond 50 lignes/fonction).
+     */
+    private fun contactStopDecision(
+        blocking: List<PlacedLabel>,
+        cap: SteeringCap,
+        hfovDeg: Float,
+        curbContact: Boolean,
+        curbEdge: CurbEdge?,
+    ): GuidanceDecision? {
+        if (!curbContact) return null
+        val threat = contactThreat(blocking) ?: return null
+        return GuidanceDecision(
+            blocked = true, obstacle = threat, cap = cap,
+            shiftMeters = shiftOf(threat.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg),
+            curbContact = true, curbEdge = curbEdge, contactStop = true,
+        )
     }
 
     /**
@@ -323,7 +355,7 @@ object Guidance {
      * Obstacle non-bordure mesuré au contact (≤ [CONTACT_METERS]), le plus proche
      * — `null` si le seul contact est la bordure elle-même (on la monte).
      */
-    private fun contactThreat(blocking: List<PlacedLabel>): PlacedLabel? =
+    internal fun contactThreat(blocking: List<PlacedLabel>): PlacedLabel? =
         blocking.mapNotNull { hit ->
             hit.meters?.takeIf { it.isFinite() && it <= CONTACT_METERS && !isCurbStep(hit.label) }
                 ?.let { hit to it }
@@ -395,7 +427,7 @@ object Guidance {
      * (sans personne d'abord, sinon moins d'objets à portée, sinon obstacle
      * connu le plus loin), le centre en premier à égalité.
      */
-    private fun bestPassage(
+    internal fun bestPassage(
         labels: List<PlacedLabel>,
         cap: SteeringCap,
         rangeMeters: Float,

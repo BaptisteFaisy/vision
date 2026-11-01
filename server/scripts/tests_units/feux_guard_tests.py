@@ -231,6 +231,43 @@ def _curb(guard, seg, check) -> None:
           "zebra" in labels and "bordure" in labels, str(labels))
 
 
+def _crowd(guard, seg, check) -> None:
+    """Foule (patch P0 01/11) : plafond 16 tenu, réserve du feu sans perte en cascade.
+
+    En foule, 10 personnes ; 8 objets = la moitié de la scène perdue. Deux
+    propriétés : 10 personnes tiennent entières sous 16, et la place réservée au
+    feu coûte **au plus une** personne — jamais celle d'un gardé déjà bien classé
+    (un feu à 0,99 était effacé au profit d'un passage réservé à 0,10).
+    """
+    import numpy as np
+
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+
+    def people(count: int) -> list[dict]:
+        return [{"label": f"personne{i}", "score": 0.9 - 0.01 * i,
+                 "box": [0.0, 0.0, 8.0, 8.0], "mask": mask} for i in range(count)]
+
+    def guarded(label: str, score: float) -> dict:
+        return {"label": label, "score": score, "box": [1.0, 1.0, 4.0, 4.0], "mask": mask}
+
+    ten = guard.finalize_guarded(seg.finalize, people(10), (16, 16), 16, "none")
+    check("foule : 10 personnes tiennent sous le plafond 16",
+          len(ten["objects"]) == 10, str(len(ten["objects"])))
+    crowd = people(16) + [guarded("feu piéton", 0.12)]
+    labels = [item["label"] for item
+              in guard.finalize_guarded(seg.finalize, crowd, (16, 16), 16, "none")["objects"]]
+    check("foule : 16 personnes + 1 feu -> le feu est gardé",
+          "feu piéton" in labels and len(labels) == 16, str(labels))
+    check("foule : la réserve du feu ne coûte qu'une personne",
+          sum(label.startswith("personne") for label in labels) == 15, str(labels))
+    both = people(16) + [guarded("feu piéton", 0.99), guarded("zebra", 0.10)]
+    mixed = [item["label"] for item
+             in guard.finalize_guarded(seg.finalize, both, (16, 16), 16, "none")["objects"]]
+    check("foule : un gardé déjà dans le top n'est jamais évincé par une réserve",
+          "feu piéton" in mixed and "zebra" in mixed, str(mixed))
+
+
 def test_feux_guard(_) -> None:
     """Garde feux : point d'entrée unique (un seul slot RUNNERS, harnais à 497 l)."""
     from test_units import check
@@ -241,5 +278,6 @@ def test_feux_guard(_) -> None:
     _work_edge(guard, check)
     _finalize(guard, _live_fast_module("segmentation"), check)
     _curb(guard, _live_fast_module("segmentation"), check)
+    _crowd(guard, _live_fast_module("segmentation"), check)
     _payload_wiring(check)
     _service_wiring(check)

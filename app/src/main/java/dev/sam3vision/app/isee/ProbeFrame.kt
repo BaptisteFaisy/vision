@@ -6,9 +6,11 @@ import dev.sam3vision.app.TRANSPORT_WS_KO
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameLabels
+import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
+import dev.sam3vision.core.live.Timing
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
@@ -54,6 +56,35 @@ internal fun detectionsAndReadingsOf(
 internal fun distanceLayerOf(frame: LiveFrame, readings: List<DistanceReading>): DistanceLayer? =
     if (readings.isEmpty() || frame.width <= 0 || frame.height <= 0) null
     else DistanceLayer(frame.width, frame.height, readings)
+
+/**
+ * Instant de capture d'une frame, ramené sur l'horloge de la décision ([atMs]).
+ *
+ * Le guidage juge une mesure **à l'instant où il parle** ([Timing.ageOf], audit
+ * foule du 01/11) : encore faut-il savoir quand cette mesure a été prise. La sonde
+ * ne transporte pas l'horodatage brut du capteur jusqu'à la publication, mais elle
+ * transporte sa **mesure** : [FrameTimings] chronomètre le trajet capture → masques
+ * poste par poste (`captureToJpegMs`, `jpegToSentMs`, `sentToReceivedMs`,
+ * `receivedToOverlaysMs`). L'instant de capture se relit donc par soustraction du
+ * total mesuré — pas d'horloge implicite, un chiffre déjà relevé.
+ *
+ * `null` quand rien n'est mesuré (`totalMs` = `-1` : première frame, transport
+ * muet) : on préfère avouer qu'on ne sait pas plutôt que d'affirmer une capture
+ * confondue avec l'instant de la décision.
+ */
+internal fun capturedAtMsOf(atMs: Long, timings: FrameTimings): Long? =
+    timings.totalMs.takeIf { it > 0L }?.let { atMs - it }
+
+/**
+ * Âge de la frame au moment de décider (ms) : la valeur que la voix reçoit en
+ * `ageMs`. Une frame publiée décrit un monde vieux de son trajet, jamais de zéro
+ * (0,7 s à 1,4 m/s = 1 m parcouru).
+ *
+ * Zéro quand la chronologie manque : une mesure dont on ignore l'âge n'est pas
+ * pénalisée, elle n'est simplement pas rajeunie de force.
+ */
+internal fun frameAgeMsOf(atMs: Long, timings: FrameTimings): Long =
+    capturedAtMsOf(atMs, timings)?.let { Timing.ageOf(it, atMs) } ?: 0L
 
 /** Plafond d'objets quand les Réglages n'en imposent pas (valeur du Direct). */
 internal const val DEFAULT_MAX_OBJECTS = 12

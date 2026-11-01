@@ -16,11 +16,14 @@ package dev.sam3vision.core.model
  */
 object ObjectLimits {
     /**
-     * Valeur par défaut : **8 objets** à l'écran (demande user du 26/10, confirmée le
-     * 26/10 soir : « j'avais dit 8 »). Réglable de 1 à 32 dans Réglages
-     * (plafond 32 : demande user du 29/10).
+     * Valeur par défaut : **16 objets** à l'écran (ex-8, patch P0 foule 01/11).
+     *
+     * En foule, 10 personnes ; 8 objets = la moitié de la scène perdue — et le serveur
+     * tronque au seul score, donc ce sont les plus loin, les plus occlus et les plus
+     * coupés qui sautent (mesuré : iSee recevait 5 à 8 objets sur une scène de 10).
+     * Réglable de 1 à 32 dans Réglages (plafond 32 : demande user du 29/10).
      */
-    const val DEFAULT_ON_SCREEN = 8
+    const val DEFAULT_ON_SCREEN = 16
     const val MIN_ON_SCREEN = 1
     const val MAX_ON_SCREEN = 32
 

@@ -57,8 +57,8 @@ class StairConceptsTest {
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
-                "beanie", "socks",
+                "stairs", "fence", "gate", "wall", "stroller", "child",
+                "electric scooter", "dog",
             ),
             LivePrompts.default,
         )

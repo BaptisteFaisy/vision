@@ -4,6 +4,7 @@ import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.TtsDriver
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.live.AttentionCadence
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -37,6 +38,12 @@ private class FakeDriver(var fail: Boolean = false) : TtsDriver {
 /** Dossier temporaire de travail (voix de proximité, niveau fichier : visible du banc `Rig`). */
 private fun tempDir(): File = Files.createTempDirectory("voixfallback").toFile()
 
+/** Annonce « personne » d'une foule : même famille, cadran différent (clé de cadence identique). */
+private const val PERSONNE_2H = "Attention à la personne, à 2 heures."
+
+/** Variante à 3 heures : sans piste, la cadence la confond avec [PERSONNE_2H] (nombres ignorés). */
+private const val PERSONNE_3H = "Attention à la personne, à 3 heures."
+
 /**
  * Voix de proximité : repli TTS système sans clé (signal unique, oral seul),
  * urgences via la voix de sécurité (sans synthèse réseau), repli sur
@@ -58,6 +65,7 @@ class ProximityVoiceTest {
             withSafety: Boolean = true,
             withSystem: Boolean = true,
             nowMs: () -> Long = { 0L },
+            cadence: AttentionCadence = AttentionCadence(),
         ): ProximityVoice {
             val player = SpeechPlayer(File(tempDir(), "play"))
             val settings = { Settings.Default.copy(ttsApiKey = key, speechLanguage = language) }
@@ -75,6 +83,7 @@ class ProximityVoiceTest {
                 nowMs = nowMs,
                 safety = safety,
                 system = system,
+                cadence = cadence,
             )
         }
     }
@@ -270,6 +279,116 @@ class ProximityVoiceTest {
         voice.flushPending(playerIdle = true)
 
         assertTrue(rig.spoken.isEmpty())
+    }
+
+    @Test
+    fun `deux personnes de pistes differentes parlent a une seconde d'intervalle`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 1)
+        now = 1_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 2)
+
+        assertEquals(listOf(PERSONNE_2H, PERSONNE_3H), rig.spoken)
+    }
+
+    @Test
+    fun `meme piste, la seconde annonce sort au silence apres la redite`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 1)
+        now = 2_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 1)
+        voice.flushPending(playerIdle = true)
+        assertEquals(listOf(PERSONNE_2H), rig.spoken)
+
+        now = AttentionCadence.DEFAULT_REPEAT_MS + 500L
+        voice.flushPending(playerIdle = true)
+
+        assertEquals(listOf(PERSONNE_2H, PERSONNE_3H), rig.spoken)
+    }
+
+    @Test
+    fun `l'annonce differee sort avec la voix douce, pas la securite`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 1)
+        now = 2_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 1)
+        now = AttentionCadence.DEFAULT_REPEAT_MS + 500L
+        voice.flushPending(playerIdle = true)
+
+        assertEquals(listOf(PERSONNE_2H, PERSONNE_3H), rig.attempts)
+        assertTrue(rig.safetyDriver.calls.isEmpty())
+    }
+
+    @Test
+    fun `une annonce en attente n'est dite qu'une fois`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 1)
+        now = 2_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 1)
+        now = AttentionCadence.DEFAULT_REPEAT_MS + 500L
+        voice.flushPending(playerIdle = true)
+        now += 500L
+        voice.flushPending(playerIdle = true)
+
+        assertEquals(listOf(PERSONNE_2H, PERSONNE_3H), rig.spoken)
+    }
+
+    @Test
+    fun `au-dela de 3 s de retard, l'annonce en attente est jetee`() = runTest {
+        assertEquals(3_000L, AttentionCadence.PENDING_TTL_MS)
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 1)
+        now = 2_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 1)
+        now = AttentionCadence.DEFAULT_REPEAT_MS + AttentionCadence.PENDING_TTL_MS + 1L
+        voice.flushPending(playerIdle = true)
+
+        assertEquals(listOf(PERSONNE_2H), rig.spoken)
+    }
+
+    @Test
+    fun `urgent passe malgre la redite`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true, trackId = 7)
+        now = 1_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true, trackId = 7)
+        assertEquals(listOf(PERSONNE_2H), rig.spoken)
+
+        now = 1_500L
+        voice.onPhrase(PERSONNE_3H, playerIdle = false, urgent = true, trackId = 7)
+
+        assertEquals(listOf(FakeDriver.Call(PERSONNE_3H, true)), rig.safetyDriver.calls)
+    }
+
+    @Test
+    fun `sans piste, la redite d'avant tient toujours`() = runTest {
+        val rig = Rig()
+        var now = 0L
+        val voice = rig.voice(nowMs = { now }, cadence = AttentionCadence(gapMs = 0L))
+
+        voice.onPhrase(PERSONNE_2H, playerIdle = true)
+        now = 1_000L
+        voice.onPhrase(PERSONNE_3H, playerIdle = true)
+
+        assertEquals(listOf(PERSONNE_2H), rig.spoken)
     }
 
     @Test

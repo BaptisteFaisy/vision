@@ -31,6 +31,9 @@ class LiveRequest(BaseModel):
 
     image_b64: str = Field(min_length=MIN_IMAGE_CHARS)
     prompts: list[str] | None = None
+    # Absent = backstop serveur `service.MAX_OBJECTS_DEFAULT` (16, ex-8 : en foule,
+    # 10 personnes ; 8 objets = la moitié de la scène perdue). Présent = plafond du
+    # client, seulement borné à 1..segmentation.MAX_OBJECTS (32), jamais rejeté.
     max_objects: int | None = None
     work_edge: int | None = None
     # Profondeur fusionnée : chaque objet porte sa médiane de proximité

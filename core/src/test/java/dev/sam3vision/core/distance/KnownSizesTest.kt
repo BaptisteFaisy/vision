@@ -64,9 +64,10 @@ class KnownSizesTest {
         assertEquals(1.45f, KnownSizes.heightMeters("voiture")!!, 0.001f)
         assertEquals(2.80f, KnownSizes.heightMeters("truck")!!, 0.001f)
         assertEquals(2.80f, KnownSizes.heightMeters("camion")!!, 0.001f)
-        assertEquals(1.00f, KnownSizes.heightMeters("electric scooter")!!, 0.001f)
-        assertEquals(1.00f, KnownSizes.heightMeters("Trottinette électrique")!!, 0.001f)
-        assertEquals(1.00f, KnownSizes.heightMeters("scooter")!!, 0.001f)
+        // Trottinette : 1,15 m depuis le P0 point 7 (guidon haut, 0,9-1,25 m)
+        assertEquals(1.15f, KnownSizes.heightMeters("electric scooter")!!, 0.001f)
+        assertEquals(1.15f, KnownSizes.heightMeters("Trottinette électrique")!!, 0.001f)
+        assertEquals(1.15f, KnownSizes.heightMeters("scooter")!!, 0.001f)
     }
 
     @Test
@@ -130,8 +131,10 @@ class KnownSizesTest {
         assertEquals(1.23f, KnownSizes.heightMeters("femme assise")!!, 0.001f)
         assertEquals(1.75f, KnownSizes.heightMeters("cycliste")!!, 0.001f)
         assertEquals(1.75f, KnownSizes.heightMeters("cyclist")!!, 0.001f)
-        assertEquals(1.25f, KnownSizes.heightMeters("fauteuil roulant")!!, 0.001f)
-        assertEquals(1.25f, KnownSizes.heightMeters("wheelchair")!!, 0.001f)
+        // Fauteuil roulant : 0,95 m de dossier (P0 point 7), pas la taille assise
+        // d'une personne sur une chaise (1,25 m)
+        assertEquals(0.95f, KnownSizes.heightMeters("fauteuil roulant")!!, 0.001f)
+        assertEquals(0.95f, KnownSizes.heightMeters("wheelchair")!!, 0.001f)
         // « personne » seule reste debout : l'entrée exacte prime sur le premier mot
         assertEquals(1.70f, KnownSizes.heightMeters("personne")!!, 0.001f)
     }
@@ -198,5 +201,92 @@ class KnownSizesTest {
         assertNull(KnownSizes.heightMeters("pole"))
         assertTrue("pole" in KnownSizes.DEPTH_ONLY)
         assertEquals(5.00f, KnownSizes.heightMeters("street lamp")!!, 0.001f)
+    }
+
+    @Test
+    fun `enfant child et children partagent 1 20 m`() {
+        listOf("child", "children", "kid", "enfant", "enfants", "ENFANTS", "Enfant").forEach { label ->
+            assertEquals("hauteur $label", 1.20f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+    }
+
+    @Test
+    fun `poussette et ses synonymes a 1 05 m`() {
+        listOf("poussette", "Poussette", "poussettes", "stroller", "pram", "buggy").forEach { label ->
+            assertEquals("hauteur $label", 1.05f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+    }
+
+    @Test
+    fun `fauteuil roulant personne assise a 0 95 m`() {
+        // canonical() neutralise casse, accents, espaces et ponctuation
+        assertEquals("fauteuil roulant", KnownSizes.canonical("  Fauteuil  Roulant. "))
+        listOf("wheelchair", "fauteuil roulant", "Fauteuil roulant", "fauteuils roulants").forEach { label ->
+            assertEquals("hauteur $label", 0.95f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+        // le repli dernier mot anglais retrouve le fauteuil dans une expression
+        assertEquals(0.95f, KnownSizes.heightMeters("electric wheelchair")!!, 0.001f)
+    }
+
+    @Test
+    fun `trottinette a 1 15 m, electrique ou non`() {
+        val labels = listOf(
+            "trottinette", "Trottinette électrique", "trottinettes électriques",
+            "electric scooter", "scooter", "kick scooter",
+        )
+        labels.forEach { label ->
+            assertEquals("hauteur $label", 1.15f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+    }
+
+    @Test
+    fun `chien et dog a 0 55 m au garrot`() {
+        listOf("chien", "chiens", "dog", "dogs", "Chien").forEach { label ->
+            assertEquals("hauteur $label", 0.55f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+    }
+
+    @Test
+    fun `adulte debout reste 1 70 m et ne couvre pas un enfant`() {
+        listOf("person", "personne", "personnes", "humain", "human").forEach { label ->
+            assertEquals("hauteur $label", 1.70f, KnownSizes.heightMeters(label)!!, 0.001f)
+        }
+        // L'adulte est plus haut que l'enfant : deux entrées distinctes, pas une
+        // tolérance plus large sur « person » (voir le KDoc de KnownSizes).
+        val adult = KnownSizes.heightMeters("person")!!
+        val child = KnownSizes.heightMeters("child")!!
+        assertTrue("un enfant est lu plus bas qu'un adulte", child < adult)
+        // 1,20 / 1,70 : l'écart dépasse largement la tolérance de l'adulte (± 6 %)
+        assertEquals(0.71f, child / adult, 0.01f)
+        assertTrue(KnownSizes.toleranceFraction("person") < 0.20f)
+    }
+
+    @Test
+    fun `tolerance par categorie de foule`() {
+        assertEquals(0.20f, KnownSizes.toleranceFraction("enfant"), 0.001f)
+        assertEquals(0.20f, KnownSizes.toleranceFraction("children"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("Poussette"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("stroller"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("wheelchair"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("fauteuil roulant"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("trottinette"), 0.001f)
+        assertEquals(0.25f, KnownSizes.toleranceFraction("electric scooter"), 0.001f)
+        assertEquals(0.30f, KnownSizes.toleranceFraction("chien"), 0.001f)
+        assertEquals(0.30f, KnownSizes.toleranceFraction("dogs"), 0.001f)
+        // l'adulte garde sa tolérance serrée : la foule n'a pas relâché sa mesure
+        assertEquals(0.06f, KnownSizes.toleranceFraction("person"), 0.001f)
+    }
+
+    @Test
+    fun `poids de fusion de la foule plus prudent que l adulte`() {
+        val adult = KnownSizes.fusionWeight("person")
+        val child = KnownSizes.fusionWeight("child")
+        val stroller = KnownSizes.fusionWeight("poussette")
+        val dog = KnownSizes.fusionWeight("chien")
+        assertTrue("adulte > enfant", adult > child)
+        assertTrue("enfant > poussette", child > stroller)
+        assertTrue("poussette > chien", stroller > dog)
+        assertEquals(1f / 1.30f, dog, 0.001f)
+        assertTrue("un chien pèse encore", dog > 0f)
     }
 }

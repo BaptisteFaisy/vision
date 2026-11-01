@@ -9,6 +9,25 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * Déclencheur des consignes de guidage : **la direction en continu, en moins
  * de 100 ms** (ordre user du 31/10 — [GuidanceWord], clips pré-synthétisés).
  *
+ * Audit foule du 01/11/2026 — les trois chiffres qui ont créé ce patch : la
+ * cadence des décisions est de **1,4-1,7 par seconde**, chaque décision juge
+ * une image vieille de 0,65-0,70 s (soit **1,9 m d'erreur** à 1,4 m/s, une
+ * largeur de trottoir), et la voix était **muette 90-94 % des frames**. D'où
+ * trois règles, appliquées dans cet ordre :
+ * - **on ne se tait plus en foule** : voie libre + décalage ([LateralNudge])
+ *   ⇒ le mot du côté sort toujours ; décalage serré ([LateralNudge.tight]),
+ *   la phrase reste ce mot de côté — le catalogue n'a pas de clip « serrez »,
+ *   on n'en invente pas (aucun clip créé, [GuidanceWord] inchangé) ;
+ * - **fraîcheur** ([Timing.isStale]) : une frame plus vieille que
+ *   [Timing.STALE_MS] ne prouve pas que la voie est libre, donc jamais
+ *   « Tout droit. » ; un côté (décalage, retour trottoir) et un stop restent
+ *   valables, eux, et parlent ;
+ * - **urgence hors cadence** ([Timing.isUrgent]) : un TTC sous
+ *   [Timing.URGENT_TTC_S] fait sortir le mot du côté même si
+ *   [AnnouncementGate] le retenait (redite récente) — on écrit par le chemin
+ *   d'écriture existant ([AnnouncementGate.markSpoken]) et l'échéance de
+ *   redite repart de cet instant.
+ *
  * La machine anti-répétition est [AnnouncementGate], partagée avec les
  * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
  * une consigne nouvelle parle dès la première frame (seul « Stop. » coupe
@@ -56,7 +75,8 @@ class GuidanceAnnouncer(
 
     /**
      * Décalage de la dernière frame (`null` le plus souvent) : la vidéo y lit
-     * la flèche latérale, en direct comme la décision.
+     * la flèche latérale et la voix lit [LateralNudge.tight], en direct comme
+     * la décision. Toujours cohérent avec la place libre de la frame.
      */
     var lastNudge: LateralNudge? = null
         private set
@@ -81,6 +101,14 @@ class GuidanceAnnouncer(
      * optimal, on part vers lui sauf humain à moins de 80 cm — sinon
      * l'évitement générique. Direction stable : redite toutes les [repeatMs]
      * millisecondes, sauf overwrite (mot nouveau aussitôt) ; jamais de stop.
+     * [ageMs] est l'âge de la mesure (ms) : vieille ([Timing.isStale]),
+     * elle ne dit plus « Tout droit. ». [speedMps] est la vitesse de marche
+     * (GPS) : la portée suit l'horizon ([Timing.rangeFor]), donc on voit
+     * venir de plus loin en marchant vite ; `null` = portée historique.
+     * [free] est la place libre de part et d'autre de l'axe : `null` la fait
+     * estimer ici ([FreeSpace.of]) — elle sert à marquer un décalage serré
+     * ([LateralNudge.tight]) que la voix ne peut pas promettre. Les trois
+     * ont une valeur par défaut : aucun appelant existant ne change.
      */
     fun onFrame(
         atMs: Long,
@@ -92,22 +120,75 @@ class GuidanceAnnouncer(
         sidewalk: SidewalkPosition = SidewalkPosition.Ahead,
         samPassage: Passage? = null,
         holeSide: GuidanceSide? = null,
+        ageMs: Long = 0L,
+        speedMps: Float? = null,
+        free: FreeSpace? = null,
     ): String? {
         val effective = routeCap ?: cap
-        val decision = samPassage?.let { samDecision(it, labels, effective, hfovDeg) }
-            ?: Guidance.decide(labels, effective, rangeMeters, hfovDeg, holeSide = holeSide)
+        val space = free ?: FreeSpace.of(labels, hfovDeg)
+        val range = rangeFor(speedMps)
+        val decision = samPassage?.let { samDecision(it, labels, effective, hfovDeg, range) }
+            ?: Guidance.decide(
+                labels, effective, range, hfovDeg, free = space, speedMps = speedMps,
+                holeSide = holeSide,
+            )
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
-        if (decision.blocked) {
-            val tl = TwinLiteWord.fromGuidance(Guidance.word(decision))
-            val again = if (tl == TwinLiteWord.Stop) null else repeatMs
-            return speak(atMs, tl.key, tl.text(language), again)
-        }
-        val word = nudgeOf(atMs, labels, hfovDeg)?.let { GuidanceWord.fromCap(it.side) }
-            ?: clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg)
-        return speak(atMs, word.key, word.text(language), repeatMs)
+        // L'évitement passe DEVANT la décision de couloir : en foule le couloir
+        // est bouché presque en permanence, et c'est justement là que l'ordre
+        // doit venir de la piste (TTC, hystérésis, espace libre) et non du
+        // « côté le moins encombré » d'une frame. Un obstacle pile dans l'axe
+        // n'a pas de côté : le couloir parle alors seul.
+        val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
+        if (cue != null) return nudgeWord(atMs, cue, language)
+        if (decision.blocked) return blockedWord(atMs, decision, language)
+        val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
+        // Frame périmée : elle ne prouve pas que la voie est libre (« Tout
+        // droit. » est une affirmation, pas une absence) ; un côté reste bon.
+        if (word == GuidanceWord.Straight && Timing.isStale(ageMs)) return null
+        return sideWord(atMs, word, language)
     }
+
+    /**
+     * Couloir bouché : le côté de sortie TwinLite, dit dès la première frame
+     * (`again = null` pour un stop, qui ne se répète jamais). Le bouché prime
+     * sur le décalage : `lastNudge` reste `null` (une seule flèche à l'écran).
+     */
+    private fun blockedWord(atMs: Long, decision: GuidanceDecision, language: SpeechLanguage): String? {
+        val twin = TwinLiteWord.fromGuidance(Guidance.word(decision))
+        val again = if (twin == TwinLiteWord.Stop) null else repeatMs
+        return speak(atMs, directionKey(twin.text(language)), twin.text(language), again)
+    }
+
+    /**
+     * Décalage latéral : le mot du côté où aller, **toujours** (voie libre
+     * mais foule : on ne se tait plus). Urgent ([Timing.isUrgent]), il sort
+     * même si la redite en cours le retenait. Serré ([LateralNudge.tight]),
+     * la phrase reste le mot de côté — le catalogue n'a pas de clip pour
+     * « serrez », la couche voix lit le drapeau.
+     */
+    private fun nudgeWord(atMs: Long, cue: LateralNudge, language: SpeechLanguage): String? {
+        // Même vocabulaire que le couloir bouché (TwinLite) : une seule clé
+        // d'anti-répétition pour une seule consigne de direction, sinon le
+        // décalage et le couloir se disent deux fois le même côté.
+        val word = GuidanceWord.fromCap(cue.side)
+        return speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs,
+            urgent = Timing.isUrgent(cue.ttcS))
+    }
+
+    /**
+     * Clé d'anti-répétition **de la direction**, indépendante du vocabulaire :
+     * le décalage parle avec les mots SAM (`Left.`) et le couloir bouché avec
+     * les mots TwinLite (`left.`) — même consigne, deux canaux. Sans clé
+     * commune, les deux voix redisent le même côté à 0,7 s d'écart (« 88
+     * changements de mot en 120 s », audit foule du 01/11).
+     */
+    private fun directionKey(text: String): String = "dir|" + text.lowercase().trimEnd('.')
+
+    /** Mot de voie libre (cap, retour trottoir) : redit à la cadence normale. */
+    private fun sideWord(atMs: Long, word: GuidanceWord, language: SpeechLanguage): String? =
+        speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs)
 
     /**
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur
@@ -122,12 +203,13 @@ class GuidanceAnnouncer(
         labels: List<PlacedLabel>,
         cap: SteeringCap,
         hfovDeg: Float,
+        range: Float,
     ): GuidanceDecision {
         if (!passage.blocked) return GuidanceDecision(blocked = false, cap = cap)
         val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
         val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
-        val use = if (!PeoplePath.clearsSide(labels, side, rangeMeters, hfovDeg) &&
-            PeoplePath.clearsSide(labels, other, rangeMeters, hfovDeg)
+        val use = if (!PeoplePath.clearsSide(labels, side, range, hfovDeg) &&
+            PeoplePath.clearsSide(labels, other, range, hfovDeg)
         ) {
             other
         } else {
@@ -152,11 +234,56 @@ class GuidanceAnnouncer(
         )
     }
 
-    /** Décalage latéral : obstacle proche qui s'approche — mot du côté où aller. */
-    private fun nudgeOf(atMs: Long, labels: List<PlacedLabel>, hfovDeg: Float): LateralNudge? {
-        val cue = nudge.onFrame(atMs, labels, hfovDeg) ?: return null
-        lastNudge = cue
-        return cue
+    /**
+     * Portée de la frame : l'horizon de marche ([Timing.rangeFor]) quand la
+     * vitesse est connue — on voit venir de plus loin en marchant vite — mais
+     * jamais moins que la portée historique ([rangeMeters]), pour qu'aucun
+     * appelant sans GPS ne perde de champ.
+     */
+    private fun rangeFor(speedMps: Float?): Float =
+        if (speedMps == null) rangeMeters else maxOf(rangeMeters, Timing.rangeFor(speedMps))
+
+    /**
+     * Décalage latéral : obstacle proche qui s'approche — mot du côté où aller.
+     * [free] est la place libre de la frame : le drapeau [LateralNudge.tight]
+     * est re-vérifié ici (`canShift`), pour que la couche voix ne reçoive
+     * jamais un décalage « serré » contredit par le terrain.
+     */
+    private fun nudgeOf(
+        atMs: Long,
+        labels: List<PlacedLabel>,
+        hfovDeg: Float,
+        ageMs: Long,
+        speedMps: Float?,
+        free: FreeSpace,
+    ): LateralNudge? {
+        val cue = nudge.onFrame(
+            atMs = atMs,
+            labels = labels,
+            hfovDeg = hfovDeg,
+            ageMs = ageMs,
+            speedMps = speedMps,
+            free = free,
+        ) ?: return null
+        val tightened = tightOf(cue, free)
+        lastNudge = tightened
+        return tightened
+    }
+
+    /**
+     * Décalage marqué serré si la place libre du côté conseillé n'a même pas
+     * la marge de bord ([FreeSpace.EDGE_MARGIN_M]) : le mot reste celui du
+     * côté, mais la couche voix sait qu'il n'y a pas de pas à promettre.
+     * La règle est celle du tracker, re-vérifiée sur l'espace de la frame.
+     */
+    private fun tightOf(cue: LateralNudge, free: FreeSpace): LateralNudge {
+        if (cue.tight) return cue
+        val side = when (cue.side) {
+            SteeringCap.Left -> GuidanceSide.Left
+            SteeringCap.Right -> GuidanceSide.Right
+            SteeringCap.Straight -> return cue
+        }
+        return if (free.canShift(side, FreeSpace.EDGE_MARGIN_M)) cue else cue.copy(tight = true)
     }
 
     /**
@@ -180,21 +307,32 @@ class GuidanceAnnouncer(
         cap: SteeringCap,
         labels: List<PlacedLabel>,
         hfovDeg: Float,
+        range: Float,
     ): GuidanceWord {
         val word = sidewalkWord(sidewalk, cap)
         val capWord = GuidanceWord.fromCap(cap)
         if (word == capWord) return word
         val side = if (word == GuidanceWord.Left) GuidanceSide.Left else GuidanceSide.Right
-        return if (PeoplePath.clearsSide(labels, side, rangeMeters, hfovDeg)) word else capWord
+        return if (PeoplePath.clearsSide(labels, side, range, hfovDeg)) word else capWord
     }
 
     /**
      * Mot SAM ou TwinLite : nouveau dit aussitôt (overwrite, sans délai ni
      * stabilité, clips < 100 ms), même direction redite après [again]
      * (`null` = jamais répété ; plus aucun stop depuis le 31/10).
+     * [urgent] est le seul chemin qui ignore la redite : on écrit alors
+     * directement la mémoire ([AnnouncementGate.markSpoken], le même chemin
+     * d'écriture que les autres mots) et la phrase sort, pour un contact
+     * sous [Timing.URGENT_TTC_S] — la cadence ne retarde jamais un danger.
      */
-    private fun speak(atMs: Long, key: String, phrase: String, again: Long?): String? {
-        if (!gate.admit(atMs, key, urgent = true, firstSight = true, repeatMs = again)) return null
+    private fun speak(
+        atMs: Long,
+        key: String,
+        phrase: String,
+        again: Long?,
+        urgent: Boolean = false,
+    ): String? {
+        if (!urgent && !gate.admit(atMs, key, urgent = true, firstSight = true, repeatMs = again)) return null
         gate.markSpoken(key, atMs, phrase)
         return phrase
     }

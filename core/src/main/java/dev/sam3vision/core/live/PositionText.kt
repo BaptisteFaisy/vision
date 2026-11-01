@@ -19,6 +19,18 @@ data class PlacedLabel(
     val meters: Float? = null,
     val x0: Float? = null,
     val x1: Float? = null,
+    /**
+     * Identité de la piste ([PersonTracker]) : `null` quand l'appelant n'a pas
+     * suivi la scène. Sert à ne prévenir qu'une fois par personne et à juger
+     * l'approche (audit foule du 01/11).
+     */
+    val trackId: Int? = null,
+    /**
+     * Vitesse de fermeture de la piste (m/s, positif = ça se rapproche),
+     * `null` sans piste : [Timing.projectDistance] rend alors la mesure telle
+     * quelle au lieu de deviner un mouvement.
+     */
+    val closingMps: Float? = null,
 ) {
     /** Repère lisible **français** (interface et signature de scène) : « à 9 heures ». */
     val position: String get() = PositionText.clockLabel(centerX)
