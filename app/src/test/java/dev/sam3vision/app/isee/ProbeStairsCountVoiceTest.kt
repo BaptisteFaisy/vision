@@ -29,7 +29,7 @@ import org.junit.Test
 /**
  * Voix du compteur de marches : quand SAM nomme l'escalier et que la caméra
  * voit des marches fraîches, le battement 300 ms dit le compte (« N
- * marches. »), une fois par compte puis répété toutes les 4 s ; sans
+ * marches. »), une fois par compte puis répété toutes les 1 s ; sans
  * escalier nommé, sans compte frais ou en Traversée : silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
@@ -71,7 +71,7 @@ class ProbeStairsCountVoiceTest {
     }
 
     @Test
-    fun `escalier nomme et marches vues dit le compte une fois`() = runTest {
+    fun `meme compte se repete toutes les 1 s`() = runTest {
         val (probe, fake, spoken, scope) = harness(this)
         try {
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
@@ -80,10 +80,17 @@ class ProbeStairsCountVoiceTest {
 
             respond(probe, fake, "A")
             assertTrue(stairsFoundOf(probe.state.value).detected)
-            advanceTimeBy(1_500L)
             runCurrent()
-
             assertEquals(listOf("$offered marches."), spoken)
+
+            advanceTimeBy(1_000L)
+            runCurrent()
+            assertEquals(2, spoken.size)
+
+            advanceTimeBy(1_000L)
+            runCurrent()
+            assertEquals(3, spoken.size)
+            assertTrue(spoken.all { it == "$offered marches." })
         } finally {
             scope.cancel()
         }
@@ -161,15 +168,19 @@ class ProbeStairsCountVoiceTest {
         // Scheduler coupé : ce test verrouille le compteur, pas les keyframes (voir LiveAdaptiveTest).
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         val spoken = mutableListOf<String>()
+        // Horloges virtuelles partagées : le compteur et la déduplication voix
+        // suivent le temps du test, pas l'horloge réelle.
+        val clock = { scope.testScheduler.currentTime }
         val voice = ProximityVoice(
             player = SpeechPlayer(File(tempDir(), "play")),
             settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
             safety = testSafetyVoice(),
             onSpeaking = { if (it.isNotEmpty()) spoken += it },
             synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
+            nowMs = clock,
         )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        probe.observeStairsCount(watchers, voice, { true }, { SpeechLanguage.Fr })
+        probe.observeStairsCount(watchers, voice, { true }, { SpeechLanguage.Fr }, nowMs = clock)
         return Wiring(probe, fake, spoken, watchers)
     }
 
