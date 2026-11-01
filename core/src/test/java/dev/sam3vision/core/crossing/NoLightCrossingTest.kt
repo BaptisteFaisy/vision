@@ -51,11 +51,13 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `annonceur - traversez des la 2e frame calme`() {
+    fun `annonceur - silence avant 3 s calmes, traversez apres`() {
         val voice = NoLightAnnouncer()
 
         assertNull(voice.onFrame(0L, danger = false, SpeechLanguage.Fr))
-        assertEquals("Traversez.", voice.onFrame(200L, danger = false, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(200L, danger = false, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(2_000L, danger = false, SpeechLanguage.Fr))
+        assertEquals("Traversez.", voice.onFrame(3_000L, danger = false, SpeechLanguage.Fr))
     }
 
     @Test
@@ -65,13 +67,18 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `annonceur - danger isole tait, calme reconfirme`() {
+    fun `annonceur - danger rouvre la fenetre de 3 s`() {
         val voice = NoLightAnnouncer()
         voice.onFrame(0L, danger = false, SpeechLanguage.Fr)
+        voice.onFrame(1_000L, danger = false, SpeechLanguage.Fr)
 
-        assertNull(voice.onFrame(200L, danger = true, SpeechLanguage.Fr))
-        assertNull(voice.onFrame(400L, danger = false, SpeechLanguage.Fr))
-        assertEquals("Traversez.", voice.onFrame(600L, danger = false, SpeechLanguage.Fr))
+        // Danger isolé : tait et rouvre la fenêtre.
+        assertNull(voice.onFrame(1_200L, danger = true, SpeechLanguage.Fr))
+        // 2,8 s de calme après le danger : encore silence.
+        assertNull(voice.onFrame(2_000L, danger = false, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(4_000L, danger = false, SpeechLanguage.Fr))
+        // 3 s après le retour au calme : « Traversez. ».
+        assertEquals("Traversez.", voice.onFrame(5_000L, danger = false, SpeechLanguage.Fr))
     }
 
     @Test
@@ -88,10 +95,11 @@ class NoLightCrossingTest {
     fun `annonceur - attendez coupe le delai apres traversez`() {
         val voice = NoLightAnnouncer()
         voice.onFrame(0L, danger = false, SpeechLanguage.Fr)
-        assertEquals("Traversez.", voice.onFrame(200L, danger = false, SpeechLanguage.Fr))
+        voice.onFrame(1_000L, danger = false, SpeechLanguage.Fr)
+        assertEquals("Traversez.", voice.onFrame(3_000L, danger = false, SpeechLanguage.Fr))
 
-        assertNull(voice.onFrame(400L, danger = true, SpeechLanguage.Fr))
-        assertEquals("Attendez.", voice.onFrame(600L, danger = true, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(3_200L, danger = true, SpeechLanguage.Fr))
+        assertEquals("Attendez.", voice.onFrame(3_400L, danger = true, SpeechLanguage.Fr))
     }
 
     @Test
@@ -106,23 +114,37 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `annonceur - repetition toutes les 2 s`() {
+    fun `annonceur - traversez apres 3 s, repetition toutes les 2 s`() {
         val voice = NoLightAnnouncer()
         voice.onFrame(0L, danger = false, SpeechLanguage.En)
-        assertEquals("Cross.", voice.onFrame(200L, danger = false, SpeechLanguage.En))
+        assertNull(voice.onFrame(200L, danger = false, SpeechLanguage.En))
+        assertEquals("Cross.", voice.onFrame(3_000L, danger = false, SpeechLanguage.En))
 
-        assertNull(voice.onFrame(400L, danger = false, SpeechLanguage.En))
-        assertEquals("Cross.", voice.onFrame(2_300L, danger = false, SpeechLanguage.En))
+        assertNull(voice.onFrame(3_200L, danger = false, SpeechLanguage.En))
+        assertEquals("Cross.", voice.onFrame(5_100L, danger = false, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `annonceur - phrase vehicule calme ne rouvre pas la fenetre`() {
+        val voice = NoLightAnnouncer()
+        voice.onFrame(0L, danger = false, SpeechLanguage.Fr)
+        // Une phrase véhicules sur calme (ex. « à l'arrêt ») recule le
+        // délai du verdict, sans rouvrir la fenêtre de 3 s.
+        assertNull(voice.onFrame(1_000L, danger = false, SpeechLanguage.Fr, vehicleSpoke = true))
+        assertNull(voice.onFrame(2_000L, danger = false, SpeechLanguage.Fr))
+        assertEquals("Traversez.", voice.onFrame(3_100L, danger = false, SpeechLanguage.Fr))
     }
 
     @Test
     fun `annonceur - reset rearme`() {
         val voice = NoLightAnnouncer()
         voice.onFrame(0L, danger = false, SpeechLanguage.Fr)
-        voice.onFrame(200L, danger = false, SpeechLanguage.Fr)
+        voice.onFrame(1_000L, danger = false, SpeechLanguage.Fr)
+        voice.onFrame(3_000L, danger = false, SpeechLanguage.Fr)
         voice.reset()
 
-        assertNull(voice.onFrame(400L, danger = false, SpeechLanguage.Fr))
-        assertEquals("Traversez.", voice.onFrame(600L, danger = false, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(3_200L, danger = false, SpeechLanguage.Fr))
+        assertNull(voice.onFrame(3_400L, danger = false, SpeechLanguage.Fr))
+        assertEquals("Traversez.", voice.onFrame(6_400L, danger = false, SpeechLanguage.Fr))
     }
 }

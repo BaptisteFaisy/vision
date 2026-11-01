@@ -74,30 +74,34 @@ class NoLightCrossingTest {
     }
 
     @Test
-    fun `sans feu - traversez des la 2e frame calme`() {
+    fun `sans feu - silence avant 3 s calmes, traversez apres`() {
         resetWatches()
 
         assertNull(calm(SpeechLanguage.Fr, 0L))
-        assertEquals("Traversez.", calm(SpeechLanguage.Fr, 200L))
+        assertNull(calm(SpeechLanguage.Fr, 200L))
+        assertNull(calm(SpeechLanguage.Fr, 2_000L))
+        assertEquals("Traversez.", calm(SpeechLanguage.Fr, 3_000L))
     }
 
     @Test
-    fun `sans feu - traversez en anglais`() {
+    fun `sans feu - traversez en anglais apres 3 s calmes`() {
         resetWatches()
 
         assertNull(calm(SpeechLanguage.En, 0L))
-        assertEquals("Cross.", calm(SpeechLanguage.En, 200L))
+        assertNull(calm(SpeechLanguage.En, 1_000L))
+        assertEquals("Cross.", calm(SpeechLanguage.En, 3_000L))
     }
 
     @Test
-    fun `sans feu - repetition toutes les 2 s`() {
+    fun `sans feu - repetition toutes les 2 s apres 3 s calmes`() {
         resetWatches()
         val language = SpeechLanguage.Fr
 
         assertNull(calm(language, 0L))
-        assertEquals("Traversez.", calm(language, 200L))
-        assertNull(calm(language, 400L))
-        assertEquals("Traversez.", calm(language, 2_300L))
+        assertNull(calm(language, 1_000L))
+        assertEquals("Traversez.", calm(language, 3_000L))
+        assertNull(calm(language, 3_200L))
+        assertEquals("Traversez.", calm(language, 5_100L))
     }
 
     @Test
@@ -224,14 +228,15 @@ class NoLightCrossingTest {
         }
 
         assertNull(parked(0L))
-        assertEquals("Traversez.", parked(200L))
-        assertEquals("Voiture à l'arrêt, à 5 mètres.", parked(400L))
-        assertNull(parked(600L))
-        assertEquals("Traversez.", parked(2_500L))
+        assertNull(parked(1_000L))
+        assertEquals("Voiture à l'arrêt, à 5 mètres.", parked(2_000L))
+        assertNull(parked(3_100L))
+        assertNull(parked(3_200L))
+        assertEquals("Traversez.", parked(4_100L))
     }
 
     @Test
-    fun `sans feu - pan sur voiture garee lointaine dit traversez`() {
+    fun `sans feu - pan sur voiture garee lointaine dit traversez apres 3 s`() {
         resetWatches()
         fun panning(index: Int, atMs: Long): String? {
             val frame = carBox(100f, cx = 320f + index * 5f)
@@ -242,8 +247,10 @@ class NoLightCrossingTest {
         }
 
         assertNull(panning(0, 0L))
-        assertEquals("Traversez.", panning(1, 100L))
-        assertNull(panning(2, 200L))
+        assertNull(panning(1, 100L))
+        assertNull(panning(15, 1_500L))
+        assertNull(panning(29, 2_900L))
+        assertEquals("Traversez.", panning(30, 3_000L))
     }
 
     @Test
@@ -258,10 +265,11 @@ class NoLightCrossingTest {
         }
 
         assertNull(calm(SpeechLanguage.En, 0L))
-        assertEquals("Cross.", calm(SpeechLanguage.En, 200L))
-        assertNull(moving(100f, 400L))
-        assertNull(moving(110f, 500L))
-        assertEquals("Stop, car moving.", moving(120f, 600L))
+        assertNull(calm(SpeechLanguage.En, 1_000L))
+        assertEquals("Cross.", calm(SpeechLanguage.En, 3_000L))
+        assertNull(moving(100f, 3_200L))
+        assertNull(moving(110f, 3_300L))
+        assertEquals("Stop, car moving.", moving(120f, 3_400L))
     }
 
     @Test
