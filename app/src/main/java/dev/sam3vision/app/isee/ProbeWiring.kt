@@ -104,6 +104,8 @@ internal fun LiveProbe.configureFrom(
     }
     val forced = if (fromGlasses) settings.glassesFovDeg else settings.cameraFovDeg
     val chosen = chooseLens(forced, sensorLens, glassesLens, fromGlasses)
+    // Converge avec `observeGlassesLive` : le pont E5 recadre cette focale par photo.
+    GlassesVideoLink.glassesStreamLens = if (fromGlasses) chosen.spec else null
     onLens?.invoke(chosen.origin)
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
