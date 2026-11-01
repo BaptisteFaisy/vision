@@ -50,6 +50,31 @@ def add_ms(timers: dict, stage: str, value_ms: float) -> float:
     return total
 
 
+def _as_ms(value) -> float:
+    """Poste en ms flottant ; absent ou non numérique → 0.0 (jamais d'exception)."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def build_breakdown(timers: dict, total_ms: float) -> dict:
+    """Partage vision / DETR / overhead d'une frame, en ms (somme = total).
+
+    ``vision_ms`` = l'encodeur (une passe/frame), ``detr_ms`` = les passes DETR
+    (cumul quand un forward par concept), ``overhead_ms`` = tout le reste
+    (décodage, préprocess, tokenize, post, transferts, file GPU, masques…).
+    L'overhead est un résidu borné à 0 : un cumul de postes supérieur au total
+    (arrondis) ne donne jamais un temps négatif. Émis **toujours** (pas de
+    levier) : trois nombres, ~60 o, ignorés par les clients anciens.
+    """
+    vision = round(_as_ms(timers.get("vision_ms")), DIGITS)
+    detr = round(_as_ms(timers.get("detr_ms")), DIGITS)
+    total = round(_as_ms(total_ms), DIGITS)
+    overhead = round(max(total - vision - detr, 0.0), DIGITS)
+    return {"vision_ms": vision, "detr_ms": detr, "overhead_ms": overhead}
+
+
 class Stage:
     """Chronomètre de bloc : ``with Stage(timers, "vision_ms"):``.
 

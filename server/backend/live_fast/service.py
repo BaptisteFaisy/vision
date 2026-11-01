@@ -21,7 +21,8 @@ from http_errors import validation_detail as _validation_detail
 from live_app_utils import accepts_param, call
 from passage import suggest_passage
 from pipe_compat import accepts_param, call
-from timing import Stage, container_age_seconds, elapsed_ms, format_server_timing, now
+from timing import (Stage, build_breakdown, container_age_seconds, elapsed_ms,
+                      format_server_timing, now)
 
 MODEL_LABEL = "sam3.1-fast"
 # Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
@@ -131,6 +132,7 @@ class Sam3LiveService:
         conteneur, la frame N+1 se prépare pendant l'inférence de N. Le résultat porte en
         plus ``mask_encoding`` (la représentation appliquée) et, si ``FAST_TIMING=1``,
         ``timings_ms`` (postes en ms). ``elapsed_ms`` garde son sens : total serveur.
+        ``breakdown_ms`` (vision / DETR / overhead, somme = total) est émis toujours.
         """
         from imaging import decode_image
 
@@ -160,6 +162,7 @@ class Sam3LiveService:
                            with_depth=with_depth)
         timers["total_ms"] = elapsed_ms(started)
         result["elapsed_ms"] = int(round(timers["total_ms"]))
+        result["breakdown_ms"] = build_breakdown(timers, timers["total_ms"])
         result["fast"] = {"batch_prompts": batch, "edge": result.pop("_edge_applied"),
                           "edge_asked": edge, "edge_ok": result.pop("_edge_ok"),
                           "vision_accel": self.ctx.get("vision_accel"),
