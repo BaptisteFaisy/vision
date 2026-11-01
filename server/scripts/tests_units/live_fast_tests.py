@@ -17,10 +17,16 @@ import numpy as np
 
 
 class _Tensor:
-    """Tensor factice : ne sert qu'à ``detection_entries`` (``.float().cpu().numpy()``)."""
+    """Tensor factice : ``detection_entries`` (``.float().cpu().numpy()``, ``[top].byte()``)."""
 
     def __init__(self, array) -> None:
         self._array = np.asarray(array)
+
+    def __getitem__(self, key):
+        return _Tensor(self._array[key])
+
+    def byte(self):
+        return _Tensor(self._array.astype(np.uint8))
 
     def float(self):
         return self
@@ -56,6 +62,13 @@ def test_detection_entries(segmentation) -> None:
           entries[0]["box"] == [0.0, 0.0, 8.0, 8.0], str(entries[0]["box"]))
     check("detection_entries: keep=0 → aucun objet",
           segmentation.detection_entries(_detection(4), "car", (8, 8), (8, 8), keep=0) == [])
+    full = segmentation.detection_entries(_detection(30), "chaise", (8, 8), (16, 16), keep=100)
+    check("detection_entries: masque uint8, valeurs intactes",
+          entries[0]["mask"].dtype == np.uint8 and entries[0]["mask"].sum() == 1
+          and entries[0]["mask"][1, 1] == 1, str(entries[0]["mask"].dtype))
+    check("detection_entries: top-k avant transfert = sélection complète tronquée",
+          [e["score"] for e in entries] == [e["score"] for e in full[:12]]
+          and all((a["mask"] == b["mask"]).all() for a, b in zip(entries, full[:12])))
 
 
 def _scored(count: int, scores):
