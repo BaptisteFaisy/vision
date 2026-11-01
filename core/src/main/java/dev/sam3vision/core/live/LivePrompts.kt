@@ -4,130 +4,52 @@ package dev.sam3vision.core.live
  * Prompts du direct : concepts suivis par SAM 3.1, liste courte modifiable depuis l'UI.
  * [normalize] assainit avant l'envoi au backend (`max_objects` borne la réponse).
  *
- * Navigation : aucune consigne ici, le post-traitement suffit. L'intention (« aller à X »)
- * est détectée en déterministe sur le texte dicté (NavigationIntentParser),
- * pas par un concept suivi ni par le LLM. Ces prompts sont des noms de concepts SAM 3.1
- * (18 max, 32 caractères max), pas des instructions : une phrase de navigation n'y aurait
- * aucun sens et volerait un slot de suivi.
+ * Spec v4 : listes verrouillées, deux mondes.
+ * - Dehors ([default]) : 16 concepts — personne, voiture, feu piéton, bordure,
+ *   trottoir, passage piéton, poteau, escaliers, grillage, mur, barrière, panneau,
+ *   lampadaire, animal, poubelle, souvenirs.
+ * - Dedans ([indoor]) : 10 objets — clés, boîte de médicaments, lunettes, boîtier
+ *   de lunettes, téléphone, chaussures, porte, murs, humain, chaussettes.
+ *
+ * Supprimés de la détection (spec v4) : bus, vélo, camion, moto, clés dehors,
+ * borne, arbre, portail, bateau — plus les anciens doublons (tête du feu,
+ * trottinette, poussette, enfant, chien, bonnet).
+ *
+ * Concepts en anglais : c'est la langue que SAM 3.1 segmente le mieux.
+ * [forMode] bascule les listes dehors/dedans (`Settings.outdoorMode` côté sonde).
+ * « Find my X » ([withConcept]) ajoute le concept, le dernier cède son slot au
+ * plafond. Champ « Follow » ([field]) gardé.
  */
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **21** concepts extérieurs — mobiles (« person »,
-     * « car », « bus », et « bicycle » + « motorcycle » du 01/11 : un vélo et
-     * une moto arrivent vite et longent le trottoir) puis feux piétons et cheminement (« pedestrian traffic light »,
-     * « pedestrian signal head », « curb », « crosswalk ») puis statiques
-     * (« pole », « stairs », « keys », « gate », « wall », ordre user du 31/10 :
-     * iSee détecte les murs), puis la boutique du square (« souvenir shop »,
-     * « beanie », « socks ») et enfin la foule (« stroller », « child »,
-     * « dog »).
-     *
-     * **Ordre user du 01/11** : « vire electric scooter, bicycle, sidewalk,
-     * fence », puis « rajoute bus », puis « bicycle moto je veux » — bus, vélo
-     * et moto sont revenus, puis « go sidewalk » : le trottoir aussi.
-     * Restent sortis : la trottinette électrique et la clôture.
-     *
-     * Le trottoir n'est **pas** un obstacle à contourner ([CurbConcepts.isGround]
-     * l'exclut du guidage) : il sert de **rail**. [SidewalkKeep.positionOf] le
-     * lit, et l'app ne corrige que si l'utilisateur n'est plus dessus (dérive,
-     * contournement) — trottoir droit devant = aucun mot. Ces cinq-là ne sont plus suivis **au repos** ; la
-     * Traversée les rétablit quand elle s'arme (`VehicleConcepts.promptsFor`
-     * remet car/bus/bicycle/camion/moto, et `TraversePipeline` remet curb +
-     * sidewalk), et le preset [outdoor] garde fence/animal pour la marche
-     * urbaine. Conséquence assumée : hors Traversée, un vélo ou un bus n'est
-     * plus vu — c'est le prix des slots rendus.
-     *
-     * **Ordre user du 01/11 : les souvenirs et les clés restent.** L'audit
-     * foule les avait sortis au profit de « stroller », « child »,
-     * « electric scooter » et « dog » ; Baptiste a demandé de les remettre.
-     * La foule n'est donc plus suivie par le **défaut** mais par [outdoor],
-     * le preset de marche urbaine (pastille « Extérieur »), qui porte les
-     * trois concepts de corps qui manquaient. Modifiables à chaud dans le
-     * direct (champ « Follow »), slot « curb » réservé.
-     *
-     * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
-     * dans les deux modes) : tout ce que la Traversée doit voir (voiture,
-     * bus, vélo, feu, bordure, trottoir, passage, personnes) est déjà suivi
-     * ici, la bascule ne change plus les prompts — sauf la traversée active,
-     * qui ajoute camion et moto (reel audit 31/10, voir `VehicleConcepts`).
-     * « door » et « window » ont cédé leurs slots aux véhicules, au feu et à
-     * la bordure ; « barrier » est sorti le 31/10 (le preset extérieur le
-     * reconnaît toujours) ; « electric scooter » est revenu le 01/11 pour la
-     * foule, sans changer le veto de la Traversée (qui le classe véhicule) ;
-     * « wall » y est entré le 31/10 (plafond 17 → 18, rien ne sort).
-     *
-     * Historique des plafonds : 2 (26/10, le tracker tronquait à
-     * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
-     * tous les dangers extérieurs), 17 (31/10, ordre user : tête du feu
-     * piéton en plus du caisson), 18 (31/10, ordre user : iSee détecte
-     * les murs) — [MAX] et `PROMPT_LIMIT` montent ensemble.
-     * Historique des défauts : 10 (28/10), 12 (29/10, ordre user : portes et
-     * barrières reconnues en plus), 14 (30/10 : clôtures et portails reconnus
-     * en plus), 16 (30/10 : unification traversée/normal ; 31/10 : camion,
-     * moto et trottinette cèdent leurs slots aux souvenirs), 17 (31/10 :
-     * tête du feu piéton en plus du caisson, « barrier » à « keys »),
-     * 18 (31/10 : « wall » en plus, rien ne sort), puis 01/11 à plafond
-     * constant : les trois souvenirs et « keys » sortent, la foule entre.
-     * Sur `/live` les prompts sont batchés (un seul forward, mesure du 26/10 :
-     * 2 ou 8 concepts = 118 ms médian) ; sur le tracker chaque concept coûte
-     * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
+     * Concepts dehors : les **16** de la spec v4, dans l'ordre de la spec.
+     * Liste unique normal/Traversée : la bascule ne change plus les prompts.
      */
     val default: List<String> = listOf(
-        "person", "car", "bus", "bicycle", "motorcycle",
-        "pedestrian traffic light", "pedestrian signal head",
-        "curb", "sidewalk", "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop",
-        "beanie", "socks", "wall", "stroller", "child", "dog",
+        "person", "car", "pedestrian traffic light", "curb", "sidewalk", "crosswalk",
+        "pole", "stairs", "fence", "wall", "barrier", "sign", "street lamp",
+        "animal", "trash can", "souvenir shop",
     )
 
     /**
-     * Preset extérieur : **18** concepts de cheminement urbain — la personne et
-     * le mobilier qui borde le trottoir (poteaux, lampadaires, bornes, clôtures,
-     * barrières, portails, panneaux, arbres), plus le trottoir lui-même et le
-     * passage piéton, les encombrants (poubelles), les animaux et le feu piéton
-     * — ordre user du 29/10 (31/10 : piétons seuls, plus de feux voiture, tête
-     * du feu suivie) (30/10 : « sidewalk » remplace « dumpster ») (reel audit
-     * 31/10 : « crosswalk » et « street lamp » en plus, « bollard » et « sign »
-     * déjà suivis, non dupliqués), détecté en permanence hors mode traversée
-     * pour anticiper les passages protégés. Bascule depuis la pastille
-     * « Extérieur » du direct, sans passer par le champ « Follow ». Les trois
-     * concepts de foule ajoutés le 01/11 (« stroller », « child »,
-     * « electric scooter ») y vivent : la marche urbaine voit la poussette et
-     * l'enfant, le défaut garde la boutique. 18 concepts, au plafond, comme
-     * [default] (pastille « Rue »).
+     * Preset extérieur : replié sur [default] (spec v4, détection unifiée à 16
+     * concepts). Gardé pour la pastille « Outdoor » du direct, qui envoie la
+     * même liste que « Street ».
      */
-    val outdoor: List<String> = listOf(
-        "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
-        "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
-        "pedestrian traffic light", "pedestrian signal head",
-        "stroller", "child", "electric scooter",
-    )
+    val outdoor: List<String> = default
 
     /**
-     * Concepts d'intérieur : **10** objets d'appartement pour la sonde iSee en
-     * mode maison — la personne et ce qui structure une pièce (portes,
-     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables),
-     * le passage piéton (reel audit 31/10), la poussette (audit foule du
-     * 01/11 : la personne qui se déplace chez elle avec une poussette ou un
-     * déambulateur — c'est un corps qui bloque, pas du décor ; le déambulateur
-     * n'a pas de concept propre, la poussette est le plus proche voisin) et
-     * les clés (ordre du 01/11 : SAM juge l'affichage du picto clé, dedans
-     * comme dehors — le gabarit seul ne l'affiche plus).
-     * Bien sous [MAX] ; les pastilles du mode Maison ([HomeModes]) gardent
-     * leurs autres petits objets (médicaments…) : ici les clés sont suivies
-     * comme le décor, pas seulement sur le mot parlé.
+     * Concepts dedans : les **10** objets de la spec v4, dans l'ordre de la spec.
      */
     val indoor: List<String> = listOf(
-        "person", "stroller", "door", "chair", "table", "stairs", "wall", "window",
-        "crosswalk", "keys",
+        "keys", "medicine box", "glasses", "glasses case", "phone", "shoes",
+        "door", "wall", "person", "socks",
     )
 
     /**
-     * Liste du monde sensoriel : dehors = [default] (les 21 concepts
-     * extérieurs, foule incluse), dedans = [indoor] (les 10 objets
-     * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
-     * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
-     * (18 concepts de cheminement, pastille « Extérieur » du direct) : la
-     * bascule monde s'applique à la sonde iSee, pas aux pastilles.
+     * Liste du monde sensoriel : dehors = [default] (16 concepts), dedans =
+     * [indoor] (10 objets). La sonde iSee bascule via `Settings.outdoorMode`.
      */
     fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
 
@@ -142,18 +64,11 @@ object LivePrompts {
     }
 
     /**
-     * Nombre maximal de concepts : **22** (18 du 01/11 plus poussette, enfant,
-     * trottinette et chien, ordre user du 01/11 : la boutique **et** la foule
-     * ensemble). Le backend suit : `MAX_PROMPTS = 22` sur `/live`,
-     * `PROMPT_LIMIT = 22` côté tracker ; le client ne doit pas en envoyer
-     * davantage — sinon l'app affiche des concepts jamais détectés.
-     *
-     * La liste par défaut occupe 21 de ces 22 places : la marge sert à
-     * « Find the X » ([withConcept]), pas à allonger le suivi au repos.
-     *
-     * **Couplage de déploiement** : un serveur resté à 18 **refuse** la frame
-     * (`PromptError`), il ne tronque pas. Le serveur se déploie au merge
-     * (`[deploy-gpu]`) ; une app à 22 ne doit partir qu'après.
+     * Nombre maximal de concepts : **22** (le backend suit : `MAX_PROMPTS = 22`
+     * sur `/live`, `PROMPT_LIMIT = 22` côté tracker ; un serveur resté en
+     * arrière **refuse** la frame, il ne tronque pas). Les listes spec v4
+     * (16 dehors, 10 dedans) tiennent sous ce plafond ; la marge sert à
+     * « Find my X » ([withConcept]), pas à allonger le suivi au repos.
      */
     const val MAX = 22
 
@@ -176,11 +91,11 @@ object LivePrompts {
     }
 
     /**
-     * Ordre « Find the X » : [label] rejoint [prompts], même au plafond —
+     * Ordre « Find my X » : [label] rejoint [prompts], même au plafond —
      * le dernier concept cède alors son slot à l'ordre explicite (les
-     * concepts de tête, piétons et traversée, ne bougent jamais). Déjà
-     * présent (comparaison insensible à la casse), vide ou trop long :
-     * liste inchangée. Pur, testé en JVM.
+     * concepts de tête ne bougent jamais). Déjà présent (comparaison
+     * insensible à la casse), vide ou trop long : liste inchangée. Pur, testé
+     * en JVM.
      */
     fun withConcept(prompts: List<String>, label: String): List<String> {
         val clean = label.trim()
