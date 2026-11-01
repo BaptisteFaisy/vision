@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — Latence : verdicts R1/ENCODE/p95 consolidés, budget republié (branche `lat-coord-verdict`)
+
+- **Fait** : reprise du chantier latence (15 agents) consolidée en une mise à jour
+  unique du budget — `ENCODE` passe de 27 à **10 ms mesurés** (n = 343, écart 27/32
+  tranché), la campagne **R1 Redmi combi** (N = 323, moyenne 343 ms, max 722 ms,
+  p95 477, p99 573, gigue 75,1) ne tient ni 300/500 ni 250/500, `cb` p95 = 67
+  expliqué et résolu (split `be6ca9ac`, p95 = 1 post-split), file client confirmée
+  (`up` p50 19 = phase caméra, file serveur 0). Outillage déjà mergé : parseur et
+  budget enrichis (PR #902), porte N/conditions datées (PR #906), analyseur
+  `lat_stats` (PR #915), contrat M1 byte-exact (PR #900). Restent en attente (bail
+  GPU w12 jamais libéré, Redmi débranché le 01/11 à 18:16) : campagne longue sur
+  master HEAD, froid/snapshot muraux, partage vision/détection, baseline M1 A/B,
+  DECODE-vs-N.
+- **Preuve** : `budget_latence.py --selftest` 20/20, `--check-doc` 7/7,
+  `check-budget-provenance.py` 0 erreur (2 avertissements grand-père),
+  `test_scripts.sh` vert, CI `ci/couche0/ci-budget` verte.
+
 ## 2026-11-01 — iSee : fin du crash `IndexOutOfBounds` des trackers concurrents (branche `persontracker-race`)
 
 - **Fait** : `LiveProbe.dispatch` lance un `runFrame` par frame sans garde
