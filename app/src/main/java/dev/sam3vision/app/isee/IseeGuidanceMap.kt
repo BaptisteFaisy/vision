@@ -28,10 +28,9 @@ import dev.sam3vision.core.nav.NavRoute
  * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
  * l'écran : carte réduite (tracé + position, repli schéma si les tuiles
  * échouent) et instruction en cours, sans le reste du trajet (ni km ni
- * temps). La boule et la phrase en cours s'effacent pendant
- * le guidage (la carte prend leur place), la caméra et la sonde
- * continuent (évitement d'obstacles préservé). L'arrêt se fait à la
- * voix (« arrête le guidage »).
+ * temps). La boule et la phrase restent affichées entre la caméra et la
+ * carte, la caméra et la sonde continuent (évitement d'obstacles
+ * préservé). L'arrêt se fait à la voix (« arrête le guidage »).
  *
  * Affichée par `IseeScenePane` quand la session est en
  * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
@@ -72,9 +71,11 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
 /**
  * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
- * phrase ([orb]). Le choix vit ici (état de session observé) pour garder
- * `PortraitScene` sous le plafond de 50 lignes. La barre du bas s'efface
- * pendant le guidage ([isGuidanceOverlay]) : pas de recouvrement.
+ * phrase ([orb]). Pendant le guidage, la boule et la phrase restent
+ * affichées entre la caméra et la carte. Le choix vit ici (état de
+ * session observé) pour garder `PortraitScene` sous le plafond de 50
+ * lignes. La barre du bas s'efface pendant le guidage
+ * ([isGuidanceOverlay]) : pas de recouvrement.
  */
 @Composable
 internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
@@ -84,11 +85,11 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
     val navState by viewModel.voiceNavState.collectAsState()
     val placed = Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp).padding(horizontal = 16.dp)
     when (val nav = navState) {
-        is VoiceNavUiState.Guiding -> IseeGuidanceBlock(
-            nav,
-            viewModel::debugNavSnapshot,
-            placed,
-        )
+        is VoiceNavUiState.Guiding -> {
+            // La boule reste entre la caméra et la carte (la carte passe par-dessus).
+            orb()
+            IseeGuidanceBlock(nav, viewModel::debugNavSnapshot, placed)
+        }
         is VoiceNavUiState.Confirming -> IseeRouteLoading(nav, placed)
         else -> orb()
     }
@@ -96,8 +97,8 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
 
 /**
  * Le guidage recouvre-t-il la scène (calcul d'itinéraire ou carte suivie) :
- * la carte prend le bas de l'écran, la boule, la phrase et la barre du bas
- * s'effacent. Pure : même état, même réponse, testée sur JVM.
+ * la carte prend le bas de l'écran et la barre du bas s'efface (la boule
+ * et la phrase restent). Pure : même état, même réponse, testée sur JVM.
  */
 internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
     navState is VoiceNavUiState.Guiding || navState is VoiceNavUiState.Confirming
