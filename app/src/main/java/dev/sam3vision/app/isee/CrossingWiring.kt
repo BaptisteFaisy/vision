@@ -371,8 +371,8 @@ internal object CrossingLateralWatch {
 /**
  * Alimente le guidage latéral depuis la sonde : hors traversée le mot et
  * l'arrivée suivent chaque frame publiée ; en traversée ils ne suivent que
- * passage proche (≤ 3 m mesurés ou boîte prouvée sous les pieds,
- * [CrossingOffer.seesNearCrosswalk] — fail-closed) : à moins de 3 m en face,
+ * passage proche (≤ 6 m mesurés ou boîte prouvée sous les pieds,
+ * [CrossingOffer.seesNearCrosswalk] — fail-closed) : à moins de 6 m en face,
  * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
  * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
  * doux, `urgent = false`). Loin ou invisible, la mémoire retombe (une ligne

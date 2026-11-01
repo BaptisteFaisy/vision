@@ -175,12 +175,12 @@ class CrossingLateralTest {
         val box = listOf(10f, 100f, 100f, 500f)
         val objects = listOf(obj("crosswalk", box))
         feedCrossingLateral(
-            true, objects, 512, 1138, listOf(reading("crosswalk", 2.5f, box)), null,
+            true, objects, 512, 1138, listOf(reading("crosswalk", 5.0f, box)), null,
             LensSpec.Default, 0L, SpeechLanguage.Fr,
         )
         assertEquals("Gauche.", CrossingLateralWatch.flow.value?.lateral)
         feedCrossingLateral(
-            true, objects, 512, 1138, listOf(reading("crosswalk", 5.0f, box)), null,
+            true, objects, 512, 1138, listOf(reading("crosswalk", 6.5f, box)), null,
             LensSpec.Default, 200L, SpeechLanguage.Fr,
         )
         assertNull(CrossingLateralWatch.flow.value)

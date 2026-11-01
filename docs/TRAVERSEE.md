@@ -330,12 +330,12 @@ Ordre user : fini le doute — rouge ou vert, et une différenciation certaine.
 
 ## 10. Guidage sur le passage proche, même en Traversée (31/10)
 
-Ordre user : à moins de 3 m en face, iSee aligne l'user à la voix pour qu'il
+Ordre user : à moins de 6 m en face (3 m le 31/10, 6 m depuis le 01/11, §17), iSee aligne l'user à la voix pour qu'il
 soit bien sur le passage. Avant, le latéral retombait dès que le mode
 s'armait — pile quand l'user s'en approchait, plus d'alignement ni de
 « Sur le passage. ».
 
-- **seuil** : `CrossingGuidance.GUIDE_METERS = 3,0 m` — au-delà ou sans
+- **seuil** : `CrossingGuidance.GUIDE_METERS = 6,0 m` (3,0 m le 31/10) — au-delà ou sans
   preuve de proximité (mesure ou boîte prouvée sous les pieds,
   `CrossingOffer.seesNearCrosswalk` avec `maxMeters = GUIDE_METERS`,
   fail-closed), silence comme avant ;
@@ -492,3 +492,24 @@ Depuis le 31/10 le déploiement CI est conditionnel (marqueur `[deploy-gpu]`
 dans le message du push, `deploy-live-fast.yml`) : chaque deploy invalide le
 snapshot, donc une prise qui suit un deploy de peu paie le boot complet —
 prévoir le `/warm` dans le temps d'installation, pas dans la minute de prise.
+
+## 17. Passage dit 6 m à l'avance, guidé dès 6 m (01/11)
+
+Ordre user : quand un passage piéton est détecté, iSee le dit 6 m à
+l'avance (« Passage piéton à gauche, à 6 mètres. ») et guide vers lui
+(« Gauche. », « Droite. », « Tout droit. », puis « Sur le passage. »).
+Avant, l'annonce parlait dès la détection, même à 10-20 m — trop tôt
+pour s'aligner — et le guidage retombait au-delà de 3 m en Traversée.
+
+- **annonce** : `CrossingApproachWatcher.ANNOUNCE_METERS = 6,0 m` — mesuré
+  au-delà, silence (compte remis à zéro, annonce déjà dite gardée — dite
+  une fois par vue) ; à 6 m ou moins, 2 frames puis la phrase localisée ;
+  sans mesure, la direction seule parle comme avant (jamais de chiffre
+  deviné) ;
+- **guidage** : `CrossingGuidance.GUIDE_METERS = 6,0 m` (3,0 m le 31/10,
+  §10) — en Traversée comme hors Traversée, les mots doux suivent le
+  passage dès 6 m mesurés (ou boîte prouvée sous les pieds, fail-closed),
+  sous la priorité du feu, du veto et des véhicules ;
+- **preuves** : `CrossingApproachTest` (silence au-delà de 6 m, borne 6 m
+  incluse, loin-puis-proche), `CrossingGuidanceTest` et
+  `CrossingOfferTest` (bornes 6 m).
