@@ -263,10 +263,7 @@ class StairWatcher(
         }
         onCountdown(signal, nowMs, language, direction, meters)?.let { return it }
         if (hits < confirmFrames) return null
-        // Approche avec profondeur : les jalons ont la voix — le standard ne
-        // se répète ni entre deux paliers ni pendant qu'un palier se confirme
-        // (l'expiration de séance rouvre une approche neuve, standard parlé).
-        if (opened && meters != null && meters.isFinite()) return null
+        if (tiersOwnVoice(meters)) return null
         if (!cooldownOk(nowMs, cooldownMs)) return null
         markApproach(nowMs)
         return StairCue(
@@ -414,6 +411,11 @@ class StairWatcher(
             resetTiers()
         }
     }
+
+    /**
+     * Jalons maîtres de la voix : approche ouverte avec profondeur connue.
+     */
+    private fun tiersOwnVoice(meters: Float?): Boolean = opened && meters != null && meters.isFinite()
 
     /** Silence [cd] écoulé depuis la dernière annonce (ou aucune annonce encore). */
     private fun cooldownOk(nowMs: Long, cd: Long): Boolean =
