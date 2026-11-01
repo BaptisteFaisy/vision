@@ -143,6 +143,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `VeilPolicyTest` (4), `:core:testDebugUnitTest` vert sur r630 ;
   recette chambre sur Redmi `2c6852ac` (build branche) : teinte bleue partie
   (saturation haute 69→~30), couleurs du bas préservées, 6-7 objets suivis.
+## 2026-11-01 — docs : spec v4 + revue des 14 branches (branche `feat/isee-docs-revue`)
+
+- **Fait** : réécriture voix (`docs/VOIX-DANGER.md` : échelle 0-12, traversée
+  100-102, chaîne dedans, écrasement, table d'antirépétition, clips anglais,
+  10 ordres « mode … », listes 16/10, contrats `VoiceBus.post` /
+  `AntiRepeat.allow`), traversée (`docs/TRAVERSEE.md` : verdict « Cross. » /
+  « Don't cross. », voiture uniquement, exclusivité), recette rue
+  (`docs/RECETTE-RUE.md` : 12 items + interdits), guidage
+  (`docs/GUIDAGE-TOUT-DROIT.md` : GPS 11 + rappel 3, rail 10, repli 12),
+  résumé agents (`AGENTS.md` § 1 bis). Historiques pré-v4 : pointeurs
+  `git show 4a3c2bcf:…`, rien n'est perdu.
+- **Revue** : `docs/REVUE-V4.md` — 28 points relus dans le code des 14
+  branches `feat/isee-*` : 9 bloquantes (doublon `AntiRepeat`, niveau 0
+  « Car moving. » vs « Car. », verdict vs catalogue, silence vs synthèse,
+  murs au niveau 7, deux parseurs find, clips find hors catalogue,
+  confirmations en synthèse réseau, phrases seuils non clippables),
+  8 majeures, 9 trous/collisions (exclusivité traversée, repli 12,
+  arbitrage des modes, Maps partiel, code mort, `LivePrompts` réécrit
+  deux fois, tests tautologiques + « Wait. », collisions de merge),
+  12 décisions proposées (D-01 à D-12). 9 branches committées, 5 WIP non
+  committés, zéro vide à l'heure du relevé (~16h45).
+- **Preuve** : docs seuls, aucun code touché (`git status` : 6 fichiers
+  `.md`) ; aucune garde CI ne porte sur ces fichiers (`check-voice-nav-doc`
+  ne couvre que `NAVIGATION-VOCALE.md`, inchangé).
 
 ## 2026-11-01 — iSee : rail trottoir métrique, deux paliers (branche `feat/rail-trottoir`)
 
