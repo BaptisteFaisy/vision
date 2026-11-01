@@ -2,6 +2,7 @@ package dev.sam3vision.core.curb
 
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceSide
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
@@ -80,7 +81,7 @@ class SidewalkRailTest {
         val state = SidewalkRail.of(listOf(bord(-0.8f)))
 
         assertEquals(RailLevel.NONE, state.level)
-        assertNull(SidewalkRail.phrase(state))
+        assertNull(SidewalkRail.cue(state))
     }
 
     @Test
@@ -133,33 +134,27 @@ class SidewalkRailTest {
     }
 
     @Test
-    fun `phrase FR de derive dit l oppose du bord`() {
+    fun `derive dit le mot oppose au bord, pas une phrase`() {
+        // Ordre user du 01/11 : « juste droite et gauche » — les mots du
+        // guidage, donc les clips locaux (guide_left / guide_right).
         val gauche = SidewalkRail.of(listOf(bord(-0.4f)))
-        assertEquals("Serrez à droite.", SidewalkRail.phrase(gauche, SpeechLanguage.Fr))
+        assertEquals(RailCue.Direction(GuidanceWord.Right), SidewalkRail.cue(gauche))
 
         val droite = SidewalkRail.of(listOf(bord(0.4f)))
-        assertEquals("Serrez à gauche.", SidewalkRail.phrase(droite, SpeechLanguage.Fr))
+        assertEquals(RailCue.Direction(GuidanceWord.Left), SidewalkRail.cue(droite))
     }
 
     @Test
-    fun `phrase EN de derive dit l oppose du bord`() {
-        val gauche = SidewalkRail.of(listOf(bord(-0.4f)))
-        assertEquals("Keep right.", SidewalkRail.phrase(gauche, SpeechLanguage.En))
-
-        val droite = SidewalkRail.of(listOf(bord(0.4f)))
-        assertEquals("Keep left.", SidewalkRail.phrase(droite, SpeechLanguage.En))
-    }
-
-    @Test
-    fun `phrase de bord sans cote en FR et EN`() {
+    fun `au bord c est stop, la direction vient ensuite`() {
+        // Ordre user du 01/11 : « à 30 cm c'est stop puis la direction opposée ».
         val gauche = SidewalkRail.of(listOf(bord(-0.2f)))
-        assertEquals("Attention, bord du trottoir.", SidewalkRail.phrase(gauche, SpeechLanguage.Fr))
-        assertEquals("Caution, kerb.", SidewalkRail.phrase(gauche, SpeechLanguage.En))
+        assertEquals(RailLevel.EDGE, gauche.level)
+        assertEquals(RailCue.Stop, SidewalkRail.cue(gauche))
+        assertEquals(GuidanceSide.Right, SidewalkRail.awayFrom(gauche.side))
 
-        // Même phrase des deux côtés : le bord ne se nomme pas.
         val droite = SidewalkRail.of(listOf(bord(0.2f)))
-        assertEquals("Attention, bord du trottoir.", SidewalkRail.phrase(droite, SpeechLanguage.Fr))
-        assertEquals("Caution, kerb.", SidewalkRail.phrase(droite, SpeechLanguage.En))
+        assertEquals(RailCue.Stop, SidewalkRail.cue(droite))
+        assertEquals(GuidanceSide.Left, SidewalkRail.awayFrom(droite.side))
     }
 
     @Test
@@ -167,11 +162,11 @@ class SidewalkRailTest {
         // Le chiffre de l'audit : l'ancienne bande d'image tolérait ±0,85 m à 4 m.
         val large = SidewalkRail.of(listOf(bord(0.80f, depth = 4f)))
         assertEquals(RailLevel.NONE, large.level)
-        assertNull(SidewalkRail.phrase(large, SpeechLanguage.Fr))
+        assertNull(SidewalkRail.cue(large))
 
         val serre = SidewalkRail.of(listOf(bord(0.45f, depth = 4f)))
         assertEquals(RailLevel.DRIFT, serre.level)
-        assertEquals("Serrez à gauche.", SidewalkRail.phrase(serre, SpeechLanguage.Fr))
+        assertEquals(RailCue.Direction(GuidanceWord.Left), SidewalkRail.cue(serre))
     }
 
     @Test

@@ -1,6 +1,6 @@
 package dev.sam3vision.core.live
 
-import dev.sam3vision.core.curb.RailLevel
+import dev.sam3vision.core.curb.RailCue
 import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.curb.SidewalkRail
@@ -98,6 +98,9 @@ class GuidanceAnnouncer(
     var lastNudge: LateralNudge? = null
         private set
 
+    /** Instant du dernier « Stop. » du rail : la direction opposée suit à la frame d'après. */
+    private var stopSaidAtMs: Long? = null
+
     private val nudge = LateralNudgeTracker()
 
     /**
@@ -165,13 +168,23 @@ class GuidanceAnnouncer(
         val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
         if (cue != null) return nudgeWord(atMs, cue, language)
         if (decision.blocked) return blockedWord(atMs, decision, language)
-        // Rail trottoir : sous la sécurité (bouché, décalage), devant la voie
-        // libre — une dérive ne se dit jamais « Tout droit. ».
-        val railCue = railCueOf(rail, language)
-        if (railCue != null) return railSpeak(atMs, railCue.first, railCue.second, ageMs)
+        // Rail trottoir : sous la sécurité, devant la voie libre. Il possède la
+        // frame dès qu'il a quelque chose à dire — s'il est retenu (redite,
+        // frame périmée), on se tait plutôt que de dire « Tout droit. ».
+        if (rail != null) {
+            val cue = SidewalkRail.cue(rail)
+            if (cue != null) return railSpeak(atMs, rail, cue, language, ageMs)
+        }
         val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
-        // Frame périmée : elle ne prouve pas que la voie est libre (« Tout
-        // droit. » est une affirmation, pas une absence) ; un côté reste bon.
+        return freeWord(atMs, word, language, ageMs)
+    }
+
+    /**
+     * Mot de voie libre, muet sur une frame périmée quand il affirme « Tout
+     * droit. » (une image de 1,5 s ne prouve pas que la voie est libre) — un
+     * côté, lui, reste valable. Extrait de [onFrame] (plafond 50 lignes).
+     */
+    private fun freeWord(atMs: Long, word: GuidanceWord, language: SpeechLanguage, ageMs: Long): String? {
         if (word == GuidanceWord.Straight && Timing.isStale(ageMs)) return null
         return sideWord(atMs, word, language)
     }
@@ -222,25 +235,37 @@ class GuidanceAnnouncer(
      * [SidewalkRail.phrase] ne devine pas une direction). `null` rend la main à
      * la voie libre : sans consigne de bordure, le cap reste valable.
      */
-    private fun railCueOf(rail: RailState?, language: SpeechLanguage): Pair<RailLevel, String>? =
-        rail?.let { state ->
-            SidewalkRail.phrase(state, language)?.let { phrase -> state.level to phrase }
+    /**
+     * Rail trottoir, **muet sur une frame périmée** : on ne dit pas « stop » sur
+     * une image de 1,5 s.
+     *
+     * Ordre user du 01/11 : à 30 cm c'est **« Stop. » puis la direction
+     * opposée**. Un seul clip par frame : la frame du bord dit l'arrêt (urgent,
+     * il coupe la lecture), la frame suivante dit le côté — [stopSaidAtMs] le
+     * retient, et le couple se rejoue après [RAIL_REPEAT_MS].
+     */
+    private fun railSpeak(
+        atMs: Long,
+        rail: RailState,
+        cue: RailCue,
+        language: SpeechLanguage,
+        ageMs: Long,
+    ): String? {
+        if (Timing.isStale(ageMs)) return null
+        val away = SidewalkRail.awayFrom(rail.side)?.let { GuidanceWord.fromSide(it) }
+        if (cue is RailCue.Stop) {
+            val recent = stopSaidAtMs?.let { atMs - it < RAIL_REPEAT_MS } == true
+            if (!recent) {
+                val said = speak(atMs, "rail|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
+                if (said != null) stopSaidAtMs = atMs
+                return said
+            }
+            // L'arrêt vient d'être dit : on enchaîne la direction opposée.
+            return away?.let { speak(atMs, "rail|dir|" + it.name, it.text(language), RAIL_REPEAT_MS) }
         }
-
-    /**
-     * Clé d'anti-répétition du rail, par **niveau** : une dérive stable se redit
-     * toutes les [RAIL_REPEAT_MS], mais l'aggravation (DRIFT → EDGE) est un mot
-     * nouveau, donc dite aussitôt (overwrite), sans attendre l'échéance.
-     */
-    private fun railKey(level: RailLevel): String = "rail|" + level.name
-
-    /**
-     * Phrase du rail, **muette sur une frame périmée** : on ne dit pas
-     * « serrez » sur une image de 1,5 s. Le rail possède alors la frame — ni
-     * « Tout droit. », ni un côté qui contredirait la consigne.
-     */
-    private fun railSpeak(atMs: Long, level: RailLevel, phrase: String, ageMs: Long): String? =
-        if (Timing.isStale(ageMs)) null else speak(atMs, railKey(level), phrase, RAIL_REPEAT_MS)
+        val word = (cue as RailCue.Direction).word
+        return speak(atMs, "rail|dir|" + word.name, word.text(language), RAIL_REPEAT_MS)
+    }
 
     /**
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur

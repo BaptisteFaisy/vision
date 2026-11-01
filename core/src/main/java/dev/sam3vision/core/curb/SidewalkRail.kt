@@ -3,6 +3,7 @@ package dev.sam3vision.core.curb
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceSide
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -35,6 +36,18 @@ data class RailState(
         /** Rien de mesuré : jamais une absence prouvée (scène vide, SAM muet). */
         fun none(): RailState = RailState(null, null, RailLevel.NONE)
     }
+}
+
+/**
+ * Consigne du rail : un arrêt ([RailCue.Stop]) ou un mot de direction
+ * ([RailCue.Direction]) — jamais une phrase à synthétiser.
+ */
+sealed interface RailCue {
+    /** « Stop. » (clip `guide_stop`) : on ne franchit pas le bord. */
+    data object Stop : RailCue
+
+    /** « Gauche. » / « Droite. » (clips `guide_*`) : direction à suivre. */
+    data class Direction(val word: GuidanceWord) : RailCue
 }
 
 /**
@@ -102,39 +115,30 @@ object SidewalkRail {
     }
 
     /**
-     * Phrase du rail, `null` quand il n'y a rien à dire (niveau [RailLevel.NONE],
-     * côté inconnu). La consigne est **l'opposé du bord** : une bordure à gauche
-     * fait serrer à droite. Le bord lui-même ne se nomme pas dans la consigne de
-     * dérive (une phrase, un geste) ; au niveau [RailLevel.EDGE] on prévient
-     * sans désigner de côté — au contact, un mauvais côté coûte plus qu'un
-     * silence.
+     * Consigne du rail : **les mots du guidage**, donc les clips pré-synthétisés
+     * (`guide_left`, `guide_right`, `guide_stop`) — dits en moins de 100 ms, sans
+     * synthèse réseau (ordre user du 01/11 : « juste droite et gauche, et à
+     * 30 cm c'est stop puis la direction opposée »).
+     *
+     * - [RailLevel.DRIFT] : un mot seul, **l'opposé du bord** (bordure à gauche
+     *   ⇒ « Droite. »).
+     * - [RailLevel.EDGE] : [RailCue.Stop] d'abord — on s'arrête — puis la
+     *   direction opposée, que l'annonceur enchaîne à la frame suivante (le
+     *   guidage ne prononce qu'un clip par frame, et « Stop. » doit couper la
+     *   lecture en cours).
+     * - `null` : rien à dire (niveau [RailLevel.NONE] ou bordure sans côté).
      */
-    fun phrase(
-        state: RailState,
-        language: SpeechLanguage = SpeechLanguage.DEFAULT,
-    ): String? = when (state.level) {
+    fun cue(state: RailState): RailCue? = when (state.level) {
         RailLevel.NONE -> null
-        RailLevel.EDGE -> when (language) {
-            SpeechLanguage.En -> "Caution, kerb."
-            else -> "Attention, bord du trottoir."
-        }
-        RailLevel.DRIFT -> {
-            val away = when (state.side) {
-                GuidanceSide.Left -> GuidanceSide.Right
-                GuidanceSide.Right -> GuidanceSide.Left
-                null -> return null
-            }
-            when (language) {
-                SpeechLanguage.En -> when (away) {
-                    GuidanceSide.Left -> "Keep left."
-                    else -> "Keep right."
-                }
-                else -> when (away) {
-                    GuidanceSide.Left -> "Serrez à gauche."
-                    else -> "Serrez à droite."
-                }
-            }
-        }
+        RailLevel.EDGE -> RailCue.Stop
+        RailLevel.DRIFT -> awayFrom(state.side)?.let { RailCue.Direction(GuidanceWord.fromSide(it)) }
+    }
+
+    /** Direction opposée au bord [side], `null` si le côté est inconnu. */
+    fun awayFrom(side: GuidanceSide?): GuidanceSide? = when (side) {
+        GuidanceSide.Left -> GuidanceSide.Right
+        GuidanceSide.Right -> GuidanceSide.Left
+        null -> null
     }
 
     /** Vrai si [label] désigne une bordure (casse, accents, pluriel neutralisés). */

@@ -179,10 +179,12 @@ Ce qui a changé : tout est en **mètres**, lus sur la bordure (`curb`) —
 `core/.../curb/SidewalkRail.kt` ; le masque de sol est coupé par le cadre de
 l'image, son bord n'est pas la bordure. Deux paliers :
 
-- sous `DRIFT_M` (0,50 m) : « Serrez à gauche/droite », **l'opposé du bord**
-  (une bordure à gauche fait serrer à droite) ;
-- sous `EDGE_M` (0,30 m) : « Attention, bord du trottoir », **sans côté** — au
-  contact, un mauvais côté coûte plus qu'un silence.
+- sous `DRIFT_M` (0,50 m) : **« Gauche. » / « Droite. »** — les mots du
+  guidage, donc les clips locaux (`guide_left`/`guide_right`, < 100 ms), et
+  toujours **l'opposé du bord** (une bordure à gauche fait aller à droite) ;
+- sous `EDGE_M` (0,30 m) : **« Stop. »** puis, à la frame suivante, la
+  direction opposée (`guide_stop`, puis `guide_left`/`guide_right`). Un seul
+  clip par frame : l'arrêt doit couper la lecture en cours.
 
 La limite : sans bordure mesurée, silence — une scène vide ne prouve pas une absence.
 Câblage : `ProbeGuideFrame.rail` (`probeGuideFrameOf`, `app/.../isee/ProbeWiring.kt`)
