@@ -1,7 +1,9 @@
 package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PositionText
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -90,11 +92,12 @@ data class HazardSignal(
 /**
  * Ordre d'annonce « attention … » : [phrase] dans la langue de la voix,
  * [meters] la distance du signal qui l'a déclenché (journal, réglages),
- * [urgent] pour la seule personne imminente, [kind] sa sorte (l'arbitre
- * voix y lit le rang : personne P3, barrière P4, divers avec le reste),
- * [safetyPhrase] l'alerte immédiate (consigne, jamais de « Stop » hors
- * Traversée) pour la seule personne imminente (`null` sinon — la barrière
- * reste douce).
+ * [urgent] pour la seule personne imminente (son mot seul d'évitement,
+ * « Droite. »/« Gauche. », part en clip `guide_*`, jamais fusionné),
+ * [kind] sa sorte (l'arbitre voix y lit le rang : personne P3, barrière
+ * P4, divers avec le reste), [safetyPhrase] l'alerte immédiate lue par
+ * l'arbitre (`null` pour la personne : le mot imminent part en clip, la
+ * fusion casserait le clipId — la barrière reste douce).
  */
 data class HazardCue(
     val phrase: String,
@@ -117,11 +120,12 @@ object HazardText {
 
     /**
      * « Attention à la personne, à 2 heures, passez à gauche. » : la personne
-     * dit aussi comment l'éviter — le côté conseillé est l'opposé de la
-     * personne (personne à gauche de l'axe = on passe à droite). Axe pile ou
-     * heure inconnue = droite par défaut (prior, à valider rue : on serre à
-     * droite). Doux comme imminent, personne seule (les autres dangers
-     * restent descriptifs, voir [phrase]).
+     * douce (2-4 m) dit aussi comment l'éviter — le côté conseillé est
+     * l'opposé de la personne (personne à gauche de l'axe = on passe à
+     * droite). Axe pile ou heure inconnue = droite par défaut (prior, à
+     * valider rue : on serre à droite). Personne seule (les autres dangers
+     * restent descriptifs, voir [phrase]) : l'imminente (≤ 2 m) dit le mot
+     * seul d'évitement en clip, voir [HazardWatcher].
      */
     fun personPhrase(
         name: HazardConcepts.HazardName,
@@ -132,26 +136,23 @@ object HazardText {
         return "$situated, ${avoidText(centerX, language)}."
     }
 
+    /**
+     * Côté d'évitement conseillé : l'opposé de la personne (personne à
+     * gauche de l'axe = on passe à droite). Axe pile ou heure inconnue =
+     * droite par défaut (prior, à valider rue : on serre à droite). Seule
+     * source du côté, lue par la phrase douce ([personPhrase]) comme par
+     * le mot imminent ([HazardWatcher]).
+     */
+    fun avoidSide(centerX: Float?): SteeringCap =
+        if (centerX == null || centerX < AXIS_MID) SteeringCap.Right else SteeringCap.Left
+
     /** Consigne d'évitement : le côté opposé à la personne (droite par défaut). */
     private fun avoidText(centerX: Float?, language: SpeechLanguage): String {
-        val right = centerX == null || centerX < AXIS_MID
+        val right = avoidSide(centerX) == SteeringCap.Right
         return when (language) {
             SpeechLanguage.Fr -> if (right) "passez à droite" else "passez à gauche"
             SpeechLanguage.En -> if (right) "pass on the right" else "pass on the left"
         }
-    }
-
-    /**
-     * Alerte immédiate de la personne imminente : consigne courte +
-     * évitement, sans heure (à un pas, le côté prime sur le cadran) et sans
-     * « Stop » (§ 22 : le stop ne se dit qu'en Traversée). On garde
-     * « Attention à la personne » car « Personne, … » seul s'entendrait
-     * comme nobody. Parlée par la voix de sécurité, qui coupe tout,
-     * dictée du user comprise.
-     */
-    fun safetyPersonPhrase(language: SpeechLanguage, centerX: Float? = null): String = when (language) {
-        SpeechLanguage.Fr -> "Attention à la personne, ${avoidText(centerX, language)}."
-        SpeechLanguage.En -> "Attention, person, ${avoidText(centerX, language)}."
     }
 
     /** « Attention … » pour [name] selon [language], située à [centerX] (`null` = sans heure). */
@@ -172,13 +173,15 @@ object HazardText {
  * puis silence pendant [cooldownMs] (dit-une-fois, cooldown partagé :
  * pas de bavardage même si les humains bougent).
  *
- * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence) ;
- * la personne imminente (à [PERSON_FAST_METERS] ou moins) parle dès la 1re
- * frame en alerte de sécurité ([HazardCue.safetyPhrase], sans consommer le
- * cooldown doux : la barrière suit sans attendre). La personne dit aussi
- * comment l'éviter ([HazardText.personPhrase]), doux comme imminent.
- * Personne déjà dite : le repli ([HazardSignal.alt]) parle à sa place au
- * lieu d'attendre son départ.
+ * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence,
+ * [HazardText.personPhrase] avec évitement) ; la personne imminente (à
+ * [PERSON_FAST_METERS] ou moins) dit le mot seul d'évitement dès la 1re
+ * frame (« Droite. »/« Gauche. », clips `guide_*`, départ < 100 ms),
+ * répété toutes les [IMMINENT_REPEAT_MS] tant qu'imminente, sans consommer
+ * le cooldown doux (la barrière suit sans attendre) et sans passer par la
+ * voix de sécurité. Personne douce déjà dite : le repli ([HazardSignal.alt])
+ * parle à sa place au lieu d'attendre son départ — mais l'imminente
+ * contourne ce verrou (doux-puis-approche parle, sinon silence critique).
  */
 class HazardWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -199,7 +202,13 @@ class HazardWatcher(
     /** Frames consécutives sans personne détectée (un clignotement ne ré-arme pas). */
     private var personQuiet: Int = 0
 
-    /** Dernière annonce douce, `null` si aucune (l'imminent sécurité ne compte pas). */
+    /** Dernier mot imminent parlé, `null` si aucun (porte de répétition). */
+    private var lastImminentWord: String? = null
+
+    /** Instant du dernier mot imminent, [NO_INSTANT] si aucun. */
+    private var lastImminentMs: Long = NO_INSTANT
+
+    /** Dernière annonce douce, `null` si aucune (le mot imminent ne compte pas). */
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
 
@@ -236,18 +245,23 @@ class HazardWatcher(
     /** Vrai si [label] nomme une personne (`null` = non). */
     private fun isPersonLabel(label: String?): Boolean = label?.let(HazardConcepts::isPerson) == true
 
+    /** Vrai si [meters] est une personne imminente (à [PERSON_FAST_METERS] ou moins). */
+    private fun isImminent(meters: Float?): Boolean = meters != null && meters <= PERSON_FAST_METERS
+
     /**
-     * Candidat de la frame : le signal retenu, sauf personne déjà dite (le
-     * repli parle alors à sa place), `null` si rien à confirmer. Le
-     * principal comme le repli portent [HazardConcepts.isSpoken] : un vieux
-     * signal poteau reste muet.
+     * Candidat de la frame : le signal retenu, sauf personne douce déjà
+     * dite (le repli parle alors à sa place), `null` si rien à confirmer.
+     * La personne imminente contourne le verrou dit-une-fois (doux puis
+     * approche = le mot parle, sinon silence critique). Le principal comme
+     * le repli portent [HazardConcepts.isSpoken] : un vieux signal poteau
+     * reste muet.
      */
     private fun candidateOf(signal: HazardSignal): Candidate? {
         if (!signal.detected) return null
         val label = signal.label ?: return null
         if (!HazardConcepts.isSpoken(label)) return null
         val name = HazardConcepts.nameOf(label) ?: return null
-        if (HazardConcepts.isPerson(label) && personSpoken) {
+        if (HazardConcepts.isPerson(label) && personSpoken && !isImminent(signal.meters)) {
             val alt = signal.alt ?: return null
             val altLabel = alt.label ?: return null
             if (!HazardConcepts.isSpoken(altLabel)) return null
@@ -257,19 +271,23 @@ class HazardWatcher(
         return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX)
     }
 
-    /** Personne : imminente dès la 1re frame (sécurité), sinon douce confirmée, dite une fois. */
+    /**
+     * Personne : l'imminente dit le mot seul d'évitement dès la 1re frame
+     * (clip `guide_*`, répété toutes les [IMMINENT_REPEAT_MS], immédiat au
+     * changement de mot) ; sinon douce confirmée, dite une fois.
+     */
     private fun onPerson(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
         otherHits = 0
         val meters = candidate.meters
-        if (meters != null && meters <= PERSON_FAST_METERS) {
+        if (isImminent(meters)) {
+            val word = GuidanceWord.fromCap(HazardText.avoidSide(candidate.centerX)).text(language)
+            if (word == lastImminentWord && nowMs - lastImminentMs < IMMINENT_REPEAT_MS) return null
+            lastImminentWord = word
+            lastImminentMs = nowMs
             personSpoken = true
             personQuiet = 0
             personHits = 0
-            return HazardCue(
-                HazardText.personPhrase(candidate.name, language, candidate.centerX),
-                meters, urgent = true, kind = HazardKind.PERSON,
-                safetyPhrase = HazardText.safetyPersonPhrase(language, candidate.centerX),
-            )
+            return HazardCue(word, meters, urgent = true, kind = HazardKind.PERSON)
         }
         personHits++
         if (personHits < confirmFrames) return null
@@ -298,13 +316,15 @@ class HazardWatcher(
         )
     }
 
-    /** Oublie les comptes et l'annonce (nouvelle séance de direct). */
+    /** Oublie les comptes, l'annonce et le mot imminent (nouvelle séance de direct). */
     fun reset() {
         personHits = 0
         otherHits = 0
         lastCueAtMs = NO_INSTANT
         personSpoken = false
         personQuiet = 0
+        lastImminentWord = null
+        lastImminentMs = NO_INSTANT
     }
 
     companion object {
@@ -320,8 +340,15 @@ class HazardWatcher(
         /** Au-delà de cette distance (m), une personne ne fait pas parler (ordre user : 4 m). */
         const val PERSON_METERS = 4f
 
-        /** Personne à cette distance (m) ou moins : annonce dès la 1re frame, urgente. */
+        /** Personne à cette distance (m) ou moins : mot seul dès la 1re frame, urgent. */
         const val PERSON_FAST_METERS = 2f
+
+        /**
+         * Répétition du mot imminent : il reparle toutes les 300 ms tant que
+         * la personne reste imminente (miroir du `HEARTBEAT_MS` traversée —
+         * le core ne voit pas l'app, la valeur est dupliquée, pas partagée).
+         */
+        const val IMMINENT_REPEAT_MS = 300L
 
         /** Frames sans personne avant de ré-armer l'annonce (un clignotement ne ré-arme pas). */
         const val PERSON_REARM_FRAMES = 3

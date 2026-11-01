@@ -3,6 +3,27 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : humain imminent = mot seul répété 300 ms (branche `hazard-person-300ms`)
+
+- **Ordre user** : juste « humain, passez à droite / gauche », en
+  300 ms — le mot seul répété, comme la Traversée.
+- **Fait (§ 21, § 26 VOIX-DANGER)** : personne imminente (≤ 2 m) =
+  `GuidanceWord` opposé (« Droite. »/« Gauche. », clips `guide_*`
+  existants, départ < 100 ms), répété toutes les
+  `IMMINENT_REPEAT_MS` 300 ms tant qu'imminente (miroir
+  `HEARTBEAT_MS` traversée), immédiat au changement de mot ;
+  `safetyPersonPhrase` supprimée (plus de voix sécurité pour la
+  personne) ; le mot est exclu de la fusion (`imminentWordClipId`,
+  la fusion casserait le clip) et part en `speakWord` ; l'imminente
+  contourne le verrou dit-une-fois (doux-puis-approche parle) ;
+  phrase douce 2-4 m inchangée.
+- **Preuve** : `:core:testDebugUnitTest` 2 816 +
+  `:app:testDebugUnitTest` 1 676 verts sur r630 (0 échec, 0 sauté,
+  dont 3 nouveaux core — mot/côté, répétition 300 ms,
+  doux-puis-imminent — et 2 nouveaux app `imminentWordClipId`) ;
+  `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
+  finding (scanner Kotlin indisponible, comme avant).
+
 ## 2026-11-01 — iSee : voix danger aux humains, poteau muet (branche `hazard-person-not-pole`)
 
 - **Ordre user** : ne plus dire les poteaux ; la consigne « passez à

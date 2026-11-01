@@ -4,6 +4,7 @@ import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
+import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.traverse.VehicleStateCue
 
 /**
@@ -78,4 +79,17 @@ private fun softRank(kind: HazardKind): ObstacleRank = when (kind) {
     HazardKind.PERSON -> ObstacleRank.PERSON
     HazardKind.BARRIER -> ObstacleRank.BARRIER
     HazardKind.OTHER -> ObstacleRank.OTHER
+}
+
+/**
+ * Clip du mot seul d'une personne imminente : l'entrée `guide_*` quand
+ * [hazard] est une personne urgente dont la phrase est un mot du guidage
+ * (`null` sinon — doux, barrière, divers, sécurité, ou phrase qui n'est
+ * pas un mot). Le mot part en clip immédiat, jamais fusionné : la fusion
+ * casserait le clipId (départ < 100 ms exigé). Pur, testé en JVM.
+ */
+internal fun imminentWordClipId(hazard: HazardCue?): String? {
+    if (hazard == null || hazard.kind != HazardKind.PERSON) return null
+    if (!hazard.urgent || hazard.safetyPhrase != null) return null
+    return GuidanceWord.clipIdFor(hazard.phrase)
 }
