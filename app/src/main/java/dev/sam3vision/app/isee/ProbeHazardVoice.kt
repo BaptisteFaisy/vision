@@ -7,8 +7,8 @@ import dev.sam3vision.core.hazard.HazardSignal
 /**
  * Ligne diagnostique danger d'une frame (DEBUG seul, tag `HazardVoice`) :
  * nombre de lectures, lectures à label parlé (`label/mètres/centre-x-px`),
- * signal retenu (détecté/mètres/label/centre-normalisé/repli) et phrase du
- * cue (`null` = muet). Construite au [StringBuilder], appelée sous
+ * signal retenu (détecté/mètres/label/centre-normalisé) et phrase du cue
+ * (`null` = muet). Construite au [StringBuilder], appelée sous
  * `BuildConfig.DEBUG` : aucun log ni allocation en release. Pure, testée
  * en JVM. Miroir de `curbVoiceLine` (`ProbeCurbVoice.kt`).
  */
@@ -29,7 +29,6 @@ internal fun hazardVoiceLine(
     }
     return line.append("] signal=").append(signal.detected).append('/').append(signal.meters)
         .append("m/").append(signal.label).append("/cx=").append(signal.centerX)
-        .append("/alt=").append(signal.alt?.label)
         .append(" phrase=").append(phrase)
         .toString()
 }

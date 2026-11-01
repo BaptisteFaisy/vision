@@ -59,17 +59,16 @@ class SeuilsDehorsV4Test {
     // Humains — niveau 2.
 
     @Test
-    fun `humain a 9m dit mot seul niveau 2`() {
+    fun `humain a 9m dit mot continu niveau 2 des la 1re frame`() {
         val signal = HazardSignal.of(listOf(centered("person", 9f)), 512, 1138)
         assertTrue(signal.detected)
         val watcher = HazardWatcher()
-        assertNull(watcher.onSignal(signal, 1_000L, En))
-        val cue = watcher.onSignal(signal, 1_100L, En)
+        val cue = watcher.onSignal(signal, 1_000L, En)
 
         assertEquals("Right.", cue!!.phrase)
         assertEquals(2, cue.level)
-        assertEquals("human-soft", cue.antiRepeatKey)
-        assertFalse(cue.urgent)
+        assertEquals("human-imminent", cue.antiRepeatKey)
+        assertTrue(cue.urgent)
     }
 
     @Test
@@ -96,15 +95,18 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `personne douce anti repetition 2s apres rearmement`() {
+    fun `personne presente = mot continu niveau 2 sans cooldown ni rearmement`() {
         val watcher = HazardWatcher()
         val signal = softPerson(5f)
-        watcher.onSignal(signal, 1_000L, En)
-        assertNotNull(watcher.onSignal(signal, 1_100L, En))
-        repeat(3) { watcher.onSignal(HazardSignal.none(), 1_200L + it * 100L, En) }
-        assertNull(watcher.onSignal(signal, 1_500L, En))
-        assertNull(watcher.onSignal(signal, 1_600L, En))
-        assertNotNull(watcher.onSignal(signal, 3_200L, En))
+
+        assertEquals("Right.", watcher.onSignal(signal, 1_000L, En)!!.phrase)
+        assertNull(watcher.onSignal(signal, 1_100L, En))
+        val cue = watcher.onSignal(signal, 1_300L, En)
+
+        assertEquals("Right.", cue!!.phrase)
+        assertEquals(2, cue.level)
+        assertEquals("human-imminent", cue.antiRepeatKey)
+        assertTrue(cue.urgent)
     }
 
     // Grillages, murs, barrières — niveau 4.
@@ -153,18 +155,18 @@ class SeuilsDehorsV4Test {
     // Poteaux, mobilier vertical, divers — niveau 7.
 
     @Test
-    fun `poteau parle depuis v4 niveau 7`() {
+    fun `poteau mot continu niveau 7 des la 1re frame`() {
         assertTrue(HazardConcepts.isSpoken("pole"))
         assertTrue(HazardConcepts.isSpoken("poteau"))
         assertTrue(HazardConcepts.isPole("poteau"))
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 5f, label = "pole", centerX = 0.5f)
-        watcher.onSignal(signal, 1_000L, En)
-        val cue = watcher.onSignal(signal, 1_100L, En)
+        val cue = watcher.onSignal(signal, 1_000L, En)
 
-        assertEquals("Attention, pole, at 12 o'clock.", cue!!.phrase)
+        assertEquals("Right.", cue!!.phrase)
         assertEquals(7, cue.level)
-        assertEquals("pole", cue.antiRepeatKey)
+        assertEquals("pole-avoid", cue.antiRepeatKey)
+        assertTrue(cue.urgent)
     }
 
     @Test

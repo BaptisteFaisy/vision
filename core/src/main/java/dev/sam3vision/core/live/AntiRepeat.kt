@@ -14,8 +14,9 @@ package dev.sam3vision.core.live
  *
  * Table de la spec (clé = durée) :
  * - `car-moving` = 4 s (niveau 0, voitures en mouvement < 20 m) ;
- * - `human-soft` = 2 s (niveau 2, humains < 10 m) ;
- * - `human-imminent` = immédiat hors table (niveau 2, ≤ 2 m : dit toujours) ;
+ * - `human-soft` = 2 s (niveau 2, humains) ;
+ * - `human-imminent` = immédiat hors table (niveau 2, mot continu : dit toujours) ;
+ * - `pole-avoid` = immédiat hors table (niveau 7, mot continu : dit toujours) ;
  * - `gps-reminder` = sans antirépétition (niveau 3, rappel aux 15 s de silence) ;
  * - `fence` = 4 s (niveau 4, grillages + murs + barrières < 6 m) ;
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
@@ -61,7 +62,7 @@ object AntiRepeat {
     const val KEY_HUMAN_SOFT = "human-soft"
 
     /**
-     * Niveau 2 : humain imminent (≤ 2 m, mot immédiat) — hors table,
+     * Niveau 2 : mot humain continu (0-15 m droit devant) — hors table,
      * toujours autorisé ([allow] ne mémorise rien pour cette clé).
      */
     const val KEY_HUMAN_IMMINENT = "human-imminent"
@@ -83,6 +84,12 @@ object AntiRepeat {
 
     /** Niveau 7 : poteaux + mobilier vertical (lampadaire, panneau) < 6 m — 2 s. */
     const val KEY_POLE = "pole"
+
+    /**
+     * Niveau 7 : mot poteau continu (0-15 m droit devant) — hors table,
+     * toujours autorisé ([allow] ne mémorise rien pour cette clé).
+     */
+    const val KEY_POLE_AVOID = "pole-avoid"
 
     /** Niveau 7 : divers (animal, poubelle, souvenirs) < 6 m — 2 s. */
     const val KEY_MISC = "misc"
@@ -162,8 +169,8 @@ object AntiRepeat {
         KEY_FIND_FOUND -> 2_000L
         KEY_DOOR_WALL -> 4_000L
         KEY_CROSSWALK_ANNOUNCE, KEY_CROSSWALK_ARRIVAL -> ONCE_MS
-        // Imminent, rappel GPS, alignement : sans délai (toujours autorisés).
-        KEY_HUMAN_IMMINENT, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
+        // Mots continus, rappel GPS, alignement : sans délai (toujours autorisés).
+        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
         else -> 0L
     }
