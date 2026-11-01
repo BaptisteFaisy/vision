@@ -122,4 +122,30 @@ class VehicleStateRangeTest {
         }
         assertFalse(watcher.movingThisFrame)
     }
+
+    @Test
+    fun `portees - 4m et lateral proche arretes, gare a 16m tu`() {
+        val stoppedMid = VehicleStateWatcher()
+        repeat(2) { index ->
+            stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = index * 100L)
+        }
+        val mid = stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = 200L)
+        assertEquals("Car stopped, 4 meters away.", mid!!.phrase)
+
+        val stoppedSide = VehicleStateWatcher()
+        val sideBox = box(100f, cx = 64f)
+        repeat(2) { index ->
+            stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = index * 100L)
+        }
+        val side = stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = 200L)
+        assertEquals("Car stopped, 2 meters away.", side!!.phrase)
+
+        val parkedFar = VehicleStateWatcher()
+        repeat(3) { index ->
+            assertNull(
+                "immobile à 16 m : hors portée",
+                parkedFar.update(listOf(det("car", sideBox)), listOf(reading("car", 16f, sideBox)), atMs = index * 100L),
+            )
+        }
+    }
 }

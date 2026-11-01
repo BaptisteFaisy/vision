@@ -121,4 +121,25 @@ class VehicleStateBackgroundTest {
         val heightPx = widthPx * 0.6f
         return listOf(cx - widthPx / 2f, 240f - heightPx / 2f, cx + widthPx / 2f, 240f + heightPx / 2f)
     }
+
+    @Test
+    fun `still compense - derive qui suit la camera, arret annonce`() {
+        // Caméra qui avance (+5 px/frame comme le fond) : sans fond, silence ; avec fond,
+        // la dérive compensée prouve l'arrêt (5 m, seau stable) — jamais du mouvement.
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val bare = VehicleStateWatcher()
+        repeat(3) { index ->
+            val frame = box(100f, cx = 320f + index * 5f)
+            assertNull(bare.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L))
+        }
+        val watcher = VehicleStateWatcher()
+        var cue: VehicleStateCue? = null
+        repeat(3) { index ->
+            val frame = box(100f, cx = 320f + index * 5f)
+            cue = watcher.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L, motion = motion)
+        }
+
+        assertEquals("Car stopped, 5 meters away.", cue!!.phrase)
+        assertNull("jamais de mouvement : pas d'alerte", watcher.lastMovingAlertMs)
+    }
 }
