@@ -52,8 +52,8 @@ class IseeVoiceNav(
     private val settings: () -> Settings,
     private val scope: CoroutineScope,
     private val speak: suspend (String) -> Unit,
-    /** Parole route via Laure (manœuvres GPS, même voix que les obstacles). */
-    private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
+    /** Parole route (manœuvres niveau 11, rappel niveau 3 : postée au bus). */
+    private val speakRoute: (suspend (phrase: String, level: Int) -> Unit)? = null,
     /** Coupe la parole route (fin de guidage). */
     private val stopRoute: () -> Unit = {},
     /** Cap route poussé à la sonde (`null` = fin, retour au cap manuel). */

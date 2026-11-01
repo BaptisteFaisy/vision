@@ -48,6 +48,8 @@ class IseeAnswers(
     private val askTimeoutMs: Long = ASK_TIMEOUT_MS,
     /** Attente maximale de la réponse préemptée avant de renoncer (repli, voir [acquireAsking]). */
     private val preemptTimeoutMs: Long = PREEMPT_TIMEOUT_MS,
+    /** Traversée active : le chat y est muet (texte seul, SPEC v4). */
+    private val crossingActive: () -> Boolean = { false },
 ) {
 
     /**
@@ -161,10 +163,14 @@ class IseeAnswers(
                 onFailure = { error -> Result.failure(error) },
             )
 
-    /** Réponse reçue : texte affiché même si la voix échoue, puis lecture en continu. */
+    /** Réponse reçue : texte affiché même si la voix échoue, puis lecture en continu (sauf en Traversée : muet). */
     private suspend fun spoken(row: MessageMultimedia, answer: String) {
         media.setAnswerText(row, answer)
         transcript.refresh()
+        if (crossingActive()) {
+            prune()
+            return
+        }
         update { it.copy(status = IseeStatusText.STEP_SPEAKING) }
         playback.speakStreaming(row, answer)
         prune()

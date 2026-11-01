@@ -2,8 +2,7 @@ package dev.sam3vision.app.voicenav
 
 import android.content.Context
 import dev.sam3vision.app.navigation.VoiceNavTracker
-import dev.sam3vision.app.speech.SpeechArbitration
-import dev.sam3vision.app.speech.SpeechPriority
+import dev.sam3vision.app.isee.OutdoorLevel
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.AndroidTtsDriver
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
@@ -96,7 +95,7 @@ class VoiceNavEngineDriver(
     private val scope: CoroutineScope,
     private val onUpdate: (GuidanceUpdate) -> Unit,
     private val onRouteCap: (SteeringCap?) -> Unit = {},
-    private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
+    private val speakRoute: (suspend (phrase: String, level: Int) -> Unit)? = null,
     private val stopRoute: () -> Unit = {},
     /** Lecture réelle du lecteur partagé (voix réseau) : lue par [isSpeaking]. */
     private val routeReaderBusy: () -> Boolean = { false },
@@ -168,10 +167,10 @@ class VoiceNavEngineDriver(
     }
 
     /**
-     * Parole d'un événement route (niveau 11) : voix réseau quand elle est câblée
-     * ([speakRoute], même politique que le canal système), sinon voix système
-     * ([system]). L'urgence vient de [SpeechArbitration] (sortie de trace,
-     * recalcul : coupe). Ne lève jamais.
+     * Parole d'un événement route (niveau 11, SPEC v4) : voix réseau quand
+     * elle est câblée ([speakRoute], postée au bus par l'appelant), sinon
+     * voix système ([system]). Plus d'urgence route : tout événement GPS
+     * parle au même rang, le bus arbitre. Ne lève jamais.
      */
     private fun say(event: VoiceNavEvent, system: () -> String?) {
         val laure = speakRoute
@@ -181,8 +180,7 @@ class VoiceNavEngineDriver(
         }
         val phrase = routeAnnouncer.onEvent(System.currentTimeMillis(), event, settings().speechLanguage)
             ?: return
-        val danger = SpeechArbitration.priorityOf(event) == SpeechPriority.Danger
-        scope.launch { runCatching { laure(phrase, danger) } }
+        scope.launch { runCatching { laure(phrase, OutdoorLevel.GPS_EVENT) } }
     }
 
     /**
@@ -336,7 +334,7 @@ class VoiceNavEngineDriver(
             runCatching { speaker.onRepeat(phrase) }
             return
         }
-        scope.launch { runCatching { laure(phrase, false) } }
+        scope.launch { runCatching { laure(phrase, OutdoorLevel.GPS_REMINDER) } }
     }
 
     /** Traversée passée : annonce, le guidage reprend. */

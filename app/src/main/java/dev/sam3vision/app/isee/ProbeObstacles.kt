@@ -5,15 +5,16 @@ import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateCue
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 
 /** Portée parlée du mouvement : SPEC v4, voitures en mouvement < 20 m. */
 private const val MOVING_SPEAK_METERS = 20f
@@ -79,28 +80,19 @@ internal class ObstacleWatchers(
  * 101 humain et 102 bordure en Traversée) proposé au bus ([offer] :
  * antirépétition puis [VoiceBus.post]). L'écrasé n'est jamais redit ; le
  * bus écrase entre producteurs (escaliers, grillage, trottoir, GPS…).
- * Les signaux des guetteurs core sont lus tels quels (autre mission).
- *
- * [voice], [playerIdle], [safety] et le mutex de parole douce sont le
- * câblage historique, gardés pour la bascule : la parole passe par le bus,
- * câblé une fois au démarrage — le parent les retire quand tous les
- * producteurs postent au bus.
  */
 internal fun LiveProbe.observeObstacles(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
-    safety: SafetyVoice,
     vehicle: VehicleStateWatcher = VehicleStateWatcher(),
     curb: CurbWatcher = CurbWatcher(),
     hazard: HazardWatcher = HazardWatcher(),
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): ObstacleWatchers {
     val watchers = ObstacleWatchers(vehicle, curb, hazard)
-    val softSpeech = Mutex()
     scope.launch {
         state.collect { st ->
-            obstacleFrame(st, scope, voice, playerIdle, language, safety, watchers, softSpeech)
+            obstacleFrame(st, language, watchers, placeMode)
         }
     }
     return watchers
@@ -113,16 +105,11 @@ internal fun LiveProbe.observeObstacles(
  * immédiat, niveau 2), arbitrés ([decideFrame]) puis proposés au bus
  * ([offer]). `collect` séquentiel : une alerte confirmée ne s'annule pas.
  */
-@Suppress("UNUSED_PARAMETER")
 internal fun obstacleFrame(
     st: LiveProbeState,
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
-    safety: SafetyVoice,
     watchers: ObstacleWatchers,
-    softSpeech: Mutex,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ) {
     val readings = st.distanceLayer?.readings ?: return
     val nowMs = System.currentTimeMillis()
@@ -134,12 +121,17 @@ internal fun obstacleFrame(
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
     if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
     val hazardCue = watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
+    // Dedans : seule la personne parle (cran 2, le même que dehors) —
+    // voitures, bordures, mobilier et 101/102 se taisent (le verdict 100,
+    // lui, parle toujours en Traversée).
+    val indoor = placeMode() == PictoPlaceMode.DEDANS
     offer(
         decideFrame(
             listOf(
-                vehicleWish(vehicleCue),
-                hazardWish(hazardCue, st.crossingActive),
-                curbWish(curbCue, st.crossingActive),
+                vehicleWish(vehicleCue).takeUnless { indoor },
+                hazardWish(hazardCue, st.crossingActive)
+                    ?.takeIf { !indoor || (!st.crossingActive && hazardCue?.kind == HazardKind.PERSON) },
+                curbWish(curbCue, st.crossingActive).takeUnless { indoor },
             ),
         ),
         nowMs,

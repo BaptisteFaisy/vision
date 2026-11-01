@@ -18,12 +18,14 @@ import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.model.toDetections
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
@@ -80,6 +82,8 @@ internal fun LiveProbe.setCrossingActive(
     glassesLens: LensSpec? = null,
 ) {
     configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens, glassesLens, fromGlasses)
+    // Activation : le verdict repart de zéro (premier verdict parlé aussitôt).
+    if (active) verdictEngine.reset()
 }
 
 /**
@@ -438,21 +442,35 @@ internal fun observeCrossingLateral(
 }
 
 /**
- * Voix du guidage latéral sur [ProximityVoice] : mot en clip doux (file au
- * silence), annonce localisée en doux obstacle (file au silence), arrivée
- * (« Sur le passage. ») en file dernière — jamais devant une autre annonce
- * (ordre user du 31/10) — et rattrapage arrivée à chaque frame, aussi en
- * Traversée (où la file obstacles est coupée). Rien ne coupe ici.
+ * Voix du guidage latéral sur le bus (SPEC v4, niveau 8) : mot
+ * d'alignement en clip (clé alignement, au changement), annonce localisée
+ * (clé annonce, 1 fois par vue), arrivée (clé arrivée, 1 fois). Sans file
+ * ni rattrapage : l'écrasé n'est jamais redit. Dehors uniquement.
  */
 internal fun observeCrossingVoice(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ) = observeCrossingLateral(
     CrossingLateralWatch.flow, scope,
-    speakWord = { clip, text -> voice.speakWord(clip, text, language(), playerIdle(), urgent = false, queue = true) },
-    say = { voice.onPhrase(it, playerIdle(), queue = true) },
-    sayArrival = { voice.onArrivalPhrase(it, playerIdle()) },
-    flush = { voice.flushArrival(playerIdle()) },
+    speakWord = { clip, text ->
+        if (placeMode() == PictoPlaceMode.DEHORS &&
+            AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ALIGN, System.currentTimeMillis())
+        ) {
+            VoiceBus.post(OutdoorLevel.CROSSWALK, text, clip)
+        }
+    },
+    say = { text ->
+        if (placeMode() == PictoPlaceMode.DEHORS &&
+            AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis())
+        ) {
+            VoiceBus.post(OutdoorLevel.CROSSWALK, text)
+        }
+    },
+    sayArrival = { text ->
+        if (placeMode() == PictoPlaceMode.DEHORS &&
+            AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ARRIVAL, System.currentTimeMillis())
+        ) {
+            VoiceBus.post(OutdoorLevel.CROSSWALK, text)
+        }
+    },
 )

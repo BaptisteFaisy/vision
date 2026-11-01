@@ -1,6 +1,7 @@
 package dev.sam3vision.core.picto
 
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.live.AntiRepeat
 
 /**
  * Les 10 objets cherchables dedans (spec v4) : le concept SAM suivi
@@ -158,14 +159,14 @@ object FindIndoorLevels {
  * one-shot par ordre, sans clé.
  */
 object FindIndoorRepeat {
-    /** Résultat de recherche : trouvé à un cadran donné. */
-    const val FIND_FOUND_KEY = "find-found"
+    /** Résultat de recherche : trouvé à un cadran donné (table centrale). */
+    const val FIND_FOUND_KEY = AntiRepeat.KEY_FIND_FOUND
 
     /** Durée du trouvé au même cadran (changement = immédiat). */
     const val FIND_FOUND_MS = 2_000L
 
-    /** Porte et murs dedans. */
-    const val DOOR_WALL_KEY = "indoor-doorwall"
+    /** Porte et murs dedans (table centrale). */
+    const val DOOR_WALL_KEY = AntiRepeat.KEY_DOOR_WALL
 
     /** Durée porte et murs (changement de cadran = immédiat). */
     const val DOOR_WALL_MS = 4_000L

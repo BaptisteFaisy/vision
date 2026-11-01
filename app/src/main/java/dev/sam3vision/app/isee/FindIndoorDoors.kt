@@ -2,10 +2,10 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.picto.FindIndoorClips
 import dev.sam3vision.core.picto.FindIndoorLevels
-import dev.sam3vision.core.picto.FindIndoorRepeat
 import dev.sam3vision.core.picto.FindIndoorTarget
 import dev.sam3vision.core.picto.PictoPlaceMode
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +57,7 @@ object IndoorDoorWall {
 
 /**
  * Guetteur porte et murs : le changement (nature ou cadran) parle aussitôt,
- * le même constat attend l'anti-répétition ([FindIndoorRepeat]). Remis à
+ * le même constat attend l'anti-répétition ([AntiRepeat]). Remis à
  * zéro avec les autres resets de séance. Testé en JVM.
  */
 class IndoorDoorWatcher {
@@ -78,7 +78,7 @@ class IndoorDoorWatcher {
             lastClock = cue.clock
             return cue
         }
-        return if (allow(FindIndoorRepeat.DOOR_WALL_KEY, nowMs)) cue else null
+        return if (allow(AntiRepeat.KEY_DOOR_WALL, nowMs)) cue else null
     }
 
     /** Oublie le constat (nouvelle séance, sortie de dedans). */
