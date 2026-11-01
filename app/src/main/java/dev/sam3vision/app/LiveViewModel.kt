@@ -391,7 +391,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         val predicted = prediction.boxesAt(now, width, height)
         val gap = fps.gapAt(now)
         val recent = timeline.recent(now, MEMORY_WINDOW_MS)
-        val snap = chronology.snapshot(shown.frame)
+        val snap = chronology.snapshot(shown.frame, painter.lastDecode)
         pixel.publish(snap)
         _state.update { current ->
             current.copy(
