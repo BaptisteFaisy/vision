@@ -217,7 +217,7 @@ class VehicleStateWatcher(
         motion: FrameMotion?,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, atMs, hushed, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc, motion)
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: stoppedPick(current, meters, atMs, hushed, fondFranc, motion)
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -228,6 +228,7 @@ class VehicleStateWatcher(
         atMs: Long,
         hushed: Set<String>,
         movingMeters: Float,
+        motion: FrameMotion?,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
@@ -239,7 +240,8 @@ class VehicleStateWatcher(
                 val tauHit = tauKey != null && tauKey == candidate
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == candidate
                 val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
-                    seen.area, seen.closeness, atMs, approach.lastGlobal)
+                    seen.area, seen.closeness, atMs, approach.lastGlobal) &&
+                    !followingCamera(prev, seen, atMs, motion)
                 (tauHit || lateralHit || growth) && inMovingRange(meters[candidate], movingMeters)
             }
         val key = moving.minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -281,6 +283,12 @@ class VehicleStateWatcher(
         val measured = meters[key]
         val state = if (measured != null && measured > STOPPED_METERS) State.PARKED else State.STOPPED
         return Pick(state, name, measured, seen.cx, false)
+    }
+
+    /** Boîte qui suit la caméra : sa surface qui flicker est de la gigue SAM, pas une approche (miroir du veto arrêt). */
+    private fun followingCamera(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
+        if (motion == null) return false
+        return backgroundVerdict(prev, seen, atMs, motion) == Verdict.CAMERA_MOVED
     }
 
     /** Dérive faible : brute sans signal fond, jugée contre le défilement sinon (une piste qui suit la caméra est un arrêt compensé, pas un mouvement). */
