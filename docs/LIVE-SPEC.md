@@ -246,7 +246,7 @@ mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 18 (plafond 18)
+## 5. Concepts suivis : 21 (plafond 22)
 
 - Liste par défaut : `["person", "car", "bus", "bicycle", "motorcycle",
   "pedestrian traffic light", "pedestrian signal head", "curb", "sidewalk",

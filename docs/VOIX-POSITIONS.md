@@ -73,7 +73,7 @@ L'annonce passe par le moteur **unique** de l'app, jamais par un second lecteur.
 | Chemin | Câblage | Garde « ne coupe rien » |
 |---|---|---|
 | Direct (écran vidéo) | `LivePositionVoice` (`app/.../live/LivePositionVoice.kt`) construit dans `LiveViewModel.kt:126`, voix `VoiceAnnouncer(app, "positions")` (`LiveViewModel.kt:124`, dossier `POSITION_VOICE_DIR = "positions"`, `:497`) | `Mutex speaking` en `tryLock` (`LivePositionVoice.kt:37,62-69`) : une phrase en cours n'est **ni coupée ni doublée** ; rien n'est dit pendant une question mémoire (`asking`, `:50`) |
-| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../isee/LiveProbe.kt:418-423`) → `ProbeWiring.observeSpoken` → `ProximityVoice.onPhrase` | `playerIdle()` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:29-38`) |
+| iSee (fenêtre caméra) | `LiveProbe.phraseOf` (`app/.../isee/ProbeWiring.kt:386`) → `LiveProbe.observeSpoken` (`ProbeWiring.kt:170`) → `ProximityVoice.onPhrase` (`ProximityVoice.kt:167`) | `playerIdle` : si une bulle du chat est en cours, l'annonce **n'est pas jouée** (`ProximityVoice.kt:169`, garde `:197`) |
 | Analyse photo | `AppViewModel.announcePositions` (`AppViewModel.kt:187-195`) | même voix, un seul `say` à la fois |
 
 Réglage : **`Settings.ttsAnnouncePositions`** (défaut `true`, `Settings.kt:36`), bascule

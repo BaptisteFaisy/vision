@@ -53,7 +53,8 @@ cd server  # depuis la racine du dépôt vision
 ```
 
 Équivalent manuel (sans la partie secret) : `/home/baptiste/.venv-modal/bin/modal deploy backend/modal_app.py`.
-L'URL se termine par `...modal.run` ; elle sert de `expo.extra.apiUrl` côté app.
+L'URL se termine par `...modal.run` ; côté app native elle part en `sam.base.url`
+(`local.properties` → `BuildConfig.SAM_BASE_URL` → `Settings.samEndpoint()`).
 
 ## Smoke test
 
