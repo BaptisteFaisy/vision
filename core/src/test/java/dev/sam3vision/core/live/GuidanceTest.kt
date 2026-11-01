@@ -55,8 +55,17 @@ class GuidanceTest {
     }
 
     @Test
-    fun `objet lointain au centre ne bloque pas`() {
+    fun `obstacle sur l axe a 10 m bloque (portee axe 15 m)`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f, 10f)))
+
+        assertTrue(decision.blocked)
+        assertEquals(GuidanceSide.Left, decision.side)
+        assertEquals("Left.", Guidance.phrase(decision))
+    }
+
+    @Test
+    fun `objet sur l axe au dela de 15 m ne bloque pas`() {
+        val decision = Guidance.decide(listOf(placed("personne", 0.5f, 16f)))
 
         assertFalse(decision.blocked)
     }
