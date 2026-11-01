@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import android.graphics.Bitmap
+import dev.sam3vision.core.live.VeilPolicy
 import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.alphaLut
 import dev.sam3vision.core.mask.colorizeGrayToBitmap
@@ -17,7 +18,7 @@ import dev.sam3vision.core.model.LiveFrame
  * entre 4 et 6 images par seconde).
  *
  * Trois chose sont donc mises en cache ici :
- * - la table de 256 niveaux, **une fois par couleur** de la palette ;
+ * - la table de 256 niveaux, **une fois par (couleur, alpha)** ;
  * - le tampon de pixels de destination, par emplacement de masque ;
  * - le bitmap lui-même, en **deux exemplaires alternés** : on ne repeint jamais celui
  *   qui est en cours d'affichage.
@@ -28,7 +29,7 @@ class MaskPainter(
     private val alpha: Int,
 ) {
 
-    private val luts = HashMap<Int, IntArray>()
+    private val luts = HashMap<Pair<Int, Int>, IntArray>()
     private val scratch = ArrayList<IntArray>()
     private val targets = ArrayList<Array<Bitmap?>>()
     private var front = 0
@@ -40,7 +41,7 @@ class MaskPainter(
         front = 1 - front
         return frame.objects.mapIndexedNotNull { index, obj ->
             val gray = decodeObjectGray(obj, frame.width, frame.height) ?: return@mapIndexedNotNull null
-            paint(index, gray, paletteArgb(index))
+            paint(index, gray, paletteArgb(index), obj.label)
         }
     }
 
@@ -54,11 +55,16 @@ class MaskPainter(
         android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms")
     }
 
-    /** Colore [gray] de l'emplacement [index] (`null` = bitmap increé, masque sauté). */
-    private fun paint(index: Int, gray: GrayMask, argb: Int): Bitmap? {
+    /**
+     * Colore [gray] de l'emplacement [index] (`null` = bitmap increé, masque sauté).
+     * Un label de décor ([VeilPolicy]) est colorié en transparent : pastille et
+     * voix inchangées, pas de voile à mi-écran.
+     */
+    private fun paint(index: Int, gray: GrayMask, argb: Int, label: String): Bitmap? {
         val buffer = scratchFor(index, gray.size)
         val pair = targetsFor(index)
-        return colorizeGrayToBitmap(gray, lutFor(argb), buffer, pair[front]).also { pair[front] = it }
+        val effAlpha = if (VeilPolicy.showsVeil(label)) alpha else 0
+        return colorizeGrayToBitmap(gray, lutFor(argb, effAlpha), buffer, pair[front]).also { pair[front] = it }
     }
 
     /** Tampon de coloriage de l'emplacement [index], agrandi si la frame change de taille. */
@@ -75,6 +81,7 @@ class MaskPainter(
         return targets[index]
     }
 
-    /** Table des 256 niveaux d'une couleur, calculée une seule fois par couleur. */
-    private fun lutFor(argb: Int): IntArray = luts.getOrPut(argb) { alphaLut(argb, alpha) }
+    /** Table des 256 niveaux d'un (couleur, alpha), calculée une seule fois par couple. */
+    private fun lutFor(argb: Int, alpha: Int): IntArray =
+        luts.getOrPut(argb to alpha) { alphaLut(argb, alpha) }
 }
