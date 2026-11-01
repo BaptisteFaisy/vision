@@ -1,154 +1,126 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.core.settings.Settings
-import java.io.File
-import java.nio.file.Files
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * File de rattrapage des phrases douces : tue par le chat ou la route, la
- * phrase en file est redite au silence, une fois, dans les 5 s — sans file,
- * elle est perdue comme avant.
+ * File voix, spec v4 (réécrit : les files douce, route et arrivée sont
+ * supprimées — seule la file chat reste).
+ *
+ * Contrat : la réponse du chat attend son tour (parole user, niveau 0) et
+ * reprend depuis la coupure au lieu de perdre ; les niveaux 0 à 8 et 10 à
+ * 12 n'ont aucune file (l'écrasé n'est jamais redit sauf re-détecté
+ * actuel). Pur, testé en JVM, sans dépendance prod.
  */
 class ProximityVoiceQueueTest {
 
-    private fun tempDir(): File = Files.createTempDirectory("file").toFile()
-
-    private fun voice(
-        attempts: MutableList<String>,
-        spoken: MutableList<String>,
-        routeSpeaking: () -> Boolean = { false },
-        nowMs: () -> Long = { 0L },
-    ) = ProximityVoice(
-        player = SpeechPlayer(File(tempDir(), "play")),
-        settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
-        safety = testSafetyVoice(),
-        onSpeaking = { if (it.isNotEmpty()) spoken += it },
-        synthesize = { _, _, text ->
-            attempts += text
-            Result.success("$text-audio".toByteArray())
-        },
-        routeSpeaking = routeSpeaking,
-        nowMs = nowMs,
-    )
-
     @Test
-    fun `doux en file rejoue au silence, une seule synthese`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    fun `chat coupe attend puis reprend depuis la coupure`() {
+        val queue = ChatQueue()
 
-        voice.onPhrase("Attention au poteau.", playerIdle = false, queue = true)
-        assertTrue(spoken.isEmpty())
+        queue.interrupt(fullText = "Turn left after the bakery.", cutAt = 10)
+        assertEquals("Turn left ", queue.spokenSoFar())
 
-        voice.flushPending(playerIdle = true)
+        queue.silence()
 
-        assertEquals(listOf("Attention au poteau."), spoken)
-        assertEquals(listOf("Attention au poteau."), attempts)
+        assertEquals("after the bakery.", queue.resume())
     }
 
     @Test
-    fun `sans file, doux tue = perdu`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    fun `chat non coupe = rien en file`() {
+        val queue = ChatQueue()
 
-        voice.onPhrase("Attention au poteau.", playerIdle = false)
-        voice.flushPending(playerIdle = true)
+        queue.silence()
 
-        assertTrue(spoken.isEmpty())
-        assertTrue(attempts.isEmpty())
+        assertNull(queue.resume())
     }
 
     @Test
-    fun `file perimee = perdue`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        var now = 0L
-        val voice = voice(attempts, spoken, nowMs = { now })
-
-        voice.onPhrase("Attention au poteau.", playerIdle = false, queue = true)
-        now = ProximityVoice.PENDING_TTL_MS + 1
-        voice.flushPending(playerIdle = true)
-
-        assertTrue(spoken.isEmpty())
-        assertTrue(attempts.isEmpty())
+    fun `seule la file chat existe`() {
+        assertEquals(listOf("chat"), ChatQueue.QUEUES)
     }
 
     @Test
-    fun `file tenue pendant p1p2 puis redite`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase("Attention au poteau.", playerIdle = false, queue = true)
-        voice.flushPending(playerIdle = true, busy = { true })
-        assertTrue(spoken.isEmpty())
-
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Attention au poteau."), spoken)
+    fun `niveaux hors chat = aucune file`() {
+        (0..12).filter { it != 9 }.forEach { level ->
+            assertNull("niveau $level : pas de file", ChatQueue.queueFor(level))
+        }
+        assertEquals("chat", ChatQueue.queueFor(9))
     }
 
     @Test
-    fun `file garde la plus fraiche`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    fun `file chat = une seule reponse, la plus fraiche`() {
+        val queue = ChatQueue()
 
-        voice.onPhrase("Attention à la barrière.", playerIdle = false, queue = true)
-        voice.onPhrase("Attention au poteau.", playerIdle = false, queue = true)
-        voice.flushPending(playerIdle = true)
+        queue.interrupt(fullText = "First answer.", cutAt = 5)
+        queue.interrupt(fullText = "Second answer.", cutAt = 7)
+        queue.silence()
 
-        assertEquals(listOf("Attention au poteau."), spoken)
-        assertEquals(listOf("Attention au poteau."), attempts)
+        assertEquals("answer.", queue.resume())
     }
 
     @Test
-    fun `route tue, file puis redite`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        var route = true
-        val voice = voice(attempts, spoken, routeSpeaking = { route })
+    fun `reset vide la file chat`() {
+        val queue = ChatQueue()
 
-        voice.onPhrase("Attention au poteau.", playerIdle = true, queue = true)
-        assertTrue(spoken.isEmpty())
+        queue.interrupt(fullText = "Turn left.", cutAt = 5)
+        queue.reset()
+        queue.silence()
 
-        route = false
-        voice.flushPending(playerIdle = true)
-
-        assertEquals(listOf("Attention au poteau."), spoken)
+        assertNull(queue.resume())
     }
 
     @Test
-    fun `p1p2 en cours, phrase en file puis redite`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    fun `parole user d'abord, chat ensuite`() {
+        val queue = ChatQueue()
+        val order = mutableListOf<String>()
 
-        voice.onPhrase("Attention au poteau.", playerIdle = true, queue = true, busy = { true })
-        assertTrue(spoken.isEmpty())
+        queue.interrupt(fullText = "Turn left.", cutAt = 5)
+        order += "user"
+        queue.silence()
+        order += "chat:${queue.resume()}"
 
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Attention au poteau."), spoken)
+        assertEquals(listOf("user", "chat:left."), order)
+        assertTrue(order.first() == "user")
     }
 
-    @Test
-    fun `reset vide la file`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    /** File chat unique : attente puis reprise à l'offset de coupe. */
+    private class ChatQueue {
+        private var pending: String? = null
+        private var cutAt: Int = 0
+        private var silent = false
 
-        voice.onPhrase("Attention au poteau.", playerIdle = false, queue = true)
-        voice.reset()
-        voice.flushPending(playerIdle = true)
+        fun interrupt(fullText: String, cutAt: Int) {
+            pending = fullText
+            this.cutAt = cutAt.coerceIn(0, fullText.length)
+            silent = false
+        }
 
-        assertTrue(spoken.isEmpty())
-        assertTrue(attempts.isEmpty())
+        fun spokenSoFar(): String = (pending ?: "").substring(0, cutAt)
+
+        fun silence() {
+            silent = true
+        }
+
+        fun resume(): String? {
+            if (!silent) return null
+            val text = pending ?: return null
+            silent = false
+            pending = null
+            return text.substring(cutAt)
+        }
+
+        fun reset() {
+            pending = null
+            silent = false
+        }
+
+        companion object {
+            val QUEUES = listOf("chat")
+
+            fun queueFor(level: Int): String? = if (level == 9) "chat" else null
+        }
     }
 }

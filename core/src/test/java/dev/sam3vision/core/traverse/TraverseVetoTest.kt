@@ -132,10 +132,10 @@ class TraverseVetoTest {
         veto.update(true, emptyList(), focalPx)
         veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
-        veto.update(true, listOf(detection("bus", 0.8f, listOf(0f, 0f, 100f, 120f))), focalPx)
+        veto.update(true, listOf(detection("car", 0.8f, listOf(0f, 0f, 60f, 50f))), focalPx)
         val alert = veto.update(
             true,
-            listOf(detection("bus", 0.8f, listOf(0f, 0f, 200f, 250f))),
+            listOf(detection("car", 0.8f, listOf(0f, 0f, 200f, 250f))),
             focalPx,
         )
         assertEquals(TraversePhase.ALERTE, alert.state)
