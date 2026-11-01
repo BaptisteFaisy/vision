@@ -93,7 +93,6 @@ class DictationOrderTest {
 
     @Test
     fun `les anciens ordres sans mode partent au llm`() {
-        assertNull(DictationOrders.parse("Find the keys"))
         assertNull(DictationOrders.parse("traverser"))
         assertNull(DictationOrders.parse("crossing mode on"))
         assertNull(DictationOrders.parse("maison"))
@@ -137,7 +136,38 @@ class DictationOrderTest {
     }
 
     @Test
-    fun `isOrder ne dit vrai que pour les 10 ordres`() {
+    fun `ou sont sans mode cherche dans les 10`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où sont mes clés"))
+        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("où est mon téléphone"))
+        assertEquals(DictationOrder.Find("glasses"), DictationOrders.parse("où sont mes lunettes"))
+    }
+
+    @Test
+    fun `where sans mode cherche dans les 10`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("where are my keys"))
+        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("Where is my phone?"))
+        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("locate my phone"))
+    }
+
+    @Test
+    fun `find sans mode cherche dans les 10`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("find my keys"))
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("Find the keys"))
+        assertEquals(DictationOrder.Find("shoes"), DictationOrders.parse("find my shoes please"))
+    }
+
+    @Test
+    fun `ou where et find hors des 10 partent au llm`() {
+        assertNull(DictationOrders.parse("où est la gare"))
+        assertNull(DictationOrders.parse("where is the exit"))
+        assertNull(DictationOrders.parse("where is my wallet"))
+        assertNull(DictationOrders.parse("find the elephant"))
+        assertNull(DictationOrders.parse("I found my keys"))
+        assertNull(DictationOrders.parse("where is it?"))
+    }
+
+    @Test
+    fun `isOrder dit vrai pour les ordres, faux pour le reste`() {
         assertTrue(DictationOrders.isOrder("mode outdoor"))
         assertTrue(DictationOrders.isOrder("mode indoor"))
         assertTrue(DictationOrders.isOrder("mode crossing on"))
@@ -148,6 +178,9 @@ class DictationOrderTest {
         assertTrue(DictationOrders.isOrder("mode GPS off"))
         assertTrue(DictationOrders.isOrder("mode glasses on"))
         assertTrue(DictationOrders.isOrder("mode glasses off"))
+        assertTrue(DictationOrders.isOrder("où sont mes clés"))
+        assertTrue(DictationOrders.isOrder("where are my keys"))
+        assertTrue(DictationOrders.isOrder("find my keys"))
         assertFalse(DictationOrders.isOrder("mode outdoor please"))
         assertFalse(DictationOrders.isOrder("décris-moi la pièce"))
     }

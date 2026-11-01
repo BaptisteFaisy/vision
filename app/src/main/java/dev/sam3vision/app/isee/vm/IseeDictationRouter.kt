@@ -38,9 +38,12 @@ interface DictationActions {
 }
 
 /**
- * Routeur de dictée iSee (spec v4) : « mode … » en tête de phrase ⇒ l'un
- * des 10 ordres ([DictationActions]) ; tout le reste ⇒ `false`, l'appelant
- * envoie le texte au LLM comme question. Sans état et sans condition de
+ * Routeur de dictée iSee (spec v4 + chasse sans « mode », décision user du
+ * 01/11) : « mode … » en tête de phrase ⇒ l'un des 10 ordres
+ * ([DictationActions]) ; sans « mode », seule une chasse visant l'une des
+ * 10 cibles dedans est un ordre (« où sont mes clés », « where are my
+ * keys », « find my keys ») ; tout le reste ⇒ `false`, l'appelant envoie
+ * le texte au LLM comme question. Sans état et sans condition de
  * mode : la dictée reste active partout, traversée comprise — un ordre
  * dit en traversée est routé comme ailleurs.
  *

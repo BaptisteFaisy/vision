@@ -213,7 +213,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode }, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
     private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() })
@@ -223,7 +223,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         modes = modes,
         runCrossing = steering::runCrossing,
         onCrossingChanged = spine::onCrossingChanged,
-        confirmFindStopped = {
+        confirmFindStopped = { picto.cancelHunt()
             val confirm = DictationRouterText.findStopped(settings.speechLanguage)
             update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, hits = emptyList()), status = confirm) }
             speakNavigation(confirm)

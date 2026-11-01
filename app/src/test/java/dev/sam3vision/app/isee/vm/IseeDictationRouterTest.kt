@@ -7,8 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Routeur de dictée (spec v4) : les 10 ordres « mode … » appellent leur
- * effet, une fois ; tout le reste rend `false` sans rien appeler —
+ * Routeur de dictée (spec v4 + chasse sans « mode ») : les 10 ordres
+ * « mode … » et les chasses sans « mode » vers les 10 dedans appellent
+ * leur effet, une fois ; tout le reste rend `false` sans rien appeler —
  * l'appelant envoie le texte au LLM comme question.
  */
 class IseeDictationRouterTest {
@@ -56,13 +57,27 @@ class IseeDictationRouterTest {
     }
 
     @Test
+    fun `les chasses sans mode appellent find une fois`() = runTest {
+        val cases = listOf(
+            "où sont mes clés" to "find:keys",
+            "where are my keys" to "find:keys",
+            "find my keys" to "find:keys",
+            "Find the keys" to "find:keys",
+        )
+        cases.forEach { (text, want) ->
+            calls.clear()
+            assertTrue(text, router.run(text))
+            assertEquals(listOf(want), calls)
+        }
+    }
+
+    @Test
     fun `les questions partent au llm sans effet`() = runTest {
         val questions = listOf(
             "décris-moi la pièce",
             "quelle heure est-il ?",
             "",
             "   ",
-            "Find the keys",
             "traverser",
             "crossing mode on",
             "maison",
@@ -75,6 +90,9 @@ class IseeDictationRouterTest {
             "mode find my",
             "mode GPS I want to go to",
             "s'il te plaît mode outdoor",
+            "où est la gare",
+            "where is the exit",
+            "find the elephant",
         )
         questions.forEach { text ->
             calls.clear()
