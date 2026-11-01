@@ -5,7 +5,6 @@ import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.live.AttentionCadence
 import dev.sam3vision.core.live.GuidanceWord
-import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -37,7 +36,7 @@ import kotlin.coroutines.coroutineContext
  *
  * Sans clé ElevenLabs (ou voix réseau en panne : 401/402/429), pas de
  * silence : la phrase douce part au TTS système ([system], en file),
- * précédée une fois par session du signal [networkVoiceDown]. Le repli est
+ * précédée une fois par session du signal [VoiceOfflineFallback]. Le repli est
  * oral seul (ni sous-titre, ni fanion — miroir `SafetyVoice` : sans fin de
  * lecture, un fanion bloquerait la voix douce pour toujours), mais mémorisé
  * (pas de répétition).
@@ -108,11 +107,16 @@ class ProximityVoice(
     /** Arrivée sur le passage gardée ([onArrivalPhrase]), `null` si aucune. */
     private var pendingArrival: Pending? = null
 
-    /** Signal « voix réseau indisponible » déjà parlé (une fois par session). */
-    private var networkAlertSpoken = false
-
     /** Lecture déjà coupée pour la parole du user (une fois par prise de parole). */
     private var cutForUserDone = false
+
+    /** Repli hors-ligne (voix réseau en panne) : dit au TTS système, mémorisé comme le doux. */
+    private val offline = VoiceOfflineFallback(system) {
+        lastPhrase = it
+        lastPhraseAtMs = nowMs()
+        cadence.record(it, nowMs())
+        cutForUserDone = false
+    }
 
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
@@ -121,7 +125,7 @@ class ProximityVoice(
         pending = null
         pendingRoute = null
         pendingArrival = null
-        networkAlertSpoken = false
+        offline.reset()
         cutForUserDone = false
         cadence.reset()
     }
@@ -366,15 +370,15 @@ class ProximityVoice(
     /**
      * Synthèse + lecture d'une phrase douce admise ; `true` si parlée (ou
      * confiée au TTS système). Sans clé, ou voix réseau en panne (401/402/429) :
-     * repli système ([speakOffline]), jamais de silence quand un moteur est
+     * repli système ([VoiceOfflineFallback]), jamais de silence quand un moteur est
      * câblé. Mémorisée au moment de parler seulement.
      */
     private suspend fun speak(phrase: String, current: Settings): Boolean {
         coroutineContext.ensureActive()
-        if (!current.ttsConfigured) return speakOffline(phrase, current)
+        if (!current.ttsConfigured) return offline.speak(phrase, current)
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
             .getOrElse { error ->
-                return if (isNetworkVoiceDown(error)) speakOffline(phrase, current) else false
+                return if (VoiceOfflineFallback.isNetworkVoiceDown(error)) offline.speak(phrase, current) else false
             }
         coroutineContext.ensureActive()
         if (bytes.isEmpty() || !canPlay() || systemBusy()) return false
@@ -387,36 +391,6 @@ class ProximityVoice(
         onSpeaking(phrase)
         player.play(bytes).onFailure { onSpeaking("") }
         return true
-    }
-
-    /**
-     * Repli TTS système (hors-ligne) : [phrase] douce dite sans ElevenLabs,
-     * en file. Le premier repli de la session est précédé du signal
-     * [networkVoiceDown] (combiné en une seule parole : l'ordre est
-     * atomique). `true` si confié au moteur (mémorisé, oral seul : ni
-     * sous-titre ni fanion — sans fin de lecture, un fanion bloquerait la
-     * voix douce) ; `false` si aucun moteur câblé (non mémorisé : réémis,
-     * il se dira).
-     */
-    private fun speakOffline(phrase: String, current: Settings): Boolean {
-        val alerted = networkAlertSpoken
-        val utterance =
-            if (alerted) phrase else "${networkVoiceDown(current.speechLanguage)} $phrase"
-        val engine = system ?: return false
-        val locale = SystemTtsEngine.localeOf(current.speechLanguage)
-        if (!engine.speak(utterance, false, locale, current.ttsSpeed, 1f)) return false
-        networkAlertSpoken = true
-        lastPhrase = phrase
-        lastPhraseAtMs = nowMs()
-        cadence.record(phrase, nowMs())
-        cutForUserDone = false
-        return true
-    }
-
-    /** Voix réseau en panne durable (clé, crédits, cadence) : le repli système prend le relais. */
-    private fun isNetworkVoiceDown(error: Throwable): Boolean = when (error) {
-        is ApiError.InvalidKey, is ApiError.PaymentRequired, is ApiError.RateLimited -> true
-        else -> false
     }
 
     /**
@@ -464,12 +438,12 @@ class ProximityVoice(
             return
         }
         if (!current.ttsConfigured) {
-            speakOffline(text, current)
+            offline.speak(text, current)
             return
         }
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text)
             .getOrElse { error ->
-                if (isNetworkVoiceDown(error)) speakOffline(text, current)
+                if (VoiceOfflineFallback.isNetworkVoiceDown(error)) offline.speak(text, current)
                 return
             }
         coroutineContext.ensureActive()
@@ -508,15 +482,5 @@ class ProximityVoice(
          * présent se redit et le retour d'une scène parle.
          */
         const val REPEAT_TTL_MS = 4_000L
-
-        /**
-         * Signal unique de repli (« Voix réseau indisponible. » /
-         * « Network voice unavailable. ») : parlé une fois par session devant
-         * la première phrase dite au TTS système.
-         */
-        fun networkVoiceDown(language: SpeechLanguage): String = when (language) {
-            SpeechLanguage.Fr -> "Voix réseau indisponible."
-            SpeechLanguage.En -> "Network voice unavailable."
-        }
     }
 }

@@ -274,7 +274,7 @@ class ProximityVoiceTest {
 
     @Test
     fun `signal bilingue`() {
-        assertEquals("Voix réseau indisponible.", ProximityVoice.networkVoiceDown(SpeechLanguage.Fr))
-        assertEquals("Network voice unavailable.", ProximityVoice.networkVoiceDown(SpeechLanguage.En))
+        assertEquals("Voix réseau indisponible.", VoiceOfflineFallback.networkVoiceDown(SpeechLanguage.Fr))
+        assertEquals("Network voice unavailable.", VoiceOfflineFallback.networkVoiceDown(SpeechLanguage.En))
     }
 }
