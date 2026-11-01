@@ -135,6 +135,7 @@ internal object SettingsCodec {
     private const val K_CAREGIVER_INVITE = "caregiverInvite"
     private const val K_MAX_OBJECTS = "maxObjects"
     private const val K_DEPTH_BACKEND = "depthBackend"
+    private const val K_CAMERA_HAL_BARE = "cameraHalBareEnabled"
 
     fun encode(s: Settings): String = buildString {
         appendLine("$K_LLM_BASE_URL=${s.llmBaseUrl}")
@@ -178,6 +179,7 @@ internal object SettingsCodec {
         appendLine("$K_CAREGIVER_INVITE=${s.caregiverInvite}")
         appendLine("$K_MAX_OBJECTS=${s.objectsOnScreen}")
         appendLine("$K_DEPTH_BACKEND=${s.depthBackend.name}")
+        appendLine("$K_CAMERA_HAL_BARE=${s.cameraHalBareEnabled}")
     }
 
     /** Tolérant : une clé absente (ancien fichier) reprend sa valeur par défaut. */
@@ -228,8 +230,14 @@ internal object SettingsCodec {
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
             depthBackend = DepthBackend.fromName(values[K_DEPTH_BACKEND]),
-        ).let { decodeShare(values, it) }.let { decodeAdaptive(values, it) }.let { decodeStream(values, it) }
+        ).let { decodeShare(values, it) }.let { decodeAdaptive(values, it) }.let { decodeStream(values, it) }.let { decodeHal(values, it) }
     }
+
+    /** Drapeau HAL dépouillé : à part pour que [decode] reste sous 50 lignes. */
+    private fun decodeHal(values: Map<String, String>, default: Settings): Settings = default.copy(
+        cameraHalBareEnabled = values[K_CAMERA_HAL_BARE]?.toBooleanStrictOrNull()
+            ?: default.cameraHalBareEnabled,
+    )
 
     /** Drapeau temps réel : à part pour que [decode] reste sous 50 lignes. */
     private fun decodeStream(values: Map<String, String>, default: Settings): Settings = default.copy(
