@@ -13,9 +13,29 @@ import org.junit.Test
  * français (10/2026) : ces tests verrouillent 0 vert sur rouge et le rappel
  * bonhomme. Détection au plus large (31/10, ordre user) : élancés comme
  * ronds passent l'élancement 1,0 ; les disques au contour cyan complet
- * (tache plus large que haute) restent refusés — réalité par ancre.
+ * restent refusés quand leur tache est large **et pleine** ([WIDE_FILL_MAX]),
+ * un bonhomme large restant ajouré — réalité par ancre.
  */
 class PedLightGateTest {
+
+    /**
+     * Tache verte **plus large que haute** (16 x 8) dans la moitie basse :
+     * pleine (disque de face, remplissage ~0,78) ou creuse (contour,
+     * remplissage ~0,35) — meme boite englobante, seule la densite change.
+     */
+    private fun wideBlob(filled: Boolean): IntArray {
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in 12 until 20) {
+            for (x in 2 until 18) {
+                val dx = (x - 9.5f) / 8f
+                val dy = (y - 15.5f) / 4f
+                val r = dx * dx + dy * dy
+                val inside = if (filled) r <= 1f else r in 0.75f..1f
+                if (inside) pixels[y * 20 + x] = GREEN
+            }
+        }
+        return pixels
+    }
 
     @Test
     fun `barre verte basse elancee - acceptee`() {
@@ -42,6 +62,16 @@ class PedLightGateTest {
         val pixels = barBottom()
         paintDisc(pixels, 20, 20, 10, 5, 3, RED)
         assertFalse(PedLightGate.acceptGreen(pixels, 20, 20))
+    }
+
+    @Test
+    fun `large et plein - disque de face refuse`() {
+        assertFalse(PedLightGate.acceptGreen(wideBlob(filled = true), 20, 20))
+    }
+
+    @Test
+    fun `large et ajoure - accepte (meme boite, tache creuse)`() {
+        assertTrue(PedLightGate.acceptGreen(wideBlob(filled = false), 20, 20))
     }
 
     @Test
@@ -204,6 +234,15 @@ class PedLightGateTest {
         assertEquals(CrossingState.Green, verdict3Of("tel_g05.ppm"))
         assertEquals(CrossingState.Green, verdict3Of("tel_g06.ppm"))
         assertEquals(CrossingState.Green, verdict3Of("tel_g07.ppm"))
+    }
+
+    @Test
+    fun `tel - verts larges et ajoures acceptes (tache plus large que haute)`() {
+        // 01/11 avant correction : ces deux verts réels tombaient sur
+        // ELONGATION_MIN (bonhomme large, halo). Un disque large est PLEIN
+        // (remplissage 0,75-0,88), eux sont ajourés (0,09 et 0,16).
+        assertEquals(CrossingState.Green, verdict3Of("tel_g08.ppm"))
+        assertEquals(CrossingState.Green, verdict3Of("tel_g09.ppm"))
     }
 
     @Test
