@@ -239,7 +239,7 @@ class VehicleStateWatcher(
         motion: FrameMotion?,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: if (announceStopped) stoppedPick(gyro, current, meters, atMs, hushed, fondFranc, motion) else null
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion, gyro) ?: if (announceStopped) stoppedPick(gyro, current, meters, atMs, hushed, fondFranc, motion) else null
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -251,6 +251,7 @@ class VehicleStateWatcher(
         hushed: Set<String>,
         movingMeters: Float,
         motion: FrameMotion?,
+        gyro: GyroMotion?,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
@@ -262,7 +263,11 @@ class VehicleStateWatcher(
                 val prev = previous[candidate]
                 val seen = current.getValue(candidate)
                 val tauHit = tauKey != null && tauKey == labelPart(candidate)
-                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate)
+                // Attribution : un latéral ne s'impute qu'à la candidate qui glisse
+                // elle-même — sinon une piste qui churn entre voitures voisines
+                // fait annoncer la garée d'à côté (faux « Stop », Times Square).
+                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate) &&
+                    prev != null && !still(prev, seen, atMs, motion, gyro)
                 // Tronqué au cadre (entrée/sortie de champ) : la croissance est
                 // un artefact de (dé)clip, pas une approche (doctrine onEdge).
                 val growth = prev != null && !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
