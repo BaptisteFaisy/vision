@@ -282,8 +282,10 @@ la voix ne se tait jamais : évitement, sinon tout droit toutes les 300 ms.
 - **états moteurs** (30/10, soir ; stop déplacé le 31/10) : en traversée,
   les voitures disent si elles roulent ou sont arrêtées (« Stop, car
   moving. » — « Stop, 2 vehicles moving. » au pluriel — si le mouvement
-  est proche (sous 8 m), « Car moving, 12 meters away. » / « Car stopped,
-  2 meters away. » sinon, langue de la voix, anglais par défaut) — le
+  est proche (sous 8 m), « Car moving. » / « Car stopped,
+  2 meters away. » sinon, langue de la voix, anglais par défaut — depuis
+  le 01/11 le mouvement ne dit plus son emplacement, § 32 de
+  `VOIX-DANGER.md`) — le
   même `VehicleStateWatcher` que le mode normal (mouvement confirmé ou
   croissance jusqu'à 15 m — `MOVING_METERS`, arrêt mesuré jusqu'à 3 m,
   2 frames, silences 4 s / 10 s), parlé après le feu et avant les
@@ -426,8 +428,9 @@ danger. Avec feu : scan > stop urgent > évitement > feu > véhicules doux
 ## 14. Sans feu : le mouvement se dit à toute portée (31/10)
 
 Ordre user : sans feu, une voiture en mouvement se dit **dès qu'elle est
-détectée, même au-delà de 15 m** (« Car moving, 30 meters away. »). Seul le
-mouvement est illimité : l'arrêt garde 15 m (une voiture garée loin ne
+détectée, même au-delà de 15 m** (« Car moving. » — la portée, pas la
+position : depuis le 01/11 un mobile n'est plus situé, § 32 de
+`VOIX-DANGER.md`). Seul le mouvement est illimité : l'arrêt garde 15 m (une voiture garée loin ne
 bloque pas le « Traversez. »), et avec feu / en mode normal la portée reste
 15 m.
 

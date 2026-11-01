@@ -3,6 +3,31 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : une voiture qui roule ne dit plus où elle est (branche `fix/vehicule-mobile-sans-emplacement`)
+
+- **Fait** : ordre user « ne me dis plus l'emplacement de la voiture si tu
+  vois une voiture qui bouge ». Le mouvement parle nu — « Voiture en
+  mouvement. » / « Car moving. », pluriel « 2 vehicles moving. » — sans
+  distance ni heure (`VehicleStateText.movingPhrase` /
+  `movingPluralPhrase` perdent leurs paramètres de position, donc le
+  compilateur tient la règle). Le danger est intact : « Stop, car
+  moving. » sous 8 m ou non mesuré, urgence douce inchangée. L'arrêt et
+  le stationnement gardent leur emplacement (« Voiture à l'arrêt, à 2
+  mètres. », « Bus en stationnement, à 8 mètres. », heure du cadran sans
+  mesure) : c'est le repère qui ne bouge pas. Portée du mouvement
+  inchangée (15 m, infini sans feu). Docs : § 32 de `VOIX-DANGER.md`,
+  § 7 et § 14 de `TRAVERSEE.md` réécrits.
+- **Preuve** : `:core:testDebugUnitTest` + `:app:testDebugUnitTest` verts
+  (BUILD SUCCESSFUL, 0 échec) ; 1 test neuf `VehicleStateTextTest`
+  (`mouvement jamais situe - arret et stationnement si`, FR/EN,
+  singulier/pluriel) ; attentes réécrites dans `VehicleStateTest`,
+  `VehicleStateRangeTest`, `VehicleStateBackgroundTest`,
+  `VehicleStateLateralTest`, `VehicleStateDepthTest`,
+  `EgoVoteWatcherTest`, `NoLightCrossingTest`, `CrossingVehicleTest`,
+  `LiveVehicleVoiceTest` ; `check-kotlin-limits.py` OK, `check-voicepack`,
+  `check-isee-design`, `check-budget-derive`, `check-voice-nav-doc` OK.
+  Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — iSee : rappel vocal GPS toutes les 5 s, relatif au cap suivi (branche `feat/isee-gps-voix-5s`)
 
 - **Fait** : quand le guidage in-app court, la voix redit où aller au

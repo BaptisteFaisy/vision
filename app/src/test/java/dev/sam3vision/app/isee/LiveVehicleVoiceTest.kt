@@ -92,9 +92,9 @@ class LiveVehicleVoiceTest {
         at(110f, 100L)
         at(120f, 200L)
 
-        assertEquals("Car moving, 5 meters away.", state.value.spoken)
+        assertEquals("Car moving.", state.value.spoken)
         advanceUntilIdle()
-        assertEquals(listOf("Car moving, 5 meters away."), spoken)
+        assertEquals(listOf("Car moving."), spoken)
     }
 
     @Test

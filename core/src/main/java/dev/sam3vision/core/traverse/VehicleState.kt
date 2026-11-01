@@ -45,10 +45,13 @@ data class VehicleStateCue(
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
  * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS] (sauf [update] : sans-feu = infini),
- * mesuré ou non — toute voiture vue se dit, en mouvement ou à l'arrêt.
+ * mesuré ou non — toute voiture vue se dit, en mouvement ou à l'arrêt. **Mais un mobile ne
+ * dit jamais son emplacement** (ni distance ni heure) : ce qu'on situerait serait faux avant
+ * la fin de la phrase (ordre user du 01/11/2026). L'arrêt et le stationnement gardent leur
+ * mesure — le repère stable — et le danger proche garde son alerte ([VehicleStateCue.safetyPhrase]).
  *
  * Le pluriel est générique : deux types mobiles ou plus dans la même frame
- * disent « 2 vehicles moving… » (distance du plus proche), pas le nom du
+ * disent « 2 vehicles moving. » (même sans emplacement), pas le nom du
  * type — les pistes sont par type, pas par instance, et deux voitures sous
  * le même label comptent pour une (limite connue).
  *
@@ -173,8 +176,8 @@ class VehicleStateWatcher(
     private fun cueFor(pick: Pick, near: Boolean, language: SpeechLanguage): VehicleStateCue {
         val movingPlural = pick.state == State.MOVING && pick.movingCount >= 2
         val phrase = when {
-            movingPlural -> VehicleStateText.movingPluralPhrase(pick.movingCount, pick.meters, pick.centerX, language)
-            pick.state == State.MOVING -> VehicleStateText.movingPhrase(pick.name, pick.meters, pick.centerX, language)
+            movingPlural -> VehicleStateText.movingPluralPhrase(pick.movingCount, language)
+            pick.state == State.MOVING -> VehicleStateText.movingPhrase(pick.name, language)
             pick.state == State.STOPPED -> VehicleStateText.stoppedPhrase(pick.name, pick.meters, pick.centerX, language)
             else -> VehicleStateText.parkedPhrase(pick.name, pick.meters, pick.centerX, language)
         }
