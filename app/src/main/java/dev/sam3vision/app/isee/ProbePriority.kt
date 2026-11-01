@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.traverse.VehicleStateCue
 
@@ -101,7 +102,7 @@ internal fun decideFrame(wishes: List<VoiceWish?>): VoiceWish? =
  */
 internal fun vehicleWish(cue: VehicleStateCue?): VoiceWish? {
     if (cue == null || !cue.moving) return null
-    return VoiceWish(OutdoorLevel.CAR_MOVING, cue.phrase, AntiRepeat.CAR_MOVING, recordedClipId(cue.phrase))
+    return VoiceWish(OutdoorLevel.CAR_MOVING, cue.phrase, AntiRepeat.KEY_CAR_MOVING, recordedClipId(cue.phrase))
 }
 
 /**
@@ -117,15 +118,15 @@ internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): Voice
     }
     return when (cue.kind) {
         HazardKind.PERSON -> personWish(cue, OutdoorLevel.HUMAN)
-        HazardKind.BARRIER -> VoiceWish(OutdoorLevel.FENCE, cue.phrase, AntiRepeat.FENCE)
-        HazardKind.OTHER -> VoiceWish(OutdoorLevel.POLE, cue.phrase, AntiRepeat.POLE)
+        HazardKind.BARRIER -> VoiceWish(OutdoorLevel.FENCE, cue.phrase, AntiRepeat.KEY_FENCE)
+        HazardKind.OTHER -> VoiceWish(OutdoorLevel.POLE, cue.phrase, AntiRepeat.KEY_POLE)
     }
 }
 
 /** Vœu personne : mot imminent en clip, sinon phrase douce (même niveau). */
 private fun personWish(cue: HazardCue, level: Int): VoiceWish =
-    if (cue.urgent) VoiceWish(level, cue.phrase, AntiRepeat.HUMAN_IMMINENT, GuidanceWord.clipIdFor(cue.phrase))
-    else VoiceWish(level, cue.phrase, AntiRepeat.HUMAN_SOFT)
+    if (cue.urgent) VoiceWish(level, cue.phrase, AntiRepeat.KEY_HUMAN_IMMINENT, GuidanceWord.clipIdFor(cue.phrase))
+    else VoiceWish(level, cue.phrase, AntiRepeat.KEY_HUMAN_SOFT)
 
 /**
  * Vœu bordure : niveau 5 dehors, 102 en Traversée. Pur, testé en JVM.
@@ -134,7 +135,7 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
     if (cue == null) return null
     return VoiceWish(
         if (crossingActive) CrossingLevel.CURB else OutdoorLevel.CURB,
-        cue.phrase, AntiRepeat.CURB,
+        cue.phrase, AntiRepeat.KEY_CURB,
     )
 }
 

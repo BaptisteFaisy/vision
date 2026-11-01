@@ -66,7 +66,7 @@ class IndoorDoorWatcher {
 
     /**
      * Constat à dire pour ce [cue] (`null` = plus rien : le guetteur
-     * oublie). [allow] est la signature d'AntiRepeat (clé, horloge).
+     * oublie). [allow] est la signature de la table centrale (clé, horloge).
      */
     fun onCue(cue: IndoorDoorWall.Cue?, nowMs: Long, allow: (key: String, nowMs: Long) -> Boolean): IndoorDoorWall.Cue? {
         if (cue == null) {

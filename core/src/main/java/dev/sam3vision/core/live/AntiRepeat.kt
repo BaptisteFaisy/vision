@@ -29,6 +29,8 @@ package dev.sam3vision.core.live
  * - `sidewalk` = 10 s (niveau 10, trottoirs) ;
  * - `verdict` = 3 s avec changement immédiat (traversée : le verdict
  *   nouveau parle tout de suite, voir les clés paramétrées ci-dessous).
+ * - `find-found` = 2 s (dedans : trouvaille find, niveau 0 indoor).
+ * - `door-wall` = 4 s (dedans : porte et murs, niveau 13).
  * GPS (niveaux 3, 11) et chat (niveau 9) : sans antirépétition — le chat
  * n'a pas de clé (reprise depuis la coupure, pas de redite).
  *
@@ -43,8 +45,8 @@ package dev.sam3vision.core.live
  *
  * Clés inconnues : toujours autorisées (sans antirépétition) — une mission
  * qui invente une clé ne se fait jamais taire par une faute de frappe, et
- * l'indoor (objet cherché, porte et murs : pas de délai en v4) n'a qu'à
- * réutiliser `human-soft` pour l'humain et parler librement pour le reste.
+ * l'indoor (objet cherché 2 s, porte et murs 4 s) n'a qu'à réutiliser
+ * `human-soft` pour l'humain.
  *
  * Pur JVM, synchrone ([Synchronized] : les guetteurs appellent depuis des
  * coroutines) et testé ([atMs] fourni, comme [AnnouncementGate]). [reset] en
@@ -114,6 +116,12 @@ object AntiRepeat {
      */
     const val KEY_VERDICT = "verdict"
 
+    /** Dedans : trouvaille find (objet cherché détecté) — 2 s. */
+    const val KEY_FIND_FOUND = "find-found"
+
+    /** Dedans : porte et murs (niveau 13) — 4 s. */
+    const val KEY_DOOR_WALL = "door-wall"
+
     /** Durée « 1 fois » : ne s'écoule jamais, seul [forget] / [reset] ré-arme. */
     const val ONCE_MS = Long.MAX_VALUE
 
@@ -151,6 +159,8 @@ object AntiRepeat {
         KEY_MISC -> 2_000L
         KEY_SIDEWALK -> 10_000L
         KEY_VERDICT -> 3_000L
+        KEY_FIND_FOUND -> 2_000L
+        KEY_DOOR_WALL -> 4_000L
         KEY_CROSSWALK_ANNOUNCE, KEY_CROSSWALK_ARRIVAL -> ONCE_MS
         // Imminent, rappel GPS, alignement : sans délai (toujours autorisés).
         KEY_HUMAN_IMMINENT, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L

@@ -1,5 +1,7 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.live.AntiRepeat
+
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.SystemTtsEngine
@@ -113,9 +115,9 @@ class EchelleOverwriteTest {
     fun `le plus petit niveau gagne, les autres ecrases`() {
         val winner = decideFrame(
             listOf(
-                VoiceWish(OutdoorLevel.CURB, "bordure", AntiRepeat.CURB),
-                VoiceWish(OutdoorLevel.HUMAN, "personne", AntiRepeat.HUMAN_SOFT),
-                VoiceWish(OutdoorLevel.CAR_MOVING, "voiture", AntiRepeat.CAR_MOVING),
+                VoiceWish(OutdoorLevel.CURB, "bordure", AntiRepeat.KEY_CURB),
+                VoiceWish(OutdoorLevel.HUMAN, "personne", AntiRepeat.KEY_HUMAN_SOFT),
+                VoiceWish(OutdoorLevel.CAR_MOVING, "voiture", AntiRepeat.KEY_CAR_MOVING),
             ),
         )
 
@@ -126,10 +128,10 @@ class EchelleOverwriteTest {
     @Test
     fun `nuls et blancs ignores, silence si rien`() {
         assertNull(decideFrame(listOf(null, null)))
-        assertNull(decideFrame(listOf(VoiceWish(OutdoorLevel.CURB, "  ", AntiRepeat.CURB))))
+        assertNull(decideFrame(listOf(VoiceWish(OutdoorLevel.CURB, "  ", AntiRepeat.KEY_CURB))))
         assertEquals(
             "seul",
-            decideFrame(listOf(null, VoiceWish(OutdoorLevel.SIDEWALK, "seul", AntiRepeat.SIDEWALK)))?.text,
+            decideFrame(listOf(null, VoiceWish(OutdoorLevel.SIDEWALK, "seul", AntiRepeat.KEY_SIDEWALK)))?.text,
         )
     }
 
@@ -141,7 +143,7 @@ class EchelleOverwriteTest {
 
         assertNotNull(moving)
         assertEquals(OutdoorLevel.CAR_MOVING, moving?.level)
-        assertEquals(AntiRepeat.CAR_MOVING, moving?.key)
+        assertEquals(AntiRepeat.KEY_CAR_MOVING, moving?.key)
         assertEquals("vehicle_car_moving", moving?.clipId)
 
         assertNull(vehicleWish(VehicleStateCue("Voiture à l'arrêt.", meters = 5f, moving = false)))
@@ -161,14 +163,14 @@ class EchelleOverwriteTest {
         val soft = hazardWish(HazardCue("Attention à la personne.", meters = 3f, kind = HazardKind.PERSON))
 
         assertEquals(OutdoorLevel.HUMAN, soft?.level)
-        assertEquals(AntiRepeat.HUMAN_SOFT, soft?.key)
+        assertEquals(AntiRepeat.KEY_HUMAN_SOFT, soft?.key)
         assertNull(soft?.clipId)
 
         val word = GuidanceWord.fromCap(dev.sam3vision.core.live.SteeringCap.Right).text(SpeechLanguage.Fr)
         val imminent = hazardWish(HazardCue(word, meters = 1f, urgent = true, kind = HazardKind.PERSON))
 
         assertEquals(OutdoorLevel.HUMAN, imminent?.level)
-        assertEquals(AntiRepeat.HUMAN_IMMINENT, imminent?.key)
+        assertEquals(AntiRepeat.KEY_HUMAN_IMMINENT, imminent?.key)
         assertEquals(GuidanceWord.clipIdFor(word), imminent?.clipId)
         assertNotNull(imminent?.clipId)
     }
@@ -180,7 +182,7 @@ class EchelleOverwriteTest {
             hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER))?.level,
         )
         assertEquals(
-            AntiRepeat.FENCE,
+            AntiRepeat.KEY_FENCE,
             hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER))?.key,
         )
         assertEquals(
@@ -217,7 +219,7 @@ class EchelleOverwriteTest {
         val cue = CurbCue("Bordure détectée.", meters = 2f, tier = CurbTier.FAR)
 
         assertEquals(OutdoorLevel.CURB, curbWish(cue)?.level)
-        assertEquals(AntiRepeat.CURB, curbWish(cue)?.key)
+        assertEquals(AntiRepeat.KEY_CURB, curbWish(cue)?.key)
         assertEquals(CrossingLevel.CURB, curbWish(cue, crossingActive = true)?.level)
         assertNull(curbWish(null))
     }
@@ -226,27 +228,27 @@ class EchelleOverwriteTest {
 
     @Test
     fun `fenetres de la spec par cle`() {
-        assertTrue(AntiRepeat.allow(AntiRepeat.CAR_MOVING, 0L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.CAR_MOVING, 3_999L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.CAR_MOVING, 4_000L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CAR_MOVING, 0L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_CAR_MOVING, 3_999L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CAR_MOVING, 4_000L))
 
-        assertTrue(AntiRepeat.allow(AntiRepeat.HUMAN_SOFT, 0L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.HUMAN_SOFT, 1_999L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.HUMAN_SOFT, 2_000L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_SOFT, 0L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_SOFT, 1_999L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_SOFT, 2_000L))
 
-        assertTrue(AntiRepeat.allow(AntiRepeat.SIDEWALK, 0L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.SIDEWALK, 9_999L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.SIDEWALK, 10_000L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_SIDEWALK, 0L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_SIDEWALK, 9_999L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_SIDEWALK, 10_000L))
 
-        assertTrue(AntiRepeat.allow(AntiRepeat.VERDICT, 0L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.VERDICT, 2_999L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.VERDICT, 3_000L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 0L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 2_999L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 3_000L))
     }
 
     @Test
     fun `imminent immediat, cles inconnues jamais tues`() {
-        assertTrue(AntiRepeat.allow(AntiRepeat.HUMAN_IMMINENT, 0L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.HUMAN_IMMINENT, 0L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_IMMINENT, 0L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_IMMINENT, 0L))
         assertTrue(AntiRepeat.allow("inconnue", 0L))
         assertTrue(AntiRepeat.allow("inconnue", 0L))
     }
@@ -317,7 +319,7 @@ class EchelleOverwriteTest {
 
     @Test
     fun `offre postee une fois puis tue par l antirepetition`() {
-        val wish = VoiceWish(OutdoorLevel.CURB, "bordure", AntiRepeat.CURB)
+        val wish = VoiceWish(OutdoorLevel.CURB, "bordure", AntiRepeat.KEY_CURB)
 
         assertTrue(offer(wish, nowMs = 0L))
         assertFalse(offer(wish, nowMs = 1_000L))
