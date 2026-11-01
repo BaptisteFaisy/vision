@@ -16,8 +16,7 @@ import dev.sam3vision.core.live.LivePrompts
  * Ce fichier ne touche pas à [LivePrompts] (défauts du direct, hors
  * périmètre) : l'intégrateur ajoute « handrail » par le champ « Follow » ou
  * instruction du propriétaire des prompts. [promptsFor] reste disponible
- * pour composer une base (miroir de `StairConcepts.promptsFor` côté
- * traversée).
+ * pour composer une base (miroir de `TraversePipeline.promptsFor`).
  *
  * Distance : volontairement **absente** de [KnownSizes] — une rampe
  * segmentée va du barreau au garde-corps d'étage, aucune hauteur typique
@@ -49,7 +48,7 @@ object HandrailConcepts {
 
     /**
      * Prompts rampe : « handrail » d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] — miroir de `StairConcepts.promptsFor` côté traversée.
+     * [LivePrompts.MAX] — miroir de `TraversePipeline.promptsFor`.
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
         LivePrompts.normalize(PROMPTS + base)

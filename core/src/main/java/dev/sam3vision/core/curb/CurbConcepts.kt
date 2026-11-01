@@ -18,7 +18,7 @@ import dev.sam3vision.core.distance.KnownSizes
  * ([CurbSignal]) n'en retient que le proche (bande basse, ≤ 1 m). « marche »
  * compte comme « step » (audit 31/10 : le backend segmente la marche comme
  * bord ; le contexte couloir/bande/distance lève l'ambiguïté avec la marche
- * à pied, assumée côté [dev.sam3vision.core.traverse.StairConcepts]).
+ * à pied, assumée côté [dev.sam3vision.core.stairs.StairConcepts]).
  */
 object CurbConcepts {
 
