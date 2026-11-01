@@ -24,6 +24,14 @@ fun interface CrossingVerdictPoster {
 }
 
 /**
+ * Moteur du verdict branché au bus (SPEC v4, niveau 100) : feu piéton puis
+ * voitures en mouvement. Nourri à chaque frame en Traversée, remis à zéro à l'activation.
+ */
+internal fun busVerdictEngine(): CrossingVerdictEngine = CrossingVerdictEngine(
+    poster = CrossingVerdictPoster { level, text, clipId -> VoiceBus.post(level, text, clipId) },
+)
+
+/**
  * Frame traversée (SPEC v4) : [posts] ordonnés (verdict 100, humains 101,
  * bordures 102), [verdict] et ses entrées ([light], [carMoving]), [overlay]
  * (l'état rouge-vert affiché et vibré) et [haptic] (l'état à vibrer, `null`

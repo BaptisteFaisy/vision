@@ -41,8 +41,7 @@ internal fun LiveProbe.observeStairs(
     val watcher = StairWatcher(confirmFrames = 2)
     scope.launch {
         state.collect { st ->
-            if (st.crossingActive) return@collect
-            if (placeMode() != PictoPlaceMode.DEHORS) return@collect
+            if (st.crossingActive || placeMode() != PictoPlaceMode.DEHORS) return@collect
             if (this@observeStairs.stairsYieldToAvoidance()) return@collect
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
             // repli : un escalier nommé sans mesure reste un escalier.

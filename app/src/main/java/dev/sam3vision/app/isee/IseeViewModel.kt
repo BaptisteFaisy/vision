@@ -16,11 +16,11 @@ import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
-import dev.sam3vision.app.isee.vm.DictationActions
 import dev.sam3vision.app.isee.vm.DictationRouterText
 import dev.sam3vision.app.isee.vm.IseeAnswers
 import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
+import dev.sam3vision.app.isee.vm.IseeDictationActions
 import dev.sam3vision.app.isee.vm.IseeDictationRouter
 import dev.sam3vision.app.isee.vm.IseeGlassesOrder
 import dev.sam3vision.app.isee.vm.IseeHoldMic
@@ -41,10 +41,6 @@ import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
-import dev.sam3vision.core.picto.FindIndoorClips
-import dev.sam3vision.core.picto.FindIndoorLevels
-import dev.sam3vision.core.picto.FindIndoorTarget
-import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
@@ -52,7 +48,6 @@ import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
@@ -109,7 +104,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode }, probeState = probe.state,
         update = ::update,
         scope = viewModelScope,
-        onFound = ::speakFound,
+        onFound = ::postFoundClip,
     )
     /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
     val crossingChip = CrossingChipZone()
@@ -189,7 +184,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
-        speakRoute = { text, level -> speakGps(text, level) },
+        speakRoute = { text, level -> spine.speakGps(text, level) },
         // Fin de guidage : le lecteur est coupé (une coupe ne termine
         // jamais : pas de `onComplete`) — l'état parlant est rendu ici.
         stopRoute = { player.stop(); update { it.copy(speakingEntryId = null, speakingText = "") } },
@@ -218,32 +213,25 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode }, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode }, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
 
-    /**
-     * Routeur de dictée (spec v4) : les 10 ordres « mode … » rejouent les
-     * collaborateurs existants sous leurs phrases canoniques ; tout le reste
-     * part au LLM comme question. Sans condition de mode : actif partout,
-     * traversée comprise. « mode glasses on/off » rejoue la bascule « iSee »
-     * (pas d'API on/off explicite côté lunettes, voir rapport).
-     */
-    private val dictationRouter = IseeDictationRouter(object : DictationActions {
-        override suspend fun onOutdoor() { modes.run("mode dehors") }
-        override suspend fun onIndoor() { modes.run("mode dedans") }
-        override suspend fun onCrossing(active: Boolean) {
-            steering.runCrossing(if (active) "crossing mode on" else "crossing mode off")
-            onCrossingChanged()
-        }
-        override suspend fun onFind(label: String) { modes.run("find the " + label) }
-        override suspend fun onFindOff() {
+    /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
+    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() })
+
+    /** Routeur de la dictée (SPEC v4) : « mode … » ⇒ ordre exécuté ; le reste ⇒ question au LLM (voir [IseeDictationActions]). */
+    private val dictationRouter = IseeDictationRouter(IseeDictationActions(
+        modes = modes,
+        runCrossing = steering::runCrossing,
+        onCrossingChanged = spine::onCrossingChanged,
+        confirmFindStopped = {
             val confirm = DictationRouterText.findStopped(settings.speechLanguage)
             update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, hits = emptyList()), status = confirm) }
             speakNavigation(confirm)
-        }
-        override suspend fun onGpsGo(destination: String) { voiceNav.run("I want to go to " + destination) }
-        override suspend fun onGpsOff() { voiceNav.runOrder("disable the GPS") }
-        override suspend fun onGlasses(on: Boolean) { glassesOrder.run("iSee") }
-    })
+        },
+        gpsGo = { destination -> voiceNav.run("I want to go to " + destination) },
+        gpsOff = { voiceNav.runOrder("disable the GPS") },
+        glasses = { glassesOrder.run("iSee") },
+    ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap)
     private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
@@ -289,13 +277,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             picto.refresh()
             intro.playIfPending()
         }
-        // Bus vocal (SPEC v4) : branché une fois ici — porte-parole (clips
-        // anglais, synthèse GPS), reprise chat au repos, parole du user.
-        VoiceBus.speaker = BusSpeaker(viewModelScope, player, clipPlayer, proximity)
-        VoiceBus.onIdle = { viewModelScope.launch { resumeChatIfDue() } }
-        viewModelScope.launch {
-            state.collect { VoiceBus.userSpeaking(it.holding || it.transcribing) }
-        }
+        // Bus vocal (SPEC v4) : câblé par la colonne (porte-parole, reprise chat, parole du user).
+        spine.wireBus(BusSpeaker(viewModelScope, player, clipPlayer, proximity), state)
         probe.observeSpoken(viewModelScope, placeMode = { _state.value.placeMode })
         // Placement sur le passage (mot + approche + arrivée, niveau 8).
         observeCrossingVoice(viewModelScope, placeMode = { _state.value.placeMode })
@@ -315,22 +298,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
     fun toggleCrossing() {
         steering.toggleCrossing()
-        onCrossingChanged()
+        spine.onCrossingChanged()
     }
 
-    /**
-     * Traversée basculée (SPEC v4) : à l'allumage, le chat en cours est
-     * coupé (il attendra sa reprise) et la voix GPS se tait — le verdict
-     * prend le son ; à l'arrêt, la réponse coupée reprend s'il y a lieu.
-     */
-    private fun onCrossingChanged() {
-        if (probe.state.value.crossingActive) {
-            cutSpeech()
-            voiceNav.stopVoice()
-        } else {
-            viewModelScope.launch { resumeChatIfDue() }
-        }
-    }
 
     override fun onCleared() {
         liveDictation.stop()
@@ -384,34 +354,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /**
-     * Parole GPS vers le bus (SPEC v4) : manœuvres au rang 11, rappel au
-     * rang 3 — tus en Traversée (le verdict y est propriétaire du son) et
-     * dedans (chaîne dedans : find, user, humain, chat, porte et murs).
-     */
-    private fun speakGps(text: String, level: Int) {
-        if (probe.state.value.crossingActive) return
-        if (_state.value.placeMode != PictoPlaceMode.DEHORS) return
-        VoiceBus.post(level, text)
-    }
 
-    /** Reprise au repos : la réponse coupée reparle (rang 9, hors Traversée). */
-    private suspend fun resumeChatIfDue() {
-        if (probe.state.value.crossingActive) return
-        runCatching { playback.speakPending() }
-    }
-
-    /**
-     * Trouvé de la chasse (SPEC v4, cran find 0) : « Keys at 9 o'clock. »
-     * en clip anglais, clé par clip (changement aussitôt, même trouvé 2 s).
-     */
-    private fun speakFound(label: String, clockHour: Int) {
-        val target = FindIndoorTarget.fromSpoken(label) ?: return
-        val clip = FindIndoorClips.found(target, clockHour)
-        if (AntiRepeat.allow(AntiRepeat.KEY_FIND_FOUND + ":" + clip.id, System.currentTimeMillis())) {
-            VoiceBus.post(FindIndoorLevels.FIND, clip.text, clip.id)
-        }
-    }
 
     /** Texte entendu (lunettes ou dictée) : ordres locaux d'abord, sinon question au LLM. */
     private suspend fun answerHeard(text: String, pcm: ByteArray) {
@@ -478,11 +421,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
     fun settingsOpened() = update { it.copy(openSettings = false) }
 
-    /** Ordres « Find the X » / « Where are my keys » / « où sont mes clés » : X rejoint les masques SAM, son picto se crée à sa première détection puis s'ancre sur lui. */
-    private fun runFindOrder(label: String) {
-        probe.ensureConcept(settings, label, camera?.lensSpec, lensFeeds::note, lensFeeds.mire())
-        picto.findObject(label)
-    }
 
     /** Texte transcrit : coupe d'intro possible, ligne Room + MP3, puis question au LLM. */
     private suspend fun handleDictated(text: String, pcm: ByteArray) {
@@ -514,8 +452,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private fun update(fn: (IseeUiState) -> IseeUiState) = _state.update(fn)
 
     private fun playerIdle(): Boolean = _state.value.speakingEntryId == null
-
-
 
     /** Position média pour les sous-titres ; aucune estimation d'une vitesse de parole. */
     fun speechPosition() = player.position()
