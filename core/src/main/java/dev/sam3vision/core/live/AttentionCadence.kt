@@ -37,6 +37,17 @@ package dev.sam3vision.core.live
  * du guidage ne sont jamais filtrés ici. Pur JVM et testé : l'appelant dit
  * quand la phrase a **vraiment** parlé ([record]) — une phrase avalée par le
  * lecteur, la synthèse ou une dictée ne consomme pas son tour.
+ *
+ * Voix v4 (SPEC v4) : [blocked] et [record] prennent une clé [AntiRepeat]
+ * optionnelle ([key]) — la redite suit alors la table centrale au lieu de
+ * [repeatMs] (sans clé : comportement historique inchangé). Correspondance
+ * des familles « Attention » : poteaux et mobilier → [AntiRepeat.KEY_POLE],
+ * divers (animal, poubelle) → [AntiRepeat.KEY_MISC], personnes douces →
+ * [AntiRepeat.KEY_HUMAN_SOFT], bordures → [AntiRepeat.KEY_CURB], escaliers →
+ * [AntiRepeat.KEY_STAIRS], grillages → [AntiRepeat.KEY_FENCE]. La mémoire
+ * reste locale à l'instance (file [pending] comprise) : la table ne fournit
+ * que les durées, source unique — les niveaux v4 qui postent directement sur
+ * le bus voix appellent [AntiRepeat.allow] eux-mêmes.
  */
 class AttentionCadence(
     private val gapMs: Long = DEFAULT_GAP_MS,
@@ -44,7 +55,7 @@ class AttentionCadence(
     private val urgentGapMs: Long = DEFAULT_URGENT_GAP_MS,
 ) {
     /** Instant du dernier passage de chaque annonce, par clé ([keyFor]). */
-    private val saidAt = HashMap<String, Long>()
+    private val saidAt = HashMap<String, Said>()
 
     /** Instant de la dernière annonce « Attention … » vraiment parlée. */
     private var lastAtMs: Long = NO_INSTANT
@@ -65,6 +76,10 @@ class AttentionCadence(
      * personne a son tour ») ; sans piste, la clé reste la phrase privée de ses
      * nombres, donc le comportement d'avant les foules ne bouge pas.
      *
+     * [key] (voix v4) : clé [AntiRepeat] — la redite suit la table centrale
+     * au lieu de [repeatMs] (`null` = historique). Clé inconnue ou sans délai
+     * (durée nulle) : pas de redite, seul le silence ([gapMs]) peut taire.
+     *
      * Effet de bord voulu : une phrase tue par la **redite** — jamais par le
      * silence, jamais une urgente — est mémorisée pour [pending]. Deux appels
      * sur la même clé ne font qu'une entrée.
@@ -74,13 +89,15 @@ class AttentionCadence(
         nowMs: Long,
         urgent: Boolean = false,
         trackId: Int? = null,
+        key: String? = null,
     ): Boolean {
         if (!isAttention(phrase)) return false
         prune(nowMs)
-        val key = keyFor(phrase, trackId)
-        val dueAtMs = rediteUntil(key, nowMs, urgent)
+        val repeat = repeatFor(key)
+        val rediteKey = keyFor(phrase, trackId)
+        val dueAtMs = rediteUntil(rediteKey, nowMs, urgent, repeat)
         if (dueAtMs != null) {
-            remember(phrase, key, dueAtMs)
+            remember(phrase, rediteKey, dueAtMs)
             return true
         }
         val last = if (urgent) lastUrgentAtMs else lastAtMs
@@ -90,15 +107,16 @@ class AttentionCadence(
     /**
      * Mémorise que [phrase] a parlé à [nowMs] (seules les annonces comptent).
      * [trackId] désigne la piste qui a parlé ; son éventuelle attente devient
-     * caduque, puisque l'annonce vient d'être dite.
+     * caduque, puisque l'annonce vient d'être dite. [key] (voix v4) : clé
+     * [AntiRepeat] — la redite de cette annonce suit la table centrale.
      */
-    fun record(phrase: String, nowMs: Long, urgent: Boolean = false, trackId: Int? = null) {
+    fun record(phrase: String, nowMs: Long, urgent: Boolean = false, trackId: Int? = null, key: String? = null) {
         if (!isAttention(phrase)) return
-        val key = keyFor(phrase, trackId)
-        saidAt[key] = nowMs
+        val rediteKey = keyFor(phrase, trackId)
+        saidAt[rediteKey] = Said(nowMs, repeatFor(key))
         lastAtMs = nowMs
         if (urgent) lastUrgentAtMs = nowMs
-        waiting.removeAll { it.key == key }
+        waiting.removeAll { it.key == rediteKey }
         prune(nowMs)
     }
 
@@ -140,14 +158,23 @@ class AttentionCadence(
     }
 
     /**
+     * Durée de redite : la table centrale ([AntiRepeat]) quand [key] est
+     * donnée, [repeatMs] sinon. Les clés « 1 fois » sont plafonnées
+     * ([REPEAT_ONCE_CAP_MS] : l'addition `dernier + délai` ne doit jamais
+     * déborder — 24 h dans une séance, c'est une fois).
+     */
+    private fun repeatFor(key: String?): Long =
+        key?.let { minOf(AntiRepeat.durationMs(it), REPEAT_ONCE_CAP_MS) } ?: repeatMs
+
+    /**
      * Échéance de la redite de [key] si elle court encore à [nowMs], `null`
      * sinon. Une annonce [urgent] n'a pas de redite : [urgentGapMs] suffit à
      * empêcher un danger présent de couper la parole à chaque frame.
      */
-    private fun rediteUntil(key: String, nowMs: Long, urgent: Boolean): Long? {
+    private fun rediteUntil(key: String, nowMs: Long, urgent: Boolean, repeat: Long): Long? {
         if (urgent) return null
-        val last = saidAt[key] ?: return null
-        return if (nowMs - last < repeatMs) last + repeatMs else null
+        val said = saidAt[key] ?: return null
+        return if (nowMs - said.atMs < repeat) said.atMs + repeat else null
     }
 
     /** Vrai si [delayMs] se sont écoulés depuis [instant] (jamais dit = oui). */
@@ -164,12 +191,15 @@ class AttentionCadence(
     /** Oublie les annonces sorties de la fenêtre : la mémorisation reste bornée. */
     private fun prune(nowMs: Long) {
         if (saidAt.size <= MAX_KEYS) return
-        saidAt.entries.removeAll { nowMs - it.value >= repeatMs }
+        saidAt.entries.removeAll { nowMs - it.value.atMs >= it.value.repeatMs }
     }
 
     /** Clé de redite : la phrase, plus la piste quand l'appelant en donne une. */
     private fun keyFor(phrase: String, trackId: Int?): String =
         if (trackId == null) keyOf(phrase) else keyOf(phrase) + PISTE + trackId
+
+    /** Dernier passage d'une annonce : instant parlé et durée de sa redite. */
+    private data class Said(val atMs: Long, val repeatMs: Long)
 
     /** Une annonce tue par la redite, en attente de son échéance. */
     private data class Waiting(val phrase: String, val key: String, val dueAtMs: Long)
@@ -186,6 +216,12 @@ class AttentionCadence(
 
         /** Retard maximal d'une annonce mise en attente : au-delà, elle est périmée. */
         const val PENDING_TTL_MS = 3_000L
+
+        /**
+         * Plafond d'une redite issue de la table ([AntiRepeat.ONCE_MS] ne tient
+         * pas dans `dernier + délai`) : 24 h — dans une séance, c'est une fois.
+         */
+        private const val REPEAT_ONCE_CAP_MS = 24L * 3_600_000L
 
         /** Borne du dictionnaire des redites (une foule crée des clés par piste). */
         private const val MAX_KEYS = 64
