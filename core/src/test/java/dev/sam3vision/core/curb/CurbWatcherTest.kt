@@ -276,7 +276,7 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `cooldown bordures dix secondes`() {
+    fun `cooldown bordures quatre secondes`() {
         val watcher = CurbWatcher()
         val positive = CurbSignal(detected = true, meters = 0.8f)
 
@@ -287,9 +287,7 @@ class CurbWatcherTest {
         watcher.onSignal(CurbSignal.none(), 4000L)
         watcher.onSignal(CurbSignal.none(), 5000L)
         assertNull(watcher.onSignal(positive, 6000L))
-        assertNull(watcher.onSignal(positive, 7000L))
-        assertNull(watcher.onSignal(positive, 8000L))
-        assertNotNull("cooldown 10 s écoulé", watcher.onSignal(positive, 13000L))
+        assertNotNull("cooldown 4 s écoulé", watcher.onSignal(positive, 7000L))
     }
 
     @Test
