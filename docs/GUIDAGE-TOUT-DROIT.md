@@ -191,7 +191,7 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
   Escaliers et marches (`stairs`, `escalier`, `step`, `steps`, `marche`) : sans
   hauteur sténopé (volontaire, `KnownSizes.kt:15-22`), lus sans distance,
   bloquants par prudence (`:161`). « marche » est reconnu
-  (`stairs/StairConcepts.kt`, `CurbConcepts.kt:15-16`) mais le couloir
+  (`stairs/StairConcepts.kt`, `CurbConcepts.kt:18-21`) mais le couloir
   bloque tout label : la reco ne conditionne pas le blocage.
 - **Trou** : aucun concept, aucune taille inventée (`heightMeters("trou")` et
   `("hole")` = `null`) — la prudence bloque (`:179`). Une vraie distance

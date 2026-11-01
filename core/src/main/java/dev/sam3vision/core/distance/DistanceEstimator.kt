@@ -270,8 +270,9 @@ class DistanceMeter(
         // −20° pour un téléphone à 1,5 m) : un piéton à 1 m était annoncé à 2,27 m
         // et le seuil de contact de 0,6 m devenait inatteignable. Il n'existe pas
         // de plan de sol par objet côté direct pour remplacer ce chiffre
-        // (`GroundPipeline` n'est pas branché à la boucle live, pas de
-        // `GroundReadings` par boîte) — c'est là qu'il se branchera. Une distance
+        // (pas de `GroundReadings` par boîte — c'est là qu'un futur pipeline
+        // se branchera ; l'ancien `GroundPipeline`, jamais branché, a été
+        // supprimé le 01/11/2026). Une distance
         // inconnue se traite comme proche par les appelants conservateurs
         // (`Guidance` bloque sans distance) ; un chiffre faux est pire.
         if (Pinhole.isCutBottom(box, height)) return null

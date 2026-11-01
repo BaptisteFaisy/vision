@@ -12,7 +12,7 @@ donnée). Les mesures de temps et de débit sont dans `docs/PERF.md`, jamais ici
 
 | Module | Type Gradle | Namespace / ID | minSdk | `src/main` | `src/test` | `src/androidTest` |
 |---|---|---|---|---|---|---|
-| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **257** fichiers | 324 fichiers / **2 933** `@Test` | — |
+| `:core` | `com.android.library` | `dev.sam3vision.core` | 26 | **258** fichiers | 325 fichiers / **2 957** `@Test` | — |
 | `:app` | `com.android.application` | `dev.sam3vision.app` | 29 | **376** fichiers | 252 fichiers / **1 838** `@Test` | 4 fichiers / **9** tests |
 | `:app` → `glasses/bench/` | sous-dossier, **pas un module** | `dev.sam3vision.app.glasses.bench` | 29 | **14** fichiers | 9 fichiers / **98** `@Test` | 1 fichier / **1** test |
 
@@ -25,15 +25,15 @@ dossier de l'ancien module a disparu du disque ; `git ls-files` ne trouve plus a
 `glasses-spike/`.
 
 ```bash
-find core/src/main -name '*.kt' | wc -l            # 257
-find core/src/test -name '*.kt' | wc -l            # 324
+find core/src/main -name '*.kt' | wc -l            # 258
+find core/src/test -name '*.kt' | wc -l            # 325
 find app/src/main -name '*.kt' | wc -l             # 376
 find app/src/test -name '*.kt' | wc -l             # 252
 find app/src/main/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 14
 find app/src/test/java/dev/sam3vision/app/glasses/bench -name '*.kt' | wc -l        # 9
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench | wc -l        # 98
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 1222
-find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 152 813
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' | wc -l          # 1224
+find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' -exec cat {} + | wc -l  # 153 303
 ```
 
 Les `@Test` se comptent au `grep -rho` : le poste `pc` n'a pas `rg` dans son `PATH`, et un
