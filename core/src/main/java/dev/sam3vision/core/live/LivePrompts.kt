@@ -13,8 +13,9 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **18** concepts extérieurs — mobiles (« person »,
-     * « car », « bus » rétabli le 01/11) puis feux piétons et cheminement (« pedestrian traffic light »,
+     * Concepts par défaut : **20** concepts extérieurs — mobiles (« person »,
+     * « car », « bus », et « bicycle » + « motorcycle » du 01/11 : un vélo et
+     * une moto arrivent vite et longent le trottoir) puis feux piétons et cheminement (« pedestrian traffic light »,
      * « pedestrian signal head », « curb », « crosswalk ») puis statiques
      * (« pole », « stairs », « keys », « gate », « wall », ordre user du 31/10 :
      * iSee détecte les murs), puis la boutique du square (« souvenir shop »,
@@ -22,7 +23,8 @@ object LivePrompts {
      * « dog »).
      *
      * **Ordre user du 01/11** : « vire electric scooter, bicycle, sidewalk,
-     * fence » puis « rajoute bus » (un bus arrive vite et large : il reste). Ces cinq-là ne sont plus suivis **au repos** ; la
+     * fence », puis « rajoute bus », puis « bicycle moto je veux » — bus, vélo
+     * et moto sont revenus ; restent sortis : trottinette, trottoir, clôture. Ces cinq-là ne sont plus suivis **au repos** ; la
      * Traversée les rétablit quand elle s'arme (`VehicleConcepts.promptsFor`
      * remet car/bus/bicycle/camion/moto, et `TraversePipeline` remet curb +
      * sidewalk), et le preset [outdoor] garde fence/animal pour la marche
@@ -65,7 +67,8 @@ object LivePrompts {
      * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
      */
     val default: List<String> = listOf(
-        "person", "car", "bus", "pedestrian traffic light", "pedestrian signal head",
+        "person", "car", "bus", "bicycle", "motorcycle",
+        "pedestrian traffic light", "pedestrian signal head",
         "curb", "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop",
         "beanie", "socks", "wall", "stroller", "child", "dog",
     )
