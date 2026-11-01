@@ -9,17 +9,17 @@ import dev.sam3vision.core.crossing.CrossingText
 import dev.sam3vision.core.crossing.CrossingVoiceAction
 import dev.sam3vision.core.crossing.CrossingVoiceCommand
 import dev.sam3vision.core.distance.LensSpec
-import dev.sam3vision.core.live.SteeringCommand
-import dev.sam3vision.core.live.SteeringText
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Ordres courts d'iSee autour de la caméra : bascule du mode Traversée,
- * ordre vocal (« traverser », « crossing mode on/off », « crosswalk on/off »)
- * et ordre de cap (« va à gauche »). Le mode Traversée ne s'arme plus
- * seul : ni la vision ni le guidage ne le basculent, seuls la puce et
- * l'ordre vocal le font.
+ * Ordres courts d'iSee autour de la caméra : bascule du mode Traversée et
+ * ordre vocal (« traverser », « crossing mode on/off », « crosswalk on/off »,
+ * rejoué par le routeur de dictée sous ses phrases canoniques « mode
+ * crossing on/off »). L'ordre de cap manuel (« va à gauche ») est supprimé
+ * (spec v4 : la phrase part au LLM comme question). Le mode Traversée ne
+ * s'arme plus seul : ni la vision ni le guidage ne le basculent, seuls la
+ * puce et l'ordre vocal le font.
  * Extrait d'[IseeViewModel] (limite 500 lignes) : la logique ne change pas,
  * elle vit simplement à côté — même motif que `ProbeWiring`, `IseeVoiceNav`
  * et sœurs.
@@ -67,20 +67,6 @@ class IseeSteeringOrders(
         val language = settings().speechLanguage
         speak(CrossingText.mode(wantActive, language))
         if (wantActive) announceAhead(language)
-        return true
-    }
-
-    /**
-     * Ordre vocal de cap (« va à gauche ») : le guidage recalcule le passage
-     * vers ce cap, la confirmation part par le même chemin que la navigation.
-     * Vrai si [text] portait un ordre (la dictée ne part ni à Maps ni au LLM).
-     */
-    suspend fun runSteering(text: String): Boolean {
-        val cap = SteeringCommand.parse(text) ?: return false
-        probe.setSteering(cap)
-        val confirm = SteeringText.confirm(cap, settings().guideStraight, settings().speechLanguage)
-        update { it.copy(status = confirm) }
-        speak(confirm)
         return true
     }
 
