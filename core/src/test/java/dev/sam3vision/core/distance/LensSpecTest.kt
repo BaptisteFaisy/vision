@@ -67,14 +67,28 @@ class LensSpecTest {
     }
 
     @Test
-    fun `repli lunettes, 100 degres diagonaux en 9 16 portrait`() {
+    fun `repli lunettes, capteur 68 degres ramene a la fenetre 9 16`() {
         val glasses = LensSpec.Glasses
-        assertEquals(60.6f, glasses.horizontalFovDeg, 0.01f)
-        assertEquals(92.18f, glasses.verticalFovDeg, 0.2f)
+        assertEquals(53.67f, glasses.horizontalFovDeg, 0.05f)
+        assertEquals(83.93f, glasses.verticalFovDeg, 0.05f)
         assertFalse(glasses.sensorLandscape)
         assertTrue(glasses.usable)
         // Image portrait : la largeur porte l'horizontal du flux
-        assertEquals(60.6f, glasses.widthFovDeg(225, 320), 0.01f)
+        assertEquals(53.67f, glasses.widthFovDeg(225, 320), 0.05f)
+        // 720 px de large : focale = 360 / tan(26,83°).
+        assertEquals(711.6f, glasses.focalPx(720, 1280), 0.5f)
+    }
+
+    @Test
+    fun `flux lunettes, table capteur vers fenetre 9 16`() {
+        val hstn = LensSpec.glassesStreamForSensorH(70f)
+        assertEquals(55.41f, hstn.horizontalFovDeg, 0.05f)
+        assertEquals(86.07f, hstn.verticalFovDeg, 0.05f)
+        assertTrue(hstn.usable)
+        val vanguard = LensSpec.glassesStreamForSensorH(95f)
+        assertEquals(78.60f, vanguard.horizontalFovDeg, 0.05f)
+        assertEquals(111.00f, vanguard.verticalFovDeg, 0.1f)
+        assertTrue(vanguard.usable)
     }
 
     @Test

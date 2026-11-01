@@ -88,21 +88,37 @@ data class LensSpec(
         /** Repli quand le capteur ne dit rien et que l'utilisateur n'a rien réglé. */
         val Default: LensSpec = fromHorizontalFov(DEFAULT_H_FOV_DEG)
 
-        /** Champ horizontal du flux lunettes 9:16, déduit des 100° diagonaux constructeur. */
-        const val GLASSES_H_FOV_DEG = 60.6f
+        /**
+         * Champ horizontal capteur par défaut des lunettes (R4 : milieu de
+         * [66, 70]° labo DXOMARK, 12 MP 3024×4032). Le SDK n'expose aucun
+         * calibrage : la table par modèle vit côté `:app` (`GlassesLens.kt`),
+         * ce repli ne sert que sans modèle reconnu.
+         */
+        const val GLASSES_SENSOR_H_FOV_DEG = 68f
+
+        /** Aspect du capteur photo des lunettes (3024/4032, portrait natif). */
+        const val GLASSES_SENSOR_ASPECT = 0.75f
+
+        /**
+         * Largeur du flux dans le capteur (2268/3024) : le DAT HIGH 720×1280
+         * est la fenêtre 9:16 centrale pleine hauteur du 12 MP (facteur 3,15
+         * uniforme des deux côtés : 2268/720 = 4032/1280), pas le capteur
+         * entier — l'horizontal du flux est donc plus étroit que celui du
+         * capteur, à focale pixels constante.
+         */
+        const val GLASSES_FLUX_WIDTH_FRACTION = 0.75f
 
         /** Rapport largeur/hauteur du flux des lunettes (720×1280 portrait). */
         const val GLASSES_ASPECT = 9f / 16f
 
         /**
-         * Repli lunettes (≈ 60,6° × 92,1°, capteur natif portrait) : la diagonale
-         * de 100° annoncée par le constructeur, ramenée au 9:16 du flux. Estimation
-         * en attendant la mire (protocole `docs/LUNETTES-RECETTE-TEL.md` § 6) : le
-         * flux peut être recadré ou stabilisé — le réglage l'affine, la mire le
-         * remplacera.
+         * Repli lunettes (≈ 53,7° × 83,9°, capteur natif portrait) : le champ
+         * capteur par défaut ([GLASSES_SENSOR_H_FOV_DEG]) ramené à la fenêtre
+         * 9:16 du flux ([glassesStreamForSensorH]). Estimation en attendant la
+         * mire (protocole `docs/LUNETTES-RECETTE-TEL.md` § 6) : le flux peut
+         * être stabilisé en plus — le réglage l'affine, la mire le remplacera.
          */
-        val Glasses: LensSpec = fromHorizontalFov(GLASSES_H_FOV_DEG, GLASSES_ASPECT)
-            .copy(sensorLandscape = false)
+        val Glasses: LensSpec = glassesStreamForSensorH(GLASSES_SENSOR_H_FOV_DEG)
 
         /**
          * Calibrage déduit d'un seul angle horizontal (réglage utilisateur), pour un
@@ -133,6 +149,21 @@ data class LensSpec(
             if (forcedFovDeg in FOV_MIN..FOV_MAX) fromHorizontalFov(forcedFovDeg, GLASSES_ASPECT)
                 .copy(sensorLandscape = false)
             else Glasses
+
+        /**
+         * Calibrage du flux DAT HIGH pour un capteur lunettes de champ
+         * horizontal [sensorHFovDeg] (12 MP 3:4) : le flux est la fenêtre 9:16
+         * centrale pleine hauteur, donc l'horizontal se resserre à focale
+         * constante ([GLASSES_FLUX_WIDTH_FRACTION]) tandis que le vertical est
+         * celui du capteur (hauteur pleine). Centre centré, distorsion nulle
+         * (non mesurée). 68° → 53,7° × 83,9°.
+         */
+        fun glassesStreamForSensorH(sensorHFovDeg: Float): LensSpec {
+            val halfSensor = tan(Math.toRadians(sensorHFovDeg / 2.0))
+            val horizontal = Math.toDegrees(2.0 * atan(GLASSES_FLUX_WIDTH_FRACTION * halfSensor)).toFloat()
+            val vertical = Math.toDegrees(2.0 * atan(halfSensor / GLASSES_SENSOR_ASPECT)).toFloat()
+            return LensSpec(horizontal, vertical, sensorLandscape = false)
+        }
 
         /** Calibrage à partir d'une focale (mm) et d'un capteur (mm), `null` si incohérent. */
         fun fromSensor(focalMm: Float, sensorWidthMm: Float, sensorHeightMm: Float): LensSpec? {
