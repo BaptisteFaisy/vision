@@ -165,4 +165,75 @@ class GlassesPolicyTest {
             )
         }
     }
+
+    @Test
+    fun `le bandeau de confirmation disparait quand l enregistrement aboutit`() {
+        // Régression : le bandeau « accept, then come back here » restait affiché à côté
+        // de la ligne d'état « registered », comme si rien n'était confirmé.
+        val confirmed = registrationStateMessage(
+            wasRegistered = false,
+            registered = true,
+            wanted = false,
+            current = GlassesMessages.registrationStarted(),
+        )
+        assertEquals(MessageKind.INFO, confirmed?.kind)
+        assertEquals(GlassesMessages.registrationConfirmed(), confirmed)
+    }
+
+    @Test
+    fun `un re-enregistrement confirme ne garde pas le bandeau`() {
+        val confirmed = registrationStateMessage(
+            wasRegistered = true,
+            registered = true,
+            wanted = false,
+            current = GlassesMessages.registrationStarted(),
+        )
+        assertEquals(GlassesMessages.registrationConfirmed(), confirmed)
+    }
+
+    @Test
+    fun `un premier enregistrement froid annonce le succes`() {
+        val confirmed = registrationStateMessage(
+            wasRegistered = false,
+            registered = true,
+            wanted = false,
+            current = null,
+        )
+        assertEquals(GlassesMessages.registrationConfirmed(), confirmed)
+    }
+
+    @Test
+    fun `une erreur gardee n est pas ecrasee par le succes`() {
+        val failure = GlassesMessages.registrationFailed("timeout")
+        val kept = registrationStateMessage(
+            wasRegistered = false,
+            registered = true,
+            wanted = false,
+            current = failure,
+        )
+        assertEquals(failure, kept)
+    }
+
+    @Test
+    fun `en attente de confirmation le bandeau reste`() {
+        val started = GlassesMessages.registrationStarted()
+        val kept = registrationStateMessage(
+            wasRegistered = false,
+            registered = false,
+            wanted = false,
+            current = started,
+        )
+        assertEquals(started, kept)
+    }
+
+    @Test
+    fun `la perte garde son avertissement meme apres un succes`() {
+        val lost = registrationStateMessage(
+            wasRegistered = true,
+            registered = false,
+            wanted = false,
+            current = GlassesMessages.registrationConfirmed(),
+        )
+        assertEquals(GlassesMessages.registrationLost(), lost)
+    }
 }

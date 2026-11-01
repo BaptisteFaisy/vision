@@ -137,7 +137,7 @@ class GlassesController(
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
     private var inputs: GlassesInputs? = null
-    private var activity: Activity? = null
+    internal var activity: Activity? = null
     private var started = false
 
     /** Autorisations : demande ouverte par l'activité, verdict appliqué ici. */
@@ -205,30 +205,20 @@ class GlassesController(
     }
 
     /**
-     * Enregistrement reçu du SDK : l'état suit, et **une perte se dit** (mise à jour de
-     * l'app ou de Meta AI, réinstallation) — sinon l'écran affichait « non enregistrée »
-     * sans cause, et la session grisée restait un mystère.
+     * Enregistrement reçu du SDK : l'état suit, et le bandeau suit aussi — la
+     * confirmation remplace la demande (« accept, then come back here »), et
+     * **une perte se dit** (mise à jour de l'app ou de Meta AI, réinstallation).
      */
-    private fun onRegistrationState(registered: Boolean) {
-        _state.update { it.copy(registered = registered) }
-        registrationLostMessage(wasRegistered, registered, unregisterWanted)?.let(::note)
+    internal fun onRegistrationState(registered: Boolean) {
+        val current = _state.value.message
+        val next = registrationStateMessage(wasRegistered, registered, unregisterWanted, current)
+        _state.update { it.copy(registered = registered, message = next) }
+        if (next != null && next != current) _events.tryEmit(GlassesEvent.Note(next))
         wasRegistered = registered
         if (registered) unregisterWanted = false
     }
 
-    /** Enregistre l'app auprès de l'app Meta AI : la confirmation se fait côté Meta AI. */
-    fun register() {
-        initialize()
-        val host = activity ?: return note(GlassesMessages.noActivity())
-        // L'app Meta AI peut être absente ou refuser l'ouverture : le SDK lève, il ne rend
-        // pas de résultat (`startRegistration` est `void` en 1.0.1) — on ne laisse pas
-        // l'exception emporter le fil principal, et l'écran dit ce qui s'est passé.
-        runCatching { Wearables.startRegistration(host) }
-            .onSuccess { note(GlassesMessages.registrationStarted()) }
-            .onFailure { error ->
-                note(GlassesMessages.registrationFailed(error.message ?: "app Meta AI injoignable"))
-            }
-    }
+    /** `register()` et `refresh()` vivent dans [GlassesControllerRegistration] (garde 500 lignes). */
 
     fun unregister() {
         // Désenregistrement **voulu** : ne pas l'annoncer comme une perte subie.
@@ -491,7 +481,7 @@ class GlassesController(
     }
 
     /** Affiche le message (teinté par sa gravité) et le pousse aux abonnés. */
-    private fun note(message: GlassesMessage) {
+    internal fun note(message: GlassesMessage) {
         Log.i(TAG, "note ${message.kind} : ${message.text}")
         _state.update { it.copy(message = message) }
         _events.tryEmit(GlassesEvent.Note(message))

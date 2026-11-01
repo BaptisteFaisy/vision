@@ -276,6 +276,11 @@ object GlassesMessages {
         "The Meta AI app asks for confirmation: accept, then come back here.",
     )
 
+    fun registrationConfirmed() = GlassesMessage(
+        MessageKind.INFO,
+        "Glasses registered: you can start the session.",
+    )
+
     fun noActivity() = GlassesMessage(MessageKind.ERROR, "Come back to the app, then restart the registration.")
 
     /**
@@ -427,20 +432,7 @@ fun registrationErrorWorthTelling(error: RegistrationError): Boolean =
  */
 fun sessionErrorWorthTelling(error: DeviceSessionError, phase: SessionPhase, current: GlassesMessage?): Boolean = !(error == DeviceSessionError.UNEXPECTED_ERROR && phase == SessionPhase.STOPPED && current?.kind == MessageKind.ERROR)
 
-/**
- * Ce que la **perte** d'enregistrement doit dire, et quand se taire : rien au premier état
- * (au démarrage, `wasRegistered` est faux), rien quand c'est l'utilisateur qui s'est
- * désenregistré (`wanted`), sinon l'avertissement. Pur, donc testé en JVM.
- */
-fun registrationLostMessage(
-    wasRegistered: Boolean,
-    registered: Boolean,
-    wanted: Boolean,
-): GlassesMessage? = when {
-    !wasRegistered || registered -> null
-    wanted -> null
-    else -> GlassesMessages.registrationLost()
-}
+/** Les messages d'enregistrement vivent dans [GlassesRegistrationPolicy] (garde 500 lignes). */
 
 /** Une session terminée n'est pas une session : il faut pouvoir en rouvrir une. */
 fun SessionPhase.isFinished(): Boolean = this == SessionPhase.STOPPED

@@ -46,6 +46,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.waitingForLink().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.registrationConfirmed().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
     }
@@ -111,6 +112,7 @@ class GlassesMessagesTest {
             GlassesMessages.streamStopped(),
             GlassesMessages.liveNotOnGlasses(),
             GlassesMessages.registrationStarted(),
+            GlassesMessages.registrationConfirmed(),
             GlassesMessages.mockReady(),
             GlassesMessages.noMockPress(),
             GlassesMessages.framesVoiceRoute(),
