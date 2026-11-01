@@ -14,10 +14,10 @@ import org.junit.Test
  * Table de décision du mode Traversée : le feu **et** l'état des véhicules
  * décident, en anglais mot pour mot (« You can cross » / « Don't cross yet »).
  *
- * Un véhicule en mouvement (ou proche non classé) force l'attente même sur
- * vert ; un véhicule confirmé à l'arrêt (mesuré ≤ 3 m, centré, immobile, seau
- * stable) ne bloque plus. Le rouge interdit toujours (état binaire, fini le
- * doute).
+ * Un véhicule en mouvement (ou proche non prouvé immobile) force l'attente
+ * même sur vert ; un véhicule prouvé immobile (mesuré ≤ 15 m, centre quasi
+ * fixe, seau stable, boîte qui ne grandit pas, fond fixe) ne bloque plus. Le
+ * rouge interdit toujours (état binaire, fini le doute).
  *
  * Sortie : 4 frames publiées sans passage ni feu, ou 4 s d'horloge sans
  * scène (le réseau figé ne coince plus le mode).
