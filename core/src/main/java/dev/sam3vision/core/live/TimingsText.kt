@@ -78,13 +78,26 @@ object TimingsText {
      * `age` = capteur → entrée analyseur (expo, readout, livraison, attente fil),
      * `enc` = NV21 → JPEG, `b64` = base64 + horodatage, `cb` = rappel `onFrame`
      * (profondeur, mouvement, réserve/envoi), `total` = analyse complète.
+     * `int` = intervalle depuis l'entrée précédente de l'analyseur, c'est-à-dire la
+     * **cadence réellement obtenue** (pas celle demandée) : il sépare ce que le
+     * matériel impose de ce que l'application retarde. À 30 fps l'exposition ne
+     * peut pas dépasser 33 ms ; si `int` vaut 33 et `age` 81, l'écart n'est ni
+     * l'exposition ni la cadence.
      * `age + enc + b64 + cb` retrouve le `capt` de la sonde à ~1 ms près.
      *
      * Invisible à `parse_isee_lat.py` (ni `latency`, ni `server:`) : la ligne vit
      * dans le même dump `ISEE_LAT`, sans fausser le verdict.
      */
-    fun capsplit(ageMs: Long, encMs: Long, b64Ms: Long, cbMs: Long, totalMs: Long): String =
-        "capsplit age $ageMs · enc $encMs · b64 $b64Ms · cb $cbMs · total $totalMs"
+    fun capsplit(
+        ageMs: Long,
+        encMs: Long,
+        b64Ms: Long,
+        cbMs: Long,
+        totalMs: Long,
+        intervalMs: Long,
+    ): String =
+        "capsplit age $ageMs · enc $encMs · b64 $b64Ms · cb $cbMs · total $totalMs" +
+            " · int $intervalMs"
 
     /**
      * Étages serveur reçus : « server: preprocess 12 ms · vision 47 ms · detr 38 ms ».
