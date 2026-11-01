@@ -63,6 +63,7 @@ class IseePictoTest {
         storeRoot: File? = null,
         now: () -> Long = { 0L },
         placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
+        frames: () -> GrayImage = { FRAME },
     ) = { scope: kotlinx.coroutines.test.TestScope ->
         IseePicto(
             media = MediaCacheStore(tempDir("isee-picto-media"), dao),
@@ -74,7 +75,7 @@ class IseePictoTest {
             scope = scope,
             photoJpeg = { PHOTO_JPEG },
             photoTemplate = { PHOTO_TEMPLATE },
-            frameGray = { jpeg -> decodeCalls?.add(jpeg); FRAME },
+            frameGray = { jpeg -> decodeCalls?.add(jpeg); frames() },
             io = Dispatchers.Unconfined,
             clock = now,
             placeMode = placeMode,
@@ -180,6 +181,39 @@ class IseePictoTest {
         val back = state.value.picto.hits.single()
         assertEquals(0.6f, back.x, 1e-6f)
         assertEquals(0.2f, back.w, 1e-6f)
+        assertEquals(1, client.calls)
+    }
+
+    @Test
+    fun `objet hors champ, le picto chassé disparaît aussitôt`() = runTest {
+        var now = 10_000L
+        var frame = FRAME
+        val coordinator = picto(now = { now }, frames = { frame })(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onFrame("frame-avec-cles")
+        advanceUntilIdle()
+        assertEquals(0.2f, state.value.picto.hits.single().x, 1e-6f)
+        // SAM dit parti : le passage gabarit précédent ne ressuscite rien.
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        coordinator.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.hits.size)
+        // La caméra ne voit plus les clés : le picto tombe sans attendre SAM.
+        frame = MISS
+        now += 600
+        coordinator.onFrame("frame-sans-cles")
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        // Et il revient dès que SAM les revoit, sans régénérer.
+        coordinator.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        advanceUntilIdle()
+        assertEquals(0.6f, state.value.picto.hits.single().x, 1e-6f)
         assertEquals(1, client.calls)
     }
 
@@ -403,6 +437,9 @@ class IseePictoTest {
 
         /** Frame à motif unique : son propre gabarit central y est reconnu. */
         val FRAME: GrayImage = geometricFrame(64, 22, 20, 8)
+
+        /** Frame vide : aucun gabarit ne s'y reconnaît (fenêtres plates). */
+        val MISS: GrayImage = GrayImage(IntArray(64 * 64), 64, 64)
 
         /** Gabarit réel de la frame : la détection le retrouve (chaîne prouvée en core). */
         val PHOTO_TEMPLATE: PictoTemplate = buildTemplate(FRAME)
