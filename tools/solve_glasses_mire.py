@@ -25,6 +25,7 @@ from pathlib import Path
 
 REF_W, REF_H = 720, 1280  # flux HIGH des lunettes, portrait
 MIN_PHOTOS = 3            # en dessous, la résolution est sous-contrainte
+RMS_MAX_PX = 1.0          # au-dessus, la mire est refusée : rephotographier
 SQUARE_TOL = 0.02         # |fx-fy|/fx max : la conversion suppose des pixels carrés
 
 
@@ -81,9 +82,27 @@ def opencv_to_distortion(k1_cv, k2_cv, fx, fy, w, h):
 def format_block(result):
     """Bloc `mire v1` à coller dans l'app (voir `parseMireBlock`)."""
     lines = ["mire v1"]
-    for key in ("hFovDeg", "vFovDeg", "cx", "cy", "hasDistortion", "k1", "k2", "atMs"):
+    for key in ("hFovDeg", "vFovDeg", "cx", "cy", "hasDistortion", "k1", "k2", "atMs", "refW", "refH"):
         lines.append(f"{key}={result[key]}")
     return "\n".join(lines) + "\n"
+
+
+def check_photo_geometry(shapes):
+    """Refuse (exit 1) un lot hors flux HIGH : homogene et 720x1280 exiges.
+
+    `shapes` = [(h, w), ...] des photos detectees (non vide, garanti par
+    l'appelant apres le seuil MIN_PHOTOS). Une photo de rue affichee
+    (post-crop) ou voix 16:9 calibrerait du post-crop stocke comme pre-crop,
+    re-remappe ensuite = double crop. Testee en stdlib (selftest).
+    """
+    dims = set(shapes)
+    if len(dims) > 1:
+        print(f"error: tailles hétérogènes {sorted(dims)} — que du {REF_W}x{REF_H} (flux HIGH brut)", file=sys.stderr)
+        sys.exit(1)
+    if dims != {(REF_H, REF_W)}:
+        (h, w) = next(iter(dims))
+        print(f"error: {w}x{h}, attendu {REF_W}x{REF_H} — photographier le flux HIGH brut, pas un snapshot de vue ni une photo voix", file=sys.stderr)
+        sys.exit(1)
 
 
 def solve_photos(paths, nx, ny, square_mm):
@@ -108,12 +127,16 @@ def solve_photos(paths, nx, ny, square_mm):
         print(f"error: {len(boards)} damier(s) detecte(s), {MIN_PHOTOS} minimum requis",
               file=sys.stderr)
         sys.exit(1)
+    check_photo_geometry([(h, w) for (h, w), _ in boards])
+    (h, w), _ = boards[0]
     obj = [pattern] * len(boards)
     img = [corners for _, corners in boards]
-    (h, w), _ = boards[0]
     flags = (cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_K4 + cv2.CALIB_FIX_K5 +
              cv2.CALIB_FIX_K6 + cv2.CALIB_ZERO_TANGENT_DIST)
     rms, camera, dist, _, _ = cv2.calibrateCamera(obj, img, (w, h), None, None, flags=flags)
+    if float(rms) >= RMS_MAX_PX:
+        print(f"error: rms={float(rms):.3f} px >= {RMS_MAX_PX:g} px — rephotographier (angles variés, damier net)", file=sys.stderr)
+        sys.exit(1)
     fx, fy = float(camera[0, 0]), float(camera[1, 1])
     cx, cy = float(camera[0, 2]) / w, float(camera[1, 2]) / h
     k1, k2 = opencv_to_distortion(float(dist[0, 0]), float(dist[0, 1]), fx, fy, w, h)
@@ -202,12 +225,26 @@ def selftest():
     except ValueError:
         check("pixels non carres refuses", True)
     check("fov 500px/720px", abs(focal_to_fov_deg(500.0, 720.0) - 71.51) < 0.01)
+
+    def refused(shapes):
+        try:
+            check_photo_geometry(shapes)
+        except SystemExit:
+            return True
+        return False
+
+    check("lot HIGH homogene accepte", not refused([(1280, 720)] * 3))
+    check("lot heterogene refuse", refused([(1280, 720), (1280, 719)]))
+    check("snapshot de vue refuse", refused([(405, 720)]))
+    check("mauvaises dimensions refusees", refused([(1280, 719)]))
     svg = gen_mire_svg(9, 6, 25.0)
     check("svg cases noires", svg.count('fill="black"') == 35)
     check("svg dimensions mm", 'width="270.00mm"' in svg and 'height="195.00mm"' in svg)
     block = format_block({"hFovDeg": 60.61, "vFovDeg": 92.19, "cx": 0.5, "cy": 0.5,
-                          "hasDistortion": True, "k1": -0.1, "k2": 0.02, "atMs": 1})
+                          "hasDistortion": True, "k1": -0.1, "k2": 0.02, "atMs": 1,
+                          "refW": 720, "refH": 1280})
     check("bloc entete", block.startswith("mire v1\n"))
+    check("bloc geometrie", "refW=720\n" in block and "refH=1280\n" in block)
     try:
         import cv2  # noqa: F401
         import numpy  # noqa: F401
