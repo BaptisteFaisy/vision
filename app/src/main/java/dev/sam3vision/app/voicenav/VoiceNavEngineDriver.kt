@@ -23,11 +23,13 @@ import dev.sam3vision.core.nav.NavManeuver
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.nav.NavState
 import dev.sam3vision.core.nav.PeriodicGuidance
+import dev.sam3vision.core.nav.PeriodicTuning
 import dev.sam3vision.core.nav.WalkDirective
 import dev.sam3vision.core.nav.toNavRoute
 import dev.sam3vision.core.net.HttpRouteClient
 import dev.sam3vision.core.net.RouteClient
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -46,11 +48,17 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * - [onRouteCap] reçoit le cap de chaque manœuvre (`null` en fin de guidage),
  *   pour la sonde SAM (`LiveProbe.setRouteCap`) : tant qu'il est posé, la
  *   sonde marche le couloir de la route (fusion itinéraire × obstacle).
- * - [speakRoute] dit les manœuvres par la voix Laure (`null` = voix système) :
+ * - [speakRoute] dit les manœuvres par la voix réseau ElevenLabs (`null` = voix système) :
  *   la phrase (même politique que le canal système) + son urgence (sortie de
  *   trace et recalcul coupent, le reste attend). Une seule voix : GPS et
  *   obstacles partagent le même tuyau, jamais deux voix en même temps.
- * - [stopRoute] coupe la parole route (fin de guidage), miroir de [speakRoute].
+ *   Niveaux SPEC v4 : manœuvres = 11, rappel 15 s = 3 (l'intégrateur les
+ *   porte au bus vocal).
+ * - [stopRoute] coupe la parole route (fin de guidage, user qui parle),
+ *   miroir de [speakRoute] ;
+ * - [routeReaderBusy] lit le lecteur partagé (voix réseau) : le garde
+ *   [isSpeaking] marque la route occupée sur son état réel, jamais sur le
+ *   TTS système qui ne parle pas sur ce chemin.
  *
  * Priorité à la voix du user : tant qu'il parle ([userSpeaking]), la voix
  * ordinaire se tait — sauf urgence ([VoiceNavPolicy.isUrgent]) qui coupe.
@@ -64,9 +72,9 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * juste en caps, et une mauvaise consigne vaut moins que la phrase exacte.
  * L'arrivée ne passe PAS par le haut-parleur : [onUpdate] la signale et la
  * session annonce (« Arrivée à destination », une seule voix).
- * Rappel toutes les 5 s ([PeriodicGuidance], au premier fix qui suit
- * l'échéance) : consigne relative au cap suivi GPS (jamais la boussole),
- * anglais, sans rue ni distance ; une annonce moteur recale la cadence.
+ * Rappel toutes les 15 s ([PeriodicGuidance], au premier fix qui suit
+ * l'échéance) : dernière consigne répétée + distance restante
+ * ([gpsReminderPhrase], anglais) ; une annonce moteur recale la cadence.
  *
  * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
  * quand la cible est un passage protégé — simple préavis parlé (« Crosswalk
@@ -90,6 +98,8 @@ class VoiceNavEngineDriver(
     private val onRouteCap: (SteeringCap?) -> Unit = {},
     private val speakRoute: (suspend (phrase: String, urgent: Boolean) -> Unit)? = null,
     private val stopRoute: () -> Unit = {},
+    /** Lecture réelle du lecteur partagé (voix réseau) : lue par [isSpeaking]. */
+    private val routeReaderBusy: () -> Boolean = { false },
     /** L'utilisateur parle (dictée en cours) : la voix ordinaire se tait. */
     private val userSpeaking: () -> Boolean = { false },
 ) {
@@ -101,9 +111,12 @@ class VoiceNavEngineDriver(
     private val speaker by speakerLazy
     private val routeAnnouncer = VoiceNavAnnouncer()
     private val detourReroute = DetourReroute()
-    private val periodic = PeriodicGuidance()
+    private val periodic = PeriodicGuidance(PeriodicTuning(repeatMs = GPS_REMINDER_MS))
     /** Un événement moteur a parlé sur le fix en cours : le rappel se tait, cadence recalée. */
     private var fixHadEvent = false
+    /** Dernière consigne écran + reste : le rappel 15 s les répète ([gpsReminderPhrase]). */
+    private var lastInstruction: String? = null
+    private var lastRemainingMeters: Long = 0
 
     @Volatile
     private var legs: GuidingLegs? = null
@@ -145,6 +158,8 @@ class VoiceNavEngineDriver(
             return false
         }
         legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
+        lastInstruction = null
+        lastRemainingMeters = 0
         detourReroute.reset()
         periodic.reset()
         fixHadEvent = false
@@ -153,7 +168,7 @@ class VoiceNavEngineDriver(
     }
 
     /**
-     * Parole d'un événement route : voix Laure quand elle est câblée
+     * Parole d'un événement route (niveau 11) : voix réseau quand elle est câblée
      * ([speakRoute], même politique que le canal système), sinon voix système
      * ([system]). L'urgence vient de [SpeechArbitration] (sortie de trace,
      * recalcul : coupe). Ne lève jamais.
@@ -183,6 +198,8 @@ class VoiceNavEngineDriver(
     /** Coupe l'écoute, la parole et la mémoire ; réutilisable après. */
     fun stop() {
         legs = null
+        lastInstruction = null
+        lastRemainingMeters = 0
         rerouting = false
         runCatching { onRouteCap(null) }
         runCatching { stopRoute() }
@@ -197,12 +214,13 @@ class VoiceNavEngineDriver(
     }
 
     /**
-     * L'utilisateur prend la parole : la parole en cours est coupée, la
-     * mémoire du guidage intacte (le moteur réémettra). Idempotent, sans
-     * effet si la voix n'a jamais parlé.
+     * L'utilisateur prend la parole : la parole en cours est coupée (voix
+     * système comme lecteur partagé), la mémoire du guidage intacte (le
+     * moteur réémettra). Idempotent, sans effet si la voix n'a jamais parlé.
      */
     fun stopVoice() {
         if (speakerLazy.isInitialized()) runCatching { speaker.stop() }
+        runCatching { stopRoute() }
     }
 
     /** Libération finale : le canal vocal n'accepte plus rien ensuite. */
@@ -213,11 +231,16 @@ class VoiceNavEngineDriver(
 
     /**
      * Vrai si la voix route parle (arbitre vocal : l'obstacle non urgent
-     * attend). N'initialise jamais le haut-parleur paresseux : jamais
-     * démarré = silencieux.
+     * attend). Voix réseau ([speakRoute]) : état réel du lecteur partagé
+     * ([routeReaderBusy]) ; voix système : haut-parleur paresseux, jamais
+     * démarré = silencieux (jamais initialisé ici).
      */
-    fun isSpeaking(): Boolean =
-        if (speakerLazy.isInitialized()) speaker.isSpeaking() else false
+    fun isSpeaking(): Boolean {
+        if (speakRoute != null) return routeSpeechActive(true, runCatching { routeReaderBusy() }.getOrDefault(false), false)
+        val speakerActive = if (speakerLazy.isInitialized()) speaker.isSpeaking() else false
+        return routeSpeechActive(false, false, speakerActive)
+    }
+
 
     /** Itinéraire en cours de guidage, `null` au repos (carte de debug). */
     fun debugRoute(): NavRoute? = legs?.route
@@ -275,7 +298,7 @@ class VoiceNavEngineDriver(
     /**
      * Fix brut après le dispatch moteur : un événement vient-il de parler
      * sur ce fix ([fixHadEvent]) ? Oui → cadence recalée, silence. Non →
-     * rappel 5 s ([PeriodicGuidance]) si le guidage court. Ne lève jamais.
+     * rappel 15 s ([PeriodicGuidance]) si le guidage court. Ne lève jamais.
      */
     private fun onTrackerFix(fix: NavFix) {
         runCatching { tickPeriodic(fix) }
@@ -291,18 +314,23 @@ class VoiceNavEngineDriver(
         if (tracker.state != NavState.Guiding) return
         val target = runCatching { tracker.nextManeuver() }.getOrNull() ?: return
         val directive = periodic.onFix(fix, target) ?: return
-        speakPeriodic(directive)
+        speakPeriodic(directive, fix, target)
     }
 
     /**
-     * Parole du rappel : voix Laure quand elle est câblée ([speakRoute],
-     * hors porte — le rappel redit exprès, la porte ne sait pas ; l'aval
-     * arbitre : user, lecteur occupé, doublon récent), sinon voix système
-     * ([VoiceNavSpeaker.onRepeat], silence seul). Non urgent, ne lève jamais.
+     * Parole du rappel 15 s ([gpsReminderPhrase], anglais) : voix réseau
+     * quand elle est câblée ([speakRoute], hors porte — le rappel redit
+     * exprès, la porte ne sait pas ; l'aval arbitre : user, lecteur
+     * occupé, doublon récent), sinon voix système ([VoiceNavSpeaker.onRepeat],
+     * silence seul). Non urgent, ne lève jamais.
      */
-    private fun speakPeriodic(directive: WalkDirective) {
-        val language = runCatching { settings().speechLanguage }.getOrNull() ?: return
-        val phrase = VoiceNavPhrases.phrase(periodicEventOf(directive), language)
+    private fun speakPeriodic(directive: WalkDirective, fix: NavFix, target: NavManeuver) {
+        val instruction = lastInstruction?.takeIf { it.isNotBlank() }
+            ?: VoiceNavPhrases.phrase(periodicEventOf(directive), SpeechLanguage.En)
+        val remaining = remainingFromFix(fix, target) ?: lastRemainingMeters
+        val phrase = gpsReminderPhrase(instruction, remaining)
+
+
         val laure = speakRoute
         if (laure == null) {
             runCatching { speaker.onRepeat(phrase) }
@@ -329,6 +357,8 @@ class VoiceNavEngineDriver(
 
     /** État écran : instruction + « dans X » + reste estimé du trajet. */
     private fun buildUpdate(instruction: String, distM: Double): GuidanceUpdate {
+        lastInstruction = instruction
+        lastRemainingMeters = remainingMeters(distM)
         val near = distM.toLong().coerceAtLeast(0)
         val remaining = remainingMeters(distM)
         return GuidanceUpdate(
@@ -345,6 +375,19 @@ class VoiceNavEngineDriver(
         val index = legs.route.maneuvers.indexOf(runCatching { tracker.nextManeuver() }.getOrNull())
         if (index < 0) return distM.toLong().coerceAtLeast(0)
         return (distM + legs.tails[index]).toLong().coerceAtLeast(0)
+    }
+
+    /**
+     * Reste estimé depuis [fix] vers [target] : vol d'oiseau + queue des
+     * manœuvres suivantes, `null` sans tracé. Pur calcul, ne lève jamais.
+     */
+    private fun remainingFromFix(fix: NavFix, target: NavManeuver): Long? {
+        val legs = legs ?: return null
+        val index = legs.route.maneuvers.indexOf(target)
+        if (index < 0) return null
+        val toTarget = NavGeo.haversineMeters(fix.lat, fix.lon, target.lat, target.lon)
+        if (!toTarget.isFinite()) return null
+        return (toTarget + legs.tails[index]).toLong().coerceAtLeast(0)
     }
 
     /** Recalcul sérialisé : un seul à la fois, le moteur réémettra sinon. */
