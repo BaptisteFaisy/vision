@@ -192,3 +192,70 @@ def test_detr_coords_key(_timing) -> None:
               detr_graph._coords_key(12345, 10, 20, "torch.float32", "cuda:0") == base)
     finally:
         _release_detr(live_fast, saved_torch)
+
+
+def test_detr_coords_no_sync(_timing) -> None:
+    """Clé coords sans sync : ptr réutilisé à H/W différents → grilles fraîches.
+
+    Non-régression du refus de capture (01/11, 3060 Ti) : `int()` sur les
+    vues H/W dans `_cached_coords` synchronisait pendant la capture CUDA →
+    8/8 captures refusées (`cudaErrorStreamCaptureUnsupported`), eager
+    déguisé. Les H/W viennent désormais de la table latérale `_spatial_dims`
+    (zéro sync) ; un sync réintroduit dans le chemin de capture est refusé
+    ici (analyse statique) et par le harness GPU (capture refusée).
+    """
+    import inspect
+
+    from test_units import check
+
+    detr_graph, live_fast, saved_torch = _detr_module()
+    try:
+        saved_dims = dict(detr_graph._spatial_dims)
+        detr_graph._spatial_dims.clear()
+        try:
+            ptr = 0xC0FFEE
+            detr_graph._record_spatial_dims(ptr, "cuda:0", ((24, 32),))
+            check("coords : ptr connu → H/W résolus sans sync",
+                  detr_graph._lookup_coords_dims(ptr, ptr, 8, "cuda:0") == (24, 32))
+            # Réutilisation du stockage à H/W différents : la table suit, les
+            # grilles périmées (anciennes H/W) ne sont plus adressables.
+            detr_graph._record_spatial_dims(ptr, "cuda:0", ((12, 16),))
+            check("coords : ptr réutilisé → nouveaux H/W (pas de grille périmée)",
+                  detr_graph._lookup_coords_dims(ptr, ptr, 8, "cuda:0") == (12, 16))
+            check("coords : ptr réutilisé → clés distinctes",
+                  detr_graph._coords_key(ptr, 24, 32, "torch.float32", "cuda:0")
+                  != detr_graph._coords_key(ptr, 12, 16, "torch.float32", "cuda:0"))
+            check("coords : ptr inconnu → None (repli eager)",
+                  detr_graph._lookup_coords_dims(0xDEAD, 0xDEAD, 8, "cuda:0") is None)
+            check("coords : device distinct → None",
+                  detr_graph._lookup_coords_dims(ptr, ptr, 8, "cuda:1") is None)
+            # Multi-niveaux : le niveau se déduit de l'offset de la vue.
+            detr_graph._record_spatial_dims(ptr, "cuda:0", ((24, 32), (12, 16)))
+            check("coords : vue niveau 0 → H/W du niveau 0",
+                  detr_graph._lookup_coords_dims(ptr, ptr, 8, "cuda:0") == (24, 32))
+            check("coords : vue niveau 1 → H/W du niveau 1",
+                  detr_graph._lookup_coords_dims(ptr, ptr + 2 * 8, 8, "cuda:0") == (12, 16))
+            check("coords : offset hors table → None",
+                  detr_graph._lookup_coords_dims(ptr, ptr + 4 * 8, 8, "cuda:0") is None)
+            # La table est bornée et ne perd jamais l'entrée du forward courant.
+            for index in range(detr_graph._SPATIAL_DIMS_MAX + 4):
+                detr_graph._record_spatial_dims(0x1000 + index, "cuda:0", ((8, 8),))
+            detr_graph._record_spatial_dims(ptr, "cuda:0", ((24, 32),))
+            check("coords : table bornée",
+                  len(detr_graph._spatial_dims) <= detr_graph._SPATIAL_DIMS_MAX,
+                  str(len(detr_graph._spatial_dims)))
+            check("coords : entrée courante conservée après éviction",
+                  detr_graph._lookup_coords_dims(ptr, ptr, 8, "cuda:0") == (24, 32))
+        finally:
+            detr_graph._spatial_dims.clear()
+            detr_graph._spatial_dims.update(saved_dims)
+        # Chemin de capture sans sync : aucun `int()` inline sur les vues,
+        # aucun `.item()`, gate `is_current_stream_capturing` présent.
+        src = inspect.getsource(detr_graph.patch_detr_capture)
+        check("coords : gate capture présent", "is_current_stream_capturing" in src)
+        check("coords : pas de lecture sync inline sur les vues pendant la capture",
+              "int(height)" not in src and "int(width)" not in src)
+        check("coords : pas de .item()/.tolist() dans les contournements",
+              ".item(" not in src and ".tolist(" not in src)
+    finally:
+        _release_detr(live_fast, saved_torch)

@@ -426,6 +426,7 @@ RUNNERS = (
     ("live_fast : clone detr_graph", "timing", live_fast_perf_tests.test_detr_clone),
     ("live_fast : clés detr_graph", "timing", live_fast_perf_tests.test_detr_shape_scalars),
     ("live_fast : clé coords detr", "timing", live_fast_perf_tests.test_detr_coords_key),
+    ("live_fast : coords detr sans sync", "timing", live_fast_perf_tests.test_detr_coords_no_sync),
     ("feux : garde serveur (labels/slot/work_edge)", "timing", feux_guard_tests.test_feux_guard),
 )
 
