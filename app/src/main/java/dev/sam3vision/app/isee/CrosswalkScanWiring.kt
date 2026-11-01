@@ -107,7 +107,7 @@ internal object CrosswalkScanWatch {
     /**
      * Phrase du scan (`null` = silence), machine + lacet ensemble : le
      * capteur tourne hors `Idle`/`Done`, [movingNow] est le brut véhicules
-     * ([CrossingVehicleWatch.movingNow], déjà nourri de la frame), [feu]
+     * ([VehicleStateWatcher.movingThisFrame], déjà nourri de la frame), [feu]
      * vrai quand le feu parle (avance silencieuse, jamais couvert).
      */
     fun update(

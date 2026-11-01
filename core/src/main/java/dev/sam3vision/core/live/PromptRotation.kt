@@ -1,8 +1,8 @@
 package dev.sam3vision.core.live
 
 /**
- * Rotation des concepts du direct : la sonde envoie 21 concepts à 30 Hz et le
- * post-traitement serveur (~67 ms) domine la latence ; en 3 groupes de ~7, le
+ * Rotation des concepts du direct : la sonde envoie 16 concepts à 30 Hz et le
+ * post-traitement serveur (~67 ms) domine la latence ; en 3 groupes de 6, le
  * poste tombe à ~39 ms (bench A100 budget-8, batch-7 graphé). [split] découpe
  * une fois par configuration, [groupFor] choisit le groupe de la frame.
  *

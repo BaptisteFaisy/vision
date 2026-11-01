@@ -151,8 +151,8 @@ class VehicleApproach {
         return verdict(frameWidth, frameHeight, radialMpsByKey)
     }
 
-    /** Boîte tronquée par le cadre : sa croissance/vitesse est un artefact de (dé)clip, pas une mesure. */
-    private fun onEdge(box: Box, frameWidth: Int, frameHeight: Int): Boolean =
+    /** Boîte tronquée par le cadre : sa croissance/vitesse est un artefact de (dé)clip, pas une mesure. Lue aussi par le suiveur (croissance). */
+    internal fun onEdge(box: Box, frameWidth: Int, frameHeight: Int): Boolean =
         box.x1 <= EDGE_PX || box.x2 >= frameWidth - EDGE_PX || box.y1 <= EDGE_PX || box.y2 >= frameHeight - EDGE_PX
 
     /**

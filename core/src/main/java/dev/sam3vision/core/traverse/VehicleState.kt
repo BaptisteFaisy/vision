@@ -82,10 +82,10 @@ class VehicleStateWatcher(
     /** État annoncé : ce qui roule, ce qui est à l'arrêt, ce qui est garé. */
     private enum class State { MOVING, STOPPED, PARKED }
 
-    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité, boîte. */
-    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?, val box: List<Float>)
+    /** Véhicule vu : label SAM brut, surface (px²), centre normalisé, proximité, boîte et troncature cadre. */
+    private data class Current(val label: String, val area: Float, val cx: Float?, val cy: Float?, val closeness: Float?, val box: List<Float>, val edge: Boolean)
 
-    /** Mémoire d'une frame : surface, centre, seau-mètre, date, proximité et boîte. */
+    /** Mémoire d'une frame : surface, centre, seau-mètre, date, proximité, boîte et troncature cadre. */
     private data class Prev(
         val area: Float,
         val cx: Float?,
@@ -94,6 +94,7 @@ class VehicleStateWatcher(
         val atMs: Long,
         val closeness: Float?, // PISTE2
         val box: List<Float>,
+        val edge: Boolean,
     )
 
     /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile. */
@@ -162,7 +163,7 @@ class VehicleStateWatcher(
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
         val pick = pick(gyro, announceStopped, current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
         previous = current.mapValues { (key, seen) ->
-            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(metersFor(meters, key)), atMs, seen.closeness, seen.box) // PISTE2
+            Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(metersFor(meters, key)), atMs, seen.closeness, seen.box, seen.edge) // PISTE2
         }
         movingThisFrame = pick?.state == State.MOVING
         if (pick == null) {
@@ -262,7 +263,9 @@ class VehicleStateWatcher(
                 val seen = current.getValue(candidate)
                 val tauHit = tauKey != null && tauKey == labelPart(candidate)
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate)
-                val growth = prev != null && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
+                // Tronqué au cadre (entrée/sortie de champ) : la croissance est
+                // un artefact de (dé)clip, pas une approche (doctrine onEdge).
+                val growth = prev != null && !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
                     seen.area, seen.closeness, atMs, approach.lastGlobal) &&
                     !followingCamera(prev, seen, atMs, motion)
                 (tauHit || lateralHit || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)
@@ -313,7 +316,7 @@ class VehicleStateWatcher(
     /** Boîte qui suit la caméra : sa surface qui flicker est de la gigue SAM, pas une approche (miroir du veto arrêt). */
     private fun followingCamera(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
         if (motion == null) return false
-        return backgroundVerdict(prev, seen, atMs, motion) == Verdict.CAMERA_MOVED
+        return backgroundVerdict(prev, seen, atMs, motion, null) == Verdict.CAMERA_MOVED
     }
 
     /** Dérive faible : brute sans signal fond, jugée contre le défilement sinon (une piste qui suit la caméra est un arrêt compensé, pas un mouvement). */
@@ -356,6 +359,7 @@ class VehicleStateWatcher(
                 cy = center?.let { (it[1] + it[3]) / 2f },
                 closeness = depthByBox?.get(detection.box)?.takeIf { it.isFinite() }, // PISTE2
                 box = detection.box,
+                edge = approach.onEdge(box, detection.width, detection.height),
             )
             // Clé d'instance (label + seau L/C/R, miroir de l'approche) : deux
             // voitures se suivent séparément, le pluriel compte juste, et la
