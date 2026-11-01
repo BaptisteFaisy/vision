@@ -234,8 +234,9 @@ Réponse : `{"released": true}` ; 401/402/403/429 remontent une erreur typée au
 | Délai normal / première frame | 10 s / 60 s | `LiveProbe.kt:481`, `:484` |
 
 Régulation de l'écran iSee : au-delà du budget de latence, le régulateur **referme** à un
-créneau ; il ne rouvre que sous la moitié du budget (`RELAX_RATIO = 0.5`) et après trois
-mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage du conteneur
+créneau ; il ne rouvre qu'après 5 moyennes consécutives sous le budget (`REOPEN_AFTER = 5`)
+et après trois mesures (`REGULATE_MIN_SAMPLES = 3`), la première frame payant le démarrage
+du conteneur
 (`LiveSession.kt:99-112`, `:168`, `:186`, `:189`). Une frame encodée peut attendre en **réserve**
 (une seule, remplacée, jamais empilée) pendant que la précédente est en vol
 (`LiveProbe.kt:228-260`, `core/src/main/java/dev/sam3vision/core/live/LatestFrameSlot.kt:45`).

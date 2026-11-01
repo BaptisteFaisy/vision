@@ -49,8 +49,8 @@ le conteneur Modal retombe à zéro et rien n'est facturé.
 Pendant l'enregistrement, la session tourne en `Cadence.Fast` (`core/live/LiveSession.kt:45-51`) :
 **pas de plancher artificiel**, **deux créneaux** (`concurrency = 2`) et un **budget de latence de
 210 ms** (`latencyBudgetMs = 210L`). Le régulateur ne se prononce qu'après **3 mesures**
-(`REGULATE_MIN_SAMPLES`) et ne rouvre le second créneau que sous **la moitié** du budget
-(`RELAX_RATIO = 0.5`). Motif de ce choix (campagne Samsung 01/11, Wi-Fi) : rtt 173 ms à un créneau
+(`REGULATE_MIN_SAMPLES`) et ne rouvre le second créneau qu'après **5 moyennes consécutives**
+sous le budget (`REOPEN_AFTER = 5`). Motif de ce choix (campagne Samsung 01/11, Wi-Fi) : rtt 173 ms à un créneau
 (serveur 83 ms + réseau 89 ms) — le budget précédent (150 ms) refermait toujours, le lien ne pipelinait
 jamais. Au-delà de deux frames en vol, le backend sérialise sur son verrou GPU.
 

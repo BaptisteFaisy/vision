@@ -150,9 +150,10 @@ lancé sur cette machine pour ce comptage.
   Direct n'ayant pas de budget de latence. La sonde iSee utilise `Cadence.Fast`
   (`app/isee/LiveProbe.kt:191`) : `fastMs = 0`, `targetMs = 0`, `slowMs = 900`,
   **`concurrency = 1`**, `latencyBudgetMs = 150` (`LiveSession.kt:43-49`).
-- **Régulation par hystérésis** (`LiveSession.kt`, régulateur) : on ne rouvre un créneau que sous la
-  moitié du budget (`RELAX_RATIO = 0.5`, `:195`) et seulement après trois mesures
-  (`REGULATE_MIN_SAMPLES = 3`, `:198`), la première frame payant le démarrage du conteneur.
+- **Régulation par hystérésis** (`LiveSession.kt`, régulateur) : on ne rouvre un créneau
+  qu'après 5 moyennes consécutives sous le budget (`REOPEN_AFTER = 5`) et seulement après
+  trois mesures (`REGULATE_MIN_SAMPLES = 3`, `:198`), la première frame payant le démarrage
+  du conteneur.
 - **Une frame en vol** : si le créneau est pris, `runFrame` renvoie `null` et la frame est
   jetée — l'appelant caméra n'est jamais mis en attente (`LiveSession.kt:133-138`).
 
