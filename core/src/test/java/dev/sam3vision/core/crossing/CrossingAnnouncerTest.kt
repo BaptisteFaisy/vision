@@ -38,15 +38,15 @@ class CrossingAnnouncerTest {
     fun `le vert clignotant se dit et veto, etat rouge fail-safe`() {
         val announcer = CrossingAnnouncer()
         assertNull(announcer.onFrame(0L, CrossingState.Red))
-        announcer.onFrame(200L, CrossingState.Red)
-        announcer.onFrame(400L, CrossingState.Green)
-        assertNull("une seule extinction : pas encore veto", announcer.onFrame(600L, CrossingState.Red))
-        announcer.onFrame(800L, CrossingState.Green)
-        val cue = announcer.onFrame(1_000L, CrossingState.Red)
+        announcer.onFrame(200L, CrossingState.Red) // rouge annoncé
+        announcer.onFrame(3000L, CrossingState.Green) // vert annoncé, délai écoulé
+        assertNull(announcer.onFrame(3200L, CrossingState.Red))
+        announcer.onFrame(3400L, CrossingState.Green)
+        val cue = announcer.onFrame(3600L, CrossingState.Red)
         assertEquals("Flashing green, do not cross.", cue?.phrase)
         assertTrue("vert annoncé avant : urgent", cue?.urgent ?: false)
         assertEquals(CrossingState.Red, cue?.state)
-        assertNull("veto : pas de traversez tant que ca clignote", announcer.onFrame(1_200L, CrossingState.Green))
+        assertNull("veto : pas de traversez tant que ca clignote", announcer.onFrame(3800L, CrossingState.Green))
         assertEquals("Flashing green, do not cross.", announcer.lastCue?.phrase)
     }
 

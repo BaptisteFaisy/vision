@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "date": "2026-11-01",
+  "sha": "PR-711",
+  "pipeline": "CrossingPrompts.selectLightBox -> crop JVM 96px (miroir CrossingPixels.crop) -> PedLightGate.verdict",
+  "note": "V4 (PR 711 : crop 48->96 px, recentrage lampe) : 6/6 verts synthetiques (h64 admis — tache non elargie au downscale), le reste inchange (v3 : 5/6) ; car-disc synthetique admis, 0 vert sur rouges/eteints.",
+  "cases": [
+    {"id": "green-h64", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h32", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h24", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h16", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h12", "truth": "Green", "verdict": "Green"},
+    {"id": "green-h08", "truth": "Green", "verdict": "Green"},
+    {"id": "red-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "off-h32", "truth": "Red", "verdict": "Red"},
+    {"id": "car-disc", "truth": "Red", "verdict": "Green"},
+    {"id": "real-green", "truth": "Green", "verdict": "Green"},
+    {"id": "real-red", "truth": "Red", "verdict": "Red"},
+    {"id": "real-r1b", "truth": "Green", "verdict": "Green"}
+  ],
+  "recall": [
+    {"id": "synthetic_green", "value": "6/6"},
+    {"id": "synthetic_green_grand", "value": "2/2"},
+    {"id": "synthetic_green_petit", "value": "4/4"},
+    {"id": "false_green", "value": "0/3"}
+  ]
+}

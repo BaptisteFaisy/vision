@@ -6,11 +6,11 @@ import org.junit.Test
 
 /**
  * Éval JVM détection→verdict sur caissons type SAM + rappel petits objets
- * versionné (`feuxevel/RECALL-v3.json`).
+ * versionné (`feuxevel/RECALL-v4.json`).
  *
  * Les 6 cas `green-h*` balayent la taille du caisson (64 → 8 px de haut) :
- * rappel piné 5/6 depuis la v3 (01/11 : souche green_frac + vert
- * cyan/délavé — h32/h24/h16/h12/h08 admis, h64 refusé par la porte).
+ * rappel piné 6/6 depuis la v4 (PR 711 : crop 96 px, recentrage —
+ * h64 admis, tache non élargie au downscale ; v3 : 5/6 à 48 px).
  * Les cas `real-*` prouvent que la chaîne rend du vert sur de vrais crops.
  * Le disque synthétique est admis (A2 levé 31/10, ordre user) : piné vert
  * dans le doré, exclu du 0-vert qui ne couvre que rouges/éteints.
@@ -19,9 +19,9 @@ import org.junit.Test
 class CaissonEvalTest {
 
     @Test
-    fun `la chaine detection-verdict suit le dore v3`() {
+    fun `la chaine detection-verdict suit le dore v4`() {
         val golden = loadGolden(javaClass.classLoader)
-        assertEquals("version du doré", 3, golden.version)
+        assertEquals("version du doré", 4, golden.version)
         val cases = evalCases(javaClass.classLoader)
         assertEquals("cas dorés", golden.verdicts.keys.sorted(), cases.map { it.id }.sorted())
         for (c in cases) {
@@ -30,7 +30,7 @@ class CaissonEvalTest {
     }
 
     @Test
-    fun `le rappel petits objets vaut le dore v3`() {
+    fun `le rappel petits objets vaut le dore v4`() {
         val cases = evalCases(javaClass.classLoader)
         val verdicts = cases.associate { it.id to runChain(it) }
         val golden = loadGolden(javaClass.classLoader)

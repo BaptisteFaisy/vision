@@ -3,7 +3,6 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.live.LivePrompts
-import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
@@ -189,7 +188,9 @@ class TraverseVeto {
             .minByOrNull { it.meters ?: Float.MAX_VALUE }
 
     /**
-     * Candidature d'une détection au veto : véhicule confiant qui approche ou proche.
+     * Candidature d'une détection au veto : véhicule confiant qui approche
+     * (croissance de boîte — la proximité seule ne bloque pas : une garée
+     * proche s'annonce, elle ne veto pas).
      *
      * @param stopped pistes neutralisées (arrêt confirmé [stoppedKeys] + suivi
      * caméra `VehicleApproach.cameraMovedKeys`), écartées de la sélection du
@@ -201,13 +202,11 @@ class TraverseVeto {
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
         val growing = area != null && previous != null && area > previous
+        if (!growing) return null
         val centerX = detection.normalizedBox()?.let { (it[0] + it[2]) / 2f } ?: 0.5f
         if (vehicleKey(detection.label) in stopped) return null
         if (VehicleApproach.instanceKeyOf(detection.label, centerX) in stopped) return null
-        val meters = distanceOf(detection, focalPx)
-        val near = meters != null && meters < VETO_METERS
-        if (!growing && !near) return null
-        return Blocking(detection.label, meters)
+        return Blocking(detection.label, distanceOf(detection, focalPx))
     }
 
     /**
@@ -281,18 +280,14 @@ class TraverseVeto {
     }
 
     /**
-     * Un objet calibré proche (véhicule ou non) : le guidage obstacles reste
-     * actif. Une personne non mesurable compte comme proche (prudence :
-     * l'inconnu ne coupe jamais le guidage devant un humain), comme un
-     * véhicule confiant non mesuré (jamais prouvé loin — annoncé sans
-     * distance, pas coupé).
+     * Guidage obstacles à garder : objet calibré proche (véhicule ou non), ou véhicule
+     * confiant non mesuré (jamais prouvé loin — annoncé sans distance, pas coupé).
      */
     private fun hasNearObject(detections: List<Detection>, focalPx: Float): Boolean =
         detections.any { detection ->
             if (detection.score <= SCORE_MIN) return@any false
             val meters = distanceOf(detection, focalPx)
-            meters?.let { it < VETO_METERS } == true ||
-                (meters == null && (PersonLabels.isPerson(detection.label) || VehicleConcepts.isVehicle(detection.label)))
+            if (meters != null) meters < VETO_METERS else VehicleConcepts.isVehicle(detection.label)
         }
 
     /** Transition : le veto prime sur le vert, l'alerte exige une reconfirmation. */

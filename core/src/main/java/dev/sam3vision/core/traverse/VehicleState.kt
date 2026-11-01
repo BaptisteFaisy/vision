@@ -139,7 +139,7 @@ class VehicleStateWatcher(
         val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
-        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters)
+        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness) // PISTE2
         }
@@ -211,9 +211,10 @@ class VehicleStateWatcher(
         hushed: Set<String>,
         fondFranc: Boolean,
         movingMeters: Float,
+        motion: FrameMotion?,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, atMs, hushed, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc)
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters) ?: stoppedPick(current, meters, atMs, hushed, fondFranc, motion)
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -255,6 +256,7 @@ class VehicleStateWatcher(
         atMs: Long,
         hushed: Set<String>,
         fondFranc: Boolean, // FUSION : + fond franc — pas de faux « à l'arrêt » sous suivi sans piste suiveuse
+        motion: FrameMotion?,
     ): Pick? {
         val key = current.keys
             .filter { candidate ->
@@ -263,7 +265,7 @@ class VehicleStateWatcher(
                 val prev = previous[candidate] ?: return@filter false
                 val measured = meters[candidate]
                 if (measured != null && measured > PARKED_METERS) return@filter false
-                if (!isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs) || seen.area > prev.area) return@filter false
+                if (!still(prev, seen, atMs, motion) || seen.area > prev.area) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -273,6 +275,13 @@ class VehicleStateWatcher(
         val measured = meters[key]
         val state = if (measured != null && measured > STOPPED_METERS) State.PARKED else State.STOPPED
         return Pick(state, name, measured, seen.cx, false)
+    }
+
+    /** Dérive faible : brute sans signal fond, jugée contre le défilement sinon (une piste qui suit la caméra est un arrêt compensé, pas un mouvement). */
+    private fun still(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
+        if (motion == null) return isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)
+        val verdict = backgroundVerdict(prev, seen, atMs, motion)
+        return verdict == Verdict.STATIC || verdict == Verdict.CAMERA_MOVED
     }
 
     /** Verdict fond de la dérive [prev]→[seen] ([Verdict.UNKNOWN] sans datation ni géométrie). */
