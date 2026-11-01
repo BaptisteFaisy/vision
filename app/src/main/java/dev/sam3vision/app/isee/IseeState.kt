@@ -54,8 +54,8 @@ data class IseeUiState(
     val openSettings: Boolean = false,
     /** Repères visuels : génération en cours, objets reconnus sur l'image. */
     val picto: PictoUiState = PictoUiState(),
-    /** Lieu du picto (dedans par défaut) : dehors, les pictos sont muets et invisibles ; bascule à la voix uniquement, sans témoin visuel. */
-    val placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,
+    /** Lieu du picto (dehors par défaut : la rue parle au lancement, 01/11/2026) : dehors, les pictos sont muets et invisibles ; bascule à la voix uniquement, sans témoin visuel. */
+    val placeMode: PictoPlaceMode = PictoPlaceMode.DEHORS,
     /**
      * Photo des lunettes en cours d'affichage (`null` = aucune) : dans la rue,
      * à l'emplacement caméra ([GlassesPhotoStreet]), posée même depuis un autre
