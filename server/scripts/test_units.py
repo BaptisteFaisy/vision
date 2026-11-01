@@ -389,6 +389,8 @@ RUNNERS = (
     ("profondeur : poids locaux (build)", "depth", depth_tests.test_depth_local_weights),
     ("profondeur : run_frame joint les médianes", "fast_core",
      depth_tests.test_run_frame_depth),
+    ("profondeur : run_frame saute depth à 0 objet", "fast_core",
+     depth_tests.test_run_frame_depth_skip_empty),
     ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
     ("live_fast : passage (tolérance)", "passage", live_fast_tests.test_passage_tolerance),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.

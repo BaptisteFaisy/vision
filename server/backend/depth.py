@@ -102,12 +102,14 @@ def attach_medians(norm, entries, image_size):
 def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict):
     """Étage profondeur de ``run_frame`` : médiane par entrée, sous le verrou GPU.
 
-    Sans ``with_depth`` ou sans modèle chargé : les entrées repartent intactes
-    (repli gracieux — le client bascule sur sa profondeur embarquée). Le poste
-    ``depth_ms`` n'est émis que si le levier ``FAST_TIMING`` est vrai.
+    Sans ``with_depth``, sans modèle chargé, ou sans entrée (DETR n'a rien
+    trouvé : aucune médiane à mesurer) : les entrées repartent intactes, sans
+    forward (repli gracieux — le client bascule sur sa profondeur embarquée).
+    Le poste ``depth_ms`` n'est émis que si le levier ``FAST_TIMING`` est vrai
+    et qu'un forward a réellement eu lieu.
     Implémentation unique, partagée par les deux variantes du backend.
     """
-    if not with_depth or ctx.get("depth_model") is None:
+    if not with_depth or ctx.get("depth_model") is None or not entries:
         return entries
     from timing import add_ms, elapsed_ms, now
 

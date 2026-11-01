@@ -152,6 +152,55 @@ def test_run_frame_depth(fast_core) -> None:
           "depth" not in bare["objects"][0], str(bare["objects"][0])[:120])
 
 
+def test_run_frame_depth_skip_empty(fast_core) -> None:
+    """``run_frame(with_depth)`` : 0 objet ⇒ pas de forward depth, ≥1 ⇒ médianes."""
+    import depth as depth_mod
+    from PIL import Image
+
+    from test_units import check
+
+    image = Image.new("RGB", (64, 32), (10, 200, 30))
+    mask = np.zeros((32, 64), dtype=np.uint8)
+    mask[4:20, 8:40] = 1
+    entry = {"label": "chaise", "score": 0.9, "box": [8.0, 4.0, 40.0, 20.0], "mask": mask}
+    ctx = {"edge_applied": 518, "processor": _StubProcessor(), "device": "cpu", "dtype": None,
+           "depth_model": "model", "depth_processor": "processor"}
+    saved = (fast_core._vision, fast_core._collect, depth_mod.depth_map_for)
+    calls: list = []
+    try:
+        fast_core._vision = lambda _ctx, _pixels, _timers: "vision"
+
+        def fake_map(_model, _processor, _image, _device):
+            calls.append(True)
+            return np.linspace(0, 1, 32 * 64, dtype=np.float32).reshape(32, 64)
+
+        depth_mod.depth_map_for = fake_map
+        fast_core._collect = lambda *_args: []
+        timers: dict = {}
+        empty = fast_core.run_frame(ctx, image, ["chaise"], 512, 12, True,
+                                    timers=timers, with_depth=True)
+        calls_after_empty = len(calls)
+        fast_core._collect = lambda *_args: [dict(entry)]
+        timers_full: dict = {}
+        full = fast_core.run_frame(ctx, image, ["chaise"], 512, 12, True,
+                                   timers=timers_full, with_depth=True)
+        calls_after_full = len(calls)
+    finally:
+        fast_core._vision, fast_core._collect = saved[0], saved[1]
+        depth_mod.depth_map_for = saved[2]
+    check("run_frame: 0 objet ⇒ aucun forward depth",
+          empty["objects"] == [] and calls_after_empty == 0,
+          f"{empty['objects']} appels={calls_after_empty}")
+    check("run_frame: 0 objet ⇒ pas de poste depth_ms", "depth_ms" not in timers,
+          str(sorted(timers)))
+    got = full["objects"][0].get("depth")
+    check("run_frame: ≥1 objet ⇒ forward + médiane 0..1",
+          calls_after_full == 1 and isinstance(got, float) and 0.0 <= got <= 1.0,
+          f"appels={calls_after_full} depth={got}")
+    check("run_frame: ≥1 objet ⇒ poste depth_ms émis", "depth_ms" in timers_full,
+          str(sorted(timers_full)))
+
+
 def test_depth_local_weights(_) -> None:
     """Poids DA2 : répertoire local (build) honoré, repli Hub sinon.
 
