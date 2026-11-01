@@ -138,6 +138,23 @@ class ProximityVoiceRepeatTest {
     }
 
     @Test
+    fun `dedup reduit reparle apres 1 s, pas avant`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        var now = 0L
+        val voice = voice(attempts, spoken, nowMs = { now })
+
+        voice.onPhrase("5 marches.", playerIdle = true, dedupMs = 1_000L)
+        now = 999L
+        voice.onPhrase("5 marches.", playerIdle = true, dedupMs = 1_000L)
+        now = 1_000L
+        voice.onPhrase("5 marches.", playerIdle = true, dedupMs = 1_000L)
+
+        assertEquals(listOf("5 marches.", "5 marches."), spoken)
+        assertEquals(2, attempts.size)
+    }
+
+    @Test
     fun `stop jamais repete meme apres le delai`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()

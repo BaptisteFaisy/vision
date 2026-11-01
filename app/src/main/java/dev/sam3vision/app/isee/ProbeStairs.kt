@@ -26,7 +26,9 @@ import kotlinx.coroutines.launch
  * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
  * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
  * [stairsAudible] ignore la sourdine GPS (chat libre suffit) : la sécurité
- * passe avant le silence (contrat `IseeVoiceGate`).
+ * passe avant le silence (contrat `IseeVoiceGate`). L'esquive en cours
+ * ([stairsYieldToAvoidance]) tait l'annonce : les humains priment, même sur
+ * les escaliers.
  */
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
@@ -40,6 +42,7 @@ internal fun LiveProbe.observeStairs(
     scope.launch {
         state.collect { st ->
             if (st.crossingActive) return@collect
+            if (this@observeStairs.stairsYieldToAvoidance()) return@collect
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
             // repli : un escalier nommé sans mesure reste un escalier.
             val readings = st.distanceLayer?.readings.orEmpty()
@@ -102,15 +105,26 @@ internal fun stairsRoiOf(found: StairLabelSignal, width: Int, height: Int): Stai
 }
 
 /**
+ * Esquive en cours (décalage humain ou couloir bouché) : les voix escaliers
+ * se taisent — l'évitement prime, même sur les escaliers. Pur hors sonde
+ * (lit la dernière décision guidée, posée à chaque frame en mode guidage).
+ */
+internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
+    if (voice.cue()?.urgent == true) return true
+    return voice.lastDecision?.blocked == true
+}
+
+/**
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
- * 4 s ([StairCountVoice]), doux, coupé en Traversée. La voix part en
- * coroutine fille : le battement ne s'arrête
- * jamais pour une synthèse lente (le lecteur coupe le précédent, dernier
- * gagnant). Sans escalier nommé ou sans compte frais : silence (auto-muet
- * caméra coupée, séance finie). Rend le compteur pour le `reset()` de séance.
- * [stairsAudible] ignore la sourdine GPS, comme l'annonce (sécurité).
+ * 1 s ([StairCountVoice]), doux, coupé en Traversée comme en esquive
+ * ([stairsYieldToAvoidance]). La voix part en coroutine fille : le battement
+ * ne s'arrête jamais pour une synthèse lente (le lecteur coupe le précédent,
+ * dernier gagnant). Sans escalier nommé ou sans compte frais : silence
+ * (auto-muet caméra coupée, séance finie). Rend le compteur pour le `reset()`
+ * de séance. [stairsAudible] ignore la sourdine GPS, comme l'annonce
+ * (sécurité). [nowMs] est l'horloge du compteur (injectée en test).
  */
 internal fun LiveProbe.observeStairsCount(
     scope: CoroutineScope,
@@ -118,6 +132,7 @@ internal fun LiveProbe.observeStairsCount(
     stairsAudible: () -> Boolean,
     language: () -> SpeechLanguage,
     tickMs: Long = StairCountVoice.COUNT_MS,
+    nowMs: () -> Long = { System.currentTimeMillis() },
 ): StairCountVoice {
     val counter = StairCountVoice()
     scope.launch {
@@ -125,11 +140,14 @@ internal fun LiveProbe.observeStairsCount(
             delay(tickMs)
             val st = state.value
             if (st.crossingActive) continue
+            if (this@observeStairsCount.stairsYieldToAvoidance()) continue
             if (!stairsFoundOf(st).detected) continue
             val phrase = counter.onTick(
-                true, StairCannyCount.lineCount(), System.currentTimeMillis(), language(),
+                true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
-            scope.launch { voice.onPhrase(phrase, stairsAudible(), urgent = false) }
+            scope.launch {
+                voice.onPhrase(phrase, stairsAudible(), urgent = false, dedupMs = StairCountVoice.REPEAT_MS)
+            }
         }
     }
     return counter

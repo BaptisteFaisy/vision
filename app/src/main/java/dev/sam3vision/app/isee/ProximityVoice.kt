@@ -109,6 +109,9 @@ class ProximityVoice(
      * le silence, dans [PENDING_TTL_MS] — sans file, elle se redit à la
      * prochaine émission. [busy] : P1/P2 en cours, vus par l'appelant — la
      * phrase douce part en file si [queue] (jamais de chevauchement SafetyVoice).
+     * [dedupMs] : délai de déduplication de cette phrase ([REPEAT_TTL_MS] par
+     * défaut — le compteur de marches y passe 1 s : un compte répété n'est
+     * pas un bégaiement, c'est le pas suivant).
      */
     suspend fun onPhrase(
         phrase: String,
@@ -116,8 +119,9 @@ class ProximityVoice(
         urgent: Boolean = false,
         queue: Boolean = false,
         busy: () -> Boolean = { false },
+        dedupMs: Long = REPEAT_TTL_MS,
     ) {
-        if (saidRecently(phrase)) return
+        if (saidRecently(phrase, dedupMs)) return
         if (urgent) {
             speakUrgent(phrase)
             return
@@ -212,13 +216,13 @@ class ProximityVoice(
         due != null && due.phrase != lastPhrase && nowMs() < due.expiresAtMs
 
     /**
-     * Vrai si [phrase] vient d'être dite (moins de [REPEAT_TTL_MS]) : la
+     * Vrai si [phrase] vient d'être dite (moins de [ttlMs]) : la
      * déduplication est bornée — un danger présent se redit, le retour
      * d'une scène parle, et rien ne bégaie. Le stop garde sa règle propre
      * (jamais répété, [speakWord]).
      */
-    private fun saidRecently(phrase: String): Boolean =
-        phrase == lastPhrase && nowMs() - lastPhraseAtMs < REPEAT_TTL_MS
+    private fun saidRecently(phrase: String, ttlMs: Long = REPEAT_TTL_MS): Boolean =
+        phrase == lastPhrase && nowMs() - lastPhraseAtMs < ttlMs
 
     /**
      * Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée.
