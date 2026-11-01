@@ -118,7 +118,9 @@ internal fun StateFlow<LiveProbeState>.noticeStates(): Flow<LiveProbeState> =
 @Composable
 internal fun LiveProbe.collectPixels(): LiveProbeState {
     val snapshots = remember { state.pixelStates() }
-    val snap by snapshots.collectAsState(state.value)
+    // Graine mémorisée : l'initial reste l'état courant, sans lecture en composition.
+    val initial = remember { state.value }
+    val snap by snapshots.collectAsState(initial)
     return snap
 }
 
@@ -126,7 +128,9 @@ internal fun LiveProbe.collectPixels(): LiveProbeState {
 @Composable
 internal fun LiveProbe.collectRest(): LiveProbeState {
     val snapshots = remember { state.restStates() }
-    val snap by snapshots.collectAsState(state.value)
+    // Graine mémorisée : l'initial reste l'état courant, sans lecture en composition.
+    val initial = remember { state.value }
+    val snap by snapshots.collectAsState(initial)
     return snap
 }
 
@@ -134,6 +138,8 @@ internal fun LiveProbe.collectRest(): LiveProbeState {
 @Composable
 internal fun LiveProbe.collectNotice(): LiveProbeState {
     val snapshots = remember { state.noticeStates() }
-    val snap by snapshots.collectAsState(state.value)
+    // Graine mémorisée : l'initial reste l'état courant, sans lecture en composition.
+    val initial = remember { state.value }
+    val snap by snapshots.collectAsState(initial)
     return snap
 }
