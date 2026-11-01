@@ -2,6 +2,7 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,5 +66,23 @@ class VehicleStateLateralTest {
 
         watcher.reset()
         assertFalse("reset : brut effacé", watcher.movingThisFrame)
+    }
+
+    @Test
+    fun `voiture qui traverse - mouvement lateral annonce`() {
+        // Fond fixe (caméra immobile) + boîte qui glisse à taille stable :
+        // la traversée latérale (verdict approche) annonce dès confirmation.
+        val motion = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val watcher = VehicleStateWatcher()
+        val frames = listOf(200f, 240f, 280f, 320f, 360f).map { box(100f, cx = it) }
+        frames.forEachIndexed { index, frame ->
+            val cue = watcher.update(
+                listOf(det("car", frame)), listOf(reading("car", 12f, frame)),
+                atMs = index * 100L, language = SpeechLanguage.Fr, motion = motion,
+            )
+            if (index < 3) assertNull(cue)
+            else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
+            else assertNull("cooldown mouvement", cue)
+        }
     }
 }

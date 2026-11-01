@@ -106,9 +106,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
-    /** TTS système partagé : alertes de sécurité + repli hors-ligne de la voix de proximité. */
     private val systemTts = SystemTtsEngine.create(getApplication())
-    /** Voix de sécurité : toute urgence, dite aussitôt en grave, même en dictée. */
+    /** Voix de sécurité : toute urgence, dite aussitôt en grave, même en dictée (moteur partagé avec le repli hors-ligne de la voix de proximité). */
     private val safety = SafetyVoice(player, systemTts, { settings }, stopCurrent = { player.stop(); update { it.cutSpeaking() } })
     /** Voix de proximité : doux en Laure, urgences déléguées à la sécurité. */
     private val proximity = ProximityVoice(player, { settings }, safety, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking, system = systemTts, systemBusy = { systemTts.speaking })
@@ -445,11 +444,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Voix ambiante : [urgent] passe toujours (micro, LLM, GPS coupé) ; sinon, silence si occupé ou porte fermée. */
-    private fun canAnnounce(urgent: Boolean = false): Boolean =
-        urgent || (!speechBusy() && voiceNavVoiceGate.ambientAllowed())
-
-    /** Décision d'une voix ambiante (annonce ou voix du sol), urgence mise à part. */
-    private fun maySpeakAmbient(urgent: Boolean): Boolean = voiceNavVoiceGate.maySpeak(urgent, speechBusy())
+    private fun canAnnounce(urgent: Boolean = false): Boolean = urgent || (!speechBusy() && voiceNavVoiceGate.ambientAllowed())
 
     /** GPS désactivé (ordre) : la fenêtre d'action (photo, caméra) réouvre la voix. */
     private val voiceNavVoiceGate get() = voiceNav.voiceGate

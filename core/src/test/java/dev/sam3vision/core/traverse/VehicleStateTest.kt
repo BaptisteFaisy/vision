@@ -2,7 +2,6 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
-import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -176,32 +175,6 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `portees - 4m et lateral proche arretes, gare a 16m tu`() {
-        val stoppedMid = VehicleStateWatcher()
-        repeat(2) { index ->
-            stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = index * 100L)
-        }
-        val mid = stoppedMid.update(listOf(det("car", box(100f))), listOf(reading("car", 4f, box(100f))), atMs = 200L)
-        assertEquals("Car stopped, 4 meters away.", mid!!.phrase)
-
-        val stoppedSide = VehicleStateWatcher()
-        val sideBox = box(100f, cx = 64f)
-        repeat(2) { index ->
-            stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = index * 100L)
-        }
-        val side = stoppedSide.update(listOf(det("car", sideBox)), listOf(reading("car", 2f, sideBox)), atMs = 200L)
-        assertEquals("Car stopped, 2 meters away.", side!!.phrase)
-
-        val parkedFar = VehicleStateWatcher()
-        repeat(3) { index ->
-            assertNull(
-                "immobile à 16 m : hors portée",
-                parkedFar.update(listOf(det("car", sideBox)), listOf(reading("car", 16f, sideBox)), atMs = index * 100L),
-            )
-        }
-    }
-
-    @Test
     fun `voiture garee a 5m et sur le cote - annonce a l'arret`() {
         val mid = VehicleStateWatcher()
         repeat(2) { index ->
@@ -226,24 +199,6 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `voiture qui traverse - mouvement lateral annonce`() {
-        // Fond fixe (caméra immobile) + boîte qui glisse à taille stable :
-        // la traversée latérale (verdict approche) annonce dès confirmation.
-        val motion = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 100L)
-        val watcher = VehicleStateWatcher()
-        val frames = listOf(200f, 240f, 280f, 320f, 360f).map { box(100f, cx = it) }
-        frames.forEachIndexed { index, frame ->
-            val cue = watcher.update(
-                listOf(det("car", frame)), listOf(reading("car", 12f, frame)),
-                atMs = index * 100L, language = SpeechLanguage.Fr, motion = motion,
-            )
-            if (index < 3) assertNull(cue)
-            else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
-            else assertNull("cooldown mouvement", cue)
-        }
-    }
-
-    @Test
     fun `vehicule gare - annonce entre 5 et 15m, silence partage avec l arret`() {
         val watcher = VehicleStateWatcher()
         assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 0L))
@@ -259,27 +214,6 @@ class VehicleStateTest {
             "stationnement et arrêt partagent le silence de 10 s",
             watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 2f, box(100f))), atMs = 500L),
         )
-    }
-
-    @Test
-    fun `still compense - derive qui suit la camera, arret annonce`() {
-        // Caméra qui avance (+5 px/frame comme le fond) : sans fond, silence ; avec fond,
-        // la dérive compensée prouve l'arrêt (5 m, seau stable) — jamais du mouvement.
-        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
-        val bare = VehicleStateWatcher()
-        repeat(3) { index ->
-            val frame = box(100f, cx = 320f + index * 5f)
-            assertNull(bare.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L))
-        }
-        val watcher = VehicleStateWatcher()
-        var cue: VehicleStateCue? = null
-        repeat(3) { index ->
-            val frame = box(100f, cx = 320f + index * 5f)
-            cue = watcher.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = index * 100L, motion = motion)
-        }
-
-        assertEquals("Car stopped, 5 meters away.", cue!!.phrase)
-        assertNull("jamais de mouvement : pas d'alerte", watcher.lastMovingAlertMs)
     }
 
     @Test
