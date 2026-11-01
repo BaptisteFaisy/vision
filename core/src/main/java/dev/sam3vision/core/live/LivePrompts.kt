@@ -60,7 +60,7 @@ object LivePrompts {
         "person", "car", "bus", "bicycle", "pedestrian traffic light",
         "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
         "stairs", "keys", "fence", "gate", "souvenir shop", "beanie", "socks",
-        "wall",
+        "wall", "stroller", "child", "electric scooter", "dog",
     )
 
     /**
@@ -124,13 +124,17 @@ object LivePrompts {
     }
 
     /**
-     * Nombre maximal de concepts : **18** (17 du 31/10 plus les murs,
-     * ordre user du 31/10 : iSee détecte les murs). Le backend suit :
-     * `MAX_PROMPTS = 18` sur `/live`, `PROMPT_LIMIT = 18` côté tracker ;
-     * le client ne doit pas en envoyer davantage — sinon l'app affiche
-     * des concepts jamais détectés.
+     * Nombre maximal de concepts : **22** (18 du 01/11 plus poussette, enfant,
+     * trottinette et chien, ordre user du 01/11 : la boutique **et** la foule
+     * ensemble). Le backend suit : `MAX_PROMPTS = 22` sur `/live`,
+     * `PROMPT_LIMIT = 22` côté tracker ; le client ne doit pas en envoyer
+     * davantage — sinon l'app affiche des concepts jamais détectés.
+     *
+     * **Couplage de déploiement** : un serveur resté à 18 **refuse** la frame
+     * (`PromptError`), il ne tronque pas. Le serveur se déploie au merge
+     * (`[deploy-gpu]`) ; une app à 22 ne doit partir qu'après.
      */
-    const val MAX = 18
+    const val MAX = 22
 
     /** Longueur maximale d'un prompt : au-delà, ce n'est plus un concept. */
     const val MAX_LENGTH = 32

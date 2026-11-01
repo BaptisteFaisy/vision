@@ -17,11 +17,11 @@ class LivePromptsNavigationTest {
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
                 "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks", "wall",
+                "socks", "wall", "stroller", "child", "electric scooter", "dog",
             ),
             LivePrompts.default,
         )
-        assertEquals(18, LivePrompts.MAX)
+        assertEquals(22, LivePrompts.MAX)
     }
 
     @Test

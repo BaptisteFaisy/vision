@@ -10,18 +10,18 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `dix huit concepts exterieur par defaut, au plafond client`() {
-        assertEquals(18, LivePrompts.default.size)
+    fun `vingt deux concepts exterieur par defaut, au plafond client`() {
+        assertEquals(22, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
                 "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks", "wall",
+                "socks", "wall", "stroller", "child", "electric scooter", "dog",
             ),
             LivePrompts.default,
         )
-        assertEquals(18, LivePrompts.MAX)
+        assertEquals(22, LivePrompts.MAX)
         assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
         assertEquals("person", LivePrompts.default.first())
     }
@@ -44,15 +44,16 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `foule suivie par le preset exterieur, souvenirs restes dans le defaut`() {
-        // Ordre user du 01/11 : « remets souvenir shop, beanie, socks, keys ».
-        // Le défaut garde donc ses 18 concepts de boutique et de rue ; la
-        // poussette, l'enfant et la trottinette passent dans le preset
-        // extérieur (18 aussi), qui est le mode de marche urbaine.
-        assertFalse("stroller" in LivePrompts.default)
-        assertFalse("child" in LivePrompts.default)
-        assertFalse("electric scooter" in LivePrompts.default)
-        assertFalse("dog" in LivePrompts.default)
+    fun `foule et souvenirs ensemble dans le defaut, plafond a vingt deux`() {
+        // Ordres user du 01/11, dans l'ordre : « remets souvenir shop, beanie,
+        // socks, keys » puis « rajoute les filtres poussette/enfant/
+        // trottinette/chien ». Les deux tiennent : le plafond passe de 18 à 22
+        // côté client **et** côté serveur (MAX_PROMPTS / PROMPT_LIMIT), sinon
+        // `/live` refuserait la frame.
+        assertTrue("stroller" in LivePrompts.default)
+        assertTrue("child" in LivePrompts.default)
+        assertTrue("electric scooter" in LivePrompts.default)
+        assertTrue("dog" in LivePrompts.default)
         assertTrue("souvenir shop" in LivePrompts.default)
         assertTrue("beanie" in LivePrompts.default)
         assertTrue("socks" in LivePrompts.default)
@@ -126,7 +127,7 @@ class LivePromptsTest {
     @Test
     fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(18, exterior.size)
+        assertEquals(22, exterior.size)
         assertTrue("wall" in exterior)
         assertTrue("fence" in exterior)
         assertTrue("gate" in exterior)
@@ -145,10 +146,10 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `tous les prompts tiennent en dix huit concepts de trente deux caracteres au plus`() {
+    fun `tous les prompts tiennent en vingt deux concepts de trente deux caracteres au plus`() {
         listOf(LivePrompts.default, LivePrompts.outdoor, LivePrompts.indoor).forEach { prompts ->
             assertTrue(prompts.size <= LivePrompts.MAX)
-            assertTrue(prompts.size <= 18)
+            assertTrue(prompts.size <= 22)
             prompts.forEach { concept ->
                 assertTrue(concept.length <= LivePrompts.MAX_LENGTH)
                 assertTrue(concept.length <= 32)
@@ -172,12 +173,12 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `la liste est bornee a dix huit prompts`() {
-        val many = (1..20).map { "objet$it" }
+    fun `la liste est bornee a vingt deux prompts`() {
+        val many = (1..30).map { "objet$it" }
         val normalized = LivePrompts.normalize(many)
         assertEquals(LivePrompts.MAX, normalized.size)
         assertEquals("objet1", normalized.first())
-        assertEquals("objet18", normalized.last())
+        assertEquals("objet22", normalized.last())
     }
 
     @Test
@@ -217,7 +218,7 @@ class LivePromptsTest {
     @Test
     fun `find the x au plafond, le dernier concept cede son slot`() {
         // « Find the X » au plafond ne reste plus muet — démontré avec « wallet »
-        // : « dog », 18e depuis l'audit foule du 01/11, sort, 18 suivis.
+        // : le 22e (« dog », ordre user du 01/11) sort, 22 suivis.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
         assertEquals(LivePrompts.MAX, next.size)
         assertTrue("wallet" in next)
