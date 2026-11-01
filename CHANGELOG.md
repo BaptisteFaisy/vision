@@ -19,6 +19,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `budget_latence.py --selftest` 20/20, `--check-doc` 7/7,
   `check-budget-provenance.py` 0 erreur (2 avertissements grand-père),
   `test_scripts.sh` vert, CI `ci/couche0/ci-budget` verte.
+## 2026-11-01 — iSee : vols recouvrés sérialisés, fin du crash `FrameLabels` (branche `runframe-mutex`)
+
+- **Fait** : `runFrame` lance la frame suivante avant de publier (débit
+  GPU), donc deux publications partageaient les instances de la sonde
+  (`FrameLabels`, trackers, veto, chronologie) — `ArrayIndexOutOfBounds`
+  dans `FrameLabels.of`, app tuée (émulateur le 01/11, même famille que
+  le crash `PersonTracker.sweep` déjà fixé). La section publication est
+  désormais sous mutex, le réseau reste parallèle (le `drain` part
+  toujours avant la publication).
+- **Preuve** : test JVM `LiveProbePublishConcurrencyTest` (60 paires de
+  vols recouvrés via `onFrame` + client manuel) rouge avant le fix
+  (signature exacte du crash), vert après ; `:core:testDebugUnitTest` +
+  `:app:testDebugUnitTest` verts sur le r630 (BUILD SUCCESSFUL, 0 échec).
 
 ## 2026-11-01 — iSee : fin du crash `IndexOutOfBounds` des trackers concurrents (branche `persontracker-race`)
 
