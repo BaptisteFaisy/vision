@@ -60,6 +60,12 @@ class LiveLensTest {
     }
 
     @Test
+    fun `côté lunettes la mire prime sur le repli`() {
+        val mire = LensSpec(60.61f, 92.19f, sensorLandscape = false)
+        assertEquals(mire, chosenLens(0f, sensor, mire, fromGlasses = true))
+    }
+
+    @Test
     fun `côté lunettes la provenance suit l'étage`() {
         val mire = LensSpec(60f, 90f, sensorLandscape = false)
         assertEquals(LensOrigin.FORCED, chooseLens(70f, sensor, mire, fromGlasses = true).origin)

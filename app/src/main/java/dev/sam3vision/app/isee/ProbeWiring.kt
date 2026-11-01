@@ -136,7 +136,7 @@ fun LiveProbe.clearRouteCap() {
  * ([LivePrompts.withConcept]), seul un label vide ou de plus de 32
  * caractères est refusé, sans reconfiguration. Pur hors sonde, testé en JVM.
  */
-internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLens: LensSpec? = null, onLens: ((LensOrigin) -> Unit)? = null) {
+internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLens: LensSpec? = null, onLens: ((LensOrigin) -> Unit)? = null, glassesLens: LensSpec? = null) {
     if (state.value.crossingActive) return
     val clean = label.trim()
     if (clean.isEmpty()) return
@@ -147,7 +147,7 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLe
     val evicted = if (current.size >= LivePrompts.MAX) current.lastOrNull() else null
     val detail = if (evicted == null) "${next.size} suivis" else "${next.size} suivis, « $evicted » sorti"
     android.util.Log.i("sam3vision", "find : « $clean » ajouté aux masques SAM ($detail)")
-    configureFrom(settings, next, false, sensorLens, onLens)
+    configureFrom(settings, next, false, sensorLens, onLens, glassesLens)
 }
 
 /**

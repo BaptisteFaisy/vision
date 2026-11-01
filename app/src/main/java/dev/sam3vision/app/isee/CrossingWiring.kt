@@ -77,8 +77,9 @@ internal fun LiveProbe.setCrossingActive(
     sensorLens: LensSpec? = null,
     onLens: ((LensOrigin) -> Unit)? = null,
     fromGlasses: Boolean = GlassesVideoLink.live.value,
+    glassesLens: LensSpec? = null,
 ) {
-    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens, fromGlasses = fromGlasses)
+    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens, glassesLens, fromGlasses)
 }
 
 /**
