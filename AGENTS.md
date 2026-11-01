@@ -61,7 +61,7 @@ là, atteignables depuis les Réglages, section « Other screens »
 | Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
 | Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
-| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … », reste = LLM (voir § 1 bis) |
+| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … » + chasse sans « mode » vers les 10 dedans, reste = LLM (voir § 1 bis) |
 
 ## 1 bis. Spec v4 — résumé (`feat/isee-*`, 01/11/2026, mergée)
 
