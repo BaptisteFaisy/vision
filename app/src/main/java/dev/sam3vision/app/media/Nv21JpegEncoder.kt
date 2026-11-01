@@ -232,20 +232,6 @@ class Nv21JpegEncoder {
         return JpegLuma(bytes, lumaPlan(size))
     }
 
-    /**
-     * Deux JPEG **bruts** issus d'un seul pack NV21 : la frame SAM et celle du direct
-     * aidant partagent la même géométrie (480 px), donc la rotation et la réduction ne
-     * sont payées qu'une fois — seule la compression JPEG est faite deux fois (une par
-     * qualité). `null` si le buffer n'est pas en YUV 4:2:0 (repli `Bitmap` unique de
-     * l'appelant, décodé une fois lui aussi).
-     */
-    fun encodeJpegPair(proxy: ImageProxy, edge: Int, firstQuality: Int, secondQuality: Int): JpegPair? {
-        val size = pack(proxy, edge) ?: return null
-        val first = compress(nv21, size.width, size.height, firstQuality) ?: return null
-        val second = compress(nv21, size.width, size.height, secondQuality) ?: return null
-        return JpegPair(first, second, lumaPlan(size))
-    }
-
     /** Recopie NV21 des plans caméra (rotation et réduction) ; `null` si la forme manque. */
     private fun pack(proxy: ImageProxy, edge: Int): Packed? {
         if (proxy.format != ImageFormat.YUV_420_888) return null
@@ -323,9 +309,6 @@ class EncodedFrame(val jpegBase64: String, val luma: ByteArray)
 
 /** Frame JPEG brute et son plan de luminance (compteur de marches). */
 class JpegLuma(val jpeg: ByteArray, val luma: ByteArray)
-
-/** Deux JPEG bruts issus d'un seul pack NV21, et leur plan de luminance partagé. */
-class JpegPair(val first: ByteArray, val second: ByteArray, val luma: ByteArray)
 
 /** JPEG → base64 sans préfixe `data:` — une seule implémentation pour toute l'app. */
 fun jpegBytesToBase64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
