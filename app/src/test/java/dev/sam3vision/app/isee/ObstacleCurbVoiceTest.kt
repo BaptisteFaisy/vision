@@ -34,7 +34,7 @@ class ObstacleCurbVoiceTest {
     private class CapturingDriver : TtsDriver {
         val phrases = mutableListOf<String>()
         override val speaking: Boolean get() = false
-        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
+        override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
             phrases += text
             return true
         }
@@ -46,7 +46,7 @@ class ObstacleCurbVoiceTest {
 
     /** Voix douce capturante : synthèse jouée, phrases dites enregistrées. */
     private fun voix(spoken: MutableList<String>) = ProximityVoice(
-        player = SpeechPlayer(File(tempDir(), "play")),
+        player = SpeechPlayer(File(tempDir(), "play")), safety = testSafetyVoice(),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
         onSpeaking = { if (it.isNotEmpty()) spoken += it },
         synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
