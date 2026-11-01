@@ -24,11 +24,13 @@ import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.bitmapToJpeg
 import dev.sam3vision.app.lensSpecOf
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.app.media.jpegBytesToBase64
 import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.TimingsText
 import dev.sam3vision.core.live.captureStamp
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.share.STREAM_FRAME_MS
@@ -259,28 +261,36 @@ class IseeCameraHost(private val context: Context) {
             proxy.close()
             return
         }
+        val enteredAtNs = SystemClock.elapsedRealtimeNanos()
         val startedAt = SystemClock.elapsedRealtime()
         try {
             // Passe unique : un seul pack NV21 (ou un seul Bitmap de repli) pour SAM
             // et le direct aidant — plus un encodage JPEG par consommateur.
             val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
             val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
-            val encoded = encodeSinglePass(
-                proxy,
-                quality, shareDue,
-            )
+            val encStart = SystemClock.elapsedRealtime()
+            val encoded = encodeSinglePass(proxy, quality, shareDue)
+            val encMs = SystemClock.elapsedRealtime() - encStart
+            val ageMs = (enteredAtNs - captureStamp(proxy.imageInfo.timestamp, enteredAtNs)) / NS_PER_MS
             encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
             val shareBytes = offerEncodedShare(encoded, startedAt)
             if (lightVerdict(encoded.mean) == LightVerdict.LOW_LIGHT) {
                 noteLowLight()
-                countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt, proxy.width to proxy.height, encoded.sam.size, shareBytes)
+                // Veto nuit : pas de b64 ni de rappel — capsplit honnête (b64/cb à zéro).
+                countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
+                    proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, 0, 0)
                 return
             }
             wasDark = false
-            onFrame?.invoke(jpegBytesToBase64(encoded.sam), captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos()))
-            countConversion(
-                ++conversionFrames, SystemClock.elapsedRealtime() - startedAt, proxy.width to proxy.height, encoded.sam.size, shareBytes,
-            )
+            val b64Start = SystemClock.elapsedRealtime()
+            val b64 = jpegBytesToBase64(encoded.sam)
+            val stamp = captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos())
+            val b64Ms = SystemClock.elapsedRealtime() - b64Start
+            val cbStart = SystemClock.elapsedRealtime()
+            onFrame?.invoke(b64, stamp)
+            val cbMs = SystemClock.elapsedRealtime() - cbStart
+            countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
+                proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, b64Ms, cbMs)
         } catch (_: Throwable) {
             // frame illisible : la suivante arrive tout de suite
         } finally {
@@ -330,9 +340,7 @@ class IseeCameraHost(private val context: Context) {
     private fun bitmapFallback(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
         val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE)
         val pixels = IntArray(upright.width * upright.height)
-        upright.getPixels(
-            pixels, 0, upright.width, 0, 0, upright.width, upright.height,
-            )
+        upright.getPixels(pixels, 0, upright.width, 0, 0, upright.width, upright.height)
 
         val share = if (shareDue) bitmapToJpeg(upright, SHARE_FRAME_QUALITY) else null
         return SinglePass(bitmapToJpeg(upright, quality), null, share, meanLumaFromArgb(pixels))
@@ -368,14 +376,18 @@ class IseeCameraHost(private val context: Context) {
         if (laplacianVariance(luma, LumaPlane.WIDTH, LumaPlane.HEIGHT) < BLUR_VAR_MIN) blurryFrames += 1
     }
 
-    /** Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames. */
-    private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int, shareBytes: Int) {
+    /**
+     * Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames.
+     * La décomposition `capsplit` part sous le tag [LiveLatencyLog.TAG] : même dump
+     * `ISEE_LAT` que la sonde, jointure temporelle directe avec le poste `capt`.
+     */
+    private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int, shareBytes: Int,
+        ageMs: Long, encMs: Long, b64Ms: Long, cbMs: Long) {
         if (frames % LOG_EVERY_FRAMES != 0) return
         val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
-        android.util.Log.i(
-            "sam3vision",
-            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)",
-        )
+        android.util.Log.i("sam3vision",
+            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)")
+        android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms))
     }
 
     /**
@@ -476,5 +488,8 @@ class IseeCameraHost(private val context: Context) {
 
         /** Une ligne de frames jetées tous les 60 (même cadence que le direct). */
         private const val LOG_EVERY_DROPS = 60L
+
+        /** Nanosecondes par milliseconde : l'âge capteur → analyseur se lit en ms. */
+        private const val NS_PER_MS = 1_000_000L
     }
 }

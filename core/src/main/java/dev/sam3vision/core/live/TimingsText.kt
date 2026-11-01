@@ -73,6 +73,20 @@ object TimingsText {
     }
 
     /**
+     * Décomposition du poste `capt` (capture → jpeg), loggée 1 frame sur 20 par
+     * l'analyseur caméra : « capsplit age 81 · enc 24 · b64 3 · cb 2 · total 30 ».
+     * `age` = capteur → entrée analyseur (expo, readout, livraison, attente fil),
+     * `enc` = NV21 → JPEG, `b64` = base64 + horodatage, `cb` = rappel `onFrame`
+     * (profondeur, mouvement, réserve/envoi), `total` = analyse complète.
+     * `age + enc + b64 + cb` retrouve le `capt` de la sonde à ~1 ms près.
+     *
+     * Invisible à `parse_isee_lat.py` (ni `latency`, ni `server:`) : la ligne vit
+     * dans le même dump `ISEE_LAT`, sans fausser le verdict.
+     */
+    fun capsplit(ageMs: Long, encMs: Long, b64Ms: Long, cbMs: Long, totalMs: Long): String =
+        "capsplit age $ageMs · enc $encMs · b64 $b64Ms · cb $cbMs · total $totalMs"
+
+    /**
      * Étages serveur reçus : « server: preprocess 12 ms · vision 47 ms · detr 38 ms ».
      * « server: — » quand `FAST_TIMING` est éteint au déploiement.
      */
