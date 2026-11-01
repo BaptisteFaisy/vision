@@ -39,7 +39,7 @@ class IseeGuidanceMapTest {
     }
 
     @Test
-    fun `en guidage, parole sans transcript : la boule reste, rien a afficher`() {
+    fun `en guidage, parole sans transcript — la boule reste, rien a afficher`() {
         val silent = IseeUiState(holding = true, userSpeaking = true, liveTranscript = "   ")
 
         assertFalse(showGuidanceTranscript(guiding, silent))
