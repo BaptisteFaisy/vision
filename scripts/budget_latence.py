@@ -10,7 +10,7 @@ comparaisons sont exactes, l'affichage seul arrondit (au dixième, virgule déci
 (Seule exception : le bloc `mesures`, relevé en millisecondes entières comme `ISEE_LAT`.)
 
 Usage :
-    python3 scripts/budget_latence.py --selftest     # 19 assertions sur l'arithmétique
+    python3 scripts/budget_latence.py --selftest     # 20 assertions sur l'arithmétique
     python3 scripts/budget_latence.py --check-doc    # 7 blocs : doc <-> script
     python3 scripts/budget_latence.py --write-doc    # régénère les blocs du document
     python3 scripts/budget_latence.py --verdict      # verdict chiffré sur les 100 ms
@@ -45,7 +45,7 @@ def plage_str(bornes):
 # --- étages du chemin client (dixièmes de ms) --------------------------------
 CAPTURE = (860, 860)                  # mesuré 01/11/2026 : capsplit `age` p50, n = 38 (Direct)
 CAPTURE_LOCAL = (250, 250)            # u07, hypothèse locale (rien à encoder par frame)
-ENCODE = (270, 270)                   # mesuré 01/11/2026 : enc 24 + b64 3
+ENCODE = (100, 100)                   # mesuré 01/11/2026 : enc p50 + b64 p50 0, n = 343
 ENCODE_HYPOTHESE = (50, 80)           # u02, estimé après la refonte NV21 (avant mesure)
 DECODE = (100, 250)                   # u07, simulation
 COMPOSE = (9, 30)                     # u03, mesuré 0,93 ms/frame (JVM)
@@ -53,16 +53,14 @@ DISPLAY = (167, 174)                  # 1 vsync 60 Hz, ± 1 frame
 PROPAGATION = (40, 100)               # u11, cible < 8 ms/frame à 512×206
 CLIENT_CLOUD = (CAPTURE[0] + ENCODE[0] + DECODE[0] + COMPOSE[0] + DISPLAY[0],
                 CAPTURE[1] + ENCODE[1] + DECODE[1] + COMPOSE[1] + DISPLAY[1])
-# Ce que ce document publiait avant la campagne du 01/11 : CAPTURE 25 (simulation) et
-# ENCODE 5–8 (estimation). Gardé pour chiffrer l'écart, jamais publié comme un budget.
+# Avant la campagne du 01/11 : CAPTURE 25 (simulation), ENCODE 5–8 (estimation) — écart chiffré, jamais publié.
 CLIENT_CLOUD_AVANT = (CAPTURE_LOCAL[0] + ENCODE_HYPOTHESE[0] + DECODE[0] + COMPOSE[0] + DISPLAY[0],
                       CAPTURE_LOCAL[1] + ENCODE_HYPOTHESE[1] + DECODE[1] + COMPOSE[1] + DISPLAY[1])
 HORS_PROPAGATION = (CAPTURE_LOCAL[0] + COMPOSE[0] + DISPLAY[0],
                     CAPTURE_LOCAL[1] + COMPOSE[1] + DISPLAY[1])
 CLIENT_LOCAL = (HORS_PROPAGATION[0] + PROPAGATION[0],
                 HORS_PROPAGATION[1] + PROPAGATION[1])
-# Chemin local qui garde l'encode par frame (donc la file de l'analyseur) : le scénario que
-# la mesure du 01/11 rend visible, et qui ne tient pas la cible.
+# Chemin local gardant l'encode par frame : visible depuis le 01/11, ne tient pas la cible.
 CLIENT_LOCAL_MESURE = (CAPTURE[0] + COMPOSE[0] + DISPLAY[0] + PROPAGATION[0],
                        CAPTURE[1] + COMPOSE[1] + DISPLAY[1] + PROPAGATION[1])
 
@@ -102,6 +100,8 @@ CAMPAGNES = (
      "référence avant PR2", None, None, None, None),
     ("post-PR2", 1500, 380, (119, 38, 100, 164, 1, 58), 713,
      "scène vide (0 masque), app à 430 % CPU", None, None, None, None),
+    ("R1 Redmi combi", 323, 343, (151, 30, 96, 107, 20, 45), 722, "Redmi, combi HAL+wifilock+cb, "
+     "01/11/2026 15:47–15:49, serveur sam3-eu-a100 ; 323 chaudes (328 brutes, skip 5)", 477, 573, 75.1, None),
 )
 CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parseur, objectif
 
@@ -116,12 +116,11 @@ ETAGES_DOC = (
      "`age` ↔ `total` +0,18 : la durée d'analyse n'explique pas l'âge, le délai est en amont "
      "de l'analyseur"),
     ("ENCODE", plage_str(ENCODE), "NV21 → JPEG q65 → base64 du corps de requête",
-     "**mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, SM-G780G, n = 38) "
-     "— le relevé à `int` du même dump donne `enc` p50 9 ms ; écart non tranché, la valeur "
-     "haute est publiée",
+     "**mesuré** 10 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` p50 + `b64` p50 0, 30 fps "
+     "tenus, n = 343 sur 3 sessions ; le 27 venait d'un micro-échantillon n = 2, tranché)",
      "≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu"),
     ("QUEUE", "calculée", "attente du créneau d'envoi (`intervalMsAdaptive`)",
-     "u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2) ; cadence prudente de cet arbre : 350 / 500 / 900 ms",
+     "u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2), confirmée le 01/11/2026 (`up` p50 19 ms = phase caméra, file serveur 0 ms, n = 1081) ; cadence prudente de cet arbre : 350 / 500 / 900 ms",
      "0 ms si la frame est traitée sans tick (chemin local)"),
     ("HTTP", f"{dix_str(AR_MEDIAN)} (médian mesuré)",
      "requête émise → réponse complète lue par le client (**= A/R**)",
@@ -183,13 +182,13 @@ PLANCHERS_DOC = (
 
 # --- § 4 : budget par architecture (nom, contexte, A/R, client, attente, verdict) ---
 ARCHITECTURES = (
-    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (2516, 3029), "quart", "cloud"),
-    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (2374, 2904), "quart", "cloud"),
-    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (2391, 2827), "quart", "cloud"),
-    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1884, 2312), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1858, 2286), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (1406, 1751), "vsync", "cloud"),
-    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (1406, 1751), "vsync", "limite"),
+    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (2346, 2859), "quart", "cloud"),
+    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (2204, 2734), "quart", "cloud"),
+    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (2221, 2657), "quart", "cloud"),
+    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1714, 2142), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1688, 2116), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (1236, 1581), "vsync", "cloud"),
+    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (1236, 1581), "vsync", "limite"),
     ("Keyframe cloud + propagation locale (30 fps)", "téléphone", LOCAL_AR, CLIENT_LOCAL, "local", "local"),
     ("Le même, capture mesurée sur appareil (01/11)", "téléphone", LOCAL_AR, CLIENT_LOCAL_MESURE,
      "local", "local-mesure"),
@@ -219,8 +218,7 @@ def percee_de(ar, client):
     return (ar[0] + client[0], ar[1] + client[1])
 
 
-# Boîte GPU dans le LAN : lue dans `ARCHITECTURES` (A/R local + client cloud + attente), jamais
-# recopiée — c'est ce qui garantit que le § 4 et le § 5 publient le même chiffre.
+# Boîte LAN lue dans `ARCHITECTURES` (jamais recopiée) : § 4 et § 5 publient le même chiffre.
 LAN_PERÇU = next(percee_de(ar, client) for nom, _, ar, client, _, _ in ARCHITECTURES
                  if nom.startswith("Boîte GPU"))
 
@@ -424,7 +422,7 @@ def assertions_socle():
                     for _, _, a, c, t, s in ARCHITECTURES for i in (0, 1))
     depasse = min(haut for _, haut in cloud) > CIBLE_DIX
     return (
-        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1406, 1584)),
+        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1236, 1414)),
         (f"sommes keyframe + propagation : {plage_str(local)}", lambda: local == (466, 554)),
         (f"plancher A/R cloud {dix_str(PLANCHER_CLOUD)} ms > 100 ms", lambda: PLANCHER_CLOUD > CIBLE_DIX),
         ("les 6 architectures cloud dépassent 100 ms", lambda: len(cloud) == 6 and depasse),
@@ -441,8 +439,8 @@ def assertions_socle():
 
 
 def assertions_campagnes():
-    """5 assertions : campagnes ISEE_LAT citées au § 10 et verdict paramétrable."""
-    base, post = CAMPAGNES
+    """6 assertions : campagnes ISEE_LAT citées au § 10 et verdict paramétrable."""
+    base, post, r1 = CAMPAGNES
     gain_moyenne, gain_max = base[2] - post[2], base[4] - post[4]
     return (
         (f"campagnes ISEE_LAT : N={base[1]}/{post[1]}, moyennes {base[2]}/{post[2]} ms", lambda: (base[1], base[2], post[1], post[2]) == (1257, 454, 1500, 380)),
@@ -452,13 +450,15 @@ def assertions_campagnes():
                   and cellule_mesure(200, 400, 300, 500, [("p95", 350, 400), ("jetées", 2, 3)]) == "tenu"
                   and cellule_mesure(200, 400, 300, 500, [("p95", None, 400), ("jetées", 2, None)]) == "tenu")),
         ("campagnes historiques : p95/p99/gigue/jetées non relevés, publiés « — »",
-         lambda: (all(c[i] is None for c in CAMPAGNES for i in (6, 7, 8, 9)) and table_mesures().count("—") >= 8)),
+         lambda: all(c[i] is None for c in CAMPAGNES[:2] for i in (6, 7, 8, 9))),
+        (f"R1 Redmi : N={r1[1]}, moyenne {r1[2]} ms, p95 {r1[6]}, p99 {r1[7]}, gigue {r1[8]}",
+         lambda: (r1[1], r1[2], r1[4], r1[6], r1[7], r1[8], r1[9]) == (323, 343, 722, 477, 573, 75.1, None)),
         (f"gains post-PR2 : −{gain_moyenne} ms en moyenne, −{gain_max} en max", lambda: (gain_moyenne, gain_max) == (74, 964)),
     )
 
 
 def assertions():
-    """Les 19 assertions du `--selftest` : (libellé, prédicat)."""
+    """Les 20 assertions du `--selftest` : (libellé, prédicat)."""
     lignes, pire = limites()
     return (assertions_socle() + assertions_campagnes()
             + ((f"limites du script : {lignes} l., fonction max {pire[1]} l. ({pire[0]})",

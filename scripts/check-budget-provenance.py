@@ -15,7 +15,7 @@ C. **contradiction** — si une campagne archivée mesure un étage, le budget n
    s'écarte de plus de `TOLERANCE` de la mesure. C'est le contrôle qui manquait le
    01/11/2026 : `CAPTURE` était publié à 25 ms (**simulation**, « jamais lu sur un
    appareil ») alors que l'appareil mesurait 86 ms, et `ENCODE` à 5–8 ms (**estimé**)
-   alors que l'appareil mesurait 27 ms. Rien ne reliait l'étiquette à une campagne.
+   alors que l'appareil mesurait 10 ms. Rien ne reliait l'étiquette à une campagne.
 D. **campagnes** — toute ligne du tableau `mesures` (§ 10) porte un N (entier > 0) ;
    toute NOUVELLE ligne (absente de la base git) porte des conditions datées. Les lignes
    anciennes sans date sont averties, pas refusées (clause grand-père) ; sans base git
@@ -69,12 +69,18 @@ NETTOYAGE = re.compile(r"[*`]")
 
 # --- l'archive : la seule porte d'entrée d'une mesure dans ce dépôt ----------
 # (nom, date, {étage: ms mesurée}, source, N)  — N None : dump non archivé.
+# Le 27 d'ENCODE (micro-échantillon n = 2, valeurs de fixture) en est sorti le
+# 01/11/2026 au profit du 10 nominal (n = 343) : une archive ne garde pas un faux.
 CAMPAGNES = (
     ("ISEE_LAT capsplit", "01/11/2026",
-     {"CAPTURE": 86, "ENCODE": 27},
+     {"CAPTURE": 86},
      "`ISEE_LAT: capsplit` (`TimingsText.capsplit`, 1 frame sur 20), téléphone SM-G780G, build "
      "`1.0.1139-da6531a`, écran iSee",
      38),
+    ("ISEE_LAT encode nominal", "01/11/2026",
+     {"ENCODE": 10},
+     "`ISEE_LAT: capsplit` (`enc` p50 + `b64` p50, 3 sessions à 30 fps tenus le 01/11/2026)",
+     343),
 )
 
 
@@ -413,9 +419,9 @@ def selftest():
         ("deux étiquettes", "| `W` | c | 25 | **mesuré** 01/11/2026 puis **estimé** | p |", 1, 0),
         ("contradiction CAPTURE", "| `CAPTURE` | c | 25 | u07 **simulation** | p |", 1, 0),
         ("écart de 200 %", "| `CAPTURE` | c | 189 | **mesuré** 01/11/2026 (x) | p |", 1, 0),
-        ("ENCODE mesuré exact", "| `ENCODE` | c | 27 | **mesuré** 01/11/2026 (x) | p |", 0, 0),
-        ("ENCODE à 9 %", "| `ENCODE` | c | 29,5 | **mesuré** 01/11/2026 (x) | p |", 0, 0),
-        ("plage 5–8 contre 27", "| `ENCODE` | c | 5–8 | u02 **estimé** | p |", 1, 0),
+        ("ENCODE mesuré exact", "| `ENCODE` | c | 10 | **mesuré** 01/11/2026 (x) | p |", 0, 0),
+        ("ENCODE à 9 %", "| `ENCODE` | c | 10,9 | **mesuré** 01/11/2026 (x) | p |", 0, 0),
+        ("plage 5–8 contre 10", "| `ENCODE` | c | 5–8 | u02 **estimé** | p |", 1, 0),
     ]
     echecs = 0
     for libelle, ligne, attendu, _ in cas:
