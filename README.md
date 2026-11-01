@@ -237,7 +237,7 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,771 @Test: 2,933 + 1,838)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,795 @Test: 2,957 + 1,838)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -259,10 +259,10 @@ recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1222** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **152,813** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **79,385** — `:core` 257 f. / 34,130 l. · `:app` 376 f. / 45,255 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **4,771** — `:core` 2,933 · `:app` 1,838 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **1224** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **153,303** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **79,608** — `:core` 258 f. / 34,344 l. · `:app` 376 f. / 45,264 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **4,795** — `:core` 2,957 · `:app` 1,838 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
 | Backend Python (`server/backend`) | **43** fichiers, **9,043** lignes | `find server/backend -name '*.py' \| wc -l` |

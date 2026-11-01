@@ -15,7 +15,7 @@ une *procédure*, pas une preuve — sauf le §3 (harnais émulateur), exécuté
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 2 933
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 2 957
 grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 1 838
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 98
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 8
@@ -24,13 +24,13 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 324 (dont 16 aides) | 309 | **2 933** |
+| `:core` | 325 (dont 16 aides) | 310 | **2 957** |
 | `:app` | 252 (dont 6 aides) | 248 | **1 838** |
-| **Total JVM** | **576** | **557** | **4 771** |
+| **Total JVM** | **577** | **558** | **4 795** |
 | `:app` `androidTest` | 3 | 3 | **8** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **4 771 tests JVM** au total, dont **2 933** dans `:core` et **1 838** dans `:app`. Dans `:app`, le
+- **4 795 tests JVM** au total, dont **2 957** dans `:core` et **1 838** dans `:app`. Dans `:app`, le
   banc lunettes pèse **98** (`glasses/bench/`) et le reste du paquet `glasses` **177**. Les
   **9 tests instrumentés** (8 + 1) sont hors de ce total.
 - « Classes `@Test` » = classes portant au moins un `@Test` (trois fichiers portent
@@ -253,11 +253,11 @@ et `TapZonesTest.kt`, listées séparément). Table régénérée mécaniquement
 (attribution positionnelle des `@Test` aux classes, vérifiée : totaux = `grep`) ;
 le script jetable n'est pas versionné.
 
-### `:core` — 2933
+### `:core` — 2957
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **crossing** (278) : CaissonEvalTest 4, CrossingAnnouncerTest 13, CrossingApproachTest 10, CrossingArrivalTest 13, CrossingFeaturesTest 4, CrossingGuidanceTest 27, CrossingLightDueTest 4, CrossingOfferTest 9, CrossingOnPathTest 18, CrossingStateTest 38, CrossingTextTest 8, CrossingTriggerExitDecisionTest 7, CrossingVoiceCommandTest 17, CrossingVoiceHysteresisTest 5, CrosswalkScanTest 21, HeadTraversePassTest 1, NoLightCrossingTest 12, PedLightColorTest 13, PedLightGateFuzzTest 5, PedLightGateLimitsTest 7, PedLightGateTest 35, TrainedLightColorTest 7
-- **curb** (71) : CurbAnnounceTest 23, CurbWatcherTest 23, SidewalkKeepTest 14, SidewalkWatcherTest 11
+- **curb** (87) : CurbAnnounceTest 23, CurbWatcherTest 23, SidewalkKeepTest 14, SidewalkRailTest 16, SidewalkWatcherTest 11
 - **cycle** (25) : CycleConceptsTest 5, CycleMotionTest 10, CycleWatcherTest 10
 - **depth** (56) : DepthAffineTest 7, DepthConfirmTest 9, DepthEstimatorTest 2, DepthFusionTest 9, DepthMapTest 5, DepthReadingsTest 18, SerialRunGuardTest 6
 - **distance** (191) : CalibrationSolverTest 3, DistanceBenchmarkTest 5, DistanceEstimatorTest 9, DistanceFusionTest 14, DistanceKalmanTest 11, DistanceMeterTest 26, DistanceTextEnglishTest 7, DistanceTextTest 8, DistortionTest 5, GroundPlaneTest 18, KnownSizesTest 28, LensSpecTest 17, OpticsTest 30, ReadingQualityTest 10
@@ -268,7 +268,7 @@ le script jetable n'est pas versionné.
 - **hazard** (76) : FenceOpeningConceptsTest 7, FenceOpeningSignalTest 13, FenceOpeningTextTest 9, FenceOpeningWatcherTest 10, HazardConceptsTest 11, HazardWatchTest 26
 - **iseedesign** (33) : DissolveTest 10, IseePortraitTest 11, IseeSceneTest 9, SpokenCaptionTest 3
 - **keyframe** (37) : KeyframeSchedulerTest 21, KeyframeSimTest 9, RequestBudgetTest 7
-- **live** (653) : AnnouncementGateTest 11, AttentionCadenceTest 18, CaptureStampTest 3, FrameBenchTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, FreeSpaceTest 14, GlassesLatencyTest 10, GuidanceAnnouncerSidewalkTest 8, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 37, GuidanceFenceOpeningTest 12, GuidanceHeartbeatTest 6, GuidanceInstructionTest 6, GuidanceObstaclesTest 10, GuidanceRayTest 9, GuidanceStarvationTest 7, GuidanceSteeringTest 18, GuidanceTest 38, GuidanceWordTest 7, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 40, LatestFrameSlotTest 6, LiveCadenceSimTest 1, LiveCrowdCadenceTest 5, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 23, LivePumpTest 7, LiveSessionBytesTest 1, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 20, LiveStatsTest 9, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 9, MaisonEnterCommandTest 4, PeoplePathRobustnessTest 11, PeoplePathTest 29, PersonLabelsTest 5, PersonTrackTest 16, PositionAnnouncerTest 8, PositionTextEnglishTest 5, PositionTextTest 18, ScreenTimingsTest 4, SignConceptsTest 10, SteeringTest 12, TimelineTextTest 7, TimingTest 13, TimingsTextTest 6, TrackRunnerStartTest 3, TrackRunnerTest 17, TwinLiteWordTest 10, UploadFastDropTest 8, UploadLadderTest 19
+- **live** (661) : AnnouncementGateTest 11, AttentionCadenceTest 18, CaptureStampTest 3, FrameBenchTest 3, FrameGateEraTest 4, FrameGateTest 5, FrameRateTest 4, FrameRosterTest 7, FreeSpaceTest 14, GlassesLatencyTest 10, GuidanceAnnouncerSidewalkTest 8, GuidanceAnnouncerSteeringTest 2, GuidanceAnnouncerTest 45, GuidanceFenceOpeningTest 12, GuidanceHeartbeatTest 6, GuidanceInstructionTest 6, GuidanceObstaclesTest 10, GuidanceRayTest 9, GuidanceStarvationTest 7, GuidanceSteeringTest 18, GuidanceTest 38, GuidanceWordTest 7, HomeModesTest 15, LatencyBenchTest 1, LatencyProfileTest 11, LatencyTraceTest 12, LateralNudgeTest 40, LatestFrameSlotTest 6, LiveCadenceSimTest 1, LiveCrowdCadenceTest 5, LiveFrameBudgetTest 1, LiveMemoryFlowTest 2, LiveNarratorTest 7, LivePipelineTest 7, LivePromptsNavigationTest 2, LivePromptsTest 23, LivePumpTest 7, LiveSessionBytesTest 1, LiveSessionCloseTest 2, LiveSessionStopTest 3, LiveSessionTest 20, LiveStatsTest 9, LiveTimelineTest 10, LiveTimingsTest 15, LiveWireGuardTest 9, MaisonEnterCommandTest 4, PeoplePathRobustnessTest 11, PeoplePathTest 29, PersonLabelsTest 5, PersonTrackTest 16, PositionAnnouncerTest 8, PositionTextEnglishTest 5, PositionTextTest 18, ScreenTimingsTest 4, SignConceptsTest 10, SteeringTest 12, TimelineTextTest 7, TimingTest 13, TimingsTextTest 6, TrackRunnerStartTest 3, TrackRunnerTest 17, TwinLiteWordTest 10, UploadFastDropTest 8, UploadLadderTest 19
 - **local** (39) : BlockMotionAdapterTest 3, LocalOverlayEngineTest 24, LocalOverlaySimTest 3, LocalPropagatorBenchTest 1, LocalPropagatorTest 8
 - **mask** (115) : MaskBenchTest 3, MaskColorizePerfTest 4, MaskCoreTest 20, MaskDecodeTest 7, MaskDetectionsTest 9, MaskGeometryTest 8, MaskGoldenTest 2, MaskMotionTest 6, MaskPolyTest 7, MaskPropagatorBenchTest 1, MaskPropagatorTest 13, MaskRleTest 8, MaskRobustnessTest 20, MaskUpscaleTest 7
 - **model** (10) : GeometryTest 4, ObjectLimitsTest 6

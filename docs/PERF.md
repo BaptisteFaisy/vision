@@ -19,12 +19,12 @@ le relevé se rejoue avec `python3 tools/count-tree.py`, jamais à la main)
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **1222** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **152 813** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **576** (324 `:core` + 252 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **2 933** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| Fichiers Kotlin | **1224** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **153 303** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **577** (325 `:core` + 252 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **2 957** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
 | `@Test` JVM `:app` | **1 838** | idem sur `app/src/test` (dont **98** dans `glasses/bench`) |
-| **Total JVM** | **4 771** | somme des deux lignes |
+| **Total JVM** | **4 795** | somme des deux lignes |
 | Tests instrumentés | **9** (8 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
 | Garde de taille | **1 356** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
 | Gardes de scripts | **177** tests, 177 ok | `bash scripts/test_scripts.sh` |
