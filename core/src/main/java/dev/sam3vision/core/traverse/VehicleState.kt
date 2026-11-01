@@ -389,7 +389,7 @@ class VehicleStateWatcher(
         /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
         const val NEAR_MOVING_METERS = 8f
 
-        /** Sous ce seuil (m), l'immobile se dit « à l'arrêt » (et ne bloque plus le veto, arrêt confirmé) ; au-delà, « en stationnement ». */
+        /** Sous ce seuil (m), l'immobile se dit « à l'arrêt » ; au-delà, « en stationnement ». Le veto a sa propre portée d'exemption ([TraverseVeto.STILL_EXEMPT_METERS]). */
         const val STOPPED_METERS = 5f
 
         /** Au-delà (m), un véhicule immobile ne fait pas parler (stationnement lointain tu). */

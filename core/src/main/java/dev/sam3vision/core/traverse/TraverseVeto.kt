@@ -102,11 +102,14 @@ data class TraverseDecision(
  * (surface de boîte croissante sur deux frames) **ou** qu'il est proche (distance
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
- * calibré pour les sept véhicules) et [Pinhole]. Un véhicule confirmé à
- * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ne
- * bloque plus : le vert seul décide alors ; en mouvement, proche ou doute
- * bloque — sauf croissance expliquée par la caméra (pan suivi, voir
- * [vetoCandidate]). L'approche suivie
+ * calibré pour les sept véhicules) et [Pinhole]. Un véhicule prouvé immobile
+ * (mesuré sous [STILL_EXEMPT_METERS], centre quasi fixe, portée stable à
+ * [STILL_RANGE_M] près, croissance sous le tremblé [AREA_JITTER_RATIO], fond
+ * fixe — voir [stoppedKeys]) ne bloque plus :
+ * le vert seul décide alors, à toute place dans l'image (une garée sur le
+ * côté n'interdit pas la traversée, ordre user du 01/11) ; en mouvement,
+ * proche non prouvé immobile ou doute bloque — sauf croissance expliquée par
+ * la caméra (pan suivi, voir [vetoCandidate]). L'approche suivie
  * (IoU + tau < 3 s — voir [approachVerdict]) bloque aussi, en ceinture et
  * bretelles.
  *
@@ -160,7 +163,7 @@ class TraverseVeto {
         motion: FrameMotion? = null,
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
     ): TraverseDecision {
-        val stopped = stoppedKeys(detections, focalPx, atMs)
+        val stopped = stoppedKeys(detections, focalPx, atMs, motion)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
         val blocking = findBlocking(detections, focalPx, stopped + hushed)
         previousAreas = vehicleAreas(detections)
@@ -214,15 +217,25 @@ class TraverseVeto {
     }
 
     /**
-     * Clés des véhicules confirmés à l'arrêt : mesurés au sténopé sous
-     * [VehicleStateWatcher.STOPPED_METERS], dans le couloir marché, quasi
-     * immobiles et à seau-mètre stable depuis la frame précédente datée
-     * (miroir de la voix [VehicleStateWatcher], au sténopé près — iSee et
-     * direct en profitent sans changer leurs signatures). Sans date
-     * ([atMs] < 0) : vide, le doute bloque.
+     * Clés des véhicules prouvés immobiles : mesurés au sténopé sous
+     * [STILL_EXEMPT_METERS], quasi immobiles et à portée stable
+     * ([isStableRange] : ±[STILL_RANGE_M], pas d'égalité de seau — une frontière
+     * ne casse pas l'arrêt) depuis la frame précédente datée, boîte qui ne
+     * grandit pas au-delà du tremblé ([isGrowingBeyondJitter] : une approche
+     * de face garde son centre et peut garder sa portée — la croissance
+     * franche tranche), fond fixe (un pan prouvé refuse toute exemption : une
+     * boîte statique dans l'image bouge alors avec la caméra). Sans date
+     * ([atMs] < 0) : vide, le doute bloque. Plus de couloir (01/11) : une
+     * garée sur le côté, prouvée immobile, n'interdit pas la traversée.
      */
-    private fun stoppedKeys(detections: List<Detection>, focalPx: Float, atMs: Long): Set<String> {
-        if (atMs < 0L || focalPx <= 0f) return emptySet()
+    private fun stoppedKeys(
+        detections: List<Detection>,
+        focalPx: Float,
+        atMs: Long,
+        motion: FrameMotion?,
+    ): Set<String> {
+        if (atMs < 0L || focalPx <= 0f || backgroundPanning(motion)) return emptySet()
+        val currentAreas = vehicleAreas(detections)
         return detections.mapNotNull { detection ->
             if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
             if (detection.score <= SCORE_MIN) return@mapNotNull null
@@ -234,17 +247,32 @@ class TraverseVeto {
             val dtSeconds = (atMs - prev.atMs) / 1000f
             if (dtSeconds <= 0f || dtSeconds > STILL_STALE_SECONDS) return@mapNotNull null
             val meters = distanceOf(detection, focalPx) ?: return@mapNotNull null
-            if (meters > VehicleStateWatcher.STOPPED_METERS) return@mapNotNull null
+            if (meters > STILL_EXEMPT_METERS) return@mapNotNull null
+            val previousArea = previousAreas[key] ?: return@mapNotNull null
+            if (isGrowingBeyondJitter(previousArea, currentAreas[key] ?: 0f)) return@mapNotNull null
             val center = detection.normalizedBox() ?: return@mapNotNull null
             val cx = (center[0] + center[2]) / 2f
             val cy = (center[1] + center[3]) / 2f
-            if (cx < PositionText.SIDE_EDGE || cx > 1f - PositionText.SIDE_EDGE) return@mapNotNull null
             val px = prev.cx ?: return@mapNotNull null
             val py = prev.cy ?: return@mapNotNull null
             if (hypot(cx - px, cy - py) / dtSeconds > VehicleStateWatcher.STILL_SPEED) return@mapNotNull null
-            if (PositionText.sceneBucket(meters) != prev.bucket) return@mapNotNull null
+            if (!isStableRange(meters, prev.meters)) return@mapNotNull null
             key
         }.toSet()
+    }
+
+    /**
+     * Fond prouvé en pan (vitesse franche au-delà de
+     * [VehicleBackground.LATERAL_RATIO]) : une boîte statique dans l'image
+     * bouge alors avec la caméra, ce n'est pas un arrêt prouvé. Fond inconnu
+     * (`null` ou inutilisable) : on ne prouve pas le pan, l'immobilité mesurée
+     * vaut arrêt (le chemin iSee ne câble pas le fond au veto).
+     */
+    private fun backgroundPanning(motion: FrameMotion?): Boolean {
+        if (motion == null) return false
+        val ground = VehicleBackground.groundOf(motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs)
+            ?: return false
+        return ground > VehicleBackground.LATERAL_RATIO
     }
 
     /** Mémoire d'immobilité de la frame (boîte max par label, miroir du veto). */
@@ -259,10 +287,12 @@ class TraverseVeto {
             .mapValues { (_, same) ->
                 val seen = same.maxBy { Box.fromProto(it.box)?.area ?: -1f }
                 val center = seen.normalizedBox()
+                val meters = distanceOf(seen, focalPx)
                 StillMemory(
                     cx = center?.let { (it[0] + it[2]) / 2f },
                     cy = center?.let { (it[1] + it[3]) / 2f },
-                    bucket = PositionText.sceneBucket(distanceOf(seen, focalPx)),
+                    meters = meters,
+                    bucket = PositionText.sceneBucket(meters),
                     atMs = atMs,
                 )
             }
@@ -315,10 +345,11 @@ class TraverseVeto {
     /** Clé de suivi d'un véhicule entre deux frames (« Cars » et « car » fusionnent). */
     private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
 
-    /** Immobilité mémorisée : centre normalisé, seau-mètre et date de la frame. */
+    /** Immobilité mémorisée : centre normalisé, portée, seau-mètre et date de la frame. */
     private data class StillMemory(
         val cx: Float?,
         val cy: Float?,
+        val meters: Float?,
         val bucket: String,
         val atMs: Long,
     )
@@ -332,6 +363,9 @@ class TraverseVeto {
 
         /** Sous cette distance sténopé (m), un objet proche garde le guidage obstacles actif. */
         const val VETO_METERS = 15f
+
+        /** Un véhicule prouvé immobile sous cette distance sténopé (m) ne bloque plus : le vert seul décide (01/11). */
+        const val STILL_EXEMPT_METERS = 15f
 
         /** Fraîcheur exigée de la frame précédente pour conclure à l'arrêt (s). */
         const val STILL_STALE_SECONDS = 1.0f
