@@ -32,7 +32,7 @@ class GlassesSelectTest {
     }
 
     @Test
-    fun `mire, profil et repli : l'etage le plus mesure gagne`() {
+    fun `mire, profil et repli, l'etage le plus mesure gagne`() {
         val mire = LensSpec(60f, 90f, sensorLandscape = false)
         val withMire = chooseLens(0f, null, mire, fromGlasses = true)
         assertEquals(LensOrigin.SENSOR, withMire.origin)
