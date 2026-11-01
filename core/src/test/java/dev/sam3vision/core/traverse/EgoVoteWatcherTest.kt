@@ -19,22 +19,22 @@ import org.junit.Test
 class EgoVoteWatcherTest {
 
     @Test
-    fun `pan + voiture garee - silence, camera accusee`() {
-        // Boîte à largeur constante qui suit le fond : ni croissance ni tau,
-        // dérive trop vive pour un arrêt — et la caméra est accusée.
+    fun `pan + voiture garee - arret compense annonce, camera accusee`() {
+        // Boîte à largeur constante qui suit le fond : ni croissance ni tau ;
+        // la dérive jugée contre le fond prouve l'arrêt (compensé, pas un
+        // faux) — et la caméra est accusée.
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val watcher = VehicleStateWatcher()
         repeat(12) { index ->
             val frame = box(100f, cx = 320f + index * 5f)
-            assertNull(
-                "pan suivi : silence",
-                watcher.update(listOf(det("car", frame)), listOf(reading("car", 2f, frame)),
-                    atMs = index * 100L, motion = motion),
-            )
+            val cue = watcher.update(listOf(det("car", frame)), listOf(reading("car", 2f, frame)),
+                atMs = index * 100L, motion = motion)
+            if (index == 2) assertEquals("Car stopped, 2 meters away.", cue!!.phrase)
+            else assertNull("pan suivi : confirmation puis cooldown", cue)
         }
 
         assertTrue(watcher.cameraMoved)
-        assertNull(watcher.lastAlertMs)
+        assertNotNull(watcher.lastAlertMs)
     }
 
     @Test
