@@ -26,11 +26,19 @@ from timing import Stage, container_age_seconds, elapsed_ms, format_server_timin
 MODEL_LABEL = "sam3.1-fast"
 # Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
 RELEASE_GRACE_SECONDS = 0.5
+# Cohérence keep-alive (O2) : le client ping à 30 s (WsTransport pingInterval),
+# le serveur tue à 45 s — marge 15 s pour un aller-retour lent. Les pings sont
+# protocole (pong auto, jamais livrés à la boucle) : une connexion sans frame
+# reste un zombie, fermé ici en 1011 ; le client rouvre paresseusement à la
+# frame suivante (WsLiveClient.openLocked). 30 < 45 : ne jamais inverser.
 WS_IDLE_SECONDS = 45.0  # sans message : pair considéré mort, fermeture 1011 (zombie ≤ 45 s)
 WS_FRAME_SECONDS = 180.0  # inférence max par frame : au-delà, erreur 503, connexion gardée
 WS_MAX_REPLY_BYTES = 4_000_000  # réponse plus grosse : fermeture 1009 avant le proxy
 
-WORK_EDGE_DEFAULT = 768
+# Défaut 512 (O2, ex-768) : aligné sur ce que tous les clients envoient déjà
+# (LiveSession/LivePipeline WORK_EDGE = 512) — ne sert qu'aux clients muets.
+# Mesuré : 512→768 = +7 ms/frame seulement (240→247 ms) : gain modeste, gratuit.
+WORK_EDGE_DEFAULT = 512
 # Plancher 512 (reel audit 31/10, ex-256) : sous 512 px le petit feu lointain et
 # les zébrures ne sont plus segmentés — un client qui demande moins reçoit 512.
 WORK_EDGE_MIN = 512

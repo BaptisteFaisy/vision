@@ -436,3 +436,53 @@ def test_boot_cpu_logs(_module) -> None:
           _stages(out.getvalue()) == ["import_torch", "import_transformers", "config_edge",
                                       "model_from_pretrained", "processor_from_pretrained",
                                       "total"], _stages(out.getvalue()))
+
+
+def test_o2_warm_server(_module) -> None:
+    """O2 serveur-chaud : défauts déployés (batch, work_edge, idle, pool, /warm)."""
+    import asyncio
+
+    from test_units import asgi_call, check
+
+    service = _fresh_live_fast("service")
+    check("o2 : work_edge défaut 512 (client)", service.WORK_EDGE_DEFAULT == 512,
+          str(service.WORK_EDGE_DEFAULT))
+    check("o2 : work_edge défaut ≥ plancher 512",
+          service.WORK_EDGE_DEFAULT >= service.WORK_EDGE_MIN,
+          f"{service.WORK_EDGE_DEFAULT} < {service.WORK_EDGE_MIN}")
+    check("o2 : idle WS 45 s > ping client 30 s (WsTransport)",
+          service.WS_IDLE_SECONDS == 45.0 and service.WS_IDLE_SECONDS > 30,
+          str(service.WS_IDLE_SECONDS))
+
+    previous = os.environ.pop("FAST_BATCH_PROMPTS", None)
+    try:
+        default = _fresh_live_fast("fast_core")
+        check("o2 : lot DETR actif sans env", default.BATCH_PROMPTS is True,
+              str(default.BATCH_PROMPTS))
+        check("o2 : /health annonce le lot",
+              default.levers().get("batch_prompts") is True,
+              str(default.levers().get("batch_prompts")))
+        os.environ["FAST_BATCH_PROMPTS"] = "0"
+        bare = _fresh_live_fast("fast_core")
+        check("o2 : FAST_BATCH_PROMPTS=0 coupe le lot (A/B)",
+              bare.BATCH_PROMPTS is False, str(bare.BATCH_PROMPTS))
+    finally:
+        if previous is None:
+            os.environ.pop("FAST_BATCH_PROMPTS", None)
+        else:
+            os.environ["FAST_BATCH_PROMPTS"] = previous
+
+    pool = os.environ.pop("FAST_MIN_CONTAINERS", None)
+    try:
+        app = _fresh_live_fast("live_app_fast")
+        check("o2 : pool chaud 0 par défaut (garde coût)",
+              app.MIN_CONTAINERS == 0, str(app.MIN_CONTAINERS))
+        api = app.Sam3Live().web()
+        status, payload = asyncio.run(asgi_call(api, "GET", "/warm", b""))
+        check("o2 : GET /warm pré-chauffe sans inférence",
+              status == 200 and payload.get("warm") is True, str(payload)[:120])
+    finally:
+        if pool is None:
+            os.environ.pop("FAST_MIN_CONTAINERS", None)
+        else:
+            os.environ["FAST_MIN_CONTAINERS"] = pool

@@ -4,7 +4,8 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 (``POST /live``, ``GET /health``) et chaque levier est isolé pour être mesuré séparément :
 
 * ``FAST_BATCH_PROMPTS=1`` — un seul forward DETR pour N concepts (batch de textes,
-  embeddings vision répliqués sur la dim batch) au lieu d'une passe par concept ;
+  embeddings vision répliqués sur la dim batch) au lieu d'une passe par concept
+  (actif par défaut depuis O2 ; ``=0`` ou ``batch_prompts=0`` pour la mesure A/B) ;
 * ``FAST_EDGE=448``        — surcharge de la taille d'entrée du préprocesseur ;
 * ``FAST_COMPILE=1``       — ``torch.compile`` de l'encodeur vision + warm-up explicite ;
 * ``FAST_CUDA_GRAPH=1``    — capture CUDA graph de l'encodeur vision (exclusive de compile) ;
@@ -56,7 +57,10 @@ DTYPES = ("bf16", "fp16", "fp32")
 
 
 # --- leviers du conteneur (lus à l'import, surchargeables par requête) -------------
-BATCH_PROMPTS = env_bool(os.environ.get("FAST_BATCH_PROMPTS"))
+# Lot DETR actif par défaut (O2) : UN forward pour les N concepts, comme la prod
+# Modal (deploy pose déjà FAST_BATCH_PROMPTS=1) — le knob requête batch_prompts=0
+# garde la mesure A/B passe-par-passe, et FAST_BATCH_PROMPTS=0 le coupe au deploy.
+BATCH_PROMPTS = env_bool(os.environ.get("FAST_BATCH_PROMPTS"), True)
 EDGE = env_int(os.environ.get("FAST_EDGE"))
 RUNTIME_EDGE = env_bool(os.environ.get("FAST_EDGE_RUNTIME"))
 COMPILE = env_bool(os.environ.get("FAST_COMPILE"))
