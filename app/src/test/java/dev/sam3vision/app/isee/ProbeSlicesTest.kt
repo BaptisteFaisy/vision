@@ -184,6 +184,8 @@ class ProbeSlicesTest {
             background = StandardTestDispatcher(scope.testScheduler),
             clientFor = { _, _, _ -> fake },
         )
+        // Pas d'adaptatif ici : le test verrouille le scopage, les deux frames partent.
+        built.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         built.configure(ENDPOINT, guide = true)
         built.begin()
         return built
