@@ -8,8 +8,8 @@ import org.junit.Test
 /**
  * Voix du compteur de marches : le compte est dit à la détection puis à
  * chaque changement, au plus toutes les 300 ms — et le même compte se
- * répète toutes les 1 s tant que l'escalier reste vu (dans l'escalier, le
- * compte reste utile), jamais en boucle serrée.
+ * répète toutes les 0,5 s tant que l'escalier reste vu (dans l'escalier,
+ * le compte reste utile), jamais en boucle serrée.
  */
 class StairCountVoiceTest {
 
@@ -19,14 +19,14 @@ class StairCountVoiceTest {
     }
 
     @Test
-    fun `meme compte se repete apres 2 s, pas avant`() {
+    fun `meme compte se repete apres 0,5 s, pas avant`() {
         val voice = StairCountVoice()
         assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
         assertNull(voice.onTick(true, 5, 1_100L))
-        assertNull(voice.onTick(true, 5, 2_999L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 3_000L))
-        assertNull(voice.onTick(true, 5, 3_100L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 5_000L))
+        assertNull(voice.onTick(true, 5, 1_499L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_500L))
+        assertNull(voice.onTick(true, 5, 1_600L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 2_000L))
     }
 
     @Test

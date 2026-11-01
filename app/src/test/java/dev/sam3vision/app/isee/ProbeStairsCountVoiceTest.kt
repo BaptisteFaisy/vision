@@ -28,7 +28,7 @@ import org.junit.Test
  * Voix du compteur de marches (SPEC v4, niveau 6) : quand SAM nomme
  * l'escalier et que la caméra voit des marches fraîches, le battement
  * 300 ms poste le compte (« N marches. »), une fois par compte puis répété
- * toutes les 2 s — devant le chat (6 < 9) ; sans escalier nommé, sans
+ * toutes les 0,5 s — devant le chat (6 < 9) ; sans escalier nommé, sans
  * compte frais ou en Traversée : silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
@@ -96,7 +96,7 @@ class ProbeStairsCountVoiceTest {
     private fun textes(): List<String> = speaker.said.map { it.text }
 
     @Test
-    fun `meme compte se repete toutes les 2 s`() = runTest {
+    fun `meme compte se repete toutes les 0,5 s`() = runTest {
         val (probe, fake, scope) = harness(this)
         try {
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
@@ -106,16 +106,23 @@ class ProbeStairsCountVoiceTest {
             respond(probe, fake, "A")
             assertTrue(stairsFoundOf(probe.state.value).detected)
             runCurrent()
-            assertEquals(listOf("$offered marches."), textes())
-            assertEquals(OutdoorLevel.STAIRS, speaker.said.single().level)
+            // Le battement 300 ms a déjà pu redire le compte pendant la
+            // fenêtre de réponse : on verrouille la cadence, pas le nombre.
+            val first = speaker.said.size
+            assertTrue(first > 0)
+            assertEquals(OutdoorLevel.STAIRS, speaker.said.first().level)
+            assertTrue(textes().all { it == "$offered marches." })
 
-            advanceTimeBy(1_000L)
+            // 1,1 s puis 1,2 s, bornes hors temps de battement : 2
+            // répétitions pile par fenêtre (le dit à +600/+1200 du
+            // dernier, le suivant à +1800 hors fenêtre).
+            advanceTimeBy(1_100L)
             runCurrent()
-            assertEquals(1, speaker.said.size)
+            assertEquals(first + 2, speaker.said.size)
 
-            advanceTimeBy(500L)
+            advanceTimeBy(1_200L)
             runCurrent()
-            assertEquals(2, speaker.said.size)
+            assertEquals(first + 4, speaker.said.size)
             assertTrue(textes().all { it == "$offered marches." })
         } finally {
             scope.cancel()
@@ -167,7 +174,10 @@ class ProbeStairsCountVoiceTest {
             assertTrue(stairsFoundOf(probe.state.value).detected)
             runCurrent()
 
-            assertEquals(listOf("$offered marches."), textes())
+            // Le compte parle malgré le chat en lecture (la cadence, elle,
+            // est verrouillée par le test de répétition).
+            assertTrue(textes().isNotEmpty())
+            assertTrue(textes().all { it == "$offered marches." })
         } finally {
             scope.cancel()
         }

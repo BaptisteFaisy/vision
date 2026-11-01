@@ -82,6 +82,15 @@ class IseeSpecV4AntiRepeatTest {
     }
 
     @Test
+    fun `compte des marches = 0,5s`() {
+        val gate = SpecAntiRepeat()
+
+        assertTrue(gate.allow("stairs-count", 0L))
+        assertFalse(gate.allow("stairs-count", 499L))
+        assertTrue(gate.allow("stairs-count", 500L))
+    }
+
+    @Test
     fun `poteaux et divers = 2s`() {
         val gate = SpecAntiRepeat()
 
@@ -124,7 +133,7 @@ class IseeSpecV4AntiRepeatTest {
         assertEquals(
             setOf(
                 "car-moving", "human-soft", "human-imminent", "fence", "curb",
-                "stairs", "pole", "pole-avoid", "sidewalk", "verdict",
+                "stairs", "stairs-count", "pole", "pole-avoid", "sidewalk", "verdict",
             ),
             TIMED_KEYS,
         )
@@ -154,6 +163,7 @@ class IseeSpecV4AntiRepeatTest {
             "fence" to 4_000L,
             "curb" to 2_000L,
             "stairs" to 2_000L,
+            "stairs-count" to 500L,
             "pole" to 2_000L,
             "sidewalk" to 10_000L,
             "verdict" to 3_000L,
@@ -196,7 +206,7 @@ class IseeSpecV4AntiRepeatTest {
     companion object {
         val TIMED_KEYS = setOf(
             "car-moving", "human-soft", "human-imminent", "fence", "curb",
-            "stairs", "pole", "pole-avoid", "sidewalk", "verdict",
+            "stairs", "stairs-count", "pole", "pole-avoid", "sidewalk", "verdict",
         )
         val CROSSWALK_KEYS = setOf("crosswalk-announce", "crosswalk-align", "crosswalk-arrival")
     }

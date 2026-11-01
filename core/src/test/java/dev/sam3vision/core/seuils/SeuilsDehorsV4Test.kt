@@ -301,11 +301,11 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `escalier anti repetition 2s`() {
+    fun `escalier compte 0,5s annonce 2s`() {
         val voice = StairCountVoice()
         assertEquals("5 steps.", voice.onTick(true, 5, 1_000L, En))
-        assertNull(voice.onTick(true, 5, 2_500L, En))
-        assertEquals("5 steps.", voice.onTick(true, 5, 3_100L, En))
+        assertNull(voice.onTick(true, 5, 1_499L, En))
+        assertEquals("5 steps.", voice.onTick(true, 5, 1_500L, En))
         val watcher = StairWatcher()
         val signal = StairSignal(detected = true, confidence = 0.9f, lineCount = 0, roiTop = 0, roiBottom = 0)
         watcher.onSignal(signal, 1_000L, En)
