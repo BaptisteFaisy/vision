@@ -162,7 +162,11 @@ class ProbeSlicesTest {
         assertEquals("voix : mêmes triplets dans la tranche chiffres et l'état brut", rawSpoken, restSpoken)
         assertEquals("voix : la tranche chiffres porte la dernière phrase", probe.state.value.spokenSeq, restSpoken.last().seq)
         assertEquals("voix : la tranche chiffres ne perd pas la fin", probe.state.value, restSnaps.last())
-        // `begin` raz le warming d'état : la notice initiale est froide, puis suit frames.
+        assertNoticesFollowFrames(notices)
+    }
+
+    /** `begin` raz le warming d'état : la notice initiale est froide, puis suit frames. */
+    private fun assertNoticesFollowFrames(notices: List<ProbeNoticeKey>) {
         assertEquals("notice : frames 1..2, une fois chacun, jamais les pixels",
             listOf(
                 ProbeNoticeKey(frames = 0, error = null, warming = false),
