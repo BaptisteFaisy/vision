@@ -285,6 +285,21 @@ branche est rebasée sur `origin/master` **avant** le push.
 Le hook ne remplace aucun filet : le balayeur continue de rebaser les PR `BEHIND`
 et `conflict_agent.py` reste la dernière porte pour ce qui a échappé au push.
 
+**Où sont les conflits qui restent** (mêmes 250 PR, comptes rendus de l'agent
+dépouillés par `tools/pr-conflits.py` — il nomme les fichiers qu'il a
+réconciliés) : 34 fichiers, dont `docs/TRAVERSEE.md` (5), `docs/VOIX-DANGER.md`
+(5), `ProbeWiring.kt` (4), `LiveProbe.kt` (3). Les deux journaux de conception
+pèsent 29 % des réconciliations : ce sont eux qui grossissent à chaque PR, pas
+le code.
+
+En revanche **`CHANGELOG.md` n'apparaît jamais** dans ces réconciliations (0 sur
+34) : `merge=union` le règle dans le clone du balayeur avant que l'agent ne soit
+saisi. Il ne coûte donc aucune boucle LLM — seulement un affichage `DIRTY` dans
+l'UI GitHub, qui ignore `merge=union` (vérifié sur un dépôt jetable). Le laisser
+tel quel est le bon arbitrage : une entrée générée après merge remplacerait un
+journal écrit à la main (172 entrées, Constat/Fait/Preuve) par des titres de PR,
+pour zéro conflit gagné.
+
 ## 6. Ce qui n'est pas dans ce dépôt
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
