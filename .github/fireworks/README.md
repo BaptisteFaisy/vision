@@ -48,7 +48,7 @@ Le script est lu sur `origin/master` (pas sur la branche de la PR, qui peut
 
 Empreinte par tête de PR + cooldown 20 min, plafond 10 saisines/heure (`SPAWN_CAP`)
 et 3 saisines par PR en 30 min (`SAISINES_PR_MAX` : une PR ne peut pas brûler
-tout le quota horaire à elle seule), 8 fichiers max, refus des conflits sous
+tout le quota horaire à elle seule), 100 fichiers max, refus des conflits sous
 `.github/`, des binaires et des fichiers de plus de 200 Ko, budget 240 s, push
 avec bail uniquement. Le dry-run ne consomme ni empreinte ni quota, et l'union
 déterministe des journaux ne consomme rien du tout.
