@@ -22,7 +22,7 @@ class CrossingRealMotionTest {
 
     private data class Frame(val detections: List<Detection>)
 
-    /** Frames d'une fixture (`real-motion/*.json`), boîtes pixels 640×480. */
+    /** Frames d'une fixture JSON real-motion, boîtes pixels 640×480. */
     private fun loadFrames(name: String): List<Frame> {
         val text = javaClass.classLoader.getResourceAsStream("real-motion/$name")
             ?.bufferedReader()?.readText() ?: error("fixture absente : $name")
