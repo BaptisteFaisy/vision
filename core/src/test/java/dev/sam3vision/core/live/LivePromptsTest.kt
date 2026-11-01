@@ -16,8 +16,8 @@ class LivePromptsTest {
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "fence", "gate", "wall", "stroller", "child",
-                "electric scooter", "dog",
+                "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
+                "socks", "wall",
             ),
             LivePrompts.default,
         )
@@ -30,8 +30,9 @@ class LivePromptsTest {
     fun `murs clotures et portails suivis en exterieur, barrier et keys hors defaut`() {
         // Ordre user du 31/10 : « fence » garde son slot, « barrier » sort
         // (reconnu encore par le preset extérieur), « wall » entre en 18e.
-        // Audit foule du 01/11 : « keys » cède le sien à la poussette.
-        assertFalse("keys" in LivePrompts.default)
+        // Ordre user du 01/11 : les souvenirs et les clés **restent** dans le
+        // défaut (boutique du square) — la foule passe par le preset extérieur.
+        assertTrue("keys" in LivePrompts.default)
         assertFalse("barrier" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.default)
         assertTrue("gate" in LivePrompts.default)
@@ -43,18 +44,22 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `foule suivie par defaut, souvenirs et cles sortis`() {
-        // Audit foule du 01/11 : poussette, enfant, trottinette et chien
-        // entrent dans les 18 — les souvenirs de la boutique du square
-        // (31/10) et les clés cèdent leurs quatre slots.
-        assertTrue("stroller" in LivePrompts.default)
-        assertTrue("child" in LivePrompts.default)
-        assertTrue("electric scooter" in LivePrompts.default)
-        assertTrue("dog" in LivePrompts.default)
-        assertFalse("souvenir shop" in LivePrompts.default)
-        assertFalse("beanie" in LivePrompts.default)
-        assertFalse("socks" in LivePrompts.default)
-        assertFalse("keys" in LivePrompts.default)
+    fun `foule suivie par le preset exterieur, souvenirs restes dans le defaut`() {
+        // Ordre user du 01/11 : « remets souvenir shop, beanie, socks, keys ».
+        // Le défaut garde donc ses 18 concepts de boutique et de rue ; la
+        // poussette, l'enfant et la trottinette passent dans le preset
+        // extérieur (18 aussi), qui est le mode de marche urbaine.
+        assertFalse("stroller" in LivePrompts.default)
+        assertFalse("child" in LivePrompts.default)
+        assertFalse("electric scooter" in LivePrompts.default)
+        assertFalse("dog" in LivePrompts.default)
+        assertTrue("souvenir shop" in LivePrompts.default)
+        assertTrue("beanie" in LivePrompts.default)
+        assertTrue("socks" in LivePrompts.default)
+        assertTrue("keys" in LivePrompts.default)
+        assertTrue("stroller" in LivePrompts.outdoor)
+        assertTrue("child" in LivePrompts.outdoor)
+        assertTrue("electric scooter" in LivePrompts.outdoor)
         assertFalse("truck" in LivePrompts.default)
         assertFalse("motorcycle" in LivePrompts.default)
         assertFalse("scooter" in LivePrompts.default)
@@ -85,6 +90,7 @@ class LivePromptsTest {
                 "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
                 "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
                 "pedestrian traffic light", "pedestrian signal head",
+                "stroller", "child", "electric scooter",
             ),
             LivePrompts.outdoor,
         )
@@ -97,7 +103,9 @@ class LivePromptsTest {
         assertTrue("sidewalk" in LivePrompts.outdoor)
         assertFalse("dumpster" in LivePrompts.outdoor)
         assertTrue("pedestrian signal head" in LivePrompts.outdoor)
-        assertEquals(15, LivePrompts.outdoor.size)
+        // 15 de cheminement + poussette, enfant, trottinette (ordre user du
+        // 01/11 : la foule se suit dans le preset extérieur, pas dans le défaut).
+        assertEquals(18, LivePrompts.outdoor.size)
     }
 
     @Test
