@@ -27,6 +27,9 @@
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Session lunettes-iSee : maintien en veille par un service de premier plan
+         typé `connectedDevice` (notification « Session lunettes iSee active »). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Banc lunettes : la voix est routée vers la sortie des lunettes (setPreferredDevice, A2DP/BLE). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
@@ -108,6 +111,12 @@
             android:name=".voicenav.GuidanceTrackingService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- Session lunettes-iSee : maintien en veille (lien + flux + voix), bouton d'arrêt. -->
+        <service
+            android:name=".glasses.GlassesSessionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
     </application>
 

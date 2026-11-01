@@ -4,8 +4,11 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import dev.sam3vision.app.bitmapToJpegBase64
+import dev.sam3vision.app.glasses.GlassesBackgroundFrames
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.uprightScaled
 import kotlinx.coroutines.Dispatchers
@@ -23,17 +26,27 @@ import kotlinx.coroutines.withContext
  * l'ancien sondage ajoutait jusqu'à 500 ms à chaque envoi. [LiveProbe.wantsFrame] reste
  * le seul garde (créneau libre + cadence échue), donc le serveur ne voit pas plus de
  * frames qu'avant — il les voit plus tôt.
+ *
+ * Téléphone en veille : la surface du direct est détruite et la rue ne se
+ * photographie plus — la poussée elle-même est alors décodée hors écran
+ * ([GlassesBackgroundFrames]), et la sonde ne se tait pas jusqu'au réveil.
  */
 @Composable
-internal fun GlassesProbeWiring(probe: LiveProbe, glassesLive: Boolean) {
-    LaunchedEffect(probe, glassesLive) {
-        if (!glassesLive) return@LaunchedEffect
+internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean) {
+    val sampler = remember { GlassesBackgroundFrames() }
+    DisposableEffect(sampler) {
+        onDispose { sampler.release() }
+    }
+    LaunchedEffect(probe, glassesFeed) {
+        if (!glassesFeed) return@LaunchedEffect
         GlassesVideoLink.frames.collect { box ->
             if (box == null || !probe.wantsFrame()) return@collect
-            // La photo vient de la vue (fil UI) ; tout le reste — redressement, JPEG,
-            // Canny, sonde — tourne en fond, comme le fil d'analyse du téléphone.
-            val bitmap = GlassesVideoLink.takeSnapshot() ?: return@collect
+            // La photo vient de la vue (fil UI) ; en veille, la poussée est
+            // décodée hors écran. Tout le reste — redressement, JPEG, Canny,
+            // sonde — tourne en fond, comme le fil d'analyse du téléphone.
+            val snapshot = GlassesVideoLink.takeSnapshot()
             withContext(Dispatchers.Default) {
+                val bitmap = snapshot ?: sampler.bitmapOf(box) ?: return@withContext
                 val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
                 probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
             }

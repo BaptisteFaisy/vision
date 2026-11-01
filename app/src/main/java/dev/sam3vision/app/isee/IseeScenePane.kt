@@ -97,7 +97,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // qui se met à parler ne fait plus respirer l'image.
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f) }
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
-    GlassesProbeWiring(viewModel.probe, glassesLive && state.glassesPhoto == null)
+    GlassesProbeWiring(viewModel.probe, (glassesLive || glassesStreaming) && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     val navState by viewModel.voiceNavState.collectAsState()
     SceneGuidanceLayer(viewModel) {
