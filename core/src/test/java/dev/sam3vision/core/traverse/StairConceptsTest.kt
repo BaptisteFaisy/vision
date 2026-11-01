@@ -46,7 +46,7 @@ class StairConceptsTest {
         assertEquals(listOf("stairs"), StairConcepts.promptsFor())
         val prompts = StairConcepts.promptsFor(listOf("person", "door"))
         assertEquals(listOf("stairs", "person", "door"), prompts)
-        val full = StairConcepts.promptsFor((1..20).map { "objet$it" })
+        val full = StairConcepts.promptsFor((1..30).map { "objet$it" })
         assertEquals(LivePrompts.MAX, full.size)
         assertEquals("stairs", full.first())
     }
@@ -58,11 +58,11 @@ class StairConceptsTest {
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
                 "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks", "wall",
+                "socks", "wall", "stroller", "child", "electric scooter", "dog",
             ),
             LivePrompts.default,
         )
-        assertEquals(18, LivePrompts.MAX)
+        assertEquals(22, LivePrompts.MAX)
         assertEquals(
             listOf("car", "bus", "bicycle", "truck", "motorcycle"),
             VehicleConcepts.PROMPTS,
