@@ -122,29 +122,25 @@ data class HazardCue(
  * « Attention à la barrière, à 2 heures. » / « Attention, barrier, at 2
  * o'clock. » — une info de description, jamais une consigne (l'ordre user :
  * iSee décrit, en douceur, au cadran des aveugles) — sauf la personne,
- * qui dit aussi comment l'éviter (ordre user du 01/11, voir [personPhrase]).
+ * qui dit le seul mot d'évitement (ordre user du 01/11, voir [personPhrase]).
  */
 object HazardText {
     /** Axe marché : en deçà, la personne est à gauche — on passe à droite. */
     private const val AXIS_MID = 0.5f
 
     /**
-     * « Attention à la personne, à 2 heures, passez à gauche. » : la personne
-     * douce (2-4 m) dit aussi comment l'éviter — le côté conseillé est
-     * l'opposé de la personne (personne à gauche de l'axe = on passe à
-     * droite). Axe pile ou heure inconnue = droite par défaut (prior, à
-     * valider rue : on serre à droite). Personne seule (les autres dangers
-     * restent descriptifs, voir [phrase]) : l'imminente (≤ 2 m) dit le mot
-     * seul d'évitement en clip, voir [HazardWatcher].
+     * « Gauche. » / « Left. » : la personne douce (2-4 m) dit le seul mot
+     * d'évitement — le côté conseillé est l'opposé de la personne
+     * (personne à gauche de l'axe = on passe à droite). Axe pile ou heure
+     * inconnue = droite par défaut (prior, à valider rue : on serre à
+     * droite). Personne seule (les autres dangers restent descriptifs, voir
+     * [phrase]) : le même mot que l'imminente (≤ 2 m), qui le dit en clip,
+     * voir [HazardWatcher].
      */
     fun personPhrase(
-        name: HazardConcepts.HazardName,
         language: SpeechLanguage,
         centerX: Float? = null,
-    ): String {
-        val situated = phrase(name, language, centerX).dropLast(1)
-        return "$situated, ${avoidText(centerX, language)}."
-    }
+    ): String = GuidanceWord.fromCap(avoidSide(centerX)).text(language)
 
     /**
      * Côté d'évitement conseillé : l'opposé de la personne (personne à
@@ -155,15 +151,6 @@ object HazardText {
      */
     fun avoidSide(centerX: Float?): SteeringCap =
         if (centerX == null || centerX <= AXIS_MID) SteeringCap.Right else SteeringCap.Left
-
-    /** Consigne d'évitement : le côté opposé à la personne (droite par défaut). */
-    private fun avoidText(centerX: Float?, language: SpeechLanguage): String {
-        val right = avoidSide(centerX) == SteeringCap.Right
-        return when (language) {
-            SpeechLanguage.Fr -> if (right) "passez à droite" else "passez à gauche"
-            SpeechLanguage.En -> if (right) "pass on the right" else "pass on the left"
-        }
-    }
 
     /** « Attention … » pour [name] selon [language], située à [centerX] (`null` = sans heure). */
     fun phrase(
@@ -184,7 +171,7 @@ object HazardText {
  * pas de bavardage même si les humains bougent).
  *
  * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence,
- * [HazardText.personPhrase] avec évitement) ; la personne imminente (à
+ * [HazardText.personPhrase] : le seul mot d'évitement) ; la personne imminente (à
  * [PERSON_FAST_METERS] ou moins) dit le mot seul d'évitement dès la 1re
  * frame (« Droite. »/« Gauche. », clips `guide_*`, départ < 100 ms),
  * répété toutes les [IMMINENT_REPEAT_MS] tant qu'imminente, sans consommer
@@ -293,7 +280,7 @@ class HazardWatcher(
         otherHits = 0
         val meters = candidate.meters
         if (isImminent(meters)) {
-            val word = GuidanceWord.fromCap(HazardText.avoidSide(candidate.centerX)).text(language)
+            val word = HazardText.personPhrase(language, candidate.centerX)
             if (word == lastImminentWord && nowMs - lastImminentMs < IMMINENT_REPEAT_MS) return null
             lastImminentWord = word
             lastImminentMs = nowMs
@@ -310,7 +297,7 @@ class HazardWatcher(
         personSpoken = true
         personQuiet = 0
         return HazardCue(
-            HazardText.personPhrase(candidate.name, language, candidate.centerX),
+            HazardText.personPhrase(language, candidate.centerX),
             meters, kind = HazardKind.PERSON, trackId = candidate.trackId,
         )
     }

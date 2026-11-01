@@ -76,8 +76,6 @@
     {"id": "hazard_bollard", "en": "Attention, bollard.", "parts": ["Attention ", "à la borne", "Attention, ", "bollard"]},
     {"id": "hazard_fence", "en": "Attention, fence.", "parts": ["Attention ", "à la clôture", "Attention, ", "fence"]},
     {"id": "hazard_gate", "en": "Attention, gate.", "parts": ["Attention ", "au portail", "Attention, ", "gate"]},
-    {"id": "hazard_pole_right", "en": "Attention, pole, pass on the right.", "parts": ["Attention ", "au poteau", "passez à droite", "Attention, ", "pole", "pass on the right"]},
-    {"id": "hazard_pole_left", "en": "Attention, pole, pass on the left.", "parts": ["Attention ", "au poteau", "passez à gauche", "Attention, ", "pole", "pass on the left"]},
     {"id": "cycle_velo_moving", "en": "Attention, bicycle moving.", "parts": ["Attention, ", "vélo", "en mouvement", "bicycle", "moving"]},
     {"id": "cycle_velo_stopped", "en": "Bicycle stopped.", "parts": ["vélo", "arrêté", "bicycle", "stopped"]},
     {"id": "cycle_trott_moving", "en": "Attention, scooter moving.", "parts": ["Attention, ", "trottinette", "en mouvement", "scooter", "moving"]},

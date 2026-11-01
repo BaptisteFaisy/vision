@@ -4,10 +4,10 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PersonLabels
 
 /**
- * Concepts qui font parler le guetteur danger « Attention … » : la
- * personne proche (ordre user du 01/11 : la voix danger ne parle plus des
- * poteaux, la consigne d'évitement « passez à droite / gauche » passe aux
- * humains) et le mobilier qui barre le passage (dire « Attention … » —
+ * Concepts qui font parler le guetteur danger : la personne proche
+ * (ordre user du 01/11 : la voix danger ne parle plus des poteaux, et la
+ * personne dit le seul mot d'évitement « Droite. »/« Gauche. ») et le
+ * mobilier qui barre le passage (dire « Attention … » —
  * ordre user du 29/10 : iSee décrit, en douceur — les mots du guidage
  * disent où aller, l'attention dit quoi éviter).
  *

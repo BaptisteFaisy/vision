@@ -99,7 +99,7 @@ class HazardWatchTest {
         assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la personne, passez à droite.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
         assertFalse(cue.urgent)
     }
 
@@ -177,31 +177,34 @@ class HazardWatchTest {
         assertNull(watcher.onSignal(signal, 18_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(signal, 19_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la personne, passez à droite.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
     }
 
     @Test
     fun `personne dit comment l'eviter - cote oppose, FR EN`() {
-        val person = HazardConcepts.nameOf("personne")!!
         assertEquals(
-            "Attention à la personne, à 11 heures, passez à droite.",
-            HazardText.personPhrase(person, SpeechLanguage.Fr, 0.4f),
+            "Droite.",
+            HazardText.personPhrase(SpeechLanguage.Fr, 0.4f),
         )
         assertEquals(
-            "Attention à la personne, à 2 heures, passez à gauche.",
-            HazardText.personPhrase(person, SpeechLanguage.Fr, 0.8f),
+            "Gauche.",
+            HazardText.personPhrase(SpeechLanguage.Fr, 0.8f),
         )
         assertEquals(
-            "Attention, person, at 2 o'clock, pass on the left.",
-            HazardText.personPhrase(person, SpeechLanguage.En, 0.8f),
+            "Left.",
+            HazardText.personPhrase(SpeechLanguage.En, 0.8f),
         )
         assertEquals(
-            "Attention à la personne, passez à droite.",
-            HazardText.personPhrase(person, SpeechLanguage.Fr),
+            "Right.",
+            HazardText.personPhrase(SpeechLanguage.En, 0.4f),
         )
         assertEquals(
-            "Attention à la personne, à midi, passez à droite.",
-            HazardText.personPhrase(person, SpeechLanguage.Fr, 0.5f),
+            "Droite.",
+            HazardText.personPhrase(SpeechLanguage.Fr),
+        )
+        assertEquals(
+            "Droite.",
+            HazardText.personPhrase(SpeechLanguage.Fr, 0.5f),
         )
 
         val watcher = HazardWatcher()
@@ -209,7 +212,7 @@ class HazardWatchTest {
         watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
         val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la personne, à 2 heures, passez à gauche.", cue!!.phrase)
+        assertEquals("Gauche.", cue!!.phrase)
     }
 
     @Test
