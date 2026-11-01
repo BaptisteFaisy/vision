@@ -151,6 +151,10 @@ android {
         // Calque local (propagation entre deux keyframes) : vide = le réglage des Réglages
         // décide ; « true »/« false » = drapeau de build prioritaire (démo, tests).
         buildConfigField("String", "LOCAL_OVERLAY", "\"${localProp("live.local.overlay")}\"")
+        // Transport WS texte forcé (jambe base64 du A/B M1, docs/LATENCE-M1-HARNESS.md) :
+        // vide (défaut) = binaire M1 ; « true » = JSON texte même si le serveur lit le
+        // binaire. Drapeau de campagne, jamais commité (local.properties gitignoré).
+        buildConfigField("String", "WS_TEXT", "\"${localProp("live.ws.text")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

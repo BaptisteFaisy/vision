@@ -56,6 +56,23 @@ class LiveClientFactoryTest {
     }
 
     @Test
+    fun `la fabrique transmet onBinaryChange au client`() = runBlocking {
+        val transport = ContractWsTransport()
+            .apply { answerBytesWith { listOf(NetContract.frameReply(1)) } }
+        val legs = mutableListOf<Boolean>()
+        val client = liveClientWith(
+            baseUrl = "https://exemple.invalid",
+            timeoutSeconds = 10L,
+            onBinaryChange = legs::add,
+            transportFor = { transport },
+        )
+
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+
+        assertEquals(listOf(true), legs)
+    }
+
+    @Test
     fun `la fabrique transmet binaryWs au message envoye`() = runBlocking {
         val transport = ContractWsTransport()
             .apply { answerBytesWith { listOf(NetContract.frameReply(1)) } }

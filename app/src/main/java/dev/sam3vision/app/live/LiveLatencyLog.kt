@@ -40,4 +40,9 @@ object LiveLatencyLog {
         line(t)?.let { Log.i(TAG, it) }
         serverLine(t)?.let { Log.i(TAG, it) }
     }
+
+    /** Annonce le transport WS de la session ([TimingsText.leg]) ; ne lève jamais. */
+    fun leg(binary: Boolean) {
+        Log.i(TAG, TimingsText.leg(binary))
+    }
 }

@@ -82,4 +82,12 @@ class LiveLatencyLogTest {
             line.contains(Regex("""(^| )latency \d""")),
         )
     }
+
+    @Test
+    fun `l annonce de jambe ne leve jamais`() {
+        // `Log.i` rend sa valeur par défaut en JVM (testOptions) : l'appel prouve
+        // seulement le câblage, la chaîne est prouvée côté core (TimingsTextTest).
+        LiveLatencyLog.leg(true)
+        LiveLatencyLog.leg(false)
+    }
 }

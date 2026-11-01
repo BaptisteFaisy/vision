@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.net.LIVE_TIMEOUT_SECONDS
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WireMarks
@@ -41,6 +42,9 @@ object LiveMaskTransport {
      * les usages qui ne dessinent jamais de masque (pastilles, guidage) — aucun des
      * deux écrans actuels, qui affichent tous deux les masques (`LiveScreen`,
      * `IseeVisionCard`, `GlassesMaskLayer`), donc opt-in explicite.
+     * [binaryWs] force le transport WS (`false` = JSON texte, jambe base64 du A/B
+     * `docs/LATENCE-M1-HARNESS.md`) ; par défaut le build décide (`live.ws.text`) et
+     * le binaire M1 reste le transport (même défaut que la fabrique).
      */
     fun clientFor(
         base: String,
@@ -48,5 +52,16 @@ object LiveMaskTransport {
         marks: WireMarks? = null,
         withDepth: Boolean = false,
         masks: Boolean = true,
-    ): LiveClient = liveClient(base, timeout, marks, MASK_FORMAT, MASK_EDGE, withDepth, masks)
+        binaryWs: Boolean = !buildFlagOn(BuildConfig.WS_TEXT, false),
+    ): LiveClient = liveClient(
+        base,
+        timeout,
+        marks,
+        MASK_FORMAT,
+        MASK_EDGE,
+        withDepth,
+        masks,
+        binaryWs,
+        onBinaryChange = LiveLatencyLog::leg,
+    )
 }

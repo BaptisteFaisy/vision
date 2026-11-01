@@ -33,7 +33,12 @@ fun liveClient(
      * serveur déployé lit le binaire, avec repli JSON si le serveur le refuse.
      */
     binaryWs: Boolean = true,
-): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks, binaryWs) { milliseconds ->
+    /**
+     * Annonce du transport (`true` = binaire) : une fois à la première frame, puis
+     * au repli texte. `null` = silencieuse ; non bloquante (thread réseau).
+     */
+    onBinaryChange: ((Boolean) -> Unit)? = null,
+): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks, binaryWs, onBinaryChange) { milliseconds ->
     OkHttpWsTransport(liveWsClient(milliseconds / 1000))
 }
 
@@ -47,6 +52,7 @@ internal fun liveClientWith(
     withDepth: Boolean = false,
     masks: Boolean = true,
     binaryWs: Boolean = true,
+    onBinaryChange: ((Boolean) -> Unit)? = null,
     transportFor: (Long) -> WsTransport,
 ): LiveClient = WsLiveClient(
     baseUrl,
@@ -60,4 +66,5 @@ internal fun liveClientWith(
     withDepth = withDepth,
     masks = masks,
     binaryWs = binaryWs,
+    onBinaryChange = onBinaryChange,
 )

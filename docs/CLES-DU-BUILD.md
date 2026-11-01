@@ -19,6 +19,7 @@ de clé pour que le chat réponde et que la voix parle ; les clés sont dans le 
 | Clé Google Maps | `google.maps.api.key` | `GOOGLE_MAPS_API_KEY` |
 | Endpoint tap SAM 3.1 | `sam31.endpoint` (vide = tap désactivé) | `SAM31_ENDPOINT` |
 | Surimpression locale (défaut build) | `live.local.overlay` | `LIVE_LOCAL_OVERLAY` |
+| WS texte forcé (jambe base64 du A/B M1) | `live.ws.text` (vide = binaire) | `WS_TEXT` |
 | Dev lunettes (manifest) | `mwdat.application.id`, `mwdat.client.token` (défaut `"0"`) | — (`manifestPlaceholders`) |
 
 `app/build.gradle.kts` lit le fichier, `app/SettingsSeed.kt` remplit les champs vides au
