@@ -77,8 +77,8 @@ class LiveFrameCadenceTest {
     fun `la cadence suit la latence de la session`() {
         val active = session()
         assertEquals(
-            "session sans mesure : plancher rapide",
-            dev.sam3vision.core.live.Cadence.Direct.fastMs,
+            "session sans mesure : cible prudente",
+            dev.sam3vision.core.live.Cadence.Direct.targetMs,
             active.intervalMsAdaptive(),
         )
     }

@@ -105,20 +105,23 @@ class LiveSessionTest {
     }
 
     @Test
-    fun `l'intervalle adaptatif ralentit quand la latence moyenne depasse 900 ms`() {
-        assertEquals(900L, sessionWith(LiveStats(), 1_000L, 1_400L).intervalMsAdaptive())
+    fun `le direct suit la moitie de la latence moyenne`() {
+        assertEquals(600L, sessionWith(LiveStats(), 1_000L, 1_400L).intervalMsAdaptive())
+        assertEquals(105L, sessionWith(LiveStats(), 120L, 300L).intervalMsAdaptive())
+        assertEquals(250L, sessionWith(LiveStats(), 400L, 600L).intervalMsAdaptive())
+        assertEquals(450L, sessionWith(LiveStats(), 900L).intervalMsAdaptive())
+        assertEquals(175L, sessionWith(LiveStats(), 350L).intervalMsAdaptive())
     }
 
     @Test
-    fun `l'intervalle adaptatif accelere quand la latence moyenne est sous 350 ms`() {
-        assertEquals(350L, sessionWith(LiveStats(), 120L, 300L).intervalMsAdaptive())
+    fun `le direct borne sa cadence regulee entre 33 et 900 ms`() {
+        assertEquals(33L, sessionWith(LiveStats(), 20L).intervalMsAdaptive())
+        assertEquals(900L, sessionWith(LiveStats(), 4_000L).intervalMsAdaptive())
     }
 
     @Test
-    fun `l'intervalle adaptatif reste a 500 ms entre les deux seuils`() {
-        assertEquals(500L, sessionWith(LiveStats(), 400L, 600L).intervalMsAdaptive())
-        assertEquals(500L, sessionWith(LiveStats(), 900L).intervalMsAdaptive())
-        assertEquals(500L, sessionWith(LiveStats(), 350L).intervalMsAdaptive())
+    fun `le direct sans mesure garde la cible de 500 ms`() {
+        assertEquals(500L, sessionWith(LiveStats()).intervalMsAdaptive())
     }
 
     @Test

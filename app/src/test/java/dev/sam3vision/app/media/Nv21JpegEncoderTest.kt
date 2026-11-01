@@ -1,7 +1,9 @@
 package dev.sam3vision.app.media
 
+import dev.sam3vision.core.local.LumaPlane
 import java.nio.ByteBuffer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -171,5 +173,40 @@ class Nv21JpegEncoderTest {
         assertEquals(180, sampledMeanLuma(big, 640, 480))
         // Dimensions nulles : 0, pas de division par zéro.
         assertEquals(0, sampledMeanLuma(frame().y, 0, 4))
+    }
+
+    @Test
+    fun `l'echantillonneur rend le meme plan a chaque appel`() {
+        val sampler = LumaSampler()
+        val nv21 = ByteArray(512 * 512 * 3 / 2) { (it % 251).toByte() }
+        val first = sampler.sample(nv21, 512, 512)
+        val second = sampler.sample(nv21, 512, 512)
+        assertSame("zéro allocation par frame en régime établi", first, second)
+        assertEquals(LumaPlane.SIZE, first.size)
+    }
+
+    @Test
+    fun `l'echantillonnage suit le plus proche voisin`() {
+        val width = 512
+        val height = 320
+        val nv21 = ByteArray(width * height * 3 / 2) { index -> (index % 251).toByte() }
+        val out = LumaSampler().sample(nv21, width, height)
+        listOf(0 to 0, 255 to 102, 17 to 55, 200 to 3).forEach { (x, y) ->
+            val row = (y.toLong() * height / LumaPlane.HEIGHT).toInt() * width
+            val col = (x.toLong() * width / LumaPlane.WIDTH).toInt()
+            assertEquals("en ($x,$y)", nv21[row + col], out[y * LumaPlane.WIDTH + x])
+        }
+    }
+
+    @Test
+    fun `les tables suivent la taille paquee`() {
+        val sampler = LumaSampler()
+        val small = ByteArray(320 * 240 * 3 / 2) { 7 }
+        val big = ByteArray(640 * 480 * 3 / 2) { 9 }
+        val first = sampler.sample(small, 320, 240)
+        first.forEach { assertEquals(7.toByte(), it) }
+        val second = sampler.sample(big, 640, 480)
+        assertSame("même tampon après changement de taille", first, second)
+        second.forEach { assertEquals(9.toByte(), it) }
     }
 }

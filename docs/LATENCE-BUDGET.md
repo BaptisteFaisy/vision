@@ -346,7 +346,7 @@ fait échouer la CI.
 | 3 608 → 560 octets, 6,7 → 1,5 ms (RLE 256 px) | banc de campagne `bench_mask_payload.py` (hors dépôt) | u04 |
 | composition 1,79 → 0,93 ms/frame, 3,4 Mo → 0 octet | banc `MaskOverlayBenchTest` (hors dépôt) | u03 |
 | encode 17–32 → 5–8 ms (NV21), 3 bitmaps → 0 | `Nv21JpegEncoder` (hors dépôt) | u02 |
-| cadence adaptative, réserve 1 frame | `LiveSession`, `LivePump` (vague 1) ; ici : `Cadence.Direct` 350/500/900 ms | u01 |
+| cadence adaptative, réserve 1 frame | `LiveSession`, `LivePump` (vague 1) ; puis `Cadence.Direct` régulée (latence/2, 33-900 ms) | u01, O8 |
 | 7 étages, perçu ≠ A/R, coût d'instrumentation borné | `LatencyProfile`, `LatencyTrace` (vague 1) | u07 |
 | 1 220–1 260 ms affichés (6 en vol) · 599–775 ms (1 en vol) | notes de campagne, terrain | terrain |
 

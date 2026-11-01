@@ -29,14 +29,17 @@ class OnnxDepthEstimator private constructor(
 
     override val backend: DepthBackend = DepthBackend.DA2
 
+    /** Tampons de prétraitement réutilisés : zéro allocation par inférence. */
+    private val scratch = DepthScratch()
+
     override suspend fun estimate(argb: IntArray, width: Int, height: Int): Result<DepthResult> =
         withContext(Dispatchers.Default) {
             runCatching {
                 val resized = DepthPreprocess.resizeArgbBilinear(
-                    argb, width, height, DepthPreprocess.INPUT_SIZE,
+                    argb, width, height, DepthPreprocess.INPUT_SIZE, scratch.resized(),
                 )
                 val input = DepthPreprocess.normalizeCHW(
-                    resized, DepthPreprocess.INPUT_SIZE, IMAGE_MEAN, IMAGE_STD,
+                    resized, DepthPreprocess.INPUT_SIZE, IMAGE_MEAN, IMAGE_STD, scratch.chw(),
                 )
                 val started = android.os.SystemClock.elapsedRealtime()
                 // Sérialisé : `OrtSession.run` n'est pas thread-safe (SIGABRT
@@ -68,6 +71,9 @@ class OnnxDepthEstimator private constructor(
     companion object {
         const val ASSET_NAME = "da2_small_uint8.ort"
 
+        /** Fils intra-op ORT : 2 depuis O8 cpu-max (4 avant). */
+        const val INTRA_OP_THREADS = 2
+
         private const val INPUT_SIZE = 256
 
         /** Moyennes/écarts ImageNet du `preprocessor_config.json` de DA2. */
@@ -79,15 +85,16 @@ class OnnxDepthEstimator private constructor(
          * en repli dev), `null` si le modèle est absent : le sélecteur rend
          * alors un estimateur « modèle manquant » explicite. NNAPI essayé le
          * 2026-10-28 : session OK et bit-identique au CPU, mais jamais plus
-         * rapide en dos-à-dos — CPU seul (+ 4 threads intra-op) tant qu'un
-         * banc ne prouve pas le contraire. Budget suivi par [DepthBench]
+         * rapide en dos-à-dos — CPU seul (+ 2 threads intra-op depuis O8
+         * cpu-max, 4 avant) tant qu'un banc ne prouve pas le contraire.
+         * Budget suivi par [DepthBench]
          * (médiane sur [DepthBench.RUNS] runs) ; l'attente du verrou est
          * mesurée ([SerialRunGuard]) et loguée quand elle est non nulle.
          */
         fun open(context: Context): DepthEstimator? {
             val weights = readStoreFile(context) ?: readAsset(context, ASSET_NAME) ?: return null
             val options = OrtSession.SessionOptions()
-            options.setIntraOpNumThreads(4)
+            options.setIntraOpNumThreads(INTRA_OP_THREADS)
             return try {
                 val session = OrtEnvironment.getEnvironment().createSession(weights, options)
                 OnnxDepthEstimator(session, session.inputNames.first())

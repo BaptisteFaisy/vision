@@ -19,7 +19,7 @@ L'intervalle à couvrir est celui du direct : une frame en vol maximum, cadence 
 la latence moyenne (`LiveSession.intervalMsAdaptive()`,
 `core/src/main/java/dev/sam3vision/core/live/LiveSession.kt:153`). Page caméra iSee :
 `Cadence.Fast` = pas de plancher, budget 150 ms (`LiveSession.kt:43-48`) ; Direct :
-350/500/900 ms (`LiveSession.kt:34`).
+moitié de la latence bornée 33-900 ms (`LiveSession.intervalMsContinuous`, O8).
 
 ## 2. Ce qui est prédit, et ce qui ne l'est pas
 
