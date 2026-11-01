@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.mask.DecodeSplit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -179,6 +180,21 @@ class LiveTimingsTest {
     fun `le cout local ne melange pas telephone et reseau`() {
         // 22 d'encodage + 37 de masques + 8 de pixel, rien du réseau.
         assertEquals(67L, fullStages().localMs)
+    }
+
+    @Test
+    fun `l'instantane porte le decodage sans toucher ni ligne ni totaux`() {
+        val decode = DecodeSplit(2L, 28L, 1L, 6L, 37L, 12)
+        val chronology = LiveTimings(FakeClock()::read)
+        LiveStage.entries.forEach { chronology.mark(it) }
+        val stages = chronology.snapshot(decode = decode)
+
+        assertEquals(decode, stages.decode)
+        assertEquals("la décomposition ne se paie pas deux fois", 7L, stages.totalMs)
+        assertEquals("ni dans le coût local", 4L, stages.localMs)
+        assertFalse(TimingsText.compact(stages).contains("dec"))
+        // Une décomposition seule n'est pas une chronologie : le poste parent la couvre.
+        assertFalse(FrameTimings(decode = decode).known)
     }
 
     /** Chronologie complète d'une frame, telle que les marques réelles la produisent. */

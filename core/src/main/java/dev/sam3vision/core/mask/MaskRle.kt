@@ -13,9 +13,9 @@ package dev.sam3vision.core.mask
  * par niveau. `null` — jamais d'exception — si le base64, un varint ou la somme des runs ne
  * collent pas : l'appelant dessine alors la boîte, comme pour un masque `"none"`.
  */
-fun decodeRleMask(maskB64: String, width: Int, height: Int): GrayMask? {
-    val runs = base64Bytes(maskB64) ?: return null
-    return decodeRleBytes(runs, width, height)
+fun decodeRleMask(maskB64: String, width: Int, height: Int, probe: DecodeProbe? = null): GrayMask? {
+    val runs = base64Bytes(maskB64, probe) ?: return null
+    return probe.timed(DecodeStage.IMG) { decodeRleBytes(runs, width, height) }
 }
 
 /** [decodeRleMask] sans base64 : les runs bruts, tels que les tests les fabriquent. */
