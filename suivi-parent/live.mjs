@@ -1,5 +1,5 @@
 import { NO_STREAM_TEXT, shareIdOf, stateOf, neverPublished } from './session.mjs';
-import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
+import { frameOf, frozenFrameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
 import './settings.mjs';
@@ -17,6 +17,10 @@ const tripBall = document.getElementById('trip-ball');
 const pictoEl = document.getElementById('pictos');
 const pictoStrip = document.getElementById('picto-strip');
 let live = null, polling = false, frameSrc = '', pictoSig = '';
+// Dernière peinture : son instant et son tuyau (direct ou photo lente). À la
+// perte du direct, l'image posée reste figée pendant la grâce au lieu
+// d'être arrachée — chaque micro-trou clignotait sinon.
+let shownAt = 0, showingDirect = false;
 // Direct de la caméra : dernière frame reçue par WebSocket et son instant.
 let streamSrc = '', streamAt = 0;
 // La salle a dit que la caméra est éteinte : le direct comme la photo lente
@@ -107,6 +111,17 @@ function renderFrame(status) {
     return;
   }
   const view = frameOf(live, status, Date.now(), cameraOff);
+  // Micro-coupure du direct : l'image posée reste figée pendant la grâce, au
+  // lieu d'être arrachée (reflow de toute la page) ou permutée avec la photo
+  // lente (flash + re-swap au retour). Avec une photo lente fraîche, on ne
+  // gèle que si le direct s'affichait — sinon le rafraîchissement normal
+  // (toutes les 2 s) serait bloqué.
+  if (frameSrc && frozenFrameOf(shownAt) && (!view || showingDirect)) {
+    noteEl.hidden = true;
+    frameEl.hidden = false;
+    viewEl.classList.remove('empty');
+    return;
+  }
   if (!view) {
     if (frameSrc) { frameEl.removeAttribute('src'); frameSrc = ''; }
     streamSrc = '';
@@ -128,7 +143,7 @@ function renderFrame(status) {
   viewEl.classList.remove('empty');
   frameEl.alt = 'Ce que voit ton proche, en direct';
   // Une data URL identique n'est pas réassignée : l'image ne clignote pas à chaque poll.
-  if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; }
+  if (view.src !== frameSrc) { frameSrc = view.src; frameEl.src = view.src; shownAt = Date.now(); showingDirect = false; }
 }
 
 /**
@@ -159,6 +174,8 @@ function paintStream() {
       frameEl.alt = 'Ce que voit ton proche, en direct';
       frameSrc = src;
       frameEl.src = src;
+      shownAt = Date.now();
+      showingDirect = true;
       notePaint();
     };
     preload.onerror = () => { if (decoding === src) decoding = null; };

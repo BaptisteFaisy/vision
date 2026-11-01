@@ -21,6 +21,20 @@ const val STREAM_FRAME_MAX_AGE_MS = 300L
 const val STREAM_RETRY_MS = 2_000L
 
 /**
+ * Tours de pompe vides consécutifs avant d'annoncer la caméra éteinte : un
+ * micro-trou (encodeur lent, GC, executor saturé) ne doit pas effacer l'image
+ * des aidants — seul un silence d'environ une seconde envoie l'avis `false`.
+ * À 15 im/s, 15 tours ≈ 1 s.
+ */
+const val STREAM_CAMERA_OFF_TURNS = 15
+
+/**
+ * Vrai quand le silence dure assez pour annoncer la caméra éteinte : en
+ * dessous du seuil, la page garde sa dernière image et le trou reste invisible.
+ */
+fun cameraOffReady(emptyTurns: Int): Boolean = emptyTurns >= STREAM_CAMERA_OFF_TURNS
+
+/**
  * URL du direct (`/ws?role=push`) : même origine que le relais, en `wss` quand il
  * est en `https`. La clé d'écriture voyage dans l'URL — c'est le même secret que
  * `/api/share`, et le relais la compare au flux avant d'accepter les frames.

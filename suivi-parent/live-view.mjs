@@ -52,6 +52,22 @@ export function tripOf(live, status) {
   return trip;
 }
 
+/**
+ * Grâce pendant laquelle la dernière image posée reste figée à la perte du
+ * direct, au lieu d'être effacée ou permutée aussitôt : un micro-trou
+ * (jitter réseau, reconnect du tuyau, avis caméra sur un stall encodeur)
+ * devient invisible, un vrai arrêt efface après la grâce.
+ */
+export const DIRECT_FREEZE_MS = 2_500;
+
+/**
+ * Vrai si l'image posée à `shownAt` peut encore rester affichée : posée
+ * récemment (moins de `graceMs`), donc un trou du direct plutôt qu'un arrêt.
+ */
+export function frozenFrameOf(shownAt, now = Date.now(), graceMs = DIRECT_FREEZE_MS) {
+  return Number.isFinite(shownAt) && shownAt > 0 && now - shownAt < graceMs;
+}
+
 /** Remplissage de la barre, en pourcentage borné 0..100. */
 export function tripPercent(trip) {
   const progress = Number(trip && trip.progress);

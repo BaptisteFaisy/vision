@@ -8,6 +8,7 @@ import dev.sam3vision.core.share.STREAM_FRAME_MS
 import dev.sam3vision.core.share.STREAM_RETRY_MS
 import dev.sam3vision.core.share.audienceWatching
 import dev.sam3vision.core.share.cameraNotice
+import dev.sam3vision.core.share.cameraOffReady
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -51,6 +52,9 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
     /** Dernier état caméra annoncé ; `null` force une republication au tour suivant. */
     @Volatile
     private var announced: Boolean? = null
+
+    /** Tours vides consécutifs : seul un silence durable annonce la caméra éteinte. */
+    private var emptyTurns = 0
 
     /** Frames poussées, tours sans frame fraîche, envois refusés par le tuyau. */
     @Volatile
@@ -126,15 +130,18 @@ class ShareStreamer(private val client: OkHttpClient = liveHttpClient()) {
             val wait = nextDue - System.currentTimeMillis()
             if (wait > 0) delay(wait) else nextDue = System.currentTimeMillis()
             // Sans spectateur, rien ne part — et le retour de l'audience republie l'état.
-            if (!watching) { announced = null; continue }
-            // Caméra fermée ou figée : les aidants l'apprennent dans le tour,
-            // au lieu de garder la dernière image jusqu'à 8 s.
+            if (!watching) { announced = null; emptyTurns = 0; continue }
+            // Caméra fermée ou figée : les aidants l'apprennent après la grâce,
+            // au lieu de garder la dernière image jusqu'à 8 s. Un tour vide
+            // seul n'éteint rien, sinon chaque micro-trou fait clignoter leur page.
             val frame = SharedCameraFrame.latestBytes(System.currentTimeMillis())
             if (frame == null || frame.jpeg.isEmpty()) {
                 droppedFrames += 1
-                announce(ws, false)
+                emptyTurns += 1
+                if (cameraOffReady(emptyTurns)) announce(ws, false)
                 continue
             }
+            emptyTurns = 0
             if (frame.seq == sentSeq) continue
             sentSeq = frame.seq
             if (!ws.send(ByteString.of(*frame.jpeg))) {
