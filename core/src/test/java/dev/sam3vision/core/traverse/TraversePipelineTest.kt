@@ -116,11 +116,12 @@ class TraversePipelineTest {
         val player = FakePlayer()
         val pipe = pipeline(player = player)
         repeat(5) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val repeat = pipe.frame(listOf(seg()), green = true, index = 6)
-        assertNull("piste non confirmée : vert maintenu, répétition pas encore due", repeat.cue)
+        val small = listOf(0f, 0f, 100f, 100f)
+        val repeat = pipe.frame(listOf(seg(box = small)), green = true, index = 6)
+        assertNull("pas d'approche : vert maintenu, répétition pas encore due", repeat.cue)
         val alert = pipe.frame(listOf(seg()), green = true, index = 7)
-        assertNull("piste confirmée : veto force le rouge, une seule frame ne suffit pas", alert.cue)
-        val out = pipe.frame(listOf(seg()), green = true, index = 8)
+        assertNull("croissance : veto force le rouge, une seule frame ne suffit pas", alert.cue)
+        val out = pipe.frame(listOf(seg(box = listOf(0f, 0f, 220f, 220f))), green = true, index = 8)
 
         assertTrue(out.decision.veto)
         assertEquals(TraversePhase.ATTENDRE, out.decision.state)

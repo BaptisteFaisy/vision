@@ -260,9 +260,12 @@ class VehicleStateWatcher(
     ): Pick? {
         val key = current.keys
             .filter { candidate ->
-                if (candidate in hushed || fondFranc) return@filter false // PISTE1+FUSION
+                if (candidate in hushed) return@filter false // PISTE1+FUSION
                 val seen = current.getValue(candidate)
                 val prev = previous[candidate] ?: return@filter false
+                // Fond franc : l'arrêt brut est suspect — sauf piste suiveuse
+                // (arrêt compensé prouvé, pas un faux).
+                if (fondFranc && (motion == null || backgroundVerdict(prev, seen, atMs, motion) != Verdict.CAMERA_MOVED)) return@filter false
                 val measured = meters[candidate]
                 if (measured != null && measured > PARKED_METERS) return@filter false
                 if (!still(prev, seen, atMs, motion) || seen.area > prev.area) return@filter false
