@@ -8,12 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -21,8 +17,8 @@ import androidx.compose.ui.unit.sp
 private const val THINKING_LINE = "Thinking…"
 
 /**
- * Le bas de l'écran : la ligne de statut (si elle a quelque chose à dire) posée
- * au-dessus de la pill d'instructions.
+ * Le bas de l'écran : la ligne de statut, seule (si elle a quelque chose à
+ * dire) — la pill d'instructions « Tap see / Hold ask » est retirée.
  *
  * La ligne existe parce que `IseeUiState.status` était écrit de partout (échec de
  * question, clé LLM absente, micro indisponible, rien entendu…) et lu par aucun
@@ -32,8 +28,7 @@ private const val THINKING_LINE = "Thinking…"
 @Composable
 internal fun SceneBottomBar(state: IseeUiState, modifier: Modifier = Modifier) {
     Column(modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        statusLineOf(state)?.let { StatusLine(it, Modifier.padding(bottom = 8.dp)) }
-        InstructionPill()
+        statusLineOf(state)?.let { StatusLine(it) }
     }
 }
 
@@ -60,25 +55,5 @@ internal fun StatusLine(text: String, modifier: Modifier = Modifier) {
         modifier = modifier
             .background(IseeSceneColors.instructBg.copy(alpha = 0.86f), RoundedCornerShape(50))
             .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
-}
-
-/** La pill d'instructions du bas : actions fortes sombres, verbes de service gris. */
-@Composable
-private fun InstructionPill(modifier: Modifier = Modifier) {
-    Text(
-        buildAnnotatedString {
-            val strong = SpanStyle(color = IseeSceneColors.instructStrong, fontWeight = FontWeight.Bold)
-            val soft = SpanStyle(color = IseeSceneColors.instructGray)
-            withStyle(strong) { append("Tap") }
-            withStyle(soft) { append(" see") }
-            withStyle(strong) { append("   Hold") }
-            withStyle(soft) { append(" ask") }
-        },
-        color = IseeSceneColors.instructStrong,
-        fontSize = 13.sp,
-        modifier = modifier
-            .background(IseeSceneColors.instructBg, RoundedCornerShape(50))
-            .padding(horizontal = 18.dp, vertical = 9.dp),
     )
 }

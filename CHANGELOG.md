@@ -177,6 +177,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `IseePictoVoiceTest` 19/19, `ProbeEnsureConceptTest` 7/7 verts ;
   `check-kotlin-limits.py` OK (aucun dépassement).
 
+## 2026-11-01 — iSee : carte GPS réduite, sans km/temps ni badge gestes (branche `fix/isee-carte-reduite-sans-badge`)
+
+- **Ordre user** : rapetisser un peu la carte quand le GPS est actif,
+  retirer les indications de km et de temps sous la carte, et retirer
+  tout le temps le badge « Tap see / Hold ask ».
+- **Fait** : carte du guidage `IseeGuidanceBlock` 200 → 160 dp ;
+  ligne du reste (`remainingLine`, « In 50 m · 2.4 km left ·
+  12 min ») supprimée — seule l'instruction en cours reste sous la
+  carte ; pill `InstructionPill` supprimée de `SceneBottomBar` (la
+  ligne de statut reste) ; KDoc et imports morts nettoyés.
+- **Preuve** : `:app:testDebugUnitTest` 1 755 verts (0 échec,
+  0 sauté, dont 5 `IseeStatusLineTest`) ; `check-kotlin-limits.py`
+  OK (1 342 fichiers, aucun dépassement).
+
 ## 2026-10-31 — iSee : escaliers jalonnés à 4 / 2 / 1 m (branche `feat/escaliers-jalons`)
 
 - **Ordre user** : quand iSee détecte un escalier, le dire à 4 m, 2 m et 1 m.
