@@ -1,11 +1,15 @@
 package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.live.PersonLabels
 
 /**
- * Concepts du mobilier qui barre le passage : ce que SAM doit suivre pour
- * dire « Attention … » (ordre user du 29/10 : iSee décrit, en douceur — les
- * mots du guidage disent où aller, l'attention dit quoi éviter).
+ * Concepts qui font parler le guetteur danger « Attention … » : la
+ * personne proche (ordre user du 01/11 : la voix danger ne parle plus des
+ * poteaux, la consigne d'évitement « passez à droite / gauche » passe aux
+ * humains) et le mobilier qui barre le passage (dire « Attention … » —
+ * ordre user du 29/10 : iSee décrit, en douceur — les mots du guidage
+ * disent où aller, l'attention dit quoi éviter).
  *
  * `barrier` n'est plus dans les défauts du direct (31/10 : son slot passe
  * à « keys », ordre user) ; il reste reconnu côté client ([isHazard])
@@ -15,14 +19,22 @@ import dev.sam3vision.core.distance.KnownSizes
  * (« sign », « panneau », « traffic sign ») et potelets (« potelet »,
  * « plot » → « bollard ») s'y ajoutent (reel audit 31/10).
  *
- * Liste fermée : un concept = un nom FR/EN ([HazardName]). Le « etc. » de
- * l'ordre s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
+ * Le poteau reste reconnu ([isPole]) mais ne parle plus : [isSpoken] le
+ * tait, la personne parle à sa place. La reconnaissance est conservée
+ * pour le repli haut-de-poteau de la Traversée
+ * (`CrossingPrompts.selectPoleTopBox`, qui vise le haut du poteau pour y
+ * lire le feu) — voix muette mais reconnaissance conservée.
+ *
+ * Liste fermée : un concept = un nom FR/EN ([HazardName]) ; la personne y
+ * entre par [PersonLabels], sans table à part. Le « etc. » de l'ordre
+ * s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
  */
 object HazardConcepts {
 
     /**
      * Nom parlé du concept : [fr] le complément (« à la barrière »,
-     * « au poteau » — contraction incluse), [en] le nom nu (« barrier »).
+     * « à la personne » — contraction incluse), [en] le nom nu
+     * (« barrier »).
      */
     data class HazardName(val fr: String, val en: String)
 
@@ -49,34 +61,57 @@ object HazardConcepts {
         "plot" to HazardName("au plot", "bollard"),
     )
 
-    /** Nom parlé de [label], `null` si ce n'est pas du mobilier suivi. */
+    /** Nom parlé de [label], `null` si ni personne ni mobilier suivi. */
     fun nameOf(label: String): HazardName? {
         val key = KnownSizes.canonical(label)
         if (key.isEmpty()) return null
         NAMES[key]?.let { return it }
-        if (key.endsWith("s") && key.length > 3) return NAMES[key.dropLast(1)]
+        if (key.endsWith("s") && key.length > 3) NAMES[key.dropLast(1)]?.let { return it }
+        if (PersonLabels.isPerson(label)) return HazardName("à la personne", "person")
         return null
     }
 
-    /** Vrai si [label] désigne du mobilier suivi (casse, accents, pluriel neutralisés). */
+    /** Vrai si [label] désigne une personne ou du mobilier suivi (casse, accents, pluriel neutralisés). */
     fun isHazard(label: String): Boolean = nameOf(label) != null
 
-    /** Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais une table à part). */
+    /**
+     * Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais
+     * une table à part). Requis par `CrossingPrompts.selectPoleTopBox`
+     * (repli haut-de-poteau) : voix muette mais reconnaissance conservée.
+     */
     fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
 
-    /** Vrai si [label] désigne une barrière (P4, après le poteau P3). */
+    /** Vrai si [label] désigne une personne (le nom anglais fait foi, jamais une table à part). */
+    fun isPerson(label: String): Boolean = nameOf(label)?.en == "person"
+
+    /**
+     * Vrai si [label] fait parler le guetteur : personne ou mobilier
+     * suivi, sauf le poteau (muet depuis l'ordre user du 01/11).
+     */
+    fun isSpoken(label: String): Boolean = isHazard(label) && !isPole(label)
+
+    /** Vrai si [label] désigne une barrière (P4, après la personne P3). */
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
-    /** Sorte parlée de [label] : poteau, barrière, ou divers (borne, clôture, portail…). */
+    /** Sorte parlée de [label] : personne, barrière, ou divers (poteau muet, borne, clôture, portail…). */
     fun kindOf(label: String): HazardKind = when (nameOf(label)?.en) {
-        "pole" -> HazardKind.POLE
+        "person" -> HazardKind.PERSON
         "barrier" -> HazardKind.BARRIER
         else -> HazardKind.OTHER
     }
 }
 
 /**
- * Sorte de mobilier, dans l'ordre de parole (poteau P3 avant barrière P4,
- * divers avec le reste) : l'arbitre voix y lit le rang du guetteur mobilier.
+ * Sorte parlée, dans l'ordre de parole (personne P3 avant barrière P4,
+ * divers avec le reste) : l'arbitre voix y lit le rang du guetteur danger.
  */
-enum class HazardKind { POLE, BARRIER, OTHER }
+enum class HazardKind {
+    /** Personne proche : dit aussi comment l'éviter (P3). */
+    PERSON,
+
+    /** Barrière : descriptive, après la personne (P4). */
+    BARRIER,
+
+    /** Divers : poteau muet, borne, clôture, portail… (avec le reste). */
+    OTHER,
+}

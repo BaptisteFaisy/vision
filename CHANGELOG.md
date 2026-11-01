@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : voix danger aux humains, poteau muet (branche `hazard-person-not-pole`)
+
+- **Ordre user** : ne plus dire les poteaux ; la consigne « passez à
+  droite / gauche » passe aux humains.
+- **Fait (§ 11, § 18, § 21, § 26 VOIX-DANGER)** : `HazardConcepts` —
+  personne reconnue via `PersonLabels` (`human`/`humans` ajoutés),
+  `isSpoken` tait le poteau (reconnaissance gardée pour le repli
+  haut-de-poteau Traversée) ; `HazardWatcher` — `personPhrase` +
+  `safetyPersonPhrase` (« Attention à la personne, … passez à … »,
+  P3, 4 m / imminent 2 m, dit-une-fois) ; `HazardKind.PERSON` +
+  `ObstacleRank.PERSON` ; autre mobilier inchangé ; prompts
+  LivePrompts, catalogue et MP3 voix inchangés (clips personne =
+  suivi, régénération ElevenLabs requise).
+- **Preuve** : `:core:testDebugUnitTest` 2 814 +
+  `:app:testDebugUnitTest` 1 667 verts sur r630 (0 échec, 0 sauté,
+  dont « poteau = silence » nouveau) ; `check-kotlin-limits.py` OK ;
+  `check-voicepack.py` OK ; UBS : 0 finding (scanner Kotlin
+  indisponible, comme avant).
+
 ## 2026-10-31 — iSee : escaliers jalonnés à 4 / 2 / 1 m (branche `feat/escaliers-jalons`)
 
 - **Ordre user** : quand iSee détecte un escalier, le dire à 4 m, 2 m et 1 m.

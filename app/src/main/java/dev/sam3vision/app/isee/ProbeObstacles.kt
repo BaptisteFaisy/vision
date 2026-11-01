@@ -48,7 +48,7 @@ internal class ObstacleWatchers(
 /**
  * Guetteur obstacles de la sonde : véhicules, bordure et mobilier calculés
  * sur la même frame, parlés une fois dans l'ordre P1-P5 (voiture en mouvement
- * > bordure > poteau > barrière > reste) au lieu de se couper. La sécurité
+ * > bordure > personne > barrière > reste) au lieu de se couper. La sécurité
  * fusionnée ([SafetyVoice], jamais de « Stop » hors Traversée) part aussitôt,
  * en direct ; le doux fusionné part en coroutine fille, sérialisé ([Mutex] :
  * jamais de chevauchement doux, jamais de frame bloquée par une synthèse) et

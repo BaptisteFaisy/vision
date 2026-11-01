@@ -8,13 +8,13 @@ import dev.sam3vision.core.traverse.VehicleStateCue
 
 /**
  * Priorité voix des obstacles : P1 (voiture en mouvement) > P2 (bordure) >
- * P3 (poteau) > P4 (barrière) > reste (arrêt, bateau, divers — dans l'ordre
+ * P3 (personne) > P4 (barrière) > reste (arrêt, bateau, divers — dans l'ordre
  * de détection). Quand SAM confirme plusieurs obstacles sur la même frame,
  * l'arbitre ([decideObstacles]) les ordonne au lieu de les faire se couper :
  * tout ce qui est confirmé est dit, dans cet ordre. Extrait de `ProbeWiring`
  * (plafond 500 lignes). Pur, testé en JVM.
  */
-internal enum class ObstacleRank { VEHICLE_MOVING, CURB, POLE, BARRIER, OTHER }
+internal enum class ObstacleRank { VEHICLE_MOVING, CURB, PERSON, BARRIER, OTHER }
 
 /** Voix de sécurité en cours : une alerte couvre les 2,5 s qui suivent (sous les 3 s de la file douce, pour que le rattrapage parle encore frais — prior, à valider rue). */
 internal const val SAFETY_SPEECH_MS = 2_500L
@@ -35,9 +35,9 @@ internal fun safetyBusy(nowMs: Long, lastSafetyMs: Long?): Boolean =
 internal data class ObstacleDecision(val safety: String?, val soft: String?, val urgent: Boolean = false)
 
 /**
- * Arbitre d'une frame en mode normal : les sécurités (bordure, poteau
- * imminent — jamais de « Stop » hors Traversée, § 22) fusionnent dans
- * l'ordre des rangs, puis les doux (mouvement P1, bordure à 1 m, poteau,
+ * Arbitre d'une frame en mode normal : les sécurités (bordure, personne
+ * imminente — jamais de « Stop » hors Traversée, § 22) fusionnent dans
+ * l'ordre des rangs, puis les doux (mouvement P1, bordure à 1 m, personne,
  * barrière, reste en ordre de détection). Le véhicule ne fournit que du
  * doux ici (son stop roulant ne se dit qu'en Traversée, § 22) ; son
  * `urgent` (danger qui s'approche, bordure à 0,7 m) coupe le doux. `null` partout =
@@ -73,9 +73,9 @@ private fun softRank(cue: VehicleStateCue): ObstacleRank =
 private fun softRank(cue: CurbCue): ObstacleRank =
     if (cue.tier == CurbTier.FAR) ObstacleRank.CURB else ObstacleRank.OTHER
 
-/** Rang doux du mobilier : poteau, barrière, puis divers avec le reste. */
+/** Rang doux du danger : personne, barrière, puis divers avec le reste. */
 private fun softRank(kind: HazardKind): ObstacleRank = when (kind) {
-    HazardKind.POLE -> ObstacleRank.POLE
+    HazardKind.PERSON -> ObstacleRank.PERSON
     HazardKind.BARRIER -> ObstacleRank.BARRIER
     HazardKind.OTHER -> ObstacleRank.OTHER
 }

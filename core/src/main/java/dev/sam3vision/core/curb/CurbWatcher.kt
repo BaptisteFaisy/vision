@@ -207,7 +207,7 @@ class CurbWatcher(
     val lastAlertMs: Long?
         get() = lastCueAtMs.takeIf { it != NO_INSTANT }
 
-    /** Dernier palier proche, `null` si aucun (P2 : le poteau attend quand il est frais). */
+    /** Dernier palier proche, `null` si aucun (P2 : la personne attend quand il est frais). */
     val lastNearMs: Long?
         get() = lastNearAtMs.takeIf { it != NO_INSTANT }
 

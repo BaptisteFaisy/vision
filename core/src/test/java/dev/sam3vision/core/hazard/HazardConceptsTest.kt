@@ -5,13 +5,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Mobilier suivi : concepts FR/EN reconnus, le reste ignoré. */
+/** Danger suivi : personne + mobilier FR/EN reconnus, le reste ignoré, le poteau muet. */
 class HazardConceptsTest {
 
     @Test
     fun `concepts anglais reconnus`() {
         assertTrue(HazardConcepts.isHazard("barrier"))
         assertTrue(HazardConcepts.isHazard("pole"))
+        assertTrue(HazardConcepts.isHazard("person"))
+        assertTrue(HazardConcepts.isHazard("human"))
         assertTrue(HazardConcepts.isHazard("bollard"))
         assertTrue(HazardConcepts.isHazard("fence"))
         assertTrue(HazardConcepts.isHazard("gate"))
@@ -24,6 +26,8 @@ class HazardConceptsTest {
     fun `concepts francais reconnus, accents et casse neutralises`() {
         assertTrue(HazardConcepts.isHazard("Barrière"))
         assertTrue(HazardConcepts.isHazard("POTEAU"))
+        assertTrue(HazardConcepts.isHazard("Personne"))
+        assertTrue(HazardConcepts.isHazard("humain"))
         assertTrue(HazardConcepts.isHazard("borne"))
         assertTrue(HazardConcepts.isHazard("Clôture"))
         assertTrue(HazardConcepts.isHazard("portail"))
@@ -39,6 +43,8 @@ class HazardConceptsTest {
     fun `pluriels reconnus`() {
         assertTrue(HazardConcepts.isHazard("barriers"))
         assertTrue(HazardConcepts.isHazard("poteaux"))
+        assertTrue(HazardConcepts.isHazard("persons"))
+        assertTrue(HazardConcepts.isHazard("humans"))
         assertTrue(HazardConcepts.isHazard("portails"))
         assertTrue(HazardConcepts.isHazard("street lamps"))
         assertTrue(HazardConcepts.isHazard("lampadaires"))
@@ -52,8 +58,10 @@ class HazardConceptsTest {
     fun `noms parles`() {
         assertEquals("à la barrière", HazardConcepts.nameOf("barrier")!!.fr)
         assertEquals("au poteau", HazardConcepts.nameOf("poteau")!!.fr)
+        assertEquals("à la personne", HazardConcepts.nameOf("personne")!!.fr)
         assertEquals("barrier", HazardConcepts.nameOf("barrier")!!.en)
         assertEquals("pole", HazardConcepts.nameOf("poteau")!!.en)
+        assertEquals("person", HazardConcepts.nameOf("person")!!.en)
         assertEquals("au lampadaire", HazardConcepts.nameOf("street lamp")!!.fr)
         assertEquals("street lamp", HazardConcepts.nameOf("lampadaire")!!.en)
         assertEquals("au panneau", HazardConcepts.nameOf("sign")!!.fr)
@@ -63,7 +71,7 @@ class HazardConceptsTest {
     }
 
     @Test
-    fun `poteaux reconnus FR EN pluriel`() {
+    fun `poteaux reconnus FR EN pluriel, reconnus mais muets`() {
         assertTrue(HazardConcepts.isPole("pole"))
         assertTrue(HazardConcepts.isPole("poteau"))
         assertTrue(HazardConcepts.isPole("POTEAUX"))
@@ -71,6 +79,28 @@ class HazardConceptsTest {
         assertFalse(HazardConcepts.isPole("barrier"))
         assertFalse(HazardConcepts.isPole("person"))
         assertFalse(HazardConcepts.isPole("  "))
+        assertTrue(HazardConcepts.isHazard("pole"))
+        assertTrue(HazardConcepts.isHazard("poteau"))
+        assertFalse(HazardConcepts.isSpoken("pole"))
+        assertFalse(HazardConcepts.isSpoken("poteau"))
+        assertFalse(HazardConcepts.isSpoken("POTEAUX"))
+    }
+
+    @Test
+    fun `personnes reconnues FR EN, casse neutralisee, parlees`() {
+        assertTrue(HazardConcepts.isPerson("person"))
+        assertTrue(HazardConcepts.isPerson("Personne"))
+        assertTrue(HazardConcepts.isPerson("humain"))
+        assertTrue(HazardConcepts.isPerson("HUMAN"))
+        assertTrue(HazardConcepts.isPerson("pedestrian"))
+        assertFalse(HazardConcepts.isPerson("barrier"))
+        assertFalse(HazardConcepts.isPerson("pole"))
+        assertFalse(HazardConcepts.isPerson("  "))
+        assertTrue(HazardConcepts.isHazard("person"))
+        assertTrue(HazardConcepts.isHazard("humain"))
+        assertTrue(HazardConcepts.isSpoken("person"))
+        assertTrue(HazardConcepts.isSpoken("Personne"))
+        assertTrue(HazardConcepts.isSpoken("pedestrian"))
     }
 
     @Test
@@ -85,19 +115,20 @@ class HazardConceptsTest {
     }
 
     @Test
-    fun `sorte par label - poteau, barriere, divers`() {
-        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poteau"))
-        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poles"))
+    fun `sorte par label - personne, barriere, divers`() {
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("person"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("Personnes"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("humain"))
         assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("barrier"))
         assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("Barrières"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("poteau"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("poles"))
         assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("borne"))
         assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("clôture"))
-        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("person"))
     }
 
     @Test
     fun `autres labels ignores`() {
-        assertFalse(HazardConcepts.isHazard("person"))
         assertFalse(HazardConcepts.isHazard("car"))
         assertFalse(HazardConcepts.isHazard("sidewalk"))
         assertFalse(HazardConcepts.isHazard("marche"))
