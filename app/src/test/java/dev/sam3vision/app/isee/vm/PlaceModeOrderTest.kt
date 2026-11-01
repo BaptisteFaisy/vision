@@ -23,6 +23,15 @@ class PlaceModeOrderTest {
     )
 
     @Test
+    fun `au lancement la voix dehors parle, dehors est le defaut`() {
+        // 01/11/2026 : le défaut dedans bâillonnait toute la voix dehors
+        // (obstacles, GPS, traversée) à chaque lancement — le chat seul
+        // répondait. Dehors est l'usage premier et de sécurité.
+        assertEquals(PictoPlaceMode.DEHORS, IseeUiState().placeMode)
+        assertEquals(PictoPlaceMode.DEHORS, PictoPlaceMode.DEFAULT)
+    }
+
+    @Test
     fun `mode dehors bascule et confirme a voix haute`() = runBlocking {
         assertTrue(order().run("mode dehors"))
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
@@ -53,7 +62,7 @@ class PlaceModeOrderTest {
         assertFalse(orders.run("dehors il pleut"))
         assertFalse(orders.run("quel mode de cuisson ?"))
         assertFalse(orders.run("il fait beau dehors"))
-        assertEquals(PictoPlaceMode.DEDANS, state.placeMode)
+        assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
         assertTrue(spoken.isEmpty())
         assertTrue(state.status == null)
     }

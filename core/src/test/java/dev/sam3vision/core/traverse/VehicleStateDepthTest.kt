@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -56,14 +57,18 @@ class VehicleStateDepthTest {
 
     @Test
     fun `croissance a profondeur croissante - en mouvement, urgent au centre`() {
-        val watcher = VehicleStateWatcher()
+        val watcher = VehicleStateWatcher(confirmFrames = 1, movingCooldownMs = 0L)
         assertNull(frame(watcher, 100f, 0L, 0.4f))
-        assertNull("confirmation en cours", frame(watcher, 110f, 100L, 0.5f))
-        val third = frame(watcher, 120f, 200L, 0.6f, SpeechLanguage.Fr)
+        listOf(110f to 0.5f, 120f to 0.6f, 130f to 0.7f, 140f to 0.8f).forEachIndexed { index, (width, depth) ->
+            val cue = frame(watcher, width, (index + 1) * 100L, depth, SpeechLanguage.Fr)
+            assertEquals("Voiture.", cue!!.phrase)
+            assertFalse("croissance seule, tau run < 5 : pas urgent", cue.urgent)
+        }
+        val sixth = frame(watcher, 150f, 500L, 0.9f, SpeechLanguage.Fr)
 
-        assertEquals("Voiture.", third!!.phrase)
-        assertEquals(5f, third.meters!!, 0.001f)
-        assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
+        assertEquals("Voiture.", sixth!!.phrase)
+        assertEquals(5f, sixth.meters!!, 0.001f)
+        assertTrue("tau run 5 + proche + centre : urgent", sixth.urgent)
     }
 
     @Test
@@ -79,11 +84,14 @@ class VehicleStateDepthTest {
 
     @Test
     fun `profondeur partielle - le doute ne tait pas`() {
-        val watcher = VehicleStateWatcher()
+        val watcher = VehicleStateWatcher(confirmFrames = 1, movingCooldownMs = 0L)
         assertNull(frame(watcher, 100f, 0L, null))
-        assertNull("croissance confirmée sans première mesure", frame(watcher, 110f, 100L, 0.5f))
-        val third = frame(watcher, 120f, 200L, 0.5f, SpeechLanguage.Fr)
+        assertNotNull("croissance sans première mesure : le doute parle", frame(watcher, 110f, 100L, 0.5f))
+        assertNull("profondeur constante, tau run < 5", frame(watcher, 120f, 200L, 0.5f))
+        assertNull(frame(watcher, 130f, 300L, 0.5f))
+        assertNull(frame(watcher, 140f, 400L, 0.5f))
+        val sixth = frame(watcher, 150f, 500L, 0.5f, SpeechLanguage.Fr)
 
-        assertNotNull("tau sans première mesure : le doute parle", third)
+        assertNotNull("tau sans première mesure : le doute parle", sixth)
     }
 }

@@ -39,6 +39,10 @@ class MotionModel(
     var jumps: Int = 0
         private set
 
+    /** Vitesse brute de largeur de la dernière observation (px/s, signée) : le run de croissance. */
+    var lastRawWidth: Float = 0f
+        private set
+
     /**
      * Incorpore la boîte serveur [box] datée de [timestampMs]. [maxSpeedPxPerSec] borne
      * la vitesse (calculée depuis la taille d'image : un objet ne traverse pas l'écran
@@ -52,6 +56,7 @@ class MotionModel(
         }
         val predicted = predictAt(timestampMs)
         val raw = rawVelocity(box, dt).limited(maxSpeedPxPerSec)
+        lastRawWidth = raw.width
         return if (box.iou(predicted) < minIou) {
             jump(box, raw, timestampMs)
         } else {

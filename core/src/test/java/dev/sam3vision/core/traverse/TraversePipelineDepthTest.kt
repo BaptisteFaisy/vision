@@ -23,11 +23,11 @@ class TraversePipelineDepthTest {
         return listOf(320f - widthPx / 2f, 240f - heightPx / 2f, 320f + widthPx / 2f, 240f + heightPx / 2f)
     }
 
-    /** Quatre frames croissantes (100→130), mesurées à [depth] ; verdict de la dernière. */
+    /** Sept frames croissantes (100→160), mesurées à [depth] ; verdict de la dernière. */
     private suspend fun lastVerdict(depth: Float?): TraverseDecision {
         val pipeline = TraversePipeline()
         var decision: TraverseDecision? = null
-        listOf(100f, 110f, 120f, 130f).forEachIndexed { index, width ->
+        listOf(100f, 110f, 120f, 130f, 140f, 150f, 160f).forEachIndexed { index, width ->
             val out = pipeline.onFrame(listOf(seg(width, depth)), 640, 480, true, -1f, index * 100L)
             decision = out.decision
         }

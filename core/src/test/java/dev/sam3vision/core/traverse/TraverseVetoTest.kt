@@ -245,12 +245,15 @@ class TraverseVetoTest {
         val veto = TraverseVeto()
         val first = veto.update(true, listOf(detection("car", 0.9f, listOf(270f, 210f, 370f, 270f))), focalPx, 0L)
         veto.update(true, listOf(detection("car", 0.9f, listOf(265f, 207f, 375f, 273f))), focalPx, 100L)
-        val third = veto.update(true, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(255f, 201f, 385f, 279f))), focalPx, 300L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(250f, 198f, 390f, 282f))), focalPx, 400L)
+        val sixth = veto.update(true, listOf(detection("car", 0.9f, listOf(245f, 195f, 395f, 285f))), focalPx, 500L)
 
         assertFalse("piste jeune : pas de TTC", first.veto)
         assertNull(first.approachTtcSeconds)
-        assertTrue(third.veto)
-        assertNotNull("rapprochement confirmé suivi", third.approachTtcSeconds)
+        assertTrue(sixth.veto)
+        assertNotNull("rapprochement confirmé suivi", sixth.approachTtcSeconds)
     }
 
     @Test

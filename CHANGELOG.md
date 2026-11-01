@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : la rue reparle au lancement, dehors est le défaut (branche `fix/voix-dehors-defaut`)
+
+- **Demande** : « mon app isee ne me parle plus » après mise à jour —
+  le chat répond quand on lui parle, mais la voix dehors (obstacles,
+  GPS, traversée) reste muette.
+- **Cause** : depuis les modes v4 (`8562bb3a`), toute la voix dehors
+  est bâillonnée sur `placeMode == DEHORS` (`ProbeWiring`,
+  `IseeVoiceSpine.speakGps`, `CrossingWiring`) alors que le lieu
+  d'ouverture est `DEDANS`, en mémoire seule (ni persistance, ni
+  détection auto) — chaque lancement rendait la rue muette, sans
+  aucun indice. Le build du 30/10 n'avait aucune porte de lieu.
+- **Fait** : défaut `DEHORS` (`IseeUiState.placeMode`,
+  `PictoPlaceMode.DEFAULT`) — dehors est l'usage premier et de
+  sécurité ; « mode dedans » garde les pictos dedans.
+- **Preuve** : `PlaceModeOrderTest` (+1 : dehors au lancement),
+  `PictoPlaceModeTest` verts ; `:app` 1 849 + `:core` 3 241 tests,
+  0 échec ; `check-kotlin-limits.py` vert. Recette téléphone
+  **non mesurée** (téléphone occupé par une campagne).
+
 ## 2026-11-01 — iSee : « où sont mes clés » relance la chasse (branche `fix/isee-where-find-sans-mode`)
 
 - **Demande** : les pictos ne marchent plus — « où sont mes clés »

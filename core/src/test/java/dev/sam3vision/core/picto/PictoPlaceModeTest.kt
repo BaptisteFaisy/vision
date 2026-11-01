@@ -10,8 +10,8 @@ import org.junit.Test
 class PictoPlaceModeTest {
 
     @Test
-    fun `le lieu par defaut est dedans, picto actif`() {
-        assertEquals(PictoPlaceMode.DEDANS, PictoPlaceMode.DEFAULT)
+    fun `le lieu par defaut est dehors, la rue parle au lancement`() {
+        assertEquals(PictoPlaceMode.DEHORS, PictoPlaceMode.DEFAULT)
         assertTrue(PictoPlaceMode.DEDANS.pictoEnabled)
         assertFalse(PictoPlaceMode.DEHORS.pictoEnabled)
     }

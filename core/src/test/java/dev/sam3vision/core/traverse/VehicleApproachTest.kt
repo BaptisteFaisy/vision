@@ -17,16 +17,42 @@ import org.junit.Test
 class VehicleApproachTest {
 
     @Test
-    fun `voiture qui approche - veto des la 3e frame avec TTC`() {
+    fun `voiture qui approche - veto a la 6e frame avec TTC`() {
         val approach = VehicleApproach()
-        assertFalse(approach.update(listOf(car(100f)), atMs = 0L).approaching)
-        assertFalse(approach.update(listOf(car(110f)), atMs = 100L).approaching)
-        val third = approach.update(listOf(car(120f)), atMs = 200L)
+        listOf(100f, 110f, 120f, 130f, 140f).forEachIndexed { index, width ->
+            assertFalse("run ${index + 1} < 5 : le tau attend (flicker)",
+                approach.update(listOf(car(width)), atMs = index * 100L).approaching)
+        }
+        val sixth = approach.update(listOf(car(150f)), atMs = 500L)
 
-        assertTrue("croissance lisse + vitesse établie", third.approaching)
-        assertNotNull(third.ttcSeconds)
-        assertTrue("tau ~2,4 s", third.ttcSeconds!! in 1.0f..3.0f)
-        assertEquals("car", third.label)
+        assertTrue("croissance lisse + vitesse établie", sixth.approaching)
+        assertNotNull(sixth.ttcSeconds)
+        assertTrue("tau ~1,8 s", sixth.ttcSeconds!! in 1.0f..3.0f)
+        assertEquals("car", sixth.label)
+    }
+
+    @Test
+    fun `flicker asymetrique - pas de veto tau`() {
+        // Miroir trace G1w (S1 figé) : ±30 px alternés, jamais 3 signes +.
+        val approach = VehicleApproach()
+        val widths = listOf(40f, 72f, 60f, 92f, 80f, 112f)
+        widths.forEachIndexed { index, width ->
+            assertFalse(
+                "flicker frame ${index + 1} : pas d'approche",
+                approach.update(listOf(car(width)), atMs = index * 170L).approaching,
+            )
+        }
+    }
+
+    @Test
+    fun `croissance franche - veto tau tenu des la 6e frame`() {
+        val approach = VehicleApproach()
+        val frames = listOf(100f, 110f, 120f, 130f, 140f, 150f, 160f)
+        frames.forEachIndexed { index, width ->
+            val verdict = approach.update(listOf(car(width)), atMs = index * 100L)
+            if (index < 5) assertFalse("run < 5 : silence", verdict.approaching)
+            else assertTrue("croissance franche : veto", verdict.approaching)
+        }
     }
 
     @Test
@@ -55,10 +81,13 @@ class VehicleApproachTest {
         val approach = VehicleApproach()
         approach.update(listOf(car(100f), busStatic()), atMs = 0L)
         approach.update(listOf(car(110f), busStatic()), atMs = 100L)
-        val third = approach.update(listOf(car(120f), busStatic()), atMs = 200L)
+        approach.update(listOf(car(120f), busStatic()), atMs = 200L)
+        approach.update(listOf(car(130f), busStatic()), atMs = 300L)
+        approach.update(listOf(car(140f), busStatic()), atMs = 400L)
+        val sixth = approach.update(listOf(car(150f), busStatic()), atMs = 500L)
 
-        assertTrue(third.approaching)
-        assertEquals("car", third.label)
+        assertTrue(sixth.approaching)
+        assertEquals("car", sixth.label)
     }
 
     @Test
@@ -184,16 +213,18 @@ class VehicleApproachTest {
     }
 
     @Test
-    fun `dt 500ms - association IoU 0-2 et veto a la 3e frame`() {
+    fun `dt 500ms - association tenue et veto a la 6e frame`() {
         val approach = VehicleApproach()
-        assertFalse(approach.update(listOf(car(100f)), atMs = 0L).approaching)
-        assertFalse(approach.update(listOf(car(200f)), atMs = 500L).approaching)
-        val third = approach.update(listOf(car(300f)), atMs = 1000L)
+        listOf(60f, 90f, 135f, 203f, 304f).forEachIndexed { index, width ->
+            assertFalse("run ${index + 1} < 5 : le tau attend",
+                approach.update(listOf(car(width)), atMs = index * 500L).approaching)
+        }
+        val sixth = approach.update(listOf(car(456f)), atMs = 2500L)
 
-        assertTrue("IoU 0,25 > 0,2 : piste tenue", third.approaching)
-        assertNotNull(third.ttcSeconds)
-        assertTrue("tau ~2,5 s", third.ttcSeconds!! in 1.0f..3.0f)
-        assertEquals("car", third.label)
+        assertTrue("IoU > 0,15 : piste tenue", sixth.approaching)
+        assertNotNull(sixth.ttcSeconds)
+        assertTrue("tau ~2,7 s", sixth.ttcSeconds!! in 1.0f..3.0f)
+        assertEquals("car", sixth.label)
         assertEquals(1, approach.trackCount)
     }
 
@@ -223,12 +254,13 @@ class VehicleApproachTest {
     @Test
     fun `approche frontale - lateral muet`() {
         val approach = VehicleApproach()
-        approach.update(listOf(car(100f)), atMs = 0L)
-        approach.update(listOf(car(110f)), atMs = 100L)
-        val third = approach.update(listOf(car(120f)), atMs = 200L)
+        listOf(100f, 110f, 120f, 130f, 140f).forEachIndexed { index, width ->
+            approach.update(listOf(car(width)), atMs = index * 100L)
+        }
+        val sixth = approach.update(listOf(car(150f)), atMs = 500L)
 
-        assertTrue(third.approaching)
-        assertFalse("vitesse x nulle", third.lateralMoving)
+        assertTrue(sixth.approaching)
+        assertFalse("vitesse x nulle", sixth.lateralMoving)
     }
 
     @Test
@@ -312,9 +344,10 @@ class VehicleApproachTest {
         assertFalse("sans radiale : croissance lente muette", silent.approaching)
 
         val noisy = VehicleApproach()
-        noisy.update(listOf(car(100f)), atMs = 0L)
-        noisy.update(listOf(car(200f)), atMs = 500L)
-        val held = noisy.update(listOf(car(300f)), atMs = 1000L, radialMpsByKey = mapOf(key to 5f))
+        listOf(60f, 90f, 135f, 203f, 304f).forEachIndexed { index, width ->
+            noisy.update(listOf(car(width)), atMs = index * 500L, radialMpsByKey = mapOf(key to 5f))
+        }
+        val held = noisy.update(listOf(car(456f)), atMs = 2500L, radialMpsByKey = mapOf(key to 5f))
         assertTrue("tau franc : récession n'efface pas", held.approaching)
         assertNotNull(held.ttcSeconds)
     }

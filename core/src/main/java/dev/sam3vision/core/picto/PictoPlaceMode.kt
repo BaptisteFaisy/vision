@@ -18,8 +18,8 @@ enum class PictoPlaceMode {
     val pictoEnabled: Boolean get() = this == DEDANS
 
     companion object {
-        /** Lieu d'ouverture : dedans, comme l'appartement du mode Maison. */
-        val DEFAULT: PictoPlaceMode = DEDANS
+        /** Lieu d'ouverture : dehors — la rue (obstacles, GPS, traversée) parle au lancement, le silence dehors est un danger (01/11/2026). */
+        val DEFAULT: PictoPlaceMode = DEHORS
     }
 }
 

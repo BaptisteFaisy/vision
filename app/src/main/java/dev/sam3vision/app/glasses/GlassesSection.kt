@@ -29,9 +29,9 @@ import dev.sam3vision.app.StatusBanner
 val LocalBenchOpener = compositionLocalOf<(() -> Unit)?> { null }
 
 /**
- * Bloc « Lunettes » des Réglages : état lisible et trois gestes utiles
- * (enregistrer auprès de Meta AI, démarrer la session, prendre une photo),
- * puis l'entrée du banc d'essai ([LocalBenchOpener]).
+ * Bloc « Lunettes » des Réglages : état lisible et quatre gestes utiles
+ * (enregistrer auprès de Meta AI, actualiser l'état, démarrer la session,
+ * prendre une photo), puis l'entrée du banc d'essai ([LocalBenchOpener]).
  * Les lunettes simulées n'apparaissent qu'en build debug.
  */
 @Composable
@@ -39,6 +39,7 @@ fun GlassesSection(
     state: GlassesUiState,
     debugBuild: Boolean,
     onRegister: () -> Unit,
+    onRefresh: () -> Unit,
     onRequestCamera: () -> Unit,
     onRequestMic: () -> Unit,
     onConnect: () -> Unit,
@@ -58,7 +59,7 @@ fun GlassesSection(
         GlassesStatusLines(state)
         state.message?.let { StatusBanner(it.text, bannerColor(it.kind)) }
         PermissionActions(onRequestCamera, onRequestMic)
-        ProductionActions(state, onRegister, onConnect, onCapture, onDisconnect)
+        ProductionActions(state, onRegister, onRefresh, onConnect, onCapture, onDisconnect)
         photoHint(state)?.let { Text(it, color = AppColors.warning, fontSize = 12.sp) }
         talkHint(state)?.let { Text(it, color = AppColors.warning, fontSize = 12.sp) }
         if (debugBuild) {
@@ -83,11 +84,12 @@ private fun PermissionActions(onCamera: () -> Unit, onMic: () -> Unit) {
     GlassButton("Allow the microphone (Meta AI)", true, primary = false, onClick = onMic)
 }
 
-/** Les trois gestes de production : enregistrement Meta AI, session, photo. */
+/** Les gestes de production : enregistrement Meta AI, actualisation, session, photo. */
 @Composable
 private fun ProductionActions(
     state: GlassesUiState,
     onRegister: () -> Unit,
+    onRefresh: () -> Unit,
     onConnect: () -> Unit,
     onCapture: () -> Unit,
     onDisconnect: () -> Unit,
@@ -97,6 +99,12 @@ private fun ProductionActions(
         enabled = state.sdkReady,
         primary = false,
         onClick = onRegister,
+    )
+    GlassButton(
+        label = "Refresh",
+        enabled = state.sdkReady,
+        primary = false,
+        onClick = onRefresh,
     )
     GlassButton(
         label = connectLabel(state),
@@ -140,6 +148,7 @@ internal fun GlassesBlock(glasses: GlassesController) {
         state = glassesState,
         debugBuild = BuildConfig.DEBUG,
         onRegister = glasses::register,
+        onRefresh = glasses::refresh,
         onRequestCamera = { glasses.requestPermission(Permission.CAMERA) },
         onRequestMic = { glasses.requestPermission(Permission.MICROPHONE) },
         onConnect = { Log.i("GlassesChain", "tap session"); glasses.connect() },

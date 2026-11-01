@@ -30,6 +30,7 @@ import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
 import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
 import dev.sam3vision.app.glasses.bench.SpikeLaunch
 import dev.sam3vision.app.glasses.debugMockConnect
+import dev.sam3vision.app.glasses.refresh
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.locked.LockedMicBridge
 import dev.sam3vision.app.perms.canAskBackground
@@ -227,6 +228,9 @@ class MainActivity : ComponentActivity() {
         // Session lunettes : un démarrage du maintien refusé en fond (Android 12+)
         // se rejoue ici, au premier plan.
         if (glassesKeepAlive()) GlassesSessionLifecycle.startBackground(this)
+        // Retour de l'app Meta AI : le flux d'enregistrement ne réémet pas
+        // toujours, on relit l'état pour que le bloc Lunettes suive.
+        glasses.refresh()
     }
 
     /** Session lunettes-iSee en cours : la veille ne coupe ni la session ni la carte. */
