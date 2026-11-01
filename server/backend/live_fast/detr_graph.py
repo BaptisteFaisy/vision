@@ -9,8 +9,10 @@ Ce module les clone en **tenseurs statiques**, capture le graphe sur ces buffers
 chaque frame recopie dedans et rejoue. Trois garde-fous, dans l'ordre :
 
 * **forme inconnue = eager** : la première passe d'une forme (n concepts, longueur de
-  tokens) s'exécute normalement et sert à la capture ; au-delà d'un budget de formes,
-  on ne capture plus (la VRAM n'est pas extensible) ;
+  tokens) s'exécute normalement et sert à la capture ; à budget plein, TOUTES les
+  formes sont évincées d'un coup (génération exclusive) pour faire place à la
+  nouvelle — sans ça, tout changement de forme après saturation restait eager
+  pour toujours (batch-8 jamais graphé en prod, 01/11) ;
 * **vérification obligatoire** : après capture, graphe et eager sont comparés sur la même
   entrée ; au moindre écart la forme est marquée « sans graphe ». Une sortie fausse de 2
   % serait invisible à l'œil et fausserait les distances ;
@@ -36,8 +38,13 @@ actif), mathématiquement identiques, pinnés à `transformers==5.20.2` :
 
 from types import SimpleNamespace
 
-# Formes capturées au maximum : une par nombre de concepts, une par longueur de tokens.
-MAX_SHAPES = 3
+# Formes capturées au maximum : les tokens sont paddés à 32 (Sam3Processor) et la
+# vision est fixe à edge fixe — une forme ≈ un nombre de concepts (1..8 : 3 presets
+# + suivi custom + marge). Coût mesuré par entrée (3060 Ti, bf16, edge 1008, 01/11) :
+# ~0,55/1,33/2,62 Go réservés pour n=1/2/4 (≈0,65 Go/concept) ; prod A100-40Go :
+# pire cas théorique Σ(n=1..8) ≈ 24 Go + ~4 Go de base < 40 Go.
+# Au-delà : éviction TOTALE (génération exclusive — pas de LRU : voir `_evict_all`).
+MAX_SHAPES = 8
 # Écart maximal accepté entre la sortie eager et la sortie graphée (bf16 : marge large).
 TOLERANCE = 2e-2
 # `spatial_shapes` mémoïsés (un par forme vision — même budget que les graphes, +1).
@@ -165,6 +172,8 @@ class DetrGraphs:
         self._entries = {}
         self._warm = set()
         self._failed = set()
+        self._evictions = 0
+        self._evicted = []
         self.state = "idle"
 
     def __call__(self, forward, embeds, inputs):
@@ -181,13 +190,37 @@ class DetrGraphs:
         self._capture(forward, embeds, inputs, key, out)
         return out
 
+    def _evict_all(self) -> None:
+        """Éjecte TOUTES les formes (génération exclusive), graphes libérés.
+
+        PAS de LRU par entrée : détruire (`reset()`) UN graphe puis en capturer
+        un autre corrompt les replays des graphes co-résidents — prouvé en torch
+        pur (2.14.1, 3060 Ti, 01/11) : 3 captures sans reset OK, reset sans
+        recapture OK, reset PUIS recapture → `launch failure` au replay du
+        co-résident, pools privés ou pas. La corruption tue le contexte CUDA
+        (conteneur à redémarrer) : la seule destruction sûre est TOTALE (zéro
+        co-résident vivant à la prochaine capture). Le changement de forme coûte
+        donc une re-génération (~2 passes eager + capture) — rare en direct
+        (concepts fixés en séance), jamais eager-pour-toujours.
+        """
+        for old in self._entries.values():
+            try:
+                old["graph"].reset()
+            except Exception:  # noqa: BLE01 — l'éviction ne doit jamais casser le live
+                pass
+        self._evicted = sorted(str(key) for key in self._entries)
+        self._entries.clear()
+        self._evictions += 1
+
     def _capture(self, forward, embeds, inputs, key, eager_out) -> None:
         """Capture après une première passe eager, puis vérifie avant d'accepter le graphe."""
         torch = _torch()
         if key in self._failed or not torch.cuda.is_available():
             return
-        if len(self._entries) >= self.budget:
+        if self.budget <= 0:
             return
+        if len(self._entries) >= self.budget:
+            self._evict_all()
         if key not in self._warm:
             self._warm.add(key)
             return
@@ -248,7 +281,10 @@ class DetrGraphs:
 
     def status(self) -> dict:
         """État lisible depuis /health et le banc : formes capturées, politique en vigueur."""
-        return {"detr_graph": self.state, "shapes": len(self._entries), "budget": self.budget}
+        return {"detr_graph": self.state, "shapes": len(self._entries), "budget": self.budget,
+                "keys": [str(key) for key in self._entries],
+                "evictions": self._evictions, "evicted": list(self._evicted),
+                "warmed": len(self._warm), "failed": len(self._failed)}
 
 
 def graph_holder(ctx):

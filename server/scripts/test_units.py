@@ -27,7 +27,7 @@ from pathlib import Path
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
-                         depth_tests, feux_guard_tests, latency_tests,
+                         depth_tests, detr_evict_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
                          native_tests, post_tests, preproc_tests, tracking_tests, weights_tests,
                          ws_binary_tests)
@@ -442,6 +442,10 @@ RUNNERS = (
     ("live_fast : coords detr sans sync", "timing", live_fast_perf_tests.test_detr_coords_no_sync),
     ("live_fast : coords detr niveaux", "timing", live_fast_perf_tests.test_detr_coords_levels),
     ("live_fast : coords detr statique capture", "timing", live_fast_perf_tests.test_detr_coords_capture_static),
+    ("live_fast : éviction totale detr", "timing", detr_evict_tests.test_detr_evict_all),
+    ("live_fast : budget detr non plein", "timing", detr_evict_tests.test_detr_budget_non_plein),
+    ("live_fast : échec capture detr permanent", "timing", detr_evict_tests.test_detr_failed_permanent),
+    ("live_fast : statut detr debug", "timing", detr_evict_tests.test_detr_status),
     ("live_fast : sync timing + poste d2h", "timing", live_fast_perf_tests.test_sync_timing),
     ("feux : garde serveur (labels/slot/work_edge)", "timing", feux_guard_tests.test_feux_guard),
     ("live_fast : pré-traitement (levier FAST_PREPROCESS)", "timing",
