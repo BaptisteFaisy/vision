@@ -223,8 +223,8 @@ def main_capsplit(texte, skip):
     return 0
 
 
-def selftest():
-    """Assertions du parseur : formes, warmup, centiles, verdict, serveurs, capsplit."""
+def selftest_frames():
+    """Formes, warmup, centiles, verdict : les assertions du mode par défaut."""
     cas = [
         ("I ISEE_LAT: latency 348 · capt 22 · up 61 · srv 92 · rtt 153 · mask 37 · pixel 8",
          {"latency": 348, "capt": 22, "up": 61, "srv": 92, "rtt": 153,
@@ -245,6 +245,11 @@ def selftest():
     rate, ko = verdict([{"latency": v} for v in (100, 600)], 300, 500)
     assert ok and not ko and any("TENU" in l for l in tenu)
     assert any("NON TENU" in l for l in rate)
+    return len(cas)
+
+
+def selftest_serveurs():
+    """Étages serveur : formes, ordre des rangs, CLI muette et parlante."""
     srv = "I ISEE_LAT: server: preprocess 7 ms · detr 52 ms"
     assert parse_ligne_server(srv) == {"preprocess": 7, "detr": 52}
     assert parse_ligne_server("10-31 12:00:00.000 1 2 I ISEE_LAT: server: —") is None
@@ -261,7 +266,19 @@ def selftest():
     tableau = tableau_serveurs([{"detr": v} for v in (10, 20, 30, 40, 50)])
     assert [l.split() for l in tableau if l.split()[0] == "detr"] == [
         ["detr", "5", "30.0", "30", "50", "50"]]
+    import contextlib, io
+    vide, plein = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(vide), contextlib.redirect_stderr(vide):
+        assert main_serveurs("I ISEE_LAT: latency 1 · pixel 1\n", 0) == 2
+    with contextlib.redirect_stdout(plein), contextlib.redirect_stderr(plein):
+        assert main_serveurs(srv + "\n", 0) == 0
+    assert "detr" in plein.getvalue() and "aucune ligne" in vide.getvalue()
+
+
+def selftest_capsplit():
+    """Capsplit : formes, warmup, somme frame par frame, comparaison au `capt`."""
     cap = "I ISEE_LAT: capsplit age 81 · enc 24 · b64 3 · cb 2 · total 30"
+    srv = "I ISEE_LAT: server: preprocess 7 ms · detr 52 ms"
     assert parse_ligne_capsplit(cap) == {"age": 81, "enc": 24, "b64": 3, "cb": 2,
                                          "total": 30}
     assert "total" in parse_ligne_capsplit(cap)
@@ -274,29 +291,30 @@ def selftest():
     bloc_cap = "\n".join(f"I ISEE_LAT: capsplit age {v} · enc 1 · b64 1 · cb 1 · total 5"
                          for v in (900, 800, 10, 11))
     assert [l["age"] for l in parse_texte_capsplit(bloc_cap, skip=2)] == [10, 11]
-    assert parse_texte_capsplit(melange + cap + "\n", skip=0) == [
+    assert parse_texte_capsplit(cap + "\n", skip=0) == [
         {"age": 81, "enc": 24, "b64": 3, "cb": 2, "total": 30}]
-    cap_table = tableau_capsplit(parse_texte_capsplit(cap + "\n", 0),
-                                 parse_texte("I ISEE_LAT: latency 348 · capt 111 · pixel 8\n",
-                                             skip=0))
+    cap_table = tableau_capsplit(
+        parse_texte_capsplit(cap + "\n", 0),
+        parse_texte("I ISEE_LAT: latency 348 · capt 111 · pixel 8\n", skip=0))
     assert [l.split() for l in cap_table if l.split()[0] == "somme"] == [
         ["somme", "1", "110.0", "110", "110", "110"]]
     assert any("écart -1.0" in l for l in cap_table)
     assert tableau_capsplit([], [])[-1] == "capt non mesuré dans ce dump"
     import contextlib, io
-    vide, plein = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(vide), contextlib.redirect_stderr(vide):
-        assert main_serveurs("I ISEE_LAT: latency 1 · pixel 1\n", 0) == 2
-    with contextlib.redirect_stdout(plein), contextlib.redirect_stderr(plein):
-        assert main_serveurs(srv + "\n", 0) == 0
-    assert "detr" in plein.getvalue() and "aucune ligne" in vide.getvalue()
     muet, parle = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(muet), contextlib.redirect_stderr(muet):
         assert main_capsplit("I ISEE_LAT: latency 1 · pixel 1\n", 0) == 2
     with contextlib.redirect_stdout(parle), contextlib.redirect_stderr(parle):
         assert main_capsplit(cap + "\n", 0) == 0
     assert "somme" in parle.getvalue() and "aucune ligne" in muet.getvalue()
-    print(f"OK   {len(cas) + 32} assertions parse_isee_lat")  # 32 asserts + 4 cas
+
+
+def selftest():
+    """Assertions du parseur : trois blocs indépendants (verdict, serveurs, capsplit)."""
+    cas = selftest_frames()
+    selftest_serveurs()
+    selftest_capsplit()
+    print(f"OK   {cas + 32} assertions parse_isee_lat")  # 32 asserts + 4 cas
     return 0
 
 
