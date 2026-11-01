@@ -195,8 +195,8 @@ lecture ratée.
 - **La voix sort dans les lunettes** quand la session est ouverte : le lecteur unique de l'app
   (`SpeechPlayer`) relit la sortie Bluetooth **à chaque phrase** et la pose sur
   `MediaPlayer.preferredDevice` (`glasses/GlassesVoiceRoute.kt`), la paire étant reconnue à son
-  nom et un **puits de son** seulement ; hors session, ou si aucun appareil ne peut recevoir
-  le son, la sortie par défaut du téléphone reste en place (aucun échec silencieux : une ligne
+  nom et un **puits de son** seulement, A2DP d'abord et SCO jamais (canal d'appel, pas musique) ; hors session,
+  ou si aucun appareil ne peut recevoir le son, la sortie par défaut du téléphone reste en place (aucun échec silencieux : une ligne
   `GlassesVoice` au changement de décision). Le choix lui-même est pur et partagé avec le banc
   (`glasses/GlassesAudioRoute.kt`, testé en JVM).
 - Le flux vidéo a **deux consommateurs** dans `GlassesCamera.kt` : le collecteur de production

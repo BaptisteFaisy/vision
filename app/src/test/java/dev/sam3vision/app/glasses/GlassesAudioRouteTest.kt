@@ -1,18 +1,23 @@
 package dev.sam3vision.app.glasses
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Choix de la sortie audio de la voix, sur JVM : aucun `AudioManager`, aucun
  * appareil, aucun stub.
  *
- * Les deux règles sont celles qui se paient sur le terrain : la paire de lunettes
+ * Les trois règles sont celles qui se paient sur le terrain : la paire de lunettes
  * connue du SDK passe **avant** une autre sortie Bluetooth (sinon des écouteurs
- * branchés prennent la voix), et un appareil qui n'est pas un puits de son n'est
+ * branchés prennent la voix), un appareil qui n'est pas un puits de son n'est
  * **jamais** choisi (le téléphone de test se présente lui-même comme une sortie
- * SCO : s'y router fait disparaître le son sans erreur).
+ * SCO : s'y router fait disparaître le son sans erreur), et le **SCO n'est jamais
+ * choisi non plus** (Xiaomi 01/11 : la voix partait sur « Ray-Ban Meta Hands-Free »,
+ * un canal d'appel qui ne rend pas le flux musique — texte affiché, silence total,
+ * sans aucune erreur).
  *
  * Depuis que le banc (`bench/GlassesVoice`) **et** la production
  * ([GlassesVoiceRoute]) ne sont plus que des adaptateurs, ce fichier est le seul
@@ -39,15 +44,15 @@ class GlassesAudioRouteTest {
     }
 
     @Test
-    fun `sans nom connu c est le meilleur type qui gagne`() {
+    fun `sans nom connu c est l A2DP qui gagne`() {
         val picked = pickBluetoothOutput(
             listOf(
-                output(name = "haut-parleur", type = TYPE_A2DP, rank = 2),
-                output(name = "Linkster TW1", type = TYPE_BLE, rank = 0),
+                output(name = "haut-parleur", type = TYPE_A2DP, rank = rankOf(TYPE_A2DP)),
+                output(name = "Linkster TW1", type = TYPE_BLE, rank = rankOf(TYPE_BLE)),
             ),
             preferredName = null,
         )
-        assertEquals("Linkster TW1", picked?.name)
+        assertEquals("haut-parleur", picked?.name)
     }
 
     @Test
@@ -80,10 +85,43 @@ class GlassesAudioRouteTest {
     @Test
     fun `le nom est reconnu sans la casse ni le suffixe de la pile Bluetooth`() {
         val picked = pickBluetoothOutput(
+            listOf(output(name = "Ray-Ban Meta Audio", type = TYPE_A2DP, rank = 2)),
+            preferredName = "ray-ban meta",
+        )
+        assertEquals("Ray-Ban Meta Audio", picked?.name)
+    }
+
+    @Test
+    fun `le SCO ne prend jamais la voix, meme nomme et seul`() {
+        // « Hands-Free » = canal d'appel : le flux musique n'y sort pas, et la
+        // plateforme ne le dit pas — `null` rend la voix au haut-parleur.
+        val picked = pickBluetoothOutput(
             listOf(output(name = "Ray-Ban Meta Hands-Free", type = TYPE_SCO, rank = 4)),
             preferredName = "ray-ban meta",
         )
-        assertEquals("Ray-Ban Meta Hands-Free", picked?.name)
+        assertNull(picked)
+    }
+
+    @Test
+    fun `entre homonymes c est le meilleur type qui gagne`() {
+        val picked = pickBluetoothOutput(
+            listOf(
+                output(name = "Ray-Ban Meta", type = TYPE_BLE, rank = rankOf(TYPE_BLE)),
+                output(name = "Ray-Ban Meta", type = TYPE_A2DP, rank = rankOf(TYPE_A2DP)),
+            ),
+            preferredName = "Ray-Ban Meta",
+        )
+        assertEquals(TYPE_A2DP, picked?.type)
+    }
+
+    @Test
+    fun `l A2DP passe avant le BLE dans le rang des types`() {
+        assertTrue(rankOf(TYPE_A2DP) < rankOf(TYPE_BLE))
+    }
+
+    @Test
+    fun `le SCO n est pas une sortie voix`() {
+        assertFalse(isBluetoothOutput(TYPE_SCO))
     }
 
     @Test

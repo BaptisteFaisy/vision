@@ -9,11 +9,13 @@ import android.media.AudioManager
  *
  * Le code Android ([GlassesVoiceRoute] en production, `bench/GlassesVoice` pour le
  * banc) ne décide pas : il lit `AudioManager`, remplit des [AudioOutput] et applique
- * le choix. C'est ce qui permet de prouver ici, sur JVM, les deux règles qui
+ * le choix. C'est ce qui permet de prouver ici, sur JVM, les trois règles qui
  * comptent — **une paire de lunettes nommée passe avant n'importe quelle autre
- * sortie**, et **un appareil qui n'est pas un puits de son n'est jamais choisi**
+ * sortie**, **un appareil qui n'est pas un puits de son n'est jamais choisi**
  * (le téléphone se présente parfois lui-même comme une sortie Bluetooth : s'y
- * router fait disparaître la voix sans aucune erreur).
+ * router fait disparaître la voix sans aucune erreur), et **le SCO n'est jamais
+ * choisi** (« Hands-Free » = canal d'appel : le flux musique d'un `MediaPlayer`
+ * n'y sort pas, sans aucune erreur — Xiaomi 01/11 : texte affiché, silence total).
  */
 
 /**
@@ -38,36 +40,41 @@ internal data class AudioOutput(
  * `null` = aucune sortie Bluetooth utilisable, on reste sur la sortie par défaut.
  *
  * La correspondance est partielle et insensible à la casse : le nom du SDK
- * (« Ray-Ban Meta ») et celui de la pile Bluetooth du téléphone (« Ray-Ban Meta
- * Hands-Free ») ne sont pas toujours identiques au caractère près.
+ * (« Ray-Ban Meta ») et celui de la pile Bluetooth du téléphone ne sont pas
+ * toujours identiques au caractère près. Plusieurs homonymes : le meilleur
+ * type gagne ([rankOf]) ; le SCO n'est jamais rendu (appel, pas musique).
  */
 internal fun pickBluetoothOutput(
     candidates: List<AudioOutput>,
     preferredName: String?,
 ): AudioOutput? {
-    val sinks = candidates.filter { it.isSink }
+    val sinks = candidates.filter { it.isSink && isBluetoothOutput(it.type) }
     preferredName?.trim()?.takeIf { it.isNotEmpty() }?.let { wanted ->
-        sinks.firstOrNull { it.name.contains(wanted, ignoreCase = true) }?.let { return it }
+        sinks.filter { it.name.contains(wanted, ignoreCase = true) }
+            .minByOrNull { it.rank }?.let { return it }
     }
     return sinks.minByOrNull { it.rank }
 }
 
-/** Ce qui peut sortir du son vers une paire : BLE d'abord, A2DP (la musique des lunettes) ensuite. */
+/** Le flux musique de la voix : A2DP d'abord (seule sortie prouvée sur paire, `bt_a2dp` 27/10), BLE ensuite. */
 internal fun rankOf(type: Int): Int = when (type) {
-    AudioDeviceInfo.TYPE_BLE_HEADSET -> 0
-    AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> 1
-    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> 2
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> 0
+    AudioDeviceInfo.TYPE_BLE_HEADSET -> 1
+    AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> 2
     AudioDeviceInfo.TYPE_HEARING_AID -> 3
     else -> 4
 }
 
-/** Types qui peuvent recevoir la voix d'une paire : casque BLE, enceinte BLE, A2DP, SCO, aide auditive. */
+/**
+ * Types qui peuvent recevoir la voix : A2DP, casque et enceinte BLE, aide auditive.
+ * Le SCO (« Hands-Free ») en est exclu : canal d'appel, le flux musique ne s'y
+ * rend pas — s'y router tait la voix sans erreur (Xiaomi 01/11).
+ */
 @Suppress("InlinedApi")
-internal fun isBluetoothOutput(type: Int): Boolean = type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+internal fun isBluetoothOutput(type: Int): Boolean = type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+    type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
     type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
     type == AudioDeviceInfo.TYPE_BLE_BROADCAST ||
-    type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-    type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
     type == AudioDeviceInfo.TYPE_HEARING_AID
 
 /**

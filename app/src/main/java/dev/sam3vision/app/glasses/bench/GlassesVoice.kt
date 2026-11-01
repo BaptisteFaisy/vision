@@ -66,7 +66,7 @@ class GlassesVoice(
     /**
      * Choisit la sortie audio de la voix : la paire de lunettes si son nom est
      * connu ([preferredName], celui que le SDK DAT annonce), sinon la meilleure
-     * sortie Bluetooth réellement disponible (BLE, A2DP, puis SCO). Ne lève jamais.
+     * sortie Bluetooth réellement disponible (A2DP d'abord, BLE ensuite, SCO jamais : appel). Ne lève jamais.
      *
      * Rend la ligne du journal : avec les lunettes sur les yeux, savoir **où** le son
      * est sorti est la seule preuve audible de la chaîne, et logcat ne se lit pas
