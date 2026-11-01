@@ -65,9 +65,9 @@ class ObstacleCurbVoiceTest {
         -1, "curb", meters, meters, listOf(220f, 300f, 420f, 460f),
     )
 
-    /** Passant sans bord : ni bordure, ni véhicule, ni mobilier — aucun guetteur ne parle. */
+    /** Passant sans bord, hors couloir : ni bordure, ni véhicule, ni danger parlé — aucun guetteur ne parle. */
     private fun passant() = DistanceReading(
-        -1, "person", 5f, 5f, listOf(220f, 300f, 420f, 460f),
+        -1, "person", 5f, 5f, listOf(20f, 300f, 120f, 460f),
     )
 
     /** État sonde minimal : [frames] vues, [readings] dans le calque distances. */

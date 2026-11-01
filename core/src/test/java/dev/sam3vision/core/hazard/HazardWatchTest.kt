@@ -85,8 +85,36 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `personne a 4m5 = silence`() {
+    fun `personne a 4m5 droit devant = detectee, palier loin`() {
         val signal = HazardSignal.of(listOf(danger("person", 4.5f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(4.5f, signal.meters!!, 0.001f)
+        assertEquals("person", signal.label)
+    }
+
+    @Test
+    fun `personne a 15 m droit devant = detectee`() {
+        val signal = HazardSignal.of(listOf(danger("person", 15f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(15f, signal.meters!!, 0.001f)
+        assertEquals("person", signal.label)
+    }
+
+    @Test
+    fun `personne a 16 m = silence`() {
+        val signal = HazardSignal.of(listOf(danger("person", 16f)), 512, 1138)
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `personne loin hors couloir = silence`() {
+        val signal = HazardSignal.of(
+            listOf(reading("person", 10f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
 
         assertFalse(signal.detected)
     }
@@ -332,15 +360,74 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `poteau = silence`() {
+    fun `poteau proche = detecte et dit en 2 frames, doux`() {
         val signal = HazardSignal.of(listOf(danger("pole", 1.5f)), 512, 1138)
 
-        assertFalse(signal.detected)
+        assertTrue(signal.detected)
+        assertEquals("pole", signal.label)
 
         val watcher = HazardWatcher()
-        val manual = HazardSignal(detected = true, meters = 1.5f, label = "poteau")
+        val manual = HazardSignal(detected = true, meters = 1.5f, label = "poteau", centerX = 0.5f)
 
         assertNull(watcher.onSignal(manual, 1_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(manual, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau, à midi.", cue!!.phrase)
+        assertFalse(cue.urgent)
+        assertEquals(HazardKind.OTHER, cue.kind)
+        assertNull(cue.safetyPhrase)
+    }
+
+    @Test
+    fun `poteau a 15 m droit devant = detecte`() {
+        val signal = HazardSignal.of(listOf(danger("poteau", 15f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(15f, signal.meters!!, 0.001f)
+        assertEquals("poteau", signal.label)
+    }
+
+    @Test
+    fun `poteau a 16 m = silence`() {
+        val signal = HazardSignal.of(listOf(danger("poteau", 16f)), 512, 1138)
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `poteau loin hors couloir = silence`() {
+        val signal = HazardSignal.of(
+            listOf(reading("poteau", 10f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertFalse(signal.detected)
+    }
+
+    @Test
+    fun `poteau lointain dit en 2 frames, doux`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 12f, label = "poteau", centerX = 0.5f)
+
+        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Attention au poteau, à midi.", cue!!.phrase)
+        assertFalse(cue.urgent)
+        assertEquals(HazardKind.OTHER, cue.kind)
+    }
+
+    @Test
+    fun `personne lointaine dit le mot d'evitement en 2 frames, doux`() {
+        val watcher = HazardWatcher()
+        val signal = HazardSignal(detected = true, meters = 12f, label = "person", centerX = 0.8f)
+
+        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+
+        assertEquals("Gauche.", cue!!.phrase)
+        assertFalse(cue.urgent)
+        assertEquals(HazardKind.PERSON, cue.kind)
     }
 
     @Test

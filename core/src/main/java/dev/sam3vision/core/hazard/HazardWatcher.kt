@@ -21,12 +21,13 @@ data class HazardAlt(
 /**
  * Signal danger d'une frame : [detected] quand une personne ou du mobilier
  * suivi est dans le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins
- * ([HazardWatcher.PERSON_METERS] pour une personne), [meters] sa distance,
- * [label] son libellé SAM brut (la phrase y lit le nom parlé), [centerX]
- * son centre normalisé (l'heure du cadran, `null` = inconnue). La personne
- * prime : présente, elle est retenue même si une barrière est plus proche
- * ([alt] la garde en repli) ; sinon le plus proche gagne. Le poteau ne
- * parle plus (ordre user du 01/11) : reconnu mais muet, jamais retenu.
+ * ([HazardWatcher.PERSON_METERS] pour une personne, 15 m droit devant pour
+ * la personne et le poteau — [HazardWatcher.PERSON_FAR_METERS] et
+ * [HazardWatcher.POLE_FAR_METERS], ordre user du 01/11), [meters] sa
+ * distance, [label] son libellé SAM brut (la phrase y lit le nom parlé),
+ * [centerX] son centre normalisé (l'heure du cadran, `null` = inconnue).
+ * La personne prime : présente, elle est retenue même si une barrière est
+ * plus proche ([alt] la garde en repli) ; sinon le plus proche gagne.
  */
 data class HazardSignal(
     val detected: Boolean,
@@ -45,7 +46,8 @@ data class HazardSignal(
          * Signal des lectures affinées : un label parlé [HazardConcepts] dans
          * le couloir ([PositionText.SIDE_EDGE]) — plein axe pour une personne
          * imminente ([HazardWatcher.PERSON_FAST_METERS], le proche percute
-         * même au bord du cadre) — mesuré sous le seuil. La personne
+         * même au bord du cadre) — mesuré sous le seuil (15 m droit devant
+         * pour la personne et le poteau, portée proche sinon). La personne
          * prime sur tout non-personne (P3 avant P4, gardé en [HazardSignal.alt]) ;
          * à sorte égale le plus proche gagne ; boîte illisible ou dimensions
          * nulles = ignoré.
@@ -77,18 +79,28 @@ data class HazardSignal(
         private fun nearHazard(reading: DistanceReading, frameW: Int): Hit? {
             if (!HazardConcepts.isSpoken(reading.label)) return null
             val meters = reading.meters.takeIf { it.isFinite() } ?: return null
-            val person = HazardConcepts.isPerson(reading.label)
-            val limit = if (person) HazardWatcher.PERSON_METERS
-            else HazardWatcher.HAZARD_METERS
-            if (meters > limit) return null
             val box = reading.box
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
+            val inCorridor = centerX in PositionText.SIDE_EDGE..1f - PositionText.SIDE_EDGE
+            val person = HazardConcepts.isPerson(reading.label)
             // Personne imminente : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
             val nearPerson = person && meters <= HazardWatcher.PERSON_FAST_METERS
-            if (!nearPerson && (centerX < PositionText.SIDE_EDGE || centerX > 1f - PositionText.SIDE_EDGE)) return null
+            if (!nearPerson && !inCorridor) return null
+            if (meters > nearLimit(reading.label, person, inCorridor)) return null
             val trackId = reading.trackId.takeIf { it != DistanceMeter.UNTRACKED_ID }
             return Hit(meters, reading.label, centerX, trackId)
+        }
+
+        /**
+         * Seuil parlé : 15 m droit devant pour la personne et le poteau
+         * (palier loin, couloir strict — ordre user du 01/11), portée
+         * proche sinon (la personne imminente hors couloir garde 4 m).
+         */
+        private fun nearLimit(label: String, person: Boolean, inCorridor: Boolean): Float {
+            if (inCorridor && person) return HazardWatcher.PERSON_FAR_METERS
+            if (inCorridor && HazardConcepts.isPole(label)) return HazardWatcher.POLE_FAR_METERS
+            return if (person) HazardWatcher.PERSON_METERS else HazardWatcher.HAZARD_METERS
         }
     }
 }
@@ -250,9 +262,7 @@ class HazardWatcher(
      * Candidat de la frame : le signal retenu, sauf personne douce déjà
      * dite (le repli parle alors à sa place), `null` si rien à confirmer.
      * La personne imminente contourne le verrou dit-une-fois (doux puis
-     * approche = le mot parle, sinon silence critique). Le principal comme
-     * le repli portent [HazardConcepts.isSpoken] : un vieux signal poteau
-     * reste muet.
+     * approche = le mot parle, sinon silence critique).
      */
     private fun candidateOf(signal: HazardSignal): Candidate? {
         if (!signal.detected) return null
@@ -342,6 +352,12 @@ class HazardWatcher(
 
         /** Personne à cette distance (m) ou moins : mot seul dès la 1re frame, urgent. */
         const val PERSON_FAST_METERS = 2f
+
+        /** Au-delà de cette distance (m), une personne droit devant ne fait pas parler (palier loin, ordre user du 01/11 : 15 m). */
+        const val PERSON_FAR_METERS = 15f
+
+        /** Au-delà de cette distance (m), un poteau droit devant ne fait pas parler (palier loin, ordre user du 01/11 : 15 m). */
+        const val POLE_FAR_METERS = 15f
 
         /**
          * Répétition du mot imminent : il reparle toutes les 300 ms tant que

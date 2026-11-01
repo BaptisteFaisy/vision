@@ -295,7 +295,9 @@ qui remplace l'urgence du § 10 (gardée pour mémoire) :
   (« Attention à la personne, passez à droite. » à l'époque — mot seul
   depuis le 01/11, § 34 ; `HazardConcepts` :
   personne, barrière, borne, clôture, portail — FR/EN, 4 m la personne,
-  3 m le reste, 2 frames, 10 s de silence ; le poteau ne parle plus, § 26)
+  3 m le reste (15 m droit devant pour la personne et le poteau depuis
+  le § 35), 2 frames, 10 s de silence ; le poteau reparle depuis le
+  § 35 (était muet depuis le § 26))
   et mobilier suivi parlent en douceur (`urgent = false`, synthèse réseau,
   jamais de coupure) ;
 - **stop gardé en attendant** : le stop interne (contact mesuré ≤ 0,6 m,
@@ -1260,9 +1262,10 @@ douce) : la douce dit le même mot seul que l'imminente.
   voix (synthèse, attend le silence) — seule l'imminente part en clip
   `guide_*` (< 100 ms, répétée toutes les 300 ms) ;
 - **consigne « passez à … » supprimée** : `avoidText` n'existe plus, et
-  les deux clips poteau morts (`hazard_pole_right/left` — le poteau ne
-  parle plus depuis le § 26, le garde voicepack exigeait leurs morceaux
-  dans le Kotlin) sortent du catalogue avec leurs MP3 ;
+  les deux clips poteau morts (`hazard_pole_right/left` — le poteau
+  était muet depuis le § 26, il reparle au § 35, le garde voicepack
+  exigeait leurs morceaux dans le Kotlin) sortent du catalogue avec
+  leurs MP3 ;
 - **hors cadence « Attention … »** : le mot ne dit plus « Attention »,
   il ne consomme plus le budget partagé (§ 30) — comme le mot imminent
   avant lui ; l'anti-spam reste le dit-une-fois + 10 s du guetteur.
@@ -1273,3 +1276,33 @@ défaut droite, axe pile ; doux confirmé en 2 frames, ré-armement).
 
 Recette téléphone : personne à 3 m à gauche → « Right. » — **non
 mesuré**, exige un APK de cette branche sur appareil réel.
+
+## 35. S'écarter des gens et des poteaux même à 15 m devant (ordre user du 01/11)
+
+Le user marche avec l'app : ni les gens ni les poteaux ne sont annoncés
+assez tôt — la personne se tait au-delà de 4 m, le poteau est muet
+partout (§ 26). Nouveau contrat : droit devant, les deux parlent
+jusqu'à 15 m.
+
+- **palier loin** (`HazardWatcher.PERSON_FAR_METERS` et `POLE_FAR_METERS`,
+  15 m, couloir strict `SIDE_EDGE` — hors couloir = silence, au-delà de
+  15 m = silence) : la personne dit le même mot d'évitement qu'en proche
+  (§ 34, côté opposé, doux, 2 frames, dit-une-fois, 10 s de silence) ;
+  le poteau dit « Attention au poteau, à … heures. » / « Attention,
+  pole, at … o'clock. » (doux, 2 frames, 10 s de silence, sorte
+  `OTHER` — fusion douce, jamais de préemption) ;
+- **poteau proche** : « Attention au poteau … » dès 3 m et moins, comme
+  la barrière (`HazardConcepts.isSpoken` ne le tait plus) ;
+- **inchangé** : personne imminente ≤ 2 m (mot seul urgent en clip),
+  barrière et reste à 3 m, cadence « Attention … » (§ 30), parole du
+  user devant tout, traversée (le repli haut-de-poteau garde
+  `isPole`).
+
+Verrouillé par `HazardConceptsTest` (poteau parlé) et `HazardWatchTest`
+(+8 : personne/poteau à 15 m détectés, à 16 m muets, hors couloir
+muets, poteau proche et lointain dits en doux, personne lointaine en
+mot d'évitement). `check-kotlin-limits.py` vert.
+
+Recette téléphone : personne et poteau à 12-15 m droit devant → mot
+d'évitement puis « Attention au poteau … » — **non mesuré**, exige un
+APK de cette branche sur appareil réel.
