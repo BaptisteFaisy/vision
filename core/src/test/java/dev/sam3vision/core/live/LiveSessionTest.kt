@@ -91,6 +91,18 @@ class LiveSessionTest {
     }
 
     @Test
+    fun `runFrameWith envoie les concepts de la frame, normalises`() = runBlocking {
+        val client = FakeLiveClient()
+        val session = LiveSession(client, prompts = LivePrompts.default)
+        val group = PromptRotation.groupFor(PromptRotation.split(LivePrompts.default), 1)
+
+        session.runFrameWith("QQ==", group)
+
+        assertEquals(group, client.lastPrompts)
+        assertEquals(1, session.stats.samples)
+    }
+
+    @Test
     fun `un echec note la latence mais pas le serveur`() = runBlocking {
         val client = FakeLiveClient()
         client.result = Result.failure(ApiError.Timeout())

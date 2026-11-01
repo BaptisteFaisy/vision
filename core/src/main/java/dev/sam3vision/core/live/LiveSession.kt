@@ -177,6 +177,14 @@ class LiveSession(
         runGated { client.live(jpegB64, normalizedPrompts, workEdge, maxObjects) }
 
     /**
+     * Même frame, concepts **de cette frame** : la rotation ([PromptRotation])
+     * envoie un groupe par frame au lieu de la liste entière — mêmes règles
+     * (créneau, ère, statistiques, régulateur) que [runFrame].
+     */
+    suspend fun runFrameWith(jpegB64: String, prompts: List<String>): Result<LiveFrame>? =
+        runGated { client.live(jpegB64, LivePrompts.normalize(prompts), workEdge, maxObjects) }
+
+    /**
      * Même frame, JPEG **brut** : [LiveClient.liveBytes], sans base64 côté client.
      * Mêmes règles (créneau, ère, statistiques, régulateur) que [runFrame].
      */

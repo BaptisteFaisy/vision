@@ -123,6 +123,8 @@ class LiveProbe(
 
     /** Voix de la sonde : guidage (cap route > cap manuel) puis positions. */
     internal val voice = ProbeVoice()
+    /** Rotation 3 groupes + accumulation : un groupe par frame, fusion publiée. */
+    internal val rotation = ProbeRotationState()
     /** Déclencheur du mode Traversée : vert confirmé (4 frames), rouge vite (2 frames). */
     internal val crossing = CrossingAnnouncer()
 
@@ -177,6 +179,7 @@ class LiveProbe(
     ) {
         val clean = baseUrl.trim()
         openSessions(clean, prompts, maxObjects)
+        rotation.usePrompts(prompts)
         voice.guide = guide
         voice.announce = announce
         voice.language = language
@@ -287,6 +290,7 @@ _state.update { it.cleared() }
         noteCrowd(0)
         meters.reset()
         adaptive.reset()
+        rotation.reset()
         ProbeBackgroundMotion.reset()
         MotionLog.reset()
     }
@@ -384,7 +388,8 @@ _state.update { it.cleared() }
         chronology.beginFrame(captureAtNs, encodedAtNs)
         // Hors du thread principal : la sérialisation de la frame (JSON + base64) et la
         // normalisation des concepts ne doivent jamais tomber dans la boucle de composition.
-        scope.launch(background) { runFrame(active, jpegB64, at) }
+        val send = rotation.send(state.value.conceptsSent)
+        scope.launch(background) { runFrame(active, jpegB64, at, send.prompts, send.rotated) }
     }
 
     /** Une réponse vient d'arriver : une frame en réserve part maintenant, au lieu
@@ -412,8 +417,8 @@ _state.update { it.cleared() }
         coldSession?.useCadence(cadence)
     }
 
-    private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long) {
-        val result = active.runFrame(jpegB64)
+    private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean) {
+        val result = active.runFrameWith(jpegB64, prompts)
         if (result == null) { adaptive.onDropped(); return drain() }
         adaptive.onSettled(System.currentTimeMillis() - at, result, jpegB64.length)
         // Réponse complète (corps lu et JSON tourné) : le poste « reçu » est posé ici.
@@ -425,7 +430,7 @@ _state.update { it.cleared() }
         // masques (~15 ms) ne doivent pas laisser le GPU inactif.
         drain()
         yield()
-        val frame = result.getOrNull()
+        val frame = accumulated(result.getOrNull(), prompts, rotated)
         if (frame == null) {
             // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
             // restent les derniers connus, seul le message d'erreur change.
