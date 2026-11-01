@@ -34,6 +34,13 @@ object GlassesAudioPlan {
      */
     fun usable(connected: Boolean, streaming: Boolean, audioAllowed: Boolean): Boolean =
         connected && streaming && audioAllowed
+
+    /**
+     * Piste audio utilisable ou `null` : plan utilisable + piste caméra.
+     * (Provient de `GlassesController.currentAudio`, qui touche son plafond.)
+     */
+    fun <T> select(connected: Boolean, streaming: Boolean, micAllowed: Boolean, audio: T): T? =
+        if (usable(connected, streaming, micAllowed)) audio else null
 }
 
 /** Mise au format de la dictée : PCM 16 bits mono, 16 kHz. */

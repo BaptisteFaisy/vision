@@ -2,12 +2,17 @@ package dev.sam3vision.app.glasses
 
 import android.os.SystemClock
 import android.util.Log
+import com.meta.wearable.dat.core.session.DeviceSession
+import com.meta.wearable.dat.motion.addMotion
+import com.meta.wearable.dat.motion.removeMotion
+import com.meta.wearable.dat.motion.types.MotionConfiguration
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GlassesClockOffset
 import dev.sam3vision.core.live.GlassesLinkStats
 import dev.sam3vision.core.live.LinkDrop
 import dev.sam3vision.core.live.TimingsText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -179,6 +184,29 @@ object GlassesVideoLink {
         if (!pose.isValid) return null
         if (nowMs - headPoseAtMs > HEAD_POSE_STALE_AFTER_MS) return null
         return pose
+    }
+
+    private var headPoseFeed: GlassesHeadPose? = null
+
+    /**
+     * Attache la pose tête DAT Motion sur la session (pin 1.0.0, 10 Hz) : un
+     * refus (canal bêta, paire sans Motion) publie null et la sonde garde le
+     * sténopé seul. Motif passerelle comme les frames et les notes.
+     */
+    fun attachHeadPose(scope: CoroutineScope, onNote: (GlassesMessage) -> Unit, session: DeviceSession) {
+        headPoseFeed = GlassesHeadPose(scope, onNote).also {
+            it.start(
+                attach = { session.addMotion(MotionConfiguration()).getOrNull() },
+                detach = { session.removeMotion() },
+            )
+        }
+    }
+
+    /** Détache la pose tête (oublie la pose, jamais de valeur périmée). */
+    fun detachHeadPose() {
+        headPoseFeed?.stop()
+        headPoseFeed = null
+        publishHeadPose(null)
     }
 
     @Volatile
@@ -378,7 +406,7 @@ object GlassesVideoLink {
         // La paire peut changer entre deux sessions : la focale est reposée par D1.
         glassesStreamLens = null
         // ...et la pose tête (jamais de pose périmée d'une session à l'autre).
-        publishHeadPose(null)
+        detachHeadPose()
     }
 
     /** Taille annoncée par le décodeur (un changement de résolution recadre la vue). */

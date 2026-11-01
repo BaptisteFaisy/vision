@@ -13,9 +13,6 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationError
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
-import com.meta.wearable.dat.motion.addMotion
-import com.meta.wearable.dat.motion.removeMotion
-import com.meta.wearable.dat.motion.types.MotionConfiguration
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
 import dev.sam3vision.app.speechClient
@@ -137,7 +134,6 @@ class GlassesController(
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
     private var inputs: GlassesInputs? = null
-    private var headPose: GlassesHeadPose? = null
     private var activity: Activity? = null
     private var started = false
 
@@ -360,27 +356,16 @@ class GlassesController(
         if (started) {
             camera = cam
             // La dictée peut prendre le micro des lunettes tant que le flux tourne.
-            GlassesMicLink.attach { currentAudio() }
+            GlassesMicLink.attach {
+                val snapshot = _state.value
+                GlassesAudioPlan.select(snapshot.connected, snapshot.streaming, snapshot.micAllowed, camera?.audio)
+            }
             GlassesVideoLink.attachNotes(::note)
             // Session ouverte : l'écoute part au premier flux montant.
             autoListen.arm()
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
-        // Motion au pin 1.0.0, config par défaut (10 Hz) : un refus (canal bêta,
-        // paire sans Motion) publie null et la sonde garde le sténopé seul.
-        headPose = GlassesHeadPose(scope, ::note).also {
-            it.start(
-                attach = { created.addMotion(MotionConfiguration()).getOrNull() },
-                detach = { created.removeMotion() },
-            )
-        }
-    }
-
-    /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
-    private fun currentAudio(): PcmSource? {
-        val snapshot = _state.value
-        val usable = GlassesAudioPlan.usable(snapshot.connected, snapshot.streaming, snapshot.micAllowed)
-        return if (usable) camera?.audio else null
+        GlassesVideoLink.attachHeadPose(scope, ::note, created)
     }
 
     private suspend fun ensureCameraPermission(): Boolean {
@@ -480,8 +465,6 @@ class GlassesController(
         GlassesMicLink.detach()
         GlassesVideoLink.detachNotes()
         GlassesVideoLink.clear()
-        headPose?.stop()
-        headPose = null
         inputs?.stop()
         inputs = null
         camera?.stop()
