@@ -150,21 +150,36 @@ def cout_a_douze(decodages, par_n):
             f"(pente {pente:.2f}, {len(proches)} pts proches)")
 
 
+def lignes_csv(entete, rangees):
+    """En-tête + rangées en une seule liste (un `writelines`, pas de boucle)."""
+    return [entete + "\n"] + [",".join(r) + "\n" for r in rangees]
+
+
 def ecrire_csv(prefixe, frames, lignes_capsplit, decodages):
     """Trois CSV (frames, capsplit, decode), warmup déjà exclu par l'appelant."""
+    postes = parse_isee_lat.POSTES
     with open(f"{prefixe}-frames.csv", "w", encoding="utf-8") as f:
-        f.write("idx," + ",".join(parse_isee_lat.POSTES) + "\n")
-        for i, m in enumerate(frames):
-            f.write(",".join([str(i)] + [str(m.get(p, "")) for p in parse_isee_lat.POSTES]) + "\n")
+        f.writelines(lignes_csv("idx," + ",".join(postes),
+                                [[str(i)] + [str(m.get(p, "")) for p in postes]
+                                 for i, m in enumerate(frames)]))
+    postes_cap = parse_isee_lat.POSTES_CAPSPLIT
     with open(f"{prefixe}-capsplit.csv", "w", encoding="utf-8") as f:
-        f.write("idx," + ",".join(parse_isee_lat.POSTES_CAPSPLIT) + "\n")
-        for i, m in enumerate(lignes_capsplit):
-            f.write(",".join([str(i)] + [str(m.get(p, "")) for p in parse_isee_lat.POSTES_CAPSPLIT]) + "\n")
+        f.writelines(lignes_csv("idx," + ",".join(postes_cap),
+                                [[str(i)] + [str(m.get(p, "")) for p in postes_cap]
+                                 for i, m in enumerate(lignes_capsplit)]))
     with open(f"{prefixe}-decode.csv", "w", encoding="utf-8") as f:
-        f.write("idx,masques,ms\n")
-        for i, (n, ms) in enumerate(decodages):
-            f.write(f"{i},{n},{ms}\n")
+        f.writelines(lignes_csv("idx,masques,ms",
+                                [[str(i), str(n), str(ms)]
+                                 for i, (n, ms) in enumerate(decodages)]))
     return [f"{prefixe}-frames.csv", f"{prefixe}-capsplit.csv", f"{prefixe}-decode.csv"]
+
+
+def lit_entree(chemin):
+    """Contenu du dump : fichier sous context manager, sinon stdin."""
+    if chemin is None:
+        return sys.stdin.read()
+    with open(chemin, encoding="utf-8") as f:
+        return f.read()
 
 
 def analyser(texte, skip):
@@ -211,11 +226,11 @@ def selftest():
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         fichiers = ecrire_csv(f"{tmp}/c", frames, lignes, decodages)
-        contenu = open(fichiers[0], encoding="utf-8").read().splitlines()
+        contenu = lit_entree(fichiers[0]).splitlines()
         assert contenu[0] == "idx,latency,capt,up,srv,rtt,mask,pixel"
         assert contenu[1].split(",")[1] == "100" and len(contenu) == 11
-        assert open(fichiers[1], encoding="utf-8").read().count("\n") == 2
-        assert open(fichiers[2], encoding="utf-8").read().splitlines()[2] == "1,6,8"
+        assert lit_entree(fichiers[1]).count("\n") == 2
+        assert lit_entree(fichiers[2]).splitlines()[2] == "1,6,8"
     print("OK   14 assertions lat_stats")
     return 0
 
@@ -240,8 +255,7 @@ def main(argv):
         print("usage : lat_stats.py [fichier] [--skip K] [--csv PREFIXE]",
               file=sys.stderr)
         return 2
-    texte = open(chemin, encoding="utf-8").read() if chemin else sys.stdin.read()
-    tableaux, (frames, lignes, decodages) = analyser(texte, skip)
+    tableaux, (frames, lignes, decodages) = analyser(lit_entree(chemin), skip)
     if tableaux is None:
         print("aucune frame ISEE_LAT complète (GPU froid ? tag filtré ?)",
               file=sys.stderr)
