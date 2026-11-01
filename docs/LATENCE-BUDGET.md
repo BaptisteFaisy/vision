@@ -248,7 +248,7 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 | fait vérifiable ici | où | valeur / conséquence |
 |---|---|---|
 | transport du Direct | `core/net/LiveClientFactory.kt`, `core/net/WsLiveClient.kt` | **WebSocket** vers `/live/ws`, pas de `POST` par frame |
-| gain du WebSocket sur le `POST`, mesuré côté serveur | `core/net/WsLiveClient.kt:11` (commentaire daté) | 50,3 ms contre 81,4 ms — ~31 ms gagnés par frame |
+| gain du WebSocket sur le `POST`, mesuré côté serveur | `core/net/WsLiveClient.kt:12` (commentaire daté) | 50,3 ms contre 81,4 ms — ~31 ms gagnés par frame |
 | cadence prudente du Direct | `core/live/LiveSession.kt:34` (`Cadence.Direct`) | 350 / 500 / 900 ms → l'attente réelle est **plus haute** que l'hypothèse du § 4 |
 | ce que cet arbre refuse d'affirmer | `docs/PERF.md` § 1 et § 3 | latences, fps, réveil de conteneur : « non mesuré ici » |
 | instrument côté client | `core/live/LiveStats.kt`, banc JVM `LiveFrameBudgetTest` | coûts CPU mesurés en microsecondes, hors JPEG et hors radio |
