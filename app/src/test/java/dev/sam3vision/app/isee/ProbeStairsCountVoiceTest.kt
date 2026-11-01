@@ -47,7 +47,6 @@ class ProbeStairsCountVoiceTest {
 
     /** Profondeur factice : « stairs going up » à 3 mètres, boîte nette. */
     private class StairsDepth : DepthMeter {
-        override fun offer(jpegB64: String) {}
         override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>) =
             pinhole + DistanceReading(-1, "stairs going up", 3f, 3f, listOf(100f, 200f, 400f, 900f))
 

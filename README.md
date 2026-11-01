@@ -125,9 +125,10 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 - **Tap mode** — film briefly, get a spoken summary. `POST /video` client written
   and tested; the route is implemented on no server here, so the client falls back
   to `POST /segment` on the first frame (`docs/MODE-TAP.md`).
-- **On-device depth (beta)** — a proximity map 100% on the phone (Depth Anything V2
-  Small, ONNX Runtime, the 27 MB `.ort` model downloaded once and checked by
-  sha256), fused with the masks (`docs/DEPTH.md`).
+- **Depth** — Depth Anything V2 Small runs **on the GPU server** (one map per 8
+  frames, medians repeated in between, `with_depth`); the app sends every frame
+  with `with_depth` and refines its pinhole distances with those medians. Nothing
+  is inferred on the phone (`docs/DEPTH.md`).
 - **Voice navigation** — "take me to X" geocodes with Android's `Geocoder`, falls
   back to the French BAN (`api-adresse.data.gouv.fr`), routes with Valhalla (CPU
   backend, `/route`), draws the trip on an in-app MapLibre map

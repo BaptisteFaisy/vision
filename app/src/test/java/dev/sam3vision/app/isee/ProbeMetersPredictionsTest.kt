@@ -1,6 +1,5 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.distance.DistanceMeter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,10 +21,7 @@ class ProbeMetersPredictionsTest {
         var calls = 0
         val probe = ProbeMeters(
             scope = scope,
-            background = dispatcher,
-            appContext = null,
             depthMeter = null,
-            depthEngine = { DepthBackend.DA2 },
             onPredictions = { calls++ },
         )
         probe.noteFrame(512, 384)

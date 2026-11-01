@@ -1,35 +1,29 @@
 package dev.sam3vision.app.isee
 
-import android.content.Context
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.depth.DepthMeter
-import dev.sam3vision.app.depth.LiveDepthMeter
+import dev.sam3vision.app.depth.ServerDepthMeter
 import dev.sam3vision.app.live.DistanceTicker
 import dev.sam3vision.app.live.predictedLayer
-import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 
 /**
  * Les moteurs embarqués de la sonde derrière une seule façade (extrait de
  * `LiveProbe`, plafond 500 lignes) : la profondeur affine les distances, le
- * ticker republie les pastilles prédites toutes les [DistanceTicker.TICK_MS]. Mêmes frames
- * capturées offertes au moteur, resets communs, `null` sans contexte (tests).
+ * ticker republie les pastilles prédites toutes les [DistanceTicker.TICK_MS].
+ * La profondeur est celle du **serveur** ([ServerDepthMeter]) : plus aucune
+ * inférence sur le téléphone depuis le 01/11 (voir `docs/DEPTH.md`).
  */
 internal class ProbeMeters(
     scope: CoroutineScope,
-    background: CoroutineDispatcher,
-    appContext: Context?,
-    depthMeter: DepthMeter?,
-    depthEngine: () -> DepthBackend,
+    depthMeter: DepthMeter? = null,
     onPredictions: (DistanceLayer?) -> Unit = {},
     clockMs: () -> Long = { System.currentTimeMillis() },
 ) {
-    private val depth = depthMeter
-        ?: appContext?.let { ctx -> LiveDepthMeter(scope, ctx, background, depthEngine) }
+    private val depth = depthMeter ?: ServerDepthMeter
     private var predicted: DistanceMeter? = null
     private var frameWidth = 0
     private var frameHeight = 0
@@ -40,18 +34,13 @@ internal class ProbeMeters(
         onPredictions(predictedLayer(frameWidth, frameHeight, meter.predictions(now), null))
     }
 
-    /** Frame capturée au moteur de profondeur. */
-    fun offer(jpegB64: String) {
-        depth?.offer(jpegB64)
-    }
-
-    /** Distances affinées par la profondeur, ou le sténopé tel quel. */
+    /** Distances affinées par la profondeur du serveur, ou le sténopé tel quel. */
     fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> =
-        depth?.readingsFor(frame, pinhole) ?: pinhole
+        depth.readingsFor(frame, pinhole)
 
-    /** Oublie cartes et moteur (nouvelle séance). */
+    /** Oublie moteurs et carte (nouvelle séance). */
     fun reset() {
-        depth?.reset()
+        depth.reset()
     }
 
     /**

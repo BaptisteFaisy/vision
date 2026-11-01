@@ -1,6 +1,5 @@
 package dev.sam3vision.core.settings
 
-import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -195,13 +194,6 @@ data class Settings(
      * défaut Modal) ou dans Réglages.
      */
     val routeBaseUrl: String = "",
-    /**
-     * Moteur de profondeur embarqué (100 % sur le téléphone, 0 GPU Modal).
-     * Toujours actif (DA2, seuil < 200 ms tenu sur Redmi) — l'option Coupée
-     * est supprimée (31/10). Réglages anciens (AUTO, MIDAS, OFF) migrés
-     * vers DA2 par fromName.
-     */
-    val depthBackend: DepthBackend = DepthBackend.DA2,
     /**
      * Post-traitements HAL coupés (interrupteur TECHNICAL SETTINGS, mesure
      * latence : `age` = expo + readout + HAL + livraison). **`false` par

@@ -51,7 +51,6 @@ class ProbeStairsGateTest {
 
     /** Sténopé seul : l'escalier nommé par SAM n'a aucune lecture de distance. */
     private class PinholeOnly : DepthMeter {
-        override fun offer(jpegB64: String) {}
         override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>) = pinhole
         override fun reset() {}
     }

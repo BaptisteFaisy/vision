@@ -172,14 +172,6 @@ android {
         buildConfig = true
     }
 
-    // Profondeur : DA2 embarqué en .ort (prouvé sur Redmi : le paquet -mobile
-    // refuse le .onnx par ORT_INVALID_ARGUMENT et ne sait pas exécuter le
-    // ConvInteger quantifié — ORT_NOT_IMPLEMENTED — d'où le paquet ORT
-    // complet). Stocké brut (lecture fiable des gros assets + mmap).
-    androidResources {
-        noCompress.add("ort")
-    }
-
     // Tests JVM du module app : `Log`, `SystemClock` et `Bitmap` rendent leur valeur par
     // défaut au lieu de lever « not mocked » — les sondes iSee se testent sans appareil.
     testOptions {
@@ -243,7 +235,6 @@ dependencies {
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)
     // Profondeur embarquée : DA2 Small (ONNX), seul runtime embarqué restant.
-    implementation(libs.onnxruntime.android)
     // Carte du guidage vocal : MapLibre Native (MapView classique, Maven Central,
     // BSD-2) + tuiles raster OSM France gratuites sans clé (guidemap/GuideMapStyle).
     implementation("org.maplibre.gl:android-sdk:13.7.1")
