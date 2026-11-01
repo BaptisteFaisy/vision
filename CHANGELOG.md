@@ -3,6 +3,34 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : la personne douce dit le seul mot « Droite. »/« Gauche. » (branche `fix-personne-mot-seul`)
+
+- **Fait** : ordre user « iSee me dit encore attention personne à x
+  o'clock pass on right/left alors que je veux juste qu'il dise right ou
+  left ». La personne douce (2-4 m) disait toute la phrase
+  (`HazardText.personPhrase` : « Attention, person, at 2 o'clock, pass
+  on the left. ») — elle dit désormais le seul mot d'évitement, le même
+  que l'imminente : « Droite. »/« Gauche. » / « Right. »/« Left. »
+  (`GuidanceWord`, `avoidSide` seule source du côté, inchangée). La
+  douce garde sa cadence (2 frames, dite une fois, 10 s de silence,
+  ré-armement) et sa voix (synthèse, attend le silence) — seule
+  l'imminente part en clip `guide_*`. La consigne « passez à … » /
+  « pass on the … » disparaît (`avoidText` supprimé), avec elle les
+  deux clips poteau morts du catalogue (`hazard_pole_right/left` + 2
+  MP3 — le poteau ne parle plus, le garde voicepack exigeait leurs
+  morceaux dans le Kotlin). Effet second : le mot ne dit plus
+  « Attention », il ne consomme plus le budget partagé de la cadence —
+  comme le mot imminent avant lui ; l'anti-spam reste le dit-une-fois +
+  10 s du guetteur. Docs : § 34 de `VOIX-DANGER.md`, § 11/21/26
+  pointés.
+- **Preuve** : `:core:testDebugUnitTest` + `:app:testDebugUnitTest`
+  verts sur le r630 (BUILD SUCCESSFUL, 0 échec) ; attentes réécrites
+  dans `HazardWatchTest` (mot seul FR/EN, défaut droite, axe pile,
+  doux confirmé, ré-armement) — le test rouge avant le fix (nouvelle
+  API `personPhrase` inexistante), vert après ;
+  `check-voicepack.py` OK (112 clips), `check-kotlin-limits.py` OK.
+  Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — iSee : le mur ne voile plus la rue (branche `isee-wall-mask-freeze`)
 
 - **Fait** : `VeilPolicy` (`core/.../live/VeilPolicy.kt`) — le décor suivi (`wall`)
