@@ -67,7 +67,7 @@ class VehicleStateTest {
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertEquals("Voiture en mouvement.", third!!.phrase)
         assertEquals(5f, third.meters!!, 0.001f)
         assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
     }
@@ -84,7 +84,7 @@ class VehicleStateTest {
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture en mouvement, à 5 mètres.", third!!.phrase)
+        assertEquals("Voiture en mouvement.", third!!.phrase)
         assertFalse("sans tau : doux", third.urgent)
     }
 
@@ -121,7 +121,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(110f))), emptyList(), atMs = 100L)
         val third = moving.update(listOf(det("car", box(120f))), emptyList(), atMs = 200L)
 
-        assertEquals("Car moving, at 12 o'clock.", third!!.phrase)
+        assertEquals("Car moving.", third!!.phrase)
         assertNull(third.meters)
         assertFalse(third.urgent)
 
@@ -227,7 +227,7 @@ class VehicleStateTest {
             atMs = 200L,
         )
 
-        assertEquals("Car moving, 5 meters away.", third!!.phrase)
+        assertEquals("Car moving.", third!!.phrase)
         assertFalse("approche à 9 h : doux", third.urgent)
     }
 
@@ -240,7 +240,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 1_000L)
         assertNull("mouvement : 900 ms < 4 s", moving.update(listOf(det("car", box(140f))), listOf(reading("car", 5f, box(140f))), atMs = 1_100L))
         val replay = moving.update(listOf(det("car", box(150f))), listOf(reading("car", 5f, box(150f))), atMs = 4_300L)
-        assertEquals("Car moving, 5 meters away.", replay!!.phrase)
+        assertEquals("Car moving.", replay!!.phrase)
 
         val stopped = VehicleStateWatcher()
         repeat(3) { index ->
@@ -259,16 +259,12 @@ class VehicleStateTest {
         assertEquals("Voiture", voiture.fr)
         assertEquals("Car", voiture.en)
         assertEquals(
-            "Voiture en mouvement, à 5 mètres.",
-            VehicleStateText.movingPhrase(voiture, 5f, null, SpeechLanguage.Fr),
+            "Voiture en mouvement.",
+            VehicleStateText.movingPhrase(voiture, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Voiture en mouvement, à midi.",
-            VehicleStateText.movingPhrase(voiture, null, 0.5f, SpeechLanguage.Fr),
-        )
-        assertEquals(
-            "Car moving, 5 meters away.",
-            VehicleStateText.movingPhrase(voiture, 5f, null, SpeechLanguage.En),
+            "Car moving.",
+            VehicleStateText.movingPhrase(voiture, SpeechLanguage.En),
         )
         assertEquals(
             "Voiture à l'arrêt, à 2 mètres.",
@@ -368,7 +364,7 @@ class VehicleStateTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Car moving, 12 meters away.", cue!!.phrase)
+        assertEquals("Car moving.", cue!!.phrase)
         assertNull(cue.safetyPhrase)
         assertFalse("loin du centre du danger : doux", cue.urgent)
     }
@@ -443,16 +439,16 @@ class VehicleStateTest {
             )
         }
 
-        assertEquals("2 vehicles moving, 5 meters away.", cue!!.phrase)
+        assertEquals("2 vehicles moving.", cue!!.phrase)
         assertEquals("Stop, 2 vehicles moving.", cue.safetyPhrase)
         assertEquals(2, cue.movingCount)
         assertEquals(
-            "2 véhicules en mouvement, à 5 mètres.",
-            VehicleStateText.movingPluralPhrase(2, 5f, null, SpeechLanguage.Fr),
+            "2 véhicules en mouvement.",
+            VehicleStateText.movingPluralPhrase(2, SpeechLanguage.Fr),
         )
         assertEquals(
-            "2 vehicles moving, at 12 o'clock.",
-            VehicleStateText.movingPluralPhrase(2, null, 0.5f, SpeechLanguage.En),
+            "2 vehicles moving.",
+            VehicleStateText.movingPluralPhrase(2, SpeechLanguage.En),
         )
         assertEquals(
             "Stop, 3 véhicules en mouvement.",

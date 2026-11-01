@@ -46,7 +46,7 @@ class VehicleStateLateralTest {
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture en mouvement, à 5 mètres.", fourth!!.phrase)
+        assertEquals("Voiture en mouvement.", fourth!!.phrase)
     }
 
     @Test
@@ -81,7 +81,7 @@ class VehicleStateLateralTest {
                 atMs = index * 100L, language = SpeechLanguage.Fr, motion = motion,
             )
             if (index < 3) assertNull(cue)
-            else if (index == 3) assertEquals("Voiture en mouvement, à 12 mètres.", cue!!.phrase)
+            else if (index == 3) assertEquals("Voiture en mouvement.", cue!!.phrase)
             else assertNull("cooldown mouvement", cue)
         }
     }

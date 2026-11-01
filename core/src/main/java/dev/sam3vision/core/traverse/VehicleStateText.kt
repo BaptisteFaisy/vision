@@ -6,9 +6,11 @@ import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Noms parlés des véhicules et phrases d'état FR/EN (« Voiture en mouvement, à 5 mètres. »,
- * « Car stopped, 2 meters away. », « Bus en stationnement… ») : distance au mètre entier
- * si mesurée, heure du cadran sinon (jamais d'heure devinée sans géométrie).
+ * Noms parlés des véhicules et phrases d'état FR/EN : « Voiture en mouvement. » (jamais
+ * située), « Car stopped, 2 meters away. », « Bus en stationnement… ». L'immobile se situe —
+ * distance au mètre entier si mesurée, heure du cadran sinon (jamais d'heure devinée sans
+ * géométrie) ; **le mobile ne se situe pas** : il bouge, donc sa position est fausse avant
+ * la fin de la phrase (ordre user du 01/11/2026).
  */
 object VehicleStateText {
 
@@ -45,40 +47,25 @@ object VehicleStateText {
         return null
     }
 
-    /** « Voiture en mouvement… », à la distance mesurée ou à l'heure. */
-    fun movingPhrase(
-        name: VehicleName,
-        meters: Float?,
-        centerX: Float?,
-        language: SpeechLanguage,
-    ): String = situate(
-        base = when (language) {
-            SpeechLanguage.Fr -> "${name.fr} en mouvement"
-            SpeechLanguage.En -> "${name.en} moving"
-        },
-        meters = meters,
-        centerX = centerX,
-        language = language,
-    )
+    /**
+     * « Voiture en mouvement. » — **sans emplacement** : ni distance ni heure. Un mobile
+     * n'a pas de position qui tienne le temps d'être dite (ordre user du 01/11/2026) ;
+     * le danger, lui, reste ([safetyPhrase]).
+     */
+    fun movingPhrase(name: VehicleName, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "${name.fr} en mouvement."
+        SpeechLanguage.En -> "${name.en} moving."
+    }
 
     /**
-     * « 2 vehicles moving… » : pluriel générique ([count] types mobiles, pistes par type),
-     * situé comme le singulier (distance du plus proche, heure sinon).
+     * « 2 vehicles moving. » : pluriel générique ([count] types mobiles, pistes par type)
+     * et, comme le singulier, **sans emplacement** — des mobiles n'ont pas de position
+     * qui tienne le temps d'être dite.
      */
-    fun movingPluralPhrase(
-        count: Int,
-        meters: Float?,
-        centerX: Float?,
-        language: SpeechLanguage,
-    ): String = situate(
-        base = when (language) {
-            SpeechLanguage.Fr -> "$count véhicules en mouvement"
-            SpeechLanguage.En -> "$count vehicles moving"
-        },
-        meters = meters,
-        centerX = centerX,
-        language = language,
-    )
+    fun movingPluralPhrase(count: Int, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "$count véhicules en mouvement."
+        SpeechLanguage.En -> "$count vehicles moving."
+    }
 
     /**
      * Alerte immédiate « Stop, … » (sans distance ni heure, voix de sécurité qui coupe tout).
@@ -135,7 +122,7 @@ object VehicleStateText {
         language = language,
     )
 
-    /** Situe [base] : distance au mètre entier si mesurée, heure sinon. */
+    /** Situe [base] — arrêt et stationnement seulement : distance au mètre entier si mesurée, heure sinon. */
     private fun situate(
         base: String,
         meters: Float?,

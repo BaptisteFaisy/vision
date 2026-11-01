@@ -55,7 +55,7 @@ class VehicleStateRangeTest {
             movingMeters = range,
         )
 
-        assertEquals("Car moving, 30 meters away.", third?.phrase)
+        assertEquals("Car moving.", third?.phrase)
         assertTrue(watcher.movingThisFrame)
     }
 
@@ -80,7 +80,7 @@ class VehicleStateRangeTest {
                 atMs = atMs, movingMeters = range,
             )
             if (index >= 8) assertNull("caméra unanime : le mouvement se tait", hushed)
-            if (index == 9) assertEquals("Car moving, 30 meters away.", spoke?.phrase)
+            if (index == 9) assertEquals("Car moving.", spoke?.phrase)
         }
 
         assertTrue(muted.cameraMoved)

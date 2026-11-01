@@ -270,7 +270,7 @@ class CrossingVehicleTest {
 
         assertNull(at(100f, 0L))
         assertNull(at(110f, 100L))
-        assertEquals("Car moving, 12 meters away.", at(120f, 200L))
+        assertEquals("Car moving.", at(120f, 200L))
     }
 
     @Test
@@ -294,6 +294,6 @@ class CrossingVehicleTest {
         CrossingVehicleWatch.reset()
         assertNull(at(100f, 0L, true))
         assertNull(at(110f, 100L, true))
-        assertEquals("Car moving, 30 meters away.", at(120f, 200L, true))
+        assertEquals("Car moving.", at(120f, 200L, true))
     }
 }

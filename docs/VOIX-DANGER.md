@@ -641,10 +641,10 @@ pied.
 Nouveau contrat, qui amende les § 16-19 :
 
 - **pluriel véhicules** : deux types mobiles ou plus dans la même frame =
-  « 2 vehicles moving, 5 meters away. » / « 2 véhicules en mouvement, à 5
-  mètres. » (générique : les pistes sont par type, pas par instance —
-  deux voitures sous le même label comptent pour une, limite connue,
-  distance du plus proche) ; le « Stop » suit (« Stop, 2 vehicles
+  « 2 vehicles moving. » / « 2 véhicules en mouvement. » (générique : les
+  pistes sont par type, pas par instance — deux voitures sous le même
+  label comptent pour une, limite connue ; plus de position depuis le
+  01/11, § 32) ; le « Stop » suit (« Stop, 2 vehicles
   moving. ») ; le singulier est inchangé (`VehicleStateText`,
   `VehicleStateCue.movingCount`) ;
 - **personne + évitement** : phrase douce (2-4 m) « Attention à la
@@ -1153,7 +1153,44 @@ la personne seule ; alerte rebord + voiture → le rebord d'abord, la
 voiture juste après — **non mesuré**, exige un APK de cette branche sur
 appareil réel.
 
-## 32. Compteur de marches prioritaire : dit chaque seconde, coupe le doux (ordre user du 01/11)
+## 32. Un mobile ne dit plus son emplacement (ordre user du 01/11)
+
+Le user marche avec l'app : « ne me dis plus l'emplacement de la voiture
+si tu vois une voiture qui bouge ». Une distance ou une heure dite sur un
+véhicule qui roule est périmée avant la fin de la phrase — et l'app la
+redit toutes les 4 s.
+
+- **mouvement** : « Voiture en mouvement. » / « Car moving. » — nu, sans
+  distance ni heure, singulier comme pluriel (« 2 vehicles moving. ») ;
+  `VehicleStateText.movingPhrase` / `movingPluralPhrase` n'ont plus de
+  paramètre de position (le compilateur garde la règle) ;
+- **danger conservé** : le proche (sous 8 m, ou non mesuré) garde son
+  « Stop, car moving. » (voix de sécurité, § 29) ; l'urgence du canal
+  doux (`VehicleStateCue.urgent`, `safetyPhrase`) ne bouge pas ;
+- **immobiles inchangés** : l'arrêt et le stationnement situent toujours
+  (« Voiture à l'arrêt, à 2 mètres. », « Bus en stationnement, à 8
+  mètres. », heure du cadran sans mesure) — c'est le repère qui ne bouge
+  pas, donc la seule position qui tient ;
+- **portée inchangée** : le mouvement se dit toujours jusqu'à
+  `MOVING_METERS` (infini sans feu, § 14 de `TRAVERSEE.md`) ; seule la
+  position tombe ;
+- **inchangé ailleurs** : le décalage latéral en Traversée
+  (« Attention, voiture à gauche. ») et le veto ne disent pas de
+  position, rien à couper.
+
+Verrouillé par `VehicleStateTextTest` (`mouvement jamais situe - arret et
+stationnement si`, FR/EN, singulier/pluriel, arrêt et stationnement
+conservés) et par les attentes réécrites de `VehicleStateTest`,
+`VehicleStateRangeTest`, `VehicleStateBackgroundTest`,
+`VehicleStateLateralTest`, `VehicleStateDepthTest`, `EgoVoteWatcherTest`,
+`NoLightCrossingTest`, `CrossingVehicleTest`, `LiveVehicleVoiceTest`.
+
+Reste à trancher : les cycles (`CycleWatcher`, « Attention, vélo en
+mouvement, à 2 heures. ») disent encore leur heure — même problème, mais
+l'ordre ne parlait que de « la voiture ». Recette téléphone **non
+mesurée**.
+
+## 33. Compteur de marches prioritaire : dit chaque seconde, coupe le doux (ordre user du 01/11)
 
 Le user marche avec l'app : devant un escalier, le compte des marches se
 fait attendre — il veut l'entendre toutes les secondes, en plus haute

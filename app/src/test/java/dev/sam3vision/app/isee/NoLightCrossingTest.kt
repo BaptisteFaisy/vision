@@ -132,7 +132,7 @@ class NoLightCrossingTest {
 
         assertNull(far(100f, 0L))
         assertNull(far(110f, 100L))
-        assertEquals("Car moving, 12 meters away.", far(120f, 200L))
+        assertEquals("Car moving.", far(120f, 200L))
     }
 
     @Test
@@ -149,7 +149,7 @@ class NoLightCrossingTest {
 
         assertEquals("Droite.", far(100f, 0L))
         assertEquals("Droite.", far(110f, 100L))
-        assertEquals("Car moving, 12 meters away.", far(120f, 200L))
+        assertEquals("Car moving.", far(120f, 200L))
     }
 
     @Test
@@ -166,7 +166,7 @@ class NoLightCrossingTest {
 
         assertNull(far(100f, 0L))
         assertNull(far(110f, 100L))
-        assertEquals("Car moving, 30 meters away.", far(120f, 200L))
+        assertEquals("Car moving.", far(120f, 200L))
     }
 
     @Test
@@ -189,7 +189,7 @@ class NoLightCrossingTest {
 
         assertNull(far(100f, 100L))
         assertNull(far(110f, 200L))
-        assertEquals("Car moving, 30 meters away.", far(120f, 300L))
+        assertEquals("Car moving.", far(120f, 300L))
     }
 
     @Test

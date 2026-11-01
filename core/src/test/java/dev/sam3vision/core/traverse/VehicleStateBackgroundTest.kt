@@ -106,7 +106,7 @@ class VehicleStateBackgroundTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Car moving, 8 meters away.", third!!.phrase)
+        assertEquals("Car moving.", third!!.phrase)
         assertEquals("Stop, car moving.", third.safetyPhrase)
         assertTrue("tau + 8 m + centre : urgent", third.urgent)
     }
