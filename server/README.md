@@ -52,7 +52,7 @@ argument de commande (fichier temporaire `chmod 600`, secret Modal écrasé depu
 # tests unitaires backend, sans GPU ni token (stdlib + PIL + numpy + fastapi) — ce que lance la CI
 python3 scripts/test_units.py
 
-# contrat WebSocket sans GPU ni réseau (24 vérifications)
+# contrat WebSocket sans GPU ni réseau (55 vérifications)
 python3 scripts/test_live_ws.py
 
 # E2E contre un backend déployé (stdlib seule ; groupes health, segment, analyze, ask, contract-errors…)

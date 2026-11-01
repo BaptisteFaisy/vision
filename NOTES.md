@@ -28,6 +28,7 @@ Les comptages sont refaits sur ce commit ; ce qui n'a pas été exécuté est ma
 | core-ktx | **1.18.0** | `libs.versions.toml:4` (`coreKtx`) |
 | JUnit / androidx.test | **4.13.2** / ext-junit **1.3.0**, core **1.7.0**, runner+rules **1.7.0** | `libs.versions.toml:17,18,19,20` |
 | org.json (test only) | **20240303** | `libs.versions.toml:22`, `core/build.gradle.kts:40` |
+| MapLibre Native | **13.7.1** (codé en dur, hors catalogue) | `app/build.gradle.kts:249` |
 | jump3r (MP3 pur Java) | **1.0.4** | `libs.versions.toml:21` |
 | mwdat (lunettes Meta) | **1.0.0** (core, camera, inputs, mockdevice) — la seule version que les lunettes servent ; garde `DatPinTest`, raison dans le toml | `libs.versions.toml:27` |
 | guava | **33.3.1-android** (pinning transitif Room, sans import direct) | `libs.versions.toml:28`, `app/build.gradle.kts:216-217` |
@@ -56,7 +57,7 @@ les totaux bougent de quelques dizaines de lignes, les proportions non.
 | dont `app/src/androidTest` (nettoyage, profondeur, média) | **8** (appareil requis) |
 | dont `app/src/androidTestDebug` (`bench/MockGlassesTest`) | **1** (appareil requis) |
 | `@Preview` Compose | **11** |
-| Plus gros fichiers | `app/AppViewModel.kt` et `app/isee/IseeViewModel.kt` — **498** lignes chacun (côté Python : `conflict_agent.py`, `fast_core.py` — 499) |
+| Plus gros fichiers | `app/glasses/GlassesController.kt` — **499** lignes, puis `app/LiveViewModel.kt` et `app/isee/IseeViewModel.kt` — 498 chacun (côté Python : `conflict_agent.py`, `fast_core.py` — 499) |
 
 Le nombre de tests réellement **exécutés** est **non mesuré ici** : aucun `gradlew` n'a été
 lancé sur cette machine pour ce comptage.
