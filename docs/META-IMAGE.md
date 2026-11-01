@@ -62,8 +62,8 @@ l'utilisateur est seul. « Where are my keys » (`parseWhere`, objets maison
 ou « my ») prend le même chemin, sauf repère déjà armé (chassé, jamais
 régénéré) ; toute autre question « where » reste pour le LLM. Le matcher
 local le reconnaît dès la frame suivante et `PictoLayer` le montre sur la
-caméra iSee, à son emplacement — le premier reconnu aussi en grand au-dessus
-(`IseePictoBig`).
+caméra iSee, à son emplacement (cadre jaune seul,
+sans nom ni carte « en grand »).
 
 ## Où ça vit dans le code
 
