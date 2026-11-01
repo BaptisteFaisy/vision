@@ -13,13 +13,21 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **18** concepts extérieurs — mobiles (« person »,
-     * « car », « bus », « bicycle ») puis feux piétons et cheminement
-     * (« pedestrian traffic light », « pedestrian signal head », « curb »,
-     * « sidewalk », « crosswalk ») puis statiques (« pole », « stairs »,
-     * « fence », « gate », « wall », ordre user du 31/10 : iSee détecte
-     * les murs), puis les clés et les souvenirs du 31/10 (« keys »,
-     * « souvenir shop », « beanie », « socks », boutique du square).
+     * Concepts par défaut : **17** concepts extérieurs — mobiles (« person »,
+     * « car ») puis feux piétons et cheminement (« pedestrian traffic light »,
+     * « pedestrian signal head », « curb », « crosswalk ») puis statiques
+     * (« pole », « stairs », « keys », « gate », « wall », ordre user du 31/10 :
+     * iSee détecte les murs), puis la boutique du square (« souvenir shop »,
+     * « beanie », « socks ») et enfin la foule (« stroller », « child »,
+     * « dog »).
+     *
+     * **Ordre user du 01/11** : « vire electric scooter, bus, bicycle,
+     * sidewalk, fence ». Ces cinq-là ne sont plus suivis **au repos** ; la
+     * Traversée les rétablit quand elle s'arme (`VehicleConcepts.promptsFor`
+     * remet car/bus/bicycle/camion/moto, et `TraversePipeline` remet curb +
+     * sidewalk), et le preset [outdoor] garde fence/animal pour la marche
+     * urbaine. Conséquence assumée : hors Traversée, un vélo ou un bus n'est
+     * plus vu — c'est le prix des slots rendus.
      *
      * **Ordre user du 01/11 : les souvenirs et les clés restent.** L'audit
      * foule les avait sortis au profit de « stroller », « child »,
@@ -57,10 +65,9 @@ object LivePrompts {
      * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
      */
     val default: List<String> = listOf(
-        "person", "car", "bus", "bicycle", "pedestrian traffic light",
-        "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-        "stairs", "keys", "fence", "gate", "souvenir shop", "beanie", "socks",
-        "wall", "stroller", "child", "electric scooter", "dog",
+        "person", "car", "pedestrian traffic light", "pedestrian signal head",
+        "curb", "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop",
+        "beanie", "socks", "wall", "stroller", "child", "dog",
     )
 
     /**
@@ -129,6 +136,9 @@ object LivePrompts {
      * ensemble). Le backend suit : `MAX_PROMPTS = 22` sur `/live`,
      * `PROMPT_LIMIT = 22` côté tracker ; le client ne doit pas en envoyer
      * davantage — sinon l'app affiche des concepts jamais détectés.
+     *
+     * La liste par défaut n'occupe que 17 de ces 22 places : la marge sert à
+     * « Find the X » ([withConcept]), pas à allonger le suivi au repos.
      *
      * **Couplage de déploiement** : un serveur resté à 18 **refuse** la frame
      * (`PromptError`), il ne tronque pas. Le serveur se déploie au merge

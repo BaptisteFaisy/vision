@@ -248,15 +248,18 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
 
 ## 5. Concepts suivis : 18 (plafond 18)
 
-- Liste par défaut : `["person", "car", "bus", "bicycle",
-  "pedestrian traffic light", "pedestrian signal head", "curb", "sidewalk",
-  "crosswalk", "pole", "stairs", "keys", "fence", "gate", "souvenir shop",
-  "beanie", "socks", "wall", "stroller", "child", "electric scooter", "dog"]`
-  (22 concepts extérieurs, ordres user des 28/10-01/11 : la tête du feu piéton
-  suit le caisson depuis le 31/10, la couleur s'y lit en local ; les murs
-  depuis le 31/10 ; la boutique du square **et** les corps de la foule depuis
-  le 01/11 — plafond client et serveur à 22, un serveur resté à 18 refuse la
-  frame) —
+- Liste par défaut : `["person", "car", "pedestrian traffic light",
+  "pedestrian signal head", "curb", "crosswalk", "pole", "stairs", "keys",
+  "gate", "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
+  "dog"]`
+  (**17 concepts extérieurs**, ordres user des 28/10-01/11 : la tête du feu
+  piéton suit le caisson depuis le 31/10, la couleur s'y lit en local ; les
+  murs depuis le 31/10 ; les souvenirs et les corps de la foule depuis le
+  01/11 ; **bus, bicycle, sidewalk, fence et electric scooter sont sortis le
+  01/11** — la Traversée les rétablit quand elle s'arme, via
+  `VehicleConcepts.promptsFor` + curb/sidewalk). Plafond client **et** serveur :
+  **22** (marge pour « Find the X »), un serveur resté à 18 refuserait la
+  frame —
   `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
 - Preset extérieur : `["person", "pole", "street lamp", "bollard", "fence", "barrier",
   "gate", "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",

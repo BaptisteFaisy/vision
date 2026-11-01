@@ -10,14 +10,14 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `vingt deux concepts exterieur par defaut, au plafond client`() {
-        assertEquals(22, LivePrompts.default.size)
+    fun `dix sept concepts exterieur par defaut, plafond client a vingt deux`() {
+        assertEquals(17, LivePrompts.default.size)
         assertEquals(
             listOf(
-                "person", "car", "bus", "bicycle", "pedestrian traffic light",
-                "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "keys", "fence", "gate", "souvenir shop", "beanie",
-                "socks", "wall", "stroller", "child", "electric scooter", "dog",
+                "person", "car", "pedestrian traffic light", "pedestrian signal head",
+                "curb", "crosswalk", "pole", "stairs", "keys", "gate",
+                "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
+                "dog",
             ),
             LivePrompts.default,
         )
@@ -28,13 +28,15 @@ class LivePromptsTest {
 
     @Test
     fun `murs clotures et portails suivis en exterieur, barrier et keys hors defaut`() {
-        // Ordre user du 31/10 : « fence » garde son slot, « barrier » sort
-        // (reconnu encore par le preset extérieur), « wall » entre en 18e.
-        // Ordre user du 01/11 : les souvenirs et les clés **restent** dans le
-        // défaut (boutique du square) — la foule passe par le preset extérieur.
+        // Ordre user du 31/10 : « fence » avait son slot, « barrier » est sorti
+        // (reconnu encore par le preset extérieur), « wall » est entré en 18e.
+        // Ordre user du 01/11 : les souvenirs et les clés **restent**, mais
+        // « fence » quitte le défaut (« vire … fence ») : il vit dans le
+        // preset extérieur, avec la marche urbaine.
         assertTrue("keys" in LivePrompts.default)
         assertFalse("barrier" in LivePrompts.default)
-        assertTrue("fence" in LivePrompts.default)
+        assertFalse("fence" in LivePrompts.default)
+        assertTrue("fence" in LivePrompts.outdoor)
         assertTrue("gate" in LivePrompts.default)
         assertTrue("wall" in LivePrompts.default)
         // Unification traversée/normal (30/10) : porte et fenêtre cèdent
@@ -46,14 +48,18 @@ class LivePromptsTest {
     @Test
     fun `foule et souvenirs ensemble dans le defaut, plafond a vingt deux`() {
         // Ordres user du 01/11, dans l'ordre : « remets souvenir shop, beanie,
-        // socks, keys » puis « rajoute les filtres poussette/enfant/
-        // trottinette/chien ». Les deux tiennent : le plafond passe de 18 à 22
-        // côté client **et** côté serveur (MAX_PROMPTS / PROMPT_LIMIT), sinon
-        // `/live` refuserait la frame.
+        // socks, keys », « rajoute poussette/enfant/trottinette/chien », puis
+        // « vire electric scooter, bus, bicycle, sidewalk, fence ».
+        // Résultat : 17 concepts suivis, plafond toujours à 22 (client et
+        // serveur) — la marge sert à « Find the X », pas à la liste par défaut.
         assertTrue("stroller" in LivePrompts.default)
         assertTrue("child" in LivePrompts.default)
-        assertTrue("electric scooter" in LivePrompts.default)
         assertTrue("dog" in LivePrompts.default)
+        assertFalse("electric scooter" in LivePrompts.default)
+        assertFalse("bus" in LivePrompts.default)
+        assertFalse("bicycle" in LivePrompts.default)
+        assertFalse("sidewalk" in LivePrompts.default)
+        assertFalse("fence" in LivePrompts.default)
         assertTrue("souvenir shop" in LivePrompts.default)
         assertTrue("beanie" in LivePrompts.default)
         assertTrue("socks" in LivePrompts.default)
@@ -78,9 +84,14 @@ class LivePromptsTest {
                 (CrossingPrompts.isLightLabel(concept) && CrossingPrompts.LIGHT in LivePrompts.default)
             assertTrue(concept, covered)
         }
-        (VehicleConcepts.PROMPTS - extras - "scooter").forEach { concept ->
-            assertTrue(concept, concept in LivePrompts.default)
+        // Depuis « vire bus, bicycle … » (ordre user du 01/11) le défaut ne
+        // porte plus les cinq véhicules : c'est `VehicleConcepts.promptsFor`
+        // qui les rétablit quand la Traversée s'arme, et elle les met en tête.
+        val crossing = VehicleConcepts.promptsFor(LivePrompts.default)
+        (VehicleConcepts.PROMPTS).forEach { concept ->
+            assertTrue(concept, concept in crossing)
         }
+        assertEquals(VehicleConcepts.PROMPTS, crossing.take(VehicleConcepts.PROMPTS.size))
         assertTrue("curb" in LivePrompts.default)
     }
 
@@ -127,11 +138,13 @@ class LivePromptsTest {
     @Test
     fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(22, exterior.size)
+        assertEquals(17, exterior.size)
         assertTrue("wall" in exterior)
-        assertTrue("fence" in exterior)
         assertTrue("gate" in exterior)
-        assertTrue("sidewalk" in exterior)
+        // « vire … sidewalk, fence » (ordre user du 01/11) : ces deux-là ne
+        // sont plus suivis au repos, ni dans le défaut ni dans le monde iSee.
+        assertFalse("fence" in exterior)
+        assertFalse("sidewalk" in exterior)
     }
 
     @Test
@@ -216,14 +229,14 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `find the x au plafond, le dernier concept cede son slot`() {
-        // « Find the X » au plafond ne reste plus muet — démontré avec « wallet »
-        // : le 22e (« dog », ordre user du 01/11) sort, 22 suivis.
+    fun `find the x sous le plafond s ajoute sans rien chasser`() {
+        // La liste par défaut est à 17, le plafond à 22 : « Find the X » ajoute
+        // (« wallet ») sans évincer personne — l'éviction ne commence qu'à 22.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(LivePrompts.MAX, next.size)
+        assertEquals(18, next.size)
         assertTrue("wallet" in next)
-        assertFalse("dog" in next)
-        assertEquals(LivePrompts.default.dropLast(1) + "wallet", next)
+        assertTrue("dog" in next)
+        assertEquals(LivePrompts.default + "wallet", next)
     }
 
     @Test
