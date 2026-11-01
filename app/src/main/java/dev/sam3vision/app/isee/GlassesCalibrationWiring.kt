@@ -1,12 +1,14 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.glasses.GlassesVideoLink
+import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -31,15 +33,42 @@ internal fun LiveProbe.setCalibration(lens: LensSpec, pose: CameraPose? = null) 
  */
 /**
  * Bascule lunettes-live de la sonde : le tangage téléphone ne vise pas où visent
- * les lunettes (DAT 1.0.0 n'expose aucune orientation tête), donc la branche
- * plan-de-sol est coupée explicitement — sténopé + profondeur gardent la main.
- * Retour téléphone : la branche rouvre (la pose IMU reprend si le tangage tourne,
- * sinon `null` = sténopé seul, repli existant).
+ * les lunettes, donc sans pose tête ([headPose] `null`) la branche plan-de-sol
+ * est coupée explicitement — l'estimation tombe sur le sténopé seul
+ * (coupe-circuit D3). Avec une pose tête DAT Motion, la branche rouvre **sur
+ * la tête** : le sol est mesuré aux yeux, pas à la poche. Retour téléphone :
+ * la branche rouvre (la pose IMU reprend si le tangage tourne, sinon `null` =
+ * sténopé seul).
  */
-fun LiveProbe.setGlassesLive(live: Boolean) {
-    distances.groundPlaneEnabled = !live
-    if (live) distances.pose = null
-    android.util.Log.i("GlassesBridge", "plan de sol " + if (live) "coupé (lunettes-live, sténopé seul)" else "rouvert (téléphone)")
+fun LiveProbe.setGlassesLive(live: Boolean, headPose: CameraPose? = null) {
+    if (!live) {
+        distances.groundPlaneEnabled = true
+        android.util.Log.i("GlassesBridge", "plan de sol rouvert (téléphone)")
+        return
+    }
+    val pose = headPose?.takeIf { it.isValid }
+    distances.pose = pose
+    distances.groundPlaneEnabled = pose != null
+    android.util.Log.i(
+        "GlassesBridge",
+        "plan de sol " + if (pose != null) "lunettes-live sur pose tête" else "coupé (lunettes-live, sténopé seul)",
+    )
+}
+
+/**
+ * Suit la pose tête DAT Motion : chaque émission, si le direct vit, la pose
+ * (fraîche) rouvre la branche sol, son absence la recoupe — [setGlassesLive]
+ * reste le seul écrivain de la bascule. Hors direct, les émissions sont
+ * ignorées (la voie téléphone garde la main).
+ */
+internal fun LiveProbe.observeHeadPose(scope: CoroutineScope) {
+    scope.launch {
+        GlassesVideoLink.headPose.collect { pose ->
+            if (!GlassesVideoLink.live.value) return@collect
+            val fresh = pose?.takeIf { GlassesVideoLink.freshHeadPose() === it }
+            setGlassesLive(true, fresh)
+        }
+    }
 }
 
 /** Vrai quand la branche sol est coupée (lunettes-live) : hook UI, sans état. */
@@ -55,7 +84,9 @@ internal fun LiveProbe.observeGlassesLive(
 ) {
     scope.launch {
         // `live` est un StateFlow conflated : une valeur répétée ne réémet pas.
-        GlassesVideoLink.live.collect { live ->
+        // `mireVersion` force la relecture (Save/Clear mire → stack reposé chaud).
+        combine(GlassesVideoLink.live, GlassesMireStore.mireVersion) { live, _ -> live }
+            .collect { live ->
             if (live) {
                 onGlasses()
                 val chosen = chooseLens(settings().glassesFovDeg, phoneLens(), glassesLens(), fromGlasses = true)

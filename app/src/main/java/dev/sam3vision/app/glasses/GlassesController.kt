@@ -92,7 +92,10 @@ class GlassesController(
     /** Question mains-libres : micro des lunettes, transcription, événements. */
     private val talkHost = GlassesTalkHost(
         scope = scope,
-        audio = ::currentAudio,
+        audio = {
+            val snapshot = _state.value
+            GlassesAudioPlan.select(snapshot.connected, snapshot.streaming, snapshot.micAllowed, camera?.audio)
+        },
         engine = ::speechClient,
         settings = frameSettings,
         beep = beeps::invoke,
@@ -356,19 +359,16 @@ class GlassesController(
         if (started) {
             camera = cam
             // La dictée peut prendre le micro des lunettes tant que le flux tourne.
-            GlassesMicLink.attach { currentAudio() }
+            GlassesMicLink.attach {
+                val snapshot = _state.value
+                GlassesAudioPlan.select(snapshot.connected, snapshot.streaming, snapshot.micAllowed, camera?.audio)
+            }
             GlassesVideoLink.attachNotes(::note)
             // Session ouverte : l'écoute part au premier flux montant.
             autoListen.arm()
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
-    }
-
-    /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
-    private fun currentAudio(): PcmSource? {
-        val snapshot = _state.value
-        val usable = GlassesAudioPlan.usable(snapshot.connected, snapshot.streaming, snapshot.micAllowed)
-        return if (usable) camera?.audio else null
+        GlassesVideoLink.attachHeadPose(scope, ::note, created)
     }
 
     private suspend fun ensureCameraPermission(): Boolean {

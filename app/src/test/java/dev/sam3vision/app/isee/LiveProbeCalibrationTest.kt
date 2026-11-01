@@ -1,7 +1,9 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.glasses.GlassesVideoLink
+import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.core.distance.CameraPose
+import dev.sam3vision.core.distance.CropGeometry
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.settings.Settings
@@ -117,5 +119,165 @@ class LiveProbeCalibrationTest {
         probe.configureFrom(Settings.Default, glassesLens = mire, fromGlasses = true)
 
         assertEquals(mire, probe.distances.lensSpec)
+        assertEquals(mire, GlassesVideoLink.glassesStreamLens)
+    }
+
+    @Test
+    fun `save mire reapplique le stack sans bascule live`() = runTest {
+        val (probe, _) = probeHarness(this)
+        var reads = 0
+        var mire: LensSpec? = null
+        val observer = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            probe.observeGlassesLive(
+                observer, { Settings.Default }, { null }, {}, {},
+                glassesLens = { reads += 1; mire },
+            )
+            runCurrent()
+            GlassesVideoLink.markRendered()
+            runCurrent()
+            val readsAtLive = reads
+            assertEquals(LensSpec.Glasses, probe.distances.lensSpec)
+
+            mire = LensSpec(60.61f, 92.19f, sensorLandscape = false)
+            GlassesMireStore.mireVersion.value += 1
+            runCurrent()
+
+            assertTrue(reads > readsAtLive)
+            assertEquals(mire, probe.distances.lensSpec)
+            assertEquals(mire, GlassesVideoLink.glassesStreamLens)
+        } finally {
+            observer.cancel()
+        }
+    }
+
+    @Test
+    fun `setGlassesLive avec pose tete rouvre la branche sol sur la tete`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val head = CameraPose(CameraPose.GLASSES_HEIGHT_M, 0.3f)
+
+        probe.setGlassesLive(true, head)
+
+        assertEquals(head, probe.distances.pose)
+        assertTrue(probe.distances.groundPlaneEnabled)
+    }
+
+    @Test
+    fun `setGlassesLive sans pose tete coupe le circuit`() = runTest {
+        val (probe, _) = probeHarness(this)
+        probe.distances.pose = CameraPose(1.5f, 0.1f)
+
+        probe.setGlassesLive(true)
+
+        assertNull(probe.distances.pose)
+        assertTrue(!probe.distances.groundPlaneEnabled)
+    }
+
+    @Test
+    fun `setGlassesLive refuse une pose tete inexploitable`() = runTest {
+        val (probe, _) = probeHarness(this)
+
+        probe.setGlassesLive(true, CameraPose(99f, 0f))
+
+        assertNull(probe.distances.pose)
+        assertTrue(!probe.distances.groundPlaneEnabled)
+    }
+
+    @Test
+    fun `observeHeadPose applique la pose fraiche quand le direct vit`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val observer = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            probe.observeHeadPose(observer)
+            probe.setGlassesLive(true)
+            GlassesVideoLink.markRendered()
+            val head = CameraPose(CameraPose.GLASSES_HEIGHT_M, 0.2f)
+            GlassesVideoLink.publishHeadPose(head)
+            runCurrent()
+
+            assertEquals(head, probe.distances.pose)
+            assertTrue(probe.distances.groundPlaneEnabled)
+
+            GlassesVideoLink.publishHeadPose(null)
+            runCurrent()
+
+            assertNull(probe.distances.pose)
+            assertTrue(!probe.distances.groundPlaneEnabled)
+        } finally {
+            observer.cancel()
+        }
+    }
+
+    @Test
+    fun `observeHeadPose ignore une pose perimee`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val observer = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            probe.observeHeadPose(observer)
+            probe.setGlassesLive(true)
+            GlassesVideoLink.markRendered()
+            val head = CameraPose(CameraPose.GLASSES_HEIGHT_M, 0.2f)
+            GlassesVideoLink.publishHeadPose(head, nowMs = 1L)
+            runCurrent()
+
+            assertNull(probe.distances.pose)
+            assertTrue(!probe.distances.groundPlaneEnabled)
+        } finally {
+            observer.cancel()
+        }
+    }
+
+    @Test
+    fun `observeHeadPose ignore la pose hors direct`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val observer = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            probe.observeHeadPose(observer)
+            GlassesVideoLink.publishHeadPose(CameraPose(CameraPose.GLASSES_HEIGHT_M, 0.2f))
+            runCurrent()
+
+            assertNull(probe.distances.pose)
+            assertTrue(probe.distances.groundPlaneEnabled)
+        } finally {
+            observer.cancel()
+        }
+    }
+
+    @Test
+    fun `E5 pose la focale recadree par photo vue`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val stream = LensSpec(68f, 100.4f, sensorLandscape = false)
+        GlassesVideoLink.glassesStreamLens = stream
+        GlassesVideoLink.noteSnapshotGeometry(720, 1280, 320, 180)
+
+        applyGlassesLens(probe, fromView = true)
+
+        val expected = CropGeometry.afterCrop(stream, 720, 1280, CropGeometry.fillViewCrop(720, 1280, 320, 180))!!
+        assertEquals(expected, probe.distances.lensSpec)
+        GlassesVideoLink.detachSnapshot()
+    }
+
+    @Test
+    fun `E5 hors vue repose le flux, sans focale ne touche rien`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val stream = LensSpec(68f, 100.4f, sensorLandscape = false)
+        GlassesVideoLink.glassesStreamLens = stream
+
+        applyGlassesLens(probe, fromView = false)
+        assertEquals(stream, probe.distances.lensSpec)
+
+        GlassesVideoLink.glassesStreamLens = null
+        applyGlassesLens(probe, fromView = true)
+        assertEquals(stream, probe.distances.lensSpec)
+    }
+
+    @Test
+    fun `groundDegraded reflete la bascule sol`() = runTest {
+        val (probe, _) = probeHarness(this)
+        assertTrue(!probe.groundDegraded)
+        probe.setGlassesLive(true)
+        assertTrue(probe.groundDegraded)
+        probe.setGlassesLive(false)
+        assertTrue(!probe.groundDegraded)
     }
 }

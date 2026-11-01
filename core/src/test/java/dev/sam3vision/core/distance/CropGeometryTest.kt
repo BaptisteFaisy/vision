@@ -139,4 +139,95 @@ class CropGeometryTest {
         val bad = LensSpec(0f, 0f)
         assertNull(CropGeometry.afterCrop(bad, SRC_W, SRC_H, crop169))
     }
+
+    @Test
+    fun `la distorsion se propage renormalisee au crop`() {
+        // Mire type (`GlassesMireTest` : k1 = -0,1, k2 = 0,02) sur le flux HIGH.
+        val mire = stream.copy(distortion = RadialDistortion(-0.1f, 0.02f))
+        val cropped = CropGeometry.afterCrop(mire, SRC_W, SRC_H, crop169)!!
+        assertTrue(cropped.usable)
+        assertTrue(cropped.hasMeasuredDistortion)
+        // (n'/n)^2 = 81/256, (n'/n)^4 = (81/256)^2 : 720x1280 -> 720x405.
+        assertEquals(-0.03164f, cropped.distortion!!.k1, 0.00002f)
+        assertEquals(0.002f, cropped.distortion.k2, 0.00002f)
+        // Coeffs nuls mesures : propages non-nuls (mesure sans distorsion).
+        val zero = CropGeometry.afterCrop(
+            stream.copy(distortion = RadialDistortion(0f, 0f)), SRC_W, SRC_H, crop169,
+        )!!
+        assertEquals(RadialDistortion(0f, 0f), zero.distortion)
+    }
+
+    @Test
+    fun `redresser commute avec le crop, au centieme de pixel`() {
+        // Grille 9x9 du crop : redresser en source puis mapper == mapper puis
+        // redresser en crop (preuve float64 ~1e-13, bruit float32 seul ici).
+        val mire = stream.copy(distortion = RadialDistortion(-0.1f, 0.02f))
+        val cropped = CropGeometry.afterCrop(mire, SRC_W, SRC_H, crop169)!!
+        val (cx, cy) = mire.principalPx(SRC_W, SRC_H)
+        val (ccx, ccy) = cropped.principalPx(crop169.width, crop169.height)
+        val ns = Distortion.normPx(SRC_W, SRC_H)
+        val nc = Distortion.normPx(crop169.width, crop169.height)
+        for (gx in 0..8) for (gy in 0..8) {
+            val x = gx * (SRC_W - 1) / 8f
+            val y = crop169.y + gy * (crop169.height - 1) / 8f
+            val px = x - crop169.x
+            val py = y - crop169.y
+            assertEquals(
+                Distortion.undistortX(x, y, cx, cy, ns, mire.distortion) - crop169.x,
+                Distortion.undistortX(px, py, ccx, ccy, nc, cropped.distortion), 0.01f,
+            )
+            assertEquals(
+                Distortion.undistortY(x, y, cx, cy, ns, mire.distortion) - crop169.y,
+                Distortion.undistortY(px, py, ccx, ccy, nc, cropped.distortion), 0.01f,
+            )
+        }
+    }
+
+    @Test
+    fun `recentre ou pas, la propagation reste exacte`() {
+        // Crop NON centre en x (remplit-la-vue 1920x1080 -> 720x1280) : `r`
+        // part du centre optique remappe, le recentrage ne casse rien.
+        val src = LensSpec(H_STREAM, V_STREAM, sensorLandscape = false)
+            .copy(distortion = RadialDistortion(-0.1f, 0.02f))
+        val crop = CropGeometry.fillViewCrop(1920, 1080, 720, 1280)
+        assertEquals(CropGeometry.Window(656, 0, 607, 1080), crop)
+        val cropped = CropGeometry.afterCrop(src, 1920, 1080, crop)!!
+        val (cx, cy) = src.principalPx(1920, 1080)
+        val (ccx, ccy) = cropped.principalPx(crop.width, crop.height)
+        val ns = Distortion.normPx(1920, 1080)
+        val nc = Distortion.normPx(crop.width, crop.height)
+        for (gx in 0..4) for (gy in 0..4) {
+            val x = crop.x + gx * (crop.width - 1) / 4f
+            val y = crop.y + gy * (crop.height - 1) / 4f
+            assertEquals(
+                Distortion.undistortY(x, y, cx, cy, ns, src.distortion) - crop.y,
+                Distortion.undistortY(x - crop.x, y - crop.y, ccx, ccy, nc, cropped.distortion),
+                0.01f,
+            )
+        }
+    }
+
+    @Test
+    fun `sans mesure, pas de distorsion inventee`() {
+        val cropped = CropGeometry.afterCrop(stream, SRC_W, SRC_H, crop169)!!
+        assertNull(cropped.distortion)
+    }
+
+    @Test
+    fun `le null post-crop sous-estimait de 2 pour cent au bord`() {
+        // Boite 390 px au bord gauche du crop 16:9, mire (-0,1 ; 0,02) :
+        // hauteur redressee 381,6 px -> le null sous-estimait de 2,2 %.
+        val mire = stream.copy(distortion = RadialDistortion(-0.1f, 0.02f))
+        val cropped = CropGeometry.afterCrop(mire, SRC_W, SRC_H, crop169)!!
+        val focal = cropped.focalPx(crop169.width, crop169.height)
+        val (ccx, ccy) = cropped.principalPx(crop169.width, crop169.height)
+        val nc = Distortion.normPx(crop169.width, crop169.height)
+        val top = Distortion.undistortY(70f, 10f, ccx, ccy, nc, cropped.distortion)
+        val bottom = Distortion.undistortY(70f, 400f, ccx, ccy, nc, cropped.distortion)
+        assertEquals(381.6f, bottom - top, 0.3f)
+        val box = listOf(10f, 10f, 130f, 400f)
+        val brut = Pinhole.distanceMeters(box, 1.7f, focal)!!
+        val corrige = 1.7f * focal / (bottom - top)
+        assertEquals(0.022f, (corrige - brut) / brut, 0.002f)
+    }
 }

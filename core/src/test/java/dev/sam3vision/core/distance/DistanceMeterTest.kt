@@ -276,6 +276,23 @@ class DistanceMeterTest {
     }
 
     @Test
+    fun `distorsion mire propagee au crop agit sur la mesure`() {
+        val mire = LensSpec(68f, 100.4f, sensorLandscape = false).copy(distortion = RadialDistortion(-0.1f, 0.02f))
+        val crop = CropGeometry.fillViewCrop(720, 1280, 320, 180)
+        val lens = CropGeometry.afterCrop(mire, 720, 1280, crop)!!
+        val box = listOf(10f, 10f, 130f, 170f)
+        val corrected = DistanceMeter(lens).measure(320, 180, listOf(detection("personne", box))).first()
+        val plain = DistanceMeter(lens.copy(distortion = null)).measure(320, 180, listOf(detection("personne", box))).first()
+        val focal = lens.focalPx(320, 180)
+        val (cx, cy) = lens.principalPx(320, 180)
+        val norm = Distortion.normPx(320, 180)
+        val top = Distortion.undistortY(70f, 10f, cx, cy, norm, lens.distortion)
+        val bottom = Distortion.undistortY(70f, 170f, cx, cy, norm, lens.distortion)
+        assertEquals(1.70f * focal / (bottom - top), corrected.rawMeters, 0.001f)
+        assertTrue(corrected.rawMeters > plain.rawMeters)
+    }
+
+    @Test
     fun `bordure collee au bas avec pose n'a plus de distance`() {
         // P0 point 7 : le bas coupé ne rend plus la distance du bord bas. La pose
         // seule ne fait pas un plan de sol : sans ligne de pieds dans l'image, il

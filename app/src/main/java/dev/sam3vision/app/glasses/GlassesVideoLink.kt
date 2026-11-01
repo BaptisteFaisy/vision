@@ -2,11 +2,17 @@ package dev.sam3vision.app.glasses
 
 import android.os.SystemClock
 import android.util.Log
+import com.meta.wearable.dat.core.session.DeviceSession
+import com.meta.wearable.dat.motion.addMotion
+import com.meta.wearable.dat.motion.removeMotion
+import com.meta.wearable.dat.motion.types.MotionConfiguration
+import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GlassesClockOffset
 import dev.sam3vision.core.live.GlassesLinkStats
 import dev.sam3vision.core.live.LinkDrop
 import dev.sam3vision.core.live.TimingsText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +71,9 @@ private const val TAG = "GlassesVideo"
 
 /** Journal de la mesure du lien (recette B1/B2 : `logcat -s GlassesLink`). */
 private const val LINK_TAG = "GlassesLink"
+
+/** Âge maximal d'une pose tête crue fraîche (10 Hz nominaux, large comme `PitchMeter`). */
+const val HEAD_POSE_STALE_AFTER_MS = 1_000L
 
 /**
  * Une poussée de frame, numérotée : deux poussées identiques (le mock rejoue la même image)
@@ -145,6 +154,61 @@ object GlassesVideoLink {
      * le décodeur les prend ici faute de config dans le flux. Toujours `null` sur des
      * lunettes réelles (la config voyage dans le flux).
      */
+    private val _headPose = MutableStateFlow<CameraPose?>(null)
+
+    /**
+     * Dernière pose tête DAT Motion (`null` = inconnue : Motion refusée,
+     * orientation absente, erreur, ou session fermée). Écrite par
+     * [GlassesHeadPose], lue par la sonde (`observeHeadPose`, `PitchMeter`) :
+     * même motif passerelle que les frames, sans référence au SDK ni à l'UI.
+     */
+    val headPose: StateFlow<CameraPose?> = _headPose.asStateFlow()
+
+    /** Fraîcheur de [headPose] (ms wall-clock téléphone, `0` = jamais). */
+    @Volatile
+    var headPoseAtMs: Long = 0L
+        private set
+
+    /** Publie la pose tête (ou son absence) en la datant. */
+    fun publishHeadPose(pose: CameraPose?, nowMs: Long = System.currentTimeMillis()) {
+        headPoseAtMs = nowMs
+        _headPose.value = pose
+    }
+
+    /**
+     * Pose tête si fraîche (même horizon 1 s que `PitchMeter.STALE_AFTER_MS`),
+     * sinon `null` : une pose périmée ne rouvre jamais la branche sol.
+     */
+    fun freshHeadPose(nowMs: Long = System.currentTimeMillis()): CameraPose? {
+        val pose = _headPose.value ?: return null
+        if (!pose.isValid) return null
+        if (nowMs - headPoseAtMs > HEAD_POSE_STALE_AFTER_MS) return null
+        return pose
+    }
+
+    private var headPoseFeed: GlassesHeadPose? = null
+
+    /**
+     * Attache la pose tête DAT Motion sur la session (pin 1.0.0, 10 Hz) : un
+     * refus (canal bêta, paire sans Motion) publie null et la sonde garde le
+     * sténopé seul. Motif passerelle comme les frames et les notes.
+     */
+    fun attachHeadPose(scope: CoroutineScope, onNote: (GlassesMessage) -> Unit, session: DeviceSession) {
+        headPoseFeed = GlassesHeadPose(scope, onNote).also {
+            it.start(
+                attach = { session.addMotion(MotionConfiguration()).getOrNull() },
+                detach = { session.removeMotion() },
+            )
+        }
+    }
+
+    /** Détache la pose tête (oublie la pose, jamais de valeur périmée). */
+    fun detachHeadPose() {
+        headPoseFeed?.stop()
+        headPoseFeed = null
+        publishHeadPose(null)
+    }
+
     @Volatile
     var fallbackCsd: ByteArray? = null
 
@@ -341,6 +405,8 @@ object GlassesVideoLink {
         fallbackCsd = null
         // La paire peut changer entre deux sessions : la focale est reposée par D1.
         glassesStreamLens = null
+        // ...et la pose tête (jamais de pose périmée d'une session à l'autre).
+        detachHeadPose()
     }
 
     /** Taille annoncée par le décodeur (un changement de résolution recadre la vue). */

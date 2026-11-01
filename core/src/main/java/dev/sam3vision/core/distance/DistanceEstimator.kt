@@ -168,11 +168,12 @@ class DistanceMeter(
     var pose: CameraPose? = null
 
     /**
-     * Coupe-circuit de la branche plan-de-sol : `false` en lunettes-live (le
-     * tangage téléphone ne vise pas où visent les lunettes, DAT 1.0.0 sans
-     * orientation tête) — [groundMeters] rend alors `null`, la fusion tombe sur
-     * le sténopé seul, et aucune valeur téléphone ne fuit silencieusement.
-     * Volatile : écrit par l'UI, lu par le thread des frames.
+     * Coupe-circuit de la branche plan-de-sol : `false` en lunettes-live sans
+     * pose tête (le tangage téléphone ne vise pas où visent les lunettes) —
+     * [groundMeters] rend alors `null`, la fusion tombe sur le sténopé seul, et
+     * aucune valeur téléphone ne fuit silencieusement. Rouvert avec la pose
+     * tête DAT Motion quand elle est fraîche (`setGlassesLive`). Volatile :
+     * écrit par l'UI, lu par le thread des frames.
      */
     @Volatile
     var groundPlaneEnabled: Boolean = true

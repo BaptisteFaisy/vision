@@ -210,4 +210,12 @@ class GlassesVideoLinkTest {
     /** Frame datée comme `pushCopy` : pts média + arrivée monotone téléphone. */
     private fun dated(arrivedAtNs: Long, presentationTimeUs: Long = 900_000L) =
         frame().copy(presentationTimeUs = presentationTimeUs, arrivedAtNs = arrivedAtNs)
+
+    @Test
+    fun `detach oublie la geometrie snapshot`() {
+        GlassesVideoLink.noteSnapshotGeometry(720, 1280, 320, 180)
+        assertTrue(GlassesVideoLink.snapshotGeometry() != null)
+        GlassesVideoLink.detachSnapshot()
+        assertNull(GlassesVideoLink.snapshotGeometry())
+    }
 }
