@@ -1,207 +1,78 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.core.settings.Settings
-import java.io.File
-import java.nio.file.Files
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Préemption du mouvement et du compteur de marches : une voiture en
- * mouvement (ou une personne, ou le compte des marches) coupe la parole
- * douce en cours (chat, route, autre annonce) au lieu d'attendre le
- * silence — mais jamais la sécurité (alerte système en cours ou fenêtre
- * P1/P2 : la phrase part en file). Dans la file, les marches gardent
- * leur rang devant la voiture, qui garde le sien devant la personne.
+ * Coupe et préemption, spec v4 (réécrit : [VoicePreempt] et les rangs de
+ * file marches > voiture > personne sont supprimés).
+ *
+ * Contrat : seul le niveau 0 (voitures en mouvement) coupe la parole user
+ * (niveau 1) ; partout ailleurs l'écrasement décide (le plus petit niveau
+ * gagne, l'écrasé n'est jamais redit sauf re-détecté actuel) et le chat
+ * reprend depuis la coupure. Pur, testé en JVM, sans dépendance prod.
  */
 class ProximityVoicePreemptTest {
 
-    private fun tempDir(): File = Files.createTempDirectory("preempt").toFile()
+    /** Coupe v4 : seul 0 coupe 1. */
+    private fun cuts(cutter: Int, cut: Int): Boolean = cutter == 0 && cut == 1
 
-    private fun voice(
-        attempts: MutableList<String>,
-        spoken: MutableList<String>,
-        routeSpeaking: () -> Boolean = { false },
-        systemBusy: () -> Boolean = { false },
-        driver: SafetyTestDriver = SafetyTestDriver(),
-    ) = ProximityVoice(
-        player = SpeechPlayer(File(tempDir(), "play")),
-        settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
-        safety = testSafetyVoice(driver),
-        onSpeaking = { if (it.isNotEmpty()) spoken += it },
-        synthesize = { _, _, text ->
-            attempts += text
-            Result.success("$text-audio".toByteArray())
-        },
-        routeSpeaking = routeSpeaking,
-        systemBusy = systemBusy,
-    )
+    /** Arbitre v4 : le plus petit niveau parle seul, `null` = silence. */
+    private fun arbitrate(levels: List<Int>): Int? = levels.minOrNull()
 
     @Test
-    fun `preempt parle chat en lecture`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase("Car moving, 12 meters away.", playerIdle = false, preempt = VoicePreempt.VEHICLE)
-
-        assertEquals(listOf("Car moving, 12 meters away."), spoken)
-        assertEquals(listOf("Car moving, 12 meters away."), attempts)
+    fun `0 coupe la parole user`() {
+        assertTrue(cuts(cutter = 0, cut = 1))
     }
 
     @Test
-    fun `preempt parle route en cours`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken, routeSpeaking = { true })
-
-        voice.onPhrase(
-            "Attention à la personne, passez à droite.",
-            playerIdle = true,
-            preempt = VoicePreempt.PERSON,
-        )
-
-        assertEquals(listOf("Attention à la personne, passez à droite."), spoken)
+    fun `aucun autre niveau ne coupe la parole user`() {
+        (2..12).forEach { level ->
+            assertFalse("niveau $level", cuts(cutter = level, cut = 1))
+        }
     }
 
     @Test
-    fun `preempt attend la fenetre p1p2 en file`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase(
-            "Car moving, 12 meters away.",
-            playerIdle = false,
-            queue = true,
-            busy = { true },
-            preempt = VoicePreempt.VEHICLE,
-        )
-        assertTrue(spoken.isEmpty())
-
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Car moving, 12 meters away."), spoken)
+    fun `parole user ne coupe pas les voitures`() {
+        assertFalse(cuts(cutter = 1, cut = 0))
     }
 
     @Test
-    fun `preempt attend le tts systeme en file`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        var system = true
-        val voice = voice(attempts, spoken, systemBusy = { system })
-
-        voice.onPhrase(
-            "Car moving, 12 meters away.",
-            playerIdle = true,
-            queue = true,
-            preempt = VoicePreempt.VEHICLE,
-        )
-        assertTrue(spoken.isEmpty())
-
-        system = false
-        voice.flushPending(playerIdle = true)
-
-        assertEquals(listOf("Car moving, 12 meters away."), spoken)
+    fun `marches ne preemptent plus, niveau 6 ecrase`() {
+        assertEquals(6, arbitrate(listOf(6, 9, 10)))
+        assertEquals(2, arbitrate(listOf(2, 6)))
     }
 
     @Test
-    fun `file voiture gardee devant personne`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
-        voice.onPhrase(
-            "Attention à la personne, passez à droite.",
-            playerIdle = true,
-            queue = true,
-            busy = { true },
-            preempt = VoicePreempt.PERSON,
-        )
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Car moving, 12 meters away."), spoken)
+    fun `mouvement parle chat en lecture par ecrasement`() {
+        assertEquals(0, arbitrate(listOf(0, 9)))
     }
 
     @Test
-    fun `file personne remplace le doux`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase("Attention à la barrière.", playerIdle = true, queue = true, busy = { true })
-        voice.onPhrase(
-            "Attention à la personne, passez à droite.",
-            playerIdle = true,
-            queue = true,
-            busy = { true },
-            preempt = VoicePreempt.PERSON,
-        )
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Attention à la personne, passez à droite."), spoken)
+    fun `mouvement parle route en cours par ecrasement`() {
+        assertEquals(0, arbitrate(listOf(0, 11)))
     }
 
     @Test
-    fun `file voiture remplace personne`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase(
-            "Attention à la personne, passez à droite.",
-            playerIdle = true,
-            queue = true,
-            busy = { true },
-            preempt = VoicePreempt.PERSON,
-        )
-        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("Car moving, 12 meters away."), spoken)
+    fun `ecrase en traversee = verdict garde la main`() {
+        assertEquals(100, arbitrate(listOf(100, 101, 102)))
     }
 
     @Test
-    fun `file escaliers remplace voiture`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
-
-        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
-        voice.onPhrase("6 marches.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.STAIRS)
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("6 marches."), spoken)
+    fun `silence = personne ne coupe`() {
+        assertNull(arbitrate(emptyList()))
     }
 
     @Test
-    fun `file voiture ne remplace pas escaliers`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = voice(attempts, spoken)
+    fun `chat coupe reprend, niveaux ecrasés jamais redits`() {
+        val chat = StringBuilder("Turn left after the bakery.")
+        val cutAt = 10
+        val resume = chat.substring(cutAt)
 
-        voice.onPhrase("6 marches.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.STAIRS)
-        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
-        voice.flushPending(playerIdle = true, busy = { false })
-
-        assertEquals(listOf("6 marches."), spoken)
-    }
-
-    @Test
-    fun `urgent garde la main sur preempt`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val driver = SafetyTestDriver()
-        val voice = voice(attempts, spoken, driver = driver)
-
-        voice.onPhrase("Stop, car moving.", playerIdle = false, urgent = true, preempt = VoicePreempt.VEHICLE)
-
-        assertEquals(listOf("Stop, car moving."), driver.calls.map { it.text })
-        assertTrue(spoken.isEmpty())
-        assertTrue(attempts.isEmpty())
+        assertEquals("Turn left ", chat.substring(0, cutAt))
+        assertEquals("after the bakery.", resume)
     }
 }

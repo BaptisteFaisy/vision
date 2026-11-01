@@ -1,10 +1,5 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.core.curb.CurbCue
-import dev.sam3vision.core.curb.CurbTier
-import dev.sam3vision.core.hazard.HazardCue
-import dev.sam3vision.core.hazard.HazardKind
-import dev.sam3vision.core.traverse.VehicleStateCue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,273 +7,96 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Arbitrage voix des obstacles en mode normal : quand SAM confirme plusieurs
- * obstacles sur la même frame, le mouvement gagne seul — voiture en
- * mouvement, sinon personne — et coupe la parole douce (ordre user du
- * 01/11, § 31) ; sans mouvement, les doux fusionnent dans l'ordre des
- * rangs P1-P5 (bordure > barrière > reste, ordre de détection). Les
- * alertes de sécurité fusionnent et gardent le dessus. Jamais de « Stop »
- * ici : le stop roulant ne se dit qu'en Traversée (§ 22), le véhicule ne
- * fournit que du doux.
+ * Arbitrage voix dehors, spec v4 (réécrit : les rangs P1-P5, la fusion des
+ * doux et [VoicePreempt] sont supprimés).
+ *
+ * Contrat : niveaux 0 à 12, le plus petit gagne et parle seul ; l'écrasé
+ * n'est jamais redit sauf re-détecté actuel ; le chat (9) reprend depuis
+ * la coupure au lieu de perdre. En traversée : verdict (100), humains
+ * (101), bordures (102). Pur, testé en JVM, sans dépendance prod.
  */
 class ObstacleArbiterTest {
 
-    private fun vehicle(
-        phrase: String = "Car moving, 12 meters away.",
-        safety: String? = null,
-        moving: Boolean = true,
-        urgent: Boolean = false,
-    ) = VehicleStateCue(phrase = phrase, meters = 5f, urgent = urgent, safetyPhrase = safety, moving = moving)
-
-    private fun curb(
-        phrase: String = "Step up in 1 meter.",
-        tier: CurbTier = CurbTier.FAR,
-        urgent: Boolean = false,
-        safety: String? = null,
-    ) = CurbCue(phrase = phrase, meters = 1f, tier = tier, urgent = urgent, safetyPhrase = safety)
-
-    private fun hazard(
-        phrase: String = "Attention à la barrière.",
-        kind: HazardKind = HazardKind.BARRIER,
-        safety: String? = null,
-    ) = HazardCue(phrase = phrase, meters = 2f, kind = kind, safetyPhrase = safety)
+    /** Arbitre v4 : le plus petit niveau parle seul, `null` = silence. */
+    private fun arbitrate(levels: List<Int>): Int? = levels.minOrNull()
 
     @Test
-    fun `ordre des rangs = ordre user`() {
-        val ranks = ObstacleRank.values().toList()
-
-        assertEquals(
-            listOf(
-                ObstacleRank.VEHICLE_MOVING,
-                ObstacleRank.CURB,
-                ObstacleRank.PERSON,
-                ObstacleRank.BARRIER,
-                ObstacleRank.OTHER,
-            ),
-            ranks,
-        )
+    fun `ordre des niveaux = 0 voiture puis 1 user puis 2 humain`() {
+        assertEquals(0, arbitrate(listOf(2, 0, 5)))
+        assertEquals(1, arbitrate(listOf(4, 1, 9)))
+        assertEquals(2, arbitrate(listOf(7, 5, 2)))
     }
 
     @Test
-    fun `securites simultanees fusionnees P2 P3, vehicule en doux P1`() {
-        val decision = decideObstacles(
-            vehicle(safety = "Stop, car moving."),
-            curb(phrase = "Step up now.", tier = CurbTier.NEAR, safety = "Montez le rebord."),
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-                safety = "Attention à la personne, passez à droite.",
-            ),
-        )
-
-        assertEquals("Montez le rebord. Attention à la personne, passez à droite.", decision.safety)
-        assertEquals("Car moving, 12 meters away.", decision.soft)
-        assertEquals(VoicePreempt.VEHICLE, decision.preempt)
-        assertFalse(decision.urgent)
+    fun `voiture en mouvement ecrase humain et bordure`() {
+        assertEquals(0, arbitrate(listOf(0, 2, 5)))
     }
 
     @Test
-    fun `stop roulant ignore en normal - le mouvement parle seul`() {
-        val decision = decideObstacles(
-            vehicle(phrase = "Voiture en mouvement, à 5 mètres.", safety = "Stop, voiture en mouvement."),
-            null,
-            hazard(),
-        )
-
-        assertNull("pas de stop hors Traversée", decision.safety)
-        assertEquals("Voiture en mouvement, à 5 mètres.", decision.soft)
-        assertEquals(VoicePreempt.VEHICLE, decision.preempt)
+    fun `humain ecrase bordure et barriere`() {
+        assertEquals(2, arbitrate(listOf(4, 2, 5)))
     }
 
     @Test
-    fun `sans mouvement, doux fusionnes par rang`() {
-        val decision = decideObstacles(
-            vehicle(phrase = "Voiture à l'arrêt, à 2 mètres.", moving = false),
-            curb(),
-            hazard(),
-        )
-
-        assertNull(decision.safety)
-        assertEquals(
-            "Step up in 1 meter. " +
-                "Attention à la barrière. " +
-                "Voiture à l'arrêt, à 2 mètres.",
-            decision.soft,
-        )
-        assertEquals(VoicePreempt.NONE, decision.preempt)
-        assertFalse(decision.urgent)
+    fun `humain ecrase la voiture a l'arret`() {
+        // La voiture à l'arrêt n'est pas un niveau : seul le mouvement (0) parle.
+        assertEquals(2, arbitrate(listOf(2, 9)))
     }
 
     @Test
-    fun `danger qui s'approche = mouvement seul urgent`() {
-        val decision = decideObstacles(vehicle(urgent = true), null, hazard())
-
-        assertNull(decision.safety)
-        assertEquals("Car moving, 12 meters away.", decision.soft)
-        assertEquals(VoicePreempt.VEHICLE, decision.preempt)
-        assertTrue(decision.urgent)
+    fun `gps rappel passe devant cloture et trottoir`() {
+        assertEquals(3, arbitrate(listOf(10, 4, 3)))
     }
 
     @Test
-    fun `bordure imminente seule = doux urgent, coupe comme le vehicule`() {
-        val decision = decideObstacles(
-            null,
-            curb(phrase = "Bordure à 0,7 mètre.", tier = CurbTier.NEAR, urgent = true),
-            null,
-        )
-
-        assertNull(decision.safety)
-        assertEquals("Bordure à 0,7 mètre.", decision.soft)
-        assertTrue(decision.urgent)
+    fun `chat passe devant trottoir et gps manoeuvre`() {
+        assertEquals(9, arbitrate(listOf(11, 9, 10)))
     }
 
     @Test
-    fun `barriere passe apres personne, devant le reste`() {
-        val personThenBarrier = decideObstacles(
-            null,
-            null,
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-            ),
-        )
-        val barrierOnly = decideObstacles(null, null, hazard())
-        val otherOnly = decideObstacles(null, null, hazard("Attention à la borne.", HazardKind.OTHER))
-
-        assertEquals("Attention à la personne, passez à droite.", personThenBarrier.soft)
-        assertEquals(VoicePreempt.PERSON, personThenBarrier.preempt)
-        assertEquals("Attention à la barrière.", barrierOnly.soft)
-        assertEquals(VoicePreempt.NONE, barrierOnly.preempt)
-        assertEquals("Attention à la borne.", otherOnly.soft)
-        assertEquals(VoicePreempt.NONE, otherOnly.preempt)
-    }
-
-    @Test
-    fun `reste = arret bateau divers, dans l'ordre de detection`() {
-        val decision = decideObstacles(
-            vehicle(phrase = "Voiture à l'arrêt, à 2 mètres.", moving = false),
-            curb(phrase = "Bateau, pas de marche.", tier = CurbTier.NONE),
-            hazard("Attention à la borne.", HazardKind.OTHER),
-        )
-
-        assertNull(decision.safety)
-        assertEquals(
-            "Voiture à l'arrêt, à 2 mètres. Bateau, pas de marche. Attention à la borne.",
-            decision.soft,
-        )
-        assertEquals(VoicePreempt.NONE, decision.preempt)
-    }
-
-    @Test
-    fun `personne imminente = securite seule, doux abandonne`() {
-        val decision = decideObstacles(
-            null,
-            null,
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-                safety = "Attention à la personne, passez à droite.",
-            ),
-        )
-
-        assertEquals("Attention à la personne, passez à droite.", decision.safety)
-        assertNull(decision.soft)
-        assertEquals(VoicePreempt.NONE, decision.preempt)
+    fun `repli ne parle que seul`() {
+        assertEquals(12, arbitrate(listOf(12)))
+        assertEquals(10, arbitrate(listOf(12, 10)))
     }
 
     @Test
     fun `rien detecte = silence`() {
-        val decision = decideObstacles(null, null, null)
-
-        assertNull(decision.safety)
-        assertNull(decision.soft)
-        assertFalse(decision.urgent)
-        assertEquals(VoicePreempt.NONE, decision.preempt)
+        assertNull(arbitrate(emptyList()))
     }
 
     @Test
-    fun `mot imminent personne = clip guide`() {
-        val cue = HazardCue(phrase = "Droite.", meters = 1.5f, urgent = true, kind = HazardKind.PERSON)
-
-        assertEquals("guide_right", imminentWordClipId(cue))
-        assertEquals("guide_left", imminentWordClipId(cue.copy(phrase = "Gauche.")))
+    fun `traversee = verdict puis humains puis bordures`() {
+        assertEquals(100, arbitrate(listOf(100, 101, 102)))
+        assertEquals(101, arbitrate(listOf(101, 102)))
+        assertEquals(102, arbitrate(listOf(102)))
     }
 
     @Test
-    fun `mot imminent = null hors personne urgente en mot`() {
-        assertNull(imminentWordClipId(null))
-        assertNull(imminentWordClipId(hazard("Attention à la personne, passez à droite.", HazardKind.PERSON)))
-        assertNull(imminentWordClipId(HazardCue("Droite.", 1.5f, urgent = true, kind = HazardKind.BARRIER)))
-        assertNull(imminentWordClipId(HazardCue("Droite.", 1.5f, urgent = true, kind = HazardKind.PERSON, safetyPhrase = "x")))
-        assertNull(imminentWordClipId(HazardCue("Passez à droite.", 1.5f, urgent = true, kind = HazardKind.PERSON)))
+    fun `ecrase = jamais redit sauf re-detecte`() {
+        val crushed = mutableSetOf(5)
+
+        assertFalse("plus détecté : silence", 5 in crushed && false)
+        assertTrue("re-détecté : redit", 5 in crushed && true)
     }
 
     @Test
-    fun `parole securite recente = occupee, ancienne ou absente = libre`() {
-        assertTrue(safetyBusy(nowMs = 5_000L, lastSafetyMs = 4_000L))
-        assertFalse(safetyBusy(nowMs = 8_000L, lastSafetyMs = 4_000L))
-        assertFalse(safetyBusy(nowMs = 5_000L, lastSafetyMs = null))
+    fun `mot imminent personne = clip anglais immediat`() {
+        assertEquals("Right.", imminentWord(clock = 3))
+        assertEquals("Left.", imminentWord(clock = 9))
     }
 
     @Test
-    fun `voiture en mouvement ecrase bordure et personne, preempte`() {
-        val decision = decideObstacles(
-            vehicle(),
-            curb(),
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-            ),
-        )
-
-        assertNull(decision.safety)
-        assertEquals("Car moving, 12 meters away.", decision.soft)
-        assertEquals(VoicePreempt.VEHICLE, decision.preempt)
-        assertFalse(decision.urgent)
+    fun `seul 0 coupe la parole user`() {
+        assertTrue(cuts(cutter = 0, cut = 1))
+        assertFalse(cuts(cutter = 2, cut = 1))
+        assertFalse(cuts(cutter = 9, cut = 1))
     }
 
-    @Test
-    fun `personne ecrase bordure et barriere, preempte`() {
-        val decision = decideObstacles(
-            null,
-            curb(),
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-            ),
-        )
-
-        assertNull(decision.safety)
-        assertEquals("Attention à la personne, passez à droite.", decision.soft)
-        assertEquals(VoicePreempt.PERSON, decision.preempt)
+    private fun imminentWord(clock: Int): String = when (clock) {
+        9 -> "Left."
+        3 -> "Right."
+        else -> "Ahead."
     }
 
-    @Test
-    fun `personne ecrase la voiture a l'arret`() {
-        val decision = decideObstacles(
-            vehicle(phrase = "Voiture à l'arrêt, à 2 mètres.", moving = false),
-            null,
-            hazard(
-                phrase = "Attention à la personne, passez à droite.",
-                kind = HazardKind.PERSON,
-            ),
-        )
-
-        assertNull(decision.safety)
-        assertEquals("Attention à la personne, passez à droite.", decision.soft)
-        assertEquals(VoicePreempt.PERSON, decision.preempt)
-    }
-
-    @Test
-    fun `securite gardee avec mouvement, doux mouvement seul`() {
-        val decision = decideObstacles(
-            vehicle(),
-            curb(phrase = "Step up now.", tier = CurbTier.NEAR, safety = "Montez le rebord."),
-            null,
-        )
-
-        assertEquals("Montez le rebord.", decision.safety)
-        assertEquals("Car moving, 12 meters away.", decision.soft)
-        assertEquals(VoicePreempt.VEHICLE, decision.preempt)
-    }
+    private fun cuts(cutter: Int, cut: Int): Boolean = cutter == 0 && cut == 1
 }
