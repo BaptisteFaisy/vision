@@ -109,6 +109,9 @@ par les tests JVM seulement. Le libellé « le POST a été retiré » est expli
   (`Json.kt:323`, défaut `MASK_ENCODING_PNG` ; `Models.kt:18`, consts `:59-60`).
 - `timings_ms` est facultatif : postes serveur flottants, carte vide si absent
   (`Json.kt:336-346`).
+- `breakdown_ms` est toujours servi : `{"vision_ms": f, "detr_ms": f, "overhead_ms": f}`
+  (somme = total serveur, une décimale) — vision = encodeur, DETR = passes de
+  détection, overhead = tout le reste. Les clients anciens l'ignorent.
 - `passage` est facultatif : couloir bouché par une personne (`blocked`), côté
   conseillé (`side` : `"left"`/`"right"`, `null` sur voie libre) et écho de
   l'obstacle (`label`, `box` en pixels image, `score`). Absent sur un backend
