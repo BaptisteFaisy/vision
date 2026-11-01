@@ -3,6 +3,7 @@ package dev.sam3vision.app.live
 import android.content.Context
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.distance.RadialDistortion
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Mire lunettes persistée : le LensSpec mesuré sur damier (protocole
@@ -25,6 +26,7 @@ class GlassesMireStore(context: Context) {
             .putFloat(KEY_K2, spec.distortion?.k2 ?: 0f)
             .putLong(KEY_AT, atMs)
             .apply()
+        mireVersion.value += 1
     }
 
     /** Dernière mire persistée, null si jamais posée, effacée ou illisible. */
@@ -47,6 +49,7 @@ class GlassesMireStore(context: Context) {
             .remove(KEY_H).remove(KEY_V).remove(KEY_CX).remove(KEY_CY)
             .remove(KEY_HAS_DIST).remove(KEY_K1).remove(KEY_K2).remove(KEY_AT)
             .apply()
+        mireVersion.value += 1
     }
 
     /**
@@ -57,6 +60,16 @@ class GlassesMireStore(context: Context) {
         if (lastMire() == null) return null
         val age = nowMs - prefs.getLong(KEY_AT, 0L)
         return if (age >= 0L) age else null
+    }
+
+    companion object {
+        /**
+         * Version bumpée à chaque save/clear, toutes instances (l'écran
+         * Réglages et la sonde tiennent des stores distincts) : la bascule
+         * `observeGlassesLive` s'y réabonne et repose le stack sans attendre
+         * un on/off du direct.
+         */
+        val mireVersion = MutableStateFlow(0L)
     }
 
     private companion object {

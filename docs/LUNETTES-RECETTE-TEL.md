@@ -96,12 +96,17 @@ mesure sur un repli estimé (`LensSpec.Glasses`, affinable par `glassesFovDeg`)
 
 1. Imprimer : `python3 tools/solve_glasses_mire.py gen-mire --corners 9x6 --square-mm 25 --out mire.svg`
    — 100 %, vérifier la case au réglet.
-2. Photographier : ≥ 3 photos du damier via le flux HIGH (720×1280), angles
-   variés (face, penché ±30°, coins et centre du cadre couverts).
+2. Photographier : ≥ 3 photos du damier avec les frames BRUTES du flux HIGH
+   (720×1280 exactement, toutes la même taille), angles variés (face, penché
+   ±30°, coins et centre couverts). INTERDIT : snapshots de la rue affichée
+   (déjà recadrés) et photos voix 16:9 — calibreraient du post-crop stocké
+   comme pré-crop, re-remappé ensuite (double crop). Le solveur refuse le reste.
 3. Résoudre : `uv run --with opencv-python-headless --with numpy tools/solve_glasses_mire.py solve --photos DIR --corners 9x6 --square-mm 25 --out mire.json`
-   — exige pixels carrés (±2 %), sinon rephotographier ; viser rms < 1 px.
-4. Coller : le bloc `mire v1` dans Réglages → Distances → Mire solver block
-   → Save mire (persisté `GlassesMireStore`, étage SENSOR de la voie lunettes).
+   — refuse : pixels non carrés (±2 %), tailles hors 720×1280 ou hétérogènes,
+   rms ≥ 1 px. En cas de refus : rephotographier, ne pas bidouiller.
+4. Coller : le bloc `mire v1` (avec `refW`/`refH` de traçabilité) dans
+   Réglages → Distances → Mire solver block → Save mire (persisté
+   `GlassesMireStore`, étage SENSOR appliqué dès la frame suivante).
 5. Recette : distance sténopé sur objet connu à ±10 % (3 distances).
 
 Conventions : k1/k2 OpenCV (norme focale) convertis en norme demi-diagonale
